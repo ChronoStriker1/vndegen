@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
         .library(name: "HubUI", targets: ["HubUI"]),
+        .library(name: "SaveSync", targets: ["SaveSync"]),
     ],
     targets: [
         .target(name: "VNCore"),
@@ -21,11 +22,13 @@ let package = Package(
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock"], swiftSettings: mainActorByDefault),
+        .target(name: "SaveSync", dependencies: ["VNCore"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
+        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker"], exclude: ["Fixtures"]),
     ]
 )
