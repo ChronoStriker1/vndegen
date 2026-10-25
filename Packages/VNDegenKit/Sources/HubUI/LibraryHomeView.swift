@@ -25,6 +25,7 @@ struct LibraryHomeView: View {
                 // Shelves run to the screen edges. Content is inset by hand with metrics.leading and trailing.
                 .ignoresSafeArea(edges: .horizontal)
                 .onChange(of: nav.focus) { _, focus in
+                    guard nav.focusMovedByController else { return }
                     withAnimation(Theme.focusAnimation) {
                         if case let .tile(shelf, _)? = focus {
                             // Nested scroll views: scroll the page to the shelf, then the shelf to the tile.

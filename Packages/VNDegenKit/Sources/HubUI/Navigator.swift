@@ -214,15 +214,18 @@ final class Navigator {
     }
 
     /// Touch users never see a focus ring. Controllers, the keyboard, and the pointer reveal it.
-    func isFocused(_ target: Target) -> Bool {
-        focus == target && hub.input.lastInputKind != .touch
-    }
+    func isFocused(_ target: Target) -> Bool { focus == target && hub.input.lastInputKind != .touch }
+
+    /// Screens scroll to keep focus in view only when a controller or the keyboard moved it. Scrolling under a hovering
+    /// pointer or a touch user's finger would fight them.
+    private(set) var focusMovedByController = false
 
     /// Pointer hover on Mac and iPad moves focus without activating.
     func hover(_ target: Target) {
         // Views behind an open sheet are not in the focus table, so they cannot steal focus from it.
         guard position(of: target, in: rows()) != nil else { return }
         hub.input.noteInput(.keyboardMouse)
+        focusMovedByController = false
         if focus != target { setFocus(target) }
     }
 
@@ -233,6 +236,7 @@ final class Navigator {
         #else
         hub.input.noteInput(.touch)
         #endif
+        focusMovedByController = false
         setFocus(target)
         activate(target)
     }
@@ -387,6 +391,7 @@ final class Navigator {
     }
 
     func handle(_ event: ControllerEvent) {
+        focusMovedByController = true
         if case .unlock = sheet {
             unlockView?.handle(event)
             return

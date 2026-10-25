@@ -60,6 +60,7 @@ struct LibraryGridView: View {
                 }
                 .scrollIndicators(.hidden)
                 .onChange(of: nav.focus) { _, focus in
+                    guard nav.focusMovedByController else { return }
                     if let focus, focus.gameID != nil {
                         withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
                     }

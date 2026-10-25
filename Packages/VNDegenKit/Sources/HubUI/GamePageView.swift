@@ -36,6 +36,7 @@ struct GamePageView: View {
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: [.horizontal, .top])
             .onChange(of: nav.focus) { _, focus in
+                guard nav.focusMovedByController else { return }
                 withAnimation(Theme.focusAnimation) {
                     if let focus, focus == .pageEngine || focus == .pageOrientation {
                         proxy.scrollTo(focus, anchor: .center)
