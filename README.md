@@ -1,4 +1,4 @@
-<img src="App/Icon/icon-ios.svg" width="96" height="96" alt="VNDegen icon">
+<img src="App/Icon/icon-mac.svg" width="96" height="96" alt="VNDegen icon">
 
 # VNDegen
 
