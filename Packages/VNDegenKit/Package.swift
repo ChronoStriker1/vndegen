@@ -23,7 +23,8 @@ let package = Package(
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock"], swiftSettings: mainActorByDefault),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker"]),
-        .testTarget(name: "MetadataTests", dependencies: ["Metadata"]),
+        // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
+        .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
     ]
