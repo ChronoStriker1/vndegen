@@ -4,6 +4,7 @@ import EngineRPGMaker
 import Metadata
 import GameInput
 import Lock
+import SaveSync
 import HubUI
 
 /// Every engine plugin the app ships. Add new engines here.
@@ -24,35 +25,40 @@ struct VNDegenApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor(HubAppDelegate.self) private var appDelegate
     #endif
-    @State private var hub = Hub(
-        library: LibraryStore(paths: libraryPaths, engines: engines),
-        metadata: MetadataService(),
-        input: InputHub(),
-        lock: LockService()
-    )
+    @State private var hub: Hub = {
+        let library = LibraryStore(paths: libraryPaths, engines: engines)
+        return Hub(library: library, metadata: MetadataService(), input: InputHub(), lock: LockService(),
+                   saveSync: SaveSyncService(library: library))
+    }()
 
     var body: some Scene {
-        WindowGroup {
-            HubRootView(hub: hub)
-                .task {
-                    hub.input.start()
-                    #if DEBUG
-                    await DebugHooks.run(hub)
-                    #endif
-                    await hub.refreshLibrary()
-                    // `-autolaunch "<folder name>"` starts a game directly, for testing.
-                    if let name = UserDefaults.standard.string(forKey: "autolaunch") {
-                        hub.launch(GameID(name))
-                    }
-                    #if DEBUG
-                    await DebugHooks.playInput(hub)
-                    #endif
-                }
-        }
         #if os(macOS)
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1280, height: 800)
+        // One window only. The hub and its play session are app-wide, and a second window would try to host the same
+        // native game view. Window, unlike WindowGroup, has no File > New Window.
+        Window("VNDegen", id: "main") { root }
+            .windowStyle(.hiddenTitleBar)
+            .defaultSize(width: 1280, height: 800)
+        #else
+        WindowGroup { root }
         #endif
+    }
+
+    private var root: some View {
+        HubRootView(hub: hub)
+            .task {
+                hub.input.start()
+                #if DEBUG
+                await DebugHooks.run(hub)
+                #endif
+                await hub.refreshLibrary()
+                // `-autolaunch "<folder name>"` starts a game directly, for testing.
+                if let name = UserDefaults.standard.string(forKey: "autolaunch") {
+                    hub.launch(GameID(name))
+                }
+                #if DEBUG
+                await DebugHooks.playInput(hub)
+                #endif
+            }
     }
 }
 

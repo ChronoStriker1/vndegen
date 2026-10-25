@@ -19,6 +19,13 @@ nonisolated enum ArtworkRendering: Hashable, Sendable {
 final class ArtworkCache {
     static let shared = ArtworkCache()
     private let cache = NSCache<NSString, CGImage>()
+    private let halos = NSCache<NSString, HaloEntry>()
+
+    /// NSCache can't hold nil, and "this logo needs no halo" is the common answer worth remembering.
+    private final class HaloEntry {
+        let halo: LogoHalo?
+        init(_ halo: LogoHalo?) { self.halo = halo }
+    }
 
     private func key(_ url: URL, _ rendering: ArtworkRendering) -> NSString { "\(url.path)#\(rendering)" as NSString }
 
@@ -53,6 +60,63 @@ final class ArtworkCache {
 
     nonisolated private static let blurContext = CIContext(options: [.cacheIntermediates: false])
 
+    func cachedHalo(_ url: URL) -> LogoHalo?? { halos.object(forKey: url.path as NSString).map(\.halo) }
+
+    /// The glow for a logo, worked out once per file. The halo is blurred, so one small render serves every display size.
+    func halo(_ url: URL) async -> LogoHalo? {
+        if let hit = cachedHalo(url) { return hit }
+        let halo = await Task.detached(priority: .userInitiated) { Self.makeHalo(url) }.value
+        halos.setObject(HaloEntry(halo), forKey: url.path as NSString)
+        return halo
+    }
+
+    /// Builds a halo when enough of the logo is dark ink that it would sink into the hero's dark scrim. Strength grows
+    /// with the share of dark pixels, so outlined logos get a faint glow and black ink logos a clear one. Thresholds come
+    /// from measuring the demo library's Steam logos: OMORI has no dark pixels, Steins;Gate about half.
+    nonisolated private static func makeHalo(_ url: URL) -> LogoHalo? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let logo = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
+                  kCGImageSourceThumbnailMaxPixelSize: 256,
+              ] as CFDictionary)
+        else { return nil }
+        let width = logo.width, height = logo.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data
+        else { return nil }
+        context.draw(logo, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var ink = 0.0, darkInk = 0.0
+        for offset in stride(from: 0, to: width * height * 4, by: 4) {
+            let alpha = Double(pixels[offset + 3])
+            guard alpha > 0 else { continue }
+            // Channels are premultiplied, so dividing by alpha recovers the color's own luma.
+            let luma = (0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1]) + 0.0722 * Double(pixels[offset + 2])) / alpha
+            ink += alpha
+            if luma < 0.3 { darkInk += alpha }
+        }
+        // A logo without transparency is a picture, not ink, and a halo would only outline its rectangle.
+        guard ink > 0, ink / (255 * Double(width * height)) < 0.9 else { return nil }
+        let strength = min(1, (darkInk / ink - 0.3) / 0.4)
+        guard strength > 0.05 else { return nil }
+
+        let longSide = CGFloat(max(width, height))
+        let sigma = longSide * 0.05, spread = (longSide * 0.015).rounded()
+        let pad = (sigma * 3 + spread).rounded(.up)
+        let input = CIImage(cgImage: logo)
+        let silhouette = CIImage(color: .white).cropped(to: input.extent)
+            .applyingFilter("CIBlendWithAlphaMask", parameters: [kCIInputBackgroundImageKey: CIImage.empty(), kCIInputMaskImageKey: input])
+        let glow = silhouette
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: spread])
+            .applyingGaussianBlur(sigma: sigma)
+        let canvas = input.extent.insetBy(dx: -pad, dy: -pad)
+        guard let image = blurContext.createCGImage(glow, from: canvas) else { return nil }
+        return LogoHalo(image: image, inset: pad / CGFloat(width), opacity: 0.75 * strength)
+    }
+
     nonisolated private static func decode(_ url: URL, _ rendering: ArtworkRendering) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -81,6 +145,13 @@ final class ArtworkCache {
     }
 }
 
+/// A white glow shaped like a logo, larger than the logo by `inset` times the logo's width on every side.
+nonisolated struct LogoHalo: Sendable {
+    let image: CGImage
+    let inset: CGFloat
+    let opacity: Double
+}
+
 /// A local artwork file drawn into a frame of `size` points, or `placeholder` while it loads or when it is missing.
 struct ArtworkImage<Placeholder: View>: View {
     @Environment(\.displayScale) private var displayScale
@@ -89,8 +160,11 @@ struct ArtworkImage<Placeholder: View>: View {
     var contentMode: ContentMode = .fill
     var alignment: Alignment = .center
     var blurred = false
+    /// Draws a soft light glow behind the image when it is a dark logo. See `ArtworkCache.halo`.
+    var halo = false
     @ViewBuilder var placeholder: Placeholder
     @State private var image: CGImage?
+    @State private var logoHalo: LogoHalo?
 
     /// Pixel sizes snap to 64 so small layout changes reuse the cached decode.
     private var rendering: ArtworkRendering {
@@ -111,16 +185,28 @@ struct ArtworkImage<Placeholder: View>: View {
                 Image(decorative: image, scale: 1)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
+                    .background {
+                        if let logoHalo {
+                            GeometryReader { geo in
+                                Image(decorative: logoHalo.image, scale: 1)
+                                    .resizable()
+                                    .padding(-logoHalo.inset * geo.size.width)
+                                    .opacity(logoHalo.opacity)
+                            }
+                        }
+                    }
             } else {
                 placeholder
             }
         }
         .frame(width: size.width, height: size.height, alignment: alignment)
         .task(id: LoadKey(url: url, rendering: rendering)) {
-            guard let url else { image = nil; return }
+            guard let url else { image = nil; logoHalo = nil; return }
             let rendering = rendering
-            if let hit = ArtworkCache.shared.cached(url, rendering) { image = hit; return }
-            image = await ArtworkCache.shared.image(url, rendering)
+            let cache = ArtworkCache.shared
+            if let hit = cache.cached(url, rendering) { image = hit } else { image = await cache.image(url, rendering) }
+            guard halo else { return }
+            if let hit = cache.cachedHalo(url) { logoHalo = hit } else { logoHalo = await cache.halo(url) }
         }
     }
 }
@@ -159,7 +245,7 @@ struct GameLogo: View {
 
     var body: some View {
         let title = hub.displayTitle(game)
-        ArtworkImage(url: hub.artworkURL(game, [.logo]), size: maxSize, contentMode: .fit, alignment: alignment) {
+        ArtworkImage(url: hub.artworkURL(game, [.logo]), size: maxSize, contentMode: .fit, alignment: alignment, halo: true) {
             Text(title)
                 .font(.display(maxSize.height * 0.42, weight: .black))
                 .lineLimit(2)

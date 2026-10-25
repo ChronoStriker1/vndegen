@@ -1,5 +1,6 @@
 import SwiftUI
 import VNCore
+import SaveSync
 
 /// The Big Picture-style hub: library, game pages, settings, and the player.
 public struct HubRootView: View {
@@ -104,6 +105,18 @@ private struct LibraryContainer: View {
             if let game = hub.library.game(id) { ArtworkEditorSheet(game: game) }
         case let .metadata(id):
             if let game = hub.library.game(id) { MetadataSearchSheet(game: game) }
+        case let .saves(id):
+            if let game = hub.library.game(id) {
+                SheetScaffold(title: "Saves", subtitle: hub.displayTitle(game), escapeCloses: true) {
+                    GameSavesView(service: hub.saveSync, game: id).scrollContentBackground(.hidden)
+                }
+                .presentationDetents([.large])
+                #if os(macOS)
+                .frame(minWidth: 520, minHeight: 560)
+                #endif
+            }
+        case let .settingsPage(page):
+            SettingsPageSheet(page: page)
         }
     }
 }

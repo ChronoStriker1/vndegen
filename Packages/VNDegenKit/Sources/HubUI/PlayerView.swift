@@ -1,6 +1,7 @@
 import SwiftUI
 import VNCore
 import GameInput
+import Lock
 
 /// Hosts a running engine session full screen, with touch controls and the hub menu over it.
 struct PlayerView: View {
@@ -9,9 +10,10 @@ struct PlayerView: View {
     @State private var menu = PlayerMenu()
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
     @State private var needsRotation = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        let showsTouchControls = hub.input.lastInputKind == .touch && hub.input.controllerNames.isEmpty && !menu.isOpen
+        let showsTouchControls = hub.input.lastInputKind == .touch && hub.input.controllerNames.isEmpty && !menu.isOpen && !isCovered
         ZStack {
             SessionViewHost(session: session)
                 .ignoresSafeArea()
@@ -51,8 +53,16 @@ struct PlayerView: View {
                 .padding(10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
+            if isCovered {
+                // Recreated when the app becomes active, so the Face ID prompt starts in the foreground rather than
+                // failing while the app is still in the background.
+                unlockView
+                    .id(scenePhase == .active)
+                    .transition(.opacity)
+            }
         }
         .animation(.easeOut(duration: 0.2), value: menu.isOpen)
+        .animation(.easeOut(duration: 0.2), value: isCovered)
         .animation(.easeOut(duration: 0.25), value: needsRotation)
         .background(.black)
         .onAppear {
@@ -61,6 +71,14 @@ struct PlayerView: View {
             #if os(iOS)
             OrientationLock.apply(orientation)
             #endif
+        }
+        .onChange(of: isCovered, initial: true) { _, covered in
+            applyInputMode()
+            if covered {
+                session.setPaused(true)
+            } else if !menu.isOpen {
+                session.setPaused(false)
+            }
         }
         #if os(iOS)
         .onDisappear { OrientationLock.apply(nil) }
@@ -76,7 +94,22 @@ struct PlayerView: View {
 
     private var title: String { game.map(hub.displayTitle) ?? "" }
 
+    /// A hidden game stays paused behind the unlock screen while the library is locked, such as after the app went to
+    /// the background mid-game. Ending the session instead would lose progress the game has not saved.
+    private var isCovered: Bool { game?.isLocked == true && !hub.lock.isUnlocked }
+
+    /// Unlocking resumes the game. Cancel quits to the library through the normal path, so play time is recorded.
+    private var unlockView: UnlockView {
+        UnlockView(lock: hub.lock) { unlocked in
+            if !unlocked { hub.endSession() }
+        }
+    }
+
     private func handle(_ event: ControllerEvent) {
+        if isCovered {
+            unlockView.handle(event)
+            return
+        }
         guard menu.isOpen else {
             if event == .button(.hub, pressed: true) { openMenu() } else { session.send(event) }
             return
@@ -104,10 +137,11 @@ struct PlayerView: View {
         session.setPaused(false)
     }
 
-    /// The game reads the keyboard itself and wants raw presses. The menu wants translated, repeating navigation.
+    /// The game reads the keyboard itself and wants raw presses. The menu and the unlock screen want translated,
+    /// repeating navigation.
     private func applyInputMode() {
-        hub.input.translatesKeyboard = menu.isOpen
-        hub.input.repeatsDirections = menu.isOpen
+        hub.input.translatesKeyboard = menu.isOpen || isCovered
+        hub.input.repeatsDirections = menu.isOpen || isCovered
     }
 }
 

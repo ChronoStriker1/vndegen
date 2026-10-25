@@ -2,7 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 import VNCore
 
-/// Ludusavi folder and automatic backup, shown inside the app's Settings screen.
+/// Ludusavi folder and automatic backup, shown from the app's Settings screen. It draws a plain grouped form and takes
+/// its colors from the host's color scheme and tint.
 public struct SaveSyncSettingsView: View {
     @Bindable var service: SaveSyncService
     @State private var picking = false
@@ -20,17 +21,20 @@ public struct SaveSyncSettingsView: View {
                 case let .unavailable(message):
                     Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 }
-                Button("Choose Folder…") { picking = true }
+                Button(service.folder == .none ? "Choose Folder…" : "Choose Another Folder…", systemImage: "folder") { picking = true }
                 if let suggested = service.suggestedFolder, service.folder != .ready(suggested) {
                     Button { service.chooseFolder(suggested) } label: {
                         FolderRow(url: suggested, detail: "Use Ludusavi's backup folder")
                     }
+                    .buttonStyle(.plain)
                 }
                 if service.folder != .none {
-                    Button("Forget Folder", role: .destructive) { service.forgetFolder() }
+                    // Hosts may set a plain foreground style, which would otherwise hide the destructive red.
+                    Button("Forget Folder", systemImage: "xmark.circle", role: .destructive) { service.forgetFolder() }
+                        .foregroundStyle(.red)
                 }
             } header: {
-                Text("Ludusavi backups")
+                Text("Backup folder")
             } footer: {
                 Text("Pick the folder Ludusavi backs up to. For a folder on a server, connect to the server in the Files app first.")
             }
@@ -44,7 +48,6 @@ public struct SaveSyncSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Save Sync")
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             if case let .success(url) = result { service.chooseFolder(url) }
         }
@@ -85,15 +88,21 @@ private struct FolderRow: View {
     let detail: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(url.lastPathComponent)
-            Text(detail).font(.caption).foregroundStyle(.secondary)
-            Text(url.path).font(.caption2).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(url.lastPathComponent).font(.body.weight(.semibold))
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+                Text(url.path).font(.caption2.monospaced()).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
+            }
+        } icon: {
+            Image(systemName: "externaldrive.fill").foregroundStyle(.tint)
         }
+        .contentShape(.rect)
     }
 }
 
-/// A game's Ludusavi backups, with restore, back up, and undo. Shown on the game page.
+/// A game's Ludusavi backups, with restore, back up, and undo. Shown from the game page, styled like
+/// `SaveSyncSettingsView`.
 public struct GameSavesView: View {
     let service: SaveSyncService
     let game: GameID
@@ -124,8 +133,15 @@ public struct GameSavesView: View {
             if case .ready = service.folder {
                 Section("Ludusavi game") {
                     Button { choosingGame = true } label: {
-                        LabeledContent("Backups from", value: service.match(for: game) ?? "No match")
+                        HStack {
+                            Text("Backups from")
+                            Spacer()
+                            Text(service.match(for: game) ?? "No match").foregroundStyle(.secondary).lineLimit(1)
+                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                        }
+                        .contentShape(.rect)
                     }
+                    .buttonStyle(.plain)
                 }
                 backupList
                 actions
@@ -173,6 +189,7 @@ public struct GameSavesView: View {
             ForEach(backups.reversed()) { backup in
                 Button { selected = backup.name } label: { BackupRow(backup: backup, isLatest: backup.name == backups.last?.name,
                                                                       isSelected: backup.name == selected) }
+                    .buttonStyle(.plain)
             }
         } header: {
             Text("Backups")
@@ -181,10 +198,10 @@ public struct GameSavesView: View {
 
     @ViewBuilder private var actions: some View {
         Section {
-            Button("Restore Selected Backup") { selected.map { confirming = .restore($0) } }
+            Button("Restore Selected Backup", systemImage: "clock.arrow.circlepath") { selected.map { confirming = .restore($0) } }
                 .disabled(selected == nil)
-            Button("Back Up Now") { run { try await backUp() } }
-            Button("Undo Last Restore") { confirming = .undo }
+            Button("Back Up Now", systemImage: "square.and.arrow.up") { run { try await backUp() } }
+            Button("Undo Last Restore", systemImage: "arrow.uturn.backward") { confirming = .undo }
                 .disabled(!service.canUndoRestore(game))
         } footer: {
             if busy {
@@ -262,18 +279,28 @@ private struct BackupRow: View {
     }
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(Self.title(backup)).foregroundStyle(.primary)
-                    if isLatest { Text("Latest").font(.caption.bold()).foregroundStyle(.tint) }
+        HStack(spacing: 14) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.title3)
+                .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(Self.title(backup)).font(.body.weight(.semibold))
+                    if isLatest {
+                        Text("Latest")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(.tint, in: .capsule)
+                    }
                 }
                 Text(detail).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if isSelected { Image(systemName: "checkmark").foregroundStyle(.tint) }
         }
+        .padding(.vertical, 2)
         .contentShape(.rect)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var detail: String {
@@ -302,16 +329,17 @@ private struct LudusaviGamePicker: View {
     var body: some View {
         NavigationStack {
             List {
-                Button("Match automatically") { onPick(nil) }
+                Button { onPick(nil) } label: { Label("Match automatically", systemImage: "wand.and.stars") }
                 ForEach(folders.filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }, id: \.self) { folder in
                     Button { onPick(folder) } label: {
                         HStack {
-                            Text(folder).foregroundStyle(.primary)
+                            Text(folder)
                             Spacer()
-                            if folder == current { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                            if folder == current { Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint) }
                         }
                         .contentShape(.rect)
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .searchable(text: $query)

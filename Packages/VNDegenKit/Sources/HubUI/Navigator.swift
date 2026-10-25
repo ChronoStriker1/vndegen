@@ -23,6 +23,8 @@ final class Navigator {
         case orientation(GameID)
         case artwork(GameID)
         case metadata(GameID)
+        case saves(GameID)
+        case settingsPage(SettingsPage)
 
         var id: String {
             switch self {
@@ -31,8 +33,15 @@ final class Navigator {
             case let .orientation(id): "orientation:\(id)"
             case let .artwork(id): "artwork:\(id)"
             case let .metadata(id): "metadata:\(id)"
+            case let .saves(id): "saves:\(id)"
+            case let .settingsPage(page): "settings:\(page)"
             }
         }
+    }
+
+    /// Settings groups that are whole forms of their own, so they open in a sheet instead of inside the settings list.
+    enum SettingsPage: CaseIterable {
+        case metadata, lock, saves
     }
 
     enum Shelf: String, CaseIterable {
@@ -54,7 +63,8 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageLock, pageEngine, pageOrientation
+        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation
+        case settingsPage(SettingsPage)
         case engineOption(EngineID?)
         case orientationOption(PlayOrientation?)
     }
@@ -122,7 +132,7 @@ final class Navigator {
         if let sheet {
             switch sheet {
             case .engine, .orientation: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
-            case .unlock, .artwork, .metadata: return []
+            case .unlock, .artwork, .metadata, .saves, .settingsPage: return []
             }
         }
         switch route {
@@ -142,11 +152,12 @@ final class Navigator {
         case .game:
             return [
                 Row(id: "page-back", items: [.back]),
-                Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageLock]),
+                Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : [])
         case .settings:
             return [Row(id: "settings-back", items: [.back])]
+                + SettingsPage.allCases.map { Row(id: "settings-\($0)", items: [.settingsPage($0)]) }
         }
     }
 
@@ -255,6 +266,8 @@ final class Navigator {
         case .pagePlay: if let id = pageGameID { hub.launch(id) }
         case .pageArtwork: if let id = pageGameID { sheet = .artwork(id) }
         case .pageMetadata: if let id = pageGameID { sheet = .metadata(id) }
+        case .pageSaves: if let id = pageGameID { sheet = .saves(id) }
+        case let .settingsPage(page): sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
@@ -357,7 +370,7 @@ final class Navigator {
         case .orientation:
             let fixed = PlayOrientation.allCases.map { Choice(target: .orientationOption($0), title: $0.title) }
             return [Choice(target: .orientationOption(nil), title: "Use default", detail: "Currently \(PlayOrientation.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata:
+        case .unlock, .artwork, .metadata, .saves, .settingsPage:
             return []
         }
     }
@@ -366,7 +379,7 @@ final class Navigator {
         switch sheet {
         case let .engine(id): .engineOption(hub.library.game(id)?.engineOverride)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
-        case .unlock, .artwork, .metadata: nil
+        case .unlock, .artwork, .metadata, .saves, .settingsPage: nil
         }
     }
 
@@ -379,12 +392,13 @@ final class Navigator {
         syncInputMode()
     }
 
-    /// Text fields on the settings screen and in the metadata search need raw keyboard input.
+    /// The settings screen and its pages, the metadata search, and the Ludusavi game search in the saves sheet have text
+    /// fields that need raw keyboard input.
     private func syncInputMode() {
         guard case .library = hub.screen else { return }
         let typing: Bool
         switch (sheet, route) {
-        case (.metadata?, _), (nil, .settings?): typing = true
+        case (.metadata?, _), (.saves?, _), (.settingsPage?, _), (nil, .settings?): typing = true
         default: typing = false
         }
         hub.input.translatesKeyboard = !typing
