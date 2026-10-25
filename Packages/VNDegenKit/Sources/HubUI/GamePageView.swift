@@ -101,6 +101,9 @@ struct GamePageView: View {
         HubButton(target: .pageMetadata, kind: labels ? .secondary : .icon) {
             labeled("Find metadata", "text.magnifyingglass", labels)
         }
+        HubButton(target: .pageSaves, kind: labels ? .secondary : .icon) {
+            labeled("Saves", "externaldrive", labels)
+        }
         HubButton(target: .pageLock, kind: labels ? .secondary : .icon) {
             labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels)
         }

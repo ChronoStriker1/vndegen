@@ -21,7 +21,7 @@ let package = Package(
         .target(name: "EngineRPGMaker", dependencies: ["VNCore"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker"]),

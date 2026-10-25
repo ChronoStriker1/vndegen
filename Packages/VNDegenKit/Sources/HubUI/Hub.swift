@@ -4,6 +4,7 @@ import VNCore
 import Metadata
 import GameInput
 import Lock
+import SaveSync
 
 /// App-level state: what is on screen and the services every screen shares.
 @MainActor
@@ -18,16 +19,18 @@ public final class Hub {
     public let metadata: MetadataService
     public let input: InputHub
     public let lock: LockService
+    public let saveSync: SaveSyncService
     public private(set) var screen: Screen = .library
     public var launchError: String?
     @ObservationIgnored private var sessionStart: Date?
     @ObservationIgnored private var matching: Task<Void, Never>?
 
-    public init(library: LibraryStore, metadata: MetadataService, input: InputHub, lock: LockService) {
+    public init(library: LibraryStore, metadata: MetadataService, input: InputHub, lock: LockService, saveSync: SaveSyncService) {
         self.library = library
         self.metadata = metadata
         self.input = input
         self.lock = lock
+        self.saveSync = saveSync
     }
 
     /// Rescans the games folder, then looks up metadata for games that have none, without holding up the caller.
@@ -73,5 +76,6 @@ public final class Hub {
         }
         sessionStart = nil
         screen = .library
+        Task { await saveSync.sessionEnded(id) }
     }
 }

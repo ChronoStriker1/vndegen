@@ -3,6 +3,7 @@ import VNCore
 import Metadata
 import GameInput
 import Lock
+import SaveSync
 #if canImport(UIKit)
 import UIKit
 #else
@@ -79,92 +80,90 @@ struct SettingsView: View {
     @Environment(\.hubMetrics) private var metrics
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
     @AppStorage(PlayOrientation.storageKey) private var orientation = PlayOrientation.landscape
-    @State private var page: Page?
-
-    /// MetadataSettingsView and LockSettingsView are whole forms, so they open in their own sheet.
-    private enum Page: String, Identifiable {
-        case metadata, lock
-        var id: String { rawValue }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ScreenHeader(title: "Settings")
-            Form {
-                Section {
-                    LabeledContent("Games folder") {
-                        Text(Self.displayPath(hub.library.paths.gamesRoot))
-                            .font(.system(size: 13, design: .monospaced))
-                            .textSelection(.enabled)
+            ScrollViewReader { proxy in
+                Form {
+                    Section {
+                        LabeledContent("Games folder") {
+                            Text(Self.displayPath(hub.library.paths.gamesRoot))
+                                .font(.system(size: 13, design: .monospaced))
+                                .textSelection(.enabled)
+                        }
+                        Button(LibraryFolder.openTitle, systemImage: "folder") { LibraryFolder.open(hub.library.paths.gamesRoot) }
+                        Button("Rescan library", systemImage: "arrow.clockwise") { Task { await hub.refreshLibrary() } }
+                    } header: {
+                        Text("Library")
+                    } footer: {
+                        Text(LibraryFolder.instructions)
                     }
-                    Button(LibraryFolder.openTitle, systemImage: "folder") { LibraryFolder.open(hub.library.paths.gamesRoot) }
-                    Button("Rescan library", systemImage: "arrow.clockwise") { Task { await hub.refreshLibrary() } }
-                } header: {
-                    Text("Library")
-                } footer: {
-                    Text(LibraryFolder.instructions)
-                }
 
-                Section("Sources and privacy") {
-                    pageRow("Metadata sources", systemImage: "text.magnifyingglass",
-                            value: hub.metadata.activeSources.map(\.displayName).formatted(.list(type: .and)), page: .metadata)
-                    pageRow("Hidden games", systemImage: "lock",
-                            value: hub.lock.hasPasscode ? "Passcode set" : "No passcode", page: .lock)
-                }
-
-                Section {
-                    Picker("Touch controls", selection: $touchMode) {
-                        ForEach(TouchControlsMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                    Section("Sources and privacy") {
+                        pageRow("Metadata sources", systemImage: "text.magnifyingglass",
+                                value: hub.metadata.activeSources.map(\.displayName).formatted(.list(type: .and)), page: .metadata)
+                        pageRow("Hidden games", systemImage: "lock",
+                                value: hub.lock.hasPasscode ? "Passcode set" : "No passcode", page: .lock)
                     }
-                    #if os(iOS)
-                    Picker("In-game orientation", selection: $orientation) {
-                        ForEach(PlayOrientation.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    #endif
-                } header: {
-                    Text("Controls")
-                } footer: {
-                    #if os(iOS)
-                    Text("Touch controls show over a game when you play by touch and no controller is connected. In-game orientation applies while a game plays, and each game page can override it.")
-                    #else
-                    Text("Shown over a game when you play by touch and no controller is connected.")
-                    #endif
-                }
 
-                Section {
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                    Section {
+                        pageRow("Ludusavi backups", systemImage: "externaldrive", value: savesSummary, page: .saves)
+                    } header: {
+                        Text("Saves")
+                    } footer: {
+                        Text("Restore and back up game saves through Ludusavi. Each game's page lists its backups under Saves.")
+                    }
+
+                    Section {
+                        Picker("Touch controls", selection: $touchMode) {
+                            ForEach(TouchControlsMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        #if os(iOS)
+                        Picker("In-game orientation", selection: $orientation) {
+                            ForEach(PlayOrientation.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        #endif
+                    } header: {
+                        Text("Controls")
+                    } footer: {
+                        #if os(iOS)
+                        Text("Touch controls show over a game when you play by touch and no controller is connected. In-game orientation applies while a game plays, and each game page can override it.")
+                        #else
+                        Text("Shown over a game when you play by touch and no controller is connected.")
+                        #endif
+                    }
+
+                    Section {
+                        LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                    }
+                }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+                .onChange(of: nav.focus) { _, focus in
+                    guard nav.focusMovedByController, let focus else { return }
+                    withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
                 }
             }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
         }
         .balancedHorizontalSafeArea(metrics)
         .background { Theme.background.ignoresSafeArea() }
-        .sheet(item: $page) { page in
-            Group {
-                switch page {
-                case .metadata:
-                    SheetScaffold(title: "Metadata sources", escapeCloses: true, onClose: { self.page = nil }) {
-                        MetadataSettingsView(service: hub.metadata).scrollContentBackground(.hidden)
-                    }
-                case .lock:
-                    SheetScaffold(title: "Hidden games", onClose: { self.page = nil }) {
-                        LockSettingsView(lock: hub.lock).scrollContentBackground(.hidden)
-                    }
-                }
-            }
-            .environment(nav)
-            .presentationDetents([.large])
-            #if os(macOS)
-            .frame(minWidth: 520, minHeight: 560)
-            #endif
+    }
+
+    private var savesSummary: String {
+        switch hub.saveSync.folder {
+        case .none: "Not set up"
+        case let .ready(url): url.lastPathComponent
+        case .unavailable: "Folder unavailable"
         }
     }
 
-    private func pageRow(_ title: String, systemImage: String, value: String, page: Page) -> some View {
-        Button { self.page = page } label: {
+    /// A row that opens a settings page. It is a focus target, so a controller can reach it.
+    private func pageRow(_ title: String, systemImage: String, value: String, page: Navigator.SettingsPage) -> some View {
+        let target = Navigator.Target.settingsPage(page)
+        return Button { nav.select(target) } label: {
             HStack {
                 Label(title, systemImage: systemImage).foregroundStyle(.white)
                 Spacer()
@@ -174,6 +173,10 @@ struct SettingsView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .onHover { if $0 { nav.hover(target) } }
+        .listRowBackground(nav.isFocused(target) ? Color.white.opacity(0.2) : nil)
+        .animation(Theme.focusAnimation, value: nav.isFocused(target))
+        .id(target)
     }
 
     static func displayPath(_ url: URL) -> String {
@@ -183,6 +186,35 @@ struct SettingsView: View {
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
         #else
         return path.components(separatedBy: "/Documents/").last.map { "On My \(UIDevice.current.localizedModel) › VNDegen › \($0)" } ?? path
+        #endif
+    }
+}
+
+/// A settings page that is a whole form of its own, in a sheet over the settings screen.
+struct SettingsPageSheet: View {
+    @Environment(Hub.self) private var hub
+    let page: Navigator.SettingsPage
+
+    var body: some View {
+        Group {
+            switch page {
+            case .metadata:
+                SheetScaffold(title: "Metadata sources", escapeCloses: true) {
+                    MetadataSettingsView(service: hub.metadata).scrollContentBackground(.hidden)
+                }
+            case .lock:
+                SheetScaffold(title: "Hidden games") {
+                    LockSettingsView(lock: hub.lock).scrollContentBackground(.hidden)
+                }
+            case .saves:
+                SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
+                    SaveSyncSettingsView(service: hub.saveSync).scrollContentBackground(.hidden)
+                }
+            }
+        }
+        .presentationDetents([.large])
+        #if os(macOS)
+        .frame(minWidth: 520, minHeight: 560)
         #endif
     }
 }
