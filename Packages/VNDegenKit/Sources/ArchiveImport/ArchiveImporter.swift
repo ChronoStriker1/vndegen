@@ -1,0 +1,313 @@
+import Foundation
+import Observation
+#if canImport(UIKit)
+import UIKit
+#endif
+
+/// Imports one archive as a new game folder. The archive is extracted into `Games/.importing/<id>` and moved into Games
+/// only when everything succeeded, so the library never sees a partial game. The library scan skips dot folders.
+@Observable
+public final class ArchiveImporter {
+    public enum Step: Equatable {
+        case choosing
+        /// Reading the archive's file list.
+        case opening
+        /// Showing the archive and the editable folder name.
+        case reviewing
+        case password(wrong: Bool)
+        case extracting
+        /// The extraction held only another archive, offered for extraction too.
+        case nested(fileName: String)
+        case finished(ImportResult)
+    }
+
+    public struct ImportResult: Equatable, Sendable {
+        /// The new folder in Games. Pass it to the library rescan and focus the game it creates.
+        public var folderName: String
+        public var files: Int
+        public var bytes: Int64
+        public var duration: Duration
+    }
+
+    public let gamesRoot: URL
+    public private(set) var step: Step = .choosing {
+        didSet { keepAwake(step == .extracting) }
+    }
+    /// Why the last action failed, shown on the step it returned to.
+    public private(set) var errorMessage: String?
+    /// The archive being extracted. After the user accepts a nested archive this is the inner one.
+    public private(set) var source: ArchiveSource?
+    public private(set) var contents: ArchiveContents?
+    public private(set) var progress: ImportProgress?
+    public var folderName = ""
+    /// Offered only when the picked archive is on this device, not in iCloud Drive or on a server.
+    public private(set) var archiveIsOnDevice = false
+    public var deleteArchiveAfterImport = false
+
+    /// The archive the user picked, which "Delete archive after import" removes.
+    private var picked: (source: ArchiveSource, contents: ArchiveContents)?
+    private var securityScoped: [URL] = []
+    /// Extraction folders still on disk. A nested import keeps the outer one until the inner one finishes.
+    private var stagings: [URL] = []
+    /// The outer extraction's game folder while the nested offer is showing.
+    private var pendingRoot: URL?
+    private var password: String?
+    private var task: Task<Void, Never>?
+    private var started: ContinuousClock.Instant?
+    #if os(macOS)
+    private var awakeActivity: NSObjectProtocol?
+    #endif
+
+    /// Staging folders of imports running in this process. Any other folder in `.importing` is left from a crash.
+    private static var liveStagings: Set<URL> = []
+
+    public init(gamesRoot: URL) {
+        self.gamesRoot = gamesRoot
+        let leftovers = (try? FileManager.default.contentsOfDirectory(at: stagingParent, includingPropertiesForKeys: nil)) ?? []
+        for url in leftovers where !Self.liveStagings.contains(url.standardizedFileURL) {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private var stagingParent: URL { gamesRoot.appendingPathComponent(".importing", isDirectory: true) }
+
+    public var folderNameProblem: String? { GameFolderName.problem(with: folderName, in: gamesRoot) }
+
+    // MARK: Actions
+
+    /// Takes the files from the document picker, open panel, or a drop, and lists the archive.
+    public func choose(_ urls: [URL]) async {
+        close()
+        step = .opening
+        securityScoped = urls.filter { $0.startAccessingSecurityScopedResource() }
+        do {
+            let (source, contents) = try await Self.open(urls)
+            picked = (source, contents)
+            self.source = source
+            self.contents = contents
+            folderName = source.suggestedFolderName
+            archiveIsOnDevice = source.volumes.allSatisfy(Self.isOnDevice)
+            step = .reviewing
+        } catch {
+            fail(error, returningTo: .choosing)
+        }
+    }
+
+    public func startImport() {
+        guard task == nil, folderNameProblem == nil, let contents else { return }
+        if contents.isEncrypted, password == nil {
+            step = .password(wrong: false)
+        } else {
+            extract()
+        }
+    }
+
+    public func submitPassword(_ password: String) {
+        guard case .password = step else { return }
+        self.password = password
+        extract()
+    }
+
+    /// Stops the extraction in progress and deletes what it wrote, or backs out of the password or nested prompt.
+    public func cancel() {
+        if let task {
+            task.cancel()
+        } else {
+            pendingRoot = nil
+            discardStagings()
+            restartFromPicked()
+        }
+    }
+
+    public func extractNested() {
+        guard case .nested = step, let root = pendingRoot, let inner = ArchiveExtractor.nestedArchive(in: root) else { return }
+        pendingRoot = nil
+        password = nil
+        source = inner
+        do {
+            contents = try ArchiveExtractor.list(inner)
+            startImport()
+        } catch {
+            discardStagings()
+            fail(error, returningTo: .reviewing)
+            restartFromPicked()
+        }
+    }
+
+    public func keepNested() {
+        guard case .nested = step, let root = pendingRoot else { return }
+        pendingRoot = nil
+        finish(root)
+    }
+
+    /// Goes back to the picker for another archive.
+    public func reset() {
+        close()
+        step = .choosing
+    }
+
+    /// Cancels any import and releases the picked files. Call when the import view goes away.
+    public func close() {
+        task?.cancel()
+        task = nil
+        discardStagings()
+        securityScoped.forEach { $0.stopAccessingSecurityScopedResource() }
+        securityScoped = []
+        picked = nil
+        source = nil
+        contents = nil
+        progress = nil
+        password = nil
+        errorMessage = nil
+        pendingRoot = nil
+        deleteArchiveAfterImport = false
+    }
+
+    // MARK: Extraction
+
+    private func extract() {
+        guard let source, let contents else { return }
+        errorMessage = nil
+        progress = ImportProgress(total: contents)
+        if stagings.isEmpty { started = .now }
+        step = .extracting
+        let staging = stagingParent.appendingPathComponent(UUID().uuidString, isDirectory: true).standardizedFileURL
+        stagings.append(staging)
+        Self.liveStagings.insert(staging)
+        let password = password
+        task = Task {
+            do {
+                try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+                try Self.checkSpace(contents.byteCount, on: gamesRoot)
+                progress = try await Self.extract(source, password: password, into: staging, total: contents) { progress in
+                    Task { @MainActor in
+                        if self.task != nil { self.progress = progress }
+                    }
+                }
+                task = nil
+                let root = ArchiveExtractor.gameRoot(in: staging)
+                if let inner = ArchiveExtractor.nestedArchive(in: root) {
+                    pendingRoot = root
+                    step = .nested(fileName: inner.fileName)
+                } else {
+                    finish(root)
+                }
+            } catch {
+                task = nil
+                try? FileManager.default.removeItem(at: staging)
+                stagings.removeAll { $0 == staging }
+                Self.liveStagings.remove(staging)
+                switch error {
+                case ArchiveError.wrongPassword:
+                    step = .password(wrong: true)
+                case ArchiveError.passwordRequired:
+                    step = .password(wrong: false)
+                default:
+                    discardStagings()
+                    fail(error, returningTo: .reviewing)
+                    restartFromPicked()
+                }
+            }
+        }
+    }
+
+    private func finish(_ root: URL) {
+        let name = folderName.trimmingCharacters(in: .whitespaces)
+        do {
+            // Checked again because another import or the Files app may have taken the name meanwhile.
+            if let problem = GameFolderName.problem(with: name, in: gamesRoot) { throw ImportFailure(message: problem) }
+            try FileManager.default.moveItem(at: root, to: gamesRoot.appendingPathComponent(name, isDirectory: true))
+        } catch {
+            discardStagings()
+            fail(error, returningTo: .reviewing)
+            restartFromPicked()
+            return
+        }
+        discardStagings()
+        if deleteArchiveAfterImport, archiveIsOnDevice, let picked {
+            picked.source.volumes.forEach { try? FileManager.default.removeItem(at: $0) }
+        }
+        let duration = started.map { ContinuousClock.now - $0 } ?? .zero
+        step = .finished(ImportResult(
+            folderName: name,
+            files: progress?.files ?? 0,
+            bytes: progress?.bytes ?? 0,
+            duration: duration))
+    }
+
+    /// After a failure or cancel inside a nested import, the review screen shows the archive the user picked again.
+    private func restartFromPicked() {
+        guard let picked else { return }
+        source = picked.source
+        contents = picked.contents
+        password = nil
+        step = .reviewing
+    }
+
+    private func discardStagings() {
+        for staging in stagings {
+            try? FileManager.default.removeItem(at: staging)
+            Self.liveStagings.remove(staging)
+        }
+        stagings = []
+    }
+
+    private func fail(_ error: Error, returningTo step: Step) {
+        errorMessage = switch error {
+        case let error as ArchiveError: error.message
+        case is CancellationError: "Import cancelled. Nothing was added to Games."
+        case let error as ImportFailure: error.message
+        default: error.localizedDescription
+        }
+        self.step = step
+    }
+
+    private func keepAwake(_ awake: Bool) {
+        #if os(iOS)
+        UIApplication.shared.isIdleTimerDisabled = awake
+        #elseif os(macOS)
+        if awake, awakeActivity == nil {
+            awakeActivity = ProcessInfo.processInfo.beginActivity(
+                options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Importing a game")
+        } else if !awake, let activity = awakeActivity {
+            ProcessInfo.processInfo.endActivity(activity)
+            awakeActivity = nil
+        }
+        #endif
+    }
+
+    // MARK: Off the main actor
+
+    @concurrent
+    private static func open(_ urls: [URL]) async throws -> (ArchiveSource, ArchiveContents) {
+        let source = try ArchiveSource(picked: urls)
+        return (source, try ArchiveExtractor.list(source))
+    }
+
+    @concurrent
+    private static func extract(
+        _ source: ArchiveSource, password: String?, into staging: URL, total: ArchiveContents,
+        progress: @escaping @Sendable (ImportProgress) -> Void
+    ) async throws -> ImportProgress {
+        try ArchiveExtractor.extract(source, password: password, into: staging, total: total, progress: progress)
+    }
+
+    nonisolated private static func checkSpace(_ bytes: Int64, on folder: URL) throws {
+        let available = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            .volumeAvailableCapacityForImportantUsage ?? .max
+        // Headroom for file system overhead, so the import never fills the device to the last byte.
+        let needed = bytes + bytes / 50 + 100_000_000
+        if needed > available { throw ArchiveError.notEnoughSpace(needed: needed, available: available) }
+    }
+
+    /// iCloud Drive files and network shares are not on the device. Their "Delete archive" would reach other devices
+    /// or a server, so the option is not offered for them.
+    nonisolated private static func isOnDevice(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [.volumeIsLocalKey, .isUbiquitousItemKey])
+        return values?.volumeIsLocal == true && values?.isUbiquitousItem != true
+    }
+}
+
+private struct ImportFailure: Error {
+    let message: String
+}
