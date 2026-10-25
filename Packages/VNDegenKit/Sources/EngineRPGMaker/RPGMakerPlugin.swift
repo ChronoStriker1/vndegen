@@ -1,5 +1,9 @@
 import Foundation
+import OSLog
 import VNCore
+import WebRuntime
+
+nonisolated let rpgLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "rpgmaker")
 
 extension EngineID {
     nonisolated public static let rpgMakerMV = EngineID("rpgmaker.mv")
@@ -30,17 +34,30 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         return nil
     }
 
+    /// Runs the game in the shared web host. The desktop user agent hides the iPhone from MZ's `Utils.isMobileDevice`,
+    /// which would otherwise give up 10% of the height to browser chrome that a web view does not have. iPad and macOS
+    /// already report this shape.
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
-        try RPGMakerSession(launch: launch)
+        guard let url = Bundle.module.url(forResource: "rpgmaker", withExtension: "js") else { throw RPGMakerError.scriptMissing }
+        return try WebGameConfiguration(
+            folder: GameFolder(rpgMakerGameAt: launch.folder), appName: "rmmz-game",
+            userScripts: [try String(contentsOf: url, encoding: .utf8)], iOSUserAgent: WebGameConfiguration.desktopUserAgent,
+            buttonScript: { button, pressed in
+                KeyStroke.stroke(for: button).map {
+                    "__vndegen.key('\(pressed ? "keydown" : "keyup")', '\($0.key)', '\($0.code)', \($0.keyCode))"
+                }
+            },
+            scriptArgument: "rpgmaker-script", log: rpgLog
+        ).makeSession(launch)
     }
 }
 
 nonisolated enum RPGMakerError: LocalizedError {
-    case shimMissing
+    case scriptMissing
 
     var errorDescription: String? {
         switch self {
-        case .shimMissing: "The NW.js compatibility script is missing from the app bundle."
+        case .scriptMissing: "The RPG Maker compatibility script is missing from the app bundle."
         }
     }
 }

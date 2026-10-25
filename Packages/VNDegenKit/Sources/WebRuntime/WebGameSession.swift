@@ -8,21 +8,54 @@ import UIKit
 import AppKit
 #endif
 
-nonisolated let rpgLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "rpgmaker")
+/// What an engine plugin tells the shared web host about its game.
+public struct WebGameConfiguration {
+    public var folder: GameFolder
+    /// What NW.js reports as `nw.App.manifest.name`.
+    public var appName: String
+    /// Scripts injected at document start after the Node shim, in order.
+    public var userScripts: [String]
+    /// Sent instead of WebKit's own user agent on iOS.
+    public var iOSUserAgent: String?
+    /// The JavaScript that delivers a button press or release to the game. Nil drops the button.
+    public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
+    /// The DEBUG input script launch argument, such as "rpgmaker-script".
+    public var scriptArgument: String
+    public var log: Logger
 
-/// Runs an RPG Maker MV or MZ game in a WKWebView, looking enough like NW.js that the game saves to its own `save/`
-/// folder in the format the desktop build uses.
-final class RPGMakerSession: NSObject, EngineSession {
+    public init(folder: GameFolder, appName: String, userScripts: [String] = [], iOSUserAgent: String? = nil,
+                buttonScript: @escaping @MainActor (VirtualButton, _ pressed: Bool) -> String?, scriptArgument: String, log: Logger) {
+        self.folder = folder
+        self.appName = appName
+        self.userScripts = userScripts
+        self.iOSUserAgent = iOSUserAgent
+        self.buttonScript = buttonScript
+        self.scriptArgument = scriptArgument
+        self.log = log
+    }
+
+    /// A desktop Safari user agent. Engines that check for a phone or tablet in it would otherwise lay themselves out for
+    /// a mobile browser.
+    public static let desktopUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+
+    @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
+        try WebGameSession(launch: launch, configuration: self)
+    }
+}
+
+/// Runs an HTML5 game in a WKWebView that looks enough like NW.js that the game reads and writes its own folder through
+/// Node's `fs`, the way its desktop build does.
+final class WebGameSession: NSObject, EngineSession {
     static let bridgePrefix = "\u{1}vndegen:"
     static let messageName = "vndegen"
-    /// Hides the iPhone from MZ's `Utils.isMobileDevice`, which would otherwise give up 10% of the height to browser chrome
-    /// that a web view does not have. iPad and macOS already report this shape.
-    static let desktopUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 
     let view: PlatformView
     private let webView: GameWebView
     private let folder: GameFolder
     private let bridge: NodeBridge
+    private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
+    private let scriptArgument: String
+    private let log: Logger
     private let onExit: @MainActor () -> Void
     private var ended = false
     private var paused = false
@@ -30,13 +63,16 @@ final class RPGMakerSession: NSObject, EngineSession {
     private var script: Task<Void, Never>?
     #endif
 
-    init(launch: GameLaunch) throws {
-        folder = GameFolder(root: launch.folder)
+    init(launch: GameLaunch, configuration game: WebGameConfiguration) throws {
+        folder = game.folder
         bridge = NodeBridge(folder: folder)
+        buttonScript = game.buttonScript
+        scriptArgument = game.scriptArgument
+        log = game.log
         onExit = launch.onExit
-        let shim = try Self.shimSource(for: folder)
+        let shim = try Self.shimSource(for: game)
         let configuration = WKWebViewConfiguration()
-        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder), forURLScheme: GameFolder.scheme)
+        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder, log: log), forURLScheme: GameFolder.scheme)
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #if os(iOS)
         configuration.allowsInlineMediaPlayback = true
@@ -44,8 +80,10 @@ final class RPGMakerSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        configuration.userContentController.addUserScript(
-            WKUserScript(source: shim, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        for source in [shim] + game.userScripts {
+            configuration.userContentController.addUserScript(
+                WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
         super.init()
@@ -60,7 +98,7 @@ final class RPGMakerSession: NSObject, EngineSession {
         webView.allowsLinkPreview = false
         webView.allowsBackForwardNavigationGestures = false
         #if os(iOS)
-        webView.customUserAgent = Self.desktopUserAgent
+        webView.customUserAgent = game.iOSUserAgent
         webView.isOpaque = true
         webView.backgroundColor = .black
         let scrollView = webView.scrollView
@@ -76,7 +114,7 @@ final class RPGMakerSession: NSObject, EngineSession {
         #else
         webView.allowsMagnification = false
         #endif
-        rpgLog.notice("loading \(launch.game.title, privacy: .public) from \(launch.folder.path, privacy: .public)")
+        log.notice("loading \(launch.game.title, privacy: .public) from \(launch.folder.path, privacy: .public)")
         webView.load(URLRequest(url: folder.indexURL))
         #if DEBUG
         startScriptIfRequested()
@@ -84,12 +122,12 @@ final class RPGMakerSession: NSObject, EngineSession {
     }
 
     deinit {
-        rpgLog.notice("session released")
+        log.notice("session released")
     }
 
-    private static func shimSource(for folder: GameFolder) throws -> String {
-        guard let url = Bundle.module.url(forResource: "nwjs-shim", withExtension: "js") else { throw RPGMakerError.shimMissing }
-        let config = ["mainModule": folder.mainModule, "cwd": GameFolder.virtualRoot, "platform": "darwin"]
+    private static func shimSource(for game: WebGameConfiguration) throws -> String {
+        guard let url = Bundle.module.url(forResource: "nwjs-shim", withExtension: "js") else { throw WebRuntimeError.shimMissing }
+        let config = ["mainModule": game.folder.mainModule, "cwd": GameFolder.virtualRoot, "platform": "darwin", "appName": game.appName]
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
@@ -99,8 +137,8 @@ final class RPGMakerSession: NSObject, EngineSession {
     func send(_ event: ControllerEvent) {
         switch event {
         case let .button(button, pressed):
-            guard let stroke = KeyStroke.stroke(for: button) else { return }
-            run("__vndegen.key('\(pressed ? "keydown" : "keyup")', '\(stroke.key)', '\(stroke.code)', \(stroke.keyCode))")
+            guard let script = buttonScript(button, pressed) else { return }
+            run(script)
         case .pointer(let pointer):
             let phase = switch pointer.phase {
             case .began: "began"
@@ -140,9 +178,9 @@ final class RPGMakerSession: NSObject, EngineSession {
 
     private func run(_ javaScript: String) {
         guard !ended else { return }
-        webView.evaluateJavaScript(javaScript) { _, error in
+        webView.evaluateJavaScript(javaScript) { [log] _, error in
             if let error {
-                rpgLog.error("js call failed: \(javaScript, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                log.error("js call failed: \(javaScript, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -186,11 +224,11 @@ final class RPGMakerSession: NSObject, EngineSession {
 
 // MARK: - WKUIDelegate
 
-extension RPGMakerSession: WKUIDelegate {
+extension WebGameSession: WKUIDelegate {
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
         guard prompt.hasPrefix(Self.bridgePrefix) else {
-            rpgLog.notice("prompt ignored: \(prompt, privacy: .public)")
+            log.notice("prompt ignored: \(prompt, privacy: .public)")
             completionHandler(nil)
             return
         }
@@ -199,13 +237,13 @@ extension RPGMakerSession: WKUIDelegate {
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping @MainActor () -> Void) {
-        rpgLog.notice("alert: \(message, privacy: .public)")
+        log.notice("alert: \(message, privacy: .public)")
         completionHandler()
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping @MainActor (Bool) -> Void) {
-        rpgLog.notice("confirm answered no: \(message, privacy: .public)")
+        log.notice("confirm answered no: \(message, privacy: .public)")
         completionHandler(false)
     }
 
@@ -218,7 +256,7 @@ extension RPGMakerSession: WKUIDelegate {
 
 // MARK: - WKNavigationDelegate
 
-extension RPGMakerSession: WKNavigationDelegate {
+extension WebGameSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { return decisionHandler(.cancel) }
@@ -231,37 +269,37 @@ extension RPGMakerSession: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
-        rpgLog.error("navigation failed: \(error.localizedDescription, privacy: .public)")
+        log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
-        rpgLog.error("navigation failed: \(error.localizedDescription, privacy: .public)")
+        log.error("navigation failed: \(error.localizedDescription, privacy: .public)")
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        rpgLog.error("web content process died, reloading the game")
+        log.error("web content process died, reloading the game")
         webView.reload()
     }
 }
 
 // MARK: - WKScriptMessageHandler
 
-extension RPGMakerSession: WKScriptMessageHandler {
+extension WebGameSession: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let text = body["message"] as? String else { return }
         switch body["level"] as? String {
-        case "error": rpgLog.error("js: \(text, privacy: .public)")
-        case "warn": rpgLog.warning("js: \(text, privacy: .public)")
-        default: rpgLog.notice("js: \(text, privacy: .public)")
+        case "error": log.error("js: \(text, privacy: .public)")
+        case "warn": log.warning("js: \(text, privacy: .public)")
+        default: log.notice("js: \(text, privacy: .public)")
         }
     }
 }
 
 /// WKUserContentController retains its handlers, so the session goes behind a weak link to avoid a cycle with its web view.
 private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
-    private weak var target: RPGMakerSession?
+    private weak var target: WebGameSession?
 
-    init(_ target: RPGMakerSession) {
+    init(_ target: WebGameSession) {
         self.target = target
     }
 
@@ -279,26 +317,36 @@ final class GameWebView: WKWebView {
     #endif
 }
 
+nonisolated enum WebRuntimeError: LocalizedError {
+    case shimMissing
+
+    var errorDescription: String? {
+        switch self {
+        case .shimMissing: "The NW.js compatibility script is missing from the app bundle."
+        }
+    }
+}
+
 // MARK: - Debug script
 
 #if DEBUG
-extension RPGMakerSession {
+extension WebGameSession {
     private func startScriptIfRequested() {
         let steps: [InputStep]
         do {
-            guard let parsed = try InputScript.fromLaunchArguments() else { return }
+            guard let parsed = try InputScript.fromLaunchArguments(scriptArgument) else { return }
             steps = parsed
         } catch {
-            rpgLog.error("script: \(String(describing: error), privacy: .public)")
+            log.error("script: \(String(describing: error), privacy: .public)")
             return
         }
-        rpgLog.notice("script: \(steps.count) steps")
-        script = Task { [weak self] in
+        log.notice("script: \(steps.count) steps")
+        script = Task { [weak self, log] in
             for step in steps {
                 guard let self, !Task.isCancelled else { return }
                 await self.perform(step)
             }
-            rpgLog.notice("script: done")
+            log.notice("script: done")
         }
     }
 
@@ -322,17 +370,17 @@ extension RPGMakerSession {
             send(.scroll(dy: dy))
         case .js(let code):
             let result = await evaluate(code)
-            rpgLog.notice("script js: \(code, privacy: .public) => \(result, privacy: .public)")
+            log.notice("script js: \(code, privacy: .public) => \(result, privacy: .public)")
         case .fps(let seconds):
             await measureFrameRate(seconds)
         case .log(let text):
-            rpgLog.notice("script: \(text, privacy: .public)")
+            log.notice("script: \(text, privacy: .public)")
         case .quit:
             quitFromGame()
         }
     }
 
-    /// Counts requestAnimationFrame callbacks (what the compositor delivers) and Graphics.frameCount (engine updates)
+    /// Counts requestAnimationFrame callbacks (what the compositor delivers) and RPG Maker's Graphics.frameCount (engine updates)
     /// over a window. The sampler exists only while this step runs.
     private func measureFrameRate(_ seconds: Double) async {
         let sampler = """
@@ -353,9 +401,9 @@ extension RPGMakerSession {
         """
         do {
             let result = try await webView.callAsyncJavaScript(sampler, arguments: ["seconds": seconds], contentWorld: .page)
-            rpgLog.notice("script fps: \(String(describing: result ?? "nil"), privacy: .public)")
+            log.notice("script fps: \(String(describing: result ?? "nil"), privacy: .public)")
         } catch {
-            rpgLog.error("script fps failed: \(error.localizedDescription, privacy: .public)")
+            log.error("script fps failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

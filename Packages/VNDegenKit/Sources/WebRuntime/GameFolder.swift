@@ -1,51 +1,40 @@
 import Foundation
 
-/// The game folder as the page and the NW.js shim see it.
+/// The game folder as the page and the Node shim see it.
 ///
-/// The shim works in a virtual POSIX tree rooted at `virtualRoot`. The game never learns a real path (MZ's main.js
-/// refuses to start when its path begins with `/private/var`, which is where iOS keeps Documents), and every path the
-/// game hands back is confined to this folder before it touches disk.
-nonisolated struct GameFolder: Sendable {
-    static let virtualRoot = "/game"
-    static let scheme = "vndegen"
-    static let origin = "\(scheme)://game"
+/// The shim works in a virtual POSIX tree rooted at `virtualRoot`. The game never learns a real path (RPG Maker MZ's
+/// main.js refuses to start when its path begins with `/private/var`, which is where iOS keeps Documents), and every
+/// path the game hands back is confined to this folder before it touches disk.
+nonisolated public struct GameFolder: Sendable {
+    public static let virtualRoot = "/game"
+    public static let scheme = "vndegen"
+    public static let origin = "\(scheme)://game"
 
     /// The game folder on disk, as the user copied it in.
-    let root: URL
-    /// Where index.html lives, relative to `root`: empty for MZ and "www" for deployed MV games.
-    let webRoot: String
+    public let root: URL
+    /// Where index.html lives, relative to `root`, such as "" or "www".
+    public let webRoot: String
     /// `root` with every symlink resolved. Every path this folder hands out must lead somewhere under it.
     private let realRoot: String
 
-    init(root: URL, webRoot: String) {
+    public init(root: URL, webRoot: String) {
         self.root = root
         self.webRoot = webRoot
         realRoot = Self.realPath(root.path) ?? root.path
     }
 
-    /// Picks the web root the way `RPGMakerPlugin.detect` does: the top level when its js/ holds the engine core,
-    /// otherwise www/.
-    init(root: URL) {
-        let top = GameFolder(root: root, webRoot: "")
-        let hasCore = { (dir: String) in
-            ["rmmz_core.js", "rpg_core.js"].contains { top.resolve(virtualPath: "\(dir)/js/\($0)").map(Self.isFile) ?? false }
-        }
-        self = !hasCore(Self.virtualRoot) && hasCore("\(Self.virtualRoot)/www") ? GameFolder(root: root, webRoot: "www") : top
-    }
-
-    private var virtualWebRoot: String { webRoot.isEmpty ? Self.virtualRoot : "\(Self.virtualRoot)/\(webRoot)" }
+    /// The web root as a virtual path.
+    public var virtualWebRoot: String { webRoot.isEmpty ? Self.virtualRoot : "\(Self.virtualRoot)/\(webRoot)" }
     /// What NW.js reports as `process.mainModule.filename`.
-    var mainModule: String { "\(virtualWebRoot)/index.html" }
-    var indexURL: URL { URL(string: "\(Self.origin)/index.html")! }
-    /// Where NW.js builds save: `save/` beside index.html.
-    var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
+    public var mainModule: String { "\(virtualWebRoot)/index.html" }
+    public var indexURL: URL { URL(string: "\(Self.origin)/index.html")! }
 
     /// Maps a virtual absolute path to disk. Nil when the path is relative, climbs out of the game folder, or passes
     /// through a symlink that leads out of it.
     ///
     /// A name missing on disk matches an entry that differs from it only in case. Windows games often get the case of
     /// their own files wrong, which Windows and the Mac's disk forgive and an iPhone's disk does not.
-    func resolve(virtualPath: String) -> URL? {
+    public func resolve(virtualPath: String) -> URL? {
         guard let relative = Self.confine(virtualPath) else { return nil }
         var path = root.path
         var deepestExisting = Self.exists(path) ? path : nil
@@ -65,7 +54,7 @@ nonisolated struct GameFolder: Sendable {
     }
 
     /// Maps the path of a `vndegen://game/...` request to disk. Nil when it escapes the web root.
-    func resolve(servedPath: String) -> URL? {
+    public func resolve(servedPath: String) -> URL? {
         let path = servedPath.isEmpty || servedPath == "/" ? "/index.html" : servedPath
         return resolve(virtualPath: virtualWebRoot + (path.hasPrefix("/") ? path : "/" + path))
     }
@@ -225,12 +214,12 @@ nonisolated extension GameFolder {
         return .partial(start: start, end: end)
     }
 
-    static func isDirectory(_ url: URL) -> Bool {
+    public static func isDirectory(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
-    static func isFile(_ url: URL) -> Bool {
+    public static func isFile(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && !isDirectory.boolValue
     }

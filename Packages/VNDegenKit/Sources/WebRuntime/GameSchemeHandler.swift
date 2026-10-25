@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import WebKit
 
 /// Serves `vndegen://game/...` from the game's web root. Reads run off the main thread, one chunk at a time, and stop
@@ -6,11 +7,13 @@ import WebKit
 /// task is touched after `stop`, and a stopped task's address can be reused by a new one before a slow read returns.
 final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private let folder: GameFolder
+    private let log: Logger
     private var pending: [Int: any WKURLSchemeTask] = [:]
     private var nextSerial = 0
 
-    init(folder: GameFolder) {
+    init(folder: GameFolder, log: Logger) {
         self.folder = folder
+        self.log = log
     }
 
     func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
@@ -48,7 +51,7 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private func respond(_ serial: Int, url: URL, with response: FileResponse) -> Bool {
         guard let task = pending[serial] else { return false }
         if response.status >= 400 {
-            rpgLog.error("served \(response.status) for \(url.path, privacy: .public)")
+            log.error("served \(response.status) for \(url.path, privacy: .public)")
         }
         task.didReceive(HTTPURLResponse(url: url, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: response.headers)!)
         return true
@@ -64,7 +67,7 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private func finish(_ serial: Int, failing error: (any Error)? = nil) {
         guard let task = pending.removeValue(forKey: serial) else { return }
         if let error {
-            rpgLog.error("read failed: \(error.localizedDescription, privacy: .public)")
+            log.error("read failed: \(error.localizedDescription, privacy: .public)")
             task.didFailWithError(error)
         } else {
             task.didFinish()

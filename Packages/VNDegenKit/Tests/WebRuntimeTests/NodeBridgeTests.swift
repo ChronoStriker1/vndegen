@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import EngineRPGMaker
+@testable import WebRuntime
 
 private struct Sandbox {
     let root: URL

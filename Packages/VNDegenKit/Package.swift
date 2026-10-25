@@ -8,6 +8,7 @@ let package = Package(
     platforms: [.iOS(.v18), .macOS(.v15)],
     products: [
         .library(name: "VNCore", targets: ["VNCore"]),
+        .library(name: "WebRuntime", targets: ["WebRuntime"]),
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
@@ -19,7 +20,8 @@ let package = Package(
     targets: [
         .target(name: "VNCore"),
         .target(name: "GameInput", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "EngineRPGMaker", dependencies: ["VNCore"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "WebRuntime", dependencies: ["VNCore"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync"], swiftSettings: mainActorByDefault),
@@ -30,7 +32,8 @@ let package = Package(
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
         .target(name: "ArchiveImport", dependencies: ["CArchive"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
-        .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"]),
+        .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
