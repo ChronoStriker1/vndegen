@@ -41,6 +41,7 @@ final class RPGMakerSession: NSObject, EngineSession {
         #if os(iOS)
         configuration.allowsInlineMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = false
+        configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
         configuration.userContentController.addUserScript(
@@ -56,21 +57,34 @@ final class RPGMakerSession: NSObject, EngineSession {
         #if DEBUG
         webView.isInspectable = true
         #endif
+        webView.allowsLinkPreview = false
+        webView.allowsBackForwardNavigationGestures = false
         #if os(iOS)
         webView.customUserAgent = Self.desktopUserAgent
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.bounces = false
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.isOpaque = true
         webView.backgroundColor = .black
+        let scrollView = webView.scrollView
+        scrollView.isScrollEnabled = false
+        scrollView.bounces = false
+        scrollView.bouncesZoom = false
+        scrollView.minimumZoomScale = 1
+        scrollView.maximumZoomScale = 1
+        scrollView.pinchGestureRecognizer?.isEnabled = false
+        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.delaysContentTouches = false
+        scrollView.backgroundColor = .black
         #else
         webView.allowsMagnification = false
-        webView.allowsBackForwardNavigationGestures = false
         #endif
         rpgLog.notice("loading \(launch.game.title, privacy: .public) from \(launch.folder.path, privacy: .public)")
         webView.load(URLRequest(url: folder.indexURL))
         #if DEBUG
         startScriptIfRequested()
         #endif
+    }
+
+    deinit {
+        rpgLog.notice("session released")
     }
 
     private static func shimSource(for folder: GameFolder) throws -> String {
@@ -306,15 +320,42 @@ extension RPGMakerSession {
             send(.pointer(PointerEvent(phase: .ended, location: point)))
         case .scroll(let dy):
             send(.scroll(dy: dy))
-        case .snapshot(let path):
-            await snapshot(to: path)
         case .js(let code):
             let result = await evaluate(code)
             rpgLog.notice("script js: \(code, privacy: .public) => \(result, privacy: .public)")
+        case .fps(let seconds):
+            await measureFrameRate(seconds)
         case .log(let text):
             rpgLog.notice("script: \(text, privacy: .public)")
         case .quit:
             quitFromGame()
+        }
+    }
+
+    /// Counts requestAnimationFrame callbacks (what the compositor delivers) and Graphics.frameCount (engine updates)
+    /// over a window. The sampler exists only while this step runs.
+    private func measureFrameRate(_ seconds: Double) async {
+        let sampler = """
+        const start = performance.now(), engineStart = window.Graphics ? Graphics.frameCount : 0;
+        let frames = 0, worst = 0, last = start;
+        await new Promise((done) => {
+            const tick = (now) => {
+                frames++;
+                worst = Math.max(worst, now - last);
+                last = now;
+                if (now - start < seconds * 1000) requestAnimationFrame(tick); else done();
+            };
+            requestAnimationFrame(tick);
+        });
+        const elapsed = (performance.now() - start) / 1000;
+        const engine = window.Graphics ? Graphics.frameCount - engineStart : 0;
+        return `raf ${(frames / elapsed).toFixed(1)} fps, engine ${(engine / elapsed).toFixed(1)} fps, worst frame ${worst.toFixed(1)} ms over ${elapsed.toFixed(1)} s`;
+        """
+        do {
+            let result = try await webView.callAsyncJavaScript(sampler, arguments: ["seconds": seconds], contentWorld: .page)
+            rpgLog.notice("script fps: \(String(describing: result ?? "nil"), privacy: .public)")
+        } catch {
+            rpgLog.error("script fps failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -332,32 +373,6 @@ extension RPGMakerSession {
                 }
             }
         }
-    }
-
-    private func snapshot(to path: String) async {
-        let png: Data? = await withCheckedContinuation { continuation in
-            webView.takeSnapshot(with: nil) { image, error in
-                if let error { rpgLog.error("script: snapshot failed: \(error.localizedDescription, privacy: .public)") }
-                continuation.resume(returning: image.flatMap(Self.pngData))
-            }
-        }
-        guard let png else { return }
-        do {
-            let url = URL(fileURLWithPath: path)
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try png.write(to: url)
-            rpgLog.notice("script: wrote \(path, privacy: .public)")
-        } catch {
-            rpgLog.error("script: could not write \(path, privacy: .public): \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private static func pngData(_ image: PlatformImage) -> Data? {
-        #if canImport(UIKit)
-        image.pngData()
-        #else
-        image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?.representation(using: .png, properties: [:])
-        #endif
     }
 }
 #endif

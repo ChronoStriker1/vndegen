@@ -40,6 +40,9 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func finish(_ serial: Int, url: URL, with response: FileResponse) {
         guard let task = pending.removeValue(forKey: serial) else { return }
+        if response.status >= 400 {
+            rpgLog.error("served \(response.status) for \(url.path, privacy: .public)")
+        }
         let http = HTTPURLResponse(url: url, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: response.headers)!
         task.didReceive(http)
         if !response.body.isEmpty { task.didReceive(response.body) }

@@ -351,6 +351,57 @@
         Object.defineProperty(Navigator.prototype, 'getGamepads', { value: () => [], configurable: true, writable: true });
     } catch (e) { /* locked down */ }
 
+    // WebKit says it can play Ogg Vorbis, but its decodeAudioData rejects every Ogg file, so the engine would fail on
+    // its first sound. Saying no makes MZ decode with its bundled VorbisDecoder and MV pick its .m4a files instead.
+    const canPlayType = HTMLMediaElement.prototype.canPlayType;
+    HTMLMediaElement.prototype.canPlayType = function (type) {
+        return /^audio\/ogg/i.test(String(type)) ? '' : canPlayType.call(this, type);
+    };
+
+    // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
+    // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
+    // timeupdate re-arms a timer, so the timer runs only after updates stop, and it sends a looping element that is
+    // stuck at its end back to the start.
+    const play = HTMLMediaElement.prototype.play;
+    const stalledLoops = new WeakMap();
+    function rearmLoop(media) {
+        clearTimeout(stalledLoops.get(media));
+        if (!media.loop || !media.duration) return;
+        const remaining = Math.max(0, media.duration - media.currentTime) / (media.playbackRate || 1);
+        stalledLoops.set(media, setTimeout(() => {
+            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) media.currentTime = 0;
+        }, remaining * 1000 + 250));
+    }
+    HTMLMediaElement.prototype.play = function () {
+        if (!stalledLoops.has(this)) {
+            stalledLoops.set(this, 0);
+            this.addEventListener('timeupdate', () => rearmLoop(this));
+        }
+        return play.apply(this, arguments);
+    };
+
+    // An AudioContext starts suspended and the engine resumes it only on a touch or key event, which a gamepad player
+    // never produces on the web view. The app allows playback without a gesture, so every context is resumed unless
+    // the session is paused. WebKit on iOS also suspends a new context once, about 100 ms after it starts running.
+    const audioContexts = [];
+    let audioPaused = false;
+    const resumeAudio = (context) => {
+        if (!audioPaused && context.state === 'suspended' && document.visibilityState === 'visible') context.resume().catch(noop);
+    };
+    const NativeAudioContext = window.AudioContext || window.webkitAudioContext;
+    if (NativeAudioContext) {
+        class AudioContext extends NativeAudioContext {
+            constructor(...args) {
+                super(...args);
+                audioContexts.push(this);
+                this.addEventListener('statechange', () => resumeAudio(this));
+                resumeAudio(this);
+            }
+        }
+        window.AudioContext = window.webkitAudioContext = AudioContext;
+        document.addEventListener('visibilitychange', () => audioContexts.forEach(resumeAudio));
+    }
+
     // MZ asks for fullscreen on F4 without catching the rejection, which would end the game on the error screen.
     const resolved = () => Promise.resolve();
     for (const name of ['requestFullscreen', 'webkitRequestFullscreen']) {
@@ -396,8 +447,28 @@
         post({ level: 'error', message: 'unhandled rejection: ' + describe(event.reason) });
     });
 
+    // Reports once which renderer the engine got, so a fall back to PIXI's canvas renderer shows up in the app log.
+    // MZ keeps it at Graphics._app.renderer, MV at Graphics._renderer. PIXI's WEBGL renderer type is 1.
+    function reportRenderer(attempt) {
+        const graphics = window.Graphics;
+        const renderer = graphics && ((graphics._app && graphics._app.renderer) || graphics._renderer);
+        if (!renderer) {
+            if (attempt < 60) setTimeout(() => reportRenderer(attempt + 1), 500);
+            return;
+        }
+        const gl = renderer.gl;
+        const info = {
+            renderer: renderer.type === 1 ? 'webgl' : 'canvas',
+            webglVersion: gl ? (typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext ? 2 : 1) : 0,
+            gpu: gl ? gl.getParameter(gl.RENDERER) : null,
+            resolution: renderer.resolution,
+        };
+        (info.renderer === 'webgl' ? console.info : console.error)('vndegen renderer ' + JSON.stringify(info));
+    }
+    window.addEventListener('load', () => reportRenderer(0));
+
     // Input and lifecycle entry points the session calls through evaluateJavaScript.
-    let lastX = 0, lastY = 0, videoWasPlaying = false;
+    let lastX = 0, lastY = 0;
     const target = () => document.body || document.documentElement;
 
     window.__vndegen = {
@@ -421,18 +492,13 @@
             target().dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: lastX, clientY: lastY, bubbles: true, cancelable: true }));
         },
         setPaused(paused) {
-            const scenes = window.SceneManager, audio = window.WebAudio, video = window.Video;
-            const context = audio && audio._context;
-            const element = video && video._element;
+            const scenes = window.SceneManager;
+            audioPaused = paused;
             if (paused) {
                 if (scenes && scenes.stop) scenes.stop();
-                if (context && context.state === 'running') context.suspend();
-                videoWasPlaying = !!(element && !element.paused && element.src);
-                if (videoWasPlaying) element.pause();
+                for (const context of audioContexts) if (context.state === 'running') context.suspend();
             } else {
-                if (context && context.state === 'suspended') context.resume();
-                if (videoWasPlaying && element) element.play().catch(noop);
-                videoWasPlaying = false;
+                audioContexts.forEach(resumeAudio);
                 if (window.Input && window.Input.clear) window.Input.clear();
                 if (scenes && scenes.resume) scenes.resume();
             }
