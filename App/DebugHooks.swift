@@ -15,6 +15,7 @@ import AppKit
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
+///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
 enum DebugHooks {
     static func run(_ hub: Hub) async {
         #if canImport(UIKit)
@@ -32,9 +33,9 @@ enum DebugHooks {
     }
 
     static func playInput(_ hub: Hub) async {
-        guard let script = UserDefaults.standard.string(forKey: "demoInput") else { return }
+        let script = UserDefaults.standard.string(forKey: "demoInput") ?? ""
         try? await Task.sleep(for: .seconds(1.5))
-        hub.input.noteInput(.gamepad)
+        if !script.isEmpty { hub.input.noteInput(.gamepad) }
         for step in script.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) {
             if let button = VirtualButton(rawValue: step) {
                 hub.input.onEvent?(.button(button, pressed: true))
@@ -42,7 +43,22 @@ enum DebugHooks {
             }
             try? await Task.sleep(for: .seconds(0.6))
         }
+        #if os(macOS)
+        if let path = UserDefaults.standard.string(forKey: "snapshot") {
+            try? await Task.sleep(for: .seconds(3))
+            snapshotWindow(to: URL(fileURLWithPath: path))
+        }
+        #endif
     }
+
+    #if os(macOS)
+    static func snapshotWindow(to url: URL) {
+        guard let view = NSApp.windows.first(where: \.isVisible)?.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: url)
+    }
+    #endif
 }
 
 /// Fake game folders that detect as RPG Maker MZ, dressed with real Steam library art and metadata, so the hub can be
