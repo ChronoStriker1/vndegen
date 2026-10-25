@@ -1,33 +1,101 @@
 import SwiftUI
 import VNCore
 
-/// Placeholder library screen. The Big Picture-style hub replaces it.
+/// The Big Picture-style hub: library, game pages, settings, and the player.
 public struct HubRootView: View {
     @Bindable var hub: Hub
+    // Owned here so the route and focus survive size changes, such as folding an iPhone Duo, and play sessions.
+    @State private var nav: Navigator
+    @Environment(\.scenePhase) private var scenePhase
 
-    public init(hub: Hub) { self.hub = hub }
+    public init(hub: Hub) {
+        self.hub = hub
+        _nav = State(initialValue: Navigator(hub: hub))
+    }
 
     public var body: some View {
-        switch hub.screen {
-        case .library:
-            NavigationStack {
-                List(hub.library.games) { game in
-                    Button {
-                        hub.launch(game.id)
-                    } label: {
-                        LabeledContent(game.title, value: hub.library.plugin(for: game.engine)?.descriptor.shortName ?? "Unknown")
-                    }
+        GeometryReader { geo in
+            Group {
+                switch hub.screen {
+                case .library: LibraryContainer()
+                case let .playing(_, session): PlayerView(hub: hub, session: session)
                 }
-                .navigationTitle("Library")
-                .refreshable { await hub.library.refresh() }
             }
-            .alert("Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { hub.launchError = nil } })) {
-                Button("OK") {}
-            } message: {
-                Text(hub.launchError ?? "")
+            .environment(\.hubMetrics, HubMetrics(size: geo.size, insets: geo.safeAreaInsets))
+        }
+        .environment(hub)
+        .environment(nav)
+        .foregroundStyle(.white)
+        .tint(Theme.accent)
+        .preferredColorScheme(.dark)
+        .background(Theme.background)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { nav.relock() }
+        }
+    }
+}
+
+private struct LibraryContainer: View {
+    @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
+
+    var body: some View {
+        @Bindable var nav = nav
+        ZStack {
+            switch nav.route {
+            case nil:
+                if nav.visibleGames.isEmpty {
+                    EmptyLibraryView()
+                        .overlay(alignment: .top) { TopBar() }
+                        .transition(.opacity)
+                } else {
+                    LibraryHomeView().transition(.opacity)
+                }
+            case .grid:
+                LibraryGridView().transition(.opacity.combined(with: .scale(scale: 1.03)))
+            case let .game(id):
+                if let game = hub.library.game(id) {
+                    GamePageView(game: game).transition(.opacity.combined(with: .scale(scale: 1.03)))
+                }
+            case .settings:
+                SettingsView().transition(.opacity.combined(with: .move(edge: .trailing)))
             }
-        case let .playing(_, session):
-            PlayerView(hub: hub, session: session)
+        }
+        .animation(.smooth(duration: 0.35), value: nav.path)
+        .sheet(item: $nav.sheet) { sheet in
+            sheetContent(sheet)
+                .environment(hub)
+                .environment(nav)
+        }
+        .alert("Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { hub.launchError = nil } })) {
+            Button("OK") {}
+        } message: {
+            Text(hub.launchError ?? "")
+        }
+        .onAppear {
+            nav.attachInput()
+            nav.revalidate()
+        }
+        .onChange(of: hub.library.games) { nav.revalidate() }
+        .onChange(of: hub.lock.isUnlocked) { nav.revalidate() }
+    }
+
+    @ViewBuilder
+    private func sheetContent(_ sheet: Navigator.Sheet) -> some View {
+        switch sheet {
+        case .unlock:
+            SheetScaffold(title: "Hidden games") {
+                if let unlock = nav.unlockView {
+                    unlock.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .presentationDetents([.medium, .large])
+        case let .engine(id):
+            if let game = hub.library.game(id) { EnginePickerSheet(game: game) }
+        case let .artwork(id):
+            if let game = hub.library.game(id) { ArtworkEditorSheet(game: game) }
+        case let .metadata(id):
+            if let game = hub.library.game(id) { MetadataSearchSheet(game: game) }
         }
     }
 }

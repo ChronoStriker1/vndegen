@@ -24,6 +24,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: VNDegen
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         NSFaceIDUsageDescription: Unlock hidden games.
