@@ -64,11 +64,17 @@ struct HeroBackdrop: View {
                     .id(game.id)
                     .transition(.opacity)
                 }
-                LinearGradient(colors: [Theme.background.opacity(0.85), Theme.background.opacity(0.25), .clear],
+                // Holds dark across the text column and fades out past it, so bright art stays bright on the right.
+                LinearGradient(stops: [.init(color: Theme.background.opacity(0.9), location: 0),
+                                       .init(color: Theme.background.opacity(0.75), location: 0.4),
+                                       .init(color: Theme.background.opacity(0.3), location: 0.72),
+                                       .init(color: .clear, location: 1)],
                                startPoint: .leading, endPoint: .trailing)
-                    .frame(width: geo.size.width * (metrics.isCompact ? 1 : 0.7))
+                    .frame(width: geo.size.width * (metrics.isCompact ? 1 : 0.75))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                LinearGradient(stops: [.init(color: .clear, location: 0.3), .init(color: Theme.background.opacity(0.92), location: 0.78)],
+                LinearGradient(stops: [.init(color: .clear, location: 0.2),
+                                       .init(color: Theme.background.opacity(0.45), location: 0.5),
+                                       .init(color: Theme.background.opacity(0.92), location: 0.78)],
                                startPoint: .top, endPoint: .bottom)
             }
             .frame(width: geo.size.width, height: geo.size.height)

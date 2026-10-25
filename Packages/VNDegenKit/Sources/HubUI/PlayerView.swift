@@ -8,12 +8,25 @@ struct PlayerView: View {
     let session: any EngineSession
     @State private var menu = PlayerMenu()
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
+    @State private var needsRotation = false
 
     var body: some View {
         let showsTouchControls = hub.input.lastInputKind == .touch && hub.input.controllerNames.isEmpty && !menu.isOpen
         ZStack {
             SessionViewHost(session: session)
                 .ignoresSafeArea()
+            #if os(iOS)
+            if #available(iOS 26, *), OrientationLock.usesSceneLock {
+                // Full size so every window resize lays it out again.
+                SceneOrientationLock(orientation: orientation, needsRotation: $needsRotation)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+            if needsRotation {
+                RotateHint(orientation: orientation)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+            #endif
             if showsTouchControls {
                 TouchControlsOverlay(mode: $touchMode) { event in
                     hub.input.noteInput(.touch)
@@ -40,12 +53,13 @@ struct PlayerView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: menu.isOpen)
+        .animation(.easeOut(duration: 0.25), value: needsRotation)
         .background(.black)
         .onAppear {
             hub.input.onEvent = handle
             applyInputMode()
             #if os(iOS)
-            OrientationLock.apply(game?.orientation ?? PlayOrientation.setting)
+            OrientationLock.apply(orientation)
             #endif
         }
         #if os(iOS)
@@ -57,6 +71,8 @@ struct PlayerView: View {
         guard case let .playing(id, _) = hub.screen else { return nil }
         return hub.library.game(id)
     }
+
+    private var orientation: PlayOrientation { game?.orientation ?? PlayOrientation.setting }
 
     private var title: String { game.map(hub.displayTitle) ?? "" }
 
@@ -130,6 +146,33 @@ private struct PlayerMenuView: View {
             .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
             .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
         }
+    }
+}
+
+/// Asks the player to turn a full-screen iPad that shows the game in the wrong orientation.
+private struct RotateHint: View {
+    let orientation: PlayOrientation
+
+    var body: some View {
+        let landscape = orientation == .landscape
+        VStack(spacing: 12) {
+            Image(systemName: landscape ? "rectangle.landscape.rotate" : "rectangle.portrait.rotate")
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .symbolEffect(.wiggle.byLayer, options: .repeat(.periodic(delay: 1.5)))
+            Text(landscape ? "Rotate to landscape" : "Rotate to portrait")
+                .font(.display(17, weight: .heavy))
+                .foregroundStyle(.white)
+            Text("The game locks once it is \(landscape ? "landscape" : "portrait").")
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.secondaryText)
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 26)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+        .accessibilityElement(children: .combine)
+        .allowsHitTesting(false)
     }
 }
 
