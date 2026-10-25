@@ -1,0 +1,77 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 18,
+ "limit": 50,
+ "data": [
+  {
+   "id": 691025,
+   "score": 0,
+   "style": "alternate",
+   "width": 920,
+   "height": 430,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/da30fe700e9d71002682b0782ee3f437.png",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/da30fe700e9d71002682b0782ee3f437.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "CaptainCalamity",
+    "steam64": "76561199403072176",
+    "avatar": "https://avatars.steamstatic.com/49b8fc0f64109308009c25636336670ba7d6066e_medium.jpg"
+   }
+  },
+  {
+   "id": 442654,
+   "score": 0,
+   "style": "alternate",
+   "width": 920,
+   "height": 430,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/6763f2fdd226adc3e19aca07dbdc1a06.png",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/6763f2fdd226adc3e19aca07dbdc1a06.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Batclark06",
+    "steam64": "76561199038635687",
+    "avatar": "https://avatars.steamstatic.com/a27b21692aa5d61824cebd4715b59e8adfd09dfb_medium.jpg"
+   }
+  },
+  {
+   "id": 155927,
+   "score": 0,
+   "style": "alternate",
+   "width": 920,
+   "height": 430,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/8735706021f377f5fa972c0016c12db5.png",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/8735706021f377f5fa972c0016c12db5.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Peipara :)",
+    "steam64": "76561198444267961",
+    "avatar": "https://avatars.steamstatic.com/c6eecbf6cf9be397aa21bd3f6f9bfe0698460b5c_medium.jpg"
+   }
+  }
+ ]
+}

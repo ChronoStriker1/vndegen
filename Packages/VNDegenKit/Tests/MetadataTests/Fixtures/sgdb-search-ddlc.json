@@ -1,0 +1,30 @@
+{
+ "success": true,
+ "data": [
+  {
+   "id": 21043,
+   "name": "Doki Doki Literature Club",
+   "verified": true,
+   "types": [
+    "steam"
+   ],
+   "release_date": 1506063600
+  },
+  {
+   "id": 5275964,
+   "name": "Doki Doki Literature Club - Purist Mod",
+   "verified": true,
+   "types": [],
+   "release_date": 1535068800
+  },
+  {
+   "id": 5287508,
+   "name": "Doki Doki Literature Club Plus!",
+   "verified": true,
+   "types": [
+    "steam"
+   ],
+   "release_date": 1625011200
+  }
+ ]
+}

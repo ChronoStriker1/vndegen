@@ -1,0 +1,85 @@
+[
+ {
+  "id": 55935,
+  "artworks": [
+   {
+    "id": 27008,
+    "image_id": "arku8"
+   },
+   {
+    "id": 226801,
+    "image_id": "ar4v01"
+   }
+  ],
+  "cover": {
+   "id": 312530,
+   "image_id": "co6p5e"
+  },
+  "external_games": [
+   {
+    "id": 1184744,
+    "uid": "UCATzt4RZi2xZBYoHjXc_how",
+    "external_game_source": 10
+   },
+   {
+    "id": 102032,
+    "uid": "60005",
+    "external_game_source": 3
+   },
+   {
+    "id": 2131148,
+    "uid": "106599",
+    "external_game_source": 30
+   },
+   {
+    "id": 185493,
+    "uid": "698780",
+    "external_game_source": 1
+   },
+   {
+    "id": 254380,
+    "uid": "497527",
+    "external_game_source": 14
+   }
+  ],
+  "first_release_date": 1506038400,
+  "genres": [
+   {
+    "id": 31,
+    "name": "Adventure"
+   },
+   {
+    "id": 32,
+    "name": "Indie"
+   },
+   {
+    "id": 34,
+    "name": "Visual Novel"
+   }
+  ],
+  "involved_companies": [
+   {
+    "id": 91811,
+    "company": {
+     "id": 14329,
+     "name": "Team Salvato"
+    },
+    "developer": true,
+    "publisher": true
+   },
+   {
+    "id": 361971,
+    "company": {
+     "id": 6352,
+     "name": "Serenity Forge"
+    },
+    "developer": false,
+    "publisher": true
+   }
+  ],
+  "name": "Doki Doki Literature Club!",
+  "summary": "The Literature Club is full of cute girls! Will you write the way into their heart? This game is not suitable for children or those who are easily disturbed.",
+  "total_rating": 88.12471261518827,
+  "url": "https://www.igdb.com/games/doki-doki-literature-club"
+ }
+]

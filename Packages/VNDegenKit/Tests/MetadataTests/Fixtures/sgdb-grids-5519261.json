@@ -1,0 +1,31 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 1,
+ "limit": 50,
+ "data": [
+  {
+   "id": 808684,
+   "score": 0,
+   "style": "alternate",
+   "width": 600,
+   "height": 900,
+   "nsfw": false,
+   "humor": false,
+   "notes": "*\"NYAH MUTHAFUCKAH!\"* | Custom grid prominently featuring **Lady Lewdipop**",
+   "mime": "image/jpeg",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/8c30b76a10455c7c19ec9a9d3a0d738a.jpg",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/8c30b76a10455c7c19ec9a9d3a0d738a.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Middele",
+    "steam64": "76561198708652658",
+    "avatar": "https://avatars.steamstatic.com/97c9dc4ed68f88361302cad2dafd6f65b372454a_medium.jpg"
+   }
+  }
+ ]
+}

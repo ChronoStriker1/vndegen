@@ -1,0 +1,51 @@
+{
+ "more": false,
+ "results": [
+  {
+   "extlinks": [
+    {
+     "id": "http://ddlc.moe/",
+     "name": "website"
+    },
+    {
+     "id": "26478",
+     "name": "egs"
+    },
+    {
+     "id": "698780",
+     "name": "steam"
+    },
+    {
+     "id": "698780",
+     "name": "steamdb"
+    },
+    {
+     "id": "teamsalvato/ddlc",
+     "name": "itch"
+    }
+   ],
+   "id": "r53689"
+  },
+  {
+   "extlinks": [
+    {
+     "id": "https://ddlc.plus/",
+     "name": "website"
+    },
+    {
+     "id": "31201",
+     "name": "egs"
+    },
+    {
+     "id": "1388880",
+     "name": "steam"
+    },
+    {
+     "id": "1388880",
+     "name": "steamdb"
+    }
+   ],
+   "id": "r80357"
+  }
+ ]
+}

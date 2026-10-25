@@ -1,0 +1,77 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 67,
+ "limit": 50,
+ "data": [
+  {
+   "id": 94799,
+   "score": 0,
+   "style": "custom",
+   "width": 0,
+   "height": 0,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/vnd.microsoft.icon",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/icon/706df93d9b361db5c2a627c639a40fd7.ico",
+   "thumb": "https://cdn2.steamgriddb.com/icon/706df93d9b361db5c2a627c639a40fd7/32/512x512.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "dokitsumi",
+    "steam64": "76561199812782651",
+    "avatar": "https://avatars.steamstatic.com/25e851500bc6e90152ce3c1a4436a0b2fcd9e164_medium.jpg"
+   }
+  },
+  {
+   "id": 6309,
+   "score": 0,
+   "style": "custom",
+   "width": 1024,
+   "height": 1024,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/icon/6a13382a520e0420014027350a0b3eb4.png",
+   "thumb": "https://cdn2.steamgriddb.com/icon_thumb/6a13382a520e0420014027350a0b3eb4.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Peipara :)",
+    "steam64": "76561198444267961",
+    "avatar": "https://avatars.steamstatic.com/c6eecbf6cf9be397aa21bd3f6f9bfe0698460b5c_medium.jpg"
+   }
+  },
+  {
+   "id": 101047,
+   "score": 0,
+   "style": "official",
+   "width": 512,
+   "height": 512,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/icon/46cc87b0bb6d0dccc4fedce8fd20de06.png",
+   "thumb": "https://cdn2.steamgriddb.com/icon_thumb/46cc87b0bb6d0dccc4fedce8fd20de06.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Scolkerh",
+    "steam64": "76561198421536491",
+    "avatar": "https://avatars.steamstatic.com/b7066fb6ff81e0241bea7620e0bda9e06b669c13_medium.jpg"
+   }
+  }
+ ]
+}
