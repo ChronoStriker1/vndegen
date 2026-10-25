@@ -267,6 +267,118 @@ private func tree(_ root: URL) throws -> [String: String] {
     #expect(!fm.fileExists(atPath: snapshot.path))
 }
 
+@Test func anUnreadableMappingIsNeverReplaced() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("backups"))
+    let locations = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
+    let gameDir = store.root.appendingPathComponent("G")
+    try fm.createDirectory(at: gameDir, withIntermediateDirectories: true)
+    let mappingURL = gameDir.appendingPathComponent("mapping.yaml")
+    let notText = Data([0xFF, 0xFE, 0x00, 0x80])
+    try notText.write(to: mappingURL)
+
+    #expect(throws: SaveSyncError.unreadable(mappingURL.path)) {
+        try store.backUp(folder: "G", title: "G", game: GameID("G"), locations: locations, retention: nil, os: "mac", comment: nil)
+    }
+    #expect(try Data(contentsOf: mappingURL) == notText)
+    #expect(try fm.contentsOfDirectory(atPath: gameDir.path) == ["mapping.yaml"])
+    #expect(try LudusaviStore.regularFiles(in: base.appendingPathComponent("no such folder")).isEmpty)
+}
+
+/// A failed backup removes its folder, so two backups that started from the same mapping must never share one.
+@Test func eachBackupGetsAFolderOfItsOwn() throws {
+    let gameDir = try temporaryDirectory().appendingPathComponent("G")
+    let mapping = LudusaviMapping(name: "G")
+    let now = Date(timeIntervalSince1970: 0)
+    let first = try LudusaviStore.makeBackupFolder(differential: false, now: now, mapping: mapping, gameDir: gameDir)
+    let second = try LudusaviStore.makeBackupFolder(differential: false, now: now, mapping: mapping, gameDir: gameDir)
+    #expect(first == "backup-19700101T000000Z" && second == "backup-19700101T000001Z")
+    #expect(try fm.contentsOfDirectory(atPath: gameDir.path).sorted() == [first, second])
+}
+
+@MainActor
+@Test func theServiceRunsOneOperationAtATime() async throws {
+    let base = try temporaryDirectory()
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    _ = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
+    let library = LibraryStore(paths: paths, engines: [RPGMakerPlugin(.mz)])
+    await library.refresh()
+    let backups = base.appendingPathComponent("ludusavi-backup/No Socks RPG", isDirectory: true)
+    try fm.createDirectory(at: backups, withIntermediateDirectories: true)
+    try Data(LudusaviMapping(name: "No Socks RPG").yamlString().utf8).write(to: backups.appendingPathComponent("mapping.yaml"))
+    let service = SaveSyncService(library: library)
+    service.chooseFolder(backups.deletingLastPathComponent())
+    await service.refresh()
+
+    let id = GameID("No Socks RPG")
+    async let first = service.backUp(id)
+    async let second = service.backUp(id)
+    async let third = service.backUp(id)
+    let made = try await [first, second, third].compactMap(\.backup)
+    #expect(made.count == 1)
+}
+
+@Test func undoRefusesSnapshotsItCannotTrust() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("backups"))
+    let locations = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
+    _ = try store.backUp(folder: nil, title: "G", game: GameID("G"), locations: locations, retention: nil, os: "mac", comment: nil)
+    try write(["file1.rmmzsave": "mine", "file2.rmmzsave": "two"], to: locations[0])
+    let snapshot = base.appendingPathComponent("snapshot")
+    _ = try store.restore(folder: "G", backup: nil, locations: locations, snapshot: snapshot)
+    #expect(LudusaviStore.isComplete(snapshot: snapshot))
+    let afterRestore = ["file1.rmmzsave": "one", "file2.rmmzsave": "two"]
+
+    // A snapshot folder that can't be listed must not read as empty, or undo would delete every save.
+    let saved = snapshot.appendingPathComponent("0").path
+    try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: saved)
+    #expect(throws: SaveSyncError.self) { try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot) }
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: saved)
+    #expect(try contents(of: locations[0]) == afterRestore)
+
+    // A save folder that can't be listed stops a restore before it writes, since its snapshot would be incomplete.
+    let saves = locations[0].directory.path
+    try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: saves)
+    #expect(throws: SaveSyncError.self) { try store.restore(folder: "G", backup: nil, locations: locations, snapshot: snapshot) }
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: saves)
+    #expect(try contents(of: locations[0]) == afterRestore)
+    #expect(LudusaviStore.isComplete(snapshot: snapshot))
+
+    try fm.removeItem(at: snapshot.appendingPathComponent("complete"))
+    #expect(throws: SaveSyncError.incompleteSnapshot) { try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot) }
+    #expect(try contents(of: locations[0]) == afterRestore)
+}
+
+@Test func aSaveBackedUpFromTwoFoldersRestoresAndBacksUpFromTheSameOne() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("backups"))
+    let locations = try makeGame(in: base)
+    let mac = "/Users/user/Games/NoSocksRPG/save/"
+    let stored = [mac + "file1.rmmzsave": "mac", deckSave + "file1.rmmzsave": "deck", deckSave + "file2.rmmzsave": "two",
+                  deckSave + "global.rmmzsave": "g"]
+    var mapping = LudusaviMapping(name: "G")
+    mapping.backups = [FullBackup(name: "backup-1", when: Timestamp.epoch, locked: false,
+                                  files: stored.mapValues { FileEntry(hash: sha1($0), size: UInt64($0.utf8.count)) },
+                                  registryHash: nil, children: [])]
+    let gameDir = store.root.appendingPathComponent("G")
+    for (path, content) in stored {
+        let url = gameDir.appendingPathComponent(try #require(mapping.storedPath(of: path, in: "backup-1")))
+        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(content.utf8).write(to: url)
+    }
+    try Data(mapping.yamlString().utf8).write(to: gameDir.appendingPathComponent("mapping.yaml"))
+
+    let report = try store.restore(folder: "G", backup: nil, locations: locations, snapshot: base.appendingPathComponent("snapshot"))
+    #expect(report.skipped == [mac + "file1.rmmzsave"])
+    #expect(try contents(of: locations[0])["file1.rmmzsave"] == "deck")
+
+    try write(["file1.rmmzsave": "deck v2"], to: locations[0])
+    _ = try store.backUp(folder: "G", title: "G", game: GameID("G"), locations: locations,
+                         retention: Retention(full: 1, differential: 1), os: "mac", comment: nil)
+    let diff = try #require(try store.mapping("G").backups.last?.children.last)
+    #expect(diff.files == [deckSave + "file1.rmmzsave": .changed(FileEntry(hash: sha1("deck v2"), size: 7))])
+}
+
 /// Runs against a copy of the user's real No Socks RPG backup, when the Mac running the tests has it.
 @Suite(.enabled(if: fm.fileExists(atPath: realSample.path)))
 struct RealSampleTests {

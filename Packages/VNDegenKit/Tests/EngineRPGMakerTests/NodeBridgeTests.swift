@@ -82,6 +82,29 @@ private func decode(_ json: String) throws -> BridgeRequest {
     #expect(sandbox.bridge.handle(.readFile(path: "/game", text: true)) == .failure(BridgeError(code: "EISDIR", message: "illegal operation on a directory")))
 }
 
+@Test func copyFileNeverDeletesWhatItCopiesOnto() throws {
+    let sandbox = try Sandbox()
+    defer { sandbox.remove() }
+    let bridge = sandbox.bridge
+    #expect(bridge.handle(.mkdir(path: "/game/save", recursive: false)) == .value(.null))
+    #expect(bridge.handle(.writeFile(path: "/game/save/file1.rmmzsave", data: "one", text: true)) == .value(.null))
+    #expect(bridge.handle(.writeFile(path: "/game/save/file2.rmmzsave", data: "two", text: true)) == .value(.null))
+
+    let isDirectory = BridgeError(code: "EISDIR", message: "illegal operation on a directory")
+    #expect(bridge.handle(.copyFile(from: "/game/save/file1.rmmzsave", to: "/game/save")) == .failure(isDirectory))
+    #expect(bridge.handle(.copyFile(from: "/game/save/file1.rmmzsave", to: "/game")) == .failure(isDirectory))
+    #expect(bridge.handle(.copyFile(from: "/game/save", to: "/game/backup")) == .failure(isDirectory))
+    #expect(bridge.handle(.copyFile(from: "/game/save/file1.rmmzsave", to: "/game/save/./file1.rmmzsave")) == .value(.null))
+    #expect(bridge.handle(.readFile(path: "/game/save/file1.rmmzsave", text: true)) == .value(.string("one")))
+
+    #expect(bridge.handle(.copyFile(from: "/game/save/file1.rmmzsave", to: "/game/save/file2.rmmzsave")) == .value(.null))
+    #expect(bridge.handle(.readFile(path: "/game/save/file2.rmmzsave", text: true)) == .value(.string("one")))
+    #expect(bridge.handle(.copyFile(from: "/game/save/file1.rmmzsave", to: "/game/missing/file1.rmmzsave"))
+            == .failure(BridgeError(code: "ENOENT", message: "no such file or directory, '/game/missing/file1.rmmzsave'")))
+    let left = try FileManager.default.contentsOfDirectory(atPath: sandbox.root.appendingPathComponent("save").path).sorted()
+    #expect(left == ["file1.rmmzsave", "file2.rmmzsave"])
+}
+
 @Test func repliesSerializeForTheShim() {
     #expect(BridgeReply.value(.bool(true)).json == #"{"value":true}"#)
     #expect(BridgeReply.value(.null).json == #"{"value":null}"#)

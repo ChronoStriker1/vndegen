@@ -56,18 +56,18 @@ public struct LudusaviStore: Sendable {
         guard let files = mapping.effectiveFiles(backup) else { throw SaveSyncError.noBackups }
         let gameDir = root.appendingPathComponent(folder, isDirectory: true)
 
+        // A save the backup holds under more than one path restores from the path a backup would record it under.
+        let recorded = RecordedPaths(files.keys, locations: locations)
         var planned: [URL: (source: URL, entry: FileEntry, relative: String)] = [:]
         var skipped: [String] = []
         for (path, stored) in files.sortedByKey {
-            guard let (location, relative) = Self.claim(path, locations) else { skipped.append(path); continue }
+            guard let (index, relative) = Self.claim(path, locations), recorded.path(of: relative, in: index) == path else {
+                skipped.append(path)
+                continue
+            }
             if stored.backup.hasSuffix(".zip") { throw SaveSyncError.zipBackup(stored.backup) }
             guard let source = mapping.storedPath(of: path, in: stored.backup) else { skipped.append(path); continue }
-            let target = location.directory.appendingPathComponent(relative)
-            if planned[target] == nil {
-                planned[target] = (gameDir.appendingPathComponent(source), stored.entry, relative)
-            } else {
-                skipped.append(path)
-            }
+            planned[locations[index].directory.appendingPathComponent(relative)] = (gameDir.appendingPathComponent(source), stored.entry, relative)
         }
         guard !planned.isEmpty else { throw SaveSyncError.nothingToRestore(skipped.count) }
 
@@ -91,24 +91,37 @@ public struct LudusaviStore: Sendable {
                              skipped: skipped)
     }
 
-    /// Puts the saves from the last restore's snapshot back, removing saves the snapshot did not have.
+    /// Puts the saves from the last restore's snapshot back, removing saves the snapshot did not have. Reads every
+    /// folder before changing anything, so a folder that can't be read stops the undo with no save touched.
     public static func undoRestore(locations: [SaveLocation], snapshot: URL) throws {
         let fm = FileManager.default
         guard fm.fileExists(atPath: snapshot.path) else { throw SaveSyncError.noSnapshot }
-        for (index, location) in locations.enumerated() {
+        guard isComplete(snapshot: snapshot) else { throw SaveSyncError.incompleteSnapshot }
+        let plans = try locations.enumerated().map { index, location in
             let saved = snapshot.appendingPathComponent(String(index), isDirectory: true)
-            let keep = Set(regularFiles(in: saved))
-            for relative in keep {
-                let target = location.directory.appendingPathComponent(relative)
+            guard fm.fileExists(atPath: saved.path) else { throw SaveSyncError.incompleteSnapshot }
+            return (location: location, saved: saved, keep: Set(try regularFiles(in: saved)), current: try localSaves([location]))
+        }
+        for plan in plans {
+            for relative in plan.keep {
+                let target = plan.location.directory.appendingPathComponent(relative)
                 try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try Data(contentsOf: saved.appendingPathComponent(relative)).write(to: target, options: .atomic)
+                try Data(contentsOf: plan.saved.appendingPathComponent(relative)).write(to: target, options: .atomic)
             }
-            for save in localSaves([location]) where !keep.contains(save.relative) {
+            for save in plan.current where !plan.keep.contains(save.relative) {
                 try fm.removeItem(at: save.url)
             }
         }
         try fm.removeItem(at: snapshot)
     }
+
+    /// True when `snapshot` holds every save it was meant to. Only a complete snapshot can be undone to, because undo
+    /// deletes the saves a snapshot lacks.
+    public static func isComplete(snapshot: URL) -> Bool {
+        FileManager.default.fileExists(atPath: snapshot.appendingPathComponent(snapshotCompleteFile).path)
+    }
+
+    static let snapshotCompleteFile = "complete"
 
     static func takeSnapshot(of locations: [SaveLocation], to snapshot: URL) throws {
         let fm = FileManager.default
@@ -117,12 +130,13 @@ public struct LudusaviStore: Sendable {
         for (index, location) in locations.enumerated() {
             let dir = staging.appendingPathComponent(String(index), isDirectory: true)
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            for save in localSaves([location]) {
+            for save in try localSaves([location]) {
                 let target = dir.appendingPathComponent(save.relative)
                 try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try fm.copyItem(at: save.url, to: target)
             }
         }
+        try Data().write(to: staging.appendingPathComponent(snapshotCompleteFile))
         try? fm.removeItem(at: snapshot)
         try fm.moveItem(at: staging, to: snapshot)
     }
@@ -135,13 +149,13 @@ public struct LudusaviStore: Sendable {
     /// latest backup already matches.
     public func backUp(folder: String?, title: String, game: GameID, locations: [SaveLocation], retention: Retention?,
                        now: Date = .now, os: String, comment: String?) throws -> BackupReport {
-        let local = Self.localSaves(locations)
+        let local = try Self.localSaves(locations)
         guard !local.isEmpty else { throw SaveSyncError.noLocalSaves }
 
         let folder = folder ?? LudusaviMapping.escapeFolderName(title)
         let gameDir = root.appendingPathComponent(folder, isDirectory: true)
         let mappingURL = gameDir.appendingPathComponent(Self.mappingFile)
-        let original = try? String(contentsOf: mappingURL, encoding: .utf8)
+        let original = try Self.textIfPresent(mappingURL)
         var mapping = try original.map(LudusaviMapping.init(yaml:)) ?? LudusaviMapping(name: title)
         let latest = mapping.effectiveFiles() ?? [:]
 
@@ -160,7 +174,7 @@ public struct LudusaviStore: Sendable {
 
         let retention = retention ?? Retention(inferredFrom: mapping)
         let differential = retention.allowsDifferential(after: mapping)
-        let name = Self.newBackupName(differential: differential, now: now, mapping: mapping, gameDir: gameDir)
+        let name = try Self.makeBackupFolder(differential: differential, now: now, mapping: mapping, gameDir: gameDir)
 
         // The files whose bytes go into the new folder, and the entries the mapping records.
         var copies: [String: Source] = [:]
@@ -209,7 +223,7 @@ public struct LudusaviStore: Sendable {
             }
             try writeMapping(mapping, to: mappingURL, expecting: original)
         } catch {
-            // Only the folder this call created. Existing backups are never touched.
+            // Only the folder this call created, which no other backup can share. Existing backups are never touched.
             try? fm.removeItem(at: backupDir)
             throw error
         }
@@ -220,7 +234,7 @@ public struct LudusaviStore: Sendable {
     /// Refuses to write when someone else changed the file since it was read.
     private func writeMapping(_ mapping: LudusaviMapping, to url: URL, expecting original: String?) throws {
         let fm = FileManager.default
-        let current = try? String(contentsOf: url, encoding: .utf8)
+        let current = try Self.textIfPresent(url)
         guard current == original else { throw SaveSyncError.changedDuringBackup }
         let previous = url.deletingLastPathComponent().appendingPathComponent(Self.previousMappingFile)
         if current != nil {
@@ -236,13 +250,32 @@ public struct LudusaviStore: Sendable {
         try? fm.removeItem(at: previous)
     }
 
-    static func newBackupName(differential: Bool, now: Date, mapping: LudusaviMapping, gameDir: URL) -> String {
+    /// The file's text, or nil when there is no file. Any other failure throws, so a mapping that can't be read is never
+    /// mistaken for a game with no backups and written over.
+    static func textIfPresent(_ url: URL) throws -> String? {
+        do {
+            return try String(contentsOf: url, encoding: .utf8)
+        } catch CocoaError.fileReadNoSuchFile {
+            return nil
+        } catch {
+            throw SaveSyncError.unreadable(url.path)
+        }
+    }
+
+    /// Creates the folder for a new backup and returns its name. Creating fails when the folder already exists, so two
+    /// backups never share one, and a failed backup removes only its own.
+    static func makeBackupFolder(differential: Bool, now: Date, mapping: LudusaviMapping, gameDir: URL) throws -> String {
+        let fm = FileManager.default
+        try fm.createDirectory(at: gameDir, withIntermediateDirectories: true)
         var date = now
         while true {
             let name = "backup-\(Timestamp.folderStamp(date))\(differential ? "-diff" : "")"
-            let taken = mapping.summaries.contains { $0.name == name }
-                || FileManager.default.fileExists(atPath: gameDir.appendingPathComponent(name).path)
-            if !taken { return name }
+            if !mapping.summaries.contains(where: { $0.name == name }) {
+                do {
+                    try fm.createDirectory(at: gameDir.appendingPathComponent(name, isDirectory: true), withIntermediateDirectories: false)
+                    return name
+                } catch CocoaError.fileWriteFileExists {}
+            }
             date += 1
         }
     }
@@ -259,37 +292,21 @@ public struct LudusaviStore: Sendable {
         }
     }
 
-    /// Picks the path each local save is recorded under, in the order of `local`. The path the latest backup used for that save wins. A new
-    /// save takes the most common folder of that location's saves in the latest backup. With nothing to go on, the
-    /// save goes under `/VNDegen/<game>/`.
+    /// Picks the path each local save is recorded under, in the order of `local`. The path the latest backup used for
+    /// that save wins. A new save takes the most common folder of that location's saves in the latest backup. With
+    /// nothing to go on, the save goes under `/VNDegen/<game>/`.
     static func canonicalPaths(for local: [LocalSave], locations: [SaveLocation], latest: [String: StoredFile],
                                game: GameID) -> (recorded: [String], origin: [BackupReport.PathOrigin: Int]) {
-        var known: [Int: [String: [String]]] = [:]
-        var prefixes: [Int: [String: Int]] = [:]
-        for path in latest.keys {
-            for (index, location) in locations.enumerated() {
-                guard let relative = location.relativePath(path), path.hasSuffix(relative) else { continue }
-                known[index, default: [:]][relative, default: []].append(path)
-                prefixes[index, default: [:]][String(path.dropLast(relative.count)), default: 0] += 1
-            }
-        }
-        func rank(_ index: Int) -> (String, String) -> Bool {
-            { a, b in
-                let ca = prefixes[index]?[a] ?? 0, cb = prefixes[index]?[b] ?? 0
-                return ca != cb ? ca > cb : a < b
-            }
-        }
-
+        let known = RecordedPaths(latest.keys, locations: locations)
         var recorded: [String] = []
         var origin: [BackupReport.PathOrigin: Int] = [:]
         for save in local {
             let location = locations[save.location]
-            if let candidates = known[save.location]?[save.relative] {
-                let ranked = candidates.map { String($0.dropLast(save.relative.count)) }.sorted(by: rank(save.location))
-                recorded.append(ranked[0] + save.relative)
+            if let path = known.path(of: save.relative, in: save.location) {
+                recorded.append(path)
                 origin[.latestBackup, default: 0] += 1
-            } else if let prefix = prefixes[save.location]?.keys.sorted(by: rank(save.location)).first {
-                recorded.append(prefix + save.relative)
+            } else if let folder = known.commonFolder[save.location] {
+                recorded.append(folder + save.relative)
                 origin[.commonFolder, default: 0] += 1
             } else {
                 let own = "/VNDegen/\(game.rawValue)/\(location.directory.lastPathComponent)/\(save.relative)"
@@ -301,6 +318,37 @@ public struct LudusaviStore: Sendable {
         return (recorded, origin)
     }
 
+    /// Where a backup keeps each save of each location. A backup can hold the same save under several folders, such as
+    /// the Steam Deck's and the Mac's, and restore and back up must agree on one: the folder holding most of that
+    /// location's saves, then the alphabetically first.
+    struct RecordedPaths {
+        /// Location index to save path relative to the location to the chosen absolute path.
+        private var chosen: [Int: [String: String]] = [:]
+        /// Location index to the folder, with a trailing slash, that holds most of its saves.
+        private(set) var commonFolder: [Int: String] = [:]
+
+        init(_ paths: some Sequence<String>, locations: [SaveLocation]) {
+            var folders: [Int: [String: [String]]] = [:]
+            var counts: [Int: [String: Int]] = [:]
+            for path in paths {
+                guard let (index, relative) = LudusaviStore.claim(path, locations), path.hasSuffix(relative) else { continue }
+                let folder = String(path.dropLast(relative.count))
+                folders[index, default: [:]][relative, default: []].append(folder)
+                counts[index, default: [:]][folder, default: 0] += 1
+            }
+            for (index, byRelative) in folders {
+                let count = counts[index] ?? [:]
+                let first = { (a: String, b: String) in count[a] != count[b] ? count[a, default: 0] > count[b, default: 0] : a < b }
+                chosen[index] = Dictionary(uniqueKeysWithValues: byRelative.map { relative, candidates in
+                    (relative, candidates.min(by: first)! + relative)
+                })
+                commonFolder[index] = count.keys.min(by: first)
+            }
+        }
+
+        func path(of relative: String, in location: Int) -> String? { chosen[location]?[relative] }
+    }
+
     // MARK: Local files
 
     struct LocalSave {
@@ -310,29 +358,45 @@ public struct LudusaviStore: Sendable {
     }
 
     /// Files in each location's directory that its rule recognizes as saves.
-    static func localSaves(_ locations: [SaveLocation]) -> [LocalSave] {
-        locations.enumerated().flatMap { index, location in
-            regularFiles(in: location.directory).compactMap { relative in
+    static func localSaves(_ locations: [SaveLocation]) throws -> [LocalSave] {
+        try locations.enumerated().flatMap { index, location in
+            try regularFiles(in: location.directory).compactMap { relative in
                 let url = location.directory.appendingPathComponent(relative)
                 return location.relativePath(url.path) == relative ? LocalSave(location: index, relative: relative, url: url) : nil
             }
         }
     }
 
-    /// Relative paths with forward slashes, skipping hidden files.
-    static func regularFiles(in directory: URL) -> [String] {
+    /// Relative paths with forward slashes, skipping hidden files. A directory that does not exist has none. Any other
+    /// failure throws, so a folder that could not be listed is never taken for an empty one.
+    static func regularFiles(in directory: URL) throws -> [String] {
+        do {
+            _ = try directory.checkResourceIsReachable()
+        } catch CocoaError.fileReadNoSuchFile {
+            return []
+        } catch {
+            throw SaveSyncError.unreadable(directory.path)
+        }
         let base = directory.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        var failed: URL?
         guard let walker = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey],
-                                                          options: [.skipsHiddenFiles]) else { return [] }
-        return walker.compactMap { item -> String? in
-            guard let url = item as? URL, (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { return nil }
-            return url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.dropFirst(base.count).joined(separator: "/")
-        }.sorted()
+                                                          options: [.skipsHiddenFiles], errorHandler: { url, _ in failed = url; return false })
+        else { throw SaveSyncError.unreadable(directory.path) }
+        var files: [String] = []
+        for case let url as URL in walker {
+            let values: URLResourceValues
+            do { values = try url.resourceValues(forKeys: [.isRegularFileKey]) } catch { throw SaveSyncError.unreadable(url.path) }
+            guard values.isRegularFile == true else { continue }
+            files.append(url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.dropFirst(base.count).joined(separator: "/"))
+        }
+        if let failed { throw SaveSyncError.unreadable(failed.path) }
+        return files.sorted()
     }
 
-    static func claim(_ path: String, _ locations: [SaveLocation]) -> (SaveLocation, String)? {
-        for location in locations {
-            if let relative = location.relativePath(path) { return (location, relative) }
+    /// The first location whose rule recognizes `path`, by index, and the path relative to it.
+    static func claim(_ path: String, _ locations: [SaveLocation]) -> (Int, String)? {
+        for (index, location) in locations.enumerated() {
+            if let relative = location.relativePath(path) { return (index, relative) }
         }
         return nil
     }
@@ -399,6 +463,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case zipBackup(String)
     case noLocalSaves
     case noSnapshot
+    case incompleteSnapshot
     case unsupportedPath(String)
     case changedDuringBackup
     case engineUnsupported
@@ -413,6 +478,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case let .zipBackup(name): "\(name) is a zip backup. VNDegen reads only Ludusavi's simple format."
         case .noLocalSaves: "This game has no saves to back up yet."
         case .noSnapshot: "There is no restore to undo."
+        case .incompleteSnapshot: "The saves kept before the last restore are incomplete, so undoing it could lose saves. Nothing was changed."
         case let .unsupportedPath(path): "Can't store \(path) in a Ludusavi backup."
         case .changedDuringBackup: "Ludusavi's mapping.yaml changed while VNDegen was writing. Nothing was recorded. Try again."
         case .engineUnsupported: "Save sync does not support this game's engine yet."

@@ -2,8 +2,12 @@ import Foundation
 import Testing
 @testable import EngineRPGMaker
 
+/// `VNDEGEN_TEST_DIR` puts the games on another volume, such as a case-sensitive disk image.
+private let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+    ?? FileManager.default.temporaryDirectory
+
 private func temporaryGame() throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let root = scratch.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root.appendingPathComponent("js"), withIntermediateDirectories: true)
     try Data("<html></html>".utf8).write(to: root.appendingPathComponent("index.html"))
     try Data("0123456789".utf8).write(to: root.appendingPathComponent("js/main.js"))
@@ -39,12 +43,20 @@ private func temporaryGame() throws -> URL {
     #expect(folder.resolve(virtualPath: "/game/www/save/file1.rpgsave")?.path == "/tmp/game/www/save/file1.rpgsave")
 }
 
-@Test func webRootIsDetectedFromIndexLocation() throws {
+@Test func webRootFollowsTheEngineCore() throws {
     let root = try temporaryGame()
     defer { try? FileManager.default.removeItem(at: root) }
+    try Data().write(to: root.appendingPathComponent("js/rmmz_core.js"))
     #expect(GameFolder(root: root).webRoot == "")
-    try FileManager.default.moveItem(at: root.appendingPathComponent("index.html"), to: root.appendingPathComponent("moved.html"))
-    #expect(GameFolder(root: root).webRoot == "www")
+
+    let mv = try temporaryGame()
+    defer { try? FileManager.default.removeItem(at: mv) }
+    try FileManager.default.createDirectory(at: mv.appendingPathComponent("WWW/JS"), withIntermediateDirectories: true)
+    try Data("mv".utf8).write(to: mv.appendingPathComponent("WWW/index.html"))
+    try Data().write(to: mv.appendingPathComponent("WWW/JS/rpg_core.js"))
+    let folder = GameFolder(root: mv)
+    #expect(folder.webRoot == "www")
+    #expect(try folder.resolve(servedPath: "/").map { try Data(contentsOf: $0) } == Data("mv".utf8))
 }
 
 @Test func mimeTypesCoverWhatTheEngineLoads() {
@@ -68,7 +80,13 @@ private func temporaryGame() throws -> URL {
     #expect(GameFolder.byteRange(header: "bytes=0-1", size: 0) == .full)
 }
 
-@Test func servingReturnsWholeFilesRangesAndMisses() throws {
+private func text(of response: FileResponse) async throws -> String {
+    var body = Data()
+    try await response.body?.stream { body.append($0); return true }
+    return String(decoding: body, as: UTF8.self)
+}
+
+@Test func servingReturnsWholeFilesRangesAndMisses() async throws {
     let root = try temporaryGame()
     defer { try? FileManager.default.removeItem(at: root) }
     let folder = GameFolder(root: root)
@@ -78,18 +96,95 @@ private func temporaryGame() throws -> URL {
     #expect(whole.headers["Content-Type"] == "text/javascript")
     #expect(whole.headers["Content-Length"] == "10")
     #expect(whole.headers["Accept-Ranges"] == "bytes")
-    #expect(String(decoding: whole.body, as: UTF8.self) == "0123456789")
+    #expect(try await text(of: whole) == "0123456789")
 
     let part = folder.serve(path: "/js/main.js", range: "bytes=2-4")
     #expect(part.status == 206)
     #expect(part.headers["Content-Range"] == "bytes 2-4/10")
-    #expect(String(decoding: part.body, as: UTF8.self) == "234")
+    #expect(try await text(of: part) == "234")
 
     let head = folder.serve(path: "/js/main.js", method: "HEAD")
-    #expect(head.status == 200 && head.body.isEmpty && head.headers["Content-Length"] == "10")
+    #expect(head.status == 200 && head.body == nil && head.headers["Content-Length"] == "10")
 
     #expect(folder.serve(path: "/js/main.js", range: "bytes=10-").status == 416)
     #expect(folder.serve(path: "/js/missing.js").status == 404)
     #expect(folder.serve(path: "/js").status == 404)
     #expect(folder.serve(path: "/../../../../etc/passwd").status == 404)
+}
+
+@Test func bodiesStreamInChunksAndStopWhenTheTaskStops() async throws {
+    let root = try temporaryGame()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let span = try #require(GameFolder(root: root).serve(path: "/js/main.js", range: "bytes=1-").body)
+
+    var chunks: [String] = []
+    try await span.stream(chunkSize: 4) { chunks.append(String(decoding: $0, as: UTF8.self)); return true }
+    #expect(chunks == ["1234", "5678", "9"])
+
+    chunks = []
+    try await span.stream(chunkSize: 4) { chunks.append(String(decoding: $0, as: UTF8.self)); return false }
+    #expect(chunks == ["1234"])
+}
+
+@Test func symlinksThatLeaveTheGameFolderAreRefused() async throws {
+    let fm = FileManager.default
+    let root = try temporaryGame()
+    let outside = root.deletingLastPathComponent().appendingPathComponent("outside-\(UUID().uuidString)")
+    defer { try? fm.removeItem(at: root); try? fm.removeItem(at: outside) }
+    try fm.createDirectory(at: outside, withIntermediateDirectories: true)
+    try Data("secret".utf8).write(to: outside.appendingPathComponent("secret.txt"))
+    try fm.createDirectory(at: root.appendingPathComponent("save"), withIntermediateDirectories: true)
+    try fm.createSymbolicLink(at: root.appendingPathComponent("outside"), withDestinationURL: outside)
+    try fm.createSymbolicLink(at: root.appendingPathComponent("save/file1.rmmzsave"), withDestinationURL: outside.appendingPathComponent("secret.txt"))
+    try fm.createSymbolicLink(at: root.appendingPathComponent("save/file2.rmmzsave"), withDestinationURL: outside.appendingPathComponent("new.txt"))
+    try fm.createSymbolicLink(at: root.appendingPathComponent("scripts"), withDestinationURL: root.appendingPathComponent("js"))
+    let folder = GameFolder(root: root)
+    let bridge = NodeBridge(folder: folder)
+
+    #expect(folder.resolve(virtualPath: "/game/outside") == nil)
+    #expect(folder.resolve(virtualPath: "/game/outside/secret.txt") == nil)
+    #expect(folder.resolve(virtualPath: "/game/outside/new/file.txt") == nil)
+    #expect(folder.resolve(virtualPath: "/game/save/file1.rmmzsave") == nil)
+    #expect(folder.resolve(virtualPath: "/game/save/file2.rmmzsave") == nil)
+    #expect(folder.serve(path: "/outside/secret.txt").status == 404)
+    #expect(folder.serve(path: "/save/file1.rmmzsave").status == 404)
+    #expect(bridge.handle(.exists(path: "/game/outside/secret.txt")) == .value(.bool(false)))
+    for request: BridgeRequest in [
+        .readFile(path: "/game/outside/secret.txt", text: true),
+        .readFile(path: "/game/save/file1.rmmzsave", text: true),
+        .writeFile(path: "/game/outside/new.txt", data: "x", text: true),
+        .writeFile(path: "/game/save/file2.rmmzsave", data: "x", text: true),
+        .mkdir(path: "/game/outside/dir", recursive: true),
+        .copyFile(from: "/game/index.html", to: "/game/outside/new.txt"),
+        .rename(from: "/game/js/main.js", to: "/game/outside/new.txt"),
+        .unlink(path: "/game/outside/secret.txt"),
+    ] {
+        guard case .failure(let error) = bridge.handle(request) else { Issue.record("\(request) reached outside"); continue }
+        #expect(error.code == "EACCES")
+    }
+    #expect(try fm.contentsOfDirectory(atPath: outside.path) == ["secret.txt"])
+    #expect(try String(contentsOf: outside.appendingPathComponent("secret.txt"), encoding: .utf8) == "secret")
+
+    // A symlink that stays inside the game folder still works.
+    #expect(try await text(of: folder.serve(path: "/scripts/main.js")) == "0123456789")
+}
+
+/// Exercises the lookup only on a case-sensitive volume, such as `VNDEGEN_TEST_DIR` on a case-sensitive APFS disk image.
+/// On a case-insensitive disk the same expectations hold without it.
+@Test func namesWithTheWrongCaseFindTheFileOnDisk() async throws {
+    let fm = FileManager.default
+    let root = try temporaryGame()
+    defer { try? fm.removeItem(at: root) }
+    try fm.createDirectory(at: root.appendingPathComponent("img/Pictures"), withIntermediateDirectories: true)
+    try Data("png".utf8).write(to: root.appendingPathComponent("img/Pictures/Actor1.png"))
+    try fm.createDirectory(at: root.appendingPathComponent("Save"), withIntermediateDirectories: true)
+    let folder = GameFolder(root: root)
+    let bridge = NodeBridge(folder: folder)
+
+    #expect(try await text(of: folder.serve(path: "/IMG/pictures/actor1.PNG")) == "png")
+    #expect(bridge.handle(.exists(path: "/game/img/pictures/ACTOR1.png")) == .value(.bool(true)))
+    #expect(bridge.handle(.readFile(path: "/game/Img/Pictures/actor1.png", text: true)) == .value(.string("png")))
+    #expect(bridge.handle(.writeFile(path: "/game/save/file1.rmmzsave", data: "s", text: true)) == .value(.null))
+    #expect(try fm.contentsOfDirectory(atPath: root.appendingPathComponent("Save").path) == ["file1.rmmzsave"])
+    #expect(try fm.contentsOfDirectory(atPath: #require(folder.saveDirectory).path) == ["file1.rmmzsave"])
 }

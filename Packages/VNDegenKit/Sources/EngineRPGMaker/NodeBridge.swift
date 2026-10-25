@@ -181,8 +181,21 @@ nonisolated struct NodeBridge: Sendable {
         case let .copyFile(from, to):
             let source = try confined(from), target = try confined(to)
             guard fm.fileExists(atPath: source.path) else { throw Self.missing(from) }
-            if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
-            try fm.copyItem(at: source, to: target)
+            guard !GameFolder.isDirectory(source), !GameFolder.isDirectory(target) else {
+                throw BridgeError(code: "EISDIR", message: "illegal operation on a directory")
+            }
+            // Node treats a copy onto the same file as done. Replacing it would delete the source.
+            if Self.isSameFile(source, target) { return .null }
+            guard GameFolder.isDirectory(target.deletingLastPathComponent()) else { throw Self.missing(to) }
+            // Copies beside the target and renames over it, so a failed copy leaves the old target in place.
+            let staging = target.deletingLastPathComponent().appendingPathComponent(".\(target.lastPathComponent).\(UUID().uuidString)")
+            do {
+                try fm.copyItem(at: source.resolvingSymlinksInPath(), to: staging)
+                guard rename(staging.path, target.path) == 0 else { throw Self.posixError() }
+            } catch {
+                try? fm.removeItem(at: staging)
+                throw error
+            }
             return .null
 
         case .openExternal, .quit:
@@ -195,6 +208,12 @@ nonisolated struct NodeBridge: Sendable {
             throw BridgeError(code: "EACCES", message: "path is outside the game folder: \(path)")
         }
         return url
+    }
+
+    private static func isSameFile(_ a: URL, _ b: URL) -> Bool {
+        var first = stat(), second = stat()
+        guard stat(a.path, &first) == 0, stat(b.path, &second) == 0 else { return false }
+        return first.st_dev == second.st_dev && first.st_ino == second.st_ino
     }
 
     private static func missing(_ path: String) -> BridgeError {

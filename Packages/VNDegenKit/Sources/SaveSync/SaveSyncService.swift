@@ -42,6 +42,8 @@ public final class SaveSyncService {
     private var settings: Settings
     /// The folder whose security scope is open, so it can be closed when the user picks another.
     @ObservationIgnored private var accessed: URL?
+    /// The last restore, undo, or backup started. Each new one waits for it, so two never write the same folders at once.
+    @ObservationIgnored private var lastOperation: Task<Void, Never>?
 
     public init(library: LibraryStore) {
         self.library = library
@@ -148,23 +150,23 @@ public final class SaveSyncService {
         let locations = try saveLocations(id)
         let snapshot = snapshotURL(id)
         try FileManager.default.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let report = try await Task.detached(priority: .userInitiated) {
+        let report = try await serialized {
             try store.restore(folder: folder, backup: backup, locations: locations, snapshot: snapshot)
-        }.value
+        }
         log.info("restored \(report.restored.count) saves of \(id.rawValue) from \(report.backup)")
         return report
     }
 
     public func canUndoRestore(_ id: GameID) -> Bool {
-        FileManager.default.fileExists(atPath: snapshotURL(id).path)
+        LudusaviStore.isComplete(snapshot: snapshotURL(id))
     }
 
     public func undoRestore(_ id: GameID) async throws {
         let locations = try saveLocations(id)
         let snapshot = snapshotURL(id)
-        try await Task.detached(priority: .userInitiated) {
+        try await serialized {
             try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot)
-        }.value
+        }
     }
 
     public func backUp(_ id: GameID) async throws -> BackupReport {
@@ -172,10 +174,10 @@ public final class SaveSyncService {
         guard let game = library.game(id) else { throw SaveSyncError.noLocalSaves }
         let locations = try saveLocations(id)
         let folder = match(for: id), retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
-        let report = try await Task.detached(priority: .userInitiated) {
+        let report = try await serialized {
             try store.backUp(folder: folder, title: game.title, game: id, locations: locations, retention: retention,
                              os: os, comment: comment)
-        }.value
+        }
         if folder == nil, report.backup != nil {
             settings.matches[id.rawValue] = LudusaviMapping.escapeFolderName(game.title)
             saveSettings()
@@ -195,6 +197,17 @@ public final class SaveSyncService {
         } catch {
             log.error("automatic backup of \(id.rawValue) failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Runs `work` off the main thread after every operation started before it has finished.
+    private func serialized<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        let previous = lastOperation
+        let operation = Task.detached(priority: .userInitiated) {
+            await previous?.value
+            return try work()
+        }
+        lastOperation = Task { _ = try? await operation.value }
+        return try await operation.value
     }
 
     private func saveLocations(_ id: GameID) throws -> [SaveLocation] {

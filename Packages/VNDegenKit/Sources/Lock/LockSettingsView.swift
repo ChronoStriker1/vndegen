@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Passcode and biometrics options, shown inside the app's Settings screen.
 public struct LockSettingsView: View {
-    @Bindable var lock: LockService
+    let lock: LockService
     @State private var flow: PasscodeFlow.Purpose?
 
     public init(lock: LockService) { self.lock = lock }
@@ -14,7 +14,9 @@ public struct LockSettingsView: View {
                     Button("Change Passcode") { flow = .change }
                     Button("Remove Passcode", role: .destructive) { flow = .remove }
                 } else {
-                    Button("Set Passcode") { flow = .create }
+                    Button("Set Passcode") {
+                        Task { if await lock.authorizeCredentialChange() { flow = .create } }
+                    }
                 }
             } header: {
                 Text("Hidden games")
@@ -24,7 +26,9 @@ public struct LockSettingsView: View {
                      : "Locked games stay hidden until you unlock them with \(unlockMethods).")
             }
             Section {
-                Toggle(isOn: $lock.biometricsEnabled) {
+                Toggle(isOn: Binding(get: { lock.biometricsEnabled }, set: { enabled in
+                    Task { await lock.setBiometricsEnabled(enabled) }
+                })) {
                     Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
                 }
                 .disabled(lock.biometry == .none)

@@ -32,10 +32,10 @@ public enum Biometry: Sendable {
 public final class LockService {
     public private(set) var isUnlocked = false
     public private(set) var hasPasscode = false
-    /// The biometry this device can use right now. `.none` when it has none, none enrolled, or it is locked out.
+    /// The biometry this device can use right now. `.none` when it has none or none enrolled.
     public private(set) var biometry: Biometry = .none
-    /// The user's choice to offer biometrics. Remembered across launches.
-    public var biometricsEnabled: Bool {
+    /// The user's choice to offer biometrics. Remembered across launches. Change it with `setBiometricsEnabled(_:)`.
+    public private(set) var biometricsEnabled: Bool {
         didSet { defaults.set(biometricsEnabled, forKey: Self.biometricsKey) }
     }
     /// True when nothing could unlock the library yet, so the user must set a passcode before locking games.
@@ -67,7 +67,11 @@ public final class LockService {
     /// Re-reads what biometry the device offers. The views call it when they appear, since enrollment can change in Settings.
     public func refreshBiometry() {
         let context = LAContext()
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else {
+        var error: NSError?
+        let available = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        // A locked-out sensor still guards the library, and the device passcode stands in for it. Counting it as absent
+        // would let anyone who fails Face ID a few times set a passcode of their own.
+        guard available || error?.code == LAError.biometryLockout.rawValue else {
             biometry = .none
             return
         }
@@ -79,18 +83,43 @@ public final class LockService {
         }
     }
 
-    /// Biometrics first. With an app passcode set, the prompt's fallback button returns here so the user types it on the keypad.
-    /// Without one, the system falls back to the device passcode. Returns whether the library is now unlocked.
+    /// Biometrics first, falling back as `authenticate(reason:)` describes. Returns whether the library is now unlocked.
     public func unlockWithBiometrics() async -> Bool {
         guard canUseBiometrics, !authenticating else { return isUnlocked }
+        let ok = await authenticate(reason: "Show your hidden games.")
+        if ok { isUnlocked = true }
+        return ok
+    }
+
+    /// True when the user may add a passcode or turn biometrics off. When biometrics alone guard hidden games, either
+    /// change would let whoever holds the device in, so it asks for biometrics first, the same check that unlocks.
+    /// With a passcode set, the passcode flows ask for the current one instead.
+    public func authorizeCredentialChange() async -> Bool {
+        guard !hasPasscode, canUseBiometrics else { return true }
+        guard !authenticating else { return false }
+        return await authenticate(reason: "Change how your hidden games unlock.")
+    }
+
+    /// Turns biometrics on, or off once `authorizeCredentialChange()` allows it. Returns the setting now in effect.
+    @discardableResult
+    public func setBiometricsEnabled(_ enabled: Bool) async -> Bool {
+        if enabled {
+            biometricsEnabled = true
+        } else if await authorizeCredentialChange() {
+            biometricsEnabled = false
+        }
+        return biometricsEnabled
+    }
+
+    /// With an app passcode set, the prompt's fallback button returns to the caller so the user types it on the keypad.
+    /// Without one, the system falls back to the device passcode.
+    private func authenticate(reason: String) async -> Bool {
         authenticating = true
         defer { authenticating = false }
         let context = LAContext()
         context.localizedFallbackTitle = hasPasscode ? "Enter Passcode" : nil
         let policy: LAPolicy = hasPasscode ? .deviceOwnerAuthenticationWithBiometrics : .deviceOwnerAuthentication
-        let ok = (try? await context.evaluatePolicy(policy, localizedReason: "Show your hidden games.")) ?? false
-        if ok { isUnlocked = true }
-        return ok
+        return (try? await context.evaluatePolicy(policy, localizedReason: reason)) ?? false
     }
 
     public func unlock(passcode: String) -> Bool {
