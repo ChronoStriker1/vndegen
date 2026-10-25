@@ -63,6 +63,15 @@ struct HubMetrics: Equatable {
     var titleSize: CGFloat { isCompact ? 30 : (isShort ? 30 : 44) }
 }
 
+extension View {
+    /// Insets both sides by the larger horizontal safe area, so centered layouts stay centered on the screen when only
+    /// one side has an inset, such as the iPhone Duo's 84 pt camera inset.
+    func balancedHorizontalSafeArea(_ metrics: HubMetrics) -> some View {
+        padding(.horizontal, max(metrics.insets.leading, metrics.insets.trailing))
+            .ignoresSafeArea(edges: .horizontal)
+    }
+}
+
 extension EnvironmentValues {
     @Entry var hubMetrics = HubMetrics(size: CGSize(width: 1024, height: 768))
 }

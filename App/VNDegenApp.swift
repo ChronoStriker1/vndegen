@@ -29,7 +29,7 @@ struct VNDegenApp: App {
                     #if DEBUG
                     await DebugHooks.run(hub)
                     #endif
-                    await hub.library.refresh()
+                    await hub.refreshLibrary()
                     // `-autolaunch "<folder name>"` starts a game directly, for testing.
                     if let name = UserDefaults.standard.string(forKey: "autolaunch") {
                         hub.launch(GameID(name))

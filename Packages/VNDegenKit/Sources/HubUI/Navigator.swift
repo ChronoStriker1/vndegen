@@ -67,8 +67,6 @@ final class Navigator {
     private(set) var path: [Route] = []
     var sheet: Sheet? { didSet { syncInputMode() } }
     private(set) var focus: Target?
-    /// Touch users never see a focus ring. Controller, keyboard, and pointer hover reveal it.
-    private var focusVisible = false
     /// The game shown in the home hero: the last game whose tile had focus.
     private var heroID: GameID?
     /// Set by the grid view from its width.
@@ -198,20 +196,25 @@ final class Navigator {
         }
     }
 
+    /// Touch users never see a focus ring. Controllers, the keyboard, and the pointer reveal it.
     func isFocused(_ target: Target) -> Bool {
-        focus == target && (focusVisible || hub.input.lastInputKind != .touch)
+        focus == target && hub.input.lastInputKind != .touch
     }
 
     /// Pointer hover on Mac and iPad moves focus without activating.
     func hover(_ target: Target) {
         guard sheet == nil else { return }
-        focusVisible = true
+        hub.input.noteInput(.keyboardMouse)
         if focus != target { setFocus(target) }
     }
 
     /// Tap or click: focus and activate in one step.
     func select(_ target: Target) {
-        focusVisible = false
+        #if os(macOS)
+        hub.input.noteInput(.keyboardMouse)
+        #else
+        hub.input.noteInput(.touch)
+        #endif
         setFocus(target)
         activate(target)
     }
@@ -302,7 +305,7 @@ final class Navigator {
             syncInputMode()
         }
         // Until the user steers with a controller, keep the default focus current as the library loads.
-        if !focusVisible || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
+        if hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
     }
 
     // MARK: Engines
@@ -346,7 +349,6 @@ final class Navigator {
     }
 
     func handle(_ event: ControllerEvent) {
-        focusVisible = true
         if case .unlock = sheet {
             unlockView?.handle(event)
             return

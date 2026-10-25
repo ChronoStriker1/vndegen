@@ -39,8 +39,12 @@ struct LibraryGridView: View {
 
     var body: some View {
         let games = nav.visibleGames
-        let tile = metrics.isCompact ? (metrics.size.width - metrics.padding * 2 - metrics.tileSpacing * 2) / 3 : metrics.tileWidth
-        let columns = max(2, Int((metrics.size.width - metrics.padding * 2 + metrics.tileSpacing) / (tile + metrics.tileSpacing)))
+        let spacing = metrics.tileSpacing
+        let available = metrics.fullWidth - 2 * max(metrics.insets.leading, metrics.insets.trailing) - metrics.padding * 2
+        let target = metrics.isCompact ? (available - spacing * 2) / 3 : metrics.tileWidth
+        let columns = max(2, Int((available + spacing) / (target + spacing)))
+        // Stretch tiles so each row runs edge to edge instead of leaving a ragged gap on the right.
+        let tile = (available - spacing * CGFloat(columns - 1)) / CGFloat(columns)
         VStack(alignment: .leading, spacing: 8) {
             ScreenHeader(title: "All games", detail: "\(games.count)")
             ScrollViewReader { proxy in
@@ -63,14 +67,23 @@ struct LibraryGridView: View {
             }
         }
         .onChange(of: columns, initial: true) { _, columns in nav.gridColumns = columns }
+        .balancedHorizontalSafeArea(metrics)
         .background { Theme.background.ignoresSafeArea() }
     }
 }
 
 struct SettingsView: View {
     @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
+    @State private var page: Page?
+
+    /// MetadataSettingsView and LockSettingsView are whole forms, so they open in their own sheet.
+    private enum Page: String, Identifiable {
+        case metadata, lock
+        var id: String { rawValue }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -83,15 +96,19 @@ struct SettingsView: View {
                             .textSelection(.enabled)
                     }
                     Button(LibraryFolder.openTitle, systemImage: "folder") { LibraryFolder.open(hub.library.paths.gamesRoot) }
-                    Button("Rescan library", systemImage: "arrow.clockwise") { Task { await hub.library.refresh() } }
+                    Button("Rescan library", systemImage: "arrow.clockwise") { Task { await hub.refreshLibrary() } }
                 } header: {
                     Text("Library")
                 } footer: {
                     Text(LibraryFolder.instructions)
                 }
 
-                Section("Metadata") { MetadataSettingsView(service: hub.metadata) }
-                Section("Hidden games") { LockSettingsView(lock: hub.lock) }
+                Section("Sources and privacy") {
+                    pageRow("Metadata sources", systemImage: "text.magnifyingglass",
+                            value: hub.metadata.activeSources.map(\.displayName).formatted(.list(type: .and)), page: .metadata)
+                    pageRow("Hidden games", systemImage: "lock",
+                            value: hub.lock.hasPasscode ? "Passcode set" : "No passcode", page: .lock)
+                }
 
                 Section {
                     Picker("Touch controls", selection: $touchMode) {
@@ -112,7 +129,40 @@ struct SettingsView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
+        .balancedHorizontalSafeArea(metrics)
         .background { Theme.background.ignoresSafeArea() }
+        .sheet(item: $page) { page in
+            Group {
+                switch page {
+                case .metadata:
+                    SheetScaffold(title: "Metadata sources", escapeCloses: true, onClose: { self.page = nil }) {
+                        MetadataSettingsView(service: hub.metadata).scrollContentBackground(.hidden)
+                    }
+                case .lock:
+                    SheetScaffold(title: "Hidden games", onClose: { self.page = nil }) {
+                        LockSettingsView(lock: hub.lock).scrollContentBackground(.hidden)
+                    }
+                }
+            }
+            .environment(nav)
+            .presentationDetents([.large])
+            #if os(macOS)
+            .frame(minWidth: 520, minHeight: 560)
+            #endif
+        }
+    }
+
+    private func pageRow(_ title: String, systemImage: String, value: String, page: Page) -> some View {
+        Button { self.page = page } label: {
+            HStack {
+                Label(title, systemImage: systemImage).foregroundStyle(.white)
+                Spacer()
+                Text(value).foregroundStyle(Theme.secondaryText).lineLimit(1)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.tertiaryText)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 
     static func displayPath(_ url: URL) -> String {
@@ -202,7 +252,7 @@ struct EmptyLibraryView: View {
                         .buttonStyle(HubButtonStyle(kind: .primary, focused: false))
                         Button {
                             scanning = true
-                            Task { await hub.library.refresh(); scanning = false }
+                            Task { await hub.refreshLibrary(); scanning = false }
                         } label: {
                             Label("Rescan", systemImage: "arrow.clockwise")
                         }
@@ -218,7 +268,8 @@ struct EmptyLibraryView: View {
             .frame(maxWidth: .infinity, minHeight: metrics.size.height)
         }
         .scrollIndicators(.hidden)
-        .refreshable { await hub.library.refresh() }
+        .balancedHorizontalSafeArea(metrics)
+        .refreshable { await hub.refreshLibrary() }
         .background {
             RadialGradient(colors: [Theme.accent.opacity(0.22), Theme.background], center: .init(x: 0.3, y: 0.35),
                            startRadius: 0, endRadius: max(metrics.size.width, metrics.size.height) * 0.7)

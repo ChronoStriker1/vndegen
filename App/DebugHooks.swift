@@ -26,6 +26,7 @@ enum DebugHooks {
     static func playInput(_ hub: Hub) async {
         guard let script = UserDefaults.standard.string(forKey: "demoInput") else { return }
         try? await Task.sleep(for: .seconds(1.5))
+        hub.input.noteInput(.gamepad)
         for step in script.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) {
             if let button = VirtualButton(rawValue: step) {
                 hub.input.onEvent?(.button(button, pressed: true))

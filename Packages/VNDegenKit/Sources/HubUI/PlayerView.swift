@@ -15,7 +15,10 @@ struct PlayerView: View {
             SessionViewHost(session: session)
                 .ignoresSafeArea()
             if showsTouchControls {
-                TouchControlsOverlay(mode: $touchMode, send: handle)
+                TouchControlsOverlay(mode: $touchMode) { event in
+                    hub.input.noteInput(.touch)
+                    handle(event)
+                }
             }
             if menu.isOpen {
                 PlayerMenuView(menu: menu, title: title, onResume: resume, onQuit: hub.endSession)

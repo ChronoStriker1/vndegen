@@ -11,6 +11,8 @@ struct SheetScaffold<Content: View>: View {
     var subtitle: String?
     /// Only for sheets that turn off keyboard translation. Elsewhere InputHub already maps Escape to cancel.
     var escapeCloses = false
+    /// Defaults to closing the navigator's sheet.
+    var onClose: (() -> Void)?
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -23,7 +25,7 @@ struct SheetScaffold<Content: View>: View {
                     }
                 }
                 Spacer()
-                Button("Done") { nav.back() }
+                Button("Done") { if let onClose { onClose() } else { nav.back() } }
                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
                     .keyboardShortcut(escapeCloses ? .cancelAction : nil)
             }
@@ -230,7 +232,7 @@ struct ArtworkEditorSheet: View {
                                     .clipShape(.rect(cornerRadius: 8, style: .continuous))
                             }
                         }
-                        .overlay(alignment: .bottomLeading) { Tag(text: candidate.source.rawValue).padding(6) }
+                        .overlay(alignment: .bottomLeading) { Tag(text: candidate.source.displayName).padding(6) }
                     }
                     .buttonStyle(TileButtonStyle(focused: false))
                     .disabled(applying != nil)
@@ -298,7 +300,8 @@ struct MetadataSearchSheet: View {
     @State private var error: String?
 
     var body: some View {
-        SheetScaffold(title: "Find metadata", subtitle: "Match \(game.id.rawValue) to a known game", escapeCloses: true) {
+        let sources = hub.metadata.activeSources.map(\.displayName).formatted(.list(type: .or))
+        SheetScaffold(title: "Find metadata", subtitle: "Match \(game.id.rawValue) on \(sources)", escapeCloses: true) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.tertiaryText)
@@ -359,7 +362,7 @@ struct MetadataSearchSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(candidate.title).font(.system(size: 16, weight: .semibold)).lineLimit(2)
                 HStack(spacing: 8) {
-                    Tag(text: candidate.ref.source.rawValue.uppercased())
+                    Tag(text: candidate.ref.source.displayName)
                     if let year = candidate.year { Text(year).foregroundStyle(Theme.secondaryText) }
                 }
                 .font(.system(size: 13))

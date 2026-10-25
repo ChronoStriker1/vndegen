@@ -84,12 +84,12 @@ private struct LibraryContainer: View {
     private func sheetContent(_ sheet: Navigator.Sheet) -> some View {
         switch sheet {
         case .unlock:
-            SheetScaffold(title: "Hidden games") {
-                if let unlock = nav.unlockView {
-                    unlock.frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-            .presentationDetents([.medium, .large])
+            // UnlockView brings its own backdrop and Cancel button, and calls onDone either way.
+            nav.unlockView
+                .presentationDetents([.large])
+                #if os(macOS)
+                .frame(minWidth: 560, minHeight: 600)
+                #endif
         case let .engine(id):
             if let game = hub.library.game(id) { EnginePickerSheet(game: game) }
         case let .artwork(id):
