@@ -1,9 +1,9 @@
 import Foundation
 import WebKit
 
-/// Serves `vndegen://game/...` from the game's web root. Reads run off the main thread. Replies are matched back by a
-/// serial, not by task identity, because WebKit throws if a task is touched after `stop`, and a stopped task's address
-/// can be reused by a new one before a slow read returns.
+/// Serves `vndegen://game/...` from the game's web root. Reads run off the main thread, one chunk at a time, and stop
+/// when WebKit stops the task. Replies are matched back by a serial, not by task identity, because WebKit throws if a
+/// task is touched after `stop`, and a stopped task's address can be reused by a new one before a slow read returns.
 final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private let folder: GameFolder
     private var pending: [Int: any WKURLSchemeTask] = [:]
@@ -28,7 +28,13 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         let folder = folder
         Task.detached(priority: .userInitiated) {
             let response = folder.serve(path: path, method: method, range: range)
-            await self.finish(serial, url: url, with: response)
+            guard await self.respond(serial, url: url, with: response) else { return }
+            do {
+                try await response.body?.stream { await self.send($0, to: serial) }
+                await self.finish(serial)
+            } catch {
+                await self.finish(serial, failing: error)
+            }
         }
     }
 
@@ -38,14 +44,30 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 
-    private func finish(_ serial: Int, url: URL, with response: FileResponse) {
-        guard let task = pending.removeValue(forKey: serial) else { return }
+    /// Sends the status and headers. False when WebKit has stopped the task.
+    private func respond(_ serial: Int, url: URL, with response: FileResponse) -> Bool {
+        guard let task = pending[serial] else { return false }
         if response.status >= 400 {
             rpgLog.error("served \(response.status) for \(url.path, privacy: .public)")
         }
-        let http = HTTPURLResponse(url: url, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: response.headers)!
-        task.didReceive(http)
-        if !response.body.isEmpty { task.didReceive(response.body) }
-        task.didFinish()
+        task.didReceive(HTTPURLResponse(url: url, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: response.headers)!)
+        return true
+    }
+
+    /// False when WebKit has stopped the task, which ends the read.
+    private func send(_ data: Data, to serial: Int) -> Bool {
+        guard let task = pending[serial] else { return false }
+        task.didReceive(data)
+        return true
+    }
+
+    private func finish(_ serial: Int, failing error: (any Error)? = nil) {
+        guard let task = pending.removeValue(forKey: serial) else { return }
+        if let error {
+            rpgLog.error("read failed: \(error.localizedDescription, privacy: .public)")
+            task.didFailWithError(error)
+        } else {
+            task.didFinish()
+        }
     }
 }

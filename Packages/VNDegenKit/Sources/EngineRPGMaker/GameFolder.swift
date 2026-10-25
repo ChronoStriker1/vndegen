@@ -14,27 +14,54 @@ nonisolated struct GameFolder: Sendable {
     let root: URL
     /// Where index.html lives, relative to `root`: empty for MZ and "www" for deployed MV games.
     let webRoot: String
+    /// `root` with every symlink resolved. Every path this folder hands out must lead somewhere under it.
+    private let realRoot: String
 
     init(root: URL, webRoot: String) {
         self.root = root
         self.webRoot = webRoot
+        realRoot = Self.realPath(root.path) ?? root.path
     }
 
-    /// Picks the web root the way `RPGMakerPlugin.detect` does.
+    /// Picks the web root the way `RPGMakerPlugin.detect` does: the top level when its js/ holds the engine core,
+    /// otherwise www/.
     init(root: URL) {
-        let top = root.appendingPathComponent("index.html").path
-        self.init(root: root, webRoot: FileManager.default.fileExists(atPath: top) ? "" : "www")
+        let top = GameFolder(root: root, webRoot: "")
+        let hasCore = { (dir: String) in
+            ["rmmz_core.js", "rpg_core.js"].contains { top.resolve(virtualPath: "\(dir)/js/\($0)").map(Self.isFile) ?? false }
+        }
+        self = !hasCore(Self.virtualRoot) && hasCore("\(Self.virtualRoot)/www") ? GameFolder(root: root, webRoot: "www") : top
     }
 
     private var virtualWebRoot: String { webRoot.isEmpty ? Self.virtualRoot : "\(Self.virtualRoot)/\(webRoot)" }
     /// What NW.js reports as `process.mainModule.filename`.
     var mainModule: String { "\(virtualWebRoot)/index.html" }
     var indexURL: URL { URL(string: "\(Self.origin)/index.html")! }
+    /// Where NW.js builds save: `save/` beside index.html.
+    var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
 
-    /// Maps a virtual absolute path to disk. Nil when the path is relative or climbs out of the game folder.
+    /// Maps a virtual absolute path to disk. Nil when the path is relative, climbs out of the game folder, or passes
+    /// through a symlink that leads out of it.
+    ///
+    /// A name missing on disk matches an entry that differs from it only in case. Windows games often get the case of
+    /// their own files wrong, which Windows and the Mac's disk forgive and an iPhone's disk does not.
     func resolve(virtualPath: String) -> URL? {
         guard let relative = Self.confine(virtualPath) else { return nil }
-        return relative.isEmpty ? root : root.appendingPathComponent(relative)
+        var path = root.path
+        var deepestExisting = Self.exists(path) ? path : nil
+        for name in relative.split(separator: "/").map(String.init) {
+            if deepestExisting == path, let actual = Self.entry(name, in: path) {
+                path += "/" + actual
+                deepestExisting = path
+            } else {
+                path += "/" + name
+            }
+        }
+        // Names below the deepest existing one do not exist yet, so they cannot be symlinks.
+        if let deepestExisting {
+            guard let real = Self.realPath(deepestExisting), real == realRoot || real.hasPrefix(realRoot + "/") else { return nil }
+        }
+        return URL(fileURLWithPath: path)
     }
 
     /// Maps the path of a `vndegen://game/...` request to disk. Nil when it escapes the web root.
@@ -44,7 +71,7 @@ nonisolated struct GameFolder: Sendable {
     }
 
     /// Normalizes `.` and `..` lexically and returns the path relative to the virtual root. Nil when the path is not
-    /// absolute or ends up outside the root. Symlinks are not followed: the folder is the user's own content.
+    /// absolute or ends up outside the root. `resolve` then checks where symlinks lead.
     static func confine(_ virtualPath: String) -> String? {
         guard virtualPath.hasPrefix("/") else { return nil }
         var parts: [Substring] = []
@@ -61,6 +88,27 @@ nonisolated struct GameFolder: Sendable {
         }
         guard parts.first == Substring(virtualRoot.dropFirst()) else { return nil }
         return parts.dropFirst().joined(separator: "/")
+    }
+
+    /// The name of `name` as it is on disk in `directory`: itself when it exists, otherwise the first entry that equals
+    /// it ignoring case. Nil when neither exists.
+    private static func entry(_ name: String, in directory: String) -> String? {
+        if exists(directory + "/" + name) { return name }
+        return (try? FileManager.default.contentsOfDirectory(atPath: directory))?
+            .sorted()
+            .first { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// True when anything is at `path`, including a symlink whose target is missing.
+    private static func exists(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0
+    }
+
+    private static func realPath(_ path: String) -> String? {
+        guard let resolved = realpath(path, nil) else { return nil }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     static func mimeType(forExtension ext: String) -> String {
@@ -97,10 +145,35 @@ nonisolated struct GameFolder: Sendable {
 nonisolated struct FileResponse: Equatable, Sendable {
     var status: Int
     var headers: [String: String]
-    var body: Data
+    /// The part of the file the body carries. Nil for an empty body.
+    var body: FileSpan?
 
     static func empty(_ status: Int, headers: [String: String] = [:]) -> FileResponse {
-        FileResponse(status: status, headers: headers.merging(["Content-Length": "0"]) { a, _ in a }, body: Data())
+        FileResponse(status: status, headers: headers.merging(["Content-Length": "0"]) { a, _ in a }, body: nil)
+    }
+}
+
+nonisolated struct FileSpan: Equatable, Sendable {
+    var url: URL
+    var offset: UInt64
+    var length: UInt64
+
+    static let chunkSize = 256 << 10
+
+    /// Reads the span one chunk at a time and hands each chunk to `deliver`, which returns false to stop early, as when
+    /// WebKit stops the request. The read never holds more than one chunk of the file.
+    func stream(chunkSize: Int = Self.chunkSize, to deliver: (Data) async -> Bool) async throws {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: offset)
+        var remaining = length
+        while remaining > 0 {
+            guard let chunk = try handle.read(upToCount: Int(min(UInt64(chunkSize), remaining))), !chunk.isEmpty else {
+                throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: url.path])
+            }
+            remaining -= UInt64(chunk.count)
+            guard await deliver(chunk) else { return }
+        }
     }
 }
 
@@ -114,11 +187,9 @@ nonisolated extension GameFolder {
     /// Answers one request the way a static file server would: 404 for misses and escapes, 206 for a byte range,
     /// 416 for a range past the end. WebKit's media loader relies on the range support and `Accept-Ranges`.
     func serve(path: String, method: String = "GET", range: String? = nil) -> FileResponse {
-        guard let url = resolve(servedPath: path), !Self.isDirectory(url),
-              let handle = try? FileHandle(forReadingFrom: url) else { return .empty(404) }
-        defer { try? handle.close() }
-        guard let end = try? handle.seekToEnd() else { return .empty(500) }
-        let size = Int64(end)
+        var info = stat()
+        guard let url = resolve(servedPath: path), stat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return .empty(404) }
+        let size = Int64(info.st_size)
         var headers = ["Content-Type": Self.mimeType(forExtension: url.pathExtension), "Accept-Ranges": "bytes"]
         let status: Int, first: Int64, last: Int64
         switch Self.byteRange(header: range, size: size) {
@@ -132,9 +203,7 @@ nonisolated extension GameFolder {
         }
         let length = max(0, last - first + 1)
         headers["Content-Length"] = String(length)
-        if method == "HEAD" || length == 0 { return FileResponse(status: status, headers: headers, body: Data()) }
-        guard (try? handle.seek(toOffset: UInt64(first))) != nil,
-              let body = try? handle.read(upToCount: Int(length)) else { return .empty(500) }
+        let body = method == "HEAD" || length == 0 ? nil : FileSpan(url: url, offset: UInt64(first), length: UInt64(length))
         return FileResponse(status: status, headers: headers, body: body)
     }
 
@@ -159,5 +228,10 @@ nonisolated extension GameFolder {
     static func isDirectory(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    static func isFile(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && !isDirectory.boolValue
     }
 }
