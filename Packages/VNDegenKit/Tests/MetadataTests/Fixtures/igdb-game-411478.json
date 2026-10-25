@@ -1,0 +1,51 @@
+[
+ {
+  "id": 411478,
+  "artworks": [
+   {
+    "id": 299966,
+    "image_id": "ar6fge"
+   },
+   {
+    "id": 295364,
+    "image_id": "ar6bwk"
+   }
+  ],
+  "cover": {
+   "id": 586825,
+   "image_id": "cocksp"
+  },
+  "external_games": [
+   {
+    "id": 3194853,
+    "uid": "4929970",
+    "external_game_source": 1
+   }
+  ],
+  "first_release_date": 1785110400,
+  "genres": [
+   {
+    "id": 12,
+    "name": "Role-playing (RPG)"
+   },
+   {
+    "id": 31,
+    "name": "Adventure"
+   }
+  ],
+  "involved_companies": [
+   {
+    "id": 408088,
+    "company": {
+     "id": 61477,
+     "name": "Spicyfuse"
+    },
+    "developer": true,
+    "publisher": false
+   }
+  ],
+  "name": "No Socks RPG",
+  "summary": "Fight groovy enemies, and recruit a team of sexy, cute and quirky Monster Girls to get your fits back!",
+  "url": "https://www.igdb.com/games/no-socks-rpg"
+ }
+]

@@ -1,0 +1,86 @@
+[
+ {
+  "id": 152122,
+  "cover": {
+   "id": 508942,
+   "image_id": "coawpa"
+  },
+  "first_release_date": 1625011200,
+  "name": "Doki Doki Literature Club Plus!"
+ },
+ {
+  "id": 55935,
+  "cover": {
+   "id": 312530,
+   "image_id": "co6p5e"
+  },
+  "first_release_date": 1506038400,
+  "name": "Doki Doki Literature Club!"
+ },
+ {
+  "id": 309582,
+  "cover": {
+   "id": 431829,
+   "image_id": "co9979"
+  },
+  "first_release_date": 1546214400,
+  "name": "Doki Doki Literature Club"
+ },
+ {
+  "id": 336275,
+  "cover": {
+   "id": 446115,
+   "image_id": "co9k83"
+  },
+  "name": "Doki Doki Literature Club! Take Two!"
+ },
+ {
+  "id": 166194,
+  "first_release_date": 1649376000,
+  "name": "Doki Doki Literature Club Plus!: Premium Edition"
+ },
+ {
+  "id": 279818,
+  "cover": {
+   "id": 442043,
+   "image_id": "co9h2z"
+  },
+  "first_release_date": 1599264000,
+  "name": "Doki-doki Literature Club! GB Version"
+ },
+ {
+  "id": 172644,
+  "cover": {
+   "id": 219048,
+   "image_id": "co4p0o"
+  },
+  "first_release_date": 1535068800,
+  "name": "Doki Doki Literature Club: Purist Mod"
+ },
+ {
+  "id": 336088,
+  "cover": {
+   "id": 445776,
+   "image_id": "co9jyo"
+  },
+  "first_release_date": 1519084800,
+  "name": "Doki Doki Literature Club: The Festival"
+ },
+ {
+  "id": 336089,
+  "cover": {
+   "id": 445777,
+   "image_id": "co9jyp"
+  },
+  "name": "Welcome to: Doki Doki Literature Club, Player!"
+ },
+ {
+  "id": 336269,
+  "cover": {
+   "id": 446106,
+   "image_id": "co9k7u"
+  },
+  "first_release_date": 1533254400,
+  "name": "Just Monika: A Doki Doki Literature Club Song"
+ }
+]

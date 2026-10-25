@@ -1,0 +1,36 @@
+{
+ "4929970": {
+  "success": true,
+  "data": {
+   "type": "game",
+   "name": "No Socks RPG",
+   "steam_appid": 4929970,
+   "short_description": "Fight groovy enemies, and recruit a team of sexy, cute and quirky Monster Girls to get your fits back!",
+   "header_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/30672ba3a9c000e8a864658fda45c6bd53003c77/header.jpg?t=1785651574",
+   "developers": [
+    "Spicyfuse"
+   ],
+   "publishers": [
+    "Cakesin"
+   ],
+   "genres": [
+    {
+     "id": "25",
+     "description": "Adventure"
+    },
+    {
+     "id": "4",
+     "description": "Casual"
+    },
+    {
+     "id": "3",
+     "description": "RPG"
+    }
+   ],
+   "release_date": {
+    "coming_soon": false,
+    "date": "Jul 27, 2026"
+   }
+  }
+ }
+}

@@ -1,0 +1,77 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 16,
+ "limit": 50,
+ "data": [
+  {
+   "id": 39420,
+   "score": 0,
+   "style": "alternate",
+   "width": 3840,
+   "height": 1240,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/hero/1d6f5d0e873ff67e5934494d9f99946e.png",
+   "thumb": "https://cdn2.steamgriddb.com/hero_thumb/1d6f5d0e873ff67e5934494d9f99946e.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Peipara :)",
+    "steam64": "76561198444267961",
+    "avatar": "https://avatars.steamstatic.com/c6eecbf6cf9be397aa21bd3f6f9bfe0698460b5c_medium.jpg"
+   }
+  },
+  {
+   "id": 56700,
+   "score": 0,
+   "style": "alternate",
+   "width": 1920,
+   "height": 620,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/jpeg",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/hero/31d08e66ac5b3a4f66a9f76a340169b8.jpg",
+   "thumb": "https://cdn2.steamgriddb.com/hero_thumb/31d08e66ac5b3a4f66a9f76a340169b8.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "HTheorigin4l",
+    "steam64": "76561199263013428",
+    "avatar": "https://avatars.steamstatic.com/f2580a9130c102e9de1382fafebfc63d4ea8da85_medium.jpg"
+   }
+  },
+  {
+   "id": 5836,
+   "score": 0,
+   "style": "alternate",
+   "width": 1920,
+   "height": 620,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/jpeg",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/hero/6fd9a99a5abed788d9afc9d52d54e91b.jpg",
+   "thumb": "https://cdn2.steamgriddb.com/hero_thumb/6fd9a99a5abed788d9afc9d52d54e91b.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Appz",
+    "steam64": "76561197979868330",
+    "avatar": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/cf/cfdf15d885a82a0211ffa5e43af1973a29d60fea_medium.jpg"
+   }
+  }
+ ]
+}

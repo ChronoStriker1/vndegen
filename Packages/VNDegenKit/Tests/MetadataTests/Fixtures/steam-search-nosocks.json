@@ -1,0 +1,36 @@
+{
+ "total": 2,
+ "items": [
+  {
+   "type": "app",
+   "name": "No Socks RPG",
+   "id": 4929970,
+   "price": {
+    "currency": "USD",
+    "initial": 999,
+    "final": 999
+   },
+   "tiny_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/6e92d5d07619205be73206b2d862a776cd67e2c5/capsule_231x87.jpg?t=1785651574",
+   "metascore": "",
+   "platforms": {
+    "windows": true,
+    "mac": true,
+    "linux": false
+   },
+   "streamingvideo": false
+  },
+  {
+   "type": "app",
+   "name": "No Socks RPG Demo",
+   "id": 4930240,
+   "tiny_image": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4930240/6e92d5d07619205be73206b2d862a776cd67e2c5/capsule_231x87.jpg?t=1785443557",
+   "metascore": "",
+   "platforms": {
+    "windows": true,
+    "mac": true,
+    "linux": false
+   },
+   "streamingvideo": false
+  }
+ ]
+}
