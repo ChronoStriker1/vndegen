@@ -1,0 +1,8 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj
+.swiftpm/
+Packages/VNDegenKit/.build/
+.audit/
+*.ipa
