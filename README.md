@@ -27,7 +27,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Hardware rendering.** Web-based engines render through WebGL on Metal.
 
 <p align="center">
-  <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open">
+  <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
 </p>
 
 ## Engines
@@ -46,7 +46,7 @@ RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKi
 Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each.
 
 - **iPhone and iPad:** open the Files app, then On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
-- **Mac:** copy the game folders into `~/Documents/VNDegen/Games`.
+- **Mac:** copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.
 
 VNDegen rescans the folder on launch and on pull to refresh.
 

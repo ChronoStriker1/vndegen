@@ -57,7 +57,7 @@ struct VNDegenApp: App {
 }
 
 /// The standard library location. In DEBUG, `-libraryRoot <path>` points the app at a separate library, so test runs
-/// on a shared Mac never touch ~/Documents/VNDegen.
+/// on a shared Mac never touch ~/Games/VNDegen.
 private var libraryPaths: LibraryPaths {
     #if DEBUG
     if let root = UserDefaults.standard.string(forKey: "libraryRoot") {

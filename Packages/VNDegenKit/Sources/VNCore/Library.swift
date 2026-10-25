@@ -13,15 +13,14 @@ public struct LibraryPaths: Sendable {
         self.support = support
     }
 
-    /// iOS: Documents/Games, visible in the Files app. macOS: ~/Documents/VNDegen/Games.
+    /// iOS: Documents/Games, visible in the Files app. macOS: ~/Games/VNDegen, outside the folders iCloud Drive can sync.
     public static var standard: LibraryPaths {
         let fm = FileManager.default
-        let documents = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         #if os(macOS)
-        let games = documents.appendingPathComponent("VNDegen/Games", isDirectory: true)
+        let games = fm.homeDirectoryForCurrentUser.appendingPathComponent("Games/VNDegen", isDirectory: true)
         #else
-        let games = documents.appendingPathComponent("Games", isDirectory: true)
+        let games = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Games", isDirectory: true)
         #endif
         return LibraryPaths(gamesRoot: games, support: appSupport.appendingPathComponent("VNDegen", isDirectory: true))
     }

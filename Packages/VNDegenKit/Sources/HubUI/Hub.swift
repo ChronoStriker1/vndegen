@@ -65,6 +65,8 @@ public final class Hub {
 
     public func endSession() {
         guard case let .playing(id, session) = screen else { return }
+        // The player's input handler captures the session. The library attaches its own when it reappears.
+        input.onEvent = nil
         session.terminate()
         if let start = sessionStart {
             library.update(id) { $0.playTime += Date.now.timeIntervalSince(start) }

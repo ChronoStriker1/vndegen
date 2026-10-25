@@ -203,7 +203,7 @@ extension TouchControlsMode {
 enum LibraryFolder {
     #if os(macOS)
     static let openTitle = "Show in Finder"
-    static let instructions = "Copy each game into its own folder inside ~/Documents/VNDegen/Games, then rescan."
+    static let instructions = "Copy each game into its own folder inside ~/Games/VNDegen, then rescan."
     static func open(_ url: URL) {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         NSWorkspace.shared.activateFileViewerSelecting([url])
