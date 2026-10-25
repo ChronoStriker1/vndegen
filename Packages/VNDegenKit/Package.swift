@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "Lock", targets: ["Lock"]),
         .library(name: "HubUI", targets: ["HubUI"]),
         .library(name: "SaveSync", targets: ["SaveSync"]),
+        .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
     ],
     targets: [
         .target(name: "VNCore"),
@@ -23,6 +24,11 @@ let package = Package(
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore"]),
+        // The system libarchive plus zlib's infback9 for Deflate64. Lives inside ArchiveImport's folder.
+        .target(
+            name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
+            linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
+        .target(name: "ArchiveImport", dependencies: ["CArchive"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
@@ -30,5 +36,6 @@ let package = Package(
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker"], exclude: ["Fixtures"]),
+        .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]
 )

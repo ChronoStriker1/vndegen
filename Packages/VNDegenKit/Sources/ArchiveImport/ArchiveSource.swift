@@ -1,0 +1,104 @@
+import Foundation
+
+/// An archive the user picked: one file, or every volume of a multi-volume set in read order.
+nonisolated public struct ArchiveSource: Sendable, Hashable {
+    public let volumes: [URL]
+    /// The archive's file name without its extension or part suffix, offered as the game's folder name.
+    public let suggestedFolderName: String
+
+    public var fileName: String { volumes[0].lastPathComponent }
+
+    /// Groups picked files into one archive. Picking a single volume also pulls in its sibling volumes when the folder
+    /// can be listed, which works on macOS and for files already in the app's container.
+    public init(picked urls: [URL]) throws(ArchiveError) {
+        let named = urls.compactMap { url in VolumeName(url.lastPathComponent).map { (url, $0) } }
+        guard let first = named.first else { throw .notAnArchive }
+        guard named.allSatisfy({ $0.1.set == first.1.set }) else { throw .severalArchives }
+
+        var volumes = Dictionary(named.map { ($0.1.index, $0.0) }, uniquingKeysWith: { a, _ in a })
+        if first.1.kind != .single, named.count == 1 {
+            let folder = first.0.deletingLastPathComponent()
+            let siblings = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+            for url in siblings {
+                if let name = VolumeName(url.lastPathComponent), name.set == first.1.set { volumes[name.index] = url }
+            }
+        }
+        let order = volumes.keys.sorted()
+        if first.1.kind != .single, let missing = Self.firstGap(order, startingAt: first.1.kind.firstIndex) {
+            throw .missingVolume(missing)
+        }
+        self.volumes = order.map { volumes[$0]! }
+        suggestedFolderName = first.1.stem
+    }
+
+    /// The first part number missing from a volume set, counted the way the files are named (part1, r00, 001).
+    private static func firstGap(_ indexes: [Int], startingAt start: Int) -> Int? {
+        for (offset, index) in indexes.enumerated() where index != start + offset { return start + offset }
+        return nil
+    }
+}
+
+/// What a file name says about the file's place in an archive set.
+nonisolated struct VolumeName: Equatable {
+    enum Kind: Equatable {
+        /// `game.zip`, `game.7z`, or `game.rar` with no other volumes.
+        case single
+        /// `game.part1.rar`, `game.part2.rar`, ...
+        case rarParts
+        /// `game.rar`, `game.r00`, `game.r01`, ... The `.rar` volume reads first.
+        case rarOldStyle
+        /// `game.7z.001`, `game.7z.002`, ... Byte-split files that read as one stream.
+        case split
+
+        var firstIndex: Int { self == .rarParts || self == .split ? 1 : 0 }
+    }
+
+    /// The name without extension and part suffix.
+    var stem: String
+    var kind: Kind
+    /// Shared by every volume of one set.
+    var set: String
+    /// Read order inside the set.
+    var index: Int
+
+    init?(_ fileName: String) {
+        if let match = fileName.wholeMatch(of: /(.+)\.part(\d+)\.rar/.ignoresCase()) {
+            self.init(fileName, stem: match.1, kind: .rarParts, index: Int(match.2)!)
+        } else if let match = fileName.wholeMatch(of: /(.+)\.r(\d\d)/.ignoresCase()) {
+            self.init(fileName, stem: match.1, kind: .rarOldStyle, index: Int(match.2)! + 1)
+        } else if let match = fileName.wholeMatch(of: /(.+)\.rar/.ignoresCase()) {
+            self.init(fileName, stem: match.1, kind: .rarOldStyle, index: 0)
+        } else if let match = fileName.wholeMatch(of: /(.+)\.(?:zip|7z)\.(\d{3})/.ignoresCase()) {
+            self.init(fileName, stem: match.1, kind: .split, index: Int(match.2)!)
+        } else if let match = fileName.wholeMatch(of: /(.+)\.(?:zip|7z)/.ignoresCase()) {
+            self.init(fileName, stem: match.1, kind: .single, index: 0)
+        } else {
+            return nil
+        }
+    }
+
+    private init(_ fileName: String, stem: Substring, kind: Kind, index: Int) {
+        self.stem = stem.trimmingCharacters(in: .whitespaces)
+        self.kind = kind
+        self.index = index
+        // A lone `game.rar` is old-style volume 0 until a `game.r00` shows up, so both share one key.
+        set = "\(stem.lowercased())|\(kind == .single ? fileName.lowercased() : "\(kind)")"
+    }
+}
+
+/// Checks a folder name the user typed for a new game.
+nonisolated enum GameFolderName {
+    /// The reason the name can't be used in `gamesRoot`, or nil when it can.
+    static func problem(with name: String, in gamesRoot: URL) -> String? {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { return "Enter a folder name." }
+        if name.contains("/") || name.contains(":") { return "A folder name can't contain / or :." }
+        if name.hasPrefix(".") { return "A folder name can't start with a period." }
+        let existing = (try? FileManager.default.contentsOfDirectory(atPath: gamesRoot.path)) ?? []
+        // Compared without case because the default APFS volume treats "Game" and "game" as one folder.
+        if existing.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            return "Games already has a folder named \"\(name)\". Choose another name."
+        }
+        return nil
+    }
+}
