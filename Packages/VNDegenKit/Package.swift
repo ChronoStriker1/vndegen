@@ -22,5 +22,9 @@ let package = Package(
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock"], swiftSettings: mainActorByDefault),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
+        .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker"]),
+        .testTarget(name: "MetadataTests", dependencies: ["Metadata"]),
+        .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
+        .testTarget(name: "LockTests", dependencies: ["Lock"]),
     ]
 )

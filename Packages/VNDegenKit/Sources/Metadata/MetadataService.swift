@@ -52,3 +52,12 @@ public final class MetadataService {
     /// Downloads the candidate and stores it in the slot.
     public func setArtwork(_ candidate: ArtworkCandidate, for id: GameID, in library: LibraryStore) async throws {}
 }
+
+import SwiftUI
+
+/// API keys for IGDB (Twitch client ID and secret) and SteamGridDB. Shown inside the app's Settings screen.
+public struct MetadataSettingsView: View {
+    let service: MetadataService
+    public init(service: MetadataService) { self.service = service }
+    public var body: some View { Text("Metadata sources") }
+}
