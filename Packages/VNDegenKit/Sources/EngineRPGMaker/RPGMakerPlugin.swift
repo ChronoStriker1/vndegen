@@ -31,8 +31,16 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
-        throw RPGMakerError.notImplemented
+        try RPGMakerSession(launch: launch)
     }
 }
 
-enum RPGMakerError: Error { case notImplemented }
+nonisolated enum RPGMakerError: LocalizedError {
+    case shimMissing
+
+    var errorDescription: String? {
+        switch self {
+        case .shimMissing: "The NW.js compatibility script is missing from the app bundle."
+        }
+    }
+}
