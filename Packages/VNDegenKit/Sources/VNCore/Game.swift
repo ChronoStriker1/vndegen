@@ -73,6 +73,11 @@ public struct GameMetadata: Codable, Hashable, Sendable {
     }
 }
 
+/// How the interface is oriented while a game plays on iPhone and iPad.
+public enum PlayOrientation: String, Codable, CaseIterable, Sendable {
+    case landscape, portrait, followDevice
+}
+
 public struct Game: Identifiable, Codable, Hashable, Sendable {
     public let id: GameID
     /// Display title. Starts as the folder name. The user or metadata can change it.
@@ -88,6 +93,8 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
     public var addedAt: Date
     public var lastPlayedAt: Date?
     public var playTime: TimeInterval
+    /// Overrides the app's in-game orientation setting for this game. Nil follows the setting.
+    public var orientation: PlayOrientation?
 
     public var engine: EngineID? { engineOverride ?? detected?.engine }
 

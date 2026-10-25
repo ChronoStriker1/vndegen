@@ -21,12 +21,25 @@ public final class Hub {
     public private(set) var screen: Screen = .library
     public var launchError: String?
     @ObservationIgnored private var sessionStart: Date?
+    @ObservationIgnored private var matching: Task<Void, Never>?
 
     public init(library: LibraryStore, metadata: MetadataService, input: InputHub, lock: LockService) {
         self.library = library
         self.metadata = metadata
         self.input = input
         self.lock = lock
+    }
+
+    /// Rescans the games folder, then looks up metadata for games that have none, without holding up the caller.
+    public func refreshLibrary() async {
+        await library.refresh()
+        guard matching == nil else { return }
+        let unmatched = library.games.filter { $0.metadata == nil }.map(\.id)
+        guard !unmatched.isEmpty else { return }
+        matching = Task {
+            for id in unmatched { await metadata.autoMatch(id, in: library) }
+            matching = nil
+        }
     }
 
     public func launch(_ id: GameID) {

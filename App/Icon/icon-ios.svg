@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="80%">
+      <stop offset="0" stop-color="#3a1240"/>
+      <stop offset="0.55" stop-color="#140c1f"/>
+      <stop offset="1" stop-color="#09090f"/>
+    </radialGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5c97"/>
+      <stop offset="1" stop-color="#ff3f55"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a3cc2"/>
+      <stop offset="1" stop-color="#2c1650"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f7fd0"/>
+      <stop offset="1" stop-color="#132a52"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.28"/>
+      <stop offset="0.45" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="30" flood-color="#ff3f7f" flood-opacity="0.7"/>
+    </filter>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g id="art">
+    <g filter="url(#shadow)">
+      <g transform="rotate(-16 512 860)">
+        <rect x="332" y="250" width="360" height="540" rx="44" fill="url(#left)"/>
+        <rect x="332" y="250" width="360" height="540" rx="44" fill="url(#sheen)"/>
+        <rect x="333.5" y="251.5" width="357" height="537" rx="42.5" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="3"/>
+      </g>
+      <g transform="rotate(16 512 860)">
+        <rect x="332" y="250" width="360" height="540" rx="44" fill="url(#right)"/>
+        <rect x="332" y="250" width="360" height="540" rx="44" fill="url(#sheen)"/>
+        <rect x="333.5" y="251.5" width="357" height="537" rx="42.5" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="3"/>
+      </g>
+    </g>
+    <g filter="url(#glow)">
+      <rect x="332" y="222" width="360" height="540" rx="44" fill="url(#front)"/>
+    </g>
+    <rect x="332" y="222" width="360" height="540" rx="44" fill="url(#sheen)"/>
+    <rect x="333.5" y="223.5" width="357" height="537" rx="42.5" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="3"/>
+    <path d="M462 392 L462 592 Q462 614 481 603 L624 514 Q642 492 624 480 L481 381 Q462 370 462 392 Z" fill="#fff"/>
+  </g>
+</svg>

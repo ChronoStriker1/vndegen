@@ -16,7 +16,10 @@ targets:
   VNDegen:
     type: application
     supportedDestinations: [iOS, macOS]
-    sources: [App]
+    sources:
+      - path: App
+        # SVG sources for the app icon. The asset catalog holds the rendered PNGs.
+        excludes: ["Icon/**"]
     dependencies:
       - package: VNDegenKit
         products: [VNCore, EngineRPGMaker, Metadata, GameInput, Lock, HubUI]
@@ -24,6 +27,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: VNDegen
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         NSFaceIDUsageDescription: Unlock hidden games.
@@ -41,6 +46,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.chronostriker1.vndegen
         PRODUCT_NAME: VNDegen
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         CODE_SIGN_STYLE: Manual
