@@ -1,0 +1,95 @@
+---
+name: No Socks RPG
+drives:
+  drive-0: ""
+backups:
+  - name: backup-20260923T022236Z
+    when: "2026-09-23T02:22:36.001866802Z"
+    os: linux
+    files:
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/config.rmmzsave:
+        hash: 8581073de9cd1fb1d9f05d25e0165cb6848a21a8
+        size: 2364
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file0.rmmzsave:
+        hash: 3397ec66e7d2eec108de0e458e28eddb683b273e
+        size: 174733
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file1.rmmzsave:
+        hash: e222c5419fec1a846809c349383d8f35fbfd4809
+        size: 150997
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file10.rmmzsave:
+        hash: 03910f5a315dac044e5da84c938cfd73fa8e9d4f
+        size: 124332
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file11.rmmzsave:
+        hash: b9cf3457d853cb9012da377d7c59e79240d5e6f6
+        size: 131748
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file12.rmmzsave:
+        hash: 7decafe8920b3570f6463aa09c52ca9cb280c38c
+        size: 159852
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file13.rmmzsave:
+        hash: 7153c7dee55094562c41640a2ff0e58f690e7320
+        size: 172006
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file14.rmmzsave:
+        hash: e30d7d9758fb69d5b69807fe3950aaa50e4f9377
+        size: 88187
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file15.rmmzsave:
+        hash: e74e1d2e794e3c65a61eff3e46435dbcf8bc3502
+        size: 87660
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file16.rmmzsave:
+        hash: 0f2b76e0bc43f8060baedb50bfeed9aed1b0bcbf
+        size: 176279
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file17.rmmzsave:
+        hash: 29468a8d43228b338e93d3bb5c2e92aa2faebe9a
+        size: 126380
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file18.rmmzsave:
+        hash: c9fc52a7e72e9349b93827dfc05d7fb315cc023f
+        size: 126316
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file19.rmmzsave:
+        hash: c22c6b2e833a41bbc669e80c4f2951f315a86dc8
+        size: 119058
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file2.rmmzsave:
+        hash: f23e41acfc7e9e13b276e7facd9ed7ce6244f6f6
+        size: 146440
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file20.rmmzsave:
+        hash: 0a8f634d71c4f16726ec6f62e827978e2fabb05a
+        size: 141350
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file3.rmmzsave:
+        hash: 0f68a7383e1b43c2d0f03b3b10ebddde2acca95a
+        size: 97047
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file4.rmmzsave:
+        hash: cb236685af5c599a29b766d5afadf19fdfec8cea
+        size: 89040
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file5.rmmzsave:
+        hash: 35d51f62d6330f12aa7d71fb4c0fddfb30dba4cc
+        size: 105632
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file6.rmmzsave:
+        hash: bde2f1e9e985ccc37da769bf97230bdecf06d469
+        size: 81367
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file7.rmmzsave:
+        hash: bd10d9bd0369a603b59ee3e5df922695ee25acbb
+        size: 87745
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file8.rmmzsave:
+        hash: 3a633c17d82458f8820e0e0394136975415983d1
+        size: 142482
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file9.rmmzsave:
+        hash: dc441d9ee5e0bea3a0d1ceb430af0eda09e35cce
+        size: 187189
+      /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/global.rmmzsave:
+        hash: 2984f4af1d6a5a4f0a86b2edc2e47f12058aed1f
+        size: 1335
+    registry:
+      hash: ~
+    children:
+      - name: backup-20261025T164619Z-diff
+        when: "2026-10-25T16:46:19.618203Z"
+        os: mac
+        files:
+          /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/config.rmmzsave:
+            hash: c7b25825b7a8ed3dd86b920037d722de40b55dde
+            size: 2368
+          /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file0.rmmzsave:
+            hash: f5999febed67cebc1eda7b8d2414764f6ebe8e0a
+            size: 148141
+          /home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/global.rmmzsave:
+            hash: 70402838810b97d9555b2b604b9789a1dce8ab79
+            size: 1344
+        registry: ~

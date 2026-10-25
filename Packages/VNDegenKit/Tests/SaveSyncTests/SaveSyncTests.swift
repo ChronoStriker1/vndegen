@@ -1,0 +1,362 @@
+import CryptoKit
+import EngineRPGMaker
+import Foundation
+import Testing
+import VNCore
+@testable import SaveSync
+
+private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
+private let deckSave = "/home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/"
+private var fm: FileManager { .default }
+
+private func temporaryDirectory() throws -> URL {
+    let url = fm.temporaryDirectory.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    try fm.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
+}
+
+/// An RPG Maker MZ game folder with the given saves.
+private func makeGame(in base: URL, saves: [String: String] = [:]) throws -> [SaveLocation] {
+    let game = base.appendingPathComponent("Games/No Socks RPG", isDirectory: true)
+    try fm.createDirectory(at: game.appendingPathComponent("js"), withIntermediateDirectories: true)
+    try Data().write(to: game.appendingPathComponent("js/rmmz_core.js"))
+    let locations = RPGMakerPlugin(.mz).saveLocations(folder: game, dataDirectory: base.appendingPathComponent("Data"))
+    try write(saves, to: locations[0])
+    return locations
+}
+
+private func write(_ saves: [String: String], to location: SaveLocation) throws {
+    try fm.createDirectory(at: location.directory, withIntermediateDirectories: true)
+    for (name, content) in saves { try Data(content.utf8).write(to: location.directory.appendingPathComponent(name)) }
+}
+
+private func contents(of location: SaveLocation) throws -> [String: String] {
+    Dictionary(uniqueKeysWithValues: try LudusaviStore.regularFiles(in: location.directory).map {
+        ($0, String(decoding: try Data(contentsOf: location.directory.appendingPathComponent($0)), as: UTF8.self))
+    })
+}
+
+private func sha1(_ text: String) -> String {
+    Insecure.SHA1.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+}
+
+/// Every file under `root` with its SHA-1, to prove a backup left existing folders alone.
+private func tree(_ root: URL) throws -> [String: String] {
+    Dictionary(uniqueKeysWithValues: try LudusaviStore.regularFiles(in: root).map {
+        ($0, LudusaviStore.sha1(try Data(contentsOf: root.appendingPathComponent($0))))
+    })
+}
+
+// MARK: - mapping.yaml
+
+@Test func realMappingRoundTripsByteForByte() throws {
+    let text = try String(contentsOf: fixtures.appendingPathComponent("nosocks-mapping.yaml"), encoding: .utf8)
+    let mapping = try LudusaviMapping(yaml: text)
+    #expect(mapping.name == "No Socks RPG")
+    #expect(mapping.drives == ["drive-0": ""])
+    #expect(mapping.backups.count == 1)
+    let full = try #require(mapping.backups.first)
+    #expect(full.name == "backup-20260923T022236Z" && full.os == "linux" && full.files.count == 23 && full.registryHash == nil)
+    #expect(full.files[deckSave + "file0.rmmzsave"] == FileEntry(hash: "3397ec66e7d2eec108de0e458e28eddb683b273e", size: 174733))
+    let diff = try #require(full.children.first)
+    #expect(diff.name == "backup-20261025T164619Z-diff" && diff.os == "mac" && diff.files.count == 3 && diff.registry == nil)
+
+    let written = mapping.yamlString()
+    #expect(written == text)
+    #expect(try LudusaviMapping(yaml: written) == mapping)
+}
+
+@Test func yamlQuotesWhatSerdeQuotes() throws {
+    var mapping = LudusaviMapping(name: "Doki Doki: Literature Club!", drives: ["drive-C": "C:"])
+    mapping.backups = [FullBackup(name: "backup-1", when: "2026-01-01T00:00:00Z", os: "windows", comment: "it's \"quoted\"\nnext",
+                                  locked: true, semantics: nil, files: ["C:/Users/a b/save #1.dat": FileEntry(hash: "123", size: 4)],
+                                  registryHash: "abc", children: [])]
+    let text = mapping.yamlString()
+    #expect(text.contains("name: \"Doki Doki: Literature Club!\""))
+    #expect(text.contains("\"C:/Users/a b/save #1.dat\":"))
+    #expect(text.contains("hash: \"123\""))
+    #expect(text.contains("locked: true"))
+    #expect(try LudusaviMapping(yaml: text) == mapping)
+}
+
+@Test func differentialRemovalsAndRegistryOverridesRoundTrip() throws {
+    let text = """
+    ---
+    name: Game
+    drives:
+      drive-0: ""
+    backups:
+      - name: "."
+        when: "2026-01-01T00:00:00Z"
+        files:
+          /a/save/x.rpgsave:
+            hash: aa
+            size: 1
+        registry:
+          hash: ff
+        children:
+          - name: backup-20260102T000000Z-diff
+            when: "2026-01-02T00:00:00.5Z"
+            files:
+              /a/save/x.rpgsave: ~
+            registry:
+              hash: ~
+
+    """
+    let mapping = try LudusaviMapping(yaml: text)
+    let diff = try #require(mapping.backups.first?.children.first)
+    #expect(diff.files["/a/save/x.rpgsave"] == .removed)
+    #expect(diff.registry == .init(hash: nil))
+    #expect(mapping.effectiveFiles()?.isEmpty == true)
+    #expect(mapping.storedPath(of: "/a/save/x.rpgsave", in: ".") == "drive-0/a/save/x.rpgsave")
+    #expect(try LudusaviMapping(yaml: mapping.yamlString()) == mapping)
+}
+
+@Test func effectiveFilesAreTheFullBackupPlusTheChosenDifferential() throws {
+    let mapping = try LudusaviMapping(yaml: String(contentsOf: fixtures.appendingPathComponent("nosocks-mapping.yaml"), encoding: .utf8))
+    let latest = try #require(mapping.effectiveFiles())
+    #expect(latest.count == 23)
+    #expect(latest[deckSave + "file0.rmmzsave"] == StoredFile(entry: FileEntry(hash: "f5999febed67cebc1eda7b8d2414764f6ebe8e0a", size: 148141),
+                                                              backup: "backup-20261025T164619Z-diff"))
+    #expect(latest[deckSave + "file1.rmmzsave"]?.backup == "backup-20260923T022236Z")
+    #expect(latest.values.filter { $0.backup.hasSuffix("-diff") }.count == 3)
+
+    let full = try #require(mapping.effectiveFiles("backup-20260923T022236Z"))
+    #expect(full[deckSave + "file0.rmmzsave"]?.entry.hash == "3397ec66e7d2eec108de0e458e28eddb683b273e")
+    #expect(mapping.effectiveFiles("backup-nope") == nil)
+
+    #expect(mapping.summaries.map(\.name) == ["backup-20260923T022236Z", "backup-20261025T164619Z-diff"])
+    #expect(mapping.summaries.map(\.fileCount) == [23, 23])
+    #expect(mapping.summaries.last?.changedCount == 3)
+    #expect(mapping.storedPath(of: deckSave + "file0.rmmzsave", in: "backup-20261025T164619Z-diff")
+            == "backup-20261025T164619Z-diff/drive-0/home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/file0.rmmzsave")
+}
+
+@Test func timestampsMatchLudusavi() throws {
+    let date = try #require(Timestamp.parse("2026-10-25T16:46:19.618203Z"))
+    #expect(abs(date.timeIntervalSince1970 - 1_792_946_779.618203) < 0.0001)
+    #expect(Timestamp.parse("2026-09-23T02:22:36.001866802Z") != nil)
+    #expect(Timestamp.folderStamp(date) == "20261025T164619Z")
+    #expect(Timestamp.format(Date(timeIntervalSince1970: 1_792_946_779.5)) == "2026-10-25T16:46:19.500Z")
+}
+
+@Test func gameFoldersMatchByNormalizedTitle() {
+    let folders = ["Doki Doki Literature Club_", "No Socks RPG", "Other"]
+    #expect(LudusaviStore.match(["no socks rpg"], in: folders) == "No Socks RPG")
+    #expect(LudusaviStore.match(["Doki Doki Literature Club!"], in: folders) == "Doki Doki Literature Club_")
+    #expect(LudusaviStore.match(["No Socks"], in: folders) == nil)
+    #expect(LudusaviMapping.escapeFolderName(".Hack: G.U.") == "_Hack_ G.U_")
+}
+
+@Test func configGivesFolderAndRetention() throws {
+    let config = try LudusaviConfig(yaml: """
+    ---
+    runtime:
+      threads: ~
+    backup:
+      path: /Users/me/ludusavi-backup
+      ignoredGames: []
+      retention:
+        full: 1
+        differential: 5
+      format:
+        chosen: simple
+    restore:
+      path: /Users/me/ludusavi-backup
+    """)
+    #expect(config.backupPath?.path == "/Users/me/ludusavi-backup")
+    #expect(config.retention == Retention(full: 1, differential: 5))
+}
+
+// MARK: - RPG Maker save rule
+
+@Test func rpgMakerRuleMapsDeckPaths() throws {
+    let base = try temporaryDirectory()
+    let location = try #require(try makeGame(in: base).first)
+    #expect(location.directory.lastPathComponent == "save")
+    #expect(location.directory.deletingLastPathComponent().lastPathComponent == "No Socks RPG")
+    let rule = location.relativePath
+    #expect(rule(deckSave + "file0.rmmzsave") == "file0.rmmzsave")
+    #expect(rule(deckSave + "global.rmmzsave") == "global.rmmzsave")
+    #expect(rule("C:/Program Files (x86)/Steam/steamapps/common/Game/www/save/file3.rpgsave") == "file3.rpgsave")
+    #expect(rule("/home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/img/file0.rmmzsave") == nil)
+    #expect(rule(deckSave + "notes.txt") == nil)
+    #expect(rule("/save/file0.rmmzsave") == nil)
+    #expect(rule(location.directory.appendingPathComponent("file0.rmmzsave").path) == "file0.rmmzsave")
+}
+
+@Test func rpgMakerMVSavesUnderTheWebRoot() throws {
+    let game = try temporaryDirectory().appendingPathComponent("MV Game")
+    try fm.createDirectory(at: game.appendingPathComponent("www/js"), withIntermediateDirectories: true)
+    try Data().write(to: game.appendingPathComponent("www/js/rpg_core.js"))
+    let location = try #require(RPGMakerPlugin(.mv).saveLocations(folder: game, dataDirectory: game).first)
+    #expect(location.directory.path.hasSuffix("MV Game/www/save"))
+}
+
+// MARK: - Restore and back up
+
+@Test func backUpThenRestoreAndUndo() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["file1.rmmzsave": "one", "global.rmmzsave": "g1"])
+    let game = GameID("No Socks RPG")
+    let start = Date(timeIntervalSince1970: 1_792_886_400)
+
+    let first = try store.backUp(folder: nil, title: "No Socks RPG", game: game, locations: locations, retention: nil, now: start,
+                                 os: "mac", comment: "VNDegen on Mac")
+    #expect(first.backup == "backup-20261025T000000Z" && !first.isDifferential && first.paths == [.vndegen: 2])
+    var mapping = try store.mapping("No Socks RPG")
+    #expect(mapping.backups.first?.files["/VNDegen/No Socks RPG/save/file1.rmmzsave"] == FileEntry(hash: sha1("one"), size: 3))
+
+    let again = try store.backUp(folder: "No Socks RPG", title: "No Socks RPG", game: game, locations: locations,
+                                 retention: Retention(full: 1, differential: 1), now: start + 60, os: "mac", comment: nil)
+    #expect(again.backup == nil)
+
+    try write(["file1.rmmzsave": "one v2", "file2.rmmzsave": "two"], to: locations[0])
+    let diff = try store.backUp(folder: "No Socks RPG", title: "No Socks RPG", game: game, locations: locations,
+                                retention: Retention(full: 1, differential: 1), now: start + 120, os: "mac", comment: nil)
+    #expect(diff.backup == "backup-20261025T000200Z-diff" && diff.isDifferential && diff.filesWritten == 2)
+    #expect(diff.paths == [.latestBackup: 2, .commonFolder: 1])
+    mapping = try store.mapping("No Socks RPG")
+    let child = try #require(mapping.backups.first?.children.first)
+    #expect(child.files == ["/VNDegen/No Socks RPG/save/file1.rmmzsave": .changed(FileEntry(hash: sha1("one v2"), size: 6)),
+                            "/VNDegen/No Socks RPG/save/file2.rmmzsave": .changed(FileEntry(hash: sha1("two"), size: 3))])
+
+    let snapshot = base.appendingPathComponent("Snapshots/No Socks RPG")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try write(["file3.rmmzsave": "local only"], to: locations[0])
+    let restored = try store.restore(folder: "No Socks RPG", backup: "backup-20261025T000000Z", locations: locations, snapshot: snapshot)
+    #expect(restored.restored == ["file1.rmmzsave", "global.rmmzsave"])
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "one", "file2.rmmzsave": "two", "file3.rmmzsave": "local only",
+                                               "global.rmmzsave": "g1"])
+
+    try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot)
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "one v2", "file2.rmmzsave": "two", "file3.rmmzsave": "local only",
+                                               "global.rmmzsave": "g1"])
+    #expect(!fm.fileExists(atPath: snapshot.path))
+    #expect(throws: SaveSyncError.noSnapshot) { try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot) }
+}
+
+@Test func retentionFollowsLudusavi() throws {
+    var mapping = LudusaviMapping(name: "G")
+    #expect(!Retention(full: 1, differential: 1).allowsDifferential(after: mapping))
+    mapping.backups = [FullBackup(name: "f", when: Timestamp.epoch, locked: false, files: [:], registryHash: nil, children: [])]
+    #expect(Retention(full: 1, differential: 1).allowsDifferential(after: mapping))
+    #expect(!Retention(full: 1, differential: 0).allowsDifferential(after: mapping))
+    mapping.backups[0].children = [DifferentialBackup(name: "d", when: Timestamp.epoch, locked: false, files: [:], registry: nil)]
+    #expect(!Retention(full: 2, differential: 1).allowsDifferential(after: mapping))
+    #expect(Retention(full: 2, differential: 2).allowsDifferential(after: mapping))
+    #expect(Retention(inferredFrom: mapping) == Retention(full: 1, differential: 1))
+}
+
+@Test func restoreRefusesCorruptBackups() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("backups"))
+    let locations = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
+    _ = try store.backUp(folder: nil, title: "G", game: GameID("G"), locations: locations, retention: nil, os: "mac", comment: nil)
+    let stored = try #require(LudusaviStore.regularFiles(in: store.root.appendingPathComponent("G")).first { $0.hasSuffix("file1.rmmzsave") })
+    try Data("tampered".utf8).write(to: store.root.appendingPathComponent("G").appendingPathComponent(stored))
+    try write(["file1.rmmzsave": "mine"], to: locations[0])
+
+    let snapshot = base.appendingPathComponent("snapshot")
+    #expect(throws: SaveSyncError.self) {
+        try store.restore(folder: "G", backup: nil, locations: locations, snapshot: snapshot)
+    }
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "mine"])
+    #expect(!fm.fileExists(atPath: snapshot.path))
+}
+
+/// Runs against a copy of the user's real No Socks RPG backup, when the Mac running the tests has it.
+@Suite(.enabled(if: fm.fileExists(atPath: realSample.path)))
+struct RealSampleTests {
+    @Test func restoreLatestThenBackUpADifferential() throws {
+        let base = try temporaryDirectory()
+        let root = base.appendingPathComponent("ludusavi-backup")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        try fm.copyItem(at: realSample, to: root.appendingPathComponent("No Socks RPG"))
+        let store = LudusaviStore(root: root)
+        let locations = try makeGame(in: base)
+
+        let report = try store.restore(folder: "No Socks RPG", backup: nil, locations: locations,
+                                       snapshot: base.appendingPathComponent("snapshot"))
+        #expect(report.restored.count == 23 && report.skipped.isEmpty)
+        let mapping = try store.mapping("No Socks RPG")
+        for (path, stored) in try #require(mapping.effectiveFiles()) {
+            let local = locations[0].directory.appendingPathComponent(URL(fileURLWithPath: path).lastPathComponent)
+            let source = root.appendingPathComponent("No Socks RPG").appendingPathComponent(try #require(mapping.storedPath(of: path, in: stored.backup)))
+            #expect(try Data(contentsOf: local) == Data(contentsOf: source))
+        }
+
+        let before = try tree(root.appendingPathComponent("No Socks RPG"))
+        try Data("new progress".utf8).write(to: locations[0].directory.appendingPathComponent("file1.rmmzsave"))
+        try Data("brand new".utf8).write(to: locations[0].directory.appendingPathComponent("file21.rmmzsave"))
+        let backup = try store.backUp(folder: "No Socks RPG", title: "No Socks RPG", game: GameID("No Socks RPG"), locations: locations,
+                                      retention: nil, os: "mac", comment: "VNDegen test")
+        let name = try #require(backup.backup)
+        #expect(backup.isDifferential && backup.paths == [.latestBackup: 23, .commonFolder: 1])
+
+        let after = try tree(root.appendingPathComponent("No Socks RPG"))
+        for (path, hash) in before where path != "mapping.yaml" { #expect(after[path] == hash, "\(path) changed") }
+        #expect(!fm.fileExists(atPath: root.appendingPathComponent("No Socks RPG/mapping.yaml.vndegen-previous").path))
+
+        let updated = try store.mapping("No Socks RPG")
+        #expect(Array(updated.backups[0].children.dropLast()) == mapping.backups[0].children)
+        let diff = try #require(updated.backups[0].children.last)
+        #expect(diff.name == name && diff.registry == nil && diff.comment == "VNDegen test")
+        // The earlier diff's three files differ from the full backup, so they carry forward with the two changes.
+        #expect(Set(diff.files.keys) == Set(["config", "file0", "file1", "file21", "global"].map { deckSave + $0 + ".rmmzsave" }))
+        #expect(diff.files[deckSave + "file1.rmmzsave"] == .changed(FileEntry(hash: sha1("new progress"), size: 12)))
+        for (path, change) in diff.files {
+            guard case let .changed(entry) = change else { Issue.record("\(path) marked removed"); continue }
+            let stored = root.appendingPathComponent("No Socks RPG").appendingPathComponent(try #require(updated.storedPath(of: path, in: name)))
+            let data = try Data(contentsOf: stored)
+            #expect(LudusaviStore.sha1(data) == entry.hash && UInt64(data.count) == entry.size)
+        }
+    }
+}
+
+private let realSample = fm.homeDirectoryForCurrentUser.appendingPathComponent("vndegen-testgames/ludusavi-sample/No Socks RPG")
+
+@MainActor
+@Test func sessionEndBacksUpOnlyWhenAutomaticBackupIsOn() async throws {
+    let base = try temporaryDirectory()
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    _ = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
+    let library = LibraryStore(paths: paths, engines: [RPGMakerPlugin(.mz)])
+    await library.refresh()
+    let backups = base.appendingPathComponent("ludusavi-backup/No Socks RPG", isDirectory: true)
+    try fm.createDirectory(at: backups, withIntermediateDirectories: true)
+    try Data(LudusaviMapping(name: "No Socks RPG").yamlString().utf8).write(to: backups.appendingPathComponent("mapping.yaml"))
+
+    let service = SaveSyncService(library: library)
+    service.chooseFolder(backups.deletingLastPathComponent())
+    await service.refresh()
+    #expect(service.match(for: GameID("No Socks RPG")) == "No Socks RPG")
+
+    await service.sessionEnded(GameID("No Socks RPG"))
+    #expect(try await service.backups(for: GameID("No Socks RPG")).isEmpty)
+
+    service.autoBackup = true
+    await service.sessionEnded(GameID("No Socks RPG"))
+    let made = try await service.backups(for: GameID("No Socks RPG"))
+    #expect(made.count == 1 && made[0].fileCount == 1)
+    #expect(SaveSyncService(library: library).autoBackup)
+}
+
+@Test func ludusavisOwnRetentionStartsANewFullAfterTwoDifferentials() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("backups"))
+    let locations = try makeGame(in: base, saves: ["file1.rmmzsave": "v0"])
+    let limits = Retention(full: 3, differential: 2)
+    var kinds: [Bool] = []
+    for version in 1...4 {
+        let report = try store.backUp(folder: "G", title: "G", game: GameID("G"), locations: locations, retention: limits,
+                                      now: Date(timeIntervalSince1970: Double(version) * 3600), os: "mac", comment: nil)
+        kinds.append(report.isDifferential)
+        try write(["file1.rmmzsave": "v\(version)"], to: locations[0])
+    }
+    #expect(kinds == [false, true, true, false])
+    let mapping = try store.mapping("G")
+    #expect(mapping.backups.map(\.children.count) == [2, 0])
+}

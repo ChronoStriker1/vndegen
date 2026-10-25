@@ -79,6 +79,26 @@ public protocol EnginePlugin: Sendable {
     /// Inspects a folder listing. Returns nil when the folder is not this engine. Must not touch UI state.
     func detect(_ probe: FolderProbe) -> EngineMatch?
     @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession
+    /// Where this engine keeps a game's saves on this device. Save sync uses it to restore and back up.
+    func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation]
+}
+
+extension EnginePlugin {
+    public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] { [] }
+}
+
+/// A directory where an engine keeps saves, plus the rule that recognizes the same saves on other machines.
+public struct SaveLocation: Sendable {
+    public let directory: URL
+    /// Maps an absolute path with forward slashes, as another machine's backup records it, to a path relative to
+    /// `directory`. Returns nil when the file is not a save of this kind. The rule also accepts paths inside
+    /// `directory` itself, which is how local files are recognized as saves.
+    public let relativePath: @Sendable (String) -> String?
+
+    public init(directory: URL, relativePath: @escaping @Sendable (String) -> String?) {
+        self.directory = directory
+        self.relativePath = relativePath
+    }
 }
 
 /// A running game. The hub embeds `view` full screen and forwards controller input that the view does not receive natively.
