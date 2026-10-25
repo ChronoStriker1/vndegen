@@ -1,0 +1,77 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 78,
+ "limit": 50,
+ "data": [
+  {
+   "id": 162934,
+   "score": 0,
+   "style": "alternate",
+   "width": 600,
+   "height": 900,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/66cff14a77fb713dc60adc123a8861bd.png",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/66cff14a77fb713dc60adc123a8861bd.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "TINCTUREnoise",
+    "steam64": "76561198255298442",
+    "avatar": "https://avatars.steamstatic.com/20d2738439a193fe7ea7525ec53ca322644c0049_medium.jpg"
+   }
+  },
+  {
+   "id": 70014,
+   "score": 0,
+   "style": "alternate",
+   "width": 600,
+   "height": 900,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/2681c753b582ca0d48152fddd38593f7.png",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/2681c753b582ca0d48152fddd38593f7.jpg",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Appz",
+    "steam64": "76561197979868330",
+    "avatar": "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/cf/cfdf15d885a82a0211ffa5e43af1973a29d60fea_medium.jpg"
+   }
+  },
+  {
+   "id": 109597,
+   "score": 0,
+   "style": "alternate",
+   "width": 600,
+   "height": 900,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/grid/b9e3838697233778ccae1bbca00ae4de.png",
+   "thumb": "https://cdn2.steamgriddb.com/thumb/b9e3838697233778ccae1bbca00ae4de.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Ellie53",
+    "steam64": "76561199026148955",
+    "avatar": "https://avatars.steamstatic.com/b185513fd6f049b81086dde6010ec08c100cfe0a_medium.jpg"
+   }
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 1,
+ "limit": 50,
+ "data": [
+  {
+   "id": 114880,
+   "score": 0,
+   "style": "official",
+   "width": 128,
+   "height": 128,
+   "nsfw": false,
+   "humor": false,
+   "notes": "Official Icon",
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/icon/9d3bc6deae79ff977bb87b7fac1f8b80.png",
+   "thumb": "https://cdn2.steamgriddb.com/icon_thumb/9d3bc6deae79ff977bb87b7fac1f8b80.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Middele",
+    "steam64": "76561198708652658",
+    "avatar": "https://avatars.steamstatic.com/97c9dc4ed68f88361302cad2dafd6f65b372454a_medium.jpg"
+   }
+  }
+ ]
+}

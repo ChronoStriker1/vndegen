@@ -1,0 +1,54 @@
+{
+ "success": true,
+ "page": 0,
+ "total": 2,
+ "limit": 50,
+ "data": [
+  {
+   "id": 174783,
+   "score": 0,
+   "style": "official",
+   "width": 1229,
+   "height": 358,
+   "nsfw": false,
+   "humor": false,
+   "notes": "Official Logo without characters",
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/logo/568fe58ba4afa54d2db108fbd57a1f11.png",
+   "thumb": "https://cdn2.steamgriddb.com/logo_thumb/568fe58ba4afa54d2db108fbd57a1f11.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "Middele",
+    "steam64": "76561198708652658",
+    "avatar": "https://avatars.steamstatic.com/97c9dc4ed68f88361302cad2dafd6f65b372454a_medium.jpg"
+   }
+  },
+  {
+   "id": 165421,
+   "score": 0,
+   "style": "official",
+   "width": 841,
+   "height": 235,
+   "nsfw": false,
+   "humor": false,
+   "notes": null,
+   "mime": "image/png",
+   "language": "en",
+   "url": "https://cdn2.steamgriddb.com/logo/f801b42be81a4cca273b50e3367c25fe.png",
+   "thumb": "https://cdn2.steamgriddb.com/logo_thumb/f801b42be81a4cca273b50e3367c25fe.png",
+   "lock": false,
+   "epilepsy": false,
+   "upvotes": 0,
+   "downvotes": 0,
+   "author": {
+    "name": "VoiDMaiD",
+    "steam64": "76561198120405480",
+    "avatar": "https://avatars.steamstatic.com/d00414db77935653e7f806f8de1611d7f12d4a12_medium.jpg"
+   }
+  }
+ ]
+}

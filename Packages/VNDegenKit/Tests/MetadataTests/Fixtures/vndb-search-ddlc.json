@@ -1,0 +1,83 @@
+{
+ "more": true,
+ "results": [
+  {
+   "id": "v21905",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv.t/36/79136.jpg"
+   },
+   "released": "2017-09-22",
+   "title": "Doki Doki Literature Club!"
+  },
+  {
+   "id": "v22971",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/90/35190.jpg"
+   },
+   "released": "2018-03-26",
+   "title": "Doki Doki Literature Club 2 Next History"
+  },
+  {
+   "id": "v23240",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/89/35489.jpg"
+   },
+   "released": "2018-04-11",
+   "title": "Sayori Shoots Up DDLC!"
+  },
+  {
+   "id": "v23283",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/43/35543.jpg"
+   },
+   "released": "2018-06-03",
+   "title": "Doki Doki Literature Club: Episode Natsuki"
+  },
+  {
+   "id": "v23410",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/71/44771.jpg"
+   },
+   "released": null,
+   "title": "DDLC: Coldest Summer"
+  },
+  {
+   "id": "v25414",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/57/38357.jpg"
+   },
+   "released": "2018-08-24",
+   "title": "Doki Doki Literature Club! Purist Mod"
+  },
+  {
+   "id": "v26793",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/70/43670.jpg"
+   },
+   "released": "2020-01-08",
+   "title": "Doki Doki Literature Club! Fruits of the Literature Club"
+  },
+  {
+   "id": "v28280",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/67/42067.jpg"
+   },
+   "released": "2018-05-25",
+   "title": "Doki Doki Literature Club: Another Moment With You"
+  },
+  {
+   "id": "v33966",
+   "image": {
+    "thumbnail": "https://t.vndb.org/cv/94/52994.jpg"
+   },
+   "released": "2025-10-31",
+   "title": "Monika After Story"
+  },
+  {
+   "id": "v51435",
+   "image": null,
+   "released": "2022-06-01",
+   "title": "Doki Doki Afterimage"
+  }
+ ]
+}
