@@ -20,10 +20,19 @@ let engines: [any EnginePlugin] = {
     return engines
 }()
 
+#if os(macOS)
+/// The play session lives in the app's one window, so closing it quits, as closing a PC game's window does.
+final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+#endif
+
 @main
 struct VNDegenApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor(HubAppDelegate.self) private var appDelegate
+    #else
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     #endif
     @State private var hub: Hub = {
         let library = LibraryStore(paths: libraryPaths, engines: engines)
