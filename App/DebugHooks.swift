@@ -16,6 +16,7 @@ import AppKit
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
+///   -windowSize 900x600      resizes the window before the snapshot
 enum DebugHooks {
     static func run(_ hub: Hub) async {
         #if canImport(UIKit)
@@ -45,6 +46,10 @@ enum DebugHooks {
         }
         #if os(macOS)
         if let path = UserDefaults.standard.string(forKey: "snapshot") {
+            if let size = UserDefaults.standard.string(forKey: "windowSize")?.split(separator: "x").compactMap({ Double($0) }),
+               size.count == 2, let window = NSApp.windows.first(where: \.isVisible) {
+                window.setContentSize(NSSize(width: size[0], height: size[1]))
+            }
             try? await Task.sleep(for: .seconds(3))
             snapshotWindow(to: URL(fileURLWithPath: path))
         }
