@@ -16,11 +16,17 @@ nonisolated public struct GameFolder: Sendable {
     public let webRoot: String
     /// `root` with every symlink resolved. Every path this folder hands out must lead somewhere under it.
     private let realRoot: String
+    /// `root` as the kernel names it for an open descriptor. `open` compares descriptors against this, not `realRoot`,
+    /// so both sides of the comparison come from `F_GETPATH`.
+    private let descriptorRoot: String
 
     public init(root: URL, webRoot: String) {
         self.root = root
         self.webRoot = webRoot
         realRoot = Self.realPath(root.path) ?? root.path
+        let fd = Darwin.open(root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        descriptorRoot = (fd >= 0 ? Self.descriptorPath(fd) : nil) ?? realRoot
+        if fd >= 0 { close(fd) }
     }
 
     /// The web root as a virtual path.
@@ -94,6 +100,13 @@ nonisolated public struct GameFolder: Sendable {
         return lstat(path, &info) == 0
     }
 
+    /// Where an open descriptor's file is now, which a rename or symlink swap after the open cannot change.
+    static func descriptorPath(_ fd: Int32) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard fcntl(fd, F_GETPATH, &buffer) != -1 else { return nil }
+        return String(cString: buffer)
+    }
+
     private static func realPath(_ path: String) -> String? {
         guard let resolved = realpath(path, nil) else { return nil }
         defer { free(resolved) }
@@ -131,6 +144,33 @@ nonisolated public struct GameFolder: Sendable {
     }
 }
 
+/// Why `GameFolder.open` refused a path.
+nonisolated enum OpenFailure: Error, Equatable {
+    /// What opened lies outside the game folder.
+    case outside
+    case posix(Int32)
+}
+
+nonisolated extension GameFolder {
+    /// Opens what `url` names, then confirms the opened file itself lies inside the game folder. The check runs on the
+    /// descriptor, not the path, so a symlink swapped in after `resolve` validated the path cannot lead the read or write
+    /// out of the folder. Callers read and write through the returned handle only.
+    func open(_ url: URL, flags: Int32 = O_RDONLY) throws(OpenFailure) -> FileHandle {
+        // O_NONBLOCK keeps a FIFO in the folder from blocking the open. Regular files and directories ignore it.
+        let fd = Darwin.open(url.path, flags | O_CLOEXEC | O_NONBLOCK)
+        guard fd >= 0 else { throw .posix(errno) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        guard let path = Self.descriptorPath(fd), path == descriptorRoot || path.hasPrefix(descriptorRoot + "/") else { throw .outside }
+        return handle
+    }
+
+    /// Opens the directory that holds `url`, verified as `open` does, for `*at` calls on the returned name. Those calls
+    /// look up only that one name, without following a symlink, so nothing between the check and the write can move.
+    func openParent(of url: URL) throws(OpenFailure) -> (directory: FileHandle, name: String) {
+        (try open(url.deletingLastPathComponent(), flags: O_RDONLY | O_DIRECTORY), url.lastPathComponent)
+    }
+}
+
 nonisolated struct FileResponse: Equatable, Sendable {
     var status: Int
     var headers: [String: String]
@@ -142,23 +182,26 @@ nonisolated struct FileResponse: Equatable, Sendable {
     }
 }
 
+/// Part of a file that `GameFolder.serve` already opened and checked.
 nonisolated struct FileSpan: Equatable, Sendable {
-    var url: URL
+    var handle: FileHandle
     var offset: UInt64
     var length: UInt64
 
     static let chunkSize = 256 << 10
 
+    static func == (a: FileSpan, b: FileSpan) -> Bool {
+        a.handle === b.handle && a.offset == b.offset && a.length == b.length
+    }
+
     /// Reads the span one chunk at a time and hands each chunk to `deliver`, which returns false to stop early, as when
     /// WebKit stops the request. The read never holds more than one chunk of the file.
     func stream(chunkSize: Int = Self.chunkSize, to deliver: (Data) async -> Bool) async throws {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
         try handle.seek(toOffset: offset)
         var remaining = length
         while remaining > 0 {
             guard let chunk = try handle.read(upToCount: Int(min(UInt64(chunkSize), remaining))), !chunk.isEmpty else {
-                throw CocoaError(.fileReadCorruptFile, userInfo: [NSFilePathErrorKey: url.path])
+                throw CocoaError(.fileReadCorruptFile)
             }
             remaining -= UInt64(chunk.count)
             guard await deliver(chunk) else { return }
@@ -177,7 +220,8 @@ nonisolated extension GameFolder {
     /// 416 for a range past the end. WebKit's media loader relies on the range support and `Accept-Ranges`.
     func serve(path: String, method: String = "GET", range: String? = nil) -> FileResponse {
         var info = stat()
-        guard let url = resolve(servedPath: path), stat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return .empty(404) }
+        guard let url = resolve(servedPath: path), let handle = try? open(url),
+              fstat(handle.fileDescriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return .empty(404) }
         let size = Int64(info.st_size)
         var headers = ["Content-Type": Self.mimeType(forExtension: url.pathExtension), "Accept-Ranges": "bytes"]
         let status: Int, first: Int64, last: Int64
@@ -192,7 +236,7 @@ nonisolated extension GameFolder {
         }
         let length = max(0, last - first + 1)
         headers["Content-Length"] = String(length)
-        let body = method == "HEAD" || length == 0 ? nil : FileSpan(url: url, offset: UInt64(first), length: UInt64(length))
+        let body = method == "HEAD" || length == 0 ? nil : FileSpan(handle: handle, offset: UInt64(first), length: UInt64(length))
         return FileResponse(status: status, headers: headers, body: body)
     }
 

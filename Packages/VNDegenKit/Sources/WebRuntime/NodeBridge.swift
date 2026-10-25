@@ -104,6 +104,10 @@ nonisolated enum BridgeReply: Equatable, Sendable, Encodable {
 
 /// Runs the file operations of `BridgeRequest` against the game folder. It touches nothing else, so tests drive it
 /// with a temporary directory.
+///
+/// Every operation works on descriptors that `GameFolder.open` checked after opening: reads go through the opened file,
+/// and changes go through `*at` calls on the opened parent directory with a single name that is never followed as a
+/// symlink. A game that swaps a directory for an escaping symlink mid-operation therefore cannot reach outside.
 nonisolated struct NodeBridge: Sendable {
     let folder: GameFolder
 
@@ -118,83 +122,83 @@ nonisolated struct NodeBridge: Sendable {
     }
 
     private func perform(_ request: BridgeRequest) throws -> BridgeValue {
-        let fm = FileManager.default
         switch request {
         case .exists(let path):
             guard let url = folder.resolve(virtualPath: path) else { return .bool(false) }
-            return .bool(fm.fileExists(atPath: url.path))
+            return .bool((try? folder.open(url)) != nil)
 
         case .stat(let path):
-            let url = try confined(path)
-            guard fm.fileExists(atPath: url.path) else { throw Self.missing(path) }
-            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .fileSizeKey, .contentModificationDateKey])
-            return .stat(FileStat(isFile: values.isRegularFile ?? false,
-                                  isDirectory: values.isDirectory ?? false,
-                                  size: Int64(values.fileSize ?? 0),
-                                  mtimeMs: (values.contentModificationDate ?? .distantPast).timeIntervalSince1970 * 1000))
+            let info = try Self.info(try open(path))
+            let mtime = Double(info.st_mtimespec.tv_sec) * 1000 + Double(info.st_mtimespec.tv_nsec) / 1_000_000
+            return .stat(FileStat(isFile: Self.kind(info) == S_IFREG, isDirectory: Self.kind(info) == S_IFDIR,
+                                  size: Int64(info.st_size), mtimeMs: mtime))
 
         case let .readFile(path, text):
-            let url = try confined(path)
-            guard !GameFolder.isDirectory(url) else { throw BridgeError(code: "EISDIR", message: "illegal operation on a directory") }
-            guard let data = fm.contents(atPath: url.path) else { throw Self.missing(path) }
+            let file = try open(path)
+            guard Self.kind(try Self.info(file)) != S_IFDIR else { throw BridgeError(code: "EISDIR", message: "illegal operation on a directory") }
+            let data = try file.readToEnd() ?? Data()
             return .string(text ? String(decoding: data, as: UTF8.self) : data.base64EncodedString())
 
         case let .writeFile(path, payload, text):
-            let url = try confined(path)
-            guard GameFolder.isDirectory(url.deletingLastPathComponent()) else { throw Self.missing(path) }
+            let (directory, name) = try openParent(path)
             guard let data = text ? Data(payload.utf8) : Data(base64Encoded: payload) else {
                 throw BridgeError(code: "EINVAL", message: "data is not base64")
             }
-            try data.write(to: url, options: .atomic)
+            try Self.replace(name, in: directory) { try $0.write(contentsOf: data) }
             return .null
 
         case let .mkdir(path, recursive):
             let url = try confined(path)
-            if fm.fileExists(atPath: url.path) {
+            if (try? folder.open(url)) != nil {
                 if recursive { return .null }
                 throw BridgeError(code: "EEXIST", message: "file already exists")
             }
-            guard recursive || GameFolder.isDirectory(url.deletingLastPathComponent()) else { throw Self.missing(path) }
-            try fm.createDirectory(at: url, withIntermediateDirectories: recursive)
+            if recursive {
+                try makeDirectories(url, path: path)
+            } else {
+                let (directory, name) = try openParent(path)
+                guard mkdirat(directory.fileDescriptor, name, 0o755) == 0 else { throw Self.posixError(path) }
+            }
             return .null
 
         case .readdir(let path):
-            let url = try confined(path)
-            guard fm.fileExists(atPath: url.path) else { throw Self.missing(path) }
-            guard GameFolder.isDirectory(url) else { throw BridgeError(code: "ENOTDIR", message: "not a directory") }
-            return .strings(try fm.contentsOfDirectory(atPath: url.path).sorted())
+            let directory = try open(path)
+            guard Self.kind(try Self.info(directory)) == S_IFDIR else { throw BridgeError(code: "ENOTDIR", message: "not a directory") }
+            return .strings(try Self.names(in: directory).sorted())
 
         case let .rename(from, to):
-            let source = try confined(from), target = try confined(to)
-            guard fm.fileExists(atPath: source.path) else { throw Self.missing(from) }
+            let (sourceDirectory, sourceName) = try openParent(from)
+            let (targetDirectory, targetName) = try openParent(to)
             // rename(2) replaces the target atomically, which FileManager.moveItem refuses to do.
-            guard rename(source.path, target.path) == 0 else { throw Self.posixError() }
+            guard renameat(sourceDirectory.fileDescriptor, sourceName, targetDirectory.fileDescriptor, targetName) == 0 else {
+                throw Self.posixError(from)
+            }
             return .null
 
         case .unlink(let path):
-            let url = try confined(path)
-            guard fm.fileExists(atPath: url.path) else { throw Self.missing(path) }
-            guard !GameFolder.isDirectory(url) else { throw BridgeError(code: "EPERM", message: "operation not permitted on a directory") }
-            try fm.removeItem(at: url)
+            let (directory, name) = try openParent(path)
+            var info = stat()
+            guard fstatat(directory.fileDescriptor, name, &info, AT_SYMLINK_NOFOLLOW) == 0 else { throw Self.posixError(path) }
+            guard Self.kind(info) != S_IFDIR else { throw BridgeError(code: "EPERM", message: "operation not permitted on a directory") }
+            guard unlinkat(directory.fileDescriptor, name, 0) == 0 else { throw Self.posixError(path) }
             return .null
 
         case let .copyFile(from, to):
-            let source = try confined(from), target = try confined(to)
-            guard fm.fileExists(atPath: source.path) else { throw Self.missing(from) }
-            guard !GameFolder.isDirectory(source), !GameFolder.isDirectory(target) else {
-                throw BridgeError(code: "EISDIR", message: "illegal operation on a directory")
+            let source = try open(from)
+            let sourceInfo = try Self.info(source)
+            let isDirectory = BridgeError(code: "EISDIR", message: "illegal operation on a directory")
+            guard Self.kind(sourceInfo) != S_IFDIR else { throw isDirectory }
+            if let target = try? folder.open(try confined(to)) {
+                let targetInfo = try Self.info(target)
+                guard Self.kind(targetInfo) != S_IFDIR else { throw isDirectory }
+                // Node treats a copy onto the same file as done. Replacing it would delete the source.
+                if targetInfo.st_dev == sourceInfo.st_dev && targetInfo.st_ino == sourceInfo.st_ino { return .null }
             }
-            // Node treats a copy onto the same file as done. Replacing it would delete the source.
-            if Self.isSameFile(source, target) { return .null }
-            guard GameFolder.isDirectory(target.deletingLastPathComponent()) else { throw Self.missing(to) }
-            // Copies beside the target and renames over it, so a failed copy leaves the old target in place.
-            let staging = target.deletingLastPathComponent().appendingPathComponent(".\(target.lastPathComponent).\(UUID().uuidString)")
-            do {
-                try fm.copyItem(at: source.resolvingSymlinksInPath(), to: staging)
-                guard rename(staging.path, target.path) == 0 else { throw Self.posixError() }
-            } catch {
-                try? fm.removeItem(at: staging)
-                throw error
+            let (directory, name) = try openParent(to)
+            try Self.replace(name, in: directory) { target in
+                while let chunk = try source.read(upToCount: FileSpan.chunkSize), !chunk.isEmpty {
+                    try target.write(contentsOf: chunk)
+                }
             }
             return .null
 
@@ -204,24 +208,96 @@ nonisolated struct NodeBridge: Sendable {
     }
 
     private func confined(_ path: String) throws -> URL {
-        guard let url = folder.resolve(virtualPath: path) else {
-            throw BridgeError(code: "EACCES", message: "path is outside the game folder: \(path)")
-        }
+        guard let url = folder.resolve(virtualPath: path) else { throw Self.outside(path) }
         return url
     }
 
-    private static func isSameFile(_ a: URL, _ b: URL) -> Bool {
-        var first = stat(), second = stat()
-        guard stat(a.path, &first) == 0, stat(b.path, &second) == 0 else { return false }
-        return first.st_dev == second.st_dev && first.st_ino == second.st_ino
+    private func open(_ path: String) throws -> FileHandle {
+        do {
+            return try folder.open(try confined(path))
+        } catch let failure as OpenFailure {
+            throw Self.error(failure, path: path)
+        }
+    }
+
+    private func openParent(_ path: String) throws -> (FileHandle, String) {
+        try openParent(of: try confined(path), path: path)
+    }
+
+    private func openParent(of url: URL, path: String) throws -> (FileHandle, String) {
+        do {
+            return try folder.openParent(of: url)
+        } catch let failure as OpenFailure {
+            throw Self.error(failure, path: path)
+        }
+    }
+
+    /// Creates each missing directory on the way to `url`, one verified parent at a time. `url` comes from `resolve`, so
+    /// it lies under the game root.
+    private func makeDirectories(_ url: URL, path: String) throws {
+        var missing: [URL] = []
+        var current = url
+        while (try? folder.open(current)) == nil, current.path.count > folder.root.path.count {
+            missing.append(current)
+            current = current.deletingLastPathComponent()
+        }
+        for directory in missing.reversed() {
+            let (parent, name) = try openParent(of: directory, path: path)
+            guard mkdirat(parent.fileDescriptor, name, 0o755) == 0 || errno == EEXIST else { throw Self.posixError(path) }
+        }
+    }
+
+    /// Writes `name` in `directory` through a staging file beside it, then renames the staging file over it, so a failed
+    /// write leaves the old file in place. A symlink at `name` is replaced, not followed.
+    private static func replace(_ name: String, in directory: FileHandle, write: (FileHandle) throws -> Void) throws {
+        let staging = ".\(name).\(UUID().uuidString)"
+        let fd = openat(directory.fileDescriptor, staging, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)
+        guard fd >= 0 else { throw posixError(name) }
+        do {
+            try write(FileHandle(fileDescriptor: fd, closeOnDealloc: true))
+            guard renameat(directory.fileDescriptor, staging, directory.fileDescriptor, name) == 0 else { throw posixError(name) }
+        } catch {
+            unlinkat(directory.fileDescriptor, staging, 0)
+            throw error
+        }
+    }
+
+    private static func names(in directory: FileHandle) throws -> [String] {
+        // fdopendir takes ownership of the descriptor it is given, so it gets a duplicate.
+        guard let stream = fdopendir(dup(directory.fileDescriptor)) else { throw posixError("") }
+        defer { closedir(stream) }
+        var names: [String] = []
+        while let entry = readdir(stream) {
+            let name = withUnsafeBytes(of: entry.pointee.d_name) { String(decoding: $0.prefix(Int(entry.pointee.d_namlen)), as: UTF8.self) }
+            if name != "." && name != ".." { names.append(name) }
+        }
+        return names
+    }
+
+    private static func info(_ file: FileHandle) throws -> stat {
+        var info = stat()
+        guard fstat(file.fileDescriptor, &info) == 0 else { throw posixError("") }
+        return info
+    }
+
+    private static func kind(_ info: stat) -> mode_t { info.st_mode & S_IFMT }
+
+    private static func error(_ failure: OpenFailure, path: String) -> BridgeError {
+        switch failure {
+        case .outside: outside(path)
+        case .posix(let code): posixError(path, code: code)
+        }
+    }
+
+    private static func outside(_ path: String) -> BridgeError {
+        BridgeError(code: "EACCES", message: "path is outside the game folder: \(path)")
     }
 
     private static func missing(_ path: String) -> BridgeError {
         BridgeError(code: "ENOENT", message: "no such file or directory, '\(path)'")
     }
 
-    private static func posixError() -> BridgeError {
-        let code = errno
+    private static func posixError(_ path: String, code: Int32 = errno) -> BridgeError {
         let name = switch code {
         case ENOENT: "ENOENT"
         case EACCES, EPERM: "EACCES"
@@ -231,6 +307,7 @@ nonisolated struct NodeBridge: Sendable {
         case ENOTEMPTY: "ENOTEMPTY"
         default: "EIO"
         }
+        if name == "ENOENT" { return missing(path) }
         return BridgeError(code: name, message: String(cString: strerror(code)))
     }
 }
