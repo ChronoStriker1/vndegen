@@ -20,6 +20,7 @@ final class Navigator {
     enum Sheet: Identifiable {
         case unlock
         case engine(GameID)
+        case orientation(GameID)
         case artwork(GameID)
         case metadata(GameID)
 
@@ -27,6 +28,7 @@ final class Navigator {
             switch self {
             case .unlock: "unlock"
             case let .engine(id): "engine:\(id)"
+            case let .orientation(id): "orientation:\(id)"
             case let .artwork(id): "artwork:\(id)"
             case let .metadata(id): "metadata:\(id)"
             }
@@ -52,8 +54,9 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageLock, pageEngine
+        case pagePlay, pageArtwork, pageMetadata, pageLock, pageEngine, pageOrientation
         case engineOption(EngineID?)
+        case orientationOption(PlayOrientation?)
     }
 
     struct Row {
@@ -65,7 +68,20 @@ final class Navigator {
 
     let hub: Hub
     private(set) var path: [Route] = []
-    var sheet: Sheet? { didSet { syncInputMode() } }
+    var sheet: Sheet? {
+        didSet {
+            syncInputMode()
+            // Focus moves into a sheet and returns to whatever opened it, however the sheet closes.
+            if oldValue == nil, sheet != nil {
+                focusBeforeSheet = focus
+                setFocus(defaultFocus)
+            } else if sheet == nil, oldValue != nil {
+                setFocus(focusBeforeSheet)
+                focusBeforeSheet = nil
+            }
+        }
+    }
+    @ObservationIgnored private var focusBeforeSheet: Target?
     private(set) var focus: Target?
     /// The game shown in the home hero: the last game whose tile had focus.
     private var heroID: GameID?
@@ -105,7 +121,7 @@ final class Navigator {
     func rows() -> [Row] {
         if let sheet {
             switch sheet {
-            case let .engine(id): return engineOptions(for: id).map { Row(id: "engine-\($0.id?.rawValue ?? "auto")", items: [.engineOption($0.id)]) }
+            case .engine, .orientation: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case .unlock, .artwork, .metadata: return []
             }
         }
@@ -128,14 +144,15 @@ final class Navigator {
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
-            ]
+            ] + (Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : [])
         case .settings:
             return [Row(id: "settings-back", items: [.back])]
         }
     }
 
     private var defaultFocus: Target? {
-        if case let .engine(id) = sheet { return .engineOption(hub.library.game(id)?.engineOverride) }
+        // Only choice sheets have focus targets. Others take touch, pointer, and their own controller handling.
+        if let sheet { return selectedChoice(for: sheet) }
         switch route {
         case nil:
             if let game = heroGame, let shelf = shelves.first(where: { $0.games.contains { $0.id == game.id } }) {
@@ -203,7 +220,8 @@ final class Navigator {
 
     /// Pointer hover on Mac and iPad moves focus without activating.
     func hover(_ target: Target) {
-        guard sheet == nil else { return }
+        // Views behind an open sheet are not in the focus table, so they cannot steal focus from it.
+        guard position(of: target, in: rows()) != nil else { return }
         hub.input.noteInput(.keyboardMouse)
         if focus != target { setFocus(target) }
     }
@@ -234,9 +252,13 @@ final class Navigator {
         case .pageArtwork: if let id = pageGameID { sheet = .artwork(id) }
         case .pageMetadata: if let id = pageGameID { sheet = .metadata(id) }
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
+        case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
         case let .engineOption(engine):
             if case let .engine(id) = sheet { hub.library.update(id) { $0.engineOverride = engine } }
+            sheet = nil
+        case let .orientationOption(orientation):
+            if case let .orientation(id) = sheet { hub.library.update(id) { $0.orientation = orientation } }
             sheet = nil
         }
     }
@@ -308,24 +330,40 @@ final class Navigator {
         if hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
     }
 
-    // MARK: Engines
+    // MARK: Choice sheets
 
-    struct EngineOption: Identifiable {
-        let id: EngineID?
+    /// One option in a sheet that picks a single value, such as the engine override.
+    struct Choice: Identifiable {
+        let target: Target
         let title: String
-        let detail: String?
+        var detail: String?
+        var id: Target { target }
     }
 
-    /// "Automatic (detected: X)" first, then every engine that runs on this platform.
-    func engineOptions(for id: GameID) -> [EngineOption] {
-        let game = hub.library.game(id)
-        let detected = game?.detected.flatMap { hub.library.plugin(for: $0.engine)?.descriptor.displayName }
-        let automatic = EngineOption(id: nil, title: "Automatic", detail: "Detected: \(detected ?? "none")")
-        let manual = hub.library.engines
-            .map(\.descriptor)
-            .filter { $0.platforms.contains(.current) }
-            .map { EngineOption(id: $0.id, title: $0.displayName, detail: nil) }
-        return [automatic] + manual
+    func choices(for sheet: Sheet) -> [Choice] {
+        switch sheet {
+        case let .engine(id):
+            // "Automatic (detected: X)" first, then every engine that runs on this platform.
+            let detected = hub.library.game(id)?.detected.flatMap { hub.library.plugin(for: $0.engine)?.descriptor.displayName }
+            let manual = hub.library.engines
+                .map(\.descriptor)
+                .filter { $0.platforms.contains(.current) }
+                .map { Choice(target: .engineOption($0.id), title: $0.displayName) }
+            return [Choice(target: .engineOption(nil), title: "Automatic", detail: "Detected: \(detected ?? "none")")] + manual
+        case .orientation:
+            let fixed = PlayOrientation.allCases.map { Choice(target: .orientationOption($0), title: $0.title) }
+            return [Choice(target: .orientationOption(nil), title: "Use default", detail: "Currently \(PlayOrientation.setting.title), from Settings")] + fixed
+        case .unlock, .artwork, .metadata:
+            return []
+        }
+    }
+
+    func selectedChoice(for sheet: Sheet) -> Target? {
+        switch sheet {
+        case let .engine(id): .engineOption(hub.library.game(id)?.engineOverride)
+        case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
+        case .unlock, .artwork, .metadata: nil
+        }
     }
 
     // MARK: Input

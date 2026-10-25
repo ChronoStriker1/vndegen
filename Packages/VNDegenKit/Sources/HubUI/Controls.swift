@@ -56,8 +56,7 @@ struct GameTile: View {
         let focused = nav.isFocused(target)
         let width = width ?? metrics.tileWidth
         Button { nav.select(target) } label: {
-            GameArt(game: game, slots: [.capsule], maxPixel: 600)
-                .frame(width: width, height: width * 1.5)
+            GameArt(game: game, slots: [.capsule], size: CGSize(width: width, height: width * 1.5))
                 .clipShape(.rect(cornerRadius: 10, style: .continuous))
                 .overlay(alignment: .topLeading) {
                     if game.isLocked {
@@ -84,7 +83,8 @@ struct TileButtonStyle: ButtonStyle {
         configuration.label
             .overlay { shape.strokeBorder(.white.opacity(focused ? 1 : 0.08), lineWidth: focused ? 3 : 1) }
             .scaleEffect(configuration.isPressed ? 0.97 : (focused ? 1.07 : 1))
-            .shadow(color: focused ? Theme.accent.opacity(0.55) : .black.opacity(0.45), radius: focused ? 22 : 10, y: focused ? 0 : 6)
+            // Only the focused tile casts a glow. A shadow on every tile costs an offscreen pass per tile while scrolling.
+            .shadow(color: focused ? Theme.accent.opacity(0.55) : .clear, radius: focused ? 22 : 0)
             .zIndex(focused ? 1 : 0)
             .animation(Theme.focusAnimation, value: focused)
             .animation(Theme.focusAnimation, value: configuration.isPressed)

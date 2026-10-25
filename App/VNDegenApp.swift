@@ -7,13 +7,23 @@ import Lock
 import HubUI
 
 /// Every engine plugin the app ships. Add new engines here.
-let engines: [any EnginePlugin] = [
-    RPGMakerPlugin(.mz),
-    RPGMakerPlugin(.mv),
-]
+let engines: [any EnginePlugin] = {
+    var engines: [any EnginePlugin] = [
+        RPGMakerPlugin(.mz),
+        RPGMakerPlugin(.mv),
+    ]
+    #if DEBUG
+    // Registered first, so it wins the MZ engine ID over the real runtime.
+    if UserDefaults.standard.bool(forKey: "fakeSession") { engines.insert(FakeSessionPlugin(), at: 0) }
+    #endif
+    return engines
+}()
 
 @main
 struct VNDegenApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(HubAppDelegate.self) private var appDelegate
+    #endif
     @State private var hub = Hub(
         library: LibraryStore(paths: libraryPaths, engines: engines),
         metadata: MetadataService(),

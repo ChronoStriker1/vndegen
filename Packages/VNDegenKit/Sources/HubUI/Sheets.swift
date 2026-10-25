@@ -38,29 +38,32 @@ struct SheetScaffold<Content: View>: View {
     }
 }
 
-// MARK: Engine picker
+// MARK: Choice sheets
 
-struct EnginePickerSheet: View {
-    @Environment(Hub.self) private var hub
+/// Picks one value for a game, such as its engine override or in-game orientation.
+struct ChoiceSheet: View {
     @Environment(Navigator.self) private var nav
-    let game: Game
+    let sheet: Navigator.Sheet
+    let title: String
+    let subtitle: String
+    let footnote: String
 
     var body: some View {
-        SheetScaffold(title: "Engine", subtitle: hub.displayTitle(game)) {
+        let selected = nav.selectedChoice(for: sheet)
+        SheetScaffold(title: title, subtitle: subtitle) {
             ScrollView {
                 VStack(spacing: 10) {
-                    ForEach(nav.engineOptions(for: game.id)) { option in
-                        let target = Navigator.Target.engineOption(option.id)
-                        let focused = nav.isFocused(target)
-                        let selected = game.engineOverride == option.id
-                        Button { nav.select(target) } label: {
+                    ForEach(nav.choices(for: sheet)) { choice in
+                        let focused = nav.isFocused(choice.target)
+                        let isSelected = selected == choice.target
+                        Button { nav.select(choice.target) } label: {
                             HStack(spacing: 14) {
-                                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                                     .font(.system(size: 20))
-                                    .foregroundStyle(selected ? Theme.accent : Theme.tertiaryText)
+                                    .foregroundStyle(isSelected ? Theme.accent : Theme.tertiaryText)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(option.title).font(.system(size: 16, weight: .semibold))
-                                    if let detail = option.detail {
+                                    Text(choice.title).font(.system(size: 16, weight: .semibold))
+                                    if let detail = choice.detail {
                                         Text(detail).font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
                                     }
                                 }
@@ -76,10 +79,10 @@ struct EnginePickerSheet: View {
                             .contentShape(.rect)
                         }
                         .buttonStyle(.plain)
-                        .onHover { if $0 { nav.setFocus(target) } }
+                        .onHover { if $0 { nav.hover(choice.target) } }
                         .animation(Theme.focusAnimation, value: focused)
                     }
-                    Text("Only engines that run on this device are listed. A manual choice wins over detection until you switch back to Automatic.")
+                    Text(footnote)
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.tertiaryText)
                         .padding(.top, 6)
@@ -188,10 +191,9 @@ struct ArtworkEditorSheet: View {
             if slot == .logo {
                 GameLogo(game: game, maxSize: CGSize(width: width * 0.9, height: width / aspect * 0.8), alignment: .center)
                     .frame(width: width, height: width / aspect)
-                    .background { GameArt(game: game, slots: [.hero, .header], maxPixel: 800).opacity(0.5) }
+                    .background { GameArt(game: game, slots: [.hero, .header], size: CGSize(width: width, height: width / aspect)).opacity(0.5) }
             } else {
-                GameArt(game: game, slots: [slot], maxPixel: 900)
-                    .frame(width: width, height: width / aspect)
+                GameArt(game: game, slots: [slot], size: CGSize(width: width, height: width / aspect))
             }
         }
         .clipShape(.rect(cornerRadius: 10, style: .continuous))

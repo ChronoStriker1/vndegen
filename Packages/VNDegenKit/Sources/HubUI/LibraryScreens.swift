@@ -77,6 +77,7 @@ struct SettingsView: View {
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
+    @AppStorage(PlayOrientation.storageKey) private var orientation = PlayOrientation.landscape
     @State private var page: Page?
 
     /// MetadataSettingsView and LockSettingsView are whole forms, so they open in their own sheet.
@@ -114,10 +115,19 @@ struct SettingsView: View {
                     Picker("Touch controls", selection: $touchMode) {
                         ForEach(TouchControlsMode.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
+                    #if os(iOS)
+                    Picker("In-game orientation", selection: $orientation) {
+                        ForEach(PlayOrientation.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    #endif
                 } header: {
                     Text("Controls")
                 } footer: {
+                    #if os(iOS)
+                    Text("Touch controls show over a game when you play by touch and no controller is connected. In-game orientation applies while a game plays, and each game page can override it.")
+                    #else
                     Text("Shown over a game when you play by touch and no controller is connected.")
+                    #endif
                 }
 
                 Section {

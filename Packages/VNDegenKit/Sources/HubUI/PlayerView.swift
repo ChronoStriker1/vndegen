@@ -44,13 +44,21 @@ struct PlayerView: View {
         .onAppear {
             hub.input.onEvent = handle
             applyInputMode()
+            #if os(iOS)
+            OrientationLock.apply(game?.orientation ?? PlayOrientation.setting)
+            #endif
         }
+        #if os(iOS)
+        .onDisappear { OrientationLock.apply(nil) }
+        #endif
     }
 
-    private var title: String {
-        guard case let .playing(id, _) = hub.screen, let game = hub.library.game(id) else { return "" }
-        return hub.displayTitle(game)
+    private var game: Game? {
+        guard case let .playing(id, _) = hub.screen else { return nil }
+        return hub.library.game(id)
     }
+
+    private var title: String { game.map(hub.displayTitle) ?? "" }
 
     private func handle(_ event: ControllerEvent) {
         guard menu.isOpen else {

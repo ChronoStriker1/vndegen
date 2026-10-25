@@ -1,46 +1,109 @@
 import SwiftUI
 import ImageIO
+import CoreImage
 import VNCore
 
-/// Decoded, downsampled artwork keyed by file URL and pixel size. Steam heroes are 3840 pixels wide, so decoding at
-/// display size keeps memory flat. LibraryStore writes a new file name per change, so URL keys never go stale.
+/// How a piece of artwork is drawn, which decides the pixels worth decoding.
+nonisolated enum ArtworkRendering: Hashable, Sendable {
+    /// Scaled to fill or fit a frame of this many pixels.
+    case fill(width: Int, height: Int)
+    case fit(width: Int, height: Int)
+    /// A soft wash for backgrounds. Blurred once from a small thumbnail, then scaled up by the GPU.
+    case blurred
+}
+
+/// Decoded artwork keyed by file URL and rendering. Steam heroes are 3840 pixels wide, so everything is decoded at the
+/// size it is drawn, off the main thread, and blurred copies are made once per image instead of blurring every frame.
+/// LibraryStore writes a new file name per change, so URL keys never go stale.
 @MainActor
 final class ArtworkCache {
     static let shared = ArtworkCache()
     private let cache = NSCache<NSString, CGImage>()
 
-    private func key(_ url: URL, _ maxPixel: Int) -> NSString { "\(url.path)#\(maxPixel)" as NSString }
+    private func key(_ url: URL, _ rendering: ArtworkRendering) -> NSString { "\(url.path)#\(rendering)" as NSString }
 
-    func cached(_ url: URL, maxPixel: Int) -> CGImage? { cache.object(forKey: key(url, maxPixel)) }
+    func cached(_ url: URL, _ rendering: ArtworkRendering) -> CGImage? { cache.object(forKey: key(url, rendering)) }
 
-    func image(_ url: URL, maxPixel: Int) async -> CGImage? {
-        if let hit = cached(url, maxPixel: maxPixel) { return hit }
-        let image = await Task.detached(priority: .userInitiated) { Self.downsample(url, maxPixel: maxPixel) }.value
-        if let image { cache.setObject(image, forKey: key(url, maxPixel)) }
+    func image(_ url: URL, _ rendering: ArtworkRendering) async -> CGImage? {
+        if let hit = cached(url, rendering) { return hit }
+        let image = await Task.detached(priority: .userInitiated) { Self.decode(url, rendering) }.value
+        if let image { cache.setObject(image, forKey: key(url, rendering)) }
         return image
     }
 
-    nonisolated private static func downsample(_ url: URL, maxPixel: Int) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) else {
-            return nil
+    /// A wide hero filling a tall frame is decoded at full height, but only its middle is visible. Copying out the
+    /// visible part keeps a 3840 pixel wide texture from reaching the GPU for a phone-width slice.
+    nonisolated private static func cropToVisible(_ image: CGImage, width: Int, height: Int) -> CGImage {
+        let scale = max(CGFloat(width) / CGFloat(image.width), CGFloat(height) / CGFloat(image.height))
+        let visible = CGSize(width: min(CGFloat(image.width), CGFloat(width) / scale),
+                             height: min(CGFloat(image.height), CGFloat(height) / scale))
+        guard visible.width * visible.height < CGFloat(image.width * image.height) * 0.75 else { return image }
+        let rect = CGRect(x: ((CGFloat(image.width) - visible.width) / 2).rounded(.down),
+                          y: ((CGFloat(image.height) - visible.height) / 2).rounded(.down),
+                          width: visible.width.rounded(.down), height: visible.height.rounded(.down))
+        guard let cropped = image.cropping(to: rect),
+              let context = CGContext(data: nil, width: cropped.width, height: cropped.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return image }
+        // Drawing into a new bitmap drops the reference to the full-size backing store that cropping(to:) keeps.
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: cropped.width, height: cropped.height))
+        return context.makeImage() ?? image
+    }
+
+    nonisolated private static let blurContext = CIContext(options: [.cacheIntermediates: false])
+
+    nonisolated private static func decode(_ url: URL, _ rendering: ArtworkRendering) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let sourceWidth = properties[kCGImagePropertyPixelWidth] as? CGFloat,
+              let sourceHeight = properties[kCGImagePropertyPixelHeight] as? CGFloat,
+              sourceWidth > 0, sourceHeight > 0 else { return nil }
+        let scale: CGFloat
+        switch rendering {
+        case let .fill(width, height): scale = max(CGFloat(width) / sourceWidth, CGFloat(height) / sourceHeight)
+        case let .fit(width, height): scale = min(CGFloat(width) / sourceWidth, CGFloat(height) / sourceHeight)
+        case .blurred: scale = 160 / max(sourceWidth, sourceHeight)
         }
+        let maxPixel = max(1, Int((max(sourceWidth, sourceHeight) * min(scale, 1)).rounded(.up)))
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixel,
         ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        if case let .fill(width, height) = rendering { return cropToVisible(image, width: width, height: height) }
+        guard rendering == .blurred else { return image }
+        let input = CIImage(cgImage: image)
+        let blurred = input.clampedToExtent().applyingGaussianBlur(sigma: 7).cropped(to: input.extent)
+        return blurContext.createCGImage(blurred, from: input.extent)
     }
 }
 
-/// A local artwork file, or `placeholder` while it loads or when it is missing.
+/// A local artwork file drawn into a frame of `size` points, or `placeholder` while it loads or when it is missing.
 struct ArtworkImage<Placeholder: View>: View {
+    @Environment(\.displayScale) private var displayScale
     let url: URL?
-    var maxPixel = 1200
+    let size: CGSize
     var contentMode: ContentMode = .fill
+    var alignment: Alignment = .center
+    var blurred = false
     @ViewBuilder var placeholder: Placeholder
     @State private var image: CGImage?
+
+    /// Pixel sizes snap to 64 so small layout changes reuse the cached decode.
+    private var rendering: ArtworkRendering {
+        if blurred { return .blurred }
+        let width = Int((size.width * displayScale / 64).rounded(.up)) * 64
+        let height = Int((size.height * displayScale / 64).rounded(.up)) * 64
+        return contentMode == .fill ? .fill(width: width, height: height) : .fit(width: width, height: height)
+    }
+
+    private struct LoadKey: Hashable {
+        let url: URL?
+        let rendering: ArtworkRendering
+    }
 
     var body: some View {
         ZStack {
@@ -52,10 +115,12 @@ struct ArtworkImage<Placeholder: View>: View {
                 placeholder
             }
         }
-        .task(id: url) {
+        .frame(width: size.width, height: size.height, alignment: alignment)
+        .task(id: LoadKey(url: url, rendering: rendering)) {
             guard let url else { image = nil; return }
-            if let hit = ArtworkCache.shared.cached(url, maxPixel: maxPixel) { image = hit; return }
-            image = await ArtworkCache.shared.image(url, maxPixel: maxPixel)
+            let rendering = rendering
+            if let hit = ArtworkCache.shared.cached(url, rendering) { image = hit; return }
+            image = await ArtworkCache.shared.image(url, rendering)
         }
     }
 }
@@ -69,17 +134,19 @@ extension Hub {
     }
 }
 
-/// Fills its frame with the game's art for `slots`, or a generated poster when there is none.
+/// The game's art for `slots` in a frame of `size`, or a generated poster when there is none.
 struct GameArt: View {
     @Environment(Hub.self) private var hub
     let game: Game
     let slots: [ArtworkSlot]
-    var maxPixel = 1200
+    let size: CGSize
+    var blurred = false
 
     var body: some View {
-        ArtworkImage(url: hub.artworkURL(game, slots), maxPixel: maxPixel) {
+        ArtworkImage(url: hub.artworkURL(game, slots), size: size, blurred: blurred) {
             PlaceholderArt(title: hub.displayTitle(game), wide: slots.first != .capsule)
         }
+        .clipped()
     }
 }
 
@@ -92,7 +159,7 @@ struct GameLogo: View {
 
     var body: some View {
         let title = hub.displayTitle(game)
-        ArtworkImage(url: hub.artworkURL(game, [.logo]), maxPixel: 1000, contentMode: .fit) {
+        ArtworkImage(url: hub.artworkURL(game, [.logo]), size: maxSize, contentMode: .fit, alignment: alignment) {
             Text(title)
                 .font(.display(maxSize.height * 0.42, weight: .black))
                 .lineLimit(2)
@@ -102,7 +169,6 @@ struct GameLogo: View {
                 .shadow(color: .black.opacity(0.6), radius: 12, y: 4)
                 .frame(maxWidth: maxSize.width, maxHeight: maxSize.height, alignment: alignment)
         }
-        .frame(maxWidth: maxSize.width, maxHeight: maxSize.height, alignment: alignment)
         .shadow(color: .black.opacity(0.45), radius: 18, y: 6)
         .accessibilityLabel(title)
     }

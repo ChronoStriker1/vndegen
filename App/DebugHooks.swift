@@ -2,16 +2,24 @@
 import Foundation
 import VNCore
 import HubUI
+import EngineRPGMaker
 #if canImport(UIKit)
 import UIKit
+#else
+import AppKit
 #endif
 
 /// Launch arguments for screenshots and UI tests. None of this ships in release builds.
 ///   -seedDemoLibrary YES     creates demo games with real Steam library art
 ///   -demoInput "down,right"  plays controller presses after launch, 0.6 s apart ("wait" pauses one step)
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
+///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
+///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
 enum DebugHooks {
     static func run(_ hub: Hub) async {
+        #if canImport(UIKit)
+        if UserDefaults.standard.bool(forKey: "frameMonitor") { FrameMonitor.shared.start() }
+        #endif
         #if canImport(UIKit)
         if UserDefaults.standard.string(forKey: "forceOrientation") == "landscape",
            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
@@ -95,12 +103,31 @@ enum DemoLibrary {
             summary: "A quiet village, a summer festival, and a curse that returns every year.",
             developers: ["07th Expansion"], publishers: ["MangaGamer"], releaseDate: "2015-05-15",
             genres: ["Visual Novel", "Horror", "Mystery"])),
+        brief("Danganronpa", 413410, "Danganronpa: Trigger Happy Havoc", "Spike Chunsoft", "2016-02-18", ["Visual Novel", "Mystery"]),
+        brief("Ace Attorney Trilogy", 787480, "Phoenix Wright: Ace Attorney Trilogy", "Capcom", "2019-04-09", ["Visual Novel", "Courtroom"]),
+        brief("CHAOS;CHILD", 970570, "CHAOS;CHILD", "MAGES.", "2019-02-26", ["Visual Novel", "Thriller"]),
+        brief("Muv-Luv", 802880, "Muv-Luv", "âge", "2016-12-07", ["Visual Novel", "Sci-fi"]),
+        brief("Coffee Talk", 914800, "Coffee Talk", "Toge Productions", "2020-01-29", ["Visual Novel", "Cozy"]),
+        brief("Ib", 1901370, "Ib", "kouri", "2022-04-11", ["Horror", "RPG Maker"]),
+        brief("Undertale", 391540, "Undertale", "tobyfox", "2015-09-15", ["RPG", "Bullet Hell"]),
+        brief("Yume Nikki", 650700, "Yume Nikki", "Kikiyama", "2018-02-23", ["Exploration", "RPG Maker"]),
+        brief("LISA", 335670, "LISA: The Painful", "Dingaling Productions", "2014-12-15", ["RPG", "Post-apocalyptic"]),
+        brief("Corpse Party", 251270, "Corpse Party", "Team GrisGris", "2016-04-25", ["Horror", "RPG Maker"]),
+        brief("The Witch's House MV", 885810, "The Witch's House MV", "Fummy", "2018-10-26", ["Horror", "Puzzle"]),
+        brief("Mad Father", 483980, "Mad Father", "sen", "2016-05-27", ["Horror", "RPG Maker"]),
+        brief("Needy Streamer Overload", 1451940, "NEEDY STREAMER OVERLOAD", "WSS playground", "2022-01-21", ["Visual Novel", "Simulation"]),
+        brief("AI The Somnium Files", 948740, "AI: The Somnium Files", "Spike Chunsoft", "2019-09-17", ["Visual Novel", "Detective"]),
+        brief("planetarian", 316720, "planetarian ~the reverie of a little planet~", "Key", "2014-09-15", ["Visual Novel", "Kinetic Novel"]),
         Entry(folder: "Doki Doki Literature Club", appID: 698780, metadata: GameMetadata(
             title: "Doki Doki Literature Club!",
             summary: "Join the Literature Club and write poems for the girls you like. This game is not suitable for children or those easily disturbed.",
             developers: ["Team Salvato"], publishers: ["Team Salvato"], releaseDate: "2017-09-22",
             genres: ["Visual Novel", "Psychological Horror"]), playedDaysAgo: 12, playTime: 4 * 3600, locked: true),
     ]
+
+    private static func brief(_ folder: String, _ appID: Int, _ title: String, _ developer: String, _ release: String, _ genres: [String]) -> Entry {
+        Entry(folder: folder, appID: appID, metadata: GameMetadata(title: title, developers: [developer], releaseDate: release, genres: genres))
+    }
 
     static let files: [(ArtworkSlot, String)] = [
         (.capsule, "library_600x900_2x.jpg"), (.hero, "library_hero.jpg"), (.logo, "logo.png"), (.header, "header.jpg"),
@@ -153,4 +180,123 @@ enum DemoLibrary {
         }
     }
 }
+/// Stands in for the RPG Maker MZ runtime so the player screen, its overlay, and orientation can be tested before the
+/// real runtime exists. It shows the game title, the view's shape, and the last controller event.
+nonisolated struct FakeSessionPlugin: EnginePlugin {
+    var descriptor: EngineDescriptor {
+        EngineDescriptor(id: .rpgMakerMZ, displayName: "RPG Maker MZ (fake session)", shortName: "MZ", platforms: [.macOS, .iOS])
+    }
+
+    func detect(_ probe: FolderProbe) -> EngineMatch? { RPGMakerPlugin(.mz).detect(probe) }
+
+    @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession { FakeSession(launch) }
+}
+
+final class FakeSession: EngineSession {
+    let view: PlatformView
+    private let label: FakeSessionLabel
+
+    init(_ launch: GameLaunch) {
+        label = FakeSessionLabel(title: launch.game.metadata?.title ?? launch.game.title)
+        view = label
+    }
+
+    func send(_ event: ControllerEvent) { label.lastEvent = "\(event)" }
+    func setPaused(_ paused: Bool) { label.paused = paused }
+    func terminate() {}
+}
+
+#if canImport(UIKit)
+final class FakeSessionLabel: UILabel {
+    let title: String
+    var lastEvent = "none" { didSet { refresh() } }
+    var paused = false { didSet { refresh() } }
+
+    init(title: String) {
+        self.title = title
+        super.init(frame: .zero)
+        backgroundColor = UIColor(red: 0.1, green: 0.25, blue: 0.4, alpha: 1)
+        textColor = .white
+        textAlignment = .center
+        numberOfLines = 0
+        font = .monospacedSystemFont(ofSize: 18, weight: .semibold)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        refresh()
+    }
+
+    private func refresh() {
+        let shape = bounds.width > bounds.height ? "landscape" : "portrait"
+        text = "FAKE SESSION\n\(title)\n\(Int(bounds.width)) x \(Int(bounds.height)) \(shape)\(paused ? "\npaused" : "")\nlast event: \(lastEvent)"
+    }
+}
+
+/// Logs frame pacing from a display link: frames per second, hitches (frames that took over 1.5 intervals), and the worst frame.
+final class FrameMonitor: NSObject {
+    static let shared = FrameMonitor()
+    private var link: CADisplayLink?
+    private var last: CFTimeInterval = 0
+    private var windowStart: CFTimeInterval = 0
+    private var frames = 0
+    private var hitches = 0
+    private var worst: CFTimeInterval = 0
+
+    func start() {
+        guard link == nil else { return }
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        let now = link.timestamp
+        let interval = link.targetTimestamp - link.timestamp
+        if last > 0 {
+            let delta = now - last
+            frames += 1
+            worst = max(worst, delta)
+            if delta > interval * 1.5 { hitches += 1 }
+        } else {
+            windowStart = now
+        }
+        last = now
+        if now - windowStart >= 1 {
+            NSLog("FRAMES fps=%d hitches=%d worst=%.1fms target=%.1fms", frames, hitches, worst * 1000, interval * 1000)
+            frames = 0
+            hitches = 0
+            worst = 0
+            windowStart = now
+        }
+    }
+}
+#else
+final class FakeSessionLabel: NSTextField {
+    let title: String
+    var lastEvent = "none" { didSet { refresh() } }
+    var paused = false { didSet { refresh() } }
+
+    init(title: String) {
+        self.title = title
+        super.init(frame: .zero)
+        isEditable = false
+        isBordered = false
+        drawsBackground = true
+        backgroundColor = NSColor(red: 0.1, green: 0.25, blue: 0.4, alpha: 1)
+        textColor = .white
+        alignment = .center
+        font = .monospacedSystemFont(ofSize: 18, weight: .semibold)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func refresh() {
+        stringValue = "FAKE SESSION\n\(title)\(paused ? "\npaused" : "")\nlast event: \(lastEvent)"
+    }
+}
+#endif
 #endif

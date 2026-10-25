@@ -37,8 +37,8 @@ struct GamePageView: View {
             .ignoresSafeArea(edges: [.horizontal, .top])
             .onChange(of: nav.focus) { _, focus in
                 withAnimation(Theme.focusAnimation) {
-                    if focus == .pageEngine {
-                        proxy.scrollTo(Navigator.Target.pageEngine, anchor: .center)
+                    if let focus, focus == .pageEngine || focus == .pageOrientation {
+                        proxy.scrollTo(focus, anchor: .center)
                     } else {
                         proxy.scrollTo("banner", anchor: .top)
                     }
@@ -46,21 +46,18 @@ struct GamePageView: View {
             }
         }
         .background {
-            ZStack {
-                Theme.background
-                GameArt(game: game, slots: [.hero, .header, .capsule], maxPixel: 400)
-                    .blur(radius: 60)
+            GeometryReader { geo in
+                GameArt(game: game, slots: [.hero, .header, .capsule], size: geo.size, blurred: true)
                     .opacity(0.3)
-                    .clipped()
             }
+            .background(Theme.background)
             .ignoresSafeArea()
         }
     }
 
     private var banner: some View {
-        GameArt(game: game, slots: [.hero, .header, .capsule], maxPixel: 2400)
-            .frame(width: metrics.fullWidth, height: metrics.insets.top + metrics.bannerHeight)
-            .clipped()
+        GameArt(game: game, slots: [.hero, .header, .capsule],
+                size: CGSize(width: metrics.fullWidth, height: metrics.insets.top + metrics.bannerHeight))
             .overlay {
                 LinearGradient(colors: [.black.opacity(0.45), .clear], startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.3))
             }
@@ -146,6 +143,10 @@ struct GamePageView: View {
             InfoRow(label: "Folder", value: game.id.rawValue)
             EngineSection(game: game)
                 .padding(.top, 14)
+            #if os(iOS)
+            OrientationSection(game: game)
+                .padding(.top, 18)
+            #endif
         }
         .padding(18)
         .background(Theme.surface, in: .rect(cornerRadius: 16, style: .continuous))
@@ -187,6 +188,28 @@ private struct InfoRow: View {
 }
 
 /// The engine in use, how it was chosen, and the button that opens the manual override.
+/// The game's in-game orientation and the button that opens its override.
+private struct OrientationSection: View {
+    let game: Game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "In-game orientation", systemImage: "rotate.right")
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text((game.orientation ?? PlayOrientation.setting).title)
+                        .font(.system(size: 17, weight: .bold))
+                    Text(game.orientation == nil ? "Default from Settings" : "Set for this game")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                Spacer()
+                HubButton(target: .pageOrientation, kind: .secondary) { Text("Change") }
+            }
+        }
+    }
+}
+
 private struct EngineSection: View {
     @Environment(Hub.self) private var hub
     let game: Game

@@ -91,7 +91,15 @@ private struct LibraryContainer: View {
                 .frame(minWidth: 560, minHeight: 600)
                 #endif
         case let .engine(id):
-            if let game = hub.library.game(id) { EnginePickerSheet(game: game) }
+            if let game = hub.library.game(id) {
+                ChoiceSheet(sheet: sheet, title: "Engine", subtitle: hub.displayTitle(game),
+                            footnote: "Only engines that run on this device are listed. A manual choice wins over detection until you switch back to Automatic.")
+            }
+        case let .orientation(id):
+            if let game = hub.library.game(id) {
+                ChoiceSheet(sheet: sheet, title: "In-game orientation", subtitle: hub.displayTitle(game),
+                            footnote: "Landscape keeps either landscape side and follows how you hold the device. Some mobile-style games are made for portrait.")
+            }
         case let .artwork(id):
             if let game = hub.library.game(id) { ArtworkEditorSheet(game: game) }
         case let .metadata(id):

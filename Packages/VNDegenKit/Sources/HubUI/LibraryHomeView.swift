@@ -53,14 +53,10 @@ struct HeroBackdrop: View {
                 Theme.background
                 if let game {
                     ZStack(alignment: .top) {
-                        GameArt(game: game, slots: [.hero, .header, .capsule], maxPixel: 400)
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .blur(radius: 50)
+                        GameArt(game: game, slots: [.hero, .header, .capsule], size: geo.size, blurred: true)
                             .opacity(0.45)
-                            .clipped()
-                        GameArt(game: game, slots: [.hero, .header, .capsule], maxPixel: 2000)
-                            .frame(width: geo.size.width, height: metrics.insets.top + metrics.stageHeight * 1.08)
-                            .clipped()
+                        GameArt(game: game, slots: [.hero, .header, .capsule],
+                                size: CGSize(width: geo.size.width, height: metrics.insets.top + metrics.stageHeight * 1.08))
                             .mask(LinearGradient(stops: [.init(color: .black, location: 0.55), .init(color: .clear, location: 1)],
                                                  startPoint: .top, endPoint: .bottom))
                     }
