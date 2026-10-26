@@ -20,7 +20,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Engine detection.** Each engine is a plugin that recognizes its own files, such as `js/rmmz_core.js` for RPG Maker MZ. The game page shows the detected engine and the file that identified it. Games with no detected engine can be assigned one by hand.
 - **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, and genres from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
 - **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place.
-- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. On a touch screen without a controller, an on-screen overlay works as a gamepad or as a virtual mouse cursor.
+- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. Each game has its own control method (Automatic, Touch gamepad, Touch mouse, or Controller only with no overlay), switchable from the in-game menu, and its own button mapping: any overlay or controller button can send a gamepad action, a keyboard key, or a mouse click.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen reads and writes [Ludusavi](https://github.com/mtkennerly/ludusavi) backups, so saves move between VNDegen and the PC copies Ludusavi manages. Restores can be undone.
@@ -68,6 +68,8 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 | VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
 
 The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen.
+
+These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
 
 <p align="center">
   <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a D-pad, A B X Y buttons, shoulder buttons, and menu buttons over No Socks RPG gameplay, with the party on the beach map">
