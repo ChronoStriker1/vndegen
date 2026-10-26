@@ -47,7 +47,8 @@ init 999 python in _vndegen:
     Input.event = input_event_without_menu_key
 
     # The game window takes the hub window's place: full screen when the hub is, otherwise its exact frame.
-    # VNDEGEN_WINDOW is "x,y,width,height" in screen points, with the origin at the top left of the main display.
+    # VNDEGEN_WINDOW is the hub window's frame, "x,y,width,height" in screen points with the origin at the top left of
+    # the main display.
     _preferences.fullscreen = os.environ.get("VNDEGEN_FULLSCREEN") == "1"
     window = os.environ.get("VNDEGEN_WINDOW")
     if window and not _preferences.fullscreen:
@@ -59,9 +60,14 @@ init 999 python in _vndegen:
         set_mode = Interface.set_mode
 
         def place_window(self):
-            # Ren'Py fits its first window to the game's aspect ratio, so the exact frame is set once it exists.
+            # Ren'Py fits its first window to the game's aspect ratio, so the exact frame is set once it exists. The
+            # window has no title bar, like the hub window it replaces.
             Interface.set_mode = set_mode
             set_mode(self)
+            import ctypes
+            sdl = ctypes.CDLL(None)
+            sdl.SDL_GL_GetCurrentWindow.restype = ctypes.c_void_p
+            sdl.SDL_SetWindowBordered(ctypes.c_void_p(sdl.SDL_GL_GetCurrentWindow()), 0)
             window = pygame.display.get_window()
             window.resize((width, height), opengl=True)
             window.set_position((x, y))

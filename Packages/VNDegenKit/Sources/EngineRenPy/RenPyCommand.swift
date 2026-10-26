@@ -11,8 +11,8 @@ nonisolated public struct RenPyCommand: Sendable {
     /// Where the game window opens.
     public enum Placement: Sendable, Equatable {
         case fullScreen
-        /// The window's content area in screen points, with the origin at the top left of the main display, as SDL
-        /// counts.
+        /// The window's frame, title bar included, in screen points with the origin at the top left of the main
+        /// display, as SDL counts.
         case frame(CGRect)
     }
 

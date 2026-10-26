@@ -136,11 +136,10 @@ final class RenPySession: EngineSession {
         if hubWindow?.isVisible == false { showHub() }
     }
 
-    /// The content area of a standard titled window whose frame is the hub window's frame, in SDL's coordinates.
+    /// The hub window's frame in SDL's coordinates.
     static func gameFrame(over window: NSWindow) -> CGRect {
-        let content = NSWindow.contentRect(forFrameRect: window.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable])
-        let top = NSScreen.screens.first?.frame.maxY ?? content.maxY
-        return CGRect(x: content.minX, y: top - content.maxY, width: content.width, height: content.height)
+        let top = NSScreen.screens.first?.frame.maxY ?? window.frame.maxY
+        return CGRect(x: window.frame.minX, y: top - window.frame.maxY, width: window.frame.width, height: window.frame.height)
     }
 
     /// Ren'Py's log, written fresh for each launch. Its tracebacks land beside it in `logs/`.
