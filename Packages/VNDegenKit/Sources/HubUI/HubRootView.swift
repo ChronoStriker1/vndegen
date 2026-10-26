@@ -124,6 +124,11 @@ private struct LibraryContainer: View {
                 ChoiceSheet(sheet: sheet, title: "Engine", subtitle: hub.displayTitle(game),
                             footnote: "Only engines that run on this device are listed. A manual choice wins over detection until you switch back to Automatic.")
             }
+        case let .variant(id):
+            if let game = hub.library.game(id), let variants = nav.variants(id) {
+                ChoiceSheet(sheet: sheet, title: variants.title, subtitle: hub.displayTitle(game),
+                            footnote: "An advanced option. Automatic picks the right one for almost every game.")
+            }
         case let .orientation(id):
             if let game = hub.library.game(id) {
                 ChoiceSheet(sheet: sheet, title: "In-game orientation", subtitle: hub.displayTitle(game),

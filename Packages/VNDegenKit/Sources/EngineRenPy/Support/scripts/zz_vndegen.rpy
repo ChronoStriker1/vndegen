@@ -1,9 +1,13 @@
 # VNDegen's hook. VNDegen's launcher adds this file's folder to Ren'Py's search path, so every game it runs loads
 # this file. Nothing here changes the game's own files. Valid on Ren'Py 6.99 to 8.
+#
+# On iOS every game runs in the app's one interpreter, and Ren'Py's reload between games keeps patched classes and
+# functions. So each patch below wraps the original it saved in vndegen_original, never the previous game's patch.
 
 init 999 python in _vndegen:
     import os
     import signal
+    import sys
     import time
     import pygame
 
@@ -54,26 +58,40 @@ init 999 python in _vndegen:
             quit_requested = False
             quit_game()
 
-    signal.signal(signal.SIGTERM, request_quit)
-    config.periodic_callbacks.append(quit_if_requested)
+    # Tells VNDegen the game booted, for the game page. Ren'Py's traceback.txt beside it tells it when a game failed.
+    main_menu_noted = [not os.environ.get("VNDEGEN_DATA")]
+
+    def note_main_menu():
+        if not main_menu_noted[0] and (renpy.store.main_menu or renpy.get_screen("main_menu")):
+            main_menu_noted[0] = True
+            open(os.path.join(os.environ["VNDEGEN_DATA"], "logs", "main-menu"), "w").close()
+
+    config.periodic_callbacks.append(note_main_menu)
+
+    # On iOS VNDegen's launcher answers the hub instead, through quit_game.
+    if not renpy.ios:
+        signal.signal(signal.SIGTERM, request_quit)
+        config.periodic_callbacks.append(quit_if_requested)
 
     # A text prompt, such as a name entry, swallows the backtick's key press and types it. It passes it on instead, so
     # the backtick still opens the menu there, and never types.
     Input = renpy.display.behavior.Input
-    input_event = Input.event
+    input_event = getattr(Input.event, "vndegen_original", Input.event)
 
     def input_event_without_menu_key(self, ev, x, y, st):
         if renpy.display.behavior.map_event(ev, "vndegen_menu") or (ev.type == pygame.TEXTINPUT and ev.text == "`"):
             return None
         return input_event(self, ev, x, y, st)
 
+    input_event_without_menu_key.vndegen_original = input_event
     Input.event = input_event_without_menu_key
 
     # The game window takes the hub window's place: full screen when the hub is, otherwise its exact frame.
     # VNDEGEN_WINDOW is the hub window's frame, "x,y,width,height" in screen points with the origin at the top left of
     # the main display.
-    _preferences.fullscreen = os.environ.get("VNDEGEN_FULLSCREEN") == "1"
     window = os.environ.get("VNDEGEN_WINDOW")
+    if not renpy.ios:
+        _preferences.fullscreen = os.environ.get("VNDEGEN_FULLSCREEN") == "1"
     if window and not _preferences.fullscreen:
         x, y, width, height = [int(round(float(v))) for v in window.split(",")]
         _preferences.maximized = False
@@ -96,6 +114,36 @@ init 999 python in _vndegen:
             window.set_position((x, y))
 
         Interface.set_mode = place_window
+
+    # VNDEGEN_RENPY7_GAME is set for a Ren'Py 7 game on Ren'Py 8. Its persistent data, such as unlocked gallery
+    # images, is written so that the game's PC version, on Ren'Py 7 and Python 2, loads it too: in pickle protocol 2,
+    # with each class Ren'Py 7.5 moved under its Ren'Py 7.4 module. Every Ren'Py since 7.4 loads the old names. Saves
+    # keep Ren'Py 8's format, because older Ren'Py can't load a newer Ren'Py's save state either way.
+    if os.environ.get("VNDEGEN_RENPY7_GAME") == "1" and sys.version_info[0] >= 3:
+        import io
+        import pickle
+        import renpy.persistent as persistent_module
+
+        python2_modules = {
+            "renpy.revertable": "renpy.python",
+            "renpy.rollback": "renpy.python",
+            "renpy.display.scenelists": "renpy.display.core",
+        }
+
+        class Python2Pickler(pickle._Pickler):
+            def save_global(self, obj, name=None):
+                old = python2_modules.get(getattr(obj, "__module__", None))
+                if old is None:
+                    return pickle._Pickler.save_global(self, obj, name)
+                self.write(pickle.GLOBAL + (old + "\n" + (name or obj.__qualname__) + "\n").encode("utf-8"))
+                self.memoize(obj)
+
+        def python2_dumps(o, highest=False, bad_reduction_name=None):
+            f = io.BytesIO()
+            Python2Pickler(f, 2).dump(o)
+            return f.getvalue()
+
+        persistent_module.dumps = python2_dumps
 
     # VNDEGEN_BUTTONS carries the game's remapped controller buttons, such as "a=key:K_z,b=click:3,x=button:confirm,y=nothing".
     # The game window reads the controller itself, so the remapping happens here: each remapped button gets the Ren'Py
@@ -149,7 +197,8 @@ init 999 python in _vndegen:
                         holds.setdefault(press, []).append((kind, value))
                 config.pad_bindings[press], config.pad_bindings[release], config.pad_bindings["repeat_" + press] = bindings
 
-        post_event = renpy.display.controller.post_event
+        controller = renpy.display.controller
+        post_event = getattr(controller.post_event, "vndegen_original", controller.post_event)
         # The press event each button or stick axis holds down, such as {"lefty": "pad_lefty_neg"}. Ren'Py can report
         # a stick going straight from neg to pos, with no zero between, so a new direction first releases the old one.
         held = {}
@@ -166,7 +215,8 @@ init 999 python in _vndegen:
                         post_input(kind, value, True)
             post_event(control, state, repeat)
 
-        renpy.display.controller.post_event = post_remapped
+        post_remapped.vndegen_original = post_event
+        controller.post_event = post_remapped
 
     if os.environ.get("VNDEGEN_BUTTONS"):
         remap(os.environ["VNDEGEN_BUTTONS"])
@@ -185,6 +235,8 @@ init 999 python in _vndegen:
     #   axis:<name>:<state>
     #                move a controller axis, such as axis:lefty:neg for the left stick up; states are neg, pos, and zero
     #   save:<slot>  what a save slot's button does on the save screen; load:<slot> is the same on the load screen
+    #   restore:<save>
+    #                load a save by its file name, such as 1-1, with no confirmation, as renpy.load does
     #   quit         quit, with the result "main-menu" if a menu step got there; without it the game stays open
     probe = os.environ.get("VNDEGEN_PROBE")
     if probe:
@@ -263,6 +315,9 @@ init 999 python in _vndegen:
                 renpy.display.controller.controller_event(arg, "release")
             elif step == "axis":
                 renpy.display.controller.controller_event(*arg.split(":"))
+            elif step == "restore":
+                probe_log("restore " + str(renpy.can_load(arg)))
+                renpy.load(arg)
             elif step in ("start", "save", "load"):
                 if step == "start":
                     probe_state["action"] = renpy.store.Start()

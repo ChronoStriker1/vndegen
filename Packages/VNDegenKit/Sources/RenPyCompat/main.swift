@@ -1,5 +1,6 @@
 // Boots every Ren'Py game in a folder the way VNDegen does, with the probe in zz_vndegen.rpy, and prints a Markdown
-// table: the runtime each game got and why, whether it reached the main menu, and whether its folder stayed unchanged.
+// table: each game's fingerprint (`RenPyLayout.fingerprint`), the runtime it got and why, whether it reached the main
+// menu, and whether its folder stayed unchanged.
 //   swift run RenPyCompat <games folder> --runtimes <folder with 7/ and 8/> [--runtime 7|8] [--timeout 45] [--out <folder>]
 // scripts/renpy-compat.sh fetches the runtimes, builds this, and runs it.
 #if os(macOS)
@@ -61,17 +62,6 @@ func resolvedComponents(_ url: URL) -> [String] {
     return (existing.resolvingSymlinksInPath().pathComponents + missing).map { $0.lowercased() }
 }
 
-/// The first line that names a Python exception in Ren'Py's traceback, or else in its log.
-func firstError(_ files: [URL]) -> String? {
-    for file in files {
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
-        if let line = text.split(separator: "\n").first(where: { $0.firstMatch(of: #/^[A-Za-z.]*(Error|Exception)\b/#) != nil }) {
-            return String(line.prefix(120))
-        }
-    }
-    return nil
-}
-
 let options = Options(Array(CommandLine.arguments.dropFirst()))
 guard let support = RenPyCommand.support else { fatalError("EngineRenPy's Support folder is missing") }
 let names = ((try? FileManager.default.contentsOfDirectory(atPath: options.games.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
@@ -93,8 +83,8 @@ func refuse(_ path: URL, _ reason: String) -> Never {
 }
 if let game = overlappedGame(outComponents) { refuse(options.out, "overlaps the game folder \(game)") }
 
-print("| Game | Version | Runtime | Result | Seconds | Game folder | Error |")
-print("|---|---|---|---|---|---|---|")
+print("| Game | Version | Fingerprint | Runtime | Result | Seconds | Game folder | Error |")
+print("|---|---|---|---|---|---|---|---|")
 for (name, folder, layout) in games {
     let runtime = options.runtime ?? layout.runtime
     let out = options.out.appendingPathComponent("\(name)/\(runtime.rawValue)", isDirectory: true)
@@ -110,8 +100,8 @@ for (name, folder, layout) in games {
     FileManager.default.createFile(atPath: stdout.path, contents: nil)
 
     let base = folder.appendingPathComponent(layout.path(""), isDirectory: true)
-    var command = RenPyCommand(base: base, runtime: runtime, runtimes: options.runtimes, support: support, dataDirectory: data,
-                               placement: .frame(CGRect(x: 80, y: 80, width: 1280, height: 720)))
+    var command = RenPyCommand(base: base, runtime: runtime, gameLine: layout.runtime, runtimes: options.runtimes, support: support,
+                               dataDirectory: data, placement: .frame(CGRect(x: 80, y: 80, width: 1280, height: 720)))
     command.environment["VNDEGEN_PROBE"] = probe.path
     command.environment["VNDEGEN_PROBE_TIMEOUT"] = String(options.timeout)
 
@@ -133,9 +123,10 @@ for (name, folder, layout) in games {
         + before.keys.filter { !FileManager.default.fileExists(atPath: folder.path + $0) }.count
     let result = (try? String(contentsOf: probe.appendingPathComponent("result.txt"), encoding: .utf8))?
         .trimmingCharacters(in: .whitespacesAndNewlines) ?? "no result, exit \(process.terminationStatus)"
-    let error = firstError([data.appendingPathComponent("logs/traceback.txt"), stdout]) ?? ""
+    let error = RenPyBootRecord.firstError([data.appendingPathComponent("logs/traceback.txt"), stdout]) ?? ""
     let version = layout.version ?? "?"
-    print("| \(name) | \(version) | \(runtime.displayName) (\(options.runtime == nil ? layout.evidence.rawValue : "forced")) | \(result) | \(seconds) | \(changed == 0 ? "unchanged" : "\(changed) files changed") | \(error) |")
+    let fingerprint = RenPyLayout.fingerprint(base: base) ?? "-"
+    print("| \(name) | \(version) | \(fingerprint) | \(runtime.displayName) (\(options.runtime == nil ? layout.evidence.rawValue : "forced")) | \(result) | \(seconds) | \(changed == 0 ? "unchanged" : "\(changed) files changed") | \(error) |")
 }
 #else
 print("RenPyCompat runs on macOS only.")

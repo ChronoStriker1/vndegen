@@ -10,9 +10,11 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Control methods and button mapping (0.2.1).
 - Ren'Py on macOS (0.3.0, fixes in 0.3.1).
 
+## Merged, not yet released
+- Ren'Py on iPhone and iPad. What was built is in "Phase 2 on iOS" in `docs/renpy-spike.md`.
+
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
-- Ren'Py on iPhone and iPad (`ws/renpy-ios`). The plan is in `docs/renpy-spike.md`.
 - KiriKiri (`ws/kirikiri`), starting with a feasibility test of encrypted `data.xp3` archives and Windows plugin DLLs.
 - Ludusavi rebuilt into the app (`ws/ludusavi-native`). VNDegen will connect to the backup server itself over SSH with rsync instead of using a picked folder, match games automatically through Ludusavi's manifest, and build in Ludusavi's backup features.
 - Fixes to the TyranoScript in-page Ogg decoder.

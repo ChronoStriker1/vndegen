@@ -23,19 +23,32 @@ targets:
     dependencies:
       - package: VNDegenKit
         products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+      # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
+      # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
+      - framework: build/renpy/ios/RenPyRuntime.xcframework
+        embed: false
+        platformFilter: iOS
+      - framework: build/renpy/ios/MetalANGLE.xcframework
+        platformFilter: iOS
     # Ren'Py games on macOS run on the two runtimes this copies into Contents/Resources/RenPy. scripts/renpy-runtime.sh
     # fetches them into build/renpy. They run as helper processes, so each Mach-O file is signed like the app. Any
-    # failed step fails the build, and so does a runtime that is missing or unsigned at the end.
+    # failed step fails the build, and so does a runtime that is missing or unsigned at the end. iOS gets Ren'Py 8's
+    # Python side only, since its native side is linked into the app.
     postBuildScripts:
       - name: Bundle Ren'Py runtimes
         basedOnDependencyAnalysis: false
         shell: /bin/bash
         script: |
           set -euo pipefail
-          [ "$PLATFORM_NAME" = macosx ] || exit 0
-          "$SRCROOT/scripts/renpy-runtime.sh" "$SRCROOT/build/renpy"
           dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/RenPy"
-          rsync -a --delete --exclude .vndegen-runtime "$SRCROOT/build/renpy/" "$dest/"
+          if [ "$PLATFORM_NAME" != macosx ]; then
+            "$SRCROOT/scripts/renpy-runtime.sh" "$SRCROOT/build/renpy" ios
+            mkdir -p "$dest"
+            rsync -a --delete --exclude .vndegen-runtime --exclude 'lib/py3-mac-universal' "$SRCROOT/build/renpy/8/" "$dest/8/"
+            exit 0
+          fi
+          "$SRCROOT/scripts/renpy-runtime.sh" "$SRCROOT/build/renpy"
+          rsync -a --delete --exclude .vndegen-runtime --exclude ios "$SRCROOT/build/renpy/" "$dest/"
           binaries=("$dest"/8/lib/py3-mac-universal/{python,librenpython.dylib} "$dest"/7/lib/py2-mac-universal/{python,librenpython.dylib})
           for binary in "${binaries[@]}"; do
             codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$binary"
@@ -95,3 +108,5 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         # The Ren'Py build phase reads build/renpy and writes into the app bundle.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # What Ren'Py's static libraries need from the system, as in renios's own Xcode project.
+        "OTHER_LDFLAGS[sdk=iphone*]": "$(inherited) -lc++ -framework AudioToolbox -framework AVFoundation -framework CoreMotion -framework CoreHaptics -framework GameController -framework ImageIO -framework QuartzCore -framework CoreServices"

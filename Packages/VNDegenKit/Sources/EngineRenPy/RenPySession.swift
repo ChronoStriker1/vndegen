@@ -3,8 +3,6 @@ import AppKit
 import OSLog
 import VNCore
 
-nonisolated let renPyLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "renpy")
-
 /// Ren'Py runs as a helper process with its own SDL window, so a crash or `os._exit` in a game never takes down the hub,
 /// and Ren'Py 7 and 8 games each get their own Python. The game window opens over the hub window and covers it exactly.
 /// The hub window stays ordered in behind it. Ordering out the app's last window would quit the app, and when the game
@@ -17,6 +15,8 @@ final class RenPySession: EngineSession {
     private let launch: GameLaunch
     private let base: URL
     private let runtime: RenPyRuntime
+    /// The runtime the game's own version calls for, which `runtime` overrides when the player picked another.
+    private let gameLine: RenPyRuntime
     private let runtimes: URL
     private let support: URL
     private weak var hubWindow: NSWindow?
@@ -36,6 +36,7 @@ final class RenPySession: EngineSession {
         else { throw RenPyError.runtimeMissing(runtime) }
         self.launch = launch
         self.runtime = runtime
+        gameLine = layout.runtime
         self.runtimes = runtimes
         self.support = support
         base = launch.folder.appendingPathComponent(layout.path(""), isDirectory: true)
@@ -50,7 +51,7 @@ final class RenPySession: EngineSession {
     private func start(in window: NSWindow) {
         hubWindow = window
         let placement: RenPyCommand.Placement = window.styleMask.contains(.fullScreen) ? .fullScreen : .frame(Self.gameFrame(over: window))
-        let command = RenPyCommand(base: base, runtime: runtime, runtimes: runtimes, support: support,
+        let command = RenPyCommand(base: base, runtime: runtime, gameLine: gameLine, runtimes: runtimes, support: support,
                                    dataDirectory: launch.dataDirectory, placement: placement, buttons: launch.game.buttonMapping)
         process.executableURL = command.executable
         process.arguments = command.arguments
