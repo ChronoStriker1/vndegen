@@ -352,7 +352,12 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     importer.deleteArchiveAfterImport = true
     importer.startImport()
     // Once the staging folder exists, the import has handed extraction to the background.
-    while items(games.appendingPathComponent(".importing")).isEmpty { await Task.yield() }
+    let deadline = Date.now.addingTimeInterval(10)
+    while items(games.appendingPathComponent(".importing")).isEmpty {
+        try #require(importer.step == .extracting, "import stopped before extracting: \(importer.errorMessage ?? "no error")")
+        try #require(Date.now < deadline, "staging folder never appeared")
+        await Task.yield()
+    }
     // Holding the main actor lets extraction finish while its result waits here, then Cancel lands before it.
     usleep(1_000_000)
     importer.cancel()
