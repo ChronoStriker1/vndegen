@@ -186,14 +186,15 @@ func replaceFile(ctx context.Context, in rc.Params) (rc.Params, error) {
 	if (current == nil) != (expected == nil) || !bytes.Equal(current, expected) {
 		return rc.Params{"replaced": false}, nil
 	}
-	// A cancelled call never renames. The smb backend's own requests ignore the context, so this is the last point
-	// where cancelling still decides the outcome.
+	// The commit point. A call cancelled before here never renames. The smb backend's own requests ignore the
+	// context, so once Move starts, cancelling no longer stops it, and the caller treats the outcome as unknown.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	// The window: another device that writes dstRemote after the server sent the bytes read above and before the
-	// rename completes is overwritten. On SMB that is the read's CLOSE, the backend's parent folder check (CREATE and
-	// CLOSE), the rename's CREATE of the source, and its SET_INFO, which replaces the file.
+	// rename completes is overwritten. On SMB that is six requests, one after another: the read that reaches the end
+	// of the file, the read's CLOSE, the backend's parent folder check (CREATE and CLOSE), the rename's CREATE of the
+	// source, and its SET_INFO, which replaces the file. A few milliseconds on a LAN.
 	if _, err := move(ctx, source, dst); err != nil {
 		return nil, err
 	}
@@ -217,8 +218,8 @@ func readAll(ctx context.Context, f fs.Fs, remote string) ([]byte, error) {
 	var data []byte
 	chunk := make([]byte, 64*1024)
 	for {
-		// Checked between reads: a server that trickles the file in under the idle deadline still can't hold a
-		// cancelled call.
+		// Checked between reads, so a cancelled call stops at the next chunk. A single read already sent ends only
+		// when its bytes are in or nothing arrives for the idle deadline.
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}

@@ -7,8 +7,9 @@ import Synchronization
 /// program, so VNDegen calls the same code in process.
 public enum Rclone {
     /// Runs the rc call `method` with `input` and decodes its reply. Cancelling the caller cancels the call, which then
-    /// ends at rclone's next step, or for a request already sent, when the server answers or the idle timeout passes.
-    /// This returns only once rclone has, so a cancelled call never acts after its caller moved on.
+    /// ends at rclone's next step. A request already sent ends when its answer is in, or when nothing arrives for the
+    /// idle deadline. This returns only once rclone has, so a cancelled call never acts after its caller moved on. A
+    /// call that finished despite a cancel returns its result: what it did is done.
     public static func call<Output: Decodable>(_ method: String, _ input: some Encodable, as _: Output.Type = Output.self) async throws -> Output {
         let data = try await call(method, json: JSONEncoder().encode(input))
         return try JSONDecoder().decode(Output.self, from: data)

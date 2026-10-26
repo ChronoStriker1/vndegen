@@ -415,6 +415,9 @@ public final class SaveSyncService {
         let (report, synced) = try await withStore(server) { store in
             try await store.refreshGame(match.folder)
             try await store.fetch(match.folder, backup: backup)
+            // A download that finished after a cancel still reports success, so the saves here change only if the
+            // restore itself was not cancelled.
+            try Task.checkCancellation()
             let report = try store.local.restore(folder: match.folder, backup: backup, locations: locations, snapshot: snapshot)
             let latest = try store.local.mapping(match.folder).summaries.last?.revision
             return (report, SyncRecord(folder: match.folder, latest: latest, saves: try LudusaviStore.localHashes(locations)))

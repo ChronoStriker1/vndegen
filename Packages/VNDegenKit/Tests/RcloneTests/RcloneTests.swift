@@ -1,3 +1,4 @@
+import CRclone
 import Foundation
 import Rclone
 import Testing
@@ -66,4 +67,35 @@ private struct Stat: Decodable { var item: Item? }
     await #expect(throws: CancellationError.self) { try await cancelled.value }
     #expect(try String(contentsOf: root.appendingPathComponent("mapping.yaml"), encoding: .utf8) == "old")
     #expect(try await Rclone.call("vndegen/replacefile", input, as: Replaced.self).replaced)
+}
+
+/// Runs one call through the C interface, as Rclone.call does, with `cancel` deciding whether it is cancelled between
+/// its begin and its run.
+private func callDirectly(_ id: Int64, _ method: String, _ input: [String: String], cancel: Bool) throws -> (status: Int32, reply: String) {
+    VNDRcloneBegin(id)
+    if cancel { VNDRcloneCancel(id) }
+    var status: Int32 = 0
+    let json = String(decoding: try JSONEncoder().encode(input), as: UTF8.self)
+    let output = json.withCString { input in method.withCString { VNDRcloneCall(id, $0, input, &status) } }
+    defer { VNDRcloneFree(output) }
+    return (status, String(cString: output!))
+}
+
+@Test func aCallCancelledWhileItRunsNeverRenames() async throws {
+    _ = try await Rclone.call("core/version", [String: String](), as: Version.self)
+    let root = try folder()
+    try Data("old".utf8).write(to: root.appendingPathComponent("mapping.yaml"))
+    try Data("new".utf8).write(to: root.appendingPathComponent("next.tmp"))
+    let input = ["fs": root.path, "srcRemote": "next.tmp", "dstRemote": "mapping.yaml", "expected": Data("old".utf8).base64EncodedString()]
+
+    // Begun, then cancelled: rclone runs the call with a cancelled context, and it stops at its read.
+    let cancelled = try callDirectly(-1, "vndegen/replacefile", input, cancel: true)
+    #expect(cancelled.status != 200)
+    #expect(try String(contentsOf: root.appendingPathComponent("mapping.yaml"), encoding: .utf8) == "old")
+
+    // A cancel for a call that was never begun keeps nothing, so a later call under that ID runs normally.
+    VNDRcloneCancel(-2)
+    let later = try callDirectly(-2, "vndegen/replacefile", input, cancel: false)
+    #expect(later.status == 200 && later.reply.contains("true"))
+    #expect(try String(contentsOf: root.appendingPathComponent("mapping.yaml"), encoding: .utf8) == "new")
 }

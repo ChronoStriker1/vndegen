@@ -152,9 +152,11 @@ struct RemoteStore: Sendable {
         // rclone reads the server's mapping.yaml whole, compares it with the base, and only on a match renames the
         // temporary file over it with the smb backend's Move, which replaces the file in one step, so there is never a
         // moment with no mapping.yaml. The window: another device that writes mapping.yaml after the server sent the
-        // bytes of that comparison and before the rename completes is overwritten. On SMB that window is four requests,
-        // one after another: the comparison read's CLOSE, the backend's parent folder check (CREATE and CLOSE), the
-        // rename's CREATE of the temporary file, and the SET_INFO that replaces mapping.yaml. A few milliseconds on a LAN.
+        // bytes of that comparison and before the rename completes is overwritten. On SMB that window is six requests,
+        // one after another: the read that reaches the end of the file, its CLOSE, the backend's parent folder check
+        // (CREATE and CLOSE), the rename's CREATE of the temporary file, and the SET_INFO that replaces mapping.yaml.
+        // A few milliseconds on a LAN. Cancelling stops the call only before the rename starts; after that, the error
+        // below treats the outcome as unknown.
         let reply = try await call("vndegen/replacefile", ["fs": root, "srcRemote": Self.temporaryMapping(folder, device: device),
                                                            "dstRemote": Self.mappingPath(folder), "expected": base?.base64EncodedString() ?? NSNull()])
         return try JSONDecoder().decode(Replaced.self, from: reply).replaced
