@@ -31,8 +31,13 @@ Merged into `dev` for the next release: Ren'Py games two folders deep are detect
 2. AliceSoft System 3 and 4 (xsystem35, xsystem4).
 3. Artemis.
 4. Wolf RPG Editor, which needs a new runtime.
-5. Suggested controller layouts for games and engines without gamepad support. On a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse. It then proposes a controller layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. This may be hard and costly, so it comes second to last.
-6. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
+5. Flash, through Ruffle (MIT or Apache-2.0) in the web view the RPG Maker MV/MZ and TyranoScript plugins already use. 14 library games.
+6. Godot, on the Godot runtime matching each game's version. A game's `.pck` loads only if it uses no native GDExtension libraries. 6 library games.
+7. NekoSDK. No runtime or reimplementation exists, so this is a reimplementation from the game files, starting with a feasibility test. 16 library games, 45 GB.
+8. Unity, starting with a feasibility test. IL2CPP games are compiled x86 code and cannot run on iOS without an emulator. Mono games need a reimplementation of the UnityEngine API that nobody has built. 60 library games: 44 Mono, 10 IL2CPP, and 6 not yet checked.
+9. After the engine plugins: installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
+10. Suggested controller layouts for games and engines without gamepad support. On a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse. It then proposes a controller layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. This may be hard and costly, so it comes second to last.
+11. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder.
@@ -40,4 +45,4 @@ When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG
 ## Out of scope for now
 - Apple TV.
 - iCloud saves.
-- Unity, Godot, GameMaker, and other general-purpose engines. Flash through Ruffle is the most realistic of these if it is ever picked up.
+- GameMaker and the other general-purpose and custom engines in `docs/engine-survey.md` that are not listed under Next.
