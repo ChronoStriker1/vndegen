@@ -23,7 +23,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. Each game has its own control method (Automatic, Touch gamepad, Touch mouse, or Controller only with no overlay), switchable from the in-game menu, and its own button mapping: any overlay or controller button can send a gamepad action, a keyboard key, or a mouse click.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
-- **Ludusavi saves.** VNDegen reads and writes [Ludusavi](https://github.com/mtkennerly/ludusavi) backups, so saves move between VNDegen and the PC copies Ludusavi manages. Restores can be undone.
+- **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your server over SSH and rsync, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
 - **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL, which runs on Metal.
 
 <p align="center">
@@ -88,15 +88,25 @@ Steam and VNDB work without setup. SteamGridDB and IGDB need keys, entered in Se
 
 ## Ludusavi
 
-Point VNDegen at your Ludusavi backup folder in Settings. On a Mac it reads the folder from Ludusavi's own configuration. On iPhone and iPad, pick the folder in the file picker. That can be a network share connected in the Files app.
+VNDegen talks to the server that holds your Ludusavi backups itself. It logs in over SSH and syncs with rsync, speaking rsync's protocol in the app, so it works the same on iPhone, iPad, and Mac with nothing to install on the device.
 
-Each game page then lists that game's Ludusavi backups with their date and source device:
+Set it up once in Settings, under Ludusavi backups:
 
-- **Restore** copies a backup into the game's save folder, after keeping a copy of the current saves for Undo.
-- **Back up now** writes a new backup in Ludusavi's own format, using the same file paths as your existing backups so Ludusavi restores it correctly on the other machines.
-- **Automatic backup** when a game closes is available and off by default.
+1. Enter the server's host, port, SSH user, and the folder Ludusavi backs up to on that server.
+2. Copy VNDegen's key and add it to that user's `~/.ssh/authorized_keys` on the server. VNDegen makes the key on first use and keeps the private half in the device's Keychain.
+3. Tap Test Connection. The first time, VNDegen shows the server's fingerprint, the same text `ssh-keygen -lf` prints for its host key. Trust it once it matches. VNDegen refuses to connect if that key ever changes.
+4. Turn on Match my Ludusavi settings and enter the retention limits from Ludusavi's Other screen. On a Mac with Ludusavi installed, VNDegen reads them from Ludusavi's config.
 
-VNDegen never changes or deletes existing backups.
+The server needs `rsync` on the user's path. rsync 3 works, and so does the openrsync that macOS ships.
+
+Each game then finds its Ludusavi game by itself: by the Steam app ID in its metadata through Ludusavi's manifest, else by title. You can pick another on the game's Saves page. That page lists the game's backups with their date, source device, and kind, says whether the saves here or on the server are newer, and previews what a restore changes.
+
+- **Restore** brings a backup down and copies it into the game's save folder, after keeping a copy of the current saves for Undo.
+- **Back up now** writes a full or differential backup in Ludusavi's format, as Ludusavi would, with the same file paths as your existing backups, so Ludusavi restores it on the PC and Steam Deck. A game with no backup yet goes where the PC keeps it, under the Steam library the other backups use. With retention limits set, backups beyond them are deleted, as Ludusavi deletes them.
+- **Before a game starts**, VNDegen asks when another device backed up newer saves, or when the saves changed both here and on the server.
+- **Automatic backup** when a game closes is available and off by default. It skips a game whose saves changed in both places and leaves the choice to you.
+
+Ludusavi on a PC that syncs its backup folder with rclone sees VNDegen's backups as changes in the cloud. When Ludusavi asks, choose to download them.
 
 ## Building
 
