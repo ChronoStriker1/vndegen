@@ -265,7 +265,7 @@ nonisolated extension GameFolder {
             switch archive.member(inner) {
             case let .packed(offset, size):
                 guard let handle = try? archiveHandle() else { return nil }
-                return (handle, offset, Int64(size), inner)
+                return (handle, offset, size, inner)
             case .unpacked(let unpacked):
                 return openRegularFile(virtualPath: "\(virtualWebRoot).unpacked/\(unpacked)").map { ($0, 0, $1, inner) }
             case nil:
