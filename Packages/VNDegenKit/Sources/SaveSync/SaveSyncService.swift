@@ -145,11 +145,12 @@ public final class SaveSyncService {
     /// `manifest` nil leaves Ludusavi's manifest out, as tests do.
     public init(library: LibraryStore, connector: Connector? = nil, manifest: URL? = ludusaviManifest) {
         self.library = library
-        directory = library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)
+        let directory = library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)
+        self.directory = directory
         settings = (try? JSONDecoder().decode(Settings.self, from: Data(contentsOf: directory.appendingPathComponent("settings.json")))) ?? Settings()
         configRetention = LudusaviConfig.load()?.retention
         self.connector = connector ?? { server in
-            try await SSHConnection.connect(to: server.ssh, key: SSHIdentity.key(), hostKey: server.hostKey)
+            try await SSHConnection.connect(to: server.ssh, key: SSHIdentity.key(in: directory), hostKey: server.hostKey)
         }
         manifestStore = manifest.map { ManifestStore(source: $0, directory: library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)) }
         if settings.server?.hostKey != nil { connection = .connected }
@@ -203,7 +204,7 @@ public final class SaveSyncService {
     // MARK: Server
 
     /// The line to add to the server account's `authorized_keys`.
-    public func publicKey() throws -> String { try SSHIdentity.authorizedKeysLine() }
+    public func publicKey() throws -> String { try SSHIdentity.authorizedKeysLine(in: directory) }
 
     /// Saves the server details. A different server forgets the pinned host key and the copy of the old store.
     public func setServer(host: String, port: Int, user: String, path: String) {

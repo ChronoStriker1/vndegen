@@ -462,3 +462,14 @@ private let realSample = fm.homeDirectoryForCurrentUser.appendingPathComponent("
     let mapping = try store.mapping("G")
     #expect(mapping.backups.map(\.children.count) == [2, 0])
 }
+
+#if os(macOS)
+@Test func theMacKeepsItsSSHKeyInAFileOnlyItsUserCanRead() throws {
+    let directory = try temporaryDirectory().appendingPathComponent("SaveSync")
+    let made = try SSHIdentity.key(in: directory)
+    let file = directory.appendingPathComponent("ssh-ed25519")
+    #expect((try fm.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) == 0o600)
+    #expect(try SSHIdentity.key(in: directory).rawRepresentation == made.rawRepresentation)
+    #expect(try fm.contentsOfDirectory(atPath: directory.path) == ["ssh-ed25519"])
+}
+#endif
