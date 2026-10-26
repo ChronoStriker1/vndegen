@@ -278,9 +278,11 @@ static ttstr TVPFindGameExe(const ttstr& dir)
     std::vector<std::string> exes;
     std::vector<std::string> configs;
     TVPGetLocalFileListAt(dir,
-                          [&](const ttstr& name, tTVPLocalFileInfo* s)
+                          [&](const ttstr&, tTVPLocalFileInfo* s)
                           {
-                              std::string file = name.AsStdString();
+                              // The lister's name is lowercased for the auto path table. The
+                              // file is opened by path, which is case sensitive on iOS.
+                              std::string file = s->NativeName;
                               if (!(s->Mode & S_IFREG))
                                   return;
                               if (!stem(file, ".exe").empty())
