@@ -298,6 +298,7 @@ final class Hooks: @unchecked Sendable {
     private let lock = NSLock()
     private var command: (@Sendable ([String]) async throws -> Void)?
     private var finished: (@Sendable ([String]) -> Void)?
+    private var finishing: (@Sendable ([String]) async -> Void)?
     private var connect: (@Sendable (Int) async throws -> Void)?
     private var next: (any RsyncConnection)?
     private var connections = 0
@@ -312,6 +313,13 @@ final class Hooks: @unchecked Sendable {
     var afterCommand: (@Sendable ([String]) -> Void)? {
         get { lock.withLock { finished } }
         set { lock.withLock { finished = newValue } }
+    }
+
+    /// Runs when the service waits for a command to exit, before the exit is seen, with its arguments. A delay here is a
+    /// server that has sent everything and exits late.
+    var beforeFinish: (@Sendable ([String]) async -> Void)? {
+        get { lock.withLock { finishing } }
+        set { lock.withLock { finishing = newValue } }
     }
 
     /// Runs `action` once, before the first command that starts after the `pushes`th push finished.
@@ -360,7 +368,7 @@ private struct HookedConnection: RsyncConnection {
 
     func start(_ arguments: [String]) async throws -> any RsyncTransport {
         try await hooks.beforeCommand?(arguments)
-        return HookedTransport(base: try await ProcessConnection().start(arguments)) { [hooks] in hooks.afterCommand?(arguments) }
+        return HookedTransport(base: try await ProcessConnection().start(arguments), arguments: arguments, hooks: hooks)
     }
 
     func close() async {}
@@ -368,14 +376,16 @@ private struct HookedConnection: RsyncConnection {
 
 private struct HookedTransport: RsyncTransport {
     let base: any RsyncTransport
-    let finished: @Sendable () -> Void
+    let arguments: [String]
+    let hooks: Hooks
 
     var output: AsyncThrowingStream<[UInt8], any Error> { base.output }
 
     func write(_ bytes: [UInt8]) async throws { try await base.write(bytes) }
 
     func finish() async throws -> (status: Int32, errorOutput: String) {
-        defer { finished() }
+        await hooks.beforeFinish?(arguments)
+        defer { hooks.afterCommand?(arguments) }
         return try await base.finish()
     }
 }
@@ -729,4 +739,48 @@ private struct RefusingConnection: RsyncConnection {
     model.select(.backUp)
     for _ in 0 ..< 100 where model.busy { try await Task.sleep(for: .milliseconds(50)) }
     #expect(try setup.serverMapping().summaries.last?.os == "linux")
+}
+
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func theLastComparisonDecidesBeforeItsReadEnds() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    _ = try await setup.service.checkedBackUp(setup.id)
+    try write(["file1.rmmzsave": "two"], to: setup.locations[0])
+
+    // The last comparison's sender delivers mapping.yaml and then exits late, and the Deck backs up meanwhile. The
+    // second read to end after the folder upload is that comparison.
+    let pushesDone = Locked(0), readsDone = Locked(0)
+    setup.hooks.afterCommand = { arguments in if Command(arguments) == .push { pushesDone { $0 += 1 } } }
+    setup.hooks.beforeFinish = { arguments in
+        guard Command(arguments) == .read, pushesDone({ $0 }) >= 1, readsDone({ $0 += 1; return $0 }) == 2 else { return }
+        // Long enough for the mapping upload to finish, when nothing waits for this exit.
+        for _ in 0 ..< 40 where pushesDone({ $0 }) < 2 { try? await Task.sleep(for: .milliseconds(50)) }
+        try? await setup.deckBacksUp(["file1.rmmzsave": "deck"], at: 1)
+    }
+    let result = await Task { try await setup.service.checkedBackUp(setup.id) }.result
+
+    // This device's mapping went before the Deck's, so the Deck built on it, and the readback reports the later change.
+    #expect(throws: SaveSyncError.changedAfterBackup) { try result.get() }
+    let summaries = try setup.serverMapping().summaries
+    #expect(summaries.map(\.os) == ["mac", "mac", "linux"])
+    try setup.expectStoreIsWhole()
+}
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func aGameIsInSyncAfterItsOwnBackupOrRestore() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    // The Deck's backup holds a save this device never had.
+    try setup.deckBacksUp(["file1.rmmzsave": "one", "file2.rmmzsave": "deck only"], at: 1)
+    let deck = try #require(try setup.serverMapping().summaries.last)
+    try write(["file1.rmmzsave": "two"], to: setup.locations[0])
+    _ = try await setup.service.checkedBackUp(setup.id)
+    #expect(try await setup.service.status(for: setup.id) == .inSync)
+
+    // Restoring the older backup on purpose leaves the game in sync too, until a save changes.
+    _ = try await setup.service.restore(setup.id, backup: deck.name)
+    #expect(try contents(of: setup.locations[0]) == ["file1.rmmzsave": "one", "file2.rmmzsave": "deck only"])
+    #expect(try await setup.service.status(for: setup.id) == .inSync)
+    try write(["file1.rmmzsave": "three"], to: setup.locations[0])
+    #expect(try await setup.service.status(for: setup.id) == .localChanged)
 }

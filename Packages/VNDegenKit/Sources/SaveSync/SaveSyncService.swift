@@ -52,6 +52,7 @@ public struct GameMatch: Equatable, Sendable {
 public enum SyncStatus: Equatable, Sendable {
     /// The server has no backup of the game yet.
     case noBackups
+    /// The saves here match the latest backup, or neither they nor the server changed since the last backup or restore.
     case inSync
     /// The saves here changed since the last backup or restore, and the server did not.
     case localChanged
@@ -401,10 +402,11 @@ public final class SaveSyncService {
     /// still list; Ludusavi deletes unlisted `backup-*` folders at its next backup of the game.
     ///
     /// No lock is shared with Ludusavi or other devices. The mapping upload is set up first and waits until rsync on the
-    /// server asks for the file. Only then does a second channel read the server's mapping.yaml for the last time, and
-    /// the bytes go, or the file is skipped and the server's copy stays untouched. What remains is another device
-    /// writing mapping.yaml during one round trip: after that last read reaches the server and before rsync renames
-    /// the new file into place. Reading the mapping back afterwards reports a change that lands later.
+    /// server asks for the file. Only then does a second channel read the server's mapping.yaml for the last time. As
+    /// soon as its bytes are in and checked, before that read's closing statistics and exit, the new bytes go, or the
+    /// file is skipped and the server's copy stays untouched. What remains is another device writing mapping.yaml during
+    /// about one round trip: after the server sent the bytes of that last read and before rsync renames the new file
+    /// into place. Reading the mapping back afterwards reports a change that lands later.
     public func backUp(_ id: GameID, judged: ServerRevision) async throws -> BackupReport {
         guard let server = trustedServer, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id)
@@ -427,19 +429,22 @@ public final class SaveSyncService {
                 return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
             }
             let pushed = try Data(contentsOf: mappingURL)
-            let sending = Flag()
+            let comparison = Comparison()
             do {
                 try await store.push(client, folder: match.folder, backup: name, like: before.entries)
                 try await store.verify(client, folder: match.folder, backup: name, differential: report.isDifferential)
                 let sent = try await store.pushMapping(client, folder: match.folder, like: before.entries) {
-                    guard try await store.readGame(client, folder: match.folder).mapping == before.mapping else { return false }
-                    sending.set()
-                    return true
+                    let (same, rest) = try await store.mappingIs(before.mapping, client, folder: match.folder)
+                    comparison.decided(same, rest: rest)
+                    return same
                 }
+                // The comparison's read ends after the decision. A failure there still fails the backup, without
+                // undoing a mapping already sent.
+                try await comparison.rest?.value
                 guard sent else { throw SaveSyncError.changedDuringBackup }
             } catch {
                 // Until mapping.yaml starts going up, nothing names the new folder, and its name is this device's alone.
-                if !sending.isSet { try? await store.delete(client, folder: match.folder, names: [name]) }
+                if !comparison.approved { try? await store.delete(client, folder: match.folder, names: [name]) }
                 // Back to the server's state: the next read brings its mapping.yaml down again.
                 try? FileManager.default.removeItem(at: store.mirror.appendingPathComponent(match.folder).appendingPathComponent(name))
                 if let original = before.mapping { try? original.write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
@@ -479,10 +484,13 @@ public final class SaveSyncService {
                 return (SyncCheck(status: .inSync, revision: revision), SyncRecord(folder: match.folder, latest: summary.revision, saves: local))
             }
             guard let previous else { return (SyncCheck(status: local.isEmpty ? .newerBackup(summary) : .conflict(summary), revision: revision), nil) }
+            // Neither side changed since the last backup or restore here. The latest backup can still differ from the saves
+            // here, such as a save it carries that this device never had, or an older backup restored on purpose.
             let status: SyncStatus = switch (previous.latest != summary.revision, local != previous.saves) {
             case (true, false): .newerBackup(summary)
             case (true, true): .conflict(summary)
-            default: .localChanged
+            case (false, true): .localChanged
+            case (false, false): .inSync
             }
             return (SyncCheck(status: status, revision: revision), nil)
         }
@@ -727,12 +735,17 @@ struct LudusaviConfig {
     }
 }
 
-/// A one-way switch that a closure on another task can set.
-private final class Flag: @unchecked Sendable {
+/// The last mapping comparison of a backup, recorded by the upload's confirm closure: whether it let the mapping go,
+/// and the rest of its read, which ends after the decision.
+private final class Comparison: @unchecked Sendable {
     private let lock = NSLock()
-    private var value = false
+    private var same = false
+    private var remainder: Task<Void, any Error>?
 
-    var isSet: Bool { lock.withLock { value } }
+    var approved: Bool { lock.withLock { same } }
+    var rest: Task<Void, any Error>? { lock.withLock { remainder } }
 
-    func set() { lock.withLock { value = true } }
+    func decided(_ same: Bool, rest: Task<Void, any Error>) {
+        lock.withLock { (self.same, remainder) = (same, rest) }
+    }
 }

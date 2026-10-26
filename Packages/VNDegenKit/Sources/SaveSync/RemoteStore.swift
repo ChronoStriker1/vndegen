@@ -58,17 +58,45 @@ struct RemoteStore: Sendable {
     /// a mapping.yaml that another device rewrote at the same size within the same second, so this pulls into an empty
     /// folder instead.
     func readGame(_ client: RsyncClient, folder: String) async throws -> GameState {
+        try await readGame(client, folder: folder, arrived: nil)
+    }
+
+    /// `readGame`, also handing the state to `arrived` as soon as the mapping's bytes are in and checked, before the
+    /// server's closing statistics and exit.
+    private func readGame(_ client: RsyncClient, folder: String, arrived: (@Sendable (GameState) async throws -> Void)?) async throws -> GameState {
         let scratch = mirror.deletingLastPathComponent().appendingPathComponent("Incoming-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
         let name = RsyncClient.escapedPattern(folder)
+        let state = { @Sendable (listed: [RsyncEntry]) throws -> GameState in
+            let entries = GameEntries(root: listed.first { $0.path == "." }, folder: listed.first { $0.path == folder },
+                                      mapping: listed.first { $0.path == "\(folder)/\(LudusaviStore.mappingFile)" })
+            let url = scratch.appendingPathComponent(folder, isDirectory: true).appendingPathComponent(LudusaviStore.mappingFile)
+            return GameState(entries: entries, mapping: entries.mapping == nil ? nil : try Data(contentsOf: url))
+        }
+        var onArrival: (@Sendable ([RsyncEntry]) async throws -> Void)?
+        if let arrived { onArrival = { listed in try await arrived(try state(listed)) } }
         let report = try await client.pull(remote(), into: scratch, filters: [.include("/\(name)/"), .include("/\(name)/mapping.yaml"), .exclude("*")],
-                                           owners: true)
-        let entries = GameEntries(root: report.entries.first { $0.path == "." },
-                                  folder: report.entries.first { $0.path == folder },
-                                  mapping: report.entries.first { $0.path == "\(folder)/\(LudusaviStore.mappingFile)" })
-        let url = scratch.appendingPathComponent(folder, isDirectory: true).appendingPathComponent(LudusaviStore.mappingFile)
-        return GameState(entries: entries, mapping: entries.mapping == nil ? nil : try Data(contentsOf: url))
+                                           owners: true, arrived: onArrival)
+        return try state(report.entries)
+    }
+
+    /// Whether the server's mapping.yaml of the game is `expected`, byte for byte, nil meaning none. Answers as soon as
+    /// the file's bytes are in and checked, without waiting for the server's closing statistics and exit. `rest` is that
+    /// remainder of the read; it fails when the server does not end cleanly.
+    func mappingIs(_ expected: Data?, _ client: RsyncClient, folder: String) async throws -> (same: Bool, rest: Task<Void, any Error>) {
+        let (answers, answer) = AsyncThrowingStream<Bool, any Error>.makeStream()
+        let rest = Task {
+            do {
+                _ = try await readGame(client, folder: folder) { answer.yield($0.mapping == expected) }
+                answer.finish()
+            } catch {
+                answer.finish(throwing: error)
+                throw error
+            }
+        }
+        for try await same in answers { return (same, rest) }
+        throw RsyncError.connectionClosed(nil)
     }
 
     struct GameEntries: Sendable {

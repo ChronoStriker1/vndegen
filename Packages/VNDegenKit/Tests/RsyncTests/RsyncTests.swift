@@ -294,3 +294,13 @@ private final class StuckServer {
     #expect(ContinuousClock.now - start < .seconds(5))
     await connection.close()
 }
+
+@Test func aServerThatCannotBeReachedFailsCleanly() async throws {
+    // A port that was free a moment ago, so nothing listens on it.
+    let probe = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton).bind(host: "127.0.0.1", port: 0).get()
+    let port = probe.localAddress?.port ?? 1
+    try await probe.close()
+    for server in [SSHServer(host: "no-such-host.invalid", user: "test"), SSHServer(host: "127.0.0.1", port: port, user: "test")] {
+        await #expect(throws: SSHError.self, "\(server.host)") { _ = try await SSHConnection.connect(to: server, key: .init(), hostKey: nil) }
+    }
+}

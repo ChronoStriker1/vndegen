@@ -34,9 +34,14 @@ public struct RsyncClient: Sendable {
     /// modification time already match are skipped. Every file is checked against the sender's checksum and replaces
     /// the old one in one rename. Nothing is deleted. Returns every entry the server listed, with owners when `owners`
     /// is set. Local files keep the local owner.
+    ///
+    /// `arrived` runs once, with every entry the server listed, as soon as every file the pull asked for is in place with
+    /// its size and checksum checked. The server's closing statistics and its exit come after it, so a caller can act on
+    /// the files without waiting for them. The pull still fails afterwards if the server does not end cleanly.
     @discardableResult
-    public func pull(_ remote: String, into local: URL, filters: [RsyncFilter] = [], owners: Bool = false) async throws -> PullReport {
-        let (entries, transferred) = try await receive(remote, filters: filters, owners: owners, into: local)
+    public func pull(_ remote: String, into local: URL, filters: [RsyncFilter] = [], owners: Bool = false,
+                     arrived: (@Sendable ([RsyncEntry]) async throws -> Void)? = nil) async throws -> PullReport {
+        let (entries, transferred) = try await receive(remote, filters: filters, owners: owners, into: local, arrived: arrived)
         return PullReport(entries: entries, transferred: transferred)
     }
 
@@ -46,8 +51,8 @@ public struct RsyncClient: Sendable {
         public var transferred: [String]
     }
 
-    private func receive(_ remote: String, filters: [RsyncFilter], owners: Bool,
-                         into destination: URL?) async throws -> (entries: [RsyncEntry], transferred: [String]) {
+    private func receive(_ remote: String, filters: [RsyncFilter], owners: Bool, into destination: URL?,
+                         arrived: (@Sendable ([RsyncEntry]) async throws -> Void)? = nil) async throws -> (entries: [RsyncEntry], transferred: [String]) {
         let transport = try await connection.start([program, "--server", "--sender", owners ? "-rog" : "-r", ".", remote])
         let session = try await Session(transport)
         var buffer = WireBuffer()
@@ -80,6 +85,7 @@ public struct RsyncClient: Sendable {
         try await transport.write(buffer.bytes)
 
         var transferred: [String] = []
+        if wanted.isEmpty { try await arrived?(entries) }
         var phase = 0
         while true {
             let index = try await session.reader.int32()
@@ -92,6 +98,7 @@ public struct RsyncClient: Sendable {
             let entry = entries[Int(index)]
             try await receiveFile(entry, to: target, session: session)
             transferred.append(entry.path)
+            if transferred.count == wanted.count { try await arrived?(entries) }
         }
         // Bytes read, bytes written, and total size, which only rsync's own client prints.
         for _ in 0 ..< 3 { _ = try await session.reader.int64() }
@@ -126,7 +133,7 @@ public struct RsyncClient: Sendable {
                 try handle.write(contentsOf: data)
             }
             let expected = try await reader.read(16)
-            guard md4.finalize() == expected else { throw RsyncError.checksumMismatch(entry.path) }
+            guard md4.finalize() == expected, try handle.offset() == UInt64(entry.size) else { throw RsyncError.checksumMismatch(entry.path) }
             try handle.synchronize()
         } catch {
             try? FileManager.default.removeItem(at: temporary)

@@ -85,6 +85,8 @@ public final class SSHConnection: RsyncConnection {
                 connecting.whenSuccess { $0.close(promise: nil) }
             }
         } catch {
+            // The login never starts, but its promise must still end, or NIO reports it leaked.
+            outcome.loggedIn.fail(error)
             if Task.isCancelled { throw CancellationError() }
             throw SSHError.unreachable(error.localizedDescription)
         }
