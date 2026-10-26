@@ -431,9 +431,13 @@ final class Navigator {
     }
 
     #if os(iOS)
-    /// Writes to the defaults key that the settings screen's `@AppStorage` reads.
-    private func setControlMethod(_ method: ControlMethod) {
+    /// Writes to the defaults key that the settings screen's `@AppStorage` reads. A mouse row the new method hides hands
+    /// focus to the control method row.
+    func setControlMethod(_ method: ControlMethod) {
         UserDefaults.standard.set(method.rawValue, forKey: ControlMethod.storageKey)
+        if let focus, focus == .controllerMouse || focus == .mouseStyle, position(of: focus, in: rows()) == nil {
+            setFocus(.controlMethod)
+        }
     }
 
     /// Writes the next value to the defaults key that the settings screen's `@AppStorage` reads.

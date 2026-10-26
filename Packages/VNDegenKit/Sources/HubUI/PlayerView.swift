@@ -18,7 +18,7 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
-            SessionViewHost(session: session, acceptsTouches: overlayMode != .off)
+            SessionViewHost(session: session)
                 .ignoresSafeArea()
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
@@ -30,6 +30,13 @@ struct PlayerView: View {
             if needsRotation {
                 RotateHint(orientation: orientation)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+            if overlayMode == .off {
+                // Swallows touches above the game. Disabling interaction on the game view would cut off its keyboard too.
+                Color.clear
+                    .contentShape(.rect)
+                    .gesture(DragGesture(minimumDistance: 0))
+                    .ignoresSafeArea()
             }
             if let overlayMode, overlayMode.hasOverlay {
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
@@ -187,9 +194,11 @@ struct PlayerView: View {
     }
 
     /// Saved on the game, so the method sticks the next time it plays too.
+    /// A menu row the new method hides hands focus to the methods row.
     private func setMethod(_ method: ControlMethod) {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.controlMethod = method }
+        if !PlayerMenu.items(for: method).contains(menu.focus) { menu.focus = .method }
     }
 
     private func openMapping() {
@@ -410,15 +419,12 @@ private struct RotateHint: View {
 #if canImport(UIKit)
 private struct SessionViewHost: UIViewRepresentable {
     let session: any EngineSession
-    let acceptsTouches: Bool
     func makeUIView(context: Context) -> UIView { session.view }
-    func updateUIView(_ view: UIView, context: Context) { view.isUserInteractionEnabled = acceptsTouches }
+    func updateUIView(_ view: UIView, context: Context) {}
 }
 #else
 private struct SessionViewHost: NSViewRepresentable {
     let session: any EngineSession
-    /// Macs have no touch screen, so this changes nothing.
-    let acceptsTouches: Bool
     func makeNSView(context: Context) -> NSView { session.view }
     func updateNSView(_ view: NSView, context: Context) {}
 }

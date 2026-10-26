@@ -122,16 +122,16 @@ struct SettingsView: View {
 
                     #if os(iOS)
                     Section {
-                        Picker("Control method", selection: Binding(get: { controlMethod.kind }, set: { controlMethod = ControlMethod($0) })) {
+                        Picker("Control method", selection: Binding(get: { controlMethod.kind }, set: { nav.setControlMethod(ControlMethod($0)) })) {
                             ForEach(ControlMethod.Kind.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
                         .focusRow(.controlMethod, nav)
                         if controlMethod.kind == .controller {
-                            Toggle("Mouse", isOn: Binding(get: { controlMethod.mouse != nil }, set: { _ in controlMethod = controlMethod.togglingMouse }))
+                            Toggle("Mouse", isOn: Binding(get: { controlMethod.mouse != nil }, set: { _ in nav.setControlMethod(controlMethod.togglingMouse) }))
                                 .focusRow(.controllerMouse, nav)
                         }
                         if let mouse = controlMethod.mouse {
-                            Picker("Mouse style", selection: Binding(get: { mouse }, set: { controlMethod = controlMethod.with(mouse: $0) })) {
+                            Picker("Mouse style", selection: Binding(get: { mouse }, set: { nav.setControlMethod(controlMethod.with(mouse: $0)) })) {
                                 ForEach(MouseStyle.allCases, id: \.self) { Text($0.title).tag($0) }
                             }
                             .focusRow(.mouseStyle, nav)
