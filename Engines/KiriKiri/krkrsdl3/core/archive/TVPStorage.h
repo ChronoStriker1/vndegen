@@ -27,6 +27,7 @@ extern ttstr TVPNativeExeName; // */TVP/krkrsdl3.exe
 extern ttstr TVPNativeExeDir;  // */TVP/
 extern ttstr TVPNativeProjectData; // */Game/data.xp3 or */Game/data/
 extern ttstr TVPNativeProjectDir;  // */Game/
+extern ttstr TVPNativeGameExe;     // */Game/game.exe, or empty when -gameroot names none
 extern ttstr TVPNativeDataPath;    // */Game/savedata/
 extern ttstr TVPProjectData;       // file://*/Game/data.xp3> or */Game/data/
 extern ttstr TVPProjectDir;        // file://*/Game/

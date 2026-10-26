@@ -1,4 +1,8 @@
 #include "tjsCommHead.h"
+#include <algorithm>
+#include <cstring>
+#include <string>
+#include <vector>
 #include "TVPSettings.h"
 
 #include "TVPWindow.h"
@@ -243,6 +247,39 @@ static void TVPDetectRender()
     }
 }
 
+// System.exeName is the game's .exe on Windows, and games look for files beside it, such as
+// <exe>.cf. A folder can hold tools too, so the .exe that has a .cf wins, then a lone .exe.
+static ttstr TVPFindGameExe(const ttstr& dir)
+{
+    auto stem = [](std::string name, const char* ext)
+    {
+        for (char& c : name)
+            if (c >= 'A' && c <= 'Z')
+                c += 'a' - 'A';
+        size_t length = strlen(ext);
+        bool matches = name.size() > length && !name.compare(name.size() - length, length, ext);
+        return matches ? name.substr(0, name.size() - length) : std::string();
+    };
+    std::vector<std::string> exes;
+    std::vector<std::string> configs;
+    TVPGetLocalFileListAt(dir,
+                          [&](const ttstr& name, tTVPLocalFileInfo* s)
+                          {
+                              std::string file = name.AsStdString();
+                              if (!(s->Mode & S_IFREG))
+                                  return;
+                              if (!stem(file, ".exe").empty())
+                                  exes.push_back(file);
+                              else if (!stem(file, ".cf").empty())
+                                  configs.push_back(stem(file, ".cf"));
+                          });
+    std::sort(exes.begin(), exes.end());
+    for (const std::string& exe : exes)
+        if (std::find(configs.begin(), configs.end(), stem(exe, ".exe")) != configs.end())
+            return dir + ttstr(exe);
+    return exes.size() == 1 ? dir + ttstr(exes.front()) : ttstr();
+}
+
 bool TVPParseArguments(int argc, char* argv[])
 {
     // exeName
@@ -270,6 +307,7 @@ bool TVPParseArguments(int argc, char* argv[])
         TVPNativeProjectDir = ttstr(gameRoot);
         if (TVPNativeProjectDir.GetLastChar() != TJS_N('/'))
             TVPNativeProjectDir += TJS_N("/");
+        TVPNativeGameExe = TVPFindGameExe(TVPNativeProjectDir);
     }
     else if (TVPCheckExistentLocalFolder(TVPNativeProjectData))
     {
@@ -313,6 +351,7 @@ void TVPClearAllArguments()
     TVPNativeExeDir.Clear();
     TVPNativeProjectData.Clear();
     TVPNativeProjectDir.Clear();
+    TVPNativeGameExe.Clear();
     TVPNativeDataPath.Clear();
     TVPProjectData.Clear();
     TVPProjectDir.Clear();

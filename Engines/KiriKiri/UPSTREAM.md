@@ -26,6 +26,11 @@ Bundled third-party code keeps its own license: SQLite (public domain), the LZMA
 - The OpenGL and Vulkan render backends and their shaders. VNDegen renders with the software backend, which presents through SDL3's renderer on Metal.
 - The `environ/` folders for Android, OpenHarmony, WebAssembly, Windows, Linux, SDL2, and the console build. `environ/apple/apple_video.mm` and `environ/PlatformVideo.h`, an unimplemented system video interface, are removed too.
 
+## VNDegen's additions
+
+- `vndegen/ciphers.cpp`: native decryption of encrypted archives. Each scheme is one row in its table.
+- `vndegen/sigcheck.cpp`: a `sigcheck.dll` stub. Its `Window.checkSignature` reports every file's signature as valid without checking it.
+
 ## VNDegen's changes to upstream files
 
 1. `core/archive/XP3Archive.cpp`: reads hashed-name archives. Some Kirikiri Z archives store each file under the MD5 of its name and keep the real name in an `eliF` chunk just before the `File` chunk. The index reader maps each `eliF` name to the `File` chunk after it.
@@ -40,5 +45,6 @@ Bundled third-party code keeps its own license: SQLite (public domain), the LZMA
 10. `environ/apple/apple_core.mm`: resources such as the fallback font are looked up in the bundle that contains the engine, which is the framework when the engine is embedded in an app, instead of the main bundle.
 11. `core/archive/XP3Archive.cpp`, `core/archive/XP3Archive.h`: each archive detects its encryption when it opens, through `VNKKDetectCipher` in `vndegen/ciphers.cpp`, and keeps the scheme in `Cipher`. Reads decrypt with it unless a game's `xp3filter.tjs` has installed an extraction filter, which takes its place.
 12. `core/media/font/TVPFont.cpp`: the scan of the game's `fonts/` folder passed bare file names to the font loader, which needs storage names, so a game with a `fonts/` folder stopped at startup with `Not supported media type ""`. It now passes each file's full name, and skips folders.
+13. `core/utils/TVPSettings.cpp`, `core/script/tjsNativeSystem.cpp`, `core/archive/TVPStorage.cpp`, `core/archive/TVPStorage.h`: with `-gameroot`, `System.exeName` is the game's `.exe` in that folder, as on Windows, instead of the project data. Games check for files beside it, such as `<exe>.cf`. When the folder holds several, the `.exe` with a matching `.cf` wins, then a lone `.exe`. The value is no longer cached across games in one process.
 
 Text files without a byte order mark are left as upstream decodes them. krkrsdl3 tries strict UTF-8 first, then Shift_JIS, then GBK. Real Shift_JIS text is not valid UTF-8, so Japanese scripts decode as Shift_JIS, as on Windows. UTF-8 fan translations also keep working.

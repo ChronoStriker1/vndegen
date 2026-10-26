@@ -38,6 +38,7 @@ ttstr TVPNativeExeName;
 ttstr TVPNativeExeDir;     
 ttstr TVPNativeProjectData;
 ttstr TVPNativeProjectDir; 
+ttstr TVPNativeGameExe;
 ttstr TVPNativeDataPath;   
 ttstr TVPProjectData;      
 ttstr TVPProjectDir;       

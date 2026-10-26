@@ -315,6 +315,7 @@ endif()
 # An object library keeps every object file, so the plugins' static registrations survive linking.
 add_library(kirikiri_engine OBJECT
     vndegen/ciphers.cpp
+    vndegen/sigcheck.cpp
     ${KIRIKIRI_CORE_SOURCES}
     ${KIRIKIRI_ENVIRON_SOURCES}
     ${KIRIKIRI_PLUGINS_SOURCES}
