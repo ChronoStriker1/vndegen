@@ -93,7 +93,7 @@ VNDegen talks to the server that holds your Ludusavi backups itself. It logs in 
 Set it up once in Settings, under Ludusavi backups:
 
 1. Enter the server's host, port, SSH user, and the folder Ludusavi backs up to on that server.
-2. Copy VNDegen's key and add it to that user's `~/.ssh/authorized_keys` on the server. VNDegen makes the key on first use and keeps the private half in the device's Keychain.
+2. Copy VNDegen's key and add it to that user's `~/.ssh/authorized_keys` on the server. VNDegen makes the key on first use. On iPhone and iPad it keeps the private half in the Keychain. On a Mac it keeps it in a file only your user can read, in VNDegen's Application Support folder, so app updates don't ask for your password.
 3. Tap Test Connection. The first time, VNDegen shows the server's fingerprint, the same text `ssh-keygen -lf` prints for its host key. Trust it once it matches. VNDegen refuses to connect if that key ever changes.
 4. Turn on Match my Ludusavi settings and enter the retention limits from Ludusavi's Other screen. On a Mac with Ludusavi installed, VNDegen reads them from Ludusavi's config.
 
