@@ -269,3 +269,17 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
     #expect(Set(table.values).count == table.count)
 }
 #endif
+
+@Test func handsTheEngineADataFolderWithItsClosingSlash() {
+    let folder = URL(fileURLWithPath: "/Games/Test Game 01")
+    let data = URL(fileURLWithPath: "/Data/Test Game 01")
+    let unpacked = KiriKiriPaths(folder: folder, dataDirectory: data,
+                                 layout: KiriKiriLayout(root: "Test Game 01", data: .folder("Test Game 01/data")))
+    #expect(unpacked.projectData == "/Games/Test Game 01/Test Game 01/data/")
+    #expect(unpacked.gameRoot.path == "/Games/Test Game 01/Test Game 01")
+    let archive = KiriKiriPaths(folder: folder, dataDirectory: data, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")))
+    #expect(archive.projectData == "/Games/Test Game 01/data.xp3")
+    #expect(archive.appData.path == "/Data/Test Game 01/AppData")
+    #expect(archive.documents.path == "/Data/Test Game 01/Documents")
+    #expect(archive.log.path == "/Data/Test Game 01/logs/kirikiri.txt")
+}

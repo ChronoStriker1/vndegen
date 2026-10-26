@@ -65,7 +65,7 @@ final class KiriKiriSession: EngineSession {
 
     private func start() {
         guard case .waiting = state else { return }
-        let strings = [paths.gameRoot, paths.projectData, paths.log, paths.appData, paths.documents].map { strdup($0.path) }
+        let strings = [paths.gameRoot.path, paths.projectData, paths.log.path, paths.appData.path, paths.documents.path].map { strdup($0) }
         defer { strings.forEach { free($0) } }
         #if canImport(UIKit)
         let hostView: UnsafeMutableRawPointer? = nil
@@ -213,7 +213,8 @@ private final class FrameTarget: NSObject {
 /// Windows AppData and Documents folders.
 nonisolated struct KiriKiriPaths {
     var gameRoot: URL
-    var projectData: URL
+    /// The project as the engine takes it. Kirikiri tells a folder from an archive by its closing slash.
+    var projectData: String
     var log: URL
     var appData: URL
     var documents: URL
@@ -221,8 +222,8 @@ nonisolated struct KiriKiriPaths {
     init(folder: URL, dataDirectory: URL, layout: KiriKiriLayout) {
         gameRoot = folder.appendingPathComponent(layout.root, isDirectory: true)
         switch layout.data {
-        case let .archive(path), let .embedded(path): projectData = folder.appendingPathComponent(path)
-        case let .folder(path): projectData = folder.appendingPathComponent(path, isDirectory: true)
+        case let .archive(path), let .embedded(path): projectData = folder.appendingPathComponent(path).path
+        case let .folder(path): projectData = folder.appendingPathComponent(path, isDirectory: true).path + "/"
         }
         log = dataDirectory.appendingPathComponent("logs/kirikiri.txt")
         appData = KiriKiriPlugin.appDataDirectory(dataDirectory)
