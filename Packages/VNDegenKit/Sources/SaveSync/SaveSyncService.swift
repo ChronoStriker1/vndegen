@@ -370,15 +370,19 @@ public final class SaveSyncService {
                 let latest = try store.local.mapping(match.folder).summaries.last?.name ?? ""
                 return (report, SyncRecord(folder: match.folder, backup: latest, saves: saves))
             }
+            var pushingMapping = false
             do {
                 try await store.push(client, folder: match.folder, backup: name, like: before)
+                try await store.verify(client, folder: match.folder, backup: name)
                 let now = try await store.refreshGameEntries(client, folder: match.folder)
                 guard now.mapping?.size == before.mapping?.size, now.mapping?.modified == before.mapping?.modified else {
-                    try? await store.delete(client, folder: match.folder, names: [name])
                     throw SaveSyncError.changedDuringBackup
                 }
+                pushingMapping = true
                 try await store.pushMapping(client, folder: match.folder, like: before)
             } catch {
+                // Until mapping.yaml goes up, nothing names the new folder, which no other backup can share.
+                if !pushingMapping { try? await store.delete(client, folder: match.folder, names: [name]) }
                 // Back to the server's state: the next read brings its mapping.yaml down again.
                 try? FileManager.default.removeItem(at: store.mirror.appendingPathComponent(match.folder).appendingPathComponent(name))
                 if let original { try? Data(original.utf8).write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }

@@ -90,14 +90,41 @@ struct RemoteStore: Sendable {
     /// Sends the mirror's backup folder `backup` of the game up. New folders and files take the game folder's owner,
     /// group, and mode, or the store folder's for a new game, so the PC's own access to the share keeps working.
     func push(_ client: RsyncClient, folder: String, backup: String, like entries: GameEntries) async throws {
-        let root = mirror.appendingPathComponent(folder).appendingPathComponent(backup)
         var paths = [backup]
-        for relative in try LudusaviStore.regularFiles(in: root) {
+        for relative in try Self.files(under: mirror.appendingPathComponent(folder).appendingPathComponent(backup)).keys {
             let parts = relative.split(separator: "/").map(String.init)
             for depth in 1 ..< parts.count { paths.append(([backup] + parts.prefix(depth)).joined(separator: "/")) }
             paths.append(backup + "/" + relative)
         }
         try await upload(client, folder: folder, paths: Array(Set(paths)), like: entries)
+    }
+
+    /// Throws unless the server's copy of backup folder `backup` holds exactly the mirror's files, at the same sizes.
+    /// mapping.yaml goes up only after this, so it never names files the server lacks.
+    func verify(_ client: RsyncClient, folder: String, backup: String) async throws {
+        let local = try Self.files(under: mirror.appendingPathComponent(folder).appendingPathComponent(backup))
+        let listed = try await client.list(remote(folder), filters: [.include("/\(RsyncClient.escapedPattern(backup))/***"), .exclude("*")])
+        let prefix = backup + "/"
+        let remote = Dictionary(uniqueKeysWithValues: listed.filter { $0.kind == .file && $0.path.hasPrefix(prefix) }
+            .map { (String($0.path.dropFirst(prefix.count)), $0.size) })
+        guard !local.isEmpty, remote == local else { throw SaveSyncError.incompleteUpload(backup) }
+    }
+
+    /// Every file under `root`, by relative path, with its size. Hidden ones too: backups keep paths such as
+    /// `drive-0/home/deck/.local/share/...`.
+    static func files(under root: URL) throws -> [String: Int64] {
+        let base = root.standardizedFileURL.resolvingSymlinksInPath().pathComponents.count
+        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]) else {
+            throw SaveSyncError.unreadable(root.path)
+        }
+        var files: [String: Int64] = [:]
+        for case let url as URL in walker {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            guard values.isRegularFile == true else { continue }
+            let relative = url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.dropFirst(base).joined(separator: "/")
+            files[relative] = Int64(values.fileSize ?? 0)
+        }
+        return files
     }
 
     /// Sends the mirror's mapping.yaml of the game up.

@@ -550,6 +550,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case incompleteSnapshot
     case unsupportedPath(String)
     case changedDuringBackup
+    case incompleteUpload(String)
     case engineUnsupported
     case outsideSaveFolder(String)
 
@@ -567,6 +568,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case .incompleteSnapshot: "The saves kept before the last restore are incomplete, so undoing it could lose saves. Nothing was changed."
         case let .unsupportedPath(path): "Can't store \(path) in a Ludusavi backup."
         case .changedDuringBackup: "Another device backed up this game while VNDegen was writing. Nothing was recorded. Try again."
+        case let .incompleteUpload(name): "The server's copy of \(name) is incomplete, so VNDegen did not record it. Nothing was changed. Try again."
         case .engineUnsupported: "Save sync does not support this game's engine yet."
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
         }

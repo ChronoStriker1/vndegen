@@ -109,6 +109,12 @@ private struct Setup {
     let mapping = try LudusaviStore(root: setup.store).mapping("Test Game 01")
     #expect(mapping.name == "Test Game 01")
     #expect(mapping.backups.first?.files.keys.sorted() == ["/home/deck/.local/share/Steam/steamapps/common/TestGame01/save/file1.rmmzsave"])
+    // The Deck path runs through a hidden folder, and the bytes must reach the server under it.
+    let backup = try #require(mapping.backups.first)
+    for (path, entry) in backup.files {
+        let stored = setup.store.appendingPathComponent("Test Game 01").appendingPathComponent(try #require(mapping.storedPath(of: path, in: backup.name)))
+        #expect(LudusaviStore.sha1(try Data(contentsOf: stored)) == entry.hash)
+    }
     #expect(setup.service.match(for: setup.id)?.inStore == true)
 }
 
