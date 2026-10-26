@@ -29,6 +29,30 @@
     }
     window.addEventListener('load', () => reportRenderer(0));
 
+    // pixi-filters' tilt-shift takes window.innerWidth and innerHeight, read once when the filter is made, as the size
+    // of what it blurs, and blurs more the further a pixel is from its sharp band in that size. NW.js opens the window
+    // at the game's resolution, which is what games are tuned for. Here the window is the whole view, so on an iPad the
+    // blur spread over half the game, the more so when the game started in portrait. This uses the game's resolution.
+    let pixi;
+    Object.defineProperty(window, 'PIXI', {
+        configurable: true,
+        get: () => pixi,
+        set(value) {
+            if (value === pixi) return;
+            pixi = value;
+            const filter = value && value.Filter;
+            if (!filter) return;
+            const apply = filter.prototype.apply;
+            filter.prototype.apply = function () {
+                const tiltShift = pixi.filters && pixi.filters.TiltShiftAxisFilter;
+                if (tiltShift && this instanceof tiltShift && window.Graphics) {
+                    this.uniforms.texSize.set(window.Graphics.width, window.Graphics.height);
+                }
+                return apply.apply(this, arguments);
+            };
+        },
+    });
+
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
         const scenes = window.SceneManager;
