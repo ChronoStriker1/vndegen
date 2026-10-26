@@ -1,6 +1,6 @@
 # Builds the KiriKiri engine (krkrsdl3) for VNDegen. scripts/kirikiri-engine.sh drives it.
-#   macOS: KiriKiriHelper, an executable VNDegen runs a game in.
-#   iOS:   KiriKiri.framework, which exports only the vnkk_* functions of vnkk.h.
+#   KiriKiri.framework, which exports only the vnkk_* functions of vnkk.h, for macOS and iOS.
+#   KiriKiriHelper on macOS, an executable that runs one game in its own window, for testing the engine.
 # Rendering is software compositing presented through SDL3's renderer (Metal), with no OpenGL and
 # no JIT. Adapted from krkrsdl3_build's CMakeLists.txt and cmake/*.txt; see UPSTREAM.md.
 cmake_minimum_required(VERSION 3.28)
@@ -11,7 +11,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 else()
     set(CMAKE_OSX_DEPLOYMENT_TARGET 15.0)
 endif()
-set(CMAKE_OSX_ARCHITECTURES arm64)
+set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "One architecture per build; the macOS framework is made universal afterwards")
 
 project(KiriKiri LANGUAGES C CXX OBJC OBJCXX)
 
@@ -395,22 +395,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         "-framework UIKit"
         "-framework AVFoundation"
     )
-    add_library(KiriKiri SHARED vndegen/vnkk.mm ${KIRIKIRI_API}/vnkk.h)
-    target_link_libraries(KiriKiri PRIVATE kirikiri_engine)
-    set_target_properties(KiriKiri PROPERTIES
-        FRAMEWORK TRUE
-        PUBLIC_HEADER ${KIRIKIRI_API}/vnkk.h
-        MACOSX_FRAMEWORK_IDENTIFIER com.chronostriker1.vndegen.KiriKiri
-        MACOSX_FRAMEWORK_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/vndegen/Info.plist
-    )
-    # Only the C API is visible. SDL3 and the rest stay private, so they cannot clash with another
-    # copy of SDL in the same app.
-    target_link_options(KiriKiri PRIVATE
-        -Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/vndegen/vnkk.exports
-        -Wl,-dead_strip
-    )
-    add_custom_command(TARGET KiriKiri POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} $<TARGET_BUNDLE_DIR:KiriKiri>/)
+    set(KIRIKIRI_MINIMUM_OS_KEY MinimumOSVersion)
 else()
     target_link_libraries(kirikiri_engine PUBLIC
         "-framework AppKit"
@@ -418,6 +403,33 @@ else()
         "-framework ForceFeedback"
         "-framework Carbon"
     )
+    set(KIRIKIRI_MINIMUM_OS_KEY LSMinimumSystemVersion)
+endif()
+
+add_library(KiriKiri SHARED vndegen/vnkk.mm ${KIRIKIRI_API}/vnkk.h)
+target_link_libraries(KiriKiri PRIVATE kirikiri_engine)
+set_target_properties(KiriKiri PROPERTIES
+    FRAMEWORK TRUE
+    PUBLIC_HEADER ${KIRIKIRI_API}/vnkk.h
+    MACOSX_FRAMEWORK_IDENTIFIER com.chronostriker1.vndegen.KiriKiri
+    MACOSX_FRAMEWORK_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/vndegen/Info.plist
+)
+# Only the C API is visible. SDL3 and the rest stay private, so they cannot clash with another
+# copy of SDL in the same app.
+target_link_options(KiriKiri PRIVATE
+    -Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/vndegen/vnkk.exports
+    -Wl,-dead_strip
+)
+# An iOS framework keeps its resources at its top level, a macOS one in Resources.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(KIRIKIRI_RESOURCES $<TARGET_BUNDLE_DIR:KiriKiri>)
+else()
+    set(KIRIKIRI_RESOURCES $<TARGET_FILE_DIR:KiriKiri>/Resources)
+endif()
+add_custom_command(TARGET KiriKiri POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} ${KIRIKIRI_RESOURCES}/)
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(KiriKiriHelper vndegen/helper_main.cpp vndegen/vnkk.mm)
     target_link_libraries(KiriKiriHelper PRIVATE kirikiri_engine)
     target_link_options(KiriKiriHelper PRIVATE -Wl,-dead_strip)

@@ -42,6 +42,8 @@ ttstr TVPNativeDataPath;
 ttstr TVPProjectData;      
 ttstr TVPProjectDir;       
 ttstr TVPDataPath;         
+ttstr TVPAppDataDir;
+ttstr TVPPersonalDir;
 
 //---------------------------------------------------------------------------
 

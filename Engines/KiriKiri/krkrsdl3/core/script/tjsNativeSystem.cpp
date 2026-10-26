@@ -676,7 +676,7 @@ TJS_DENY_NATIVE_PROP_SETTER
 }
 TJS_END_NATIVE_STATIC_PROP_DECL_OUTER(cls, exePath)
 //----------------------------------------------------------------------
-TJS_BEGIN_NATIVE_PROP_DECL(personalPath){TJS_BEGIN_NATIVE_PROP_GETTER{* result = TVPProjectDir;
+TJS_BEGIN_NATIVE_PROP_DECL(personalPath){TJS_BEGIN_NATIVE_PROP_GETTER{* result = TVPPersonalDir;
 return TJS_S_OK;
 }
 TJS_END_NATIVE_PROP_GETTER
@@ -685,7 +685,7 @@ TJS_DENY_NATIVE_PROP_SETTER
 }
 TJS_END_NATIVE_STATIC_PROP_DECL_OUTER(cls, personalPath)
 //----------------------------------------------------------------------
-TJS_BEGIN_NATIVE_PROP_DECL(appDataPath){TJS_BEGIN_NATIVE_PROP_GETTER{* result = TVPProjectDir;
+TJS_BEGIN_NATIVE_PROP_DECL(appDataPath){TJS_BEGIN_NATIVE_PROP_GETTER{* result = TVPAppDataDir;
 return TJS_S_OK;
 }
 TJS_END_NATIVE_PROP_GETTER
