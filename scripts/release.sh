@@ -13,6 +13,13 @@ git fetch -q origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "push main first" >&2; exit 2; }
 ! git rev-parse -q --verify "refs/tags/v$version" >/dev/null || { echo "v$version already exists" >&2; exit 2; }
 
+# The repo carries the released version, so a build from source reports it too.
+if ! grep -q "MARKETING_VERSION: \"$version\"" project.yml; then
+  sed -i.bak -E "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"$version\"/" project.yml && rm -f project.yml.bak
+  git commit -q -m "Set version to $version" project.yml
+  git push -q origin main
+fi
+
 build_number=$(git rev-list --count HEAD)
 host=${VNDEGEN_MAC:-$(cat ~/.config/vndegen/mac-host 2>/dev/null)}
 [ -n "$host" ] || { echo "set VNDEGEN_MAC or write the Mac's hostname to ~/.config/vndegen/mac-host" >&2; exit 2; }
