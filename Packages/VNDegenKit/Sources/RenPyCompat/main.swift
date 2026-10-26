@@ -1,7 +1,7 @@
 // Boots every Ren'Py game in a folder the way VNDegen does, with the probe in zz_vndegen.rpy, and prints a Markdown
 // table: the runtime each game got and why, whether it reached the main menu, and whether its folder stayed unchanged.
 //   swift run RenPyCompat <games folder> --runtimes <folder with 7/ and 8/> [--runtime 7|8] [--timeout 45] [--out <folder>]
-// scripts/renpy-compat.sh fetches the runtimes and runs this.
+// scripts/renpy-compat.sh fetches the runtimes, builds this, and runs it.
 #if os(macOS)
 import EngineRenPy
 import Foundation

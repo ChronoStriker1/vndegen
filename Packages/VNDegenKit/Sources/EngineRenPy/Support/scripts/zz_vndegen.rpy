@@ -56,38 +56,170 @@ init 999 python in _vndegen:
 
         Interface.set_mode = place_window
 
-    # VNDEGEN_PROBE is set only by scripts/renpy-compat.sh. It clicks through splash screens until the main menu
-    # shows, writes the result and a screenshot to the folder it names, and quits.
+    # VNDEGEN_BUTTONS carries the game's remapped controller buttons, such as "a=key:K_z,b=click:3,x=button:confirm,y=nothing".
+    # The game window reads the controller itself, so the remapping happens here: each remapped button gets the Ren'Py
+    # bindings of the button that does its action in the standard layout, or posts the key or click it is bound to.
+    # Buttons the player left alone keep Ren'Py's own bindings.
+    controls = {
+        "up": [("pad_dpup_press", "pad_dpup_release"), ("pad_lefty_neg", "pad_lefty_zero")],
+        "down": [("pad_dpdown_press", "pad_dpdown_release"), ("pad_lefty_pos", "pad_lefty_zero")],
+        "left": [("pad_dpleft_press", "pad_dpleft_release"), ("pad_leftx_neg", "pad_leftx_zero")],
+        "right": [("pad_dpright_press", "pad_dpright_release"), ("pad_leftx_pos", "pad_leftx_zero")],
+        "a": [("pad_a_press", "pad_a_release")],
+        "b": [("pad_b_press", "pad_b_release")],
+        "x": [("pad_x_press", "pad_x_release")],
+        "y": [("pad_y_press", "pad_y_release")],
+        "l": [("pad_leftshoulder_press", "pad_leftshoulder_release")],
+        "r": [("pad_rightshoulder_press", "pad_rightshoulder_release")],
+        "l2": [("pad_lefttrigger_pos", "pad_lefttrigger_zero")],
+        "r2": [("pad_righttrigger_pos", "pad_righttrigger_zero")],
+        "menu": [("pad_start_press", "pad_start_release")],
+    }
+    standard = {
+        "up": "up", "down": "down", "left": "left", "right": "right",
+        "confirm": "a", "cancel": "b", "dash": "x", "menu": "menu", "pageUp": "l", "pageDown": "r",
+    }
+
+    def post_input(kind, value, down):
+        if kind == "key":
+            key = getattr(pygame, value)
+            pygame.event.post(pygame.event.Event(pygame.KEYDOWN if down else pygame.KEYUP, key=key, mod=0, scancode=0,
+                                                 unicode=chr(key) if key < 128 else "", repeat=False))
+        else:
+            pygame.event.post(pygame.event.Event(pygame.MOUSEBUTTONDOWN if down else pygame.MOUSEBUTTONUP,
+                                                 pos=pygame.mouse.get_pos(), button=int(value), which=0, touch=False))
+
+    def remap(buttons):
+        defaults = dict(config.pad_bindings)
+        # Pad event name to the keys and clicks it posts. Up and down share the stick's release, as do left and right.
+        posts = {}
+        for item in buttons.split(","):
+            control, _, action = item.partition("=")
+            kind, _, value = action.partition(":")
+            if control not in controls:
+                continue
+            for i, (press, release) in enumerate(controls[control]):
+                if kind == "button" and value in standard:
+                    source = controls[standard[value]][min(i, len(controls[standard[value]]) - 1)]
+                    bindings = [defaults.get(source[0], []), defaults.get(source[1], []), defaults.get("repeat_" + source[0], [])]
+                else:
+                    bindings = [[], [], []]
+                    if kind in ("key", "click"):
+                        posts.setdefault(press, []).append((kind, value, True))
+                        posts.setdefault(release, []).append((kind, value, False))
+                config.pad_bindings[press], config.pad_bindings[release], config.pad_bindings["repeat_" + press] = bindings
+
+        post_event = renpy.display.controller.post_event
+
+        def post_remapped(control, state, repeat):
+            if not repeat and renpy.display.interface.keyboard_focused:
+                for post in posts.get("pad_{}_{}".format(control, state), []):
+                    post_input(*post)
+            post_event(control, state, repeat)
+
+        renpy.display.controller.post_event = post_remapped
+
+    if os.environ.get("VNDEGEN_BUTTONS"):
+        remap(os.environ["VNDEGEN_BUTTONS"])
+
+    # VNDEGEN_PROBE is set only by test runs, such as scripts/renpy-compat.sh. It runs the steps in VNDEGEN_PROBE_STEPS
+    # one at a time, writes screenshots and a result line to the folder VNDEGEN_PROBE names, and quits at the end. The
+    # default steps click through splash screens until the main menu shows. Steps, separated by spaces:
+    #   menu         dismiss splash screens and press first choices and buttons until the main menu shows, or fail after
+    #                VNDEGEN_PROBE_TIMEOUT seconds
+    #   start        what the main menu's Start button does
+    #   wait:<s>     wait
+    #   dismiss      what a click on the dialogue does
+    #   shot:<name>  save a screenshot as <name>.png
+    #   key:<K_x>    press and release a key, as the keyboard would
+    #   pad:<name>   press and release a controller button, by its SDL name such as guide, back, or a
+    #   save:<slot>  what a save slot's button does on the save screen; load:<slot> is the same on the load screen
+    #   quit         quit, with the result "main-menu" if a menu step got there; without it the game stays open
     probe = os.environ.get("VNDEGEN_PROBE")
     if probe:
         probe_start = time.time()
         probe_timeout = float(os.environ.get("VNDEGEN_PROBE_TIMEOUT", "45"))
-        probe_next = [probe_start + 1.0, probe_start + 5.0]
+        probe_steps = os.environ.get("VNDEGEN_PROBE_STEPS", "menu shot:screen quit").split()
+        probe_state = {"next": probe_start + 1.0, "dismiss": probe_start + 5.0, "action": None, "reached": [], "tries": 0}
+
+        def probe_log(line):
+            with open(os.path.join(probe, "steps.txt"), "a") as f:
+                f.write("%.1f %s\n" % (time.time() - probe_start, line))
 
         def probe_finish(result):
-            renpy.screenshot(os.path.join(probe, "screen.png"))
             with open(os.path.join(probe, "result.txt"), "w") as f:
                 f.write(result + "\n")
             renpy.quit()
 
-        def probe_tick():
-            now = time.time()
-            if now < probe_next[0]:
-                return
-            probe_next[0] = now + 1.0
-            if renpy.store.main_menu or renpy.get_screen("main_menu"):
-                probe_finish("main-menu")
-            elif now - probe_start > probe_timeout:
-                try:
-                    showing = " ".join(sorted(renpy.get_showing_tags("screens")))
-                except Exception:
-                    showing = ""
-                probe_finish("no-main-menu " + (showing or "-"))
-            elif now >= probe_next[1]:
-                probe_next[1] = now + 4.0
-                renpy.queue_event("dismiss")
+        def probe_run():
+            # Actions run here, inside an interaction, as a click on a button would run them.
+            action, probe_state["action"] = probe_state["action"], None
+            if action is not None:
+                return renpy.run(action)
 
-        config.periodic_callbacks.append(probe_tick)
+        config.underlay.append(renpy.Keymap(_vndegen_probe=probe_run))
+
+        def probe_step():
+            now = time.time()
+            if not probe_steps or now < probe_state["next"]:
+                return
+            step, _, arg = probe_steps[0].partition(":")
+            probe_state["next"] = now + 0.5
+            if step == "menu":
+                if renpy.store.main_menu or renpy.get_screen("main_menu"):
+                    probe_log("main-menu")
+                    probe_state["reached"].append("main-menu")
+                    probe_steps.pop(0)
+                elif now - probe_start > probe_timeout:
+                    try:
+                        showing = " ".join(sorted(renpy.get_showing_tags("screens")))
+                    except Exception:
+                        showing = ""
+                    renpy.screenshot(os.path.join(probe, "screen.png"))
+                    probe_finish("no-main-menu " + (showing or "-"))
+                elif now >= probe_state["dismiss"]:
+                    probe_state["dismiss"] = now + 4.0
+                    probe_state["tries"] += 1
+                    choice = renpy.get_screen("choice")
+                    if choice and choice.scope.get("items"):
+                        # Such as a first-run language picker.
+                        probe_log("choice " + choice.scope["items"][0].caption)
+                        probe_state["action"] = choice.scope["items"][0].action
+                        renpy.queue_event("_vndegen_probe")
+                    elif not renpy.get_screen("say") and probe_state["tries"] % 2:
+                        # Such as a disclaimer's continue button: what Down and then Enter on a keyboard do.
+                        renpy.queue_event("focus_down")
+                        renpy.queue_event("button_select")
+                    else:
+                        renpy.queue_event("dismiss")
+                return
+            probe_steps.pop(0)
+            probe_log((step + " " + arg).strip())
+            if step == "wait":
+                probe_state["next"] = now + float(arg)
+            elif step == "shot":
+                renpy.screenshot(os.path.join(probe, arg + ".png"))
+            elif step == "dismiss":
+                renpy.queue_event("dismiss")
+            elif step == "key":
+                post_input("key", arg, True)
+                post_input("key", arg, False)
+            elif step == "pad":
+                renpy.display.controller.controller_event(arg, "press")
+                renpy.display.controller.controller_event(arg, "release")
+            elif step in ("start", "save", "load"):
+                if step == "start":
+                    probe_state["action"] = renpy.store.Start()
+                elif step == "save":
+                    probe_state["action"] = renpy.store.FileSave(arg, confirm=False)
+                else:
+                    probe_state["action"] = renpy.store.FileLoad(arg, confirm=False)
+                renpy.queue_event("_vndegen_probe")
+                probe_state["next"] = now + 1.0
+            elif step == "quit":
+                probe_finish(" ".join(probe_state["reached"]) or "done")
+
+        config.periodic_callbacks.append(probe_step)
 
 style _vndegen_frame:
     xalign 0.5

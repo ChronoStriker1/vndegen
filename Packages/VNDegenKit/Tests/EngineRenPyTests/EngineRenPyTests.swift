@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VNCore
+import GameInput
 @testable import EngineRenPy
 
 /// Writes `files` (relative path to contents) into a fresh folder.
@@ -128,4 +129,19 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(command.environment["VNDEGEN_DATA"] == "/data/Test Game")
     #expect(command.environment["VNDEGEN_WINDOW"] == "10,38,1280,772")
     #expect(command.environment["VNDEGEN_FULLSCREEN"] == nil)
+}
+
+@Test func passesRemappedButtonsToTheHook() throws {
+    let z = try #require(KeyboardKey.choices.first { $0.code == "KeyZ" })
+    let up = try #require(KeyboardKey.choices.first { $0.code == "ArrowUp" })
+    let buttons: [ControlInput: ControlAction] = [.y: .nothing, .a: .key(z), .l: .key(up), .b: .click(.secondary), .x: .button(.confirm)]
+    #expect(RenPyCommand.buttonsVariable(buttons) == "a=key:K_z,b=click:3,x=button:confirm,y=nothing,l=key:K_UP")
+    #expect(RenPyCommand.buttonsVariable([:]) == nil)
+    #expect(KeyboardKey.choices.allSatisfy { RenPyCommand.pygameKey($0) != nil })
+    #expect(KeyboardKey.choices.compactMap(RenPyCommand.pygameKey).filter { $0.hasPrefix("K_F") }.count == 12)
+
+    let command = RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: .renPy8, runtimes: URL(fileURLWithPath: "/app/RenPy"),
+                               support: URL(fileURLWithPath: "/support"), dataDirectory: URL(fileURLWithPath: "/data/Test Game"),
+                               placement: nil, buttons: [.r2: .click(.primary)])
+    #expect(command.environment["VNDEGEN_BUTTONS"] == "r2=click:1")
 }

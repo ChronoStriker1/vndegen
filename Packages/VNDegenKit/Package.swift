@@ -44,7 +44,7 @@ let package = Package(
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
-        .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy"]),
+        .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),

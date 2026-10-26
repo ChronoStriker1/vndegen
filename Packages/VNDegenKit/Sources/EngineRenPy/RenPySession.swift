@@ -42,7 +42,7 @@ final class RenPySession: EngineSession {
         RenPyPlugin.importGameSaves(base: base, dataDirectory: launch.dataDirectory)
         let placement: RenPyCommand.Placement = window.styleMask.contains(.fullScreen) ? .fullScreen : .frame(Self.gameFrame(over: window))
         let command = RenPyCommand(base: base, runtime: runtime, runtimes: runtimes, support: support,
-                                   dataDirectory: launch.dataDirectory, placement: placement)
+                                   dataDirectory: launch.dataDirectory, placement: placement, buttons: launch.game.buttonMapping)
         process.executableURL = command.executable
         process.arguments = command.arguments
         process.environment = command.environment
@@ -102,8 +102,15 @@ final class RenPySession: EngineSession {
         activation = nil
     }
 
-    /// The game window receives keyboard, mouse, and controller input itself.
-    func send(_ event: ControllerEvent) {}
+    /// The game window reads the keyboard, mouse, and controller itself, and `zz_vndegen.rpy` applies the game's button
+    /// mapping there, keys and clicks included. The hub only gets input while VNDegen is in front of the game, so a press
+    /// then brings the game window back.
+    func send(_ event: ControllerEvent) {
+        switch event {
+        case .button(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): showGame()
+        case .button, .key, .click, .pointer, .scroll: break
+        }
+    }
 
     /// Pauses only while VNDegen is in front, which is when the hub's own menu or lock screen covers the placeholder.
     /// While the game window is in front, the hub has nothing on screen to pause for. Resuming brings the game back.
