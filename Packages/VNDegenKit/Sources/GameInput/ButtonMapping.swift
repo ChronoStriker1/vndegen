@@ -1,8 +1,8 @@
 import Foundation
 import VNCore
 
-/// A game's button layout: the standard layout plus the buttons the player remapped. Only differences from the standard
-/// layout are stored, so a game keeps following the standard layout for every button the player left alone.
+/// A game's button layout: every button sends the same Xbox button, except the ones the player remapped. Only the
+/// remapped buttons are stored, so a game keeps following the default layout for every button the player left alone.
 nonisolated public struct ButtonMapping: Equatable, Sendable {
     public private(set) var overrides: [ControlInput: ControlAction]
 
@@ -11,58 +11,113 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
     }
 
     public func action(for input: ControlInput) -> ControlAction {
-        overrides[input] ?? input.standardAction
+        overrides[input] ?? .gamepad(input)
     }
 
     public func isRemapped(_ input: ControlInput) -> Bool { overrides[input] != nil }
 
     public mutating func set(_ action: ControlAction, for input: ControlInput) {
-        overrides[input] = action == input.standardAction ? nil : action
+        overrides[input] = action == .gamepad(input) ? nil : action
     }
 
     /// The value to store on `Game.buttonMapping`, nil when nothing is remapped.
     public var stored: [ControlInput: ControlAction]? { overrides.isEmpty ? nil : overrides }
+
+    /// The keys RPG Maker games read, as VNDegen sent them before it sent gamepad buttons. Return confirms in every RPG
+    /// Maker, where Z is the A button in XP. Escape and X both cancel and open the menu in all of them. Shift dashes,
+    /// and Q and W turn pages. The left stick moves like the D-pad. The other buttons stay gamepad buttons.
+    public static let rpgMaker: ButtonMapping = {
+        var mapping = ButtonMapping()
+        let keys: [ControlInput: KeyboardKey] = [
+            .a: .enter, .b: .escape, .x: .shift, .y: .x, .menu: .x, .l: .q, .r: .w,
+            .up: .arrowUp, .down: .arrowDown, .left: .arrowLeft, .right: .arrowRight,
+            .leftStickUp: .arrowUp, .leftStickDown: .arrowDown, .leftStickLeft: .arrowLeft, .leftStickRight: .arrowRight,
+        ]
+        for (input, key) in keys { mapping.set(.key(key), for: input) }
+        return mapping
+    }()
 }
 
 nonisolated extension ControlInput {
-    /// The layout every engine maps to its own keys, and the one the hub's own screens always use.
-    public var standardAction: ControlAction {
-        switch self {
-        case .up: .button(.up)
-        case .down: .button(.down)
-        case .left: .button(.left)
-        case .right: .button(.right)
-        case .a: .button(.confirm)
-        case .b: .button(.cancel)
-        case .x: .button(.dash)
-        case .y: .button(.menu)
-        case .l: .button(.pageUp)
-        case .r: .button(.pageDown)
-        case .l2, .r2: .nothing
-        case .menu: .button(.menu)
-        }
+    /// What the button does on the hub's own screens and in the VNDegen menu, whatever the game's mapping. View opens
+    /// the VNDegen menu there, as Home does.
+    public var navigationAction: ControlAction {
+        if self == .view { return .button(.hub) }
+        return virtualButton.map(ControlAction.button) ?? .nothing
+    }
+
+    /// What the button does under `mapping`, or on the hub's screens when it is nil.
+    public func action(in mapping: ButtonMapping?) -> ControlAction {
+        mapping?.action(for: self) ?? navigationAction
     }
 
     public var title: String {
         switch self {
-        case .up: "D-pad up"
-        case .down: "D-pad down"
-        case .left: "D-pad left"
-        case .right: "D-pad right"
         case .a: "A"
         case .b: "B"
         case .x: "X"
         case .y: "Y"
-        case .l: "L"
-        case .r: "R"
-        case .l2: "L2"
-        case .r2: "R2"
+        case .l: "LB"
+        case .r: "RB"
+        case .l2: "LT"
+        case .r2: "RT"
+        case .view: "View"
         case .menu: "Menu"
+        case .l3: "L3"
+        case .r3: "R3"
+        case .up: "D-pad up"
+        case .down: "D-pad down"
+        case .left: "D-pad left"
+        case .right: "D-pad right"
+        case .leftStickUp: "Left stick up"
+        case .leftStickDown: "Left stick down"
+        case .leftStickLeft: "Left stick left"
+        case .leftStickRight: "Left stick right"
+        case .rightStickUp: "Right stick up"
+        case .rightStickDown: "Right stick down"
+        case .rightStickLeft: "Right stick left"
+        case .rightStickRight: "Right stick right"
         }
     }
 
-    /// The touch gamepad has every button except the triggers.
-    public var isOnTouchGamepad: Bool { self != .l2 && self != .r2 }
+    /// A label short enough for a touch gamepad badge.
+    var shortTitle: String {
+        switch self {
+        case .up: "D↑"
+        case .down: "D↓"
+        case .left: "D←"
+        case .right: "D→"
+        case .leftStickUp: "L↑"
+        case .leftStickDown: "L↓"
+        case .leftStickLeft: "L←"
+        case .leftStickRight: "L→"
+        case .rightStickUp: "R↑"
+        case .rightStickDown: "R↓"
+        case .rightStickLeft: "R←"
+        case .rightStickRight: "R→"
+        default: title
+        }
+    }
+
+    /// The touch gamepad has every button except the sticks and pressing them in.
+    public var isOnTouchGamepad: Bool {
+        switch self {
+        case .l3, .r3, .leftStickUp, .leftStickDown, .leftStickLeft, .leftStickRight,
+             .rightStickUp, .rightStickDown, .rightStickLeft, .rightStickRight: false
+        default: true
+        }
+    }
+
+    /// The left stick direction that matches a D-pad direction.
+    var leftStick: ControlInput? {
+        switch self {
+        case .up: .leftStickUp
+        case .down: .leftStickDown
+        case .left: .leftStickLeft
+        case .right: .leftStickRight
+        default: nil
+        }
+    }
 }
 
 nonisolated extension ControlAction {
@@ -70,6 +125,7 @@ nonisolated extension ControlAction {
     public func event(pressed: Bool) -> ControllerEvent? {
         switch self {
         case let .button(button): .button(button, pressed: pressed)
+        case let .gamepad(input): .gamepad(input, pressed: pressed)
         case let .key(key): .key(key, pressed: pressed)
         case let .click(button): .click(button, pressed: pressed)
         case .nothing: nil
@@ -83,6 +139,7 @@ nonisolated extension ControlAction {
     public var title: String {
         switch self {
         case let .button(button): button.title
+        case let .gamepad(input): "Gamepad \(input.title)"
         case let .key(key): "\(key.label) key"
         case .click(.primary): "Click"
         case .click(.secondary): "Right click"
@@ -90,9 +147,10 @@ nonisolated extension ControlAction {
         }
     }
 
-    /// The short label the touch gamepad shows on a button bound to a key or a click.
+    /// The short label the touch gamepad shows on a remapped button.
     public var badge: String? {
         switch self {
+        case let .gamepad(input): input.shortTitle
         case let .key(key): key.label
         case .click(.primary): "Click"
         case .click(.secondary): "R-Click"
@@ -101,7 +159,7 @@ nonisolated extension ControlAction {
     }
 
     /// Every action a button can take, in the order the mapping editor lists them.
-    public static let gamepadChoices: [ControlAction] = VirtualButton.allCases.filter { $0 != .hub }.map(ControlAction.button)
+    public static let gamepadChoices: [ControlAction] = ControlInput.allCases.map(ControlAction.gamepad)
     public static let mouseChoices: [ControlAction] = [.click(.primary), .click(.secondary)]
     public static let keyChoices: [ControlAction] = KeyboardKey.choices.map(ControlAction.key)
 }
@@ -122,9 +180,74 @@ nonisolated extension VirtualButton {
         case .hub: "VNDegen menu"
         }
     }
+
+    /// The button that sent this action in the old standard layout. Ren'Py gave a remapped button that button's
+    /// bindings, and TyranoScript turns these buttons back into the same actions.
+    var legacyInput: ControlInput? {
+        switch self {
+        case .up: .up
+        case .down: .down
+        case .left: .left
+        case .right: .right
+        case .confirm: .a
+        case .cancel: .b
+        case .dash: .x
+        case .menu: .menu
+        case .pageUp: .l
+        case .pageDown: .r
+        case .hub: nil
+        }
+    }
+}
+
+nonisolated extension ButtonMapping {
+    /// Converts a mapping saved by a version whose buttons sent engine-neutral actions, such as Confirm, into what each
+    /// action sent in the game's engine, through `legacy`, so a remapped game works the same. Back then the left stick
+    /// followed the D-pad's mapping, so a remapped direction also remaps its left stick direction. Nil when nothing
+    /// changes.
+    static func converting(_ stored: [ControlInput: ControlAction],
+                           legacy: (VirtualButton) -> ControlAction?) -> ButtonMapping? {
+        func convert(_ action: ControlAction, stick: Bool) -> ControlAction {
+            guard case let .button(button) = action else { return action }
+            if let converted = legacy(button) { return converted }
+            guard let input = button.legacyInput else { return .nothing }
+            return .gamepad(stick ? input.leftStick ?? input : input)
+        }
+        var mapping = ButtonMapping()
+        for (input, action) in stored {
+            mapping.set(convert(action, stick: false), for: input)
+            if let stick = input.leftStick, stored[stick] == nil { mapping.set(convert(action, stick: true), for: stick) }
+        }
+        return mapping.stored == stored ? nil : mapping
+    }
+
+    /// Converts the mappings of every game the library remembers, once, when the app first runs a version whose buttons
+    /// send gamepad buttons. Later runs leave mappings alone, since a newer mapping can remap the D-pad without its stick.
+    @MainActor public static func convertLegacyMappings(in library: LibraryStore, defaults: UserDefaults = .standard) {
+        let key = "convertedButtonMappings"
+        guard !defaults.bool(forKey: key) else { return }
+        for game in library.allGames {
+            guard let stored = game.buttonMapping else { continue }
+            let plugin = library.plugin(for: game.engine)
+            guard let mapping = converting(stored, legacy: { plugin?.legacyAction(for: $0) }) else { continue }
+            library.update(game.id) { $0.buttonMapping = mapping.stored }
+        }
+        defaults.set(true, forKey: key)
+    }
 }
 
 nonisolated extension KeyboardKey {
+    static let enter = KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)
+    static let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
+    static let shift = KeyboardKey(key: "Shift", code: "ShiftLeft", keyCode: 16)
+    static let arrowUp = KeyboardKey(key: "ArrowUp", code: "ArrowUp", keyCode: 38)
+    static let arrowDown = KeyboardKey(key: "ArrowDown", code: "ArrowDown", keyCode: 40)
+    static let arrowLeft = KeyboardKey(key: "ArrowLeft", code: "ArrowLeft", keyCode: 37)
+    static let arrowRight = KeyboardKey(key: "ArrowRight", code: "ArrowRight", keyCode: 39)
+    static let q = KeyboardKey(key: "q", code: "KeyQ", keyCode: 81)
+    static let w = KeyboardKey(key: "w", code: "KeyW", keyCode: 87)
+    static let x = KeyboardKey(key: "x", code: "KeyX", keyCode: 88)
+
     /// The keys a button can be bound to.
     public static let choices: [KeyboardKey] = {
         let letters = (UInt8(ascii: "A")...UInt8(ascii: "Z")).map { ascii in
@@ -133,14 +256,9 @@ nonisolated extension KeyboardKey {
         }
         let digits = (0...9).map { KeyboardKey(key: "\($0)", code: "Digit\($0)", keyCode: 48 + $0) }
         let named = [
-            KeyboardKey(key: "ArrowUp", code: "ArrowUp", keyCode: 38),
-            KeyboardKey(key: "ArrowDown", code: "ArrowDown", keyCode: 40),
-            KeyboardKey(key: "ArrowLeft", code: "ArrowLeft", keyCode: 37),
-            KeyboardKey(key: "ArrowRight", code: "ArrowRight", keyCode: 39),
-            KeyboardKey(key: "Enter", code: "Enter", keyCode: 13),
-            KeyboardKey(key: "Escape", code: "Escape", keyCode: 27),
+            arrowUp, arrowDown, arrowLeft, arrowRight, enter, escape,
             KeyboardKey(key: " ", code: "Space", keyCode: 32),
-            KeyboardKey(key: "Shift", code: "ShiftLeft", keyCode: 16),
+            shift,
             KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17),
             KeyboardKey(key: "Alt", code: "AltLeft", keyCode: 18),
             KeyboardKey(key: "Tab", code: "Tab", keyCode: 9),

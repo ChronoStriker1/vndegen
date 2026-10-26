@@ -13,12 +13,10 @@ init 999 python in _vndegen:
 
     from store import config, renpy, _preferences, Return
 
-    # The backtick and the controller's View or Share and Home buttons open the VNDegen menu, as in every other
-    # VNDegen engine. Ren'Py binds those two buttons to rollback and the game menu, which the game's own Menu and B
-    # buttons still reach.
+    # The backtick and the controller's Home button open the VNDegen menu, as in every other VNDegen engine. Ren'Py
+    # binds Home to the game menu, which the game's own Menu button still reaches. View keeps Ren'Py's own binding.
     config.keymap["vndegen_menu"] = ["K_BACKQUOTE"]
-    for name in ["pad_back_press", "repeat_pad_back_press", "pad_guide_press"]:
-        config.pad_bindings[name] = ["vndegen_menu"]
+    config.pad_bindings["pad_guide_press"] = ["vndegen_menu"]
 
     menu_open = False
 
@@ -145,28 +143,35 @@ init 999 python in _vndegen:
 
         persistent_module.dumps = python2_dumps
 
-    # VNDEGEN_BUTTONS carries the game's remapped controller buttons, such as "a=key:K_z,b=click:3,x=button:confirm,y=nothing".
+    # VNDEGEN_BUTTONS carries the game's remapped controller buttons, such as "a=key:K_z,b=click:3,x=pad:a,y=nothing".
     # The game window reads the controller itself, so the remapping happens here: each remapped button gets the Ren'Py
-    # bindings of the button that does its action in the standard layout, or posts the key or click it is bound to.
-    # Buttons the player left alone keep Ren'Py's own bindings.
+    # bindings of the Xbox button it is mapped to, or posts the key or click it is bound to. Buttons the player left
+    # alone keep Ren'Py's own bindings.
     controls = {
-        "up": [("pad_dpup_press", "pad_dpup_release"), ("pad_lefty_neg", "pad_lefty_zero")],
-        "down": [("pad_dpdown_press", "pad_dpdown_release"), ("pad_lefty_pos", "pad_lefty_zero")],
-        "left": [("pad_dpleft_press", "pad_dpleft_release"), ("pad_leftx_neg", "pad_leftx_zero")],
-        "right": [("pad_dpright_press", "pad_dpright_release"), ("pad_leftx_pos", "pad_leftx_zero")],
-        "a": [("pad_a_press", "pad_a_release")],
-        "b": [("pad_b_press", "pad_b_release")],
-        "x": [("pad_x_press", "pad_x_release")],
-        "y": [("pad_y_press", "pad_y_release")],
-        "l": [("pad_leftshoulder_press", "pad_leftshoulder_release")],
-        "r": [("pad_rightshoulder_press", "pad_rightshoulder_release")],
-        "l2": [("pad_lefttrigger_pos", "pad_lefttrigger_zero")],
-        "r2": [("pad_righttrigger_pos", "pad_righttrigger_zero")],
-        "menu": [("pad_start_press", "pad_start_release")],
-    }
-    standard = {
-        "up": "up", "down": "down", "left": "left", "right": "right",
-        "confirm": "a", "cancel": "b", "dash": "x", "menu": "menu", "pageUp": "l", "pageDown": "r",
+        "a": ("pad_a_press", "pad_a_release"),
+        "b": ("pad_b_press", "pad_b_release"),
+        "x": ("pad_x_press", "pad_x_release"),
+        "y": ("pad_y_press", "pad_y_release"),
+        "l": ("pad_leftshoulder_press", "pad_leftshoulder_release"),
+        "r": ("pad_rightshoulder_press", "pad_rightshoulder_release"),
+        "l2": ("pad_lefttrigger_pos", "pad_lefttrigger_zero"),
+        "r2": ("pad_righttrigger_pos", "pad_righttrigger_zero"),
+        "view": ("pad_back_press", "pad_back_release"),
+        "menu": ("pad_start_press", "pad_start_release"),
+        "l3": ("pad_leftstick_press", "pad_leftstick_release"),
+        "r3": ("pad_rightstick_press", "pad_rightstick_release"),
+        "up": ("pad_dpup_press", "pad_dpup_release"),
+        "down": ("pad_dpdown_press", "pad_dpdown_release"),
+        "left": ("pad_dpleft_press", "pad_dpleft_release"),
+        "right": ("pad_dpright_press", "pad_dpright_release"),
+        "leftStickUp": ("pad_lefty_neg", "pad_lefty_zero"),
+        "leftStickDown": ("pad_lefty_pos", "pad_lefty_zero"),
+        "leftStickLeft": ("pad_leftx_neg", "pad_leftx_zero"),
+        "leftStickRight": ("pad_leftx_pos", "pad_leftx_zero"),
+        "rightStickUp": ("pad_righty_neg", "pad_righty_zero"),
+        "rightStickDown": ("pad_righty_pos", "pad_righty_zero"),
+        "rightStickLeft": ("pad_rightx_neg", "pad_rightx_zero"),
+        "rightStickRight": ("pad_rightx_pos", "pad_rightx_zero"),
     }
 
     def post_input(kind, value, down):
@@ -187,15 +192,15 @@ init 999 python in _vndegen:
             kind, _, value = action.partition(":")
             if control not in controls:
                 continue
-            for i, (press, release) in enumerate(controls[control]):
-                if kind == "button" and value in standard:
-                    source = controls[standard[value]][min(i, len(controls[standard[value]]) - 1)]
-                    bindings = [defaults.get(source[0], []), defaults.get(source[1], []), defaults.get("repeat_" + source[0], [])]
-                else:
-                    bindings = [[], [], []]
-                    if kind in ("key", "click"):
-                        holds.setdefault(press, []).append((kind, value))
-                config.pad_bindings[press], config.pad_bindings[release], config.pad_bindings["repeat_" + press] = bindings
+            press, release = controls[control]
+            if kind == "pad" and value in controls:
+                source = controls[value]
+                bindings = [defaults.get(source[0], []), defaults.get(source[1], []), defaults.get("repeat_" + source[0], [])]
+            else:
+                bindings = [[], [], []]
+                if kind in ("key", "click"):
+                    holds.setdefault(press, []).append((kind, value))
+            config.pad_bindings[press], config.pad_bindings[release], config.pad_bindings["repeat_" + press] = bindings
 
         controller = renpy.display.controller
         post_event = getattr(controller.post_event, "vndegen_original", controller.post_event)

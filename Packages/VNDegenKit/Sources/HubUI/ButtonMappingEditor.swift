@@ -132,8 +132,35 @@ extension MouseStyle {
 final class ButtonMappingEditor: Identifiable {
     enum Target: Hashable {
         case input(ControlInput)
-        case reset
+        /// Applies a whole layout, such as `ButtonMapping.rpgMaker`.
+        case apply(Layout)
         case action(ControlAction)
+    }
+
+    /// The layouts the top of the button list applies.
+    enum Layout: CaseIterable {
+        case rpgMaker, gamepad
+
+        var mapping: ButtonMapping {
+            switch self {
+            case .rpgMaker: .rpgMaker
+            case .gamepad: ButtonMapping()
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .rpgMaker: "RPG Maker controls"
+            case .gamepad: "Reset to gamepad defaults"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .rpgMaker: "keyboard"
+            case .gamepad: "arrow.counterclockwise"
+            }
+        }
     }
 
     struct Section {
@@ -144,9 +171,10 @@ final class ButtonMappingEditor: Identifiable {
     }
 
     static let sections = [
-        Section(title: "Gamepad", actions: ControlAction.gamepadChoices + [.nothing], minWidth: 120),
-        Section(title: "Mouse", actions: ControlAction.mouseChoices, minWidth: 120),
+        Section(title: "Gamepad", actions: ControlAction.gamepadChoices, minWidth: 120),
         Section(title: "Keyboard", actions: ControlAction.keyChoices, minWidth: 54),
+        Section(title: "Mouse", actions: ControlAction.mouseChoices, minWidth: 120),
+        Section(title: "Nothing", actions: [.nothing], minWidth: 120),
     ]
     static let spacing: CGFloat = 8
 
@@ -172,7 +200,7 @@ final class ButtonMappingEditor: Identifiable {
     }
 
     func rows() -> [[Target]] {
-        guard picking != nil else { return ControlInput.allCases.map { [.input($0)] } + [[.reset]] }
+        guard picking != nil else { return [Layout.allCases.map(Target.apply)] + ControlInput.allCases.map { [.input($0)] } }
         return Self.sections.flatMap { section in
             let targets = section.actions.map(Target.action)
             let columns = columns(section)
@@ -183,7 +211,7 @@ final class ButtonMappingEditor: Identifiable {
     /// The focused target, or the default when the stored one is not on screen.
     var focus: Target? {
         let rows = rows()
-        let fallback: Target = picking.map { .action(mapping.action(for: $0)) } ?? .input(.up)
+        let fallback: Target = picking.map { .action(mapping.action(for: $0)) } ?? .input(ControlInput.allCases[0])
         for candidate in [target, fallback] {
             if let candidate, rows.contains(where: { $0.contains(candidate) }) { return candidate }
         }
@@ -243,8 +271,8 @@ final class ButtonMappingEditor: Identifiable {
         case let .input(input):
             picking = input
             target = nil
-        case .reset:
-            library.update(gameID) { $0.buttonMapping = nil }
+        case let .apply(layout):
+            library.update(gameID) { $0.buttonMapping = layout.mapping.stored }
         case let .action(action):
             guard let input = picking else { return }
             library.update(gameID) { game in
@@ -291,6 +319,20 @@ struct ButtonMappingSheet: View {
     private var inputList: some View {
         let mapping = editor.mapping
         return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                ForEach(ButtonMappingEditor.Layout.allCases, id: \.self) { layout in
+                    let target = ButtonMappingEditor.Target.apply(layout)
+                    Button { editor.select(target) } label: {
+                        Label(layout.title, systemImage: layout.systemImage)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(target)))
+                    .disabled(mapping == layout.mapping)
+                    .id(target)
+                }
+            }
+            .padding(.bottom, 8)
             ForEach(ControlInput.allCases, id: \.self) { input in
                 let target = ButtonMappingEditor.Target.input(input)
                 Button { editor.select(target) } label: {
@@ -323,18 +365,11 @@ struct ButtonMappingSheet: View {
                 .buttonStyle(.plain)
                 .id(target)
             }
-            Button { editor.select(.reset) } label: {
-                Label("Reset to defaults", systemImage: "arrow.counterclockwise")
-            }
-            .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(.reset)))
-            .disabled(mapping.overrides.isEmpty)
-            .padding(.top, 8)
-            .id(ButtonMappingEditor.Target.reset)
-            Text("Options and Home on a controller always open the VNDegen menu, and so does the house button on the touch gamepad. The library and the VNDegen menu always use the standard layout.")
+            Text("Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad. Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 6)
+                .padding(.top, 14)
         }
         .animation(Theme.focusAnimation, value: editor.focus)
     }

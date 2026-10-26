@@ -137,6 +137,10 @@ nonisolated struct RGSSInputRouter {
             return button.retroKey.map { hold($0, pressed) } ?? []
         case let .key(key, pressed):
             return key.retroKey.map { hold($0, pressed) } ?? []
+        // RGSS reads no gamepad of its own, so Xbox buttons press RPG Maker's keys for VNDegen's actions: A confirms,
+        // B cancels, X dashes, Y and Menu open the menu, LB and RB are L and R, and the D-pad and left stick move.
+        case let .gamepad(input, pressed):
+            return input.virtualButton?.retroKey.map { hold($0, pressed) } ?? []
         case let .pointer(pointer):
             self.pointer = pointer.location
             let button: Int32 = pointer.button == .primary ? 0 : 1

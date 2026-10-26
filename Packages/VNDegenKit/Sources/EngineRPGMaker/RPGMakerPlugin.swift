@@ -43,12 +43,17 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
             folder: GameFolder(rpgMakerGameAt: launch.folder), appName: "rmmz-game",
             userScripts: [try String(contentsOf: url, encoding: .utf8)], userAgent: Self.userAgent,
             buttonScript: { button, pressed in
-                KeyStroke.stroke(for: button).map {
+                KeyStroke.key(for: button).map {
                     "__vndegen.key('\(pressed ? "keydown" : "keyup")', '\($0.key)', '\($0.code)', \($0.keyCode))"
                 }
             },
             scriptArgument: "rpgmaker-script", log: rpgLog
         ).makeSession(launch)
+    }
+
+    /// Buttons used to press these keys, so a remap from then presses the same key.
+    public func legacyAction(for button: VirtualButton) -> ControlAction? {
+        KeyStroke.key(for: button).map(ControlAction.key)
     }
 }
 

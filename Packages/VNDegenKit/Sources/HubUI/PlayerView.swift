@@ -71,6 +71,11 @@ struct PlayerView: View {
                     .transition(.opacity)
             }
         }
+        // The game and the touch gamepad get touches near the screen edges at once. iOS otherwise holds them while its own
+        // edge gestures, such as the Home indicator's, decide.
+        #if os(iOS)
+        .defersSystemGestures(on: .all)
+        #endif
         .animation(.easeOut(duration: 0.2), value: menu.isOpen)
         .animation(.easeOut(duration: 0.2), value: isCovered)
         .animation(.easeOut(duration: 0.25), value: needsRotation)
@@ -216,7 +221,7 @@ struct PlayerView: View {
     }
 
     /// The game reads the keyboard itself and wants raw presses through its own button mapping. The menu and the unlock
-    /// screen want translated, repeating navigation in the standard layout. Each switch replaces the input consumer, which
+    /// screen want translated, repeating navigation in the hub's own layout. Each switch replaces the input consumer, which
     /// releases everything the outgoing one holds and keeps buttons still held silent until they are pressed again. A
     /// game that reads controllers itself gets none from the hub, so no press reaches it twice.
     private func applyInputMode() {
@@ -226,7 +231,7 @@ struct PlayerView: View {
         hub.input.onEvent = navigating ? navigate : session.drawsOwnMenu ? nil : play
         hub.input.translatesKeyboard = navigating
         hub.input.repeatsDirections = navigating
-        hub.input.buttonMapping = navigating ? ButtonMapping() : mapping
+        hub.input.buttonMapping = navigating ? nil : mapping
     }
 }
 
@@ -249,6 +254,7 @@ final class PlayerMenu {
 }
 
 private struct PlayerMenuView: View {
+    @Environment(\.hubMetrics) private var metrics
     let menu: PlayerMenu
     let title: String
     let method: ControlMethod
@@ -262,16 +268,15 @@ private struct PlayerMenuView: View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            // Side by side when a landscape phone is too short for one column.
-            ViewThatFits(in: .vertical) {
-                VStack(spacing: 18) {
-                    session
-                    controls
-                }
-                HStack(alignment: .center, spacing: 28) {
-                    session
-                    controls
-                }
+            // Side by side when a landscape phone or a short window has no room for one column, and is wide enough for
+            // two: the columns' 220 pt buttons, spacing and padding need about 620 pt. Not ViewThatFits: after a tap on
+            // Quit inside its second choice, SwiftUI kept the player in place, so the next game reused this view and
+            // never started.
+            let sideBySide = metrics.isShort && metrics.size.width >= 640
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
+            layout {
+                session
+                controls
             }
             .padding(28)
             .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))

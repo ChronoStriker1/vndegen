@@ -139,6 +139,18 @@ private let none: @Sendable (RuntimePackage) -> URL? = { _ in nil }
         #expect(router.translate(.key(enter, pressed: false)) == [.key(RetroKey.return, down: false)])
     }
 
+    @Test func xboxButtonsPressRPGMakersKeys() {
+        var router = RGSSInputRouter()
+        #expect(router.translate(.gamepad(.a, pressed: true)) == [.key(RetroKey.return, down: true)])
+        #expect(router.translate(.gamepad(.y, pressed: true)) == [.key(RetroKey.ascii("x"), down: true)])
+        // The D-pad and the left stick share the arrow keys.
+        #expect(router.translate(.gamepad(.up, pressed: true)) == [.key(RetroKey.up, down: true)])
+        #expect(router.translate(.gamepad(.leftStickUp, pressed: true)).isEmpty)
+        #expect(router.translate(.gamepad(.up, pressed: false)).isEmpty)
+        #expect(router.translate(.gamepad(.leftStickUp, pressed: false)) == [.key(RetroKey.up, down: false)])
+        #expect(router.translate(.gamepad(.view, pressed: true)).isEmpty)
+    }
+
     @Test func remappedKeys() {
         #expect(KeyboardKey(key: "z", code: "KeyZ", keyCode: 90).retroKey == RetroKey.ascii("z"))
         #expect(KeyboardKey(key: "5", code: "Digit5", keyCode: 53).retroKey == RetroKey.ascii("5"))

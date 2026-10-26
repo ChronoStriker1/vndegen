@@ -61,6 +61,9 @@ public final class LibraryStore {
 
     public func game(_ id: GameID) -> Game? { records[id] }
 
+    /// Every game the library remembers, including those whose folder is missing.
+    public var allGames: [Game] { Array(records.values) }
+
     /// Rescans the games folder and re-runs detection on every present game.
     public func refresh() async {
         let paths = paths, engines = engines
