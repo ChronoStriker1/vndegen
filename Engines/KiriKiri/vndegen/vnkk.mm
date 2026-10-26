@@ -268,8 +268,16 @@ static void closeWithoutConfirmation()
     } catch (...) {
         SDL_Log("vnkk: could not turn off the quit confirmation");
     }
-    if (TVPMainWindow)
-        TVPMainWindow->Close();
+    // A script error while the game closes stops its teardown partway, with its window half
+    // invalidated, so further events would only raise more errors. The game is ended at once.
+    try {
+        if (TVPMainWindow)
+            TVPMainWindow->Close();
+    } catch (const eTJS &e) {
+        SDL_Log("vnkk: closing the game raised %s, terminating it", e.GetMessage().AsStdString().c_str());
+        terminated = true;
+        TVPTerminateAsync();
+    }
 }
 
 int vnkk_iterate(void)

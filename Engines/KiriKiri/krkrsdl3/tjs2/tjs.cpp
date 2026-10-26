@@ -71,6 +71,9 @@ bool TJSUnaryAsteriskIgnoresPropAccess = false;
 // normal property access, if this options is set true.
 // This is replaced with '&' operator since TJS2 2.4.15. Turn true for
 // gaining old compatibility.
+bool TJSVarDeclarationRunsPropertySetter = false;
+// A "var" declaration in a class or on global assigns through an existing
+// property, as before Kirikiri 2.29.
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------

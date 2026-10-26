@@ -1,7 +1,9 @@
 #include "tjsCommHead.h"
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <string>
+#include <utility>
 #include <vector>
 #include "TVPSettings.h"
 
@@ -16,6 +18,7 @@
 #include "PlatformFile.h"
 
 #include "TVPCompositor.h"
+#include "tjsLex.h"
 
 TVPGlobalSettings TVPSettings;
 static std::vector<ttstr> TVPProgramArguments;
@@ -52,7 +55,19 @@ static ttstr TVPParseCommandLineOne(const ttstr& i)
     p++;
 
     ttstr optname(o, (int)(p - o));
-    // as a string
+    // A quoted value is a TJS string literal, as .cf files write them.
+    if (*p == TJS_N('\'') || *p == TJS_N('"'))
+    {
+        try
+        {
+            tTJSVariant value;
+            if (TJSParseString(value, &p))
+                return optname + ttstr(value);
+        }
+        catch (...)
+        {
+        }
+    }
     return optname + p;
 }
 static void TVPInitProgramArguments(int tvp_argc, char* tvp_argv[])
@@ -280,8 +295,8 @@ static ttstr TVPFindGameExe(const ttstr& dir)
     return exes.size() == 1 ? dir + ttstr(exes.front()) : ttstr();
 }
 
-// A folder named by a command-line option, as a storage name ending in a slash. Without the option, `fallback`.
-static ttstr TVPFolderOption(const tjs_char* name, const ttstr& fallback)
+// A folder named by a command-line option, as a native path ending in a slash. Without the option, `fallback`.
+static ttstr TVPNativeFolderOption(const tjs_char* name, const ttstr& fallback)
 {
     tTJSVariant value;
     if (!TVPGetCommandLine(name, &value))
@@ -289,7 +304,80 @@ static ttstr TVPFolderOption(const tjs_char* name, const ttstr& fallback)
     ttstr folder(value);
     if (folder.GetLastChar() != TJS_N('/'))
         folder += TJS_N("/");
-    return TVPNormalizeStorageName(folder);
+    return folder;
+}
+
+// Options a game's .cf may not set: VNDegen chooses the renderer, the window, the game folder,
+// and the folders that stand in for AppData and Documents, and a game may not name a program
+// to run. -forcelog opens krkr.console.log while options are still being read, which aborts the
+// engine, and VNDegen keeps its own log.
+static bool TVPConfigOptionIgnored(const ttstr& option)
+{
+    static const tjs_char* const ignored[] = {
+        TJS_N("-render="),       TJS_N("-drawthread="), TJS_N("-window="),   TJS_N("-vsync="),
+        TJS_N("-stretch="),      TJS_N("-smoothzoom="), TJS_N("-gameroot="), TJS_N("-appdatadir="),
+        TJS_N("-personaldir="),  TJS_N("-exceptionexe="), TJS_N("-exceptionarg="), TJS_N("-forcelog=")};
+    for (const tjs_char* name : ignored)
+        if (option.StartsWith(name))
+            return true;
+    return false;
+}
+
+// A game's <exe>.cf holds options as on Windows: a NAME="VALUE" line each, the value a TJS
+// string, and comments starting with ';'. They rank below the command line.
+static void TVPReadConfigFileOptions(const ttstr& exe)
+{
+    std::string path = exe.AsStdString();
+    path.replace(path.size() - 4, 4, ".cf");
+    std::ifstream file(path);
+    if (!file)
+        return;
+    ttstr applied, ignored;
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.empty() || line[0] == ';')
+            continue;
+        ttstr option = TVPParseCommandLineOne(ttstr("-" + line));
+        if (TVPConfigOptionIgnored(option))
+        {
+            ignored += ttstr(TJS_N(" ")) + option;
+            continue;
+        }
+        applied += ttstr(TJS_N(" ")) + option;
+        TVPProgramArguments.push_back(option);
+    }
+    TVPAddImportantLog(ttstr(TJS_N("(info) Options from the .cf file :")) + applied);
+    if (!ignored.IsEmpty())
+        TVPAddImportantLog(ttstr(TJS_N("(info) Ignored options from the .cf file :")) + ignored);
+}
+
+// -datapath moves savedata/, as on Windows. Its macros name the game folder and the folders that
+// stand in for AppData and Documents. $(vistapath) is AppData, as on Windows Vista and later, and
+// Saved Games is Documents here. A relative path is in the game folder. Returns an empty string
+// for a path outside those folders.
+static ttstr TVPResolveDataPath(ttstr path, const ttstr& appData, const ttstr& personal)
+{
+    const ttstr& root = TVPNativeProjectDir;
+    const std::pair<const tjs_char*, const ttstr*> macros[] = {
+        {TJS_N("$(exepath)"), &root},       {TJS_N("$(personalpath)"), &personal},
+        {TJS_N("$(appdatapath)"), &appData}, {TJS_N("$(vistapath)"), &appData},
+        {TJS_N("$(savedgamespath)"), &personal}};
+    for (const auto& [macro, folder] : macros)
+        path.Replace(macro, folder->SubString(0, folder->GetLen() - 1));
+    path.Replace(TJS_N("\\"), TJS_N("/"));
+    if (!path.StartsWith(TJS_N("/")))
+        path = root + path;
+    if (path.GetLastChar() != TJS_N('/'))
+        path += TJS_N("/");
+    if (path.IndexOf(ttstr(TJS_N("/../"))) >= 0 || path.IndexOf(TJS_N(':')) >= 0)
+        return ttstr();
+    for (const ttstr* folder : {&root, &appData, &personal})
+        if (path.StartsWith(*folder))
+            return path;
+    return ttstr();
 }
 
 bool TVPParseArguments(int argc, char* argv[])
@@ -304,8 +392,13 @@ bool TVPParseArguments(int argc, char* argv[])
 
     // datas
     TVPNativeProjectData = argv[1];
-    if (!TVPCheckExistentLocalFolder(TVPNativeProjectData) &&
-        !TVPCheckExistentLocalFile(TVPNativeProjectData))
+    if (TVPCheckExistentLocalFolder(TVPNativeProjectData))
+    {
+        // Storage names inside a folder are its path with the file name appended.
+        if (TVPNativeProjectData.GetLastChar() != TJS_N('/'))
+            TVPNativeProjectData += TJS_N("/");
+    }
+    else if (!TVPCheckExistentLocalFile(TVPNativeProjectData))
     {
         TVPAddImportantLog(TVPFormatMessage("%1 not found.", TVPNativeProjectData));
         return false;
@@ -320,6 +413,8 @@ bool TVPParseArguments(int argc, char* argv[])
         if (TVPNativeProjectDir.GetLastChar() != TJS_N('/'))
             TVPNativeProjectDir += TJS_N("/");
         TVPNativeGameExe = TVPFindGameExe(TVPNativeProjectDir);
+        if (!TVPNativeGameExe.IsEmpty())
+            TVPReadConfigFileOptions(TVPNativeGameExe);
     }
     else if (TVPCheckExistentLocalFolder(TVPNativeProjectData))
     {
@@ -335,11 +430,23 @@ bool TVPParseArguments(int argc, char* argv[])
     TVPAddImportantLog(TVPFormatMessage("(info) Game path : %1", TVPProjectData));
     // System.appDataPath and System.personalPath are the AppData and Documents folders on Windows, where some games
     // keep their saves. -appdatadir and -personaldir name the folders that stand in for them.
-    TVPAppDataDir = TVPFolderOption(TJS_N("-appdatadir"), TVPProjectDir);
-    TVPPersonalDir = TVPFolderOption(TJS_N("-personaldir"), TVPProjectDir);
+    ttstr nativeAppData = TVPNativeFolderOption(TJS_N("-appdatadir"), TVPNativeProjectDir);
+    ttstr nativePersonal = TVPNativeFolderOption(TJS_N("-personaldir"), TVPNativeProjectDir);
+    TVPAppDataDir = TVPNormalizeStorageName(nativeAppData);
+    TVPPersonalDir = TVPNormalizeStorageName(nativePersonal);
 
     // savedata path
     TVPDataPath = TVPProjectDir + TJS_N("savedata/");
+    tTJSVariant dataPathOption;
+    if (TVPGetCommandLine(TJS_N("-datapath"), &dataPathOption) && !ttstr(dataPathOption).IsEmpty())
+    {
+        ttstr dataPath = TVPResolveDataPath(dataPathOption, nativeAppData, nativePersonal);
+        if (dataPath.IsEmpty())
+            TVPAddImportantLog(TVPFormatMessage("(info) Ignoring -datapath=%1, which leaves the game's folders",
+                                                ttstr(dataPathOption)));
+        else
+            TVPDataPath = TVPNormalizeStorageName(dataPath);
+    }
     TVPNativeDataPath = TVPGetLocallyAccessibleName(TVPDataPath);
     TVPAddImportantLog(TVPFormatMessage("(info) Savedata path : %1", TVPDataPath));
 
