@@ -120,6 +120,8 @@ private:
     AVCodecContext *video = nullptr, *audio = nullptr;
     int videoIndex = -1, audioIndex = -1;
     int64_t origin = 0; // the container's start time, in AV_TIME_BASE units
+    double firstVideo = 0; // the video's first time, which a seek before it lands on
+    bool rewindsByByte = false; // an MPEG program stream, which reads again from its first byte
     SwsContext *scaler = nullptr;
     SwrContext *resampler = nullptr;
     AVFrame *decoded = nullptr, *transferred = nullptr;

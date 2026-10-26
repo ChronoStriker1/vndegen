@@ -12,6 +12,7 @@ extern "C" {
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 
 using namespace std::chrono_literals;
 
@@ -149,6 +150,11 @@ bool MovieDecoder::OpenStreams(std::string &error)
     AVRational rate = av_guess_frame_rate(format, videoStream, nullptr);
     info.fps = rate.num > 0 && rate.den > 0 ? av_q2d(rate) : 30;
     origin = format->start_time != AV_NOPTS_VALUE ? format->start_time : 0;
+    if (videoStream->start_time != AV_NOPTS_VALUE)
+        firstVideo = std::max(Seconds(videoStream->start_time, videoIndex), 0.0);
+    // An MPEG program stream has no header, so it can be read again from its first byte. Other
+    // containers keep state that a seek in their bytes leaves stale, such as ASF's packet parser.
+    rewindsByByte = !strcmp(format->iformat->name, "mpeg");
     if (format->duration > 0)
         info.duration = format->duration / (double)AV_TIME_BASE;
     else if (videoStream->duration > 0)
@@ -430,8 +436,8 @@ void MovieDecoder::DoSeek(std::unique_lock<std::mutex> &lock)
 
     // Containers without an index, such as MPEG program streams, seek by searching timestamps and
     // can land past the target. Read up to the first video keyframe to see where a seek landed, and
-    // start earlier until it lands at or before the target, or read from the first byte, which
-    // packet-based containers allow. The packets read are kept and played.
+    // start earlier until it lands at or before the target, or the video's first frame, or read an
+    // MPEG program stream from its first byte. The packets read are kept and played.
     std::vector<AVPacket *> lead;
     auto dropLead = [&] {
         for (AVPacket *packet : lead)
@@ -444,7 +450,7 @@ void MovieDecoder::DoSeek(std::unique_lock<std::mutex> &lock)
     for (;;) {
         dropLead();
         result = SeekContainer(t - backoff, fromFirstByte);
-        if (result < 0 && !fromFirstByte && t - backoff <= 0) {
+        if (result < 0 && !fromFirstByte && t - backoff <= 0 && rewindsByByte) {
             fromFirstByte = true;
             continue;
         }
@@ -462,12 +468,14 @@ void MovieDecoder::DoSeek(std::unique_lock<std::mutex> &lock)
             if (packet->stream_index == videoIndex && (packet->flags & AV_PKT_FLAG_KEY) && ts != AV_NOPTS_VALUE)
                 keyframe = Seconds(ts, videoIndex);
         }
-        if (keyframe <= t + 0.5 / info.fps || fromFirstByte)
+        if (keyframe <= std::max(t, firstVideo) + 0.5 / info.fps || fromFirstByte)
             break;
-        if (t - backoff <= 0)
+        if (t - backoff > 0)
+            backoff = backoff ? backoff * 2 : 1;
+        else if (rewindsByByte)
             fromFirstByte = true;
         else
-            backoff = backoff ? backoff * 2 : 1;
+            break;
     }
     avcodec_flush_buffers(video);
     if (audio)
