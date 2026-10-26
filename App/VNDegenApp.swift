@@ -3,6 +3,7 @@ import VNCore
 import EngineRPGMaker
 import EngineTyrano
 import EngineRenPy
+import EngineKiriKiri
 import Metadata
 import GameInput
 import Lock
@@ -16,6 +17,7 @@ let engines: [any EnginePlugin] = {
         RPGMakerPlugin(.mv),
         TyranoPlugin(),
         RenPyPlugin(),
+        KiriKiriPlugin(),
     ]
     #if DEBUG
     // Registered first, so it wins the MZ engine ID over the real runtime.

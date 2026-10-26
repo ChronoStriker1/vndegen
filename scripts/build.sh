@@ -12,7 +12,11 @@ cd "$(dirname "$0")/.."
 xcodegen generate --quiet
 
 # xcodebuild prints every warning and compiler command. Errors and the final status are what matter here.
+# Xcode needs the KiriKiri engine's framework before it can plan the app build, so the engine builds first. The
+# project's KiriKiriEngine target rebuilds it too, for builds started from Xcode, once it exists.
 xcb() {
+  mkdir -p build
+  scripts/kirikiri-engine.sh build/kirikiri >build/kirikiri-engine.log 2>&1 || { tail -n 40 build/kirikiri-engine.log; return 1; }
   xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 \
     | grep -E "error:|BUILD (SUCCEEDED|FAILED)|\*\* " | grep -v "^/Applications" | head -60 || true
   return "${PIPESTATUS[0]}"
