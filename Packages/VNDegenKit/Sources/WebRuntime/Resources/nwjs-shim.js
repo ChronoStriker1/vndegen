@@ -398,9 +398,11 @@
     window.close = () => nwWindow.close();
 
     // localStorage kept in files in the app's data directory for this game, written before setItem returns. WebKit's
-    // own storage would share one origin among all games and write to disk at a time of its choosing.
+    // own storage would share one origin among all games and write to disk at a time of its choosing. Memory changes
+    // only after the disk does, so a failed write never leaves the page seeing less than is saved. A clear that fails
+    // part way reloads what is left on disk.
     if (config.storage) {
-        const items = new Map(Object.entries(call('storageLoad', {})));
+        let items = new Map(Object.entries(call('storageLoad', {})));
         const storage = {
             get length() { return items.size; },
             key: (index) => { const keys = Array.from(items.keys()); return index < keys.length ? keys[index] : null; },
@@ -410,8 +412,21 @@
                 call('storageSet', { key: key, value: value });
                 items.set(key, value);
             },
-            removeItem: (key) => { key = String(key); if (items.delete(key)) call('storageRemove', { key: key }); },
-            clear: () => { items.clear(); call('storageClear', {}); },
+            removeItem: (key) => {
+                key = String(key);
+                if (!items.has(key)) return;
+                call('storageRemove', { key: key });
+                items.delete(key);
+            },
+            clear: () => {
+                try {
+                    call('storageClear', {});
+                } catch (e) {
+                    items = new Map(Object.entries(call('storageLoad', {})));
+                    throw e;
+                }
+                items.clear();
+            },
         };
         // Pages also read and write keys as properties, as in localStorage.foo = 'bar'.
         const named = (key) => typeof key === 'string' && !(key in storage);

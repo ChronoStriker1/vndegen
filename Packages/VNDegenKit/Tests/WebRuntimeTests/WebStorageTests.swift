@@ -71,3 +71,47 @@ import Testing
     #expect(try storage.value(for: "TestGame01_sf") == "old")
     #expect(try storage.value(for: "missing") == nil)
 }
+
+@MainActor @Test func pageStorageChangesMemoryOnlyAfterTheDisk() async throws {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: base) }
+    let storage = WebStorage(directory: base)
+    try storage.set("a", "1")
+    try storage.set("b", "2")
+    try storage.set("c", "3")
+    var failing = false
+    let page = try PageHarness { request in
+        guard failing else { return storage.handle(request) }
+        switch request {
+        case .storageRemove, .storageSet: return .failure(BridgeError(code: "EIO", message: "disk full"))
+        case .storageClear:
+            // Removes one file, then fails, as a clear interrupted part way would.
+            try? storage.remove("a")
+            return .failure(BridgeError(code: "EIO", message: "disk full"))
+        default: return storage.handle(request)
+        }
+    }
+    try await page.load("<html><body></body></html>")
+    #expect(try await page.run("return localStorage.length") as? Int == 3)
+
+    failing = true
+    let afterRemove = try await page.run("""
+        let threw = false;
+        try { localStorage.removeItem('b'); } catch (e) { threw = true; }
+        return [threw, localStorage.getItem('b')];
+        """) as? [Any]
+    #expect(afterRemove?.first as? Bool == true && afterRemove?.last as? String == "2")
+
+    let afterClear = try await page.run("""
+        let threw = false;
+        try { localStorage.clear(); } catch (e) { threw = true; }
+        return [threw, localStorage.length, localStorage.getItem('a'), localStorage.getItem('c')];
+        """) as? [Any]
+    #expect(afterClear?[0] as? Bool == true && afterClear?[1] as? Int == 2)
+    #expect(afterClear?[2] is NSNull && afterClear?[3] as? String == "3")
+    #expect(try storage.load() == ["b": "2", "c": "3"])
+
+    failing = false
+    #expect(try await page.run("localStorage.removeItem('b'); localStorage.clear(); return localStorage.length") as? Int == 0)
+    #expect(try storage.load().isEmpty)
+}
