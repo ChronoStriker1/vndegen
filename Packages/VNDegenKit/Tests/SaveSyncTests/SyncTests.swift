@@ -789,8 +789,8 @@ private struct RefusingConnection: RsyncConnection {
 @Test(.enabled(if: rsyncPath != nil)) func aSaveWrittenWhileItsBackupRunsStaysChanged() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
     let location = setup.locations[0]
-    // The game writes a save after the backup read the saves and before its folder goes up.
-    setup.hooks.onceBeforePush(1) { try write(["file1.rmmzsave": "two"], to: location) }
+    // The game writes a save right after the backup read and copied the saves.
+    setup.service.afterLocalBackup = { try? write(["file1.rmmzsave": "two"], to: location) }
     _ = try await setup.service.checkedBackUp(setup.id)
     #expect(Set(try #require(try setup.serverMapping().effectiveFiles()).values.map(\.entry.hash)) == [sha1("one")])
     #expect(try await setup.service.status(for: setup.id) == .localChanged)
@@ -811,4 +811,22 @@ private struct RefusingConnection: RsyncConnection {
     await service.sessionEnded(id)
     #expect(try setup.serverMapping().summaries.last?.os == "mac")
     #expect(try await service.status(for: id) == .inSync)
+}
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func keepingSavesOverABackupWithMoreSavesBacksUpOnceThenRests() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    let service = setup.service, id = setup.id
+    _ = try await service.checkedBackUp(id)
+    // The Deck's newer backup has this device's save unchanged, plus one this device doesn't have.
+    try setup.deckBacksUp(["file1.rmmzsave": "one", "file2.rmmzsave": "deck only"], at: 1)
+    let deck = try #require(try setup.serverMapping().summaries.last)
+    service.keepLocalSaves(id, over: deck)
+    #expect(try await service.status(for: id) == .localChanged)
+    service.autoBackup = true
+    await service.sessionEnded(id)
+    #expect(try await service.status(for: id) == .inSync)
+    let count = try setup.serverMapping().summaries.count
+    await service.sessionEnded(id)
+    #expect(try setup.serverMapping().summaries.count == count)
 }

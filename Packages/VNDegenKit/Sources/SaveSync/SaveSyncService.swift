@@ -134,6 +134,8 @@ public final class SaveSyncService {
     @ObservationIgnored var timeouts = Timeouts()
     /// The time new backups are named after. Tests set it.
     @ObservationIgnored var clock: @Sendable () -> Date = { .now }
+    /// Runs right after a backup has read and copied the saves, before anything goes to the server. Tests set it.
+    @ObservationIgnored var afterLocalBackup: (@Sendable () -> Void)?
 
     struct Timeouts {
         var launchCheck: Duration = .seconds(6)
@@ -196,6 +198,8 @@ public final class SaveSyncService {
         var latest: BackupRevision?
         /// Each save's SHA-1, keyed `location:relative`.
         var saves: [String: String]
+        /// The user kept the saves here over `latest`, so they count as changed until a backup records them.
+        var keptLocal: Bool? = nil
     }
 
     var deviceID: String { settings.deviceID }
@@ -412,7 +416,7 @@ public final class SaveSyncService {
         let locations = try saveLocations(id)
         let retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
         let pcFolders = pcFolders(id, match: match, locations: locations)
-        let now = clock(), device = deviceID
+        let now = clock(), device = deviceID, afterLocalBackup = afterLocalBackup
         let (report, synced) = try await withStore(server) { store, client in
             let before = try await store.refreshGame(client, folder: match.folder)
             guard judged.mapping == before.mapping else { throw SaveSyncError.changedSinceCheck }
@@ -423,6 +427,7 @@ public final class SaveSyncService {
             let mappingURL = store.mirror.appendingPathComponent(match.folder).appendingPathComponent(LudusaviStore.mappingFile)
             let report = try store.local.backUp(folder: match.folder, title: match.title, game: id, locations: locations, retention: retention,
                                                 pcFolders: pcFolders, now: now, device: device, os: os, comment: comment)
+            afterLocalBackup?()
             let saves = report.saves
             guard let name = report.backup else {
                 let latest = try store.local.mapping(match.folder).summaries.last?.revision
@@ -486,7 +491,8 @@ public final class SaveSyncService {
             guard let previous else { return (SyncCheck(status: local.isEmpty ? .newerBackup(summary) : .conflict(summary), revision: revision), nil) }
             // Neither side changed since the last backup or restore here. The latest backup can still differ from the saves
             // here, such as a save it carries that this device never had, or an older backup restored on purpose.
-            let status: SyncStatus = switch (previous.latest != summary.revision, local != previous.saves) {
+            let localChanged = previous.keptLocal == true ? !local.isEmpty : local != previous.saves
+            let status: SyncStatus = switch (previous.latest != summary.revision, localChanged) {
             case (true, false): .newerBackup(summary)
             case (true, true): .conflict(summary)
             case (false, true): .localChanged
@@ -518,11 +524,11 @@ public final class SaveSyncService {
 
     /// Keeps the saves here over the server's newer backup. The next backup records them on top of it.
     public func keepLocalSaves(_ id: GameID, over backup: BackupSummary) {
-        guard let match = match(for: id), let locations = try? saveLocations(id) else { return }
-        // The baseline is the server's backup, so every save here that differs from it counts as changed and the next
-        // backup is not skipped, even when the saves here did not change since this device's last backup.
-        let server = try? RemoteStore(path: ".", mirror: mirror).local.latestHashes(folder: match.folder, locations: locations)
-        record(SyncRecord(folder: match.folder, latest: backup.revision, saves: server?.hashes ?? [:]), for: id)
+        guard let match = match(for: id) else { return }
+        // The saves here count as changed until a backup records them, even when they did not change since this
+        // device's last backup. A backup that finds nothing to add records the game as it is and ends that.
+        let saves = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0.saves : nil } ?? [:]
+        record(SyncRecord(folder: match.folder, latest: backup.revision, saves: saves, keptLocal: true), for: id)
     }
 
     /// Call when a game session ends. With automatic backup on, backs up saves that changed here, unless the server
