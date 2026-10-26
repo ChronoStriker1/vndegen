@@ -350,7 +350,10 @@ tTJSNI_KAGParser::tTJSNI_KAGParser()
     Owner = NULL;
     Scenario = NULL;
     Lines = NULL;
+    CurLine = 0;
+    CurPos = 0;
     CurLineStr = NULL;
+    LineBufferUsing = false;
     ProcessSpecialTags = true;
     IgnoreCR = false;
     DicClear = NULL;

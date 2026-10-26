@@ -391,7 +391,10 @@ tTJSNI_ExtKAGParser::tTJSNI_ExtKAGParser()
     Owner = NULL;
     Scenario = NULL;
     Lines = NULL;
+    CurLine = 0;
+    CurPos = 0;
     CurLineStr = NULL;
+    LineBufferUsing = false;
     ProcessSpecialTags = true;
     IgnoreCR = false;
     RecordingMacro = false;

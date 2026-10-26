@@ -1002,6 +1002,7 @@ tTJSNI_WaveSoundBuffer::tTJSNI_WaveSoundBuffer()
     Volume = 100000;
     Volume2 = 100000;
     BufferCanControlPan = false;
+    BufferCanControlFrequency = false;
     Pan = 0;
     PosX = PosY = PosZ = (tTVReal)0.0;
     SoundBuffer = NULL;
