@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.2.2",
+          "buildVersion": "81",
+          "date": "2026-10-26T06:24:09Z",
+          "localizedDescription": "Fixes for button mapping and touch controls.\n\n## Downloads\n\n- `VNDegen-0.2.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.2.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n\n## Fixed\n\n- Keys no longer stay stuck when you open the VNDegen menu while holding a button. The game gets the release, and a button still held when you resume does nothing until you press it again.\n- Two buttons mapped to the same key keep it held until both are released, on the overlay and on a controller, including a button mapped to Enter alongside Confirm.\n- A controller button mapped to Click clicks where the mouse pointer is.\n- Your choice from the old \"Touch controls\" setting carries over to the new control method.\n\n## Known limits\n\n- If the VNDegen menu opens while a finger is held on the touch mouse, the game can see the mouse button as still pressed until the next click.\n- The right stick cannot be mapped yet.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.2.2/VNDegen-0.2.2.ipa",
+          "size": 2505173,
+          "sha256": "775d78852deeed2aa664a66656111f44aeb539c09165e718b9515f668aa664d9",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.2.1",
           "buildVersion": "77",
           "date": "2026-10-26T05:59:36Z",
