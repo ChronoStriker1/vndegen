@@ -215,10 +215,13 @@ struct ButtonMappingSheet: View {
                 let target = ButtonMappingEditor.Target.input(input)
                 Button { editor.select(target) } label: {
                     HStack(spacing: 14) {
+                        // One width for every button, so the actions line up.
                         Text(input.title)
                             .font(.system(size: 14, weight: .heavy, design: .rounded))
-                            .frame(minWidth: 44, minHeight: 32)
-                            .padding(.horizontal, input.title.count > 2 ? 6 : 0)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 6)
+                            .frame(width: 104, height: 32)
                             .background(Theme.surface, in: .capsule)
                             .overlay { Capsule().strokeBorder(Theme.stroke) }
                         VStack(alignment: .leading, spacing: 2) {
