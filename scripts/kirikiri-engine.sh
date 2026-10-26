@@ -4,7 +4,8 @@
 #                                        macOS (arm64 and x86_64, for the universal Release app)
 #   <dest>/mac/KiriKiriHelper            macOS arm64 executable that runs one game, for testing, with its font in
 #                                        <dest>/mac/Res/
-#   <dest>/licenses/                     the engine's license and its dependencies', one text file each
+#   <dest>/licenses/                     the engine's license, its fallback font's, and its dependencies', one text
+#                                        file each
 #   scripts/kirikiri-engine.sh build/kirikiri
 # A second argument builds only the restart harness KiriKiriRestart, into <dest>/<argument>/:
 #   restart        a release build
@@ -82,6 +83,7 @@ lipo -create "$work/mac/KiriKiri.framework/Versions/A/KiriKiri" "$work/mac-x86_6
 rm -rf "$dest/mac" "$dest/ios" "$dest/licenses"
 mkdir -p "$dest/mac/Res" "$dest/ios" "$dest/licenses"
 cp -p "$src/krkrsdl3/LICENSE" "$dest/licenses/KiriKiri engine (krkrsdl3).txt"
+cp -p "$src/DroidSansFallback-LICENSE.txt" "$dest/licenses/Droid Sans Fallback font.txt"
 for copyright in "$work/ios/vcpkg_installed/arm64-ios/share"/*/copyright; do
   cp -p "$copyright" "$dest/licenses/$(basename "$(dirname "$copyright")").txt"
 done
