@@ -102,3 +102,18 @@ private final class ShimPage {
         #expect(try await page.run(snapshot) as? String == idle, "\(input)")
     }
 }
+
+@Test @MainActor func aGameListeningAfterThePadConnectedStillHearsOfIt() async throws {
+    let page = try await ShimPage()
+    try await page.run(WebGameSession.gamepadScript(.a, pressed: true))
+    try await page.run("window.heard = []; window.addEventListener('gamepadconnected', (e) => heard.push(e.gamepad.buttons[0].pressed))")
+    let deadline = ContinuousClock.now + .seconds(5)
+    while try await page.run("heard.length") as? Int == 0, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(try await page.run("JSON.stringify(heard)") as? String == "[true]")
+    // Later presses announce nothing more.
+    try await page.run(WebGameSession.gamepadScript(.b, pressed: true))
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(try await page.run("heard.length") as? Int == 1)
+}

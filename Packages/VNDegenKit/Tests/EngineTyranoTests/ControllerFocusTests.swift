@@ -4,6 +4,7 @@ import Testing
 import VNCore
 import WebKit
 @testable import WebRuntime
+import EngineTyrano
 
 private let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     .appendingPathComponent("../../Sources/EngineTyrano/Resources/tyrano.js").standardizedFileURL
@@ -85,17 +86,30 @@ window.TYRANO = { kag: { stat: { is_strong_stop: true, visible_menu_button: true
     return try await view.evaluateJavaScript("window.chosen || 'nothing'")
 }
 
-@MainActor @Test func gamepadButtonsDoTyranoActionsUnlessTheGameReadsTheGamepad() async throws {
+@MainActor @Test func gamepadButtonsDoTyranoActionsUnlessTheGameBindsThem() async throws {
     let configuration = try configuration()
     let loader = Loader()
     let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
     await loader.load(page, in: view)
     #expect(try await pressPad(view, [.down, .leftStickDown, .a]) as? String == "choice")
 
-    // A game that sets useGamepad reads the virtual gamepad through Tyrano's own KeyConfig.js instead.
-    let own = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
-    await loader.load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {"), in: own)
-    #expect(try await pressPad(own, [.down, .down, .a]) as? String == "nothing")
-    _ = try await own.evaluateJavaScript(WebGameSession.gamepadScript(.a, pressed: true) + "; 0")
-    #expect(try await own.evaluateJavaScript("navigator.getGamepads()[0].buttons[0].pressed") as? Bool == true)
+    // A game that turns on Tyrano's gamepad support but binds nothing still gets VNDegen's actions.
+    let unbound = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {"), in: unbound)
+    #expect(try await pressPad(unbound, [.down, .down, .a]) as? String == "choice")
+
+    // A button the game's KeyConfig.js binds is the game's alone: here A, which the stand-in engine ignores.
+    let bound = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {")
+        .replacingOccurrences(of: "key_mouse: {", with: "key_mouse: { map_pad: { button: { A: 'next' }, stick_digital: {}, stick: {} },"), in: bound)
+    #expect(try await pressPad(bound, [.down, .down, .a]) as? String == "nothing")
+    _ = try await bound.evaluateJavaScript(WebGameSession.gamepadScript(.a, pressed: true) + "; 0")
+    #expect(try await bound.evaluateJavaScript("navigator.getGamepads()[0].buttons[0].pressed") as? Bool == true)
+}
+
+@Test func legacyRemapsKeepRunningTyranoActions() {
+    let plugin = TyranoPlugin()
+    #expect(plugin.legacyAction(for: .confirm) == .button(.confirm))
+    #expect(plugin.legacyAction(for: .left) == .button(.left))
+    #expect(plugin.legacyAction(for: .hub) == nil)
 }

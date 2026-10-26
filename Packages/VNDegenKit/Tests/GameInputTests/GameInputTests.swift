@@ -123,11 +123,11 @@ import VNCore
     #expect(ButtonMapping.converting([.a: .gamepad(.b)]) { _ in nil } == nil)
 }
 
-@Test @MainActor func libraryConversionRunsOnceForEveryGameAndAfterwardOnlyForEngineNeutralActions() async throws {
+@Test @MainActor func libraryConversionRunsOnceForEveryRememberedGame() async throws {
     let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-mapping-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let paths = LibraryPaths(gamesRoot: root.appending(path: "Games"), support: root.appending(path: "Support"))
-    for name in ["Old", "Keys", "New"] {
+    for name in ["Old", "Keys", "Gone"] {
         try FileManager.default.createDirectory(at: paths.gamesRoot.appending(path: name), withIntermediateDirectories: true)
     }
     let suite = "vndegen-conversion-\(UUID().uuidString)"
@@ -139,16 +139,21 @@ import VNCore
     await library.refresh()
     library.update(GameID("Old")) { $0.buttonMapping = [.a: .button(.cancel)] }
     library.update(GameID("Keys")) { $0.buttonMapping = [.up: .key(w)] }
+    library.update(GameID("Gone")) { $0.buttonMapping = [.left: .nothing] }
+    // A game whose folder is missing still converts, so it plays the same when its folder comes back.
+    try FileManager.default.removeItem(at: paths.gamesRoot.appending(path: "Gone"))
+    await library.refresh()
+    #expect(library.games.map(\.id).contains(GameID("Gone")) == false)
+
     ButtonMapping.convertLegacyMappings(in: library, defaults: defaults)
     #expect(library.game(GameID("Old"))?.buttonMapping == [.a: .gamepad(.b)])
     #expect(library.game(GameID("Keys"))?.buttonMapping == [.up: .key(w), .leftStickUp: .key(w)])
+    #expect(library.game(GameID("Gone"))?.buttonMapping == [.left: .nothing, .leftStickLeft: .nothing])
 
-    // A D-pad remapped by this version keeps its stick, and an engine-neutral action left behind still converts.
-    library.update(GameID("New")) { $0.buttonMapping = [.down: .key(w)] }
-    library.update(GameID("Old")) { $0.buttonMapping = [.b: .button(.confirm)] }
+    // A D-pad remapped by this version keeps its stick.
+    library.update(GameID("Keys")) { $0.buttonMapping = [.down: .key(w)] }
     ButtonMapping.convertLegacyMappings(in: library, defaults: defaults)
-    #expect(library.game(GameID("New"))?.buttonMapping == [.down: .key(w)])
-    #expect(library.game(GameID("Old"))?.buttonMapping == [.b: .gamepad(.a)])
+    #expect(library.game(GameID("Keys"))?.buttonMapping == [.down: .key(w)])
 }
 
 @Test func keyChoicesAreUniqueAndLabelled() {

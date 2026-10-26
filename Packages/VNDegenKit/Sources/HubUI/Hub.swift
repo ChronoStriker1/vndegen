@@ -40,6 +40,7 @@ public final class Hub {
         self.lock = lock
         self.saveSync = saveSync
         ControlMethod.migrateTouchControlsSetting()
+        ButtonMapping.convertLegacyMappings(in: library)
     }
 
     /// Rescans the games folder and the archives beside it, then looks up metadata for games that have none, without
@@ -47,7 +48,6 @@ public final class Hub {
     public func refreshLibrary() async {
         async let archives = LocalArchives.find(gamesRoot: library.paths.gamesRoot)
         await library.refresh()
-        ButtonMapping.convertLegacyMappings(in: library)
         localArchives = await archives
         guard matching == nil else { return }
         let unmatched = library.games.filter { $0.metadata == nil }.map(\.id)

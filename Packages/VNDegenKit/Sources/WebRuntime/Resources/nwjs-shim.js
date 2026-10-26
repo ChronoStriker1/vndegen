@@ -480,16 +480,30 @@
     for (const type of ['gamepadconnected', 'gamepaddisconnected']) {
         window.addEventListener(type, (event) => { if (event.isTrusted) event.stopImmediatePropagation(); }, true);
     }
+    const connectedEvent = () => {
+        const event = new Event('gamepadconnected');
+        Object.defineProperty(event, 'gamepad', { value: padSnapshot() });
+        return event;
+    };
     function pressPad(name, pressed) {
         if (!(name in padButtons) && !(name in padAxes)) return;
         if (pressed) padHeld.add(name); else padHeld.delete(name);
         padTimestamp = performance.now();
         if (padConnected) return;
         padConnected = true;
-        const event = new Event('gamepadconnected');
-        Object.defineProperty(event, 'gamepad', { value: padSnapshot() });
-        window.dispatchEvent(event);
+        window.dispatchEvent(connectedEvent());
     }
+    // A game can start listening after the pad connected, such as TyranoScript, which starts reading the pad from
+    // this event once its engine has loaded. It still hears about the pad, as it would from a browser's first press.
+    const addWindowListener = window.addEventListener;
+    window.addEventListener = function (type, listener, options) {
+        addWindowListener.call(this, type, listener, options);
+        if (type !== 'gamepadconnected' || !padConnected || !listener) return;
+        setTimeout(() => {
+            const event = connectedEvent();
+            if (typeof listener === 'function') listener.call(window, event); else listener.handleEvent(event);
+        }, 0);
+    };
 
     // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
     // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
@@ -654,11 +668,12 @@
         // it stands for, such as 'confirm', or null.
         gamepad(name, pressed, action) {
             pressPad(name, pressed);
-            window.__vndegen.onGamepad(action, pressed);
+            window.__vndegen.onGamepad(action, pressed, name);
         },
         // Engine scripts replace this to stop and restart their own loop.
         onPause: noop,
-        // Engine scripts whose games may read no gamepad replace this to turn its actions into their own input.
+        // Engine scripts whose games may read no gamepad replace this to turn its actions into their own input. It gets the
+        // engine-neutral action, or null, then pressed, then the button's VNDegen name.
         onGamepad: noop,
         quit: quit,
     };

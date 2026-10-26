@@ -50,7 +50,8 @@ public enum ControlInput: String, CaseIterable, Codable, CodingKeyRepresentable,
 
 /// What a remappable button does in a game.
 public enum ControlAction: Hashable, Codable, Sendable {
-    /// What buttons sent before they sent gamepad buttons. Only remaps saved by those versions hold it.
+    /// What buttons sent before they sent gamepad buttons. Only remaps saved by those versions hold it, in engines where
+    /// no gamepad button or key does the same, such as TyranoScript.
     case button(VirtualButton)
     case key(KeyboardKey)
     case click(PointerEvent.Button)

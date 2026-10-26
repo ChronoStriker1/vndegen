@@ -44,6 +44,12 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         ).makeSession(launch)
     }
 
+    /// Buttons used to run Tyrano's actions here directly, which still works. As an Xbox button, such a remap would do
+    /// what the game's own KeyConfig.js says when the game reads the gamepad.
+    public func legacyAction(for button: VirtualButton) -> ControlAction? {
+        button == .hub ? nil : .button(button)
+    }
+
     /// The PC builds run on Chromium, and Tyrano branches on the browser it sees. As Safari it would ask for .m4a files
     /// in place of the .ogg files the games ship. Electron builds also mark the user agent, which is how Tyrano tells
     /// Electron from NW.js.

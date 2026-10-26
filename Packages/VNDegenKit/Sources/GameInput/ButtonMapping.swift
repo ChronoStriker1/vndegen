@@ -221,16 +221,13 @@ nonisolated extension ButtonMapping {
         return mapping.stored == stored ? nil : mapping
     }
 
-    /// Converts the mappings of games saved before buttons sent gamepad buttons. Run after each library refresh. The
-    /// first run converts every game. Later ones convert only mappings that still send engine-neutral actions, such as
-    /// a game whose folder was missing before, since a newer mapping can remap the D-pad without its stick.
+    /// Converts the mappings of every game the library remembers, once, when the app first runs a version whose buttons
+    /// send gamepad buttons. Later runs leave mappings alone, since a newer mapping can remap the D-pad without its stick.
     @MainActor public static func convertLegacyMappings(in library: LibraryStore, defaults: UserDefaults = .standard) {
         let key = "convertedButtonMappings"
-        let all = !defaults.bool(forKey: key)
-        for game in library.games {
-            guard let stored = game.buttonMapping,
-                  all || stored.values.contains(where: { if case .button = $0 { true } else { false } })
-            else { continue }
+        guard !defaults.bool(forKey: key) else { return }
+        for game in library.allGames {
+            guard let stored = game.buttonMapping else { continue }
             let plugin = library.plugin(for: game.engine)
             guard let mapping = converting(stored, legacy: { plugin?.legacyAction(for: $0) }) else { continue }
             library.update(game.id) { $0.buttonMapping = mapping.stored }

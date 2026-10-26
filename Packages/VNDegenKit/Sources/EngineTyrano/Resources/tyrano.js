@@ -241,12 +241,29 @@
         },
     };
 
-    // TyranoScript 5 reads a gamepad itself only when the game sets useGamepad in Config.tjs, through its KeyConfig.js.
-    // Then the game gets the virtual gamepad alone. Otherwise each gamepad button does its engine-neutral action here.
-    window.__vndegen.onGamepad = (action, pressed) => {
-        const k = kag();
-        if (!action || (k && k.config && String(k.config.useGamepad) === 'true')) return;
-        window.__vndegenTyrano.button(action, pressed);
+    // TyranoScript 5 reads a gamepad itself when the game sets useGamepad in Config.tjs, and then does what KeyConfig.js
+    // binds to each button by its name or standard index. Games often turn it on and bind nothing. A button the game binds
+    // is the game's alone. Every other button does its engine-neutral action here.
+    const padNames = {
+        a: ['A', 0], b: ['B', 1], x: ['X', 2], y: ['Y', 3], l: ['LB', 4], r: ['RB', 5], l2: ['LT', 6], r2: ['RT', 7],
+        view: ['SELECT', 8], menu: ['START', 9], l3: ['LS', 10], r3: ['RS', 11],
+        up: ['UP', 12], down: ['DOWN', 13], left: ['LEFT', 14], right: ['RIGHT', 15],
+        leftStickUp: ['L_UP', null, 'L'], leftStickDown: ['L_DOWN', null, 'L'],
+        leftStickLeft: ['L_LEFT', null, 'L'], leftStickRight: ['L_RIGHT', null, 'L'],
+        rightStickUp: ['R_UP', null, 'R'], rightStickDown: ['R_DOWN', null, 'R'],
+        rightStickLeft: ['R_LEFT', null, 'R'], rightStickRight: ['R_RIGHT', null, 'R'],
+    };
+    function gameBinds(name) {
+        const k = kag(), keys = k && k.key_mouse;
+        if (!keys || String(k.config && k.config.useGamepad) !== 'true' || !padNames[name]) return false;
+        const pad = keys.map_pad || {};
+        const [label, index, stick] = padNames[name];
+        if (stick) return !!((pad.stick_digital || {})[label] || (pad.stick || {})[stick]);
+        const buttons = pad.button || {};
+        return !!(buttons[label] || buttons[index]);
+    }
+    window.__vndegen.onGamepad = (action, pressed, name) => {
+        if (action && !gameBinds(name)) window.__vndegenTyrano.button(action, pressed);
     };
 
     // A real or overlay tap means the player stopped using the controller focus.
