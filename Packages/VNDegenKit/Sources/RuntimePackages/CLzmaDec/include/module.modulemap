@@ -1,0 +1,10 @@
+// The LZMA SDK's decoder plus the system libraries RuntimePackages uses. The link lines make every importer link
+// zlib, bzip2 and libarchive, so Package.swift needs no linker settings for this target.
+module CLzmaDec {
+    header "LzmaDec.h"
+    header "RuntimePackagesSystem.h"
+    link "z"
+    link "bz2"
+    link "archive"
+    export *
+}
