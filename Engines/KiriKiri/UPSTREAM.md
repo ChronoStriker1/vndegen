@@ -1,0 +1,42 @@
+# KiriKiri engine upstream
+
+VNDegen runs KiriKiri games on krkrsdl3, an SDL3 port of the Kirikiri 2 and Kirikiri Z engine derived from Kirikiroid2.
+
+## Sources
+
+| Folder | Upstream | Commit |
+|---|---|---|
+| `krkrsdl3/` | https://github.com/krkrsdl3/krkrsdl3 | `dd1de3d2fd6a10c4f5ef8801e6649f520fc5bc3e` |
+| `CMakeLists.txt`, `vcpkg.json`, `triplets/` | Adapted from https://github.com/krkrsdl3/krkrsdl3_build (`CMakeLists.txt`, `cmake/*.txt`, `vcpkg.json`, `CMakePresets.json`, `vcpkg/triplets`) | `6059f7857bf6c56bad33a781ec0fc2cc5151b86a` |
+| `DroidSansFallback.ttf`, downloaded at build time | `Res/` in krkrsdl3_build, from the Android Open Source Project | Same |
+
+The first commit that adds `krkrsdl3/` holds the upstream files unmodified. Every later change to them is listed below, so `git log -p -- Engines/KiriKiri/krkrsdl3` shows each one.
+
+## License
+
+krkrsdl3 carries the Kirikiri license in `krkrsdl3/LICENSE`: a BSD-style license with a krkrsdl3 clause. A binary distribution must include the copyright notice, the conditions, and the disclaimer in its documentation, so VNDegen's app must show the text of `krkrsdl3/LICENSE`. The krkrsdl3 clause requires anyone who distributes ports of commercial games that run on modified krkrsdl3 to publish the modified source under the same terms. This folder, in a public repository, does that.
+
+Bundled third-party code keeps its own license: SQLite (public domain), the LZMA SDK in `plugins/Kirikiroid2/7zip` (public domain), and minizip (zlib license). The Bison-generated parsers in `tjs2/*.tab.*` carry Bison's exception, which lets them be distributed under the engine's license. DroidSansFallback.ttf is under the Apache License 2.0. Dependencies from vcpkg keep theirs: SDL3, SDL3_ttf, zlib, and libpng (zlib-style), FreeType (FreeType License), libjpeg-turbo (BSD-style and IJG), libwebp, libogg, libvorbis, Opus, and opusfile (BSD), oniguruma (BSD), plutovg (MIT), and glm (MIT).
+
+## Left out
+
+- The movie player in `core/media/movie/`. Its `CDVDMsg*`, `CDVDMessageQueue`, `VideoReferenceClock`, and `VideoPlayer*` classes derive from Kodi's VideoPlayer, which is GPL-2.0, and VNDegen stays free of GPL code. `krmovie.cpp`, `krmovie.h`, and `krnull.h` remain, as the interface the rest of the engine calls.
+- FFmpeg, which only the movie player and the `wuffmpeg` audio decoder (`plugins/wuffmpeg.cpp`) used. Without it the engine decodes Ogg Vorbis, Opus, and WAV audio, but not formats only FFmpeg reads, such as MP3.
+- The BPG image loader (`plugins/Kirikiroid2/LoadBPG.cpp`). It needs libbpg, which is LGPL, and BPG is a Kirikiroid2 conversion format that Windows games do not ship.
+- The OpenGL and Vulkan render backends and their shaders. VNDegen renders with the software backend, which presents through SDL3's renderer on Metal.
+- The `environ/` folders for Android, OpenHarmony, WebAssembly, Windows, Linux, SDL2, and the console build. `environ/apple/apple_video.mm` and `environ/PlatformVideo.h`, an unimplemented system video interface, are removed too.
+
+## VNDegen's changes to upstream files
+
+1. `core/archive/XP3Archive.cpp`: reads hashed-name archives. Some Kirikiri Z archives store each file under the MD5 of its name and keep the real name in an `eliF` chunk just before the `File` chunk. The index reader maps each `eliF` name to the `File` chunk after it.
+2. `core/media/image/GraphicsLoadThread.cpp`: a name the archive lacks, queued by `System.touchImages`, threw on the image loader's thread and aborted the process. It is now reported as a load error, as decode failures already were.
+3. `core/media/movie/krmovie.cpp`, `core/media/movie/krnull.h`: every movie logs "video not supported, skipping <name>" and is replaced by one null player whose `Play()` posts a single `EC_COMPLETE`, so the movie ends at once and a game waiting on it continues. Upstream's null layer player posted `EC_COMPLETE` on every frame. A later phase puts a new player behind the same `GetVideoOverlayObject` family of functions.
+4. `environ/iOS/ios_core.mm`: drops the include of the removed `PlatformVideo.h`.
+5. `plugins/Kirikiroid2/kirikiroid2.cpp`: no longer registers the removed BPG loader.
+6. `core/utils/TVPSettings.cpp`: a `-gameroot=<dir>` option sets the project folder, which is `System.exePath`, the base for `savedata/`, and where plugins and fonts are looked up. Without it a `data/` folder became `System.exePath`, and games that list `System.exePath + "fonts/"` failed. Command-line options are now parsed before the paths so the option can take part.
+7. `environ/sdl3/sdl3_utils.cpp`, `environ/Platform.h`: `TVPSetClockPaused` stops and resumes the engine clock. Paused time is left out of `TVPGetRoughTickCount`, so timers and transitions resume where they stopped.
+8. `environ/sdl3/sdl3_audio.cpp`, `environ/PlatformAudio.h`: `TVPSetSoundPaused` pauses and resumes every open sound buffer's audio device.
+9. `environ/sdl3/sdl3_app.cpp`, `environ/PlatformView.h`: mouse events are handled on iOS too, so VNDegen can inject them, and SDL no longer turns touches into mouse events there, since touches have their own handler. `TVPGetSDLWindow` exposes the engine's SDL window.
+10. `environ/apple/apple_core.mm`: resources such as the fallback font are looked up in the bundle that contains the engine, which is the framework when the engine is embedded in an app, instead of the main bundle.
+
+Text files without a byte order mark are left as upstream decodes them. krkrsdl3 tries strict UTF-8 first, then Shift_JIS, then GBK. Real Shift_JIS text is not valid UTF-8, so Japanese scripts decode as Shift_JIS, as on Windows. UTF-8 fan translations also keep working.
