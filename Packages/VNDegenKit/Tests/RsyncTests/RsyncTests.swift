@@ -175,3 +175,31 @@ private let sshTestKey = ProcessInfo.processInfo.environment["VNDEGEN_SSH_TEST_K
     #expect(try files(under: remote) == ["Game's [1]/mapping.yaml": "changed"])
     await connection.close()
 }
+
+/// An SSH server that accepts a test key, from `VNDEGEN_SSH_TEST` ("host port user"), `VNDEGEN_SSH_KEY` (the raw
+/// Ed25519 private key, base64), and `VNDEGEN_SSH_HOSTKEY` (the server's OpenSSH host key line).
+private let sshTest: (server: SSHServer, key: Curve25519.Signing.PrivateKey, hostKey: String)? = {
+    let environment = ProcessInfo.processInfo.environment
+    guard let target = environment["VNDEGEN_SSH_TEST"]?.split(separator: " "), target.count == 3, let port = Int(target[1]),
+          let raw = environment["VNDEGEN_SSH_KEY"].flatMap({ Data(base64Encoded: $0) }),
+          let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: raw), let hostKey = environment["VNDEGEN_SSH_HOSTKEY"] else { return nil }
+    return (SSHServer(host: String(target[0]), port: port, user: String(target[2])), key, hostKey)
+}()
+
+@Test(.enabled(if: sshTest != nil)) func aCommandThatStopsAnsweringClosesTheConnection() async throws {
+    let test = try #require(sshTest)
+    let connection = try await SSHConnection.connect(to: test.server, key: test.key, hostKey: test.hostKey, idleTimeout: .seconds(2))
+    let echo = try await connection.start(["echo", "hi"])
+    var output: [UInt8] = []
+    for try await chunk in echo.output { output += chunk }
+    #expect(String(decoding: output, as: UTF8.self) == "hi\n")
+    #expect(try await echo.finish().status == 0)
+
+    let start = ContinuousClock.now
+    let sleeper = try await connection.start(["sleep", "60"])
+    await #expect(throws: SSHError.timedOut) { for try await _ in sleeper.output {} }
+    await #expect(throws: SSHError.timedOut) { try await sleeper.finish() }
+    #expect(ContinuousClock.now - start < .seconds(10))
+    await #expect(throws: (any Error).self) { _ = try await connection.start(["true"]) }
+    await connection.close()
+}

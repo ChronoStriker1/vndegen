@@ -104,17 +104,24 @@ public final class SSHConnection: RsyncConnection {
         // A server that never opens the channel or never answers the exec request would leave both waits below open.
         let deadline = channel.eventLoop.scheduleTask(in: idleTimeout) {
             created.fail(SSHError.timedOut)
-            exec.accepted.fail(SSHError.timedOut)
+            exec.abandon(SSHError.timedOut)
             channel.close(promise: nil)
         }
         defer { deadline.cancel() }
-        try await channel.eventLoop.submit {
-            try channel.pipeline.syncOperations.handler(type: NIOSSHHandler.self).createChannel(created, channelType: .session) { child, _ in
-                child.eventLoop.makeCompletedFuture {
-                    try child.pipeline.syncOperations.addHandler(exec)
+        do {
+            try await channel.eventLoop.submit {
+                try channel.pipeline.syncOperations.handler(type: NIOSSHHandler.self).createChannel(created, channelType: .session) { child, _ in
+                    child.eventLoop.makeCompletedFuture {
+                        try child.pipeline.syncOperations.addHandler(exec)
+                    }
                 }
-            }
-        }.get()
+            }.get()
+        } catch {
+            // A closed connection has no SSH handler left. The promises must still end, or NIO reports them leaked.
+            created.fail(SSHError.commandRefused)
+            exec.abandon(SSHError.commandRefused)
+            throw SSHError.commandRefused
+        }
         let child: Channel
         do { child = try await created.futureResult.get() } catch SSHError.timedOut { throw SSHError.timedOut } catch { throw SSHError.commandRefused }
         try await child.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).get()
@@ -257,6 +264,13 @@ private final class ExecHandler: ChannelDuplexHandler, @unchecked Sendable {
     }
 
     var timedOut: Bool { timedOutFlag.withLockedValue { $0 } }
+
+    /// Ends every wait on a command whose channel never opened.
+    func abandon(_ error: SSHError) {
+        accepted.fail(error)
+        exited.fail(error)
+        continuation.finish(throwing: error)
+    }
 
     func handlerAdded(context: ChannelHandlerContext) {
         lastActivity = .now()
