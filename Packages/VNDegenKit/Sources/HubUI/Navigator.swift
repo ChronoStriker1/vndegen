@@ -208,14 +208,15 @@ final class Navigator {
             }
             return [Row(id: "grid-back", items: [.back])] + tiles
         case .game:
-            // The control method and orientation only matter on a touch device.
-            let touchOnly = [Row(id: "page-orientation", items: [.pageOrientation]), Row(id: "page-controls", items: [.pageControls])]
+            // Orientation only matters on a touch device, and the control method only where it changes something.
+            let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
+            let controls = pageGameID.map(offersControlMethod) == true ? [Row(id: "page-controls", items: [.pageControls])] : []
             return [
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
-                + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
+                + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
             var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
             #if os(iOS)
@@ -483,6 +484,12 @@ final class Navigator {
             hub.launchError = error.localizedDescription
         }
         variantRevision += 1
+    }
+
+    /// Whether the game's page offers a control method: not on a Mac, and not for a game that reads touches itself,
+    /// such as a Ren'Py game.
+    func offersControlMethod(_ id: GameID) -> Bool {
+        ControlMethod.applies(to: hub.library.plugin(for: hub.library.game(id)?.engine))
     }
 
     var pageGameID: GameID? {

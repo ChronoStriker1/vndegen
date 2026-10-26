@@ -1,3 +1,4 @@
+import EngineRenPy
 import Foundation
 import GameInput
 import Lock
@@ -108,6 +109,14 @@ private struct SlowPlugin: EnginePlugin {
     let quickStart = ContinuousClock.now
     await Hub.wait(for: quick, atMost: .seconds(30))
     #expect(ContinuousClock.now - quickStart < .seconds(2))
+}
+
+@MainActor @Test func offersAControlMethodOnlyWhereItChangesSomething() {
+    let other = SlowPlugin(sessions: Sessions())
+    #expect(ControlMethod.applies(to: other, on: .iOS))
+    #expect(ControlMethod.applies(to: nil, on: .iOS))
+    #expect(!ControlMethod.applies(to: RenPyPlugin(), on: .iOS))
+    #expect(!ControlMethod.applies(to: other, on: .macOS))
 }
 
 @MainActor @Test func controlMethodKindsAndMouseOptions() {

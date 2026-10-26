@@ -91,6 +91,9 @@ public protocol EnginePlugin: Sendable {
     /// the engine has none on this device.
     func variants(for game: Game, dataDirectory: URL) -> EngineVariants?
     func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws
+    /// True when the engine's games read touches themselves, as Ren'Py's do. VNDegen shows no touch controls over
+    /// them, so a touch device's control method changes nothing for them.
+    var readsTouches: Bool { get }
 }
 
 extension EnginePlugin {
@@ -99,6 +102,7 @@ extension EnginePlugin {
     public func backupWarning(for game: Game, dataDirectory: URL) -> String? { nil }
     public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? { nil }
     public func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws {}
+    public var readsTouches: Bool { false }
 }
 
 /// The ways an engine can run one game, such as the Ren'Py runtimes. Automatic, the engine's own choice, is the
