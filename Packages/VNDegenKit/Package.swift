@@ -19,6 +19,7 @@ let package = Package(
         .library(name: "SaveSync", targets: ["SaveSync"]),
         .library(name: "Rsync", targets: ["Rsync"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
+        .library(name: "RuntimePackages", targets: ["RuntimePackages"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
@@ -52,6 +53,10 @@ let package = Package(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
         .target(name: "ArchiveImport", dependencies: ["CArchive"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
+        // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
+        // which Inno Setup installers need.
+        .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
+        .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
@@ -74,5 +79,6 @@ let package = Package(
             .product(name: "NIOSSH", package: "swift-nio-ssh"),
         ]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
+        .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
     ]
 )

@@ -94,6 +94,9 @@ public protocol EnginePlugin: Sendable {
     /// True when the engine's games read touches themselves, as Ren'Py's do. VNDegen shows no touch controls over
     /// them, so a touch device's control method changes nothing for them.
     var readsTouches: Bool { get }
+    /// Runtime packages the game needs and doesn't ship, such as the RPG Maker RTP it names, whether or not they are
+    /// installed. The game page offers to install the missing ones.
+    func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage]
 }
 
 extension EnginePlugin {
@@ -103,6 +106,7 @@ extension EnginePlugin {
     public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? { nil }
     public func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws {}
     public var readsTouches: Bool { false }
+    public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] { [] }
 }
 
 /// The ways an engine can run one game, such as the Ren'Py runtimes. Automatic, the engine's own choice, is the

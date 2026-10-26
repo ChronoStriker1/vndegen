@@ -33,6 +33,8 @@ public struct LibraryPaths: Sendable {
     public func dataDirectory(for id: GameID) -> URL {
         support.appendingPathComponent("GameData/\(id.rawValue)", isDirectory: true)
     }
+    /// Runtime packages such as RPG Maker RTPs, one folder each, shared by every game.
+    public var runtimesDirectory: URL { support.appendingPathComponent("Runtimes", isDirectory: true) }
 }
 
 /// The game library. Folders on disk decide which games exist. library.json keeps everything the user or metadata added,
