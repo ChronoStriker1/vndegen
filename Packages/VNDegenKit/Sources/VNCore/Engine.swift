@@ -94,16 +94,13 @@ public protocol EnginePlugin: Sendable {
     /// True when the engine's games read touches themselves, as Ren'Py's do. VNDegen shows no touch controls over
     /// them, so a touch device's control method changes nothing for them.
     var readsTouches: Bool { get }
-<<<<<<< HEAD
     /// Runtime packages the game needs and doesn't ship, such as the RPG Maker RTP it names, whether or not they are
     /// installed. The game page offers to install the missing ones.
     func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage]
-=======
     /// What a button remapped to `button` sent in this engine's games, from versions whose buttons sent
     /// engine-neutral actions, so VNDegen can convert those remaps. Nil means the Xbox button that sent `button` in the
     /// old standard layout, which is right for engines that read a gamepad or turn its buttons into the same keys.
     func legacyAction(for button: VirtualButton) -> ControlAction?
->>>>>>> origin/dev
 }
 
 extension EnginePlugin {
@@ -113,11 +110,8 @@ extension EnginePlugin {
     public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? { nil }
     public func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws {}
     public var readsTouches: Bool { false }
-<<<<<<< HEAD
     public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] { [] }
-=======
     public func legacyAction(for button: VirtualButton) -> ControlAction? { nil }
->>>>>>> origin/dev
 }
 
 /// The ways an engine can run one game, such as the Ren'Py runtimes. Automatic, the engine's own choice, is the
