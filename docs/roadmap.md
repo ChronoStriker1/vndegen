@@ -18,6 +18,7 @@ Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
 - RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
 - Fixes for Touch mouse mode on iPhone (`ws/touch-mode-fix`).
+- Ludusavi save sync over SMB instead of SSH and rsync (`ws/ludusavi-smb`), reaching the share the PCs already use, as guest or with a password.
 
 Merged into `dev` for the next release: Ren'Py games two folders deep are detected, and Ren'Py on iPhone and iPad no longer offers touch control methods that do nothing there.
 
