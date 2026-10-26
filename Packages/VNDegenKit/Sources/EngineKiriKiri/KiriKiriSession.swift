@@ -131,7 +131,7 @@ final class KiriKiriSession: EngineSession {
     private func deliver(_ input: KiriKiriInput) {
         guard case let .key(scancode, down) = input else { return engine.send(input) }
         if down {
-            // Pressed again before its held-back release: the game never saw the key go up.
+            // Pressed again before its held-back release went out, so the game still has the key down.
             if let release = heldReleases.removeValue(forKey: scancode) { return release.cancel() }
             pressedAt[scancode] = .now
             return engine.send(input)
