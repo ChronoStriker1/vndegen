@@ -34,6 +34,13 @@ if (VCPKG_TARGET_ARCHITECTURE STREQUAL "x86" OR VCPKG_TARGET_ARCHITECTURE STREQU
 endif()
 
 set(OPTIONS "--enable-pic --disable-doc --enable-runtime-cpudetect --disable-autodetect")
+# VNDegen: only the formats KiriKiri games ship movies in. See Engines/KiriKiri/UPSTREAM.md.
+string(APPEND OPTIONS " --disable-everything --disable-network"
+    # mpegvideo identifies the video streams of MPEG program streams.
+    " --enable-demuxer=mpegps,mpegvideo,asf,mov"
+    " --enable-decoder=mpeg1video,mpeg2video,mp1,mp2,mp3,wmv1,wmv2,wmv3,vc1,wmav1,wmav2,h264,hevc,aac"
+    " --enable-parser=mpegvideo,mpegaudio,vc1,h264,hevc,aac"
+    " --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox")
 
 if(VCPKG_TARGET_IS_MINGW)
     if(VCPKG_TARGET_ARCHITECTURE STREQUAL "x86")
