@@ -27,6 +27,7 @@ Merged into `dev` for the next release: Ren'Py games two folders deep are detect
 2. AliceSoft System 3 and 4 (xsystem35, xsystem4).
 3. Artemis.
 4. Wolf RPG Editor, which needs a new runtime.
+5. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder.
