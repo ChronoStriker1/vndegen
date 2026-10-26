@@ -22,9 +22,7 @@ let package = Package(
     targets: [
         .target(name: "VNCore"),
         .target(name: "GameInput", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        // stb_vorbis, for Ogg Vorbis audio that WebKit on iOS cannot decode. Lives inside WebRuntime's folder.
-        .target(name: "CVorbis", path: "Sources/WebRuntime/CVorbis", cSettings: [.define("STB_VORBIS_NO_PUSHDATA_API")]),
-        .target(name: "WebRuntime", dependencies: ["VNCore", "CVorbis"], exclude: ["CVorbis"], resources: [.process("Resources")],
+        .target(name: "WebRuntime", dependencies: ["VNCore"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),

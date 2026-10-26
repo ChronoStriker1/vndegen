@@ -30,8 +30,8 @@ public struct WebGameConfiguration {
     public var userAgent: String?
     /// Where the page's localStorage lives, one file per key. Nil leaves localStorage to WebKit.
     public var storageDirectory: URL?
-    /// Serves .ogg files transcoded to AAC, for engines that have no Ogg decoder of their own.
-    public var transcodesOgg: Bool
+    /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
+    public var decodesOgg: Bool
     /// The JavaScript that delivers a button press or release to the game. Nil drops the button.
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
@@ -40,7 +40,7 @@ public struct WebGameConfiguration {
 
     /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects.
     public init(folder: GameFolder, appName: String, runtime: PageRuntime? = nil, userScripts: [String] = [],
-                userAgent: String? = nil, storageDirectory: URL? = nil, transcodesOgg: Bool = false,
+                userAgent: String? = nil, storageDirectory: URL? = nil, decodesOgg: Bool = false,
                 buttonScript: @escaping @MainActor (VirtualButton, _ pressed: Bool) -> String?, scriptArgument: String, log: Logger) {
         self.folder = folder
         self.appName = appName
@@ -48,7 +48,7 @@ public struct WebGameConfiguration {
         self.userScripts = userScripts
         self.userAgent = userAgent
         self.storageDirectory = storageDirectory
-        self.transcodesOgg = transcodesOgg
+        self.decodesOgg = decodesOgg
         self.buttonScript = buttonScript
         self.scriptArgument = scriptArgument
         self.log = log
@@ -93,9 +93,13 @@ final class WebGameSession: NSObject, EngineSession {
         log = game.log
         onExit = launch.onExit
         let shim = try Self.shimSource(for: game)
+        let ogg = game.decodesOgg ? [try Self.oggScript()] : []
+        // Version 0.2.0 transcoded Ogg to AAC files here.
+        Task.detached(priority: .background) {
+            try? FileManager.default.removeItem(at: URL.cachesDirectory.appendingPathComponent("TranscodedAudio"))
+        }
         let configuration = WKWebViewConfiguration()
-        let oggCache = game.transcodesOgg ? OggTranscodeCache(directory: Self.transcodedAudioDirectory, log: log) : nil
-        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder, log: log, oggCache: oggCache), forURLScheme: GameFolder.scheme)
+        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder, log: log), forURLScheme: GameFolder.scheme)
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #if os(iOS)
         configuration.allowsInlineMediaPlayback = true
@@ -103,7 +107,7 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        for source in [shim] + game.userScripts {
+        for source in [shim] + ogg + game.userScripts {
             configuration.userContentController.addUserScript(
                 WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -148,9 +152,26 @@ final class WebGameSession: NSObject, EngineSession {
         log.notice("session released")
     }
 
-    /// Shared by every game. The system may empty it when space runs low, which costs only a new transcode.
-    static var transcodedAudioDirectory: URL {
-        URL.cachesDirectory.appendingPathComponent("TranscodedAudio", isDirectory: true)
+    /// What the page may use to decode Ogg Vorbis. A long track at 44.1 kHz in stereo is about 4.5 million samples a
+    /// minute, so `maxSamples` allows about 11 minutes.
+    struct OggLimits: Encodable {
+        var workers = 2
+        var maxInputBytes = 64 << 20
+        var maxSamples = 60_000_000
+        var maxCacheBytes = 192 << 20
+    }
+
+    static func oggScript(limits: OggLimits = OggLimits()) throws -> String {
+        guard let script = Bundle.module.url(forResource: "ogg-vorbis", withExtension: "js"),
+              let wasm = Bundle.module.url(forResource: "vorbis", withExtension: "wasm")
+        else { throw WebRuntimeError.oggDecoderMissing }
+        struct Config: Encodable {
+            var wasm: String
+            var limits: OggLimits
+        }
+        let json = try JSONEncoder().encode(Config(wasm: try Data(contentsOf: wasm).base64EncodedString(), limits: limits))
+        return try String(contentsOf: script, encoding: .utf8)
+            .replacingOccurrences(of: "__VNDEGEN_OGG__", with: String(decoding: json, as: UTF8.self))
     }
 
     static func shimSource(for game: WebGameConfiguration) throws -> String {
@@ -401,10 +422,12 @@ final class GameWebView: WKWebView {
 
 nonisolated enum WebRuntimeError: LocalizedError {
     case shimMissing
+    case oggDecoderMissing
 
     var errorDescription: String? {
         switch self {
         case .shimMissing: "The NW.js compatibility script is missing from the app bundle."
+        case .oggDecoderMissing: "The Ogg Vorbis decoder is missing from the app bundle."
         }
     }
 }

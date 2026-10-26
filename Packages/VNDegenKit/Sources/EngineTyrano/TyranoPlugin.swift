@@ -38,7 +38,7 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
             folder: folder, appName: game.projectID, runtime: Self.runtime(for: game),
             userScripts: [try String(contentsOf: url, encoding: .utf8)],
             userAgent: Self.chromeUserAgent + (game.packaging == .electron ? " TyranoErectron" : ""),
-            storageDirectory: storage.directory, transcodesOgg: true,
+            storageDirectory: storage.directory, decodesOgg: true,
             buttonScript: { button, pressed in "__vndegenTyrano.button('\(button.rawValue)', \(pressed))" },
             scriptArgument: "tyrano-script", log: tyranoLog
         ).makeSession(launch)

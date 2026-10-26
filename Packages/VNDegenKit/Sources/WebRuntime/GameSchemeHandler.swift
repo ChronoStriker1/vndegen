@@ -8,14 +8,12 @@ import WebKit
 final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
     private let folder: GameFolder
     private let log: Logger
-    private let oggCache: OggTranscodeCache?
     private var pending: [Int: any WKURLSchemeTask] = [:]
     private var nextSerial = 0
 
-    init(folder: GameFolder, log: Logger, oggCache: OggTranscodeCache? = nil) {
+    init(folder: GameFolder, log: Logger) {
         self.folder = folder
         self.log = log
-        self.oggCache = oggCache
     }
 
     func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
@@ -31,13 +29,8 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         let method = request.httpMethod ?? "GET"
         let range = request.value(forHTTPHeaderField: "Range")
         let folder = folder
-        let oggCache = OggTranscodeCache.handles(path) ? oggCache : nil
         Task.detached(priority: .userInitiated) {
-            let response = if let oggCache {
-                await oggCache.serve(folder, path: path, method: method, range: range)
-            } else {
-                folder.serve(path: path, method: method, range: range)
-            }
+            let response = folder.serve(path: path, method: method, range: range)
             guard await self.respond(serial, url: url, with: response) else { return }
             do {
                 try await response.body?.stream { await self.send($0, to: serial) }
