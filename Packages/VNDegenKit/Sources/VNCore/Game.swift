@@ -95,6 +95,10 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
     public var playTime: TimeInterval
     /// Overrides the app's in-game orientation setting for this game. Nil follows the setting.
     public var orientation: PlayOrientation?
+    /// Overrides the app's control method setting for this game. Nil follows the setting.
+    public var controlMethod: ControlMethod?
+    /// Buttons the player remapped for this game. Buttons missing here keep the standard layout.
+    public var buttonMapping: [ControlInput: ControlAction]?
 
     public var engine: EngineID? { engineOverride ?? detected?.engine }
 

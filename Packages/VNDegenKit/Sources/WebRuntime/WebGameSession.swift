@@ -80,6 +80,8 @@ final class WebGameSession: NSObject, EngineSession {
     private let onExit: @MainActor () -> Void
     private var ended = false
     private var paused = false
+    /// Where the last pointer event landed, normalized. A click bound to a button lands here.
+    private var pointer = CGPoint(x: 0.5, y: 0.5)
     #if DEBUG
     private var script: Task<Void, Never>?
     #endif
@@ -181,17 +183,36 @@ final class WebGameSession: NSObject, EngineSession {
         case let .button(button, pressed):
             guard let script = buttonScript(button, pressed) else { return }
             run(script)
-        case .pointer(let pointer):
-            let phase = switch pointer.phase {
+        case .pointer(let event):
+            let phase = switch event.phase {
             case .began: "began"
             case .moved: "moved"
             case .ended: "ended"
             case .cancelled: "cancelled"
             }
-            run("__vndegen.pointer('\(phase)', \(pointer.location.x), \(pointer.location.y), \(pointer.button == .primary ? 0 : 2))")
+            pointer = event.location
+            run(Self.pointerScript(phase, at: pointer, event.button))
         case .scroll(let dy):
             run("__vndegen.wheel(\(dy))")
+        case let .key(key, pressed):
+            run(Self.keyScript(key, pressed: pressed))
+        case let .click(button, pressed):
+            run(Self.pointerScript(pressed ? "began" : "ended", at: pointer, button))
         }
+    }
+
+    /// Dispatches a real keydown or keyup, the same way engines deliver their own key strokes.
+    nonisolated static func keyScript(_ key: KeyboardKey, pressed: Bool) -> String {
+        "__vndegen.key('\(pressed ? "keydown" : "keyup")', \(jsString(key.key)), \(jsString(key.code)), \(key.keyCode))"
+    }
+
+    nonisolated private static func pointerScript(_ phase: String, at location: CGPoint, _ button: PointerEvent.Button) -> String {
+        "__vndegen.pointer('\(phase)', \(location.x), \(location.y), \(button == .primary ? 0 : 2))"
+    }
+
+    /// A JavaScript string literal. Keys come from library.json, so they are escaped rather than trusted.
+    nonisolated private static func jsString(_ text: String) -> String {
+        String(decoding: (try? JSONEncoder().encode(text)) ?? Data("\"\"".utf8), as: UTF8.self)
     }
 
     func setPaused(_ paused: Bool) {

@@ -62,3 +62,36 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     await reopened.refresh()
     #expect(reopened.games.map(\.id.rawValue) == ["No Socks RPG"])
 }
+
+@Test @MainActor func controlsPersistAndOlderLibrariesStillLoad() async throws {
+    let paths = try makeTempLibrary()
+    let plugins: [any EnginePlugin] = [FakePlugin(id: "mz", marker: "js/rmmz_core.js", confidence: .certain)]
+    try addGame("No Socks RPG", files: ["js/rmmz_core.js"], to: paths)
+    // A library.json from before control methods and button mappings existed.
+    try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
+    try Data("""
+    [{"id": "No Socks RPG", "title": "No Socks RPG", "artwork": {}, "isLocked": true,
+      "addedAt": "2025-01-01T00:00:00Z", "playTime": 60, "orientation": "portrait"}]
+    """.utf8).write(to: paths.libraryFile)
+
+    let library = LibraryStore(paths: paths, engines: plugins)
+    await library.refresh()
+    let id = GameID("No Socks RPG")
+    let old = try #require(library.game(id))
+    #expect(old.isLocked && old.orientation == .portrait)
+    #expect(old.controlMethod == nil && old.buttonMapping == nil)
+
+    let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
+    let mapping: [ControlInput: ControlAction] = [.y: .key(escape), .r2: .click(.secondary), .x: .nothing, .a: .button(.cancel)]
+    library.update(id) {
+        $0.controlMethod = .controllerOnly
+        $0.buttonMapping = mapping
+    }
+
+    let reopened = LibraryStore(paths: paths, engines: plugins)
+    await reopened.refresh()
+    let game = try #require(reopened.game(id))
+    #expect(game.controlMethod == .controllerOnly)
+    #expect(game.buttonMapping == mapping)
+    #expect(game.isLocked && game.playTime == 60)
+}

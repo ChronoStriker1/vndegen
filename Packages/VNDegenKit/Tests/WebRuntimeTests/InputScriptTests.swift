@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import VNCore
 @testable import WebRuntime
 
 #if DEBUG
@@ -28,3 +29,10 @@ import Testing
     #expect(try InputScript.parse("repeat confirm 60 TYRANO.kag.stat.is_strong_stop") == [.repeatPress(.confirm, 60, "TYRANO.kag.stat.is_strong_stop")])
 }
 #endif
+
+@Test func boundKeysDispatchAsRealKeyEvents() {
+    let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
+    #expect(WebGameSession.keyScript(escape, pressed: true) == #"__vndegen.key('keydown', "Escape", "Escape", 27)"#)
+    #expect(WebGameSession.keyScript(KeyboardKey(key: "'", code: "Quote", keyCode: 222), pressed: false)
+        == #"__vndegen.key('keyup', "'", "Quote", 222)"#)
+}

@@ -12,7 +12,7 @@ public enum VirtualButton: String, CaseIterable, Codable, Sendable {
 
 public struct PointerEvent: Sendable, Equatable {
     public enum Phase: Sendable { case began, moved, ended, cancelled }
-    public enum Button: Sendable { case primary, secondary }
+    public enum Button: String, Codable, Sendable { case primary, secondary }
 
     public var phase: Phase
     /// Position in the session view, normalized so (0, 0) is top left and (1, 1) is bottom right.
@@ -30,4 +30,8 @@ public enum ControllerEvent: Sendable, Equatable {
     case button(VirtualButton, pressed: Bool)
     case pointer(PointerEvent)
     case scroll(dy: Double)
+    /// A keyboard key the player bound to a button, delivered to the engine as that key.
+    case key(KeyboardKey, pressed: Bool)
+    /// A mouse button the player bound to a button. It clicks wherever the pointer last was.
+    case click(PointerEvent.Button, pressed: Bool)
 }
