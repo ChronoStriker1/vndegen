@@ -39,7 +39,8 @@ install() { # <version> <sha256> <folder> <python line>
   tar -xjf "$tarball" -C "$work"
   # Copies keep their dates, so the SDK's compiled Python stays current and Python never recompiles inside the app.
   rm -rf "$out.part" && mkdir -p "$out.part/lib/$py-mac-universal"
-  cp -Rp "$sdk/renpy.py" "$sdk/renpy" "$out.part/"
+  # LICENSE.txt is Ren'Py's own license and those of the libraries in its binaries. It ships with the runtime.
+  cp -Rp "$sdk/renpy.py" "$sdk/renpy" "$sdk/LICENSE.txt" "$out.part/"
   cp -Rp "$sdk/lib/python"* "$out.part/lib/"
   cp -p "$sdk/lib/$py-mac-universal/python" "$sdk/lib/$py-mac-universal/librenpython.dylib" "$out.part/lib/$py-mac-universal/"
   rm -rf "$work"
