@@ -152,18 +152,25 @@ void TVPRenderOnce(int winWidth, int winHeight)
 
     // 绘制 currentSprite
     TVPSprite* retSpr = KRKR_Get_Current_Sprite();
+    // Where the window's content lands, for placed overlays.
+    float contentX = 0, contentY = 0, contentScaleX = 1, contentScaleY = 1;
     if (retSpr && retSpr->texture)
     {
         if (stretch)
         {
             backend->DrawWindowTexture(retSpr->texture, 0.0f, 0.0f,
                                        (float)winWidth, (float)winHeight);
+            contentScaleX = (float)winWidth / retSpr->width;
+            contentScaleY = (float)winHeight / retSpr->height;
         }
         else
         {
             TVPCalcLetterbox(retSpr, winWidth, winHeight);
             backend->DrawWindowTexture(retSpr->texture, retSpr->xPos, retSpr->yPos,
                                        retSpr->scale * retSpr->width, retSpr->scale * retSpr->height);
+            contentX = retSpr->xPos;
+            contentY = retSpr->yPos;
+            contentScaleX = contentScaleY = retSpr->scale;
         }
     }
 
@@ -172,7 +179,15 @@ void TVPRenderOnce(int winWidth, int winHeight)
     {
         if (texture->isVisible && texture->type == 2 && texture->texture)
         {
-            if (stretch)
+            if (texture->placed && retSpr && retSpr->texture)
+            {
+                backend->DrawWindowTexture(texture->texture,
+                                           contentX + texture->placeLeft * contentScaleX,
+                                           contentY + texture->placeTop * contentScaleY,
+                                           texture->placeWidth * contentScaleX,
+                                           texture->placeHeight * contentScaleY);
+            }
+            else if (stretch)
             {
                 backend->DrawWindowTexture(texture->texture, 0.0f, 0.0f,
                                            (float)winWidth, (float)winHeight);

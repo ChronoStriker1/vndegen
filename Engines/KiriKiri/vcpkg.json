@@ -1,6 +1,11 @@
 {
     "name": "vndegen-kirikiri",
     "dependencies": [
+        {
+            "name": "ffmpeg",
+            "default-features": false,
+            "features": ["avcodec", "avformat", "swresample", "swscale"]
+        },
         "freetype",
         "glm",
         "libjpeg-turbo",

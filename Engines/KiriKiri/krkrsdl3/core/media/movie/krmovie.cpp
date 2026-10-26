@@ -2,16 +2,19 @@
 
 #include "krmovie.h"
 #include "krnull.h"
-#include "TVPDebug.h"
+#include "movie_player.h"
 
-// VNDegen has no video player yet. Every movie, in every mode, is reported and
-// replaced by a player that ends at once.
-static void CreateUnsupportedVideo(iTVPVideoCallback* callbackwin,
-                                   const tjs_char* streamname,
-                                   iTVPVideoOverlay** out)
+// Every mode plays through VNDegen's FFmpeg player. A movie it cannot decode is replaced by a
+// player that ends at once, so a game waiting on it continues.
+static void CreatePlayer(iTVPVideoCallback* callbackwin,
+                         tTJSBinaryStream* stream,
+                         const tjs_char* streamname,
+                         MovieMode mode,
+                         iTVPVideoOverlay** out)
 {
-    TVPAddImportantLog(ttstr(TJS_N("video not supported, skipping ")) + streamname);
-    *out = new NullVideoPlayer(callbackwin);
+    *out = VNKKCreateMoviePlayer(callbackwin, stream, streamname, mode);
+    if (!*out)
+        *out = new NullVideoPlayer(callbackwin);
 }
 
 void GetVideoOverlayObject(iTVPVideoCallback* callbackwin,
@@ -21,7 +24,7 @@ void GetVideoOverlayObject(iTVPVideoCallback* callbackwin,
                            uint64_t size,
                            iTVPVideoOverlay** out)
 {
-    CreateUnsupportedVideo(callbackwin, streamname, out);
+    CreatePlayer(callbackwin, stream, streamname, MovieMode::Overlay, out);
 }
 
 void GetVideoLayerObject(iTVPVideoCallback* callbackwin,
@@ -31,7 +34,7 @@ void GetVideoLayerObject(iTVPVideoCallback* callbackwin,
                          uint64_t size,
                          iTVPVideoOverlay** out)
 {
-    CreateUnsupportedVideo(callbackwin, streamname, out);
+    CreatePlayer(callbackwin, stream, streamname, MovieMode::Layer, out);
 }
 
 void GetMixingVideoOverlayObject(iTVPVideoCallback* callbackwin,
@@ -41,7 +44,7 @@ void GetMixingVideoOverlayObject(iTVPVideoCallback* callbackwin,
                                  uint64_t size,
                                  iTVPVideoOverlay** out)
 {
-    CreateUnsupportedVideo(callbackwin, streamname, out);
+    CreatePlayer(callbackwin, stream, streamname, MovieMode::Mixer, out);
 }
 
 void GetMFVideoOverlayObject(iTVPVideoCallback* callbackwin,
@@ -51,5 +54,5 @@ void GetMFVideoOverlayObject(iTVPVideoCallback* callbackwin,
                              uint64_t size,
                              iTVPVideoOverlay** out)
 {
-    CreateUnsupportedVideo(callbackwin, streamname, out);
+    CreatePlayer(callbackwin, stream, streamname, MovieMode::MediaFoundation, out);
 }

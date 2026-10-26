@@ -325,6 +325,9 @@ void tTJSNI_VideoOverlay::Open(const ttstr& _name)
     {
         if (CachedOverlay && CachedOverlayMode == Mode && CachedPlayingFile == _name)
         {
+            // The cached player still reads its own stream.
+            delete istream;
+            istream = NULL;
             VideoOverlay = CachedOverlay;
             CachedOverlay = nullptr;
             VideoOverlay->Rewind();

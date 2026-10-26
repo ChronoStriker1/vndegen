@@ -9,6 +9,7 @@ VNDegen runs KiriKiri games on krkrsdl3, an SDL3 port of the Kirikiri 2 and Kiri
 | `krkrsdl3/` | https://github.com/krkrsdl3/krkrsdl3 | `dd1de3d2fd6a10c4f5ef8801e6649f520fc5bc3e` |
 | `CMakeLists.txt`, `vcpkg.json`, `triplets/` | Adapted from https://github.com/krkrsdl3/krkrsdl3_build (`CMakeLists.txt`, `cmake/*.txt`, `vcpkg.json`, `CMakePresets.json`, `vcpkg/triplets`) | `6059f7857bf6c56bad33a781ec0fc2cc5151b86a` |
 | `DroidSansFallback.ttf`, downloaded at build time | `Res/` in krkrsdl3_build, from the Android Open Source Project | Same |
+| `ports/ffmpeg/` | `ports/ffmpeg` in https://github.com/microsoft/vcpkg, the builtin baseline of `vcpkg.json` | `8e8dfb4ba483886936ded5ca201b500b8d8b0096` |
 
 The first commit that adds `krkrsdl3/` holds the upstream files unmodified. Every later change to them is listed below, so `git log -p -- Engines/KiriKiri/krkrsdl3` shows each one.
 
@@ -18,10 +19,26 @@ krkrsdl3 carries the Kirikiri license in `krkrsdl3/LICENSE`: a BSD-style license
 
 Bundled third-party code keeps its own license: SQLite (public domain), the LZMA SDK in `plugins/Kirikiroid2/7zip` (public domain), and minizip (zlib license). The Bison-generated parsers in `tjs2/*.tab.*` carry Bison's exception, which lets them be distributed under the engine's license. DroidSansFallback.ttf is under the Apache License 2.0. Dependencies from vcpkg keep theirs: SDL3, SDL3_ttf, zlib, and libpng (zlib-style), FreeType (FreeType License), libjpeg-turbo (BSD-style and IJG), libwebp, libogg, libvorbis, Opus, and opusfile (BSD), oniguruma (BSD), plutovg (MIT), and glm (MIT).
 
+## FFmpeg
+
+VNDegen's movie decoder, `vndegen/movie_decoder.cpp`, uses FFmpeg 8.1.2. vcpkg builds it from the overlay port in `ports/ffmpeg/`, whose first commit is vcpkg's port unmodified. The one change adds the component list to the configure options:
+
+```
+--disable-everything --disable-network
+--enable-demuxer=mpegps,mpegvideo,asf,mov
+--enable-decoder=mpeg1video,mpeg2video,mp1,mp2,mp3,wmv1,wmv2,wmv3,vc1,wmav1,wmav2,h264,hevc,aac
+--enable-parser=mpegvideo,mpegaudio,vc1,h264,hevc,aac
+--enable-hwaccel=h264_videotoolbox,hevc_videotoolbox
+```
+
+The port adds the rest of the configure line: `--enable-pic --disable-doc --enable-runtime-cpudetect --disable-autodetect`, the platform options (`--target-os=darwin --enable-appkit --enable-avfoundation --enable-coreimage --enable-audiotoolbox --enable-videotoolbox` for macOS, `--enable-avfoundation --enable-coreimage --enable-videotoolbox` for iOS), the libraries that `vcpkg.json` selects (`--enable-avcodec --enable-avformat --enable-swresample --enable-swscale --disable-avdevice --disable-avfilter --disable-ffmpeg --disable-ffplay --disable-ffprobe`), and a `--disable-` option for every optional external library. The port's `gpl`, `nonfree`, and `version3` features stay off, so the line has no `--enable-gpl`, `--enable-nonfree`, or `--enable-version3`, and FFmpeg's configure reports `License: LGPL version 2.1 or later`. The `mpegvideo` demuxer is there because MPEG program streams identify their video streams by probing with it. FFmpeg enables the `h263` decoder too, which `wmv1` and `wmv2` need.
+
+FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink the program against a modified library, which VNDegen's public source permits. The app must show FFmpeg's LGPL notice alongside the krkrsdl3 license.
+
 ## Left out
 
 - The movie player in `core/media/movie/`. Its `CDVDMsg*`, `CDVDMessageQueue`, `VideoReferenceClock`, and `VideoPlayer*` classes derive from Kodi's VideoPlayer, which is GPL-2.0, and VNDegen stays free of GPL code. `krmovie.cpp`, `krmovie.h`, and `krnull.h` remain, as the interface the rest of the engine calls.
-- FFmpeg, which only the movie player and the `wuffmpeg` audio decoder (`plugins/wuffmpeg.cpp`) used. Without it the engine decodes Ogg Vorbis, Opus, and WAV audio, but not formats only FFmpeg reads, such as MP3.
+- The `wuffmpeg` audio decoder (`plugins/wuffmpeg.cpp`), which read sound files through FFmpeg. The engine decodes Ogg Vorbis, Opus, and WAV sound files, but not formats only FFmpeg reads, such as MP3. FFmpeg is built for movies only.
 - The BPG image loader (`plugins/Kirikiroid2/LoadBPG.cpp`). It needs libbpg, which is LGPL, and BPG is a Kirikiroid2 conversion format that Windows games do not ship.
 - The OpenGL and Vulkan render backends and their shaders. VNDegen renders with the software backend, which presents through SDL3's renderer on Metal.
 - The `environ/` folders for Android, OpenHarmony, WebAssembly, Windows, Linux, SDL2, and the console build. `environ/apple/apple_video.mm` and `environ/PlatformVideo.h`, an unimplemented system video interface, are removed too.
@@ -29,6 +46,7 @@ Bundled third-party code keeps its own license: SQLite (public domain), the LZMA
 ## VNDegen's additions
 
 - `vndegen/ciphers.cpp`: native decryption of encrypted archives. Each scheme is one row in its table.
+- `vndegen/movie_decoder.cpp`: decodes a movie with FFmpeg on a worker thread, reading it through the engine's storage streams, so archive ciphers apply. `vndegen/movie_test.cpp` builds `KiriKiriMovieTest`, which decodes movies with it and checks frame counts, audio, and seeking.
 - `vndegen/sigcheck.cpp`: a `sigcheck.dll` stub. Its `Window.checkSignature` reports every file's signature as valid without checking it.
 
 ## VNDegen's changes to upstream files
