@@ -318,6 +318,34 @@ private func tree(_ root: URL) throws -> [String: String] {
     #expect(made.count == 1)
 }
 
+@MainActor
+@Test func filteringTheGamePickerKeepsControllerFocusOnAShownRow() async throws {
+    let base = try temporaryDirectory()
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    _ = try makeGame(in: base)
+    let library = LibraryStore(paths: paths, engines: [RPGMakerPlugin(.mz)])
+    await library.refresh()
+    let root = base.appendingPathComponent("ludusavi-backup", isDirectory: true)
+    for name in ["No Socks RPG", "Other Game"] {
+        let folder = root.appendingPathComponent(name, isDirectory: true)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(LudusaviMapping(name: name).yamlString().utf8).write(to: folder.appendingPathComponent("mapping.yaml"))
+    }
+    let service = SaveSyncService(library: library)
+    service.chooseFolder(root)
+    await service.refresh()
+    let id = GameID("No Socks RPG")
+    #expect(service.match(for: id) == "No Socks RPG")
+
+    let model = GameSavesModel(service: service, game: id)
+    model.choosingGame = true
+    // The filter hides the matched folder, where focus would otherwise start.
+    model.query = "Other"
+    _ = model.handle(.down)
+    _ = model.handle(.down)
+    #expect(model.isFocused(.folder("Other Game")))
+}
+
 @Test func undoRefusesSnapshotsItCannotTrust() throws {
     let base = try temporaryDirectory()
     let store = LudusaviStore(root: base.appendingPathComponent("backups"))
@@ -353,7 +381,7 @@ private func tree(_ root: URL) throws -> [String: String] {
     let base = try temporaryDirectory()
     let store = LudusaviStore(root: base.appendingPathComponent("backups"))
     let locations = try makeGame(in: base)
-    let mac = "/Users/user/Games/NoSocksRPG/save/"
+    let mac = "/Users/player/Games/NoSocksRPG/save/"
     let stored = [mac + "file1.rmmzsave": "mac", deckSave + "file1.rmmzsave": "deck", deckSave + "file2.rmmzsave": "two",
                   deckSave + "global.rmmzsave": "g"]
     var mapping = LudusaviMapping(name: "G")

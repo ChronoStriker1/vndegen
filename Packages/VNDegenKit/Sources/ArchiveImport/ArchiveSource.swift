@@ -63,7 +63,9 @@ nonisolated struct VolumeName: Equatable {
 
     init?(_ fileName: String) {
         if let match = fileName.wholeMatch(of: /(.+)\.part(\d+)\.rar/.ignoresCase()) {
-            self.init(fileName, stem: match.1, kind: .rarParts, index: Int(match.2)!)
+            // A part number too long for Int is no real volume.
+            guard let index = Int(match.2) else { return nil }
+            self.init(fileName, stem: match.1, kind: .rarParts, index: index)
         } else if let match = fileName.wholeMatch(of: /(.+)\.r(\d\d)/.ignoresCase()) {
             self.init(fileName, stem: match.1, kind: .rarOldStyle, index: Int(match.2)! + 1)
         } else if let match = fileName.wholeMatch(of: /(.+)\.rar/.ignoresCase()) {

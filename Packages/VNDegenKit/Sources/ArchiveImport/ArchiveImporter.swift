@@ -40,8 +40,8 @@ public final class ArchiveImporter {
     public private(set) var contents: ArchiveContents?
     public private(set) var progress: ImportProgress?
     public var folderName = ""
-    /// Offered only when the picked archive is on this device, not in iCloud Drive or on a server.
-    public private(set) var archiveIsOnDevice = false
+    /// Offered only when the picked archive is inside VNDegen's own folders, which no other device or server shares.
+    public private(set) var canDeleteArchive = false
     public var deleteArchiveAfterImport = false
 
     /// The archive the user picked, which "Delete archive after import" removes.
@@ -86,7 +86,7 @@ public final class ArchiveImporter {
             self.source = source
             self.contents = contents
             folderName = source.suggestedFolderName
-            archiveIsOnDevice = source.volumes.allSatisfy(Self.isOnDevice)
+            canDeleteArchive = source.volumes.allSatisfy(isInOwnFolders)
             step = .reviewing
         } catch {
             fail(error, returningTo: .choosing)
@@ -178,12 +178,15 @@ public final class ArchiveImporter {
         task = Task {
             do {
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-                try Self.checkSpace(contents.byteCount, on: gamesRoot)
-                progress = try await Self.extract(source, password: password, into: staging, total: contents) { progress in
+                try ArchiveExtractor.checkSpace(for: contents, on: gamesRoot)
+                let extracted = try await Self.extract(source, password: password, into: staging, total: contents) { progress in
                     Task { @MainActor in
                         if self.task != nil { self.progress = progress }
                     }
                 }
+                // Cancel can land after extraction's last check but before this runs. Nothing may be moved or deleted then.
+                try Task.checkCancellation()
+                progress = extracted
                 task = nil
                 let root = ArchiveExtractor.gameRoot(in: staging)
                 if let inner = ArchiveExtractor.nestedArchive(in: root) {
@@ -224,7 +227,7 @@ public final class ArchiveImporter {
             return
         }
         discardStagings()
-        if deleteArchiveAfterImport, archiveIsOnDevice, let picked {
+        if deleteArchiveAfterImport, canDeleteArchive, let picked {
             picked.source.volumes.forEach { try? FileManager.default.removeItem(at: $0) }
         }
         let duration = started.map { ContinuousClock.now - $0 } ?? .zero
@@ -292,19 +295,19 @@ public final class ArchiveImporter {
         try ArchiveExtractor.extract(source, password: password, into: staging, total: total, progress: progress)
     }
 
-    nonisolated private static func checkSpace(_ bytes: Int64, on folder: URL) throws {
-        let available = try folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            .volumeAvailableCapacityForImportantUsage ?? .max
-        // Headroom for file system overhead, so the import never fills the device to the last byte.
-        let needed = bytes + bytes / 50 + 100_000_000
-        if needed > available { throw ArchiveError.notEnoughSpace(needed: needed, available: available) }
-    }
-
-    /// iCloud Drive files and network shares are not on the device. Their "Delete archive" would reach other devices
-    /// or a server, so the option is not offered for them.
-    nonisolated private static func isOnDevice(_ url: URL) -> Bool {
-        let values = try? url.resourceValues(forKeys: [.volumeIsLocalKey, .isUbiquitousItemKey])
-        return values?.volumeIsLocal == true && values?.isUbiquitousItem != true
+    /// Deleting a file that iCloud Drive, Dropbox, OneDrive, or a server shares deletes it on the user's other devices
+    /// too. A local path can't tell those apart, because File Provider syncs ordinary-looking folders. Only VNDegen's own
+    /// folders are certain to be unshared. On iOS that is the app's sandbox container. The Mac app has no sandbox, so
+    /// there it is the Games folder.
+    private func isInOwnFolders(_ url: URL) -> Bool {
+        #if os(iOS)
+        let own = URL.homeDirectory
+        #else
+        let own = gamesRoot
+        #endif
+        let ownPath = own.resolvingSymlinksInPath().standardizedFileURL.path
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        return path.hasPrefix(ownPath.hasSuffix("/") ? ownPath : ownPath + "/")
     }
 }
 

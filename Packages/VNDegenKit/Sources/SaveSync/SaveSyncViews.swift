@@ -568,10 +568,13 @@ struct FocusRing<Target: Hashable> {
     /// The ring shows only once a controller moved it, so touch users never see it.
     var showsFocus = false
 
-    /// The focused control, or the default when the stored one is no longer on screen.
+    /// The focused control, or the default when the stored one is no longer on screen. A default that is not on screen
+    /// either, such as a row the search filter hid, falls back to the first control.
     func current(in rows: [[Target]], default fallback: Target? = nil) -> Target? {
-        if let target, rows.contains(where: { $0.contains(target) }) { return target }
-        return fallback ?? rows.first?.first
+        for candidate in [target, fallback] {
+            if let candidate, rows.contains(where: { $0.contains(candidate) }) { return candidate }
+        }
+        return rows.first?.first
     }
 
     func isFocused(_ candidate: Target, in rows: [[Target]], default fallback: Target? = nil) -> Bool {

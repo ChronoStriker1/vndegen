@@ -9,7 +9,7 @@ public final class ArchiveImportModel {
     public enum Button { case up, down, left, right, confirm, cancel }
 
     enum Control: Hashable {
-        case chooseArchive, deleteToggle, chooseAnother, startImport, cancelPassword, unlock, cancelImport
+        case chooseArchive, folderName, deleteToggle, chooseAnother, startImport, passwordField, cancelPassword, unlock, cancelImport
         case keepNested, extractNested, importAnother, done
     }
 
@@ -17,6 +17,8 @@ public final class ArchiveImportModel {
     private(set) var importer: ArchiveImporter?
     var picking = false
     var password = ""
+    /// The text field with keyboard focus. The controller sets it to bring up the system keyboard.
+    var editing: Control?
     private var focus: Control?
     /// The ring shows only once a controller moved it, so touch users never see it.
     private(set) var showsFocus = false
@@ -63,8 +65,8 @@ public final class ArchiveImportModel {
         switch importer.step {
         case .choosing: return [[.chooseArchive]]
         case .opening: return []
-        case .reviewing: return (importer.archiveIsOnDevice ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
-        case .password: return [[.cancelPassword, .unlock]]
+        case .reviewing: return [[.folderName]] + (importer.canDeleteArchive ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
+        case .password: return [[.passwordField], [.cancelPassword, .unlock]]
         case .extracting: return [[.cancelImport]]
         case .nested: return [[.keepNested, .extractNested]]
         case .finished: return [[.importAnother, .done]]
@@ -110,6 +112,9 @@ public final class ArchiveImportModel {
         guard let importer else { return }
         switch control {
         case .chooseArchive: picking = true
+        case .folderName, .passwordField:
+            editing = control
+            return
         case .deleteToggle:
             importer.deleteArchiveAfterImport.toggle()
             return
@@ -222,6 +227,7 @@ public struct ArchiveDropTarget: View {
 private struct StepView: View {
     @Bindable var model: ArchiveImportModel
     @Bindable var importer: ArchiveImporter
+    @FocusState private var fieldFocus: ArchiveImportModel.Control?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -236,6 +242,8 @@ private struct StepView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: importer.step)
+        .onChange(of: model.editing) { _, editing in fieldFocus = editing }
+        .onChange(of: fieldFocus) { _, focus in model.editing = focus }
         #if os(iOS)
         .sheet(isPresented: $model.picking) {
             DocumentPicker { urls in
@@ -292,9 +300,9 @@ private struct StepView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 17, weight: .semibold))
                 .autocorrectionDisabled()
+                .focused($fieldFocus, equals: .folderName)
                 .padding(14)
-                .background(ImportTheme.surface, in: .rect(cornerRadius: 12, style: .continuous))
-                .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(ImportTheme.stroke) }
+                .fieldBackground(ImportTheme.surface, focused: model.isFocused(.folderName))
                 .onSubmit { importer.startImport() }
             if let problem = importer.folderNameProblem {
                 Label(problem, systemImage: "exclamationmark.circle.fill")
@@ -306,7 +314,7 @@ private struct StepView: View {
                     .foregroundStyle(ImportTheme.tertiaryText)
             }
         }
-        if importer.archiveIsOnDevice {
+        if importer.canDeleteArchive {
             Toggle(isOn: $importer.deleteArchiveAfterImport) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Delete archive after import").font(.system(size: 15, weight: .semibold))
@@ -348,12 +356,10 @@ private struct StepView: View {
                 SecureField("Password", text: $model.password)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
+                    .focused($fieldFocus, equals: .passwordField)
                     .padding(14)
-                    .background(Color.black.opacity(0.3), in: .rect(cornerRadius: 12, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(wrong ? ImportTheme.accent : ImportTheme.stroke)
-                    }
+                    .fieldBackground(Color.black.opacity(0.3), focused: model.isFocused(.passwordField),
+                                     stroke: wrong ? ImportTheme.accent : ImportTheme.stroke)
                     .onSubmit(model.unlock)
                 if wrong {
                     Label("That password is not correct. Try again.", systemImage: "exclamationmark.circle.fill")
@@ -460,6 +466,16 @@ private struct Card<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(ImportTheme.surface, in: .rect(cornerRadius: 16, style: .continuous))
             .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(ImportTheme.stroke) }
+    }
+}
+
+private extension View {
+    /// A text field's rounded background, outlined in white while the controller focuses it.
+    func fieldBackground(_ fill: Color, focused: Bool, stroke: Color = ImportTheme.stroke) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return background(focused ? Color.white.opacity(0.16) : fill, in: shape)
+            .overlay { shape.strokeBorder(focused ? .white : stroke, lineWidth: focused ? 2 : 1) }
+            .animation(.easeOut(duration: 0.15), value: focused)
     }
 }
 

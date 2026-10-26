@@ -27,23 +27,37 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     var hub: Hub?
     /// Longest the app waits for an automatic backup before it quits anyway.
     static let quitTimeout: Duration = .seconds(20)
+    /// Whether a quit is waiting on backups. AppKit takes exactly one reply to `.terminateLater`.
+    private var quitPending = false
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     /// Quitting by closing the window, Command-Q, or logging out ends a running game first so its play time is recorded,
-    /// then waits for automatic backups, including one still running from a game closed just before.
+    /// then waits for automatic backups, including one still running from a game closed just before. The wait and the
+    /// timeout run separately, because a backup stuck on an unreachable share never returns, cancelled or not.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let hub else { return .terminateNow }
+        guard !quitPending else { return .terminateLater }
+        quitPending = true
         Task {
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { await hub.prepareToQuit() }
-                group.addTask { try? await Task.sleep(for: Self.quitTimeout) }
-                await group.next()
-                group.cancelAll()
-            }
-            sender.reply(toApplicationShouldTerminate: true)
+            #if DEBUG
+            // `-hangQuitBackup YES` stands in for a backup that never finishes, to test the timeout.
+            if UserDefaults.standard.bool(forKey: "hangQuitBackup") { await withUnsafeContinuation { (_: UnsafeContinuation<Void, Never>) in } }
+            #endif
+            await hub.prepareToQuit()
+            finishQuit(sender)
+        }
+        Task {
+            try? await Task.sleep(for: Self.quitTimeout)
+            finishQuit(sender)
         }
         return .terminateLater
+    }
+
+    private func finishQuit(_ sender: NSApplication) {
+        guard quitPending else { return }
+        quitPending = false
+        sender.reply(toApplicationShouldTerminate: true)
     }
 }
 #endif

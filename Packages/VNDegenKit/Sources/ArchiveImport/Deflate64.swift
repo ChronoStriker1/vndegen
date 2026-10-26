@@ -20,7 +20,8 @@ nonisolated struct Deflate64Entries {
         self.url = url
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
-        let directory = try Self.centralDirectory(handle)
+        let fileSize = try handle.seekToEnd()
+        let directory = try Self.centralDirectory(handle, fileSize: fileSize)
         var cursor = 0
         while cursor + 46 <= directory.count, directory.u32(cursor) == 0x0201_4b50 {
             let method = directory.u16(cursor + 10)
@@ -38,13 +39,18 @@ nonisolated struct Deflate64Entries {
                     isEncrypted: directory.u16(cursor + 8) & 1 != 0
                 )
                 Self.applyZip64(directory[(nameStart + nameLength)..<(nameStart + nameLength + extraLength)], to: &location)
+                // Bounded by the file's size, so the offset arithmetic in `inflate` can't overflow.
+                guard location.localHeaderOffset < fileSize, location.compressedSize <= fileSize else {
+                    throw ArchiveError.impossibleSize
+                }
                 entries[Array(directory[nameStart..<(nameStart + nameLength)])] = location
             }
             cursor = nameStart + nameLength + extraLength + commentLength
         }
     }
 
-    /// Decompresses one entry, handing the output to `write` in order.
+    /// Decompresses one entry, handing the output to `write` in order. Stops before writing more than the entry's
+    /// listed size.
     func inflate(_ location: Location, write: (UnsafeRawBufferPointer) throws -> Void) throws {
         guard !location.isEncrypted else { throw ArchiveError.unsupportedEncryption }
         let handle = try FileHandle(forReadingFrom: url)
@@ -64,7 +70,7 @@ nonisolated struct Deflate64Entries {
 
         // The stream is released before this closure returns, so `write` never outlives the call.
         try withoutActuallyEscaping(write) { write in
-            let stream = InflateStream(handle: handle, remaining: location.compressedSize, write: write)
+            let stream = InflateStream(handle: handle, remaining: location.compressedSize, size: location.size, write: write)
             let context = Unmanaged.passUnretained(stream).toOpaque()
             let result = inflateBack9(&z, { context, buffer in
                 Unmanaged<InflateStream>.fromOpaque(context!).takeUnretainedValue().read(into: buffer!)
@@ -79,8 +85,7 @@ nonisolated struct Deflate64Entries {
     }
 
     /// Finds the central directory through the end record, or the zip64 end record when the archive needs one.
-    private static func centralDirectory(_ handle: FileHandle) throws -> [UInt8] {
-        let fileSize = try handle.seekToEnd()
+    private static func centralDirectory(_ handle: FileHandle, fileSize: UInt64) throws -> [UInt8] {
         let tailStart = fileSize - min(fileSize, 22 + 0xFFFF)
         try handle.seek(toOffset: tailStart)
         let tail = [UInt8](try handle.readToEnd() ?? Data())
@@ -96,6 +101,7 @@ nonisolated struct Deflate64Entries {
             size = record.u64(40)
             offset = record.u64(48)
         }
+        guard size <= fileSize, offset <= fileSize - size else { throw ArchiveError.unreadable("Bad zip central directory") }
         try handle.seek(toOffset: offset)
         return [UInt8](try handle.read(upToCount: Int(size)) ?? Data())
     }
@@ -123,15 +129,18 @@ nonisolated struct Deflate64Entries {
 private nonisolated final class InflateStream {
     let handle: FileHandle
     var remaining: UInt64
+    /// The entry's listed size, which the output may not pass.
+    let size: UInt64
     let writeBlock: (UnsafeRawBufferPointer) throws -> Void
     let input = UnsafeMutablePointer<UInt8>.allocate(capacity: 1 << 16)
     var written: UInt64 = 0
     var crc: UInt32 = 0
     var error: Error?
 
-    init(handle: FileHandle, remaining: UInt64, write: @escaping (UnsafeRawBufferPointer) throws -> Void) {
+    init(handle: FileHandle, remaining: UInt64, size: UInt64, write: @escaping (UnsafeRawBufferPointer) throws -> Void) {
         self.handle = handle
         self.remaining = remaining
+        self.size = size
         writeBlock = write
     }
 
@@ -153,6 +162,7 @@ private nonisolated final class InflateStream {
 
     func write(_ bytes: UnsafeMutablePointer<UInt8>, count: UInt32) -> Int32 {
         do {
+            guard UInt64(count) <= size - written else { throw ArchiveError.largerThanListed }
             try writeBlock(UnsafeRawBufferPointer(start: bytes, count: Int(count)))
             crc = UInt32(crc32(uLong(crc), bytes, count))
             written += UInt64(count)

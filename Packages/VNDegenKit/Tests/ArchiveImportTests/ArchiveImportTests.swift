@@ -18,6 +18,37 @@ private func text(_ url: URL) throws -> String { String(decoding: try Data(conte
 
 private func items(_ folder: URL) -> [String] { ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? []).sorted() }
 
+/// The data bytes of every file under `folder`.
+private func bytesWritten(in folder: URL) -> Int {
+    (fm.enumerator(at: folder, includingPropertiesForKeys: [.fileSizeKey])?.allObjects as? [URL] ?? [])
+        .reduce(0) { $0 + ((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
+}
+
+/// A zip whose zip64 fields list each entry at the given size, though each holds only an empty Deflate stream.
+private func zip64(listing sizes: [UInt64]) -> Data {
+    func le<T: FixedWidthInteger>(_ value: T, _ data: inout Data) { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
+    var local = Data(), central = Data()
+    for (index, size) in sizes.enumerated() {
+        let name = Data("file\(index)".utf8)
+        var extra = Data()
+        le(UInt16(1), &extra); le(UInt16(16), &extra); le(size, &extra); le(UInt64(2), &extra)
+        let offset = UInt32(local.count)
+        le(UInt32(0x0403_4b50), &local); le(UInt16(45), &local); le(UInt16(0), &local); le(UInt16(8), &local)
+        le(UInt16(0), &local); le(UInt16(0x21), &local); le(UInt32(0), &local); le(UInt32.max, &local); le(UInt32.max, &local)
+        le(UInt16(name.count), &local); le(UInt16(extra.count), &local)
+        local += name + extra + [0x03, 0x00]
+        le(UInt32(0x0201_4b50), &central); le(UInt16(45), &central); le(UInt16(45), &central); le(UInt16(0), &central)
+        le(UInt16(8), &central); le(UInt16(0), &central); le(UInt16(0x21), &central); le(UInt32(0), &central)
+        le(UInt32.max, &central); le(UInt32.max, &central); le(UInt16(name.count), &central); le(UInt16(extra.count), &central)
+        le(UInt16(0), &central); le(UInt16(0), &central); le(UInt16(0), &central); le(UInt32(0), &central); le(offset, &central)
+        central += name + extra
+    }
+    var end = Data()
+    le(UInt32(0x0605_4b50), &end); le(UInt16(0), &end); le(UInt16(0), &end); le(UInt16(sizes.count), &end)
+    le(UInt16(sizes.count), &end); le(UInt32(central.count), &end); le(UInt32(local.count), &end); le(UInt16(0), &end)
+    return local + central + end
+}
+
 @MainActor
 private func waitWhileExtracting(_ importer: ArchiveImporter) async throws {
     let deadline = ContinuousClock.now + .seconds(30)
@@ -42,11 +73,11 @@ private func importArchive(_ urls: [URL], into games: URL, password: String? = n
 // MARK: Names
 
 @Test(arguments: [
-    ("Test Game 43.7z", "Test Game 43"),
-    ("Test Game 32.rar", "Test Game 32"),
-    ("Oral Sex Brothel 2 v1.1.0.7z", "Oral Sex Brothel 2 v1.1.0"),
+    ("Test Game 01.7z", "Test Game 01"),
+    ("Test Game 02 [ENG Ver.].rar", "Test Game 02 [ENG Ver.]"),
+    ("Test Game 03 v1.1.0.7z", "Test Game 03 v1.1.0"),
     ("Game v1.02.part03.rar", "Game v1.02"),
-    ("Test Game 40.r27", "Test Game 40"),
+    ("tg-testgame04.r27", "tg-testgame04"),
     ("Big Game.7z.001", "Big Game"),
     ("SHOUTING.ZIP", "SHOUTING"),
     ("  padded .zip", "padded"),
@@ -86,6 +117,13 @@ func suggestsFolderNameFromArchiveName(fileName: String, expected: String) {
     #expect(throws: ArchiveError.missingVolume(2)) { try ArchiveSource(picked: picked) }
 }
 
+@Test func refusesPartNumbersTooLongForInt() {
+    #expect(VolumeName("Game.part99999999999999999999.rar") == nil)
+    #expect(throws: ArchiveError.notAnArchive) {
+        try ArchiveSource(picked: [URL(fileURLWithPath: "/tmp/Game.part99999999999999999999.rar")])
+    }
+}
+
 @Test func refusesTwoDifferentArchives() {
     #expect(throws: ArchiveError.severalArchives) {
         try ArchiveSource(picked: [URL(fileURLWithPath: "/tmp/a.zip"), URL(fileURLWithPath: "/tmp/b.zip")])
@@ -94,12 +132,12 @@ func suggestsFolderNameFromArchiveName(fileName: String, expected: String) {
 
 @Test func refusesFolderNamesAlreadyInGames() throws {
     let games = try temporaryDirectory()
-    try fm.createDirectory(at: games.appendingPathComponent("Test Game 43"), withIntermediateDirectories: true)
-    #expect(GameFolderName.problem(with: "summer sisters", in: games)?.contains("already has") == true)
+    try fm.createDirectory(at: games.appendingPathComponent("Test Game 01"), withIntermediateDirectories: true)
+    #expect(GameFolderName.problem(with: "test game 01", in: games)?.contains("already has") == true)
     #expect(GameFolderName.problem(with: "  ", in: games) != nil)
     #expect(GameFolderName.problem(with: "a/b", in: games) != nil)
     #expect(GameFolderName.problem(with: ".hidden", in: games) != nil)
-    #expect(GameFolderName.problem(with: "Test Game 43 2", in: games) == nil)
+    #expect(GameFolderName.problem(with: "Test Game 01 2", in: games) == nil)
 }
 
 // MARK: Name decoding
@@ -190,6 +228,90 @@ func suggestsFolderNameFromArchiveName(fileName: String, expected: String) {
     #expect(items(games.appendingPathComponent("nested")) == ["inner.7z", "readme.txt"])
 }
 
+// MARK: Limits
+
+@Test(arguments: [
+    [UInt64(1) << 62, UInt64(1) << 62],
+    [UInt64(1) << 51],
+])
+func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
+    let zip = try temporaryDirectory().appendingPathComponent("bomb.zip")
+    try zip64(listing: sizes).write(to: zip)
+    #expect(throws: ArchiveError.impossibleSize) { try ArchiveExtractor.list(ArchiveSource(picked: [zip])) }
+}
+
+@Test func stopsOnceExtractionWritesMoreThanListed() throws {
+    let source = try ArchiveSource(picked: [fixtures.appendingPathComponent("split.7z.001")])
+    // Stands in for an archive that lists less than it holds, or that changed between listing and extraction.
+    var listed = try ArchiveExtractor.list(source)
+    listed.spaceLimit = 10_000
+    let staging = try temporaryDirectory()
+    #expect(throws: ArchiveError.largerThanListed) {
+        try ArchiveExtractor.extract(source, password: nil, into: staging, total: listed) { _ in }
+    }
+    #expect(bytesWritten(in: staging) <= 10_000)
+}
+
+@Test func countsEveryEntryAgainstTheListedSpace() throws {
+    let source = try ArchiveSource(picked: [fixtures.appendingPathComponent("two-items.zip")])
+    var listed = try ArchiveExtractor.list(source)
+    #expect(throws: Never.self) { try ArchiveExtractor.extract(source, password: nil, into: temporaryDirectory(), total: listed) { _ in } }
+    // Room for the files' data alone is not enough, so an archive of many empty files can't fill the device either.
+    listed.spaceLimit = listed.byteCount
+    #expect(throws: ArchiveError.largerThanListed) {
+        try ArchiveExtractor.extract(source, password: nil, into: temporaryDirectory(), total: listed) { _ in }
+    }
+}
+
+@Test func stopsWhenFreeSpaceFallsToTheReserve() throws {
+    let source = try ArchiveSource(picked: [fixtures.appendingPathComponent("split.7z.001")])
+    let staging = try temporaryDirectory()
+    // No volume has this much free, so the first check finds the reserve gone.
+    #expect(throws: ArchiveError.ranOutOfSpace) {
+        try ArchiveExtractor.extract(source, password: nil, into: staging, total: ArchiveExtractor.list(source), reserve: .max) { _ in }
+    }
+    #expect(items(staging).isEmpty)
+}
+
+@Test func stopsDeflate64OutputAtTheListedSize() throws {
+    var bytes = [UInt8](try Data(contentsOf: fixtures.appendingPathComponent("deflate64.zip")))
+    let name = Array("Deflate Game/lines.txt".utf8)
+    let record = try #require((0..<(bytes.count - 46 - name.count)).first { at in
+        bytes[at..<(at + 4)] == [0x50, 0x4b, 0x01, 0x02] && Array(bytes[(at + 46)..<(at + 46 + name.count)]) == name
+    })
+    // The central directory now lists lines.txt at 1,000 bytes.
+    bytes.replaceSubrange((record + 24)..<(record + 28), with: [0xE8, 0x03, 0x00, 0x00])
+    let zip = try temporaryDirectory().appendingPathComponent("lying.zip")
+    try Data(bytes).write(to: zip)
+
+    let entries = try Deflate64Entries(zip: zip)
+    let location = try #require(entries.entries[name])
+    var written = 0
+    #expect(throws: ArchiveError.largerThanListed) { try entries.inflate(location) { written += $0.count } }
+    #expect(written <= 1000)
+}
+
+// MARK: Deleting the archive
+
+@MainActor @Test func offersToDeleteOnlyArchivesInVNDegensOwnFolder() async throws {
+    let games = try temporaryDirectory()
+    let outside = ArchiveImporter(gamesRoot: games)
+    // The fixtures are on a local disk outside Games, like a Dropbox or OneDrive folder would be.
+    await outside.choose([fixtures.appendingPathComponent("two-items.zip")])
+    #expect(!outside.canDeleteArchive)
+
+    let archive = games.appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    let inside = ArchiveImporter(gamesRoot: games)
+    await inside.choose([archive])
+    #expect(inside.canDeleteArchive)
+    inside.deleteArchiveAfterImport = true
+    inside.startImport()
+    try await waitWhileExtracting(inside)
+    #expect(inside.step.isFinished)
+    #expect(items(games) == [".importing", "two-items"])
+}
+
 // MARK: Cleanup
 
 @MainActor @Test func cleansUpAfterAFailedImport() async throws {
@@ -221,12 +343,53 @@ func suggestsFolderNameFromArchiveName(fileName: String, expected: String) {
     #expect(items(games.appendingPathComponent(".importing")).isEmpty)
 }
 
+@MainActor @Test func cancelArrivingAsExtractionEndsAddsAndDeletesNothing() async throws {
+    let games = try temporaryDirectory()
+    let archive = games.appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    let importer = ArchiveImporter(gamesRoot: games)
+    await importer.choose([archive])
+    importer.deleteArchiveAfterImport = true
+    importer.startImport()
+    // Once the staging folder exists, the import has handed extraction to the background.
+    while items(games.appendingPathComponent(".importing")).isEmpty { await Task.yield() }
+    // Holding the main actor lets extraction finish while its result waits here, then Cancel lands before it.
+    usleep(1_000_000)
+    importer.cancel()
+    try await waitWhileExtracting(importer)
+    #expect(importer.step == .reviewing)
+    #expect(importer.errorMessage?.contains("cancelled") == true)
+    #expect(items(games) == [".importing", "two-items.zip"])
+    #expect(items(games.appendingPathComponent(".importing")).isEmpty)
+}
+
 @MainActor @Test func removesStagingLeftFromACrashedImport() throws {
     let games = try temporaryDirectory()
     let leftover = games.appendingPathComponent(".importing/\(UUID().uuidString)/Half Game")
     try fm.createDirectory(at: leftover, withIntermediateDirectories: true)
     _ = ArchiveImporter(gamesRoot: games)
     #expect(items(games.appendingPathComponent(".importing")).isEmpty)
+}
+
+// MARK: Controller
+
+@MainActor @Test func controllerConfirmOpensTheKeyboardOnTextFields() async throws {
+    let model = ArchiveImportModel(gamesRoot: try temporaryDirectory())
+    await model.start(initialSelection: [fixtures.appendingPathComponent("password.zip")]) { _ in }
+    model.handle(.up)
+    model.handle(.up)
+    #expect(model.isFocused(.folderName))
+    model.handle(.confirm)
+    #expect(model.editing == .folderName)
+
+    model.handle(.down)
+    model.handle(.right)
+    model.handle(.confirm)
+    #expect(model.importer?.step == .password(wrong: false))
+    model.handle(.up)
+    #expect(model.isFocused(.passwordField))
+    model.handle(.confirm)
+    #expect(model.editing == .passwordField)
 }
 
 private extension ArchiveImporter.Step {

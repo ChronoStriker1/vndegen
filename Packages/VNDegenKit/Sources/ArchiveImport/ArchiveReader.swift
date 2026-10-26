@@ -10,6 +10,13 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
     case unsupportedEncryption
     case unreadable(String)
     case notEnoughSpace(needed: Int64, available: Int64)
+    /// A header gives a negative size, or sizes that add up past anything a device could hold.
+    case impossibleSize
+    /// Extraction produced more data than the headers listed, as a damaged archive or a decompression bomb does.
+    case largerThanListed
+    /// Free space fell to the reserve while extracting, because something else on the device used it meanwhile or the
+    /// archive did not list its sizes.
+    case ranOutOfSpace
 
     public var message: String {
         switch self {
@@ -22,6 +29,9 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
         case let .unreadable(detail): "The archive could not be read: \(detail)"
         case let .notEnoughSpace(needed, available):
             "The game needs \(needed.formatted(.byteCount(style: .file))), but only \(available.formatted(.byteCount(style: .file))) is free."
+        case .impossibleSize: "The archive lists impossible file sizes. It is damaged or was made to fill the device."
+        case .largerThanListed: "The archive holds more data than its file list says, so the import stopped. It is damaged or was made to fill the device."
+        case .ranOutOfSpace: "The device is almost out of space, so the import stopped. Free up space and try again."
         }
     }
 }
