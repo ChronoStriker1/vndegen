@@ -11,6 +11,13 @@
     const hasNativeFocus = (k) => !!(k && k.util && typeof k.focus_up === 'function');
     // Tyrano 5's focus applies when the screen has something it can focus, or it already holds the focus.
     const nativeApplies = (k) => hasNativeFocus(k) && (k.util.findFocused().length > 0 || k.util.findFocusable().length > 0);
+    // Tyrano 5's focus moves only between its own buttons. A game can put a control of its own beside them, such as a
+    // choice built from plain HTML next to a Save button, and then this script's own focus, which sees both, moves.
+    const related = (a, b) => a === b || a.contains(b) || b.contains(a);
+    const nativeReachesAll = (k) => {
+        const native = k.util.findFocusable().toArray();
+        return candidates().every((el) => native.some((n) => related(n, el)));
+    };
 
     const isMenuOpen = () => { const menu = document.querySelector('.layer_menu'); return !!menu && getComputedStyle(menu).display !== 'none'; };
     const openRemodal = () => document.querySelector('.remodal-wrapper.remodal-is-opened');
@@ -149,7 +156,10 @@
             if (nativeApplies(k)) {
                 setFocus(null);
                 // ok() clicks the focused button or advances the text.
-                if (!k.ok() && waitsOnButtons && !k.util.findFocused().length) k.focus_next();
+                if (k.ok() || !waitsOnButtons || k.util.findFocused().length) return;
+                if (nativeReachesAll(k)) return k.focus_next();
+                const list = candidates();
+                if (list.length) setFocus(list[0]);
                 return;
             }
             const canClick = hasNativeFocus(k) ? k.util.canClick() : k.canClick();
@@ -187,11 +197,21 @@
     for (const direction of ['up', 'down', 'left', 'right']) {
         actions[direction] = (k) => {
             if (!focusIsValid() && nativeApplies(k)) {
-                setFocus(null);
-                k['focus_' + direction]();
-                // Tyrano 5 ranks buttons on hidden pages too, such as save slots on another page, and then focuses
-                // nothing. This script's own focus only sees what is on screen.
-                if (k.util.findFocused().length) return;
+                if (nativeReachesAll(k)) {
+                    setFocus(null);
+                    k['focus_' + direction]();
+                    // Tyrano 5 ranks buttons on hidden pages too, such as save slots on another page, and then focuses
+                    // nothing. This script's own focus only sees what is on screen.
+                    if (k.util.findFocused().length) return;
+                } else {
+                    // Take over from Tyrano's focus where it is, so the move starts from the button the player sees.
+                    const from = k.util.findFocused()[0];
+                    if (from) {
+                        k.util.unfocus();
+                        const start = candidates().find((el) => related(el, from));
+                        if (start) setFocus(start);
+                    }
+                }
             }
             moveFocus(direction);
         };
