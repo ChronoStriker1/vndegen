@@ -22,7 +22,20 @@ targets:
         excludes: ["Icon/**"]
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+    # Ren'Py games on macOS run on the two runtimes this copies into Contents/Resources/RenPy. scripts/renpy-runtime.sh
+    # fetches them into build/renpy. They run as helper processes, so each Mach-O file is signed like the app.
+    postBuildScripts:
+      - name: Bundle Ren'Py runtimes
+        basedOnDependencyAnalysis: false
+        script: |
+          [ "$PLATFORM_NAME" = macosx ] || exit 0
+          "$SRCROOT/scripts/renpy-runtime.sh" "$SRCROOT/build/renpy"
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/RenPy"
+          rsync -a --delete --exclude .vndegen-runtime "$SRCROOT/build/renpy/" "$dest/"
+          for binary in "$dest"/*/lib/*-mac-universal/*; do
+            codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$binary"
+          done
     info:
       path: App/Info.plist
       properties:
@@ -73,3 +86,5 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: NO
         GENERATE_INFOPLIST_FILE: NO
+        # The Ren'Py build phase reads build/renpy and writes into the app bundle.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO

@@ -6,8 +6,8 @@ Spike date 2026-10-25, on branch `ws/renpy`. The question was whether VNDegen ca
 
 Yes on both platforms, with one large caveat on iOS.
 
-- **macOS works today.** VNDegen's new `EngineRenPy` plugin detected Servant's Revenge (Ren'Py 8.5.3) and Test Game 30 (Ren'Py 7.4.2) in the library, launched each on a bundled official Ren'Py runtime as a helper process, and both played past the main menu into the story. The hub stayed up and returned when the game quit.
-- **iOS boots a real game from Documents.** A simulator app built from Ren'Py's own prebuilt iOS libraries (renios 8.5.3) booted Servant's Revenge from the app's `Documents/Games` folder, rendered through ANGLE on Metal, took touch and keyboard input, and reached gameplay. Test Game 30, a Ren'Py 7.4.2 game, also played on that Ren'Py 8 runtime by touch. The app needed a shim to launch, because the iOS 27 SDK refuses apps without the UIScene life cycle and Ren'Py's SDL2 predates it. After the on-screen keyboard appeared, the shimmed window switched to portrait sizing and the game drew into a corner.
+- **macOS works today.** VNDegen's new `EngineRenPy` plugin detected Test Game 15 (Ren'Py 8.5.3) and Test Game 30 (Ren'Py 7.4.2) in the library, launched each on a bundled official Ren'Py runtime as a helper process, and both played past the main menu into the story. The hub stayed up and returned when the game quit.
+- **iOS boots a real game from Documents.** A simulator app built from Ren'Py's own prebuilt iOS libraries (renios 8.5.3) booted Test Game 15 from the app's `Documents/Games` folder, rendered through ANGLE on Metal, took touch and keyboard input, and reached gameplay. Test Game 30, a Ren'Py 7.4.2 game, also played on that Ren'Py 8 runtime by touch. The app needed a shim to launch, because the iOS 27 SDK refuses apps without the UIScene life cycle and Ren'Py's SDL2 predates it. After the on-screen keyboard appeared, the shimmed window switched to portrait sizing and the game drew into a corner.
 - **The caveat is Python 2.** A Ren'Py runtime only runs the `renpy/` Python package of its own release. Ren'Py 7 games run on Python 2 and Ren'Py 8 games on Python 3. macOS can ship both runtimes as separate helper processes. One iOS process can hold only one CPython, so on iOS the Ren'Py 7 games either run on the Ren'Py 8 runtime, which does Python 2 compatibility fixes, or need a second interpreter build with renamed symbols. In the version spread test, Ren'Py 8.5.3 booted 7 of 12 of the library's Ren'Py 7 games, and one shim would likely fix 4 more.
 
 ## Evidence
@@ -16,17 +16,17 @@ Everything ran on the Mac mini (Apple M4, macOS 27.0.1, Xcode 27.1). The Mac min
 
 | Experiment | Result | Evidence |
 |---|---|---|
-| Servant's Revenge (8.5.3) on the 8.5.3 SDK's macOS binary with the game's own `renpy/` | Main menu, then story | `mac-servant-shot-*.png`, `mac-servant-last-log.txt` |
-| Test Game 30 (7.4.2) on the Ren'Py 8.5.3 engine | Main menu, then story | `mac-imp-on-8.5.3-shot-*.png` |
-| Test Game 30 on the Ren'Py 7.8.7 engine | Main menu, then story | `mac-imp-on-7.8.7-shot-ingame2.png` |
+| Test Game 15 (8.5.3) on the 8.5.3 SDK's macOS binary with the game's own `renpy/` | Main menu, then story | `mac-game15-shot-*.png`, `mac-game15-last-log.txt` |
+| Test Game 30 (7.4.2) on the Ren'Py 8.5.3 engine | Main menu, then story | `mac-game30-on-8.5.3-shot-*.png` |
+| Test Game 30 on the Ren'Py 7.8.7 engine | Main menu, then story | `mac-game30-on-7.8.7-shot-ingame2.png` |
 | Test Game 54 (7.5.1) on the Ren'Py 8.5.3 engine | Fails at its splash screen: `ModuleNotFoundError: No module named 'urllib3.packages.six.moves'` | `game54-8-stdout.txt` |
 | Test Game 54 on the unpatched 7.8.7 engine | Fails: `SyntaxError: encoding declaration in Unicode string` | Quoted in Version spread |
 | Test Game 54 on 7.8.7 with a one-line loader patch | Splash, then its first-run language menu | `mac-game54-on-7.8.7-patched-shot-*.png` |
-| 7.8.7 binary with Test Game 54's or Imp's own `renpy/` | Fails: `ImportError: No module named parsersupport` | Quoted in Version spread |
-| VNDegen macOS app, `-autolaunch "Servant's Revenge"` | Helper started on the Ren'Py 8 runtime, game reached the story, quit, app kept running | `app-mac-servant-ingame2.png` |
-| VNDegen macOS app, `-autolaunch "Test Game 30"` | Helper started on the Ren'Py 7 runtime, same result | `app-mac-imp-on-7.8.7-ingame2.png` |
-| renios 8.5.3 host app in the iOS 27 simulator, game in `Documents/Games` | Fails to launch without UIScene. With the shim, main menu, name entry, and story. Layout breaks after the keyboard | `ios-sim-servant-*.png`, `ios-sim-vndhost-log.txt` |
-| Same iOS host app with Test Game 30 (7.4.2) in `Documents/Games` | Main menu, Start by tap, story advancing by tap, layout correct | `ios-sim-imp-*.png` |
+| 7.8.7 binary with Test Game 54's or Test Game 30's own `renpy/` | Fails: `ImportError: No module named parsersupport` | Quoted in Version spread |
+| VNDegen macOS app, `-autolaunch "Test Game 15"` | Helper started on the Ren'Py 8 runtime, game reached the story, quit, app kept running | `app-mac-game15-ingame2.png` |
+| VNDegen macOS app, `-autolaunch "Test Game 30"` | Helper started on the Ren'Py 7 runtime, same result | `app-mac-game30-on-7.8.7-ingame2.png` |
+| renios 8.5.3 host app in the iOS 27 simulator, game in `Documents/Games` | Fails to launch without UIScene. With the shim, main menu, name entry, and story. Layout breaks after the keyboard | `ios-sim-game15-*.png`, `ios-sim-vndhost-log.txt` |
+| Same iOS host app with Test Game 30 (7.4.2) in `Documents/Games` | Main menu, Start by tap, story advancing by tap, layout correct | `ios-sim-game30-*.png` |
 | `EngineRenPy` package tests | 7 tests pass | `scripts/build.sh test` |
 
 The macOS screenshots come from inside Ren'Py (`renpy.screenshot`), driven by a probe script copied into scratch copies of the games, because `screencapture` over SSH lacks the Screen Recording permission. The probe is `docs/renpy-spike/zz_vndegen_probe.rpy`. It is never put into a user's library.
@@ -65,7 +65,7 @@ The user's library has 28 Ren'Py 8 games and 16 Ren'Py 7 or older games.
 
 So VNDegen needs a small, growing set of compatibility patches in its bundled runtimes. Because VNDegen owns the runtime, these patches never touch the user's game folder.
 
-**The library's Ren'Py 7 games on both runtimes.** 14 of the 16 Ren'Py 7 and older games were copied from the NAS for this test, plus the two test games already there. Four of the 14 are RAR archives that neither `bsdtar` nor Homebrew's 7-Zip could unpack ("Unsupported Method"), though their SHA-1 matched the NAS. So 12 games were tested: Test Game 50, Kinky Cosplay, Test Game 20, and Pirate Booty were skipped. `docs/renpy-spike/spread-test.sh` booted each one on the patched 7.8.7 engine and on 8.5.3 with the probe script. A run counts as booting when Ren'Py raised no exception for 30 seconds and the 29-second screenshot shows the game's first interactive screen. That screen is a language picker, a disclaimer, a title screen, or, for Test Game 57, the story. This test shows that a game boots, not that it plays through to the end.
+**The library's Ren'Py 7 games on both runtimes.** 14 of the 16 Ren'Py 7 and older games were copied from the NAS for this test, plus the two test games already there. Four of the 14 are RAR archives that neither `bsdtar` nor Homebrew's 7-Zip could unpack ("Unsupported Method"), though their SHA-1 matched the NAS. So 12 games were tested: Test Game 50, Test Game 20, and two more were skipped. `docs/renpy-spike/spread-test.sh` booted each one on the patched 7.8.7 engine and on 8.5.3 with the probe script. A run counts as booting when Ren'Py raised no exception for 30 seconds and the 29-second screenshot shows the game's first interactive screen. That screen is a language picker, a disclaimer, a title screen, or, for Test Game 57, the story. This test shows that a game boots, not that it plays through to the end.
 
 | Game | Own version | Patched 7.8.7 | 8.5.3 |
 |---|---|---|---|
@@ -115,7 +115,7 @@ Under that design the hub calls a small C entry point on the main thread instead
 
 - **iOS.** Ren'Py renders through MetalANGLE, ANGLE's Metal backend. The simulator log shows `Renderer: 'ANGLE (Metal Renderer: Apple iOS simulator GPU)'` and `Version: 'OpenGL ES 3.0.0 (ANGLE 2.1.0.850c87ba5b74)'`. This meets the project's hardware acceleration and Metal rule. MetalANGLE's README has said since 2023 that the repository is "not in active development" and that ANGLE work belongs in upstream ANGLE, which has its own Metal backend ([MetalANGLE](https://github.com/kakashidinho/metalangle)). A future Ren'Py may switch to it.
 - **macOS.** Ren'Py's gl2 renderer uses Apple's OpenGL, which Apple implements on Metal. The log shows `Vendor: 'Apple'`, `Renderer: 'Apple M4'`, `Version: '2.1 Metal - 91.7'`. That is hardware accelerated and Metal underneath, but it depends on a deprecated API. Switching macOS to ANGLE needs a custom Ren'Py build.
-- **Frame rate.** The probe counted entries in Ren'Py's `interface.frame_times`, one per drawn frame, while forcing a redraw every frame. On the M4 at 1920 by 1080, Servant's Revenge drew 427 to 527 frames per second and Test Game 30 484 to 539. Ren'Py asked for a swap interval of 1, so this rate is above the display's 60 Hz. The window was most likely not throttled to vsync because no one was looking at it on the headless Mac mini (inferred). The number shows the GPU headroom for a typical visual novel scene, about 2 ms per frame, and not the frame pacing a player sees. iOS frame rate was not measured, because the simulator's GPU does not represent a device.
+- **Frame rate.** The probe counted entries in Ren'Py's `interface.frame_times`, one per drawn frame, while forcing a redraw every frame. On the M4 at 1920 by 1080, Test Game 15 drew 427 to 527 frames per second and Test Game 30 484 to 539. Ren'Py asked for a swap interval of 1, so this rate is above the display's 60 Hz. The window was most likely not throttled to vsync because no one was looking at it on the headless Mac mini (inferred). The number shows the GPU headroom for a typical visual novel scene, about 2 ms per frame, and not the frame pacing a player sees. iOS frame rate was not measured, because the simulator's GPU does not represent a device.
 
 ## Saves
 
@@ -128,14 +128,26 @@ Under that design the hub calls a small C entry point on the main thread instead
 | `RENPY_PATH_TO_SAVES` set (desktop) | `$RENPY_PATH_TO_SAVES/<save_directory>/` |
 | iOS launcher default | the app's `Documents/` |
 
-These come from `path_to_saves` in the launcher script that every game ships (such as `ServantRevenge.py`). Ren'Py loads saves from both the user folder and `game/saves`. In the Ludusavi store on the NAS, the two Ren'Py games with backups (Lucy Got Problems and Milk inside a Bag of Milk inside a Bag of Milk) record paths such as `/home/deck/.renpy/LGP-1505403882/1-1-LT1.save`.
+These come from `path_to_saves` in the launcher script that every game ships (such as `<Name>.py`). Ren'Py loads saves from both the user folder and `game/saves`. In the Ludusavi store on the NAS, the two Ren'Py games with backups record paths such as `/home/deck/.renpy/Game-1505403882/1-1-LT1.save`.
 
 `RenPyPlugin.saveLocations` returns two locations:
 
 - `<data directory>/saves`. The session points `RENPY_PATH_TO_SAVES` there. The rule maps any path with a `RenPy` or `.renpy` folder, such as the Windows, macOS, and Linux paths above, to `<save_directory>/<file>`, so it never needs to know the game's `config.save_directory`. Local paths inside the folder map to themselves.
 - `<base>/game/saves`, mapping `.../game/saves/<file>` to `<file>`.
 
-The macOS app run wrote `GameData/Servant's Revenge/saves/ServantRevenge-1791450490/persistent`, which matches the rule. Ren'Py 8.5.3 also keeps `tokens/security_keys.txt` beside the save folders (`renpy/savetoken.py`) and asks before loading a save it has no key for: "This save was created on a different device." Ludusavi does not back up that file, so a restored PC save shows Ren'Py's warning once, and the player must accept it.
+The spike's macOS app run wrote `GameData/Test Game 15/saves/Game-1791450490/persistent`, which matches the rule. Phase 1 changed this layout; see Phase 1 on macOS below. Ren'Py 8.5.3 also keeps `tokens/security_keys.txt` beside the save folders (`renpy/savetoken.py`) and asks before loading a save it has no key for: "This save was created on a different device." Ludusavi does not back up that file, so a restored PC save shows Ren'Py's warning once, and the player must accept it.
+
+## Phase 1 on macOS
+
+Units 1 to 4 and the macOS save locations are built. Where they differ from the plan above:
+
+- **Runtimes.** The macOS build phase in `project.yml` runs `scripts/renpy-runtime.sh build/renpy`, copies both runtimes into `Contents/Resources/RenPy`, and signs each `python` and `librenpython.dylib` with the app's identity. The SDK tarballs are checked against SHA-256 sums in the script and cached in `~/Library/Caches/VNDegen/renpy-sdk`. Nothing is installed into `~/Library/Application Support`.
+- **Launcher.** The helper runs VNDegen's `Support/launcher.py` on the runtime's `python`. It runs the runtime's `renpy.py` in memory with three changes: `path_to_saves` points at `<data directory>/saves` (not `RENPY_PATH_TO_SAVES`), Ren'Py's read-only mode (`renpy.macapp`) is on so nothing is compiled or written into the game folder, and the folder holding `zz_vndegen.rpy` joins the search path. Ren'Py's log goes to `<data directory>/logs/renpy.txt`.
+- **Saves.** Saves sit directly in `<data directory>/saves`, without the `config.save_directory` level, so `saveLocations` returns one location. It maps Windows, macOS, and Linux user-folder paths and `game/saves` paths into it. A game copied in with saves in `game/saves/` gets them copied into an empty save folder on its first launch.
+- **Window.** The game window has no title bar and takes the hub window's frame, or opens full screen when the hub is full screen. The runtimes are built for older macOS releases and draw a shorter title bar than the hub, so a content rect computed in the hub came out 4 points short.
+- **Controller.** Options and Home (SDL's back and guide) open the VNDegen menu, as the backtick does. The game's button mapping from the hub is passed in `VNDEGEN_BUTTONS` and applied inside Ren'Py: a button mapped to a gamepad action gets Ren'Py's bindings for the standard button with that action, and one mapped to a key or click posts it. At text prompts the backtick opens the menu instead of being typed.
+- **Compatibility.** `scripts/renpy-compat.sh` and the `RenPyCompat` tool replace `spread-test.sh`. They boot each game the way the app does, with a probe in `zz_vndegen.rpy` that presses through first-run language pickers and disclaimers, and report the runtime, the reason it was picked, whether the main menu showed, and whether the game folder changed. The launcher adds an import finder for Python 3.12 that asks old `find_module` finders, which fixes the vendored `six` failure: Test Game 54 reaches its main menu on Ren'Py 8 with it and fails with `ModuleNotFoundError: No module named 'urllib3.packages.six.moves'` without it.
+- **Runtime override.** `RenPyPlugin.setRuntimeOverride` stores a per-game runtime in `<data directory>/renpy.json`. No screen sets it yet.
 
 ## Licenses
 
@@ -185,7 +197,7 @@ Each unit ends in a check on the real app. The estimates are rough guesses.
 
 ## Reproducing
 
-- `scripts/renpy-runtime.sh` on a Mac installs the two runtimes into `~/Library/Application Support/VNDegen/RenPy`, checking the SDK's SHA-256 against Ren'Py's `checksums.txt`.
+- `scripts/renpy-runtime.sh build/renpy` on a Mac installs the two runtimes into `build/renpy`, checking each SDK against a SHA-256 in the script. The macOS build runs it.
 - `scripts/build.sh mac`, then run the app with `-autolaunch "<game folder>"`. With a DEBUG build, `-libraryRoot <path>` keeps the run out of `~/Documents/VNDegen`.
 - The iOS host app is not in the repository. It is the renios 8.5.3 prototype generated with `renpy.sh launcher ios_create <empty project> <dest>`, with `docs/renpy-spike/vndegen_main_prefix.py` inserted into `base/main.py` before `if __name__ == "__main__":`, `docs/renpy-spike/scene_shim.m` appended to `Log.m`, and a `UIApplicationSceneManifest` naming `VNDSceneDelegate` in `Info.plist`. Build it with `xcodebuild -target vndhost -configuration Debug -sdk iphonesimulator ARCHS=arm64 CODE_SIGNING_ALLOWED=NO`.
 

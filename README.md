@@ -24,7 +24,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen reads and writes [Ludusavi](https://github.com/mtkennerly/ludusavi) backups, so saves move between VNDegen and the PC copies Ludusavi manages. Restores can be undone.
-- **Hardware rendering.** Web-based engines render through WebGL on Metal.
+- **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL, which runs on Metal.
 
 <p align="center">
   <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
@@ -37,10 +37,13 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad |
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
 | TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
+| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one folder down | Mac |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
 TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. Ogg audio is converted to AAC the first time it plays, because iOS cannot play Ogg.
+
+Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py runtimes, 8.5.3 for Ren'Py 8 games and 7.8.7 for Ren'Py 7 and older games, and picks one from the game's `renpy/vc_version.py` or `renpy/__init__.py`, then its `lib/` folder names, then the engine's compiled files. Each game runs in its own process and window, which takes the hub window's place, and the hub comes back when the game quits. Saves and logs go to the game's data folder, and the game folder is never written to. A game copied from a PC with saves in `game/saves/` gets those copied in on its first launch. iPhone and iPad detect Ren'Py games but cannot run them yet.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -67,7 +70,7 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 | Previous and next page | L1 and R1 | Q and E, or Page Up and Page Down |
 | VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
 
-The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen.
+The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game on Mac reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu. Buttons remapped for the game apply there too.
 
 These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
 
@@ -106,6 +109,8 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
+The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu.
+
 From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
 ### Installing a release
@@ -133,6 +138,8 @@ Packages/VNDegenKit/
   Sources/WebRuntime/     shared host for HTML5 engines: WebKit view, game file serving, Node and NW.js layer
   Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, key mapping, save locations
   Sources/EngineTyrano/   TyranoScript: detection, Electron app.asar reading, save handling, controller mapping
+  Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, and the in-game hook
+  Sources/RenPyCompat/    command-line boot test for a folder of Ren'Py games
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
@@ -140,7 +147,7 @@ Packages/VNDegenKit/
   Sources/SaveSync/       Ludusavi backup and restore
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
 docs/                     engine survey and screenshots
-scripts/                  build, remote build, and simulator helpers
+scripts/                  build, remote build, simulator, and Ren'Py runtime helpers
 project.yml               XcodeGen project definition
 ```
 
