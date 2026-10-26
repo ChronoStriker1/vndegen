@@ -100,8 +100,11 @@ private:
     void Run();
     void DoSeek(std::unique_lock<std::mutex> &lock);
     int SeekContainer(double t, bool fromFirstByte);
-    // Queues a video packet or decodes an audio one, and frees what it does not keep.
-    void Route(AVPacket *packet, std::unique_lock<std::mutex> &lock);
+    // Queues a video or audio packet, and frees what it does not keep.
+    void Route(AVPacket *packet);
+    // Whether the sink has room for more audio.
+    bool AudioWanted();
+    void FreePackets();
     void DecodeVideo(AVPacket *packet, std::unique_lock<std::mutex> &lock);
     void DecodeAudio(AVPacket *packet, std::unique_lock<std::mutex> &lock);
     void QueueFrame(AVFrame *frame, std::unique_lock<std::mutex> &lock);
@@ -137,6 +140,9 @@ private:
     bool demuxEnded = false, videoEnded = false, audioEnded = false;
     std::deque<AVPacket *> videoPackets;
     size_t videoPacketBytes = 0;
+    // Audio waits here as packets until the sink has room, however far video reads ahead.
+    std::deque<AVPacket *> audioPackets;
+    size_t audioPacketBytes = 0;
     std::deque<MovieFrame> frames;
     std::vector<std::vector<uint8_t>> spareBuffers;
     MovieStats stats;

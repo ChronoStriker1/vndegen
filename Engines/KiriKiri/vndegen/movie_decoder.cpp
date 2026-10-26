@@ -20,6 +20,7 @@ static const size_t maxFrames = 4;
 static const double audioAhead = 0.5; // seconds written to the sink before the clock reaches them
 static const size_t minVideoPackets = 16;
 static const size_t maxVideoPacketBytes = 32 << 20;
+static const size_t maxAudioPacketBytes = 8 << 20;
 static const size_t maxLeadPackets = 2048; // read after a seek to find where it landed
 static const int ioBufferSize = 64 << 10;
 
@@ -210,8 +211,7 @@ void MovieDecoder::Prime()
 MovieDecoder::~MovieDecoder()
 {
     Stop();
-    for (AVPacket *packet : videoPackets)
-        av_packet_free(&packet);
+    FreePackets();
     av_frame_free(&decoded);
     av_frame_free(&transferred);
     sws_freeContext(scaler);
@@ -338,10 +338,22 @@ void MovieDecoder::Run()
             DecodeVideo(nullptr, lock);
             continue;
         }
-        bool wantAudio = audioIndex >= 0 && sink && !demuxEnded &&
-                         sink->Queued() < (size_t)(audioAhead * info.audioRate);
+        bool audioWanted = AudioWanted();
+        if (audioWanted && !audioPackets.empty()) {
+            AVPacket *packet = audioPackets.front();
+            audioPackets.pop_front();
+            audioPacketBytes -= packet->size;
+            DecodeAudio(packet, lock);
+            av_packet_free(&packet);
+            continue;
+        }
+        if (demuxEnded && audioPackets.empty() && !audioEnded) {
+            DecodeAudio(nullptr, lock);
+            continue;
+        }
         bool wantVideo = !demuxEnded && videoPackets.size() < minVideoPackets;
-        if ((wantAudio || wantVideo) && videoPacketBytes < maxVideoPacketBytes) {
+        if (((audioWanted && !demuxEnded) || wantVideo) && videoPacketBytes < maxVideoPacketBytes &&
+            audioPacketBytes < maxAudioPacketBytes) {
             uint64_t readGeneration = generation;
             AVPacket *packet = av_packet_alloc();
             lock.unlock();
@@ -356,27 +368,41 @@ void MovieDecoder::Run()
                 if (result != AVERROR_EOF)
                     Fail("read: " + describe(result));
                 demuxEnded = true;
-                if (audioIndex >= 0 && sink)
-                    DecodeAudio(nullptr, lock);
                 continue;
             }
-            Route(packet, lock);
+            Route(packet);
             continue;
         }
         wake.wait_for(lock, 10ms);
     }
 }
 
-void MovieDecoder::Route(AVPacket *packet, std::unique_lock<std::mutex> &lock)
+void MovieDecoder::Route(AVPacket *packet)
 {
     if (packet->stream_index == videoIndex) {
         videoPacketBytes += packet->size;
         videoPackets.push_back(packet);
-        return;
+    } else if (packet->stream_index == audioIndex && sink) {
+        audioPacketBytes += packet->size;
+        audioPackets.push_back(packet);
+    } else {
+        av_packet_free(&packet);
     }
-    if (packet->stream_index == audioIndex && sink)
-        DecodeAudio(packet, lock);
-    av_packet_free(&packet);
+}
+
+bool MovieDecoder::AudioWanted()
+{
+    return audioIndex >= 0 && sink && sink->Queued() < (size_t)(audioAhead * info.audioRate);
+}
+
+void MovieDecoder::FreePackets()
+{
+    for (std::deque<AVPacket *> *queue : {&videoPackets, &audioPackets}) {
+        for (AVPacket *packet : *queue)
+            av_packet_free(&packet);
+        queue->clear();
+    }
+    videoPacketBytes = audioPacketBytes = 0;
 }
 
 int MovieDecoder::SeekContainer(double t, bool fromFirstByte)
@@ -395,10 +421,7 @@ void MovieDecoder::DoSeek(std::unique_lock<std::mutex> &lock)
     double t = seekTarget;
     uint64_t seekGeneration = generation;
     seekPending = false;
-    for (AVPacket *packet : videoPackets)
-        av_packet_free(&packet);
-    videoPackets.clear();
-    videoPacketBytes = 0;
+    FreePackets();
     lock.unlock();
 
     // Containers without an index, such as MPEG program streams, seek by searching timestamps and
@@ -457,7 +480,7 @@ void MovieDecoder::DoSeek(std::unique_lock<std::mutex> &lock)
     demuxEnded = videoEnded = false;
     audioEnded = !sink || audioIndex < 0;
     for (AVPacket *packet : lead)
-        Route(packet, lock);
+        Route(packet);
 }
 
 void MovieDecoder::DecodeVideo(AVPacket *packet, std::unique_lock<std::mutex> &lock)
