@@ -60,3 +60,18 @@ private final class ShimPage {
     try await page.run("__vndegen.click('began', 0); __vndegen.click('ended', 0)")
     #expect(try await page.takeLog() == ["mousedown 120,80", "mouseup 120,80"])
 }
+
+@Test @MainActor func touchMovesTheMouseToItFirst() async throws {
+    let page = try await ShimPage()
+    try await page.run("""
+        document.addEventListener('mousemove', (e) => log.push('mousemove ' + e.clientX + ',' + e.clientY));
+        document.addEventListener('touchstart', () => log.push('touchstart'));
+        """)
+    // The Mac's WebKit has no TouchEvent, so a plain event carries the touch.
+    try await page.run("""
+        const touch = new Event('touchstart', { bubbles: true });
+        Object.defineProperty(touch, 'changedTouches', { value: [{ clientX: 120, clientY: 80, screenX: 120, screenY: 80 }] });
+        document.body.dispatchEvent(touch);
+        """)
+    #expect(try await page.takeLog() == ["mousemove 120,80", "touchstart"])
+}

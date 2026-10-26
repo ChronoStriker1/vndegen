@@ -566,6 +566,17 @@
         if (phase === 'ended' && button === 0) element.dispatchEvent(new MouseEvent('click', init));
     }
 
+    // A finger acts as the mouse, so a touch first moves the mouse to it, as a mouse moves before it clicks. PC games
+    // can depend on that: some plugins ignore all mouse and touch input from a few seconds after the mouse last moved
+    // until it moves again, and some menus select only what the mouse is over. The touch still reaches the game itself.
+    const moveMouseToTouch = (event) => {
+        const touch = event.changedTouches[0];
+        if (!touch) return;
+        const init = { clientX: touch.clientX, clientY: touch.clientY, screenX: touch.screenX, screenY: touch.screenY, bubbles: true, cancelable: true, view: window };
+        (document.elementFromPoint(touch.clientX, touch.clientY) || target()).dispatchEvent(new MouseEvent('mousemove', init));
+    };
+    for (const type of ['touchstart', 'touchmove']) window.addEventListener(type, moveMouseToTouch, { capture: true, passive: true });
+
     // Presses held per key code. Different buttons can send the same key, such as Confirm and a button bound to Enter,
     // so the key goes down with the first press and up with the last release.
     const keysHeld = new Map();
