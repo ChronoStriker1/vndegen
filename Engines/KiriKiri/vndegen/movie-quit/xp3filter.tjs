@@ -1,0 +1,5 @@
+// Touches every byte read from the game's archives in script, as a game's own cipher does.
+Storages.setXP3ArchiveExtractionFilter(function(hash, offset, buf, len) {
+	for (var i = 0; i < len; i++)
+		buf[i] ^= 0;
+});

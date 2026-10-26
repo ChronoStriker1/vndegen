@@ -6,13 +6,17 @@
 // checks that the first frame after the seek is at the target, then does the same for a rewind. --frames checks the number of
 // frames decoded against another decoder's count, such as ffprobe -count_frames. --dump writes the
 // frame in the middle of the movie as a PPM image. A second decoder then seeks to the middle before it
-// has decoded anything, as a game that sets a frame before playing does. Exits nonzero if a check fails.
+// has decoded anything, as a game that sets a frame before playing does. A third writes its audio to an
+// output that stays full for a while, as a sound buffer is before the movie plays. A movie with few
+// frames per second, such as one ffmpeg makes from color=r=1:d=20 and sine=d=20 as H.264 and AAC, reads
+// far ahead for video. Exits nonzero if a check fails.
 #include "tjsCommHead.h"
 #include "TVPStorage.h"
 #include "XP3Archive.h"
 #include "movie_decoder.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -62,6 +66,19 @@ public:
     void End() override {}
     size_t frames = 0;
     double firstPts = 0;
+};
+
+// Holds what it is given until Free, as a full sound buffer does, then plays it all at once.
+class HeldSink : public MovieAudioSink {
+public:
+    size_t Queued() override { return full ? frames.load() : 0; }
+    void Write(const int16_t *, size_t count, double) override { frames += count; }
+    void End() override {}
+    void Free() { full = false; }
+    std::atomic<size_t> frames{0};
+
+private:
+    std::atomic<bool> full{true};
 };
 
 static int failures;
@@ -159,7 +176,7 @@ int main(int argc, char *argv[])
     check(decoder != nullptr, "opens" + (error.empty() ? "" : ": " + error));
     if (!decoder)
         return 1;
-    const MovieInfo &info = decoder->Info();
+    const MovieInfo info = decoder->Info(); // a copy, since later checks replace the decoder
     printf("%s, %.3f fps, %.2f s%s, %d audio stream(s)\n", info.format.c_str(), info.fps, info.duration,
            info.hardware ? ", VideoToolbox" : "", info.audioStreams);
 
@@ -227,6 +244,25 @@ int main(int argc, char *argv[])
     check(landed && std::fabs(frame.pts - target) <= 1.5 / info.fps,
           "a seek before the first frame to " + std::to_string(target) + " s lands at " +
               std::to_string(landed ? frame.pts : -1));
+
+    // A sound buffer drops what it is given past its limit, so audio must wait for room, however far
+    // the decoder reads ahead for video.
+    if (info.audioRate) {
+        HeldSink held;
+        decoder = MovieDecoder::Open(openStream(), error);
+        decoder->Start(&held);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        double heldSeconds = held.frames / (double)info.audioRate;
+        check(heldSeconds < 1, "audio waits while the output is full (" + std::to_string(heldSeconds) + " s written)");
+        held.Free();
+        while (nextFrame(*decoder, frame))
+            decoder->Recycle(std::move(frame));
+        for (int tries = 0; tries < 2000 && !decoder->AudioEnded(); tries++)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        double total = held.frames / (double)info.audioRate;
+        check(std::fabs(total - info.duration) < 0.5,
+              "the held audio still covers the movie (" + std::to_string(total) + " s)");
+    }
     printf("%s\n", failures ? "movie test failed" : "movie test passed");
     return failures ? 1 : 0;
 }

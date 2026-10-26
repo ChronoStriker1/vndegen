@@ -928,9 +928,10 @@ tjs_uint tTVPXP3ArchiveStream::Read(void* buffer, tjs_uint read_size)
         // execute filter (for encryption method)
         if (TVPXP3ArchiveExtractionFilter)
         {
+            // info keeps a reference to the name, so the name must outlive it.
+            const ttstr name = Owner->GetName(StorageIndex);
             tTVPXP3ExtractionFilterInfo info(CurPos, (tjs_uint8*)buffer + write_size, one_size,
-                                             Owner->GetFileHash(StorageIndex),
-                                             Owner->GetName(StorageIndex));
+                                             Owner->GetFileHash(StorageIndex), name);
             TVPXP3ArchiveExtractionFilter((tTVPXP3ExtractionFilterInfo*)&info, &FilterContext);
         }
         // A game's own xp3filter.tjs, above, replaces VNDegen's cipher.

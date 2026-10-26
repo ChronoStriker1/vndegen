@@ -465,6 +465,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(KiriKiriMovieTest EXCLUDE_FROM_ALL vndegen/movie_test.cpp vndegen/vnkk.mm)
     target_link_libraries(KiriKiriMovieTest PRIVATE kirikiri_engine)
 
+    # Checks the native event queues. Built on demand, like KiriKiriCipherTest.
+    add_executable(KiriKiriQueueTest EXCLUDE_FROM_ALL vndegen/queue_test.cpp vndegen/vnkk.mm)
+    target_link_libraries(KiriKiriQueueTest PRIVATE kirikiri_engine)
+
     add_executable(KiriKiriRestart EXCLUDE_FROM_ALL vndegen/restart_main.mm vndegen/vnkk.mm)
     set_source_files_properties(vndegen/restart_main.mm PROPERTIES COMPILE_OPTIONS -fobjc-arc)
     target_link_libraries(KiriKiriRestart PRIVATE kirikiri_engine)

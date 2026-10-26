@@ -6,6 +6,7 @@
 #include "tjsString.h"
 #include "PlatformMutex.h"
 #include <vector>
+#include <deque>
 #include <functional>
 #include <tuple>
 #include <map>
@@ -43,8 +44,9 @@ public:
     typedef std::function<void()> tMsg;
 
     void PostUserMessage(const std::function<void()>& func, void* param1 = nullptr, int param2 = 0);
-    void FilterUserMessage(
-        const std::function<void(std::vector<std::tuple<void*, int, tMsg>>&)>& func);
+    // Removes host's queued messages numbered msg, or all of them when msg is 0, including those of
+    // the batch ProcessMessages is running.
+    void CancelUserMessages(void* host, int msg);
 
     /**
      * 画像の非同期読込み要求
@@ -58,7 +60,15 @@ public:
 private:
     tTJSCriticalSection m_msgQueueLock;
 
-    std::vector<std::tuple<void*, int, tMsg>> m_lstUserMsg;
+    struct tUserMsg
+    {
+        void* host;
+        int msg;
+        tMsg func;
+        tjs_uint64 seq;
+    };
+    std::deque<tUserMsg> m_lstUserMsg;
+    tjs_uint64 m_nextMsgSeq = 0;
     std::map<void*, std::function<void(void*, eTVPActiveEvent)>> m_activeEvents;
 };
 

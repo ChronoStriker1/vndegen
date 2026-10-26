@@ -586,6 +586,21 @@ void TVPSetXP3FilterScript(ttstr content)
     sXP3FilterScript = content;
 }
 
+void TVPClearXP3Filter()
+{
+    TVPSetXP3ArchiveExtractionFilter(nullptr);
+    TVPSetXP3ArchiveContentFilter(nullptr);
+    tTJSCriticalSectionHolder lk(_decoders_mtx);
+    for (auto& [thread, decoder] : _thread_decoders)
+        delete decoder;
+    _thread_decoders.clear();
+    for (XP3FilterDecoder* decoder : _cached_decoders)
+        delete decoder;
+    _cached_decoders.clear();
+    sXP3FilterScript.Clear();
+    _ManagedDecoderInited = _ManagedFilterInited = false;
+}
+
 static void PostRegistCallback()
 {
     ttstr path = TVPProjectDir + TJS_N("xp3filter.tjs");

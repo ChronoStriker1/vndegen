@@ -12,6 +12,7 @@
 #include "tjsCommHead.h"
 
 #include <assert.h>
+#include <atomic>
 #include "tjs.h"
 #include "tjsScriptBlock.h"
 #include "tjsArray.h"
@@ -91,8 +92,13 @@ public:
 //---------------------------------------------------------------------------
 // tTJS
 //---------------------------------------------------------------------------
+// Script engines alive. The heaps cleared in ~tTJS hold every engine's objects, and a game's
+// xp3filter.tjs runs in engines of its own, so only the last engine to go clears them.
+static std::atomic<int> TJSEngineCount{0};
+//---------------------------------------------------------------------------
 tTJS::tTJS()
 {
+    TJSEngineCount++;
     // tTJS constructor
     ConsoleOutput = NULL;
     PPValues = NULL;
@@ -204,9 +210,18 @@ tTJS::~tTJS()
     VariantArrayStack = nullptr;
 
     // 清除所有难以自动释放的堆内存
-    TJSClearScriptBlockHeap();
-    TJSClearObjectHeap();
-    TJSClearRegisterHeap();
+    if (--TJSEngineCount == 0)
+    {
+        TJSClearScriptBlockHeap();
+        TJSClearObjectHeap();
+        TJSClearRegisterHeap();
+    }
+    else
+    {
+        // The other engines' objects stay, but this engine's script blocks point back at it.
+        while (!ScriptBlocks.empty())
+            delete ScriptBlocks.back();
+    }
 }
 //---------------------------------------------------------------------------
 iTJSDispatch2* tTJS::GetGlobal()

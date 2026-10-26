@@ -1,10 +1,13 @@
 #include "tjsCommHead.h"
 #include <algorithm>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <string>
 #include <utility>
 #include <vector>
+#include <sys/stat.h>
 #include "TVPSettings.h"
 
 #include "TVPWindow.h"
@@ -356,10 +359,54 @@ static void TVPReadConfigFileOptions(const ttstr& exe)
         TVPAddImportantLog(ttstr(TJS_N("(info) Ignored options from the .cf file :")) + ignored);
 }
 
+// A native folder path, which need not exist yet, with symbolic links resolved: the real path of its
+// deepest existing folder, then the rest. Ends in a slash. Empty for a path that exists but cannot be
+// resolved, such as a link to nowhere.
+static std::string TVPRealFolderPath(std::string path)
+{
+    std::string rest;
+    for (;;)
+    {
+        char real[PATH_MAX];
+        if (realpath(path.c_str(), real))
+        {
+            std::string folder = real;
+            if (folder.back() != '/')
+                folder += '/';
+            return folder + rest;
+        }
+        struct stat st;
+        if (lstat(path.c_str(), &st) == 0)
+            return std::string();
+        while (path.size() > 1 && path.back() == '/')
+            path.pop_back();
+        size_t slash = path.rfind('/');
+        if (slash == std::string::npos)
+            return std::string();
+        rest = path.substr(slash + 1) + "/" + rest;
+        path.erase(slash + 1);
+    }
+}
+
+// The real folder a storage path names, read the way the engine reads it: a component of n dots is
+// n - 1 folders up, so "..." is two. Empty when the path climbs past the root or cannot be resolved.
+static std::string TVPResolveFolder(const ttstr& path)
+{
+    try
+    {
+        return TVPRealFolderPath(TVPGetLocallyAccessibleName(TVPNormalizeStorageName(path)).AsStdString());
+    }
+    catch (const eTJS&)
+    {
+        return std::string();
+    }
+}
+
 // -datapath moves savedata/, as on Windows. Its macros name the game folder and the folders that
 // stand in for AppData and Documents. $(vistapath) is AppData, as on Windows Vista and later, and
-// Saved Games is Documents here. A relative path is in the game folder. Returns an empty string
-// for a path outside those folders.
+// Saved Games is Documents here. A relative path is in the game folder. Returns the real path of the
+// folder, or an empty string for a path outside those folders once dots and symbolic links are
+// resolved.
 static ttstr TVPResolveDataPath(ttstr path, const ttstr& appData, const ttstr& personal)
 {
     const ttstr& root = TVPNativeProjectDir;
@@ -372,13 +419,19 @@ static ttstr TVPResolveDataPath(ttstr path, const ttstr& appData, const ttstr& p
     path.Replace(TJS_N("\\"), TJS_N("/"));
     if (!path.StartsWith(TJS_N("/")))
         path = root + path;
-    if (path.GetLastChar() != TJS_N('/'))
-        path += TJS_N("/");
-    if (path.IndexOf(ttstr(TJS_N("/../"))) >= 0 || path.IndexOf(TJS_N(':')) >= 0)
+    if (path.IndexOf(TJS_N(':')) >= 0)
+        return ttstr();
+    // The folder the engine will write to, which must also read back as itself, as it will be when
+    // the engine normalizes it again.
+    std::string real = TVPResolveFolder(path);
+    if (real.empty() || TVPResolveFolder(ttstr(real)) != real)
         return ttstr();
     for (const ttstr* folder : {&root, &appData, &personal})
-        if (path.StartsWith(*folder))
-            return path;
+    {
+        std::string base = TVPRealFolderPath(folder->AsStdString());
+        if (!base.empty() && real.compare(0, base.size(), base) == 0)
+            return ttstr(real);
+    }
     return ttstr();
 }
 

@@ -1,6 +1,11 @@
 #pragma once
 #include "tjsObject.h"
 
+// Engine shutdown: deletes the script engines that run the game's xp3filter.tjs on each thread,
+// and removes its filters, so the next game in the process starts without them. Threads that
+// read archives must have stopped.
+void TVPClearXP3Filter();
+
 class CBinaryAccessor : public tTJSDispatch
 {
     unsigned int m_length;

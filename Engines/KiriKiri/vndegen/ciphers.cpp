@@ -46,6 +46,9 @@ static const VNKKCipher ciphers[] = {
 static const size_t maxSamples = 8;
 // Reading stops early past this many bytes, so an archive of large files opens fast.
 static const uint64_t sampleBudget = 4 * 1024 * 1024;
+// Detection reads and decompresses at most this many bytes per archive. An entry that does not fit
+// in what is left is skipped before any of it is read.
+static const uint64_t workLimit = 32 * 1024 * 1024;
 // Samples at least this long cover every band of bandedXorAdd, so the schemes cannot agree on them.
 static const uint64_t preferredSampleSize = 0x200;
 // Samples are read, decompressed, and checksummed this many bytes at a time, so detection holds a
@@ -130,6 +133,24 @@ static Sample readSample(const tTVPXP3Archive::tArchiveItem &item, tTJSBinaryStr
     return sample;
 }
 
+// Takes the work of sampling item from budget: the bytes its segments store, plus the bytes the
+// compressed ones expand to. Sampling reads no more than that, since reads stop at each segment's
+// stored size and decompression at its original size. Returns false, taking nothing, when item
+// does not fit.
+static bool chargeSample(const tTVPXP3Archive::tArchiveItem &item, uint64_t &budget)
+{
+    uint64_t left = budget;
+    for (const tTVPXP3ArchiveSegment &segment : item.Segments) {
+        uint64_t stored = segment.IsCompressed ? segment.ArcSize : segment.OrgSize;
+        uint64_t expanded = segment.IsCompressed ? segment.OrgSize : 0;
+        if (stored > left || expanded > left - stored)
+            return false;
+        left -= stored + expanded;
+    }
+    budget = left;
+    return true;
+}
+
 // Index 0 counts the samples that verify without decryption, then one per scheme.
 static size_t countVerified(const std::vector<Sample> &samples, size_t index)
 {
@@ -155,20 +176,23 @@ const VNKKCipher *VNKKDetectCipher(const ttstr &archiveName,
             return aShort != bShort ? bShort : a->OrgSize < b->OrgSize;
         });
         std::vector<Sample> samples;
-        uint64_t sampledBytes = 0;
+        uint64_t sampledBytes = 0, budget = workLimit;
         for (const tTVPXP3Archive::tArchiveItem *item : candidates) {
             if (samples.size() == maxSamples || (samples.size() >= 2 && sampledBytes >= sampleBudget))
                 break;
             bool seen = false;
             for (const Sample &sample : samples)
                 seen = seen || sample.hash == item->FileHash;
-            if (seen)
+            if (seen || !chargeSample(*item, budget))
                 continue;
             samples.push_back(readSample(*item, st));
             sampledBytes += item->OrgSize;
         }
-        if (samples.empty())
+        if (samples.empty()) {
+            if (!candidates.empty())
+                SDL_Log("vnkk: the entries of %s are too large to check for encryption", name.c_str());
             return nullptr;
+        }
         // Some archives hold a warning text file under a made-up checksum, so a scheme needs only
         // half of the samples. Plain data wins a tie.
         const VNKKCipher *best = nullptr;

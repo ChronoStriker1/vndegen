@@ -10,6 +10,7 @@
 #include <malloc/malloc.h>
 #include <zlib.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -272,6 +273,122 @@ static void encryptBanded(uint32_t hash, Bytes &data)
     }
 }
 
+// An archive file held in memory: blobs at their offsets, and filler bytes everywhere else, so an
+// entry can be far larger than the test's memory. It counts the bytes read from it.
+class SyntheticArchive : public tTJSBinaryStream {
+public:
+    uint64_t Add(const Bytes &data)
+    {
+        blobs[size] = data;
+        size += data.size();
+        return size - data.size();
+    }
+    uint64_t Reserve(uint64_t count)
+    {
+        size += count;
+        return size - count;
+    }
+    tjs_uint64 Seek(tjs_int64 offset, tjs_int whence) override
+    {
+        position = (whence == TJS_BS_SEEK_SET ? 0 : whence == TJS_BS_SEEK_CUR ? position : size) + offset;
+        return position;
+    }
+    tjs_uint Read(void *buffer, tjs_uint count) override
+    {
+        uint64_t n = position < size ? std::min<uint64_t>(count, size - position) : 0;
+        uint8_t *out = (uint8_t *)buffer;
+        memset(out, 0x5a, n);
+        for (const auto &[start, data] : blobs) {
+            uint64_t from = std::max(start, position), to = std::min(start + data.size(), position + n);
+            if (from < to)
+                memcpy(out + (from - position), data.data() + (from - start), to - from);
+        }
+        position += n;
+        bytesRead += n;
+        return (tjs_uint)n;
+    }
+    tjs_uint Write(const void *, tjs_uint) override { return 0; }
+    bool Flush() override { return true; }
+    tjs_uint64 GetSize() override { return size; }
+    uint64_t bytesRead = 0;
+
+private:
+    std::map<uint64_t, Bytes> blobs;
+    uint64_t size = 0, position = 0;
+};
+
+static tTVPXP3Archive::tArchiveItem indexItem(const std::string &name, uint32_t hash, uint64_t start,
+                                              uint64_t orgSize, uint64_t arcSize, bool compressed)
+{
+    tTVPXP3Archive::tArchiveItem item;
+    item.Name = ttstr(name.c_str());
+    item.FileHash = hash;
+    item.OrgSize = orgSize;
+    item.ArcSize = arcSize;
+    item.Segments.push_back({start, 0, orgSize, arcSize, compressed});
+    return item;
+}
+
+// Detection reads and decompresses a bounded number of bytes, however large an archive's entries
+// say they are. The large entries here come after three small XOR-encrypted ones, which are enough.
+static void checkDetectionWork()
+{
+    auto archiveWith = [](SyntheticArchive &archive, std::vector<tTVPXP3Archive::tArchiveItem> &items) {
+        uint64_t smallBytes = 0;
+        for (uint32_t i = 0; i < 3; i++) {
+            Bytes plain = pattern(1000 + i * 100, i + 200), stored = plain;
+            uint32_t hash = adler(plain);
+            encryptXor(hash, stored);
+            items.push_back(indexItem("small" + std::to_string(i), hash, archive.Add(stored), plain.size(), plain.size(), false));
+            smallBytes += plain.size();
+        }
+        return smallBytes;
+    };
+    auto detect = [](SyntheticArchive &archive, const std::vector<tTVPXP3Archive::tArchiveItem> &items) {
+        auto start = std::chrono::steady_clock::now();
+        const VNKKCipher *cipher = VNKKDetectCipher(ttstr("file://./synthetic.xp3"), items, &archive);
+        printf("detection read %llu bytes in %.0f ms\n", (unsigned long long)archive.bytesRead,
+               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+        return std::string(cipher ? cipher->name : "plain");
+    };
+
+    {
+        SyntheticArchive archive;
+        std::vector<tTVPXP3Archive::tArchiveItem> items;
+        uint64_t smallBytes = archiveWith(archive, items);
+        for (uint32_t i = 0; i < 2; i++)
+            items.push_back(indexItem("stored" + std::to_string(i), i + 1, archive.Reserve(256 << 20), 256 << 20, 256 << 20, false));
+        check(detect(archive, items) == "xorByChecksum", "an archive with 256 MiB entries is detected from its small ones");
+        check(archive.bytesRead == smallBytes, "detection reads none of the 256 MiB entries (" +
+                                                   std::to_string(archive.bytesRead) + " bytes read)");
+    }
+    {
+        SyntheticArchive archive;
+        std::vector<tTVPXP3Archive::tArchiveItem> items;
+        uint64_t smallBytes = archiveWith(archive, items);
+        Bytes zeros(64 << 20);
+        uLongf packedSize = compressBound(zeros.size());
+        Bytes packed(packedSize);
+        compress(packed.data(), &packedSize, zeros.data(), zeros.size());
+        packed.resize(packedSize);
+        uint32_t hash = adler(zeros);
+        zeros = Bytes();
+        for (uint32_t i = 0; i < 2; i++)
+            items.push_back(indexItem("packed" + std::to_string(i), hash + i, archive.Add(packed), 64 << 20, packed.size(), true));
+        check(detect(archive, items) == "xorByChecksum", "an archive with entries that expand to 64 MiB is detected from its small ones");
+        check(archive.bytesRead == smallBytes, "detection decompresses none of the 64 MiB entries (" +
+                                                   std::to_string(archive.bytesRead) + " bytes read)");
+    }
+    {
+        SyntheticArchive archive;
+        std::vector<tTVPXP3Archive::tArchiveItem> items;
+        for (uint32_t i = 0; i < 2; i++)
+            items.push_back(indexItem("movie" + std::to_string(i), i + 1, archive.Reserve(256 << 20), 256 << 20, 256 << 20, false));
+        check(detect(archive, items) == "plain", "an archive of only 256 MiB entries opens as plain");
+        check(archive.bytesRead == 0, "without reading them (" + std::to_string(archive.bytesRead) + " bytes read)");
+    }
+}
+
 static int runTests()
 {
     std::filesystem::path dir = std::filesystem::temp_directory_path() / ("vnkk-cipher-test-" + std::to_string(getpid()));
@@ -380,6 +497,8 @@ static int runTests()
     tTVPXP3Archive *badChunk = tryOpenArchive(path("chunksize.xp3"));
     alarm(0);
     check(!badChunk, "an index chunk whose size overflows is rejected");
+
+    checkDetectionWork();
 
     for (tTVPXP3Archive *archive :
          {plain, xorArchive, banded, decoy, largeArchive, longArchive, placeholder, unknown, overflow, hugeArchive, packed})

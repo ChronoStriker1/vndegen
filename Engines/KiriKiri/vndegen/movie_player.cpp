@@ -179,6 +179,8 @@ public:
 
     void OnContinuousCallback(tjs_uint64) override;
 
+    void StopDecoding() { decoder->Stop(); }
+
     size_t Queued() override { return sound->GetQueuedSamples(); }
     void Write(const int16_t *samples, size_t frames, double pts) override;
     void End() override;
@@ -233,8 +235,10 @@ private:
     unsigned long mixingColor = 0xff000000;
 };
 
-// Every live player, for VNKKDestroyMoviePlayers. Main thread only.
+// Every live player, for VNKKStopMovieWorkers and VNKKDestroyMoviePlayers. Main thread only.
 static std::vector<MoviePlayer *> livePlayers;
+// From VNKKStopMovieWorkers until VNKKDestroyMoviePlayers, while the engine shuts down.
+static bool workersStopped = false;
 
 MoviePlayer::MoviePlayer(iTVPVideoCallback *callback, std::unique_ptr<MovieDecoder> decoder,
                          const ttstr &name, MovieMode mode)
@@ -514,15 +518,27 @@ void MoviePlayer::LogProgress(double now)
                      info.audioRate ? stats.audioFrames / (double)info.audioRate : 0.0, queued));
 }
 
+void VNKKStopMovieWorkers()
+{
+    workersStopped = true;
+    for (MoviePlayer *player : livePlayers)
+        player->StopDecoding();
+}
+
 void VNKKDestroyMoviePlayers()
 {
     while (!livePlayers.empty())
         delete livePlayers.back();
+    workersStopped = false;
 }
 
 iTVPVideoOverlay *VNKKCreateMoviePlayer(iTVPVideoCallback *callback, tTJSBinaryStream *stream,
                                         const ttstr &name, MovieMode mode)
 {
+    if (workersStopped) {
+        delete stream;
+        return nullptr;
+    }
     std::string error;
     std::unique_ptr<MovieDecoder> decoder = MovieDecoder::Open(stream, error);
     if (!decoder) {

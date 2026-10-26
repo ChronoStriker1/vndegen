@@ -12,6 +12,8 @@
 #include "TVPDebug.h"
 #include "TVPMsg.h"
 #include "movie_player.h"
+#include "xp3filter.h"
+#include "TextStream.h"
 #include "TVPScript.h"
 #include "TVPPlugin.h"
 
@@ -160,14 +162,24 @@ bool tTVPApplication::Run()
 
 void tTVPApplication::ProcessMessages()
 {
-    std::vector<std::tuple<void*, int, tMsg>> lstUserMsg;
+    // Messages run one at a time off the queue, so a handler that cancels a later message of this
+    // batch, as deleting a VideoOverlay does, stops it. Messages posted meanwhile wait for the next call.
+    tjs_uint64 end;
     {
         tTJSCSH cs(m_msgQueueLock);
-        m_lstUserMsg.swap(lstUserMsg);
+        end = m_nextMsgSeq;
     }
-    for (std::tuple<void*, int, tMsg>& it : lstUserMsg)
+    for (;;)
     {
-        std::get<2>(it)();
+        tMsg func;
+        {
+            tTJSCSH cs(m_msgQueueLock);
+            if (m_lstUserMsg.empty() || m_lstUserMsg.front().seq >= end)
+                break;
+            func = std::move(m_lstUserMsg.front().func);
+            m_lstUserMsg.pop_front();
+        }
+        func();
     }
     TVPTimer::ProgressAllTimer();
 }
@@ -181,18 +193,25 @@ void tTVPApplication::Terminate()
 void tTVPApplication::PostUserMessage(const std::function<void()>& func, void* host, int msg)
 {
     tTJSCSH cs(m_msgQueueLock);
-    m_lstUserMsg.emplace_back(host, msg, func);
+    m_lstUserMsg.push_back({host, msg, func, m_nextMsgSeq++});
 }
 
-void tTVPApplication::FilterUserMessage(
-    const std::function<void(std::vector<std::tuple<void*, int, tMsg>>&)>& func)
+void tTVPApplication::CancelUserMessages(void* host, int msg)
 {
     tTJSCSH cs(m_msgQueueLock);
-    func(m_lstUserMsg);
+    for (auto it = m_lstUserMsg.begin(); it != m_lstUserMsg.end();)
+    {
+        if (it->host == host && (!msg || it->msg == msg))
+            it = m_lstUserMsg.erase(it);
+        else
+            ++it;
+    }
 }
 
 void tTVPApplication::OnExit()
 {
+    // Movie decoders read archives on their own threads, through plugins and scripts deleted below.
+    VNKKStopMovieWorkers();
     TVPSystemUninit();
     TVPUnloadPlugins();
 
@@ -203,8 +222,10 @@ void tTVPApplication::OnExit()
     if (TVPSystemControl)
         delete TVPSystemControl;
     TVPSystemControl = NULL;
+    TVPClearXP3Filter();
     TVPUninitScriptEngine();
     VNKKDestroyMoviePlayers();
+    TVPResetDefaultReadEncoding();
     TVPClearAllAutoPath();
     TVPClearAllWindows();
     krkrsdl3::TVPClearAllTexture();
