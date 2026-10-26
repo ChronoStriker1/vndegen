@@ -64,7 +64,13 @@ let package = Package(
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rsync", "RsyncTestSupport", "EngineRPGMaker", "EngineRenPy"],
                     exclude: ["Fixtures"]),
         .target(name: "RsyncTestSupport", dependencies: ["Rsync"], path: "Tests/RsyncTestSupport"),
-        .testTarget(name: "RsyncTests", dependencies: ["Rsync", "RsyncTestSupport"]),
+        .testTarget(name: "RsyncTests", dependencies: [
+            "Rsync", "RsyncTestSupport",
+            .product(name: "NIOCore", package: "swift-nio"),
+            .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+            .product(name: "NIOPosix", package: "swift-nio"),
+            .product(name: "NIOSSH", package: "swift-nio-ssh"),
+        ]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]
 )

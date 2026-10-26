@@ -1,5 +1,9 @@
 import CryptoKit
 import Foundation
+import NIOConcurrencyHelpers
+import NIOCore
+import NIOPosix
+import NIOSSH
 import Testing
 @testable import Rsync
 import RsyncTestSupport
@@ -201,5 +205,92 @@ private let sshTest: (server: SSHServer, key: Curve25519.Signing.PrivateKey, hos
     await #expect(throws: SSHError.timedOut) { try await sleeper.finish() }
     #expect(ContinuousClock.now - start < .seconds(10))
     await #expect(throws: (any Error).self) { _ = try await connection.start(["true"]) }
+    await connection.close()
+}
+
+@Test(.enabled(if: rsyncPath != nil)) func aDeclinedFileIsNeverSent() async throws {
+    let remote = try temporaryDirectory(), local = try temporaryDirectory()
+    try write(["Game/mapping.yaml": "old"], under: remote)
+    try write(["mapping.yaml": "new mapping"], under: local)
+    let url = local.appendingPathComponent("mapping.yaml")
+    let upload = RsyncClient.Upload(entry: RsyncEntry(path: "mapping.yaml", kind: .file, size: 11, modified: 1_760_000_000, permissions: 0o666),
+                                    source: url)
+    let client = RsyncClient(connection: ProcessConnection())
+    let game = remote.appendingPathComponent("Game")
+
+    // The server asks for the file, and the answer is no: its copy stays, and no temporary file is left beside it.
+    let asked = NIOLockedValueBox<[String]>([])
+    let declined = try await client.push([upload], to: game.path + "/", owners: false) { path in
+        asked.withLockedValue { $0.append(path) }
+        return false
+    }
+    #expect(declined.isEmpty && asked.withLockedValue { $0 } == ["mapping.yaml"])
+    #expect(try fm.contentsOfDirectory(atPath: game.path) == ["mapping.yaml"])
+    #expect(try files(under: game) == ["mapping.yaml": "old"])
+
+    let sent = try await client.push([upload], to: game.path + "/", owners: false) { _ in true }
+    #expect(sent == ["mapping.yaml"])
+    #expect(try files(under: game) == ["mapping.yaml": "new mapping"])
+}
+
+/// A local server for SSH tests. With `ssh` false it accepts TCP connections and never says anything, as a server
+/// stuck before its SSH banner. With `ssh` true it speaks SSH, takes any key, opens channels, and never answers a
+/// command.
+private final class StuckServer {
+    let channel: Channel
+    let hostKey: String
+
+    init(ssh: Bool) async throws {
+        let key = NIOSSHPrivateKey(ed25519Key: .init())
+        hostKey = String(openSSHPublicKey: key.publicKey)
+        channel = try await ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+            .childChannelInitializer { child in
+                child.eventLoop.makeCompletedFuture {
+                    guard ssh else { return }
+                    let handler = NIOSSHHandler(role: .server(.init(hostKeys: [key], userAuthDelegate: AnyKey())), allocator: child.allocator) { channel, _ in
+                        channel.eventLoop.makeCompletedFuture { try channel.pipeline.syncOperations.addHandler(IgnoreRequests()) }
+                    }
+                    try child.pipeline.syncOperations.addHandler(handler)
+                }
+            }
+            .bind(host: "127.0.0.1", port: 0).get()
+    }
+
+    var server: SSHServer { SSHServer(host: "127.0.0.1", port: channel.localAddress?.port ?? 0, user: "test") }
+
+    private final class AnyKey: NIOSSHServerUserAuthenticationDelegate, @unchecked Sendable {
+        var supportedAuthenticationMethods: NIOSSHAvailableUserAuthenticationMethods { .publicKey }
+
+        func requestReceived(request: NIOSSHUserAuthenticationRequest, responsePromise: EventLoopPromise<NIOSSHUserAuthenticationOutcome>) {
+            responsePromise.succeed(.success)
+        }
+    }
+
+    /// Swallows channel requests such as exec, so none is ever answered.
+    private final class IgnoreRequests: ChannelInboundHandler, @unchecked Sendable {
+        typealias InboundIn = SSHChannelData
+        func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {}
+    }
+}
+
+@Test func cancellingALoginInProgressEndsItAtOnce() async throws {
+    let stuck = try await StuckServer(ssh: false)
+    defer { stuck.channel.close(promise: nil) }
+    let start = ContinuousClock.now
+    let server = stuck.server, hostKey = stuck.hostKey
+    let login = Task { _ = try await SSHConnection.connect(to: server, key: .init(), hostKey: hostKey) }
+    try await Task.sleep(for: .milliseconds(300))
+    login.cancel()
+    await #expect(throws: CancellationError.self) { try await login.value }
+    #expect(ContinuousClock.now - start < .seconds(3))
+}
+
+@Test func aCommandTheServerNeverAcceptsTimesOut() async throws {
+    let stuck = try await StuckServer(ssh: true)
+    defer { stuck.channel.close(promise: nil) }
+    let connection = try await SSHConnection.connect(to: stuck.server, key: .init(), hostKey: stuck.hostKey, idleTimeout: .seconds(1))
+    let start = ContinuousClock.now
+    await #expect(throws: SSHError.timedOut) { _ = try await connection.start(["rsync", "--server"]) }
+    #expect(ContinuousClock.now - start < .seconds(5))
     await connection.close()
 }

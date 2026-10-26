@@ -56,6 +56,7 @@ public final class SSHConnection: RsyncConnection {
     /// Connects and logs in. Throws `SSHError.unknownHostKey` with the presented key when `hostKey` is nil, so the caller
     /// can ask the user to trust it and connect again with it pinned. A command that sends and receives nothing for
     /// `idleTimeout`, including while the server opens its channel and accepts it, closes the whole connection.
+    /// Cancelling the caller closes a connection that is still being made and throws `CancellationError`.
     public static func connect(to server: SSHServer, key: Curve25519.Signing.PrivateKey, hostKey: String?,
                                timeout: Duration = .seconds(15), idleTimeout: Duration = .seconds(30)) async throws -> SSHConnection {
         let outcome = ConnectionOutcome()
@@ -71,10 +72,20 @@ public final class SSHConnection: RsyncConnection {
                     try channel.pipeline.syncOperations.addHandlers([ssh, LoginWatcher(outcome: outcome)])
                 }
             }
+        let connecting = bootstrap.connect(host: server.host, port: server.port)
+        let connected = connecting.eventLoop.makePromise(of: Channel.self)
+        connecting.cascade(to: connected)
         let channel: Channel
         do {
-            channel = try await bootstrap.connect(host: server.host, port: server.port).get()
+            channel = try await withTaskCancellationHandler {
+                try await connected.futureResult.get()
+            } onCancel: {
+                connected.fail(CancellationError())
+                // A socket that connects after the caller gave up is closed as soon as it does.
+                connecting.whenSuccess { $0.close(promise: nil) }
+            }
         } catch {
+            if Task.isCancelled { throw CancellationError() }
             throw SSHError.unreachable(error.localizedDescription)
         }
         outcome.channel = channel
@@ -83,10 +94,17 @@ public final class SSHConnection: RsyncConnection {
         }
         defer { timer.cancel() }
         do {
-            try await outcome.loggedIn.futureResult.get()
+            try await withTaskCancellationHandler {
+                try await outcome.loggedIn.futureResult.get()
+            } onCancel: {
+                outcome.loggedIn.fail(CancellationError())
+                channel.close(promise: nil)
+            }
+            try Task.checkCancellation()
             return SSHConnection(channel: channel, idleTimeout: TimeAmount(idleTimeout))
         } catch {
             try? await channel.close()
+            if Task.isCancelled { throw CancellationError() }
             throw outcome.error ?? SSHError.unreachable(error.localizedDescription)
         }
     }

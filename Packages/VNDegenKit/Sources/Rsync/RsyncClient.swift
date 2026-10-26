@@ -183,7 +183,13 @@ public struct RsyncClient: Sendable {
     /// Sends `uploads` into the folder `remote`, as `rsync -rtpI` does, plus owner and group when `owners` is set. Every
     /// upload is transferred, even one whose size and time match. Each file lands under a temporary name and replaces
     /// the old one in one rename. Folders listed before their contents are created first.
-    public func push(_ uploads: [Upload], to remote: String, owners: Bool) async throws {
+    ///
+    /// With `confirm`, each file waits until the server has asked for its content, then goes only when `confirm`
+    /// returns true for its path. A file `confirm` declines is never sent, and the server never opens a temporary file
+    /// for it, so its copy on the server stays as it was. Returns the paths that were sent.
+    @discardableResult
+    public func push(_ uploads: [Upload], to remote: String, owners: Bool,
+                     confirm: (@Sendable (String) async throws -> Bool)? = nil) async throws -> [String] {
         let sorted = uploads.sorted { $0.entry.path.utf8.lexicographicallyPrecedes($1.entry.path.utf8) }
         for upload in sorted where RsyncEntry.safeComponents(upload.entry.path) == nil {
             throw RsyncError.localFile("\(upload.entry.path) is not a path inside the folder.")
@@ -194,7 +200,7 @@ public struct RsyncClient: Sendable {
         var buffer = WireBuffer()
         FileListCodec.write(sorted.map(\.entry), owners: owners, into: &buffer)
         try await transport.write(buffer.bytes)
-        try await sendRequested(sorted, session: session)
+        return try await sendRequested(sorted, session: session, confirm: confirm)
     }
 
     /// Deletes the items directly in the folder `remote` whose names are in `names`, folders with all their contents, as
@@ -213,7 +219,7 @@ public struct RsyncClient: Sendable {
         let root = RsyncEntry(path: ".", kind: .directory, size: 0, modified: Int64(Date.now.timeIntervalSince1970), permissions: 0o755)
         FileListCodec.write([root], owners: false, into: &buffer)
         try await transport.write(buffer.bytes)
-        try await sendRequested([Upload(entry: root, source: nil)], session: session)
+        try await sendRequested([Upload(entry: root, source: nil)], session: session, confirm: nil)
     }
 
     /// rsync's wildcards are `*`, `?`, and `[`. A backslash makes the next character plain.
@@ -224,9 +230,11 @@ public struct RsyncClient: Sendable {
         }
     }
 
-    /// The sender's side after the file list: answers each file the server asks for with its whole content.
-    private func sendRequested(_ uploads: [Upload], session: Session) async throws {
+    /// The sender's side after the file list: answers each file the server asks for with its whole content, or with
+    /// nothing when `confirm` declines it, as rsync's own sender does with a file it can't open.
+    private func sendRequested(_ uploads: [Upload], session: Session, confirm: (@Sendable (String) async throws -> Bool)?) async throws -> [String] {
         let reader = session.reader
+        var sent: [String] = []
         var phase = 0
         while true {
             let index = try await reader.int32()
@@ -245,6 +253,7 @@ public struct RsyncClient: Sendable {
             let header = [try await reader.int32(), try await reader.int32(), try await reader.int32(), try await reader.int32()]
             guard header[0] >= 0, header[2] >= 0, header[2] <= 16 else { throw RsyncError.protocolViolation("a checksum header \(header)") }
             _ = try await reader.read(Int(header[0]) * (4 + Int(header[2])))
+            if let confirm, try await !confirm(uploads[Int(index)].entry.path) { continue }
 
             let data: Data
             do { data = try Data(contentsOf: source) } catch { throw RsyncError.localFile("Can't read \(source.path).") }
@@ -271,10 +280,12 @@ public struct RsyncClient: Sendable {
             buffer.int32(0)
             buffer.append(md4.finalize())
             try await session.transport.write(buffer.bytes)
+            sent.append(uploads[Int(index)].entry.path)
         }
         // The receiver's goodbye.
         guard try await reader.int32() == -1 else { throw RsyncError.protocolViolation("no final goodbye") }
         try await session.finish()
+        return sent
     }
 }
 
