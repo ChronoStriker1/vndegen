@@ -71,6 +71,11 @@ struct PlayerView: View {
                     .transition(.opacity)
             }
         }
+        // The game and the touch gamepad get touches near the screen edges at once. iOS otherwise holds them while its own
+        // edge gestures, such as the Home indicator's, decide.
+        #if os(iOS)
+        .defersSystemGestures(on: .all)
+        #endif
         .animation(.easeOut(duration: 0.2), value: menu.isOpen)
         .animation(.easeOut(duration: 0.2), value: isCovered)
         .animation(.easeOut(duration: 0.25), value: needsRotation)
