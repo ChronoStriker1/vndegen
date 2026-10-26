@@ -38,7 +38,7 @@ struct GamePageView: View {
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController else { return }
                 withAnimation(Theme.focusAnimation) {
-                    if let focus, [.pageEngine, .pageOrientation, .pageControls, .pageMapping].contains(focus) {
+                    if let focus, [.pageEngine, .pageVariant, .pageOrientation, .pageControls, .pageMapping].contains(focus) {
                         proxy.scrollTo(focus, anchor: .center)
                     } else {
                         proxy.scrollTo("banner", anchor: .top)
@@ -251,10 +251,13 @@ private struct ControlsSection: View {
     }
 }
 
-/// The engine in use, how it was chosen, and the button that opens the manual override.
+/// The engine in use, how it was chosen, and the button that opens the manual override. Below them, what the engine
+/// says about running this game here, and its advanced options.
 private struct EngineSection: View {
     @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
     let game: Game
+    @State private var note: String?
 
     var body: some View {
         let plugin = hub.library.plugin(for: game.engine)
@@ -290,6 +293,31 @@ private struct EngineSection: View {
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.secondaryText)
             }
+            if let note {
+                Text(note)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let variants = nav.variants(game.id) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(variants.title).font(.system(size: 15, weight: .semibold))
+                        Text(variants.options.first { $0.id == variants.selected }?.title ?? "Automatic, \(variants.automatic)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+                    Spacer()
+                    HubButton(target: .pageVariant, kind: .secondary) { Text("Change") }
+                }
+                .padding(.top, 4)
+            }
+        }
+        // The note can read the game's folder, so it is worked out off the main thread. It follows the engine choice,
+        // the engine's options, and what the last play recorded once that play has finished closing.
+        .task(id: "\(game.engine?.rawValue ?? "")|\(hub.closing.contains(game.id))|\(nav.variantRevision)") {
+            let folder = hub.library.paths.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
+            note = await Task.detached { [game] in plugin?.compatibilityNote(for: game, folder: folder, dataDirectory: data) }.value
         }
     }
 

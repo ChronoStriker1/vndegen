@@ -44,6 +44,9 @@ final class RenPyEmbeddedSession: EngineSession {
                              environment: command.environment.filter { $0.key.hasPrefix("VNDEGEN_") })
         let home = runtimes.appendingPathComponent(RenPyRuntime.renPy8.rawValue).path
         Self.active = self
+        // The hub can pause or end the session before its game starts, so only a new session clears the last one's state.
+        vndegen_renpy_set_paused(0)
+        _ = vndegen_renpy_take_requests()
         vndegen_renpy_set_window_handler { window in
             guard let window else { return }
             let uiWindow = Unmanaged<UIWindow>.fromOpaque(window).takeUnretainedValue()
@@ -60,7 +63,9 @@ final class RenPyEmbeddedSession: EngineSession {
 
     private func run(home: String, code: String) {
         renPyLog.info("starting \(self.launch.game.id.rawValue, privacy: .public) on Ren'Py 8 in process")
+        RenPyBootRecord.started(dataDirectory: launch.dataDirectory, runtime: .renPy8)
         let status = Self.withOutput(to: Self.logFile(launch.dataDirectory)) { vndegen_renpy_run(home, code) }
+        RenPyBootRecord.finished(dataDirectory: launch.dataDirectory, runtime: .renPy8)
         renPyLog.info("\(self.launch.game.id.rawValue, privacy: .public) ended with status \(status)")
         running = false
         Self.active = nil
@@ -188,8 +193,6 @@ private final class RenPyContainerView: UIView {
     /// SDL's view controller, taken from SDL's window. The next game reuses SDL's window, which then has no root view
     /// controller, so the controller is kept for it.
     private static var sdlController: UIViewController?
-    /// Follows the container's size by autoresizing only, because SDL moves it up itself while the on-screen keyboard
-    /// would cover a text prompt.
     private weak var gameView: UIView?
 
     init() {
@@ -216,6 +219,15 @@ private final class RenPyContainerView: UIView {
 
     func clear() {
         gameView?.removeFromSuperview()
+    }
+
+    /// SDL sets the view's frame itself: to the screen's bounds, which follow the snapshots iOS takes in the background,
+    /// and moved up while the on-screen keyboard would cover a text prompt. The view keeps the container's size and only
+    /// SDL's upward move.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let gameView else { return }
+        gameView.frame = bounds.offsetBy(dx: 0, dy: min(0, gameView.frame.minY))
     }
 }
 #endif

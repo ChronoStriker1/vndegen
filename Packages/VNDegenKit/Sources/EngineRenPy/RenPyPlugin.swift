@@ -33,6 +33,52 @@ nonisolated public struct RenPyPlugin: EnginePlugin {
         #endif
     }
 
+    nonisolated public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? {
+        guard let layout = RenPyLayout(FolderProbe(scanning: folder)) else { return nil }
+        #if os(macOS)
+        let runtime = Self.runtimeOverride(dataDirectory: dataDirectory) ?? layout.runtime
+        return "Runs on the bundled Ren'Py \(runtime.version)."
+        #else
+        let base = folder.appendingPathComponent(layout.path(""), isDirectory: true)
+        return RenPyCompatibility.note(layout: layout, fingerprint: RenPyLayout.fingerprint(base: base),
+                                       record: RenPyBootRecord.read(dataDirectory))
+        #endif
+    }
+
+    nonisolated public func backupWarning(for game: Game, dataDirectory: URL) -> String? {
+        RenPyCompatibility.backupWarning(gameVersion: game.detected?.version, runtime: Self.runtime(for: game, dataDirectory: dataDirectory))
+    }
+
+    /// The runtime choice is macOS only, since iOS has only Ren'Py 8. An advanced option: detection gets it right for
+    /// almost every game.
+    nonisolated public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? {
+        #if os(macOS)
+        let automatic = game.detected?.version.map { Self.line(of: $0) }
+        return EngineVariants(
+            title: "Ren'Py runtime",
+            options: RenPyRuntime.allCases.map { .init(id: $0.rawValue, title: "Ren'Py \($0.version)") },
+            selected: Self.runtimeOverride(dataDirectory: dataDirectory)?.rawValue,
+            automatic: automatic.map { "Ren'Py \($0.version), for the game's version" } ?? "Picked from the game's files")
+        #else
+        nil
+        #endif
+    }
+
+    nonisolated public func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws {
+        try Self.setRuntimeOverride(id.flatMap(RenPyRuntime.init(rawValue:)), dataDirectory: dataDirectory)
+    }
+
+    /// The runtime a game runs on here: always Ren'Py 8 on iOS, and on macOS the player's choice or its own line.
+    static func runtime(for game: Game, dataDirectory: URL) -> RenPyRuntime {
+        #if os(macOS)
+        return runtimeOverride(dataDirectory: dataDirectory) ?? game.detected?.version.map(line) ?? .renPy8
+        #else
+        return .renPy8
+        #endif
+    }
+
+    static func line(of version: String) -> RenPyRuntime { (Int(version.prefix { $0.isNumber }) ?? 8) >= 8 ? .renPy8 : .renPy7 }
+
     /// The runtime the player picked for a game, which wins over the one its version calls for. Nil when they have not
     /// picked one. An advanced option: detection gets it right for almost every game.
     public static func runtimeOverride(dataDirectory: URL) -> RenPyRuntime? {

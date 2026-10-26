@@ -62,17 +62,6 @@ func resolvedComponents(_ url: URL) -> [String] {
     return (existing.resolvingSymlinksInPath().pathComponents + missing).map { $0.lowercased() }
 }
 
-/// The first line that names a Python exception in Ren'Py's traceback, or else in its log.
-func firstError(_ files: [URL]) -> String? {
-    for file in files {
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
-        if let line = text.split(separator: "\n").first(where: { $0.firstMatch(of: #/^[A-Za-z.]*(Error|Exception)\b/#) != nil }) {
-            return String(line.prefix(120))
-        }
-    }
-    return nil
-}
-
 let options = Options(Array(CommandLine.arguments.dropFirst()))
 guard let support = RenPyCommand.support else { fatalError("EngineRenPy's Support folder is missing") }
 let names = ((try? FileManager.default.contentsOfDirectory(atPath: options.games.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
@@ -134,7 +123,7 @@ for (name, folder, layout) in games {
         + before.keys.filter { !FileManager.default.fileExists(atPath: folder.path + $0) }.count
     let result = (try? String(contentsOf: probe.appendingPathComponent("result.txt"), encoding: .utf8))?
         .trimmingCharacters(in: .whitespacesAndNewlines) ?? "no result, exit \(process.terminationStatus)"
-    let error = firstError([data.appendingPathComponent("logs/traceback.txt"), stdout]) ?? ""
+    let error = RenPyBootRecord.firstError([data.appendingPathComponent("logs/traceback.txt"), stdout]) ?? ""
     let version = layout.version ?? "?"
     let fingerprint = RenPyLayout.fingerprint(base: base) ?? "-"
     print("| \(name) | \(version) | \(fingerprint) | \(runtime.displayName) (\(options.runtime == nil ? layout.evidence.rawValue : "forced")) | \(result) | \(seconds) | \(changed == 0 ? "unchanged" : "\(changed) files changed") | \(error) |")

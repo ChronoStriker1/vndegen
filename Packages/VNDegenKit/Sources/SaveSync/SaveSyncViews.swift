@@ -204,8 +204,14 @@ public final class GameSavesModel {
     }
 
     enum Confirmation: Identifiable {
-        case restore(String), undo
-        var id: String { if case let .restore(name) = self { name } else { "undo" } }
+        case restore(String), undo, backUp
+        var id: String {
+            switch self {
+            case let .restore(name): name
+            case .undo: "undo"
+            case .backUp: "backUp"
+            }
+        }
     }
 
     public let service: SaveSyncService
@@ -279,7 +285,8 @@ public final class GameSavesModel {
             choosingGame = true
         case let .backup(name): selected = name
         case .restore: if let selected { confirming = .restore(selected) }
-        case .backUp: run { try await self.backUp() }
+        case .backUp:
+            if service.backupWarning(game) == nil { run { try await self.backUp() } } else { confirming = .backUp }
         case .undo: if service.canUndoRestore(game) { confirming = .undo }
         case .automaticMatch: pick(nil)
         case let .folder(folder): pick(folder)
@@ -291,6 +298,7 @@ public final class GameSavesModel {
         switch confirmation {
         case let .restore(name): run { try await self.restore(name) }
         case .undo: run { try await self.undo() }
+        case .backUp: run { try await self.backUp() }
         }
     }
 
@@ -406,6 +414,7 @@ public struct GameSavesView: View {
             switch confirmation {
             case .restore: Button("Restore") { model.perform(confirmation) }
             case .undo: Button("Undo Restore", role: .destructive) { model.perform(confirmation) }
+            case .backUp: Button("Back Up") { model.perform(confirmation) }
             }
         } message: { confirmation in
             // The dialog's buttons show no gamepad focus, so controller users get the buttons spelled out.
@@ -413,6 +422,7 @@ public struct GameSavesView: View {
             switch confirmation {
             case .restore: Text("Saves with the same names are replaced. Your current saves are kept so you can undo." + hint)
             case .undo: Text("Puts back the saves you had before the last restore. Progress saved since then is lost." + hint)
+            case .backUp: Text((model.service.backupWarning(model.game) ?? "") + hint)
             }
         }
         .sheet(isPresented: $model.choosingGame) {
@@ -451,6 +461,9 @@ public struct GameSavesView: View {
                 .disabled(!model.service.canUndoRestore(model.game))
                 .focusRow(model.isFocused(.undo), id: GameSavesModel.Target.undo)
         } footer: {
+            if let warning = model.service.backupWarning(model.game) {
+                Label(warning, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+            }
             if model.busy {
                 ProgressView()
             } else if let status = model.status {
@@ -464,6 +477,7 @@ public struct GameSavesView: View {
         switch model.confirming {
         case let .restore(name): "Restore \(model.backups.first { $0.name == name }.map(BackupRow.title) ?? name)?"
         case .undo: "Undo the last restore?"
+        case .backUp: "Back up anyway?"
         case nil: ""
         }
     }

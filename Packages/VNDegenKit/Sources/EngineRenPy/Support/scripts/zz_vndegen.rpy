@@ -58,6 +58,16 @@ init 999 python in _vndegen:
             quit_requested = False
             quit_game()
 
+    # Tells VNDegen the game booted, for the game page. Ren'Py's traceback.txt beside it tells it when a game failed.
+    main_menu_noted = [not os.environ.get("VNDEGEN_DATA")]
+
+    def note_main_menu():
+        if not main_menu_noted[0] and (renpy.store.main_menu or renpy.get_screen("main_menu")):
+            main_menu_noted[0] = True
+            open(os.path.join(os.environ["VNDEGEN_DATA"], "logs", "main-menu"), "w").close()
+
+    config.periodic_callbacks.append(note_main_menu)
+
     if renpy.ios:
         # VNDegen runs inside the same app, so it asks through its host instead of with a signal. The host also pauses
         # the game while VNDegen covers it, such as with the unlock screen.

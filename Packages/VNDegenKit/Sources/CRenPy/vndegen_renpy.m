@@ -84,8 +84,6 @@ int vndegen_renpy_run(const char *home, const char *code) {
         SDL_SetMainReady();
         Py_InitializeEx(0);
     }
-    requests = 0;
-    paused = 0;
     // SDL runs the main run loop each time Ren'Py reads events, which keeps UIKit and the hub responsive.
     SDL_iPhoneSetEventPump(1);
     int status = PyRun_SimpleString(code);

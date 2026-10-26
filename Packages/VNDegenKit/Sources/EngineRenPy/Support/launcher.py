@@ -25,7 +25,9 @@ data = os.environ["VNDEGEN_DATA"]
 scripts = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
 
 # Ren'Py's log goes to stdout, which VNDegen writes to the data directory, because read-only mode turns log.txt off.
-os.environ["RENPY_LOG_TO_STDOUT"] = "1"
+# Ren'Py on iOS logs to stdout already, and with this set it would drop what the game prints.
+if not os.environ.get("RENPY_PLATFORM", "").startswith("ios"):
+    os.environ["RENPY_LOG_TO_STDOUT"] = "1"
 
 renpy_py = os.path.join(runtime, "renpy.py")
 main = types.ModuleType("renpy_main")

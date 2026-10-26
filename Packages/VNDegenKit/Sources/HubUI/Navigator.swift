@@ -25,6 +25,8 @@ final class Navigator {
     enum Sheet: Identifiable {
         case unlock
         case engine(GameID)
+        /// The engine's advanced options for a game, such as the Ren'Py runtime.
+        case variant(GameID)
         case orientation(GameID)
         case controlMethod(GameID)
         case mapping(ButtonMappingEditor)
@@ -38,6 +40,7 @@ final class Navigator {
             switch self {
             case .unlock: "unlock"
             case let .engine(id): "engine:\(id)"
+            case let .variant(id): "variant:\(id)"
             case let .orientation(id): "orientation:\(id)"
             case let .controlMethod(id): "controlMethod:\(id)"
             case let .mapping(editor): "mapping:\(editor.gameID)"
@@ -77,11 +80,12 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation, pageControls, pageMapping
+        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
         case controlMethod, playOrientation
         case engineOption(EngineID?)
+        case variantOption(String?)
         case orientationOption(PlayOrientation?)
         case controlMethodOption(ControlMethod?)
         case artworkSlot(ArtworkSlot)
@@ -161,7 +165,7 @@ final class Navigator {
     func rows() -> [Row] {
         if let sheet {
             switch sheet {
-            case .engine, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
+            case .engine, .variant, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case let .artwork(editor):
                 let columns = max(1, editor.columns)
                 let candidates = stride(from: 0, to: editor.candidates.count, by: columns).enumerated().map { index, start in
@@ -204,7 +208,8 @@ final class Navigator {
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
-            ] + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
+            ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
+                + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
             var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
             #if os(iOS)
@@ -336,12 +341,16 @@ final class Navigator {
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
         case let .settingsPage(page): sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
+        case .pageVariant: if let id = pageGameID { sheet = .variant(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
         case .pageControls: if let id = pageGameID { sheet = .controlMethod(id) }
         case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
         case let .engineOption(engine):
             if case let .engine(id) = sheet { hub.library.update(id) { $0.engineOverride = engine } }
+            sheet = nil
+        case let .variantOption(variant):
+            if case let .variant(id) = sheet { selectVariant(variant, for: id) }
             sheet = nil
         case let .orientationOption(orientation):
             if case let .orientation(id) = sheet { hub.library.update(id) { $0.orientation = orientation } }
@@ -433,6 +442,27 @@ final class Navigator {
         UserDefaults.standard.set(values[(index + step + values.count) % values.count].rawValue, forKey: key)
     }
     #endif
+
+    /// Bumped when an engine option changes, so views that show one read it again. The engine keeps it outside the
+    /// library.
+    private(set) var variantRevision = 0
+
+    /// The game's engine options, such as the Ren'Py runtime on macOS. Nil when its engine has none here.
+    func variants(_ id: GameID) -> EngineVariants? {
+        _ = variantRevision
+        guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return nil }
+        return plugin.variants(for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+    }
+
+    private func selectVariant(_ variant: String?, for id: GameID) {
+        guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return }
+        do {
+            try plugin.selectVariant(variant, for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+        } catch {
+            hub.launchError = error.localizedDescription
+        }
+        variantRevision += 1
+    }
 
     var pageGameID: GameID? {
         if case let .game(id) = route { return id }
@@ -541,6 +571,10 @@ final class Navigator {
                 .filter { $0.platforms.contains(.current) }
                 .map { Choice(target: .engineOption($0.id), title: $0.displayName) }
             return [Choice(target: .engineOption(nil), title: "Automatic", detail: "Detected: \(detected ?? "none")")] + manual
+        case let .variant(id):
+            guard let variants = variants(id) else { return [] }
+            return [Choice(target: .variantOption(nil), title: "Automatic", detail: variants.automatic)]
+                + variants.options.map { Choice(target: .variantOption($0.id), title: $0.title) }
         case .orientation:
             let fixed = PlayOrientation.allCases.map { Choice(target: .orientationOption($0), title: $0.title) }
             return [Choice(target: .orientationOption(nil), title: "Use default", detail: "Currently \(PlayOrientation.setting.title), from Settings")] + fixed
@@ -555,6 +589,7 @@ final class Navigator {
     func selectedChoice(for sheet: Sheet) -> Target? {
         switch sheet {
         case let .engine(id): .engineOption(hub.library.game(id)?.engineOverride)
+        case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
         case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping: nil

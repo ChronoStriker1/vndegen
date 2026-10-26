@@ -81,10 +81,53 @@ public protocol EnginePlugin: Sendable {
     @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession
     /// Where this engine keeps a game's saves on this device. Save sync uses it to restore and back up.
     func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation]
+    /// What the game page says about how a game runs on this device, such as whether it is known to work. Nil when
+    /// there is nothing to say.
+    func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String?
+    /// Shown before VNDegen backs up a game's saves to Ludusavi, such as when the game's PC version can't load saves
+    /// made here. Nil when there is nothing to warn about.
+    func backupWarning(for game: Game, dataDirectory: URL) -> String?
+    /// Another way to run a game, such as a different Ren'Py runtime, for the game page's advanced options. Nil when
+    /// the engine has none on this device.
+    func variants(for game: Game, dataDirectory: URL) -> EngineVariants?
+    func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws
 }
 
 extension EnginePlugin {
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] { [] }
+    public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? { nil }
+    public func backupWarning(for game: Game, dataDirectory: URL) -> String? { nil }
+    public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? { nil }
+    public func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws {}
+}
+
+/// The ways an engine can run one game, such as the Ren'Py runtimes. Automatic, the engine's own choice, is the
+/// default.
+public struct EngineVariants: Sendable {
+    public struct Option: Sendable, Hashable {
+        public let id: String
+        public let title: String
+
+        public init(id: String, title: String) {
+            self.id = id
+            self.title = title
+        }
+    }
+
+    /// Such as "Ren'Py runtime".
+    public let title: String
+    public let options: [Option]
+    /// Nil while automatic.
+    public let selected: String?
+    /// What automatic picks for this game, such as "Ren'Py 7, from the game's version".
+    public let automatic: String
+
+    public init(title: String, options: [Option], selected: String?, automatic: String) {
+        self.title = title
+        self.options = options
+        self.selected = selected
+        self.automatic = automatic
+    }
 }
 
 /// A directory where an engine keeps saves, plus the rule that recognizes the same saves on other machines.

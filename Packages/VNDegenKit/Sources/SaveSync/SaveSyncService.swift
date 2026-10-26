@@ -187,6 +187,13 @@ public final class SaveSyncService {
         return report
     }
 
+    /// What to tell the player before backing up a game's saves, such as when its PC version can't load them. Nil when
+    /// there is nothing to say.
+    public func backupWarning(_ id: GameID) -> String? {
+        guard let game = library.game(id), let plugin = library.plugin(for: game.engine) else { return nil }
+        return plugin.backupWarning(for: game, dataDirectory: library.paths.dataDirectory(for: id))
+    }
+
     /// Call when a game session ends. Backs up when automatic backup is on and the game has a Ludusavi match.
     public func sessionEnded(_ id: GameID) async {
         guard autoBackup, store != nil else { return }

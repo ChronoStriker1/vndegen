@@ -271,3 +271,58 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
     #expect(command(.renPy8, game: .renPy8).environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
     #expect(command(.renPy7, game: .renPy7).environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
 }
+
+/// The fingerprint names no game, ignores everything but the scripts and archives directly in game/, and changes with
+/// their names or sizes.
+@Test func fingerprintsAReleaseByItsScriptsAndArchives() throws {
+    let base = try folder(["game/archive.rpa": "abc", "game/script.rpyc": "de", "game/saves/1-1-LT1.save": "x", "game/gui/a.png": "y"])
+    let fingerprint = try #require(RenPyLayout.fingerprint(base: base))
+    #expect(fingerprint.count == 16)
+    let sameRelease = try folder(["game/script.rpyc": "fg", "game/archive.rpa": "hij", "game/cache/x.rpyb": "z"])
+    #expect(RenPyLayout.fingerprint(base: sameRelease) == fingerprint)
+    let otherRelease = try folder(["game/archive.rpa": "abcd", "game/script.rpyc": "de"])
+    #expect(RenPyLayout.fingerprint(base: otherRelease) != fingerprint)
+    #expect(RenPyLayout.fingerprint(base: try folder(["game/gui/a.png": ""])) == nil)
+}
+
+/// Older Ren'Py can't load saves from a newer release, so only games older than the runtime that saves them warn.
+@Test func warnsBeforeBackingUpSavesTheGamesOwnRenPyCantLoad() {
+    #expect(RenPyCompatibility.backupWarning(gameVersion: "7.4.2", runtime: .renPy8)?.contains("Ren'Py 7.4.2") == true)
+    #expect(RenPyCompatibility.backupWarning(gameVersion: "7.4.2", runtime: .renPy7) != nil)
+    #expect(RenPyCompatibility.backupWarning(gameVersion: "8.3.4", runtime: .renPy8) != nil)
+    #expect(RenPyCompatibility.backupWarning(gameVersion: "8.5.3", runtime: .renPy8) == nil)
+    #expect(RenPyCompatibility.backupWarning(gameVersion: "7.8.7", runtime: .renPy7) == nil)
+    #expect(RenPyCompatibility.backupWarning(gameVersion: nil, runtime: .renPy8) == nil)
+}
+
+/// A run that reached the main menu counts as working even if Ren'Py failed later, and an error before it is kept.
+@Test func recordsHowARunWent() throws {
+    let data = try folder([:])
+    RenPyBootRecord.started(dataDirectory: data, runtime: .renPy8)
+    #expect(RenPyBootRecord.read(data) == RenPyBootRecord(result: .started, runtime: "8.5.3"))
+
+    let logs = data.appendingPathComponent("logs", isDirectory: true)
+    try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+    try Data("I'm sorry, but an uncaught exception occurred.\n\nTypeError: unsupported operand\n".utf8)
+        .write(to: logs.appendingPathComponent("traceback.txt"))
+    RenPyBootRecord.finished(dataDirectory: data, runtime: .renPy8)
+    #expect(RenPyBootRecord.read(data) == RenPyBootRecord(result: .failed, runtime: "8.5.3", error: "TypeError: unsupported operand"))
+
+    RenPyBootRecord.started(dataDirectory: data, runtime: .renPy8)
+    #expect(!FileManager.default.fileExists(atPath: logs.appendingPathComponent("traceback.txt").path))
+    try Data().write(to: logs.appendingPathComponent("main-menu"))
+    RenPyBootRecord.finished(dataDirectory: data, runtime: .renPy8)
+    #expect(RenPyBootRecord.read(data)?.result == .reachedMainMenu)
+}
+
+@Test func notesHowARenPy7GameRunsOnRenPy8() {
+    let renPy7 = RenPyLayout(base: "", version: "7.4.2", runtime: .renPy7, evidence: .version)
+    let worked = RenPyBootRecord(result: .reachedMainMenu, runtime: "8.5.3")
+    #expect(RenPyCompatibility.note(layout: renPy7, fingerprint: nil, record: worked)
+        == "A Ren'Py 7.4.2 game, which runs on Ren'Py 8.5.3 here. It reached its main menu on this device.")
+    #expect(RenPyCompatibility.note(layout: renPy7, fingerprint: nil, record: nil)?.hasSuffix("It hasn't been tested on Ren'Py 8 yet.") == true)
+    let renPy8 = RenPyLayout(base: "", version: "8.5.3", runtime: .renPy8, evidence: .version)
+    #expect(RenPyCompatibility.note(layout: renPy8, fingerprint: nil, record: worked) == nil)
+    #expect(RenPyCompatibility.note(layout: renPy8, fingerprint: nil, record: RenPyBootRecord(result: .failed, runtime: "8.5.3", error: "KeyError: x"))
+        == "Last time it stopped with an error: KeyError: x.")
+}
