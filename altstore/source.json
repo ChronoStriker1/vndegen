@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.2.3",
+          "buildVersion": "95",
+          "date": "2026-10-26T07:30:53Z",
+          "localizedDescription": "Fixes for TyranoScript games from the code review.\n\n## Downloads\n\n- `VNDegen-0.2.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.2.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n\n## Fixed\n\n- Ogg audio is now decoded inside the game's page (libvorbis compiled to WebAssembly) instead of by VNDegen itself, so a damaged audio file can no longer crash or corrupt the app. Decoding is limited to two tracks at a time and an 11-minute track length, and the decoded cache is capped.\n- A malformed `app.asar` package is rejected cleanly instead of crashing VNDegen during a library scan.\n- `Config.tjs` is read exactly the way TyranoScript reads it, so VNDegen backs up the right kind of saves.\n- Ludusavi backups of Electron TyranoScript games include the save key, so saves restored from another device load without Tyrano refusing them.\n- Browser-storage saves whose names differ only in upper and lower case no longer overwrite each other on Mac, and a failed save write can no longer wipe saves from memory.\n- A controller can reach every choice in TyranoScript games that mix their own buttons with Tyrano's.\n\n## Known limits\n\n- Ogg tracks longer than about 11 minutes, and chained Ogg files past their first part, play silent on iPhone and iPad.\n- Typing a name with a controller does not bring up the keyboard; use touch or a hardware keyboard.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.2.3/VNDegen-0.2.3.ipa",
+          "size": 2544303,
+          "sha256": "53322efb4030ca1342040b7b8d6d72bae33b5cdd915e9658240d766e2946a246",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.2.2",
           "buildVersion": "81",
           "date": "2026-10-26T06:24:09Z",
