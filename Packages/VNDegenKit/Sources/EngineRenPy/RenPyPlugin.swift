@@ -17,6 +17,9 @@ nonisolated public struct RenPyPlugin: EnginePlugin {
         EngineDescriptor(id: .renPy, displayName: "Ren'Py", shortName: "Ren'Py", platforms: [.macOS, .iOS])
     }
 
+    /// The game window takes touches directly, with no touch controls over it.
+    public var readsTouches: Bool { true }
+
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
         guard let layout = RenPyLayout(probe) else { return nil }
         return EngineMatch(engine: descriptor.id, confidence: .certain, version: layout.version, evidence: layout.path("renpy/"))

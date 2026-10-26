@@ -217,25 +217,26 @@ private struct OrientationSection: View {
 
 /// The game's control method on a touch device, its button mapping, and the buttons that change them.
 private struct ControlsSection: View {
+    @Environment(Navigator.self) private var nav
     let game: Game
 
     var body: some View {
         let remapped = game.buttonMapping?.count ?? 0
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Controls", systemImage: "gamecontroller")
-            #if os(iOS)
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text((game.controlMethod ?? ControlMethod.setting).title)
-                        .font(.system(size: 17, weight: .bold))
-                    Text(game.controlMethod == nil ? "Default from Settings" : "Set for this game")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.secondaryText)
+            if nav.offersControlMethod(game.id) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text((game.controlMethod ?? ControlMethod.setting).title)
+                            .font(.system(size: 17, weight: .bold))
+                        Text(game.controlMethod == nil ? "Default from Settings" : "Set for this game")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+                    Spacer()
+                    HubButton(target: .pageControls, kind: .secondary) { Text("Change") }
                 }
-                Spacer()
-                HubButton(target: .pageControls, kind: .secondary) { Text("Change") }
             }
-            #endif
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Button mapping")
