@@ -16,6 +16,8 @@ import VNCore
 ///     tap 0.5 0.5         pointer down and up at normalized view coordinates
 ///     scroll -30          one wheel event
 ///     js <expression>     evaluate in the page and log the result
+///     until 30 <expr>     poll the expression every 250 ms until it is truthy, for at most the given seconds
+///     repeat confirm 60 <expr>  press the button every 800 ms until the expression is truthy, for at most the seconds
 ///     fps 5               count animation frames and engine updates for the given seconds and log the rates
 ///     log <text>          write a marker to the app log
 ///     quit                end the session the way the game's Quit command would
@@ -26,6 +28,8 @@ nonisolated enum InputStep: Equatable, Sendable {
     case tap(CGPoint)
     case scroll(Double)
     case js(String)
+    case until(Double, String)
+    case repeatPress(VirtualButton, Double, String)
     case fps(Double)
     case log(String)
     case quit
@@ -60,6 +64,12 @@ nonisolated enum InputScript {
         case "tap": if words.count == 3, let x = Double(words[1]), let y = Double(words[2]) { return .tap(CGPoint(x: x, y: y)) }
         case "scroll": if let dy = Double(rest) { return .scroll(dy) }
         case "js": if !rest.isEmpty { return .js(rest) }
+        case "repeat":
+            if words.count >= 4, let b = VirtualButton(rawValue: words[1]), let s = Double(words[2]) {
+                return .repeatPress(b, s, words.dropFirst(3).joined(separator: " "))
+            }
+        case "until":
+            if words.count >= 3, let s = Double(words[1]) { return .until(s, words.dropFirst(2).joined(separator: " ")) }
         case "fps": if let s = Double(rest), s > 0 { return .fps(s) }
         case "log": return .log(rest)
         case "quit": return .quit

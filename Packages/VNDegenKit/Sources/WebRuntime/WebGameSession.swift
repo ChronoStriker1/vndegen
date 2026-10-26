@@ -8,27 +8,47 @@ import UIKit
 import AppKit
 #endif
 
+/// What the page sees around it: the desktop runtime its PC build shipped in.
+nonisolated public enum PageRuntime: Sendable, Equatable {
+    /// NW.js. `execPath` is what `process.execPath` reports, a virtual path.
+    case nwjs(execPath: String)
+    /// Electron with Node integration. `appPath` is what `app.getAppPath()` reports, a virtual path.
+    case electron(appPath: String)
+    /// A plain browser page with no Node.
+    case browser
+}
+
 /// What an engine plugin tells the shared web host about its game.
 public struct WebGameConfiguration {
     public var folder: GameFolder
     /// What NW.js reports as `nw.App.manifest.name`.
     public var appName: String
+    public var runtime: PageRuntime
     /// Scripts injected at document start after the Node shim, in order.
     public var userScripts: [String]
-    /// Sent instead of WebKit's own user agent on iOS.
-    public var iOSUserAgent: String?
+    /// Sent instead of WebKit's own user agent.
+    public var userAgent: String?
+    /// Where the page's localStorage lives, one file per key. Nil leaves localStorage to WebKit.
+    public var storageDirectory: URL?
+    /// Serves .ogg files transcoded to AAC, for engines that have no Ogg decoder of their own.
+    public var transcodesOgg: Bool
     /// The JavaScript that delivers a button press or release to the game. Nil drops the button.
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
     public var scriptArgument: String
     public var log: Logger
 
-    public init(folder: GameFolder, appName: String, userScripts: [String] = [], iOSUserAgent: String? = nil,
+    /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects.
+    public init(folder: GameFolder, appName: String, runtime: PageRuntime? = nil, userScripts: [String] = [],
+                userAgent: String? = nil, storageDirectory: URL? = nil, transcodesOgg: Bool = false,
                 buttonScript: @escaping @MainActor (VirtualButton, _ pressed: Bool) -> String?, scriptArgument: String, log: Logger) {
         self.folder = folder
         self.appName = appName
+        self.runtime = runtime ?? .nwjs(execPath: folder.mainModule)
         self.userScripts = userScripts
-        self.iOSUserAgent = iOSUserAgent
+        self.userAgent = userAgent
+        self.storageDirectory = storageDirectory
+        self.transcodesOgg = transcodesOgg
         self.buttonScript = buttonScript
         self.scriptArgument = scriptArgument
         self.log = log
@@ -36,7 +56,7 @@ public struct WebGameConfiguration {
 
     /// A desktop Safari user agent. Engines that check for a phone or tablet in it would otherwise lay themselves out for
     /// a mobile browser.
-    public static let desktopUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+    nonisolated public static let desktopUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         try WebGameSession(launch: launch, configuration: self)
@@ -53,6 +73,7 @@ final class WebGameSession: NSObject, EngineSession {
     private let webView: GameWebView
     private let folder: GameFolder
     private let bridge: NodeBridge
+    private let storage: WebStorage?
     private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
     private let scriptArgument: String
     private let log: Logger
@@ -66,13 +87,15 @@ final class WebGameSession: NSObject, EngineSession {
     init(launch: GameLaunch, configuration game: WebGameConfiguration) throws {
         folder = game.folder
         bridge = NodeBridge(folder: folder)
+        storage = game.storageDirectory.map(WebStorage.init)
         buttonScript = game.buttonScript
         scriptArgument = game.scriptArgument
         log = game.log
         onExit = launch.onExit
         let shim = try Self.shimSource(for: game)
         let configuration = WKWebViewConfiguration()
-        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder, log: log), forURLScheme: GameFolder.scheme)
+        let oggCache = game.transcodesOgg ? OggTranscodeCache(directory: Self.transcodedAudioDirectory, log: log) : nil
+        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder, log: log, oggCache: oggCache), forURLScheme: GameFolder.scheme)
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #if os(iOS)
         configuration.allowsInlineMediaPlayback = true
@@ -97,8 +120,8 @@ final class WebGameSession: NSObject, EngineSession {
         #endif
         webView.allowsLinkPreview = false
         webView.allowsBackForwardNavigationGestures = false
+        webView.customUserAgent = game.userAgent
         #if os(iOS)
-        webView.customUserAgent = game.iOSUserAgent
         webView.isOpaque = true
         webView.backgroundColor = .black
         let scrollView = webView.scrollView
@@ -125,9 +148,28 @@ final class WebGameSession: NSObject, EngineSession {
         log.notice("session released")
     }
 
+    /// Shared by every game. The system may empty it when space runs low, which costs only a new transcode.
+    static var transcodedAudioDirectory: URL {
+        URL.cachesDirectory.appendingPathComponent("TranscodedAudio", isDirectory: true)
+    }
+
     private static func shimSource(for game: WebGameConfiguration) throws -> String {
         guard let url = Bundle.module.url(forResource: "nwjs-shim", withExtension: "js") else { throw WebRuntimeError.shimMissing }
-        let config = ["mainModule": game.folder.mainModule, "cwd": GameFolder.virtualRoot, "platform": "darwin", "appName": game.appName]
+        var config: [String: String] = [
+            "mainModule": game.folder.mainModule, "cwd": GameFolder.virtualRoot, "platform": "darwin", "appName": game.appName,
+            "execPath": game.folder.mainModule,
+        ]
+        switch game.runtime {
+        case .nwjs(let execPath):
+            config["runtime"] = "nwjs"
+            config["execPath"] = execPath
+        case .electron(let appPath):
+            config["runtime"] = "electron"
+            config["appPath"] = appPath
+        case .browser:
+            config["runtime"] = "browser"
+        }
+        if game.storageDirectory != nil { config["storage"] = "files" }
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
@@ -157,6 +199,8 @@ final class WebGameSession: NSObject, EngineSession {
         self.paused = paused
         run("__vndegen.setPaused(\(paused))")
         webView.setAllMediaPlaybackSuspended(paused, completionHandler: nil)
+        // The hub's overlay took focus while the game was paused.
+        if !paused { webView.takeFocus() }
     }
 
     func terminate() {
@@ -216,6 +260,9 @@ final class WebGameSession: NSObject, EngineSession {
         case .openExternal(let raw):
             if let url = URL(string: raw) { openExternal(url) }
             return BridgeReply.value(.null).json
+        case .storageLoad, .storageSet, .storageRemove, .storageClear:
+            guard let storage else { return BridgeReply.failure(BridgeError(code: "ENOSYS", message: "no storage for this game")).json }
+            return storage.handle(request).json
         default:
             return bridge.handle(request).json
         }
@@ -308,11 +355,26 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+/// Takes keyboard focus whenever it is on screen. Without it the page's document never has focus, so `:focus` matches
+/// nothing and engines that move a keyboard focus between buttons, such as TyranoScript 5, cannot.
 final class GameWebView: WKWebView {
     #if os(macOS)
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        takeFocus()
+    }
+
+    func takeFocus() {
         window?.makeFirstResponder(self)
+    }
+    #else
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        takeFocus()
+    }
+
+    func takeFocus() {
+        if window != nil { becomeFirstResponder() }
     }
     #endif
 }
@@ -371,6 +433,12 @@ extension WebGameSession {
         case .js(let code):
             let result = await evaluate(code)
             log.notice("script js: \(code, privacy: .public) => \(result, privacy: .public)")
+        case let .until(seconds, condition):
+            await poll(condition, for: seconds, every: 0.25, label: "until") {}
+        case let .repeatPress(button, seconds, condition):
+            await poll(condition, for: seconds, every: 0.8, label: "repeat \(button.rawValue)") {
+                await self.perform(.press(button))
+            }
         case .fps(let seconds):
             await measureFrameRate(seconds)
         case .log(let text):
@@ -378,6 +446,21 @@ extension WebGameSession {
         case .quit:
             quitFromGame()
         }
+    }
+
+    /// Evaluates `condition` until it is truthy or `seconds` pass, running `step` and waiting `interval` between tries.
+    private func poll(_ condition: String, for seconds: Double, every interval: Double, label: String, step: () async -> Void) async {
+        let start = Date()
+        var met = false
+        var tries = 0
+        while !Task.isCancelled, Date().timeIntervalSince(start) < seconds {
+            met = await evaluate("!!(\(condition))") == "1"
+            if met { break }
+            await step()
+            tries += 1
+            await sleep(interval)
+        }
+        log.notice("script \(label, privacy: .public): \(met ? "met" : "timed out", privacy: .public) after \(tries) tries, \(Date().timeIntervalSince(start), format: .fixed(precision: 1)) s: \(condition, privacy: .public)")
     }
 
     /// Counts requestAnimationFrame callbacks (what the compositor delivers) and RPG Maker's Graphics.frameCount (engine updates)

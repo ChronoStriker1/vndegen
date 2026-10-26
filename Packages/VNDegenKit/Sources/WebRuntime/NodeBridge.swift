@@ -17,8 +17,13 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     case copyFile(from: String, to: String)
     case openExternal(url: String)
     case quit
+    /// Every localStorage key and value, for a page whose storage lives in files.
+    case storageLoad
+    case storageSet(key: String, value: String)
+    case storageRemove(key: String)
+    case storageClear
 
-    private enum Key: String, CodingKey { case op, path, text, data, recursive, from, to, url }
+    private enum Key: String, CodingKey { case op, path, text, data, recursive, from, to, url, key, value }
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: Key.self)
@@ -42,6 +47,10 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
         case "copyFile": self = .copyFile(from: try c.decode(String.self, forKey: .from), to: try c.decode(String.self, forKey: .to))
         case "openExternal": self = .openExternal(url: try c.decode(String.self, forKey: .url))
         case "quit": self = .quit
+        case "storageLoad": self = .storageLoad
+        case "storageSet": self = .storageSet(key: try c.decode(String.self, forKey: .key), value: try c.decode(String.self, forKey: .value))
+        case "storageRemove": self = .storageRemove(key: try c.decode(String.self, forKey: .key))
+        case "storageClear": self = .storageClear
         default: throw DecodingError.dataCorruptedError(forKey: .op, in: c, debugDescription: "unknown op \(op)")
         }
     }
@@ -61,6 +70,7 @@ nonisolated enum BridgeValue: Equatable, Sendable, Encodable {
     case string(String)
     case strings([String])
     case stat(FileStat)
+    case dictionary([String: String])
 
     func encode(to encoder: any Encoder) throws {
         var c = encoder.singleValueContainer()
@@ -70,6 +80,7 @@ nonisolated enum BridgeValue: Equatable, Sendable, Encodable {
         case .string(let value): try c.encode(value)
         case .strings(let value): try c.encode(value)
         case .stat(let value): try c.encode(value)
+        case .dictionary(let value): try c.encode(value)
         }
     }
 }
@@ -202,7 +213,7 @@ nonisolated struct NodeBridge: Sendable {
             }
             return .null
 
-        case .openExternal, .quit:
+        case .openExternal, .quit, .storageLoad, .storageSet, .storageRemove, .storageClear:
             throw BridgeError(code: "ENOSYS", message: "handled by the session, not the bridge")
         }
     }

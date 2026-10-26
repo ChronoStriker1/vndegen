@@ -23,5 +23,8 @@ import Testing
     #expect(try InputScript.parse("wait 1; press cancel", inline: true) == [.wait(1), .press(.cancel)])
     #expect(try InputScript.parse("js a(); b()") == [.js("a(); b()")])
     #expect(throws: InputScriptError(line: "press fire")) { try InputScript.parse("press fire") }
+    #expect(try InputScript.parse("until 30 TYRANO.kag.stat.is_strong_stop && $('.glink_button').length > 0")
+            == [.until(30, "TYRANO.kag.stat.is_strong_stop && $('.glink_button').length > 0")])
+    #expect(try InputScript.parse("repeat confirm 60 TYRANO.kag.stat.is_strong_stop") == [.repeatPress(.confirm, 60, "TYRANO.kag.stat.is_strong_stop")])
 }
 #endif

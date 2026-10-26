@@ -1,6 +1,7 @@
 import SwiftUI
 import VNCore
 import EngineRPGMaker
+import EngineTyrano
 import Metadata
 import GameInput
 import Lock
@@ -12,6 +13,7 @@ let engines: [any EnginePlugin] = {
     var engines: [any EnginePlugin] = [
         RPGMakerPlugin(.mz),
         RPGMakerPlugin(.mv),
+        TyranoPlugin(),
     ]
     #if DEBUG
     // Registered first, so it wins the MZ engine ID over the real runtime.

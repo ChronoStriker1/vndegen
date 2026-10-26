@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "VNCore", targets: ["VNCore"]),
         .library(name: "WebRuntime", targets: ["WebRuntime"]),
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
+        .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -20,8 +21,12 @@ let package = Package(
     targets: [
         .target(name: "VNCore"),
         .target(name: "GameInput", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "WebRuntime", dependencies: ["VNCore"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        // stb_vorbis, for Ogg Vorbis audio that WebKit on iOS cannot decode. Lives inside WebRuntime's folder.
+        .target(name: "CVorbis", path: "Sources/WebRuntime/CVorbis", cSettings: [.define("STB_VORBIS_NO_PUSHDATA_API")]),
+        .target(name: "WebRuntime", dependencies: ["VNCore", "CVorbis"], exclude: ["CVorbis"], resources: [.process("Resources")],
+                swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport"], swiftSettings: mainActorByDefault),
@@ -32,8 +37,9 @@ let package = Package(
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
         .target(name: "ArchiveImport", dependencies: ["CArchive"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
-        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
+        .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),

@@ -41,7 +41,7 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         guard let url = Bundle.module.url(forResource: "rpgmaker", withExtension: "js") else { throw RPGMakerError.scriptMissing }
         return try WebGameConfiguration(
             folder: GameFolder(rpgMakerGameAt: launch.folder), appName: "rmmz-game",
-            userScripts: [try String(contentsOf: url, encoding: .utf8)], iOSUserAgent: WebGameConfiguration.desktopUserAgent,
+            userScripts: [try String(contentsOf: url, encoding: .utf8)], userAgent: Self.userAgent,
             buttonScript: { button, pressed in
                 KeyStroke.stroke(for: button).map {
                     "__vndegen.key('\(pressed ? "keydown" : "keyup")', '\($0.key)', '\($0.code)', \($0.keyCode))"
@@ -50,6 +50,14 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
             scriptArgument: "rpgmaker-script", log: rpgLog
         ).makeSession(launch)
     }
+}
+
+extension RPGMakerPlugin {
+    #if os(iOS)
+    static let userAgent: String? = WebGameConfiguration.desktopUserAgent
+    #else
+    static let userAgent: String? = nil
+    #endif
 }
 
 nonisolated enum RPGMakerError: LocalizedError {

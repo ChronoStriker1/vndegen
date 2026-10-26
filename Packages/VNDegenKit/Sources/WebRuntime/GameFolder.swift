@@ -12,8 +12,10 @@ nonisolated public struct GameFolder: Sendable {
 
     /// The game folder on disk, as the user copied it in.
     public let root: URL
-    /// Where index.html lives, relative to `root`, such as "" or "www".
+    /// Where index.html lives, relative to `root`, such as "", "www", or "resources/app.asar".
     public let webRoot: String
+    /// The web root's archive when it is an Electron app.asar. Pages are served from inside it, read only.
+    private(set) var archive: AsarArchive?
     /// `root` with every symlink resolved. Every path this folder hands out must lead somewhere under it.
     private let realRoot: String
     /// `root` as the kernel names it for an open descriptor. `open` compares descriptors against this, not `realRoot`,
@@ -27,6 +29,9 @@ nonisolated public struct GameFolder: Sendable {
         let fd = Darwin.open(root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         descriptorRoot = (fd >= 0 ? Self.descriptorPath(fd) : nil) ?? realRoot
         if fd >= 0 { close(fd) }
+        if webRoot.lowercased().hasSuffix(".asar") {
+            archive = try? archiveHandle().flatMap { try AsarArchive(reading: $0) }
+        }
     }
 
     /// The web root as a virtual path.
@@ -219,13 +224,16 @@ nonisolated extension GameFolder {
     /// Answers one request the way a static file server would: 404 for misses and escapes, 206 for a byte range,
     /// 416 for a range past the end. WebKit's media loader relies on the range support and `Accept-Ranges`.
     func serve(path: String, method: String = "GET", range: String? = nil) -> FileResponse {
-        var info = stat()
-        guard let url = resolve(servedPath: path), let handle = try? open(url),
-              fstat(handle.fileDescriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return .empty(404) }
-        let size = Int64(info.st_size)
-        var headers = ["Content-Type": Self.mimeType(forExtension: url.pathExtension), "Accept-Ranges": "bytes"]
+        guard let (handle, base, size, name) = open(servedPath: path) else { return .empty(404) }
+        return Self.response(handle, base: base, size: size, contentType: Self.mimeType(forExtension: (name as NSString).pathExtension),
+                             method: method, range: range)
+    }
+
+    /// The response for `size` bytes of `handle` starting at `base`.
+    static func response(_ handle: FileHandle, base: UInt64, size: Int64, contentType: String, method: String, range: String?) -> FileResponse {
+        var headers = ["Content-Type": contentType, "Accept-Ranges": "bytes"]
         let status: Int, first: Int64, last: Int64
-        switch Self.byteRange(header: range, size: size) {
+        switch byteRange(header: range, size: size) {
         case .full:
             (status, first, last) = (200, 0, size - 1)
         case let .partial(start, end):
@@ -236,8 +244,52 @@ nonisolated extension GameFolder {
         }
         let length = max(0, last - first + 1)
         headers["Content-Length"] = String(length)
-        let body = method == "HEAD" || length == 0 ? nil : FileSpan(handle: handle, offset: UInt64(first), length: UInt64(length))
+        let body = method == "HEAD" || length == 0 ? nil : FileSpan(handle: handle, offset: base + UInt64(first), length: UInt64(length))
         return FileResponse(status: status, headers: headers, body: body)
+    }
+
+    /// Up to `limit` bytes of the file a page would get for `path`, from disk or from the web root's app.asar.
+    public func read(servedPath path: String, limit: Int) -> Data? {
+        guard let (handle, base, size, _) = open(servedPath: path) else { return nil }
+        try? handle.seek(toOffset: base)
+        return try? handle.read(upToCount: Int(min(Int64(limit), size)))
+    }
+
+    /// Opens the regular file a request names: the handle to read, where its bytes start in it, its size, and its name.
+    /// A web root that is an app.asar serves its members from the archive file, or from app.asar.unpacked/ beside it.
+    func open(servedPath path: String) -> (FileHandle, UInt64, Int64, String)? {
+        let path = path.isEmpty || path == "/" ? "/index.html" : path
+        if let archive, let relative = Self.confine(virtualWebRoot + (path.hasPrefix("/") ? path : "/" + path)),
+           relative.lowercased().hasPrefix(webRoot.lowercased() + "/") {
+            let inner = String(relative.dropFirst(webRoot.count + 1))
+            switch archive.member(inner) {
+            case let .packed(offset, size):
+                guard let handle = try? archiveHandle() else { return nil }
+                return (handle, offset, Int64(size), inner)
+            case .unpacked(let unpacked):
+                return openRegularFile(virtualPath: "\(virtualWebRoot).unpacked/\(unpacked)").map { ($0, 0, $1, inner) }
+            case nil:
+                return nil
+            }
+        }
+        guard let url = resolve(servedPath: path) else { return nil }
+        return openRegularFile(url).map { ($0, 0, $1, url.lastPathComponent) }
+    }
+
+    private func openRegularFile(virtualPath: String) -> (FileHandle, Int64)? {
+        resolve(virtualPath: virtualPath).flatMap(openRegularFile)
+    }
+
+    private func openRegularFile(_ url: URL) -> (FileHandle, Int64)? {
+        var info = stat()
+        guard let handle = try? open(url), fstat(handle.fileDescriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
+        return (handle, Int64(info.st_size))
+    }
+
+    /// The web root's archive file, opened and checked like any other file.
+    private func archiveHandle() throws -> FileHandle? {
+        guard let url = resolve(virtualPath: virtualWebRoot) else { return nil }
+        return try open(url)
     }
 
     /// Parses `bytes=a-b`, `bytes=a-`, and `bytes=-n`. A malformed header means the whole file, as RFC 9110 says.

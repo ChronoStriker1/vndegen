@@ -1,6 +1,7 @@
-// NW.js compatibility layer for HTML5 games running in VNDegen's WKWebView.
+// NW.js and Electron compatibility layer for HTML5 games running in VNDegen's WKWebView.
 // Injected at document start, before the game's own scripts. Engines decide they are on NW.js when `require` is a
 // function and `process` is an object, and then read and write their folder with `fs` the way the desktop build does.
+// config.runtime picks what the page sees: 'nwjs', 'electron' (Node plus the `electron` module), or 'browser' (no Node).
 // Synchronous file calls go through window.prompt, which the app answers in its WKUIDelegate. That is the only channel
 // WebKit offers that blocks the page until the host replies.
 (function () {
@@ -300,7 +301,7 @@
         env: {},
         argv: [config.mainModule],
         execArgv: [],
-        execPath: config.mainModule,
+        execPath: config.execPath,
         pid: 1,
         ppid: 0,
         title: 'nw',
@@ -323,7 +324,53 @@
     };
     nw.process = process;
 
-    const modules = { fs: fs, path: path, os: os, 'nw.gui': nw, process: process, buffer: { Buffer: Buffer } };
+    // Electron with nodeIntegration and the deprecated `remote` module, which is what Electron game templates call.
+    const electronApp = {
+        getAppPath: () => config.appPath,
+        getPath: () => config.cwd,
+        getName: () => config.appName,
+        getVersion: () => '1.0.0',
+        requestSingleInstanceLock: () => true,
+        quit: quit, exit: quit, on: noop, once: noop,
+    };
+    const electron = {
+        app: electronApp,
+        remote: {
+            app: electronApp,
+            getCurrentWindow: () => nwWindow,
+            BrowserWindow: { getFocusedWindow: () => nwWindow, getAllWindows: () => [nwWindow] },
+            dialog: { showMessageBoxSync: () => 0, showOpenDialogSync: () => undefined, showSaveDialogSync: () => undefined },
+            Menu: Menu, MenuItem: MenuItem,
+        },
+        shell: { openExternal: (url) => { nw.Shell.openExternal(url); return Promise.resolve(); } },
+        ipcRenderer: { send: noop, on: noop, once: noop, removeListener: noop, invoke: () => Promise.resolve() },
+    };
+
+    // Modules that games ship in node_modules/ and load whether or not they use them, such as TyranoScript's patch
+    // check. fs-extra's sync calls map onto fs. Unpacking zips is not supported.
+    const fsExtra = Object.assign({}, fs, {
+        pathExistsSync: fs.existsSync,
+        ensureDirSync: (p) => fs.mkdirSync(p, { recursive: true }),
+        mkdirsSync: (p) => fs.mkdirSync(p, { recursive: true }),
+        mkdirpSync: (p) => fs.mkdirSync(p, { recursive: true }),
+        copySync: (from, to) => fs.copyFileSync(from, to),
+        removeSync: (p) => { if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) fs.unlinkSync(p); },
+        readJsonSync: (p) => JSON.parse(fs.readFileSync(p, 'utf8')),
+        writeJsonSync: (p, value) => fs.writeFileSync(p, JSON.stringify(value)),
+    });
+    class AdmZip {
+        constructor() { throw new Error('VNDegen cannot unpack zip files for the game'); }
+    }
+
+    const modules = {
+        fs: fs, path: path, os: os, process: process, buffer: { Buffer: Buffer }, 'fs-extra': fsExtra, 'adm-zip': AdmZip,
+    };
+    if (config.runtime === 'electron') {
+        modules.electron = electron;
+        process.versions.electron = '22.0.0';
+    } else {
+        modules['nw.gui'] = nw;
+    }
     function require(name) {
         const key = String(name).replace(/^node:/, '');
         if (Object.prototype.hasOwnProperty.call(modules, key)) return modules[key];
@@ -336,15 +383,49 @@
     require.main = process.mainModule;
     nw.require = require;
 
-    window.require = require;
-    window.process = process;
-    window.nw = nw;
-    window.Buffer = Buffer;
-    window.global = window;
+    if (config.runtime !== 'browser') {
+        window.require = require;
+        window.process = process;
+        window.Buffer = Buffer;
+        window.global = window;
+        window.__dirname = path.dirname(config.mainModule);
+        window.__filename = config.mainModule;
+        window.chrome = window.chrome || {};
+        window.chrome.runtime = window.chrome.runtime || {};
+        window.chrome.runtime.reload = () => location.reload();
+    }
+    if (config.runtime === 'nwjs') window.nw = nw;
     window.close = () => nwWindow.close();
-    window.chrome = window.chrome || {};
-    window.chrome.runtime = window.chrome.runtime || {};
-    window.chrome.runtime.reload = () => location.reload();
+
+    // localStorage kept in files in the app's data directory for this game, written before setItem returns. WebKit's
+    // own storage would share one origin among all games and write to disk at a time of its choosing.
+    if (config.storage) {
+        const items = new Map(Object.entries(call('storageLoad', {})));
+        const storage = {
+            get length() { return items.size; },
+            key: (index) => { const keys = Array.from(items.keys()); return index < keys.length ? keys[index] : null; },
+            getItem: (key) => { key = String(key); return items.has(key) ? items.get(key) : null; },
+            setItem: (key, value) => {
+                key = String(key); value = String(value);
+                call('storageSet', { key: key, value: value });
+                items.set(key, value);
+            },
+            removeItem: (key) => { key = String(key); if (items.delete(key)) call('storageRemove', { key: key }); },
+            clear: () => { items.clear(); call('storageClear', {}); },
+        };
+        // Pages also read and write keys as properties, as in localStorage.foo = 'bar'.
+        const named = (key) => typeof key === 'string' && !(key in storage);
+        const localStorage = new Proxy(storage, {
+            get: (target, key) => (named(key) ? (items.has(key) ? items.get(key) : undefined) : target[key]),
+            set: (target, key, value) => { if (named(key)) target.setItem(key, value); return true; },
+            deleteProperty: (target, key) => { if (named(key)) target.removeItem(key); return true; },
+            has: (target, key) => key in target || items.has(key),
+            ownKeys: () => Array.from(items.keys()),
+            getOwnPropertyDescriptor: (target, key) => (items.has(key)
+                ? { value: items.get(key), writable: true, enumerable: true, configurable: true } : undefined),
+        });
+        Object.defineProperty(window, 'localStorage', { value: localStorage, configurable: true, enumerable: true });
+    }
 
     // The app delivers gamepad input through the session, so the page must not read the controllers a second time.
     try {
@@ -419,6 +500,15 @@
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureViewport);
     else ensureViewport();
+
+    // A game page is one fixed screen. WebKit scrolls it to keep a focused text field above the on-screen keyboard and
+    // leaves it scrolled when the keyboard goes, which would cut off the bottom of the game. Once no text field has focus,
+    // the page goes back to the top.
+    const editing = () => { const a = document.activeElement; return !!a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
+    const unscroll = () => { if (!editing() && (window.scrollX || window.scrollY)) window.scrollTo(0, 0); };
+    window.addEventListener('scroll', unscroll);
+    document.addEventListener('focusout', () => setTimeout(unscroll, 0));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', unscroll);
 
     // Console and uncaught errors go to the app log, where scripts/sim.sh log can show them.
     function describe(value) {

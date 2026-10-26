@@ -22,7 +22,7 @@ targets:
         excludes: ["Icon/**"]
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
     info:
       path: App/Info.plist
       properties:
