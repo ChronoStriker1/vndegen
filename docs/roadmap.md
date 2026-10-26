@@ -16,14 +16,19 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
-- RPG Maker XP, VX, and VX Ace (`ws/rgss`), starting with a feasibility test of mkxp-z on iOS.
-- Ren'Py follow-ups (`ws/renpy-followups`): detect games two folders deep, and hide touch control methods that do nothing for Ren'Py on iPhone and iPad.
+- RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
+- Fixes for Touch mouse mode on iPhone (`ws/touch-mode-fix`).
+
+Merged into `dev` for the next release: Ren'Py games two folders deep are detected, and Ren'Py on iPhone and iPad no longer offers touch control methods that do nothing there.
 
 ## Next
 1. NScripter (ONScripter).
 2. AliceSoft System 3 and 4 (xsystem35, xsystem4).
 3. Artemis.
 4. Wolf RPG Editor, which needs a new runtime.
+
+## Runtime packages
+When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder.
 
 ## Out of scope for now
 - Apple TV.
