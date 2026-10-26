@@ -440,6 +440,12 @@ void sendMouseMotion(float pX, float pY)
     int pixelY = static_cast<int>(pY * windowHeight);
     krkrsdl3::KRKR_Trig_MouseMove(pixelX,pixelY);
 }
+// Fingers still down when a game quits never lift for it, and the next game in the process would start mid-gesture.
+static void resetTouches()
+{
+    fingers.clear();
+    _state = STATE_IDLE;
+}
 #endif
 
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
@@ -600,6 +606,9 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
 #ifdef _KRKRSDL3_USE_VULKAN
     if (TVPSettings.renderer == "vulkan")
         SDL_Vulkan_UnloadLibrary();
+#endif
+#if defined(_KRKRSDL3_ANDROID) || defined(_KRKRSDL3_EMSCRIPTEN) || defined(_KRKRSDL3_IOS)
+    resetTouches();
 #endif
     SDL_Log("KRKRSDL3 quit successfully!");
     SDL_Quit();

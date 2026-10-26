@@ -32,6 +32,9 @@ final class KiriKiriSession: EngineSession {
     private let launch: GameLaunch
     private let paths: KiriKiriPaths
     private var state = State.waiting
+    /// A native modal loop inside a frame, such as a game's own dialog, can fire the display link or the quit timer
+    /// again before the frame returns. The engine ignores a nested frame, and nothing may stop it under the running one.
+    private var inFrame = false
     private var paused = false
     private var router = KiriKiriInputRouter()
     private var displayLink: CADisplayLink?
@@ -98,7 +101,10 @@ final class KiriKiriSession: EngineSession {
         displayLink = link
     }
 
-    fileprivate func step() {
+    func step() {
+        guard !inFrame else { return }
+        inFrame = true
+        defer { inFrame = false }
         switch state {
         case .running:
             if engine.iterate() != 0 { finish() }

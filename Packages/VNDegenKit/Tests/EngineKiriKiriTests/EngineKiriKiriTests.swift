@@ -312,3 +312,51 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
     #expect(archive.documents.path == "/Data/Test Game 01/Documents")
     #expect(archive.log.path == "/Data/Test Game 01/logs/kirikiri.txt")
 }
+
+/// An engine that runs no game. It records the calls a session makes while one of its frames is still running.
+private enum FakeEngine {
+    nonisolated(unsafe) static var inFrame = false
+    nonisolated(unsafe) static var callsInFrame: [String] = []
+    /// Runs inside the next frame, as a native modal loop would.
+    nonisolated(unsafe) static var duringFrame: (() -> Void)?
+
+    static func record(_ call: String) {
+        if inFrame { callsInFrame.append(call) }
+    }
+
+    @MainActor static var engine: KiriKiriEngine {
+        KiriKiriEngine(
+            start: { _ in 0 },
+            iterate: {
+                FakeEngine.record("iterate")
+                guard !FakeEngine.inFrame else { return 0 }
+                FakeEngine.inFrame = true
+                defer { FakeEngine.inFrame = false }
+                let work = FakeEngine.duringFrame
+                FakeEngine.duringFrame = nil
+                work?()
+                return 0
+            },
+            key: { _, _ in }, mouseButton: { _, _, _, _ in }, mouseMove: { _, _ in }, click: { _, _ in }, wheel: { _ in },
+            setPaused: { _ in }, requestQuit: {}, stop: { FakeEngine.record("stop") }, view: { nil })
+    }
+}
+
+@MainActor @Test func runsNoEngineCallUnderAFrameThatIsStillRunning() throws {
+    let data = try folder([:])
+    let launch = GameLaunch(game: Game(id: GameID("Test Game 08")), folder: URL(fileURLWithPath: "/nonexistent"),
+                            dataDirectory: data, onExit: {})
+    let session = try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
+                                      engine: FakeEngine.engine)
+    try #require(session.view as? KiriKiriHostView).onReady?()
+    FakeEngine.callsInFrame = []
+    FakeEngine.duringFrame = {
+        MainActor.assumeIsolated {
+            session.step()
+            session.terminate()
+            session.step()
+        }
+    }
+    session.step()
+    #expect(FakeEngine.callsInFrame.isEmpty)
+}
