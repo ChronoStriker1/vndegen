@@ -121,3 +121,5 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         # The KiriKiri engine's simulator slice is arm64 only.
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+        # The macOS app keeps embedded frameworks in Contents/Frameworks, not beside the executable as on iOS.
+        LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]: ["$(inherited)", "@executable_path/../Frameworks"]
