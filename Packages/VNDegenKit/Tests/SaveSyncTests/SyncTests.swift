@@ -26,9 +26,11 @@ struct Setup {
     let game = "No Socks RPG"
 
     /// `server` shares another setup's store, as a second device does. Without one, the store is a new local folder.
-    /// On SMB, `remoteName` gives this device an rclone remote of its own, as another device has.
+    /// On SMB, each setup gets an rclone remote of its own, as another device has: tests run in parallel, and rclone
+    /// rebuilds a remote's config whenever it is created again. `appConnector` uses the app's own connector instead,
+    /// which reads the kept password and names the remote from the login.
     init(saves: [String: String] = [:], metadata: GameMetadata? = nil, manifest: URL? = nil, otherGames: [String: String] = [:],
-         server shared: TestServer? = nil, login: Login = .guest, remoteName: String? = nil) async throws {
+         server shared: TestServer? = nil, login: Login = .guest, appConnector: Bool = false) async throws {
         base = try temporaryDirectory()
         locations = try makeGame(in: base, saves: saves)
         library = LibraryStore(paths: LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support")),
@@ -44,7 +46,8 @@ struct Setup {
                                           files: [path: FileEntry(hash: sha1("x"), size: 1)], registryHash: nil, children: [])]
             try await server.write(Data(mapping.yamlString().utf8), to: "\(LudusaviMapping.escapeFolderName(title))/mapping.yaml")
         }
-        service = SaveSyncService(library: library, connector: Self.connector(hooks, server, library: library, remoteName: remoteName),
+        service = SaveSyncService(library: library, connector: Self.connector(hooks, server, library: library,
+                                                                            remoteName: appConnector ? nil : "test-\(UUID().uuidString.prefix(8))"),
                                   manifest: manifest, configRetention: nil)
         let share = smbTest ?? (host: "server", port: SMBRemote.defaultPort)
         switch login {
@@ -352,7 +355,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @Test(arguments: StoreKind.all) func twoDevicesBackingUpInTheSameSecondNeverShareAFolder(_ kind: StoreKind) async throws {
     try await TestServer.with(kind) { server in
         let a = try await Setup(saves: ["file1.rmmzsave": "one"], server: server)
-        let b = try await Setup(saves: ["file1.rmmzsave": "one"], server: server, remoteName: "device-b-\(UUID().uuidString.prefix(8))")
+        let b = try await Setup(saves: ["file1.rmmzsave": "one"], server: server)
         _ = try await a.service.checkedBackUp(a.id)
         let second = Date(timeIntervalSince1970: 1_800_000_000)
         a.service.clock = { second }
@@ -606,6 +609,32 @@ extension SaveSyncService {
 }
 
 @MainActor
+@Test(arguments: StoreKind.all) func aCommitWhoseAnswerIsLostKeepsWhatItPublished(_ kind: StoreKind) async throws {
+    try await TestServer.with(kind) { server in
+        let setup = try await Setup(saves: ["file1.rmmzsave": "one"], server: server)
+        _ = try await setup.service.checkedBackUp(setup.id)
+        try write(["file1.rmmzsave": "two"], to: setup.locations[0])
+        let folders = try await setup.serverFolders()
+
+        // The rename happens on the server, and then its answer is lost, so VNDegen can't tell that it happened.
+        struct LostAnswer: Error {}
+        setup.hooks.after("vndegen/replacefile") { throw LostAnswer() }
+        do {
+            _ = try await setup.service.checkedBackUp(setup.id)
+            Issue.record("the backup succeeded")
+        } catch SaveSyncError.commitUnconfirmed {}
+        let added = try await setup.serverFolders().subtracting(folders)
+        #expect(added.count == 1)
+        #expect(try await setup.serverMapping().summaries.last?.name == added.first)
+        #expect(try await setup.serverFolders().isSuperset(of: folders))
+        try await setup.expectStoreIsWhole()
+
+        // The next check reads the backup the lost answer published, and finds the saves here in it.
+        #expect(try await setup.service.status(for: setup.id) == .inSync)
+    }
+}
+
+@MainActor
 @Test func theCommitNeverLeavesAMomentWithoutMappingYaml() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
     _ = try await setup.service.checkedBackUp(setup.id)
@@ -771,10 +800,10 @@ extension SaveSyncService {
 @MainActor
 @Test(.enabled(if: smbTest != nil)) func logsInToTheShareAsGuestOrWithAPassword() async throws {
     try await TestServer.with(.smb) { server in
-        let guest = try await Setup(saves: ["file1.rmmzsave": "one"], server: server)
+        let guest = try await Setup(saves: ["file1.rmmzsave": "one"], server: server, appConnector: true)
         #expect(try await guest.service.checkedBackUp(guest.id).backup != nil)
         guard let smbPassword else { return }
-        let player = try await Setup(saves: ["file1.rmmzsave": "two"], server: server, login: .password(smbPassword))
+        let player = try await Setup(saves: ["file1.rmmzsave": "two"], server: server, login: .password(smbPassword), appConnector: true)
         #expect(player.service.storedPassword() == smbPassword)
         #expect(try await player.service.checkedBackUp(player.id).backup != nil)
         try await player.expectStoreIsWhole()

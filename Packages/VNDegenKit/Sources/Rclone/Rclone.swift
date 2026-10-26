@@ -23,9 +23,12 @@ public enum Rclone {
     public static func call(_ method: String, json input: Data) async throws -> Data {
         _ = initialized
         let id = nextID.next()
-        let reply: (Data, Int32) = try await withTaskCancellationHandler {
-            try Task.checkCancellation()
-            return await withCheckedContinuation { continuation in
+        // A call cancelled before it starts never reaches rclone. Once begun, it always runs, and a cancel that arrives
+        // from here on reaches it, even one that came between this check and the handler.
+        try Task.checkCancellation()
+        VNDRcloneBegin(id)
+        let reply: (Data, Int32) = await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
                 // rclone blocks the calling thread until the call ends, so it gets a thread of its own rather than one
                 // of the concurrency pool's.
                 Thread.detachNewThread {

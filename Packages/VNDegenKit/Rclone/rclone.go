@@ -33,10 +33,12 @@ import (
 	_ "github.com/rclone/rclone/fs/sync"
 )
 
+// Calls by ID: VNDRcloneBegin adds one, VNDRcloneCall runs and removes it, and VNDRcloneCancel cancels it while it is
+// here. A cancel that comes before or after has nothing to keep.
 var (
-	lock      sync.Mutex
-	running   = map[int64]context.CancelFunc{}
-	cancelled = map[int64]bool{}
+	lock    sync.Mutex
+	running = map[int64]context.CancelFunc{}
+	waiting = map[int64]context.Context{}
 )
 
 //export VNDRcloneInitialize
@@ -48,19 +50,29 @@ func VNDRcloneInitialize() {
 	accounting.Start(context.Background())
 }
 
-//export VNDRcloneCall
-func VNDRcloneCall(id C.longlong, method, input *C.char, status *C.int) *C.char {
+//export VNDRcloneBegin
+func VNDRcloneBegin(id C.longlong) {
 	ctx, cancel := context.WithCancel(context.Background())
 	lock.Lock()
-	if cancelled[int64(id)] {
-		delete(cancelled, int64(id))
-		cancel()
-	} else {
-		running[int64(id)] = cancel
-	}
+	defer lock.Unlock()
+	running[int64(id)] = cancel
+	waiting[int64(id)] = ctx
+}
+
+//export VNDRcloneCall
+func VNDRcloneCall(id C.longlong, method, input *C.char, status *C.int) *C.char {
+	lock.Lock()
+	ctx, ok := waiting[int64(id)]
+	delete(waiting, int64(id))
 	lock.Unlock()
+	if !ok {
+		out, code := failure(C.GoString(method), rc.Params{}, errors.New("call was not begun"), http.StatusInternalServerError)
+		*status = C.int(code)
+		return C.CString(out)
+	}
 	defer func() {
 		lock.Lock()
+		cancel := running[int64(id)]
 		delete(running, int64(id))
 		lock.Unlock()
 		cancel()
@@ -76,8 +88,6 @@ func VNDRcloneCancel(id C.longlong) {
 	defer lock.Unlock()
 	if cancel, ok := running[int64(id)]; ok {
 		cancel()
-	} else {
-		cancelled[int64(id)] = true
 	}
 }
 
@@ -176,8 +186,14 @@ func replaceFile(ctx context.Context, in rc.Params) (rc.Params, error) {
 	if (current == nil) != (expected == nil) || !bytes.Equal(current, expected) {
 		return rc.Params{"replaced": false}, nil
 	}
-	// The window: another device that writes dstRemote after the read above and before this rename completes is
-	// overwritten. On SMB that is two round trips, the parent folder check and the rename.
+	// A cancelled call never renames. The smb backend's own requests ignore the context, so this is the last point
+	// where cancelling still decides the outcome.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// The window: another device that writes dstRemote after the server sent the bytes read above and before the
+	// rename completes is overwritten. On SMB that is the read's CLOSE, the backend's parent folder check (CREATE and
+	// CLOSE), the rename's CREATE of the source, and its SET_INFO, which replaces the file.
 	if _, err := move(ctx, source, dst); err != nil {
 		return nil, err
 	}
@@ -198,9 +214,22 @@ func readAll(ctx context.Context, f fs.Fs, remote string) ([]byte, error) {
 		return nil, err
 	}
 	defer r.Close()
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
+	var data []byte
+	chunk := make([]byte, 64*1024)
+	for {
+		// Checked between reads: a server that trickles the file in under the idle deadline still can't hold a
+		// cancelled call.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		n, err := r.Read(chunk)
+		data = append(data, chunk[:n]...)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 	if data == nil {
 		data = []byte{}

@@ -53,3 +53,17 @@ private struct Stat: Decodable { var item: Item? }
         #expect(error.status == 404)
     }
 }
+
+@Test func aCancelledCallNeverRenamesAndLaterCallsStillRun() async throws {
+    let root = try folder()
+    try Data("old".utf8).write(to: root.appendingPathComponent("mapping.yaml"))
+    try Data("new".utf8).write(to: root.appendingPathComponent("next.tmp"))
+    let input = ["fs": root.path, "srcRemote": "next.tmp", "dstRemote": "mapping.yaml", "expected": Data("old".utf8).base64EncodedString()]
+    let cancelled = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await Rclone.call("vndegen/replacefile", input, as: Replaced.self)
+    }
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+    #expect(try String(contentsOf: root.appendingPathComponent("mapping.yaml"), encoding: .utf8) == "old")
+    #expect(try await Rclone.call("vndegen/replacefile", input, as: Replaced.self).replaced)
+}
