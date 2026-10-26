@@ -66,8 +66,11 @@ private struct ArchiveCard: View {
                         .foregroundStyle(Theme.secondaryText)
                 }
                 Spacer(minLength: 8)
+                // Keeps its full width, so a long file name wraps instead of the button's label.
                 Label("Import", systemImage: "square.and.arrow.down")
                     .font(.system(size: 14, weight: .bold))
+                    .lineLimit(1)
+                    .fixedSize()
                     .padding(.horizontal, 14)
                     .frame(minHeight: 36)
                     .background(Theme.accent.gradient, in: .capsule)
