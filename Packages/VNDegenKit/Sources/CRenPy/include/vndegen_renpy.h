@@ -43,4 +43,6 @@ int vndegen_renpy_take_requests(void);
 int vndegen_renpy_is_paused(void);
 /// Runs the main run loop until the game is resumed.
 void vndegen_renpy_wait_while_paused(void);
+/// Runs the main run loop briefly, for waits inside the game.
+void vndegen_renpy_pump(void);
 void vndegen_renpy_window_ready(void);

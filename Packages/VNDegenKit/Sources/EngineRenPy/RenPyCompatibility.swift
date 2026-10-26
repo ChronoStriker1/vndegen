@@ -56,9 +56,10 @@ nonisolated public struct RenPyBootRecord: Codable, Equatable, Sendable {
     }
 
     /// Records how the run that just ended went. A game that reached its main menu counts as working, even if it
-    /// stopped with an error later.
+    /// stopped with an error later. On iOS Ren'Py writes its traceback into its log, `logs/renpy.txt`, and leaves
+    /// `traceback.txt` empty.
     static func finished(dataDirectory: URL, runtime: RenPyRuntime) {
-        let error = firstError([traceback(dataDirectory)])
+        let error = firstError([traceback(dataDirectory), dataDirectory.appendingPathComponent("logs/renpy.txt")])
         let result: Result = FileManager.default.fileExists(atPath: mainMenuMarker(dataDirectory).path) ? .reachedMainMenu
             : error == nil ? .stopped : .failed
         RenPyBootRecord(result: result, runtime: runtime.version, error: error).write(dataDirectory)
@@ -131,8 +132,11 @@ nonisolated public enum RenPyCompatibility {
     static func backupWarning(gameVersion: String?, runtime: RenPyRuntime) -> String? {
         guard let gameVersion, let own = release(gameVersion), let running = release(runtime.version),
               own.lexicographicallyPrecedes(running) else { return nil }
+        // A Mac runs a Ren'Py 7 game on Ren'Py 7 unless the player picks Ren'Py 8 for it.
+        let elsewhere = runtime == .renPy8 && own[0] < 8
+            ? "VNDegen loads them on iPhone and iPad, and on a Mac once the game's Ren'Py runtime is set to Ren'Py \(runtime.version)."
+            : "VNDegen on other devices loads them."
         return "Saves made here use Ren'Py \(runtime.version), and the PC version of this game uses Ren'Py \(gameVersion). "
-            + "Older Ren'Py can't load saves from a newer release, so the PC version won't load the saves in this backup. "
-            + "VNDegen on other devices will."
+            + "Older Ren'Py can't load saves from a newer release, so the PC version won't load the saves in this backup. " + elsewhere
     }
 }

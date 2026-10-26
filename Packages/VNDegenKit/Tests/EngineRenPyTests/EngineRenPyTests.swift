@@ -287,7 +287,10 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
 
 /// Older Ren'Py can't load saves from a newer release, so only games older than the runtime that saves them warn.
 @Test func warnsBeforeBackingUpSavesTheGamesOwnRenPyCantLoad() {
-    #expect(RenPyCompatibility.backupWarning(gameVersion: "7.4.2", runtime: .renPy8)?.contains("Ren'Py 7.4.2") == true)
+    let fromIOS = RenPyCompatibility.backupWarning(gameVersion: "7.4.2", runtime: .renPy8)
+    #expect(fromIOS?.contains("Ren'Py 7.4.2") == true)
+    #expect(fromIOS?.contains("on a Mac once the game's Ren'Py runtime is set to Ren'Py 8.5.3") == true)
+    #expect(RenPyCompatibility.backupWarning(gameVersion: "8.3.4", runtime: .renPy8)?.hasSuffix("VNDegen on other devices loads them.") == true)
     #expect(RenPyCompatibility.backupWarning(gameVersion: "7.4.2", runtime: .renPy7) != nil)
     #expect(RenPyCompatibility.backupWarning(gameVersion: "8.3.4", runtime: .renPy8) != nil)
     #expect(RenPyCompatibility.backupWarning(gameVersion: "8.5.3", runtime: .renPy8) == nil)

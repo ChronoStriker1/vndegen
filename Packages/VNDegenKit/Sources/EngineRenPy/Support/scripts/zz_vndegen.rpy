@@ -68,25 +68,8 @@ init 999 python in _vndegen:
 
     config.periodic_callbacks.append(note_main_menu)
 
-    if renpy.ios:
-        # VNDegen runs inside the same app, so it asks through its host instead of with a signal. The host also pauses
-        # the game while VNDegen covers it, such as with the unlock screen.
-        import ctypes
-        host = ctypes.CDLL(None)
-
-        def check_host():
-            requests = host.vndegen_renpy_take_requests()
-            if requests & 2:
-                quit_game()
-            elif requests & 1:
-                renpy.queue_event("vndegen_menu")
-            if host.vndegen_renpy_is_paused():
-                renpy.audio.audio.pause_all()
-                host.vndegen_renpy_wait_while_paused()
-                renpy.audio.audio.unpause_all()
-
-        config.periodic_callbacks.append(check_host)
-    else:
+    # On iOS VNDegen's launcher answers the hub instead, through quit_game.
+    if not renpy.ios:
         signal.signal(signal.SIGTERM, request_quit)
         config.periodic_callbacks.append(quit_if_requested)
 

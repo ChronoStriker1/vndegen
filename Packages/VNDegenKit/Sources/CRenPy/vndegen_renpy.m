@@ -57,6 +57,7 @@ extern int SDL_GetWindowWMInfo(void *window, WindowInfo *info);
 @implementation IAPHelper
 - (BOOL)canMakePayments { return NO; }
 - (void)validateProductIdentifiers { self.finished = 1; }
+- (void)validateProductIdentifiersInBackground {}
 - (void)beginPurchase:(NSString *)identifier { self.finished = 1; }
 - (void)restorePurchases { self.finished = 1; }
 - (BOOL)hasPurchased:(NSString *)identifier { return NO; }
@@ -118,6 +119,8 @@ EXPORTED void vndegen_renpy_wait_while_paused(void) {
     while (paused) CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
 }
 
+EXPORTED void vndegen_renpy_pump(void) { CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, true); }
+
 EXPORTED void vndegen_renpy_window_ready(void) {
     void *window = SDL_GL_GetCurrentWindow();
     WindowInfo info = {{2, 0, 22}};
@@ -134,6 +137,7 @@ void vndegen_renpy_app_state(int state) {}
 int vndegen_renpy_take_requests(void) { return 0; }
 int vndegen_renpy_is_paused(void) { return 0; }
 void vndegen_renpy_wait_while_paused(void) {}
+void vndegen_renpy_pump(void) {}
 void vndegen_renpy_window_ready(void) {}
 
 #endif
