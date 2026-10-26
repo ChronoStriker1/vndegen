@@ -38,7 +38,7 @@ final class RenPyEmbeddedSession: EngineSession {
         view = container
         let base = launch.folder.appendingPathComponent(layout.path(""), isDirectory: true)
         try RenPyPlugin.importGameSaves(base: base, dataDirectory: launch.dataDirectory)
-        let command = RenPyCommand(base: base, runtime: .renPy8, runtimes: runtimes, support: support,
+        let command = RenPyCommand(base: base, runtime: .renPy8, gameLine: layout.runtime, runtimes: runtimes, support: support,
                                    dataDirectory: launch.dataDirectory, placement: nil, buttons: launch.game.buttonMapping)
         let code = Self.code(launcher: command.arguments[0], base: base.path,
                              environment: command.environment.filter { $0.key.hasPrefix("VNDEGEN_") })
@@ -188,6 +188,8 @@ private final class RenPyContainerView: UIView {
     /// SDL's view controller, taken from SDL's window. The next game reuses SDL's window, which then has no root view
     /// controller, so the controller is kept for it.
     private static var sdlController: UIViewController?
+    /// Follows the container's size by autoresizing only, because SDL moves it up itself while the on-screen keyboard
+    /// would cover a text prompt.
     private weak var gameView: UIView?
 
     init() {
@@ -214,12 +216,6 @@ private final class RenPyContainerView: UIView {
 
     func clear() {
         gameView?.removeFromSuperview()
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // SDL sets the view's frame itself when the game switches between windowed and full screen.
-        gameView?.frame = bounds
     }
 }
 #endif

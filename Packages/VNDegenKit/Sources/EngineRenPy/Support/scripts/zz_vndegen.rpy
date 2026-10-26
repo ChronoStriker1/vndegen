@@ -7,6 +7,7 @@
 init 999 python in _vndegen:
     import os
     import signal
+    import sys
     import time
     import pygame
 
@@ -121,6 +122,36 @@ init 999 python in _vndegen:
 
         Interface.set_mode = place_window
 
+    # VNDEGEN_PYTHON2_PERSISTENT is set for a Ren'Py 7 game on Ren'Py 8. Its persistent data, such as unlocked gallery
+    # images, is written so that the game's PC version, on Ren'Py 7 and Python 2, loads it too: in pickle protocol 2,
+    # with each class Ren'Py 7.5 moved under its Ren'Py 7.4 module. Every Ren'Py since 7.4 loads the old names. Saves
+    # keep Ren'Py 8's format, because older Ren'Py can't load a newer Ren'Py's save state either way.
+    if os.environ.get("VNDEGEN_PYTHON2_PERSISTENT") == "1" and sys.version_info[0] >= 3:
+        import io
+        import pickle
+        import renpy.persistent as persistent_module
+
+        python2_modules = {
+            "renpy.revertable": "renpy.python",
+            "renpy.rollback": "renpy.python",
+            "renpy.display.scenelists": "renpy.display.core",
+        }
+
+        class Python2Pickler(pickle._Pickler):
+            def save_global(self, obj, name=None):
+                old = python2_modules.get(getattr(obj, "__module__", None))
+                if old is None:
+                    return pickle._Pickler.save_global(self, obj, name)
+                self.write(pickle.GLOBAL + (old + "\n" + (name or obj.__qualname__) + "\n").encode("utf-8"))
+                self.memoize(obj)
+
+        def python2_dumps(o, highest=False, bad_reduction_name=None):
+            f = io.BytesIO()
+            Python2Pickler(f, 2).dump(o)
+            return f.getvalue()
+
+        persistent_module.dumps = python2_dumps
+
     # VNDEGEN_BUTTONS carries the game's remapped controller buttons, such as "a=key:K_z,b=click:3,x=button:confirm,y=nothing".
     # The game window reads the controller itself, so the remapping happens here: each remapped button gets the Ren'Py
     # bindings of the button that does its action in the standard layout, or posts the key or click it is bound to.
@@ -211,6 +242,8 @@ init 999 python in _vndegen:
     #   axis:<name>:<state>
     #                move a controller axis, such as axis:lefty:neg for the left stick up; states are neg, pos, and zero
     #   save:<slot>  what a save slot's button does on the save screen; load:<slot> is the same on the load screen
+    #   restore:<save>
+    #                load a save by its file name, such as 1-1, with no confirmation, as renpy.load does
     #   quit         quit, with the result "main-menu" if a menu step got there; without it the game stays open
     probe = os.environ.get("VNDEGEN_PROBE")
     if probe:
@@ -289,6 +322,9 @@ init 999 python in _vndegen:
                 renpy.display.controller.controller_event(arg, "release")
             elif step == "axis":
                 renpy.display.controller.controller_event(*arg.split(":"))
+            elif step == "restore":
+                probe_log("restore " + str(renpy.can_load(arg)))
+                renpy.load(arg)
             elif step in ("start", "save", "load"):
                 if step == "start":
                     probe_state["action"] = renpy.store.Start()

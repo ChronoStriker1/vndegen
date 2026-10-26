@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import VNCore
 
@@ -110,6 +111,23 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
             level = next
         }
         return false
+    }
+
+    /// Identifies one release of a game without naming it, for the list of games tested on Ren'Py 8: the first 16 hex
+    /// digits of a SHA-256 over the names and sizes of the scripts and archives directly in `game/`. Another release or
+    /// a modded copy gets another fingerprint. Nil when `game/` holds none of those files.
+    public static func fingerprint(base: URL) -> String? {
+        let game = base.appendingPathComponent("game", isDirectory: true)
+        let keys: Set<URLResourceKey> = [.fileSizeKey, .isRegularFileKey]
+        guard let items = try? FileManager.default.contentsOfDirectory(at: game, includingPropertiesForKeys: Array(keys)) else { return nil }
+        let lines = items.compactMap { item -> String? in
+            guard ["rpa", "rpyc", "rpy"].contains(item.pathExtension.lowercased()),
+                  let values = try? item.resourceValues(forKeys: keys), values.isRegularFile == true else { return nil }
+            return "\(item.lastPathComponent)\t\(values.fileSize ?? 0)\n"
+        }.sorted()
+        guard !lines.isEmpty else { return nil }
+        let digest = SHA256.hash(data: Data(lines.joined().utf8))
+        return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Decides only when every version names the same line.

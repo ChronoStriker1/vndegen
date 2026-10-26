@@ -27,8 +27,10 @@ nonisolated public struct RenPyCommand: Sendable {
         runtimes.appendingPathComponent("\(runtime.rawValue)/lib/\(runtime.macFolder)/python")
     }
 
-    public init(base: URL, runtime: RenPyRuntime, runtimes: URL, support: URL, dataDirectory: URL, placement: Placement?,
-                buttons: [ControlInput: ControlAction]? = nil) {
+    /// `gameLine` is the runtime the game's own version calls for. A Ren'Py 7 game on Ren'Py 8 writes persistent data
+    /// its PC version can load, as `zz_vndegen.rpy` explains.
+    public init(base: URL, runtime: RenPyRuntime, gameLine: RenPyRuntime, runtimes: URL, support: URL, dataDirectory: URL,
+                placement: Placement?, buttons: [ControlInput: ControlAction]? = nil) {
         executable = Self.python(runtime, in: runtimes)
         arguments = [support.appendingPathComponent("launcher.py").path, base.path]
         var environment = ProcessInfo.processInfo.environment
@@ -47,6 +49,7 @@ nonisolated public struct RenPyCommand: Sendable {
             break
         }
         environment["VNDEGEN_BUTTONS"] = buttons.flatMap(Self.buttonsVariable)
+        environment["VNDEGEN_PYTHON2_PERSISTENT"] = runtime == .renPy8 && gameLine == .renPy7 ? "1" : nil
         self.environment = environment
     }
 

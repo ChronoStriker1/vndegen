@@ -14,6 +14,8 @@ final class RenPySession: EngineSession {
     private let launch: GameLaunch
     private let base: URL
     private let runtime: RenPyRuntime
+    /// The runtime the game's own version calls for, which `runtime` overrides when the player picked another.
+    private let gameLine: RenPyRuntime
     private let runtimes: URL
     private let support: URL
     private weak var hubWindow: NSWindow?
@@ -33,6 +35,7 @@ final class RenPySession: EngineSession {
         else { throw RenPyError.runtimeMissing(runtime) }
         self.launch = launch
         self.runtime = runtime
+        gameLine = layout.runtime
         self.runtimes = runtimes
         self.support = support
         base = launch.folder.appendingPathComponent(layout.path(""), isDirectory: true)
@@ -47,7 +50,7 @@ final class RenPySession: EngineSession {
     private func start(in window: NSWindow) {
         hubWindow = window
         let placement: RenPyCommand.Placement = window.styleMask.contains(.fullScreen) ? .fullScreen : .frame(Self.gameFrame(over: window))
-        let command = RenPyCommand(base: base, runtime: runtime, runtimes: runtimes, support: support,
+        let command = RenPyCommand(base: base, runtime: runtime, gameLine: gameLine, runtimes: runtimes, support: support,
                                    dataDirectory: launch.dataDirectory, placement: placement, buttons: launch.game.buttonMapping)
         process.executableURL = command.executable
         process.arguments = command.arguments

@@ -233,8 +233,8 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
     #expect(FileManager.default.fileExists(atPath: support.appendingPathComponent("launcher.py").path))
     #expect(FileManager.default.fileExists(atPath: support.appendingPathComponent("scripts/zz_vndegen.rpy").path))
 
-    let command = RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: .renPy7, runtimes: URL(fileURLWithPath: "/app/RenPy"),
-                               support: support, dataDirectory: URL(fileURLWithPath: "/data/Test Game"),
+    let command = RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: .renPy7, gameLine: .renPy7,
+                               runtimes: URL(fileURLWithPath: "/app/RenPy"), support: support, dataDirectory: URL(fileURLWithPath: "/data/Test Game"),
                                placement: .frame(CGRect(x: 10, y: 38.4, width: 1280, height: 772)))
     #expect(command.executable.path == "/app/RenPy/7/lib/py2-mac-universal/python")
     #expect(command.arguments == [support.appendingPathComponent("launcher.py").path, "/games/Test Game"])
@@ -242,6 +242,7 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
     #expect(command.environment["VNDEGEN_DATA"] == "/data/Test Game")
     #expect(command.environment["VNDEGEN_WINDOW"] == "10,38,1280,772")
     #expect(command.environment["VNDEGEN_FULLSCREEN"] == nil)
+    #expect(command.environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
 }
 
 @Test func passesRemappedButtonsToTheHook() throws {
@@ -253,8 +254,20 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
     #expect(KeyboardKey.choices.allSatisfy { RenPyCommand.pygameKey($0) != nil })
     #expect(KeyboardKey.choices.compactMap(RenPyCommand.pygameKey).filter { $0.hasPrefix("K_F") }.count == 12)
 
-    let command = RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: .renPy8, runtimes: URL(fileURLWithPath: "/app/RenPy"),
-                               support: URL(fileURLWithPath: "/support"), dataDirectory: URL(fileURLWithPath: "/data/Test Game"),
+    let command = RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: .renPy8, gameLine: .renPy8,
+                               runtimes: URL(fileURLWithPath: "/app/RenPy"), support: URL(fileURLWithPath: "/support"), dataDirectory: URL(fileURLWithPath: "/data/Test Game"),
                                placement: nil, buttons: [.r2: .click(.primary)])
     #expect(command.environment["VNDEGEN_BUTTONS"] == "r2=click:1")
+}
+
+/// A Ren'Py 7 game on Ren'Py 8 asks the hook for persistent data that its PC version, on Ren'Py 7, can load.
+@Test func renPy7GameOnRenPy8WritesPython2Persistent() {
+    func command(_ runtime: RenPyRuntime, game: RenPyRuntime) -> RenPyCommand {
+        RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: runtime, gameLine: game,
+                     runtimes: URL(fileURLWithPath: "/app/RenPy"), support: URL(fileURLWithPath: "/support"),
+                     dataDirectory: URL(fileURLWithPath: "/data/Test Game"), placement: nil)
+    }
+    #expect(command(.renPy8, game: .renPy7).environment["VNDEGEN_PYTHON2_PERSISTENT"] == "1")
+    #expect(command(.renPy8, game: .renPy8).environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
+    #expect(command(.renPy7, game: .renPy7).environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
 }
