@@ -42,6 +42,7 @@ private struct Setup {
             try Data(mapping.yamlString().utf8).write(to: folder.appendingPathComponent("mapping.yaml"))
         }
         service = SaveSyncService(library: library, connector: Self.connector(hooks), manifest: manifest)
+        service.configRetention = nil
         service.setServer(host: "server", port: 22, user: "player", path: store.path)
         await service.testConnection()
         #expect(service.connection == .untrusted(hostKey: testHostKey))
@@ -565,6 +566,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
     try JSONSerialization.data(withJSONObject: settings).write(to: url)
 
     let service = SaveSyncService(library: setup.library, connector: Setup.connector(setup.hooks), manifest: nil)
+    service.configRetention = nil
     #expect(try await service.status(for: setup.id) == .conflict(latest))
     service.autoBackup = true
     await service.sessionEnded(setup.id)
