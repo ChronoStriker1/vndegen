@@ -1,0 +1,36 @@
+# A throwaway iOS app that embeds KiriKiri.framework the way VNDegen will. Build the engine first with
+# scripts/kirikiri-engine.sh build/kirikiri, then:
+#   xcodegen --spec Engines/KiriKiri/test-host/project.yml
+#   xcodebuild -project Engines/KiriKiri/test-host/KiriKiriTestHost.xcodeproj -scheme KiriKiriTestHost \
+#     -sdk iphonesimulator -derivedDataPath build/kirikiri-test-host/dd build
+# Launch it with -gameRoot <game folder> -data <data.xp3 or data folder>. The engine log is Documents/kirikiri.log.
+name: KiriKiriTestHost
+options:
+  bundleIdPrefix: com.chronostriker1
+  deploymentTarget:
+    iOS: "18.0"
+targets:
+  KiriKiriTestHost:
+    type: application
+    platform: iOS
+    sources: [main.m]
+    dependencies:
+      - framework: ../../../build/kirikiri/ios/KiriKiri.xcframework
+        embed: true
+    info:
+      path: ../../../build/kirikiri-test-host/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: SceneDelegate
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.chronostriker1.vndegen.kirikiri-test-host
+      CODE_SIGN_IDENTITY: "-"
+      CLANG_ENABLE_OBJC_ARC: YES
+      ARCHS: arm64
