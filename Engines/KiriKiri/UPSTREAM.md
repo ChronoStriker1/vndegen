@@ -33,6 +33,8 @@ VNDegen's movie decoder, `vndegen/movie_decoder.cpp`, uses FFmpeg 8.1.2. vcpkg b
 
 The port adds the rest of the configure line: `--enable-pic --disable-doc --enable-runtime-cpudetect --disable-autodetect`, the platform options (`--target-os=darwin --enable-appkit --enable-avfoundation --enable-coreimage --enable-audiotoolbox --enable-videotoolbox` for macOS, `--enable-avfoundation --enable-coreimage --enable-videotoolbox` for iOS), the libraries that `vcpkg.json` selects (`--enable-avcodec --enable-avformat --enable-swresample --enable-swscale --disable-avdevice --disable-avfilter --disable-ffmpeg --disable-ffplay --disable-ffprobe`), and a `--disable-` option for every optional external library. The port's `gpl`, `nonfree`, and `version3` features stay off, so the line has no `--enable-gpl`, `--enable-nonfree`, or `--enable-version3`, and FFmpeg's configure reports `License: LGPL version 2.1 or later`. The `mpegvideo` demuxer is there because MPEG program streams identify their video streams by probing with it. FFmpeg enables the `h263` decoder too, which `wmv1` and `wmv2` need.
 
+With FFmpeg and the player, the iOS device framework grew from 11.0 MB to 16.7 MB.
+
 FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink the program against a modified library, which VNDegen's public source permits. The app must show FFmpeg's LGPL notice alongside the krkrsdl3 license.
 
 ## Left out
@@ -48,6 +50,7 @@ FFmpeg is linked statically. LGPL 2.1 allows that when the recipient can relink 
 - `vndegen/ciphers.cpp`: native decryption of encrypted archives. Each scheme is one row in its table.
 - `vndegen/movie_decoder.cpp`: decodes a movie with FFmpeg on a worker thread, reading it through the engine's storage streams, so archive ciphers apply. `vndegen/movie_test.cpp` builds `KiriKiriMovieTest`, which decodes movies with it and checks frame counts, audio, and seeking.
 - `vndegen/movie_player.cpp`: the movie player behind `krmovie.h`'s `iTVPVideoOverlay`. It shows each decoded frame when the engine's clock reaches it, as an overlay sprite over the window or into the two bitmaps a layer-mode `VideoOverlay` shows, and plays the audio through the engine's sound output. The clock is the engine's tick count, which stops while the engine is paused, kept within 40 ms of the audio played. `vndegen/movie-check/startup.tjs` is a script-only game that `scripts/kirikiri-movie-check.sh` runs to check overlay and layer mode, loops, segment loops, period events, seeking, and pausing.
+  Left out: only the first audio stream plays, and `audioBalance`, `playRate`, the picture adjustments such as `contrast`, and the mixer mode's mixing bitmap have no effect. Mixer and Media Foundation modes draw as overlay mode does. Movie audio follows `audioVolume` but not the global sound volume.
 - `vndegen/sigcheck.cpp`: a `sigcheck.dll` stub. Its `Window.checkSignature` reports every file's signature as valid without checking it.
 
 ## VNDegen's changes to upstream files
