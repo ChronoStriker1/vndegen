@@ -22,7 +22,7 @@ let package = Package(
         .target(name: "EngineRPGMaker", dependencies: ["VNCore"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore"]),
         // The system libarchive plus zlib's infback9 for Deflate64. Lives inside ArchiveImport's folder.
         .target(

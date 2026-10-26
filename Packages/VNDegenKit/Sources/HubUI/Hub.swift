@@ -24,6 +24,8 @@ public final class Hub {
     public var launchError: String?
     @ObservationIgnored private var sessionStart: Date?
     @ObservationIgnored private var matching: Task<Void, Never>?
+    /// The automatic backups that closed sessions started, chained so the last one finishes after all the others.
+    @ObservationIgnored private var sessionEndWork: Task<Void, Never>?
 
     public init(library: LibraryStore, metadata: MetadataService, input: InputHub, lock: LockService, saveSync: SaveSyncService) {
         self.library = library
@@ -76,6 +78,17 @@ public final class Hub {
         }
         sessionStart = nil
         screen = .library
-        Task { await saveSync.sessionEnded(id) }
+        let previous = sessionEndWork
+        sessionEndWork = Task {
+            await previous?.value
+            await saveSync.sessionEnded(id)
+        }
+    }
+
+    /// Ends a running game the way quitting it from the hub would, then waits for every pending automatic backup. Call
+    /// before the app quits, so the play time and the backups are not lost. Returns at once when nothing is pending.
+    public func prepareToQuit() async {
+        endSession()
+        await sessionEndWork?.value
     }
 }

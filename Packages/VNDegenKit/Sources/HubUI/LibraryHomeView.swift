@@ -90,10 +90,13 @@ struct TopBar: View {
     @Environment(\.hubMetrics) private var metrics
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: metrics.isCompact ? 8 : 12) {
             Wordmark()
             Spacer()
+            // The empty library has its own, larger Add game button.
             if !nav.visibleGames.isEmpty {
+                HubButton(target: .addGame, kind: .icon) { Image(systemName: "plus") }
+                    .accessibilityLabel("Add game")
                 HubButton(target: .gridButton, kind: .icon) { Image(systemName: "square.grid.2x2.fill") }
                     .accessibilityLabel("All games")
             }
@@ -130,6 +133,7 @@ struct Wordmark: View {
                 .font(.display(15, weight: .black))
                 .tracking(2)
                 .foregroundStyle(.white)
+                .fixedSize()
         }
         .accessibilityElement(children: .combine)
     }

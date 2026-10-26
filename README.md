@@ -47,6 +47,7 @@ Put each game in its own folder, named as you want it to appear. The folder name
 
 - **iPhone and iPad:** open the Files app, then On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
 - **Mac:** copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.
+- **From an archive:** Add game in the library unpacks a zip, RAR, or 7z into the library. On a Mac you can also drop the archive on the window.
 
 VNDegen rescans the folder on launch and on pull to refresh.
 
