@@ -5,10 +5,11 @@
 # needs a JIT on iOS. A framework already built from the same sources and Go version is left alone.
 #   scripts/rclone-runtime.sh
 set -euo pipefail
+self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 cd "$(dirname "$0")/.."
 src=Packages/VNDegenKit/Rclone
 out=Packages/VNDegenKit/build/CRclone.xcframework
-stamp=$( { cat "$0" "$src/go.mod" "$src/go.sum" "$src/rclone.go" "$src/include/"*; go version; } | shasum -a 256 | cut -c1-16)
+stamp=$( { cat "$self" "$src/go.mod" "$src/go.sum" "$src/rclone.go" "$src/include/"*; go version; } | shasum -a 256 | cut -c1-16)
 [ "$(cat "$out/.vndegen-runtime" 2>/dev/null)" = "$stamp" ] && exit 0
 echo "rclone -> $out"
 

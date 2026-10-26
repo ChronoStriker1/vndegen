@@ -286,11 +286,7 @@ public final class SaveSyncService {
         connection = .checking
         do {
             foundGames = try await withStore(server) { store in
-                do {
-                    return try await store.countGames()
-                } catch let error as RcloneError where error.status == 404 {
-                    throw SaveSyncError.noStoreFolder(server.path)
-                }
+                try await store.countGames()
             }
             connection = .connected
         } catch {
@@ -477,6 +473,8 @@ public final class SaveSyncService {
                 if let base { try? base.write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
             }
             do {
+                // A game's first backup creates its folder, so the store folder must exist already.
+                if base == nil { _ = try await store.countGames() }
                 try await store.push(folder, backup: name)
                 try await store.verify(folder, backup: name, differential: report.isDifferential)
                 try await store.stageMapping(folder, device: device)
@@ -634,7 +632,7 @@ public final class SaveSyncService {
         let connector = connector, mirror = mirror, limit = timeouts.operation, limits = timeouts.rclone
         return try await serialized {
             let job = Task {
-                try await work(RemoteStore(access: connector(server), mirror: mirror, limits: limits))
+                try await work(RemoteStore(access: connector(server), mirror: mirror, limits: limits, path: server.path))
             }
             let deadline = Task {
                 do { try await Task.sleep(for: limit) } catch { return false }

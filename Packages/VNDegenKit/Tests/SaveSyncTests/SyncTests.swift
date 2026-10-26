@@ -796,3 +796,13 @@ extension SaveSyncService {
     guest.remote = .smb(SMBRemote(host: "nas.example"))
     #expect(try await RemoteAccess.smb(guest, password: "ignored").root == RemoteAccess.smb(guest, password: nil).root)
 }
+
+@MainActor
+@Test func aFirstBackupNeverCreatesAMissingStoreFolder() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    // The path now names a folder the share does not have, as a typo in Settings would.
+    let store = try #require(setup.server.folder)
+    try FileManager.default.removeItem(at: store)
+    await #expect(throws: SaveSyncError.noStoreFolder(setup.server.path)) { try await setup.service.checkedBackUp(setup.id) }
+    #expect(!FileManager.default.fileExists(atPath: store.path))
+}

@@ -8,6 +8,8 @@ struct RemoteStore: Sendable {
     let access: RemoteAccess
     let mirror: URL
     let limits: RcloneLimits
+    /// The store's path as the user entered it, for messages.
+    var path = ""
 
     var local: LudusaviStore { LudusaviStore(root: mirror) }
     private var root: String { access.root }
@@ -32,9 +34,14 @@ struct RemoteStore: Sendable {
         return StoreIndex(mirror: local, folders: folders.sorted())
     }
 
-    /// How many game folders the store holds. Reads only.
+    /// How many game folders the store holds. Reads only. Throws `noStoreFolder` when the store folder is missing, so a
+    /// mistyped path is reported rather than created by a first backup.
     func countGames() async throws -> Int {
-        try await list("", options: ["dirsOnly": true]).count
+        do {
+            return try await list("", options: ["dirsOnly": true]).count
+        } catch let error as RcloneError where error.status == 404 {
+            throw SaveSyncError.noStoreFolder(path)
+        }
     }
 
     // MARK: One game
