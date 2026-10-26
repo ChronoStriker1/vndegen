@@ -248,21 +248,45 @@
         a: ['A', 0], b: ['B', 1], x: ['X', 2], y: ['Y', 3], l: ['LB', 4], r: ['RB', 5], l2: ['LT', 6], r2: ['RT', 7],
         view: ['SELECT', 8], menu: ['START', 9], l3: ['LS', 10], r3: ['RS', 11],
         up: ['UP', 12], down: ['DOWN', 13], left: ['LEFT', 14], right: ['RIGHT', 15],
-        leftStickUp: ['L_UP', null, 'L'], leftStickDown: ['L_DOWN', null, 'L'],
-        leftStickLeft: ['L_LEFT', null, 'L'], leftStickRight: ['L_RIGHT', null, 'L'],
-        rightStickUp: ['R_UP', null, 'R'], rightStickDown: ['R_DOWN', null, 'R'],
-        rightStickLeft: ['R_LEFT', null, 'R'], rightStickRight: ['R_RIGHT', null, 'R'],
+        leftStickUp: ['L_UP', null, 'L', 0], leftStickDown: ['L_DOWN', null, 'L', 0],
+        leftStickLeft: ['L_LEFT', null, 'L', 0], leftStickRight: ['L_RIGHT', null, 'L', 0],
+        rightStickUp: ['R_UP', null, 'R', 1], rightStickDown: ['R_DOWN', null, 'R', 1],
+        rightStickLeft: ['R_LEFT', null, 'R', 1], rightStickRight: ['R_RIGHT', null, 'R', 1],
     };
+    const readsGamepad = (k) => !!(k && k.key_mouse && String(k.config && k.config.useGamepad) === 'true');
     function gameBinds(name) {
-        const k = kag(), keys = k && k.key_mouse;
-        if (!keys || String(k.config && k.config.useGamepad) !== 'true' || !padNames[name]) return false;
-        const pad = keys.map_pad || {};
-        const [label, index, stick] = padNames[name];
-        if (stick) return !!((pad.stick_digital || {})[label] || (pad.stick || {})[stick]);
+        const k = kag();
+        if (!readsGamepad(k) || !padNames[name]) return false;
+        const pad = k.key_mouse.map_pad || {};
+        const [label, index, stick, stickIndex] = padNames[name];
+        if (stick) {
+            const analog = pad.stick || {};
+            return !!((pad.stick_digital || {})[label] || analog[stick] || analog[stickIndex]);
+        }
         const buttons = pad.button || {};
         return !!(buttons[label] || buttons[index]);
     }
+
+    // Tyrano starts reading the gamepad when it hears gamepadconnected, which the page sends once, at the first press.
+    // A press while the game loads comes before Tyrano listens, so the pad is announced again until Tyrano reads it, for
+    // up to a minute after the page starts, and at each press. Tyrano ignores the event once it reads the pad.
+    function announcePad() {
+        const k = kag(), pad = navigator.getGamepads()[0];
+        const gamepad = readsGamepad(k) && k.key_mouse.gamepad;
+        if (!pad || !gamepad || gamepad.gamepad_exests) return;
+        const event = new Event('gamepadconnected');
+        Object.defineProperty(event, 'gamepad', { value: pad });
+        window.dispatchEvent(event);
+    }
+    let waits = 0;
+    const waitForEngine = setInterval(() => {
+        announcePad();
+        const k = kag(), gamepad = readsGamepad(k) && k.key_mouse.gamepad;
+        if ((gamepad && gamepad.gamepad_exests) || ++waits > 240) clearInterval(waitForEngine);
+    }, 250);
+
     window.__vndegen.onGamepad = (action, pressed, name) => {
+        announcePad();
         if (action && !gameBinds(name)) window.__vndegenTyrano.button(action, pressed);
     };
 

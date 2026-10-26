@@ -107,6 +107,36 @@ window.TYRANO = { kag: { stat: { is_strong_stop: true, visible_menu_button: true
     #expect(try await bound.evaluateJavaScript("navigator.getGamepads()[0].buttons[0].pressed") as? Bool == true)
 }
 
+/// Records the Tyrano actions VNDegen runs, as "name+" for a press and "name-" for a release.
+private let recordActions = "window.actions = []; const run = __vndegenTyrano.button; __vndegenTyrano.button = (n, p) => { actions.push(n + (p ? '+' : '-')); run(n, p); }; 0"
+
+@MainActor @Test func aStickTheGameBindsByIndexIsTheGamesAlone() async throws {
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: try configuration())
+    await Loader().load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {")
+        .replacingOccurrences(of: "key_mouse: {", with: "key_mouse: { map_pad: { button: {}, stick_digital: {}, stick: { 0: 'vmouse_move' } },"), in: view)
+    _ = try await view.evaluateJavaScript(recordActions)
+    _ = try await pressPad(view, [.leftStickDown, .rightStickDown, .down])
+    #expect(try await view.evaluateJavaScript("actions.join(' ')") as? String == "down+ down-")
+}
+
+@MainActor @Test func tyranoHearsOfAPadThatConnectedWhileTheGameLoaded() async throws {
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: try configuration())
+    await Loader().load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {")
+        .replacingOccurrences(of: "key_mouse: {", with: "key_mouse: { gamepad: { gamepad_exests: false },"), in: view)
+    // The press comes before the engine listens for the pad, like a press while the game loads.
+    _ = try await view.evaluateJavaScript(WebGameSession.gamepadScript(.a, pressed: true) + "; 0")
+    _ = try await view.evaluateJavaScript("""
+        window.heard = 0;
+        window.addEventListener('gamepadconnected', () => { heard++; TYRANO.kag.key_mouse.gamepad.gamepad_exests = true; }); 0
+        """)
+    let deadline = ContinuousClock.now + .seconds(5)
+    while try await view.evaluateJavaScript("heard") as? Int == 0, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(try await view.evaluateJavaScript("heard") as? Int == 1)
+}
+
 @Test func legacyRemapsKeepRunningTyranoActions() {
     let plugin = TyranoPlugin()
     #expect(plugin.legacyAction(for: .confirm) == .button(.confirm))
