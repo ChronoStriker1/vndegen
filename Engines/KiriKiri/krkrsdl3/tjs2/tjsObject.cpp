@@ -31,8 +31,7 @@ void TJSCompactObjectHeap()
 void TJSClearObjectHeap()
 {
     _tjsForceShutdown = true;
-    _allTJSObjects.forEach([](tTJSCustomObject* obj) { delete obj; });
-    _allTJSObjects.clear();
+    _allTJSObjects.deleteAll();
     _tjsForceShutdown = false;
 }
 
@@ -440,10 +439,7 @@ tTJSCustomObject::~tTJSCustomObject()
     if (TJSObjectHashMapEnabled())
         TJSRemoveObjectHashRecord(this);
 
-    if (!_tjsForceShutdown)
-    {
-        _allTJSObjects.unregisterObject(this->GCIndex);
-    }
+    _allTJSObjects.unregisterObject(this->GCIndex);
 }
 //---------------------------------------------------------------------------
 void tTJSCustomObject::_Finalize(void)

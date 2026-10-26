@@ -37,6 +37,8 @@ static Uint64 quitSentAt; // SDL ticks when the close was sent, 0 before
 static bool terminated;
 static bool finished;
 static FILE *logFile;
+// Archives can open on the engine's loader threads.
+static std::atomic<const char *> problem;
 
 static void writeLog(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
@@ -46,6 +48,7 @@ static void writeLog(void *userdata, int category, SDL_LogPriority priority, con
 
 int vnkk_start(const VNKKLaunch *launch)
 {
+    problem = nullptr;
     if (launch->logPath) {
         logFile = fopen(launch->logPath, "a");
         if (logFile)
@@ -185,9 +188,12 @@ void vnkk_request_quit(void)
 
 void vnkk_stop(void)
 {
+    // The engine clock and audio would stay paused into the next game.
+    vnkk_set_paused(false);
     if (started)
         SDL_AppQuit(nullptr, finished ? SDL_APP_SUCCESS : SDL_APP_FAILURE);
-    started = false;
+    started = running = quitRequested = terminated = finished = false;
+    quitSentAt = 0;
     if (logFile) {
         SDL_SetLogOutputFunction(SDL_GetDefaultLogOutputFunction(), nullptr);
         fclose(logFile);
@@ -210,9 +216,6 @@ void *vnkk_view(void)
     return nullptr;
 #endif
 }
-
-// Archives can open on the engine's loader threads.
-static std::atomic<const char *> problem;
 
 void vnkk_record_problem(const char *sentence)
 {

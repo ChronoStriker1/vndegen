@@ -3,11 +3,19 @@
 #   <dest>/mac/KiriKiriHelper            macOS arm64 executable, with its font in <dest>/mac/Res/
 #   <dest>/ios/KiriKiri.xcframework      iOS device and simulator (arm64) framework
 #   scripts/kirikiri-engine.sh build/kirikiri
+# A second argument builds only the restart harness KiriKiriRestart, into <dest>/<argument>/:
+#   restart        a release build
+#   restart-asan   built with AddressSanitizer and UndefinedBehaviorSanitizer
 # Dependencies come from vcpkg, a shared clone in ~/Library/Caches/VNDegen/vcpkg that this script
 # clones and bootstraps when missing. vcpkg's binary cache keeps built dependencies across
 # checkouts. A build whose inputs have not changed since the last one is skipped.
 set -euo pipefail
 dest=${1:?destination folder, such as build/kirikiri}
+harness=${2:-}
+case "$harness" in
+  "" | restart | restart-asan) ;;
+  *) echo "unknown build $harness, expected restart or restart-asan" >&2; exit 2 ;;
+esac
 root=$(cd "$(dirname "$0")/.." && pwd)
 src="$root/Engines/KiriKiri"
 cache=${VNDEGEN_KIRIKIRI_CACHE:-$HOME/Library/Caches/VNDegen}
@@ -17,7 +25,7 @@ mkdir -p "$dest"
 dest=$(cd "$dest" && pwd)
 
 stamp=$( (cat "$0"; cd "$src" && find . -path ./test-host -prune -o -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
-if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
+if [ -z "$harness" ] && [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "KiriKiri engine is up to date in $dest"
   exit 0
 fi
@@ -44,6 +52,17 @@ configure_and_build() { # <name> <triplet> <target> [cmake args...]
 
 start=$(date +%s)
 mkdir -p "$work"
+if [ -n "$harness" ]; then
+  sanitize=OFF
+  [ "$harness" = restart-asan ] && sanitize=ON
+  configure_and_build "$harness" arm64-osx KiriKiriRestart -DKIRIKIRI_SANITIZE=$sanitize
+  rm -rf "${dest:?}/$harness"
+  mkdir -p "$dest/$harness/Res"
+  cp -p "$work/$harness/KiriKiriRestart" "$dest/$harness/"
+  cp -p "$work/$harness/Res/DroidSansFallback.ttf" "$dest/$harness/Res/"
+  echo "KiriKiriRestart built in $dest/$harness in $(($(date +%s) - start)) s"
+  exit 0
+fi
 configure_and_build mac arm64-osx KiriKiriHelper
 configure_and_build ios arm64-ios KiriKiri -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos
 configure_and_build ios-sim arm64-ios-simulator KiriKiri -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator

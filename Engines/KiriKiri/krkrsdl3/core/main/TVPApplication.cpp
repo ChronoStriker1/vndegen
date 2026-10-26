@@ -122,6 +122,19 @@ bool tTVPApplication::StartApplication()
     {
         // nothing to do
     }
+    // A game whose startup fails must not take the host process down with it.
+    catch (const eTJSScriptError& e)
+    {
+        TVPAddImportantLog(ttstr(TVPScriptExceptionRaised) + TJS_N("\n") + e.GetMessage());
+        if (e.GetTrace().GetLen())
+            TVPAddImportantLog(ttstr(TJS_N("trace : ")) + e.GetTrace());
+        return false;
+    }
+    catch (const eTJS& e)
+    {
+        TVPAddImportantLog(ttstr(TVPScriptExceptionRaised) + TJS_N("\n") + e.GetMessage());
+        return false;
+    }
 
     return true;
 }

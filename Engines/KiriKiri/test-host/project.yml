@@ -3,7 +3,8 @@
 #   xcodegen --spec Engines/KiriKiri/test-host/project.yml
 #   xcodebuild -project Engines/KiriKiri/test-host/KiriKiriTestHost.xcodeproj -scheme KiriKiriTestHost \
 #     -sdk iphonesimulator -derivedDataPath build/kirikiri-test-host/dd build
-# Launch it with -gameRoot <game folder> -data <data.xp3 or data folder>. The engine log is Documents/kirikiri.log.
+# Launch it with -gameRoot <game folder> -data <data.xp3 or data folder>. Add -gameRoot2, -data2, and -switchAfter <seconds>
+# to quit that game and start a second one in the same process. The engine log is Documents/kirikiri.log.
 name: KiriKiriTestHost
 options:
   bundleIdPrefix: com.chronostriker1

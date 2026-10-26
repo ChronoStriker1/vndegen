@@ -1,14 +1,21 @@
 // Puts the engine's view inside this app's own view hierarchy, under a label the app draws on top, and runs the
 // engine from a CADisplayLink, as VNDegen will. -clickAfter <seconds> -clickX <0..1> -clickY <0..1> also sends one left
-// click through vnkk_mouse_button, the path VNDegen's controller input takes.
+// click through vnkk_mouse_button, the path VNDegen's controller input takes. -gameRoot2 and -data2 name a second game:
+// -switchAfter <seconds> quits the first game through vnkk_request_quit, and once it has quit the second game starts in
+// the same process, as when a VNDegen player returns to the library and picks another game.
 #import <UIKit/UIKit.h>
 #import <KiriKiri/vnkk.h>
+#include <unistd.h>
 
 @interface HostViewController : UIViewController
 @end
 
 @implementation HostViewController {
     CADisplayLink *_displayLink;
+    UIView *_engineView;
+    NSUInteger _game;
+    CFTimeInterval _gameStart;
+    BOOL _quitRequested;
 }
 
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations
@@ -21,27 +28,25 @@
     return YES;
 }
 
+// The game root and data arguments of each game: -gameRoot and -data, then -gameRoot2 and -data2.
+- (NSArray<NSArray<NSString *> *> *)games
+{
+    NSUserDefaults *arguments = NSUserDefaults.standardUserDefaults;
+    NSMutableArray *games = [NSMutableArray array];
+    for (NSString *suffix in @[ @"", @"2" ]) {
+        NSString *gameRoot = [arguments stringForKey:[@"gameRoot" stringByAppendingString:suffix]];
+        NSString *data = [arguments stringForKey:[@"data" stringByAppendingString:suffix]];
+        if (gameRoot && data)
+            [games addObject:@[ gameRoot, data ]];
+    }
+    return games;
+}
+
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
     if (_displayLink)
         return;
-    NSUserDefaults *arguments = NSUserDefaults.standardUserDefaults;
-    NSString *gameRoot = [arguments stringForKey:@"gameRoot"];
-    NSString *data = [arguments stringForKey:@"data"];
-    NSString *log = [[NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask]
-                         .firstObject URLByAppendingPathComponent:@"kirikiri.log"].path;
-    VNKKLaunch launch = {gameRoot.fileSystemRepresentation, data.fileSystemRepresentation, log.fileSystemRepresentation};
-    if (!gameRoot || !data || vnkk_start(&launch) != 0) {
-        NSLog(@"KiriKiriTestHost: the game did not start");
-        vnkk_stop();
-        return;
-    }
-
-    UIView *engineView = (__bridge UIView *)vnkk_view();
-    engineView.frame = self.view.bounds;
-    engineView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [self.view addSubview:engineView];
 
     UILabel *label = [UILabel new];
     label.text = @" test host ";
@@ -49,12 +54,13 @@
     label.backgroundColor = [UIColor.systemRedColor colorWithAlphaComponent:0.8];
     [label sizeToFit];
     label.center = CGPointMake(CGRectGetMidX(self.view.bounds), CGRectGetMaxY(self.view.bounds) - 20);
+    label.layer.zPosition = 1;
     [self.view addSubview:label];
 
-    // SDL made its own window key when it showed it.
-    [self.view.window makeKeyAndVisible];
-    NSLog(@"KiriKiriTestHost: engine view %@ in %@", engineView, engineView.superview);
+    if (![self startGame:0])
+        return;
 
+    NSUserDefaults *arguments = NSUserDefaults.standardUserDefaults;
     double clickAfter = [arguments doubleForKey:@"clickAfter"];
     if (clickAfter > 0) {
         float x = [arguments floatForKey:@"clickX"], y = [arguments floatForKey:@"clickY"];
@@ -70,13 +76,55 @@
     [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
 }
 
+- (BOOL)startGame:(NSUInteger)index
+{
+    NSArray<NSArray<NSString *> *> *games = self.games;
+    if (index >= games.count) {
+        NSLog(@"KiriKiriTestHost: no game %lu", (unsigned long)index + 1);
+        return NO;
+    }
+    NSString *log = [[NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask]
+                         .firstObject URLByAppendingPathComponent:@"kirikiri.log"].path;
+    VNKKLaunch launch = {games[index][0].fileSystemRepresentation, games[index][1].fileSystemRepresentation,
+                         log.fileSystemRepresentation};
+    NSLog(@"KiriKiriTestHost: starting game %lu in process %d", (unsigned long)index + 1, getpid());
+    if (vnkk_start(&launch) != 0) {
+        NSLog(@"KiriKiriTestHost: the game did not start");
+        vnkk_stop();
+        return NO;
+    }
+    _game = index;
+    _gameStart = CACurrentMediaTime();
+    _quitRequested = NO;
+
+    _engineView = (__bridge UIView *)vnkk_view();
+    _engineView.frame = self.view.bounds;
+    _engineView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.view insertSubview:_engineView atIndex:0];
+
+    // SDL made its own window key when it showed it.
+    [self.view.window makeKeyAndVisible];
+    NSLog(@"KiriKiriTestHost: engine view %@ in %@", _engineView, _engineView.superview);
+    return YES;
+}
+
 - (void)step
 {
-    if (vnkk_iterate()) {
-        [_displayLink invalidate];
-        vnkk_stop();
-        NSLog(@"KiriKiriTestHost: the game quit");
+    double switchAfter = [NSUserDefaults.standardUserDefaults doubleForKey:@"switchAfter"];
+    if (switchAfter > 0 && !_quitRequested && _game + 1 < self.games.count &&
+        CACurrentMediaTime() - _gameStart > switchAfter) {
+        NSLog(@"KiriKiriTestHost: quitting game %lu", (unsigned long)_game + 1);
+        _quitRequested = YES;
+        vnkk_request_quit();
     }
+    if (!vnkk_iterate())
+        return;
+    [_engineView removeFromSuperview];
+    _engineView = nil;
+    vnkk_stop();
+    NSLog(@"KiriKiriTestHost: game %lu quit", (unsigned long)_game + 1);
+    if (!_quitRequested || ![self startGame:_game + 1])
+        [_displayLink invalidate];
 }
 
 @end

@@ -1,5 +1,6 @@
 // The KiriKiri engine's C interface, the only part of the engine VNDegen calls.
-// Every function runs on the main thread. One game runs per process.
+// Every function runs on the main thread. One game runs at a time; after vnkk_stop, vnkk_start can
+// start another in the same process.
 #ifndef VNKK_H
 #define VNKK_H
 
@@ -45,7 +46,8 @@ VNKK_API void vnkk_request_quit(void);
 VNKK_API void vnkk_stop(void);
 
 // A sentence for the player describing the most recent problem the engine recorded, such as an
-// archive encryption it cannot read, or NULL when there is none.
+// archive encryption it cannot read, or NULL when there is none. It stays readable after the game
+// quits and clears when the next game starts.
 VNKK_API const char *vnkk_problem(void);
 
 // The UIView SDL renders into, for the host to place in its own view hierarchy. NULL on macOS.

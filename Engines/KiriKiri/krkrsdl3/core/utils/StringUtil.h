@@ -4,32 +4,7 @@
 
 #include <string>
 #include <algorithm>
-
-static int ttstr_find_first_not_of(const ttstr& str, const ttstr& r)
-{
-    const tjs_char* const pend = str.c_str() + str.length();
-    for (const tjs_char* p = str.c_str(); p < pend; ++p)
-    {
-        if (r.IndexOf(*p) != -1)
-        {
-            return p - str.c_str();
-        }
-    }
-    return -1;
-}
-
-static int ttstr_find_last_not_of(const ttstr& str, const ttstr& r)
-{
-    const tjs_char* pbegin = str.c_str();
-    for (const tjs_char* p = str.c_str() + str.length();; --p)
-    {
-        if (r.IndexOf(*p) != -1)
-            return (p - str.c_str()); // found a match
-        else if (p == pbegin)
-            break; // at beginning, no more chance for match
-    }
-    return -1;
-}
+#include <type_traits>
 
 inline std::string Trim(const std::string& val)
 {
@@ -54,29 +29,20 @@ inline std::string Trim(const std::string& val)
         return val.substr(pos, len);
     }
 }
+// Drops leading and trailing spaces and control characters, as the std::string version does.
 inline ttstr Trim(const ttstr& val)
 {
-    static const tjs_char* TRIM_STR =
-        TJS_N(" \01\02\03\04\05\06\a\b\t\n\v\f\r\x0E\x0F\x7F\x10\x11\x12\x13\x14\x15\x16\x17\x18"
-              "\x19\x1A\x1B\x1C\x1D\x1E\x1F");
-    int pos = ttstr_find_first_not_of(val, TRIM_STR);
-    int lastpos = ttstr_find_last_not_of(val, TRIM_STR);
-    if (pos == lastpos)
-    {
-        if (pos == std::wstring::npos)
-        {
-            return val;
-        }
-        else
-        {
-            return val.SubString(pos, 1);
-        }
-    }
-    else
-    {
-        std::wstring::size_type len = lastpos - pos + 1;
-        return val.SubString(pos, len);
-    }
+    auto blank = [](tjs_char c) {
+        auto u = static_cast<std::make_unsigned<tjs_char>::type>(c); // UTF-8 bytes are negative
+        return u <= 0x20 || u == 0x7F;
+    };
+    const tjs_char* begin = val.c_str();
+    const tjs_char* end = begin + val.length();
+    while (begin < end && blank(*begin))
+        begin++;
+    while (end > begin && blank(end[-1]))
+        end--;
+    return ttstr(begin, (int)(end - begin));
 }
 
 #endif // __STRING_UTILITY_H__

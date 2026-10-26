@@ -89,6 +89,10 @@ TVPWindow::TVPWindow()
 TVPWindow::~TVPWindow()
 {
     TVPUnregisterWindowToList(this);
+    // TVPClearAllWindows deletes windows that tTJSNI_Window::Invalidate never saw, and their
+    // queued events would reach the next game.
+    TVPCancelInputEvents(this);
+    TVPRemoveWindowUpdate(this);
 
     // 解除绘制设备对本窗口的引用（D3D 等析构时不再触碰本窗口；
     // 设备只经 SetDrawDeviceObject 被引用，析构必然先于本窗口发生）

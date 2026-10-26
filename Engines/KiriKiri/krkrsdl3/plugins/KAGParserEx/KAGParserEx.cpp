@@ -417,7 +417,10 @@ tTJSNI_KAGParserEX::tTJSNI_KAGParserEX()
     Owner = NULL;
     Scenario = NULL;
     Lines = NULL;
+    CurLine = 0;
+    CurPos = 0;
     CurLineStr = NULL;
+    LineBufferUsing = false;
     ProcessSpecialTags = true;
     IgnoreCR = false;
     Macros = NULL;

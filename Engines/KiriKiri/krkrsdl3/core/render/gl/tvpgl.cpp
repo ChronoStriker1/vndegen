@@ -12615,7 +12615,8 @@ extern "C"
             }
             if (flags & 1)
             {
-                tjs_uint16 in16 = *(tjs_uint16*)in;
+                tjs_uint16 in16;
+                memcpy(&in16, in, sizeof(in16)); // in is at any byte offset
                 tjs_uint mpos = in16 & 0xFFF;
                 tjs_uint mlen = (in16 >> 12) + 3;
                 in += 2;
@@ -12653,7 +12654,14 @@ extern "C"
      ((tjs_uint32)TVP_TLG6_BYTEOF((addr), 2) << 16) + \
      ((tjs_uint32)TVP_TLG6_BYTEOF((addr), 3) << 24))
 #else
-#define TVP_TLG6_FETCH_32BITS(addr) (*(tjs_uint32*)addr)
+// The bit pool is read at any byte offset, so the load must not assume alignment.
+static inline tjs_uint32 TVPTLG6Fetch32Bits(const void* addr)
+{
+    tjs_uint32 v;
+    memcpy(&v, addr, sizeof(v));
+    return v;
+}
+#define TVP_TLG6_FETCH_32BITS(addr) TVPTLG6Fetch32Bits(addr)
 #endif
 
     /*export*/
