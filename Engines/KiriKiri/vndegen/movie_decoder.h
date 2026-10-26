@@ -93,6 +93,7 @@ public:
 private:
     MovieDecoder() = default;
     bool OpenStreams(std::string &error);
+    void Prime();
     void RequestSeek(double t);
     void Run();
     void DoSeek(std::unique_lock<std::mutex> &lock);

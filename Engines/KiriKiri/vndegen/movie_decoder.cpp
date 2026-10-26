@@ -30,6 +30,26 @@ static std::string describe(int code)
     return text;
 }
 
+// Sends a packet, or null to drain, and hands each frame that comes out to onFrame.
+template<typename OnFrame>
+static int decode(AVCodecContext *context, AVPacket *packet, AVFrame *frame, OnFrame onFrame)
+{
+    int sent;
+    for (;;) {
+        sent = avcodec_send_packet(context, packet);
+        int received;
+        while ((received = avcodec_receive_frame(context, frame)) >= 0) {
+            onFrame(frame);
+            av_frame_unref(frame);
+        }
+        if (sent != AVERROR(EAGAIN))
+            break;
+        if (received != AVERROR(EAGAIN))
+            break; // the decoder neither takes input nor gives output
+    }
+    return sent == AVERROR_EOF ? 0 : sent;
+}
+
 // The engine's storage streams, which decrypt archive entries as they read, behind FFmpeg's I/O.
 static int readStream(void *opaque, uint8_t *buffer, int size)
 {
@@ -163,7 +183,28 @@ bool MovieDecoder::OpenStreams(std::string &error)
     }
     decoded = av_frame_alloc();
     transferred = av_frame_alloc();
+    if (!videoStream->codecpar->extradata_size)
+        Prime();
     return true;
+}
+
+// Video whose stream carries no extradata, such as MPEG-1 in a program stream, may have its sequence
+// header only at the start of the file, and a decoder that has not read it decodes nothing after a
+// seek. This decodes up to the first picture, then has the worker seek back to the start, which
+// checks where the container landed.
+void MovieDecoder::Prime()
+{
+    AVPacket *packet = av_packet_alloc();
+    bool pictured = false;
+    for (size_t i = 0; i < maxLeadPackets && !pictured && av_read_frame(format, packet) >= 0; i++) {
+        if (packet->stream_index == videoIndex)
+            decode(video, packet, decoded, [&](AVFrame *) { pictured = true; });
+        av_packet_unref(packet);
+    }
+    av_packet_free(&packet);
+    avcodec_flush_buffers(video);
+    seekPending = true;
+    seekTarget = 0;
 }
 
 MovieDecoder::~MovieDecoder()
@@ -412,26 +453,6 @@ void MovieDecoder::DoSeek(std::unique_lock<std::mutex> &lock)
     audioEnded = !sink || audioIndex < 0;
     for (AVPacket *packet : lead)
         Route(packet, lock);
-}
-
-// Sends a packet, or null to drain, and hands each frame that comes out to onFrame.
-template<typename OnFrame>
-static int decode(AVCodecContext *context, AVPacket *packet, AVFrame *frame, OnFrame onFrame)
-{
-    int sent;
-    for (;;) {
-        sent = avcodec_send_packet(context, packet);
-        int received;
-        while ((received = avcodec_receive_frame(context, frame)) >= 0) {
-            onFrame(frame);
-            av_frame_unref(frame);
-        }
-        if (sent != AVERROR(EAGAIN))
-            break;
-        if (received != AVERROR(EAGAIN))
-            break; // the decoder neither takes input nor gives output
-    }
-    return sent == AVERROR_EOF ? 0 : sent;
 }
 
 void MovieDecoder::DecodeVideo(AVPacket *packet, std::unique_lock<std::mutex> &lock)

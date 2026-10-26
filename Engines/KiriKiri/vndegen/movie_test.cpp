@@ -5,7 +5,8 @@
 // prints the stream info, decodes every frame and all the audio, then seeks to the middle and
 // checks that the first frame after the seek is at the target, then does the same for a rewind. --frames checks the number of
 // frames decoded against another decoder's count, such as ffprobe -count_frames. --dump writes the
-// frame in the middle of the movie as a PPM image. Exits nonzero if a check fails.
+// frame in the middle of the movie as a PPM image. A second decoder then seeks to the middle before it
+// has decoded anything, as a game that sets a frame before playing does. Exits nonzero if a check fails.
 #include "tjsCommHead.h"
 #include "TVPStorage.h"
 #include "XP3Archive.h"
@@ -135,16 +136,19 @@ int main(int argc, char *argv[])
         fprintf(stderr, "usage: %s <file> | <archive.xp3> <entry> [--frames <count>] [--dump <ppm>]\n", argv[0]);
         return 2;
     }
-    tTJSBinaryStream *stream = nullptr;
-    if (args.size() == 2) {
-        try {
-            stream = openEntry(args[0], args[1]);
-        } catch (const eTJSError &e) {
-            fprintf(stderr, "%s\n", e.GetMessage().AsStdString().c_str());
+    auto openStream = [&]() -> tTJSBinaryStream * {
+        if (args.size() == 2) {
+            try {
+                return openEntry(args[0], args[1]);
+            } catch (const eTJSError &e) {
+                fprintf(stderr, "%s\n", e.GetMessage().AsStdString().c_str());
+                return nullptr;
+            }
         }
-    } else if (FILE *file = fopen(args[0], "rb")) {
-        stream = new FileStream(file);
-    }
+        FILE *file = fopen(args[0], "rb");
+        return file ? new FileStream(file) : nullptr;
+    };
+    tTJSBinaryStream *stream = openStream();
     if (!stream) {
         fprintf(stderr, "cannot open %s\n", args.back());
         return 1;
@@ -213,6 +217,16 @@ int main(int argc, char *argv[])
         if (landed)
             decoder->Recycle(std::move(frame));
     }
+
+    // MPEG-1 video may carry its sequence header only at the start, so this decoder must not skip it.
+    double target = info.duration / 2;
+    decoder = MovieDecoder::Open(openStream(), error);
+    decoder->Start(&sink);
+    decoder->Seek(target, [] {});
+    bool landed = nextFrame(*decoder, frame);
+    check(landed && std::fabs(frame.pts - target) <= 1.5 / info.fps,
+          "a seek before the first frame to " + std::to_string(target) + " s lands at " +
+              std::to_string(landed ? frame.pts : -1));
     printf("%s\n", failures ? "movie test failed" : "movie test passed");
     return failures ? 1 : 0;
 }
