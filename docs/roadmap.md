@@ -10,7 +10,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## Next
 1. Archive import: pick a zip, rar, or 7z in Files and unpack it into the library. 462 of the 521 folders on the NAS are archives.
 2. TyranoScript, reusing the MV/MZ WebKit runtime.
-3. Ren'Py, starting with Ren'Py 8.
+3. Ren'Py: macOS through a helper process first, then iOS with an embedded Ren'Py 8 runtime. Plan and estimates in `docs/renpy-spike.md`; the prototype is on branch `ws/renpy`.
 4. KiriKiri, building on krkrsdl2.
 5. RPG Maker XP, VX, and VX Ace, building on mkxp-z.
 6. NScripter (ONScripter), then AliceSoft System 3 and 4 (xsystem35, xsystem4), then Artemis.
