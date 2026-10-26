@@ -190,9 +190,10 @@ void TVPInitFontNames()
         std::vector<ttstr> list;
         auto lister = [&](const ttstr& name, tTVPLocalFileInfo* s)
         {
-            if (s->Mode & (S_IFREG | S_IFDIR))
+            // The lister passes bare file names, and fonts load by storage name.
+            if (s->Mode & S_IFREG)
             {
-                list.emplace_back(name);
+                list.emplace_back(TVPProjectDir + "fonts/" + name);
             }
         };
         TVPGetLocalFileListAt(TVPGetLocallyAccessibleName(TVPProjectDir + "fonts"), lister);
