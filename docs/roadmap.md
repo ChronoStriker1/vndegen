@@ -22,10 +22,12 @@ Each item is planned work on its own branch, not merged into `dev`.
 - A blur over the lower game area on iPad after the game has been in portrait (`ws/ipad-blur`).
 - Ludusavi save sync over SMB instead of SSH and rsync (`ws/ludusavi-smb`), reaching the share the PCs already use, as guest or with a password.
 
-Merged into `dev` for the next release: Ren'Py games two folders deep are detected, and Ren'Py on iPhone and iPad no longer offers touch control methods that do nothing there.
+Merged into `dev` for the next release: Ren'Py games two folders deep are detected, Ren'Py on iPhone and iPad no longer offers touch control methods that do nothing there, and a game started after tapping Quit to library on a landscape iPhone no longer stays black.
 
 ## Next
-1. NScripter (ONScripter).
+1. Together, as the next work:
+   - NScripter (ONScripter).
+   - iPad multitasking: Split View, Slide Over, and an iPad window of its own. A windowed game follows the window's shape, as Follow device does, whatever in-game orientation Settings sets. The hub, the in-game menu, the touch gamepad, and every engine lay out correctly at small and odd window sizes. The iPhone has no split screen, so it needs no change.
 2. AliceSoft System 3 and 4 (xsystem35, xsystem4).
 3. Artemis.
 4. Wolf RPG Editor, which needs a new runtime.
