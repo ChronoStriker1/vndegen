@@ -21,7 +21,7 @@ Bundled third-party code keeps its own license: SQLite (public domain), the LZMA
 
 ## FFmpeg
 
-VNDegen's movie decoder, `vndegen/movie_decoder.cpp`, uses FFmpeg 8.1.2. vcpkg builds it from the overlay port in `ports/ffmpeg/`, whose first commit is vcpkg's port unmodified. The one change adds the component list to the configure options:
+VNDegen's movie decoder, `vndegen/movie_decoder.cpp`, uses FFmpeg 8.1.2. vcpkg builds it from the overlay port in `ports/ffmpeg/`, whose first commit is vcpkg's port unmodified. It has two changes. The x86_64 macOS slice builds without FFmpeg's x86 assembly (`--disable-x86asm`), so the build Mac needs no nasm, and the configure options gain the component list:
 
 ```
 --disable-everything --disable-network
