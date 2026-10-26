@@ -15,16 +15,19 @@ case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;
 
 # xcodebuild prints every warning and compiler command. Errors and the final status are what matter here.
 xcb() {
-  xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 \
-    | grep -E "error:|BUILD (SUCCEEDED|FAILED)|\*\* " | grep -v "^/Applications" | head -60 || true
-  return "${PIPESTATUS[0]}"
+  xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 | filter 'error:|BUILD (SUCCEEDED|FAILED)|\*\* '
+}
+
+# Prints the first 60 lines matching <pattern>. The command's own exit status is the pipeline's, through pipefail. The
+# filter reads all of its input, so a long log cannot stop the command with SIGPIPE, and no match is no failure.
+filter() {
+  { grep -E "$1" | grep -v "^/Applications" || true; } | awk 'NR <= 60'
 }
 
 case "${1:?destination}" in
   test)
     cd Packages/VNDegenKit
-    swift test 2>&1 | grep -E "error:|✔|✘|Test run|passed|failed" | grep -v "^/Applications" | tail -40 || true
-    exit "${PIPESTATUS[0]}" ;;
+    swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed' ;;
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;
   ios-sim) xcb -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim build ;;
   ipa)

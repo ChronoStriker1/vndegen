@@ -208,14 +208,15 @@ final class Navigator {
             }
             return [Row(id: "grid-back", items: [.back])] + tiles
         case .game:
-            // The control method and orientation only matter on a touch device.
-            let touchOnly = [Row(id: "page-orientation", items: [.pageOrientation]), Row(id: "page-controls", items: [.pageControls])]
+            // Orientation only matters on a touch device, and the control method only where it changes something.
+            let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
+            let controls = pageGameID.map(offersControlMethod) == true ? [Row(id: "page-controls", items: [.pageControls])] : []
             return [
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
-                + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
+                + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
             var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
             #if os(iOS)
@@ -353,7 +354,7 @@ final class Navigator {
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
         case .pageVariant: if let id = pageGameID { sheet = .variant(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
-        case .pageControls: if let id = pageGameID { sheet = .controlMethod(id) }
+        case .pageControls: if let id = pageGameID, offersControlMethod(id) { sheet = .controlMethod(id) }
         case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
         case let .engineOption(engine):
@@ -485,6 +486,12 @@ final class Navigator {
         variantRevision += 1
     }
 
+    /// Whether the game's page offers a control method: not on a Mac, and not for a game that reads touches itself,
+    /// such as a Ren'Py game.
+    func offersControlMethod(_ id: GameID) -> Bool {
+        ControlMethod.applies(to: hub.library.plugin(for: hub.library.game(id)?.engine))
+    }
+
     var pageGameID: GameID? {
         if case let .game(id) = route { return id }
         return nil
@@ -568,6 +575,9 @@ final class Navigator {
             sheet = nil
             syncInputMode()
         }
+        // A rescan can find that an open control method sheet's game reads touches itself, such as a Ren'Py game whose
+        // files finished copying. Closing it returns focus to its row, which the focus check below then moves.
+        if case let .controlMethod(id)? = sheet, !offersControlMethod(id) { sheet = nil }
         // Until the user steers, and always for touch users, keep the default focus current as the library loads.
         if !steered || hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
     }

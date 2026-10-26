@@ -37,7 +37,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad |
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
 | TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
-| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one folder down | Mac, iPhone, iPad |
+| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
@@ -74,7 +74,7 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 | Previous and next page | L1 and R1 | Q and E, or Page Up and Page Down |
 | VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
 
-The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu, inside the game. Buttons remapped for the game apply there too. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, and the small menu button in the corner opens the VNDegen menu.
+The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu, inside the game. Buttons remapped for the game apply there too. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method. The small menu button in the corner opens the VNDegen menu.
 
 These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
 
@@ -175,3 +175,7 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
 
 Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins.
+
+## License
+
+VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL.
