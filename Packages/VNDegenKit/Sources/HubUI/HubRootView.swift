@@ -1,6 +1,7 @@
 import SwiftUI
 import VNCore
 import SaveSync
+import ArchiveImport
 
 /// The Big Picture-style hub: library, game pages, settings, and the player.
 public struct HubRootView: View {
@@ -39,6 +40,7 @@ public struct HubRootView: View {
 private struct LibraryContainer: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
+    @State private var dropTargeted = false
 
     var body: some View {
         @Bindable var nav = nav
@@ -79,6 +81,28 @@ private struct LibraryContainer: View {
         }
         .onChange(of: hub.library.games) { nav.revalidate() }
         .onChange(of: hub.lock.isUnlocked) { nav.revalidate() }
+        #if os(macOS)
+        // Archives dropped anywhere on the library open the import sheet with them chosen.
+        .dropDestination(for: URL.self) { urls, _ in
+            let files = urls.filter(\.isFileURL)
+            guard nav.sheet == nil, !files.isEmpty else { return false }
+            nav.openImport(files)
+            return true
+        } isTargeted: { dropTargeted = $0 && nav.sheet == nil }
+        .overlay {
+            if dropTargeted {
+                // Shown while dragging only. The drop itself lands on the container, so this one takes no hits.
+                ArchiveDropTarget { _ in }
+                    .frame(maxWidth: 460)
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Theme.background.opacity(0.75))
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: dropTargeted)
+        #endif
     }
 
     @ViewBuilder
@@ -101,14 +125,14 @@ private struct LibraryContainer: View {
                 ChoiceSheet(sheet: sheet, title: "In-game orientation", subtitle: hub.displayTitle(game),
                             footnote: "Landscape keeps either landscape side and follows how you hold the device. Some mobile-style games are made for portrait.")
             }
-        case let .artwork(id):
-            if let game = hub.library.game(id) { ArtworkEditorSheet(game: game) }
-        case let .metadata(id):
-            if let game = hub.library.game(id) { MetadataSearchSheet(game: game) }
-        case let .saves(id):
-            if let game = hub.library.game(id) {
+        case let .artwork(editor):
+            if let game = hub.library.game(editor.gameID) { ArtworkEditorSheet(game: game, editor: editor) }
+        case let .metadata(search):
+            if let game = hub.library.game(search.gameID) { MetadataSearchSheet(game: game, search: search) }
+        case let .saves(model):
+            if let game = hub.library.game(model.game) {
                 SheetScaffold(title: "Saves", subtitle: hub.displayTitle(game), escapeCloses: true) {
-                    GameSavesView(service: hub.saveSync, game: id).scrollContentBackground(.hidden)
+                    GameSavesView(model: model).scrollContentBackground(.hidden)
                 }
                 .presentationDetents([.large])
                 #if os(macOS)
@@ -117,6 +141,8 @@ private struct LibraryContainer: View {
             }
         case let .settingsPage(page):
             SettingsPageSheet(page: page)
+        case let .importGame(model, initialSelection):
+            ArchiveImportView(model: model, initialSelection: initialSelection) { nav.finishImport($0) }
         }
     }
 }

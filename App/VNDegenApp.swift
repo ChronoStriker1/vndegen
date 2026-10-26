@@ -23,7 +23,28 @@ let engines: [any EnginePlugin] = {
 #if os(macOS)
 /// The play session lives in the app's one window, so closing it quits, as closing a PC game's window does.
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    /// Set by the app once its hub exists.
+    var hub: Hub?
+    /// Longest the app waits for an automatic backup before it quits anyway.
+    static let quitTimeout: Duration = .seconds(20)
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// Quitting by closing the window, Command-Q, or logging out ends a running game first so its play time is recorded,
+    /// then waits for automatic backups, including one still running from a game closed just before.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let hub else { return .terminateNow }
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await hub.prepareToQuit() }
+                group.addTask { try? await Task.sleep(for: Self.quitTimeout) }
+                await group.next()
+                group.cancelAll()
+            }
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
 }
 #endif
 
@@ -55,6 +76,9 @@ struct VNDegenApp: App {
     private var root: some View {
         HubRootView(hub: hub)
             .task {
+                #if os(macOS)
+                appDelegate.hub = hub
+                #endif
                 hub.input.start()
                 #if DEBUG
                 await DebugHooks.run(hub)

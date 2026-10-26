@@ -23,7 +23,7 @@ public final class InputHub {
     public var translatesKeyboard = true
     /// When true, a held direction repeats its press event, for menu navigation. Games want raw presses, so they set it false.
     public var repeatsDirections = true
-    public private(set) var lastInputKind: InputKind = .touch
+    public private(set) var lastInputKind: InputKind = Platform.current == .macOS ? .keyboardMouse : .touch
     public private(set) var controllerNames: [String] = []
 
     @ObservationIgnored private var router = PressRouter()

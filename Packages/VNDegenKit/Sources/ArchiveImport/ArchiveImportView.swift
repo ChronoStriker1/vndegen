@@ -1,24 +1,154 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// The state behind `ArchiveImportView`, including gamepad focus. A host that drives the view with a controller keeps the
+/// model it passed to the view and forwards button presses to `handle(_:)`.
+@Observable
+public final class ArchiveImportModel {
+    /// The controller buttons the import flow uses. This module does not depend on VNCore's input types.
+    public enum Button { case up, down, left, right, confirm, cancel }
+
+    enum Control: Hashable {
+        case chooseArchive, deleteToggle, chooseAnother, startImport, cancelPassword, unlock, cancelImport
+        case keepNested, extractNested, importAnother, done
+    }
+
+    let gamesRoot: URL
+    private(set) var importer: ArchiveImporter?
+    var picking = false
+    var password = ""
+    private var focus: Control?
+    /// The ring shows only once a controller moved it, so touch users never see it.
+    private(set) var showsFocus = false
+    @ObservationIgnored private var onFinish: ((String?) -> Void)?
+
+    public init(gamesRoot: URL) { self.gamesRoot = gamesRoot }
+
+    /// Creates the importer once, however often the view appears.
+    func start(initialSelection: [URL], onFinish: @escaping (String?) -> Void) async {
+        self.onFinish = onFinish
+        guard importer == nil else { return }
+        let importer = ArchiveImporter(gamesRoot: gamesRoot)
+        self.importer = importer
+        if !initialSelection.isEmpty { await importer.choose(initialSelection) }
+    }
+
+    /// Cancels a running extraction, or ends the flow and reports what was imported. Later calls do nothing.
+    public func close() {
+        guard let onFinish else { return }
+        guard let importer else {
+            self.onFinish = nil
+            return onFinish(nil)
+        }
+        if importer.step == .extracting {
+            importer.cancel()
+            return
+        }
+        var imported: String?
+        if case let .finished(result) = importer.step { imported = result.folderName }
+        importer.close()
+        self.onFinish = nil
+        onFinish(imported)
+    }
+
+    func unlock() {
+        guard !password.isEmpty else { return }
+        importer?.submitPassword(password)
+        password = ""
+    }
+
+    /// The controls on screen for the current step, top to bottom, each row left to right.
+    private var rows: [[Control]] {
+        guard let importer else { return [] }
+        switch importer.step {
+        case .choosing: return [[.chooseArchive]]
+        case .opening: return []
+        case .reviewing: return (importer.archiveIsOnDevice ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
+        case .password: return [[.cancelPassword, .unlock]]
+        case .extracting: return [[.cancelImport]]
+        case .nested: return [[.keepNested, .extractNested]]
+        case .finished: return [[.importAnother, .done]]
+        }
+    }
+
+    /// The focused control, or the step's main action, which is always last.
+    private var current: Control? {
+        let rows = rows
+        if let focus, rows.contains(where: { $0.contains(focus) }) { return focus }
+        return rows.last?.last
+    }
+
+    func isFocused(_ control: Control) -> Bool { showsFocus && current == control }
+
+    public func handle(_ button: Button) {
+        if button == .cancel { return close() }
+        let rows = rows
+        guard let current, let r = rows.firstIndex(where: { $0.contains(current) }), let c = rows[r].firstIndex(of: current) else { return }
+        // The first press only reveals the ring where focus already is.
+        guard showsFocus else {
+            showsFocus = true
+            if button == .confirm { activate(current) }
+            return
+        }
+        switch button {
+        case .up where r > 0: focus = rows[r - 1][min(c, rows[r - 1].count - 1)]
+        case .down where r < rows.count - 1: focus = rows[r + 1][min(c, rows[r + 1].count - 1)]
+        case .left: focus = rows[r][max(0, c - 1)]
+        case .right: focus = rows[r][min(rows[r].count - 1, c + 1)]
+        case .confirm: activate(current)
+        default: break
+        }
+    }
+
+    /// Touch and pointer: hide the ring, then activate the control.
+    func select(_ control: Control) {
+        showsFocus = false
+        activate(control)
+    }
+
+    private func activate(_ control: Control) {
+        guard let importer else { return }
+        switch control {
+        case .chooseArchive: picking = true
+        case .deleteToggle:
+            importer.deleteArchiveAfterImport.toggle()
+            return
+        case .chooseAnother, .importAnother: importer.reset()
+        case .startImport: importer.startImport()
+        case .cancelPassword, .cancelImport: importer.cancel()
+        case .unlock: unlock()
+        case .keepNested: importer.keepNested()
+        case .extractNested: importer.extractNested()
+        case .done: close()
+        }
+        // The next step starts on its main action.
+        focus = nil
+    }
+}
+
 /// The whole import flow: pick an archive, name the game, enter a password if needed, watch progress, see the result.
 /// Present it in a sheet. `onFinish` gets the new folder's name, or nil when nothing was imported, and the presenter
 /// rescans the library and focuses that game.
 public struct ArchiveImportView: View {
-    let gamesRoot: URL
     let initialSelection: [URL]
     let onFinish: (String?) -> Void
 
-    @State private var importer: ArchiveImporter?
+    @State private var model: ArchiveImportModel
 
     /// `initialSelection` starts the flow with files already chosen, such as ones dropped on `ArchiveDropTarget`.
     public init(gamesRoot: URL, initialSelection: [URL] = [], onFinish: @escaping (String?) -> Void) {
-        self.gamesRoot = gamesRoot
+        self.init(model: ArchiveImportModel(gamesRoot: gamesRoot), initialSelection: initialSelection, onFinish: onFinish)
+    }
+
+    /// For hosts that forward controller input to `model`.
+    public init(model: ArchiveImportModel, initialSelection: [URL] = [], onFinish: @escaping (String?) -> Void) {
+        _model = State(initialValue: model)
         self.initialSelection = initialSelection
         self.onFinish = onFinish
     }
 
     public var body: some View {
+        let importer = model.importer
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -28,14 +158,14 @@ public struct ArchiveImportView: View {
                     }
                 }
                 Spacer()
-                Button(importer?.step == .extracting ? "Cancel" : "Close", action: close)
+                Button(importer?.step == .extracting ? "Cancel" : "Close", action: model.close)
                     .buttonStyle(ImportButtonStyle(kind: .secondary))
                     .keyboardShortcut(.cancelAction)
             }
             .padding(22)
             ScrollView {
                 if let importer {
-                    StepView(importer: importer, onDone: close)
+                    StepView(model: model, importer: importer)
                         .padding(.horizontal, 22)
                         .padding(.bottom, 28)
                         .frame(maxWidth: 640)
@@ -51,24 +181,7 @@ public struct ArchiveImportView: View {
         #endif
         .presentationDetents([.large])
         .interactiveDismissDisabled(importer?.step == .extracting)
-        .task {
-            guard importer == nil else { return }
-            let importer = ArchiveImporter(gamesRoot: gamesRoot)
-            self.importer = importer
-            if !initialSelection.isEmpty { await importer.choose(initialSelection) }
-        }
-    }
-
-    private func close() {
-        guard let importer else { return onFinish(nil) }
-        if importer.step == .extracting {
-            importer.cancel()
-            return
-        }
-        var imported: String?
-        if case let .finished(result) = importer.step { imported = result.folderName }
-        importer.close()
-        onFinish(imported)
+        .task { await model.start(initialSelection: initialSelection, onFinish: onFinish) }
     }
 }
 
@@ -107,10 +220,8 @@ public struct ArchiveDropTarget: View {
 }
 
 private struct StepView: View {
+    @Bindable var model: ArchiveImportModel
     @Bindable var importer: ArchiveImporter
-    let onDone: () -> Void
-    @State private var picking = false
-    @State private var password = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -126,15 +237,15 @@ private struct StepView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: importer.step)
         #if os(iOS)
-        .sheet(isPresented: $picking) {
+        .sheet(isPresented: $model.picking) {
             DocumentPicker { urls in
-                picking = false
+                model.picking = false
                 if !urls.isEmpty { Task { await importer.choose(urls) } }
             }
             .ignoresSafeArea()
         }
         #else
-        .fileImporter(isPresented: $picking, allowedContentTypes: [.data], allowsMultipleSelection: true) { result in
+        .fileImporter(isPresented: $model.picking, allowedContentTypes: [.data], allowsMultipleSelection: true) { result in
             if case let .success(urls) = result, !urls.isEmpty { Task { await importer.choose(urls) } }
         }
         #endif
@@ -144,8 +255,8 @@ private struct StepView: View {
         Group {
             ArchiveDropTarget { urls in Task { await importer.choose(urls) } }
             errorLabel
-            Button { picking = true } label: { Label("Choose Archive", systemImage: "folder") }
-                .buttonStyle(ImportButtonStyle(kind: .primary))
+            Button { model.select(.chooseArchive) } label: { Label("Choose Archive", systemImage: "folder") }
+                .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.chooseArchive)))
                 .keyboardShortcut(.defaultAction)
             Text("Games are extracted into VNDegen's Games folder. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
@@ -205,14 +316,23 @@ private struct StepView: View {
                 }
             }
             .tint(ImportTheme.accent)
+            .padding(12)
+            .background {
+                // A Toggle has no button style, so its focus ring is drawn around the row.
+                let focused = model.isFocused(.deleteToggle)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(focused ? ImportTheme.accent.opacity(0.32) : .clear)
+                    .strokeBorder(focused ? .white : .clear, lineWidth: 2.5)
+            }
+            .padding(.horizontal, -12)
         }
         errorLabel
         HStack(spacing: 12) {
-            Button("Choose Another") { importer.reset() }
-                .buttonStyle(ImportButtonStyle(kind: .secondary))
+            Button("Choose Another") { model.select(.chooseAnother) }
+                .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.chooseAnother)))
             Spacer()
-            Button { importer.startImport() } label: { Label("Import", systemImage: "square.and.arrow.down") }
-                .buttonStyle(ImportButtonStyle(kind: .primary))
+            Button { model.select(.startImport) } label: { Label("Import", systemImage: "square.and.arrow.down") }
+                .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.startImport)))
                 .keyboardShortcut(.defaultAction)
                 .disabled(importer.folderNameProblem != nil)
         }
@@ -225,7 +345,7 @@ private struct StepView: View {
                 Text("Enter the password for \(importer.source?.fileName ?? "this archive").")
                     .font(.system(size: 14))
                     .foregroundStyle(ImportTheme.secondaryText)
-                SecureField("Password", text: $password)
+                SecureField("Password", text: $model.password)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17))
                     .padding(14)
@@ -234,7 +354,7 @@ private struct StepView: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(wrong ? ImportTheme.accent : ImportTheme.stroke)
                     }
-                    .onSubmit(unlock)
+                    .onSubmit(model.unlock)
                 if wrong {
                     Label("That password is not correct. Try again.", systemImage: "exclamationmark.circle.fill")
                         .font(.system(size: 13))
@@ -242,21 +362,15 @@ private struct StepView: View {
                 }
             }
             HStack(spacing: 12) {
-                Button("Cancel") { importer.cancel() }
-                    .buttonStyle(ImportButtonStyle(kind: .secondary))
+                Button("Cancel") { model.select(.cancelPassword) }
+                    .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.cancelPassword)))
                 Spacer()
-                Button(action: unlock) { Label("Unlock", systemImage: "lock.open.fill") }
-                    .buttonStyle(ImportButtonStyle(kind: .primary))
+                Button { model.select(.unlock) } label: { Label("Unlock", systemImage: "lock.open.fill") }
+                    .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.unlock)))
                     .keyboardShortcut(.defaultAction)
-                    .disabled(password.isEmpty)
+                    .disabled(model.password.isEmpty)
             }
         }
-    }
-
-    private func unlock() {
-        guard !password.isEmpty else { return }
-        importer.submitPassword(password)
-        password = ""
     }
 
     @ViewBuilder private var extracting: some View {
@@ -278,8 +392,8 @@ private struct StepView: View {
         Text("Keep VNDegen open until the import finishes. The screen stays on meanwhile.")
             .font(.system(size: 13))
             .foregroundStyle(ImportTheme.tertiaryText)
-        Button("Cancel Import", role: .cancel) { importer.cancel() }
-            .buttonStyle(ImportButtonStyle(kind: .secondary))
+        Button("Cancel Import", role: .cancel) { model.select(.cancelImport) }
+            .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.cancelImport)))
     }
 
     private func nested(_ fileName: String) -> some View {
@@ -293,11 +407,11 @@ private struct StepView: View {
                     .foregroundStyle(ImportTheme.secondaryText)
             }
             HStack(spacing: 12) {
-                Button("Keep As Is") { importer.keepNested() }
-                    .buttonStyle(ImportButtonStyle(kind: .secondary))
+                Button("Keep As Is") { model.select(.keepNested) }
+                    .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.keepNested)))
                 Spacer()
-                Button { importer.extractNested() } label: { Label("Extract", systemImage: "arrow.down.doc.fill") }
-                    .buttonStyle(ImportButtonStyle(kind: .primary))
+                Button { model.select(.extractNested) } label: { Label("Extract", systemImage: "arrow.down.doc.fill") }
+                    .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.extractNested)))
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -314,11 +428,11 @@ private struct StepView: View {
                     .foregroundStyle(ImportTheme.secondaryText)
             }
             HStack(spacing: 12) {
-                Button("Import Another") { importer.reset() }
-                    .buttonStyle(ImportButtonStyle(kind: .secondary))
+                Button("Import Another") { model.select(.importAnother) }
+                    .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.importAnother)))
                 Spacer()
-                Button("Done", action: onDone)
-                    .buttonStyle(ImportButtonStyle(kind: .primary))
+                Button("Done") { model.select(.done) }
+                    .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.done)))
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -374,24 +488,28 @@ enum ImportTheme {
 struct ImportButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary }
     let kind: Kind
+    var focused = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: kind == .primary ? 17 : 15, weight: .bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(kind == .secondary && focused ? .black : .white)
             .padding(.horizontal, kind == .primary ? 28 : 18)
             .frame(minHeight: kind == .primary ? 52 : 44)
             .background {
                 switch kind {
                 case .primary: Capsule().fill(ImportTheme.accent.gradient)
-                case .secondary: Capsule().fill(.ultraThinMaterial).overlay(Capsule().fill(.white.opacity(0.06)))
+                case .secondary:
+                    if focused { Capsule().fill(.white) } else { Capsule().fill(.ultraThinMaterial).overlay(Capsule().fill(.white.opacity(0.06))) }
                 }
             }
-            .overlay { Capsule().stroke(ImportTheme.stroke, lineWidth: 1) }
+            .overlay { Capsule().stroke(focused ? .white : ImportTheme.stroke, lineWidth: focused ? (kind == .primary ? 3 : 0) : 1) }
             .contentShape(Capsule())
             .opacity(isEnabled ? 1 : 0.4)
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .scaleEffect(configuration.isPressed ? 0.95 : (focused ? 1.06 : 1))
+            .shadow(color: focused ? ImportTheme.accent.opacity(kind == .primary ? 0.7 : 0.35) : .clear, radius: 16)
+            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
             .animation(.spring(response: 0.28, dampingFraction: 0.78), value: configuration.isPressed)
     }
 }

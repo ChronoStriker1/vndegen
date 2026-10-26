@@ -8,12 +8,13 @@ struct PlayerView: View {
     let hub: Hub
     let session: any EngineSession
     @State private var menu = PlayerMenu()
+    #if os(iOS)
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
+    #endif
     @State private var needsRotation = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        let showsTouchControls = hub.input.lastInputKind == .touch && hub.input.controllerNames.isEmpty && !menu.isOpen && !isCovered
         ZStack {
             SessionViewHost(session: session)
                 .ignoresSafeArea()
@@ -28,13 +29,14 @@ struct PlayerView: View {
                 RotateHint(orientation: orientation)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            #endif
-            if showsTouchControls {
+            // Macs have no touch screen, so only iOS gets the on-screen controls.
+            if hub.input.lastInputKind == .touch, hub.input.controllerNames.isEmpty, !menu.isOpen, !isCovered {
                 TouchControlsOverlay(mode: $touchMode) { event in
                     hub.input.noteInput(.touch)
                     handle(event)
                 }
             }
+            #endif
             if menu.isOpen {
                 PlayerMenuView(menu: menu, title: title, onResume: resume, onQuit: hub.endSession)
                     .transition(.opacity)

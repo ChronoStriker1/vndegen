@@ -3,6 +3,7 @@ import Foundation
 import VNCore
 import HubUI
 import EngineRPGMaker
+import notify
 #if canImport(UIKit)
 import UIKit
 #else
@@ -12,6 +13,8 @@ import AppKit
 /// Launch arguments for screenshots and UI tests. None of this ships in release builds.
 ///   -seedDemoLibrary YES     creates demo games with real Steam library art
 ///   -demoInput "down,right"  plays controller presses after launch, 0.6 s apart ("wait" pauses one step)
+///   notifyutil -p vndegen.input.down   presses one controller button while the app runs, through
+///                            `xcrun simctl spawn <device> notifyutil -p ...` on a simulator
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
@@ -19,6 +22,7 @@ import AppKit
 ///   -windowSize 900x600      resizes the window before the snapshot
 enum DebugHooks {
     static func run(_ hub: Hub) async {
+        listenForInput(hub)
         #if canImport(UIKit)
         if UserDefaults.standard.bool(forKey: "frameMonitor") { FrameMonitor.shared.start() }
         #endif
@@ -30,6 +34,20 @@ enum DebugHooks {
         #endif
         if UserDefaults.standard.bool(forKey: "seedDemoLibrary") {
             await DemoLibrary.seed(hub.library)
+        }
+    }
+
+    /// Registers one Darwin notification per button. The tokens live for the app's lifetime.
+    static func listenForInput(_ hub: Hub) {
+        for button in VirtualButton.allCases {
+            var token: Int32 = 0
+            notify_register_dispatch("vndegen.input.\(button.rawValue)", &token, .main) { _ in
+                MainActor.assumeIsolated {
+                    hub.input.noteInput(.gamepad)
+                    hub.input.onEvent?(.button(button, pressed: true))
+                    hub.input.onEvent?(.button(button, pressed: false))
+                }
+            }
         }
     }
 

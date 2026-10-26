@@ -119,59 +119,104 @@ extension ArtworkSlot {
     }
 }
 
+/// The artwork sheet's state. The sheet holds it so controller focus can reach the suggestions.
+@MainActor
+@Observable
+final class ArtworkEditor {
+    let gameID: GameID
+    var slot: ArtworkSlot = .capsule
+    private(set) var candidates: [ArtworkCandidate] = []
+    private(set) var loading = false
+    private(set) var applying: ArtworkCandidate.ID?
+    var error: String?
+    /// Set by the sheet from its width, so the focus table matches the suggestion grid.
+    var columns = 3
+    private let hub: Hub
+
+    init(hub: Hub, gameID: GameID) {
+        self.hub = hub
+        self.gameID = gameID
+    }
+
+    func cycleSlot(_ step: Int) {
+        let slots = ArtworkSlot.allCases
+        let index = slots.firstIndex(of: slot) ?? 0
+        slot = slots[(index + step + slots.count) % slots.count]
+    }
+
+    func loadCandidates() async {
+        guard let game = hub.library.game(gameID) else { return }
+        loading = true
+        candidates = await hub.metadata.artworkCandidates(for: game, slot: slot)
+        loading = false
+    }
+
+    func apply(_ candidate: ArtworkCandidate) {
+        guard applying == nil else { return }
+        applying = candidate.id
+        error = nil
+        Task {
+            do {
+                try await hub.metadata.setArtwork(candidate, for: gameID, in: hub.library)
+            } catch {
+                self.error = "Couldn't download that image: \(error.localizedDescription)"
+            }
+            applying = nil
+        }
+    }
+}
+
 /// Steam's "set custom artwork": pick a slot, then a suggested image, a photo, or a file.
 struct ArtworkEditorSheet: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     let game: Game
+    let editor: ArtworkEditor
 
-    @State private var candidates: [ArtworkCandidate] = []
-    @State private var loading = false
-    @State private var applying: ArtworkCandidate.ID?
     @State private var photo: PhotosPickerItem?
     @State private var importingFile = false
-    @State private var error: String?
 
     var body: some View {
-        @Bindable var nav = nav
-        let slot = nav.artworkSlot
+        let slot = editor.slot
         SheetScaffold(title: "Artwork", subtitle: hub.displayTitle(game)) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    Picker("Slot", selection: $nav.artworkSlot) {
-                        ForEach(ArtworkSlot.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        slotTabs(slot)
 
-                    HStack(alignment: .bottom, spacing: 18) {
-                        preview(slot)
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(slot.hint).font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
-                            PhotosPicker(selection: $photo, matching: .images) {
-                                Label("Photos", systemImage: "photo")
-                            }
-                            .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
-                            Button { importingFile = true } label: { Label("Files", systemImage: "folder") }
+                        HStack(alignment: .bottom, spacing: 18) {
+                            preview(slot)
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(slot.hint).font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
+                                PhotosPicker(selection: $photo, matching: .images) {
+                                    Label("Photos", systemImage: "photo")
+                                }
                                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+                                Button { importingFile = true } label: { Label("Files", systemImage: "folder") }
+                                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+                            }
                         }
-                    }
 
-                    if let error {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.accent)
-                    }
+                        if let error = editor.error {
+                            Label(error, systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.accent)
+                        }
 
-                    SectionLabel(text: "Suggestions")
-                    suggestions(slot)
+                        SectionLabel(text: "Suggestions")
+                        suggestions(slot)
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 28)
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 28)
+                .onChange(of: nav.focus) { _, focus in
+                    guard nav.focusMovedByController, case .artworkCandidate? = focus else { return }
+                    withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
+                }
             }
         }
-        .task(id: slot) { await loadCandidates(slot) }
+        .task(id: slot) { await editor.loadCandidates() }
         .onChange(of: photo) { _, item in
             guard let item else { return }
             Task { await importPhoto(item, slot: slot) }
@@ -181,6 +226,36 @@ struct ArtworkEditorSheet: View {
         }
         .presentationDetents([.large])
         .presentationSizing(.page)
+    }
+
+    /// One tab per slot. A row of focus targets rather than a segmented picker, so a controller can show focus on a slot.
+    private func slotTabs(_ selected: ArtworkSlot) -> some View {
+        HStack(spacing: 6) {
+            ForEach(ArtworkSlot.allCases, id: \.self) { slot in
+                let target = Navigator.Target.artworkSlot(slot)
+                let focused = nav.isFocused(target)
+                Button { nav.select(target) } label: {
+                    Text(slot.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .foregroundStyle(focused ? .black : .white)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .background {
+                            Capsule().fill(focused ? AnyShapeStyle(.white) : slot == selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear))
+                        }
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .onHover { if $0 { nav.hover(target) } }
+                .accessibilityAddTraits(slot == selected ? .isSelected : [])
+                .id(target)
+            }
+        }
+        .padding(4)
+        .background(Theme.surface, in: .capsule)
+        .overlay { Capsule().strokeBorder(Theme.stroke) }
+        .animation(Theme.focusAnimation, value: nav.focus)
     }
 
     private func preview(_ slot: ArtworkSlot) -> some View {
@@ -207,9 +282,9 @@ struct ArtworkEditorSheet: View {
 
     @ViewBuilder
     private func suggestions(_ slot: ArtworkSlot) -> some View {
-        if loading {
+        if editor.loading {
             ProgressView().frame(maxWidth: .infinity, minHeight: 120)
-        } else if candidates.isEmpty {
+        } else if editor.candidates.isEmpty {
             Text("No suggestions for this slot. Add a SteamGridDB key in Settings, or match the game with Find metadata.")
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.tertiaryText)
@@ -217,9 +292,12 @@ struct ArtworkEditorSheet: View {
         } else {
             let aspect = slot.nominalSize.width / slot.nominalSize.height
             let minWidth: CGFloat = aspect < 1 ? 110 : 200
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 12)], spacing: 12) {
-                ForEach(candidates) { candidate in
-                    Button { apply(candidate) } label: {
+            let spacing: CGFloat = 12
+            // A fixed column count instead of adaptive columns, so the navigator's focus rows match what is drawn.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: max(1, editor.columns)), spacing: spacing) {
+                ForEach(Array(editor.candidates.enumerated()), id: \.element.id) { index, candidate in
+                    let target = Navigator.Target.artworkCandidate(index)
+                    Button { nav.select(target) } label: {
                         AsyncImage(url: candidate.thumbnail ?? candidate.url) { image in
                             image.resizable().aspectRatio(contentMode: slot == .logo ? .fit : .fill)
                         } placeholder: {
@@ -229,36 +307,22 @@ struct ArtworkEditorSheet: View {
                         .frame(maxWidth: .infinity)
                         .clipShape(.rect(cornerRadius: 8, style: .continuous))
                         .overlay {
-                            if applying == candidate.id {
+                            if editor.applying == candidate.id {
                                 ZStack { Color.black.opacity(0.5); ProgressView() }
                                     .clipShape(.rect(cornerRadius: 8, style: .continuous))
                             }
                         }
                         .overlay(alignment: .bottomLeading) { Tag(text: candidate.source.displayName).padding(6) }
                     }
-                    .buttonStyle(TileButtonStyle(focused: false))
-                    .disabled(applying != nil)
+                    .buttonStyle(TileButtonStyle(focused: nav.isFocused(target)))
+                    .onHover { if $0 { nav.hover(target) } }
+                    .disabled(editor.applying != nil)
+                    .id(target)
                 }
             }
-        }
-    }
-
-    private func loadCandidates(_ slot: ArtworkSlot) async {
-        loading = true
-        candidates = await hub.metadata.artworkCandidates(for: game, slot: slot)
-        loading = false
-    }
-
-    private func apply(_ candidate: ArtworkCandidate) {
-        applying = candidate.id
-        error = nil
-        Task {
-            do {
-                try await hub.metadata.setArtwork(candidate, for: game.id, in: hub.library)
-            } catch {
-                self.error = "Couldn't download that image: \(error.localizedDescription)"
-            }
-            applying = nil
+            .onGeometryChange(for: Int.self) { geo in
+                max(1, Int((geo.size.width + spacing) / (minWidth + spacing)))
+            } action: { editor.columns = $0 }
         }
     }
 
@@ -268,9 +332,9 @@ struct ArtworkEditorSheet: View {
             guard let data = try await item.loadTransferable(type: Data.self) else { return }
             let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
             try hub.library.setArtwork(data, fileExtension: ext, slot: slot, for: game.id)
-            error = nil
+            editor.error = nil
         } catch {
-            self.error = "Couldn't import that photo: \(error.localizedDescription)"
+            editor.error = "Couldn't import that photo: \(error.localizedDescription)"
         }
     }
 
@@ -281,78 +345,138 @@ struct ArtworkEditorSheet: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let data = try Data(contentsOf: url)
             try hub.library.setArtwork(data, fileExtension: url.pathExtension.isEmpty ? "png" : url.pathExtension, slot: slot, for: game.id)
-            error = nil
+            editor.error = nil
         } catch {
-            self.error = "Couldn't import that file: \(error.localizedDescription)"
+            editor.error = "Couldn't import that file: \(error.localizedDescription)"
         }
     }
 }
 
 // MARK: Metadata search
 
+/// The metadata search sheet's state. The sheet holds it so controller focus can reach the results.
+@MainActor
+@Observable
+final class MetadataSearch {
+    let gameID: GameID
+    var query = ""
+    private(set) var results: [MetadataCandidate]?
+    private(set) var searching = false
+    private(set) var applying: MetadataCandidate.ID?
+    var error: String?
+    /// True while the search field has keyboard focus. The controller sets it to bring up the system keyboard.
+    var editingQuery = false
+    private let hub: Hub
+
+    init(hub: Hub, gameID: GameID) {
+        self.hub = hub
+        self.gameID = gameID
+    }
+
+    func search() async {
+        let title = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        searching = true
+        results = await hub.metadata.search(title)
+        searching = false
+    }
+
+    /// Returns whether the match was applied.
+    func apply(_ candidate: MetadataCandidate) async -> Bool {
+        guard applying == nil else { return false }
+        applying = candidate.id
+        error = nil
+        defer { applying = nil }
+        do {
+            try await hub.metadata.apply(candidate, to: gameID, in: hub.library)
+            return true
+        } catch {
+            self.error = "Couldn't apply \(candidate.title): \(error.localizedDescription)"
+            return false
+        }
+    }
+}
+
 struct MetadataSearchSheet: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
     let game: Game
-
-    @State private var query = ""
-    @State private var results: [MetadataCandidate]?
-    @State private var searching = false
-    @State private var applying: MetadataCandidate.ID?
-    @State private var error: String?
+    @Bindable var search: MetadataSearch
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         let sources = hub.metadata.activeSources.map(\.displayName).formatted(.list(type: .or))
         SheetScaffold(title: "Find metadata", subtitle: "Match \(game.id.rawValue) on \(sources)", escapeCloses: true) {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.tertiaryText)
-                    TextField("Title", text: $query)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 17))
-                        .onSubmit { Task { await search() } }
-                        .autocorrectionDisabled()
-                    if searching { ProgressView().controlSize(.small) }
-                }
-                .padding(14)
-                .background(Theme.surface, in: .rect(cornerRadius: 12, style: .continuous))
-                .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.stroke) }
-                .padding(.horizontal, 22)
+                searchField
 
-                if let error {
+                if let error = search.error {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 22)
                 }
 
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        if let results, results.isEmpty {
-                            Text("No matches. Try a shorter title, or add IGDB and SteamGridDB keys in Settings.")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Theme.tertiaryText)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            if let results = search.results, results.isEmpty {
+                                Text("No matches. Try a shorter title, or add IGDB and SteamGridDB keys in Settings.")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Theme.tertiaryText)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            ForEach(Array((search.results ?? []).enumerated()), id: \.element.id) { index, candidate in
+                                let target = Navigator.Target.metadataResult(index)
+                                Button { nav.select(target) } label: { row(candidate, focused: nav.isFocused(target)) }
+                                    .buttonStyle(.plain)
+                                    .onHover { if $0 { nav.hover(target) } }
+                                    .disabled(search.applying != nil)
+                                    .id(target)
+                            }
                         }
-                        ForEach(results ?? []) { candidate in
-                            Button { apply(candidate) } label: { row(candidate) }
-                                .buttonStyle(.plain)
-                                .disabled(applying != nil)
-                        }
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 22)
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 22)
+                    .onChange(of: nav.focus) { _, focus in
+                        guard nav.focusMovedByController, case .metadataResult? = focus else { return }
+                        withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
+                    }
                 }
             }
         }
         .task {
-            query = hub.displayTitle(game)
-            await search()
+            search.query = hub.displayTitle(game)
+            await search.search()
         }
+        .onChange(of: search.editingQuery) { _, editing in fieldFocused = editing }
+        .onChange(of: fieldFocused) { _, focused in search.editingQuery = focused }
         .presentationDetents([.large])
     }
 
-    private func row(_ candidate: MetadataCandidate) -> some View {
+    private var searchField: some View {
+        let focused = nav.isFocused(.metadataQuery)
+        return HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.tertiaryText)
+            TextField("Title", text: $search.query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 17))
+                .focused($fieldFocused)
+                .onSubmit { Task { await search.search() } }
+                .autocorrectionDisabled()
+            if search.searching { ProgressView().controlSize(.small) }
+        }
+        .padding(14)
+        .background(focused ? Color.white.opacity(0.16) : Theme.surface, in: .rect(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2 : 1)
+        }
+        .animation(Theme.focusAnimation, value: focused)
+        .onHover { if $0 { nav.hover(.metadataQuery) } }
+        .padding(.horizontal, 22)
+    }
+
+    private func row(_ candidate: MetadataCandidate, focused: Bool) -> some View {
         HStack(spacing: 14) {
             AsyncImage(url: candidate.thumbnail) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
@@ -370,32 +494,14 @@ struct MetadataSearchSheet: View {
                 .font(.system(size: 13))
             }
             Spacer()
-            if applying == candidate.id { ProgressView() } else { Image(systemName: "chevron.right").foregroundStyle(Theme.tertiaryText) }
+            if search.applying == candidate.id { ProgressView() } else { Image(systemName: "chevron.right").foregroundStyle(Theme.tertiaryText) }
         }
         .padding(12)
-        .background(Theme.surface, in: .rect(cornerRadius: 12, style: .continuous))
-        .contentShape(.rect)
-    }
-
-    private func search() async {
-        let title = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return }
-        searching = true
-        results = await hub.metadata.search(title)
-        searching = false
-    }
-
-    private func apply(_ candidate: MetadataCandidate) {
-        applying = candidate.id
-        error = nil
-        Task {
-            do {
-                try await hub.metadata.apply(candidate, to: game.id, in: hub.library)
-                nav.back()
-            } catch {
-                self.error = "Couldn't apply \(candidate.title): \(error.localizedDescription)"
-            }
-            applying = nil
+        .background(focused ? Color.white.opacity(0.16) : Theme.surface, in: .rect(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(focused ? .white : .clear, lineWidth: 2)
         }
+        .animation(Theme.focusAnimation, value: focused)
+        .contentShape(.rect)
     }
 }

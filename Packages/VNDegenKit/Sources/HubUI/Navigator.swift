@@ -1,7 +1,11 @@
 import Foundation
 import Observation
 import VNCore
+import GameInput
+import Metadata
 import Lock
+import SaveSync
+import ArchiveImport
 
 /// Where the user is in the hub, what has focus, and how controller events move it.
 ///
@@ -17,24 +21,27 @@ final class Navigator {
         case settings
     }
 
+    /// Sheets with state of their own carry its model, so controller input reaches the same state the sheet shows.
     enum Sheet: Identifiable {
         case unlock
         case engine(GameID)
         case orientation(GameID)
-        case artwork(GameID)
-        case metadata(GameID)
-        case saves(GameID)
+        case artwork(ArtworkEditor)
+        case metadata(MetadataSearch)
+        case saves(GameSavesModel)
         case settingsPage(SettingsPage)
+        case importGame(ArchiveImportModel, initialSelection: [URL])
 
         var id: String {
             switch self {
             case .unlock: "unlock"
             case let .engine(id): "engine:\(id)"
             case let .orientation(id): "orientation:\(id)"
-            case let .artwork(id): "artwork:\(id)"
-            case let .metadata(id): "metadata:\(id)"
-            case let .saves(id): "saves:\(id)"
+            case let .artwork(editor): "artwork:\(editor.gameID)"
+            case let .metadata(search): "metadata:\(search.gameID)"
+            case let .saves(model): "saves:\(model.game)"
             case let .settingsPage(page): "settings:\(page)"
+            case .importGame: "import"
             }
         }
     }
@@ -57,7 +64,8 @@ final class Navigator {
     }
 
     enum Target: Hashable {
-        case gridButton, lockButton, settingsButton
+        case addGame, gridButton, lockButton, settingsButton
+        case openFolder, rescan
         /// Hero buttons. They act on `heroGame`.
         case play, details
         case tile(Shelf, GameID)
@@ -65,8 +73,14 @@ final class Navigator {
         case back
         case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation
         case settingsPage(SettingsPage)
+        /// Settings pickers, iOS only. Confirm and left and right step through the values.
+        case touchControls, playOrientation
         case engineOption(EngineID?)
         case orientationOption(PlayOrientation?)
+        case artworkSlot(ArtworkSlot)
+        case artworkCandidate(Int)
+        case metadataQuery
+        case metadataResult(Int)
     }
 
     struct Row {
@@ -81,6 +95,8 @@ final class Navigator {
     var sheet: Sheet? {
         didSet {
             syncInputMode()
+            // Swiping the import sheet away skips its Done button, so finish the import here too.
+            if case let .importGame(model, _)? = oldValue, sheet == nil { model.close() }
             // Focus moves into a sheet and returns to whatever opened it, however the sheet closes.
             if oldValue == nil, sheet != nil {
                 focusBeforeSheet = focus
@@ -97,10 +113,13 @@ final class Navigator {
     private var heroID: GameID?
     /// Set by the grid view from its width.
     var gridColumns = 4
-    var artworkSlot: ArtworkSlot = .capsule
+    private(set) var rescanning = false
     @ObservationIgnored private var columnMemory: [String: Int] = [:]
     /// The unlock view shown in the sheet, kept so controller events reach the same instance.
     @ObservationIgnored private(set) var unlockView: UnlockView?
+
+    /// The Ludusavi settings page. One for the app, like the service it shows.
+    @ObservationIgnored private(set) lazy var saveSettings = SaveSyncSettingsModel(service: hub.saveSync)
 
     init(hub: Hub) { self.hub = hub }
 
@@ -132,13 +151,27 @@ final class Navigator {
         if let sheet {
             switch sheet {
             case .engine, .orientation: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
-            case .unlock, .artwork, .metadata, .saves, .settingsPage: return []
+            case let .artwork(editor):
+                let columns = max(1, editor.columns)
+                let candidates = stride(from: 0, to: editor.candidates.count, by: columns).enumerated().map { index, start in
+                    Row(id: "candidates-\(index)", items: (start..<min(start + columns, editor.candidates.count)).map { .artworkCandidate($0) },
+                        remembersColumn: false)
+                }
+                return [Row(id: "slots", items: ArtworkSlot.allCases.map { .artworkSlot($0) })] + candidates
+            case let .metadata(search):
+                return [Row(id: "query", items: [.metadataQuery])]
+                    + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
+            // These take controller input through their own models.
+            case .unlock, .saves, .settingsPage, .importGame: return []
             }
         }
         switch route {
         case nil:
-            let bar: [Target] = visibleGames.isEmpty ? [.lockButton, .settingsButton] : [.gridButton, .lockButton, .settingsButton]
-            var rows = [Row(id: "bar", items: bar)]
+            if visibleGames.isEmpty {
+                return [Row(id: "bar", items: [.lockButton, .settingsButton]), Row(id: "empty-add", items: [.addGame]),
+                        Row(id: "empty-folder", items: [.openFolder, .rescan])]
+            }
+            var rows = [Row(id: "bar", items: [.addGame, .gridButton, .lockButton, .settingsButton])]
             if heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
             rows += shelves.map { shelf in Row(id: shelf.shelf.rawValue, items: shelf.games.map { .tile(shelf.shelf, $0.id) }) }
             return rows
@@ -156,16 +189,25 @@ final class Navigator {
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : [])
         case .settings:
-            return [Row(id: "settings-back", items: [.back])]
-                + SettingsPage.allCases.map { Row(id: "settings-\($0)", items: [.settingsPage($0)]) }
+            var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
+            #if os(iOS)
+            items += [.touchControls, .playOrientation]
+            #endif
+            return items.map { Row(id: "settings-\($0)", items: [$0]) }
         }
     }
 
     private var defaultFocus: Target? {
-        // Only choice sheets have focus targets. Others take touch, pointer, and their own controller handling.
-        if let sheet { return selectedChoice(for: sheet) }
+        if let sheet {
+            switch sheet {
+            case let .artwork(editor): return .artworkSlot(editor.slot)
+            case .metadata: return .metadataQuery
+            default: return selectedChoice(for: sheet)
+            }
+        }
         switch route {
         case nil:
+            if visibleGames.isEmpty { return .addGame }
             if let game = heroGame, let shelf = shelves.first(where: { $0.games.contains { $0.id == game.id } }) {
                 return .tile(shelf.shelf, game.id)
             }
@@ -230,6 +272,8 @@ final class Navigator {
     /// Screens scroll to keep focus in view only when a controller or the keyboard moved it. Scrolling under a hovering
     /// pointer or a touch user's finger would fight them.
     private(set) var focusMovedByController = false
+    /// Set once a controller, the keyboard, or the pointer has moved focus. Until then focus follows the library as it loads.
+    @ObservationIgnored private var steered = false
 
     /// Pointer hover on Mac and iPad moves focus without activating.
     func hover(_ target: Target) {
@@ -237,6 +281,7 @@ final class Navigator {
         guard position(of: target, in: rows()) != nil else { return }
         hub.input.noteInput(.keyboardMouse)
         focusMovedByController = false
+        steered = true
         if focus != target { setFocus(target) }
     }
 
@@ -256,6 +301,10 @@ final class Navigator {
 
     func activate(_ target: Target) {
         switch target {
+        case .addGame: openImport()
+        case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
+        case .rescan: rescan()
+        case .touchControls, .playOrientation: stepSetting(target, by: 1)
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
@@ -264,9 +313,9 @@ final class Navigator {
         case let .tile(_, id), let .gridTile(id): push(.game(id))
         case .back: back()
         case .pagePlay: if let id = pageGameID { hub.launch(id) }
-        case .pageArtwork: if let id = pageGameID { sheet = .artwork(id) }
-        case .pageMetadata: if let id = pageGameID { sheet = .metadata(id) }
-        case .pageSaves: if let id = pageGameID { sheet = .saves(id) }
+        case .pageArtwork: if let id = pageGameID { sheet = .artwork(ArtworkEditor(hub: hub, gameID: id)) }
+        case .pageMetadata: if let id = pageGameID { sheet = .metadata(MetadataSearch(hub: hub, gameID: id)) }
+        case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
         case let .settingsPage(page): sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
@@ -277,8 +326,80 @@ final class Navigator {
         case let .orientationOption(orientation):
             if case let .orientation(id) = sheet { hub.library.update(id) { $0.orientation = orientation } }
             sheet = nil
+        case let .artworkSlot(slot):
+            if case let .artwork(editor) = sheet { editor.slot = slot }
+        case let .artworkCandidate(index):
+            if case let .artwork(editor) = sheet, editor.candidates.indices.contains(index) { editor.apply(editor.candidates[index]) }
+        case .metadataQuery:
+            if case let .metadata(search) = sheet { search.editingQuery = true }
+        case let .metadataResult(index):
+            if case let .metadata(search) = sheet, let results = search.results, results.indices.contains(index) {
+                apply(results[index], in: search)
+            }
         }
     }
+
+    /// Applies a metadata match and closes its sheet, unless the user already closed it.
+    func apply(_ candidate: MetadataCandidate, in search: MetadataSearch) {
+        Task {
+            guard await search.apply(candidate), case let .metadata(shown)? = sheet, shown === search else { return }
+            sheet = nil
+        }
+    }
+
+    // MARK: Adding games
+
+    func openImport(_ urls: [URL] = []) {
+        guard sheet == nil else { return }
+        sheet = .importGame(ArchiveImportModel(gamesRoot: hub.library.paths.gamesRoot), initialSelection: urls)
+    }
+
+    /// Closes the import sheet, then shows the new game in the library.
+    func finishImport(_ folderName: String?) {
+        if case .importGame? = sheet { sheet = nil }
+        guard let folderName else { return }
+        Task {
+            await hub.refreshLibrary()
+            let id = GameID(folderName)
+            guard hub.library.game(id) != nil else { return }
+            heroID = id
+            if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) { setFocus(tile) }
+        }
+    }
+
+    private func rescan() {
+        guard !rescanning else { return }
+        rescanning = true
+        Task {
+            await hub.refreshLibrary()
+            rescanning = false
+        }
+    }
+
+    /// Steps a settings picker through its values. Returns false for targets that are not pickers.
+    @discardableResult
+    private func stepSetting(_ target: Target, by step: Int) -> Bool {
+        #if os(iOS)
+        switch target {
+        case .touchControls: cycle(TouchControlsMode.storageKey, fallback: TouchControlsMode.gamepad, by: step)
+        case .playOrientation: cycle(PlayOrientation.storageKey, fallback: PlayOrientation.setting, by: step)
+        default: return false
+        }
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    #if os(iOS)
+    /// Writes the next value to the defaults key that the settings screen's `@AppStorage` reads.
+    private func cycle<Value: CaseIterable & RawRepresentable<String> & Equatable>(_ key: String, fallback: Value, by step: Int) {
+        let values = Array(Value.allCases)
+        let current = UserDefaults.standard.string(forKey: key).flatMap(Value.init(rawValue:)) ?? fallback
+        let index = values.firstIndex(of: current) ?? 0
+        UserDefaults.standard.set(values[(index + step + values.count) % values.count].rawValue, forKey: key)
+    }
+    #endif
 
     var pageGameID: GameID? {
         if case let .game(id) = route { return id }
@@ -310,14 +431,20 @@ final class Navigator {
         if hub.lock.isUnlocked {
             relock()
         } else {
-            unlockView = UnlockView(lock: hub.lock) { [weak self] _ in
-                guard let self else { return }
-                if case .unlock = self.sheet { self.sheet = nil }
-                self.unlockView = nil
-                self.revalidate()
-            }
-            sheet = .unlock
+            presentUnlock()
         }
+    }
+
+    /// Shows the unlock sheet, which asks for a new passcode first when nothing could unlock the library yet.
+    private func presentUnlock(then done: @escaping (Bool) -> Void = { _ in }) {
+        unlockView = UnlockView(lock: hub.lock) { [weak self] unlocked in
+            guard let self else { return }
+            if case .unlock = self.sheet { self.sheet = nil }
+            self.unlockView = nil
+            self.revalidate()
+            done(unlocked)
+        }
+        sheet = .unlock
     }
 
     /// Locks the library and drops any screen that shows a locked game.
@@ -327,7 +454,21 @@ final class Navigator {
     }
 
     private func toggleGameLock(_ id: GameID) {
-        hub.library.update(id) { $0.isLocked.toggle() }
+        guard let game = hub.library.game(id) else { return }
+        hub.lock.refreshBiometry()
+        if !game.isLocked, hub.lock.needsPasscodeSetup {
+            // A game hidden with nothing to unlock it would not be protected, so the user sets a passcode first.
+            presentUnlock { [weak self] _ in
+                guard let self, !self.hub.lock.needsPasscodeSetup else { return }
+                self.setLocked(true, id)
+            }
+            return
+        }
+        setLocked(!game.isLocked, id)
+    }
+
+    private func setLocked(_ locked: Bool, _ id: GameID) {
+        hub.library.update(id) { $0.isLocked = locked }
         revalidate()
     }
 
@@ -343,8 +484,8 @@ final class Navigator {
             sheet = nil
             syncInputMode()
         }
-        // Until the user steers with a controller, keep the default focus current as the library loads.
-        if hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
+        // Until the user steers, and always for touch users, keep the default focus current as the library loads.
+        if !steered || hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
     }
 
     // MARK: Choice sheets
@@ -370,7 +511,7 @@ final class Navigator {
         case .orientation:
             let fixed = PlayOrientation.allCases.map { Choice(target: .orientationOption($0), title: $0.title) }
             return [Choice(target: .orientationOption(nil), title: "Use default", detail: "Currently \(PlayOrientation.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata, .saves, .settingsPage:
+        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame:
             return []
         }
     }
@@ -379,7 +520,7 @@ final class Navigator {
         switch sheet {
         case let .engine(id): .engineOption(hub.library.game(id)?.engineOverride)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
-        case .unlock, .artwork, .metadata, .saves, .settingsPage: nil
+        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame: nil
         }
     }
 
@@ -392,13 +533,13 @@ final class Navigator {
         syncInputMode()
     }
 
-    /// The settings screen and its pages, the metadata search, and the Ludusavi game search in the saves sheet have text
-    /// fields that need raw keyboard input.
+    /// The settings screen and its pages, the metadata search, the Ludusavi game search in the saves sheet, and the import
+    /// sheet's folder name and password have text fields that need raw keyboard input.
     private func syncInputMode() {
         guard case .library = hub.screen else { return }
         let typing: Bool
         switch (sheet, route) {
-        case (.metadata?, _), (.saves?, _), (.settingsPage?, _), (nil, .settings?): typing = true
+        case (.metadata?, _), (.saves?, _), (.settingsPage?, _), (.importGame?, _), (nil, .settings?): typing = true
         default: typing = false
         }
         hub.input.translatesKeyboard = !typing
@@ -406,25 +547,44 @@ final class Navigator {
 
     func handle(_ event: ControllerEvent) {
         focusMovedByController = true
+        steered = true
         if case .unlock = sheet {
             unlockView?.handle(event)
             return
         }
         guard case let .button(button, pressed: true) = event else { return }
-        if case .artwork = sheet {
+        switch sheet {
+        case let .saves(model)?:
+            if !model.handle(button), button == .cancel { back() }
+            return
+        case .settingsPage(.saves)?:
+            if !saveSettings.handle(button), button == .cancel { back() }
+            return
+        case let .importGame(model, _)?:
+            if let button = ArchiveImportModel.Button(button) { model.handle(button) }
+            return
+        case let .artwork(editor)?:
             switch button {
-            case .left, .pageUp: cycleArtworkSlot(-1)
-            case .right, .pageDown: cycleArtworkSlot(1)
-            case .cancel: back()
+            // Shoulder buttons switch slots from anywhere in the sheet.
+            case .pageUp, .pageDown:
+                editor.cycleSlot(button == .pageUp ? -1 : 1)
+                setFocus(.artworkSlot(editor.slot))
+                return
+            case .left, .right:
+                move(button == .left ? .left : .right)
+                // The slot row works like tabs: moving along it switches the slot.
+                if case let .artworkSlot(slot)? = focus { editor.slot = slot }
+                return
             default: break
             }
-            return
+        default: break
         }
         switch button {
         case .up: move(.up)
         case .down: move(.down)
-        case .left: move(.left)
-        case .right: move(.right)
+        case .left, .right:
+            if let focus, stepSetting(focus, by: button == .left ? -1 : 1) { break }
+            move(button == .left ? .left : .right)
         case .confirm: if let focus { activate(focus) } else { setFocus(defaultFocus) }
         case .cancel: back()
         case .menu: if sheet == nil, route != .settings { push(.settings) }
@@ -433,11 +593,19 @@ final class Navigator {
         case .dash, .hub: break
         }
     }
+}
 
-    private func cycleArtworkSlot(_ step: Int) {
-        let slots = ArtworkSlot.allCases
-        let index = slots.firstIndex(of: artworkSlot) ?? 0
-        artworkSlot = slots[(index + step + slots.count) % slots.count]
+extension ArchiveImportModel.Button {
+    init?(_ button: VirtualButton) {
+        switch button {
+        case .up: self = .up
+        case .down: self = .down
+        case .left: self = .left
+        case .right: self = .right
+        case .confirm: self = .confirm
+        case .cancel: self = .cancel
+        default: return nil
+        }
     }
 }
 

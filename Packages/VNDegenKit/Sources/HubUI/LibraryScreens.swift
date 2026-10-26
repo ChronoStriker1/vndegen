@@ -78,8 +78,10 @@ struct SettingsView: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
+    #if os(iOS)
     @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
     @AppStorage(PlayOrientation.storageKey) private var orientation = PlayOrientation.landscape
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -92,8 +94,11 @@ struct SettingsView: View {
                                 .font(.system(size: 13, design: .monospaced))
                                 .textSelection(.enabled)
                         }
-                        Button(LibraryFolder.openTitle, systemImage: "folder") { LibraryFolder.open(hub.library.paths.gamesRoot) }
-                        Button("Rescan library", systemImage: "arrow.clockwise") { Task { await hub.refreshLibrary() } }
+                        Button(LibraryFolder.openTitle, systemImage: "folder") { nav.select(.openFolder) }
+                            .focusRow(.openFolder, nav)
+                        Button("Rescan library", systemImage: "arrow.clockwise") { nav.select(.rescan) }
+                            .disabled(nav.rescanning)
+                            .focusRow(.rescan, nav)
                     } header: {
                         Text("Library")
                     } footer: {
@@ -115,24 +120,22 @@ struct SettingsView: View {
                         Text("Restore and back up game saves through Ludusavi. Each game's page lists its backups under Saves.")
                     }
 
+                    #if os(iOS)
                     Section {
                         Picker("Touch controls", selection: $touchMode) {
                             ForEach(TouchControlsMode.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
-                        #if os(iOS)
+                        .focusRow(.touchControls, nav)
                         Picker("In-game orientation", selection: $orientation) {
                             ForEach(PlayOrientation.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
-                        #endif
+                        .focusRow(.playOrientation, nav)
                     } header: {
                         Text("Controls")
                     } footer: {
-                        #if os(iOS)
                         Text("Touch controls show over a game when you play by touch and no controller is connected. In-game orientation applies while a game plays, and each game page can override it.")
-                        #else
-                        Text("Shown over a game when you play by touch and no controller is connected.")
-                        #endif
                     }
+                    #endif
 
                     Section {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
@@ -173,10 +176,7 @@ struct SettingsView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .onHover { if $0 { nav.hover(target) } }
-        .listRowBackground(nav.isFocused(target) ? Color.white.opacity(0.2) : nil)
-        .animation(Theme.focusAnimation, value: nav.isFocused(target))
-        .id(target)
+        .focusRow(target, nav)
     }
 
     static func displayPath(_ url: URL) -> String {
@@ -190,9 +190,30 @@ struct SettingsView: View {
     }
 }
 
+extension View {
+    /// Makes a form row a focus target: pointer hover focuses it, and focus draws the hub's ring around the row.
+    func focusRow(_ target: Navigator.Target, _ nav: Navigator) -> some View {
+        let focused = nav.isFocused(target)
+        return onHover { if $0 { nav.hover(target) } }
+            .listRowBackground(focused ? FocusRowBackground() : nil)
+            .animation(Theme.focusAnimation, value: focused)
+            .id(target)
+    }
+}
+
+/// A focused form row: an accent fill and a white outline, as bold as the hub's focused buttons and tiles.
+struct FocusRowBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Theme.accent.opacity(0.32))
+            .strokeBorder(.white, lineWidth: 2.5)
+    }
+}
+
 /// A settings page that is a whole form of its own, in a sheet over the settings screen.
 struct SettingsPageSheet: View {
     @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
     let page: Navigator.SettingsPage
 
     var body: some View {
@@ -208,7 +229,7 @@ struct SettingsPageSheet: View {
                 }
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
-                    SaveSyncSettingsView(service: hub.saveSync).scrollContentBackground(.hidden)
+                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
                 }
             }
         }
@@ -219,6 +240,7 @@ struct SettingsPageSheet: View {
     }
 }
 
+#if os(iOS)
 extension TouchControlsMode {
     static let storageKey = "touchControlsMode"
 
@@ -230,6 +252,7 @@ extension TouchControlsMode {
         }
     }
 }
+#endif
 
 /// Opening the games folder in the system file browser, and how to add games there.
 enum LibraryFolder {
@@ -253,8 +276,8 @@ enum LibraryFolder {
 
 struct EmptyLibraryView: View {
     @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
-    @State private var scanning = false
 
     private var steps: [String] {
         #if os(macOS)
@@ -285,22 +308,16 @@ struct EmptyLibraryView: View {
                             }
                         }
                     }
-                    Text("RPG Maker MV and MZ games are supported today.")
+                    Text("RPG Maker MV and MZ games are supported today. Add game unpacks a zip, RAR, or 7z archive into the library.")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.tertiaryText)
-                    HStack(spacing: 12) {
-                        Button { LibraryFolder.open(hub.library.paths.gamesRoot) } label: {
-                            Label(LibraryFolder.openTitle, systemImage: "folder.fill")
+                    VStack(alignment: .leading, spacing: 12) {
+                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus") }
+                        HStack(spacing: 12) {
+                            HubButton(target: .openFolder) { Label(LibraryFolder.openTitle, systemImage: "folder.fill") }
+                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise") }
+                                .disabled(nav.rescanning)
                         }
-                        .buttonStyle(HubButtonStyle(kind: .primary, focused: false))
-                        Button {
-                            scanning = true
-                            Task { await hub.refreshLibrary(); scanning = false }
-                        } label: {
-                            Label("Rescan", systemImage: "arrow.clockwise")
-                        }
-                        .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
-                        .disabled(scanning)
                     }
                     .padding(.top, 6)
                 }
