@@ -325,6 +325,7 @@ endif()
 add_library(kirikiri_engine OBJECT
     vndegen/ciphers.cpp
     vndegen/movie_decoder.cpp
+    vndegen/movie_player.cpp
     vndegen/sigcheck.cpp
     ${KIRIKIRI_CORE_SOURCES}
     ${KIRIKIRI_ENVIRON_SOURCES}

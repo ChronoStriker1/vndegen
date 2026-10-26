@@ -29,6 +29,8 @@ public:
     virtual bool IsBufferValid() = 0;
     virtual bool IsValidFormat(tTVPWaveFormat& fmt) = 0;
     virtual tjs_uint GetCurrentPlaySamples() = 0;
+    // Sample frames appended but not yet taken by the audio device.
+    virtual tjs_uint GetQueuedSamples() = 0;
     virtual tjs_uint GetLatencySamples() = 0;
     virtual float GetLatencySeconds() = 0;
     virtual int GetRemainBuffers() = 0;
