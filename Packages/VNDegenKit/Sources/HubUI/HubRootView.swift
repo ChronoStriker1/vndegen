@@ -129,6 +129,13 @@ private struct LibraryContainer: View {
                 ChoiceSheet(sheet: sheet, title: "In-game orientation", subtitle: hub.displayTitle(game),
                             footnote: "Landscape keeps either landscape side and follows how you hold the device. Some mobile-style games are made for portrait.")
             }
+        case let .controlMethod(id):
+            if let game = hub.library.game(id) {
+                ChoiceSheet(sheet: sheet, title: "Controls", subtitle: hub.displayTitle(game),
+                            footnote: "The VNDegen menu switches the control method while you play, and the change stays with this game.")
+            }
+        case let .mapping(editor):
+            ButtonMappingSheet(editor: editor)
         case let .artwork(editor):
             if let game = hub.library.game(editor.gameID) { ArtworkEditorSheet(game: game, editor: editor) }
         case let .metadata(search):

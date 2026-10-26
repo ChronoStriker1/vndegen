@@ -38,7 +38,7 @@ struct GamePageView: View {
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController else { return }
                 withAnimation(Theme.focusAnimation) {
-                    if let focus, focus == .pageEngine || focus == .pageOrientation {
+                    if let focus, [.pageEngine, .pageOrientation, .pageControls, .pageMapping].contains(focus) {
                         proxy.scrollTo(focus, anchor: .center)
                     } else {
                         proxy.scrollTo("banner", anchor: .top)
@@ -151,6 +151,8 @@ struct GamePageView: View {
             OrientationSection(game: game)
                 .padding(.top, 18)
             #endif
+            ControlsSection(game: game)
+                .padding(.top, 18)
         }
         .padding(18)
         .background(Theme.surface, in: .rect(cornerRadius: 16, style: .continuous))
@@ -191,7 +193,6 @@ private struct InfoRow: View {
     }
 }
 
-/// The engine in use, how it was chosen, and the button that opens the manual override.
 /// The game's in-game orientation and the button that opens its override.
 private struct OrientationSection: View {
     let game: Game
@@ -214,6 +215,43 @@ private struct OrientationSection: View {
     }
 }
 
+/// The game's control method on a touch device, its button mapping, and the buttons that change them.
+private struct ControlsSection: View {
+    let game: Game
+
+    var body: some View {
+        let remapped = game.buttonMapping?.count ?? 0
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Controls", systemImage: "gamecontroller")
+            #if os(iOS)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text((game.controlMethod ?? ControlMethod.setting).title)
+                        .font(.system(size: 17, weight: .bold))
+                    Text(game.controlMethod == nil ? "Default from Settings" : "Set for this game")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                Spacer()
+                HubButton(target: .pageControls, kind: .secondary) { Text("Change") }
+            }
+            #endif
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Button mapping")
+                        .font(.system(size: 17, weight: .bold))
+                    Text(remapped == 0 ? "Standard layout" : remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                Spacer()
+                HubButton(target: .pageMapping, kind: .secondary) { Text("Edit") }
+            }
+        }
+    }
+}
+
+/// The engine in use, how it was chosen, and the button that opens the manual override.
 private struct EngineSection: View {
     @Environment(Hub.self) private var hub
     let game: Game

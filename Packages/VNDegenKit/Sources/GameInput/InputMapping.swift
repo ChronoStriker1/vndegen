@@ -1,9 +1,9 @@
 import GameController
 import VNCore
 
-/// Gamepad buttons the hub maps. Directions come from the D-pad and the left stick.
+/// Gamepad buttons the hub reads. Directions come from the D-pad and the left stick.
 nonisolated public enum GamepadElement: String, CaseIterable, Sendable {
-    case a, b, x, y, leftShoulder, rightShoulder, menu, options, home
+    case a, b, x, y, leftShoulder, rightShoulder, leftTrigger, rightTrigger, menu, options, home
 
     func input(on pad: GCExtendedGamepad) -> GCControllerButtonInput? {
         switch self {
@@ -13,26 +13,38 @@ nonisolated public enum GamepadElement: String, CaseIterable, Sendable {
         case .y: pad.buttonY
         case .leftShoulder: pad.leftShoulder
         case .rightShoulder: pad.rightShoulder
+        case .leftTrigger: pad.leftTrigger
+        case .rightTrigger: pad.rightTrigger
         case .menu: pad.buttonMenu
         case .options: pad.buttonOptions
         case .home: pad.buttonHome
         }
     }
+
+    /// The remappable button this element is. Options and Home have none: they always open the VNDegen menu, so a
+    /// mapping can never lock the player out of it.
+    public var control: ControlInput? {
+        switch self {
+        case .a: .a
+        case .b: .b
+        case .x: .x
+        case .y: .y
+        case .leftShoulder: .l
+        case .rightShoulder: .r
+        case .leftTrigger: .l2
+        case .rightTrigger: .r2
+        case .menu: .menu
+        case .options, .home: nil
+        }
+    }
+
+    /// What the element does under `mapping`.
+    public func action(in mapping: ButtonMapping) -> ControlAction {
+        control.map(mapping.action) ?? .button(.hub)
+    }
 }
 
 nonisolated public enum InputMapping {
-    public static let gamepad: [GamepadElement: VirtualButton] = [
-        .a: .confirm,
-        .b: .cancel,
-        .x: .dash,
-        .y: .menu,
-        .leftShoulder: .pageUp,
-        .rightShoulder: .pageDown,
-        .menu: .menu,
-        .options: .hub,
-        .home: .hub,
-    ]
-
     /// Opens the hub overlay even while a game reads the keyboard itself. Games almost never bind the backtick,
     /// and unlike F1 it exists on keyboards without a function row, such as most iPad keyboards.
     public static let hubKey: GCKeyCode = .graveAccentAndTilde

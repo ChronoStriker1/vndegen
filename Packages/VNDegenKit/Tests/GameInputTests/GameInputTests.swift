@@ -3,13 +3,75 @@ import Testing
 import VNCore
 @testable import GameInput
 
-@Test func gamepadMappingMatchesTheDefaultLayout() {
-    #expect(InputMapping.gamepad == [
-        .a: .confirm, .b: .cancel, .x: .dash, .y: .menu,
-        .leftShoulder: .pageUp, .rightShoulder: .pageDown,
-        .menu: .menu, .options: .hub, .home: .hub,
-    ])
-    #expect(Set(InputMapping.gamepad.keys) == Set(GamepadElement.allCases))
+@Test func gamepadElementsFollowTheStandardLayout() {
+    let standard = ButtonMapping()
+    let expected: [GamepadElement: ControlAction] = [
+        .a: .button(.confirm), .b: .button(.cancel), .x: .button(.dash), .y: .button(.menu),
+        .leftShoulder: .button(.pageUp), .rightShoulder: .button(.pageDown),
+        .leftTrigger: .nothing, .rightTrigger: .nothing,
+        .menu: .button(.menu), .options: .button(.hub), .home: .button(.hub),
+    ]
+    for element in GamepadElement.allCases {
+        #expect(element.action(in: standard) == expected[element])
+    }
+    for direction in [ControlInput.up, .down, .left, .right] {
+        #expect(standard.action(for: direction) == .button(VirtualButton(rawValue: direction.rawValue)!))
+    }
+}
+
+@Test func remappedButtonsSendTheirNewActions() {
+    let z = KeyboardKey(key: "z", code: "KeyZ", keyCode: 90)
+    let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
+    var mapping = ButtonMapping()
+    mapping.set(.key(escape), for: .y)
+    mapping.set(.key(z), for: .a)
+    mapping.set(.click(.secondary), for: .r2)
+    mapping.set(.nothing, for: .x)
+    #expect(GamepadElement.y.action(in: mapping).event(pressed: true) == .key(escape, pressed: true))
+    #expect(GamepadElement.a.action(in: mapping).event(pressed: false) == .key(z, pressed: false))
+    #expect(GamepadElement.rightTrigger.action(in: mapping).event(pressed: true) == .click(.secondary, pressed: true))
+    #expect(GamepadElement.x.action(in: mapping).event(pressed: true) == nil)
+    #expect(GamepadElement.b.action(in: mapping) == .button(.cancel))
+}
+
+@Test func optionsAndHomeAlwaysOpenTheVNDegenMenu() {
+    var mapping = ButtonMapping()
+    for input in ControlInput.allCases { mapping.set(.nothing, for: input) }
+    #expect(GamepadElement.options.action(in: mapping) == .button(.hub))
+    #expect(GamepadElement.home.action(in: mapping) == .button(.hub))
+    #expect(GamepadElement.allCases.filter { $0.control == nil } == [.options, .home])
+    #expect(!ControlAction.gamepadChoices.contains(.button(.hub)))
+}
+
+@Test func mappingStoresOnlyDifferencesFromTheStandardLayout() {
+    var mapping = ButtonMapping()
+    #expect(mapping.stored == nil)
+    mapping.set(.button(.cancel), for: .a)
+    #expect(mapping.stored == [.a: .button(.cancel)])
+    mapping.set(.button(.confirm), for: .a)
+    #expect(mapping.stored == nil)
+    #expect(!mapping.isRemapped(.a))
+}
+
+@Test func keyChoicesAreUniqueAndLabelled() {
+    let keys = KeyboardKey.choices
+    #expect(keys.count == 26 + 10 + 16 + 12)
+    #expect(Set(keys.map(\.code)).count == keys.count)
+    #expect(Set(keys.map(\.keyCode)).count == keys.count)
+    #expect(keys.first == KeyboardKey(key: "a", code: "KeyA", keyCode: 65))
+    #expect(keys.first { $0.code == "KeyZ" }?.label == "Z")
+    #expect(keys.first { $0.code == "Space" }?.label == "Space")
+    #expect(keys.first { $0.code == "F12" }?.keyCode == 123)
+    #expect(ControlAction.key(keys[25]).badge == "Z")
+}
+
+@Test func controlMethodPicksTheOverlay() {
+    #expect(ControlMethod.automatic.overlay(lastInput: .touch, controllerConnected: false) == .gamepad)
+    #expect(ControlMethod.automatic.overlay(lastInput: .touch, controllerConnected: true) == nil)
+    #expect(ControlMethod.automatic.overlay(lastInput: .gamepad, controllerConnected: false) == nil)
+    #expect(ControlMethod.touchGamepad.overlay(lastInput: .gamepad, controllerConnected: true) == .gamepad)
+    #expect(ControlMethod.touchMouse.overlay(lastInput: .keyboardMouse, controllerConnected: false) == .mouse)
+    #expect(ControlMethod.controllerOnly.overlay(lastInput: .touch, controllerConnected: false) == nil)
 }
 
 @Test func keyboardMappingCoversNavigationKeys() {
@@ -31,56 +93,79 @@ private let pad = ObjectIdentifier(NSObject())
 @Test func twoSourcesForOneButtonMakeOnePress() {
     var router = PressRouter()
     let t = ContinuousClock.now
-    #expect(router.update(.dpad(pad), .up, pressed: true, at: t, hasConsumer: true, repeats: false) == .button(.up, pressed: true))
-    #expect(router.update(.stick(pad), .up, pressed: true, at: t, hasConsumer: true, repeats: false) == nil)
-    #expect(router.update(.dpad(pad), .up, pressed: false, at: t, hasConsumer: true, repeats: false) == nil)
-    #expect(router.update(.stick(pad), .up, pressed: false, at: t, hasConsumer: true, repeats: false) == .button(.up, pressed: false))
+    #expect(router.press(.dpad(pad, .up), .button(.up), at: t, hasConsumer: true, repeats: false) == .button(.up, pressed: true))
+    #expect(router.press(.stick(pad, .up), .button(.up), at: t, hasConsumer: true, repeats: false) == nil)
+    #expect(router.release(.dpad(pad, .up)) == nil)
+    #expect(router.release(.stick(pad, .up)) == .button(.up, pressed: false))
+}
+
+@Test func dpadDiagonalHoldsTwoDirections() {
+    var router = PressRouter()
+    let t = ContinuousClock.now
+    #expect(router.press(.dpad(pad, .up), .button(.up), at: t, hasConsumer: true, repeats: false) == .button(.up, pressed: true))
+    #expect(router.press(.dpad(pad, .right), .button(.right), at: t, hasConsumer: true, repeats: false) == .button(.right, pressed: true))
+    #expect(router.release(.dpad(pad, .up)) == .button(.up, pressed: false))
+    #expect(router.release(.dpad(pad, .right)) == .button(.right, pressed: false))
+}
+
+@Test func releaseSendsWhatThePressSentAfterARemap() {
+    var router = PressRouter()
+    let t = ContinuousClock.now
+    let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
+    #expect(router.press(.gamepad(pad, .y), .key(escape), at: t, hasConsumer: true, repeats: false) == .key(escape, pressed: true))
+    #expect(router.release(.gamepad(pad, .y)) == .key(escape, pressed: false))
+}
+
+@Test func buttonBoundToNothingSendsNothing() {
+    var router = PressRouter()
+    let t = ContinuousClock.now
+    #expect(router.press(.gamepad(pad, .x), .nothing, at: t, hasConsumer: true, repeats: true) == nil)
+    #expect(router.release(.gamepad(pad, .x)) == nil)
 }
 
 @Test func pressWithoutConsumerIsDroppedWithItsRelease() {
     var router = PressRouter()
     let t = ContinuousClock.now
-    #expect(router.update(.key(1), .confirm, pressed: true, at: t, hasConsumer: false, repeats: false) == nil)
-    #expect(router.update(.key(1), .confirm, pressed: false, at: t, hasConsumer: true, repeats: false) == nil)
+    #expect(router.press(.key(1), .button(.confirm), at: t, hasConsumer: false, repeats: false) == nil)
+    #expect(router.release(.key(1)) == nil)
 }
 
 @Test func newConsumerNeverSeesTheOldConsumersHeldPress() {
     var router = PressRouter()
     let t = ContinuousClock.now
-    _ = router.update(.gamepad(pad, .a), .confirm, pressed: true, at: t, hasConsumer: true, repeats: true)
-    _ = router.update(.dpad(pad), .down, pressed: true, at: t, hasConsumer: true, repeats: true)
+    _ = router.press(.gamepad(pad, .a), .button(.confirm), at: t, hasConsumer: true, repeats: true)
+    _ = router.press(.dpad(pad, .down), .button(.down), at: t, hasConsumer: true, repeats: true)
     #expect(router.detachConsumer() == [.button(.down, pressed: false), .button(.confirm, pressed: false)])
     #expect(router.tick(at: t + .seconds(1), hasConsumer: true, repeats: true) == nil)
-    #expect(router.update(.gamepad(pad, .a), .confirm, pressed: false, at: t, hasConsumer: true, repeats: true) == nil)
-    #expect(router.update(.gamepad(pad, .a), .confirm, pressed: true, at: t, hasConsumer: true, repeats: true) == .button(.confirm, pressed: true))
+    #expect(router.release(.gamepad(pad, .a)) == nil)
+    #expect(router.press(.gamepad(pad, .a), .button(.confirm), at: t, hasConsumer: true, repeats: true) == .button(.confirm, pressed: true))
 }
 
 @Test func heldDirectionRepeatsAfterDelayThenAtInterval() {
     var router = PressRouter()
     let t = ContinuousClock.now
     let press = ControllerEvent.button(.right, pressed: true)
-    #expect(router.update(.key(7), .right, pressed: true, at: t, hasConsumer: true, repeats: true) == press)
+    #expect(router.press(.key(7), .button(.right), at: t, hasConsumer: true, repeats: true) == press)
     #expect(router.tick(at: t + .milliseconds(399), hasConsumer: true, repeats: true) == nil)
     #expect(router.tick(at: t + .milliseconds(400), hasConsumer: true, repeats: true) == press)
     #expect(router.tick(at: t + .milliseconds(450), hasConsumer: true, repeats: true) == nil)
     #expect(router.tick(at: t + .milliseconds(500), hasConsumer: true, repeats: true) == press)
     #expect(router.tick(at: t + .milliseconds(600), hasConsumer: true, repeats: true) == press)
-    #expect(router.update(.key(7), .right, pressed: false, at: t + .milliseconds(650), hasConsumer: true, repeats: true)
-        == .button(.right, pressed: false))
+    #expect(router.release(.key(7)) == .button(.right, pressed: false))
     #expect(router.tick(at: t + .milliseconds(700), hasConsumer: true, repeats: true) == nil)
 }
 
 @Test func directionsDoNotRepeatWhenRepeatIsOff() {
     var router = PressRouter()
     let t = ContinuousClock.now
-    _ = router.update(.key(7), .left, pressed: true, at: t, hasConsumer: true, repeats: false)
+    _ = router.press(.key(7), .button(.left), at: t, hasConsumer: true, repeats: false)
     #expect(router.tick(at: t + .seconds(2), hasConsumer: true, repeats: false) == nil)
 }
 
 @Test func buttonsOtherThanDirectionsNeverRepeat() {
     var router = PressRouter()
     let t = ContinuousClock.now
-    _ = router.update(.gamepad(pad, .a), .confirm, pressed: true, at: t, hasConsumer: true, repeats: true)
+    _ = router.press(.gamepad(pad, .a), .button(.confirm), at: t, hasConsumer: true, repeats: true)
     #expect(router.tick(at: t + .seconds(2), hasConsumer: true, repeats: true) == nil)
 }
 
