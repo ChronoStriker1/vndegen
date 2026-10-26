@@ -102,7 +102,7 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
 }
 
 @Test func mapsSavesFromOtherMachines() {
-    let rule = KiriKiriPlugin.saveRelativePath
+    let rule = { KiriKiriPlugin.saveRelativePath($0, folder: ["savedata"]) }
     #expect(rule("/home/deck/Games/vn/Test Game 08/savedata/datasc.ksd") == "datasc.ksd")
     #expect(rule("C:/Games/Test Game 08/savedata/data0.kdt") == "data0.kdt")
     #expect(rule("C:/Games/Test Game 08/SaveData/data.cfu") == "data.cfu")
@@ -110,7 +110,7 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
 }
 
 @Test func rejectsPathsThatNameNoSaveOrLeaveTheSaveFolder() {
-    let rule = KiriKiriPlugin.saveRelativePath
+    let rule = { KiriKiriPlugin.saveRelativePath($0, folder: ["savedata"]) }
     #expect(rule("C:/Games/Test Game 08/data.xp3") == nil)
     #expect(rule("C:/Games/Test Game 08/savedata") == nil)
     #expect(rule("C:/Games/Test Game 08/savedata/") == nil)
@@ -162,6 +162,94 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
         == "Studio/data0.kdt")
     #expect(rule("C:/Users/player/Desktop/Studio/datasc.ksd") == nil)
     #expect(rule("C:/Users/player/Documents/./datasc.ksd") == nil)
+    #expect(rule("C:/Users/player/Saved Games/Studio/datasc.ksd") == "Studio/datasc.ksd")
+    #expect(rule("/home/deck/.local/share/Steam/steamapps/compatdata/4012345/pfx/drive_c/users/steamuser/Saved Games/Studio/data0.kdt")
+        == "Studio/data0.kdt")
+}
+
+/// A `.cf` as a Kirikiri Z game ships it: a comment header, CRLF line endings, and each value spelled out in `\x`
+/// escapes. `datapath` here is `$(exepath)/erogeVN`.
+private let movedSavesConfig = Data("""
+    ; ============================================================================
+    ; *DO NOT EDIT* this file unless you are understanding what you are doing.
+    ;  Each line consists of NAME="VALUE" pair, VALUE is a series of
+    ;  \\xNN, where NN is hexadecimal representation of UNICODE codepoint.
+    ; ============================================================================
+    datapath="\\x24\\x28\\x65\\x78\\x65\\x70\\x61\\x74\\x68\\x29\\x2f\\x65\\x72\\x6f\\x67\\x65\\x56\\x4e"
+    usedb="\\x79\\x65\\x73"
+    hkupdaterect=""
+
+    """.replacingOccurrences(of: "\n", with: "\r\n").utf8)
+
+@Test func mapsTheSaveFolderAGamesConfigNames() throws {
+    let copied = try folder([
+        "Test Game 71/inner/game.exe": Data(),
+        "Test Game 71/inner/game.cf": movedSavesConfig,
+        "Test Game 71/inner/config.exe": Data(),
+        "Test Game 71/inner/data/startup.tjs": Data(),
+    ])
+    let data = URL(fileURLWithPath: "/tmp/vndegen-kirikiri-data/GameData/Test Game 71")
+    let locations = KiriKiriPlugin().saveLocations(folder: copied, dataDirectory: data)
+    #expect(locations.map { $0.directory.lastPathComponent } == ["erogeVN", "AppData", "Documents"])
+    let saves = locations[0]
+    #expect(saves.directory.standardizedFileURL.path == copied.appendingPathComponent("Test Game 71/inner/erogeVN").standardizedFileURL.path)
+    #expect(saves.relativePath("\(saves.directory.standardizedFileURL.path)/datasc.ksd") == "datasc.ksd")
+    #expect(saves.relativePath("C:/Games/Test Game 71/erogeVN/data0.kdt") == "data0.kdt")
+    #expect(saves.relativePath("/home/deck/Games/vn/Test Game 71/EROGEVN/slot/data0.bmp") == "slot/data0.bmp")
+    #expect(saves.relativePath("/VNDegen/Test Game 71/erogeVN/datasu.ksd") == "datasu.ksd")
+    // The game no longer writes savedata/, and an erogeVN folder under AppData belongs to that location.
+    #expect(saves.relativePath("C:/Games/Test Game 71/savedata/datasc.ksd") == nil)
+    #expect(saves.relativePath("C:/Users/player/AppData/Roaming/erogeVN/datasc.ksd") == nil)
+    #expect(saves.relativePath("C:/Games/Test Game 71/erogeVN/../data.xp3") == nil)
+}
+
+@Test func resolvesAConfigsSaveFolderAsTheEngineDoes() throws {
+    let cases: [(String, [String]?)] = [
+        (#"datapath="\x24\x28\x65\x78\x65\x70\x61\x74\x68\x29\x5c\x73\x61\x76\x65\x5c""#, ["save"]),
+        (#"datapath="save/" "slot""#, ["save", "slot"]),
+        ("datapath=./Save", ["Save"]),
+        ("datapath='$(appdatapath)/Studio/Test Game'", nil),
+        ("datapath=$(savedgamespath)/Studio", nil),
+        // The engine keeps savedata/ for a path that leaves the game's folders, and for the root itself.
+        ("datapath=$(exepath)/../saves", ["savedata"]),
+        // KiriKiri reads a folder named only with dots as climbing one folder fewer than its dots.
+        ("datapath=$(exepath)/.../victim/savedata", ["savedata"]),
+        ("datapath=$(exepath)/a/b/..../savedata", ["savedata"]),
+        ("datapath=$(exepath)/a/b/.../save", ["save"]),
+        ("datapath=$(exepath)/a/./save", ["a", "save"]),
+        ("datapath=$(appdatapath)/.../.../victim", ["savedata"]),
+        (#"datapath="C:\\saves""#, ["savedata"]),
+        ("datapath=/Users/someone/saves", ["savedata"]),
+        ("datapath=$(exepath)", nil),
+        ("datapath=", ["savedata"]),
+        // Only the first datapath counts, and a comment or another option is no datapath.
+        ("; datapath=commented\nDataPath=wrongcase\ndatapath=first\ndatapath=second", ["first"]),
+    ]
+    for (config, expected) in cases {
+        let copied = try folder(["game.exe": Data(), "game.cf": Data(config.utf8), "data.xp3": xp3])
+        let layout = try #require(KiriKiriLayout(scanning: copied))
+        let paths = KiriKiriPaths(folder: copied, dataDirectory: URL(fileURLWithPath: "/tmp/vndegen-kirikiri-data/GameData/Test Game"),
+                                  layout: layout)
+        #expect(KiriKiriPlugin.saveFolder(paths) == expected, "\(config)")
+    }
+}
+
+@Test func readsTheConfigOfTheExecutableTheEngineRuns() throws {
+    // With several executables and no .cf of their own, the engine reads no .cf.
+    let ambiguous = try folder(["game.exe": Data(), "config.exe": Data(), "other.cf": Data("datapath=save".utf8)])
+    #expect(KiriKiriPlugin.configuredDataPath(gameRoot: ambiguous) == nil)
+    let lone = try folder(["Game.EXE": Data(), "Game.cf": Data("datapath=save".utf8)])
+    #expect(KiriKiriPlugin.configuredDataPath(gameRoot: lone) == "save")
+}
+
+@Test func readsTJSStringLiterals() {
+    #expect(KiriKiriPlugin.tjsString(#""\x61\x3042b""#) == "a\u{3042}b")
+    #expect(KiriKiriPlugin.tjsString(#""\x304260""#) == "\u{3042}60")
+    #expect(KiriKiriPlugin.tjsString(#"'a\'b\\c\n'"#) == "a'b\\c\n")
+    #expect(KiriKiriPlugin.tjsString(#""\0101""#) == "A")
+    #expect(KiriKiriPlugin.tjsString(#""ab"  "cd" ignored"#) == "abcd")
+    #expect(KiriKiriPlugin.tjsString(#""unclosed"#) == nil)
+    #expect(KiriKiriPlugin.tjsString(#""\x61"#) == nil)
 }
 
 @Test func keepsAppDataAndDocumentsSavesInTheDataDirectory() throws {
