@@ -276,9 +276,12 @@
     if (Context) {
         const nativeDecode = Context.prototype.decodeAudioData;
         Context.prototype.decodeAudioData = function (buffer, success, failure) {
-            const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : null;
-            if (!bytes || !isOggBytes(bytes) || bytes.length > config.limits.maxInputBytes) return nativeDecode.apply(this, arguments);
-            // The copy goes to the worker. Taking it when the job starts keeps queued requests from holding copies.
+            const view = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : null;
+            if (!view || !isOggBytes(view) || view.length > config.limits.maxInputBytes) return nativeDecode.apply(this, arguments);
+            // decodeAudioData owns the buffer from the call on and detaches the page's copy, as Chromium does, so a page
+            // that reuses the buffer can't change a queued decode. The worker gets a copy only once the job starts, so
+            // queued requests hold no copies.
+            const bytes = new Uint8Array(buffer.transfer());
             const promise = decode(() => bytes.slice().buffer, false).promise.then((result) => {
                 const out = this.createBuffer(result.channels.length, result.channels[0].length, result.sampleRate);
                 result.channels.forEach((channel, c) => out.copyToChannel(channel, c));
@@ -357,6 +360,7 @@
         if (!entry) return;
         state.entry = null;
         state.url = null;
+        state.generation++;
         if (state.pending) {
             state.pending = false;
             interrupt(state, 'The play() request was interrupted by a new load request.');
@@ -372,13 +376,15 @@
     function assign(element, url) {
         let state = elements.get(element);
         if (!state) {
-            state = { url: null, entry: null, pending: false, wantsPlay: false, waiters: [] };
+            state = { url: null, entry: null, generation: 0, pending: false, wantsPlay: false, waiters: [] };
             elements.set(element, state);
             released.register(element, state);
         }
         // Taking the new entry first keeps a decode of the same URL alive when the element asks for it again.
         const entry = track(url);
         release(state);
+        // The element can get the same entry back, so only the generation tells this assignment from an earlier one.
+        const generation = ++state.generation;
         state.url = url;
         state.entry = entry;
         // Stop what the element played before, as a new src would, without giving it an empty one, which is an error.
@@ -388,10 +394,10 @@
         state.pending = true;
         entry.promise.catch((error) => {
             // The original bytes are no worse than nothing, and a format this cannot read may still play.
-            if (state.entry === entry) console.warn('Ogg decode failed for ' + url + ': ' + error.message);
+            if (state.generation === generation) console.warn('Ogg decode failed for ' + url + ': ' + error.message);
             return url;
         }).then((source) => {
-            if (state.entry !== entry) return;
+            if (state.generation !== generation) return;
             state.pending = false;
             src.set.call(element, source);
             const waiters = state.waiters.splice(0);

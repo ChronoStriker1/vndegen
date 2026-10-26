@@ -50,7 +50,8 @@ private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent
 }
 
 /// Page helpers. `until` waits for a condition. `pagesOf` lists a file's Ogg pages as [offset, length]. `withSerial`
-/// gives every page of a file another stream serial. `decodes` returns [sample rate, frames] or "rejected".
+/// gives every page of a file another stream serial. `decodes` returns [sample rate, frames] or "rejected". It decodes a
+/// copy, because decodeAudioData detaches the buffer it is given.
 private let helpers = """
     const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
     const pagesOf = (b) => {
@@ -76,7 +77,7 @@ private let helpers = """
     };
     const decodes = async (context, bytes) => {
         try {
-            const buffer = await context.decodeAudioData(bytes.buffer);
+            const buffer = await context.decodeAudioData(bytes.slice().buffer);
             return [buffer.sampleRate, buffer.length];
         } catch (e) {
             return 'rejected';
@@ -212,6 +213,43 @@ private let helpers = """
         """) as? [Any]
     #expect((result?[0] as? Int ?? 99) <= 2)
     #expect(result?[1] as? Bool == true)
+}
+
+@MainActor @Test func aQueuedDecodeKeepsTheBytesItWasGiven() async throws {
+    let (page, root) = try await oggPage(.init(workers: 2))
+    defer { try? FileManager.default.removeItem(at: root) }
+    // The page zeroes each buffer right after handing it over, while most of the requests still wait in the queue.
+    let result = try await page.run("""
+        const bytes = await (await fetch('data/bgm/tone.ogg')).arrayBuffer();
+        const context = new OfflineAudioContext(2, 1, 22050);
+        const inputs = Array.from({ length: 6 }, () => bytes.slice(0));
+        const requests = inputs.map((input) => context.decodeAudioData(input));
+        for (const input of inputs) { try { new Uint8Array(input).fill(0); } catch (e) {} }
+        const buffers = await Promise.all(requests.map((r) => r.catch(() => null)));
+        return [buffers.every((b) => b && b.length === 44100), inputs.every((input) => input.byteLength === 0)];
+        """) as? [Bool]
+    #expect(result == [true, true])
+}
+
+@MainActor @Test func reassigningASourceAfterRemovingItSetsTheDecodedTrackOnce() async throws {
+    let (page, root) = try await oggPage()
+    defer { try? FileManager.default.removeItem(at: root) }
+    // `keeper` keeps the decode of again.OGG alive, so `restarted` gets the same cache entry back. A handler left from
+    // its first assignment would set the decoded track a second time, which aborts the new play().
+    let result = try await page.run(helpers + """
+        const keeper = new Audio('data/bgm/again.OGG');
+        const restarted = new Audio('data/bgm/again.OGG');
+        restarted.play().catch(() => {});
+        restarted.removeAttribute('src');
+        restarted.src = 'data/bgm/again.OGG';
+        let sets = 0;
+        new MutationObserver((records) => { sets += records.length; }).observe(restarted, { attributes: true, attributeFilter: ['src'] });
+        step('decoding again.OGG');
+        await until(() => keeper.getAttribute('src'));
+        await new Promise((r) => setTimeout(r, 100));
+        return [sets, (restarted.getAttribute('src') || '').slice(0, 5)];
+        """) as? [Any]
+    #expect(result?[0] as? Int == 1 && result?[1] as? String == "blob:")
 }
 
 @MainActor @Test func cancelledFetchesFreeTheirWorkers() async throws {
