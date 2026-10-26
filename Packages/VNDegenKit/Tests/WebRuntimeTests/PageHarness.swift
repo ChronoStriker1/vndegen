@@ -4,9 +4,10 @@ import WebKit
 @testable import WebRuntime
 
 /// A web view running the NW.js shim on a blank page, with the app's side of the bridge answered by `answer`.
-@MainActor final class PageHarness: NSObject, WKUIDelegate {
+@MainActor final class PageHarness: NSObject, WKUIDelegate, WKNavigationDelegate {
     let webView: WKWebView
     var answer: (BridgeRequest) -> BridgeReply
+    private var loaded: CheckedContinuation<Void, any Error>?
 
     init(storage: Bool = true, scripts: [String] = [], scheme: (any WKURLSchemeHandler)? = nil,
          answer: @escaping (BridgeRequest) -> BridgeReply) throws {
@@ -23,22 +24,31 @@ import WebKit
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         super.init()
         webView.uiDelegate = self
+        webView.navigationDelegate = self
     }
 
     /// Loads `html` and waits for it to finish.
     func load(_ html: String, baseURL: URL = URL(string: "https://localhost/")!) async throws {
-        webView.loadHTMLString(html, baseURL: baseURL)
-        try await waitUntilLoaded()
+        try await withCheckedThrowingContinuation { loaded = $0; webView.loadHTMLString(html, baseURL: baseURL) }
     }
 
     func load(_ request: URLRequest) async throws {
-        webView.load(request)
-        try await waitUntilLoaded()
+        try await withCheckedThrowingContinuation { loaded = $0; webView.load(request) }
     }
 
-    private func waitUntilLoaded() async throws {
-        let start = ContinuousClock.now
-        repeat { try await Task.sleep(for: .milliseconds(20)) } while webView.isLoading && ContinuousClock.now - start < .seconds(20)
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        loaded?.resume()
+        loaded = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
+        loaded?.resume(throwing: error)
+        loaded = nil
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
+        loaded?.resume(throwing: error)
+        loaded = nil
     }
 
     /// Runs `body` as an async function in the page and returns what it returns.
