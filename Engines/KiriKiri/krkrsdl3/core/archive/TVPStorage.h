@@ -32,6 +32,8 @@ extern ttstr TVPNativeDataPath;    // */Game/savedata/
 extern ttstr TVPProjectData;       // file://*/Game/data.xp3> or */Game/data/
 extern ttstr TVPProjectDir;        // file://*/Game/
 extern ttstr TVPDataPath;          // file://*/Game/savedata/
+extern ttstr TVPAppDataDir;        // System.appDataPath, file://*/Game/ unless -appdatadir names another
+extern ttstr TVPPersonalDir;       // System.personalPath, file://*/Game/ unless -personaldir names another
 
 //---------------------------------------------------------------------------
 class iTVPStorageLister // callback class for GetListAt

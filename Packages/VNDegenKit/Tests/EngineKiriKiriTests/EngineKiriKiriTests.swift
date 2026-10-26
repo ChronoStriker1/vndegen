@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GameInput
 import VNCore
 @testable import EngineKiriKiri
 
@@ -128,4 +129,157 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
     let launch = GameLaunch(game: Game(id: GameID("Test Game 08")), folder: URL(fileURLWithPath: "/nonexistent"),
                             dataDirectory: URL(fileURLWithPath: "/nonexistent-data"), onExit: {})
     #expect(throws: KiriKiriError.self) { try KiriKiriPlugin().makeSession(launch) }
+}
+
+@Test func mapsAppDataSavesFromWindowsAndProton() {
+    let rule = KiriKiriPlugin.appDataRelativePath
+    #expect(rule("C:/Users/player/AppData/Roaming/Studio/Test Game 08/datasc.ksd") == "Studio/Test Game 08/datasc.ksd")
+    #expect(rule("/home/deck/.local/share/Steam/steamapps/compatdata/4012345/pfx/drive_c/users/steamuser/AppData/Roaming/Studio/data0.kdt")
+        == "Studio/data0.kdt")
+    #expect(rule("C:/users/player/appdata/roaming/Studio/datasu.ksd") == "Studio/datasu.ksd")
+    #expect(rule("C:/Users/player/AppData/Local/Studio/datasc.ksd") == nil)
+    #expect(rule("C:/Users/player/AppData/Roaming/") == nil)
+    #expect(rule("C:/Users/player/AppData/Roaming/Studio/../../x.ksd") == nil)
+    #expect(rule("C:/Games/Test Game 08/savedata/datasc.ksd") == nil)
+}
+
+@Test func mapsDocumentsSavesFromWindowsAndProton() {
+    let rule = KiriKiriPlugin.documentsRelativePath
+    #expect(rule("C:/Users/player/Documents/Studio/Test Game 08/datasc.ksd") == "Studio/Test Game 08/datasc.ksd")
+    #expect(rule("/home/deck/.local/share/Steam/steamapps/compatdata/4012345/pfx/drive_c/users/steamuser/My Documents/Studio/data0.kdt")
+        == "Studio/data0.kdt")
+    #expect(rule("/home/deck/.local/share/Steam/steamapps/compatdata/4012345/pfx/drive_c/users/steamuser/Documents/Studio/data0.kdt")
+        == "Studio/data0.kdt")
+    #expect(rule("C:/Users/player/Desktop/Studio/datasc.ksd") == nil)
+    #expect(rule("C:/Users/player/Documents/./datasc.ksd") == nil)
+}
+
+@Test func keepsAppDataAndDocumentsSavesInTheDataDirectory() throws {
+    let copied = try folder(["Test Game 08/game.exe": Data(), "Test Game 08/data.xp3": xp3])
+    let data = URL(fileURLWithPath: "/tmp/vndegen-kirikiri-data/GameData/Test Game 08")
+    let locations = KiriKiriPlugin().saveLocations(folder: copied, dataDirectory: data)
+    #expect(locations.map { $0.directory.lastPathComponent } == ["savedata", "AppData", "Documents"])
+    let appData = locations[1], documents = locations[2]
+    #expect(appData.directory.standardizedFileURL.path == data.appendingPathComponent("AppData").path)
+    #expect(appData.relativePath("\(data.path)/AppData/Studio/datasc.ksd") == "Studio/datasc.ksd")
+    #expect(appData.relativePath("/VNDegen/Test Game 08/AppData/Studio/datasc.ksd") == "Studio/datasc.ksd")
+    #expect(appData.relativePath("/Users/someone/Library/Application Support/VNDegen/GameData/Test Game 08/AppData/Studio/datasc.ksd")
+        == "Studio/datasc.ksd")
+    #expect(appData.relativePath("C:/Users/player/AppData/Roaming/Studio/datasc.ksd") == "Studio/datasc.ksd")
+    #expect(appData.relativePath("/VNDegen/Test Game 08/Documents/Studio/datasc.ksd") == nil)
+    #expect(documents.relativePath("/VNDegen/Test Game 08/Documents/Studio/datasc.ksd") == "Studio/datasc.ksd")
+    #expect(documents.relativePath("C:/Users/player/My Documents/Studio/datasc.ksd") == "Studio/datasc.ksd")
+}
+
+@Test func leavesAppDataSaveFoldersToTheAppDataLocation() throws {
+    let copied = try folder(["game.exe": Data(), "data.xp3": xp3])
+    let locations = KiriKiriPlugin().saveLocations(folder: copied, dataDirectory: URL(fileURLWithPath: "/nonexistent-data"))
+    let path = "C:/Users/player/AppData/Roaming/Studio/savedata/datasc.ksd"
+    #expect(locations[0].relativePath(path) == nil)
+    #expect(locations[1].relativePath(path) == "Studio/savedata/datasc.ksd")
+    // A game installed in Documents still saves in its own savedata folder, and that location comes first.
+    #expect(locations[0].relativePath("C:/Users/player/Documents/Games/Test Game 08/savedata/datasc.ksd") == "datasc.ksd")
+}
+
+@Test func mapsButtonsToKAGControls() {
+    #expect(VirtualButton.confirm.kiriKiriControl == .hold(.key(SDLScancode.return)))
+    #expect(VirtualButton.cancel.kiriKiriControl == .hold(.mouse(SDLMouseButton.right)))
+    #expect(VirtualButton.menu.kiriKiriControl == .hold(.key(SDLScancode.escape)))
+    #expect(VirtualButton.dash.kiriKiriControl == .hold(.key(SDLScancode.leftControl)))
+    #expect(VirtualButton.up.kiriKiriControl == .hold(.key(SDLScancode.up)))
+    #expect(VirtualButton.left.kiriKiriControl == .hold(.key(SDLScancode.left)))
+    #expect(VirtualButton.pageUp.kiriKiriControl == .wheel(1))
+    #expect(VirtualButton.pageDown.kiriKiriControl == .wheel(-1))
+    #expect(VirtualButton.hub.kiriKiriControl == nil)
+}
+
+@Test func sendsButtonsAsKeysClicksAndWheelNotches() {
+    var router = KiriKiriInputRouter()
+    #expect(router.translate(.button(.confirm, pressed: true)) == [.key(scancode: 40, down: true)])
+    #expect(router.translate(.button(.confirm, pressed: false)) == [.key(scancode: 40, down: false)])
+    #expect(router.translate(.button(.cancel, pressed: true)) == [.click(3, down: true)])
+    #expect(router.translate(.button(.cancel, pressed: false)) == [.click(3, down: false)])
+    #expect(router.translate(.button(.pageUp, pressed: true)) == [.wheel(notches: 1)])
+    #expect(router.translate(.button(.pageUp, pressed: false)) == [])
+    #expect(router.translate(.button(.hub, pressed: true)) == [])
+}
+
+@Test func holdsAKeyUntilItsLastPressLetsGo() {
+    var router = KiriKiriInputRouter()
+    let enter = KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)
+    #expect(router.translate(.button(.confirm, pressed: true)) == [.key(scancode: 40, down: true)])
+    #expect(router.translate(.key(enter, pressed: true)) == [])
+    #expect(router.translate(.button(.confirm, pressed: false)) == [])
+    #expect(router.translate(.key(enter, pressed: false)) == [.key(scancode: 40, down: false)])
+    #expect(router.translate(.key(enter, pressed: false)) == [])
+    #expect(router.translate(.click(.primary, pressed: true)) == [.click(1, down: true)])
+    #expect(router.releaseAll() == [.click(1, down: false)])
+    #expect(router.translate(.click(.primary, pressed: false)) == [])
+}
+
+@Test func sendsTouchMousePointerEvents() {
+    var router = KiriKiriInputRouter()
+    let point = CGPoint(x: 0.25, y: 0.75)
+    #expect(router.translate(.pointer(PointerEvent(phase: .began, location: point)))
+        == [.mouseMove(to: point), .mouseButton(1, down: true, at: point)])
+    #expect(router.translate(.pointer(PointerEvent(phase: .moved, location: point))) == [.mouseMove(to: point)])
+    #expect(router.translate(.pointer(PointerEvent(phase: .ended, location: point, button: .secondary)))
+        == [.mouseButton(3, down: false, at: point)])
+}
+
+@Test func turnsScrollingIntoWheelNotches() {
+    var router = KiriKiriInputRouter()
+    #expect(KiriKiriInputRouter.pointsPerNotch == 40)
+    #expect(router.translate(.scroll(dy: 24)) == [])
+    // Content scrolling down is the wheel turned toward the player.
+    #expect(router.translate(.scroll(dy: 24)) == [.wheel(notches: -1)])
+    #expect(router.translate(.scroll(dy: -92)) == [.wheel(notches: 2)])
+    #expect(router.translate(.scroll(dy: -38)) == [.wheel(notches: 1)])
+}
+
+@Test func mapsEveryBindableKeyToAScancode() {
+    for key in KeyboardKey.choices {
+        #expect(key.sdlScancode != nil, "\(key.code)")
+    }
+    #expect(KeyboardKey(key: "a", code: "KeyA", keyCode: 65).sdlScancode == 4)
+    #expect(KeyboardKey(key: "z", code: "KeyZ", keyCode: 90).sdlScancode == 29)
+    #expect(KeyboardKey(key: "1", code: "Digit1", keyCode: 49).sdlScancode == 30)
+    #expect(KeyboardKey(key: "0", code: "Digit0", keyCode: 48).sdlScancode == 39)
+    #expect(KeyboardKey(key: "F12", code: "F12", keyCode: 123).sdlScancode == 69)
+    #expect(KeyboardKey(key: " ", code: "Space", keyCode: 32).sdlScancode == 44)
+    #expect(KeyboardKey(key: "?", code: "Unknown", keyCode: 0).sdlScancode == nil)
+}
+
+@Test func passesTheKeyboardThroughExceptTheVNDegenKey() {
+    var router = KiriKiriInputRouter()
+    #expect(router.hostKey(SDLScancode.graveAccent, pressed: true, isRepeat: false) == [])
+    #expect(router.hostKey(SDLScancode.return, pressed: true, isRepeat: false) == [.key(scancode: 40, down: true)])
+    #expect(router.hostKey(SDLScancode.return, pressed: true, isRepeat: true) == [.key(scancode: 40, down: true)])
+    #expect(router.hostKey(SDLScancode.return, pressed: false, isRepeat: false) == [.key(scancode: 40, down: false)])
+}
+
+#if os(macOS)
+@MainActor @Test func mapsMacKeyCodesToScancodes() {
+    let table = KiriKiriHostView.scancodes
+    #expect(table[0x00] == 4) // A
+    #expect(table[0x24] == SDLScancode.return)
+    #expect(table[0x35] == SDLScancode.escape)
+    #expect(table[0x3B] == SDLScancode.leftControl)
+    #expect(table[0x7E] == SDLScancode.up)
+    #expect(Set(table.values).count == table.count)
+}
+#endif
+
+@Test func handsTheEngineADataFolderWithItsClosingSlash() {
+    let folder = URL(fileURLWithPath: "/Games/Test Game 01")
+    let data = URL(fileURLWithPath: "/Data/Test Game 01")
+    let unpacked = KiriKiriPaths(folder: folder, dataDirectory: data,
+                                 layout: KiriKiriLayout(root: "Test Game 01", data: .folder("Test Game 01/data")))
+    #expect(unpacked.projectData == "/Games/Test Game 01/Test Game 01/data/")
+    #expect(unpacked.gameRoot.path == "/Games/Test Game 01/Test Game 01")
+    let archive = KiriKiriPaths(folder: folder, dataDirectory: data, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")))
+    #expect(archive.projectData == "/Games/Test Game 01/data.xp3")
+    #expect(archive.appData.path == "/Data/Test Game 01/AppData")
+    #expect(archive.documents.path == "/Data/Test Game 01/Documents")
+    #expect(archive.log.path == "/Data/Test Game 01/logs/kirikiri.txt")
 }

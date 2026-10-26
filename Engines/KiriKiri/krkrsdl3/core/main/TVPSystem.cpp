@@ -723,9 +723,10 @@ void TVPTerminateAsync(int code)
 //---------------------------------------------------------------------------
 void TVPTerminateSync(int code)
 {
-    // do synchronous temination of application (never return)
-    TVPSystemUninit();
-    TVPAbortApplication(code);
+    // VNDegen runs the engine inside its own app, which keeps running after a game ends, so System.exit and a script
+    // error close the game the way System.terminate does instead of ending the process. The caller returns to the
+    // script or to the event loop, and the game stops at the end of the frame.
+    TVPTerminateAsync(code);
 }
 //---------------------------------------------------------------------------
 void TVPMainWindowClosed()

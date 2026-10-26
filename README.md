@@ -38,12 +38,15 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
 | TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
 | Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one folder down | Mac |
+| KiriKiri 2 and KiriKiri Z | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
 TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. iOS cannot play Ogg, so VNDegen decodes Ogg Vorbis inside the game's page with libvorbis compiled to WebAssembly, the first time each track plays.
 
 Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py runtimes, 8.5.3 for Ren'Py 8 games and 7.8.7 for Ren'Py 7 and older games, and picks one from the game's `renpy/vc_version.py` or `renpy/__init__.py`, then its `lib/` folder names, then the engine's compiled files. Each game runs in its own process and window, which takes the hub window's place, and the hub comes back when the game quits. Saves and logs go to the game's data folder, and the game folder is never written to. A game copied from a PC with saves in `game/saves/` gets those copied in on its first launch. iPhone and iPad detect Ren'Py games but cannot run them yet.
+
+KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDegen builds into the app. The game draws inside VNDegen's window, composited on the CPU and shown through Metal, so the VNDegen menu and touch controls work as for the other engines. Saves stay in the game's `savedata/` folder as on PC. A game that saves to the Windows AppData or Documents folder saves to its data folder instead, and Ludusavi backups from Windows or a Steam Deck restore there. Encrypted archives and MP3 audio don't work yet, and movies are skipped. Some Windows plugins are missing too, such as `layerExSave`, which one test game's save screen needs.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -70,7 +73,7 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 | Previous and next page | L1 and R1 | Q and E, or Page Up and Page Down |
 | VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
 
-The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game on Mac reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu. Buttons remapped for the game apply there too.
+The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. In a KiriKiri game, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls. A Ren'Py game on Mac reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu. Buttons remapped for the game apply there too.
 
 These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
 
@@ -109,7 +112,7 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
-The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu. `scripts/renpy-hook-test.sh` checks VNDegen's Ren'Py hook on both runtimes.
+Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it. The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu. `scripts/renpy-hook-test.sh` checks VNDegen's Ren'Py hook on both runtimes.
 
 From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
@@ -140,12 +143,15 @@ Packages/VNDegenKit/
   Sources/EngineTyrano/   TyranoScript: detection, Electron app.asar reading, save handling, controller mapping
   Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, and the in-game hook
   Sources/RenPyCompat/    command-line boot test for a folder of Ren'Py games
+  Sources/EngineKiriKiri/ KiriKiri: detection, save locations, and the in-process session on the engine framework
+  Sources/CKiriKiri/      vnkk.h, the KiriKiri engine's C interface
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
   Sources/Lock/           Face ID, Touch ID, and passcode
   Sources/SaveSync/       Ludusavi backup and restore
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
+Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, simulator, and Ren'Py runtime helpers
 project.yml               XcodeGen project definition

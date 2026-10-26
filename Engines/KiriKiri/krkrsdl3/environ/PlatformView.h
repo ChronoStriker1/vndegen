@@ -8,6 +8,9 @@
 */
 struct SDL_Window;
 SDL_Window* TVPGetSDLWindow();
+// On macOS, an NSWindow and an NSView for SDL to wrap instead of creating its own window. The host then sizes the
+// window, so the game cannot resize it or make it full screen. NULL for both ends that.
+void TVPSetHostWindow(void* nswindow, void* nsview);
 void TVPSetWindowTitle(const char* title);
 std::string TVPGetWindowTitle();
 void TVPSetWindowFullscreen(bool isFullscreen);

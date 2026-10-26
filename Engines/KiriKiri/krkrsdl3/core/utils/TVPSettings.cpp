@@ -280,6 +280,18 @@ static ttstr TVPFindGameExe(const ttstr& dir)
     return exes.size() == 1 ? dir + ttstr(exes.front()) : ttstr();
 }
 
+// A folder named by a command-line option, as a storage name ending in a slash. Without the option, `fallback`.
+static ttstr TVPFolderOption(const tjs_char* name, const ttstr& fallback)
+{
+    tTJSVariant value;
+    if (!TVPGetCommandLine(name, &value))
+        return fallback;
+    ttstr folder(value);
+    if (folder.GetLastChar() != TJS_N('/'))
+        folder += TJS_N("/");
+    return TVPNormalizeStorageName(folder);
+}
+
 bool TVPParseArguments(int argc, char* argv[])
 {
     // exeName
@@ -321,6 +333,10 @@ bool TVPParseArguments(int argc, char* argv[])
     TVPProjectData = TVPNormalizeStorageName(TVPNativeProjectData);
     TVPProjectDir = TVPNormalizeStorageName(TVPNativeProjectDir);
     TVPAddImportantLog(TVPFormatMessage("(info) Game path : %1", TVPProjectData));
+    // System.appDataPath and System.personalPath are the AppData and Documents folders on Windows, where some games
+    // keep their saves. -appdatadir and -personaldir name the folders that stand in for them.
+    TVPAppDataDir = TVPFolderOption(TJS_N("-appdatadir"), TVPProjectDir);
+    TVPPersonalDir = TVPFolderOption(TJS_N("-personaldir"), TVPProjectDir);
 
     // savedata path
     TVPDataPath = TVPProjectDir + TJS_N("savedata/");
@@ -356,6 +372,8 @@ void TVPClearAllArguments()
     TVPProjectData.Clear();
     TVPProjectDir.Clear();
     TVPDataPath.Clear();
+    TVPAppDataDir.Clear();
+    TVPPersonalDir.Clear();
 }
 bool TVPGetCommandLine(const tjs_char* name, tTJSVariant* value)
 {

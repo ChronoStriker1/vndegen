@@ -29,7 +29,9 @@ let package = Package(
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that the helper process loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
-        .target(name: "EngineKiriKiri", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
+        // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
+        .target(name: "CKiriKiri"),
+        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
@@ -46,7 +48,7 @@ let package = Package(
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat"]),
-        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri"]),
+        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri", "GameInput"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),

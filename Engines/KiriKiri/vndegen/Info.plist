@@ -18,7 +18,7 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>MinimumOSVersion</key>
-	<string>18.0</string>
+	<key>${KIRIKIRI_MINIMUM_OS_KEY}</key>
+	<string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>
 </dict>
 </plist>

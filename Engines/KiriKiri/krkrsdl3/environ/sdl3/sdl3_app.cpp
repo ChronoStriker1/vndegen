@@ -44,6 +44,14 @@
 static SDL_Window* tvp_window;
 static SDL_Renderer* tvp_renderer = NULL;
 static SDL_GLContext tvp_glContext = NULL;
+static void* tvp_host_window = NULL;
+static void* tvp_host_view = NULL;
+
+void TVPSetHostWindow(void* nswindow, void* nsview)
+{
+    tvp_host_window = nswindow;
+    tvp_host_view = nsview;
+}
 
 // 按后端名创建窗口（尺寸来自 TVPSettings，-window=WxH 可配置）
 static bool TVPCreateWindowForBackend(const std::string& renderer)
@@ -74,6 +82,11 @@ static bool TVPCreateWindowForBackend(const std::string& renderer)
 #endif
     }
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, flags);
+    if (tvp_host_window)
+    {
+        SDL_SetPointerProperty(props, SDL_PROP_WINDOW_CREATE_COCOA_WINDOW_POINTER, tvp_host_window);
+        SDL_SetPointerProperty(props, SDL_PROP_WINDOW_CREATE_COCOA_VIEW_POINTER, tvp_host_view);
+    }
     tvp_window = SDL_CreateWindowWithProperties(props);
     SDL_DestroyProperties(props);
     if (!tvp_window)
@@ -612,6 +625,8 @@ std::string TVPGetWindowTitle()
 
 void TVPSetWindowFullscreen(bool isFullscreen)
 {
+    if (tvp_host_window)
+        return;
     SDL_SetWindowFullscreen(tvp_window, isFullscreen);
 }
 
@@ -627,6 +642,8 @@ void TVPGetWindowSizeInPixels(int* w, int* h)
 
 void TVPSetWindowSize(int w, int h)
 {
+    if (tvp_host_window)
+        return;
     SDL_SetWindowSize(tvp_window, w, h);
 }
 

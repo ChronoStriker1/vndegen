@@ -51,8 +51,8 @@ final class Navigator {
     }
 
     /// Settings groups that are whole forms of their own, so they open in a sheet instead of inside the settings list.
-    enum SettingsPage: CaseIterable {
-        case metadata, lock, saves
+    enum SettingsPage {
+        case metadata, lock, saves, licenses
     }
 
     enum Shelf: String, CaseIterable {
@@ -206,10 +206,12 @@ final class Navigator {
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
-            var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
+            var items: [Target] = [.back, .openFolder, .rescan, .settingsPage(.metadata), .settingsPage(.lock), .settingsPage(.saves)]
             #if os(iOS)
             items += [.controlMethod, .playOrientation]
             #endif
+            // In screen order, so Licenses, at the bottom, comes last.
+            items.append(.settingsPage(.licenses))
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
         }
     }

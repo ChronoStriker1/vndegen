@@ -139,6 +139,7 @@ struct SettingsView: View {
 
                     Section {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                        pageRow("Licenses", systemImage: "doc.text", value: "", page: .licenses)
                     }
                 }
                 .formStyle(.grouped)
@@ -230,6 +231,10 @@ struct SettingsPageSheet: View {
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
                     SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
+                }
+            case .licenses:
+                SheetScaffold(title: "Licenses", subtitle: "Third-party code in VNDegen", escapeCloses: true) {
+                    LicensesView()
                 }
             }
         }
