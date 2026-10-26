@@ -1190,7 +1190,8 @@ ttstr TVPStringFromBMPUnicode(const tjs_uint16* src, tjs_int maxlen)
             return 0;
         const tjs_uint16* p = src;
         max++;
-        while (*p && --max)
+        // Counts down before reading, as TJSGetShorterStrLen does.
+        while (--max && *p)
             p++;
         srcSize = (tjs_int)(p - src);
     }

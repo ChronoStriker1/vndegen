@@ -44,7 +44,8 @@ tjs_int TJSGetShorterStrLen(const tjs_char* str, tjs_int max)
         return 0;
     const tjs_char* p = str;
     max++;
-    while (*p && --max)
+    // Counts down before reading, so a string of max characters with no terminator is not read past.
+    while (--max && *p)
         p++;
     return (tjs_int)(p - str);
 }

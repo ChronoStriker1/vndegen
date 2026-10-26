@@ -266,7 +266,8 @@ void TJS_strcpy_maxlen(tjs_char* d, const tjs_char* s, size_t len)
 {
     tjs_char ch;
     len++;
-    while ((ch = *s) != 0 && --len)
+    // Counts down before reading, as TJSGetShorterStrLen does.
+    while (--len && (ch = *s) != 0)
         *(d++) = ch, s++;
     *d = 0;
 }
