@@ -52,6 +52,9 @@
 #include "tjsNativeBasicDrawDevice.h"
 #include "tjsNativeMenuItem.h"
 #include "TVPSettings.h"
+#include "TVPStorage.h"
+#include <cstring>
+#include <fstream>
 
 // -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 // -- -- -- -- -- - tTVPAtInstallClass
@@ -497,11 +500,42 @@ class tTVPTJSGCCallback : public tTVPCompactEventCallbackIntf
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
+// Whether the game's .exe is Kirikiri 2 older than 2.29, read from its version resource. Its
+// scripts can rely on a class "var" assigning through an inherited native property, as a
+// MessageLayer that declares "var face" and then sets Layer.face by assigning to it.
+static bool TVPGameExePredatesKirikiri229()
+{
+    if (TVPNativeGameExe.IsEmpty())
+        return false;
+    // The version resource is inside the executable image, ahead of any archive appended to it.
+    std::ifstream file(TVPNativeGameExe.AsStdString(), std::ios::binary);
+    std::string image(8 << 20, '\0');
+    file.read(&image[0], image.size());
+    image.resize(file.gcount());
+    static const char16_t kirikiri2[] = u"TVP(KIRIKIRI) 2 core";
+    if (image.find(std::string((const char*)kirikiri2, sizeof(kirikiri2) - sizeof(char16_t))) ==
+        std::string::npos)
+        return false;
+    size_t info = image.find("\xbd\x04\xef\xfe"); // VS_FIXEDFILEINFO signature
+    if (info == std::string::npos || info + 12 > image.size())
+        return false;
+    tjs_uint32 fileVersionMS;
+    memcpy(&fileVersionMS, image.data() + info + 8, sizeof(fileVersionMS));
+    return fileVersionMS >> 16 == 2 && (fileVersionMS & 0xffff) < 29;
+}
+//---------------------------------------------------------------------------
 // TVPInitScriptEngine
 //---------------------------------------------------------------------------
 void TVPInitScriptEngine()
 {
     tTJSVariant val;
+
+    // The options below stay set from the previous game in the same process unless reset.
+    TJSEvalOperatorIsOnGlobal = TJSWarnOnNonGlobalEvalOperator = false;
+    TJSUnaryAsteriskIgnoresPropAccess = false;
+    TJSVarDeclarationRunsPropertySetter = TVPGameExePredatesKirikiri229();
+    if (TJSVarDeclarationRunsPropertySetter)
+        TVPAddImportantLog(TJS_N("(info) Kirikiri 2 before 2.29: var declarations assign through properties"));
 
     // Set eval expression mode
     if (TVPGetCommandLine(TJS_N("-evalcontext"), &val))

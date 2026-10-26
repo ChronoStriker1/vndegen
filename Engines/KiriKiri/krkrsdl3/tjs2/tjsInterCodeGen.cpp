@@ -2909,7 +2909,7 @@ void tTJSInterCodeContext::AddLocalVariable(const tjs_char* name, tjs_int init)
 #ifdef ENABLE_DEBUGGER
         TJSDebuggerAddClassVariable(GetSelfClassName().c_str(), name, TJS_TO_VM_REG_ADDR(dp));
 #endif // ENABLE_DEBUGGER
-        PutCode(VM_SPDS, LEX_POS);
+        PutCode(TJSVarDeclarationRunsPropertySetter ? VM_SPDE : VM_SPDS, LEX_POS);
         PutCode(TJS_TO_VM_REG_ADDR(-1), LEX_POS);
         PutCode(TJS_TO_VM_REG_ADDR(dp), LEX_POS);
         PutCode(TJS_TO_VM_REG_ADDR(init), LEX_POS);
