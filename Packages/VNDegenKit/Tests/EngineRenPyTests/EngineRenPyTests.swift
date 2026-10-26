@@ -75,6 +75,20 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(layout == RenPyLayout(base: "TestGame-1.0-pc", version: "7.4.2", runtime: .renPy7, evidence: .version))
 }
 
+@Test func findsScriptsAnyDepthUnderGame() throws {
+    let layout = try layout([
+        "TestGame-1.0-pc/renpy/__init__.py": "version_tuple = (7, 4, 2, vc_version)\n",
+        "TestGame-1.0-pc/game/scripts/act1/scenes/story.rpyc": "",
+    ])
+    #expect(layout?.base == "TestGame-1.0-pc")
+}
+
+@Test func theGameFolderScanStopsAfterItsEntryLimit() throws {
+    let game = try folder(["images/a.png": "", "images/b.png": "", "images/c.png": "", "scripts/act1/story.rpy": ""])
+    #expect(RenPyLayout.containsScript(game))
+    #expect(!RenPyLayout.containsScript(game, limit: 2))
+}
+
 @Test func ignoresFoldersWithoutGameScripts() throws {
     #expect(try layout(["renpy/__init__.py": "", "game/images/bg.png": ""]) == nil)
     #expect(try layout(["js/rmmz_core.js": "", "game/script.rpy": ""]) == nil)
@@ -149,10 +163,24 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(try FileManager.default.contentsOfDirectory(atPath: data.appendingPathComponent("saves").path).sorted() == ["1-1-LT1.save", "2-1-LT1.save"])
 }
 
+@Test func anUnreadableGameSaveFolderFailsTheLaunchUntilItCanBeRead() throws {
+    let base = try folder(["game/saves/1-1-LT1.save": "pc save"])
+    let gameSaves = base.appendingPathComponent("game/saves")
+    let data = try folder([:])
+    try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: gameSaves.path)
+    #expect(throws: RenPyError.self) { try RenPyPlugin.importGameSaves(base: base, dataDirectory: data) }
+
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gameSaves.path)
+    try RenPyPlugin.importGameSaves(base: base, dataDirectory: data)
+    #expect(try String(contentsOf: data.appendingPathComponent("saves/1-1-LT1.save"), encoding: .utf8) == "pc save")
+}
+
 #if os(macOS)
+private final class TestBundle {}
+
 /// Runs the RenPyCompat tool that `swift test` built beside the test bundle.
 private func runCompat(_ arguments: [String]) throws -> Int32 {
-    let products = try #require(Bundle.allBundles.map(\.bundleURL).first { $0.pathExtension == "xctest" }).deletingLastPathComponent()
+    let products = Bundle(for: TestBundle.self).bundleURL.deletingLastPathComponent()
     let process = Process()
     process.executableURL = products.appendingPathComponent("RenPyCompat")
     process.arguments = arguments
@@ -172,6 +200,16 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
         #expect(try runCompat([games.path, "--runtimes", "/nonexistent", "--out", out.path]) == 2, "\(out.path)")
         #expect(FileManager.default.fileExists(atPath: script.path))
     }
+}
+
+@Test func compatToolRefusesARunFolderThatALinkPutsInsideAGame() throws {
+    let games = try folder(["Test Game/renpy/__init__.py": "", "Test Game/game/script.rpy": "", "Test Game/8/keep.txt": ""])
+    let reports = try folder([:])
+    try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(at: reports.appendingPathComponent("Test Game"),
+                                               withDestinationURL: games.appendingPathComponent("Test Game"))
+    #expect(try runCompat([games.path, "--runtimes", "/nonexistent", "--runtime", "8", "--out", reports.path]) == 2)
+    #expect(FileManager.default.fileExists(atPath: games.appendingPathComponent("Test Game/8/keep.txt").path))
 }
 #endif
 

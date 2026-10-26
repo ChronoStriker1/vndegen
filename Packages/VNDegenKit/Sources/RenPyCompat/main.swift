@@ -80,15 +80,18 @@ let games = names.compactMap { name -> (String, URL, RenPyLayout)? in
     return RenPyLayout(FolderProbe(scanning: folder)).map { (name, folder, $0) }
 }
 
-// Each run deletes its output folder first, so the output must not be, hold, or sit inside a game folder.
+// Each run deletes its output folder first, so neither --out nor any folder a run deletes may be, hold, or sit inside a
+// game folder. A run's folder must also stay inside --out once symlinks are resolved, because `<out>/<game>` can be a link.
 let outComponents = resolvedComponents(options.out)
-if let overlap = games.first(where: { _, folder, _ in
-    let game = resolvedComponents(folder)
-    return outComponents.starts(with: game) || game.starts(with: outComponents)
-}) {
-    FileHandle.standardError.write(Data("RenPyCompat: --out \(options.out.path) overlaps the game folder \(overlap.0)\n".utf8))
+let gameComponents = games.map { name, folder, _ in (name, resolvedComponents(folder)) }
+func overlappedGame(_ components: [String]) -> String? {
+    gameComponents.first { _, game in components.starts(with: game) || game.starts(with: components) }?.0
+}
+func refuse(_ path: URL, _ reason: String) -> Never {
+    FileHandle.standardError.write(Data("RenPyCompat: \(path.path) \(reason)\n".utf8))
     exit(2)
 }
+if let game = overlappedGame(outComponents) { refuse(options.out, "overlaps the game folder \(game)") }
 
 print("| Game | Version | Runtime | Result | Seconds | Game folder | Error |")
 print("|---|---|---|---|---|---|---|")
@@ -97,6 +100,9 @@ for (name, folder, layout) in games {
     let out = options.out.appendingPathComponent("\(name)/\(runtime.rawValue)", isDirectory: true)
     let data = out.appendingPathComponent("data", isDirectory: true)
     let probe = out.appendingPathComponent("probe", isDirectory: true)
+    let target = resolvedComponents(out)
+    guard target.starts(with: outComponents), target.count > outComponents.count else { refuse(out, "leaves --out \(options.out.path)") }
+    if let game = overlappedGame(target) { refuse(out, "overlaps the game folder \(game)") }
     try? FileManager.default.removeItem(at: out)
     try FileManager.default.createDirectory(at: probe, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)

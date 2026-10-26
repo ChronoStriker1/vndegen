@@ -217,6 +217,25 @@ private func tree(_ root: URL) throws -> [String: String] {
     #expect(try contents(of: other[0]) == ["1-1-LT1.save": "slot one", "persistent": "p"])
 }
 
+@Test func restoreNeverWritesThroughALinkOutOfTheSaveFolder() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let game = GameID("Test Game")
+    let data = base.appendingPathComponent("Mac/GameData/Test Game")
+    let locations = RenPyPlugin().saveLocations(folder: base, dataDirectory: data)
+    try fm.createDirectory(at: locations[0].directory.appendingPathComponent("link"), withIntermediateDirectories: true)
+    try write(["link/library.json": "escaped", "1-1-LT1.save": "slot one"], to: locations[0])
+    _ = try store.backUp(folder: nil, title: "Test Game", game: game, locations: locations, retention: nil, os: "mac", comment: nil)
+
+    try fm.removeItem(at: locations[0].directory.appendingPathComponent("link"))
+    try fm.createSymbolicLink(atPath: locations[0].directory.appendingPathComponent("link").path, withDestinationPath: "../../..")
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    #expect(throws: SaveSyncError.self) { try store.restore(folder: "Test Game", backup: nil, locations: locations, snapshot: snapshot) }
+    #expect(!fm.fileExists(atPath: base.appendingPathComponent("Mac/library.json").path))
+}
+
 @Test func backUpThenRestoreAndUndo() throws {
     let base = try temporaryDirectory()
     let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
