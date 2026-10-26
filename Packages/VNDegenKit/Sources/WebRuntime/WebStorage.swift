@@ -78,7 +78,12 @@ nonisolated public struct WebStorage: Sendable {
         try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 
+    /// The name of the file that holds `key`.
+    public static func fileName(for key: String) -> String {
+        (key.addingPercentEncoding(withAllowedCharacters: allowed) ?? "") + suffix
+    }
+
     private func file(for key: String) -> URL {
-        directory.appendingPathComponent((key.addingPercentEncoding(withAllowedCharacters: Self.allowed) ?? "") + Self.suffix)
+        directory.appendingPathComponent(Self.fileName(for: key))
     }
 }

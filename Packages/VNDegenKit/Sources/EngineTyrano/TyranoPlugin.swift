@@ -28,11 +28,17 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         guard let game = TyranoGame(folder: launch.folder) else { throw TyranoError.notTyrano }
         guard let url = Bundle.module.url(forResource: "tyrano", withExtension: "js") else { throw TyranoError.scriptMissing }
         let folder = GameFolder(root: launch.folder, webRoot: game.webRoot)
+        let storage = WebStorage(directory: Self.storageDirectory(launch.dataDirectory))
+        do {
+            try Self.adoptSaveKey(of: game, folder: launch.folder, storage: storage)
+        } catch {
+            tyranoLog.error("could not update the save key: \(error.localizedDescription, privacy: .public)")
+        }
         return try WebGameConfiguration(
             folder: folder, appName: game.projectID, runtime: Self.runtime(for: game),
             userScripts: [try String(contentsOf: url, encoding: .utf8)],
             userAgent: Self.chromeUserAgent + (game.packaging == .electron ? " TyranoErectron" : ""),
-            storageDirectory: launch.dataDirectory.appendingPathComponent("localStorage", isDirectory: true), transcodesOgg: true,
+            storageDirectory: storage.directory, transcodesOgg: true,
             buttonScript: { button, pressed in "__vndegenTyrano.button('\(button.rawValue)', \(pressed))" },
             scriptArgument: "tyrano-script", log: tyranoLog
         ).makeSession(launch)

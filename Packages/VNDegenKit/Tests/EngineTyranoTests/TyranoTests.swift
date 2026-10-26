@@ -148,3 +148,54 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     let tyrano = try #require(TyranoGame(folder: root))
     #expect(tyrano.savesToFiles && tyrano.projectID == "tyranoproject")
 }
+
+@Test func anElectronBuildBacksUpItsSaveKeyAndTakesTheKeyOfRestoredSaves() throws {
+    let root = try game([
+        "resources/app/index.html": "<html>", "resources/app/tyrano/plugins/kag/kag.js": kag520,
+        "resources/app/data/system/Config.tjs": ";projectID = testgame02;\n;configSave = file\n;configSaveOverwrite = true;\n",
+        // As kag.js writes it: escape(JSON.stringify(...)), here from another install whose key is PCKEY.
+        "TestGame02_Tyrano_Data.sav": "%7B%22kind%22%3A%22save%22%2C%22hash%22%3A%22PCKEY0123456789a%22%2C%22data%22%3A%5B%7B%22title%22%3A%22%u3000%22%7D%5D%7D",
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    let data = root.appendingPathComponent("Data")
+    let tyrano = try #require(TyranoGame(folder: root))
+    let storage = WebStorage(directory: TyranoPlugin.storageDirectory(data))
+    #expect(TyranoPlugin.saveKeyName(projectID: "testgame02") == "/game/_testgame02")
+
+    try storage.set("/game/_testgame02", "THISDEVICEKEY000")
+    try TyranoPlugin.adoptSaveKey(of: tyrano, folder: root, storage: storage)
+    #expect(try storage.value(for: "/game/_testgame02") == "PCKEY0123456789a")
+    try TyranoPlugin.adoptSaveKey(of: tyrano, folder: root, storage: storage)
+    #expect(try storage.load() == ["/game/_testgame02": "PCKEY0123456789a"])
+
+    let locations = TyranoPlugin().saveLocations(folder: root, dataDirectory: data)
+    #expect(locations.count == 2 && locations[1].directory == storage.directory)
+    let keyFile = WebStorage.fileName(for: "/game/_testgame02")
+    #expect(locations[1].relativePath(storage.directory.appendingPathComponent(keyFile).path) == keyFile)
+    #expect(locations[1].relativePath("/VNDegen/game/localStorage/\(keyFile)") == keyFile)
+    #expect(locations[1].relativePath(storage.directory.appendingPathComponent("testgame02_other.value").path) == nil)
+}
+
+@Test func saveKeysAreLeftAloneWhereTyranoDoesNotCheckThem() throws {
+    let save = "%7B%22hash%22%3A%22PCKEY0123456789a%22%7D"
+    let nwjs = try game([
+        "index.html": "<html>", "package.json": "{}", "tyrano/plugins/kag/kag.js": kag450,
+        "data/system/Config.tjs": ";projectID=testgame01\n;configSave=file\n", "testgame01_tyrano_data.sav": save,
+    ])
+    let webStorage = try game([
+        "resources/app/index.html": "<html>", "resources/app/tyrano/plugins/kag/kag.js": kag520,
+        "resources/app/data/system/Config.tjs": ";projectID=testgame02\n", "testgame02_tyrano_data.sav": save,
+    ])
+    defer { for root in [nwjs, webStorage] { try? FileManager.default.removeItem(at: root) } }
+    for root in [nwjs, webStorage] {
+        let storage = WebStorage(directory: root.appendingPathComponent("Data/localStorage"))
+        try TyranoPlugin.adoptSaveKey(of: try #require(TyranoGame(folder: root)), folder: root, storage: storage)
+        #expect(try storage.load().isEmpty)
+    }
+    #expect(TyranoPlugin().saveLocations(folder: nwjs, dataDirectory: nwjs).count == 1)
+}
+
+@Test func unescapeMatchesJavaScript() {
+    #expect(TyranoPlugin.jsUnescape("%7B%22a%22%3A%u3000%7D") == "{\"a\":\u{3000}}")
+    #expect(TyranoPlugin.jsUnescape("100%25 %zz %u12 %+1 %e9") == "100% %zz %u12 %+1 é")
+}
