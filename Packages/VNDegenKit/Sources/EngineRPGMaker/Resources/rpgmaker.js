@@ -34,13 +34,17 @@
     // at the game's resolution, which is what games are tuned for. Here the window is the whole view, so on an iPad the
     // blur spread over half the game, the more so when the game started in portrait. This uses the game's resolution,
     // and moves a band left at its default, half the window's height, to half the game's.
+    // The default band can only be told apart on the first apply, while texSize still holds the window's size.
+    const fitted = new WeakSet();
     function fitToGame(uniforms) {
         const { texSize, start, end } = uniforms;
-        const width = window.Graphics.width, height = window.Graphics.height;
-        if (texSize.x === width && texSize.y === height) return;
-        const middle = texSize.y / 2;
-        if (start.x === 0 && start.y === middle && end.x === 600 && end.y === middle) start.y = end.y = height / 2;
-        texSize.set(width, height);
+        const height = window.Graphics.height;
+        if (!fitted.has(uniforms)) {
+            fitted.add(uniforms);
+            const middle = texSize.y / 2;
+            if (start.x === 0 && start.y === middle && end.x === 600 && end.y === middle) start.y = end.y = height / 2;
+        }
+        texSize.set(window.Graphics.width, height);
     }
     let pixi;
     Object.defineProperty(window, 'PIXI', {

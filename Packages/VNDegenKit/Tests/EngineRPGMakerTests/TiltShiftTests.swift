@@ -45,13 +45,18 @@ private let page = """
         guard ContinuousClock.now < deadline else { throw CancellationError() }
         try await Task.sleep(for: .milliseconds(50))
     }
-    // One filter keeps the default band, across the middle of the window. The other has a band the game placed.
+    // One filter keeps the default band, across the middle of the window. The others have bands the game placed, one
+    // across the middle of the game, which must stay put when the game's resolution later changes.
     let applied = try await webView.callAsyncJavaScript("""
         const fallback = new PIXI.filters.TiltShiftAxisFilter();
         const placed = new PIXI.filters.TiltShiftAxisFilter(new PIXI.Point(0, 205.5), new PIXI.Point(600, 205.5));
+        const middle = new PIXI.filters.TiltShiftAxisFilter(new PIXI.Point(0, 262), new PIXI.Point(600, 262));
         fallback.apply();
         placed.apply();
-        return [fallback.applied, placed.applied];
+        middle.apply();
+        Graphics.height = 600;
+        middle.apply();
+        return [fallback.applied, placed.applied, middle.applied];
         """, arguments: [:], contentWorld: .page) as? [[Double]]
-    #expect(applied == [[916, 524, 262, 262], [916, 524, 205.5, 205.5]])
+    #expect(applied == [[916, 524, 262, 262], [916, 524, 205.5, 205.5], [916, 600, 262, 262]])
 }
