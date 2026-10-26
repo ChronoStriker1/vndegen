@@ -34,6 +34,18 @@ init 999 python in _vndegen:
 
     config.underlay.append(renpy.Keymap(vndegen_menu=open_menu))
 
+    # A text prompt, such as a name entry, swallows the backtick's key press and types it. It passes it on instead, so
+    # the backtick still opens the menu there, and never types.
+    Input = renpy.display.behavior.Input
+    input_event = Input.event
+
+    def input_event_without_menu_key(self, ev, x, y, st):
+        if renpy.display.behavior.map_event(ev, "vndegen_menu") or (ev.type == pygame.TEXTINPUT and ev.text == "`"):
+            return None
+        return input_event(self, ev, x, y, st)
+
+    Input.event = input_event_without_menu_key
+
     # The game window takes the hub window's place: full screen when the hub is, otherwise its exact frame.
     # VNDEGEN_WINDOW is "x,y,width,height" in screen points, with the origin at the top left of the main display.
     _preferences.fullscreen = os.environ.get("VNDEGEN_FULLSCREEN") == "1"
@@ -205,6 +217,7 @@ init 999 python in _vndegen:
                 post_input("key", arg, True)
                 post_input("key", arg, False)
             elif step == "pad":
+                probe_log("keyboard_focused %s" % renpy.display.interface.keyboard_focused)
                 renpy.display.controller.controller_event(arg, "press")
                 renpy.display.controller.controller_event(arg, "release")
             elif step in ("start", "save", "load"):

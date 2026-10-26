@@ -57,12 +57,12 @@ final class RenPySession: EngineSession {
         do {
             try process.run()
         } catch {
-            renPyLog.error("starting \(self.runtime.displayName) failed: \(error.localizedDescription)")
+            renPyLog.error("starting \(self.runtime.displayName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             // Called from a view update, which must not change the hub's screen itself.
             Task { [onExit = launch.onExit] in onExit() }
             return
         }
-        renPyLog.info("started \(self.launch.game.id.rawValue) on \(self.runtime.displayName), pid \(self.process.processIdentifier)")
+        renPyLog.info("started \(self.launch.game.id.rawValue, privacy: .public) on \(self.runtime.displayName, privacy: .public), pid \(self.process.processIdentifier)")
         let pid = process.processIdentifier
         activation = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -76,11 +76,12 @@ final class RenPySession: EngineSession {
     /// A full-screen hub stays in its own Space, and the full-screen game opens in another one in front of it.
     private func gameCameForward() {
         guard let hubWindow, !hubWindow.styleMask.contains(.fullScreen) else { return }
+        renPyLog.info("game window in front, hiding the hub window")
         hubWindow.orderOut(nil)
     }
 
     private func ended(status: Int32) {
-        renPyLog.info("\(self.launch.game.id.rawValue) exited with status \(status)")
+        renPyLog.info("\(self.launch.game.id.rawValue, privacy: .public) exited with status \(status)")
         stopObserving()
         showHub()
         launch.onExit()
