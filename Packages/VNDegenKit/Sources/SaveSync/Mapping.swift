@@ -123,6 +123,33 @@ extension LudusaviMapping {
         return files
     }
 
+    /// Ludusavi's `forget_excess_backups`: drops the oldest unlocked backups beyond `retention`'s limits. A full backup
+    /// with a locked differential counts as locked. Returns the folders that held them, which Ludusavi then deletes.
+    mutating func forgetExcessBackups(_ retention: Retention) -> [String] {
+        let isLocked = { (full: FullBackup) in full.locked || full.children.contains(where: \.locked) }
+        var excessFulls = max(0, backups.filter { !isLocked($0) }.count - retention.full)
+        var removed: [String] = []
+        var kept: [FullBackup] = []
+        for var full in backups {
+            if !isLocked(full), excessFulls > 0 {
+                excessFulls -= 1
+                removed += [full.name] + full.children.map(\.name)
+                continue
+            }
+            var excessDiffs = max(0, full.children.filter { !$0.locked }.count - retention.differential)
+            full.children.removeAll { diff in
+                guard !diff.locked, excessDiffs > 0 else { return false }
+                excessDiffs -= 1
+                removed.append(diff.name)
+                return true
+            }
+            kept.append(full)
+        }
+        backups = kept
+        // A full backup named `.` keeps its files in the drive folders at the top of the game folder.
+        return removed.flatMap { $0 == "." ? drives.keys.sorted() : [$0] }
+    }
+
     /// Where a backed-up file's bytes are, relative to the game folder: `<backup>/<drive folder>/<path without drive>`.
     func storedPath(of path: String, in backup: String) -> String? {
         guard let (drive, plain) = Self.splitDrive(path) else { return nil }

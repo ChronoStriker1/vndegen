@@ -1,0 +1,161 @@
+import Foundation
+import Rsync
+
+/// The Ludusavi store on the server, and VNDegen's partial copy of it (the mirror) that `LudusaviStore` reads and writes.
+/// rsync keeps the two in step: mapping files and the backups a restore needs come down, and new backups go up.
+struct RemoteStore: Sendable {
+    /// The store folder on the server, without a trailing slash. Relative paths start in the login folder.
+    let path: String
+    let mirror: URL
+
+    init(path: String, mirror: URL) {
+        var path = path.trimmingCharacters(in: .whitespaces)
+        // The shell doesn't expand a quoted `~`, and rsync starts in the home folder anyway.
+        if path == "~" { path = "." } else if path.hasPrefix("~/") { path.removeFirst(2) }
+        while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+        self.path = path.isEmpty ? "." : path
+        self.mirror = mirror
+    }
+
+    var local: LudusaviStore { LudusaviStore(root: mirror) }
+
+    func remote(_ folder: String? = nil) -> String {
+        folder.map { "\(path)/\($0)/" } ?? "\(path)/"
+    }
+
+    // MARK: Index
+
+    /// Brings every game's mapping.yaml down. Only changed files move. Game folders gone from the server leave the
+    /// mirror too.
+    func refreshIndex(_ client: RsyncClient) async throws -> StoreIndex {
+        try FileManager.default.createDirectory(at: mirror, withIntermediateDirectories: true)
+        let report = try await client.pull(remote(), into: mirror, filters: [.include("/*/"), .include("/*/mapping.yaml"), .exclude("*")],
+                                           owners: true)
+        let remoteFolders = Set(report.entries.filter { $0.path.hasSuffix("/" + LudusaviStore.mappingFile) }.map { String($0.path.dropLast(13)) })
+        for folder in (try? FileManager.default.contentsOfDirectory(atPath: mirror.path)) ?? [] where !remoteFolders.contains(folder) {
+            try? FileManager.default.removeItem(at: mirror.appendingPathComponent(folder))
+        }
+        return StoreIndex(mirror: local, folders: remoteFolders.sorted(), root: report.entries.first { $0.path == "." })
+    }
+
+    /// Brings one game's mapping.yaml down, or removes the mirror's copy when the server has none. Returns the server's
+    /// entries for the store folder, the game folder, and its mapping.yaml, which tell later steps the owner to give new
+    /// files and whether the mapping changed meanwhile.
+    func refreshGame(_ client: RsyncClient, folder: String) async throws -> GameEntries {
+        let gameDir = mirror.appendingPathComponent(folder, isDirectory: true)
+        try FileManager.default.createDirectory(at: mirror, withIntermediateDirectories: true)
+        let name = RsyncClient.escapedPattern(folder)
+        let report = try await client.pull(remote(), into: mirror, filters: [.include("/\(name)/"), .include("/\(name)/mapping.yaml"), .exclude("*")],
+                                           owners: true)
+        let entries = GameEntries(root: report.entries.first { $0.path == "." },
+                                  folder: report.entries.first { $0.path == folder },
+                                  mapping: report.entries.first { $0.path == "\(folder)/\(LudusaviStore.mappingFile)" })
+        if entries.mapping == nil { try? FileManager.default.removeItem(at: gameDir.appendingPathComponent(LudusaviStore.mappingFile)) }
+        return entries
+    }
+
+    /// The server's entries for the game, like `refreshGame`, without bringing anything down.
+    func refreshGameEntries(_ client: RsyncClient, folder: String) async throws -> GameEntries {
+        let name = RsyncClient.escapedPattern(folder)
+        let entries = try await client.list(remote(), filters: [.include("/\(name)/"), .include("/\(name)/mapping.yaml"), .exclude("*")], owners: true)
+        return GameEntries(root: entries.first { $0.path == "." }, folder: entries.first { $0.path == folder },
+                           mapping: entries.first { $0.path == "\(folder)/\(LudusaviStore.mappingFile)" })
+    }
+
+    struct GameEntries: Sendable {
+        var root: RsyncEntry?
+        var folder: RsyncEntry?
+        var mapping: RsyncEntry?
+    }
+
+    /// Brings down the backup folders a restore of `backup` (nil for the latest) reads: its full backup and, for a
+    /// differential, that one. Folders already in the mirror move only where they differ.
+    func fetch(_ client: RsyncClient, folder: String, backup: String?) async throws {
+        let mapping = try local.mapping(folder)
+        var names: [String] = []
+        for full in mapping.backups {
+            if backup == nil || full.name == backup { names = [full.name] + (backup == nil ? full.children.suffix(1).map(\.name) : []) }
+            if let diff = full.children.first(where: { $0.name == backup }) { names = [full.name, diff.name] }
+        }
+        guard !names.isEmpty else { throw SaveSyncError.noBackups }
+        let filters = names.flatMap { name -> [RsyncFilter] in
+            // A full backup named `.` keeps its files in drive folders at the top of the game folder.
+            name == "." ? [.include("/drive-*/***")] : [.include("/\(RsyncClient.escapedPattern(name))/***")]
+        }
+        try await client.pull(remote(folder), into: mirror.appendingPathComponent(folder, isDirectory: true), filters: filters + [.exclude("*")])
+    }
+
+    // MARK: Sending
+
+    /// Sends the mirror's backup folder `backup` of the game up. New folders and files take the game folder's owner,
+    /// group, and mode, or the store folder's for a new game, so the PC's own access to the share keeps working.
+    func push(_ client: RsyncClient, folder: String, backup: String, like entries: GameEntries) async throws {
+        let root = mirror.appendingPathComponent(folder).appendingPathComponent(backup)
+        var paths = [backup]
+        for relative in try LudusaviStore.regularFiles(in: root) {
+            let parts = relative.split(separator: "/").map(String.init)
+            for depth in 1 ..< parts.count { paths.append(([backup] + parts.prefix(depth)).joined(separator: "/")) }
+            paths.append(backup + "/" + relative)
+        }
+        try await upload(client, folder: folder, paths: Array(Set(paths)), like: entries)
+    }
+
+    /// Sends the mirror's mapping.yaml of the game up.
+    func pushMapping(_ client: RsyncClient, folder: String, like entries: GameEntries) async throws {
+        try await upload(client, folder: folder, paths: [LudusaviStore.mappingFile], like: entries)
+    }
+
+    private func upload(_ client: RsyncClient, folder: String, paths: [String], like entries: GameEntries) async throws {
+        let template = entries.folder ?? entries.root
+        let owner = template?.owner
+        let folderMode = template?.permissions ?? 0o755
+        let fileMode = folderMode & 0o666
+        let gameDir = mirror.appendingPathComponent(folder, isDirectory: true)
+        // The game folder itself goes first, so a new game gets a folder with the right owner.
+        var uploads = [RsyncClient.Upload(entry: RsyncEntry(path: folder, kind: .directory, size: 0,
+                                                            modified: entries.folder?.modified ?? Int64(Date.now.timeIntervalSince1970),
+                                                            permissions: entries.folder?.permissions ?? folderMode, owner: entries.folder?.owner ?? owner),
+                                          source: nil)]
+        for path in paths {
+            let url = gameDir.appendingPathComponent(path)
+            let values = try url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey])
+            let modified = Int64((values.contentModificationDate ?? .now).timeIntervalSince1970)
+            uploads.append(values.isDirectory == true
+                ? .init(entry: RsyncEntry(path: "\(folder)/\(path)", kind: .directory, size: 0, modified: modified, permissions: folderMode, owner: owner), source: nil)
+                : .init(entry: RsyncEntry(path: "\(folder)/\(path)", kind: .file, size: Int64(values.fileSize ?? 0), modified: modified,
+                                          permissions: fileMode, owner: owner), source: url))
+        }
+        try await client.push(uploads, to: remote(), owners: owner != nil)
+    }
+
+    /// Deletes backup folders of the game on the server.
+    func delete(_ client: RsyncClient, folder: String, names: [String]) async throws {
+        try await client.delete(names, in: remote(folder))
+    }
+}
+
+/// The games in the store, read from the mirror's mapping files.
+struct StoreIndex: Sendable {
+    /// Folder name to the game's Ludusavi title.
+    var games: [String: String] = [:]
+    /// The folder before `<install dir>` that most of the store's backups record under Steam, such as
+    /// `/home/deck/.local/share/Steam/steamapps/common/`.
+    var steamLibrary: String?
+    var root: RsyncEntry?
+
+    init() {}
+
+    init(mirror: LudusaviStore, folders: [String], root: RsyncEntry?) {
+        self.root = root
+        var libraries: [String: Int] = [:]
+        for folder in folders {
+            guard let mapping = try? mirror.mapping(folder) else { continue }
+            games[folder] = mapping.name
+            for path in (mapping.backups.last?.files ?? [:]).keys {
+                guard let range = path.range(of: "/steamapps/common/") else { continue }
+                libraries[String(path[..<range.upperBound]), default: 0] += 1
+            }
+        }
+        steamLibrary = libraries.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }?.key
+    }
+}

@@ -4,6 +4,7 @@ import Foundation
 public protocol RsyncConnection: Sendable {
     /// Runs rsync with these arguments. `arguments[0]` is the program.
     func start(_ arguments: [String]) async throws -> any RsyncTransport
+    func close() async
 }
 
 /// An rsync client that speaks protocol 27 to `rsync --server`, the protocol openrsync and gokrazy/rsync speak. Every
@@ -31,10 +32,11 @@ public struct RsyncClient: Sendable {
 
     /// Copies the files under `remote` that `filters` let through into `local`, as `rsync -rt` does. Files whose size and
     /// modification time already match are skipped. Every file is checked against the sender's checksum and replaces
-    /// the old one in one rename. Nothing is deleted. Returns every entry the server listed.
+    /// the old one in one rename. Nothing is deleted. Returns every entry the server listed, with owners when `owners`
+    /// is set. Local files keep the local owner.
     @discardableResult
-    public func pull(_ remote: String, into local: URL, filters: [RsyncFilter] = []) async throws -> PullReport {
-        let (entries, transferred) = try await receive(remote, filters: filters, owners: false, into: local)
+    public func pull(_ remote: String, into local: URL, filters: [RsyncFilter] = [], owners: Bool = false) async throws -> PullReport {
+        let (entries, transferred) = try await receive(remote, filters: filters, owners: owners, into: local)
         return PullReport(entries: entries, transferred: transferred)
     }
 
@@ -215,7 +217,7 @@ public struct RsyncClient: Sendable {
     }
 
     /// rsync's wildcards are `*`, `?`, and `[`. A backslash makes the next character plain.
-    static func escapedPattern(_ name: String) -> String {
+    public static func escapedPattern(_ name: String) -> String {
         name.reduce(into: "") { result, character in
             if "*?[\\".contains(character) { result.append("\\") }
             result.append(character)

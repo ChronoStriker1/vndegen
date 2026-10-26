@@ -61,8 +61,10 @@ let package = Package(
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
         .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync"]),
-        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
-        .testTarget(name: "RsyncTests", dependencies: ["Rsync"]),
+        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rsync", "RsyncTestSupport", "EngineRPGMaker", "EngineRenPy"],
+                    exclude: ["Fixtures"]),
+        .target(name: "RsyncTestSupport", dependencies: ["Rsync"], path: "Tests/RsyncTestSupport"),
+        .testTarget(name: "RsyncTests", dependencies: ["Rsync", "RsyncTestSupport"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]
 )

@@ -3,21 +3,23 @@ import EngineRenPy
 import EngineRPGMaker
 import Foundation
 import Testing
+import Rsync
+import RsyncTestSupport
 import VNCore
 @testable import SaveSync
 
-private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
-private let deckSave = "/home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/"
-private var fm: FileManager { .default }
+let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
+let deckSave = "/home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/"
+var fm: FileManager { .default }
 
-private func temporaryDirectory() throws -> URL {
+func temporaryDirectory() throws -> URL {
     let url = fm.temporaryDirectory.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
     try fm.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }
 
 /// An RPG Maker MZ game folder with the given saves.
-private func makeGame(in base: URL, saves: [String: String] = [:]) throws -> [SaveLocation] {
+func makeGame(in base: URL, saves: [String: String] = [:]) throws -> [SaveLocation] {
     let game = base.appendingPathComponent("Games/No Socks RPG", isDirectory: true)
     try fm.createDirectory(at: game.appendingPathComponent("js"), withIntermediateDirectories: true)
     try Data().write(to: game.appendingPathComponent("js/rmmz_core.js"))
@@ -26,23 +28,23 @@ private func makeGame(in base: URL, saves: [String: String] = [:]) throws -> [Sa
     return locations
 }
 
-private func write(_ saves: [String: String], to location: SaveLocation) throws {
+func write(_ saves: [String: String], to location: SaveLocation) throws {
     try fm.createDirectory(at: location.directory, withIntermediateDirectories: true)
     for (name, content) in saves { try Data(content.utf8).write(to: location.directory.appendingPathComponent(name)) }
 }
 
-private func contents(of location: SaveLocation) throws -> [String: String] {
+func contents(of location: SaveLocation) throws -> [String: String] {
     Dictionary(uniqueKeysWithValues: try LudusaviStore.regularFiles(in: location.directory).map {
         ($0, String(decoding: try Data(contentsOf: location.directory.appendingPathComponent($0)), as: UTF8.self))
     })
 }
 
-private func sha1(_ text: String) -> String {
+func sha1(_ text: String) -> String {
     Insecure.SHA1.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
 }
 
 /// Every file under `root` with its SHA-1, to prove a backup left existing folders alone.
-private func tree(_ root: URL) throws -> [String: String] {
+func tree(_ root: URL) throws -> [String: String] {
     Dictionary(uniqueKeysWithValues: try LudusaviStore.regularFiles(in: root).map {
         ($0, LudusaviStore.sha1(try Data(contentsOf: root.appendingPathComponent($0))))
     })
@@ -141,15 +143,7 @@ private func tree(_ root: URL) throws -> [String: String] {
     #expect(Timestamp.format(Date(timeIntervalSince1970: 1_792_946_779.5)) == "2026-10-25T16:46:19.500Z")
 }
 
-@Test func gameFoldersMatchByNormalizedTitle() {
-    let folders = ["Doki Doki Literature Club_", "No Socks RPG", "Other"]
-    #expect(LudusaviStore.match(["no socks rpg"], in: folders) == "No Socks RPG")
-    #expect(LudusaviStore.match(["Doki Doki Literature Club!"], in: folders) == "Doki Doki Literature Club_")
-    #expect(LudusaviStore.match(["No Socks"], in: folders) == nil)
-    #expect(LudusaviMapping.escapeFolderName(".Hack: G.U.") == "_Hack_ G.U_")
-}
-
-@Test func configGivesFolderAndRetention() throws {
+@Test func configGivesRetention() throws {
     let config = try LudusaviConfig(yaml: """
     ---
     runtime:
@@ -165,7 +159,6 @@ private func tree(_ root: URL) throws -> [String: String] {
     restore:
       path: /Users/me/ludusavi-backup
     """)
-    #expect(config.backupPath?.path == "/Users/me/ludusavi-backup")
     #expect(config.retention == Retention(full: 1, differential: 5))
 }
 
@@ -337,56 +330,6 @@ private func tree(_ root: URL) throws -> [String: String] {
     #expect(try fm.contentsOfDirectory(atPath: gameDir.path).sorted() == [first, second])
 }
 
-@MainActor
-@Test func theServiceRunsOneOperationAtATime() async throws {
-    let base = try temporaryDirectory()
-    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
-    _ = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
-    let library = LibraryStore(paths: paths, engines: [RPGMakerPlugin(.mz)])
-    await library.refresh()
-    let backups = base.appendingPathComponent("ludusavi-backup/No Socks RPG", isDirectory: true)
-    try fm.createDirectory(at: backups, withIntermediateDirectories: true)
-    try Data(LudusaviMapping(name: "No Socks RPG").yamlString().utf8).write(to: backups.appendingPathComponent("mapping.yaml"))
-    let service = SaveSyncService(library: library)
-    service.chooseFolder(backups.deletingLastPathComponent())
-    await service.refresh()
-
-    let id = GameID("No Socks RPG")
-    async let first = service.backUp(id)
-    async let second = service.backUp(id)
-    async let third = service.backUp(id)
-    let made = try await [first, second, third].compactMap(\.backup)
-    #expect(made.count == 1)
-}
-
-@MainActor
-@Test func filteringTheGamePickerKeepsControllerFocusOnAShownRow() async throws {
-    let base = try temporaryDirectory()
-    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
-    _ = try makeGame(in: base)
-    let library = LibraryStore(paths: paths, engines: [RPGMakerPlugin(.mz)])
-    await library.refresh()
-    let root = base.appendingPathComponent("ludusavi-backup", isDirectory: true)
-    for name in ["No Socks RPG", "Other Game"] {
-        let folder = root.appendingPathComponent(name, isDirectory: true)
-        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-        try Data(LudusaviMapping(name: name).yamlString().utf8).write(to: folder.appendingPathComponent("mapping.yaml"))
-    }
-    let service = SaveSyncService(library: library)
-    service.chooseFolder(root)
-    await service.refresh()
-    let id = GameID("No Socks RPG")
-    #expect(service.match(for: id) == "No Socks RPG")
-
-    let model = GameSavesModel(service: service, game: id)
-    model.choosingGame = true
-    // The filter hides the matched folder, where focus would otherwise start.
-    model.query = "Other"
-    _ = model.handle(.down)
-    _ = model.handle(.down)
-    #expect(model.isFocused(.folder("Other Game")))
-}
-
 @Test func undoRefusesSnapshotsItCannotTrust() throws {
     let base = try temporaryDirectory()
     let store = LudusaviStore(root: base.appendingPathComponent("backups"))
@@ -498,32 +441,6 @@ struct RealSampleTests {
 }
 
 private let realSample = fm.homeDirectoryForCurrentUser.appendingPathComponent("vndegen-testgames/ludusavi-sample/No Socks RPG")
-
-@MainActor
-@Test func sessionEndBacksUpOnlyWhenAutomaticBackupIsOn() async throws {
-    let base = try temporaryDirectory()
-    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
-    _ = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
-    let library = LibraryStore(paths: paths, engines: [RPGMakerPlugin(.mz)])
-    await library.refresh()
-    let backups = base.appendingPathComponent("ludusavi-backup/No Socks RPG", isDirectory: true)
-    try fm.createDirectory(at: backups, withIntermediateDirectories: true)
-    try Data(LudusaviMapping(name: "No Socks RPG").yamlString().utf8).write(to: backups.appendingPathComponent("mapping.yaml"))
-
-    let service = SaveSyncService(library: library)
-    service.chooseFolder(backups.deletingLastPathComponent())
-    await service.refresh()
-    #expect(service.match(for: GameID("No Socks RPG")) == "No Socks RPG")
-
-    await service.sessionEnded(GameID("No Socks RPG"))
-    #expect(try await service.backups(for: GameID("No Socks RPG")).isEmpty)
-
-    service.autoBackup = true
-    await service.sessionEnded(GameID("No Socks RPG"))
-    let made = try await service.backups(for: GameID("No Socks RPG"))
-    #expect(made.count == 1 && made[0].fileCount == 1)
-    #expect(SaveSyncService(library: library).autoBackup)
-}
 
 @Test func ludusavisOwnRetentionStartsANewFullAfterTwoDifferentials() throws {
     let base = try temporaryDirectory()

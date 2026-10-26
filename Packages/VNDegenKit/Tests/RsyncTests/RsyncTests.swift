@@ -2,12 +2,10 @@ import CryptoKit
 import Foundation
 import Testing
 @testable import Rsync
+import RsyncTestSupport
 
 private var fm: FileManager { .default }
 
-/// The real rsync, run as `rsync --server` with pipes in place of SSH. Homebrew's 3.x when present, as on the build Mac
-/// and the servers VNDegen talks to, else the system's.
-private let rsyncPath = ["/opt/homebrew/bin/rsync", "/usr/local/bin/rsync", "/usr/bin/rsync"].first { fm.isExecutableFile(atPath: $0) }
 
 private func temporaryDirectory() throws -> URL {
     let url = fm.temporaryDirectory.appendingPathComponent("rsync-\(UUID().uuidString)", isDirectory: true)
@@ -33,66 +31,6 @@ private func files(under root: URL) throws -> [String: String] {
     return result
 }
 
-struct ProcessConnection: RsyncConnection {
-    let program: String
-
-    func start(_ arguments: [String]) async throws -> any RsyncTransport {
-        try ProcessTransport(program: program, arguments: Array(arguments.dropFirst()))
-    }
-}
-
-/// Runs rsync as a child process. Its output is drained by readability handlers, as the SSH channel drains its data.
-final class ProcessTransport: RsyncTransport, @unchecked Sendable {
-    let output: AsyncThrowingStream<[UInt8], any Error>
-    private let process = Process()
-    private let input = Pipe()
-    private let errors = Pipe()
-    private let lock = NSLock()
-    private var errorText = Data()
-
-    init(program: String, arguments: [String]) throws {
-        let stdout = Pipe()
-        let (stream, continuation) = AsyncThrowingStream<[UInt8], any Error>.makeStream()
-        output = stream
-        stdout.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            if data.isEmpty {
-                handle.readabilityHandler = nil
-                continuation.finish()
-            } else {
-                continuation.yield(Array(data))
-            }
-        }
-        errors.fileHandleForReading.readabilityHandler = { [lock] handle in
-            let data = handle.availableData
-            if data.isEmpty { handle.readabilityHandler = nil }
-            lock.withLock { self.errorText.append(data) }
-        }
-        process.executableURL = URL(fileURLWithPath: program)
-        process.arguments = arguments
-        process.standardInput = input
-        process.standardOutput = stdout
-        process.standardError = errors
-        try process.run()
-    }
-
-    func write(_ bytes: [UInt8]) async throws {
-        try input.fileHandleForWriting.write(contentsOf: bytes)
-    }
-
-    func finish() async throws -> (status: Int32, errorOutput: String) {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global().async {
-                self.process.waitUntilExit()
-                continuation.resume()
-            }
-        }
-        try? input.fileHandleForWriting.close()
-        let text = lock.withLock { String(decoding: errorText, as: UTF8.self) }
-        return (process.terminationStatus, text)
-    }
-}
-
 @Test func md4MatchesTheRFCVectors() {
     let hex = { (text: String) in MD4.hash(Array(text.utf8)).map { String(format: "%02x", $0) }.joined() }
     #expect(hex("") == "31d6cfe0d16ae931b73c59d7e0c089c0")
@@ -105,7 +43,7 @@ final class ProcessTransport: RsyncTransport, @unchecked Sendable {
     let remote = try temporaryDirectory(), local = try temporaryDirectory()
     try write(["Game A/mapping.yaml": "a", "Game A/backup-1/drive-0/save.dat": String(repeating: "x", count: 100_000),
                "Game B/mapping.yaml": "bb", "Game C [1]/mapping.yaml": "c"], under: remote)
-    let client = RsyncClient(connection: ProcessConnection(program: rsyncPath!))
+    let client = RsyncClient(connection: ProcessConnection())
     let filters: [RsyncFilter] = [.include("/*/"), .include("/*/mapping.yaml"), .exclude("*")]
 
     let first = try await client.pull(remote.path + "/", into: local, filters: filters)
@@ -126,7 +64,7 @@ final class ProcessTransport: RsyncTransport, @unchecked Sendable {
 @Test(.enabled(if: rsyncPath != nil)) func listsWithOwnersAndReportsAMissingFolder() async throws {
     let remote = try temporaryDirectory()
     try write(["Game/mapping.yaml": "a"], under: remote)
-    let client = RsyncClient(connection: ProcessConnection(program: rsyncPath!))
+    let client = RsyncClient(connection: ProcessConnection())
     let entries = try await client.list(remote.path + "/", filters: [.include("/*/"), .exclude("/*/*")], owners: true)
     #expect(entries.map(\.path) == [".", "Game"])
     let owner = try #require(entries.first?.owner)
@@ -151,7 +89,7 @@ final class ProcessTransport: RsyncTransport, @unchecked Sendable {
         let size = Int64(try! Data(contentsOf: url).count)
         return RsyncClient.Upload(entry: RsyncEntry(path: $0, kind: .file, size: size, modified: time, permissions: 0o666), source: url)
     }
-    let client = RsyncClient(connection: ProcessConnection(program: rsyncPath!))
+    let client = RsyncClient(connection: ProcessConnection())
     try await client.push(uploads, to: remote.path + "/Game/", owners: false)
 
     let game = remote.appendingPathComponent("Game")
@@ -170,7 +108,7 @@ final class ProcessTransport: RsyncTransport, @unchecked Sendable {
 @Test(.enabled(if: rsyncPath != nil)) func pushSetsOwnerAndGroupByName() async throws {
     let remote = try temporaryDirectory(), local = try temporaryDirectory()
     try write(["save.dat": "x"], under: local)
-    let client = RsyncClient(connection: ProcessConnection(program: rsyncPath!))
+    let client = RsyncClient(connection: ProcessConnection())
     let owner = try #require(try await client.list(remote.path + "/", owners: true).first?.owner)
     let upload = RsyncClient.Upload(entry: RsyncEntry(path: "save.dat", kind: .file, size: 1, modified: 1_700_000_000, permissions: 0o644,
                                                       owner: owner), source: local.appendingPathComponent("save.dat"))
@@ -184,7 +122,7 @@ final class ProcessTransport: RsyncTransport, @unchecked Sendable {
     let remote = try temporaryDirectory()
     try write(["Game/backup-1/drive-0/a.dat": "1", "Game/backup-1-diff/drive-0/a.dat": "2", "Game/backup-[2]/x": "3",
                "Game/backup-3/drive-0/a.dat": "4", "Game/mapping.yaml": "m"], under: remote)
-    let client = RsyncClient(connection: ProcessConnection(program: rsyncPath!))
+    let client = RsyncClient(connection: ProcessConnection())
     try await client.delete(["backup-1", "backup-[2]"], in: remote.path + "/Game/")
     #expect(try files(under: remote.appendingPathComponent("Game")) == ["backup-1-diff/drive-0/a.dat": "2", "backup-3/drive-0/a.dat": "4",
                                                                        "mapping.yaml": "m"])
