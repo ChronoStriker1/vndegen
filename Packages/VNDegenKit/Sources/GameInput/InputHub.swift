@@ -51,7 +51,11 @@ public final class InputHub {
 
     /// Reconciles with the system's device list, so a repeated or missed notification cannot attach a controller twice.
     private func syncDevices() {
-        let pads = GCController.controllers().filter { $0.extendedGamepad != nil }
+        var pads = GCController.controllers().filter { $0.extendedGamepad != nil }
+        #if DEBUG
+        // The simulator exposes a virtual gamepad, which hides the touch overlay. `-ignoreControllers YES` shows it.
+        if UserDefaults.standard.bool(forKey: "ignoreControllers") { pads = [] }
+        #endif
         let ids = Set(pads.map(ObjectIdentifier.init))
         for id in Set(sticks.keys).subtracting(ids) { detach(id) }
         for pad in pads where sticks[ObjectIdentifier(pad)] == nil { attach(pad) }

@@ -66,7 +66,7 @@ VNDegen rescans the folder on launch and on pull to refresh.
 The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen.
 
 <p align="center">
-  <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a D-pad, A B X Y buttons, shoulder buttons, and menu buttons around the game">
+  <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a D-pad, A B X Y buttons, shoulder buttons, and menu buttons over the No Socks RPG title screen">
   <img src="docs/screenshots/unlock.jpg" width="200" alt="Passcode keypad for unlocking hidden games, with a controller focus ring on one key">
 </p>
 
@@ -105,6 +105,14 @@ From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH 
 ### Installing a release
 
 The [Releases](https://github.com/ChronoStriker1/vndegen/releases) page has a built IPA for iPhone and iPad and a zipped app for Mac, with install steps in each release's notes. `scripts/release.sh <version>` publishes a new one from `main`.
+
+### Installing with AltStore or SideStore
+
+Add this source in AltStore or SideStore to install VNDegen and get updates:
+
+```
+https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json
+```
 
 ### Installing on iPhone or iPad
 

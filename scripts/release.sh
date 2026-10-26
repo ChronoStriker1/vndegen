@@ -27,3 +27,10 @@ scp -q "chronostriker1@$host:$remote_dir/build/release/*" "$out/"
 git tag -a "v$version" -m "VNDegen $version"
 git push -q origin "v$version"
 gh release create "v$version" "$out"/* --title "VNDegen $version" --notes-file "docs/releases/$version.md"
+
+# The AltStore and SideStore source lists every release; it is served from main.
+python3 -I scripts/altstore-source.py "$version" "$build_number" "$out/VNDegen-$version.ipa" "docs/releases/$version.md"
+git add altstore/source.json
+git commit -q -m "List $version in the AltStore source"
+git push -q origin main
+echo "Released $version. Merge main back into dev: git checkout dev && git merge main"
