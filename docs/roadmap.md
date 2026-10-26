@@ -12,17 +12,15 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Ren'Py on iPhone and iPad (0.4.0). What was built is in "Phase 2 on iOS" in `docs/renpy-spike.md`.
 - Ludusavi built into the app (0.4.0). VNDegen connects to the backup server itself over SSH with rsync, matches games through Ludusavi's manifest, and builds in Ludusavi's backup features.
 - Touch and Cursor mouse modes on iPhone and iPad, and the controller's Mouse option (0.4.0).
+- Fixes for Touch mode and for quitting on a landscape iPhone, Ren'Py games two folders deep, and no control method for Ren'Py on iPhone and iPad (0.4.1).
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
 - RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
-- Fixes for Touch mouse mode on iPhone (`ws/touch-mode-fix`).
 - Xbox gamepad controls by default for the touch gamepad and real controllers, with every Xbox button in the mapping editor and an RPG Maker preset (`ws/xbox-controls`).
 - A blur over the lower game area on iPad after the game has been in portrait (`ws/ipad-blur`).
 - Ludusavi save sync over SMB instead of SSH and rsync (`ws/ludusavi-smb`), reaching the share the PCs already use, as guest or with a password.
-
-Merged into `dev` for the next release: Ren'Py games two folders deep are detected, Ren'Py on iPhone and iPad no longer offers touch control methods that do nothing there, and a game started after tapping Quit to library on a landscape iPhone no longer stays black.
 
 ## Next
 1. Together, as the next work:
