@@ -80,11 +80,12 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
 
     private static func isBase(_ base: String, _ probe: FolderProbe) -> Bool {
         let prefix = base.isEmpty ? "" : "\(base)/".lowercased()
-        guard probe.contains("\(prefix)renpy"), probe.contains("\(prefix)game") else { return false }
-        return probe.entries.contains { entry in
-            let lower = entry.lowercased()
-            return lower.hasPrefix("\(prefix)game/") && [".rpy", ".rpyc", ".rpa"].contains { lower.hasSuffix($0) }
-        }
+        guard probe.contains("\(prefix)renpy"), let game = probe.entries.first(where: { $0.lowercased() == "\(prefix)game" })
+        else { return false }
+        let isScript = { (path: String) in [".rpy", ".rpyc", ".rpa"].contains { path.lowercased().hasSuffix($0) } }
+        if probe.entries.contains(where: { $0.lowercased().hasPrefix("\(prefix)game/") && isScript($0) }) { return true }
+        // Ren'Py loads scripts from anywhere under game/, such as game/scripts/, which can sit deeper than the probe looked.
+        return FolderProbe(scanning: probe.root.appendingPathComponent(game, isDirectory: true)).entries.contains(where: isScript)
     }
 
     /// Decides only when every version names the same line.

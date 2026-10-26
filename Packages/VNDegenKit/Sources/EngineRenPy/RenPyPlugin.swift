@@ -56,12 +56,14 @@ nonisolated public struct RenPyPlugin: EnginePlugin {
 nonisolated public enum RenPyError: Error, LocalizedError {
     case notRenPy
     case runtimeMissing(RenPyRuntime)
+    case savesNotImported(String)
     case unsupportedPlatform
 
     public var errorDescription: String? {
         switch self {
         case .notRenPy: "The folder does not hold a Ren'Py game."
         case let .runtimeMissing(runtime): "The \(runtime.displayName) runtime is missing from this build of VNDegen."
+        case let .savesNotImported(reason): "The saves in the game's game/saves folder could not be copied in. \(reason)"
         case .unsupportedPlatform: "Ren'Py does not run on this device yet."
         }
     }

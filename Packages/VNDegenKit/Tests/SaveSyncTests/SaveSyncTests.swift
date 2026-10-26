@@ -1,4 +1,5 @@
 import CryptoKit
+import EngineRenPy
 import EngineRPGMaker
 import Foundation
 import Testing
@@ -194,6 +195,27 @@ private func tree(_ root: URL) throws -> [String: String] {
 }
 
 // MARK: - Restore and back up
+
+@Test func aFirstRenPyBackupRestoresOnAnotherInstall() throws {
+    let base = try temporaryDirectory()
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let game = GameID("Test Game")
+    let mac = RenPyPlugin().saveLocations(folder: base, dataDirectory: base.appendingPathComponent("Mac/GameData/Test Game"))
+    try write(["1-1-LT1.save": "slot one", "persistent": "p"], to: mac[0])
+    let backup = try store.backUp(folder: nil, title: "Test Game", game: game, locations: mac, retention: nil,
+                                  now: Date(timeIntervalSince1970: 1_792_886_400), os: "mac", comment: nil)
+    #expect(backup.paths == [.vndegen: 2])
+    #expect(try store.mapping("Test Game").backups.first.map { Set($0.files.keys) }
+        == ["/VNDegen/Test Game/saves/1-1-LT1.save", "/VNDegen/Test Game/saves/persistent"])
+
+    let other = RenPyPlugin().saveLocations(folder: base, dataDirectory: base.appendingPathComponent("Other/GameData/Test Game"))
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let restored = try store.restore(folder: "Test Game", backup: nil, locations: other, snapshot: snapshot)
+    #expect(restored.restored == ["1-1-LT1.save", "persistent"])
+    #expect(try contents(of: other[0]) == ["1-1-LT1.save": "slot one", "persistent": "p"])
+}
 
 @Test func backUpThenRestoreAndUndo() throws {
     let base = try temporaryDirectory()

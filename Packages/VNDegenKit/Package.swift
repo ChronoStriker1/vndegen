@@ -42,12 +42,13 @@ let package = Package(
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
-        .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput"]),
+        // RenPyCompat is built for the tests, which run it as a command.
+        .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
-        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker"], exclude: ["Fixtures"]),
+        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]
 )

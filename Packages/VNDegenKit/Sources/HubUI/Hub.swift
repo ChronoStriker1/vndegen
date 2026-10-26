@@ -88,6 +88,7 @@ public final class Hub {
         let previous = sessionEndWork
         sessionEndWork = Task {
             await previous?.value
+            await session.waitUntilStopped()
             await saveSync.sessionEnded(id)
         }
     }
