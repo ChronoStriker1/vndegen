@@ -15,13 +15,14 @@ nonisolated public struct KiriKiriPlugin: EnginePlugin {
     }
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
-        guard let layout = KiriKiriLayout(probe) else { return nil }
+        let layout = KiriKiriLayout.needsDeeperListing(probe) ? KiriKiriLayout(scanning: probe.root) : KiriKiriLayout(probe)
+        guard let layout else { return nil }
         return EngineMatch(engine: descriptor.id, confidence: .certain, evidence: layout.evidence)
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         guard let engine = KiriKiriEngine.load() else { throw KiriKiriError.engineMissing }
-        guard let layout = KiriKiriLayout(FolderProbe(scanning: launch.folder)) else { throw KiriKiriError.notKiriKiri }
+        guard let layout = KiriKiriLayout(scanning: launch.folder) else { throw KiriKiriError.notKiriKiri }
         return try KiriKiriSession(launch, layout: layout, engine: engine)
     }
 }

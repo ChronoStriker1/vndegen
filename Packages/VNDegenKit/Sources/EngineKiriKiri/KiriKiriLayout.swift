@@ -33,6 +33,18 @@ nonisolated public struct KiriKiriLayout: Equatable, Sendable {
         }
     }
 
+    /// Lists `folder` deep enough for an unpacked game two folders down, `outer/inner/data/startup.tjs`, a level deeper
+    /// than `FolderProbe(scanning:)` goes by default.
+    public init?(scanning folder: URL) {
+        self.init(FolderProbe(scanning: folder, maxDepth: 4))
+    }
+
+    /// Whether `probe` holds a `data` folder two folders down, whose `startup.tjs` the library's three-level listing
+    /// leaves out. Such a folder needs `init(scanning:)`.
+    static func needsDeeperListing(_ probe: FolderProbe) -> Bool {
+        probe.entries.contains { $0.split(separator: "/").count == 3 && name($0).lowercased() == "data" }
+    }
+
     /// The shallowest root wins. Within a root, `data.xp3` wins over `data/`, which wins over an embedded archive.
     public init?(_ probe: FolderProbe) {
         // Copies made on a Mac can hold AppleDouble files such as `._data.xp3` beside the real ones.

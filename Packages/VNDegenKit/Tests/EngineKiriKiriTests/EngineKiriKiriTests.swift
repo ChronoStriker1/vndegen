@@ -56,6 +56,16 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
     #expect(KiriKiriPlugin().detect(listing)?.evidence == "Test Game 01/data/startup.tjs")
 }
 
+@Test func detectsAnUnpackedDataFolderTwoFoldersDown() throws {
+    let copied = try folder(["outer/inner/game.exe": Data(), "outer/inner/data/startup.tjs": Data(),
+                             "outer/inner/data/system/Config.tjs": Data()])
+    // The library lists three levels, which ends at `outer/inner/data`.
+    #expect(KiriKiriPlugin().detect(FolderProbe(scanning: copied))?.evidence == "outer/inner/data/startup.tjs")
+    #expect(KiriKiriLayout(scanning: copied) == KiriKiriLayout(root: "outer/inner", data: .folder("outer/inner/data")))
+    let saves = KiriKiriPlugin().saveLocations(folder: copied, dataDirectory: URL(fileURLWithPath: "/nonexistent-data"))
+    #expect(saves.first?.directory.standardizedFileURL.path == copied.appendingPathComponent("outer/inner/savedata").standardizedFileURL.path)
+}
+
 @Test func prefersTheDataArchiveOverTheDataFolder() {
     let listing = probe(["game.exe", "data.xp3", "data/startup.tjs"])
     #expect(KiriKiriLayout(listing)?.data == .archive("data.xp3"))
@@ -179,6 +189,25 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
     #expect(locations[1].relativePath(path) == "Studio/savedata/datasc.ksd")
     // A game installed in Documents still saves in its own savedata folder, and that location comes first.
     #expect(locations[0].relativePath("C:/Users/player/Documents/Games/Test Game 08/savedata/datasc.ksd") == "datasc.ksd")
+}
+
+@Test func leavesSaveFoldersInVNDegensOwnUserFoldersToThoseLocations() throws {
+    let copied = try folder(["game.exe": Data(), "data.xp3": xp3])
+    let data = URL(fileURLWithPath: "/tmp/vndegen-kirikiri-data/GameData/Test Game 08")
+    let locations = KiriKiriPlugin().saveLocations(folder: copied, dataDirectory: data)
+    // Save sync restores a file to the first location that recognizes it.
+    let claim = { (path: String) in locations.firstIndex { $0.relativePath(path) != nil } }
+    for (path, location) in [
+        ("/VNDegen/Test Game 08/AppData/Studio/savedata/datasc.ksd", 1),
+        ("/Users/someone/Library/Application Support/VNDegen/GameData/Test Game 08/AppData/Studio/savedata/datasc.ksd", 1),
+        ("\(data.path)/AppData/Studio/savedata/datasc.ksd", 1),
+        ("/VNDegen/Test Game 08/Documents/Studio/savedata/datasc.ksd", 2),
+    ] {
+        #expect(claim(path) == location, "\(path)")
+        #expect(locations[location].relativePath(path) == "Studio/savedata/datasc.ksd")
+    }
+    #expect(claim("C:/Users/player/Documents/Games/Test Game 08/savedata/datasc.ksd") == 0)
+    #expect(claim("/VNDegen/Test Game 08/savedata/datasc.ksd") == 0)
 }
 
 @Test func mapsButtonsToKAGControls() {

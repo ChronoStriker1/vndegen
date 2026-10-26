@@ -6,13 +6,18 @@ extension KiriKiriPlugin {
     /// save to `System.appDataPath` or `System.personalPath` instead, the AppData and Documents folders on Windows,
     /// which VNDegen keeps in the game's data directory.
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
-        guard let layout = KiriKiriLayout(FolderProbe(scanning: folder)) else { return [] }
+        guard let layout = KiriKiriLayout(scanning: folder) else { return [] }
         let savedata = folder.appendingPathComponent(layout.path("savedata"), isDirectory: true)
+        let appData = Self.appDataDirectory(dataDirectory), documents = Self.documentsDirectory(dataDirectory)
         return [
-            // A game that keeps a `savedata` folder under AppData saves there, not in its root.
-            SaveLocation(directory: savedata) { Self.appDataRelativePath($0) == nil ? Self.saveRelativePath($0) : nil },
-            Self.userFolderLocation(Self.appDataDirectory(dataDirectory), rule: Self.appDataRelativePath),
-            Self.userFolderLocation(Self.documentsDirectory(dataDirectory), rule: Self.documentsRelativePath),
+            // A game that keeps a `savedata` folder under AppData, or under VNDegen's own AppData or Documents, saves
+            // there, not in its root. A game installed under Windows Documents still saves in its root.
+            SaveLocation(directory: savedata) { path in
+                Self.appDataRelativePath(path) == nil && Self.ownUserFolderPath(path, directory: appData) == nil
+                    && Self.ownUserFolderPath(path, directory: documents) == nil ? Self.saveRelativePath(path) : nil
+            },
+            Self.userFolderLocation(appData, rule: Self.appDataRelativePath),
+            Self.userFolderLocation(documents, rule: Self.documentsRelativePath),
         ]
     }
 
@@ -46,20 +51,23 @@ extension KiriKiriPlugin {
     }
 
     /// A location in the game's data directory that stands in for a Windows user folder. Besides `rule`, it recognizes
-    /// its own files and `/VNDegen/<game>/<folder>/<rest>`, the path a first backup records, or a data directory's
-    /// `GameData/<game>/<folder>/<rest>` from any VNDegen install.
+    /// the paths `ownUserFolderPath` does.
     nonisolated private static func userFolderLocation(_ directory: URL, rule: @escaping @Sendable (String) -> String?) -> SaveLocation {
-        let local = directory.standardizedFileURL.path + "/"
-        let name = directory.lastPathComponent
-        return SaveLocation(directory: directory) { path in
-            if path.hasPrefix(local) { return insideFolder(String(path.dropFirst(local.count))) }
-            let parts = path.split(separator: "/", omittingEmptySubsequences: false)
-            let root = parts.dropFirst().first == "VNDegen" ? 1 : parts.firstIndex(of: "GameData")
-            if let root, parts.count > root + 3, parts[root + 2] == name {
-                return insideFolder(parts[(root + 3)...].joined(separator: "/"))
-            }
-            return rule(path)
+        SaveLocation(directory: directory) { path in
+            ownUserFolderPath(path, directory: directory).map(insideFolder) ?? rule(path)
         }
+    }
+
+    /// The rest of `path` when it is in `directory`, a user folder in the game's data directory, or in a copy of it:
+    /// `/VNDegen/<game>/<folder>/<rest>`, the path a first backup records, or a data directory's
+    /// `GameData/<game>/<folder>/<rest>` from any VNDegen install. Not yet checked with `insideFolder`.
+    nonisolated private static func ownUserFolderPath(_ path: String, directory: URL) -> String? {
+        let local = directory.standardizedFileURL.path + "/"
+        if path.hasPrefix(local) { return String(path.dropFirst(local.count)) }
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+        let root = parts.dropFirst().first == "VNDegen" ? 1 : parts.firstIndex(of: "GameData")
+        guard let root, parts.count > root + 3, parts[root + 2] == directory.lastPathComponent else { return nil }
+        return parts[(root + 3)...].joined(separator: "/")
     }
 
     /// The rest of `path` after `users/<user>/` and one of `folders`, compared without case.
