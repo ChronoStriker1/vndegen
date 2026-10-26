@@ -111,8 +111,9 @@ public final class SaveSyncService {
         get { settings.checkBeforeLaunch }
         set { settings.checkBeforeLaunch = newValue; saveSettings() }
     }
-    /// Ludusavi's retention limits from its config on this Mac. Nil elsewhere.
-    public let configRetention: Retention?
+    /// Ludusavi's retention limits from its config on this Mac. Nil elsewhere. Tests clear it, so a Mac with Ludusavi
+    /// installed runs them with the limits they set.
+    public internal(set) var configRetention: Retention?
     /// The user's Ludusavi retention limits, entered by hand. Nil infers them from the store and never deletes a backup.
     public var manualRetention: Retention? {
         get { settings.retention }
