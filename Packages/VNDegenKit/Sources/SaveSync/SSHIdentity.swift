@@ -26,22 +26,30 @@ enum SSHIdentity {
 
     #if os(macOS)
     private static func fileKey(at url: URL) throws -> Curve25519.Signing.PrivateKey {
-        if let data = try? Data(contentsOf: url) { return try Curve25519.Signing.PrivateKey(rawRepresentation: data) }
-        guard !FileManager.default.fileExists(atPath: url.path) else { throw SaveSyncError.unreadable(url.path) }
+        do {
+            return try Curve25519.Signing.PrivateKey(rawRepresentation: Data(contentsOf: url))
+        } catch CocoaError.fileReadNoSuchFile {
+            // No key yet: make one below.
+        } catch is CocoaError {
+            throw SaveSyncError.unreadable(url.path)
+        }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let key = Curve25519.Signing.PrivateKey()
-        // Written under a temporary name created with mode 0600, so the key is never readable by others, and renamed into
-        // place only once complete.
+        // Written under a temporary name created with mode 0600, so the key is never readable by others, then linked into
+        // place only once complete. A link never replaces an existing file, so when two instances make a key at once the
+        // first one in wins and the other reads it.
         let temporary = url.deletingLastPathComponent().appendingPathComponent(".ssh-ed25519-\(UUID().uuidString)")
         let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
         guard fd >= 0 else { throw SaveSyncError.unreadable(temporary.path) }
+        defer { unlink(temporary.path) }
         let data = key.rawRepresentation
         let written = data.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
         let synced = fsync(fd) == 0
         close(fd)
-        guard written == data.count, synced, rename(temporary.path, url.path) == 0 else {
-            unlink(temporary.path)
-            throw SaveSyncError.unreadable(url.path)
+        guard written == data.count, synced else { throw SaveSyncError.unreadable(url.path) }
+        guard link(temporary.path, url.path) == 0 else {
+            guard errno == EEXIST else { throw SaveSyncError.unreadable(url.path) }
+            return try Curve25519.Signing.PrivateKey(rawRepresentation: Data(contentsOf: url))
         }
         return key
     }

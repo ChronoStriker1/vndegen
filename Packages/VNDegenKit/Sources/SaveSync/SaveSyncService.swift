@@ -423,7 +423,7 @@ public final class SaveSyncService {
             let mappingURL = store.mirror.appendingPathComponent(match.folder).appendingPathComponent(LudusaviStore.mappingFile)
             let report = try store.local.backUp(folder: match.folder, title: match.title, game: id, locations: locations, retention: retention,
                                                 pcFolders: pcFolders, now: now, device: device, os: os, comment: comment)
-            let saves = try LudusaviStore.localHashes(locations)
+            let saves = report.saves
             guard let name = report.backup else {
                 let latest = try store.local.mapping(match.folder).summaries.last?.revision
                 return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
@@ -519,10 +519,10 @@ public final class SaveSyncService {
     /// Keeps the saves here over the server's newer backup. The next backup records them on top of it.
     public func keepLocalSaves(_ id: GameID, over backup: BackupSummary) {
         guard let match = match(for: id), let locations = try? saveLocations(id) else { return }
-        let saves = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0.saves : nil } ?? [:]
-        // The saves stay counted as changed, unless there were none before, so the next backup is not skipped.
-        let local = (try? LudusaviStore.localHashes(locations)) ?? [:]
-        record(SyncRecord(folder: match.folder, latest: backup.revision, saves: saves.isEmpty && local.isEmpty ? local : saves), for: id)
+        // The baseline is the server's backup, so every save here that differs from it counts as changed and the next
+        // backup is not skipped, even when the saves here did not change since this device's last backup.
+        let server = try? RemoteStore(path: ".", mirror: mirror).local.latestHashes(folder: match.folder, locations: locations)
+        record(SyncRecord(folder: match.folder, latest: backup.revision, saves: server?.hashes ?? [:]), for: id)
     }
 
     /// Call when a game session ends. With automatic backup on, backs up saves that changed here, unless the server

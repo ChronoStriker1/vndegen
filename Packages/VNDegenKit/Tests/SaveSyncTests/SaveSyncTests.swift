@@ -472,4 +472,18 @@ private let realSample = fm.homeDirectoryForCurrentUser.appendingPathComponent("
     #expect(try SSHIdentity.key(in: directory).rawRepresentation == made.rawRepresentation)
     #expect(try fm.contentsOfDirectory(atPath: directory.path) == ["ssh-ed25519"])
 }
+
+@Test func macInstancesMakingTheKeyAtOnceAllGetTheOneOnDisk() throws {
+    for _ in 0..<20 {
+        let directory = try temporaryDirectory().appendingPathComponent("SaveSync")
+        let keys = Locked<[Data]>([])
+        DispatchQueue.concurrentPerform(iterations: 8) { _ in
+            if let key = try? SSHIdentity.key(in: directory) { keys { $0.append(key.rawRepresentation) } }
+        }
+        let onDisk = try Data(contentsOf: directory.appendingPathComponent("ssh-ed25519"))
+        #expect(keys { $0 }.count == 8)
+        #expect(Set(keys { $0 }) == [onDisk])
+        #expect(try fm.contentsOfDirectory(atPath: directory.path) == ["ssh-ed25519"])
+    }
+}
 #endif

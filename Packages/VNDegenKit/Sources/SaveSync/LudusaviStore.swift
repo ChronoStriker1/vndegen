@@ -206,12 +206,15 @@ public struct LudusaviStore: Sendable {
         // The new state: everything in the latest backup, with local saves on top. Files VNDegen does not manage,
         // and saves that are missing here, carry forward unchanged rather than being recorded as removed.
         var state: [String: Source] = latest.mapValues { .stored($0) }
+        var saves: [String: String] = [:]
         for (save, path) in zip(local, paths.recorded) {
             let data = try Data(contentsOf: save.url)
-            state[path] = .local(save.url, FileEntry(hash: Self.sha1(data), size: UInt64(data.count)))
+            let hash = Self.sha1(data)
+            state[path] = .local(save.url, FileEntry(hash: hash, size: UInt64(data.count)))
+            saves["\(save.location):\(save.relative)"] = hash
         }
         if !latest.isEmpty, state.mapValues(\.entry) == latest.mapValues(\.entry) {
-            return BackupReport(backup: nil, isDifferential: false, filesWritten: 0, paths: paths.origin, pruned: [])
+            return BackupReport(backup: nil, isDifferential: false, filesWritten: 0, paths: paths.origin, pruned: [], saves: saves)
         }
 
         let limits = retention ?? Retention(inferredFrom: mapping)
@@ -272,7 +275,8 @@ public struct LudusaviStore: Sendable {
             throw error
         }
         for folder in pruned { try? fm.removeItem(at: gameDir.appendingPathComponent(folder)) }
-        return BackupReport(backup: name, isDifferential: differential, filesWritten: copies.count, paths: paths.origin, pruned: pruned)
+        return BackupReport(backup: name, isDifferential: differential, filesWritten: copies.count, paths: paths.origin, pruned: pruned,
+                            saves: saves)
     }
 
     /// Keeps the previous mapping.yaml beside the new one until the new one is written and reads back correctly.
@@ -529,6 +533,9 @@ public struct BackupReport: Sendable {
     /// Backups the retention limits dropped from mapping.yaml. Their folders stay on the server until Ludusavi on a PC
     /// prunes them at its next backup of the game.
     public var pruned: [String]
+    /// The SHA-1 of each save as this backup read it, keyed like `localHashes`. A save the game writes while the backup
+    /// runs is not in it, so the next check still counts that save as changed.
+    public var saves: [String: String] = [:]
 
     public enum PathOrigin: Sendable {
         /// The path the latest backup recorded for that save.

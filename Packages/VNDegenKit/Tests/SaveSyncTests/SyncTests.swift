@@ -784,3 +784,31 @@ private struct RefusingConnection: RsyncConnection {
     try write(["file1.rmmzsave": "three"], to: setup.locations[0])
     #expect(try await setup.service.status(for: setup.id) == .localChanged)
 }
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func aSaveWrittenWhileItsBackupRunsStaysChanged() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    let location = setup.locations[0]
+    // The game writes a save after the backup read the saves and before its folder goes up.
+    setup.hooks.onceBeforePush(1) { try write(["file1.rmmzsave": "two"], to: location) }
+    _ = try await setup.service.checkedBackUp(setup.id)
+    #expect(Set(try #require(try setup.serverMapping().effectiveFiles()).values.map(\.entry.hash)) == [sha1("one")])
+    #expect(try await setup.service.status(for: setup.id) == .localChanged)
+}
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func keepingUnchangedSavesOverANewerBackupBacksThemUp() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    let service = setup.service, id = setup.id
+    _ = try await service.checkedBackUp(id)
+    try setup.deckBacksUp(["file1.rmmzsave": "deck"], at: 1)
+    let deck = try #require(try setup.serverMapping().summaries.last)
+    #expect(try await service.status(for: id) == .newerBackup(deck))
+
+    service.keepLocalSaves(id, over: deck)
+    #expect(try await service.status(for: id) == .localChanged)
+    service.autoBackup = true
+    await service.sessionEnded(id)
+    #expect(try setup.serverMapping().summaries.last?.os == "mac")
+    #expect(try await service.status(for: id) == .inSync)
+}
