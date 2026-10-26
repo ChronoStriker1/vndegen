@@ -216,7 +216,7 @@ struct PlayerView: View {
     }
 
     /// The game reads the keyboard itself and wants raw presses through its own button mapping. The menu and the unlock
-    /// screen want translated, repeating navigation in the standard layout. Each switch replaces the input consumer, which
+    /// screen want translated, repeating navigation in the hub's own layout. Each switch replaces the input consumer, which
     /// releases everything the outgoing one holds and keeps buttons still held silent until they are pressed again. A
     /// game that reads controllers itself gets none from the hub, so no press reaches it twice.
     private func applyInputMode() {
@@ -226,7 +226,7 @@ struct PlayerView: View {
         hub.input.onEvent = navigating ? navigate : session.drawsOwnMenu ? nil : play
         hub.input.translatesKeyboard = navigating
         hub.input.repeatsDirections = navigating
-        hub.input.buttonMapping = navigating ? ButtonMapping() : mapping
+        hub.input.buttonMapping = navigating ? nil : mapping
     }
 }
 

@@ -442,10 +442,54 @@
         Object.defineProperty(window, 'localStorage', { value: localStorage, configurable: true, enumerable: true });
     }
 
-    // The app delivers gamepad input through the session, so the page must not read the controllers a second time.
+    // The page sees one standard-mapping Xbox gamepad, which the session presses through __vndegen.gamepad from both the
+    // touch gamepad and real controllers, after the game's button mapping. WebKit's own view of the controllers stays
+    // hidden, so the page never reads them a second time. Like a browser, the page sees the gamepad from its first press.
+    // Each call returns new objects, as Chrome does, since games keep the last state to find what changed.
+    const padButtons = {
+        a: 0, b: 1, x: 2, y: 3, l: 4, r: 5, l2: 6, r2: 7, view: 8, menu: 9, l3: 10, r3: 11,
+        up: 12, down: 13, left: 14, right: 15,
+    };
+    // Axis index and direction. Sticks are digital: a pushed direction is all the way over.
+    const padAxes = {
+        leftStickLeft: [0, -1], leftStickRight: [0, 1], leftStickUp: [1, -1], leftStickDown: [1, 1],
+        rightStickLeft: [2, -1], rightStickRight: [2, 1], rightStickUp: [3, -1], rightStickDown: [3, 1],
+    };
+    const padHeld = new Set();
+    let padConnected = false, padTimestamp = 0;
+    function padSnapshot() {
+        const buttons = [];
+        // Button 16 is Home, which always opens the VNDegen menu instead.
+        for (let i = 0; i <= 16; i++) {
+            const pressed = Object.keys(padButtons).some((name) => padButtons[name] === i && padHeld.has(name));
+            buttons.push({ pressed: pressed, touched: pressed, value: pressed ? 1 : 0 });
+        }
+        const axes = [0, 0, 0, 0];
+        for (const name of padHeld) if (padAxes[name]) axes[padAxes[name][0]] += padAxes[name][1];
+        return {
+            id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', index: 0, connected: true,
+            mapping: 'standard', timestamp: padTimestamp, buttons: buttons, axes: axes, vibrationActuator: null,
+        };
+    }
     try {
-        Object.defineProperty(Navigator.prototype, 'getGamepads', { value: () => [], configurable: true, writable: true });
+        Object.defineProperty(Navigator.prototype, 'getGamepads', {
+            value: () => (padConnected ? [padSnapshot()] : []), configurable: true, writable: true,
+        });
     } catch (e) { /* locked down */ }
+    // WebKit still announces the real controllers to pages that listen for them.
+    for (const type of ['gamepadconnected', 'gamepaddisconnected']) {
+        window.addEventListener(type, (event) => { if (event.isTrusted) event.stopImmediatePropagation(); }, true);
+    }
+    function pressPad(name, pressed) {
+        if (!(name in padButtons) && !(name in padAxes)) return;
+        if (pressed) padHeld.add(name); else padHeld.delete(name);
+        padTimestamp = performance.now();
+        if (padConnected) return;
+        padConnected = true;
+        const event = new Event('gamepadconnected');
+        Object.defineProperty(event, 'gamepad', { value: padSnapshot() });
+        window.dispatchEvent(event);
+    }
 
     // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
     // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
@@ -606,8 +650,16 @@
                 window.__vndegen.onPause(false);
             }
         },
+        // A virtual gamepad button by its VNDegen name, such as 'a' or 'leftStickUp', with the engine-neutral action
+        // it stands for, such as 'confirm', or null.
+        gamepad(name, pressed, action) {
+            pressPad(name, pressed);
+            window.__vndegen.onGamepad(action, pressed);
+        },
         // Engine scripts replace this to stop and restart their own loop.
         onPause: noop,
+        // Engine scripts whose games may read no gamepad replace this to turn its actions into their own input.
+        onGamepad: noop,
         quit: quit,
     };
 })();

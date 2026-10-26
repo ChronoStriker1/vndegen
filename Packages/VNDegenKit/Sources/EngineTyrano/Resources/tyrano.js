@@ -1,8 +1,9 @@
 // TyranoScript controller support. Injected at document start, after the NW.js shim.
-// Buttons call the engine's own actions on TYRANO.kag.key_mouse rather than pressing keys, because each game's
-// KeyConfig.js binds keys differently (one maps Enter to hiding the message window). TyranoScript 5 has keyboard focus
-// for its buttons and choices (focus_up, ok, cancel), which this script uses. Older versions have none, and games build
-// screens of their own from plain HTML that Tyrano 5's focus skips, so this script also keeps a focus of its own.
+// In games that read no gamepad, gamepad buttons call the engine's own actions on TYRANO.kag.key_mouse rather than
+// pressing keys, because each game's KeyConfig.js binds keys differently (one maps Enter to hiding the message window).
+// TyranoScript 5 has keyboard focus for its buttons and choices (focus_up, ok, cancel), which this script uses. Older
+// versions have none, and games build screens of their own from plain HTML that Tyrano 5's focus skips, so this script
+// also keeps a focus of its own.
 (function () {
     'use strict';
 
@@ -238,6 +239,14 @@
             if (!pressed && name === 'confirm' && hasNativeFocus(k) && k.vmouse && k.vmouse.is_visible) return k.vmouse.leftup();
             if (pressed && actions[name]) actions[name](k);
         },
+    };
+
+    // TyranoScript 5 reads a gamepad itself only when the game sets useGamepad in Config.tjs, through its KeyConfig.js.
+    // Then the game gets the virtual gamepad alone. Otherwise each gamepad button does its engine-neutral action here.
+    window.__vndegen.onGamepad = (action, pressed) => {
+        const k = kag();
+        if (!action || (k && k.config && String(k.config.useGamepad) === 'true')) return;
+        window.__vndegenTyrano.button(action, pressed);
     };
 
     // A real or overlay tap means the player stopped using the controller focus.

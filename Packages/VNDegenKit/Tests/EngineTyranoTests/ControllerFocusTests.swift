@@ -1,6 +1,9 @@
 import Foundation
+import OSLog
 import Testing
+import VNCore
 import WebKit
+@testable import WebRuntime
 
 private let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     .appendingPathComponent("../../Sources/EngineTyrano/Resources/tyrano.js").standardizedFileURL
@@ -53,14 +56,46 @@ window.TYRANO = { kag: { stat: { is_strong_stop: true, visible_menu_button: true
     }
 }
 
-@MainActor @Test func directionsReachAChoiceTyranosFocusCannot() async throws {
+/// The NW.js shim, then this script, as a game session injects them.
+@MainActor private func configuration() throws -> WKWebViewConfiguration {
+    let game = WebGameConfiguration(folder: GameFolder(root: FileManager.default.temporaryDirectory, webRoot: ""), appName: "test",
+                                    buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
     let configuration = WKWebViewConfiguration()
-    configuration.userContentController.addUserScript(
-        WKUserScript(source: try String(contentsOf: script, encoding: .utf8), injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    for source in [try WebGameSession.shimSource(for: game), try String(contentsOf: script, encoding: .utf8)] {
+        configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    }
+    return configuration
+}
+
+@MainActor @Test func directionsReachAChoiceTyranosFocusCannot() async throws {
+    let configuration = try configuration()
     let loader = Loader()
     for (buttons, expected) in [(["down", "down", "confirm"], "choice"), (["down", "confirm"], "save"), (["confirm", "down", "confirm"], "choice")] {
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         await loader.load(page, in: view)
         #expect(try await press(view, buttons) as? String == expected, "\(buttons)")
     }
+}
+
+@MainActor private func pressPad(_ view: WKWebView, _ inputs: [ControlInput]) async throws -> Any? {
+    for input in inputs {
+        let script = [true, false].map { WebGameSession.gamepadScript(input, pressed: $0) }.joined(separator: ";")
+        _ = try await view.evaluateJavaScript(script + "; 0")
+    }
+    return try await view.evaluateJavaScript("window.chosen || 'nothing'")
+}
+
+@MainActor @Test func gamepadButtonsDoTyranoActionsUnlessTheGameReadsTheGamepad() async throws {
+    let configuration = try configuration()
+    let loader = Loader()
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page, in: view)
+    #expect(try await pressPad(view, [.down, .leftStickDown, .a]) as? String == "choice")
+
+    // A game that sets useGamepad reads the virtual gamepad through Tyrano's own KeyConfig.js instead.
+    let own = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {"), in: own)
+    #expect(try await pressPad(own, [.down, .down, .a]) as? String == "nothing")
+    _ = try await own.evaluateJavaScript(WebGameSession.gamepadScript(.a, pressed: true) + "; 0")
+    #expect(try await own.evaluateJavaScript("navigator.getGamepads()[0].buttons[0].pressed") as? Bool == true)
 }

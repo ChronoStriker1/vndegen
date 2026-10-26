@@ -47,6 +47,7 @@ public final class Hub {
     public func refreshLibrary() async {
         async let archives = LocalArchives.find(gamesRoot: library.paths.gamesRoot)
         await library.refresh()
+        ButtonMapping.convertLegacyMappings(in: library)
         localArchives = await archives
         guard matching == nil else { return }
         let unmatched = library.games.filter { $0.metadata == nil }.map(\.id)

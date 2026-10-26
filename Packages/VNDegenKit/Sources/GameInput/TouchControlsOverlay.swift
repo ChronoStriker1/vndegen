@@ -90,10 +90,19 @@ private struct GamepadControls: View {
     var body: some View {
         VStack(spacing: unit * 0.28) {
             Spacer(minLength: 0)
-            HStack(spacing: unit * 0.22) {
+            // The triggers sit above the bumpers, as on an Xbox controller.
+            HStack {
+                shoulder(.l2)
+                Spacer(minLength: 0)
+                shoulder(.r2)
+            }
+            HStack(spacing: unit * 0.2) {
                 shoulder(.l)
                 HomeButton(size: unit * 0.62, press: press)
                 Spacer(minLength: 0)
+                MappedButton(input: .view, mapping: mapping, press: press) { pressed in
+                    RoundKey(symbol: "rectangle.on.rectangle", size: unit * 0.62, pressed: pressed)
+                }
                 MappedButton(input: .menu, mapping: mapping, press: press) { pressed in
                     RoundKey(symbol: "line.3.horizontal", size: unit * 0.62, pressed: pressed)
                 }
@@ -114,14 +123,14 @@ private struct GamepadControls: View {
             Text(input.title)
                 .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
-                .frame(width: unit * 1.3, height: unit * 0.6)
+                .frame(width: unit * 1.2, height: unit * 0.6)
                 .background(KeyFill(shape: Capsule(), pressed: pressed))
         }
     }
 }
 
-/// A touch gamepad button that does what the mapping says. A button bound to a key or a click shows that binding in a
-/// small badge, and a button bound to nothing dims.
+/// A touch gamepad button that does what the mapping says. A remapped button shows its binding in a small badge, and a
+/// button bound to nothing dims.
 private struct MappedButton<Label: View>: View {
     let input: ControlInput
     let mapping: ButtonMapping
@@ -132,7 +141,7 @@ private struct MappedButton<Label: View>: View {
         let action = mapping.action(for: input)
         TouchButton(input, title: input.title, press: press, label: label)
             .overlay(alignment: .topTrailing) {
-                if let badge = action.badge { Badge(text: badge).offset(x: 6, y: -6) }
+                if mapping.isRemapped(input), let badge = action.badge { Badge(text: badge).offset(x: 6, y: -6) }
             }
             .opacity(action == .nothing ? 0.35 : 1)
             .accessibilityValue(mapping.isRemapped(input) ? action.title : "")
@@ -202,7 +211,7 @@ private struct DPad: View {
             Circle().fill(.white.opacity(0.12)).frame(width: size * 0.18)
             // Badges sit beside each arm's outer end, unrotated so they read upright.
             ForEach(Self.directions, id: \.self) { direction in
-                if let badge = mapping.action(for: direction).badge {
+                if mapping.isRemapped(direction), let badge = mapping.action(for: direction).badge {
                     let angle = direction.armAngle.radians
                     Badge(text: badge)
                         .offset(x: sin(angle) * size * 0.44 + cos(angle) * size * 0.17,

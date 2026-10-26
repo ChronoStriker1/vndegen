@@ -121,8 +121,8 @@ final class RenPySession: EngineSession {
     /// then brings the game window back.
     func send(_ event: ControllerEvent) {
         switch event {
-        case .button(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): showGame()
-        case .button, .key, .click, .pointer, .scroll: break
+        case .button(_, pressed: true), .gamepad(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): showGame()
+        case .button, .gamepad, .key, .click, .pointer, .scroll: break
         }
     }
 

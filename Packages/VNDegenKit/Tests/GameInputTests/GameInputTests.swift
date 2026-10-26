@@ -4,20 +4,38 @@ import Testing
 import VNCore
 @testable import GameInput
 
-@Test func gamepadElementsFollowTheStandardLayout() {
-    let standard = ButtonMapping()
+@Test func everyButtonSendsItsOwnXboxButtonByDefault() {
+    let mapping = ButtonMapping()
+    for input in ControlInput.allCases {
+        #expect(mapping.action(for: input) == .gamepad(input))
+    }
+    let expected: [GamepadElement: ControlInput?] = [
+        .a: .a, .b: .b, .x: .x, .y: .y, .leftShoulder: .l, .rightShoulder: .r, .leftTrigger: .l2, .rightTrigger: .r2,
+        .options: .view, .menu: .menu, .leftThumbstickButton: .l3, .rightThumbstickButton: .r3, .home: nil,
+    ]
+    for element in GamepadElement.allCases {
+        #expect(element.control == expected[element], "\(element)")
+    }
+    #expect(GamepadElement.a.action(in: mapping) == .gamepad(.a))
+    #expect(GamepadElement.options.action(in: mapping) == .gamepad(.view))
+}
+
+@Test func hubScreensKeepTheirNavigation() {
     let expected: [GamepadElement: ControlAction] = [
         .a: .button(.confirm), .b: .button(.cancel), .x: .button(.dash), .y: .button(.menu),
         .leftShoulder: .button(.pageUp), .rightShoulder: .button(.pageDown),
-        .leftTrigger: .nothing, .rightTrigger: .nothing,
+        .leftTrigger: .nothing, .rightTrigger: .nothing, .leftThumbstickButton: .nothing, .rightThumbstickButton: .nothing,
         .menu: .button(.menu), .options: .button(.hub), .home: .button(.hub),
     ]
     for element in GamepadElement.allCases {
-        #expect(element.action(in: standard) == expected[element])
+        #expect(element.action(in: nil) == expected[element], "\(element)")
     }
-    for direction in [ControlInput.up, .down, .left, .right] {
-        #expect(standard.action(for: direction) == .button(VirtualButton(rawValue: direction.rawValue)!))
+    for (dpad, stick, button) in [(ControlInput.up, ControlInput.leftStickUp, VirtualButton.up), (.down, .leftStickDown, .down),
+                                  (.left, .leftStickLeft, .left), (.right, .leftStickRight, .right)] {
+        #expect(dpad.action(in: nil) == .button(button))
+        #expect(stick.action(in: nil) == .button(button))
     }
+    #expect(ControlInput.rightStickUp.action(in: nil) == .nothing)
 }
 
 @Test func remappedButtonsSendTheirNewActions() {
@@ -28,30 +46,109 @@ import VNCore
     mapping.set(.key(z), for: .a)
     mapping.set(.click(.secondary), for: .r2)
     mapping.set(.nothing, for: .x)
+    mapping.set(.gamepad(.a), for: .view)
     #expect(GamepadElement.y.action(in: mapping).event(pressed: true) == .key(escape, pressed: true))
     #expect(GamepadElement.a.action(in: mapping).event(pressed: false) == .key(z, pressed: false))
     #expect(GamepadElement.rightTrigger.action(in: mapping).event(pressed: true) == .click(.secondary, pressed: true))
     #expect(GamepadElement.x.action(in: mapping).event(pressed: true) == nil)
-    #expect(GamepadElement.b.action(in: mapping) == .button(.cancel))
+    #expect(GamepadElement.options.action(in: mapping).event(pressed: true) == .gamepad(.a, pressed: true))
+    #expect(GamepadElement.b.action(in: mapping) == .gamepad(.b))
 }
 
-@Test func optionsAndHomeAlwaysOpenTheVNDegenMenu() {
+@Test func homeAlwaysOpensTheVNDegenMenu() {
     var mapping = ButtonMapping()
     for input in ControlInput.allCases { mapping.set(.nothing, for: input) }
-    #expect(GamepadElement.options.action(in: mapping) == .button(.hub))
     #expect(GamepadElement.home.action(in: mapping) == .button(.hub))
-    #expect(GamepadElement.allCases.filter { $0.control == nil } == [.options, .home])
+    #expect(GamepadElement.allCases.filter { $0.control == nil } == [.home])
     #expect(!ControlAction.gamepadChoices.contains(.button(.hub)))
 }
 
-@Test func mappingStoresOnlyDifferencesFromTheStandardLayout() {
+@Test func mappingStoresOnlyDifferencesFromTheDefaultLayout() {
     var mapping = ButtonMapping()
     #expect(mapping.stored == nil)
-    mapping.set(.button(.cancel), for: .a)
-    #expect(mapping.stored == [.a: .button(.cancel)])
-    mapping.set(.button(.confirm), for: .a)
+    mapping.set(.gamepad(.b), for: .a)
+    #expect(mapping.stored == [.a: .gamepad(.b)])
+    mapping.set(.gamepad(.a), for: .a)
     #expect(mapping.stored == nil)
     #expect(!mapping.isRemapped(.a))
+}
+
+@Test func editorChoicesAreXboxButtonsKeysClicksAndNothing() {
+    #expect(ControlAction.gamepadChoices == ControlInput.allCases.map(ControlAction.gamepad))
+    #expect(ControlInput.allCases.count == 24)
+    #expect(ControlAction.keyChoices.allSatisfy { if case .key = $0 { true } else { false } })
+    #expect(ControlAction.mouseChoices == [.click(.primary), .click(.secondary)])
+    #expect(ControlInput.allCases.filter { !$0.isOnTouchGamepad }
+        == [.l3, .r3, .leftStickUp, .leftStickDown, .leftStickLeft, .leftStickRight,
+            .rightStickUp, .rightStickDown, .rightStickLeft, .rightStickRight])
+}
+
+@Test func rpgMakerPresetSendsTheKeysRPGMakerReads() {
+    let preset = ButtonMapping.rpgMaker
+    let codes: [ControlInput: Int] = [
+        .a: 13, .b: 27, .x: 16, .y: 88, .menu: 88, .l: 81, .r: 87,
+        .up: 38, .down: 40, .left: 37, .right: 39, .leftStickUp: 38, .leftStickDown: 40, .leftStickLeft: 37, .leftStickRight: 39,
+    ]
+    for input in ControlInput.allCases {
+        if let code = codes[input] {
+            guard case let .key(key) = preset.action(for: input) else { Issue.record("\(input) sends no key"); continue }
+            #expect(key.keyCode == code, "\(input)")
+            #expect(KeyboardKey.choices.contains(key), "\(input)")
+        } else {
+            #expect(!preset.isRemapped(input), "\(input)")
+        }
+    }
+}
+
+@Test func legacyRemapsKeepWhatTheySentInTheirEngine() {
+    let w = KeyboardKey(key: "w", code: "KeyW", keyCode: 87)
+    let enter = KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)
+    let stored: [ControlInput: ControlAction] = [.x: .button(.confirm), .up: .button(.down), .left: .key(w), .y: .nothing, .l2: .button(.menu)]
+
+    // An engine that reads the gamepad, or turns its buttons back into the same actions: the old standard button.
+    let gamepad = ButtonMapping.converting(stored) { _ in nil }
+    #expect(gamepad?.overrides == [
+        .x: .gamepad(.a), .up: .gamepad(.down), .leftStickUp: .gamepad(.leftStickDown), .left: .key(w), .leftStickLeft: .key(w),
+        .y: .nothing, .l2: .gamepad(.menu),
+    ])
+
+    // An engine whose buttons used to press keys, such as RPG Maker.
+    let keys = ButtonMapping.converting(stored) { $0 == .confirm ? .key(enter) : .key(w) }
+    #expect(keys?.action(for: .x) == .key(enter))
+    #expect(keys?.action(for: .up) == .key(w))
+    #expect(keys?.action(for: .leftStickUp) == .key(w))
+
+    // A mapping with nothing to convert stays as it is.
+    #expect(ButtonMapping.converting([.a: .key(w), .leftStickLeft: .nothing]) { _ in nil } == nil)
+    #expect(ButtonMapping.converting([.a: .gamepad(.b)]) { _ in nil } == nil)
+}
+
+@Test @MainActor func libraryConversionRunsOnceForEveryGameAndAfterwardOnlyForEngineNeutralActions() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-mapping-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let paths = LibraryPaths(gamesRoot: root.appending(path: "Games"), support: root.appending(path: "Support"))
+    for name in ["Old", "Keys", "New"] {
+        try FileManager.default.createDirectory(at: paths.gamesRoot.appending(path: name), withIntermediateDirectories: true)
+    }
+    let suite = "vndegen-conversion-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let w = KeyboardKey(key: "w", code: "KeyW", keyCode: 87)
+
+    let library = LibraryStore(paths: paths, engines: [])
+    await library.refresh()
+    library.update(GameID("Old")) { $0.buttonMapping = [.a: .button(.cancel)] }
+    library.update(GameID("Keys")) { $0.buttonMapping = [.up: .key(w)] }
+    ButtonMapping.convertLegacyMappings(in: library, defaults: defaults)
+    #expect(library.game(GameID("Old"))?.buttonMapping == [.a: .gamepad(.b)])
+    #expect(library.game(GameID("Keys"))?.buttonMapping == [.up: .key(w), .leftStickUp: .key(w)])
+
+    // A D-pad remapped by this version keeps its stick, and an engine-neutral action left behind still converts.
+    library.update(GameID("New")) { $0.buttonMapping = [.down: .key(w)] }
+    library.update(GameID("Old")) { $0.buttonMapping = [.b: .button(.confirm)] }
+    ButtonMapping.convertLegacyMappings(in: library, defaults: defaults)
+    #expect(library.game(GameID("New"))?.buttonMapping == [.down: .key(w)])
+    #expect(library.game(GameID("Old"))?.buttonMapping == [.b: .gamepad(.a)])
 }
 
 @Test func keyChoicesAreUniqueAndLabelled() {
@@ -174,21 +271,21 @@ private let pad = ObjectIdentifier(NSObject())
 }
 
 @Test func stickIgnoresDeadZoneAndWobble() {
-    var stick = StickDirections()
+    var stick = StickDirections(.left)
     #expect(stick.update(x: 0.2, y: -0.25).isEmpty)
-    #expect(stick.update(x: 0.6, y: 0).map(\.0) == [.right])
+    #expect(stick.update(x: 0.6, y: 0).map(\.0) == [.leftStickRight])
     // Wobbling between the release and press thresholds keeps the one press.
     #expect(stick.update(x: 0.4, y: 0).isEmpty)
     #expect(stick.update(x: 0.55, y: 0).isEmpty)
     let released = stick.update(x: 0.1, y: 0)
-    #expect(released.count == 1 && released[0].0 == .right && !released[0].pressed)
+    #expect(released.count == 1 && released[0].0 == .leftStickRight && !released[0].pressed)
 }
 
 @Test func stickDiagonalPressesBothAndFlickReleasesFirst() {
-    var stick = StickDirections()
-    #expect(Set(stick.update(x: 0.7, y: 0.7).map(\.0)) == [.right, .up])
+    var stick = StickDirections(.right)
+    #expect(Set(stick.update(x: 0.7, y: 0.7).map(\.0)) == [.rightStickRight, .rightStickUp])
     let flick = stick.update(x: -0.9, y: 0)
-    #expect(flick.map(\.0) == [.right, .up, .left])
+    #expect(flick.map(\.0) == [.rightStickRight, .rightStickUp, .rightStickLeft])
     #expect(flick.map(\.pressed) == [false, false, true])
 }
 
