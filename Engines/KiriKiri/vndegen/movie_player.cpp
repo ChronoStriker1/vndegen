@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <vector>
 
 static const double resyncThreshold = 0.04; // seconds
 static const double reportInterval = 5;     // seconds of movie between progress lines in the log
@@ -232,10 +233,14 @@ private:
     unsigned long mixingColor = 0xff000000;
 };
 
+// Every live player, for VNKKDestroyMoviePlayers. Main thread only.
+static std::vector<MoviePlayer *> livePlayers;
+
 MoviePlayer::MoviePlayer(iTVPVideoCallback *callback, std::unique_ptr<MovieDecoder> decoder,
                          const ttstr &name, MovieMode mode)
   : callback(callback), decoder(std::move(decoder)), info(this->decoder->Info()), name(name), mode(mode)
 {
+    livePlayers.push_back(this);
     sprite.type = 2;
     if (info.audioRate) {
         tTVPWaveFormat waveFormat = {};
@@ -261,6 +266,7 @@ MoviePlayer::MoviePlayer(iTVPVideoCallback *callback, std::unique_ptr<MovieDecod
 
 MoviePlayer::~MoviePlayer()
 {
+    livePlayers.erase(std::find(livePlayers.begin(), livePlayers.end(), this));
     TVPRemoveContinuousEventHook(this);
     LogErrors();
     if (shownCount && !ended)
@@ -506,6 +512,12 @@ void MoviePlayer::LogProgress(double now)
               format(" at %.2f s: %lld frames shown, %lld dropped, %lld decoded, %.2f s of audio, %.2f s queued",
                      now, (long long)shownCount, (long long)droppedCount, (long long)stats.videoFrames,
                      info.audioRate ? stats.audioFrames / (double)info.audioRate : 0.0, queued));
+}
+
+void VNKKDestroyMoviePlayers()
+{
+    while (!livePlayers.empty())
+        delete livePlayers.back();
 }
 
 iTVPVideoOverlay *VNKKCreateMoviePlayer(iTVPVideoCallback *callback, tTJSBinaryStream *stream,

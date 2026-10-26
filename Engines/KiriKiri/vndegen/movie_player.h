@@ -17,4 +17,9 @@ enum class MovieMode {
 iTVPVideoOverlay *VNKKCreateMoviePlayer(iTVPVideoCallback *callback, tTJSBinaryStream *stream,
                                         const ttstr &name, MovieMode mode);
 
+// Deletes the players still alive once the script engine is gone. Engine shutdown deletes leftover
+// script objects without invalidating them, so a VideoOverlay held there never releases its player,
+// whose decoder would go on using a sound buffer SDL is about to destroy.
+void VNKKDestroyMoviePlayers();
+
 #endif
