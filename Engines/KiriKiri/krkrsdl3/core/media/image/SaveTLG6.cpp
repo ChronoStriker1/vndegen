@@ -1175,15 +1175,17 @@ void SaveTLG6(tTJSBinaryStream* stream, const iTVPBaseBitmap* bmp, bool is24)
                     // do med(when p=0) or take average of upper and left pixel(p=1)
                     for (int c = 0; c < colors; c++)
                     {
+                        // TLG stores blue, green, red; the image keeps red, green, blue.
+                        int byte = colors >= 3 && c < 3 ? 2 - c : c;
                         int wp = 0;
                         for (int yy = y; yy < ylim; yy++)
                         {
                             const unsigned char* sl =
-                                x * stride + c + (const unsigned char*)bmp->GetScanLine(yy);
+                                x * stride + byte + (const unsigned char*)bmp->GetScanLine(yy);
                             const unsigned char* usl;
                             if (yy >= 1)
                                 usl =
-                                    x * stride + c + (const unsigned char*)bmp->GetScanLine(yy - 1);
+                                    x * stride + byte + (const unsigned char*)bmp->GetScanLine(yy - 1);
                             else
                                 usl = NULL;
                             for (int xx = x; xx < xlim; xx++)
