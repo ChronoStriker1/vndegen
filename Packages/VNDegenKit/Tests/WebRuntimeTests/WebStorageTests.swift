@@ -33,3 +33,41 @@ import Testing
     #expect(try decode(#"{"op":"storageClear"}"#) == .storageClear)
     #expect(BridgeReply.value(.dictionary(["k": "v"])).json == #"{"value":{"k":"v"}}"#)
 }
+
+@Test func keysThatDifferOnlyInCaseKeepSeparateFiles() throws {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: base) }
+    let storage = WebStorage(directory: base)
+    try storage.set("Save1", "upper")
+    try storage.set("save1", "lower")
+    try storage.set("SAVE1", "shout")
+    #expect(try storage.load() == ["Save1": "upper", "save1": "lower", "SAVE1": "shout"])
+    try storage.remove("save1")
+    #expect(try storage.load() == ["Save1": "upper", "SAVE1": "shout"])
+    for name in try FileManager.default.contentsOfDirectory(atPath: base.path) {
+        #expect(name.replacingOccurrences(of: #"%[0-9A-F]{2}"#, with: "", options: .regularExpression) == name.lowercased()
+            .replacingOccurrences(of: #"%[0-9a-f]{2}"#, with: "", options: .regularExpression), "\(name)")
+    }
+}
+
+@Test func filesNamedTheOldWayMoveToTheirNewNames() throws {
+    let fm = FileManager.default
+    let base = fm.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    try fm.createDirectory(at: base, withIntermediateDirectories: true)
+    let storage = WebStorage(directory: base)
+    try Data("old".utf8).write(to: base.appendingPathComponent("TestGame01_sf.value"))
+    try Data("kept".utf8).write(to: base.appendingPathComponent("lower_only.value"))
+    // Restores that brought back a file under its old name beside a current one: the newer file wins.
+    try storage.set("Config", "current")
+    try Data("stale".utf8).write(to: base.appendingPathComponent("Config.value"))
+    try fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: base.appendingPathComponent("Config.value").path)
+    try storage.set("Other", "older")
+    try fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: base.appendingPathComponent("%4Fther.value").path)
+    try Data("restored".utf8).write(to: base.appendingPathComponent("Other.value"))
+
+    #expect(try storage.load() == ["TestGame01_sf": "old", "lower_only": "kept", "Config": "current", "Other": "restored"])
+    #expect(try Set(fm.contentsOfDirectory(atPath: base.path)) == ["%54est%47ame01_sf.value", "lower_only.value", "%43onfig.value", "%4Fther.value"])
+    #expect(try storage.value(for: "TestGame01_sf") == "old")
+    #expect(try storage.value(for: "missing") == nil)
+}
