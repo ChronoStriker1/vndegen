@@ -102,4 +102,3 @@ private final class ShimPage {
         #expect(try await page.run(snapshot) as? String == idle, "\(input)")
     }
 }
-
