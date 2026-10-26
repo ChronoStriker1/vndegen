@@ -12,6 +12,7 @@
 #include "TVPDebug.h"
 #include "TVPMsg.h"
 #include "movie_player.h"
+#include "xp3filter.h"
 #include "TVPScript.h"
 #include "TVPPlugin.h"
 
@@ -208,6 +209,8 @@ void tTVPApplication::CancelUserMessages(void* host, int msg)
 
 void tTVPApplication::OnExit()
 {
+    // Movie decoders read archives on their own threads, through plugins and scripts deleted below.
+    VNKKStopMovieWorkers();
     TVPSystemUninit();
     TVPUnloadPlugins();
 
@@ -218,6 +221,7 @@ void tTVPApplication::OnExit()
     if (TVPSystemControl)
         delete TVPSystemControl;
     TVPSystemControl = NULL;
+    TVPClearXP3Filter();
     TVPUninitScriptEngine();
     VNKKDestroyMoviePlayers();
     TVPClearAllAutoPath();

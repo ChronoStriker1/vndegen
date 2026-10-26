@@ -1,0 +1,19 @@
+// A script-only game for KiriKiriRestart. It loops a movie from movie.xp3, whose reads run
+// xp3filter.tjs on the decoder's thread, in a VideoOverlay it never closes, so the player outlives
+// the game into engine shutdown. scripts/kirikiri-movie-quit-check.sh builds the archive and runs it.
+Storages.addAutoPath(System.exePath + "movie.xp3>");
+var win = new Window();
+win.setInnerSize(320, 240);
+win.visible = true;
+var base = new Layer(win, null);
+base.setImageSize(320, 240);
+base.setSize(320, 240);
+base.fillRect(0, 0, 320, 240, 0xff000000);
+base.visible = true;
+var video = new VideoOverlay(win);
+video.mode = vomOverlay;
+video.open("loop.mpg");
+video.setPos(0, 0);
+video.setSize(320, 240);
+video.loop = true;
+video.play();

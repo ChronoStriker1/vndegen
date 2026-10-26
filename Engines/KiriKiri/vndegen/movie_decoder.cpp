@@ -209,13 +209,7 @@ void MovieDecoder::Prime()
 
 MovieDecoder::~MovieDecoder()
 {
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-        quit = true;
-    }
-    wake.notify_all();
-    if (worker.joinable())
-        worker.join();
+    Stop();
     for (AVPacket *packet : videoPackets)
         av_packet_free(&packet);
     av_frame_free(&decoded);
@@ -238,6 +232,17 @@ void MovieDecoder::Start(MovieAudioSink *audioSink)
     if (!sink || audioIndex < 0)
         audioEnded = true;
     worker = std::thread([this] { Run(); });
+}
+
+void MovieDecoder::Stop()
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        quit = true;
+    }
+    wake.notify_all();
+    if (worker.joinable())
+        worker.join();
 }
 
 void MovieDecoder::RequestSeek(double t)

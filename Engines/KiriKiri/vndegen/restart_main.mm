@@ -7,6 +7,8 @@
 // it. After each game's vnkk_stop, stdout gets the resident size, the resident size once malloc has
 // returned its free pages to the system, and the number of open files. Each game is paused for
 // pauseTime at its title, and the next game's engine clock must still start level with SDL's.
+// A title marker of "movie" quits the game midway through its first movie instead: movieTime after
+// the log shows the movie opening, while its decoder is still reading.
 // Exits nonzero if a game missed its title, did not quit, or started with a clock behind SDL's.
 #include "tjsCommHead.h"
 #include "Platform.h"
@@ -22,6 +24,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -35,14 +38,20 @@ static const auto quitTimeout = std::chrono::seconds(15);
 static const auto clickAfter = std::chrono::seconds(10);
 static const auto clickInterval = std::chrono::seconds(2);
 static const auto pauseTime = std::chrono::milliseconds(500);
+static const auto movieTime = std::chrono::milliseconds(1500);
 
-// Whether a line of the log ends with the marker.
-static bool logHasLineEnding(const std::string &path, const std::string &marker)
+static std::string readLog(const std::string &path)
 {
     std::ifstream file(path, std::ios::binary);
     std::stringstream contents;
     contents << file.rdbuf();
-    return contents.str().find(marker + "\n") != std::string::npos;
+    return contents.str();
+}
+
+// Whether a line of the log ends with the marker.
+static bool logHasLineEnding(const std::string &path, const std::string &marker)
+{
+    return readLog(path).find(marker + "\n") != std::string::npos;
 }
 
 static double residentMB()
@@ -87,6 +96,7 @@ int main(int argc, char *argv[])
     int failures = 0;
     for (int i = 2, n = 1; i < argc; i += 3, n++) {
         const char *root = argv[i], *data = argv[i + 1], *marker = argv[i + 2];
+        bool midMovie = !strcmp(marker, "movie");
         std::string log = logFolder + "/" + std::to_string(n) + ".log";
         remove(log.c_str());
         printf("game %d: %s\n", n, root);
@@ -103,10 +113,16 @@ int main(int argc, char *argv[])
         int64_t clockBehind = started ? (int64_t)(SDL_GetTicks() - engineTicks) : 0;
         bool quitEarly = false;
         Clock::time_point nextClick = start + clickAfter;
+        Clock::time_point movieOpened = Clock::time_point::max();
         bool atTitle = started && runUntil(titleTimeout, [&] {
             if (vnkk_iterate()) {
                 quitEarly = true;
                 return true;
+            }
+            if (midMovie) {
+                if (movieOpened == Clock::time_point::max() && readLog(log).find("movie: opened ") != std::string::npos)
+                    movieOpened = Clock::now();
+                return movieOpened != Clock::time_point::max() && Clock::now() >= movieOpened + movieTime;
             }
             if (logHasLineEnding(log, marker))
                 return true;
@@ -120,7 +136,7 @@ int main(int argc, char *argv[])
         }) && !quitEarly;
         double titleSeconds = std::chrono::duration<double>(Clock::now() - start).count();
 
-        if (atTitle) {
+        if (atTitle && !midMovie) {
             vnkk_set_paused(true);
             std::this_thread::sleep_for(pauseTime);
             vnkk_set_paused(false);
@@ -138,7 +154,7 @@ int main(int argc, char *argv[])
         bool clockKept = clockBehind >= 0 && clockBehind < 100;
         printf("game %d: %s after %.1f s, %s, clock %lld ms behind SDL's at start, resident %.1f MB, %.1f MB after relief, "
                "%d open files\n",
-               n, atTitle ? "title" : started ? "no title" : "did not start", titleSeconds,
+               n, atTitle ? (midMovie ? "mid-movie" : "title") : started ? "no title" : "did not start", titleSeconds,
                quit ? "quit" : "did not quit", (long long)clockBehind, resident, residentMB(), openFiles());
         fflush(stdout);
         failures += !atTitle || !quit || !clockKept;
