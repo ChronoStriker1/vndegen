@@ -56,13 +56,16 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         guard let base = Self.candidates(probe).first(where: { Self.isBase($0, probe, deepBudget: &deepBudget) }) else { return nil }
         let prefix = base.isEmpty ? "" : "\(base)/"
         // The probe stops above the contents of `renpy/` and `lib/` in a base two folders down. The folder's name, in its
-        // on-disk case, comes from the probe, and what is inside is read from disk.
+        // on-disk case, comes from the probe, and what is inside is listed from disk. Names match in any case.
         let folder = { (name: String) in probe.entries.first { $0.lowercased() == (prefix + name).lowercased() } ?? prefix + name }
-        let text = { (name: String, file: String) in probe.read("\(folder(name))/\(file)").map { String(decoding: $0, as: UTF8.self) } }
-        let children = { (name: String) in
-            let names = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(folder(name)).path)) ?? []
-            return names.map { $0.lowercased() }
+        let listing = { (name: String) in
+            (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(folder(name)).path)) ?? []
         }
+        let text = { (name: String, file: String) -> String? in
+            guard let actual = listing(name).first(where: { $0.lowercased() == file }) else { return nil }
+            return probe.read("\(folder(name))/\(actual)").map { String(decoding: $0, as: UTF8.self) }
+        }
+        let children = { (name: String) in listing(name).map { $0.lowercased() } }
 
         let vcVersion = text("renpy", "vc_version.py").flatMap(Self.vcVersion)
         let tuples = vcVersion.map { [$0] } ?? Self.versionTuples(text("renpy", "__init__.py"))
@@ -118,16 +121,19 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         return containsScript(folder, budget: &unlimited)
     }
 
-    /// Gives up once it has visited `budget` entries, and takes them from `budget`.
+    /// Gives up once it has visited `budget` entries, and takes them from `budget`. Each folder is read an entry at a
+    /// time, so a huge folder is not listed past the budget.
     static func containsScript(_ folder: URL, budget: inout Int) -> Bool {
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
         var level = [folder]
         while !level.isEmpty {
             var next: [URL] = []
             for directory in level {
-                guard let items = try? FileManager.default.contentsOfDirectory(
-                    at: directory, includingPropertiesForKeys: Array(keys), options: .skipsHiddenFiles) else { continue }
-                for item in items {
+                guard budget > 0 else { return false }
+                guard let items = FileManager.default.enumerator(
+                    at: directory, includingPropertiesForKeys: Array(keys),
+                    options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else { continue }
+                while let item = items.nextObject() as? URL {
                     guard budget > 0 else { return false }
                     budget -= 1
                     if isScript(item.lastPathComponent) { return true }

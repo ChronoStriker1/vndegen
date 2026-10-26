@@ -46,12 +46,17 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(RenPyLayout.fingerprint(base: root.appendingPathComponent("TestGame/TestGame-1.0-pc")) != nil)
 }
 
-@Test func readsTheVersionOfAMixedCaseRenPyFolderTwoFoldersDown() throws {
-    let layout = try layout([
-        "TestGame/TestGame-1.0-pc/RenPy/__init__.py": "version_tuple = (7, 4, 2, vc_version)\n",
+@Test func readsTheVersionOfMixedCaseRenPyFilesTwoFoldersDown() throws {
+    let tuple = try layout([
+        "TestGame/TestGame-1.0-pc/RenPy/__INIT__.PY": "version_tuple = (7, 4, 2, vc_version)\n",
         "TestGame/TestGame-1.0-pc/game/script.rpyc": "",
     ])
-    #expect(layout == RenPyLayout(base: "TestGame/TestGame-1.0-pc", version: "7.4.2", runtime: .renPy7, evidence: .version))
+    #expect(tuple == RenPyLayout(base: "TestGame/TestGame-1.0-pc", version: "7.4.2", runtime: .renPy7, evidence: .version))
+    let vcVersion = try layout([
+        "TestGame/TestGame-1.0-pc/renpy/VC_VERSION.PY": "version = '8.5.3.26051504'\n",
+        "TestGame/TestGame-1.0-pc/game/script.rpyc": "",
+    ])
+    #expect(vcVersion?.version == "8.5.3")
 }
 
 @Test func theGameFolderWalksTwoFoldersDownShareOneBudget() throws {
@@ -63,6 +68,16 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     // A's 51 entries use up a budget of 20, so B is never walked.
     #expect(RenPyLayout(probe, deepScanLimit: 20) == nil)
     #expect(RenPyLayout(probe, deepScanLimit: 1_000)?.base == "Deep/B")
+}
+
+@Test func theGameFolderWalkStopsAtItsBudget() throws {
+    let game = try folder(Dictionary(uniqueKeysWithValues: (0 ..< 1_000).map { ("images/\($0).png", "") }))
+    var budget = 20
+    #expect(!RenPyLayout.containsScript(game, budget: &budget))
+    #expect(budget == 0)
+    // A spent budget opens no folder, not even one with a script at its top.
+    var spent = 0
+    #expect(!RenPyLayout.containsScript(try folder(["script.rpy": ""]), budget: &spent))
 }
 
 @Test func triesTheShallowestOfABoundedSetOfBases() throws {
