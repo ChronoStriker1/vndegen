@@ -156,10 +156,12 @@ struct SettingsView: View {
     }
 
     private var savesSummary: String {
-        switch hub.saveSync.folder {
-        case .none: "Not set up"
-        case let .ready(url): url.lastPathComponent
-        case .unavailable: "Folder unavailable"
+        switch hub.saveSync.connection {
+        case .notSetUp: hub.saveSync.server == nil ? "Not set up" : "Not tested"
+        case .checking: "Connecting…"
+        case .untrusted: "Not trusted yet"
+        case .connected: hub.saveSync.server?.ssh.host ?? "Connected"
+        case .failed: "Can't connect"
         }
     }
 

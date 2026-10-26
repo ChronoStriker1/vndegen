@@ -33,6 +33,8 @@ final class Navigator {
         case artwork(ArtworkEditor)
         case metadata(MetadataSearch)
         case saves(GameSavesModel)
+        /// Asked before a game starts when the save server has newer saves.
+        case launchSaves(LaunchSavesModel)
         case settingsPage(SettingsPage)
         case importGame(ArchiveImportModel, initialSelection: [URL])
 
@@ -47,6 +49,7 @@ final class Navigator {
             case let .artwork(editor): "artwork:\(editor.gameID)"
             case let .metadata(search): "metadata:\(search.gameID)"
             case let .saves(model): "saves:\(model.game)"
+            case let .launchSaves(model): "launchSaves:\(model.game)"
             case let .settingsPage(page): "settings:\(page)"
             case .importGame: "import"
             }
@@ -130,6 +133,9 @@ final class Navigator {
     /// The unlock view shown in the sheet, kept so controller events reach the same instance.
     @ObservationIgnored private(set) var unlockView: UnlockView?
 
+    /// The game whose saves are being checked before it starts.
+    private(set) var checkingSaves: GameID?
+
     /// The Ludusavi settings page. One for the app, like the service it shows.
     @ObservationIgnored private(set) lazy var saveSettings = SaveSyncSettingsModel(service: hub.saveSync)
 
@@ -177,7 +183,7 @@ final class Navigator {
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
             // These take controller input through their own models.
-            case .unlock, .saves, .settingsPage, .importGame, .mapping: return []
+            case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping: return []
             }
         }
         switch route {
@@ -331,11 +337,11 @@ final class Navigator {
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
-        case .play: if let game = heroGame { hub.launch(game.id) }
+        case .play: if let game = heroGame { play(game.id) }
         case .details: if let game = heroGame { push(.game(game.id)) }
         case let .tile(_, id), let .gridTile(id): push(.game(id))
         case .back: back()
-        case .pagePlay: if let id = pageGameID { hub.launch(id) }
+        case .pagePlay: if let id = pageGameID { play(id) }
         case .pageArtwork: if let id = pageGameID { sheet = .artwork(ArtworkEditor(hub: hub, gameID: id)) }
         case .pageMetadata: if let id = pageGameID { sheet = .metadata(MetadataSearch(hub: hub, gameID: id)) }
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
@@ -581,7 +587,7 @@ final class Navigator {
         case .controlMethod:
             let fixed = ControlMethod.allCases.map { Choice(target: .controlMethodOption($0), title: $0.title, detail: $0.detail) }
             return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping:
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping:
             return []
         }
     }
@@ -592,7 +598,23 @@ final class Navigator {
         case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
-        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping: nil
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping: nil
+        }
+    }
+
+    /// Starts a game, first asking about newer saves on the save server when there are any.
+    func play(_ id: GameID) {
+        guard checkingSaves == nil else { return }
+        checkingSaves = id
+        Task { [weak self] in
+            guard let self else { return }
+            let offer = await hub.saveSync.launchOffer(id)
+            checkingSaves = nil
+            guard let offer else { return hub.launch(id) }
+            sheet = .launchSaves(LaunchSavesModel(service: hub.saveSync, game: id, offer: offer) { [weak self] start in
+                self?.sheet = nil
+                if start { self?.hub.launch(id) }
+            })
         }
     }
 
@@ -628,6 +650,9 @@ final class Navigator {
         switch sheet {
         case let .saves(model)?:
             if !model.handle(button), button == .cancel { back() }
+            return
+        case let .launchSaves(model)?:
+            _ = model.handle(button)
             return
         case .settingsPage(.saves)?:
             if !saveSettings.handle(button), button == .cancel { back() }

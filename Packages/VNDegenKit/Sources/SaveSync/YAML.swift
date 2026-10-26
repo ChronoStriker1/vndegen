@@ -52,6 +52,16 @@ extension YAML {
         return try parser.document()
     }
 
+    /// `key: rest` or `key:` on one line, for readers that scan a file line by line. Nil for anything else.
+    static func splitKey(_ text: Substring) -> (key: String, rest: Substring)? {
+        (try? Parser.splitKey(text, line: 0)).flatMap { $0 }
+    }
+
+    /// A plain or quoted scalar on one line. Nil for anything else.
+    static func scalarText(_ text: Substring) -> String? {
+        (try? Parser([]).scalar(text, line: 0))?.string
+    }
+
     private struct Line {
         var number: Int
         var indent: Int
@@ -61,6 +71,8 @@ extension YAML {
     private struct Parser {
         var lines: [Line]
         var index = 0
+
+        init(_ lines: [Line]) { self.lines = lines }
 
         init(_ text: String) {
             lines = text.split(separator: "\n", omittingEmptySubsequences: false).enumerated().compactMap { offset, raw in

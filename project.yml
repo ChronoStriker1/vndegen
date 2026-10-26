@@ -85,6 +85,8 @@ targets:
               public.filename-extension: [7z]
               public.mime-type: [application/x-7z-compressed]
         NSFaceIDUsageDescription: Unlock hidden games.
+        # Save sync connects to the user's Ludusavi server over SSH, usually on the home network.
+        NSLocalNetworkUsageDescription: VNDegen connects to your Ludusavi server to back up and restore game saves.
         UILaunchScreen: {}
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
