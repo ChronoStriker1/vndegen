@@ -17,8 +17,8 @@ nonisolated struct TyranoGame: Equatable, Sendable {
     let packaging: Packaging
     /// From kag.js, such as "4.50" or "5.20".
     let version: String?
-    /// `projectID` in data/system/Config.tjs. Every save file and localStorage key starts with it.
-    let projectID: String?
+    /// `projectID` in data/system/Config.tjs, or Tyrano's default. Every save file and localStorage key starts with it.
+    let projectID: String
     /// `configSave=file`: saves are `<projectID>_*.sav` files beside the PC build's executable, which is the game folder.
     /// Otherwise they go to localStorage.
     let savesToFiles: Bool
@@ -38,9 +38,10 @@ nonisolated extension TyranoGame {
         packaging = webRoot.hasPrefix("resources/") ? .electron
             : web.read(servedPath: "/package.json", limit: 1) != nil ? .nwjs : .browser
         version = web.read(servedPath: "/" + Self.engineFile, limit: 4096).flatMap { Self.version(kagScript: String(decoding: $0, as: UTF8.self)) }
-        let config = web.read(servedPath: "/data/system/Config.tjs", limit: 1 << 20).map { String(decoding: $0, as: UTF8.self) } ?? ""
-        projectID = Self.setting("projectID", in: config)
-        savesToFiles = packaging != .browser && Self.setting("configSave", in: config) == "file"
+        let text = web.read(servedPath: "/data/system/Config.tjs", limit: 1 << 20).map { String(decoding: $0, as: UTF8.self) } ?? ""
+        let config = Self.config(text)
+        projectID = config["projectID"] ?? "tyranoproject"
+        savesToFiles = packaging != .browser && config["configSave"] == "file"
     }
 
     /// kag.js opens with `tyrano.plugin.kag={version:450,` where 450 means 4.50.
@@ -49,16 +50,21 @@ nonisolated extension TyranoGame {
         return "\(number / 100).\(String(format: "%02d", number % 100))"
     }
 
-    /// A Config.tjs line such as `;projectID = testgame01;` or `;configSave=file`.
-    static func setting(_ name: String, in config: String) -> String? {
-        for line in config.split(whereSeparator: \.isNewline) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasPrefix(";") else { continue }
-            let parts = trimmed.dropFirst().split(separator: "=", maxSplits: 1)
-            guard parts.count == 2, parts[0].trimmingCharacters(in: .whitespaces) == name else { continue }
-            let value = parts[1].split(separator: ";").first?.trimmingCharacters(in: .whitespaces) ?? ""
-            return value.isEmpty ? nil : value
+    /// Config.tjs as Tyrano's `compileConfig` in kag.parser.js reads it: lines that start with `;` after trimming, cut at
+    /// the first `//`, with every `;` and `"` removed, split at `=`. The key is what comes before the first `=` and the
+    /// value what lies between it and the next one, both trimmed. A later line for the same key wins.
+    static func config(_ text: String) -> [String: String] {
+        // jQuery's trim: JavaScript white space and line terminators, which include the byte order mark.
+        let space = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FEFF}"))
+        var settings: [String: String] = [:]
+        for rawLine in text.components(separatedBy: "\n") {
+            var line = rawLine.trimmingCharacters(in: space)
+            guard line.hasPrefix(";") else { continue }
+            if let comment = line.range(of: "//") { line = line[..<comment.lowerBound].trimmingCharacters(in: space) }
+            line = line.replacingOccurrences(of: ";", with: "").replacingOccurrences(of: "\"", with: "")
+            let parts = line.components(separatedBy: "=")
+            settings[parts[0].trimmingCharacters(in: space)] = parts.count > 1 ? parts[1].trimmingCharacters(in: space) : ""
         }
-        return nil
+        return settings
     }
 }

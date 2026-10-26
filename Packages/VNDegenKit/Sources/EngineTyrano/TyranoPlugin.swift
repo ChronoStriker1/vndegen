@@ -29,7 +29,7 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         guard let url = Bundle.module.url(forResource: "tyrano", withExtension: "js") else { throw TyranoError.scriptMissing }
         let folder = GameFolder(root: launch.folder, webRoot: game.webRoot)
         return try WebGameConfiguration(
-            folder: folder, appName: game.projectID ?? "tyranoscript", runtime: Self.runtime(for: game),
+            folder: folder, appName: game.projectID, runtime: Self.runtime(for: game),
             userScripts: [try String(contentsOf: url, encoding: .utf8)],
             userAgent: Self.chromeUserAgent + (game.packaging == .electron ? " TyranoErectron" : ""),
             storageDirectory: launch.dataDirectory.appendingPathComponent("localStorage", isDirectory: true), transcodesOgg: true,
