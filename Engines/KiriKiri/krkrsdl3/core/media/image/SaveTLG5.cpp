@@ -9,6 +9,8 @@
 
 #include "SaveTLG.h"
 
+#include <utility>
+
 //---------------------------------------------------------------------------
 SlideCompressor::SlideCompressor()
 {
@@ -340,6 +342,9 @@ static void Compress(const iTVPBaseBitmap* bmp, tTJSBinaryStream* out, bool is24
                         val[c] = cl - prevcl[c];
                         prevcl[c] = cl;
                     }
+                    // TLG stores blue, green, red; the image keeps red, green, blue.
+                    if (colors >= 3)
+                        std::swap(val[0], val[2]);
                     // composite colors
                     switch (colors)
                     {

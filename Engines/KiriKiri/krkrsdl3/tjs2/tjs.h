@@ -71,6 +71,10 @@ extern bool TJSUnaryAsteriskIgnoresPropAccess;
 // normal property access, if this options is set true.
 // This is replaced with '&' operator since TJS2 2.4.15. Turn true for
 // gaining old compatibility.
+extern bool TJSVarDeclarationRunsPropertySetter;
+// A "var" declaration in a class or on global assigns through an existing
+// property, as before Kirikiri 2.29, instead of creating a member that hides
+// it. Turn true for gaining old compatibility.
 
 //---------------------------------------------------------------------------
 // tTJS class - "tTJS" TJS API Class

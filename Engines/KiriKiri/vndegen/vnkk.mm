@@ -268,8 +268,28 @@ static void closeWithoutConfirmation()
     } catch (...) {
         SDL_Log("vnkk: could not turn off the quit confirmation");
     }
-    if (TVPMainWindow)
-        TVPMainWindow->Close();
+    // A script error while the game closes stops its teardown partway, with its window half
+    // invalidated, so further events would only raise more errors. The game is ended at once.
+    try {
+        if (TVPMainWindow)
+            TVPMainWindow->Close();
+    } catch (const eTJS &e) {
+        SDL_Log("vnkk: closing the game raised %s, terminating it", e.GetMessage().AsStdString().c_str());
+        terminated = true;
+        TVPTerminateAsync();
+    }
+}
+
+// Invalidates the main window without its close query, as terminating does on Windows. Its finalize
+// runs, where games that are not built on KAG save their system data. Engine shutdown deletes the
+// windows without it.
+static void closeMainWindowAnyway()
+{
+    try {
+        TVPExecuteScript(TJS_N("if (Window.mainWindow !== null && isvalid Window.mainWindow) invalidate Window.mainWindow;"));
+    } catch (const eTJS &e) {
+        SDL_Log("vnkk: closing the game's window raised %s", e.GetMessage().AsStdString().c_str());
+    }
 }
 
 int vnkk_iterate(void)
@@ -287,6 +307,7 @@ int vnkk_iterate(void)
         terminated = true;
         SDL_Log("vnkk: the game did not close, terminating it");
         TVPDoSaveSystemVariables();
+        closeMainWindowAnyway();
         TVPTerminateAsync();
     }
     try {
