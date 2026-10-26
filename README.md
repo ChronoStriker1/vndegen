@@ -36,8 +36,11 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 |---|---|---|
 | RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad |
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
+| TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
+
+TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. Ogg audio is converted to AAC the first time it plays, because iOS cannot play Ogg.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -127,6 +130,7 @@ Packages/VNDegenKit/
   Sources/VNCore/         shared types: games, the library, the engine plugin contract, input events
   Sources/WebRuntime/     shared host for HTML5 engines: WebKit view, game file serving, Node and NW.js layer
   Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, key mapping, save locations
+  Sources/EngineTyrano/   TyranoScript: detection, Electron app.asar reading, save handling, controller mapping
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
