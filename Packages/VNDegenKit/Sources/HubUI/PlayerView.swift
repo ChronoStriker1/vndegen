@@ -11,6 +11,8 @@ struct PlayerView: View {
     @State private var menu = PlayerMenu()
     @State private var mappingEditor: ButtonMappingEditor?
     @AppStorage(ControlMethod.storageKey) private var defaultMethod = ControlMethod.automatic
+    /// Whether the menu or the unlock screen has input rather than the game. Nil until the view first takes input.
+    @State private var navigating: Bool?
     @State private var needsRotation = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -30,10 +32,7 @@ struct PlayerView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
             if let overlayMode {
-                TouchControlsOverlay(mode: overlayMode, mapping: mapping) { event in
-                    hub.input.noteInput(.touch)
-                    handle(event)
-                }
+                TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
             }
             #endif
             if menu.isOpen {
@@ -75,7 +74,6 @@ struct PlayerView: View {
                 .environment(nav)
         }
         .onAppear {
-            hub.input.onEvent = handle
             applyInputMode()
             #if os(iOS)
             OrientationLock.apply(orientation)
@@ -128,13 +126,19 @@ struct PlayerView: View {
         }
     }
 
-    private func handle(_ event: ControllerEvent) {
+    /// The game's input consumer. The VNDegen menu button never reaches the game.
+    private func play(_ event: ControllerEvent) {
+        if case let .button(.hub, pressed) = event {
+            if pressed { openMenu() }
+        } else {
+            session.send(event)
+        }
+    }
+
+    /// The input consumer while the menu or the unlock screen is up.
+    private func navigate(_ event: ControllerEvent) {
         if isCovered {
             unlockView.handle(event)
-            return
-        }
-        guard menu.isOpen else {
-            if event == .button(.hub, pressed: true) { openMenu() } else { session.send(event) }
             return
         }
         guard case let .button(button, pressed: true) = event else { return }
@@ -160,11 +164,12 @@ struct PlayerView: View {
         }
     }
 
+    /// Takes input from the game before pausing it, so the game handles the releases of the buttons it holds.
     private func openMenu() {
-        session.setPaused(true)
         menu.focus = .resume
         menu.isOpen = true
         applyInputMode()
+        session.setPaused(true)
     }
 
     private func resume() {
@@ -186,9 +191,13 @@ struct PlayerView: View {
     }
 
     /// The game reads the keyboard itself and wants raw presses through its own button mapping. The menu and the unlock
-    /// screen want translated, repeating navigation in the standard layout.
+    /// screen want translated, repeating navigation in the standard layout. Each switch replaces the input consumer, which
+    /// releases everything the outgoing one holds and keeps buttons still held silent until they are pressed again.
     private func applyInputMode() {
         let navigating = menu.isOpen || isCovered
+        guard navigating != self.navigating else { return }
+        self.navigating = navigating
+        hub.input.onEvent = navigating ? navigate : play
         hub.input.translatesKeyboard = navigating
         hub.input.repeatsDirections = navigating
         hub.input.buttonMapping = navigating ? ButtonMapping() : mapping

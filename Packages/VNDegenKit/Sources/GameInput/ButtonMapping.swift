@@ -1,3 +1,4 @@
+import Foundation
 import VNCore
 
 /// A game's button layout: the standard layout plus the buttons the player remapped. Only differences from the standard
@@ -172,6 +173,23 @@ nonisolated extension KeyboardKey {
 }
 
 nonisolated extension ControlMethod {
+    /// Where Settings keeps the default method.
+    public static let storageKey = "controlMethod"
+
+    /// Carries over the Touch controls setting from before control methods existed, then removes it.
+    public static func migrateTouchControlsSetting(in defaults: UserDefaults = .standard) {
+        let legacyKey = "touchControlsMode"
+        guard let legacy = defaults.string(forKey: legacyKey) else { return }
+        let migrated: ControlMethod? = switch legacy {
+        case "gamepad": .touchGamepad
+        case "mouse": .touchMouse
+        case "hidden": .controllerOnly
+        default: nil
+        }
+        if let migrated, defaults.string(forKey: storageKey) == nil { defaults.set(migrated.rawValue, forKey: storageKey) }
+        defaults.removeObject(forKey: legacyKey)
+    }
+
     /// The on-screen controls this method shows on a touch device, or nil for none.
     public func overlay(lastInput: InputKind, controllerConnected: Bool) -> TouchControlsMode? {
         switch self {

@@ -531,28 +531,55 @@
     });
 
     // Input and lifecycle entry points the session calls through evaluateJavaScript.
-    let lastX = 0, lastY = 0;
     const target = () => document.body || document.documentElement;
+
+    // Where the pointer last was, from the real mouse, finger, or pen as well as from the session's own pointer events,
+    // so a click bound to a controller button lands under the cursor. Null is the middle of the page.
+    let lastX = null, lastY = null;
+    const trackPointer = (event) => { lastX = event.clientX; lastY = event.clientY; };
+    for (const type of ['pointermove', 'pointerdown']) window.addEventListener(type, trackPointer, { capture: true, passive: true });
+    const pointerX = () => (lastX === null ? window.innerWidth / 2 : lastX);
+    const pointerY = () => (lastY === null ? window.innerHeight / 2 : lastY);
+
+    function dispatchPointer(phase, x, y, button) {
+        lastX = x; lastY = y;
+        const down = phase === 'began' || phase === 'moved';
+        const init = { clientX: x, clientY: y, screenX: x, screenY: y, button: button, buttons: down ? (button === 2 ? 2 : 1) : 0, bubbles: true, cancelable: true, view: window };
+        const element = document.elementFromPoint(x, y) || target();
+        if (phase === 'began') element.dispatchEvent(new MouseEvent('mousemove', init));
+        element.dispatchEvent(new MouseEvent({ began: 'mousedown', moved: 'mousemove', ended: 'mouseup', cancelled: 'mouseup' }[phase], init));
+        if (phase === 'ended' && button === 0) element.dispatchEvent(new MouseEvent('click', init));
+    }
+
+    // Presses held per key code. Different buttons can send the same key, such as Confirm and a button bound to Enter,
+    // so the key goes down with the first press and up with the last release.
+    const keysHeld = new Map();
 
     window.__vndegen = {
         key(type, key, code, keyCode) {
+            const count = keysHeld.get(code) || 0;
+            if (type === 'keydown') {
+                keysHeld.set(code, count + 1);
+                if (count > 0) return;
+            } else {
+                if (count === 0) return;
+                if (count > 1) { keysHeld.set(code, count - 1); return; }
+                keysHeld.delete(code);
+            }
             const event = new KeyboardEvent(type, { key: key, code: code, keyCode: keyCode, which: keyCode, bubbles: true, cancelable: true });
             // The init dictionary's legacy fields are not honored everywhere, and the engine reads keyCode.
             for (const name of ['keyCode', 'which']) Object.defineProperty(event, name, { get: () => keyCode });
             target().dispatchEvent(event);
         },
         pointer(phase, nx, ny, button) {
-            const x = nx * window.innerWidth, y = ny * window.innerHeight;
-            lastX = x; lastY = y;
-            const down = phase === 'began' || phase === 'moved';
-            const init = { clientX: x, clientY: y, screenX: x, screenY: y, button: button, buttons: down ? (button === 2 ? 2 : 1) : 0, bubbles: true, cancelable: true, view: window };
-            const element = document.elementFromPoint(x, y) || target();
-            if (phase === 'began') element.dispatchEvent(new MouseEvent('mousemove', init));
-            element.dispatchEvent(new MouseEvent({ began: 'mousedown', moved: 'mousemove', ended: 'mouseup', cancelled: 'mouseup' }[phase], init));
-            if (phase === 'ended' && button === 0) element.dispatchEvent(new MouseEvent('click', init));
+            dispatchPointer(phase, nx * window.innerWidth, ny * window.innerHeight, button);
+        },
+        // A mouse button bound to a controller or touch button, pressed where the pointer is.
+        click(phase, button) {
+            dispatchPointer(phase, pointerX(), pointerY(), button);
         },
         wheel(dy) {
-            target().dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: lastX, clientY: lastY, bubbles: true, cancelable: true }));
+            target().dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: pointerX(), clientY: pointerY(), bubbles: true, cancelable: true }));
         },
         setPaused(paused) {
             audioPaused = paused;

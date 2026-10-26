@@ -5,32 +5,36 @@ nonisolated public enum TouchControlsMode: Sendable {
     case gamepad, mouse
 }
 
-/// On-screen controls drawn over a running game. Gamepad mode sends the actions `mapping` gives its buttons. Mouse mode
-/// moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu.
+/// Reports a touch gamepad button going down or up. A nil input is the Home button.
+typealias TouchPress = (ControlInput?, _ pressed: Bool) -> Void
+
+/// On-screen controls drawn over a running game. Gamepad mode presses buttons through `input`, which does what its
+/// button mapping says, the same as for a controller. `mapping` is that same mapping, for the buttons' badges. Mouse
+/// mode moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu.
 /// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the mouse surface covers the
 /// full screen like the session view, so its normalized pointer locations match the game's.
 public struct TouchControlsOverlay: View {
     let mode: TouchControlsMode
     let mapping: ButtonMapping
-    let send: (ControllerEvent) -> Void
+    let input: InputHub
     @State private var cursor = CGPoint(x: 0.5, y: 0.5)
     @State private var taps = 0
 
-    public init(mode: TouchControlsMode, mapping: ButtonMapping, send: @escaping (ControllerEvent) -> Void) {
+    public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub) {
         self.mode = mode
         self.mapping = mapping
-        self.send = send
+        self.input = input
     }
 
     public var body: some View {
         GeometryReader { geometry in
             let unit = min(max(min(geometry.size.width, geometry.size.height) / 6.2, 54), 76)
             switch mode {
-            case .gamepad: GamepadControls(unit: unit, mapping: mapping, send: sendWithHaptic)
+            case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press)
             case .mouse:
                 ZStack(alignment: .topTrailing) {
-                    MouseControls(cursor: $cursor, send: sendWithHaptic)
-                    HomeButton(size: unit * 0.62, send: sendWithHaptic)
+                    MouseControls(cursor: $cursor, send: sendPointer)
+                    HomeButton(size: unit * 0.62, press: press)
                         .padding(.top, 8)
                         .padding(.trailing, 16)
                 }
@@ -40,23 +44,24 @@ public struct TouchControlsOverlay: View {
         .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: taps)
     }
 
-    private func sendWithHaptic(_ event: ControllerEvent) {
-        switch event {
-        case .button(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): taps += 1
-        case let .pointer(pointer) where pointer.phase == .began: taps += 1
-        default: break
-        }
-        send(event)
+    private func press(_ control: ControlInput?, _ pressed: Bool) {
+        if pressed, control.map(mapping.action) != .nothing { taps += 1 }
+        input.touch(control, pressed: pressed)
+    }
+
+    private func sendPointer(_ event: ControllerEvent) {
+        if case let .pointer(pointer) = event, pointer.phase == .began { taps += 1 }
+        input.touchPointer(event)
     }
 }
 
 /// Opens the VNDegen menu. Never remapped, so the player can always get back to the menu.
 private struct HomeButton: View {
     let size: CGFloat
-    let send: (ControllerEvent) -> Void
+    let press: TouchPress
 
     var body: some View {
-        TouchButton(.button(.hub), title: "VNDegen menu", send: send) { pressed in
+        TouchButton(nil, title: "VNDegen menu", press: press) { pressed in
             RoundKey(symbol: "house.fill", size: size, pressed: pressed)
         }
     }
@@ -67,24 +72,24 @@ private struct HomeButton: View {
 private struct GamepadControls: View {
     let unit: CGFloat
     let mapping: ButtonMapping
-    let send: (ControllerEvent) -> Void
+    let press: TouchPress
 
     var body: some View {
         VStack(spacing: unit * 0.28) {
             Spacer(minLength: 0)
             HStack(spacing: unit * 0.22) {
                 shoulder(.l)
-                HomeButton(size: unit * 0.62, send: send)
+                HomeButton(size: unit * 0.62, press: press)
                 Spacer(minLength: 0)
-                MappedButton(input: .menu, mapping: mapping, send: send) { pressed in
+                MappedButton(input: .menu, mapping: mapping, press: press) { pressed in
                     RoundKey(symbol: "line.3.horizontal", size: unit * 0.62, pressed: pressed)
                 }
                 shoulder(.r)
             }
             HStack(alignment: .bottom) {
-                DPad(size: unit * 2.5, mapping: mapping, send: send)
+                DPad(size: unit * 2.5, mapping: mapping, press: press)
                 Spacer(minLength: 0)
-                FaceButtons(unit: unit, mapping: mapping, send: send)
+                FaceButtons(unit: unit, mapping: mapping, press: press)
             }
         }
         .padding(.horizontal, unit * 0.3)
@@ -92,7 +97,7 @@ private struct GamepadControls: View {
     }
 
     private func shoulder(_ input: ControlInput) -> some View {
-        MappedButton(input: input, mapping: mapping, send: send) { pressed in
+        MappedButton(input: input, mapping: mapping, press: press) { pressed in
             Text(input.title)
                 .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
@@ -107,12 +112,12 @@ private struct GamepadControls: View {
 private struct MappedButton<Label: View>: View {
     let input: ControlInput
     let mapping: ButtonMapping
-    let send: (ControllerEvent) -> Void
+    let press: TouchPress
     @ViewBuilder let label: (Bool) -> Label
 
     var body: some View {
         let action = mapping.action(for: input)
-        TouchButton(action, title: input.title, send: send, label: label)
+        TouchButton(input, title: input.title, press: press, label: label)
             .overlay(alignment: .topTrailing) {
                 if let badge = action.badge { Badge(text: badge).offset(x: 6, y: -6) }
             }
@@ -141,7 +146,7 @@ private struct Badge: View {
 private struct FaceButtons: View {
     let unit: CGFloat
     let mapping: ButtonMapping
-    let send: (ControllerEvent) -> Void
+    let press: TouchPress
 
     var body: some View {
         let spread = unit * 0.82
@@ -155,7 +160,7 @@ private struct FaceButtons: View {
     }
 
     private func face(_ input: ControlInput, _ tint: Color) -> some View {
-        MappedButton(input: input, mapping: mapping, send: send) { pressed in
+        MappedButton(input: input, mapping: mapping, press: press) { pressed in
             Text(input.title)
                 .font(.system(size: unit * 0.4, weight: .heavy, design: .rounded))
                 .foregroundStyle(tint)
@@ -169,7 +174,7 @@ private struct FaceButtons: View {
 private struct DPad: View {
     let size: CGFloat
     let mapping: ButtonMapping
-    let send: (ControllerEvent) -> Void
+    let press: TouchPress
     @GestureState private var held: Set<ControlInput> = []
 
     var body: some View {
@@ -213,10 +218,6 @@ private struct DPad: View {
     }
 
     private static let directions: [ControlInput] = [.up, .right, .down, .left]
-
-    private func press(_ direction: ControlInput, _ pressed: Bool) {
-        if let event = mapping.action(for: direction).event(pressed: pressed) { send(event) }
-    }
 }
 
 /// Directions for a touch offset from the pad's center, with y growing downward. Each direction covers 135 degrees,
@@ -265,20 +266,19 @@ private struct DPadArm: View {
     }
 }
 
-/// Sends a press when a finger lands and a release when it lifts or the system cancels the touch.
+/// Presses when a finger lands and releases when it lifts or the system cancels the touch.
 /// Each button tracks its own finger, so several can be held at once.
 private struct TouchButton<Label: View>: View {
-    let action: ControlAction
+    let control: ControlInput?
     let title: String
-    let send: (ControllerEvent) -> Void
+    let press: TouchPress
     let label: (Bool) -> Label
     @GestureState private var pressed = false
 
-    init(_ action: ControlAction, title: String, send: @escaping (ControllerEvent) -> Void,
-         @ViewBuilder label: @escaping (Bool) -> Label) {
-        self.action = action
+    init(_ control: ControlInput?, title: String, press: @escaping TouchPress, @ViewBuilder label: @escaping (Bool) -> Label) {
+        self.control = control
         self.title = title
-        self.send = send
+        self.press = press
         self.label = label
     }
 
@@ -288,14 +288,10 @@ private struct TouchButton<Label: View>: View {
             .animation(.easeOut(duration: 0.08), value: pressed)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).updating($pressed) { _, state, _ in state = true })
-            .onChange(of: pressed) { _, now in emit(now) }
-            .onDisappear { if pressed { emit(false) } }
+            .onChange(of: pressed) { _, now in press(control, now) }
+            .onDisappear { if pressed { press(control, false) } }
             .accessibilityLabel(title)
             .accessibilityAddTraits(.isButton)
-    }
-
-    private func emit(_ pressed: Bool) {
-        if let event = action.event(pressed: pressed) { send(event) }
     }
 }
 

@@ -1,16 +1,18 @@
 import VNCore
 
-/// One physical control that can hold an action down: a gamepad element, a D-pad or stick direction, or a keyboard key.
+/// One control that can hold an action down: a gamepad element, a D-pad or stick direction, a keyboard key, or a touch
+/// gamepad button. A nil touch input is the touch Home button.
 nonisolated enum InputSource: Hashable, Sendable {
     case gamepad(ObjectIdentifier, GamepadElement)
     case dpad(ObjectIdentifier, ControlInput)
     case stick(ObjectIdentifier, ControlInput)
     case key(Int)
+    case touch(ControlInput?)
 
     var controller: ObjectIdentifier? {
         switch self {
         case let .gamepad(id, _), let .dpad(id, _), let .stick(id, _): id
-        case .key: nil
+        case .key, .touch: nil
         }
     }
 }
@@ -20,21 +22,26 @@ nonisolated enum InputSource: Hashable, Sendable {
 /// An action goes down when its first physical source goes down and up when its last one goes up, so the D-pad and the
 /// stick pushed together, or A and Return, still make one press. Each source releases the action it pressed, even when
 /// the mapping changed while it was held. The current consumer only gets releases for presses it saw, and losing the
-/// consumer releases everything it holds.
+/// consumer releases everything it holds. Sources still held then stay silent until pressed again, without blocking
+/// other sources that press the same action for the new consumer.
 nonisolated struct PressRouter {
     static let repeatDelay: Duration = .milliseconds(400)
     static let repeatInterval: Duration = .milliseconds(100)
 
     private var held: [InputSource: ControlAction] = [:]
+    /// Sources held down through a consumer change.
+    private var muted: Set<InputSource> = []
     /// Delivered actions in press order.
     private var delivered: [ControlAction] = []
     private(set) var repeating: (action: ControlAction, at: ContinuousClock.Instant)?
 
-    var heldSources: [InputSource] { Array(held.keys) }
+    var heldSources: [InputSource] { Array(held.keys) + muted }
 
     mutating func press(_ source: InputSource, _ action: ControlAction,
                         at now: ContinuousClock.Instant, hasConsumer: Bool, repeats: Bool) -> ControllerEvent? {
         guard held[source] == nil else { return nil }
+        // A muted source pressed again lost its release, such as a touch button removed mid-press. This press is new.
+        muted.remove(source)
         let alreadyDown = held.values.contains(action)
         held[source] = action
         guard !alreadyDown, hasConsumer, let event = action.event(pressed: true) else { return nil }
@@ -44,6 +51,7 @@ nonisolated struct PressRouter {
     }
 
     mutating func release(_ source: InputSource) -> ControllerEvent? {
+        guard muted.remove(source) == nil else { return nil }
         guard let action = held.removeValue(forKey: source), !held.values.contains(action) else { return nil }
         if repeating?.action == action { repeating = nil }
         guard let index = delivered.firstIndex(of: action) else { return nil }
@@ -62,10 +70,11 @@ nonisolated struct PressRouter {
         return current.action.event(pressed: true)
     }
 
-    /// Releases for every press the outgoing consumer saw, latest first. Sources still physically held stay silent until
-    /// pressed again.
+    /// Releases for every press the outgoing consumer saw, latest first. Sources still held stay silent until pressed again.
     mutating func detachConsumer() -> [ControllerEvent] {
         let releases = delivered.reversed().compactMap { $0.event(pressed: false) }
+        muted.formUnion(held.keys)
+        held = [:]
         delivered = []
         repeating = nil
         return releases

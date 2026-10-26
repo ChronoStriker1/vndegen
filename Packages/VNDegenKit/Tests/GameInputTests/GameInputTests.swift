@@ -1,3 +1,4 @@
+import Foundation
 import GameController
 import Testing
 import VNCore
@@ -194,4 +195,98 @@ private let pad = ObjectIdentifier(NSObject())
     #expect(dpadDirections(dx: 40, dy: 8, deadZone: 5) == [.right])
     #expect(dpadDirections(dx: 30, dy: 30, deadZone: 5) == [.right, .down])
     #expect(dpadDirections(dx: -30, dy: -28, deadZone: 5) == [.left, .up])
+}
+
+@Test func heldSourceStaysSilentAfterAConsumerChangeWithoutBlockingOthers() {
+    var router = PressRouter()
+    let t = ContinuousClock.now
+    _ = router.press(.gamepad(pad, .a), .button(.confirm), at: t, hasConsumer: true, repeats: false)
+    #expect(router.detachConsumer() == [.button(.confirm, pressed: false)])
+    // A still held. Return also confirms, and the new consumer must see its press and its release.
+    #expect(router.press(.key(40), .button(.confirm), at: t, hasConsumer: true, repeats: false) == .button(.confirm, pressed: true))
+    #expect(router.release(.gamepad(pad, .a)) == nil)
+    #expect(router.release(.key(40)) == .button(.confirm, pressed: false))
+}
+
+@Test func mutedSourcePressedAgainIsANewPress() {
+    var router = PressRouter()
+    let t = ContinuousClock.now
+    _ = router.press(.touch(.a), .button(.confirm), at: t, hasConsumer: true, repeats: false)
+    _ = router.detachConsumer()
+    // The touch button went away mid-press and never released.
+    #expect(router.press(.touch(.a), .button(.confirm), at: t, hasConsumer: true, repeats: false) == .button(.confirm, pressed: true))
+    #expect(router.release(.touch(.a)) == .button(.confirm, pressed: false))
+}
+
+private let control = KeyboardKey(key: "Control", code: "ControlLeft", keyCode: 17)
+private let enter = KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)
+
+/// Records what a consumer receives.
+@MainActor
+private final class Consumer {
+    var events: [ControllerEvent] = []
+    var receive: (ControllerEvent) -> Void { { [unowned self] in events.append($0) } }
+}
+
+@Test @MainActor func switchingConsumersReleasesWhatTheGameHolds() {
+    let hub = InputHub()
+    let game = Consumer(), menu = Consumer()
+    hub.onEvent = game.receive
+    var mapping = ButtonMapping()
+    mapping.set(.key(control), for: .a)
+    hub.buttonMapping = mapping
+    hub.touch(.a, pressed: true)
+    hub.onEvent = menu.receive
+    #expect(game.events == [.key(control, pressed: true), .key(control, pressed: false)])
+    hub.touch(.a, pressed: false)
+    hub.onEvent = game.receive
+    #expect(menu.events.isEmpty)
+    #expect(game.events.count == 2)
+}
+
+@Test @MainActor func twoTouchButtonsForOneKeyHoldItUntilBothLift() {
+    let hub = InputHub()
+    let game = Consumer()
+    hub.onEvent = game.receive
+    var mapping = ButtonMapping()
+    mapping.set(.key(enter), for: .a)
+    mapping.set(.key(enter), for: .b)
+    hub.buttonMapping = mapping
+    hub.touch(.a, pressed: true)
+    hub.touch(.b, pressed: true)
+    hub.touch(.a, pressed: false)
+    #expect(game.events == [.key(enter, pressed: true)])
+    hub.touch(.b, pressed: false)
+    #expect(game.events == [.key(enter, pressed: true), .key(enter, pressed: false)])
+}
+
+@Test @MainActor func touchHomeOpensTheMenuWhateverTheMapping() {
+    let hub = InputHub()
+    let game = Consumer()
+    hub.onEvent = game.receive
+    var mapping = ButtonMapping()
+    for input in ControlInput.allCases { mapping.set(.nothing, for: input) }
+    hub.buttonMapping = mapping
+    hub.touch(nil, pressed: true)
+    hub.touch(nil, pressed: false)
+    #expect(game.events == [.button(.hub, pressed: true), .button(.hub, pressed: false)])
+}
+
+@Test func touchControlsSettingMigratesToTheDefaultControlMethod() throws {
+    let suite = "vndegen-migration-\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    for (legacy, method) in [("mouse", ControlMethod.touchMouse), ("hidden", .controllerOnly), ("gamepad", .touchGamepad)] {
+        defaults.removeObject(forKey: ControlMethod.storageKey)
+        defaults.set(legacy, forKey: "touchControlsMode")
+        ControlMethod.migrateTouchControlsSetting(in: defaults)
+        #expect(defaults.string(forKey: ControlMethod.storageKey) == method.rawValue)
+        #expect(defaults.object(forKey: "touchControlsMode") == nil)
+    }
+    // A method the player already chose wins, and the old setting still goes.
+    defaults.set(ControlMethod.automatic.rawValue, forKey: ControlMethod.storageKey)
+    defaults.set("mouse", forKey: "touchControlsMode")
+    ControlMethod.migrateTouchControlsSetting(in: defaults)
+    #expect(defaults.string(forKey: ControlMethod.storageKey) == ControlMethod.automatic.rawValue)
+    #expect(defaults.object(forKey: "touchControlsMode") == nil)
 }

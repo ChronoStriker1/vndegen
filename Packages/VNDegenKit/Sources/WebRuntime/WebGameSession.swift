@@ -80,8 +80,6 @@ final class WebGameSession: NSObject, EngineSession {
     private let onExit: @MainActor () -> Void
     private var ended = false
     private var paused = false
-    /// Where the last pointer event landed, normalized. A click bound to a button lands here.
-    private var pointer = CGPoint(x: 0.5, y: 0.5)
     #if DEBUG
     private var script: Task<Void, Never>?
     #endif
@@ -190,14 +188,14 @@ final class WebGameSession: NSObject, EngineSession {
             case .ended: "ended"
             case .cancelled: "cancelled"
             }
-            pointer = event.location
-            run(Self.pointerScript(phase, at: pointer, event.button))
+            run("__vndegen.pointer('\(phase)', \(event.location.x), \(event.location.y), \(Self.buttonNumber(event.button)))")
         case .scroll(let dy):
             run("__vndegen.wheel(\(dy))")
         case let .key(key, pressed):
             run(Self.keyScript(key, pressed: pressed))
         case let .click(button, pressed):
-            run(Self.pointerScript(pressed ? "began" : "ended", at: pointer, button))
+            // The page clicks where the pointer is, which follows the real mouse too.
+            run("__vndegen.click('\(pressed ? "began" : "ended")', \(Self.buttonNumber(button)))")
         }
     }
 
@@ -206,8 +204,9 @@ final class WebGameSession: NSObject, EngineSession {
         "__vndegen.key('\(pressed ? "keydown" : "keyup")', \(jsString(key.key)), \(jsString(key.code)), \(key.keyCode))"
     }
 
-    nonisolated private static func pointerScript(_ phase: String, at location: CGPoint, _ button: PointerEvent.Button) -> String {
-        "__vndegen.pointer('\(phase)', \(location.x), \(location.y), \(button == .primary ? 0 : 2))"
+    /// The DOM's `MouseEvent.button`.
+    nonisolated private static func buttonNumber(_ button: PointerEvent.Button) -> Int {
+        button == .primary ? 0 : 2
     }
 
     /// A JavaScript string literal. Keys come from library.json, so they are escaped rather than trusted.

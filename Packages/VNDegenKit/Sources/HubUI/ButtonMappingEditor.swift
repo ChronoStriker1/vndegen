@@ -3,8 +3,6 @@ import VNCore
 import GameInput
 
 extension ControlMethod {
-    static let storageKey = "controlMethod"
-
     /// The Settings value. Automatic until the user changes it.
     static var setting: ControlMethod {
         UserDefaults.standard.string(forKey: storageKey).flatMap(Self.init(rawValue:)) ?? .automatic

@@ -54,6 +54,19 @@ public final class InputHub {
         if lastInputKind != kind { lastInputKind = kind }
     }
 
+    /// A touch gamepad button went down or up, or the touch Home button when `input` is nil. Touch buttons share the
+    /// controllers' press tracking, so a touch button and a controller button doing the same thing make one press.
+    public func touch(_ input: ControlInput?, pressed: Bool) {
+        receive(.touch(input), pressed ? input.map(buttonMapping.action) ?? .button(.hub) : nil, kind: .touch)
+    }
+
+    /// A pointer or scroll event from the touch mouse. These hold no button the router tracks, so they go straight to
+    /// the consumer.
+    public func touchPointer(_ event: ControllerEvent) {
+        noteInput(.touch)
+        onEvent?(event)
+    }
+
     /// Reconciles with the system's device list, so a repeated or missed notification cannot attach a controller twice.
     private func syncDevices() {
         var pads = GCController.controllers().filter { $0.extendedGamepad != nil }
