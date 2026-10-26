@@ -65,7 +65,8 @@ public:
 
     // Starts decoding. Audio goes to sink, which must outlive the decoder; null drops the audio.
     void Start(MovieAudioSink *sink);
-    // Stops the worker and waits for it. Nothing more is decoded; frames already decoded stay queued.
+    // Stops the worker and waits for it, then deletes the stream. Nothing more is decoded; frames
+    // already decoded stay queued.
     void Stop();
 
     // Drops every queued frame and decodes again from time t. flush runs under the decoder's lock,

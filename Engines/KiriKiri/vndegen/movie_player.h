@@ -17,8 +17,9 @@ enum class MovieMode {
 iTVPVideoOverlay *VNKKCreateMoviePlayer(iTVPVideoCallback *callback, tTJSBinaryStream *stream,
                                         const ttstr &name, MovieMode mode);
 
-// Stops every player's decoder before engine shutdown deletes plugins and the script engine, which
-// a decoder's archive reads use: a game's xp3filter.tjs decrypts them. The players stay alive for
+// Stops every player's decoder and deletes its stream before engine shutdown deletes plugins and the
+// script engine, which a decoder's archive reads use: a game's xp3filter.tjs decrypts them, and the
+// stream holds the context its content filter returned. The players stay alive for
 // their VideoOverlays to release, and movies opened from then on play as the null player.
 void VNKKStopMovieWorkers();
 

@@ -1,5 +1,12 @@
-// Touches every byte read from the game's archives in script, as a game's own cipher does.
-Storages.setXP3ArchiveExtractionFilter(function(hash, offset, buf, len) {
+// Gives every file read from the game's archives a context, a dictionary the script engine owns, as
+// a game's own cipher may. The movie's stream holds it until the player goes.
+Storages.setXP3ArchiveContentFilter(function(path, archive, size) {
+	return [0, %[key: 123]];
+});
+// Touches every byte read in script, as a game's own cipher does.
+Storages.setXP3ArchiveExtractionFilter(function(hash, offset, buf, len, name, context) {
+	if (context !== void && context.key != 123)
+		throw new Exception("the extraction filter got another context");
 	for (var i = 0; i < len; i++)
 		buf[i] ^= 0;
 });

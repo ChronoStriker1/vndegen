@@ -2,6 +2,9 @@
 // xp3filter.tjs on the decoder's thread, in a VideoOverlay it never closes, so the player outlives
 // the game into engine shutdown. scripts/kirikiri-movie-quit-check.sh builds the archive and runs it.
 Storages.addAutoPath(System.exePath + "movie.xp3>");
+// The first read from an archive starts xp3filter.tjs, whose content filter gives the streams
+// opened after it a context.
+Scripts.execStorage("prime.tjs");
 var win = new Window();
 win.setInnerSize(320, 240);
 win.visible = true;

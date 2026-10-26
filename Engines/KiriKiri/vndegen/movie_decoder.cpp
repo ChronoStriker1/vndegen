@@ -243,6 +243,10 @@ void MovieDecoder::Stop()
     wake.notify_all();
     if (worker.joinable())
         worker.join();
+    // An archive stream holds the context its content filter returned, an object the script engine
+    // deletes at shutdown, which comes before the player goes. Nothing reads the stream from here on.
+    delete stream;
+    stream = nullptr;
 }
 
 void MovieDecoder::RequestSeek(double t)
