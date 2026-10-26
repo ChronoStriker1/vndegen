@@ -183,7 +183,7 @@ These are outside VNDegen's target and are not in the port order.
 - 1 is a solid RAR4 archive that bsdtar could not list. A header walk found `DATA.tec` files from an unrecognized engine.
 - 50 match no signature. These are mostly doujin games with proprietary formats (`.pak` with `.css` readmes, `.bsa` with `Canvas.dll`, `.gax` with `emotedriver.dll`, `Vox.dll` with `stg4_*` files).
 
-Three archive problems sit inside these groups. `Test Game 47.7z` is truncated, because its header points past the end of the 35 MB file. The Princess Defender `.rar` has no archive signature in its first bytes. The three Monster Fighter Boy Ashita folders each hold a password-protected `おまけ*.zip` bonus archive.
+Three archive problems sit inside these groups. `Test Game 47.7z` is truncated, because its header points past the end of the 35 MB file. The `.rar` of Test Game 62 has no archive signature in its first bytes. The three Test Game 63 folders each hold a password-protected `おまけ*.zip` bonus archive.
 
 ## Popularity
 
