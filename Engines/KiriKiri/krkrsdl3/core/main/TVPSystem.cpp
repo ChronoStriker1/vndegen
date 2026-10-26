@@ -737,30 +737,14 @@ void TVPMainWindowClosed()
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-// GetCommandLine
-//---------------------------------------------------------------------------
-static std::vector<std::string>* TVPGetEmbeddedOptions()
-{
-    std::vector<std::string>* ret = NULL;
-    return ret;
-}
-//---------------------------------------------------------------------------
-static std::vector<std::string>* TVPGetConfigFileOptions(const ttstr& filename)
-{
-    std::vector<std::string>* ret = NULL; // new std::vector<std::string>();
-    return ret;
-}
-//---------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------
-static bool TVPProgramArgumentsInit = false;
-static bool TVPDataPathDirectoryEnsured = false;
+// The folder last ensured, so the next game in the same process ensures its own.
+static ttstr TVPDataPathDirectoryEnsured;
 //---------------------------------------------------------------------------
 void TVPEnsureDataPathDirectory()
 {
-    if (!TVPDataPathDirectoryEnsured)
+    if (TVPDataPathDirectoryEnsured != TVPNativeDataPath)
     {
-        TVPDataPathDirectoryEnsured = true;
+        TVPDataPathDirectoryEnsured = TVPNativeDataPath;
         // ensure data path existence
         if (!TVPCheckExistentLocalFolder(TVPNativeDataPath.c_str()))
         {
