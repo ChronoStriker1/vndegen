@@ -93,17 +93,20 @@ private let none: @Sendable (RuntimePackage) -> URL? = { _ in nil }
         #expect(plugin.runtimePackages(for: game0, folder: game.root) == [RGSSRuntimes.xp])
     }
 
-    @Test func launchLinksInstalledRTPsByTheGamesName() throws {
+    @Test func launchLinksInstalledRTPsAndThePreloadScript() throws {
         let data = FileManager.default.temporaryDirectory.appendingPathComponent("rgss-data-\(UUID().uuidString)")
         let installed = try GameFolder(["Graphics/System/Window.png": Data()])
         defer { try? FileManager.default.removeItem(at: data) }
         let game = try GameFolder(["Game.ini": ini("[Game]\nRTP=RPGVXAce\n"), "Game.rgss3a": Data()])
         let layout = try #require(RGSSLayout(game.probe))
-        let paths = RGSSPaths(folder: game.root, dataDirectory: data, layout: layout, runtimes: ["RPGVXAce": installed.root])
+        let script = try GameFolder(["zz_vndegen.rb": Data("# preload".utf8)])
+        let paths = RGSSPaths(folder: game.root, dataDirectory: data, layout: layout, runtimes: ["RPGVXAce": installed.root],
+                              preload: script.root.appendingPathComponent("zz_vndegen.rb"))
         try paths.prepare()
         try paths.prepare()
         let link = paths.rtpFolder.appendingPathComponent("RPGVXAce/Graphics/System/Window.png")
         #expect(FileManager.default.fileExists(atPath: link.path))
+        #expect(FileManager.default.contents(atPath: paths.preloadFolder.appendingPathComponent("zz_vndegen.rb").path) == Data("# preload".utf8))
     }
 }
 

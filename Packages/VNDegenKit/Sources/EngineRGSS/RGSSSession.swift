@@ -33,6 +33,14 @@ final class RGSSSession: EngineSession {
     private var router = RGSSInputRouter()
     private var displayLink: CADisplayLink?
     private var lastFrame: CFTimeInterval?
+    /// When each key the game holds went down, and the releases held back for `shortestPress`.
+    private var pressedAt: [UInt32: ContinuousClock.Instant] = [:]
+    private var heldReleases: [UInt32: Task<Void, Never>] = [:]
+
+    /// RGSS reads its input once a frame and ignores a key unless it is down then, so a quick tap of a touch or
+    /// controller button, pressed and released between two frames, would be lost. A release sooner than this after its
+    /// press waits until this has passed, three frames at 60 a second.
+    static let shortestPress: Duration = .milliseconds(50)
 
     init(_ launch: GameLaunch, paths: RGSSPaths, engine: RGSSEngine) throws {
         self.launch = launch
@@ -44,7 +52,7 @@ final class RGSSSession: EngineSession {
         host.onReady = { [weak self] in self?.start() }
         host.onKey = { [weak self] key, pressed, isRepeat in
             guard let self, case .running = state else { return }
-            router.hostKey(key, pressed: pressed, isRepeat: isRepeat).forEach(engine.send)
+            router.hostKey(key, pressed: pressed, isRepeat: isRepeat).forEach(deliver)
         }
         #if canImport(AppKit)
         host.onEvent = { [weak self] event in self?.send(event) }
@@ -104,20 +112,42 @@ final class RGSSSession: EngineSession {
         if endedByGame { launch.onExit() }
     }
 
+    private func deliver(_ input: RGSSInput) {
+        guard case let .key(key, down) = input else { return engine.send(input) }
+        if down {
+            // Pressed again before its held-back release went out, so the game still has the key down.
+            if let release = heldReleases.removeValue(forKey: key) { return release.cancel() }
+            pressedAt[key] = .now
+            return engine.send(input)
+        }
+        let wait = pressedAt[key].map { $0 + Self.shortestPress - .now } ?? .zero
+        guard wait > .zero else {
+            pressedAt[key] = nil
+            return engine.send(input)
+        }
+        heldReleases[key] = Task { [weak self] in
+            try? await Task.sleep(for: wait)
+            guard !Task.isCancelled, let self else { return }
+            heldReleases[key] = nil
+            pressedAt[key] = nil
+            if case .running = state { engine.send(input) }
+        }
+    }
+
     // MARK: EngineSession
 
     /// Touches reach the game through the hub's touch controls, and on macOS the mouse arrives from the view. Controller
     /// buttons arrive here.
     func send(_ event: ControllerEvent) {
         guard case .running = state else { return }
-        router.translate(event).forEach(engine.send)
+        router.translate(event).forEach(deliver)
     }
 
     func setPaused(_ paused: Bool) {
         self.paused = paused
         guard case .running = state else { return }
         // The hub's menu takes the keyboard, so the game would never see those keys come up.
-        if paused { router.releaseAll().forEach(engine.send) }
+        if paused { router.releaseAll().forEach(deliver) }
         engine.setPaused(paused)
         lastFrame = nil
         if !paused { host.takeFocus() }

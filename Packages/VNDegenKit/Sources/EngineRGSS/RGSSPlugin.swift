@@ -56,7 +56,7 @@ nonisolated public struct RGSSPlugin: EnginePlugin {
         guard let engine = RGSSEngine.shared else { throw RGSSError.engineMissing }
         if let missing = missingRuntimes(layout).first { throw RGSSError.runtimeMissing(missing.name) }
         let paths = RGSSPaths(folder: launch.folder, dataDirectory: launch.dataDirectory, layout: layout,
-                              runtimes: installedRuntimes(layout))
+                              runtimes: installedRuntimes(layout), preload: RGSSEngine.preloadScript)
         return try RGSSSession(launch, paths: paths, engine: engine)
     }
 
@@ -117,7 +117,8 @@ nonisolated public struct RGSSPlugin: EnginePlugin {
 }
 
 /// The files a launch hands the engine. The game's data directory holds its saves, the engine's log, and the engine's
-/// own folder, where each RTP the game names links to its installed copy.
+/// own folder, where each RTP the game names links to its installed copy and VNDegen's preload script waits beside the
+/// core's own.
 nonisolated struct RGSSPaths {
     var gameIni: URL
     var system: URL
@@ -125,28 +126,38 @@ nonisolated struct RGSSPaths {
     var log: URL
     /// Installed RTP folders by the name the game gives them.
     var runtimes: [String: URL]
+    var preload: URL?
 
-    init(folder: URL, dataDirectory: URL, layout: RGSSLayout, runtimes: [String: URL]) {
+    init(folder: URL, dataDirectory: URL, layout: RGSSLayout, runtimes: [String: URL], preload: URL? = nil) {
         gameIni = folder.appendingPathComponent(layout.gameIni)
         system = dataDirectory.appendingPathComponent("rgss", isDirectory: true)
         saves = RGSSPlugin.saveDirectory(dataDirectory)
         log = dataDirectory.appendingPathComponent("logs/rgss.txt")
         self.runtimes = runtimes
+        self.preload = preload
     }
 
     /// The engine looks RTPs up by name in `mkxp-z/RTP` inside its folder.
     var rtpFolder: URL { system.appendingPathComponent("mkxp-z/RTP", isDirectory: true) }
+    /// The engine runs every script in `mkxp-z/Scripts/Preload` whose core option enables it, which VNDegen's frontend
+    /// does for its own.
+    var preloadFolder: URL { system.appendingPathComponent("mkxp-z/Scripts/Preload", isDirectory: true) }
 
-    /// Creates the folders and links the RTPs, replacing the last launch's links.
+    /// Creates the folders, links the RTPs, and puts the preload script in place, replacing the last launch's.
     func prepare() throws {
         let fileManager = FileManager.default
-        for folder in [system, saves, log.deletingLastPathComponent()] {
+        for folder in [system, saves, log.deletingLastPathComponent(), preloadFolder] {
             try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         }
         try? fileManager.removeItem(at: rtpFolder)
         try fileManager.createDirectory(at: rtpFolder, withIntermediateDirectories: true)
         for (name, folder) in runtimes {
             try fileManager.createSymbolicLink(at: rtpFolder.appendingPathComponent(name), withDestinationURL: folder)
+        }
+        if let preload {
+            let target = preloadFolder.appendingPathComponent(preload.lastPathComponent)
+            try? fileManager.removeItem(at: target)
+            try fileManager.copyItem(at: preload, to: target)
         }
     }
 }

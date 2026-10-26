@@ -31,11 +31,6 @@ wasi_sdk_sha256=2c2ed99296857e60fd14c3f40fe226231f296409502491094704089c31a16740
 binaryen_url=https://github.com/WebAssembly/binaryen/releases/download/version_126/binaryen-version_126-arm64-macos.tar.gz
 binaryen_sha256=3f1e1379894944531501a8ccc6b59c57f0c7a00fc136dd933f8a6b0c53515a88
 
-for tool in meson ninja cmake gmake gsed ggrep automake autoreconf glibtoolize ctags ruby zip; do
-  command -v "$tool" >/dev/null || { echo "error: $tool is missing, see the header of $0" >&2; exit 1; }
-done
-ctags --version 2>/dev/null | grep -q "Universal Ctags" || { echo "error: ctags must be Universal Ctags (brew install universal-ctags)" >&2; exit 1; }
-
 mkdir -p "$dest" "$cache"
 dest=$(cd "$dest" && pwd)
 stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$src" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
@@ -43,6 +38,12 @@ if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "RGSS engine is up to date in $dest"
   exit 0
 fi
+# The tools are needed only to build, so a Mac with a copy of an up-to-date build/rgss needs none of them.
+for tool in meson ninja cmake gmake gsed ggrep automake autoreconf glibtoolize ctags ruby zip; do
+  command -v "$tool" >/dev/null || { echo "error: $tool is missing, see the header of $0" >&2; exit 1; }
+done
+ctags --version 2>/dev/null | grep -q "Universal Ctags" || { echo "error: ctags must be Universal Ctags (brew install universal-ctags)" >&2; exit 1; }
+
 start=$(date +%s)
 
 # fetch <repo> <commit> <folder>: a clean checkout of one commit, kept in the cache.
@@ -73,20 +74,25 @@ fetch "$angle_repo" "$angle_commit" "$cache/src/angle-$angle_commit"
 tool "$wasi_sdk_url" "$wasi_sdk_sha256" "$cache/tools/wasi-sdk-30"
 tool "$binaryen_url" "$binaryen_sha256" "$cache/tools/binaryen-126"
 
+# The work folder stays between builds, so a change rebuilds only what it touches. The patched sources are made fresh
+# in `fresh/`, then copied over the sources the builds use by content, so unchanged files keep their times.
 work="$dest/.build"
-rm -rf "$work"
-mkdir -p "$work"
+rm -rf "$work/fresh"
+mkdir -p "$work/fresh"
 
-# The patched sources. VNDegen's preload script joins the core's own, which stage 1 packs into the core.
-rsync -a --exclude .git "$cache/src/core-$core_commit/" "$work/core/"
-for patch in "$src"/patches/*.patch; do patch -s -p1 -d "$work/core" < "$patch"; done
-cp "$src/preload/zz_vndegen.rb" "$work/core/scripts/preload/"
-rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/subprojects/"
-for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work" < "$patch"; done
+# The patched sources.
+rsync -a --exclude .git "$cache/src/core-$core_commit/" "$work/fresh/core/"
+for patch in "$src"/patches/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
+rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/fresh/subprojects/"
+for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$patch"; done
+# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have.
+rsync -a --checksum --delete --exclude /libretro/build "$work/fresh/core/" "$work/core/"
+rsync -a --checksum --delete "$work/fresh/subprojects/" "$work/subprojects/"
+rm -rf "$work/fresh"
 
 # Stage 1, cached by its inputs: the core with its patches, and the tools. Its Makefile expects GNU sed and grep, and an
 # echo that prints backslashes as they are, as Linux's /bin/sh does but macOS's does not, so it runs under bash.
-stage1_stamp=$( (echo "$core_commit $wasi_sdk_sha256 $binaryen_sha256"; cat "$src"/patches/*.patch "$src/preload/zz_vndegen.rb") | shasum -a 256 | cut -c1-16)
+stage1_stamp=$( (echo "$core_commit $wasi_sdk_sha256 $binaryen_sha256"; cat "$src"/patches/*.patch) | shasum -a 256 | cut -c1-16)
 stage1="$cache/stage1-$stage1_stamp"
 if [ ! -f "$stage1/.complete" ]; then
   echo "Building RGSS stage 1, Ruby through WebAssembly to C. This takes a while the first time."
@@ -100,24 +106,31 @@ if [ ! -f "$stage1/.complete" ]; then
   rm -rf "$stage1" && mv "$stage1.part" "$stage1"
 fi
 mkdir -p "$work/core/libretro/build"
-rm -rf "$work/core/libretro/build/libretro-stage1"
-cp -R "$stage1" "$work/core/libretro/build/libretro-stage1"
+if [ "$(cat "$work/core/libretro/build/libretro-stage1/.stamp" 2>/dev/null)" != "$stage1_stamp" ]; then
+  rm -rf "$work/core/libretro/build/libretro-stage1"
+  cp -R "$stage1" "$work/core/libretro/build/libretro-stage1"
+  echo "$stage1_stamp" > "$work/core/libretro/build/libretro-stage1/.stamp"
+fi
 
 # Stage 2 and the framework, per platform: <name> <cross file> <framework layout: ios or macos> <bundle platform>.
 build_slice() {
   local name=$1 cross="$src/cross/$2.txt" layout=$3 platform=$4
   echo "Building the RGSS engine for $name"
-  meson setup "$work/core-$name" "$work/core" --cross-file "$cross" --buildtype release -Db_lto=false \
-    -Dlibretro=true -Dlibretro_static=true -Dlibretro_save_states=false -Dcpp_args=-DMKXPZ_RETRO_FLAT_SAVES \
-    >"$work/core-$name.configure.log" 2>&1 || { tail -n 40 "$work/core-$name.configure.log" >&2; exit 1; }
+  if [ ! -f "$work/core-$name/build.ninja" ]; then
+    meson setup "$work/core-$name" "$work/core" --cross-file "$cross" --buildtype release -Db_lto=false \
+      -Dlibretro=true -Dlibretro_static=true -Dlibretro_save_states=false -Dcpp_args=-DMKXPZ_RETRO_FLAT_SAVES \
+      >"$work/core-$name.configure.log" 2>&1 || { rm -rf "$work/core-$name"; tail -n 40 "$work/core-$name.configure.log" >&2; exit 1; }
+  fi
   ninja -C "$work/core-$name" -j "$jobs" >"$work/core-$name.log" 2>&1 || { tail -n 40 "$work/core-$name.log" >&2; exit 1; }
 
-  mkdir -p "$work/host-$name"
-  rsync -a "$src/host/" "$work/host-$name/src/"
-  ln -s "$work/subprojects" "$work/host-$name/src/subprojects"
-  meson setup "$work/host-$name/build" "$work/host-$name/src" --cross-file "$cross" \
-    -Dcore="$work/core-$name/mkxp-z_libretro.a" -Dapi_include="$api" \
-    >"$work/host-$name.configure.log" 2>&1 || { tail -n 40 "$work/host-$name.configure.log" >&2; exit 1; }
+  mkdir -p "$work/host-$name/src"
+  rsync -a --checksum --delete --exclude /subprojects "$src/host/" "$work/host-$name/src/"
+  ln -sfn "$work/subprojects" "$work/host-$name/src/subprojects"
+  if [ ! -f "$work/host-$name/build/build.ninja" ]; then
+    meson setup "$work/host-$name/build" "$work/host-$name/src" --cross-file "$cross" \
+      -Dcore="$work/core-$name/mkxp-z_libretro.a" -Dapi_include="$api" \
+      >"$work/host-$name.configure.log" 2>&1 || { rm -rf "$work/host-$name/build"; tail -n 40 "$work/host-$name.configure.log" >&2; exit 1; }
+  fi
   ninja -C "$work/host-$name/build" -j "$jobs" RGSS.dylib >"$work/host-$name.log" 2>&1 || { tail -n 40 "$work/host-$name.log" >&2; exit 1; }
 
   local framework="$work/frameworks/$name/RGSS.framework" binary resources
@@ -137,6 +150,8 @@ build_slice() {
   cp "$work/host-$name/build/RGSS.dylib" "$binary"
   xcrun strip -x "$binary"
   sed "s/@PLATFORM@/$platform/" "$src/host/Info.plist" > "$resources/Info.plist"
+  # VNDegen's preload script, which a session puts in the engine's Scripts/Preload folder beside the core's own.
+  cp "$src/preload/zz_vndegen.rb" "$resources/"
   if [ "$layout" = macos ]; then
     plutil -remove MinimumOSVersion "$resources/Info.plist"
     plutil -insert LSMinimumSystemVersion -string 15.0 "$resources/Info.plist"
@@ -162,8 +177,12 @@ for folder in "$work/core/subprojects"/*/ "$work/subprojects"/angle-*/ "$work/su
     [ -f "$file" ] && cat "$file" >> "$dest/licenses/RGSS engine, $name.txt"
   done
 done
-# Ruby is built in stage 1, whose sources are not kept, so its license text is kept beside the patches.
-cp "$src/licenses/Ruby.txt" "$dest/licenses/RGSS engine, Ruby.txt"
+# Components whose license no source folder above holds: Ruby and libyaml, built in stage 1, whose sources are not
+# kept, header-only Boost, and what the core embeds.
+for file in "$src"/licenses/*.txt; do
+  name=$(basename "$file")
+  [ "$name" = source.txt ] || cp "$file" "$dest/licenses/RGSS engine, $name"
+done
 cat "$src/licenses/source.txt" > "$dest/licenses/RGSS engine source.txt"
 cat >> "$dest/licenses/RGSS engine source.txt" <<EOF
 

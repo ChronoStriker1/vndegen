@@ -1,0 +1,2 @@
+VNDegen decompresses installers with the LZMA SDK's decoder by Igor Pavlov (https://www.7-zip.org/sdk.html), which is in the
+public domain.

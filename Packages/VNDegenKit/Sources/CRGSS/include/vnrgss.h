@@ -31,7 +31,8 @@ VNRGSS_API int vnrgss_start(const VNRGSSLaunch *launch);
 VNRGSS_API int vnrgss_frame(double seconds);
 
 // A key going down or up, as a libretro key code (RETROK_*): lowercase ASCII for letters, digits and punctuation,
-// 13 Return, 27 Escape, 273 to 276 the arrows (up, down, right, left), 304 left Shift, 306 left Control.
+// 13 Return, 27 Escape, 273 to 276 the arrows (up, down, right, left), 304 left Shift, 306 left Control. RPG Maker's
+// keys also press RGSS's buttons, as on PC: Z, Return, and Space are C, X and Escape are B, left Shift is A.
 VNRGSS_API void vnrgss_key(unsigned retrokCode, bool down);
 
 // The mouse: a position normalized 0..1 over the layer, and button 0 left, 1 right, 2 middle.

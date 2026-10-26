@@ -93,6 +93,8 @@ struct Engine {
     bool keys[RETROK_LAST] = {};
     double mouseX = 0.5, mouseY = 0.5;
     bool mouseButtons[3] = {};
+    // A press the core has not seen yet. A tap shorter than a frame is still down for the core's next look.
+    bool mouseLatched[3] = {};
     double wheel = 0;
 
     AudioRing ring;
@@ -255,14 +257,54 @@ void audioSample(int16_t left, int16_t right) {
 
 void inputPoll() {}
 
+// The libretro joypad button a key presses. The core reads RGSS's buttons from the joypad only, and maps them as
+// RPG Maker does its keys: C is joypad A, B is B, A (dash) is X, X is Y, Y and Z are the stick buttons, L and R the
+// shoulders, Shift R2, Ctrl L2, and Alt Start. The keys are RPG Maker's own: Z, Return, and Space for C, X, Escape,
+// and keypad 0 for B, left Shift for A, and A, S, D, Q, and W for X, Y, Z, L, and R.
+int joypadButton(unsigned key) {
+    switch (key) {
+    case RETROK_z: case RETROK_RETURN: case RETROK_SPACE: case RETROK_KP_ENTER: return RETRO_DEVICE_ID_JOYPAD_A;
+    case RETROK_x: case RETROK_ESCAPE: case RETROK_KP0: return RETRO_DEVICE_ID_JOYPAD_B;
+    case RETROK_LSHIFT: return RETRO_DEVICE_ID_JOYPAD_X;
+    case RETROK_a: return RETRO_DEVICE_ID_JOYPAD_Y;
+    case RETROK_s: return RETRO_DEVICE_ID_JOYPAD_L3;
+    case RETROK_d: return RETRO_DEVICE_ID_JOYPAD_R3;
+    case RETROK_q: return RETRO_DEVICE_ID_JOYPAD_L;
+    case RETROK_w: return RETRO_DEVICE_ID_JOYPAD_R;
+    case RETROK_RSHIFT: return RETRO_DEVICE_ID_JOYPAD_R2;
+    case RETROK_LCTRL: case RETROK_RCTRL: return RETRO_DEVICE_ID_JOYPAD_L2;
+    case RETROK_LALT: case RETROK_RALT: return RETRO_DEVICE_ID_JOYPAD_START;
+    case RETROK_UP: case RETROK_KP8: return RETRO_DEVICE_ID_JOYPAD_UP;
+    case RETROK_DOWN: case RETROK_KP2: return RETRO_DEVICE_ID_JOYPAD_DOWN;
+    case RETROK_LEFT: case RETROK_KP4: return RETRO_DEVICE_ID_JOYPAD_LEFT;
+    case RETROK_RIGHT: case RETROK_KP6: return RETRO_DEVICE_ID_JOYPAD_RIGHT;
+    default: return -1;
+    }
+}
+
+int16_t joypadMask() {
+    static const unsigned mapped[] = {
+        RETROK_z, RETROK_RETURN, RETROK_SPACE, RETROK_KP_ENTER, RETROK_x, RETROK_ESCAPE, RETROK_KP0, RETROK_LSHIFT,
+        RETROK_a, RETROK_s, RETROK_d, RETROK_q, RETROK_w, RETROK_RSHIFT, RETROK_LCTRL, RETROK_RCTRL, RETROK_LALT,
+        RETROK_RALT, RETROK_UP, RETROK_KP8, RETROK_DOWN, RETROK_KP2, RETROK_LEFT, RETROK_KP4, RETROK_RIGHT, RETROK_KP6,
+    };
+    uint16_t mask = 0;
+    for (unsigned key : mapped) {
+        if (engine.keys[key]) mask |= (uint16_t)(1 << joypadButton(key));
+    }
+    return (int16_t)mask;
+}
+
 int16_t inputState(unsigned port, unsigned device, unsigned, unsigned id) {
     if (port != 0) return 0;
     switch (device) {
+    case RETRO_DEVICE_JOYPAD:
+        return id == RETRO_DEVICE_ID_JOYPAD_MASK ? joypadMask() : (joypadMask() >> id) & 1;
     case RETRO_DEVICE_MOUSE:
         switch (id) {
-        case RETRO_DEVICE_ID_MOUSE_LEFT: return engine.mouseButtons[0];
-        case RETRO_DEVICE_ID_MOUSE_RIGHT: return engine.mouseButtons[1];
-        case RETRO_DEVICE_ID_MOUSE_MIDDLE: return engine.mouseButtons[2];
+        case RETRO_DEVICE_ID_MOUSE_LEFT: return engine.mouseButtons[0] || engine.mouseLatched[0];
+        case RETRO_DEVICE_ID_MOUSE_RIGHT: return engine.mouseButtons[1] || engine.mouseLatched[1];
+        case RETRO_DEVICE_ID_MOUSE_MIDDLE: return engine.mouseButtons[2] || engine.mouseLatched[2];
         case RETRO_DEVICE_ID_MOUSE_WHEELUP:
         case RETRO_DEVICE_ID_MOUSE_WHEELDOWN: {
             // The core reads each direction once a frame, so a notch is reported once, then cleared.
@@ -281,7 +323,7 @@ int16_t inputState(unsigned port, unsigned device, unsigned, unsigned id) {
         switch (id) {
         case RETRO_DEVICE_ID_POINTER_X: return (int16_t)std::lround(std::clamp(x * 2 - 1, -1.0, 1.0) * 0x7fff);
         case RETRO_DEVICE_ID_POINTER_Y: return (int16_t)std::lround(std::clamp(y * 2 - 1, -1.0, 1.0) * 0x7fff);
-        case RETRO_DEVICE_ID_POINTER_PRESSED: return engine.mouseButtons[0];
+        case RETRO_DEVICE_ID_POINTER_PRESSED: return engine.mouseButtons[0] || engine.mouseLatched[0];
         case RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN: return x < 0 || x > 1 || y < 0 || y > 1;
         default: return 0;
         }
@@ -339,7 +381,7 @@ void present() {
 
 bool startGraphics(void *layer) {
     EGLAttrib platform[] = {EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE, EGL_NONE};
-    engine.display = eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, platform);
+    engine.display = eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE, nullptr, platform);
     if (engine.display == EGL_NO_DISPLAY || !eglInitialize(engine.display, nullptr, nullptr)) return false;
     EGLint configAttributes[] = {EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
                                  EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE};
@@ -419,6 +461,7 @@ int vnrgss_start(const VNRGSSLaunch *launch) {
     engine.keyboard = nullptr;
     memset(engine.keys, 0, sizeof engine.keys);
     memset(engine.mouseButtons, 0, sizeof engine.mouseButtons);
+    memset(engine.mouseLatched, 0, sizeof engine.mouseLatched);
     engine.wheel = 0;
     engine.systemDir = launch->systemDir;
     engine.saveDir = launch->saveDir;
@@ -471,6 +514,7 @@ int vnrgss_frame(double seconds) {
         engine.frameTime.callback((retro_usec_t)std::lround(std::clamp(seconds, 0.0, 0.25) * 1e6));
     }
     retro_run();
+    memset(engine.mouseLatched, 0, sizeof engine.mouseLatched);
     present();
     return engine.ended ? 1 : 0;
 }
@@ -493,7 +537,9 @@ void vnrgss_mouse_move(float x, float y) {
 }
 
 void vnrgss_mouse_button(int button, bool down) {
-    if (button >= 0 && button < 3) engine.mouseButtons[button] = down;
+    if (button < 0 || button >= 3) return;
+    engine.mouseButtons[button] = down;
+    if (down) engine.mouseLatched[button] = true;
 }
 
 void vnrgss_wheel(float notches) { engine.wheel += notches; }

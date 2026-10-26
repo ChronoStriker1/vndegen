@@ -20,6 +20,11 @@ struct RGSSEngine {
         Bundle.main.privateFrameworksURL?.appendingPathComponent("RGSS.framework/RGSS")
     }
 
+    /// VNDegen's preload script, which the framework carries. The engine runs it before each game's own scripts.
+    static var preloadScript: URL? {
+        binary.flatMap { Bundle(url: $0.deletingLastPathComponent())?.url(forResource: "zz_vndegen", withExtension: "rb") }
+    }
+
     /// Nil when this device or build of VNDegen has no engine.
     static let shared: RGSSEngine? = {
         #if arch(arm64)

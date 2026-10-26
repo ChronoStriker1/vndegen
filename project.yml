@@ -79,8 +79,8 @@ targets:
           rsync -a --delete "$SRCROOT/build/rgss/RGSS.xcframework/$slice/RGSS.framework/" "$dest/"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
           codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
-      # Settings lists each file in Licenses. Each engine build collects its own and its dependencies' into
-      # build/<engine>/licenses.
+      # Settings lists each file in Licenses. Licenses/ holds those of code built into the app itself, and each engine
+      # build collects its own and its dependencies' into build/<engine>/licenses.
       - name: Bundle third-party licenses
         basedOnDependencyAnalysis: false
         shell: /bin/bash
@@ -88,7 +88,7 @@ targets:
           set -euo pipefail
           dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Licenses"
           rm -rf "$dest" && mkdir -p "$dest"
-          for folder in "$SRCROOT"/build/*/licenses; do
+          for folder in "$SRCROOT/Licenses" "$SRCROOT"/build/*/licenses; do
             [ -d "$folder" ] && rsync -a "$folder/" "$dest/"
           done
     info:

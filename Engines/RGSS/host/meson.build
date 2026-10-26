@@ -30,4 +30,6 @@ shared_library('RGSS', 'vnrgss.mm', 'vfs.c',
         '-Wl,-install_name,@rpath/RGSS.framework/RGSS', '-Wl,-dead_strip',
     ],
     gnu_symbol_visibility: 'hidden',
+    # The core is a link argument, so Meson would not relink when only it changes.
+    link_depends: get_option('core'),
 )

@@ -49,12 +49,9 @@ final class RuntimeInstalls {
         let store = store
         tasks[package.id] = Task { [weak self] in
             do {
-                _ = try await store.install(package, progress: { progress in
-                    Task { @MainActor in
-                        guard let self, case .running = self.phases[package.id] else { return }
-                        self.phases[package.id] = .running(progress)
-                    }
-                }, acceptLicense: { text in
+                _ = try await store.install(package, progress: { [weak self] progress in
+                    Task { @MainActor in self?.update(package, progress) }
+                }, acceptLicense: { [weak self] text in
                     await self?.askToAccept(package, text: text) ?? false
                 })
                 self?.finished(package, game: game, error: nil)
@@ -62,6 +59,11 @@ final class RuntimeInstalls {
                 self?.finished(package, game: game, error: error)
             }
         }
+    }
+
+    private func update(_ package: RuntimePackage, _ progress: RuntimeInstallProgress) {
+        guard case .running = phases[package.id] else { return }
+        phases[package.id] = .running(progress)
     }
 
     func cancel(_ package: RuntimePackage) {
@@ -89,10 +91,10 @@ final class RuntimeInstalls {
 
     private func finished(_ package: RuntimePackage, game: GameID, error: Error?) {
         tasks[package.id] = nil
-        switch error {
-        case nil, is CancellationError: phases[package.id] = nil
-        case RuntimeInstallError.declinedLicense?: phases[package.id] = nil
-        case let error?: phases[package.id] = .failed(Self.describe(error, package))
+        if let error, !(error is CancellationError), error as? RuntimeInstallError != .declinedLicense {
+            phases[package.id] = .failed(Self.describe(error, package))
+        } else {
+            phases[package.id] = nil
         }
         Task { await refresh(game) }
     }
@@ -105,14 +107,14 @@ final class RuntimeInstalls {
     }
 
     static func describe(_ error: Error, _ package: RuntimePackage) -> String {
-        switch error {
-        case RuntimeInstallError.checksumMismatch?:
+        switch error as? RuntimeInstallError {
+        case .checksumMismatch?, .sizeMismatch?:
             "The file downloaded from \(package.download.host ?? "the publisher") is not the one VNDegen expects, so it was deleted. The publisher may have changed it."
-        case let RuntimeInstallError.httpStatus(status)?:
+        case let .httpStatus(status)?:
             "The download failed with HTTP status \(status)."
-        case RuntimeInstallError.unsupportedInstaller?, RuntimeInstallError.corrupt?:
-            "The installer could not be unpacked: \(error.localizedDescription)"
-        default:
+        case let .unsupportedInstaller(reason)?, let .corrupt(reason)?:
+            "The installer could not be unpacked: \(reason)."
+        case .declinedLicense?, nil:
             error.localizedDescription
         }
     }

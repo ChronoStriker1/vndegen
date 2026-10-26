@@ -60,7 +60,7 @@ let package = Package(
         // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
-        .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec"]),
+        .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
