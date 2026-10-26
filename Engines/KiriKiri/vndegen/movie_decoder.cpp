@@ -505,10 +505,13 @@ void MovieDecoder::DecodeAudio(AVPacket *packet, std::unique_lock<std::mutex> &l
     // Audio decodes in well under a millisecond per packet, so it stays under the lock, which
     // keeps a seek from slipping between decoding and writing.
     int result = decode(audio, packet, decoded, [&](AVFrame *frame) { WriteAudio(frame, lock); });
-    if (result < 0)
+    // A seek in a program stream can start inside an audio frame, which the decoder drops.
+    if (result < 0 && result != AVERROR_INVALIDDATA)
         Fail("audio: " + describe(result));
-    if (!packet)
+    if (!packet) {
         audioEnded = true;
+        sink->End();
+    }
 }
 
 void MovieDecoder::WriteAudio(AVFrame *frame, std::unique_lock<std::mutex> &lock)

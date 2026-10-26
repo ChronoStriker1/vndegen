@@ -23,6 +23,7 @@
 #include <mutex>
 
 static const double resyncThreshold = 0.04; // seconds
+static const double reportInterval = 5;     // seconds of movie between progress lines in the log
 // Sound buffer chunks. The decoder writes about half a second ahead, a few dozen packets.
 static const int soundBufferChunks = 128;
 // VideoOverlay.audioVolume runs from 0 to 100000, as DirectShow's attenuation did in krmovie.
@@ -179,6 +180,7 @@ public:
 
     size_t Queued() override { return sound->GetQueuedSamples(); }
     void Write(const int16_t *samples, size_t frames, double pts) override;
+    void End() override;
 
 private:
     double MovieTime();
@@ -186,13 +188,14 @@ private:
     void Halt();
     void Show(const MovieFrame &frame);
     void Finish();
-    bool AudioDone();
+    bool AudioDone(double now);
     void ApplyVolume();
     void UpdateSpriteVisibility() { sprite.isVisible = visible && window && hasFrame; }
     void Post(int message, intptr_t wparam, intptr_t lparam);
     void PostState(tTVPVideoStatus status);
     void LogErrors();
     void LogSummary(const char *event);
+    void LogProgress(double now);
 
     iTVPVideoCallback *callback;
     std::unique_ptr<MovieDecoder> decoder;
@@ -209,6 +212,7 @@ private:
     int shownFrame = 0;
     int stopFrame = -1;
     int64_t shownCount = 0, droppedCount = 0;
+    double nextReport = 0;
 
     // Written by the worker in Write, read by MovieTime.
     std::mutex audioMutex;
@@ -279,6 +283,12 @@ void MoviePlayer::Write(const int16_t *samples, size_t frames, double pts)
     audioWritten = true;
 }
 
+void MoviePlayer::End()
+{
+    std::lock_guard<std::mutex> lock(audioMutex);
+    sound->Flush();
+}
+
 double MoviePlayer::MovieTime()
 {
     if (!playing)
@@ -290,11 +300,11 @@ double MoviePlayer::MovieTime()
     // Read before audioMutex: the worker takes the decoder's lock, then audioMutex.
     bool audioEnded = decoder->AudioEnded();
     std::lock_guard<std::mutex> lock(audioMutex);
-    if (!audioWritten)
+    // Once the audio has ended, the video runs on the tick count. Only its last half second is
+    // left, and the device may hold back its final samples.
+    if (!audioWritten || audioEnded)
         return t;
     size_t queued = sound->GetQueuedSamples();
-    if (audioEnded && !queued)
-        return t; // the audio is over; the video runs on the tick count
     double audioTime = audioEnd - queued / (double)info.audioRate;
     if (std::fabs(audioTime - t) > resyncThreshold) {
         clockPts = audioTime;
@@ -362,6 +372,7 @@ void MoviePlayer::SeekTo(double t)
     clockPts = t;
     clockTick = TVPGetRoughTickCount();
     shownPts = -1;
+    nextReport = t;
     shownFrame = (int)std::lround(t * info.fps);
     ended = false;
 }
@@ -385,9 +396,13 @@ void MoviePlayer::OnContinuousCallback(tjs_uint64)
         Show(frame);
         decoder->Recycle(std::move(frame));
     }
+    if (now >= nextReport) {
+        LogProgress(now);
+        nextReport = std::floor(now / reportInterval + 1) * reportInterval;
+    }
     bool stopReached = stopFrame >= 0 && shownFrame >= stopFrame;
     bool lastFrameDone = decoder->VideoEnded() && now >= shownPts + 1 / info.fps;
-    if (stopReached || (lastFrameDone && AudioDone()))
+    if (stopReached || (lastFrameDone && AudioDone(now)))
         Finish();
 }
 
@@ -423,9 +438,13 @@ void MoviePlayer::Show(const MovieFrame &frame)
         Post(WM_GRAPHNOTIFY, EC_UPDATE, shownFrame);
 }
 
-bool MoviePlayer::AudioDone()
+// The device may hold back the last few samples, so audio is also done once the clock passes it.
+bool MoviePlayer::AudioDone(double now)
 {
-    return !sound || (decoder->AudioEnded() && sound->GetQueuedSamples() == 0);
+    if (!sound || !decoder->AudioEnded())
+        return !sound;
+    std::lock_guard<std::mutex> lock(audioMutex);
+    return sound->GetQueuedSamples() == 0 || now >= audioEnd;
 }
 
 void MoviePlayer::Finish()
@@ -477,6 +496,16 @@ void MoviePlayer::LogSummary(const char *event)
                               event, MovieTime(), (long long)shownCount, (long long)droppedCount,
                               (long long)stats.videoFrames,
                               info.audioRate ? stats.audioFrames / (double)info.audioRate : 0.0));
+}
+
+void MoviePlayer::LogProgress(double now)
+{
+    MovieStats stats = decoder->Stats();
+    double queued = sound ? sound->GetQueuedSamples() / (double)info.audioRate : 0;
+    TVPAddLog(ttstr(TJS_N("movie: ")) + name +
+              format(" at %.2f s: %lld frames shown, %lld dropped, %lld decoded, %.2f s of audio, %.2f s queued",
+                     now, (long long)shownCount, (long long)droppedCount, (long long)stats.videoFrames,
+                     info.audioRate ? stats.audioFrames / (double)info.audioRate : 0.0, queued));
 }
 
 iTVPVideoOverlay *VNKKCreateMoviePlayer(iTVPVideoCallback *callback, tTJSBinaryStream *stream,

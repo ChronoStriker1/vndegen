@@ -30,6 +30,8 @@ public:
     // Audio written but not yet played, in sample frames.
     virtual size_t Queued() = 0;
     virtual void Write(const int16_t *samples, size_t frames, double pts) = 0;
+    // No more audio will be written until the next seek.
+    virtual void End() = 0;
 };
 
 struct MovieInfo {

@@ -58,6 +58,7 @@ public:
             firstPts = pts;
         this->frames += frames;
     }
+    void End() override {}
     size_t frames = 0;
     double firstPts = 0;
 };
