@@ -270,6 +270,8 @@ public final class GameSavesModel {
     }
     var preview: RestorePreview?
     var sync: SyncStatus?
+    /// The server state `sync` describes. Back Up refuses to run on any other, because the user decided on this one.
+    @ObservationIgnored private var judged: ServerRevision?
     /// True until the first load finishes, so the list says it is loading rather than empty.
     var loading = true
     var busy = false
@@ -378,7 +380,8 @@ public final class GameSavesModel {
         do {
             backups = try await service.backups(for: game)
             if selected == nil || !backups.contains(where: { $0.name == selected }) { selected = backups.last?.name }
-            sync = try await service.status(for: game)
+            let check = try await service.check(game)
+            (sync, judged) = (check.status, check.revision)
             await loadPreview()
         } catch {
             backups = []
@@ -407,19 +410,30 @@ public final class GameSavesModel {
     private func restore(_ name: String) async throws {
         let report = try await service.restore(game, backup: name)
         status = Status(text: "Restored \(report.restored.count) saves.", isError: false)
-        sync = try? await service.status(for: game)
+        await refreshSync()
         await loadPreview()
     }
 
     private func undo() async throws {
         try await service.undoRestore(game)
         status = Status(text: "Your saves from before the restore are back.", isError: false)
-        sync = try? await service.status(for: game)
+        await refreshSync()
         await loadPreview()
     }
 
+    private func refreshSync() async {
+        let check = try? await service.check(game)
+        (sync, judged) = (check?.status, check?.revision)
+    }
+
     private func backUp() async throws {
-        let report = try await service.backUp(game)
+        let report: BackupReport
+        do {
+            report = try await service.backUp(game, judged: judged)
+        } catch SaveSyncError.changedSinceCheck {
+            await load()
+            throw SaveSyncError.changedSinceCheck
+        }
         selected = nil
         await load()
         guard let name = report.backup else {

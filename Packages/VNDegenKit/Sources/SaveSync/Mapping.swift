@@ -77,6 +77,17 @@ public struct BackupSummary: Identifiable, Hashable, Sendable {
     public var id: String { name }
 }
 
+/// A backup as one read of mapping.yaml saw it. Ludusavi rewrites a full backup named `.` in place when it keeps one
+/// full backup, so a newer backup can keep the name. Its time tells them apart.
+struct BackupRevision: Codable, Equatable, Sendable {
+    var name: String
+    var when: Date?
+}
+
+extension BackupSummary {
+    var revision: BackupRevision { BackupRevision(name: name, when: when) }
+}
+
 /// A file a backup holds, and the backup folder its bytes live in.
 struct StoredFile: Equatable, Sendable {
     var entry: FileEntry
@@ -148,6 +159,25 @@ extension LudusaviMapping {
         backups = kept
         // A full backup named `.` keeps its files in the drive folders at the top of the game folder.
         return removed.flatMap { $0 == "." ? drives.keys.sorted() : [$0] }
+    }
+
+    /// The folders in the game folder that hold this mapping's backups. A full backup named `.` keeps its files in the
+    /// drive folders at the top.
+    func folders(of backups: some Sequence<String>) -> Set<String> {
+        Set(backups.flatMap { $0 == "." ? drives.keys.sorted() : [$0] })
+    }
+
+    /// Of the folders a backup's retention dropped (`pruned`), the ones that are safe to delete on the server: not
+    /// locked in `base`, the mapping the backup started from, and not named by `current`, the server's mapping read back
+    /// after the new one went up. Ludusavi deletes any skipped folder itself once no mapping names it.
+    static func deletable(_ pruned: [String], base: LudusaviMapping?, current: LudusaviMapping) -> [String] {
+        let named = current.folders(of: current.summaries.map(\.name))
+        let locked = base.map { base in
+            base.folders(of: base.backups.flatMap { full in
+                (full.locked || full.children.contains(where: \.locked) ? [full.name] : []) + full.children.filter(\.locked).map(\.name)
+            })
+        } ?? []
+        return pruned.filter { !named.contains($0) && !locked.contains($0) }
     }
 
     /// Where a backed-up file's bytes are, relative to the game folder: `<backup>/<drive folder>/<path without drive>`.

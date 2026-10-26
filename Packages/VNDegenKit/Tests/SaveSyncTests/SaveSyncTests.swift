@@ -328,6 +328,10 @@ func tree(_ root: URL) throws -> [String: String] {
     let second = try LudusaviStore.makeBackupFolder(differential: false, now: now, mapping: mapping, gameDir: gameDir)
     #expect(first == "backup-19700101T000000Z" && second == "backup-19700101T000001Z")
     #expect(try fm.contentsOfDirectory(atPath: gameDir.path).sorted() == [first, second])
+    // Another device's folder from the same second has another name.
+    let mine = try LudusaviStore.makeBackupFolder(differential: true, now: now, device: "1a2b3c4d", mapping: mapping, gameDir: gameDir)
+    let theirs = try LudusaviStore.makeBackupFolder(differential: true, now: now, device: "5e6f7a8b", mapping: mapping, gameDir: gameDir)
+    #expect(mine == "backup-19700101T000000Z-diff-1a2b3c4d" && theirs == "backup-19700101T000000Z-diff-5e6f7a8b")
 }
 
 @Test func undoRefusesSnapshotsItCannotTrust() throws {

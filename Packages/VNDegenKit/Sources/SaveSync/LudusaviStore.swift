@@ -187,8 +187,10 @@ public struct LudusaviStore: Sendable {
     ///
     /// With `retention` set, the backups beyond its limits are dropped from mapping.yaml and their folders deleted, as
     /// Ludusavi's `forget_excess_backups` does. Nil infers the limits from the folder and never deletes.
+    ///
+    /// `device` ends the new folder's name, so two devices backing up in the same second never pick the same folder.
     public func backUp(folder: String?, title: String, game: GameID, locations: [SaveLocation], retention: Retention?,
-                       pcFolders: [Int: String] = [:], now: Date = .now, os: String, comment: String?) throws -> BackupReport {
+                       pcFolders: [Int: String] = [:], now: Date = .now, device: String? = nil, os: String, comment: String?) throws -> BackupReport {
         let local = try Self.localSaves(locations)
         guard !local.isEmpty else { throw SaveSyncError.noLocalSaves }
 
@@ -214,7 +216,7 @@ public struct LudusaviStore: Sendable {
 
         let limits = retention ?? Retention(inferredFrom: mapping)
         let differential = limits.allowsDifferential(after: mapping)
-        let name = try Self.makeBackupFolder(differential: differential, now: now, mapping: mapping, gameDir: gameDir)
+        let name = try Self.makeBackupFolder(differential: differential, now: now, device: device, mapping: mapping, gameDir: gameDir)
 
         // The files whose bytes go into the new folder, and the entries the mapping records.
         var copies: [String: Source] = [:]
@@ -305,14 +307,17 @@ public struct LudusaviStore: Sendable {
         }
     }
 
-    /// Creates the folder for a new backup and returns its name. Creating fails when the folder already exists, so two
-    /// backups never share one, and a failed backup removes only its own.
-    static func makeBackupFolder(differential: Bool, now: Date, mapping: LudusaviMapping, gameDir: URL) throws -> String {
+    /// Creates the folder for a new backup and returns its name: Ludusavi's `backup-<time>` or `backup-<time>-diff`, then
+    /// `-<device>` when there is one. Ludusavi reads backup names only from mapping.yaml and prunes any unlisted folder
+    /// that starts with `backup-`, so the suffix changes nothing for it. Creating fails when the folder already exists
+    /// here, so two backups never share one, and a failed backup removes only its own. The device suffix does the same
+    /// for folders on the server that another device is still sending.
+    static func makeBackupFolder(differential: Bool, now: Date, device: String? = nil, mapping: LudusaviMapping, gameDir: URL) throws -> String {
         let fm = FileManager.default
         try fm.createDirectory(at: gameDir, withIntermediateDirectories: true)
         var date = now
         while true {
-            let name = "backup-\(Timestamp.folderStamp(date))\(differential ? "-diff" : "")"
+            let name = "backup-\(Timestamp.folderStamp(date))\(differential ? "-diff" : "")\(device.map { "-" + $0 } ?? "")"
             if !mapping.summaries.contains(where: { $0.name == name }) {
                 do {
                     try fm.createDirectory(at: gameDir.appendingPathComponent(name, isDirectory: true), withIntermediateDirectories: false)
@@ -550,7 +555,10 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case incompleteSnapshot
     case unsupportedPath(String)
     case changedDuringBackup
+    case changedAfterBackup
+    case changedSinceCheck
     case incompleteUpload(String)
+    case timedOut
     case engineUnsupported
     case outsideSaveFolder(String)
 
@@ -568,7 +576,11 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case .incompleteSnapshot: "The saves kept before the last restore are incomplete, so undoing it could lose saves. Nothing was changed."
         case let .unsupportedPath(path): "Can't store \(path) in a Ludusavi backup."
         case .changedDuringBackup: "Another device backed up this game while VNDegen was writing. Nothing was recorded. Try again."
+        case .changedAfterBackup:
+            "Another device backed up this game just after VNDegen did, so VNDegen's backup may not be listed. No old backups were deleted. Check the game's backups."
+        case .changedSinceCheck: "Another device backed up this game since VNDegen last checked it. Nothing was backed up. Check the game's backups first."
         case let .incompleteUpload(name): "The server's copy of \(name) is incomplete, so VNDegen did not record it. Nothing was changed. Try again."
+        case .timedOut: "The server stopped answering, so VNDegen gave up. Try again."
         case .engineUnsupported: "Save sync does not support this game's engine yet."
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
         }

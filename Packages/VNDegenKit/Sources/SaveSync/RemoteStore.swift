@@ -38,34 +38,50 @@ struct RemoteStore: Sendable {
         return StoreIndex(mirror: local, folders: remoteFolders.sorted(), root: report.entries.first { $0.path == "." })
     }
 
-    /// Brings one game's mapping.yaml down, or removes the mirror's copy when the server has none. Returns the server's
-    /// entries for the store folder, the game folder, and its mapping.yaml, which tell later steps the owner to give new
-    /// files and whether the mapping changed meanwhile.
-    func refreshGame(_ client: RsyncClient, folder: String) async throws -> GameEntries {
-        let gameDir = mirror.appendingPathComponent(folder, isDirectory: true)
-        try FileManager.default.createDirectory(at: mirror, withIntermediateDirectories: true)
+    /// Brings one game's mapping.yaml into the mirror, or removes the mirror's copy when the server has none. Returns
+    /// what `readGame` does.
+    @discardableResult
+    func refreshGame(_ client: RsyncClient, folder: String) async throws -> GameState {
+        let state = try await readGame(client, folder: folder)
+        let url = mirror.appendingPathComponent(folder, isDirectory: true).appendingPathComponent(LudusaviStore.mappingFile)
+        if let mapping = state.mapping {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try mapping.write(to: url, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
+        return state
+    }
+
+    /// The server's mapping.yaml of the game, read whole every time, and its entries for the store folder, the game
+    /// folder, and the mapping, which give new files their owner. Leaves the mirror alone. rsync's quick check would skip
+    /// a mapping.yaml that another device rewrote at the same size within the same second, so this pulls into an empty
+    /// folder instead.
+    func readGame(_ client: RsyncClient, folder: String) async throws -> GameState {
+        let scratch = mirror.deletingLastPathComponent().appendingPathComponent("Incoming-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
         let name = RsyncClient.escapedPattern(folder)
-        let report = try await client.pull(remote(), into: mirror, filters: [.include("/\(name)/"), .include("/\(name)/mapping.yaml"), .exclude("*")],
+        let report = try await client.pull(remote(), into: scratch, filters: [.include("/\(name)/"), .include("/\(name)/mapping.yaml"), .exclude("*")],
                                            owners: true)
         let entries = GameEntries(root: report.entries.first { $0.path == "." },
                                   folder: report.entries.first { $0.path == folder },
                                   mapping: report.entries.first { $0.path == "\(folder)/\(LudusaviStore.mappingFile)" })
-        if entries.mapping == nil { try? FileManager.default.removeItem(at: gameDir.appendingPathComponent(LudusaviStore.mappingFile)) }
-        return entries
-    }
-
-    /// The server's entries for the game, like `refreshGame`, without bringing anything down.
-    func refreshGameEntries(_ client: RsyncClient, folder: String) async throws -> GameEntries {
-        let name = RsyncClient.escapedPattern(folder)
-        let entries = try await client.list(remote(), filters: [.include("/\(name)/"), .include("/\(name)/mapping.yaml"), .exclude("*")], owners: true)
-        return GameEntries(root: entries.first { $0.path == "." }, folder: entries.first { $0.path == folder },
-                           mapping: entries.first { $0.path == "\(folder)/\(LudusaviStore.mappingFile)" })
+        let url = scratch.appendingPathComponent(folder, isDirectory: true).appendingPathComponent(LudusaviStore.mappingFile)
+        return GameState(entries: entries, mapping: entries.mapping == nil ? nil : try Data(contentsOf: url))
     }
 
     struct GameEntries: Sendable {
         var root: RsyncEntry?
         var folder: RsyncEntry?
         var mapping: RsyncEntry?
+    }
+
+    /// A game on the server as one read saw it.
+    struct GameState: Sendable {
+        var entries: GameEntries
+        /// mapping.yaml's bytes. Nil when the server has none.
+        var mapping: Data?
     }
 
     /// Brings down the backup folders a restore of `backup` (nil for the latest) reads: its full backup and, for a
@@ -100,14 +116,16 @@ struct RemoteStore: Sendable {
     }
 
     /// Throws unless the server's copy of backup folder `backup` holds exactly the mirror's files, at the same sizes.
-    /// mapping.yaml goes up only after this, so it never names files the server lacks.
-    func verify(_ client: RsyncClient, folder: String, backup: String) async throws {
+    /// mapping.yaml goes up only after this, so it never names files the server lacks. Only a differential backup may
+    /// hold no files, when every file is the full backup's or was removed.
+    func verify(_ client: RsyncClient, folder: String, backup: String, differential: Bool) async throws {
         let local = try Self.files(under: mirror.appendingPathComponent(folder).appendingPathComponent(backup))
         let listed = try await client.list(remote(folder), filters: [.include("/\(RsyncClient.escapedPattern(backup))/***"), .exclude("*")])
         let prefix = backup + "/"
         let remote = Dictionary(uniqueKeysWithValues: listed.filter { $0.kind == .file && $0.path.hasPrefix(prefix) }
             .map { (String($0.path.dropFirst(prefix.count)), $0.size) })
-        guard !local.isEmpty, remote == local else { throw SaveSyncError.incompleteUpload(backup) }
+        let hasFolder = listed.contains { $0.kind == .directory && $0.path == backup }
+        guard hasFolder, remote == local, !local.isEmpty || differential else { throw SaveSyncError.incompleteUpload(backup) }
     }
 
     /// Every file under `root`, by relative path, with its size. Hidden ones too: backups keep paths such as

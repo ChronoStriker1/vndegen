@@ -61,6 +61,18 @@ public enum SyncStatus: Equatable, Sendable {
     case conflict(BackupSummary)
 }
 
+/// A game's mapping.yaml on the server as one status check read it.
+public struct ServerRevision: Equatable, Sendable {
+    let mapping: Data?
+}
+
+/// A status check's result, and the server state it judged. A backup given that state refuses to run on any other, so
+/// it never lands on top of a backup the check did not see.
+public struct SyncCheck: Equatable, Sendable {
+    public var status: SyncStatus
+    public var revision: ServerRevision
+}
+
 /// Where a game keeps its saves, for the game page.
 public struct SaveLocationInfo: Equatable, Sendable {
     /// The folder on this device.
@@ -117,6 +129,15 @@ public final class SaveSyncService {
     /// The last restore, undo, backup, or server read started. Each new one waits for it, so two never touch the same
     /// folders at once.
     @ObservationIgnored private var lastOperation: Task<Void, Never>?
+    /// How long the check before launch waits, and how long one operation may keep its connection to the server.
+    @ObservationIgnored var timeouts = Timeouts()
+    /// The time new backups are named after. Tests set it.
+    @ObservationIgnored var clock: @Sendable () -> Date = { .now }
+
+    struct Timeouts {
+        var launchCheck: Duration = .seconds(6)
+        var operation: Duration = .seconds(180)
+    }
 
     /// Ludusavi's primary manifest, at the address Ludusavi itself reads it from.
     public static let ludusaviManifest = URL(string: "https://raw.githubusercontent.com/mtkennerly/ludusavi-manifest/master/data/manifest.yaml")!
@@ -132,6 +153,7 @@ public final class SaveSyncService {
         }
         manifestStore = manifest.map { ManifestStore(source: $0, directory: library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)) }
         if settings.server?.hostKey != nil { connection = .connected }
+        saveSettings()
         loadIndexFromMirror()
     }
 
@@ -144,8 +166,14 @@ public final class SaveSyncService {
         var matches: [String: String] = [:]
         /// Per game, the server's state and the saves here at the last backup or restore.
         var synced: [String: SyncRecord] = [:]
+        /// Ends this device's backup folder names, so they never collide with another device's.
+        var deviceID = Settings.newDeviceID()
 
         init() {}
+
+        static func newDeviceID() -> String {
+            String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
+        }
 
         init(from decoder: any Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -155,16 +183,20 @@ public final class SaveSyncService {
             retention = try values.decodeIfPresent(Retention.self, forKey: .retention)
             matches = try values.decodeIfPresent([String: String].self, forKey: .matches) ?? [:]
             synced = try values.decodeIfPresent([String: SyncRecord].self, forKey: .synced) ?? [:]
+            deviceID = try values.decodeIfPresent(String.self, forKey: .deviceID) ?? Settings.newDeviceID()
         }
     }
 
     struct SyncRecord: Codable, Equatable {
         var folder: String
-        /// The latest backup on the server then.
-        var backup: String
+        /// The latest backup on the server then. Records from before VNDegen kept the backup's time have none, which
+        /// counts as a server change, so VNDegen asks rather than backs up over a backup it can't tell apart.
+        var latest: BackupRevision?
         /// Each save's SHA-1, keyed `location:relative`.
         var saves: [String: String]
     }
+
+    var deviceID: String { settings.deviceID }
 
     private var mirror: URL { directory.appendingPathComponent("Store", isDirectory: true) }
 
@@ -319,7 +351,7 @@ public final class SaveSyncService {
     public func backups(for id: GameID) async throws -> [BackupSummary] {
         guard let server = trustedServer, let match = match(for: id) else { return [] }
         return try await withStore(server) { store, client in
-            _ = try await store.refreshGame(client, folder: match.folder)
+            try await store.refreshGame(client, folder: match.folder)
             return (try? store.local.mapping(match.folder).summaries) ?? []
         }
     }
@@ -338,11 +370,11 @@ public final class SaveSyncService {
         let snapshot = snapshotURL(id)
         try FileManager.default.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
         let (report, synced) = try await withStore(server) { store, client in
-            _ = try await store.refreshGame(client, folder: match.folder)
+            try await store.refreshGame(client, folder: match.folder)
             try await store.fetch(client, folder: match.folder, backup: backup)
             let report = try store.local.restore(folder: match.folder, backup: backup, locations: locations, snapshot: snapshot)
-            let latest = try store.local.mapping(match.folder).summaries.last?.name ?? report.backup
-            return (report, SyncRecord(folder: match.folder, backup: latest, saves: try LudusaviStore.localHashes(locations)))
+            let latest = try store.local.mapping(match.folder).summaries.last?.revision
+            return (report, SyncRecord(folder: match.folder, latest: latest, saves: try LudusaviStore.localHashes(locations)))
         }
         record(synced, for: id)
         log.info("restored \(report.restored.count) saves of \(id.rawValue) from \(report.backup)")
@@ -360,51 +392,69 @@ public final class SaveSyncService {
     }
 
     /// Adds a backup of the saves here to the server. The new backup folder goes up first, then mapping.yaml, and only
-    /// when mapping.yaml did not change on the server meanwhile. Backups past the retention limits go last.
-    public func backUp(_ id: GameID) async throws -> BackupReport {
+    /// when the server's mapping.yaml still holds exactly the bytes the backup started from. Backups past the retention
+    /// limits go last. With `judged`, the server's state a status check saw, refuses with `changedSinceCheck` when the
+    /// backup would start from any other.
+    ///
+    /// No lock is shared with Ludusavi or other devices, so one window remains: another device that sends its
+    /// mapping.yaml in the one round trip between the last comparison and this device's send is overwritten. Reading the
+    /// mapping back afterwards finds a change that lands after the send, and then nothing old is deleted.
+    public func backUp(_ id: GameID, judged: ServerRevision? = nil) async throws -> BackupReport {
         guard let server = trustedServer, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id)
         let retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
         let pcFolders = pcFolders(id, match: match, locations: locations)
+        let now = clock(), device = deviceID
         let (report, synced) = try await withStore(server) { store, client in
             let before = try await store.refreshGame(client, folder: match.folder)
-            if before.mapping != nil, (try? store.local.mapping(match.folder))?.backups.isEmpty == false {
+            if let judged, judged.mapping != before.mapping { throw SaveSyncError.changedSinceCheck }
+            let base = try before.mapping.map { try LudusaviMapping(yaml: String(decoding: $0, as: UTF8.self)) }
+            if base?.backups.isEmpty == false {
                 try await store.fetch(client, folder: match.folder, backup: nil)
             }
             let mappingURL = store.mirror.appendingPathComponent(match.folder).appendingPathComponent(LudusaviStore.mappingFile)
-            let original = try LudusaviStore.textIfPresent(mappingURL)
             let report = try store.local.backUp(folder: match.folder, title: match.title, game: id, locations: locations, retention: retention,
-                                                pcFolders: pcFolders, os: os, comment: comment)
+                                                pcFolders: pcFolders, now: now, device: device, os: os, comment: comment)
             let saves = try LudusaviStore.localHashes(locations)
             guard let name = report.backup else {
-                let latest = try store.local.mapping(match.folder).summaries.last?.name ?? ""
-                return (report, SyncRecord(folder: match.folder, backup: latest, saves: saves))
+                let latest = try store.local.mapping(match.folder).summaries.last?.revision
+                return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
             }
-            var pushingMapping = false
+            let pushed = try Data(contentsOf: mappingURL)
+            var sendingMapping = false
             do {
-                try await store.push(client, folder: match.folder, backup: name, like: before)
-                try await store.verify(client, folder: match.folder, backup: name)
-                let now = try await store.refreshGameEntries(client, folder: match.folder)
-                guard now.mapping?.size == before.mapping?.size, now.mapping?.modified == before.mapping?.modified else {
+                try await store.push(client, folder: match.folder, backup: name, like: before.entries)
+                try await store.verify(client, folder: match.folder, backup: name, differential: report.isDifferential)
+                guard try await store.readGame(client, folder: match.folder).mapping == before.mapping else {
                     throw SaveSyncError.changedDuringBackup
                 }
-                pushingMapping = true
-                try await store.pushMapping(client, folder: match.folder, like: before)
+                sendingMapping = true
+                try await store.pushMapping(client, folder: match.folder, like: before.entries)
             } catch {
-                // Until mapping.yaml goes up, nothing names the new folder, which no other backup can share.
-                if !pushingMapping { try? await store.delete(client, folder: match.folder, names: [name]) }
+                // Until mapping.yaml goes up, nothing names the new folder, and its name is this device's alone.
+                if !sendingMapping { try? await store.delete(client, folder: match.folder, names: [name]) }
                 // Back to the server's state: the next read brings its mapping.yaml down again.
                 try? FileManager.default.removeItem(at: store.mirror.appendingPathComponent(match.folder).appendingPathComponent(name))
-                if let original { try? Data(original.utf8).write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
+                if let original = before.mapping { try? original.write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
                 throw error
             }
-            if !report.pruned.isEmpty {
-                do { try await store.delete(client, folder: match.folder, names: report.pruned) } catch {
+            // The server's mapping.yaml may name the new folder from here on, so nothing below deletes it.
+            let after = try await store.readGame(client, folder: match.folder).mapping
+            guard after == pushed, let current = try? LudusaviMapping(yaml: String(decoding: pushed, as: UTF8.self)) else {
+                log.error("the server's mapping of \(id.rawValue) changed right after backup \(name); deleting no old backups")
+                throw SaveSyncError.changedAfterBackup
+            }
+            let deletable = LudusaviMapping.deletable(report.pruned, base: base, current: current)
+            if deletable.count < report.pruned.count {
+                log.notice("kept old backups of \(id.rawValue) that were locked or still listed: \(Set(report.pruned).subtracting(deletable).sorted())")
+            }
+            if !deletable.isEmpty {
+                do { try await store.delete(client, folder: match.folder, names: deletable) } catch {
                     // Ludusavi deletes folders that mapping.yaml no longer lists at its next backup of the game.
                     log.error("deleting old backups of \(id.rawValue) failed: \(error.localizedDescription)")
                 }
             }
-            return (report, SyncRecord(folder: match.folder, backup: name, saves: saves))
+            return (report, SyncRecord(folder: match.folder, latest: current.summaries.last?.revision, saves: saves))
         }
         record(synced, for: id)
         if !match.inStore { storeGames[match.folder] = match.title }
@@ -414,23 +464,34 @@ public final class SaveSyncService {
 
     /// How the saves here compare with the server's latest backup. Reads the game's mapping.yaml from the server.
     public func status(for id: GameID) async throws -> SyncStatus {
+        try await check(id).status
+    }
+
+    /// `status`, with the server state it judged, for a backup that must start from that state.
+    public func check(_ id: GameID) async throws -> SyncCheck {
         guard let server = trustedServer, let match = match(for: id) else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id), previous = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0 : nil }
-        let (status, inSync) = try await withStore(server) { store, client -> (SyncStatus, SyncRecord?) in
-            _ = try await store.refreshGame(client, folder: match.folder)
+        let (check, inSync) = try await withStore(server) { store, client -> (SyncCheck, SyncRecord?) in
+            let state = try await store.refreshGame(client, folder: match.folder)
+            let revision = ServerRevision(mapping: state.mapping)
             let local = try LudusaviStore.localHashes(locations)
             guard let latest = try? store.local.latestHashes(folder: match.folder, locations: locations),
-                  let summary = try store.local.mapping(match.folder).summaries.last else { return (.noBackups, nil) }
-            if latest.hashes == local { return (.inSync, SyncRecord(folder: match.folder, backup: latest.backup, saves: local)) }
-            guard let previous else { return (local.isEmpty ? .newerBackup(summary) : .conflict(summary), nil) }
-            switch (latest.backup != previous.backup, local != previous.saves) {
-            case (true, false): return (.newerBackup(summary), nil)
-            case (true, true): return (.conflict(summary), nil)
-            default: return (.localChanged, nil)
+                  let summary = try store.local.mapping(match.folder).summaries.last else {
+                return (SyncCheck(status: .noBackups, revision: revision), nil)
             }
+            if latest.hashes == local {
+                return (SyncCheck(status: .inSync, revision: revision), SyncRecord(folder: match.folder, latest: summary.revision, saves: local))
+            }
+            guard let previous else { return (SyncCheck(status: local.isEmpty ? .newerBackup(summary) : .conflict(summary), revision: revision), nil) }
+            let status: SyncStatus = switch (previous.latest != summary.revision, local != previous.saves) {
+            case (true, false): .newerBackup(summary)
+            case (true, true): .conflict(summary)
+            default: .localChanged
+            }
+            return (SyncCheck(status: status, revision: revision), nil)
         }
         if let inSync { record(inSync, for: id) }
-        return status
+        return check
     }
 
     /// Before a game starts: a newer backup from another device, or a conflict, when there is one. Nil when there is
@@ -438,12 +499,14 @@ public final class SaveSyncService {
     public func launchOffer(_ id: GameID) async -> SyncStatus? {
         guard checkBeforeLaunch, trustedServer != nil else { return nil }
         let check = Task { try await status(for: id) }
-        switch await Self.value(of: check, within: .seconds(6)) {
+        switch await Self.value(of: check, within: timeouts.launchCheck) {
         case let offer?: switch offer {
             case .newerBackup, .conflict: return offer
             default: return nil
             }
         case nil:
+            // Cancelling closes the check's connection, so the operations queued behind it don't wait for the server.
+            check.cancel()
             log.notice("no save check for \(id.rawValue) before launch")
             return nil
         }
@@ -455,16 +518,18 @@ public final class SaveSyncService {
         let saves = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0.saves : nil } ?? [:]
         // The saves stay counted as changed, unless there were none before, so the next backup is not skipped.
         let local = (try? LudusaviStore.localHashes(locations)) ?? [:]
-        record(SyncRecord(folder: match.folder, backup: backup.name, saves: saves.isEmpty && local.isEmpty ? local : saves), for: id)
+        record(SyncRecord(folder: match.folder, latest: backup.revision, saves: saves.isEmpty && local.isEmpty ? local : saves), for: id)
     }
 
     /// Call when a game session ends. With automatic backup on, backs up saves that changed here, unless the server
-    /// changed too. That conflict waits for the user at the next launch or on the game page.
+    /// changed too. That conflict waits for the user at the next launch or on the game page. The backup refuses to run
+    /// when the server changed after the check, which then waits for the user the same way.
     public func sessionEnded(_ id: GameID) async {
         guard autoBackup, trustedServer != nil else { return }
         do {
-            switch try await status(for: id) {
-            case .localChanged, .noBackups: _ = try await backUp(id)
+            let judged = try await check(id)
+            switch judged.status {
+            case .localChanged, .noBackups: _ = try await backUp(id, judged: judged.revision)
             case .conflict: log.notice("not backing up \(id.rawValue): the server has a newer backup too")
             case .inSync, .newerBackup: break
             }
@@ -502,30 +567,51 @@ public final class SaveSyncService {
         settings.server.flatMap { $0.hostKey == nil ? nil : $0 }
     }
 
-    /// Runs `work` with one connection to the server, after every operation started before it.
+    /// Runs `work` with one connection to the server, after every operation started before it. Closes the connection
+    /// when `timeouts.operation` passes or the caller is cancelled, which ends every read and write waiting on it, so a
+    /// stalled server never holds up the operations after this one.
     private func withStore<T: Sendable>(_ server: SaveServer, _ work: @escaping @Sendable (RemoteStore, RsyncClient) async throws -> T) async throws -> T {
-        let store = RemoteStore(path: server.path, mirror: mirror), connector = connector
+        let store = RemoteStore(path: server.path, mirror: mirror), connector = connector, limit = timeouts.operation
         return try await serialized {
             let connection = try await connector(server)
+            let deadline = Task {
+                do { try await Task.sleep(for: limit) } catch { return false }
+                await connection.close()
+                return true
+            }
             do {
-                let result = try await work(store, RsyncClient(connection: connection))
+                let result = try await withTaskCancellationHandler {
+                    try await work(store, RsyncClient(connection: connection))
+                } onCancel: {
+                    Task { await connection.close() }
+                }
+                deadline.cancel()
                 await connection.close()
                 return result
             } catch {
+                deadline.cancel()
                 await connection.close()
+                if await deadline.value { throw SaveSyncError.timedOut }
                 throw error
             }
         }
     }
 
+    /// Runs `work` after every operation started before it. Cancelling the caller cancels `work`, or skips it when it
+    /// has not started yet.
     private func serialized<T: Sendable>(_ work: @escaping @Sendable () async throws -> T) async throws -> T {
         let previous = lastOperation
         let operation = Task.detached(priority: .userInitiated) {
             await previous?.value
+            try Task.checkCancellation()
             return try await work()
         }
         lastOperation = Task { _ = try? await operation.value }
-        return try await operation.value
+        return try await withTaskCancellationHandler {
+            try await operation.value
+        } onCancel: {
+            operation.cancel()
+        }
     }
 
     /// The task's value, or nil when `duration` passes first. The task keeps running.
