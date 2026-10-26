@@ -1,5 +1,8 @@
 # VNDegen's hook. VNDegen's launcher adds this file's folder to Ren'Py's search path, so every game it runs loads
 # this file. Nothing here changes the game's own files. Valid on Ren'Py 6.99 to 8.
+#
+# On iOS every game runs in the app's one interpreter, and Ren'Py's reload between games keeps patched classes and
+# functions. So each patch below wraps the original it saved in vndegen_original, never the previous game's patch.
 
 init 999 python in _vndegen:
     import os
@@ -54,26 +57,47 @@ init 999 python in _vndegen:
             quit_requested = False
             quit_game()
 
-    signal.signal(signal.SIGTERM, request_quit)
-    config.periodic_callbacks.append(quit_if_requested)
+    if renpy.ios:
+        # VNDegen runs inside the same app, so it asks through its host instead of with a signal. The host also pauses
+        # the game while VNDegen covers it, such as with the unlock screen.
+        import ctypes
+        host = ctypes.CDLL(None)
+
+        def check_host():
+            requests = host.vndegen_renpy_take_requests()
+            if requests & 2:
+                quit_game()
+            elif requests & 1:
+                renpy.queue_event("vndegen_menu")
+            if host.vndegen_renpy_is_paused():
+                renpy.audio.audio.pause_all()
+                host.vndegen_renpy_wait_while_paused()
+                renpy.audio.audio.unpause_all()
+
+        config.periodic_callbacks.append(check_host)
+    else:
+        signal.signal(signal.SIGTERM, request_quit)
+        config.periodic_callbacks.append(quit_if_requested)
 
     # A text prompt, such as a name entry, swallows the backtick's key press and types it. It passes it on instead, so
     # the backtick still opens the menu there, and never types.
     Input = renpy.display.behavior.Input
-    input_event = Input.event
+    input_event = getattr(Input.event, "vndegen_original", Input.event)
 
     def input_event_without_menu_key(self, ev, x, y, st):
         if renpy.display.behavior.map_event(ev, "vndegen_menu") or (ev.type == pygame.TEXTINPUT and ev.text == "`"):
             return None
         return input_event(self, ev, x, y, st)
 
+    input_event_without_menu_key.vndegen_original = input_event
     Input.event = input_event_without_menu_key
 
     # The game window takes the hub window's place: full screen when the hub is, otherwise its exact frame.
     # VNDEGEN_WINDOW is the hub window's frame, "x,y,width,height" in screen points with the origin at the top left of
     # the main display.
-    _preferences.fullscreen = os.environ.get("VNDEGEN_FULLSCREEN") == "1"
     window = os.environ.get("VNDEGEN_WINDOW")
+    if not renpy.ios:
+        _preferences.fullscreen = os.environ.get("VNDEGEN_FULLSCREEN") == "1"
     if window and not _preferences.fullscreen:
         x, y, width, height = [int(round(float(v))) for v in window.split(",")]
         _preferences.maximized = False
@@ -149,7 +173,8 @@ init 999 python in _vndegen:
                         holds.setdefault(press, []).append((kind, value))
                 config.pad_bindings[press], config.pad_bindings[release], config.pad_bindings["repeat_" + press] = bindings
 
-        post_event = renpy.display.controller.post_event
+        controller = renpy.display.controller
+        post_event = getattr(controller.post_event, "vndegen_original", controller.post_event)
         # The press event each button or stick axis holds down, such as {"lefty": "pad_lefty_neg"}. Ren'Py can report
         # a stick going straight from neg to pos, with no zero between, so a new direction first releases the old one.
         held = {}
@@ -166,7 +191,8 @@ init 999 python in _vndegen:
                         post_input(kind, value, True)
             post_event(control, state, repeat)
 
-        renpy.display.controller.post_event = post_remapped
+        post_remapped.vndegen_original = post_event
+        controller.post_event = post_remapped
 
     if os.environ.get("VNDEGEN_BUTTONS"):
         remap(os.environ["VNDEGEN_BUTTONS"])

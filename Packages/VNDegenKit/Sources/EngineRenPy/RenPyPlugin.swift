@@ -1,17 +1,20 @@
 import Foundation
+import OSLog
 import VNCore
+
+nonisolated let renPyLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "renpy")
 
 extension EngineID {
     nonisolated public static let renPy = EngineID("renpy")
 }
 
-/// Ren'Py games. On macOS each game runs on a bundled runtime in a helper process with its own window. iOS detects
-/// Ren'Py games but cannot run them yet.
+/// Ren'Py games. On macOS each game runs on a bundled runtime in a helper process with its own window. On iPhone and
+/// iPad every game runs inside the app on Ren'Py 8, Ren'Py 7 games included.
 nonisolated public struct RenPyPlugin: EnginePlugin {
     public init() {}
 
     public var descriptor: EngineDescriptor {
-        EngineDescriptor(id: .renPy, displayName: "Ren'Py", shortName: "Ren'Py", platforms: [.macOS])
+        EngineDescriptor(id: .renPy, displayName: "Ren'Py", shortName: "Ren'Py", platforms: [.macOS, .iOS])
     }
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
@@ -25,7 +28,8 @@ nonisolated public struct RenPyPlugin: EnginePlugin {
         let runtime = Self.runtimeOverride(dataDirectory: launch.dataDirectory) ?? layout.runtime
         return try RenPySession(launch, layout: layout, runtime: runtime)
         #else
-        throw RenPyError.unsupportedPlatform
+        guard let layout = RenPyLayout(FolderProbe(scanning: launch.folder)) else { throw RenPyError.notRenPy }
+        return try RenPyEmbeddedSession(launch, layout: layout)
         #endif
     }
 
@@ -57,14 +61,14 @@ nonisolated public enum RenPyError: Error, LocalizedError {
     case notRenPy
     case runtimeMissing(RenPyRuntime)
     case savesNotImported(String)
-    case unsupportedPlatform
+    case busy
 
     public var errorDescription: String? {
         switch self {
         case .notRenPy: "The folder does not hold a Ren'Py game."
         case let .runtimeMissing(runtime): "The \(runtime.displayName) runtime is missing from this build of VNDegen."
         case let .savesNotImported(reason): "The saves in the game's game/saves folder could not be copied in. \(reason)"
-        case .unsupportedPlatform: "Ren'Py does not run on this device yet."
+        case .busy: "Another Ren'Py game is still closing. Try again in a moment."
         }
     }
 }

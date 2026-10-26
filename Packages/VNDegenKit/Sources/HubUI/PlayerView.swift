@@ -42,7 +42,7 @@ struct PlayerView: View {
             } else if overlayMode == nil {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
                 // users get back to the menu.
-                Button { openMenu() } label: {
+                Button(action: menuButton) {
                     Image(systemName: "square.grid.2x2.fill")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 36, height: 36)
@@ -106,7 +106,7 @@ struct PlayerView: View {
     /// The touch controls to show, if any. Macs have no touch screen, so they never show any.
     private var overlayMode: TouchControlsMode? {
         #if os(iOS)
-        guard !menu.isOpen, !isCovered else { return nil }
+        guard !menu.isOpen, !isCovered, !session.drawsOwnMenu else { return nil }
         return method.overlay(lastInput: hub.input.lastInputKind, controllerConnected: !hub.input.controllerNames.isEmpty)
         #else
         return nil
@@ -164,6 +164,15 @@ struct PlayerView: View {
         }
     }
 
+    private func menuButton() {
+        if session.drawsOwnMenu {
+            session.send(.button(.hub, pressed: true))
+            session.send(.button(.hub, pressed: false))
+        } else {
+            openMenu()
+        }
+    }
+
     /// Takes input from the game before pausing it, so the game handles the releases of the buttons it holds.
     private func openMenu() {
         menu.focus = .resume
@@ -192,12 +201,13 @@ struct PlayerView: View {
 
     /// The game reads the keyboard itself and wants raw presses through its own button mapping. The menu and the unlock
     /// screen want translated, repeating navigation in the standard layout. Each switch replaces the input consumer, which
-    /// releases everything the outgoing one holds and keeps buttons still held silent until they are pressed again.
+    /// releases everything the outgoing one holds and keeps buttons still held silent until they are pressed again. A
+    /// game that reads controllers itself gets none from the hub, so no press reaches it twice.
     private func applyInputMode() {
         let navigating = menu.isOpen || isCovered
         guard navigating != self.navigating else { return }
         self.navigating = navigating
-        hub.input.onEvent = navigating ? navigate : play
+        hub.input.onEvent = navigating ? navigate : session.drawsOwnMenu ? nil : play
         hub.input.translatesKeyboard = navigating
         hub.input.repeatsDirections = navigating
         hub.input.buttonMapping = navigating ? ButtonMapping() : mapping

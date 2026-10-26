@@ -67,6 +67,13 @@ public final class InputHub {
         onEvent?(event)
     }
 
+    /// Takes the keyboard and the controllers' Home buttons back from a game that read them itself, such as Ren'Py on
+    /// iOS, whose SDL replaces the keyboard handler and hands the Home button back to the system when it quits.
+    public func reclaimDevices() {
+        guard !observers.isEmpty else { return }
+        syncDevices()
+    }
+
     /// Reconciles with the system's device list, so a repeated or missed notification cannot attach a controller twice.
     private func syncDevices() {
         var pads = GCController.controllers().filter { $0.extendedGamepad != nil }
@@ -78,6 +85,11 @@ public final class InputHub {
         for id in Set(sticks.keys).subtracting(ids) { detach(id) }
         for pad in pads where sticks[ObjectIdentifier(pad)] == nil { attach(pad) }
         controllerNames = pads.map { $0.vendorName ?? "Controller" }
+        for pad in pads {
+            // Asks the system to hand the Home button to the app. iOS only honors it when the user's settings allow it.
+            pad.extendedGamepad?.buttonHome?.preferredSystemGestureState = .disabled
+        }
+        GCKeyboard.coalesced?.handlerQueue = .main
         GCKeyboard.coalesced?.keyboardInput?.keyChangedHandler = { [weak self] _, _, code, pressed in
             self?.receiveKey(code, pressed: pressed)
         }
@@ -92,8 +104,6 @@ public final class InputHub {
                 receive(.gamepad(id, element), pressed ? element.action(in: buttonMapping) : nil, kind: .gamepad)
             }
         }
-        // Asks the system to hand the Home button to the app. iOS only honors it when the user's settings allow it.
-        pad.buttonHome?.preferredSystemGestureState = .disabled
         let dpad: [(GCControllerButtonInput, ControlInput)] = [
             (pad.dpad.up, .up), (pad.dpad.down, .down), (pad.dpad.left, .left), (pad.dpad.right, .right),
         ]

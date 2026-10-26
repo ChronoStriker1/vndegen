@@ -111,10 +111,15 @@ public protocol EngineSession: AnyObject {
     /// Returns once the game has really stopped after `terminate()`, so its saves are final. A game in a helper
     /// process can take a moment to save and quit.
     func waitUntilStopped() async
+    /// True for a game that reads touches, the keyboard, and controllers itself and shows the VNDegen menu inside the
+    /// game, as Ren'Py does. The hub then shows no touch controls or menu of its own, and its menu button reaches the
+    /// game as a `.hub` press.
+    var drawsOwnMenu: Bool { get }
 }
 
 extension EngineSession {
     public func waitUntilStopped() async {}
+    public var drawsOwnMenu: Bool { false }
 }
 
 public enum EngineDetector {

@@ -10,6 +10,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 xcodegen generate --quiet
+# The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
+case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
 
 # xcodebuild prints every warning and compiler command. Errors and the final status are what matter here.
 xcb() {

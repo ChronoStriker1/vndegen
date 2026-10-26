@@ -107,6 +107,7 @@ public final class Hub {
         // saves the new session is writing, which is the lesser problem.
         Task {
             await stopped.value
+            input.reclaimDevices()
             await Self.wait(for: ended, atMost: Self.closingTimeout)
             closing.remove(id)
         }

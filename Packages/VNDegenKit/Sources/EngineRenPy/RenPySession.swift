@@ -3,8 +3,6 @@ import AppKit
 import OSLog
 import VNCore
 
-nonisolated let renPyLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "renpy")
-
 /// Ren'Py runs as a helper process with its own SDL window, so a crash or `os._exit` in a game never takes down the hub,
 /// and Ren'Py 7 and 8 games each get their own Python. The game window opens where the hub window is, and the hub window
 /// hides while the game is in front. Quitting from the game's VNDegen menu, or any other way the process ends, brings
