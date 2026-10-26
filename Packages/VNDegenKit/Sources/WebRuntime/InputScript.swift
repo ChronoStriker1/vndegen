@@ -5,7 +5,8 @@ import VNCore
 
 /// A scripted play session for debug builds, so a game can be driven with no person at the controls.
 ///
-/// Launch with `-rpgmaker-script "<steps>"` where the value is either the steps themselves or a file holding them.
+/// Launch with `-<engine>-script "<steps>"`, such as `-rpgmaker-script`, where the value is either the steps themselves
+/// or a file holding them.
 /// A file holds one step per line, so `js` steps can use semicolons. Inline steps are separated by semicolons.
 /// A `#` line is a comment:
 ///
@@ -35,8 +36,6 @@ nonisolated struct InputScriptError: Error, Equatable {
 }
 
 nonisolated enum InputScript {
-    static let argument = "rpgmaker-script"
-
     static func parse(_ text: String, inline: Bool = false) throws -> [InputStep] {
         try text.split(whereSeparator: { $0 == "\n" || (inline && $0 == ";") })
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -45,7 +44,7 @@ nonisolated enum InputScript {
     }
 
     /// Reads the launch argument. The value is a path when a file exists there, otherwise the steps inline.
-    static func fromLaunchArguments(_ defaults: UserDefaults = .standard) throws -> [InputStep]? {
+    static func fromLaunchArguments(_ argument: String, defaults: UserDefaults = .standard) throws -> [InputStep]? {
         guard let raw = defaults.string(forKey: argument) else { return nil }
         if let file = try? String(contentsOfFile: raw, encoding: .utf8) { return try parse(file) }
         return try parse(raw, inline: true)

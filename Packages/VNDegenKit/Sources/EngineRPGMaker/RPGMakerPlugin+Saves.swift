@@ -1,11 +1,12 @@
 import Foundation
 import VNCore
+import WebRuntime
 
 extension RPGMakerPlugin {
     /// NW.js builds save with `fs` to `<web root>/save/`, the folder holding index.html. Resolved the way the game's own
     /// `fs` calls are, so a backup or restore touches the same folder the game does.
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
-        guard let directory = GameFolder(root: folder).saveDirectory else { return [] }
+        guard let directory = GameFolder(rpgMakerGameAt: folder).saveDirectory else { return [] }
         return [SaveLocation(directory: directory, relativePath: Self.saveRelativePath)]
     }
 

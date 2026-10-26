@@ -1,6 +1,6 @@
-// NW.js compatibility layer for RPG Maker MV and MZ games running in VNDegen's WKWebView.
-// Injected at document start, before main.js. The engine decides it is on NW.js when `require` is a function and
-// `process` is an object, and then saves with `fs` into <web root>/save/, the format the desktop build uses.
+// NW.js compatibility layer for HTML5 games running in VNDegen's WKWebView.
+// Injected at document start, before the game's own scripts. Engines decide they are on NW.js when `require` is a
+// function and `process` is an object, and then read and write their folder with `fs` the way the desktop build does.
 // Synchronous file calls go through window.prompt, which the app answers in its WKUIDelegate. That is the only channel
 // WebKit offers that blocks the page until the host replies.
 (function () {
@@ -270,7 +270,7 @@
 
     const nw = {
         App: {
-            argv: [], fullArgv: [], filteredArgv: [], manifest: { name: 'rmmz-game', main: 'index.html' }, dataPath: config.cwd,
+            argv: [], fullArgv: [], filteredArgv: [], manifest: { name: config.appName, main: 'index.html' }, dataPath: config.cwd,
             quit: quit, closeAllWindows: quit, on: noop, once: noop, removeListener: noop, removeAllListeners: noop,
             clearCache: noop, clearAppCache: noop, getProxyForURL: () => 'DIRECT', setProxyConfig: noop,
             registerGlobalHotKey: noop, unregisterGlobalHotKey: noop, crashBrowser: noop, crashRenderer: noop, enableComponent: noop,
@@ -350,13 +350,6 @@
     try {
         Object.defineProperty(Navigator.prototype, 'getGamepads', { value: () => [], configurable: true, writable: true });
     } catch (e) { /* locked down */ }
-
-    // WebKit says it can play Ogg Vorbis, but its decodeAudioData rejects every Ogg file, so the engine would fail on
-    // its first sound. Saying no makes MZ decode with its bundled VorbisDecoder and MV pick its .m4a files instead.
-    const canPlayType = HTMLMediaElement.prototype.canPlayType;
-    HTMLMediaElement.prototype.canPlayType = function (type) {
-        return /^audio\/ogg/i.test(String(type)) ? '' : canPlayType.call(this, type);
-    };
 
     // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
     // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
@@ -447,26 +440,6 @@
         post({ level: 'error', message: 'unhandled rejection: ' + describe(event.reason) });
     });
 
-    // Reports once which renderer the engine got, so a fall back to PIXI's canvas renderer shows up in the app log.
-    // MZ keeps it at Graphics._app.renderer, MV at Graphics._renderer. PIXI's WEBGL renderer type is 1.
-    function reportRenderer(attempt) {
-        const graphics = window.Graphics;
-        const renderer = graphics && ((graphics._app && graphics._app.renderer) || graphics._renderer);
-        if (!renderer) {
-            if (attempt < 60) setTimeout(() => reportRenderer(attempt + 1), 500);
-            return;
-        }
-        const gl = renderer.gl;
-        const info = {
-            renderer: renderer.type === 1 ? 'webgl' : 'canvas',
-            webglVersion: gl ? (typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext ? 2 : 1) : 0,
-            gpu: gl ? gl.getParameter(gl.RENDERER) : null,
-            resolution: renderer.resolution,
-        };
-        (info.renderer === 'webgl' ? console.info : console.error)('vndegen renderer ' + JSON.stringify(info));
-    }
-    window.addEventListener('load', () => reportRenderer(0));
-
     // Input and lifecycle entry points the session calls through evaluateJavaScript.
     let lastX = 0, lastY = 0;
     const target = () => document.body || document.documentElement;
@@ -492,17 +465,17 @@
             target().dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: lastX, clientY: lastY, bubbles: true, cancelable: true }));
         },
         setPaused(paused) {
-            const scenes = window.SceneManager;
             audioPaused = paused;
             if (paused) {
-                if (scenes && scenes.stop) scenes.stop();
+                window.__vndegen.onPause(true);
                 for (const context of audioContexts) if (context.state === 'running') context.suspend();
             } else {
                 audioContexts.forEach(resumeAudio);
-                if (window.Input && window.Input.clear) window.Input.clear();
-                if (scenes && scenes.resume) scenes.resume();
+                window.__vndegen.onPause(false);
             }
         },
+        // Engine scripts replace this to stop and restart their own loop.
+        onPause: noop,
         quit: quit,
     };
 })();
