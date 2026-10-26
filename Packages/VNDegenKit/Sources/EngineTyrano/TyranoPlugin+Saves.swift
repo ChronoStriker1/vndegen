@@ -7,8 +7,8 @@ extension TyranoPlugin {
     /// where only other VNDegen devices can use it.
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let game = TyranoGame(folder: folder) else { return [] }
-        if game.savesToFiles, let projectID = game.projectID {
-            return [SaveLocation(directory: folder) { Self.saveFileName($0, projectID: projectID) }]
+        if game.savesToFiles {
+            return [SaveLocation(directory: folder) { Self.saveFileName($0, projectID: game.projectID) }]
         }
         return [SaveLocation(directory: dataDirectory.appendingPathComponent("localStorage", isDirectory: true)) { path in
             let parts = path.split(separator: "/")

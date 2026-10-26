@@ -115,11 +115,36 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
 }
 
 @Test func configSettingsReadLikeTyrano() {
-    let config = "// ;projectID = commented\n;projectID = testgame03;\n; configSave = webstorage \n;empty=\n"
-    #expect(TyranoGame.setting("projectID", in: config) == "testgame03")
-    #expect(TyranoGame.setting("configSave", in: config) == "webstorage")
-    #expect(TyranoGame.setting("empty", in: config) == nil)
-    #expect(TyranoGame.setting("missing", in: config) == nil)
+    let config = TyranoGame.config("""
+        \u{FEFF};projectID = "testgame03";
+        // ;projectID = commented
+        ; configSave = webstorage \r
+        ;configSave="file"; // was webstorage
+        ;empty=
+        ;noValue
+        ;title=a=b
+        ;  url = http://example.com/x;
+        \u{3000};spaced = yes\u{3000}
+        not ;a=setting
+        """)
+    #expect(config["projectID"] == "testgame03")
+    #expect(config["configSave"] == "file")
+    #expect(config["empty"] == "" && config["noValue"] == "")
+    #expect(config["title"] == "a")
+    #expect(config["url"] == "http:")
+    #expect(config["spaced"] == "yes")
+    #expect(config["not"] == nil && config["missing"] == nil)
+    #expect(TyranoGame.config(";configSave=\"file\";\n")["configSave"] == "file")
     #expect(TyranoGame.version(kagScript: kag450) == "4.50")
     #expect(TyranoGame.version(kagScript: "var version = 'x'") == nil)
+}
+
+@Test func aQuotedFileSettingSavesToFilesAndAMissingProjectIDIsTyranosDefault() throws {
+    let root = try game([
+        "index.html": "<html>", "package.json": "{}", "tyrano/plugins/kag/kag.js": kag450,
+        "data/system/Config.tjs": ";configSave=\"file\";\r\n",
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    let tyrano = try #require(TyranoGame(folder: root))
+    #expect(tyrano.savesToFiles && tyrano.projectID == "tyranoproject")
 }
