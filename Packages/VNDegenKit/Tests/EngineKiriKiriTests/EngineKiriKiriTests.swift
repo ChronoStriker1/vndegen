@@ -363,6 +363,19 @@ private func realPath(_ path: String) throws -> String {
     #expect(router.translate(.button(.hub, pressed: true)) == [])
 }
 
+@Test func drivesTheGameFromGamepadInputsAsFromTheirButtons() {
+    var router = KiriKiriInputRouter()
+    #expect(router.translate(.gamepad(.a, pressed: true)) == [.key(scancode: 40, down: true)])
+    #expect(router.translate(.gamepad(.a, pressed: false)) == [.key(scancode: 40, down: false)])
+    #expect(router.translate(.gamepad(.b, pressed: true)) == [.click(3, down: true)])
+    #expect(router.translate(.gamepad(.b, pressed: false)) == [.click(3, down: false)])
+    for input in [ControlInput.up, .down, .left, .right] {
+        var buttons = KiriKiriInputRouter()
+        #expect(router.translate(.gamepad(input, pressed: true)) == buttons.translate(.button(input.virtualButton!, pressed: true)))
+        #expect(router.translate(.gamepad(input, pressed: false)) == buttons.translate(.button(input.virtualButton!, pressed: false)))
+    }
+}
+
 @Test func holdsAKeyUntilItsLastPressLetsGo() {
     var router = KiriKiriInputRouter()
     let enter = KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)

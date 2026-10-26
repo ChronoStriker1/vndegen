@@ -3,23 +3,24 @@ import AppKit
 import OSLog
 import VNCore
 
-nonisolated let renPyLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "renpy")
-
 /// Ren'Py runs as a helper process with its own SDL window, so a crash or `os._exit` in a game never takes down the hub,
-/// and Ren'Py 7 and 8 games each get their own Python. The game window opens where the hub window is, and the hub window
-/// hides while the game is in front. Quitting from the game's VNDegen menu, or any other way the process ends, brings
-/// the hub back and ends the session through `onExit`. When the hub ends the session instead, the game quits the way
-/// its own Quit button does, and `waitUntilStopped()` returns once it has.
+/// and Ren'Py 7 and 8 games each get their own Python. The game window opens over the hub window and covers it exactly.
+/// The hub window stays ordered in behind it. Ordering out the app's last window would quit the app, and when the game
+/// quits, macOS gives the focus to the app whose window is then in front. Quitting from the game's VNDegen menu, or any other way
+/// the process ends, brings the hub back and ends the session through `onExit`. When the hub ends the session instead,
+/// the game quits the way its own Quit button does, and `waitUntilStopped()` returns once it has.
 final class RenPySession: EngineSession {
     let view: PlatformView
     private let process = Process()
     private let launch: GameLaunch
     private let base: URL
     private let runtime: RenPyRuntime
+    /// The runtime the game's own version calls for, which `runtime` overrides when the player picked another.
+    private let gameLine: RenPyRuntime
     private let runtimes: URL
     private let support: URL
     private weak var hubWindow: NSWindow?
-    private var activation: (any NSObjectProtocol)?
+    private var spaceChange: (any NSObjectProtocol)?
     private var stopped = false
     /// Set once the hub ends the session, so the game's exit does not end it a second time.
     private var ending = false
@@ -35,6 +36,7 @@ final class RenPySession: EngineSession {
         else { throw RenPyError.runtimeMissing(runtime) }
         self.launch = launch
         self.runtime = runtime
+        gameLine = layout.runtime
         self.runtimes = runtimes
         self.support = support
         base = launch.folder.appendingPathComponent(layout.path(""), isDirectory: true)
@@ -49,7 +51,7 @@ final class RenPySession: EngineSession {
     private func start(in window: NSWindow) {
         hubWindow = window
         let placement: RenPyCommand.Placement = window.styleMask.contains(.fullScreen) ? .fullScreen : .frame(Self.gameFrame(over: window))
-        let command = RenPyCommand(base: base, runtime: runtime, runtimes: runtimes, support: support,
+        let command = RenPyCommand(base: base, runtime: runtime, gameLine: gameLine, runtimes: runtimes, support: support,
                                    dataDirectory: launch.dataDirectory, placement: placement, buttons: launch.game.buttonMapping)
         process.executableURL = command.executable
         process.arguments = command.arguments
@@ -71,21 +73,6 @@ final class RenPySession: EngineSession {
             return
         }
         renPyLog.info("started \(self.launch.game.id.rawValue, privacy: .public) on \(self.runtime.displayName, privacy: .public), pid \(self.process.processIdentifier)")
-        let pid = process.processIdentifier
-        activation = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] note in
-            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            guard app?.processIdentifier == pid else { return }
-            MainActor.assumeIsolated { self?.gameCameForward() }
-        }
-    }
-
-    /// A full-screen hub stays in its own Space, and the full-screen game opens in another one in front of it.
-    private func gameCameForward() {
-        guard let hubWindow, !hubWindow.styleMask.contains(.fullScreen) else { return }
-        renPyLog.info("game window in front, hiding the hub window")
-        hubWindow.orderOut(nil)
     }
 
     private func ended(status: Int32) {
@@ -93,14 +80,33 @@ final class RenPySession: EngineSession {
         let waiters = exitWaiters
         exitWaiters = []
         waiters.forEach { $0.resume() }
-        stopObserving()
         guard !ending else { return }
         showHub()
         launch.onExit()
     }
 
+    /// A full-screen game's Space is still closing when its process exits, and macOS then switches to a desktop Space.
+    /// When "switch to a Space with open windows" is off, nothing brings a full-screen hub back from its own Space after
+    /// that, so the hub comes forward again on the next Space change. The observer keeps the session alive until then,
+    /// because the hub lets go of it as soon as it ends.
     private func showHub() {
-        hubWindow?.makeKeyAndOrderFront(nil)
+        guard let hubWindow else { return }
+        hubWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        guard hubWindow.styleMask.contains(.fullScreen), !hubWindow.isOnActiveSpace, spaceChange == nil else { return }
+        spaceChange = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { self.spaceChanged() }
+        }
+    }
+
+    private func spaceChanged() {
+        if let spaceChange { NSWorkspace.shared.notificationCenter.removeObserver(spaceChange) }
+        spaceChange = nil
+        guard let hubWindow, !hubWindow.isOnActiveSpace else { return }
+        renPyLog.info("bringing the full-screen hub back to its Space")
+        hubWindow.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
 
@@ -110,18 +116,13 @@ final class RenPySession: EngineSession {
         game.activate()
     }
 
-    private func stopObserving() {
-        if let activation { NSWorkspace.shared.notificationCenter.removeObserver(activation) }
-        activation = nil
-    }
-
     /// The game window reads the keyboard, mouse, and controller itself, and `zz_vndegen.rpy` applies the game's button
     /// mapping there, keys and clicks included. The hub only gets input while VNDegen is in front of the game, so a press
     /// then brings the game window back.
     func send(_ event: ControllerEvent) {
         switch event {
-        case .button(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): showGame()
-        case .button, .key, .click, .pointer, .scroll: break
+        case .button(_, pressed: true), .gamepad(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): showGame()
+        case .button, .gamepad, .key, .click, .pointer, .scroll: break
         }
     }
 
@@ -144,8 +145,6 @@ final class RenPySession: EngineSession {
     /// save to a new file and renames it into place, so even that cannot leave a half-written save.
     func terminate() {
         ending = true
-        stopObserving()
-        if hubWindow?.isVisible == false { showHub() }
         guard process.isRunning else { return }
         let pid = process.processIdentifier
         if stopped {

@@ -1,3 +1,4 @@
+import EngineRenPy
 import Foundation
 import GameInput
 import Lock
@@ -108,4 +109,51 @@ private struct SlowPlugin: EnginePlugin {
     let quickStart = ContinuousClock.now
     await Hub.wait(for: quick, atMost: .seconds(30))
     #expect(ContinuousClock.now - quickStart < .seconds(2))
+}
+
+@MainActor @Test func offersAControlMethodOnlyWhereItChangesSomething() {
+    let other = SlowPlugin(sessions: Sessions())
+    #expect(ControlMethod.applies(to: other, on: .iOS))
+    #expect(ControlMethod.applies(to: nil, on: .iOS))
+    #expect(!ControlMethod.applies(to: RenPyPlugin(), on: .iOS))
+    #expect(!ControlMethod.applies(to: other, on: .macOS))
+}
+
+@MainActor @Test func aRescanThatFindsRenPyClosesTheControlMethodSheet() async throws {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    let game = paths.gamesRoot.appendingPathComponent("Test Game", isDirectory: true)
+    try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+    let library = LibraryStore(paths: paths, engines: [RenPyPlugin()])
+    await library.refresh()
+    let id = GameID("Test Game")
+    let hub = Hub(library: library, metadata: MetadataService(), input: InputHub(),
+                  lock: LockService(keychainService: "vndegen-tests-\(UUID().uuidString)", defaults: UserDefaults(suiteName: UUID().uuidString)!),
+                  saveSync: SaveSyncService(library: library))
+    let nav = Navigator(hub: hub)
+    nav.push(.game(id))
+    nav.sheet = .controlMethod(id)
+
+    // The game's files finish copying, and the next scan detects Ren'Py.
+    for path in ["renpy/__init__.py", "game/script.rpy"] {
+        let file = game.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: file)
+    }
+    await library.refresh()
+    nav.revalidate()
+    #expect(nav.sheet == nil)
+    #expect(nav.focus != .pageControls)
+}
+
+@MainActor @Test func controlMethodKindsAndMouseOptions() {
+    #expect(ControlMethod.Kind.allCases.map(ControlMethod.init) == [.automatic, .gamepad, .mouse(.touch), .controller(mouse: nil)])
+    #expect(ControlMethod.controller(mouse: .cursor).stepped(by: 1) == .automatic)
+    #expect(ControlMethod.automatic.stepped(by: -1) == .controller(mouse: nil))
+    #expect(ControlMethod.controller(mouse: nil).togglingMouse == .controller(mouse: .touch))
+    #expect(ControlMethod.controller(mouse: .cursor).togglingMouse == .controller(mouse: nil))
+    #expect(ControlMethod.mouse(.touch).togglingMouse == .mouse(.touch))
+    #expect(ControlMethod.mouse(.touch).switchingMouseStyle == .mouse(.cursor))
+    #expect(ControlMethod.controller(mouse: .cursor).switchingMouseStyle == .controller(mouse: .touch))
+    #expect(ControlMethod.controller(mouse: nil).switchingMouseStyle == .controller(mouse: nil))
 }

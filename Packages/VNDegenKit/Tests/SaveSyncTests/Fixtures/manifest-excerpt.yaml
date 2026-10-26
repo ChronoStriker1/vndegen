@@ -1,0 +1,45 @@
+---
+"Test Game 01":
+  files:
+    "<base>/save/*.rmmzsave":
+      tags:
+        - save
+      when:
+        - os: windows
+          store: steam
+    "<base>/settings.ini":
+      tags:
+        - config
+  installDir:
+    TestGame01: {}
+  launch:
+    "<base>/Game.exe":
+      - when:
+          - os: windows
+            store: steam
+  steam:
+    id: 1000001
+"Test Game 01: Deluxe Edition":
+  alias: Test Game 01
+  steam:
+    id: 1000002
+"Test Game 02":
+  cloud:
+    steam: true
+  files:
+    "<home>/.local/share/testgame02":
+      when:
+        - os: linux
+  id:
+    steamExtra:
+      - 1000004
+      - 1000005
+  installDir:
+    "Test Game 02": {}
+  steam:
+    id: 1000003
+"Test Game 03 (2019)":
+  registry:
+    HKEY_CURRENT_USER/Software/Test/Game03:
+      tags:
+        - save

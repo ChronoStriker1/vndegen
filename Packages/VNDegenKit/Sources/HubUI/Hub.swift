@@ -40,6 +40,7 @@ public final class Hub {
         self.lock = lock
         self.saveSync = saveSync
         ControlMethod.migrateTouchControlsSetting()
+        ButtonMapping.convertLegacyMappings(in: library)
     }
 
     /// Rescans the games folder and the archives beside it, then looks up metadata for games that have none, without
@@ -107,6 +108,7 @@ public final class Hub {
         // saves the new session is writing, which is the lesser problem.
         Task {
             await stopped.value
+            input.reclaimDevices()
             await Self.wait(for: ended, atMost: Self.closingTimeout)
             closing.remove(id)
         }
@@ -125,10 +127,12 @@ public final class Hub {
     /// Longest a stopped game waits for its automatic backup before it can launch again.
     static let closingTimeout: Duration = .seconds(20)
 
-    /// Ends a running game the way quitting it from the hub would, then waits for every pending automatic backup. Call
-    /// before the app quits, so the play time and the backups are not lost. Returns at once when nothing is pending.
+    /// Ends a running game the way quitting it from the hub would, then waits for every pending automatic backup, at
+    /// most `closingTimeout`. Call before the app quits, so the play time and the backups are not lost. Returns at once
+    /// when nothing is pending. A backup cut off by the quit leaves no partial backup listed, because its folder goes
+    /// up before the mapping that names it.
     public func prepareToQuit() async {
         endSession()
-        await sessionEndWork?.value
+        if let sessionEndWork { await Self.wait(for: sessionEndWork, atMost: Self.closingTimeout) }
     }
 }

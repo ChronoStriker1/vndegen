@@ -27,8 +27,10 @@ nonisolated public struct RenPyCommand: Sendable {
         runtimes.appendingPathComponent("\(runtime.rawValue)/lib/\(runtime.macFolder)/python")
     }
 
-    public init(base: URL, runtime: RenPyRuntime, runtimes: URL, support: URL, dataDirectory: URL, placement: Placement?,
-                buttons: [ControlInput: ControlAction]? = nil) {
+    /// `gameLine` is the runtime the game's own version calls for. A Ren'Py 7 game on Ren'Py 8 gets VNDegen's Python 2
+    /// compatibility fixes, in `launcher.py` and `zz_vndegen.rpy`.
+    public init(base: URL, runtime: RenPyRuntime, gameLine: RenPyRuntime, runtimes: URL, support: URL, dataDirectory: URL,
+                placement: Placement?, buttons: [ControlInput: ControlAction]? = nil) {
         executable = Self.python(runtime, in: runtimes)
         arguments = [support.appendingPathComponent("launcher.py").path, base.path]
         var environment = ProcessInfo.processInfo.environment
@@ -47,15 +49,17 @@ nonisolated public struct RenPyCommand: Sendable {
             break
         }
         environment["VNDEGEN_BUTTONS"] = buttons.flatMap(Self.buttonsVariable)
+        environment["VNDEGEN_RENPY7_GAME"] = runtime == .renPy8 && gameLine == .renPy7 ? "1" : nil
         self.environment = environment
     }
 
-    /// The remapped buttons as `zz_vndegen.rpy` reads them, such as `a=key:K_z,b=click:3,x=button:confirm,y=nothing`.
-    /// Nil when nothing is remapped.
+    /// The remapped buttons as `zz_vndegen.rpy` reads them, such as `a=key:K_z,b=click:3,x=pad:a,y=nothing`.
+    /// Nil when nothing is remapped. The hub converts engine-neutral actions from older versions before any launch.
     static func buttonsVariable(_ buttons: [ControlInput: ControlAction]) -> String? {
         let items = ControlInput.allCases.compactMap { input -> String? in
             let action: String? = switch buttons[input] {
-            case let .button(button)?: "button:\(button.rawValue)"
+            case let .gamepad(button)?: "pad:\(button.rawValue)"
+            case .button?: nil
             case let .key(key)?: pygameKey(key).map { "key:\($0)" }
             case .click(.primary)?: "click:1"
             case .click(.secondary)?: "click:3"

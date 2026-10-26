@@ -84,14 +84,22 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
     let escape = KeyboardKey(key: "Escape", code: "Escape", keyCode: 27)
     let mapping: [ControlInput: ControlAction] = [.y: .key(escape), .r2: .click(.secondary), .x: .nothing, .a: .button(.cancel)]
     library.update(id) {
-        $0.controlMethod = .controllerOnly
+        $0.controlMethod = .controller(mouse: .cursor)
         $0.buttonMapping = mapping
     }
 
     let reopened = LibraryStore(paths: paths, engines: plugins)
     await reopened.refresh()
     let game = try #require(reopened.game(id))
-    #expect(game.controlMethod == .controllerOnly)
+    #expect(game.controlMethod == .controller(mouse: .cursor))
     #expect(game.buttonMapping == mapping)
     #expect(game.isLocked && game.playTime == 60)
+}
+
+@Test func controlMethodsSavedBeforeMouseStylesKeepTheirMeaning() throws {
+    let saved = try JSONDecoder().decode([ControlMethod].self, from: Data(#"["touchGamepad", "touchMouse", "controllerOnly"]"#.utf8))
+    #expect(saved == [.gamepad, .mouse(.cursor), .controller(mouse: .touch)])
+    let all = try JSONDecoder().decode([ControlMethod].self, from: JSONEncoder().encode(ControlMethod.allCases))
+    #expect(all == ControlMethod.allCases)
+    #expect(Set(ControlMethod.allCases.map(\.rawValue)).count == ControlMethod.allCases.count)
 }

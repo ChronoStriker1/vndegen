@@ -1,6 +1,10 @@
 import Foundation
+import OSLog
 import Testing
+import VNCore
 import WebKit
+@testable import WebRuntime
+import EngineTyrano
 
 private let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     .appendingPathComponent("../../Sources/EngineTyrano/Resources/tyrano.js").standardizedFileURL
@@ -53,14 +57,89 @@ window.TYRANO = { kag: { stat: { is_strong_stop: true, visible_menu_button: true
     }
 }
 
-@MainActor @Test func directionsReachAChoiceTyranosFocusCannot() async throws {
+/// The NW.js shim, then this script, as a game session injects them.
+@MainActor private func configuration() throws -> WKWebViewConfiguration {
+    let game = WebGameConfiguration(folder: GameFolder(root: FileManager.default.temporaryDirectory, webRoot: ""), appName: "test",
+                                    buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
     let configuration = WKWebViewConfiguration()
-    configuration.userContentController.addUserScript(
-        WKUserScript(source: try String(contentsOf: script, encoding: .utf8), injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    for source in [try WebGameSession.shimSource(for: game), try String(contentsOf: script, encoding: .utf8)] {
+        configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    }
+    return configuration
+}
+
+@MainActor @Test func directionsReachAChoiceTyranosFocusCannot() async throws {
+    let configuration = try configuration()
     let loader = Loader()
     for (buttons, expected) in [(["down", "down", "confirm"], "choice"), (["down", "confirm"], "save"), (["confirm", "down", "confirm"], "choice")] {
         let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         await loader.load(page, in: view)
         #expect(try await press(view, buttons) as? String == expected, "\(buttons)")
     }
+}
+
+@MainActor private func pressPad(_ view: WKWebView, _ inputs: [ControlInput]) async throws -> Any? {
+    for input in inputs {
+        let script = [true, false].map { WebGameSession.gamepadScript(input, pressed: $0) }.joined(separator: ";")
+        _ = try await view.evaluateJavaScript(script + "; 0")
+    }
+    return try await view.evaluateJavaScript("window.chosen || 'nothing'")
+}
+
+@MainActor @Test func gamepadButtonsDoTyranoActionsUnlessTheGameBindsThem() async throws {
+    let configuration = try configuration()
+    let loader = Loader()
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page, in: view)
+    #expect(try await pressPad(view, [.down, .leftStickDown, .a]) as? String == "choice")
+
+    // A game that turns on Tyrano's gamepad support but binds nothing still gets VNDegen's actions.
+    let unbound = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {"), in: unbound)
+    #expect(try await pressPad(unbound, [.down, .down, .a]) as? String == "choice")
+
+    // A button the game's KeyConfig.js binds is the game's alone: here A, which the stand-in engine ignores.
+    let bound = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    await loader.load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {")
+        .replacingOccurrences(of: "key_mouse: {", with: "key_mouse: { map_pad: { button: { A: 'next' }, stick_digital: {}, stick: {} },"), in: bound)
+    #expect(try await pressPad(bound, [.down, .down, .a]) as? String == "nothing")
+    _ = try await bound.evaluateJavaScript(WebGameSession.gamepadScript(.a, pressed: true) + "; 0")
+    #expect(try await bound.evaluateJavaScript("navigator.getGamepads()[0].buttons[0].pressed") as? Bool == true)
+}
+
+/// Records the Tyrano actions VNDegen runs, as "name+" for a press and "name-" for a release.
+private let recordActions = "window.actions = []; const run = __vndegenTyrano.button; __vndegenTyrano.button = (n, p) => { actions.push(n + (p ? '+' : '-')); run(n, p); }; 0"
+
+@MainActor @Test func aStickTheGameBindsByIndexIsTheGamesAlone() async throws {
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: try configuration())
+    await Loader().load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {")
+        .replacingOccurrences(of: "key_mouse: {", with: "key_mouse: { map_pad: { button: {}, stick_digital: {}, stick: { 0: 'vmouse_move' } },"), in: view)
+    _ = try await view.evaluateJavaScript(recordActions)
+    _ = try await pressPad(view, [.leftStickDown, .rightStickDown, .down])
+    #expect(try await view.evaluateJavaScript("actions.join(' ')") as? String == "down+ down-")
+}
+
+@MainActor @Test func tyranoHearsOfAPadThatConnectedWhileTheGameLoaded() async throws {
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: try configuration())
+    await Loader().load(page.replacingOccurrences(of: "stat: {", with: "config: { useGamepad: 'true' }, stat: {")
+        .replacingOccurrences(of: "key_mouse: {", with: "key_mouse: { gamepad: { gamepad_exests: false },"), in: view)
+    // The press comes before the engine listens for the pad, like a press while the game loads.
+    _ = try await view.evaluateJavaScript(WebGameSession.gamepadScript(.a, pressed: true) + "; 0")
+    _ = try await view.evaluateJavaScript("""
+        window.heard = 0;
+        window.addEventListener('gamepadconnected', () => { heard++; TYRANO.kag.key_mouse.gamepad.gamepad_exests = true; }); 0
+        """)
+    let deadline = ContinuousClock.now + .seconds(5)
+    while try await view.evaluateJavaScript("heard") as? Int == 0, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(try await view.evaluateJavaScript("heard") as? Int == 1)
+}
+
+@Test func legacyRemapsKeepRunningTyranoActions() {
+    let plugin = TyranoPlugin()
+    #expect(plugin.legacyAction(for: .confirm) == .button(.confirm))
+    #expect(plugin.legacyAction(for: .left) == .button(.left))
+    #expect(plugin.legacyAction(for: .hub) == nil)
 }

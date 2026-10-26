@@ -20,11 +20,11 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Engine detection.** Each engine is a plugin that recognizes its own files, such as `js/rmmz_core.js` for RPG Maker MZ. The game page shows the detected engine and the file that identified it. Games with no detected engine can be assigned one by hand.
 - **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, and genres from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
 - **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place.
-- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. Each game has its own control method (Automatic, Touch gamepad, Touch mouse, or Controller only with no overlay), switchable from the in-game menu, and its own button mapping: any overlay or controller button can send a gamepad action, a keyboard key, or a mouse click.
+- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Every button reaches games as an Xbox controller button by default. Each game also has its own button mapping: any overlay or controller button can send another Xbox button, a keyboard key, or a mouse click.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
-- **Ludusavi saves.** VNDegen reads and writes [Ludusavi](https://github.com/mtkennerly/ludusavi) backups, so saves move between VNDegen and the PC copies Ludusavi manages. Restores can be undone.
-- **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL, which runs on Metal.
+- **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
+- **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad, both on Metal.
 
 <p align="center">
   <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
@@ -37,14 +37,18 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad |
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
 | TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
-| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one folder down | Mac |
+| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
 | KiriKiri 2 and KiriKiri Z | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
 TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. iOS cannot play Ogg, so VNDegen decodes Ogg Vorbis inside the game's page with libvorbis compiled to WebAssembly, the first time each track plays.
 
-Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py runtimes, 8.5.3 for Ren'Py 8 games and 7.8.7 for Ren'Py 7 and older games, and picks one from the game's `renpy/vc_version.py` or `renpy/__init__.py`, then its `lib/` folder names, then the engine's compiled files. Each game runs in its own process and window, which takes the hub window's place, and the hub comes back when the game quits. Saves and logs go to the game's data folder, and the game folder is never written to. A game copied from a PC with saves in `game/saves/` gets those copied in on its first launch. iPhone and iPad detect Ren'Py games but cannot run them yet.
+Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py runtimes, 8.5.3 for Ren'Py 8 games and 7.8.7 for Ren'Py 7 and older games, and picks one from the game's `renpy/vc_version.py` or `renpy/__init__.py`, then its `lib/` folder names, then the engine's compiled files. Each game runs in its own process and window, which takes the hub window's place, and the hub comes back when the game quits. Saves and logs go to the game's data folder, and the game folder is never written to. A game copied from a PC with saves in `game/saves/` gets those copied in on its first launch.
+
+On iPhone and iPad, Ren'Py 8.5.3 is built into the app and every Ren'Py game runs on it, inside VNDegen's window. Ren'Py 7 and 6.99 games run on it too, with fixes VNDegen applies in memory, such as dividing integers the Python 2 way in the game's own code. 15 of the 16 Ren'Py 7 games in the maintainer's library reached their main menu this way, and VNDegen ships that list. The page of a Ren'Py 7 game says whether it is known to work and, once it has run, whether it reached its main menu on this device. On Mac the game page's Ren'Py runtime option runs a game on the other runtime.
+
+Ren'Py can't load saves made by a newer Ren'Py. VNDegen runs each game on the newest Ren'Py of its line, so saves made here may not load in the game's PC version, and the game's Saves page warns before a Ludusavi backup when that applies. VNDegen on other devices loads them. The exception is a Mac, which runs Ren'Py 7 games on Ren'Py 7.8.7, so it loads a Ren'Py 7 game's saves from an iPhone or iPad only once that game's Ren'Py runtime option is set to Ren'Py 8.5.3. A Ren'Py 7 game's persistent data, such as unlocked gallery images, is written so its PC version loads it.
 
 KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDegen builds into the app. The game draws inside VNDegen's window, composited on the CPU and shown through Metal, so the VNDegen menu and touch controls work as for the other engines. Saves stay in the game's `savedata/` folder as on PC. A game that saves to the Windows AppData or Documents folder saves to its data folder instead, and Ludusavi backups from Windows or a Steam Deck restore there. Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives and MP3 audio don't work yet. Some Windows plugins are missing too, such as `layerExSave`, which one test game's save screen needs.
 
@@ -63,19 +67,26 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 
 ## Controls
 
-| Action | Controller | Keyboard in the library |
+In a game, the controller is an Xbox controller. Every button, from the touch gamepad or a real controller, reaches the game as the same Xbox button, and the game reads it with its own gamepad support. RPG Maker MV and MZ map a gamepad themselves, so A confirms, B cancels, X dashes, Y opens the menu, LB and RB turn pages, and the D-pad and left stick move. Like a real Xbox controller there, the Menu, View, and trigger buttons do nothing unless the game uses them.
+
+A TyranoScript game reads the gamepad when it turns that on in its Config.tjs (`useGamepad`), and each button its KeyConfig.js binds does what the game says. VNDegen turns every other button into the engine's own action: A reads on or presses the focused button, B cancels, X skips while held, Y and Menu open the game's menu, LB opens the backlog, RB turns auto mode on and off, and the D-pad and left stick move the focus. A Ren'Py game reads the controller itself in Ren'Py's own layout. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method.
+
+The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3, R3, and the sticks come from a real controller.
+
+| Action in the library and the VNDegen menu | Controller | Keyboard in the library |
 |---|---|---|
 | Move | D-pad or left stick | Arrows or WASD |
 | Confirm | A | Return or Space |
 | Cancel | B | Escape or Backspace |
 | Menu | Y or Menu | Tab |
-| Dash (in game) | X | |
-| Previous and next page | L1 and R1 | Q and E, or Page Up and Page Down |
-| VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
+| Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
+| Open the VNDegen menu in a game (resume or quit to library) | Home, and View while the menu is open | Backtick (`` ` ``) |
 
-The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. In a KiriKiri game, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls. A Ren'Py game on Mac reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu. Buttons remapped for the game apply there too.
+While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. In a KiriKiri game, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls.
 
-These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
+Each game has its own button mapping. The VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor, which lists every Xbox button. Each button can send another Xbox button, a keyboard key, a mouse click, or nothing. At the top of the editor, "RPG Maker controls" maps the buttons to the keys RPG Maker reads: A to Return, B to Escape, X to Shift, Y and Menu to X, LB to Q, RB to W, and the D-pad and left stick to the arrows. Return confirms in every RPG Maker, where XP uses Z for another button, and Escape and X both cancel and open the menu. "Reset to gamepad defaults" clears every remap. Ren'Py applies the mapping too. A remapped touch button shows what it sends, for example "Esc".
+
+A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. Remaps saved by earlier versions, which sent actions such as Confirm, convert on first launch to what those actions sent in the game's engine, so remapped games play the same: the Return key in RPG Maker, the matching Xbox button in Ren'Py, and the same TyranoScript action in TyranoScript.
 
 <p align="center">
   <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a D-pad, A B X Y buttons, shoulder buttons, and menu buttons over No Socks RPG gameplay, with the party on the beach map">
@@ -91,19 +102,33 @@ Steam and VNDB work without setup. SteamGridDB and IGDB need keys, entered in Se
 
 ## Ludusavi
 
-Point VNDegen at your Ludusavi backup folder in Settings. On a Mac it reads the folder from Ludusavi's own configuration. On iPhone and iPad, pick the folder in the file picker. That can be a network share connected in the Files app.
+VNDegen reaches your Ludusavi backups on the SMB share that Ludusavi's cloud sync uses. It has rclone's own SMB code built in, the code Ludusavi's rclone runs on the PCs, so it works the same on iPhone, iPad, and Mac with nothing to install.
 
-Each game page then lists that game's Ludusavi backups with their date and source device:
+Set it up once in Settings, under Ludusavi backups:
 
-- **Restore** copies a backup into the game's save folder, after keeping a copy of the current saves for Undo.
-- **Back up now** writes a new backup in Ludusavi's own format, using the same file paths as your existing backups so Ludusavi restores it correctly on the other machines.
-- **Automatic backup** when a game closes is available and off by default.
+1. Enter what Ludusavi's cloud settings show for its SMB remote: the host, the port (445 unless you changed it), and the username and password. Guest is on for a new setup and matches Ludusavi's `guest` username, which logs in with no password.
+2. Enter the path from Ludusavi's cloud settings. It is the share, then the folder inside it, such as `games/Ludusavi`.
+3. Tap Test Connection. VNDegen lists the folder and shows how many games it found. The test only reads.
+4. Turn on Match my Ludusavi settings and enter the retention limits from Ludusavi's Other screen. On a Mac with Ludusavi installed, VNDegen reads them from Ludusavi's config.
 
-VNDegen never changes or deletes existing backups.
+The password stays on the device and out of VNDegen's settings file. On iPhone and iPad it is in the Keychain, for this device only. On a Mac it is in a file only your user can read, in VNDegen's Application Support folder, so app updates don't ask for your password. rclone gets it obscured, in a config that lives in memory and never touches an rclone.conf.
+
+VNDegen never uploads with a sync. Ludusavi's upload is `rclone sync`, which deletes whatever the PC lacks. VNDegen only copies its new backup folder and then its mapping.yaml, so it never removes another device's backups.
+
+VNDegen 0.4.0 connected over SSH and rsync. Its settings turn save sync off after the update, with a note in Settings, until you enter the share. VNDegen deletes the SSH key it made then.
+
+Each game then finds its Ludusavi game by itself: by the Steam app ID in its metadata through Ludusavi's manifest, else by title. You can pick another on the game's Saves page. That page lists the game's backups with their date, source device, and kind, says whether the saves here or on the server are newer, and previews what a restore changes.
+
+- **Restore** brings a backup down and copies it into the game's save folder, after keeping a copy of the current saves for Undo.
+- **Back up now** writes a full or differential backup in Ludusavi's format, as Ludusavi would, with the same file paths as your existing backups, so Ludusavi restores it on the PC and Steam Deck. A game with no backup yet goes where the PC keeps it, under the Steam library the other backups use. With retention limits set, backups beyond them leave the backup list, as Ludusavi drops them. Their folders stay on the server until Ludusavi on a PC deletes them at its next backup of that game, because another device may still list them. Each device names its backup folders with an ID of its own, and VNDegen checks the server's backup list again right before it adds to it, so a backup from another device is not overwritten.
+- **Before a game starts**, VNDegen asks when another device backed up newer saves, or when the saves changed both here and on the server.
+- **Automatic backup** when a game closes is available and off by default. It skips a game whose saves changed in both places and leaves the choice to you.
+
+Ludusavi on a PC that syncs its backup folder with rclone sees VNDegen's backups as changes in the cloud. When Ludusavi asks, choose to download them.
 
 ## Building
 
-You need a Mac with Xcode 27 and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`). Run `scripts/build.sh` on that Mac:
+You need a Mac with Xcode 27, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), and Go (`brew install go`) for the rclone library that save sync uses. Run `scripts/build.sh` on that Mac:
 
 ```sh
 scripts/build.sh test      # package tests
@@ -112,7 +137,7 @@ scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug
 scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ```
 
-Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it. The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu. `scripts/renpy-hook-test.sh` checks VNDegen's Ren'Py hook on both runtimes.
+Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it. Every build first makes rclone's library from `Packages/VNDegenKit/Rclone/` for iPhone, iPad, the simulator, and the Mac (`scripts/rclone-runtime.sh`, kept until its sources or the Go version change). The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds; in Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first. `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu. `scripts/renpy-hook-test.sh` checks VNDegen's Ren'Py hook on both runtimes.
 
 From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
@@ -141,7 +166,8 @@ Packages/VNDegenKit/
   Sources/WebRuntime/     shared host for HTML5 engines: WebKit view, game file serving, Node and NW.js layer
   Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, key mapping, save locations
   Sources/EngineTyrano/   TyranoScript: detection, Electron app.asar reading, save handling, controller mapping
-  Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, and the in-game hook
+  Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, the iOS in-app session, and the in-game hook
+  Sources/CRenPy/         starts Python and runs Ren'Py inside the app on iOS
   Sources/RenPyCompat/    command-line boot test for a folder of Ren'Py games
   Sources/EngineKiriKiri/ KiriKiri: detection, save locations, and the in-process session on the engine framework
   Sources/CKiriKiri/      vnkk.h, the KiriKiri engine's C interface
@@ -150,6 +176,8 @@ Packages/VNDegenKit/
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
   Sources/Lock/           Face ID, Touch ID, and passcode
   Sources/SaveSync/       Ludusavi backup and restore
+  Sources/Rclone/         Swift calls into rclone's library
+  Rclone/                 VNDegen's build of rclone: the Go library with the SMB and local backends
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
 Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
 docs/                     engine survey and screenshots
@@ -166,3 +194,7 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
 
 Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins.
+
+## License
+
+VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL.

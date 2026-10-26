@@ -1,10 +1,12 @@
 # Engine survey
 
-Game titles from the surveyed library appear as "Test Game NN" placeholders. The per-game list is kept privately.
+Game titles are the library folder names. The per-game list is [engine-survey-games.tsv](engine-survey-games.tsv).
 
 Survey date 2026-10-25. This picks the next engines to port after RPG Maker MV/MZ and names test games from the library on the NAS.
 
-The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one row per folder under `/path/to/games`.
+Status since the survey: RPG Maker MV/MZ, TyranoScript, and Ren'Py on macOS have shipped. Ren'Py on iPhone and iPad and a KiriKiri feasibility test are in progress. `docs/roadmap.md` has the current state.
+
+The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one row per library folder.
 
 ## Summary
 
@@ -35,7 +37,7 @@ Each engine is ranked on three inputs. The first is the number of library games.
 
 | Rank | Engine | Library games (GB) | VNDB releases since 2018 | Runtime to build on | Apple status of that runtime |
 |---:|---|---:|---:|---|---|
-| 0 | RPG Maker MV/MZ | 89 (83.2) | 1,748 (all RPG Maker) | Own WebKit plugin, in progress | Being built now |
+| 0 | RPG Maker MV/MZ | 89 (83.2) | 1,748 (all RPG Maker) | Own WebKit plugin | Shipped in VNDegen 0.1.0 |
 | 1 | TyranoScript | 4 (4.5) | 5,447 | Game's own `tyrano/` JS in WKWebView | Runs in any browser |
 | 2 | Ren'Py | 44 (45.9) | 26,235 | Ren'Py itself | Official iOS and macOS support |
 | 3 | KiriKiri | 48 (124.0) | 2,857 | krkrsdl2 | Release ships iOS and macOS app bundles |
@@ -55,7 +57,7 @@ Each engine is ranked on three inputs. The first is the number of library games.
 
 **5. NScripter.** There are only 6 library games, but NScripter is fifth on VNDB all-time (2,284). ONScripter is GPL-2.0 SDL code that has been ported to many platforms. Ogapee's tree carries a `Makefile.iPhone` and `Makefile.MacOSX`. OnscripterYuri (an ONScripter-jh fork) builds for macOS on arm64 and x64 and adds an OpenGL ES 2 scaler. The effort is small.
 
-**6. AliceSoft System 3.x and 4.x.** There are 13 games. 10 are System 3.x (`System39.exe` or `SYSTEM3.EXE`) and 3 are System 4 (`Test Game 60`, `Test Game 46`, `Test Game 56`). Twelve are installed on disk and range from 4 MB to 787 MB. Test Game 56 is a 2.6 GB GOG installer. xsystem35-sdl2 and xsystem4 are GPL-2.0, active in October 2026, and use SDL2. They publish Windows and Android (xsystem35) or Linux and Windows (xsystem4) builds. No Apple build exists, but plain SDL code is a modest port.
+**6. AliceSoft System 3.x and 4.x.** There are 13 games. 10 are System 3.x (`System39.exe` or `SYSTEM3.EXE`) and 3 are System 4 (`Rance 02`, `Sengoku Rance`, `Rance IX`). Twelve are installed on disk and range from 4 MB to 787 MB. Rance IX is a 2.6 GB GOG installer. xsystem35-sdl2 and xsystem4 are GPL-2.0, active in October 2026, and use SDL2. They publish Windows and Android (xsystem35) or Linux and Windows (xsystem4) builds. No Apple build exists, but plain SDL code is a modest port.
 
 **7. Artemis.** There are 8 games. Artemis is sixth on VNDB since 2018 (681). art3m1s-core (MPL-2.0, Rust) uses native Metal on Apple and Luau for scripts on iOS. Its host app Art3m1s ships `ios-arm64.ipa` and `macos-arm64.dmg`. It is young. The repository was created in June 2026 and has 9 stars, so compatibility is unproven. Test it before ranking it higher.
 
@@ -85,39 +87,39 @@ mkxp-z, ONScripter, xsystem35-sdl2 and xsystem4 are GPL-2.0. EasyRPG Player is G
 
 ## Test picks
 
-These prefer the smallest games and cover each variant that changes the code path. All but the AliceSoft games and Test Game 61 are archives on the NAS and need extracting before use.
+These prefer the smallest games and cover each variant that changes the code path. All but the AliceSoft games and Ogress on the Cliff are archives on the NAS and need extracting before use.
 
 | Engine | Game folder | Size (MB) | Why |
 |---|---|---:|---|
-| RPG Maker MV | Test Game 11 | 145 | Smallest MV, encrypted assets |
-| RPG Maker MV | Test Game 42 | 188 | Unencrypted assets |
-| RPG Maker MV | Test Game 09 | 405 | Installed, `rpg_core.js v1.5.0`, old NW.js (`ffmpegsumo.dll`) |
-| RPG Maker MZ | Test Game 43 | 145 | Smallest MZ, encrypted assets |
-| RPG Maker MZ | Test Game 38 | 237 | Unencrypted assets |
-| TyranoScript | Test Game 35 | 109 | Plain `tyrano/` folder |
-| TyranoScript | Test Game 23 | 885 | Electron `resources/app/` layout |
-| TyranoScript | Test Game 58 | 926 | Plain layout, Japanese text |
-| Ren'Py | Test Game 15 | 146 | Ren'Py 8 (`lib/py3-*`) |
-| Ren'Py | Test Game 30 | 250 | Ren'Py 7.3 or older (Python 2), ships Mac libs |
-| Ren'Py | Test Game 54 | 734 | Ren'Py 7.4 or later (Python 2) |
-| KiriKiri | Test Game 03 | 134 | Smallest, packed `data.xp3` |
-| KiriKiri | Test Game 08 | 167 | Packed `data.xp3`, 8 plugin DLLs |
-| KiriKiri | Test Game 01 | 628 | Unpacked `data/startup.tjs` |
-| RPG Maker VX Ace | Test Game 55 | 28 | Unpacked `Data/*.rvdata2` |
-| RPG Maker VX Ace | Test Game 14 | 39 | Packed `Game.rgss3a` |
-| RPG Maker VX | Test Game 33 | 21 | Packed `Game.rgss2a` |
-| RPG Maker XP | Test Game 37 | 125 | Only XP game, `Game.rgssad` |
-| NScripter | Test Game 05 | 146 | Plain-text `00.txt` script |
-| NScripter | Test Game 44 | 191 | Plain-text `0.txt` script |
-| NScripter | Test Game 26 | 195 | Encoded `nscript.dat` |
-| AliceSoft System 3 | Test Game 28 | 4 | System 3.9, installed |
-| AliceSoft System 3 | Test Game 13 | 276 | Older `SYSTEM3.EXE` layout, installed |
-| AliceSoft System 4 | Test Game 19 | 446 | Smallest System 4, installed |
-| Artemis | Test Game 22 | 245 | Single `root.pfs` |
-| Artemis | Test Game 06 | 885 | Split `fts1.pfs.001` archive |
-| Wolf RPG Editor | Test Game 53 | 26 | Smallest Wolf game |
-| Wolf RPG Editor | Test Game 02 | 60 | Second smallest |
-| Wolf RPG Editor | Test Game 52 | 62 | Third smallest |
+| RPG Maker MV | Mama's Secret Parent Teacher Conference | 145 | Smallest MV, encrypted assets |
+| RPG Maker MV | Mirena's Manor | 188 | Unencrypted assets |
+| RPG Maker MV | Ogress on the Cliff ~Next to Tomoe-san!~ | 405 | Installed, `rpg_core.js v1.5.0`, old NW.js (`ffmpegsumo.dll`) |
+| RPG Maker MZ | Summer Sisters | 145 | Smallest MZ, encrypted assets |
+| RPG Maker MZ | Lustful Dreamers | 237 | Unencrypted assets |
+| TyranoScript | Butterfly Affection | 109 | Plain `tyrano/` folder |
+| TyranoScript | Welcome to Paradise Island | 885 | Electron `resources/app/` layout |
+| TyranoScript | 人外娘生態録 | 926 | Plain layout, Japanese text |
+| Ren'Py | Servant's Revenge_ harem corruption | 146 | Ren'Py 8 (`lib/py3-*`) |
+| Ren'Py | Give an imp a chance! | 250 | Ren'Py 7.3 or older (Python 2), ships Mac libs |
+| Ren'Py | Hypno Mama | 734 | Ren'Py 7.4 or later (Python 2) |
+| KiriKiri | Big-Breasted Married Teacher ~Shameful School Training~ | 134 | Smallest, packed `data.xp3` |
+| KiriKiri | Haramimura_ When a Wife Becomes a Villager | 167 | Packed `data.xp3`, 8 plugin DLLs |
+| KiriKiri | The Creamy Result of Hypnotizing my Annoying Stepmom and Honor Student Stepsister | 628 | Unpacked `data/startup.tjs` |
+| RPG Maker VX Ace | Lust Doll | 28 | Unpacked `Data/*.rvdata2` |
+| RPG Maker VX Ace | Catch Me in the Demon Lord's Castle | 39 | Packed `Game.rgss3a` |
+| RPG Maker VX | Mecha Girl Adventure | 21 | Packed `Game.rgss2a` |
+| RPG Maker XP | INMA KA SUGOROKU | 125 | Only XP game, `Game.rgssad` |
+| NScripter | The Encyclopedia of Tentacles for Boys Vol.1 | 146 | Plain-text `00.txt` script |
+| NScripter | Desire Dungeon | 191 | Plain-text `0.txt` script |
+| NScripter | Lilipalace (English Ver.) | 195 | Encoded `nscript.dat` |
+| AliceSoft System 3 | Rance_ Quest for Hikari | 4 | System 3.9, installed |
+| AliceSoft System 3 | Rance 4.1_ Save the Medicine Plant! | 276 | Older `SYSTEM3.EXE` layout, installed |
+| AliceSoft System 4 | Rance 02_ The Rebellious Maidens | 446 | Smallest System 4, installed |
+| Artemis | Busty Mom Impregnation Netori | 245 | Single `root.pfs` |
+| Artemis | Fantasy Tavern Sextet -Vol.1 New World Days- | 885 | Split `fts1.pfs.001` archive |
+| Wolf RPG Editor | MilkyQuest | 26 | Smallest Wolf game |
+| Wolf RPG Editor | The Land Where One Can Make Monmusu Pets - Elf Girl Mimia | 60 | Second smallest |
+| Wolf RPG Editor | Yumei Club | 62 | Third smallest |
 
 ## Library counts by engine
 
@@ -163,16 +165,16 @@ These are outside VNDegen's target and are not in the port order.
 | Unity | 60 | No. 44 are Mono and 10 are IL2CPP. The other 6 come from VNDB or public knowledge with no file check. Mono games need a reimplementation of the UnityEngine API, which nobody has built. IL2CPP games are compiled x86 code, which cannot run on iOS without an emulator. 6 use Naninovel, a VN framework on Unity, and the same limits apply |
 | Flash | 14 | Yes. Ruffle (MIT or Apache-2.0) runs in WKWebView with WebGL. Its compatibility page lists 99% language and 82% API support for ActionScript 1 and 2, and 90% language and 82% API support for ActionScript 3. This is the most practical non-VN addition |
 | Adobe AIR | 1 | Partly. The game is SWF content, so Ruffle may run it. AIR-only APIs will not work |
-| Godot | 6 | Possible. Godot is MIT and runs on iOS and macOS with a native Metal renderer since 4.4. A Windows `.pck` loads in a matching-version Godot runtime only if it uses no native GDExtension libraries. Test Game 39 uses GodotSteam, so it would not load |
+| Godot | 6 | Possible. Godot is MIT and runs on iOS and macOS with a native Metal renderer since 4.4. A Windows `.pck` loads in a matching-version Godot runtime only if it uses no native GDExtension libraries. Warding Witches uses GodotSteam, so it would not load |
 | GameMaker | 6 | No. `data.win` needs YoYo's proprietary runner. No open runner exists |
-| NW.js or Electron with custom JS | 7 | Case by case. Same WKWebView host as Tyrano. Games that call Node.js APIs need shims |
+| NW.js or Electron with custom JS | 7 | Checked on 2026-10-26, and none is RPG Maker. 2 are GameCreator, a Chinese HTML5 engine (`script.js` and `asset/assetList.json`). 1 is TyranoScript packed into its `.exe`, which the TyranoScript plugin would run once the app is unpacked from the exe. 1 is a Game Boy ROM in the binjgb emulator. 2 are custom Electron apps, one of which loads its content from a website. 1 is a custom HTML5 engine with Live2D (`data/ENGINE.js`). Each would run case by case in the WKWebView host, with shims for Node.js calls |
 | Construct | 1 | Likely. Construct 3 exports HTML5 (`c3runtime.js`), so it runs in WKWebView |
 | HSP | 1 | Unlikely. OpenHSP is BSD-3, but the Windows HSP runtime and its plugin DLLs do not map to its mobile variant |
 | Pixel Game Maker MV | 1 | No. Proprietary player |
 | GZDoom | 1 | Possible. GZDoom is open source and runs on macOS. iOS was not checked |
 | Unreal | 2 | No. Native compiled code |
-| id Tech | 2 | No. Test Game 49 is native code. The Test Game 59 folder holds data files, which existing open Test Game 59 ports can run |
-| Custom native (including DxLib) | 11 | No. Compiled native code (DxLib, VB6, SDL with bespoke DLLs, Fox Engine, KEX, Heaps on HashLink, Falcom's engine, the DOS Test Game 41) |
+| id Tech | 2 | No. Doom Eternal is native code. The Quake folder holds data files, which existing open Quake ports can run |
+| Custom native (including DxLib) | 11 | No. Compiled native code (DxLib, VB6, SDL with bespoke DLLs, Fox Engine, KEX, Heaps on HashLink, Falcom's engine, the DOS Wolfenstein 3D) |
 
 ## Unidentified folders
 
@@ -183,7 +185,7 @@ These are outside VNDegen's target and are not in the port order.
 - 1 is a solid RAR4 archive that bsdtar could not list. A header walk found `DATA.tec` files from an unrecognized engine.
 - 50 match no signature. These are mostly doujin games with proprietary formats (`.pak` with `.css` readmes, `.bsa` with `Canvas.dll`, `.gax` with `emotedriver.dll`, `Vox.dll` with `stg4_*` files).
 
-Three archive problems sit inside these groups. `Test Game 47.7z` is truncated, because its header points past the end of the 35 MB file. The `.rar` of Test Game 62 has no archive signature in its first bytes. The three Test Game 63 folders each hold a password-protected `おまけ*.zip` bonus archive.
+Three archive problems sit inside these groups. `Summer Clover.7z` is truncated, because its header points past the end of the 35 MB file. The Princess Defender `.rar` has no archive signature in its first bytes. The three Monster Fighter Boy Ashita folders each hold a password-protected `おまけ*.zip` bonus archive.
 
 ## Popularity
 
@@ -294,7 +296,7 @@ This covers every engine in the library and every engine in either VNDB top 25. 
 
 | Engine | Best runtime to build on | License | macOS | iOS | Rendering | Notes |
 |---|---|---|---|---|---|---|
-| RPG Maker MV/MZ | Game's own JS (PixiJS) in WKWebView | Game-supplied | Yes | Yes | WebGL | In progress in VNDegen |
+| RPG Maker MV/MZ | Game's own JS (PixiJS) in WKWebView | Game-supplied | Yes | Yes | WebGL | Shipped in VNDegen 0.1.0 |
 | TyranoScript | Game's own `tyrano/` JS in WKWebView | Tyrano terms (free use, no redistribution of Tyrano itself) | Yes | Yes | HTML/WebGL | Same host as MV/MZ |
 | Visual Novel Maker, Twine, Dorian | Game's own HTML in WKWebView | Game-supplied | Yes | Yes | HTML/WebGL | Not in library |
 | Ren'Py | Ren'Py ([renpy/renpy](https://github.com/renpy/renpy)) | MIT plus LGPL parts | Yes | Yes (per-game Xcode project) | OpenGL ES 2 via SDL2 | Needs a generic host and a Python 2 build for older games |

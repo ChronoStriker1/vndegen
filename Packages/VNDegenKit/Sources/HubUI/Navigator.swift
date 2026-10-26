@@ -25,12 +25,16 @@ final class Navigator {
     enum Sheet: Identifiable {
         case unlock
         case engine(GameID)
+        /// The engine's advanced options for a game, such as the Ren'Py runtime.
+        case variant(GameID)
         case orientation(GameID)
         case controlMethod(GameID)
         case mapping(ButtonMappingEditor)
         case artwork(ArtworkEditor)
         case metadata(MetadataSearch)
         case saves(GameSavesModel)
+        /// Asked before a game starts when the save server has newer saves.
+        case launchSaves(LaunchSavesModel)
         case settingsPage(SettingsPage)
         case importGame(ArchiveImportModel, initialSelection: [URL])
 
@@ -38,12 +42,14 @@ final class Navigator {
             switch self {
             case .unlock: "unlock"
             case let .engine(id): "engine:\(id)"
+            case let .variant(id): "variant:\(id)"
             case let .orientation(id): "orientation:\(id)"
             case let .controlMethod(id): "controlMethod:\(id)"
             case let .mapping(editor): "mapping:\(editor.gameID)"
             case let .artwork(editor): "artwork:\(editor.gameID)"
             case let .metadata(search): "metadata:\(search.gameID)"
             case let .saves(model): "saves:\(model.game)"
+            case let .launchSaves(model): "launchSaves:\(model.game)"
             case let .settingsPage(page): "settings:\(page)"
             case .importGame: "import"
             }
@@ -77,11 +83,12 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation, pageControls, pageMapping
+        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
-        case controlMethod, playOrientation
+        case controlMethod, controllerMouse, mouseStyle, playOrientation
         case engineOption(EngineID?)
+        case variantOption(String?)
         case orientationOption(PlayOrientation?)
         case controlMethodOption(ControlMethod?)
         case artworkSlot(ArtworkSlot)
@@ -126,6 +133,9 @@ final class Navigator {
     /// The unlock view shown in the sheet, kept so controller events reach the same instance.
     @ObservationIgnored private(set) var unlockView: UnlockView?
 
+    /// The game whose saves are being checked before it starts.
+    private(set) var checkingSaves: GameID?
+
     /// The Ludusavi settings page. One for the app, like the service it shows.
     @ObservationIgnored private(set) lazy var saveSettings = SaveSyncSettingsModel(service: hub.saveSync)
 
@@ -161,7 +171,7 @@ final class Navigator {
     func rows() -> [Row] {
         if let sheet {
             switch sheet {
-            case .engine, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
+            case .engine, .variant, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case let .artwork(editor):
                 let columns = max(1, editor.columns)
                 let candidates = stride(from: 0, to: editor.candidates.count, by: columns).enumerated().map { index, start in
@@ -173,7 +183,7 @@ final class Navigator {
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
             // These take controller input through their own models.
-            case .unlock, .saves, .settingsPage, .importGame, .mapping: return []
+            case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping: return []
             }
         }
         switch route {
@@ -198,17 +208,23 @@ final class Navigator {
             }
             return [Row(id: "grid-back", items: [.back])] + tiles
         case .game:
-            // The control method and orientation only matter on a touch device.
-            let touchOnly = [Row(id: "page-orientation", items: [.pageOrientation]), Row(id: "page-controls", items: [.pageControls])]
+            // Orientation only matters on a touch device, and the control method only where it changes something.
+            let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
+            let controls = pageGameID.map(offersControlMethod) == true ? [Row(id: "page-controls", items: [.pageControls])] : []
             return [
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
-            ] + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
+            ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
+                + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
             var items: [Target] = [.back, .openFolder, .rescan, .settingsPage(.metadata), .settingsPage(.lock), .settingsPage(.saves)]
             #if os(iOS)
-            items += [.controlMethod, .playOrientation]
+            let method = ControlMethod.setting
+            items.append(.controlMethod)
+            if method.kind == .controller { items.append(.controllerMouse) }
+            if method.mouse != nil { items.append(.mouseStyle) }
+            items.append(.playOrientation)
             #endif
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
@@ -324,26 +340,30 @@ final class Navigator {
         case let .importArchive(url): openImport([url])
         case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
-        case .controlMethod, .playOrientation: stepSetting(target, by: 1)
+        case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
-        case .play: if let game = heroGame { hub.launch(game.id) }
+        case .play: if let game = heroGame { play(game.id) }
         case .details: if let game = heroGame { push(.game(game.id)) }
         case let .tile(_, id), let .gridTile(id): push(.game(id))
         case .back: back()
-        case .pagePlay: if let id = pageGameID { hub.launch(id) }
+        case .pagePlay: if let id = pageGameID { play(id) }
         case .pageArtwork: if let id = pageGameID { sheet = .artwork(ArtworkEditor(hub: hub, gameID: id)) }
         case .pageMetadata: if let id = pageGameID { sheet = .metadata(MetadataSearch(hub: hub, gameID: id)) }
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
         case let .settingsPage(page): sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
+        case .pageVariant: if let id = pageGameID { sheet = .variant(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
-        case .pageControls: if let id = pageGameID { sheet = .controlMethod(id) }
+        case .pageControls: if let id = pageGameID, offersControlMethod(id) { sheet = .controlMethod(id) }
         case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
         case let .engineOption(engine):
             if case let .engine(id) = sheet { hub.library.update(id) { $0.engineOverride = engine } }
+            sheet = nil
+        case let .variantOption(variant):
+            if case let .variant(id) = sheet { selectVariant(variant, for: id) }
             sheet = nil
         case let .orientationOption(orientation):
             if case let .orientation(id) = sheet { hub.library.update(id) { $0.orientation = orientation } }
@@ -416,7 +436,9 @@ final class Navigator {
     private func stepSetting(_ target: Target, by step: Int) -> Bool {
         #if os(iOS)
         switch target {
-        case .controlMethod: cycle(ControlMethod.storageKey, fallback: ControlMethod.automatic, by: step)
+        case .controlMethod: setControlMethod(ControlMethod.setting.stepped(by: step))
+        case .controllerMouse: setControlMethod(ControlMethod.setting.togglingMouse)
+        case .mouseStyle: setControlMethod(ControlMethod.setting.switchingMouseStyle)
         case .playOrientation: cycle(PlayOrientation.storageKey, fallback: PlayOrientation.setting, by: step)
         default: return false
         }
@@ -427,6 +449,15 @@ final class Navigator {
     }
 
     #if os(iOS)
+    /// Writes to the defaults key that the settings screen's `@AppStorage` reads. A mouse row the new method hides hands
+    /// focus to the control method row.
+    func setControlMethod(_ method: ControlMethod) {
+        UserDefaults.standard.set(method.rawValue, forKey: ControlMethod.storageKey)
+        if let focus, focus == .controllerMouse || focus == .mouseStyle, position(of: focus, in: rows()) == nil {
+            setFocus(.controlMethod)
+        }
+    }
+
     /// Writes the next value to the defaults key that the settings screen's `@AppStorage` reads.
     private func cycle<Value: CaseIterable & RawRepresentable<String> & Equatable>(_ key: String, fallback: Value, by step: Int) {
         let values = Array(Value.allCases)
@@ -435,6 +466,33 @@ final class Navigator {
         UserDefaults.standard.set(values[(index + step + values.count) % values.count].rawValue, forKey: key)
     }
     #endif
+
+    /// Bumped when an engine option changes, so views that show one read it again. The engine keeps it outside the
+    /// library.
+    private(set) var variantRevision = 0
+
+    /// The game's engine options, such as the Ren'Py runtime on macOS. Nil when its engine has none here.
+    func variants(_ id: GameID) -> EngineVariants? {
+        _ = variantRevision
+        guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return nil }
+        return plugin.variants(for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+    }
+
+    private func selectVariant(_ variant: String?, for id: GameID) {
+        guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return }
+        do {
+            try plugin.selectVariant(variant, for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+        } catch {
+            hub.launchError = error.localizedDescription
+        }
+        variantRevision += 1
+    }
+
+    /// Whether the game's page offers a control method: not on a Mac, and not for a game that reads touches itself,
+    /// such as a Ren'Py game.
+    func offersControlMethod(_ id: GameID) -> Bool {
+        ControlMethod.applies(to: hub.library.plugin(for: hub.library.game(id)?.engine))
+    }
 
     var pageGameID: GameID? {
         if case let .game(id) = route { return id }
@@ -519,6 +577,9 @@ final class Navigator {
             sheet = nil
             syncInputMode()
         }
+        // A rescan can find that an open control method sheet's game reads touches itself, such as a Ren'Py game whose
+        // files finished copying. Closing it returns focus to its row, which the focus check below then moves.
+        if case let .controlMethod(id)? = sheet, !offersControlMethod(id) { sheet = nil }
         // Until the user steers, and always for touch users, keep the default focus current as the library loads.
         if !steered || hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
     }
@@ -543,13 +604,17 @@ final class Navigator {
                 .filter { $0.platforms.contains(.current) }
                 .map { Choice(target: .engineOption($0.id), title: $0.displayName) }
             return [Choice(target: .engineOption(nil), title: "Automatic", detail: "Detected: \(detected ?? "none")")] + manual
+        case let .variant(id):
+            guard let variants = variants(id) else { return [] }
+            return [Choice(target: .variantOption(nil), title: "Automatic", detail: variants.automatic)]
+                + variants.options.map { Choice(target: .variantOption($0.id), title: $0.title) }
         case .orientation:
             let fixed = PlayOrientation.allCases.map { Choice(target: .orientationOption($0), title: $0.title) }
             return [Choice(target: .orientationOption(nil), title: "Use default", detail: "Currently \(PlayOrientation.setting.title), from Settings")] + fixed
         case .controlMethod:
             let fixed = ControlMethod.allCases.map { Choice(target: .controlMethodOption($0), title: $0.title, detail: $0.detail) }
             return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping:
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping:
             return []
         }
     }
@@ -557,9 +622,26 @@ final class Navigator {
     func selectedChoice(for sheet: Sheet) -> Target? {
         switch sheet {
         case let .engine(id): .engineOption(hub.library.game(id)?.engineOverride)
+        case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
-        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping: nil
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping: nil
+        }
+    }
+
+    /// Starts a game, first asking about newer saves on the save server when there are any.
+    func play(_ id: GameID) {
+        guard checkingSaves == nil else { return }
+        checkingSaves = id
+        Task { [weak self] in
+            guard let self else { return }
+            let offer = await hub.saveSync.launchOffer(id)
+            checkingSaves = nil
+            guard let offer else { return hub.launch(id) }
+            sheet = .launchSaves(LaunchSavesModel(service: hub.saveSync, game: id, offer: offer) { [weak self] start in
+                self?.sheet = nil
+                if start { self?.hub.launch(id) }
+            })
         }
     }
 
@@ -595,6 +677,9 @@ final class Navigator {
         switch sheet {
         case let .saves(model)?:
             if !model.handle(button), button == .cancel { back() }
+            return
+        case let .launchSaves(model)?:
+            _ = model.handle(button)
             return
         case .settingsPage(.saves)?:
             if !saveSettings.handle(button), button == .cancel { back() }

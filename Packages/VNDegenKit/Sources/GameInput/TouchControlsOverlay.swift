@@ -1,18 +1,30 @@
 import SwiftUI
 import VNCore
 
+/// What touches do in a running game.
 nonisolated public enum TouchControlsMode: Sendable {
-    case gamepad, mouse
+    /// The touch gamepad. Touches between its buttons reach the game.
+    case gamepad
+    /// Dragging moves a virtual cursor.
+    case cursor
+    /// No overlay. Touches reach the game where they land.
+    case direct
+    /// No overlay, and the game ignores touches.
+    case off
+
+    /// Whether `TouchControlsOverlay` draws anything in this mode.
+    public var hasOverlay: Bool { self == .gamepad || self == .cursor }
 }
 
 /// Reports a touch gamepad button going down or up. A nil input is the Home button.
 typealias TouchPress = (ControlInput?, _ pressed: Bool) -> Void
 
 /// On-screen controls drawn over a running game. Gamepad mode presses buttons through `input`, which does what its
-/// button mapping says, the same as for a controller. `mapping` is that same mapping, for the buttons' badges. Mouse
-/// mode moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu.
-/// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the mouse surface covers the
-/// full screen like the session view, so its normalized pointer locations match the game's.
+/// button mapping says, the same as for a controller. `mapping` is that same mapping, for the buttons' badges. Cursor
+/// mode moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu. The modes
+/// without an overlay draw nothing.
+/// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the cursor surface covers
+/// the full screen like the session view, so its normalized pointer locations match the game's.
 public struct TouchControlsOverlay: View {
     let mode: TouchControlsMode
     let mapping: ButtonMapping
@@ -31,13 +43,14 @@ public struct TouchControlsOverlay: View {
             let unit = min(max(min(geometry.size.width, geometry.size.height) / 6.2, 54), 76)
             switch mode {
             case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press)
-            case .mouse:
+            case .cursor:
                 ZStack(alignment: .topTrailing) {
                     MouseControls(cursor: $cursor, send: sendPointer)
                     HomeButton(size: unit * 0.62, press: press)
                         .padding(.top, 8)
                         .padding(.trailing, 16)
                 }
+            case .direct, .off: EmptyView()
             }
         }
         .environment(\.colorScheme, .dark)
@@ -77,10 +90,19 @@ private struct GamepadControls: View {
     var body: some View {
         VStack(spacing: unit * 0.28) {
             Spacer(minLength: 0)
-            HStack(spacing: unit * 0.22) {
+            // The triggers sit above the bumpers, as on an Xbox controller.
+            HStack {
+                shoulder(.l2)
+                Spacer(minLength: 0)
+                shoulder(.r2)
+            }
+            HStack(spacing: unit * 0.2) {
                 shoulder(.l)
                 HomeButton(size: unit * 0.62, press: press)
                 Spacer(minLength: 0)
+                MappedButton(input: .view, mapping: mapping, press: press) { pressed in
+                    RoundKey(symbol: "rectangle.on.rectangle", size: unit * 0.62, pressed: pressed)
+                }
                 MappedButton(input: .menu, mapping: mapping, press: press) { pressed in
                     RoundKey(symbol: "line.3.horizontal", size: unit * 0.62, pressed: pressed)
                 }
@@ -101,14 +123,14 @@ private struct GamepadControls: View {
             Text(input.title)
                 .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
-                .frame(width: unit * 1.3, height: unit * 0.6)
+                .frame(width: unit * 1.2, height: unit * 0.6)
                 .background(KeyFill(shape: Capsule(), pressed: pressed))
         }
     }
 }
 
-/// A touch gamepad button that does what the mapping says. A button bound to a key or a click shows that binding in a
-/// small badge, and a button bound to nothing dims.
+/// A touch gamepad button that does what the mapping says. A remapped button shows its binding in a small badge, and a
+/// button bound to nothing dims.
 private struct MappedButton<Label: View>: View {
     let input: ControlInput
     let mapping: ButtonMapping
@@ -119,7 +141,7 @@ private struct MappedButton<Label: View>: View {
         let action = mapping.action(for: input)
         TouchButton(input, title: input.title, press: press, label: label)
             .overlay(alignment: .topTrailing) {
-                if let badge = action.badge { Badge(text: badge).offset(x: 6, y: -6) }
+                if mapping.isRemapped(input), let badge = action.badge { Badge(text: badge).offset(x: 6, y: -6) }
             }
             .opacity(action == .nothing ? 0.35 : 1)
             .accessibilityValue(mapping.isRemapped(input) ? action.title : "")
@@ -175,21 +197,34 @@ private struct DPad: View {
     let size: CGFloat
     let mapping: ButtonMapping
     let press: TouchPress
-    @GestureState private var held: Set<ControlInput> = []
+    @State private var held: Set<ControlInput> = []
 
     var body: some View {
+        let arm = size * 0.34
         ZStack {
-            Circle().fill(.ultraThinMaterial).opacity(0.55)
-            Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            DPadCross(arm: arm, length: size * 0.94).fill(.ultraThinMaterial).opacity(0.7)
+            // The pressed arms light up, from the center out.
             ForEach(Self.directions, id: \.self) { direction in
-                DPadArm(size: size, pressed: held.contains(direction))
+                Rectangle()
+                    .fill(.white.opacity(held.contains(direction) ? 0.4 : 0.06))
+                    .frame(width: arm, height: size * 0.47)
+                    .offset(y: -size * 0.235)
+                    .rotationEffect(direction.armAngle)
+            }
+            .clipShape(DPadCross(arm: arm, length: size * 0.94))
+            DPadCross(arm: arm, length: size * 0.94).stroke(.white.opacity(0.22), lineWidth: 1)
+            Circle().fill(.black.opacity(0.18)).frame(width: arm * 0.5)
+            ForEach(Self.directions, id: \.self) { direction in
+                Image(systemName: "arrowtriangle.up.fill")
+                    .font(.system(size: arm * 0.24))
+                    .foregroundStyle(.white.opacity(held.contains(direction) ? 1 : 0.75))
+                    .offset(y: -size * 0.33)
                     .rotationEffect(direction.armAngle)
                     .opacity(mapping.action(for: direction) == .nothing ? 0.35 : 1)
             }
-            Circle().fill(.white.opacity(0.12)).frame(width: size * 0.18)
             // Badges sit beside each arm's outer end, unrotated so they read upright.
             ForEach(Self.directions, id: \.self) { direction in
-                if let badge = mapping.action(for: direction).badge {
+                if mapping.isRemapped(direction), let badge = mapping.action(for: direction).badge {
                     let angle = direction.armAngle.radians
                     Badge(text: badge)
                         .offset(x: sin(angle) * size * 0.44 + cos(angle) * size * 0.17,
@@ -197,23 +232,25 @@ private struct DPad: View {
                 }
             }
         }
+        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+        .animation(.easeOut(duration: 0.08), value: held)
         .frame(width: size, height: size)
-        .contentShape(Circle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .updating($held) { value, state, _ in
-                    let center = CGPoint(x: size / 2, y: size / 2)
-                    state = dpadDirections(dx: value.location.x - center.x, dy: value.location.y - center.y,
-                                           deadZone: size * 0.12)
-                }
-        )
-        .onChange(of: held) { old, new in
-            for direction in Self.directions where old.contains(direction) && !new.contains(direction) { press(direction, false) }
-            for direction in Self.directions where new.contains(direction) && !old.contains(direction) { press(direction, true) }
+        .overlay {
+            TouchSurface(circular: true) { location in
+                let directions = location.map {
+                    dpadDirections(dx: $0.x - size / 2, dy: $0.y - size / 2, deadZone: size * 0.12)
+                } ?? []
+                let old = held
+                held = directions
+                for direction in Self.directions where old.contains(direction) && !directions.contains(direction) { press(direction, false) }
+                for direction in Self.directions where directions.contains(direction) && !old.contains(direction) { press(direction, true) }
+            }
         }
         .onDisappear {
             for direction in held { press(direction, false) }
+            held = []
         }
+        .accessibilityElement()
         .accessibilityLabel("Direction pad")
     }
 
@@ -246,23 +283,28 @@ private extension ControlInput {
     }
 }
 
-/// The upper arm of the cross. The pad rotates it into place for the other three.
-private struct DPadArm: View {
-    let size: CGFloat
-    let pressed: Bool
+/// A plus sign with rounded corners, centered in its rect: one piece, like a controller's D-pad.
+nonisolated private struct DPadCross: Shape {
+    let arm: CGFloat
+    let length: CGFloat
 
-    var body: some View {
-        let width = size * 0.3
-        ZStack {
-            RoundedRectangle(cornerRadius: width * 0.22)
-                .fill(.white.opacity(pressed ? 0.55 : 0.16))
-                .frame(width: width, height: size * 0.36)
-            Image(systemName: "chevron.up")
-                .font(.system(size: width * 0.32, weight: .bold))
-                .foregroundStyle(.white.opacity(pressed ? 1 : 0.8))
+    func path(in rect: CGRect) -> Path {
+        let a = arm / 2, b = length / 2
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        // Clockwise from the top arm's top left corner. Every third corner, where two arms meet, turns inward.
+        let corners: [(CGFloat, CGFloat)] = [
+            (-a, -b), (a, -b), (a, -a), (b, -a), (b, a), (a, a), (a, b), (-a, b), (-a, a), (-b, a), (-b, -a), (-a, -a),
+        ]
+        let points = corners.map { CGPoint(x: c.x + $0.0, y: c.y + $0.1) }
+        var path = Path()
+        path.move(to: CGPoint(x: c.x, y: c.y - b))
+        for index in points.indices {
+            let inner = index % 3 == 2
+            path.addArc(tangent1End: points[(index + 1) % points.count], tangent2End: points[(index + 2) % points.count],
+                        radius: arm * (inner ? 0.1 : 0.2))
         }
-        .offset(y: -size * 0.24)
-        .animation(.easeOut(duration: 0.08), value: pressed)
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -273,7 +315,7 @@ private struct TouchButton<Label: View>: View {
     let title: String
     let press: TouchPress
     let label: (Bool) -> Label
-    @GestureState private var pressed = false
+    @State private var pressed = false
 
     init(_ control: ControlInput?, title: String, press: @escaping TouchPress, @ViewBuilder label: @escaping (Bool) -> Label) {
         self.control = control
@@ -286,14 +328,110 @@ private struct TouchButton<Label: View>: View {
         label(pressed)
             .scaleEffect(pressed ? 0.92 : 1)
             .animation(.easeOut(duration: 0.08), value: pressed)
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).updating($pressed) { _, state, _ in state = true })
-            .onChange(of: pressed) { _, now in press(control, now) }
-            .onDisappear { if pressed { press(control, false) } }
+            .overlay {
+                TouchSurface { location in
+                    let now = location != nil
+                    guard now != pressed else { return }
+                    pressed = now
+                    press(control, now)
+                }
+            }
+            .onDisappear {
+                if pressed { press(control, false) }
+                pressed = false
+            }
+            .accessibilityElement()
             .accessibilityLabel(title)
             .accessibilityAddTraits(.isButton)
     }
 }
+
+#if canImport(UIKit)
+/// Reports one finger's position from the moment it lands, as it moves, and nil when it lifts or the system cancels it.
+/// UIKit hands a gesture recognizer each touch as it lands. A SwiftUI DragGesture here saw a touch-down only once the
+/// finger lifted, so every button pressed and released together.
+private struct TouchSurface: UIViewRepresentable {
+    var circular = false
+    let touch: (CGPoint?) -> Void
+
+    func makeUIView(context: Context) -> SurfaceView {
+        let view = SurfaceView()
+        view.backgroundColor = .clear
+        view.addGestureRecognizer(TouchRecognizer())
+        return view
+    }
+
+    func updateUIView(_ view: SurfaceView, context: Context) {
+        view.circular = circular
+        (view.gestureRecognizers?.first as? TouchRecognizer)?.report = touch
+    }
+
+    final class SurfaceView: UIView {
+        var circular = false
+
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            guard circular else { return super.point(inside: point, with: event) }
+            let dx = point.x - bounds.midX, dy = point.y - bounds.midY, radius = min(bounds.width, bounds.height) / 2
+            return dx * dx + dy * dy <= radius * radius
+        }
+    }
+
+    /// Never recognizes, so it blocks no other gesture, and nothing else can stop it from seeing its touch.
+    final class TouchRecognizer: UIGestureRecognizer {
+        var report: (CGPoint?) -> Void = { _ in }
+        private var finger: UITouch?
+
+        override init(target: Any?, action: Selector?) {
+            super.init(target: target, action: action)
+            cancelsTouchesInView = false
+            delaysTouchesBegan = false
+            delaysTouchesEnded = false
+        }
+
+        override func canPrevent(_ preventedGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+        override func canBePrevented(by preventingGestureRecognizer: UIGestureRecognizer) -> Bool { false }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            guard finger == nil, let touch = touches.first else { return }
+            finger = touch
+            report(touch.location(in: view))
+        }
+
+        override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+            if let finger, touches.contains(finger) { report(finger.location(in: view)) }
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+            lift(touches)
+        }
+
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { lift(touches) }
+
+        override func reset() {
+            super.reset()
+            if finger != nil {
+                finger = nil
+                report(nil)
+            }
+        }
+
+        private func lift(_ touches: Set<UITouch>) {
+            guard let finger, touches.contains(finger) else { return }
+            self.finger = nil
+            report(nil)
+            state = .failed
+        }
+    }
+}
+#else
+/// The touch gamepad shows only on touch devices.
+private struct TouchSurface: View {
+    var circular = false
+    let touch: (CGPoint?) -> Void
+
+    var body: some View { Color.clear }
+}
+#endif
 
 private struct KeyFill<S: InsettableShape>: View {
     let shape: S
@@ -323,7 +461,7 @@ private struct RoundKey: View {
     }
 }
 
-// MARK: - Mouse mode
+// MARK: - Cursor mode
 
 private struct MouseControls: View {
     @Binding var cursor: CGPoint

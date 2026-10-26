@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "Lock", targets: ["Lock"]),
         .library(name: "HubUI", targets: ["HubUI"]),
         .library(name: "SaveSync", targets: ["SaveSync"]),
+        .library(name: "Rclone", targets: ["Rclone"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
     ],
     targets: [
@@ -27,8 +28,10 @@ let package = Package(
                 swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
-        // Support holds the Python launcher and the Ren'Py hook script that the helper process loads from disk.
-        .target(name: "EngineRenPy", dependencies: ["VNCore"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
+        // Support holds the Python launcher and the Ren'Py hook script that Ren'Py loads from disk.
+        .target(name: "EngineRenPy", dependencies: ["VNCore", "CRenPy"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
+        // Runs Ren'Py inside the app on iOS. Ren'Py's static libraries are linked by the app target, not here.
+        .target(name: "CRenPy"),
         // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
         .target(name: "CKiriKiri"),
         .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri"], swiftSettings: mainActorByDefault),
@@ -36,7 +39,11 @@ let package = Package(
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport"], swiftSettings: mainActorByDefault),
-        .target(name: "SaveSync", dependencies: ["VNCore"]),
+        .target(name: "SaveSync", dependencies: ["VNCore", "Rclone"]),
+        // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
+        .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
+        .target(name: "Rclone", dependencies: ["CRclone"],
+                linkerSettings: [.linkedFramework("CoreFoundation"), .linkedFramework("Security"), .linkedLibrary("resolv")]),
         // The system libarchive plus zlib's infback9 for Deflate64. Lives inside ArchiveImport's folder.
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
@@ -53,8 +60,9 @@ let package = Package(
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
-        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync"]),
-        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
+        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy"]),
+        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
+        .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]
 )

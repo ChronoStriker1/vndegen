@@ -121,11 +121,9 @@ nonisolated struct KiriKiriInputRouter {
     mutating func translate(_ event: ControllerEvent) -> [KiriKiriInput] {
         switch event {
         case let .button(button, pressed):
-            switch button.kiriKiriControl {
-            case let .hold(hold): return press(hold, pressed)
-            case let .wheel(notches): return pressed ? [.wheel(notches: notches)] : []
-            case nil: return []
-            }
+            return control(button.kiriKiriControl, pressed)
+        case let .gamepad(input, pressed):
+            return control(input.virtualButton?.kiriKiriControl, pressed)
         case let .key(key, pressed):
             return key.sdlScancode.map { press(.key($0), pressed) } ?? []
         case let .click(button, pressed):
@@ -139,6 +137,14 @@ nonisolated struct KiriKiriInputRouter {
             }
         case let .scroll(dy):
             return scroll(dy)
+        }
+    }
+
+    private mutating func control(_ control: KiriKiriControl?, _ pressed: Bool) -> [KiriKiriInput] {
+        switch control {
+        case let .hold(hold): press(hold, pressed)
+        case let .wheel(notches): pressed ? [.wheel(notches: notches)] : []
+        case nil: []
         }
     }
 

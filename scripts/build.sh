@@ -10,6 +10,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 xcodegen generate --quiet
+# Save sync's rclone library, which the package links on every platform.
+scripts/rclone-runtime.sh
+# The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
+case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
 
 # xcodebuild prints every warning and compiler command. Errors and the final status are what matter here.
 # Xcode needs the KiriKiri engine's framework before it can plan the app build, so the engine builds first. The
