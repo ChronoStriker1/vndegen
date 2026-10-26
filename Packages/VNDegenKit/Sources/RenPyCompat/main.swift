@@ -49,6 +49,18 @@ func snapshot(_ folder: URL) -> [String: String] {
     return files
 }
 
+/// `url`'s path components with symlinks resolved, also when the end of the path does not exist yet, lowercased because
+/// macOS volumes usually ignore case. Two spellings of one folder come out equal.
+func resolvedComponents(_ url: URL) -> [String] {
+    var existing = url.standardizedFileURL
+    var missing: [String] = []
+    while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
+        missing.insert(existing.lastPathComponent, at: 0)
+        existing.deleteLastPathComponent()
+    }
+    return (existing.resolvingSymlinksInPath().pathComponents + missing).map { $0.lowercased() }
+}
+
 /// The first line that names a Python exception in Ren'Py's traceback, or else in its log.
 func firstError(_ files: [URL]) -> String? {
     for file in files {
@@ -63,12 +75,24 @@ func firstError(_ files: [URL]) -> String? {
 let options = Options(Array(CommandLine.arguments.dropFirst()))
 guard let support = RenPyCommand.support else { fatalError("EngineRenPy's Support folder is missing") }
 let names = ((try? FileManager.default.contentsOfDirectory(atPath: options.games.path)) ?? []).filter { !$0.hasPrefix(".") }.sorted()
+let games = names.compactMap { name -> (String, URL, RenPyLayout)? in
+    let folder = options.games.appendingPathComponent(name, isDirectory: true)
+    return RenPyLayout(FolderProbe(scanning: folder)).map { (name, folder, $0) }
+}
+
+// Each run deletes its output folder first, so the output must not be, hold, or sit inside a game folder.
+let outComponents = resolvedComponents(options.out)
+if let overlap = games.first(where: { _, folder, _ in
+    let game = resolvedComponents(folder)
+    return outComponents.starts(with: game) || game.starts(with: outComponents)
+}) {
+    FileHandle.standardError.write(Data("RenPyCompat: --out \(options.out.path) overlaps the game folder \(overlap.0)\n".utf8))
+    exit(2)
+}
 
 print("| Game | Version | Runtime | Result | Seconds | Game folder | Error |")
 print("|---|---|---|---|---|---|---|")
-for name in names {
-    let folder = options.games.appendingPathComponent(name, isDirectory: true)
-    guard let layout = RenPyLayout(FolderProbe(scanning: folder)) else { continue }
+for (name, folder, layout) in games {
     let runtime = options.runtime ?? layout.runtime
     let out = options.out.appendingPathComponent("\(name)/\(runtime.rawValue)", isDirectory: true)
     let data = out.appendingPathComponent("data", isDirectory: true)

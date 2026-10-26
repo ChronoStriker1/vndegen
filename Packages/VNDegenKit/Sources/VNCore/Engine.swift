@@ -108,6 +108,13 @@ public protocol EngineSession: AnyObject {
     func send(_ event: ControllerEvent)
     func setPaused(_ paused: Bool)
     func terminate()
+    /// Returns once the game has really stopped after `terminate()`, so its saves are final. A game in a helper
+    /// process can take a moment to save and quit.
+    func waitUntilStopped() async
+}
+
+extension EngineSession {
+    public func waitUntilStopped() async {}
 }
 
 public enum EngineDetector {

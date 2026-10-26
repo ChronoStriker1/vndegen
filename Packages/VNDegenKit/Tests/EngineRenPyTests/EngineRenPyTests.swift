@@ -67,6 +67,14 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(try layout(["renpy/main.py": "", "game/script.rpy": ""]) == RenPyLayout(base: "", version: nil, runtime: .renPy8, evidence: .fallback))
 }
 
+@Test func findsScriptsInASubfolderOfAGameOneFolderDown() throws {
+    let layout = try layout([
+        "TestGame-1.0-pc/renpy/__init__.py": "version_tuple = (7, 4, 2, vc_version)\n",
+        "TestGame-1.0-pc/game/scripts/story.rpyc": "",
+    ])
+    #expect(layout == RenPyLayout(base: "TestGame-1.0-pc", version: "7.4.2", runtime: .renPy7, evidence: .version))
+}
+
 @Test func ignoresFoldersWithoutGameScripts() throws {
     #expect(try layout(["renpy/__init__.py": "", "game/images/bg.png": ""]) == nil)
     #expect(try layout(["js/rmmz_core.js": "", "game/script.rpy": ""]) == nil)
@@ -93,18 +101,79 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(location.relativePath("/tmp/vndegen/GameData/Test Game/saves/auto-1-LT1.save") == "auto-1-LT1.save")
 }
 
+@Test func rejectsSavePathsThatLeaveTheSaveFolder() throws {
+    let data = URL(fileURLWithPath: "/tmp/vndegen/GameData/Test Game")
+    let location = try #require(RenPyPlugin().saveLocations(folder: URL(fileURLWithPath: "/nonexistent"), dataDirectory: data).first)
+    #expect(location.relativePath("/home/deck/.renpy/Game-1505403882/../../../library.json") == nil)
+    #expect(location.relativePath("C:/Games/Test Game/game/saves/../../game/script.rpy") == nil)
+    #expect(location.relativePath("/tmp/vndegen/GameData/Test Game/saves/../renpy.json") == nil)
+    #expect(location.relativePath("/tmp/vndegen/GameData/Test Game/saves/./1-1-LT1.save") == nil)
+    #expect(location.relativePath("/VNDegen/Test Game/saves/../../x") == nil)
+    #expect(location.relativePath("/home/deck/.renpy/Game-1505403882/sync/persistent") == "sync/persistent")
+}
+
+@Test func mapsTheSamePortablePathOnEveryInstall() throws {
+    let here = try #require(RenPyPlugin().saveLocations(folder: URL(fileURLWithPath: "/nonexistent"),
+                                                        dataDirectory: URL(fileURLWithPath: "/tmp/a/GameData/Test Game")).first)
+    #expect(here.relativePath("/VNDegen/Test Game/saves/1-1-LT1.save") == "1-1-LT1.save")
+    #expect(here.relativePath("/VNDegen/Test Game/saves/sync/persistent") == "sync/persistent")
+    // A backup made before VNDegen recorded the portable path names another install's data directory.
+    #expect(here.relativePath("/Users/player/Library/Application Support/VNDegen/GameData/Test Game/saves/auto-1-LT1.save") == "auto-1-LT1.save")
+    #expect(here.relativePath("/VNDegen/Test Game/1-1-LT1.save") == nil)
+}
+
 @Test func copiesGameFolderSavesOnlyIntoAnEmptySaveFolder() throws {
     let base = try folder(["game/saves/1-1-LT1.save": "pc save", "game/saves/persistent": "pc persistent"])
     let data = try folder([:])
-    RenPyPlugin.importGameSaves(base: base, dataDirectory: data)
+    try RenPyPlugin.importGameSaves(base: base, dataDirectory: data)
     #expect(try String(contentsOf: data.appendingPathComponent("saves/1-1-LT1.save"), encoding: .utf8) == "pc save")
 
     try Data("vndegen".utf8).write(to: data.appendingPathComponent("saves/persistent"))
     try Data("newer pc save".utf8).write(to: base.appendingPathComponent("game/saves/1-1-LT1.save"))
-    RenPyPlugin.importGameSaves(base: base, dataDirectory: data)
+    try RenPyPlugin.importGameSaves(base: base, dataDirectory: data)
     #expect(try String(contentsOf: data.appendingPathComponent("saves/persistent"), encoding: .utf8) == "vndegen")
     #expect(try String(contentsOf: data.appendingPathComponent("saves/1-1-LT1.save"), encoding: .utf8) == "pc save")
 }
+
+@Test func aFailedSaveImportLeavesTheSaveFolderEmptyForTheNextLaunch() throws {
+    let base = try folder(["game/saves/1-1-LT1.save": "pc save", "game/saves/2-1-LT1.save": "unreadable"])
+    let unreadable = base.appendingPathComponent("game/saves/2-1-LT1.save")
+    let data = try folder([:])
+    try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: unreadable.path)
+    #expect(throws: RenPyError.self) { try RenPyPlugin.importGameSaves(base: base, dataDirectory: data) }
+    #expect((try? FileManager.default.contentsOfDirectory(atPath: data.appendingPathComponent("saves").path))?.isEmpty ?? true)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: data.path).isEmpty)
+
+    try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: unreadable.path)
+    try RenPyPlugin.importGameSaves(base: base, dataDirectory: data)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: data.appendingPathComponent("saves").path).sorted() == ["1-1-LT1.save", "2-1-LT1.save"])
+}
+
+#if os(macOS)
+/// Runs the RenPyCompat tool that `swift test` built beside the test bundle.
+private func runCompat(_ arguments: [String]) throws -> Int32 {
+    let products = try #require(Bundle.allBundles.map(\.bundleURL).first { $0.pathExtension == "xctest" }).deletingLastPathComponent()
+    let process = Process()
+    process.executableURL = products.appendingPathComponent("RenPyCompat")
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    process.waitUntilExit()
+    return process.terminationStatus
+}
+
+@Test func compatToolRefusesAnOutputFolderThatOverlapsAGame() throws {
+    let games = try folder(["Test Game/8/renpy/__init__.py": "", "Test Game/8/game/script.rpy": "label start:\n    return\n"])
+    let script = games.appendingPathComponent("Test Game/8/game/script.rpy")
+    let link = games.deletingLastPathComponent().appendingPathComponent("\(games.lastPathComponent)-link")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: games)
+    for out in [games, games.appendingPathComponent("Test Game"), games.appendingPathComponent("Test Game/8/game/out"), link] {
+        #expect(try runCompat([games.path, "--runtimes", "/nonexistent", "--out", out.path]) == 2, "\(out.path)")
+        #expect(FileManager.default.fileExists(atPath: script.path))
+    }
+}
+#endif
 
 @Test func storesTheRuntimeOverridePerGame() throws {
     let data = try folder([:])

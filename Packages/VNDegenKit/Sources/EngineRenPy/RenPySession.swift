@@ -8,7 +8,8 @@ nonisolated let renPyLog = Logger(subsystem: "com.chronostriker1.vndegen", categ
 /// Ren'Py runs as a helper process with its own SDL window, so a crash or `os._exit` in a game never takes down the hub,
 /// and Ren'Py 7 and 8 games each get their own Python. The game window opens where the hub window is, and the hub window
 /// hides while the game is in front. Quitting from the game's VNDegen menu, or any other way the process ends, brings
-/// the hub back and ends the session through `onExit`.
+/// the hub back and ends the session through `onExit`. When the hub ends the session instead, the game quits the way
+/// its own Quit button does, and `waitUntilStopped()` returns once it has.
 final class RenPySession: EngineSession {
     let view: PlatformView
     private let process = Process()
@@ -20,6 +21,13 @@ final class RenPySession: EngineSession {
     private weak var hubWindow: NSWindow?
     private var activation: (any NSObjectProtocol)?
     private var stopped = false
+    /// Set once the hub ends the session, so the game's exit does not end it a second time.
+    private var ending = false
+    private var exitWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// How long a game gets to autosave and quit after the hub ends its session. Ren'Py itself waits up to 3 seconds
+    /// for an autosave on quit.
+    static let quitTimeout: Duration = .seconds(10)
 
     init(_ launch: GameLaunch, layout: RenPyLayout, runtime: RenPyRuntime) throws {
         guard let runtimes = RenPyCommand.bundledRuntimes, let support = RenPyCommand.support,
@@ -30,6 +38,7 @@ final class RenPySession: EngineSession {
         self.runtimes = runtimes
         self.support = support
         base = launch.folder.appendingPathComponent(layout.path(""), isDirectory: true)
+        try RenPyPlugin.importGameSaves(base: base, dataDirectory: launch.dataDirectory)
         let host = RenPyHostView(message: "\(launch.game.title) is running in its own window.")
         view = host
         host.onWindow = { [weak self] window in self?.start(in: window) }
@@ -39,7 +48,6 @@ final class RenPySession: EngineSession {
     /// Starts the game once the hub window that will host the placeholder is known, so the game window can take its place.
     private func start(in window: NSWindow) {
         hubWindow = window
-        RenPyPlugin.importGameSaves(base: base, dataDirectory: launch.dataDirectory)
         let placement: RenPyCommand.Placement = window.styleMask.contains(.fullScreen) ? .fullScreen : .frame(Self.gameFrame(over: window))
         let command = RenPyCommand(base: base, runtime: runtime, runtimes: runtimes, support: support,
                                    dataDirectory: launch.dataDirectory, placement: placement, buttons: launch.game.buttonMapping)
@@ -82,7 +90,11 @@ final class RenPySession: EngineSession {
 
     private func ended(status: Int32) {
         renPyLog.info("\(self.launch.game.id.rawValue, privacy: .public) exited with status \(status)")
+        let waiters = exitWaiters
+        exitWaiters = []
+        waiters.forEach { $0.resume() }
         stopObserving()
+        guard !ending else { return }
         showHub()
         launch.onExit()
     }
@@ -127,13 +139,31 @@ final class RenPySession: EngineSession {
         }
     }
 
-    /// Ren'Py answers SIGTERM with its quit prompt, so the hub kills the process. Ren'Py writes each save to a new file
-    /// and renames it into place, so this cannot leave a half-written save.
+    /// `zz_vndegen.rpy` answers SIGTERM by quitting as Ren'Py's Quit button does once the player confirms, so the game
+    /// autosaves and writes its persistent data. A game still running after `quitTimeout` is killed. Ren'Py writes each
+    /// save to a new file and renames it into place, so even that cannot leave a half-written save.
     func terminate() {
-        process.terminationHandler = nil
+        ending = true
         stopObserving()
-        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
         if hubWindow?.isVisible == false { showHub() }
+        guard process.isRunning else { return }
+        let pid = process.processIdentifier
+        if stopped {
+            kill(pid, SIGCONT)
+            stopped = false
+        }
+        kill(pid, SIGTERM)
+        Task {
+            try? await Task.sleep(for: Self.quitTimeout)
+            guard process.isRunning else { return }
+            renPyLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not quit in time, killing it")
+            kill(pid, SIGKILL)
+        }
+    }
+
+    func waitUntilStopped() async {
+        guard process.isRunning else { return }
+        await withCheckedContinuation { exitWaiters.append($0) }
     }
 
     /// The hub window's frame in SDL's coordinates.

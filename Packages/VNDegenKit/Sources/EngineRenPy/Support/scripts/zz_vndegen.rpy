@@ -3,6 +3,7 @@
 
 init 999 python in _vndegen:
     import os
+    import signal
     import time
     import pygame
 
@@ -17,6 +18,12 @@ init 999 python in _vndegen:
 
     menu_open = False
 
+    def quit_game():
+        # What Ren'Py's own Quit action does after the player confirms.
+        if not renpy.store.main_menu and config.autosave_on_quit:
+            renpy.force_autosave()
+        renpy.quit(save=True)
+
     def open_menu():
         global menu_open
         if menu_open:
@@ -27,12 +34,28 @@ init 999 python in _vndegen:
         finally:
             menu_open = False
         if leave:
-            # What Ren'Py's own Quit action does after the player confirms.
-            if not renpy.store.main_menu and config.autosave_on_quit:
-                renpy.force_autosave()
-            renpy.quit(save=True)
+            quit_game()
 
     config.underlay.append(renpy.Keymap(vndegen_menu=open_menu))
+
+    # VNDegen sends SIGTERM when the player quits from the hub or quits VNDegen. SDL would turn it into a quit event,
+    # which shows Ren'Py's quit prompt, so the game quits as if the player had confirmed instead. A signal can arrive
+    # anywhere, even in the middle of a save, so the handler only sets a flag for the next periodic callback.
+    quit_requested = False
+
+    def request_quit(signum, frame):
+        global quit_requested
+        quit_requested = True
+
+    def quit_if_requested():
+        # Cleared first, because the game's own quit label can run interactions that call this again.
+        global quit_requested
+        if quit_requested:
+            quit_requested = False
+            quit_game()
+
+    signal.signal(signal.SIGTERM, request_quit)
+    config.periodic_callbacks.append(quit_if_requested)
 
     # A text prompt, such as a name entry, swallows the backtick's key press and types it. It passes it on instead, so
     # the backtick still opens the menu there, and never types.
@@ -109,8 +132,8 @@ init 999 python in _vndegen:
 
     def remap(buttons):
         defaults = dict(config.pad_bindings)
-        # Pad event name to the keys and clicks it posts. Up and down share the stick's release, as do left and right.
-        posts = {}
+        # Pad press event name, such as "pad_a_press" or "pad_lefty_neg", to the keys and clicks it holds down.
+        holds = {}
         for item in buttons.split(","):
             control, _, action = item.partition("=")
             kind, _, value = action.partition(":")
@@ -123,16 +146,24 @@ init 999 python in _vndegen:
                 else:
                     bindings = [[], [], []]
                     if kind in ("key", "click"):
-                        posts.setdefault(press, []).append((kind, value, True))
-                        posts.setdefault(release, []).append((kind, value, False))
+                        holds.setdefault(press, []).append((kind, value))
                 config.pad_bindings[press], config.pad_bindings[release], config.pad_bindings["repeat_" + press] = bindings
 
         post_event = renpy.display.controller.post_event
+        # The press event each button or stick axis holds down, such as {"lefty": "pad_lefty_neg"}. Ren'Py can report
+        # a stick going straight from neg to pos, with no zero between, so a new direction first releases the old one.
+        held = {}
 
         def post_remapped(control, state, repeat):
-            if not repeat and renpy.display.interface.keyboard_focused:
-                for post in posts.get("pad_{}_{}".format(control, state), []):
-                    post_input(*post)
+            if not repeat:
+                released = held.pop(control, None)
+                for kind, value in holds.get(released, []):
+                    post_input(kind, value, False)
+                if state not in ("release", "zero") and renpy.display.interface.keyboard_focused:
+                    press = "pad_{}_{}".format(control, state)
+                    held[control] = press
+                    for kind, value in holds.get(press, []):
+                        post_input(kind, value, True)
             post_event(control, state, repeat)
 
         renpy.display.controller.post_event = post_remapped
@@ -151,6 +182,8 @@ init 999 python in _vndegen:
     #   shot:<name>  save a screenshot as <name>.png
     #   key:<K_x>    press and release a key, as the keyboard would
     #   pad:<name>   press and release a controller button, by its SDL name such as guide, back, or a
+    #   axis:<name>:<state>
+    #                move a controller axis, such as axis:lefty:neg for the left stick up; states are neg, pos, and zero
     #   save:<slot>  what a save slot's button does on the save screen; load:<slot> is the same on the load screen
     #   quit         quit, with the result "main-menu" if a menu step got there; without it the game stays open
     probe = os.environ.get("VNDEGEN_PROBE")
@@ -175,6 +208,8 @@ init 999 python in _vndegen:
             if action is not None:
                 return renpy.run(action)
 
+        # Registered with no keys, so Ren'Py does not read the name as a key and fail on the next key press.
+        config.keymap["_vndegen_probe"] = []
         config.underlay.append(renpy.Keymap(_vndegen_probe=probe_run))
 
         def probe_step():
@@ -226,6 +261,8 @@ init 999 python in _vndegen:
                 probe_log("keyboard_focused %s" % renpy.display.interface.keyboard_focused)
                 renpy.display.controller.controller_event(arg, "press")
                 renpy.display.controller.controller_event(arg, "release")
+            elif step == "axis":
+                renpy.display.controller.controller_event(*arg.split(":"))
             elif step in ("start", "save", "load"):
                 if step == "start":
                     probe_state["action"] = renpy.store.Start()
