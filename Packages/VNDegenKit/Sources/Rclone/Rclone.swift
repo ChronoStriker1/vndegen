@@ -19,7 +19,8 @@ public enum Rclone {
         _ = try await call(method, json: JSONEncoder().encode(input))
     }
 
-    private static func call(_ method: String, json input: Data) async throws -> Data {
+    /// `call` with raw JSON in and out.
+    public static func call(_ method: String, json input: Data) async throws -> Data {
         _ = initialized
         let id = nextID.next()
         let reply: (Data, Int32) = try await withTaskCancellationHandler {

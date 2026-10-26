@@ -3,8 +3,6 @@ import EngineRenPy
 import EngineRPGMaker
 import Foundation
 import Testing
-import Rsync
-import RsyncTestSupport
 import VNCore
 @testable import SaveSync
 
@@ -463,27 +461,84 @@ private let realSample = fm.homeDirectoryForCurrentUser.appendingPathComponent("
     #expect(mapping.backups.map(\.children.count) == [2, 0])
 }
 
-#if os(macOS)
-@Test func theMacKeepsItsSSHKeyInAFileOnlyItsUserCanRead() throws {
-    let directory = try temporaryDirectory().appendingPathComponent("SaveSync")
-    let made = try SSHIdentity.key(in: directory)
-    let file = directory.appendingPathComponent("ssh-ed25519")
-    #expect((try fm.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) == 0o600)
-    #expect(try SSHIdentity.key(in: directory).rawRepresentation == made.rawRepresentation)
-    #expect(try fm.contentsOfDirectory(atPath: directory.path) == ["ssh-ed25519"])
+// MARK: - Settings
+
+/// A library with No Socks RPG and the save service's folder, as a fresh install has them.
+@MainActor
+private func freshLibrary() async throws -> (library: LibraryStore, directory: URL) {
+    let base = try temporaryDirectory()
+    _ = try makeGame(in: base, saves: ["file1.rmmzsave": "one"])
+    let library = LibraryStore(paths: LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support")),
+                               engines: [RPGMakerPlugin(.mz)])
+    await library.refresh()
+    let directory = library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)
+    try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+    return (library, directory)
 }
 
-@Test func macInstancesMakingTheKeyAtOnceAllGetTheOneOnDisk() throws {
-    for _ in 0..<20 {
-        let directory = try temporaryDirectory().appendingPathComponent("SaveSync")
-        let keys = Locked<[Data]>([])
-        DispatchQueue.concurrentPerform(iterations: 8) { _ in
-            if let key = try? SSHIdentity.key(in: directory) { keys { $0.append(key.rawRepresentation) } }
-        }
-        let onDisk = try Data(contentsOf: directory.appendingPathComponent("ssh-ed25519"))
-        #expect(keys { $0 }.count == 8)
-        #expect(Set(keys { $0 }) == [onDisk])
-        #expect(try fm.contentsOfDirectory(atPath: directory.path) == ["ssh-ed25519"])
+@MainActor
+@Test func settingsFromVersion040LeaveSyncOffUntilTheShareIsEntered() async throws {
+    let (library, directory) = try await freshLibrary()
+    let id = GameID("No Socks RPG")
+    // As VNDegen 0.4.0 saved them, with its SSH key beside them.
+    try Data("""
+    {"server":{"ssh":{"host":"server","port":22,"user":"player"},"path":"/srv/ludusavi","hostKey":"ssh-ed25519 AAAA"},
+     "autoBackup":true,"checkBeforeLaunch":false,"retention":{"full":3,"differential":2},"matches":{"No Socks RPG":"No Socks"},
+     "synced":{"No Socks RPG":{"folder":"No Socks","saves":{}}},"deviceID":"1a2b3c4d"}
+    """.utf8).write(to: directory.appendingPathComponent("settings.json"))
+    let key = directory.appendingPathComponent("ssh-ed25519")
+    try Data(repeating: 7, count: 32).write(to: key)
+    let connects = Locked(0)
+    let connector: SaveSyncService.Connector = { _ in
+        connects { $0 += 1 }
+        throw SaveSyncError.notSetUp
     }
+
+    let service = SaveSyncService(library: library, connector: connector, manifest: nil, configRetention: nil)
+    #expect(service.server == nil && service.needsShare && service.connection == .notSetUp)
+    #expect(service.deviceID == "1a2b3c4d")
+    #expect(service.autoBackup && !service.checkBeforeLaunch && service.manualRetention == Retention(full: 3, differential: 2))
+    #expect(service.match(for: id)?.source == .picked)
+    #if os(macOS)
+    #expect(!fm.fileExists(atPath: key.path))
+    #endif
+
+    // Nothing reaches a server.
+    await service.refresh()
+    await service.testConnection()
+    await service.sessionEnded(id)
+    #expect(await service.launchOffer(id) == nil)
+    await #expect(throws: SaveSyncError.notSetUp) { try await service.status(for: id) }
+    #expect(connects { $0 } == 0)
+
+    // The note stays until the share is entered.
+    let again = SaveSyncService(library: library, connector: connector, manifest: nil, configRetention: nil)
+    #expect(again.needsShare && again.deviceID == "1a2b3c4d")
+    try again.setServer(host: "nas.example", port: 445, guest: true, username: "", password: "", path: "games/Ludusavi")
+    #expect(!again.needsShare && again.server?.remote == .smb(SMBRemote(host: "nas.example")))
+    #expect(SaveSyncService(library: library, connector: connector, manifest: nil, configRetention: nil).server == again.server)
+}
+
+#if os(macOS)
+@MainActor
+@Test func theMacKeepsTheSharePasswordInAFileOnlyItsUserCanRead() async throws {
+    let (library, directory) = try await freshLibrary()
+    let service = SaveSyncService(library: library, connector: nil, manifest: nil, configRetention: nil)
+    try service.setServer(host: "nas.example", port: 445, guest: false, username: "player", password: "secret", path: "games/Ludusavi")
+    let file = directory.appendingPathComponent("smb-password")
+    #expect((try fm.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) == 0o600)
+    #expect(try String(contentsOf: file, encoding: .utf8) == "secret")
+    #expect(service.storedPassword() == "secret")
+    #expect(try !fm.contentsOfDirectory(atPath: directory.path).contains { $0.hasPrefix(".smb-password") })
+    // The settings never hold it.
+    #expect(try !String(contentsOf: directory.appendingPathComponent("settings.json"), encoding: .utf8).contains("secret"))
+
+    try service.setServer(host: "nas.example", port: 445, guest: false, username: "player", password: "changed", path: "games/Ludusavi")
+    #expect(service.storedPassword() == "changed")
+    #expect((try fm.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int) == 0o600)
+
+    try service.setServer(host: "nas.example", port: 445, guest: true, username: "player", password: "changed", path: "games/Ludusavi")
+    #expect(!fm.fileExists(atPath: file.path))
+    #expect(service.storedPassword() == nil)
 }
 #endif
