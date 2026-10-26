@@ -80,7 +80,7 @@ final class Navigator {
         case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation, pageControls, pageMapping
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
-        case controlMethod, playOrientation
+        case controlMethod, controllerMouse, mouseStyle, playOrientation
         case engineOption(EngineID?)
         case orientationOption(PlayOrientation?)
         case controlMethodOption(ControlMethod?)
@@ -208,7 +208,11 @@ final class Navigator {
         case .settings:
             var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
             #if os(iOS)
-            items += [.controlMethod, .playOrientation]
+            let method = ControlMethod.setting
+            items.append(.controlMethod)
+            if method.kind == .controller { items.append(.controllerMouse) }
+            if method.mouse != nil { items.append(.mouseStyle) }
+            items.append(.playOrientation)
             #endif
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
         }
@@ -322,7 +326,7 @@ final class Navigator {
         case let .importArchive(url): openImport([url])
         case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
-        case .controlMethod, .playOrientation: stepSetting(target, by: 1)
+        case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
@@ -414,7 +418,9 @@ final class Navigator {
     private func stepSetting(_ target: Target, by step: Int) -> Bool {
         #if os(iOS)
         switch target {
-        case .controlMethod: cycle(ControlMethod.storageKey, fallback: ControlMethod.automatic, by: step)
+        case .controlMethod: setControlMethod(ControlMethod.setting.stepped(by: step))
+        case .controllerMouse: setControlMethod(ControlMethod.setting.togglingMouse)
+        case .mouseStyle: setControlMethod(ControlMethod.setting.switchingMouseStyle)
         case .playOrientation: cycle(PlayOrientation.storageKey, fallback: PlayOrientation.setting, by: step)
         default: return false
         }
@@ -425,6 +431,11 @@ final class Navigator {
     }
 
     #if os(iOS)
+    /// Writes to the defaults key that the settings screen's `@AppStorage` reads.
+    private func setControlMethod(_ method: ControlMethod) {
+        UserDefaults.standard.set(method.rawValue, forKey: ControlMethod.storageKey)
+    }
+
     /// Writes the next value to the defaults key that the settings screen's `@AppStorage` reads.
     private func cycle<Value: CaseIterable & RawRepresentable<String> & Equatable>(_ key: String, fallback: Value, by step: Int) {
         let values = Array(Value.allCases)

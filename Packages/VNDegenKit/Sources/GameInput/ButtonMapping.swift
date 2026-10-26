@@ -181,22 +181,23 @@ nonisolated extension ControlMethod {
         let legacyKey = "touchControlsMode"
         guard let legacy = defaults.string(forKey: legacyKey) else { return }
         let migrated: ControlMethod? = switch legacy {
-        case "gamepad": .touchGamepad
-        case "mouse": .touchMouse
-        case "hidden": .controllerOnly
+        case "gamepad": .gamepad
+        case "mouse": .mouse(.cursor)
+        case "hidden": .controller(mouse: .touch)
         default: nil
         }
         if let migrated, defaults.string(forKey: storageKey) == nil { defaults.set(migrated.rawValue, forKey: storageKey) }
         defaults.removeObject(forKey: legacyKey)
     }
 
-    /// The on-screen controls this method shows on a touch device, or nil for none.
-    public func overlay(lastInput: InputKind, controllerConnected: Bool) -> TouchControlsMode? {
+    /// What touches do on a touch device under this method.
+    public func touchControls(lastInput: InputKind, controllerConnected: Bool) -> TouchControlsMode {
         switch self {
-        case .automatic: lastInput == .touch && !controllerConnected ? .gamepad : nil
-        case .touchGamepad: .gamepad
-        case .touchMouse: .mouse
-        case .controllerOnly: nil
+        case .automatic: lastInput == .touch && !controllerConnected ? .gamepad : .direct
+        case .gamepad: .gamepad
+        case .mouse(.touch), .controller(mouse: .touch): .direct
+        case .mouse(.cursor), .controller(mouse: .cursor): .cursor
+        case .controller(mouse: nil): .off
         }
     }
 }

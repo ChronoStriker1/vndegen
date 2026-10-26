@@ -122,10 +122,20 @@ struct SettingsView: View {
 
                     #if os(iOS)
                     Section {
-                        Picker("Control method", selection: $controlMethod) {
-                            ForEach(ControlMethod.allCases, id: \.self) { Text($0.title).tag($0) }
+                        Picker("Control method", selection: Binding(get: { controlMethod.kind }, set: { controlMethod = ControlMethod($0) })) {
+                            ForEach(ControlMethod.Kind.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
                         .focusRow(.controlMethod, nav)
+                        if controlMethod.kind == .controller {
+                            Toggle("Mouse", isOn: Binding(get: { controlMethod.mouse != nil }, set: { _ in controlMethod = controlMethod.togglingMouse }))
+                                .focusRow(.controllerMouse, nav)
+                        }
+                        if let mouse = controlMethod.mouse {
+                            Picker("Mouse style", selection: Binding(get: { mouse }, set: { controlMethod = controlMethod.with(mouse: $0) })) {
+                                ForEach(MouseStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                            }
+                            .focusRow(.mouseStyle, nav)
+                        }
                         Picker("In-game orientation", selection: $orientation) {
                             ForEach(PlayOrientation.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
@@ -133,7 +143,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Controls")
                     } footer: {
-                        Text("Automatic shows the touch gamepad when you play by touch with no controller connected. Controller only shows no on-screen controls. Each game page can override the control method and orientation, and the VNDegen menu switches the control method while you play.")
+                        Text("Automatic shows the touch gamepad when you play by touch with no controller connected. Mouse with the touch style clicks where you tap, and the cursor style moves a pointer like a trackpad. Controller shows no on-screen controls, and the game ignores touches unless Mouse is on. Each game page can override the control method and orientation, and the VNDegen menu switches the control method while you play.")
                     }
                     #endif
 

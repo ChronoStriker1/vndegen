@@ -60,7 +60,7 @@ public final class InputHub {
         receive(.touch(input), pressed ? input.map(buttonMapping.action) ?? .button(.hub) : nil, kind: .touch)
     }
 
-    /// A pointer or scroll event from the touch mouse. These hold no button the router tracks, so they go straight to
+    /// A pointer or scroll event from the touch cursor. These hold no button the router tracks, so they go straight to
     /// the consumer.
     public func touchPointer(_ event: ControllerEvent) {
         noteInput(.touch)
