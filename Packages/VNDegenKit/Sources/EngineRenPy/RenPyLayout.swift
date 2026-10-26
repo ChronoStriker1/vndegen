@@ -19,7 +19,8 @@ nonisolated public enum RenPyRuntime: String, Codable, CaseIterable, Sendable {
 /// Where a Ren'Py game sits inside the folder the user copied in, its version, and the runtime it runs on.
 nonisolated public struct RenPyLayout: Equatable, Sendable {
     /// The Ren'Py base directory (the one holding `renpy/` and `game/`), relative to the game folder. Empty when the
-    /// folder is the base directory. Archives often unpack to one extra folder level, so that is checked too.
+    /// folder is the base directory. Archives often unpack to one or two extra folder levels, such as
+    /// `Game/Game-1.0-pc/`, so those are checked too.
     public var base: String
     /// Such as "8.5.3", read from the game's `renpy/` package.
     public var version: String?
@@ -48,18 +49,15 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
     public func path(_ relative: String) -> String { base.isEmpty ? relative : "\(base)/\(relative)" }
 
     public init?(_ probe: FolderProbe) {
-        let topLevel = probe.entries.filter { !$0.contains("/") }.sorted()
-        guard let base = ([""] + topLevel).first(where: { Self.isBase($0, probe) }) else { return nil }
+        guard let base = Self.candidates(probe).first(where: { Self.isBase($0, probe) }) else { return nil }
         let prefix = base.isEmpty ? "" : "\(base)/"
         let text = { (path: String) in probe.read(prefix + path).map { String(decoding: $0, as: UTF8.self) } }
+        // Listed from disk, because the probe stops above `lib/` and `renpy/` of a base two folders down.
         let children = { (folder: String) in
-            let lower = (prefix + folder + "/").lowercased()
-            return probe.entries.compactMap { entry -> String? in
-                let rest = entry.lowercased()
-                guard rest.hasPrefix(lower) else { return nil }
-                let name = rest.dropFirst(lower.count)
-                return name.contains("/") ? nil : String(name)
-            }
+            let path = prefix + folder
+            let actual = probe.entries.first { $0.lowercased() == path.lowercased() } ?? path
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(actual).path)) ?? []
+            return names.map { $0.lowercased() }
         }
 
         let vcVersion = text("renpy/vc_version.py").flatMap(Self.vcVersion)
@@ -77,6 +75,19 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         // Ren'Py 7.5 to 8.1 ship one `renpy/` for both lines, with a 7.x and an 8.x version tuple.
         let version = tuples.first { ($0[0] >= 8) == (runtime == .renPy8) } ?? tuples.first
         self.init(base: base, version: version?.map(String.init).joined(separator: "."), runtime: runtime, evidence: evidence)
+    }
+
+    /// Folders that may be the base directory, shallowest first and then by name: the game folder and any folder up to
+    /// two levels down that holds a `renpy` entry. The probe already lists those levels, so this reads nothing from
+    /// disk. Each candidate can cost a walk of its `game/` folder, so only the first `limit` are tried.
+    static func candidates(_ probe: FolderProbe, limit: Int = 16) -> [String] {
+        let bases = probe.entries.compactMap { entry -> String? in
+            let parts = entry.split(separator: "/", omittingEmptySubsequences: false)
+            guard parts.count <= 3, parts.last?.lowercased() == "renpy" else { return nil }
+            return parts.dropLast().joined(separator: "/")
+        }
+        let depth = { (base: String) in base.count { $0 == "/" } }
+        return Array(Set(bases).sorted { (depth($0), $0) < (depth($1), $1) }.prefix(limit))
     }
 
     private static func isBase(_ base: String, _ probe: FolderProbe) -> Bool {

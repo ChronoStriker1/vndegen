@@ -32,6 +32,28 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(RenPyLayout(probe) == RenPyLayout(base: "TestGame-1.0-pc", version: "8.5.3", runtime: .renPy8, evidence: .version))
 }
 
+@Test func detectsAGameTwoFoldersDown() throws {
+    let root = try folder([
+        "TestGame/TestGame-1.0-pc/renpy/__init__.py": dualLineInit,
+        "TestGame/TestGame-1.0-pc/lib/py2-linux-x86_64/librenpython.so": "",
+        "TestGame/TestGame-1.0-pc/game/archive.rpa": "",
+        "TestGame/readme.txt": "",
+    ])
+    let probe = FolderProbe(scanning: root)
+    #expect(RenPyPlugin().detect(probe)?.evidence == "TestGame/TestGame-1.0-pc/renpy/")
+    // The probe stops above lib/ here, so the line still has to come from the libraries on disk.
+    #expect(RenPyLayout(probe) == RenPyLayout(base: "TestGame/TestGame-1.0-pc", version: "7.5.1", runtime: .renPy7, evidence: .libraries))
+    #expect(RenPyLayout.fingerprint(base: root.appendingPathComponent("TestGame/TestGame-1.0-pc")) != nil)
+}
+
+@Test func triesTheShallowestOfABoundedSetOfBases() throws {
+    var entries: Set<String> = ["Deep/Game/renpy", "Deep/Game/game", "Near/renpy", "Near/game", "Deep/Game/lib/renpy"]
+    for index in 0 ..< 40 { entries.insert(String(format: "Many/%02d/renpy", index)) }
+    let candidates = RenPyLayout.candidates(FolderProbe(root: URL(fileURLWithPath: "/"), entries: entries))
+    #expect(candidates.count == 16)
+    #expect(Array(candidates.prefix(3)) == ["Near", "Deep/Game", "Many/00"])
+}
+
 @Test func picksTheLineOfADualLineRenPyFromItsLibraries() throws {
     let layout = try layout([
         "renpy/__init__.py": dualLineInit,
