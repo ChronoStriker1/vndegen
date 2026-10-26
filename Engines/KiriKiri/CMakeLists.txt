@@ -1,5 +1,6 @@
 # Builds the KiriKiri engine (krkrsdl3) for VNDegen. scripts/kirikiri-engine.sh drives it.
-#   macOS: KiriKiriHelper, an executable VNDegen runs a game in.
+#   macOS: KiriKiriHelper, an executable VNDegen runs a game in, and on demand KiriKiriRestart,
+#          which runs several games in one process (vndegen/restart_main.mm).
 #   iOS:   KiriKiri.framework, which exports only the vnkk_* functions of vndegen/vnkk.h.
 # Rendering is software compositing presented through SDL3's renderer (Metal), with no OpenGL and
 # no JIT. Adapted from krkrsdl3_build's CMakeLists.txt and cmake/*.txt; see UPSTREAM.md.
@@ -24,6 +25,12 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_OBJC_VISIBILITY_PRESET hidden)
 set(CMAKE_OBJCXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+
+option(KIRIKIRI_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+if(KIRIKIRI_SANITIZE)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
 
 # The engine's fallback font, used when a game ships none. krkrsdl3_build keeps it in Res/.
 set(KIRIKIRI_DOWNLOADS ${CMAKE_BINARY_DIR} CACHE PATH "Folder downloaded build inputs are cached in")
@@ -420,4 +427,10 @@ else()
     target_link_options(KiriKiriHelper PRIVATE -Wl,-dead_strip)
     add_custom_command(TARGET KiriKiriHelper POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} $<TARGET_FILE_DIR:KiriKiriHelper>/Res/DroidSansFallback.ttf)
+
+    add_executable(KiriKiriRestart EXCLUDE_FROM_ALL vndegen/restart_main.mm vndegen/vnkk.mm)
+    set_source_files_properties(vndegen/restart_main.mm PROPERTIES COMPILE_OPTIONS -fobjc-arc)
+    target_link_libraries(KiriKiriRestart PRIVATE kirikiri_engine)
+    add_custom_command(TARGET KiriKiriRestart POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} $<TARGET_FILE_DIR:KiriKiriRestart>/Res/DroidSansFallback.ttf)
 endif()
