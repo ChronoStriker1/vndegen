@@ -186,8 +186,8 @@ func replaceFile(ctx context.Context, in rc.Params) (rc.Params, error) {
 	if (current == nil) != (expected == nil) || !bytes.Equal(current, expected) {
 		return rc.Params{"replaced": false}, nil
 	}
-	// The commit point. A call cancelled before here never renames. The smb backend's own requests ignore the
-	// context, so once Move starts, cancelling no longer stops it, and the caller treats the outcome as unknown.
+	// The commit point. A call cancelled before this check never renames. The smb backend's own requests ignore the
+	// context, so after it, cancelling no longer stops the rename, and the caller treats the outcome as unknown.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

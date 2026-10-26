@@ -93,7 +93,7 @@ private func callDirectly(_ id: Int64, _ method: String, _ input: [String: Strin
     #expect(cancelled.status != 200)
     #expect(try String(contentsOf: root.appendingPathComponent("mapping.yaml"), encoding: .utf8) == "old")
 
-    // A cancel for a call that was never begun keeps nothing, so a later call under that ID runs normally.
+    // A cancel for a call that was never begun does not cancel a later call under that ID.
     VNDRcloneCancel(-2)
     let later = try callDirectly(-2, "vndegen/replacefile", input, cancel: false)
     #expect(later.status == 200 && later.reply.contains("true"))

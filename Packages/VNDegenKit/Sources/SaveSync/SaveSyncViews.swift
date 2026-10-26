@@ -237,8 +237,8 @@ public struct SaveSyncSettingsView: View {
             Text("Retention")
         } footer: {
             Text(service.configRetention != nil
-                 ? "From Ludusavi's settings on this Mac. Backups beyond these limits are deleted, as Ludusavi deletes them."
-                 : "Enter the limits from Ludusavi's Other screen. VNDegen then makes full or differential backups and deletes old ones as Ludusavi would. When off, VNDegen follows the backups already on the server and never deletes one.")
+                 ? "From Ludusavi's settings on this Mac. Backups beyond these limits leave the backup list, and Ludusavi on a PC deletes their folders at its next backup."
+                 : "Enter the limits from Ludusavi's Other screen. VNDegen then makes full or differential backups and drops old ones from the backup list as Ludusavi would. Ludusavi on a PC deletes their folders at its next backup. When off, VNDegen follows the backups already on the share and drops none.")
         }
     }
 }

@@ -568,8 +568,8 @@ public final class SaveSyncService {
             default: return nil
             }
         case nil:
-            // Cancelling ends the check's rclone call at its next step or the idle deadline, so the operations queued
-            // behind it wait no longer than that.
+            // Cancelling ends the check's rclone call at its next step, or a request already sent when its answer is in
+            // or nothing arrives for the idle deadline. The operations queued behind it start once it has ended.
             check.cancel()
             log.notice("no save check for \(id.rawValue) before launch")
             return nil
@@ -628,9 +628,9 @@ public final class SaveSyncService {
     // MARK: Plumbing
 
     /// Runs `work` with the store, after every operation started before it. When `timeouts.operation` passes or the
-    /// caller is cancelled, cancels the rclone call in progress. That call ends at rclone's next step or at the idle
-    /// deadline, and the operation ends with it, so a stalled server holds up the operations after this one no longer
-    /// than that.
+    /// caller is cancelled, cancels the rclone call in progress. That call ends at rclone's next step, or a request
+    /// already sent when its answer is in or nothing arrives for the idle deadline, and the operation ends with it. The
+    /// operations after this one wait until then: a server that keeps trickling bytes can hold them longer.
     private func withStore<T: Sendable>(_ server: SaveServer, _ work: @escaping @Sendable (RemoteStore) async throws -> T) async throws -> T {
         let connector = connector, mirror = mirror, limit = timeouts.operation, limits = timeouts.rclone
         return try await serialized {
