@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
         .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
+        .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -28,6 +29,7 @@ let package = Package(
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that the helper process loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineKiriKiri", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
@@ -44,6 +46,7 @@ let package = Package(
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat"]),
+        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
