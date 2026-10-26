@@ -1,18 +1,30 @@
 import SwiftUI
 import VNCore
 
+/// What touches do in a running game.
 nonisolated public enum TouchControlsMode: Sendable {
-    case gamepad, mouse
+    /// The touch gamepad. Touches between its buttons reach the game.
+    case gamepad
+    /// Dragging moves a virtual cursor.
+    case cursor
+    /// No overlay. Touches reach the game where they land.
+    case direct
+    /// No overlay, and the game ignores touches.
+    case off
+
+    /// Whether `TouchControlsOverlay` draws anything in this mode.
+    public var hasOverlay: Bool { self == .gamepad || self == .cursor }
 }
 
 /// Reports a touch gamepad button going down or up. A nil input is the Home button.
 typealias TouchPress = (ControlInput?, _ pressed: Bool) -> Void
 
 /// On-screen controls drawn over a running game. Gamepad mode presses buttons through `input`, which does what its
-/// button mapping says, the same as for a controller. `mapping` is that same mapping, for the buttons' badges. Mouse
-/// mode moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu.
-/// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the mouse surface covers the
-/// full screen like the session view, so its normalized pointer locations match the game's.
+/// button mapping says, the same as for a controller. `mapping` is that same mapping, for the buttons' badges. Cursor
+/// mode moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu. The modes
+/// without an overlay draw nothing.
+/// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the cursor surface covers
+/// the full screen like the session view, so its normalized pointer locations match the game's.
 public struct TouchControlsOverlay: View {
     let mode: TouchControlsMode
     let mapping: ButtonMapping
@@ -31,13 +43,14 @@ public struct TouchControlsOverlay: View {
             let unit = min(max(min(geometry.size.width, geometry.size.height) / 6.2, 54), 76)
             switch mode {
             case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press)
-            case .mouse:
+            case .cursor:
                 ZStack(alignment: .topTrailing) {
                     MouseControls(cursor: $cursor, send: sendPointer)
                     HomeButton(size: unit * 0.62, press: press)
                         .padding(.top, 8)
                         .padding(.trailing, 16)
                 }
+            case .direct, .off: EmptyView()
             }
         }
         .environment(\.colorScheme, .dark)
@@ -323,7 +336,7 @@ private struct RoundKey: View {
     }
 }
 
-// MARK: - Mouse mode
+// MARK: - Cursor mode
 
 private struct MouseControls: View {
     @Binding var cursor: CGPoint

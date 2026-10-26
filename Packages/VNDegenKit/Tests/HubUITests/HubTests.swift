@@ -109,3 +109,15 @@ private struct SlowPlugin: EnginePlugin {
     await Hub.wait(for: quick, atMost: .seconds(30))
     #expect(ContinuousClock.now - quickStart < .seconds(2))
 }
+
+@MainActor @Test func controlMethodKindsAndMouseOptions() {
+    #expect(ControlMethod.Kind.allCases.map(ControlMethod.init) == [.automatic, .gamepad, .mouse(.touch), .controller(mouse: nil)])
+    #expect(ControlMethod.controller(mouse: .cursor).stepped(by: 1) == .automatic)
+    #expect(ControlMethod.automatic.stepped(by: -1) == .controller(mouse: nil))
+    #expect(ControlMethod.controller(mouse: nil).togglingMouse == .controller(mouse: .touch))
+    #expect(ControlMethod.controller(mouse: .cursor).togglingMouse == .controller(mouse: nil))
+    #expect(ControlMethod.mouse(.touch).togglingMouse == .mouse(.touch))
+    #expect(ControlMethod.mouse(.touch).switchingMouseStyle == .mouse(.cursor))
+    #expect(ControlMethod.controller(mouse: .cursor).switchingMouseStyle == .controller(mouse: .touch))
+    #expect(ControlMethod.controller(mouse: nil).switchingMouseStyle == .controller(mouse: nil))
+}

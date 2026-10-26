@@ -66,13 +66,16 @@ import VNCore
     #expect(ControlAction.key(keys[25]).badge == "Z")
 }
 
-@Test func controlMethodPicksTheOverlay() {
-    #expect(ControlMethod.automatic.overlay(lastInput: .touch, controllerConnected: false) == .gamepad)
-    #expect(ControlMethod.automatic.overlay(lastInput: .touch, controllerConnected: true) == nil)
-    #expect(ControlMethod.automatic.overlay(lastInput: .gamepad, controllerConnected: false) == nil)
-    #expect(ControlMethod.touchGamepad.overlay(lastInput: .gamepad, controllerConnected: true) == .gamepad)
-    #expect(ControlMethod.touchMouse.overlay(lastInput: .keyboardMouse, controllerConnected: false) == .mouse)
-    #expect(ControlMethod.controllerOnly.overlay(lastInput: .touch, controllerConnected: false) == nil)
+@Test func controlMethodPicksWhatTouchesDo() {
+    #expect(ControlMethod.automatic.touchControls(lastInput: .touch, controllerConnected: false) == .gamepad)
+    #expect(ControlMethod.automatic.touchControls(lastInput: .touch, controllerConnected: true) == .direct)
+    #expect(ControlMethod.automatic.touchControls(lastInput: .gamepad, controllerConnected: false) == .direct)
+    #expect(ControlMethod.gamepad.touchControls(lastInput: .gamepad, controllerConnected: true) == .gamepad)
+    #expect(ControlMethod.mouse(.touch).touchControls(lastInput: .keyboardMouse, controllerConnected: false) == .direct)
+    #expect(ControlMethod.mouse(.cursor).touchControls(lastInput: .keyboardMouse, controllerConnected: false) == .cursor)
+    #expect(ControlMethod.controller(mouse: nil).touchControls(lastInput: .touch, controllerConnected: false) == .off)
+    #expect(ControlMethod.controller(mouse: .touch).touchControls(lastInput: .gamepad, controllerConnected: true) == .direct)
+    #expect(ControlMethod.controller(mouse: .cursor).touchControls(lastInput: .gamepad, controllerConnected: true) == .cursor)
 }
 
 @Test func keyboardMappingCoversNavigationKeys() {
@@ -276,7 +279,7 @@ private final class Consumer {
     let suite = "vndegen-migration-\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
-    for (legacy, method) in [("mouse", ControlMethod.touchMouse), ("hidden", .controllerOnly), ("gamepad", .touchGamepad)] {
+    for (legacy, method) in [("mouse", ControlMethod.mouse(.cursor)), ("hidden", .controller(mouse: .touch)), ("gamepad", .gamepad)] {
         defaults.removeObject(forKey: ControlMethod.storageKey)
         defaults.set(legacy, forKey: "touchControlsMode")
         ControlMethod.migrateTouchControlsSetting(in: defaults)

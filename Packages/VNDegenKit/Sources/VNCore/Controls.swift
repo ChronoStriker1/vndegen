@@ -32,12 +32,46 @@ public enum ControlAction: Hashable, Codable, Sendable {
     case nothing
 }
 
+/// How touches work as a mouse.
+public enum MouseStyle: String, CaseIterable, Codable, Sendable {
+    /// Touches reach the game where they land.
+    case touch
+    /// Dragging moves a cursor, like a trackpad.
+    case cursor
+}
+
 /// How a game is played on a touch device.
-public enum ControlMethod: String, CaseIterable, Codable, Sendable {
+public enum ControlMethod: Hashable, Sendable {
     /// The touch gamepad while the last input was touch and no controller is connected.
     case automatic
-    case touchGamepad
-    case touchMouse
-    /// No overlay, for a Bluetooth controller or a keyboard.
-    case controllerOnly
+    case gamepad
+    case mouse(MouseStyle)
+    /// No on-screen gamepad, for a Bluetooth controller or a keyboard. The game ignores touches unless `mouse` is set.
+    case controller(mouse: MouseStyle?)
+}
+
+extension ControlMethod: CaseIterable, RawRepresentable, Codable {
+    public static let allCases: [ControlMethod] = [
+        .automatic, .gamepad, .mouse(.touch), .mouse(.cursor),
+        .controller(mouse: nil), .controller(mouse: .touch), .controller(mouse: .cursor),
+    ]
+
+    public init?(rawValue: String) {
+        guard let method = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
+        self = method
+    }
+
+    /// `touchMouse` and `controllerOnly` predate mouse styles, so they keep what they did then: a cursor, and a controller
+    /// with touches reaching the game.
+    public var rawValue: String {
+        switch self {
+        case .automatic: "automatic"
+        case .gamepad: "touchGamepad"
+        case .mouse(.touch): "touch"
+        case .mouse(.cursor): "touchMouse"
+        case .controller(mouse: nil): "controller"
+        case .controller(mouse: .touch): "controllerOnly"
+        case .controller(mouse: .cursor): "controllerCursor"
+        }
+    }
 }

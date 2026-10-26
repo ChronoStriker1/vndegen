@@ -31,7 +31,14 @@ struct PlayerView: View {
                 RotateHint(orientation: orientation)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            if let overlayMode {
+            if overlayMode == .off {
+                // Swallows touches above the game. Disabling interaction on the game view would cut off its keyboard too.
+                Color.clear
+                    .contentShape(.rect)
+                    .gesture(DragGesture(minimumDistance: 0))
+                    .ignoresSafeArea()
+            }
+            if let overlayMode, overlayMode.hasOverlay {
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
             }
             #endif
@@ -39,7 +46,7 @@ struct PlayerView: View {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
                                onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping)
                     .transition(.opacity)
-            } else if overlayMode == nil {
+            } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
                 // users get back to the menu.
                 Button(action: menuButton) {
@@ -103,11 +110,11 @@ struct PlayerView: View {
 
     private var mapping: ButtonMapping { ButtonMapping(game?.buttonMapping) }
 
-    /// The touch controls to show, if any. Macs have no touch screen, so they never show any.
+    /// What touches do in the game. Nil while the menu or the unlock screen covers it, and on a Mac, which has no touch screen.
     private var overlayMode: TouchControlsMode? {
         #if os(iOS)
         guard !menu.isOpen, !isCovered, !session.drawsOwnMenu else { return nil }
-        return method.overlay(lastInput: hub.input.lastInputKind, controllerConnected: !hub.input.controllerNames.isEmpty)
+        return method.touchControls(lastInput: hub.input.lastInputKind, controllerConnected: !hub.input.controllerNames.isEmpty)
         #else
         return nil
         #endif
@@ -146,17 +153,24 @@ struct PlayerView: View {
             if !mappingEditor.handle(button), button == .cancel || button == .hub { self.mappingEditor = nil }
             return
         }
-        let items = PlayerMenu.items
+        let items = PlayerMenu.items(for: method)
         let index = items.firstIndex(of: menu.focus) ?? 0
         switch button {
         case .up: menu.focus = items[max(0, index - 1)]
         case .down: menu.focus = items[min(items.count - 1, index + 1)]
-        case .left, .right: if menu.focus == .method { setMethod(method.stepped(by: button == .left ? -1 : 1)) }
+        case .left, .right:
+            switch menu.focus {
+            case .method: setMethod(method.stepped(by: button == .left ? -1 : 1))
+            case .mouseStyle: setMethod(method.switchingMouseStyle)
+            case .resume, .quit, .controllerMouse, .mapping: break
+            }
         case .confirm:
             switch menu.focus {
             case .resume: resume()
             case .quit: hub.endSession()
             case .method: setMethod(method.stepped(by: 1))
+            case .controllerMouse: setMethod(method.togglingMouse)
+            case .mouseStyle: setMethod(method.switchingMouseStyle)
             case .mapping: openMapping()
             }
         case .cancel, .hub, .menu: resume()
@@ -189,9 +203,11 @@ struct PlayerView: View {
     }
 
     /// Saved on the game, so the method sticks the next time it plays too.
+    /// A menu row the new method hides hands focus to the methods row.
     private func setMethod(_ method: ControlMethod) {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.controlMethod = method }
+        if !PlayerMenu.items(for: method).contains(menu.focus) { menu.focus = .method }
     }
 
     private func openMapping() {
@@ -217,9 +233,17 @@ struct PlayerView: View {
 @MainActor
 @Observable
 final class PlayerMenu {
-    enum Item { case resume, quit, method, mapping }
+    enum Item { case resume, quit, method, controllerMouse, mouseStyle, mapping }
+
     /// Top to bottom. The control method only matters on a touch device.
-    static let items: [Item] = Platform.current == .iOS ? [.resume, .quit, .method, .mapping] : [.resume, .quit, .mapping]
+    static func items(for method: ControlMethod) -> [Item] {
+        guard Platform.current == .iOS else { return [.resume, .quit, .mapping] }
+        var items: [Item] = [.resume, .quit, .method]
+        if method.kind == .controller { items.append(.controllerMouse) }
+        if method.mouse != nil { items.append(.mouseStyle) }
+        return items + [.mapping]
+    }
+
     var isOpen = false
     var focus = Item.resume
 }
@@ -274,7 +298,10 @@ private struct PlayerMenuView: View {
     private var controls: some View {
         VStack(spacing: 12) {
             SectionLabel(text: "Controls", systemImage: "gamecontroller")
-            if PlayerMenu.items.contains(.method) { methods }
+            let items = PlayerMenu.items(for: method)
+            if items.contains(.method) { methods }
+            if items.contains(.controllerMouse) { controllerMouse }
+            if items.contains(.mouseStyle), let style = method.mouse { mouseStyles(style) }
             Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: 220) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
                 .onHover { if $0 { menu.focus = .mapping } }
@@ -283,36 +310,93 @@ private struct PlayerMenuView: View {
 
     /// One focus target for the whole row. Left and right switch the method, like tabs.
     private var methods: some View {
-        let focused = isFocused(.method)
-        return HStack(spacing: 4) {
-            ForEach(ControlMethod.allCases, id: \.self) { option in
-                Button {
-                    menu.focus = .method
-                    onMethod(option)
-                } label: {
-                    Text(option.shortTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 34)
-                        .background { Capsule().fill(option == method ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear)) }
-                        .contentShape(.capsule)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option.title)
-                .accessibilityAddTraits(option == method ? .isSelected : [])
+        segments(.method) {
+            ForEach(ControlMethod.Kind.allCases, id: \.self) { kind in
+                segment(kind.shortTitle, selected: kind == method.kind, item: .method) { onMethod(ControlMethod(kind)) }
+                    .accessibilityLabel(kind.title)
             }
         }
-        .padding(4)
-        .background(Theme.surface, in: .capsule)
-        .overlay { Capsule().strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2.5 : 1) }
-        .scaleEffect(focused ? 1.04 : 1)
-        .animation(Theme.focusAnimation, value: focused)
-        .onHover { if $0 { menu.focus = .method } }
+    }
+
+    private var controllerMouse: some View {
+        segments(.controllerMouse) {
+            Toggle("Mouse", isOn: Binding(get: { method.mouse != nil }, set: { _ in
+                menu.focus = .controllerMouse
+                onMethod(method.togglingMouse)
+            }))
+            .toggleStyle(CheckboxSegmentStyle())
+        }
+    }
+
+    private func mouseStyles(_ current: MouseStyle) -> some View {
+        segments(.mouseStyle) {
+            ForEach(MouseStyle.allCases, id: \.self) { style in
+                segment(style.title, selected: style == current, item: .mouseStyle) { onMethod(method.with(mouse: style)) }
+            }
+        }
+    }
+
+    /// A capsule of segments that takes focus as one item.
+    private func segments(_ item: PlayerMenu.Item, @ViewBuilder content: () -> some View) -> some View {
+        let focused = isFocused(item)
+        return HStack(spacing: 4) { content() }
+            .padding(4)
+            .background(Theme.surface, in: .capsule)
+            .overlay { Capsule().strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2.5 : 1) }
+            .scaleEffect(focused ? 1.04 : 1)
+            .animation(Theme.focusAnimation, value: focused)
+            .onHover { if $0 { menu.focus = item } }
+    }
+
+    private func segment(_ title: String, selected: Bool, item: PlayerMenu.Item, action: @escaping () -> Void) -> some View {
+        Button {
+            menu.focus = item
+            action()
+        } label: {
+            SegmentLabel(title: title, selected: selected)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func isFocused(_ item: PlayerMenu.Item) -> Bool { showsFocus && menu.focus == item }
+}
+
+private struct SegmentLabel: View {
+    let title: String
+    let selected: Bool
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 12)
+            .frame(minHeight: 34)
+            .background { Capsule().fill(selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear)) }
+            .contentShape(.capsule)
+    }
+}
+
+/// A checkbox the size of a menu segment.
+private struct CheckboxSegmentStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            HStack(spacing: 6) {
+                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(configuration.isOn ? Theme.accent : .white)
+                configuration.label
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 34)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 /// Asks the player to turn a full-screen iPad that shows the game in the wrong orientation.

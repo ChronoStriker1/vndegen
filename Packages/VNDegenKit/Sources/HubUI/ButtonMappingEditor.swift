@@ -8,39 +8,115 @@ extension ControlMethod {
         UserDefaults.standard.string(forKey: storageKey).flatMap(Self.init(rawValue:)) ?? .automatic
     }
 
-    var title: String {
-        switch self {
-        case .automatic: "Automatic"
-        case .touchGamepad: "Touch gamepad"
-        case .touchMouse: "Touch mouse"
-        case .controllerOnly: "Controller only"
+    /// Settings and the in-game menu pick one of these first, then a controller's mouse and the mouse style under it.
+    enum Kind: CaseIterable {
+        case automatic, gamepad, mouse, controller
+
+        var title: String {
+            switch self {
+            case .automatic: "Automatic"
+            case .gamepad: "Touch gamepad"
+            case .mouse: "Mouse"
+            case .controller: "Controller"
+            }
+        }
+
+        /// For the in-game menu's row of methods.
+        var shortTitle: String {
+            switch self {
+            case .automatic: "Auto"
+            case .gamepad: "Gamepad"
+            case .mouse: "Mouse"
+            case .controller: "Controller"
+            }
         }
     }
 
-    /// For the in-game menu's row of methods.
-    var shortTitle: String {
+    /// What picking a kind selects. A mouse starts with touch, and a controller starts without a mouse.
+    init(_ kind: Kind) {
+        self = switch kind {
+        case .automatic: .automatic
+        case .gamepad: .gamepad
+        case .mouse: .mouse(.touch)
+        case .controller: .controller(mouse: nil)
+        }
+    }
+
+    var kind: Kind {
         switch self {
-        case .automatic: "Auto"
-        case .touchGamepad: "Gamepad"
-        case .touchMouse: "Mouse"
-        case .controllerOnly: "Controller"
+        case .automatic: .automatic
+        case .gamepad: .gamepad
+        case .mouse: .mouse
+        case .controller: .controller
+        }
+    }
+
+    var mouse: MouseStyle? {
+        switch self {
+        case let .mouse(style): style
+        case let .controller(mouse): mouse
+        case .automatic, .gamepad: nil
+        }
+    }
+
+    /// Turns a controller's mouse on with touch, or off.
+    var togglingMouse: ControlMethod {
+        guard case let .controller(mouse) = self else { return self }
+        return .controller(mouse: mouse == nil ? .touch : nil)
+    }
+
+    /// Switches between touch and the cursor, for a mouse or a controller with one.
+    var switchingMouseStyle: ControlMethod { mouse.map { with(mouse: $0.other) } ?? self }
+
+    func with(mouse style: MouseStyle) -> ControlMethod {
+        switch self {
+        case .mouse: .mouse(style)
+        case .controller: .controller(mouse: style)
+        case .automatic, .gamepad: self
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .gamepad: "Touch gamepad"
+        case .mouse(.touch): "Mouse, touch"
+        case .mouse(.cursor): "Mouse, cursor"
+        case .controller(mouse: nil): "Controller only"
+        case .controller(mouse: .touch): "Controller and touch"
+        case .controller(mouse: .cursor): "Controller and cursor"
         }
     }
 
     var detail: String {
         switch self {
         case .automatic: "The touch gamepad while you play by touch with no controller connected"
-        case .touchGamepad: "Always show the on-screen gamepad"
-        case .touchMouse: "Drag to move a cursor, tap to click, tap with two fingers to right click"
-        case .controllerOnly: "No on-screen controls, for a controller or a keyboard"
+        case .gamepad: "Always show the on-screen gamepad"
+        case .mouse(.touch): "Tap or drag right where you want, as on a touch screen"
+        case .mouse(.cursor): "Drag to move a cursor, tap to click, tap with two fingers to right click"
+        case .controller(mouse: nil): "No on-screen controls, and the game ignores touches"
+        case .controller(mouse: .touch): "No on-screen controls, and touches work where you tap"
+        case .controller(mouse: .cursor): "No on-screen controls, and dragging moves a cursor"
         }
     }
 
+    /// Steps through the kinds, like tabs.
     func stepped(by step: Int) -> ControlMethod {
-        let all = Self.allCases
-        let index = all.firstIndex(of: self) ?? 0
-        return all[(index + step + all.count) % all.count]
+        let all = Kind.allCases
+        let index = all.firstIndex(of: kind) ?? 0
+        return ControlMethod(all[(index + step + all.count) % all.count])
     }
+}
+
+extension MouseStyle {
+    var title: String {
+        switch self {
+        case .touch: "Touch"
+        case .cursor: "Cursor"
+        }
+    }
+
+    var other: MouseStyle { self == .touch ? .cursor : .touch }
 }
 
 /// The button mapping editor's state: pick a button, then pick what it does. Touch, pointer, and controller drive the
