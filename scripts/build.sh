@@ -13,8 +13,11 @@ xcodegen generate --quiet
 # The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
 case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
 
-# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here.
+# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS
+# engine builds first, so a failure shows its log. The app's own build phase then finds it up to date.
 xcb() {
+  mkdir -p build
+  scripts/rgss-engine.sh build/rgss >build/rgss-engine.log 2>&1 || { tail -n 40 build/rgss-engine.log; return 1; }
   xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 \
     | grep -E "error:|BUILD (SUCCEEDED|FAILED)|\*\* " | grep -v "^/Applications" | head -60 || true
   return "${PIPESTATUS[0]}"

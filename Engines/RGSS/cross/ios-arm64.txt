@@ -1,0 +1,15 @@
+# Meson cross file for ios-arm64, used by scripts/rgss-engine.sh.
+[binaries]
+c = ['xcrun', '--sdk', 'iphoneos', 'clang', '--target=arm64-apple-ios18.0']
+cpp = ['xcrun', '--sdk', 'iphoneos', 'clang++', '--target=arm64-apple-ios18.0']
+objc = ['xcrun', '--sdk', 'iphoneos', 'clang', '--target=arm64-apple-ios18.0']
+objcpp = ['xcrun', '--sdk', 'iphoneos', 'clang++', '--target=arm64-apple-ios18.0']
+ar = ['xcrun', '--sdk', 'iphoneos', 'ar']
+strip = ['xcrun', '--sdk', 'iphoneos', 'strip']
+cmake = 'cmake'
+[host_machine]
+system = 'darwin'
+subsystem = 'ios'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'

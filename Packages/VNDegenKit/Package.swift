@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
         .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
+        .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -36,10 +37,13 @@ let package = Package(
         .target(name: "EngineRenPy", dependencies: ["VNCore", "CRenPy"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
         // Runs Ren'Py inside the app on iOS. Ren'Py's static libraries are linked by the app target, not here.
         .target(name: "CRenPy"),
+        // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
+        .target(name: "CRGSS"),
+        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore", "Rsync"]),
         // The rsync wire protocol, client side, and the SSH connection it runs over.
         .target(name: "Rsync", dependencies: [
@@ -80,5 +84,6 @@ let package = Package(
         ]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
+        .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
     ]
 )

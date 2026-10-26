@@ -38,6 +38,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
 | TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
 | Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
+| RPG Maker XP, VX, and VX Ace | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac with Apple silicon, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
@@ -48,6 +49,10 @@ Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py
 On iPhone and iPad, Ren'Py 8.5.3 is built into the app and every Ren'Py game runs on it, inside VNDegen's window. Ren'Py 7 and 6.99 games run on it too, with fixes VNDegen applies in memory, such as dividing integers the Python 2 way in the game's own code. 15 of the 16 Ren'Py 7 games in the maintainer's library reached their main menu this way, and VNDegen ships that list. The page of a Ren'Py 7 game says whether it is known to work and, once it has run, whether it reached its main menu on this device. On Mac the game page's Ren'Py runtime option runs a game on the other runtime.
 
 Ren'Py can't load saves made by a newer Ren'Py. VNDegen runs each game on the newest Ren'Py of its line, so saves made here may not load in the game's PC version, and the game's Saves page warns before a Ludusavi backup when that applies. VNDegen on other devices loads them. The exception is a Mac, which runs Ren'Py 7 games on Ren'Py 7.8.7, so it loads a Ren'Py 7 game's saves from an iPhone or iPad only once that game's Ren'Py runtime option is set to Ren'Py 8.5.3. A Ren'Py 7 game's persistent data, such as unlocked gallery images, is written so its PC version loads it.
+
+RPG Maker XP, VX, and VX Ace games run on mkxp-z, an open-source reimplementation of RPG Maker's RGSS player, built into the app as a libretro core with Ruby 3.3 compiled to plain C, so it needs no JIT. The game draws inside VNDegen's window through ANGLE on Metal, so the VNDegen menu and touch controls work as for the other engines. Packed games (`Game.rgss3a` and its older forms) and unpacked ones both work, as do MIDI music, through a public domain soundfont, and the Windows API calls many games make, which mkxp-z and VNDegen emulate. Saves go to the game's data folder. Saves copied in with a PC game in its folder still load, and the game folder is never written to. On a Mac with an Intel processor these games show as unsupported, since the engine is built for Apple silicon only. Games that need a Windows DLL VNDegen doesn't emulate lose that DLL's feature, and some games written for RPG Maker's old Ruby versions may stop with an error. The game page then says what the error was.
+
+Many RPG Maker games use the RTP, a set of stock graphics, sounds, and fonts that the PC player installs once instead of every game shipping it. Its license doesn't let VNDegen include it. When a game needs an RTP that isn't installed, its page offers Download and install, which fetches the official installer from the RPG Maker website (rpgmakerweb.com), checks it against the SHA-256 VNDegen expects, shows the RTP's license to accept, and unpacks it inside the app on Mac, iPhone, and iPad. The RTP is then shared by every game that needs it. Import from folder takes an RTP folder copied from a PC instead, such as `C:\Program Files (x86)\Common Files\Enterbrain\RGSS3\RPGVXAce`. The XP RTP is 23 MB to download, VX's 37 MB, and VX Ace's 195 MB. Nothing downloads until you tap the button.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -74,7 +79,7 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 | Previous and next page | L1 and R1 | Q and E, or Page Up and Page Down |
 | VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
 
-The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu, inside the game. Buttons remapped for the game apply there too. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method. The small menu button in the corner opens the VNDegen menu.
+The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker, MV and MZ as well as XP, VX, and VX Ace, those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu, inside the game. Buttons remapped for the game apply there too. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method. The small menu button in the corner opens the VNDegen menu.
 
 These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
 
@@ -125,6 +130,8 @@ scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 
 The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds; in Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first. `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu. `scripts/renpy-hook-test.sh` checks VNDegen's Ren'Py hook on both runtimes.
 
+Every app build also builds the RPG Maker XP, VX, and VX Ace engine into `build/rgss` with `scripts/rgss-engine.sh`, which does nothing when the engine is up to date. It fetches mkxp-z's libretro core and ANGLE at pinned commits, applies the patches in `Engines/RGSS`, and caches its sources and tools in `~/Library/Caches/VNDegen/rgss`. The first build takes about an hour, most of it compiling Ruby to WebAssembly and back to C. It needs these Homebrew packages: `meson ninja cmake bison make automake autoconf libtool universal-ctags ruby@3.3 gnu-sed grep`.
+
 From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
 ### Installing a release
@@ -155,12 +162,16 @@ Packages/VNDegenKit/
   Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, the iOS in-app session, and the in-game hook
   Sources/CRenPy/         starts Python and runs Ren'Py inside the app on iOS
   Sources/RenPyCompat/    command-line boot test for a folder of Ren'Py games
+  Sources/EngineRGSS/     RPG Maker XP, VX, and VX Ace: detection, the RTPs they need, saves, and the in-process session
+  Sources/CRGSS/          vnrgss.h, the RGSS engine's C interface
+  Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
   Sources/Lock/           Face ID, Touch ID, and passcode
   Sources/SaveSync/       Ludusavi backup and restore
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
+Engines/RGSS/             the RGSS engine's frontend, patches, and build files; UPSTREAM.md lists the pinned sources
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, simulator, and Ren'Py runtime helpers
 project.yml               XcodeGen project definition
@@ -178,4 +189,4 @@ Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector
 
 ## License
 
-VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL.
+VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL. Builds with the RPG Maker XP, VX, and VX Ace engine include mkxp-z, which is GPL-2.0-or-later, so they are distributed under the GNU GPL, version 2. Their complete source is this repository, which builds the engine from the pinned sources in `Engines/RGSS/UPSTREAM.md`. Settings, Licenses lists the license of every third-party component in the app, and where to get the source. This is not legal advice.
