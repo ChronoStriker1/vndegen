@@ -5,6 +5,7 @@
 #include <SDL3/SDL_log.h>
 #include <zlib.h>
 
+#include <algorithm>
 #include <string>
 
 // k is the low byte of the file's adler32 in every scheme seen so far.
@@ -16,22 +17,22 @@ static void xorByChecksum(uint32_t hash, uint64_t, uint8_t *buffer, size_t size)
         buffer[i] ^= k;
 }
 
-// The decoder.tpm plugin's cipher, in four bands by position within the file.
+// The decoder.tpm plugin's cipher, in four bands by position within the file. Each band is its own
+// loop, so the compiler can vectorize the last one, which holds nearly every byte.
 static void bandedXorAdd(uint32_t hash, uint64_t offset, uint8_t *buffer, size_t size)
 {
     const uint8_t k = hash;
-    const uint8_t xor1 = k * 0x15, add2 = k * 0xe0, xor3 = k * 0x2b, add4 = k * 0xca;
-    for (size_t i = 0; i < size; i++) {
-        const uint64_t p = offset + i;
-        if (p < 0x7b)
-            buffer[i] ^= xor1;
-        else if (p < 0xf6)
-            buffer[i] += add2;
-        else if (p < 0x171)
-            buffer[i] ^= xor3;
-        else
-            buffer[i] += add4;
-    }
+    const uint64_t end = offset + size;
+    auto band = [&](uint64_t from, uint64_t to, auto apply) {
+        from = std::max(from, offset);
+        to = std::min(to, end);
+        for (uint64_t p = from; p < to; p++)
+            apply(buffer[p - offset]);
+    };
+    band(0, 0x7b, [x = uint8_t(k * 0x15)](uint8_t &b) { b ^= x; });
+    band(0x7b, 0xf6, [a = uint8_t(k * 0xe0)](uint8_t &b) { b += a; });
+    band(0xf6, 0x171, [x = uint8_t(k * 0x2b)](uint8_t &b) { b ^= x; });
+    band(0x171, UINT64_MAX, [a = uint8_t(k * 0xca)](uint8_t &b) { b += a; });
 }
 
 static const VNKKCipher ciphers[] = {
@@ -40,7 +41,8 @@ static const VNKKCipher ciphers[] = {
 };
 
 static const size_t maxSamples = 8;
-static const uint64_t maxSampleSize = 64 * 1024;
+// Reading stops early past this many bytes, so an archive of large files opens fast.
+static const uint64_t sampleBudget = 4 * 1024 * 1024;
 // Samples at least this long cover every band of bandedXorAdd, so the schemes cannot agree on them.
 static const uint64_t preferredSampleSize = 0x200;
 
@@ -71,17 +73,17 @@ static Sample readSample(const tTVPXP3Archive::tArchiveItem &item, tTJSBinaryStr
     return sample;
 }
 
-static bool verifies(const std::vector<Sample> &samples, const VNKKCipher *cipher)
+static size_t countVerified(const std::vector<Sample> &samples, const VNKKCipher *cipher)
 {
+    size_t verified = 0;
     std::vector<uint8_t> plain;
     for (const Sample &sample : samples) {
         plain = sample.data;
         if (cipher)
             cipher->decrypt(sample.hash, 0, plain.data(), plain.size());
-        if (adler32(adler32(0, nullptr, 0), plain.data(), (uInt)plain.size()) != sample.hash)
-            return false;
+        verified += adler32(adler32(0, nullptr, 0), plain.data(), (uInt)plain.size()) == sample.hash;
     }
-    return true;
+    return verified;
 }
 
 const VNKKCipher *VNKKDetectCipher(const ttstr &archiveName,
@@ -90,29 +92,43 @@ const VNKKCipher *VNKKDetectCipher(const ttstr &archiveName,
 {
     std::string name = TVPExtractStorageName(archiveName).AsStdString();
     try {
+        // The smallest entries with distinct checksums, preferring ones that cover every band.
+        std::vector<const tTVPXP3Archive::tArchiveItem *> candidates;
+        for (const tTVPXP3Archive::tArchiveItem &item : items)
+            if (item.OrgSize > 0 && !item.Segments.empty())
+                candidates.push_back(&item);
+        std::sort(candidates.begin(), candidates.end(), [](auto a, auto b) {
+            bool aShort = a->OrgSize < preferredSampleSize, bShort = b->OrgSize < preferredSampleSize;
+            return aShort != bShort ? bShort : a->OrgSize < b->OrgSize;
+        });
         std::vector<Sample> samples;
-        auto take = [&](uint64_t minSize) {
-            for (const tTVPXP3Archive::tArchiveItem &item : items) {
-                if (samples.size() == maxSamples)
-                    return;
-                if (item.OrgSize < minSize || item.OrgSize > maxSampleSize || item.Segments.empty())
-                    continue;
-                bool seen = false;
-                for (const Sample &sample : samples)
-                    seen = seen || sample.hash == item.FileHash;
-                if (!seen)
-                    samples.push_back(readSample(item, st));
-            }
-        };
-        take(preferredSampleSize);
-        take(1);
-        if (samples.empty() || verifies(samples, nullptr))
+        uint64_t sampledBytes = 0;
+        for (const tTVPXP3Archive::tArchiveItem *item : candidates) {
+            if (samples.size() == maxSamples || (samples.size() >= 2 && sampledBytes >= sampleBudget))
+                break;
+            bool seen = false;
+            for (const Sample &sample : samples)
+                seen = seen || sample.hash == item->FileHash;
+            if (seen)
+                continue;
+            samples.push_back(readSample(*item, st));
+            sampledBytes += item->OrgSize;
+        }
+        if (samples.empty())
             return nullptr;
+        // Some archives hold a warning text file under a made-up checksum, so a scheme needs only
+        // half of the samples. Plain data wins a tie.
+        const VNKKCipher *best = nullptr;
+        size_t bestCount = countVerified(samples, nullptr);
         for (const VNKKCipher &cipher : ciphers) {
-            if (verifies(samples, &cipher)) {
-                SDL_Log("vnkk: %s is encrypted with %s", name.c_str(), cipher.name);
-                return &cipher;
-            }
+            size_t count = countVerified(samples, &cipher);
+            if (count > bestCount)
+                best = &cipher, bestCount = count;
+        }
+        if (bestCount * 2 >= samples.size()) {
+            if (best)
+                SDL_Log("vnkk: %s is encrypted with %s", name.c_str(), best->name);
+            return best;
         }
         bool sameChecksum = true;
         for (const tTVPXP3Archive::tArchiveItem &item : items)

@@ -203,6 +203,17 @@ static int runTests()
     writeArchive(path("plain.xp3"), entries, none, adler);
     writeArchive(path("xor.xp3"), entries, encryptXor, adler);
     writeArchive(path("banded.xp3"), entries, encryptBanded, adler);
+    // Protected archives add a warning text file whose checksum is made up.
+    std::vector<Entry> withDecoy = entries;
+    const std::string warning = "Warning: extracting this archive is prohibited.";
+    withDecoy.push_back({"warning.txt", Bytes(warning.begin(), warning.end()), false});
+    writeArchive(path("decoy.xp3"), withDecoy, encryptXor, [&](const Bytes &plain) {
+        return plain == withDecoy.back().plain ? 0x5eed5eedu : adler(plain);
+    });
+    std::vector<Entry> large;
+    for (uint32_t i = 0; i < 4; i++)
+        large.push_back({"large" + std::to_string(i) + ".ogg", pattern(300000 + i * 1000, i + 50), i == 0});
+    writeArchive(path("large.xp3"), large, encryptXor, adler);
     writeArchive(path("placeholder.xp3"), entries, none, [](const Bytes &) { return 0x23333333u; });
     // XOR by the checksum's second byte, a scheme the table lacks.
     writeArchive(path("unknown.xp3"), entries, [](uint32_t hash, Bytes &data) { encryptXor(hash >> 8, data); }, adler);
@@ -218,6 +229,13 @@ static int runTests()
     check(banded && cipherName(banded) == "bandedXorAdd", "a banded archive is detected as bandedXorAdd");
     check(xorArchive && readsPlain(xorArchive, entries), "an XOR archive decrypts to its plain contents");
     check(banded && readsPlain(banded, entries), "a banded archive decrypts to its plain contents");
+
+    tTVPXP3Archive *decoy = openArchive(path("decoy.xp3"));
+    check(decoy && cipherName(decoy) == "xorByChecksum", "an archive with a made-up checksum on one entry is still detected");
+
+    tTVPXP3Archive *largeArchive = openArchive(path("large.xp3"));
+    check(largeArchive && cipherName(largeArchive) == "xorByChecksum", "an archive of only large entries is detected");
+    check(largeArchive && readsPlain(largeArchive, large), "an archive of only large entries decrypts");
 
     tTVPXP3Archive *placeholder = openArchive(path("placeholder.xp3"));
     check(placeholder && cipherName(placeholder) == "plain", "an archive with one checksum on every entry is read as plain");
@@ -239,7 +257,7 @@ static int runTests()
     check(xorArchive && readsPlain(xorArchive, entries), "an extraction filter replaces the native cipher");
     TVPSetXP3ArchiveExtractionFilter(nullptr);
 
-    for (tTVPXP3Archive *archive : {plain, xorArchive, banded, placeholder, unknown})
+    for (tTVPXP3Archive *archive : {plain, xorArchive, banded, decoy, largeArchive, placeholder, unknown})
         if (archive)
             archive->Release();
     std::filesystem::remove_all(dir);
