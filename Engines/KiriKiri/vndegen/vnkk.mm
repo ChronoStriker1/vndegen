@@ -229,7 +229,13 @@ int vnkk_start(const VNKKLaunch *launch)
 #else
     saveKeyboardHandler();
 #endif
-    SDL_AppResult result = SDL_AppInit(nullptr, 6, (char **)argv);
+    // An exception the engine leaves uncaught would end the host app along with the game.
+    SDL_AppResult result = SDL_APP_FAILURE;
+    try {
+        result = SDL_AppInit(nullptr, 6, (char **)argv);
+    } catch (...) {
+        SDL_Log("vnkk: the game stopped on an error while starting");
+    }
 #if TARGET_OS_OSX
     if (host && engineView)
         moveIntoHostView(host);
@@ -278,10 +284,15 @@ int vnkk_iterate(void)
         TVPDoSaveSystemVariables();
         TVPTerminateAsync();
     }
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-        SDL_AppEvent(nullptr, &event);
-    finished = SDL_AppIterate(nullptr) != SDL_APP_CONTINUE;
+    try {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+            SDL_AppEvent(nullptr, &event);
+        finished = SDL_AppIterate(nullptr) != SDL_APP_CONTINUE;
+    } catch (...) {
+        SDL_Log("vnkk: the game stopped on an error");
+        finished = true;
+    }
     running = false;
     return finished;
 }

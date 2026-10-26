@@ -93,14 +93,18 @@ int tTVPThread::StartProc(void* arg)
         return 0;
 
     // 等待恢复
-    if (_this->Suspended)
-    {
-        SDL_LockMutex(impl->mutex);
+    // Waits under the mutex, so a Resume that comes first is not lost, and gives up when the thread is ended before
+    // it ever ran, as when the engine stops after a failed start.
+    SDL_LockMutex(impl->mutex);
+    while (_this->Suspended && !_this->Terminated)
         SDL_WaitCondition(impl->cond, impl->mutex);
-        SDL_UnlockMutex(impl->mutex);
+    bool run = !_this->Terminated;
+    SDL_UnlockMutex(impl->mutex);
+    if (run)
+    {
+        _this->Execute();
+        _this->OnExit();
     }
-    _this->Execute();
-    _this->OnExit();
     _this->Terminated = false;
     TVPOnThreadExited();
 
@@ -109,6 +113,10 @@ int tTVPThread::StartProc(void* arg)
 //---------------------------------------------------------------------------
 void tTVPThread::WaitFor()
 {
+    // A thread still waiting to be resumed has to see that it was terminated.
+    SDL_LockMutex(THR_IMPL->mutex);
+    SDL_BroadcastCondition(THR_IMPL->cond);
+    SDL_UnlockMutex(THR_IMPL->mutex);
     SDL_WaitThread(THR_IMPL->thread, nullptr);
 }
 //---------------------------------------------------------------------------
@@ -125,8 +133,10 @@ void tTVPThread::SetPriority(tTVPThreadPriority pri)
 //---------------------------------------------------------------------------
 void tTVPThread::Resume()
 {
+    SDL_LockMutex(THR_IMPL->mutex);
     Suspended = false;
     SDL_SignalCondition(THR_IMPL->cond);
+    SDL_UnlockMutex(THR_IMPL->mutex);
 }
 //---------------------------------------------------------------------------
 
