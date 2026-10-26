@@ -5,9 +5,14 @@
 // quits through vnkk_request_quit. A game still short of its title after clickAfter gets a left
 // click in the middle of the screen every clickInterval, as a player skipping its intro would give
 // it. After each game's vnkk_stop, stdout gets the resident size, the resident size once malloc has
-// returned its free pages to the system, and the number of open files.
-// Exits nonzero if a game missed its title or did not quit.
+// returned its free pages to the system, and the number of open files. Each game is paused for
+// pauseTime at its title, and the next game's engine clock must still start level with SDL's.
+// Exits nonzero if a game missed its title, did not quit, or started with a clock behind SDL's.
+#include "tjsCommHead.h"
+#include "Platform.h"
 #include "vnkk.h"
+
+#include <SDL3/SDL_timer.h>
 
 #import <Foundation/Foundation.h>
 #include <fcntl.h>
@@ -29,6 +34,7 @@ static const auto titleTimeout = std::chrono::seconds(30);
 static const auto quitTimeout = std::chrono::seconds(15);
 static const auto clickAfter = std::chrono::seconds(10);
 static const auto clickInterval = std::chrono::seconds(2);
+static const auto pauseTime = std::chrono::milliseconds(500);
 
 // Whether a line of the log ends with the marker.
 static bool logHasLineEnding(const std::string &path, const std::string &marker)
@@ -92,6 +98,9 @@ int main(int argc, char *argv[])
         launch.logPath = log.c_str();
         Clock::time_point start = Clock::now();
         bool started = vnkk_start(&launch) == 0;
+        // The engine clock leaves out paused time, and this game has not been paused yet.
+        tjs_uint64 engineTicks = TVPGetRoughTickCount();
+        int64_t clockBehind = started ? (int64_t)(SDL_GetTicks() - engineTicks) : 0;
         bool quitEarly = false;
         Clock::time_point nextClick = start + clickAfter;
         bool atTitle = started && runUntil(titleTimeout, [&] {
@@ -111,6 +120,12 @@ int main(int argc, char *argv[])
         }) && !quitEarly;
         double titleSeconds = std::chrono::duration<double>(Clock::now() - start).count();
 
+        if (atTitle) {
+            vnkk_set_paused(true);
+            std::this_thread::sleep_for(pauseTime);
+            vnkk_set_paused(false);
+        }
+
         bool quit = !started || quitEarly;
         if (!quit) {
             vnkk_request_quit();
@@ -120,11 +135,13 @@ int main(int argc, char *argv[])
 
         double resident = residentMB();
         malloc_zone_pressure_relief(nullptr, 0);
-        printf("game %d: %s after %.1f s, %s, resident %.1f MB, %.1f MB after relief, %d open files\n",
+        bool clockKept = clockBehind >= 0 && clockBehind < 100;
+        printf("game %d: %s after %.1f s, %s, clock %lld ms behind SDL's at start, resident %.1f MB, %.1f MB after relief, "
+               "%d open files\n",
                n, atTitle ? "title" : started ? "no title" : "did not start", titleSeconds,
-               quit ? "quit" : "did not quit", resident, residentMB(), openFiles());
+               quit ? "quit" : "did not quit", (long long)clockBehind, resident, residentMB(), openFiles());
         fflush(stdout);
-        failures += !atTitle || !quit;
+        failures += !atTitle || !quit || !clockKept;
     }
     printf("%d of %d games failed\n", failures, (argc - 2) / 3);
     return failures ? 1 : 0;

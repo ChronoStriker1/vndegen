@@ -154,6 +154,13 @@ void TVPSetClockPaused(bool paused)
     }
 }
 
+void TVPResetClock()
+{
+    std::lock_guard<std::mutex> lock(TVPClockMutex);
+    TVPPausedTicks = 0;
+    TVPPauseStart = 0;
+}
+
 tjs_uint64 TVPGetRoughTickCount()
 {
     std::lock_guard<std::mutex> lock(TVPClockMutex);

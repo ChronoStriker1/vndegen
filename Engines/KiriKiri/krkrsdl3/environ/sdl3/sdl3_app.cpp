@@ -232,6 +232,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("Fail to initialize SDL.");
         return SDL_APP_FAILURE;
     }
+    TVPResetClock();
 
     // 窗口（按所选后端决定标志位；创建失败时回退软渲染）
     if (!TVPCreateWindowForBackend(TVPSettings.renderer))

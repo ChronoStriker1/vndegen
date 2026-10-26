@@ -62,6 +62,8 @@ std::string TVPGetCurrentLanguage();
 void TVPOpenPatchLibUrl();
 tjs_uint64 TVPGetRoughTickCount();
 void TVPSetClockPaused(bool paused);
+// Forgets paused time. SDL_Init restarts SDL_GetTicks, so each game's clock starts here.
+void TVPResetClock();
 #define TVPGetTickCount TVPGetRoughTickCount
 //
 void TVPShowIME(int x, int y, int w, int h);
