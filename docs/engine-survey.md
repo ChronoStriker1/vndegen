@@ -1,5 +1,7 @@
 # Engine survey
 
+Game titles from the surveyed library appear as "Test Game NN" placeholders. The per-game list is kept privately.
+
 Survey date 2026-10-25. This picks the next engines to port after RPG Maker MV/MZ and names test games from the library on the NAS.
 
 The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one row per folder under `/path/to/games`.
