@@ -98,7 +98,7 @@ final class KiriKiriSession: EngineSession {
         displayLink = link
     }
 
-    fileprivate func step() {
+    func step() {
         switch state {
         case .running:
             if engine.iterate() != 0 { finish() }
