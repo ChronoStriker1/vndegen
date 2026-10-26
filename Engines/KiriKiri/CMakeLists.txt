@@ -314,6 +314,7 @@ endif()
 
 # An object library keeps every object file, so the plugins' static registrations survive linking.
 add_library(kirikiri_engine OBJECT
+    vndegen/ciphers.cpp
     ${KIRIKIRI_CORE_SOURCES}
     ${KIRIKIRI_ENVIRON_SOURCES}
     ${KIRIKIRI_PLUGINS_SOURCES}
@@ -342,6 +343,7 @@ target_include_directories(kirikiri_engine PUBLIC
     ${KRKRSDL}/environ
     ${KRKRSDL}/plugins
     ${KRKRSDL}/tjs2
+    vndegen
 )
 
 find_package(ZLIB REQUIRED)
@@ -420,4 +422,10 @@ else()
     target_link_options(KiriKiriHelper PRIVATE -Wl,-dead_strip)
     add_custom_command(TARGET KiriKiriHelper POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${KIRIKIRI_FONT} $<TARGET_FILE_DIR:KiriKiriHelper>/Res/DroidSansFallback.ttf)
+
+    # Checks cipher detection on synthetic archives. Built on demand, after scripts/kirikiri-engine.sh:
+    #   cmake --build build/kirikiri/.build/mac --target KiriKiriCipherTest
+    #   build/kirikiri/.build/mac/KiriKiriCipherTest
+    add_executable(KiriKiriCipherTest EXCLUDE_FROM_ALL vndegen/cipher_test.cpp vndegen/vnkk.mm)
+    target_link_libraries(KiriKiriCipherTest PRIVATE kirikiri_engine)
 endif()

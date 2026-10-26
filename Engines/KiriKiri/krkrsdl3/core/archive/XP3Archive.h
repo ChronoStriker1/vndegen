@@ -82,6 +82,7 @@ struct tTVPXP3ArchiveSegment
     bool IsCompressed;  // is compressed ?
 };
 //---------------------------------------------------------------------------
+struct VNKKCipher;
 class tTVPXP3Archive : public tTVPArchive
 {
 public:
@@ -98,6 +99,8 @@ public:
     tjs_int Count = 0;
 
     std::vector<tArchiveItem> ItemVector;
+    // The scheme VNDegen detected for this archive's data, or null when it is plain.
+    const VNKKCipher* Cipher = nullptr;
     void Init(tTJSBinaryStream* st, tjs_int64 offset, bool normalizeName = true);
 
 public:

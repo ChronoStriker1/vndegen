@@ -44,6 +44,10 @@ VNKK_API void vnkk_request_quit(void);
 // Tears the engine down after the game has quit or after vnkk_request_quit.
 VNKK_API void vnkk_stop(void);
 
+// A sentence for the player describing the most recent problem the engine recorded, such as an
+// archive encryption it cannot read, or NULL when there is none.
+VNKK_API const char *vnkk_problem(void);
+
 // The UIView SDL renders into, for the host to place in its own view hierarchy. NULL on macOS.
 VNKK_API void *vnkk_view(void);
 

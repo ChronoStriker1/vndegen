@@ -21,6 +21,7 @@
 #include "UtilStreams.h"
 #include "TVPArchive.h"
 #include "PlatformMutex.h"
+#include "ciphers.h"
 
 #include <zlib.h>
 
@@ -384,6 +385,8 @@ void tTVPXP3Archive::Init(tTJSBinaryStream* st, tjs_int64 off, bool normalizeNam
         // sort item vector by its name (required for tTVPArchive specification)
         if (normalizeName)
             std::stable_sort(ItemVector.begin(), ItemVector.end());
+
+        Cipher = VNKKDetectCipher(ArchiveName, ItemVector, st);
     }
     catch (...)
     {
@@ -929,6 +932,12 @@ tjs_uint tTVPXP3ArchiveStream::Read(void* buffer, tjs_uint read_size)
                                              Owner->GetFileHash(StorageIndex),
                                              Owner->GetName(StorageIndex));
             TVPXP3ArchiveExtractionFilter((tTVPXP3ExtractionFilterInfo*)&info, &FilterContext);
+        }
+        // A game's own xp3filter.tjs, above, replaces VNDegen's cipher.
+        else if (Owner->Cipher)
+        {
+            Owner->Cipher->decrypt(Owner->GetFileHash(StorageIndex), CurPos,
+                                   (tjs_uint8*)buffer + write_size, one_size);
         }
 
         // adjust members

@@ -18,12 +18,14 @@
 #include "TVPSystem.h"
 #include "TVPWindow.h"
 #include "WindowManager.h"
+#include "ciphers.h"
 
 #import <Foundation/Foundation.h>
 #if TARGET_OS_IOS
 #import <UIKit/UIKit.h>
 #endif
 
+#include <atomic>
 #include <cstdio>
 #include <string>
 
@@ -207,4 +209,17 @@ void *vnkk_view(void)
 #else
     return nullptr;
 #endif
+}
+
+// Archives can open on the engine's loader threads.
+static std::atomic<const char *> problem;
+
+void vnkk_record_problem(const char *sentence)
+{
+    problem = sentence;
+}
+
+const char *vnkk_problem(void)
+{
+    return problem;
 }
