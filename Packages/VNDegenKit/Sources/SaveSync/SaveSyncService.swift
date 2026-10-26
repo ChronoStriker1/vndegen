@@ -391,15 +391,20 @@ public final class SaveSyncService {
         try await serialized { try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot) }
     }
 
-    /// Adds a backup of the saves here to the server. The new backup folder goes up first, then mapping.yaml, and only
-    /// when the server's mapping.yaml still holds exactly the bytes the backup started from. Backups past the retention
-    /// limits go last. With `judged`, the server's state a status check saw, refuses with `changedSinceCheck` when the
-    /// backup would start from any other.
+    /// Adds a backup of the saves here to the server, on top of `judged`, the server state a status check saw. Refuses
+    /// with `changedSinceCheck` when the server's mapping.yaml is anything else by now. The new backup folder goes up
+    /// first, then mapping.yaml, and only when the server's mapping.yaml still holds exactly the bytes the backup started
+    /// from.
     ///
-    /// No lock is shared with Ludusavi or other devices, so one window remains: another device that sends its
-    /// mapping.yaml in the one round trip between the last comparison and this device's send is overwritten. Reading the
-    /// mapping back afterwards finds a change that lands after the send, and then nothing old is deleted.
-    public func backUp(_ id: GameID, judged: ServerRevision? = nil) async throws -> BackupReport {
+    /// Retention drops old backups from mapping.yaml only. VNDegen never deletes a backup folder another device might
+    /// still list; Ludusavi deletes unlisted `backup-*` folders at its next backup of the game.
+    ///
+    /// No lock is shared with Ludusavi or other devices. The mapping upload is set up first and waits until rsync on the
+    /// server asks for the file. Only then does a second channel read the server's mapping.yaml for the last time, and
+    /// the bytes go, or the file is skipped and the server's copy stays untouched. What remains is another device
+    /// writing mapping.yaml during one round trip: after that last read reaches the server and before rsync renames
+    /// the new file into place. Reading the mapping back afterwards reports a change that lands later.
+    public func backUp(_ id: GameID, judged: ServerRevision) async throws -> BackupReport {
         guard let server = trustedServer, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id)
         let retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
@@ -407,7 +412,7 @@ public final class SaveSyncService {
         let now = clock(), device = deviceID
         let (report, synced) = try await withStore(server) { store, client in
             let before = try await store.refreshGame(client, folder: match.folder)
-            if let judged, judged.mapping != before.mapping { throw SaveSyncError.changedSinceCheck }
+            guard judged.mapping == before.mapping else { throw SaveSyncError.changedSinceCheck }
             let base = try before.mapping.map { try LudusaviMapping(yaml: String(decoding: $0, as: UTF8.self)) }
             if base?.backups.isEmpty == false {
                 try await store.fetch(client, folder: match.folder, backup: nil)
@@ -421,40 +426,30 @@ public final class SaveSyncService {
                 return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
             }
             let pushed = try Data(contentsOf: mappingURL)
-            var sendingMapping = false
+            let sending = Flag()
             do {
                 try await store.push(client, folder: match.folder, backup: name, like: before.entries)
                 try await store.verify(client, folder: match.folder, backup: name, differential: report.isDifferential)
-                guard try await store.readGame(client, folder: match.folder).mapping == before.mapping else {
-                    throw SaveSyncError.changedDuringBackup
+                let sent = try await store.pushMapping(client, folder: match.folder, like: before.entries) {
+                    guard try await store.readGame(client, folder: match.folder).mapping == before.mapping else { return false }
+                    sending.set()
+                    return true
                 }
-                sendingMapping = true
-                try await store.pushMapping(client, folder: match.folder, like: before.entries)
+                guard sent else { throw SaveSyncError.changedDuringBackup }
             } catch {
-                // Until mapping.yaml goes up, nothing names the new folder, and its name is this device's alone.
-                if !sendingMapping { try? await store.delete(client, folder: match.folder, names: [name]) }
+                // Until mapping.yaml starts going up, nothing names the new folder, and its name is this device's alone.
+                if !sending.isSet { try? await store.delete(client, folder: match.folder, names: [name]) }
                 // Back to the server's state: the next read brings its mapping.yaml down again.
                 try? FileManager.default.removeItem(at: store.mirror.appendingPathComponent(match.folder).appendingPathComponent(name))
                 if let original = before.mapping { try? original.write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
                 throw error
             }
-            // The server's mapping.yaml may name the new folder from here on, so nothing below deletes it.
-            let after = try await store.readGame(client, folder: match.folder).mapping
-            guard after == pushed, let current = try? LudusaviMapping(yaml: String(decoding: pushed, as: UTF8.self)) else {
-                log.error("the server's mapping of \(id.rawValue) changed right after backup \(name); deleting no old backups")
+            guard try await store.readGame(client, folder: match.folder).mapping == pushed else {
+                log.error("the server's mapping of \(id.rawValue) changed right after backup \(name)")
                 throw SaveSyncError.changedAfterBackup
             }
-            let deletable = LudusaviMapping.deletable(report.pruned, base: base, current: current)
-            if deletable.count < report.pruned.count {
-                log.notice("kept old backups of \(id.rawValue) that were locked or still listed: \(Set(report.pruned).subtracting(deletable).sorted())")
-            }
-            if !deletable.isEmpty {
-                do { try await store.delete(client, folder: match.folder, names: deletable) } catch {
-                    // Ludusavi deletes folders that mapping.yaml no longer lists at its next backup of the game.
-                    log.error("deleting old backups of \(id.rawValue) failed: \(error.localizedDescription)")
-                }
-            }
-            return (report, SyncRecord(folder: match.folder, latest: current.summaries.last?.revision, saves: saves))
+            let latest = try LudusaviMapping(yaml: String(decoding: pushed, as: UTF8.self)).summaries.last?.revision
+            return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
         }
         record(synced, for: id)
         if !match.inStore { storeGames[match.folder] = match.title }
@@ -567,30 +562,39 @@ public final class SaveSyncService {
         settings.server.flatMap { $0.hostKey == nil ? nil : $0 }
     }
 
-    /// Runs `work` with one connection to the server, after every operation started before it. Closes the connection
-    /// when `timeouts.operation` passes or the caller is cancelled, which ends every read and write waiting on it, so a
-    /// stalled server never holds up the operations after this one.
+    /// Runs `work` with one connection to the server, after every operation started before it. When `timeouts.operation`
+    /// passes or the caller is cancelled, cancels the connection attempt or closes the connection, which ends every read
+    /// and write waiting on it, so a stalled server never holds up the operations after this one. The connector must
+    /// end when cancelled, as `SSHConnection.connect` does.
     private func withStore<T: Sendable>(_ server: SaveServer, _ work: @escaping @Sendable (RemoteStore, RsyncClient) async throws -> T) async throws -> T {
         let store = RemoteStore(path: server.path, mirror: mirror), connector = connector, limit = timeouts.operation
         return try await serialized {
-            let connection = try await connector(server)
+            let job = Task {
+                let connection = try await connector(server)
+                do {
+                    let result = try await withTaskCancellationHandler {
+                        try await work(store, RsyncClient(connection: connection))
+                    } onCancel: {
+                        Task { await connection.close() }
+                    }
+                    await connection.close()
+                    return result
+                } catch {
+                    await connection.close()
+                    throw error
+                }
+            }
             let deadline = Task {
                 do { try await Task.sleep(for: limit) } catch { return false }
-                await connection.close()
+                job.cancel()
                 return true
             }
             do {
-                let result = try await withTaskCancellationHandler {
-                    try await work(store, RsyncClient(connection: connection))
-                } onCancel: {
-                    Task { await connection.close() }
-                }
+                let result = try await withTaskCancellationHandler { try await job.value } onCancel: { job.cancel() }
                 deadline.cancel()
-                await connection.close()
                 return result
             } catch {
                 deadline.cancel()
-                await connection.close()
                 if await deadline.value { throw SaveSyncError.timedOut }
                 throw error
             }
@@ -720,4 +724,14 @@ struct LudusaviConfig {
             retention = Retention(full: full, differential: differential)
         }
     }
+}
+
+/// A one-way switch that a closure on another task can set.
+private final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    var isSet: Bool { lock.withLock { value } }
+
+    func set() { lock.withLock { value = true } }
 }

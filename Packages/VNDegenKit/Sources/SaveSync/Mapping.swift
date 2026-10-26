@@ -161,25 +161,6 @@ extension LudusaviMapping {
         return removed.flatMap { $0 == "." ? drives.keys.sorted() : [$0] }
     }
 
-    /// The folders in the game folder that hold this mapping's backups. A full backup named `.` keeps its files in the
-    /// drive folders at the top.
-    func folders(of backups: some Sequence<String>) -> Set<String> {
-        Set(backups.flatMap { $0 == "." ? drives.keys.sorted() : [$0] })
-    }
-
-    /// Of the folders a backup's retention dropped (`pruned`), the ones that are safe to delete on the server: not
-    /// locked in `base`, the mapping the backup started from, and not named by `current`, the server's mapping read back
-    /// after the new one went up. Ludusavi deletes any skipped folder itself once no mapping names it.
-    static func deletable(_ pruned: [String], base: LudusaviMapping?, current: LudusaviMapping) -> [String] {
-        let named = current.folders(of: current.summaries.map(\.name))
-        let locked = base.map { base in
-            base.folders(of: base.backups.flatMap { full in
-                (full.locked || full.children.contains(where: \.locked) ? [full.name] : []) + full.children.filter(\.locked).map(\.name)
-            })
-        } ?? []
-        return pruned.filter { !named.contains($0) && !locked.contains($0) }
-    }
-
     /// Where a backed-up file's bytes are, relative to the game folder: `<backup>/<drive folder>/<path without drive>`.
     func storedPath(of path: String, in backup: String) -> String? {
         guard let (drive, plain) = Self.splitDrive(path) else { return nil }

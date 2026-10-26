@@ -145,12 +145,17 @@ struct RemoteStore: Sendable {
         return files
     }
 
-    /// Sends the mirror's mapping.yaml of the game up.
-    func pushMapping(_ client: RsyncClient, folder: String, like entries: GameEntries) async throws {
-        try await upload(client, folder: folder, paths: [LudusaviStore.mappingFile], like: entries)
+    /// Sends the mirror's mapping.yaml of the game up once the server has asked for it and `confirm` returns true.
+    /// Returns false when `confirm` declined, which leaves the server's mapping.yaml as it was.
+    func pushMapping(_ client: RsyncClient, folder: String, like entries: GameEntries,
+                     confirm: @escaping @Sendable () async throws -> Bool) async throws -> Bool {
+        let sent = try await upload(client, folder: folder, paths: [LudusaviStore.mappingFile], like: entries) { _ in try await confirm() }
+        return !sent.isEmpty
     }
 
-    private func upload(_ client: RsyncClient, folder: String, paths: [String], like entries: GameEntries) async throws {
+    @discardableResult
+    private func upload(_ client: RsyncClient, folder: String, paths: [String], like entries: GameEntries,
+                        confirm: (@Sendable (String) async throws -> Bool)? = nil) async throws -> [String] {
         let template = entries.folder ?? entries.root
         let owner = template?.owner
         let folderMode = template?.permissions ?? 0o755
@@ -170,10 +175,11 @@ struct RemoteStore: Sendable {
                 : .init(entry: RsyncEntry(path: "\(folder)/\(path)", kind: .file, size: Int64(values.fileSize ?? 0), modified: modified,
                                           permissions: fileMode, owner: owner), source: url))
         }
-        try await client.push(uploads, to: remote(), owners: owner != nil)
+        return try await client.push(uploads, to: remote(), owners: owner != nil, confirm: confirm)
     }
 
-    /// Deletes backup folders of the game on the server.
+    /// Deletes backup folders of the game on the server. Only for this device's own new folder, before any mapping.yaml
+    /// names it.
     func delete(_ client: RsyncClient, folder: String, names: [String]) async throws {
         try await client.delete(names, in: remote(folder))
     }

@@ -526,7 +526,8 @@ public struct BackupReport: Sendable {
     public var isDifferential: Bool
     public var filesWritten: Int
     public var paths: [PathOrigin: Int]
-    /// Backup folders the retention limits removed.
+    /// Backups the retention limits dropped from mapping.yaml. Their folders stay on the server until Ludusavi on a PC
+    /// prunes them at its next backup of the game.
     public var pruned: [String]
 
     public enum PathOrigin: Sendable {
@@ -577,7 +578,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case let .unsupportedPath(path): "Can't store \(path) in a Ludusavi backup."
         case .changedDuringBackup: "Another device backed up this game while VNDegen was writing. Nothing was recorded. Try again."
         case .changedAfterBackup:
-            "Another device backed up this game just after VNDegen did, so VNDegen's backup may not be listed. No old backups were deleted. Check the game's backups."
+            "Another device backed up this game just after VNDegen did, so VNDegen's backup may not be listed. Check the game's backups."
         case .changedSinceCheck: "Another device backed up this game since VNDegen last checked it. Nothing was backed up. Check the game's backups first."
         case let .incompleteUpload(name): "The server's copy of \(name) is incomplete, so VNDegen did not record it. Nothing was changed. Try again."
         case .timedOut: "The server stopped answering, so VNDegen gave up. Try again."

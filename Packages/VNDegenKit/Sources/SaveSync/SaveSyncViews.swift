@@ -270,8 +270,9 @@ public final class GameSavesModel {
     }
     var preview: RestorePreview?
     var sync: SyncStatus?
-    /// The server state `sync` describes. Back Up refuses to run on any other, because the user decided on this one.
-    @ObservationIgnored private var judged: ServerRevision?
+    /// The server state `sync` describes. Back Up runs only on top of it, because the user decided on this one, so it
+    /// stays off until a check succeeds.
+    private(set) var judged: ServerRevision?
     /// True until the first load finishes, so the list says it is loading rather than empty.
     var loading = true
     var busy = false
@@ -346,7 +347,7 @@ public final class GameSavesModel {
             choosingGame = true
         case let .backup(name): selected = name
         case .restore: if let selected { confirming = .restore(selected) }
-        case .backUp: run { try await self.backUp() }
+        case .backUp: if let judged { run { try await self.backUp(on: judged) } }
         case .undo: if service.canUndoRestore(game) { confirming = .undo }
         case .automaticMatch: pick(nil)
         case let .folder(folder): pick(folder)
@@ -385,6 +386,7 @@ public final class GameSavesModel {
             await loadPreview()
         } catch {
             backups = []
+            judged = nil
             status = Status(text: error.localizedDescription, isError: true)
         }
     }
@@ -426,7 +428,7 @@ public final class GameSavesModel {
         (sync, judged) = (check?.status, check?.revision)
     }
 
-    private func backUp() async throws {
+    private func backUp(on judged: ServerRevision) async throws {
         let report: BackupReport
         do {
             report = try await service.backUp(game, judged: judged)
@@ -444,7 +446,9 @@ public final class GameSavesModel {
         if let count = report.paths[.vndegen] {
             text += " \(count) saves had no PC folder to follow, so Ludusavi will restore them under /VNDegen until you add a redirect."
         }
-        if !report.pruned.isEmpty { text += " Removed \(report.pruned.count) old backups, as your retention limits ask." }
+        if !report.pruned.isEmpty {
+            text += " Dropped \(report.pruned.count) old backups from the list, as your retention limits ask. Ludusavi deletes their folders at its next backup of this game."
+        }
         status = Status(text: text, isError: false)
     }
 }
@@ -594,6 +598,7 @@ public struct GameSavesView: View {
                 .disabled(model.selected == nil)
                 .focusRow(model.isFocused(.restore), id: GameSavesModel.Target.restore)
             Button("Back Up Now", systemImage: "square.and.arrow.up") { model.select(.backUp) }
+                .disabled(model.judged == nil)
                 .focusRow(model.isFocused(.backUp), id: GameSavesModel.Target.backUp)
             Button("Undo Last Restore", systemImage: "arrow.uturn.backward") { model.select(.undo) }
                 .disabled(!model.service.canUndoRestore(model.game))

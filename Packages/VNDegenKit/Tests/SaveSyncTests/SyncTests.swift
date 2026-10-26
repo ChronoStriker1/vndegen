@@ -152,7 +152,7 @@ private struct Setup {
     #expect(match == GameMatch(folder: "Test Game 01", title: "Test Game 01", source: .steamID(1_000_002), inStore: false))
     #expect(setup.service.manifestRules(for: setup.id) == ["<base>/save/*.rmmzsave"])
 
-    let report = try await setup.service.backUp(setup.id)
+    let report = try await setup.service.checkedBackUp(setup.id)
     #expect(report.paths == [.pcFolder: 1])
     let mapping = try LudusaviStore(root: setup.store).mapping("Test Game 01")
     #expect(mapping.name == "Test Game 01")
@@ -190,7 +190,7 @@ private struct Setup {
     let service = setup.service, id = setup.id
     #expect(try await service.status(for: id) == .noBackups)
 
-    let first = try await service.backUp(id)
+    let first = try await service.checkedBackUp(id)
     #expect(first.backup != nil && !first.isDifferential)
     #expect(try await service.status(for: id) == .inSync)
     #expect(try setup.serverMapping().backups.count == 1)
@@ -244,32 +244,39 @@ private struct Setup {
 }
 
 @MainActor
-@Test(.enabled(if: rsyncPath != nil)) func retentionDeletesOldBackupsOnTheServer() async throws {
+@Test(.enabled(if: rsyncPath != nil)) func retentionDropsOldBackupsFromTheListAndLeavesTheirFolders() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "v0"])
     setup.service.manualRetention = Retention(full: 1, differential: 1)
     var pruned: [String] = []
     for version in 1 ... 4 {
         try write(["file1.rmmzsave": "v\(version)"], to: setup.locations[0])
-        pruned += try await setup.service.backUp(setup.id).pruned
+        pruned += try await setup.service.checkedBackUp(setup.id).pruned
         try await Task.sleep(for: .seconds(1.1))
     }
     let mapping = try setup.serverMapping()
     // With one full backup, Ludusavi keeps adding differentials and drops the oldest past the limit.
     #expect(mapping.backups.count == 1 && mapping.backups[0].children.count == 1)
     #expect(pruned.count == 2)
-    let folders = try fm.contentsOfDirectory(atPath: setup.store.appendingPathComponent("No Socks RPG").path).filter { $0.hasPrefix("backup-") }
-    #expect(Set(folders) == Set(mapping.summaries.map(\.name)))
+    // Ludusavi deletes the dropped folders at its next backup of the game. VNDegen leaves them.
+    #expect(try setup.serverFolders() == Set(mapping.summaries.map(\.name) + pruned))
     #expect(try contents(of: setup.locations[0]) == ["file1.rmmzsave": "v4"])
 }
 
 @MainActor
 @Test(.enabled(if: rsyncPath != nil)) func theServiceRunsOneOperationAtATime() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
-    async let first = setup.service.backUp(setup.id)
-    async let second = setup.service.backUp(setup.id)
-    async let third = setup.service.backUp(setup.id)
-    let made = try await [first, second, third].compactMap(\.backup)
-    #expect(made.count == 1)
+    let judged = try await setup.service.check(setup.id).revision
+    let attempts = (0 ..< 3).map { _ in Task { try await setup.service.backUp(setup.id, judged: judged) } }
+    var made = 0, refused = 0
+    for attempt in attempts {
+        switch await attempt.result {
+        case .success: made += 1
+        case .failure(SaveSyncError.changedSinceCheck): refused += 1
+        case let .failure(error): Issue.record(error)
+        }
+    }
+    // The first one changes the server, so the others no longer start from the state that was checked.
+    #expect(made == 1 && refused == 2)
 }
 
 @Test func forgettingExcessBackupsMatchesLudusavi() {
@@ -290,6 +297,7 @@ private struct Setup {
 final class Hooks: @unchecked Sendable {
     private let lock = NSLock()
     private var command: (@Sendable ([String]) async throws -> Void)?
+    private var finished: (@Sendable ([String]) -> Void)?
     private var connect: (@Sendable (Int) async throws -> Void)?
     private var next: (any RsyncConnection)?
     private var connections = 0
@@ -298,6 +306,31 @@ final class Hooks: @unchecked Sendable {
     var beforeCommand: (@Sendable ([String]) async throws -> Void)? {
         get { lock.withLock { command } }
         set { lock.withLock { command = newValue } }
+    }
+
+    /// Runs after each rsync command the service started has exited, with its arguments.
+    var afterCommand: (@Sendable ([String]) -> Void)? {
+        get { lock.withLock { finished } }
+        set { lock.withLock { finished = newValue } }
+    }
+
+    /// Runs `action` once, before the first command that starts after the `pushes`th push finished.
+    func onceAfterPush(_ pushes: Int, _ action: @escaping @Sendable () async throws -> Void) {
+        let done = Locked(0), fired = Locked(false)
+        afterCommand = { arguments in if Command(arguments) == .push { done { $0 += 1 } } }
+        beforeCommand = { _ in
+            guard done({ $0 }) >= pushes, fired({ defer { $0 = true }; return !$0 }) else { return }
+            try await action()
+        }
+    }
+
+    /// Runs `action` once, right before the `pushes`th push starts.
+    func onceBeforePush(_ pushes: Int, _ action: @escaping @Sendable () async throws -> Void) {
+        let started = Locked(0)
+        beforeCommand = { arguments in
+            guard Command(arguments) == .push, started({ $0 += 1; return $0 }) == pushes else { return }
+            try await action()
+        }
     }
 
     /// Runs before each connection opens, with how many opened before it.
@@ -327,10 +360,24 @@ private struct HookedConnection: RsyncConnection {
 
     func start(_ arguments: [String]) async throws -> any RsyncTransport {
         try await hooks.beforeCommand?(arguments)
-        return try await ProcessConnection().start(arguments)
+        return HookedTransport(base: try await ProcessConnection().start(arguments)) { [hooks] in hooks.afterCommand?(arguments) }
     }
 
     func close() async {}
+}
+
+private struct HookedTransport: RsyncTransport {
+    let base: any RsyncTransport
+    let finished: @Sendable () -> Void
+
+    var output: AsyncThrowingStream<[UInt8], any Error> { base.output }
+
+    func write(_ bytes: [UInt8]) async throws { try await base.write(bytes) }
+
+    func finish() async throws -> (status: Int32, errorOutput: String) {
+        defer { finished() }
+        return try await base.finish()
+    }
 }
 
 /// A server that accepts every command and then never sends a byte, until the connection is closed.
@@ -368,21 +415,11 @@ final class Locked<Value>: @unchecked Sendable {
 }
 
 /// What a service's rsync command does: sends files (a push), reads the server, or deletes backups.
-private enum Command {
+enum Command {
     case push, read, delete
 
     init(_ arguments: [String]) {
         self = arguments.contains("--sender") ? .read : arguments.contains("--delete") ? .delete : .push
-    }
-}
-
-/// Calls `action` once, at the first command after the `pushes`th push.
-private func afterPush(_ pushes: Int, _ action: @escaping @Sendable () async throws -> Void) -> @Sendable ([String]) async throws -> Void {
-    let seen = Locked(0), done = Locked(false)
-    return { arguments in
-        if Command(arguments) == .push, seen({ $0 += 1; return $0 }) <= pushes { return }
-        guard seen({ $0 }) >= pushes, done({ defer { $0 = true }; return !$0 }) else { return }
-        try await action()
     }
 }
 
@@ -411,7 +448,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @Test(.enabled(if: rsyncPath != nil)) func twoDevicesBackingUpInTheSameSecondNeverShareAFolder() async throws {
     let a = try await Setup(saves: ["file1.rmmzsave": "one"])
     let b = try await Setup(saves: ["file1.rmmzsave": "one"], store: a.store)
-    _ = try await a.service.backUp(a.id)
+    _ = try await a.service.checkedBackUp(a.id)
     let second = Date(timeIntervalSince1970: 1_800_000_000)
     a.service.clock = { second }
     b.service.clock = { second }
@@ -422,11 +459,11 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
     // its mapping.yaml is not yet.
     let other = b.service, otherID = b.id
     let made = Locked<String?>(nil)
-    a.hooks.beforeCommand = afterPush(1) {
-        let name = try await other.backUp(otherID).backup
+    a.hooks.onceAfterPush(1) {
+        let name = try await other.checkedBackUp(otherID).backup
         made { $0 = name }
     }
-    await #expect(throws: SaveSyncError.changedDuringBackup) { try await a.service.backUp(a.id) }
+    await #expect(throws: SaveSyncError.changedDuringBackup) { try await a.service.checkedBackUp(a.id) }
 
     let mapping = try a.serverMapping()
     let bName = try #require(made { $0 })
@@ -440,15 +477,15 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @Test(.enabled(if: rsyncPath != nil)) func aChangeThatKeepsSizeAndTimeStopsTheBackupAndItsDeletions() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "v0"])
     setup.service.manualRetention = Retention(full: 1, differential: 1)
-    _ = try await setup.service.backUp(setup.id)
+    _ = try await setup.service.checkedBackUp(setup.id)
     try setup.deckBacksUp(["file1.rmmzsave": "deck"], at: 1, comment: String(repeating: "x", count: 40))
     let deckDiff = try #require(try setup.serverMapping().summaries.last?.name)
     try write(["file1.rmmzsave": "v1"], to: setup.locations[0])
 
     // The Deck locks its backup, which this backup's retention would drop, while this device's folder goes up.
     let url = setup.mappingURL
-    setup.hooks.beforeCommand = afterPush(1) { try lockKeepingSizeAndTime(url, backup: deckDiff) }
-    await #expect(throws: SaveSyncError.changedDuringBackup) { try await setup.service.backUp(setup.id) }
+    setup.hooks.onceAfterPush(1) { try lockKeepingSizeAndTime(url, backup: deckDiff) }
+    await #expect(throws: SaveSyncError.changedDuringBackup) { try await setup.service.checkedBackUp(setup.id) }
 
     let mapping = try setup.serverMapping()
     #expect(mapping.backups[0].children.map(\.name) == [deckDiff])
@@ -461,16 +498,16 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @Test(.enabled(if: rsyncPath != nil)) func aMappingReplacedRightAfterTheBackupKeepsEveryOldBackup() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "v0"])
     setup.service.manualRetention = Retention(full: 1, differential: 1)
-    _ = try await setup.service.backUp(setup.id)
+    _ = try await setup.service.checkedBackUp(setup.id)
     try write(["file1.rmmzsave": "v1"], to: setup.locations[0])
-    let first = try #require(try await setup.service.backUp(setup.id).backup)
+    let first = try #require(try await setup.service.checkedBackUp(setup.id).backup)
     try write(["file1.rmmzsave": "v2"], to: setup.locations[0])
     try await Task.sleep(for: .seconds(1.1))
 
     // Another device sends the mapping it started from, which still lists `first`, just after this device's goes up.
     let url = setup.mappingURL, stale = try Data(contentsOf: url)
-    setup.hooks.beforeCommand = afterPush(2) { try stale.write(to: url) }
-    await #expect(throws: SaveSyncError.changedAfterBackup) { try await setup.service.backUp(setup.id) }
+    setup.hooks.onceAfterPush(2) { try stale.write(to: url) }
+    await #expect(throws: SaveSyncError.changedAfterBackup) { try await setup.service.checkedBackUp(setup.id) }
 
     #expect(try Data(contentsOf: url) == stale)
     #expect(try setup.serverFolders().contains(first))
@@ -502,7 +539,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @MainActor
 @Test(.enabled(if: rsyncPath != nil)) func aSyncRecordFromBeforeBackupTimesAsksInsteadOfBackingUp() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
-    _ = try await setup.service.backUp(setup.id)
+    _ = try await setup.service.checkedBackUp(setup.id)
     try write(["file1.rmmzsave": "two"], to: setup.locations[0])
 
     // The record as VNDegen wrote it before: the latest backup by name only.
@@ -527,7 +564,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @MainActor
 @Test(.enabled(if: rsyncPath != nil)) func anAutomaticBackupNeverLandsOnABackupItsCheckDidNotSee() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
-    _ = try await setup.service.backUp(setup.id)
+    _ = try await setup.service.checkedBackUp(setup.id)
     try write(["file1.rmmzsave": "two"], to: setup.locations[0])
     setup.service.autoBackup = true
 
@@ -552,14 +589,14 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @Test(.enabled(if: rsyncPath != nil)) func aDifferentialWithNothingToStoreGoesUp() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "v1", "file2.rmmzsave": "two"])
     setup.service.manualRetention = Retention(full: 1, differential: 2)
-    _ = try await setup.service.backUp(setup.id)
+    _ = try await setup.service.checkedBackUp(setup.id)
     try write(["file1.rmmzsave": "v2"], to: setup.locations[0])
-    _ = try await setup.service.backUp(setup.id)
+    _ = try await setup.service.checkedBackUp(setup.id)
     try await Task.sleep(for: .seconds(1.1))
 
     // Back to what the full backup holds, so the new differential inherits every file and stores none.
     try write(["file1.rmmzsave": "v1"], to: setup.locations[0])
-    let report = try await setup.service.backUp(setup.id)
+    let report = try await setup.service.checkedBackUp(setup.id)
     let name = try #require(report.backup)
     #expect(report.isDifferential && report.filesWritten == 0)
     let diff = try #require(try setup.serverMapping().backups.last?.children.last)
@@ -572,36 +609,124 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
 @MainActor
 @Test(.enabled(if: rsyncPath != nil), .timeLimit(.minutes(1))) func aStalledServerHoldsUpNothingAfterIt() async throws {
     let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    // A deadline far past the launch check, so only cancelling the check can let the next operation run in time.
     setup.service.timeouts.launchCheck = .milliseconds(500)
-    setup.service.timeouts.operation = .seconds(2)
+    setup.service.timeouts.operation = .seconds(50)
 
-    // The check before launch gives up, and its connection closes, so the backup after it runs at once.
+    // The check before launch gives up while the server is silent, and its connection closes, so the backup after it
+    // runs at once.
     let stalled = StallingConnection()
     setup.hooks.nextConnection = stalled
-    let start = ContinuousClock.now
+    var start = ContinuousClock.now
     #expect(await setup.service.launchOffer(setup.id) == nil)
-    #expect(try await setup.service.backUp(setup.id).backup != nil)
+    #expect(try await setup.service.checkedBackUp(setup.id).backup != nil)
     #expect(stalled.closed)
-    #expect(ContinuousClock.now - start < .seconds(10))
+    #expect(ContinuousClock.now - start < .seconds(5))
 
-    // Any other operation ends at its deadline, and the next one runs.
+    // The same while the connection is still logging in.
+    let stalls = Locked(1)
+    setup.hooks.beforeConnect = { _ in
+        if stalls({ defer { $0 -= 1 }; return $0 > 0 }) { try await Task.sleep(for: .seconds(3600)) }
+    }
+    try write(["file1.rmmzsave": "two"], to: setup.locations[0])
+    start = ContinuousClock.now
+    #expect(await setup.service.launchOffer(setup.id) == nil)
+    #expect(try await setup.service.checkedBackUp(setup.id).backup != nil)
+    #expect(ContinuousClock.now - start < .seconds(5))
+    setup.hooks.beforeConnect = nil
+
+    // Any other operation ends at its deadline, whether the server is silent or the login never finishes, and the
+    // next one runs.
+    setup.service.timeouts.operation = .seconds(2)
     setup.hooks.nextConnection = StallingConnection()
     await #expect(throws: SaveSyncError.timedOut) { try await setup.service.status(for: setup.id) }
+    let loginStalls = Locked(1)
+    setup.hooks.beforeConnect = { _ in
+        if loginStalls({ defer { $0 -= 1 }; return $0 > 0 }) { try await Task.sleep(for: .seconds(3600)) }
+    }
+    await #expect(throws: SaveSyncError.timedOut) { try await setup.service.status(for: setup.id) }
+    setup.hooks.beforeConnect = nil
     #expect(try await setup.service.status(for: setup.id) == .inSync)
 }
 
-@Test func onlyUnlockedUnlistedBackupsAreDeleted() {
-    func full(_ name: String, locked: Bool = false, _ children: [(String, Bool)] = []) -> FullBackup {
-        FullBackup(name: name, when: Timestamp.epoch, locked: locked, files: [:], registryHash: nil,
-                   children: children.map { DifferentialBackup(name: $0.0, when: Timestamp.epoch, locked: $0.1, files: [:], registry: nil) })
+
+extension SaveSyncService {
+    /// A backup on top of what a status check just saw, as automatic backup and the game page do.
+    func checkedBackUp(_ id: GameID) async throws -> BackupReport {
+        try await backUp(id, judged: check(id).revision)
     }
-    var base = LudusaviMapping(name: "G", drives: ["drive-0": ""])
-    base.backups = [full(".", [("d0", false)]), full("f1", [("d1", true), ("d2", false)]), full("f2", locked: true)]
-    var current = base
-    current.backups = [full("f1", [("d1", true)]), full("f3", [("d2", false)])]
-    let pruned = ["drive-0", "d0", "f1", "d1", "d2", "f2", "gone"]
-    // f1 has a locked differential, so it counts as locked. d2 is still listed. f2 was locked.
-    #expect(LudusaviMapping.deletable(pruned, base: base, current: current) == ["drive-0", "d0", "gone"])
-    current.backups.append(full("."))
-    #expect(LudusaviMapping.deletable(pruned, base: nil, current: current) == ["d0", "f2", "gone"])
+}
+
+/// A server that refuses every command, as one that just went away does.
+private struct RefusingConnection: RsyncConnection {
+    func start(_ arguments: [String]) async throws -> any RsyncTransport { throw SSHError.commandRefused }
+    func close() async {}
+}
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func anOldBackupStaysWhenAnotherDeviceStillListsIt() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "v0"])
+    setup.service.manualRetention = Retention(full: 1, differential: 1)
+    _ = try await setup.service.checkedBackUp(setup.id)
+    try write(["file1.rmmzsave": "v1"], to: setup.locations[0])
+    let first = try #require(try await setup.service.checkedBackUp(setup.id).backup)
+    try write(["file1.rmmzsave": "v2"], to: setup.locations[0])
+    try await Task.sleep(for: .seconds(1.1))
+
+    // Another device sends a mapping that still lists `first`, which this backup drops, after the readback.
+    let url = setup.mappingURL, stale = try Data(contentsOf: url)
+    let sent = Locked(false)
+    setup.hooks.beforeCommand = { arguments in
+        if Command(arguments) == .delete, !sent({ $0 }) { try stale.write(to: url); sent { $0 = true } }
+    }
+    let report = try await setup.service.checkedBackUp(setup.id)
+    #expect(report.pruned == [first])
+    if !sent({ $0 }) { try stale.write(to: url) }
+
+    #expect(try setup.serverFolders().contains(first))
+    try setup.expectStoreIsWhole(strays: true)
+}
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func aMappingChangedJustBeforeItsUploadIsNeverOverwritten() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    _ = try await setup.service.checkedBackUp(setup.id)
+    try write(["file1.rmmzsave": "two"], to: setup.locations[0])
+    let before = try setup.serverFolders()
+
+    // The Deck backs up right before this device starts sending its mapping.yaml.
+    let url = setup.mappingURL
+    let deck = Locked<Data?>(nil)
+    setup.hooks.onceBeforePush(2) {
+        try await setup.deckBacksUp(["file1.rmmzsave": "deck"], at: 1)
+        let written = try Data(contentsOf: url)
+        deck { $0 = written }
+    }
+    await #expect(throws: SaveSyncError.changedDuringBackup) { try await setup.service.checkedBackUp(setup.id) }
+
+    // rsync on the server was asked for the file and got nothing, so the Deck's mapping.yaml stands, with no
+    // temporary file beside it, and this device's unlisted folder is gone.
+    #expect(try Data(contentsOf: url) == deck { $0 })
+    let leftovers = try fm.contentsOfDirectory(atPath: url.deletingLastPathComponent().path).filter { $0.hasPrefix(".") }
+    #expect(leftovers.isEmpty)
+    #expect(try setup.serverFolders().subtracting(before).count == 1)
+    #expect(try setup.serverMapping().summaries.last?.os == "linux")
+    try setup.expectStoreIsWhole()
+}
+
+@MainActor
+@Test(.enabled(if: rsyncPath != nil)) func backUpNowWaitsForAStatusCheck() async throws {
+    let setup = try await Setup(saves: ["file1.rmmzsave": "one"])
+    _ = try await setup.service.checkedBackUp(setup.id)
+    try write(["file1.rmmzsave": "two"], to: setup.locations[0])
+
+    // The page can't reach the server, so it never sees the Deck's backup that lands meanwhile.
+    let model = GameSavesModel(service: setup.service, game: setup.id)
+    setup.hooks.nextConnection = RefusingConnection()
+    await model.load()
+    try setup.deckBacksUp(["file1.rmmzsave": "deck"], at: 1)
+
+    model.select(.backUp)
+    for _ in 0 ..< 100 where model.busy { try await Task.sleep(for: .milliseconds(50)) }
+    #expect(try setup.serverMapping().summaries.last?.os == "linux")
 }
