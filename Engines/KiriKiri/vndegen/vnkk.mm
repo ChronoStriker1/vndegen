@@ -7,6 +7,7 @@
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_system.h>
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
 
@@ -40,6 +41,8 @@ static bool quitRequested;
 static Uint64 quitSentAt; // SDL ticks when the close was sent, 0 before
 static bool terminated;
 static bool finished;
+// Whether the engine runs in a view of the host app's, as in VNDegen, rather than in a window of SDL's own.
+static bool hosted;
 static FILE *logFile;
 // Archives can open on the engine's loader threads.
 static std::atomic<const char *> problem;
@@ -63,7 +66,7 @@ static void notePointer(float x, float y)
 
 // The host delivers the keyboard, and on macOS the mouse, from its own views, the way it does for its other engines.
 // SDL would deliver some of the same presses a second time, since on macOS it reads whichever AppKit events its event
-// pump happens to take off the queue.
+// pump happens to take off the queue. A game's modal window still runs that pump in its own loop.
 static bool SDLCALL filterInput(void *, SDL_Event *event)
 {
     switch (event->type) {
@@ -229,11 +232,18 @@ int vnkk_start(const VNKKLaunch *launch)
     pointerX = pointerY = -1;
 #if TARGET_OS_OSX
     NSView *host = (__bridge NSView *)launch->hostView;
+    hosted = host;
     if (host)
         prepareHostWindow(host);
 #else
+    hosted = true;
     saveKeyboardHandler();
+    // SDL's event pump runs the main run loop, which would run the host app's own work, such as its touches and its
+    // tasks, inside a frame. The host's run loop delivers the touches to SDL's view between frames anyway.
+    SDL_SetiOSEventPump(false);
 #endif
+    // SDL would catch SIGINT and SIGTERM to quit the game, and the host app could no longer be ended by them.
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, hosted ? "1" : "0");
     // An exception the engine leaves uncaught would end the host app along with the game.
     SDL_AppResult result = SDL_APP_FAILURE;
     try {
@@ -292,6 +302,19 @@ static void closeMainWindowAnyway()
     }
 }
 
+// On macOS SDL's event pump dispatches every event in the app's queue, so a hosted frame would run the host's own
+// handlers, such as its quit, inside the frame, which could not end until they returned. A hosted frame reads only
+// the events already in SDL's queue: the host delivers its input through vnkk_key and the others, and SDL records
+// its window's size changes as they happen.
+static bool nextEvent(SDL_Event *event)
+{
+#if TARGET_OS_OSX
+    if (hosted)
+        return SDL_PeepEvents(event, 1, SDL_GETEVENT, SDL_EVENT_FIRST, SDL_EVENT_LAST) > 0;
+#endif
+    return SDL_PollEvent(event);
+}
+
 int vnkk_iterate(void)
 {
     if (finished)
@@ -316,7 +339,7 @@ int vnkk_iterate(void)
             TVPTerminateAsync();
         }
         SDL_Event event;
-        while (SDL_PollEvent(&event))
+        while (nextEvent(&event))
             SDL_AppEvent(nullptr, &event);
         finished = SDL_AppIterate(nullptr) != SDL_APP_CONTINUE;
     } catch (...) {
@@ -422,7 +445,7 @@ void vnkk_stop(void)
     vnkk_set_paused(false);
     if (started)
         SDL_AppQuit(nullptr, finished ? SDL_APP_SUCCESS : SDL_APP_FAILURE);
-    started = running = quitRequested = terminated = finished = false;
+    started = running = quitRequested = terminated = finished = hosted = false;
     quitSentAt = 0;
 #if TARGET_OS_OSX
     releaseHostWindow();

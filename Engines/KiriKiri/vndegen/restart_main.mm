@@ -7,19 +7,23 @@
 // it. After each game's vnkk_stop, stdout gets the resident size, the resident size once malloc has
 // returned its free pages to the system, and the number of open files. Each game is paused for
 // pauseTime at its title, and the next game's engine clock must still start level with SDL's.
-// Exits nonzero if a game missed its title, did not quit, or started with a clock behind SDL's.
+// The games draw in a window's view and the run loop turns between frames, as in VNDegen's app,
+// and every frame runs with an event of the app's queued, which the frame must leave to the app.
+// Exits nonzero if a game missed its title, did not quit, started with a clock behind SDL's, or
+// had a frame take the app's events.
 #include "tjsCommHead.h"
 #include "Platform.h"
 #include "vnkk.h"
 
 #include <SDL3/SDL_timer.h>
 
-#import <Foundation/Foundation.h>
+#import <AppKit/AppKit.h>
 #include <fcntl.h>
 #include <mach/mach.h>
 #include <malloc/malloc.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <fstream>
@@ -62,6 +66,33 @@ static int openFiles()
     return count;
 }
 
+// Handles the app's events until `until`, as VNDegen's run loop does between frames.
+static void runHost(Clock::time_point until)
+{
+    for (;;) {
+        double seconds = std::max(std::chrono::duration<double>(until - Clock::now()).count(), 0.0);
+        NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:seconds]
+                                               inMode:NSDefaultRunLoopMode dequeue:YES];
+        if (!event)
+            return;
+        [NSApp sendEvent:event];
+    }
+}
+
+static bool appEventsTaken;
+
+// Runs a frame with an event of the app's queued and checks that the frame left it there.
+static int iterate()
+{
+    [NSApp postEvent:[NSEvent otherEventWithType:NSEventTypeApplicationDefined location:NSZeroPoint modifierFlags:0
+                                       timestamp:0 windowNumber:0 context:nil subtype:0 data1:0 data2:0]
+             atStart:NO];
+    int quit = vnkk_iterate();
+    appEventsTaken |= ![NSApp nextEventMatchingMask:NSEventMaskApplicationDefined untilDate:NSDate.distantPast
+                                             inMode:NSDefaultRunLoopMode dequeue:YES];
+    return quit;
+}
+
 // Runs frames until done() or the deadline. Returns whether done() became true.
 template <typename Done> static bool runUntil(Clock::duration timeout, Done done)
 {
@@ -72,7 +103,7 @@ template <typename Done> static bool runUntil(Clock::duration timeout, Done done
             if (done())
                 return true;
         }
-        std::this_thread::sleep_until(frameStart + frameTime);
+        runHost(frameStart + frameTime);
     }
     return false;
 }
@@ -84,6 +115,12 @@ int main(int argc, char *argv[])
         return 2;
     }
     std::string logFolder = argv[1];
+    [NSApplication sharedApplication];
+    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+    [NSApp finishLaunching];
+    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1280, 720) styleMask:NSWindowStyleMaskTitled
+                                                     backing:NSBackingStoreBuffered defer:NO];
+    [window orderFrontRegardless];
     int failures = 0;
     for (int i = 2, n = 1; i < argc; i += 3, n++) {
         const char *root = argv[i], *data = argv[i + 1], *marker = argv[i + 2];
@@ -96,6 +133,8 @@ int main(int argc, char *argv[])
         launch.gameRoot = root;
         launch.projectData = data;
         launch.logPath = log.c_str();
+        launch.hostView = (__bridge void *)window.contentView;
+        appEventsTaken = false;
         Clock::time_point start = Clock::now();
         bool started = vnkk_start(&launch) == 0;
         // The engine clock leaves out paused time, and this game has not been paused yet.
@@ -104,7 +143,7 @@ int main(int argc, char *argv[])
         bool quitEarly = false;
         Clock::time_point nextClick = start + clickAfter;
         bool atTitle = started && runUntil(titleTimeout, [&] {
-            if (vnkk_iterate()) {
+            if (iterate()) {
                 quitEarly = true;
                 return true;
             }
@@ -129,7 +168,7 @@ int main(int argc, char *argv[])
         bool quit = !started || quitEarly;
         if (!quit) {
             vnkk_request_quit();
-            quit = runUntil(quitTimeout, [] { return vnkk_iterate() != 0; });
+            quit = runUntil(quitTimeout, [] { return iterate() != 0; });
         }
         vnkk_stop();
 
@@ -137,11 +176,12 @@ int main(int argc, char *argv[])
         malloc_zone_pressure_relief(nullptr, 0);
         bool clockKept = clockBehind >= 0 && clockBehind < 100;
         printf("game %d: %s after %.1f s, %s, clock %lld ms behind SDL's at start, resident %.1f MB, %.1f MB after relief, "
-               "%d open files\n",
+               "%d open files, %s\n",
                n, atTitle ? "title" : started ? "no title" : "did not start", titleSeconds,
-               quit ? "quit" : "did not quit", (long long)clockBehind, resident, residentMB(), openFiles());
+               quit ? "quit" : "did not quit", (long long)clockBehind, resident, residentMB(), openFiles(),
+               appEventsTaken ? "a frame took the app's events" : "frames left the app's events");
         fflush(stdout);
-        failures += !atTitle || !quit || !clockKept;
+        failures += !atTitle || !quit || !clockKept || appEventsTaken;
     }
     printf("%d of %d games failed\n", failures, (argc - 2) / 3);
     return failures ? 1 : 0;

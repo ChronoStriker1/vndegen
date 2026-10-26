@@ -27,7 +27,8 @@ typedef struct VNKKLaunch {
 VNKK_API int vnkk_start(const VNKKLaunch *launch);
 
 // Runs one frame. Returns nonzero once the game has quit. A call made while another is running,
-// as happens when a modal dialog spins the run loop, returns 0 and does nothing.
+// as happens when a modal dialog spins the run loop, returns 0 and does nothing. On iOS, and on
+// macOS with a host view, a frame leaves the host app's events to the host's run loop.
 VNKK_API int vnkk_iterate(void);
 
 // Input, delivered as SDL events. Only these reach the game: SDL's own keyboard and, on macOS, its
