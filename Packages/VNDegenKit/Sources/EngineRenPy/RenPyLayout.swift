@@ -91,15 +91,23 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
     }
 
     /// Ren'Py loads scripts from anywhere under game/, such as game/scripts/act1/scenes/, deeper than the probe looks.
-    /// The walk stops at the first script and gives up after `limit` entries, so a large asset folder can't stall
-    /// detection. It does not follow symlinked folders.
-    static func containsScript(_ folder: URL, limit: Int = 20_000) -> Bool {
-        guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
-        else { return false }
-        var visited = 0
-        while visited < limit, let url = walker.nextObject() as? URL {
-            if isScript(url.lastPathComponent) { return true }
-            visited += 1
+    /// The walk lists one level at a time and stops at the first script, so the usual shallow scripts turn up before
+    /// deep asset folders are listed. It does not follow symlinked folders, so a link loop can't keep it going.
+    static func containsScript(_ folder: URL) -> Bool {
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+        var level = [folder]
+        while !level.isEmpty {
+            var next: [URL] = []
+            for directory in level {
+                guard let items = try? FileManager.default.contentsOfDirectory(
+                    at: directory, includingPropertiesForKeys: Array(keys), options: .skipsHiddenFiles) else { continue }
+                for item in items {
+                    if isScript(item.lastPathComponent) { return true }
+                    let values = try? item.resourceValues(forKeys: keys)
+                    if values?.isDirectory == true, values?.isSymbolicLink != true { next.append(item) }
+                }
+            }
+            level = next
         }
         return false
     }

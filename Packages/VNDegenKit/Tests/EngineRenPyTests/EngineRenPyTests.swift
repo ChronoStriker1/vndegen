@@ -83,10 +83,16 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(layout?.base == "TestGame-1.0-pc")
 }
 
-@Test func theGameFolderScanStopsAfterItsEntryLimit() throws {
-    let game = try folder(["images/a.png": "", "images/b.png": "", "images/c.png": "", "scripts/act1/story.rpy": ""])
-    #expect(RenPyLayout.containsScript(game))
-    #expect(!RenPyLayout.containsScript(game, limit: 2))
+@Test func findsADeepScriptBehindManyAssets() throws {
+    var files = Dictionary(uniqueKeysWithValues: (0 ..< 500).map { ("images/\($0).png", "") })
+    files["scripts/act1/scenes/story.rpyc"] = ""
+    #expect(RenPyLayout.containsScript(try folder(files)))
+}
+
+@Test func theGameFolderScanEndsOnALinkLoop() throws {
+    let game = try folder(["images/bg.png": ""])
+    try FileManager.default.createSymbolicLink(at: game.appendingPathComponent("images/loop"), withDestinationURL: game)
+    #expect(!RenPyLayout.containsScript(game))
 }
 
 @Test func ignoresFoldersWithoutGameScripts() throws {

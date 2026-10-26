@@ -107,14 +107,19 @@ public final class Hub {
         // saves the new session is writing, which is the lesser problem.
         Task {
             await stopped.value
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { await ended.value }
-                group.addTask { try? await Task.sleep(for: Self.closingTimeout) }
-                await group.next()
-                group.cancelAll()
-            }
+            await Self.wait(for: ended, atMost: Self.closingTimeout)
             closing.remove(id)
         }
+    }
+
+    /// Returns when `work` finishes or `timeout` passes, whichever is first. A task group can't do this, because it
+    /// waits for every child and awaiting a task's value ignores cancellation.
+    static func wait(for work: Task<Void, Never>, atMost timeout: Duration) async {
+        let (done, continuation) = AsyncStream<Void>.makeStream()
+        let timer = Task { try? await Task.sleep(for: timeout); continuation.finish() }
+        Task { await work.value; continuation.finish() }
+        for await _ in done {}
+        timer.cancel()
     }
 
     /// Longest a stopped game waits for its automatic backup before it can launch again.

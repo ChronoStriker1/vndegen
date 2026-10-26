@@ -96,3 +96,16 @@ private struct SlowPlugin: EnginePlugin {
     hub.launch(id)
     #expect(sessions.made.count == 2)
 }
+
+@MainActor
+@Test func aStuckBackupHoldsAClosingGameOnlyUntilTheTimeout() async {
+    let stuck = Task { await withUnsafeContinuation { (_: UnsafeContinuation<Void, Never>) in } }
+    let start = ContinuousClock.now
+    await Hub.wait(for: stuck, atMost: .milliseconds(200))
+    #expect(ContinuousClock.now - start < .seconds(2))
+
+    let quick = Task {}
+    let quickStart = ContinuousClock.now
+    await Hub.wait(for: quick, atMost: .seconds(30))
+    #expect(ContinuousClock.now - quickStart < .seconds(2))
+}
