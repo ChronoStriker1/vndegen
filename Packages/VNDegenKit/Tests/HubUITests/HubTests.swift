@@ -90,6 +90,7 @@ private struct SlowPlugin: EnginePlugin {
     sessions.made[0].stop()
     await #expect(throws: SaveSyncError.noSnapshot) { try await undo.value }
     await hub.prepareToQuit()
+    for _ in 0 ..< 100 where !hub.closing.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
     #expect(hub.closing.isEmpty)
     hub.launchError = nil
     hub.launch(id)
