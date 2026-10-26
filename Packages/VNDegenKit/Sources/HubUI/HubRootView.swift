@@ -75,6 +75,18 @@ private struct LibraryContainer: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: nav.path)
+        .overlay(alignment: .bottom) {
+            if nav.checkingSaves != nil {
+                Label("Checking for newer saves…", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: .capsule)
+                    .padding(.bottom, 32)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.smooth(duration: 0.2), value: nav.checkingSaves)
         .sheet(item: $nav.sheet) { sheet in
             sheetContent(sheet)
                 .environment(hub)
@@ -148,6 +160,17 @@ private struct LibraryContainer: View {
                 .presentationDetents([.large])
                 #if os(macOS)
                 .frame(minWidth: 520, minHeight: 560)
+                #endif
+            }
+        case let .launchSaves(model):
+            if let game = hub.library.game(model.game) {
+                SheetScaffold(title: "Newer saves", subtitle: hub.displayTitle(game), escapeCloses: false) {
+                    LaunchSavesView(model: model).scrollContentBackground(.hidden)
+                }
+                .presentationDetents([.medium, .large])
+                .interactiveDismissDisabled()
+                #if os(macOS)
+                .frame(minWidth: 480, minHeight: 380)
                 #endif
             }
         case let .settingsPage(page):
