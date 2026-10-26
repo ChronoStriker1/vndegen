@@ -175,3 +175,7 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
 
 Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins.
+
+## License
+
+VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL.
