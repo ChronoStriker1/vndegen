@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.2.0",
+          "buildVersion": "70",
+          "date": "2026-10-26T03:13:14Z",
+          "localizedDescription": "Adds TyranoScript, the second engine.\n\n## Downloads\n\n- `VNDegen-0.2.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.2.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n\n## New\n\n- TyranoScript and TyranoBuilder games: plain browser builds, NW.js builds, and Electron builds, including games packed in `app.asar`. Tested with three games covering Tyrano 4.50 and 5.20, Japanese text, and a controller from title screen through choices, saving, and loading.\n- Saves stay in the game folder as on PC. Games that save to browser storage keep it per game inside VNDegen.\n- Ogg audio plays on iPhone and iPad: VNDegen converts each track to AAC the first time it plays and caches it.\n\n## Fixed\n\n- Archive import keeps every part of a split archive safe from cleanup while it is open, and follows an archive that moved during import.\n- A security fix for how game files are opened, so a game folder cannot read files outside itself through a symlink.\n\n## Known limits\n\n- Typing a name in a game with a controller does not bring up the keyboard; use touch or a hardware keyboard.\n- Ogg files that use Opus instead of Vorbis may play silent.\n- In some TyranoScript games, VNDegen's menu button sits over the game's own button in the top right corner.\n- The Hidden games and Metadata sources settings pages still need touch or a mouse.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.2.0/VNDegen-0.2.0.ipa",
+          "size": 2383117,
+          "sha256": "d97c0b19cfe5773d67efaf16ca53cda630f284bdde4504e3b5f5b745d890228d",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.1.4",
           "buildVersion": "65",
           "date": "2026-10-26T03:04:34Z",
