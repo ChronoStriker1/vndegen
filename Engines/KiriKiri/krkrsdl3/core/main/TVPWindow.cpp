@@ -906,6 +906,15 @@ bool TVPWindow::DoClose()
         iTJSDispatch2* obj = Owner;
         // 先与脚本对象脱离，使脚本绑定在 Invalidate 时不再删除本窗口
         NotifyWindowClose();
+        // Invalidating the window invalidates the layers and objects added to it, which can
+        // release the last reference to the window object. It stays alive until its own
+        // invalidation has finished.
+        obj->AddRef();
+        struct ReleaseOwner
+        {
+            iTJSDispatch2* obj;
+            ~ReleaseOwner() { obj->Release(); }
+        } release{obj};
         obj->Invalidate(0, nullptr, nullptr, obj);
         SetVisible(false);
         // 本窗口已不再被任何对象引用，自行销毁
