@@ -177,7 +177,9 @@ public struct SaveSyncSettingsView: View {
     }
 
     private func field(_ prompt: String, text: Binding<String>) -> some View {
-        TextField(prompt, text: text)
+        // The row's label names the field. macOS would show a TextField's own title as a second label.
+        TextField(prompt, text: text, prompt: Text(prompt))
+            .labelsHidden()
             .multilineTextAlignment(.trailing)
             .autocorrectionDisabled()
             #if os(iOS)
@@ -268,7 +270,8 @@ public final class GameSavesModel {
     }
     var preview: RestorePreview?
     var sync: SyncStatus?
-    var loading = false
+    /// True until the first load finishes, so the list says it is loading rather than empty.
+    var loading = true
     var busy = false
     var status: Status?
     var confirming: Confirmation?
@@ -369,8 +372,8 @@ public final class GameSavesModel {
     }
 
     func load() async {
-        guard isSetUp else { return }
         loading = true
+        guard isSetUp else { loading = false; return }
         defer { loading = false }
         do {
             backups = try await service.backups(for: game)
@@ -563,7 +566,9 @@ public struct GameSavesView: View {
         if !preview.replaced.isEmpty { parts.append("replaces \(preview.added.isEmpty ? count(preview.replaced.count) : String(preview.replaced.count))") }
         var text = parts.isEmpty ? "Restoring this backup changes nothing." : "Restoring this backup \(parts.joined(separator: " and "))."
         if !preview.unchanged.isEmpty, !parts.isEmpty { text += " \(preview.unchanged.count) already match." }
-        if !preview.kept.isEmpty { text += " \(count(preview.kept.count)) here \(preview.kept.count == 1 ? "is" : "are") not in it and stay." }
+        if !preview.kept.isEmpty {
+            text += preview.kept.count == 1 ? " 1 save here is not in it and stays." : " \(preview.kept.count) saves here are not in it and stay."
+        }
         return text
     }
 

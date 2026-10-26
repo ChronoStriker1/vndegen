@@ -48,6 +48,7 @@ private struct Setup {
         await service.trustHostKey()
         #expect(service.connection == .connected)
         await service.refresh()
+        await service.manifestRefreshed()
     }
 
     /// Ludusavi on the Steam Deck backing up its own saves of the game into the store.

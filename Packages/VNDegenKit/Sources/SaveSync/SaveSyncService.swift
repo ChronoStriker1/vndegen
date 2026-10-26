@@ -111,6 +111,7 @@ public final class SaveSyncService {
     @ObservationIgnored private let connector: Connector
     @ObservationIgnored private let manifestStore: ManifestStore?
     @ObservationIgnored private var manifest: ManifestIndex?
+    @ObservationIgnored private var manifestRefresh: Task<Void, Never>?
     @ObservationIgnored private var steamLibrary: String?
     private var settings: Settings
     /// The last restore, undo, backup, or server read started. Each new one waits for it, so two never touch the same
@@ -219,7 +220,13 @@ public final class SaveSyncService {
 
     /// Reads the store's game list and Ludusavi's manifest when they are due. Run when a save screen appears.
     public func refresh() async {
-        if let manifestStore, let fresh = await manifestStore.refresh() { manifest = fresh }
+        // The manifest download is 18 MB, so it runs on its own and never holds up the store.
+        if let manifestStore, manifestRefresh == nil {
+            manifestRefresh = Task {
+                if let fresh = await manifestStore.refresh() { manifest = fresh }
+                manifestRefresh = nil
+            }
+        }
         guard let server = settings.server, server.hostKey != nil else { return }
         do {
             try await refreshIndex(server)
@@ -228,6 +235,9 @@ public final class SaveSyncService {
             connection = .failed(error.localizedDescription)
         }
     }
+
+    /// Returns once a manifest refresh that `refresh` started is done.
+    func manifestRefreshed() async { await manifestRefresh?.value }
 
     private func refreshIndex(_ server: SaveServer) async throws {
         let index = try await withStore(server) { store, client in try await store.refreshIndex(client) }
