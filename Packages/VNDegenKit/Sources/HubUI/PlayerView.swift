@@ -263,10 +263,12 @@ private struct PlayerMenuView: View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            // Side by side when a landscape phone or a short window has no room for one column. Not ViewThatFits:
-            // after a tap on Quit inside its second choice, SwiftUI kept the player in place, so the next game reused
-            // this view and never started.
-            let layout = metrics.isShort ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
+            // Side by side when a landscape phone or a short window has no room for one column, and is wide enough for
+            // two: the columns' 220 pt buttons, spacing and padding need about 620 pt. Not ViewThatFits: after a tap on
+            // Quit inside its second choice, SwiftUI kept the player in place, so the next game reused this view and
+            // never started.
+            let sideBySide = metrics.isShort && metrics.size.width >= 640
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
             layout {
                 session
                 controls
