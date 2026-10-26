@@ -1,5 +1,6 @@
 // The KiriKiri engine's C interface, the only part of the engine VNDegen calls.
-// Every function runs on the main thread. One game runs per process.
+// Every function runs on the main thread. One game runs at a time; after vnkk_stop, vnkk_start can
+// start another in the same process.
 #ifndef VNKK_H
 #define VNKK_H
 

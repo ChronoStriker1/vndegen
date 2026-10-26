@@ -204,10 +204,13 @@ tTJSBinaryStream* TVPGetCachedArchiveHandle(void* pointer, const ttstr& name)
 void TVPReleaseCachedArchiveHandle(void* pointer, tTJSBinaryStream* stream)
 {
     // release archive file handle
-    if (TVPArchiveHandleCacheShutdown)
+    // Streams released after the pool shut down, as script objects are during engine teardown,
+    // are closed instead of leaking their file handles into the next game.
+    if (TVPArchiveHandleCacheShutdown || !TVPArchiveHandleCacheInit)
+    {
+        delete stream;
         return;
-    if (!TVPArchiveHandleCacheInit)
-        return;
+    }
 
     tTJSCriticalSectionHolder cs_holder(TVPArchiveHandleCacheCS);
 

@@ -19,7 +19,6 @@ namespace TJS
 {
 //---------------------------------------------------------------------------
 static std::vector<ttstr> NativeClassNames;
-static bool _tjsForceShutdown = false;
 static tTJSObjectPool<tTJSDispatch> _allTJSRegister;
 static std::vector<std::pair<_TJSStaticClearFun*, void*>> _allTJSStaticClearFun;
 void TJSCompactRegisterHeap()
@@ -28,10 +27,7 @@ void TJSCompactRegisterHeap()
 }
 void TJSClearRegisterHeap()
 {
-    _tjsForceShutdown = true;
-
-    _allTJSRegister.forEach([](tTJSDispatch* obj) { delete obj; });
-    _allTJSRegister.clear();
+    _allTJSRegister.deleteAll();
     NativeClassNames.clear();
 
     for (auto obj : _allTJSStaticClearFun)
@@ -39,8 +35,6 @@ void TJSClearRegisterHeap()
         obj.first(obj.second);
     }
     _allTJSStaticClearFun.clear();
-
-    _tjsForceShutdown = false;
 }
 void TJSAddStaticToRegisterHeap(_TJSStaticClearFun* clsFun, void* ptr)
 {
@@ -97,10 +91,7 @@ tTJSNativeClassMethod::~tTJSNativeClassMethod()
 {
     if (TJSObjectHashMapEnabled())
         TJSRemoveObjectHashRecord(this);
-    if (!_tjsForceShutdown)
-    {
-        _allTJSRegister.unregisterObject(this->GCIndex);
-    }
+    _allTJSRegister.unregisterObject(this->GCIndex);
 }
 //---------------------------------------------------------------------------
 tjs_error tTJSNativeClassMethod::IsInstanceOf(tjs_uint32 flag,
@@ -201,10 +192,7 @@ tTJSNativeClassProperty::~tTJSNativeClassProperty()
 {
     if (TJSObjectHashMapEnabled())
         TJSRemoveObjectHashRecord(this);
-    if (!_tjsForceShutdown)
-    {
-        _allTJSRegister.unregisterObject(this->GCIndex);
-    }
+    _allTJSRegister.unregisterObject(this->GCIndex);
 }
 //---------------------------------------------------------------------------
 tjs_error tTJSNativeClassProperty::IsInstanceOf(tjs_uint32 flag,

@@ -319,6 +319,10 @@ tTVPLocalFileStream::tTVPLocalFileStream(const ttstr& origname,
             if (!MemBuffer)
                 TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
         }
+        else
+        {
+            TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
+        }
     }
 
     // push current tick as an environment noise

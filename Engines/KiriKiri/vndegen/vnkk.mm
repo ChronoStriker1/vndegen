@@ -183,9 +183,12 @@ void vnkk_request_quit(void)
 
 void vnkk_stop(void)
 {
+    // The engine clock and audio would stay paused into the next game.
+    vnkk_set_paused(false);
     if (started)
         SDL_AppQuit(nullptr, finished ? SDL_APP_SUCCESS : SDL_APP_FAILURE);
-    started = false;
+    started = running = quitRequested = terminated = finished = false;
+    quitSentAt = 0;
     if (logFile) {
         SDL_SetLogOutputFunction(SDL_GetDefaultLogOutputFunction(), nullptr);
         fclose(logFile);

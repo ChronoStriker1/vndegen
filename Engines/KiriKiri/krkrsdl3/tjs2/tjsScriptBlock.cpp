@@ -17,7 +17,6 @@
 
 namespace TJS
 {
-static bool _tjsForceShutdown = false;
 static tTJSObjectPool<tTJSScriptBlock> _allTJSScriptBlock;
 void TJSCompactScriptBlockHeap()
 {
@@ -25,10 +24,7 @@ void TJSCompactScriptBlockHeap()
 }
 void TJSClearScriptBlockHeap()
 {
-    _tjsForceShutdown = true;
-    _allTJSScriptBlock.forEach([](tTJSScriptBlock* obj) { delete obj; });
-    _allTJSScriptBlock.clear();
-    _tjsForceShutdown = false;
+    _allTJSScriptBlock.deleteAll();
 }
 
 //---------------------------------------------------------------------------
@@ -101,10 +97,7 @@ tTJSScriptBlock::~tTJSScriptBlock()
     if (Name)
         delete[] Name;
 
-    if (!_tjsForceShutdown)
-    {
-        _allTJSScriptBlock.unregisterObject(this->GCIndex);
-    }
+    _allTJSScriptBlock.unregisterObject(this->GCIndex);
 }
 //---------------------------------------------------------------------------
 void tTJSScriptBlock::AddRef(void)

@@ -496,8 +496,6 @@ iTJSDispatch2* TVPCreateMenuItemObject(iTJSDispatch2* window)
     {
         _menuitemclass = new tTJSNC_MenuItem();
         TJS_REGISTER_STATIC_HEAP(_menuitemclass);
-        TJS_REGISTER_STATIC_HEAP(textToKeycodeMap);
-        TJS_REGISTER_STATIC_HEAP(textToKeycodeMap);
     }
 
     iTJSDispatch2* out;
@@ -619,6 +617,10 @@ static void CreateShortCutKeyCodeTable()
 {
     textToKeycodeMap = TJSCreateDictionaryObject();
     keycodeToTextList = TJSCreateArrayObject();
+    // Both die with the script engine. Clearing them then makes the next engine build them, and
+    // register Window.menu, again.
+    TJS_REGISTER_STATIC_HEAP(textToKeycodeMap);
+    TJS_REGISTER_STATIC_HEAP(keycodeToTextList);
     if (textToKeycodeMap == nullptr || keycodeToTextList == nullptr)
         return;
 
