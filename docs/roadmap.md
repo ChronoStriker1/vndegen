@@ -19,8 +19,9 @@ Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
 - RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
 - Xbox gamepad controls by default for the touch gamepad and real controllers, with every Xbox button in the mapping editor and an RPG Maker preset. The touch gamepad's buttons act on touch-down, and its D-pad becomes one cross-shaped pad (`ws/xbox-controls`).
-- A blur over the lower game area on iPad after the game has been in portrait (`ws/ipad-blur`).
 - Ludusavi save sync over SMB instead of SSH and rsync (`ws/ludusavi-smb`), reaching the share the PCs already use, as guest or with a password.
+
+Merged into `dev` for the next release: No Socks RPG's tilt-shift blur no longer covers the lower game area on iPad after the game has been in portrait.
 
 ## Next
 1. Together, as the next work:
