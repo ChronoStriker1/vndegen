@@ -167,7 +167,7 @@ These are outside VNDegen's target and are not in the port order.
 | Adobe AIR | 1 | Partly. The game is SWF content, so Ruffle may run it. AIR-only APIs will not work |
 | Godot | 6 | Possible. Godot is MIT and runs on iOS and macOS with a native Metal renderer since 4.4. A Windows `.pck` loads in a matching-version Godot runtime only if it uses no native GDExtension libraries. Test Game 39 uses GodotSteam, so it would not load |
 | GameMaker | 6 | No. `data.win` needs YoYo's proprietary runner. No open runner exists |
-| NW.js or Electron with custom JS | 7 | Case by case. Same WKWebView host as Tyrano. Games that call Node.js APIs need shims |
+| NW.js or Electron with custom JS | 7 | Checked on 2026-10-26, and none is RPG Maker. 2 are GameCreator, a Chinese HTML5 engine (`script.js` and `asset/assetList.json`). 1 is TyranoScript packed into its `.exe`, which the TyranoScript plugin would run once the app is unpacked from the exe. 1 is a Game Boy ROM in the binjgb emulator. 2 are custom Electron apps, one of which loads its content from a website. 1 is a custom HTML5 engine with Live2D (`data/ENGINE.js`). Each would run case by case in the WKWebView host, with shims for Node.js calls |
 | Construct | 1 | Likely. Construct 3 exports HTML5 (`c3runtime.js`), so it runs in WKWebView |
 | HSP | 1 | Unlikely. OpenHSP is BSD-3, but the Windows HSP runtime and its plugin DLLs do not map to its mobile variant |
 | Pixel Game Maker MV | 1 | No. Proprietary player |
