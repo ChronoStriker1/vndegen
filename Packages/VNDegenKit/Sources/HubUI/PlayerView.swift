@@ -7,10 +7,10 @@ import Lock
 struct PlayerView: View {
     let hub: Hub
     let session: any EngineSession
+    @Environment(Navigator.self) private var nav
     @State private var menu = PlayerMenu()
-    #if os(iOS)
-    @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
-    #endif
+    @State private var mappingEditor: ButtonMappingEditor?
+    @AppStorage(ControlMethod.storageKey) private var defaultMethod = ControlMethod.automatic
     @State private var needsRotation = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -29,18 +29,20 @@ struct PlayerView: View {
                 RotateHint(orientation: orientation)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            // Macs have no touch screen, so only iOS gets the on-screen controls.
-            if hub.input.lastInputKind == .touch, hub.input.controllerNames.isEmpty, !menu.isOpen, !isCovered {
-                TouchControlsOverlay(mode: $touchMode) { event in
+            if let overlayMode {
+                TouchControlsOverlay(mode: overlayMode, mapping: mapping) { event in
                     hub.input.noteInput(.touch)
                     handle(event)
                 }
             }
             #endif
             if menu.isOpen {
-                PlayerMenuView(menu: menu, title: title, onResume: resume, onQuit: hub.endSession)
+                PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
+                               onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping)
                     .transition(.opacity)
-            } else {
+            } else if overlayMode == nil {
+                // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
+                // users get back to the menu.
                 Button { openMenu() } label: {
                     Image(systemName: "square.grid.2x2.fill")
                         .font(.system(size: 14, weight: .bold))
@@ -67,6 +69,11 @@ struct PlayerView: View {
         .animation(.easeOut(duration: 0.2), value: isCovered)
         .animation(.easeOut(duration: 0.25), value: needsRotation)
         .background(.black)
+        .sheet(item: $mappingEditor) { editor in
+            ButtonMappingSheet(editor: editor) { mappingEditor = nil }
+                .environment(hub)
+                .environment(nav)
+        }
         .onAppear {
             hub.input.onEvent = handle
             applyInputMode()
@@ -94,6 +101,20 @@ struct PlayerView: View {
 
     private var orientation: PlayOrientation { game?.orientation ?? PlayOrientation.setting }
 
+    private var method: ControlMethod { game?.controlMethod ?? defaultMethod }
+
+    private var mapping: ButtonMapping { ButtonMapping(game?.buttonMapping) }
+
+    /// The touch controls to show, if any. Macs have no touch screen, so they never show any.
+    private var overlayMode: TouchControlsMode? {
+        #if os(iOS)
+        guard !menu.isOpen, !isCovered else { return nil }
+        return method.overlay(lastInput: hub.input.lastInputKind, controllerConnected: !hub.input.controllerNames.isEmpty)
+        #else
+        return nil
+        #endif
+    }
+
     private var title: String { game.map(hub.displayTitle) ?? "" }
 
     /// A hidden game stays paused behind the unlock screen while the library is locked, such as after the app went to
@@ -117,10 +138,23 @@ struct PlayerView: View {
             return
         }
         guard case let .button(button, pressed: true) = event else { return }
+        if let mappingEditor {
+            if !mappingEditor.handle(button), button == .cancel || button == .hub { self.mappingEditor = nil }
+            return
+        }
+        let items = PlayerMenu.items
+        let index = items.firstIndex(of: menu.focus) ?? 0
         switch button {
-        case .up, .left: menu.focus = .resume
-        case .down, .right: menu.focus = .quit
-        case .confirm: menu.focus == .resume ? resume() : hub.endSession()
+        case .up: menu.focus = items[max(0, index - 1)]
+        case .down: menu.focus = items[min(items.count - 1, index + 1)]
+        case .left, .right: if menu.focus == .method { setMethod(method.stepped(by: button == .left ? -1 : 1)) }
+        case .confirm:
+            switch menu.focus {
+            case .resume: resume()
+            case .quit: hub.endSession()
+            case .method: setMethod(method.stepped(by: 1))
+            case .mapping: openMapping()
+            }
         case .cancel, .hub, .menu: resume()
         default: break
         }
@@ -134,23 +168,39 @@ struct PlayerView: View {
     }
 
     private func resume() {
+        mappingEditor = nil
         menu.isOpen = false
         applyInputMode()
         session.setPaused(false)
     }
 
-    /// The game reads the keyboard itself and wants raw presses. The menu and the unlock screen want translated,
-    /// repeating navigation.
+    /// Saved on the game, so the method sticks the next time it plays too.
+    private func setMethod(_ method: ControlMethod) {
+        guard let id = game?.id else { return }
+        hub.library.update(id) { $0.controlMethod = method }
+    }
+
+    private func openMapping() {
+        guard let id = game?.id else { return }
+        mappingEditor = ButtonMappingEditor(library: hub.library, gameID: id)
+    }
+
+    /// The game reads the keyboard itself and wants raw presses through its own button mapping. The menu and the unlock
+    /// screen want translated, repeating navigation in the standard layout.
     private func applyInputMode() {
-        hub.input.translatesKeyboard = menu.isOpen || isCovered
-        hub.input.repeatsDirections = menu.isOpen || isCovered
+        let navigating = menu.isOpen || isCovered
+        hub.input.translatesKeyboard = navigating
+        hub.input.repeatsDirections = navigating
+        hub.input.buttonMapping = navigating ? ButtonMapping() : mapping
     }
 }
 
 @MainActor
 @Observable
 final class PlayerMenu {
-    enum Item { case resume, quit }
+    enum Item { case resume, quit, method, mapping }
+    /// Top to bottom. The control method only matters on a touch device.
+    static let items: [Item] = Platform.current == .iOS ? [.resume, .quit, .method, .mapping] : [.resume, .quit, .mapping]
     var isOpen = false
     var focus = Item.resume
 }
@@ -158,31 +208,92 @@ final class PlayerMenu {
 private struct PlayerMenuView: View {
     let menu: PlayerMenu
     let title: String
+    let method: ControlMethod
+    let showsFocus: Bool
     let onResume: () -> Void
     let onQuit: () -> Void
+    let onMethod: (ControlMethod) -> Void
+    let onMapping: () -> Void
 
     var body: some View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            VStack(spacing: 14) {
-                Wordmark().padding(.bottom, 4)
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryText)
-                    .lineLimit(1)
-                Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: 220) }
-                    .buttonStyle(HubButtonStyle(kind: .primary, focused: menu.focus == .resume))
-                    .onHover { if $0 { menu.focus = .resume } }
-                Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: 220) }
-                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: menu.focus == .quit))
-                    .onHover { if $0 { menu.focus = .quit } }
+            // Side by side when a landscape phone is too short for one column.
+            ViewThatFits(in: .vertical) {
+                VStack(spacing: 18) {
+                    session
+                    controls
+                }
+                HStack(alignment: .center, spacing: 28) {
+                    session
+                    controls
+                }
             }
             .padding(28)
             .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
             .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
         }
     }
+
+    private var session: some View {
+        VStack(spacing: 14) {
+            Wordmark().padding(.bottom, 4)
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(1)
+            Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: 220) }
+                .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
+                .onHover { if $0 { menu.focus = .resume } }
+            Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: 220) }
+                .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
+                .onHover { if $0 { menu.focus = .quit } }
+        }
+    }
+
+    private var controls: some View {
+        VStack(spacing: 12) {
+            SectionLabel(text: "Controls", systemImage: "gamecontroller")
+            if PlayerMenu.items.contains(.method) { methods }
+            Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: 220) }
+                .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
+                .onHover { if $0 { menu.focus = .mapping } }
+        }
+    }
+
+    /// One focus target for the whole row. Left and right switch the method, like tabs.
+    private var methods: some View {
+        let focused = isFocused(.method)
+        return HStack(spacing: 4) {
+            ForEach(ControlMethod.allCases, id: \.self) { option in
+                Button {
+                    menu.focus = .method
+                    onMethod(option)
+                } label: {
+                    Text(option.shortTitle)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 34)
+                        .background { Capsule().fill(option == method ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear)) }
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(option.title)
+                .accessibilityAddTraits(option == method ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(Theme.surface, in: .capsule)
+        .overlay { Capsule().strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2.5 : 1) }
+        .scaleEffect(focused ? 1.04 : 1)
+        .animation(Theme.focusAnimation, value: focused)
+        .onHover { if $0 { menu.focus = .method } }
+    }
+
+    private func isFocused(_ item: PlayerMenu.Item) -> Bool { showsFocus && menu.focus == item }
 }
 
 /// Asks the player to turn a full-screen iPad that shows the game in the wrong orientation.

@@ -1,34 +1,39 @@
 import SwiftUI
 import VNCore
 
-public enum TouchControlsMode: String, CaseIterable, Codable, Sendable {
-    case gamepad, mouse, hidden
+nonisolated public enum TouchControlsMode: Sendable {
+    case gamepad, mouse
 }
 
-/// On-screen controls drawn over a running game. Gamepad mode sends buttons. Mouse mode moves a virtual cursor and sends pointer events.
+/// On-screen controls drawn over a running game. Gamepad mode sends the actions `mapping` gives its buttons. Mouse mode
+/// moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu.
 /// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the mouse surface covers the
 /// full screen like the session view, so its normalized pointer locations match the game's.
 public struct TouchControlsOverlay: View {
-    @Binding var mode: TouchControlsMode
+    let mode: TouchControlsMode
+    let mapping: ButtonMapping
     let send: (ControllerEvent) -> Void
     @State private var cursor = CGPoint(x: 0.5, y: 0.5)
     @State private var taps = 0
 
-    public init(mode: Binding<TouchControlsMode>, send: @escaping (ControllerEvent) -> Void) {
-        self._mode = mode
+    public init(mode: TouchControlsMode, mapping: ButtonMapping, send: @escaping (ControllerEvent) -> Void) {
+        self.mode = mode
+        self.mapping = mapping
         self.send = send
     }
 
     public var body: some View {
         GeometryReader { geometry in
             let unit = min(max(min(geometry.size.width, geometry.size.height) / 6.2, 54), 76)
-            ZStack {
-                switch mode {
-                case .gamepad: GamepadControls(unit: unit, send: sendWithHaptic)
-                case .mouse: MouseControls(cursor: $cursor, send: sendWithHaptic)
-                case .hidden: EmptyView()
+            switch mode {
+            case .gamepad: GamepadControls(unit: unit, mapping: mapping, send: sendWithHaptic)
+            case .mouse:
+                ZStack(alignment: .topTrailing) {
+                    MouseControls(cursor: $cursor, send: sendWithHaptic)
+                    HomeButton(size: unit * 0.62, send: sendWithHaptic)
+                        .padding(.top, 8)
+                        .padding(.trailing, 16)
                 }
-                ModeCorner(mode: $mode, unit: unit, send: sendWithHaptic)
             }
         }
         .environment(\.colorScheme, .dark)
@@ -37,7 +42,7 @@ public struct TouchControlsOverlay: View {
 
     private func sendWithHaptic(_ event: ControllerEvent) {
         switch event {
-        case .button(_, pressed: true): taps += 1
+        case .button(_, pressed: true), .key(_, pressed: true), .click(_, pressed: true): taps += 1
         case let .pointer(pointer) where pointer.phase == .began: taps += 1
         default: break
         }
@@ -45,45 +50,14 @@ public struct TouchControlsOverlay: View {
     }
 }
 
-/// The mode menu, plus a hub button when the gamepad layout is not showing its own.
-private struct ModeCorner: View {
-    @Binding var mode: TouchControlsMode
-    let unit: CGFloat
+/// Opens the VNDegen menu. Never remapped, so the player can always get back to the menu.
+private struct HomeButton: View {
+    let size: CGFloat
     let send: (ControllerEvent) -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            if mode == .mouse {
-                TouchButton(.hub, send: send) { pressed in
-                    RoundKey(symbol: "house.fill", size: unit * 0.62, pressed: pressed)
-                }
-            }
-            Menu {
-                Picker("Touch controls", selection: $mode) {
-                    Label("Gamepad", systemImage: "gamecontroller").tag(TouchControlsMode.gamepad)
-                    Label("Mouse", systemImage: "cursorarrow.rays").tag(TouchControlsMode.mouse)
-                    Label("Hide controls", systemImage: "eye.slash").tag(TouchControlsMode.hidden)
-                }
-            } label: {
-                RoundKey(symbol: mode.symbol, size: unit * 0.62, pressed: false)
-                    .opacity(mode == .hidden ? 0.55 : 1)
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .accessibilityLabel("Touch controls")
-        }
-        .padding(.top, 8)
-        .padding(.trailing, 16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-    }
-}
-
-private extension TouchControlsMode {
-    var symbol: String {
-        switch self {
-        case .gamepad: "gamecontroller.fill"
-        case .mouse: "cursorarrow.rays"
-        case .hidden: "gamecontroller"
+        TouchButton(.button(.hub), title: "VNDegen menu", send: send) { pressed in
+            RoundKey(symbol: "house.fill", size: size, pressed: pressed)
         }
     }
 }
@@ -92,35 +66,34 @@ private extension TouchControlsMode {
 
 private struct GamepadControls: View {
     let unit: CGFloat
+    let mapping: ButtonMapping
     let send: (ControllerEvent) -> Void
 
     var body: some View {
         VStack(spacing: unit * 0.28) {
             Spacer(minLength: 0)
             HStack(spacing: unit * 0.22) {
-                shoulder("L", .pageUp)
-                TouchButton(.hub, send: send) { pressed in
-                    RoundKey(symbol: "house.fill", size: unit * 0.62, pressed: pressed)
-                }
+                shoulder(.l)
+                HomeButton(size: unit * 0.62, send: send)
                 Spacer(minLength: 0)
-                TouchButton(.menu, send: send) { pressed in
+                MappedButton(input: .menu, mapping: mapping, send: send) { pressed in
                     RoundKey(symbol: "line.3.horizontal", size: unit * 0.62, pressed: pressed)
                 }
-                shoulder("R", .pageDown)
+                shoulder(.r)
             }
             HStack(alignment: .bottom) {
-                DPad(size: unit * 2.5, send: send)
+                DPad(size: unit * 2.5, mapping: mapping, send: send)
                 Spacer(minLength: 0)
-                FaceButtons(unit: unit, send: send)
+                FaceButtons(unit: unit, mapping: mapping, send: send)
             }
         }
         .padding(.horizontal, unit * 0.3)
         .padding(.bottom, unit * 0.25)
     }
 
-    private func shoulder(_ title: String, _ button: VirtualButton) -> some View {
-        TouchButton(button, send: send) { pressed in
-            Text(title)
+    private func shoulder(_ input: ControlInput) -> some View {
+        MappedButton(input: input, mapping: mapping, send: send) { pressed in
+            Text(input.title)
                 .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
                 .frame(width: unit * 1.3, height: unit * 0.6)
@@ -129,25 +102,61 @@ private struct GamepadControls: View {
     }
 }
 
+/// A touch gamepad button that does what the mapping says. A button bound to a key or a click shows that binding in a
+/// small badge, and a button bound to nothing dims.
+private struct MappedButton<Label: View>: View {
+    let input: ControlInput
+    let mapping: ButtonMapping
+    let send: (ControllerEvent) -> Void
+    @ViewBuilder let label: (Bool) -> Label
+
+    var body: some View {
+        let action = mapping.action(for: input)
+        TouchButton(action, title: input.title, send: send, label: label)
+            .overlay(alignment: .topTrailing) {
+                if let badge = action.badge { Badge(text: badge).offset(x: 6, y: -6) }
+            }
+            .opacity(action == .nothing ? 0.35 : 1)
+            .accessibilityValue(mapping.isRemapped(input) ? action.title : "")
+    }
+}
+
+private struct Badge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .heavy, design: .rounded))
+            .foregroundStyle(.black)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 5)
+            .frame(minWidth: 18, minHeight: 18)
+            .background(.white.opacity(0.92), in: .capsule)
+            .allowsHitTesting(false)
+    }
+}
+
 /// Xbox layout: A at the bottom, B right, X left, Y top.
 private struct FaceButtons: View {
     let unit: CGFloat
+    let mapping: ButtonMapping
     let send: (ControllerEvent) -> Void
 
     var body: some View {
         let spread = unit * 0.82
         ZStack {
-            face("Y", .menu, Color(red: 1, green: 0.83, blue: 0.36)).offset(y: -spread)
-            face("X", .dash, Color(red: 0.36, green: 0.66, blue: 1)).offset(x: -spread)
-            face("B", .cancel, Color(red: 1, green: 0.42, blue: 0.42)).offset(x: spread)
-            face("A", .confirm, Color(red: 0.42, green: 0.83, blue: 0.42)).offset(y: spread)
+            face(.y, Color(red: 1, green: 0.83, blue: 0.36)).offset(y: -spread)
+            face(.x, Color(red: 0.36, green: 0.66, blue: 1)).offset(x: -spread)
+            face(.b, Color(red: 1, green: 0.42, blue: 0.42)).offset(x: spread)
+            face(.a, Color(red: 0.42, green: 0.83, blue: 0.42)).offset(y: spread)
         }
         .frame(width: unit + spread * 2, height: unit + spread * 2)
     }
 
-    private func face(_ title: String, _ button: VirtualButton, _ tint: Color) -> some View {
-        TouchButton(button, send: send) { pressed in
-            Text(title)
+    private func face(_ input: ControlInput, _ tint: Color) -> some View {
+        MappedButton(input: input, mapping: mapping, send: send) { pressed in
+            Text(input.title)
                 .font(.system(size: unit * 0.4, weight: .heavy, design: .rounded))
                 .foregroundStyle(tint)
                 .frame(width: unit, height: unit)
@@ -159,18 +168,29 @@ private struct FaceButtons: View {
 /// One finger drives the whole pad, so a thumb can roll between directions. Diagonals hold two directions.
 private struct DPad: View {
     let size: CGFloat
+    let mapping: ButtonMapping
     let send: (ControllerEvent) -> Void
-    @GestureState private var held: Set<VirtualButton> = []
+    @GestureState private var held: Set<ControlInput> = []
 
     var body: some View {
         ZStack {
             Circle().fill(.ultraThinMaterial).opacity(0.55)
             Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1)
-            ForEach([VirtualButton.up, .right, .down, .left], id: \.self) { direction in
+            ForEach(Self.directions, id: \.self) { direction in
                 DPadArm(size: size, pressed: held.contains(direction))
                     .rotationEffect(direction.armAngle)
+                    .opacity(mapping.action(for: direction) == .nothing ? 0.35 : 1)
             }
             Circle().fill(.white.opacity(0.12)).frame(width: size * 0.18)
+            // Badges sit beside each arm's outer end, unrotated so they read upright.
+            ForEach(Self.directions, id: \.self) { direction in
+                if let badge = mapping.action(for: direction).badge {
+                    let angle = direction.armAngle.radians
+                    Badge(text: badge)
+                        .offset(x: sin(angle) * size * 0.44 + cos(angle) * size * 0.17,
+                                y: -cos(angle) * size * 0.44 + sin(angle) * size * 0.17)
+                }
+            }
         }
         .frame(width: size, height: size)
         .contentShape(Circle())
@@ -183,28 +203,30 @@ private struct DPad: View {
                 }
         )
         .onChange(of: held) { old, new in
-            for direction in VirtualButton.allCases {
-                if old.contains(direction), !new.contains(direction) { send(.button(direction, pressed: false)) }
-            }
-            for direction in VirtualButton.allCases {
-                if new.contains(direction), !old.contains(direction) { send(.button(direction, pressed: true)) }
-            }
+            for direction in Self.directions where old.contains(direction) && !new.contains(direction) { press(direction, false) }
+            for direction in Self.directions where new.contains(direction) && !old.contains(direction) { press(direction, true) }
         }
         .onDisappear {
-            for direction in held { send(.button(direction, pressed: false)) }
+            for direction in held { press(direction, false) }
         }
         .accessibilityLabel("Direction pad")
+    }
+
+    private static let directions: [ControlInput] = [.up, .right, .down, .left]
+
+    private func press(_ direction: ControlInput, _ pressed: Bool) {
+        if let event = mapping.action(for: direction).event(pressed: pressed) { send(event) }
     }
 }
 
 /// Directions for a touch offset from the pad's center, with y growing downward. Each direction covers 135 degrees,
 /// so the 45 degrees between two neighbors press both.
-nonisolated func dpadDirections(dx: CGFloat, dy: CGFloat, deadZone: CGFloat) -> Set<VirtualButton> {
+nonisolated func dpadDirections(dx: CGFloat, dy: CGFloat, deadZone: CGFloat) -> Set<ControlInput> {
     let distance = (dx * dx + dy * dy).squareRoot()
     guard distance > deadZone else { return [] }
     let cos = dx / distance, sin = -dy / distance
     let edge = 0.38 // cos(67.5 degrees)
-    var result: Set<VirtualButton> = []
+    var result: Set<ControlInput> = []
     if cos > edge { result.insert(.right) }
     if cos < -edge { result.insert(.left) }
     if sin > edge { result.insert(.up) }
@@ -212,7 +234,7 @@ nonisolated func dpadDirections(dx: CGFloat, dy: CGFloat, deadZone: CGFloat) -> 
     return result
 }
 
-private extension VirtualButton {
+private extension ControlInput {
     var armAngle: Angle {
         switch self {
         case .right: .degrees(90)
@@ -246,13 +268,16 @@ private struct DPadArm: View {
 /// Sends a press when a finger lands and a release when it lifts or the system cancels the touch.
 /// Each button tracks its own finger, so several can be held at once.
 private struct TouchButton<Label: View>: View {
-    let button: VirtualButton
+    let action: ControlAction
+    let title: String
     let send: (ControllerEvent) -> Void
     let label: (Bool) -> Label
     @GestureState private var pressed = false
 
-    init(_ button: VirtualButton, send: @escaping (ControllerEvent) -> Void, @ViewBuilder label: @escaping (Bool) -> Label) {
-        self.button = button
+    init(_ action: ControlAction, title: String, send: @escaping (ControllerEvent) -> Void,
+         @ViewBuilder label: @escaping (Bool) -> Label) {
+        self.action = action
+        self.title = title
         self.send = send
         self.label = label
     }
@@ -263,10 +288,14 @@ private struct TouchButton<Label: View>: View {
             .animation(.easeOut(duration: 0.08), value: pressed)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).updating($pressed) { _, state, _ in state = true })
-            .onChange(of: pressed) { _, now in send(.button(button, pressed: now)) }
-            .onDisappear { if pressed { send(.button(button, pressed: false)) } }
-            .accessibilityLabel(button.rawValue)
+            .onChange(of: pressed) { _, now in emit(now) }
+            .onDisappear { if pressed { emit(false) } }
+            .accessibilityLabel(title)
             .accessibilityAddTraits(.isButton)
+    }
+
+    private func emit(_ pressed: Bool) {
+        if let event = action.event(pressed: pressed) { send(event) }
     }
 }
 

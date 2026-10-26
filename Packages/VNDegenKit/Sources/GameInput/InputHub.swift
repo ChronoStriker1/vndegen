@@ -3,7 +3,7 @@ import GameController
 import Observation
 import VNCore
 
-public enum InputKind: Sendable { case touch, keyboardMouse, gamepad }
+nonisolated public enum InputKind: Sendable { case touch, keyboardMouse, gamepad }
 
 /// Merges game controllers, and the hardware keyboard while in the hub, into `ControllerEvent`s.
 @MainActor
@@ -12,12 +12,17 @@ public final class InputHub {
     /// The current consumer: hub navigation or the running game. Set by whoever owns the screen.
     /// Replacing it sends the outgoing consumer a release for every button it still holds,
     /// and the new consumer sees nothing from those buttons until they are pressed again. Events with no consumer are dropped.
+    /// Replacing it also restores the standard button mapping.
     @ObservationIgnored public var onEvent: ((ControllerEvent) -> Void)? {
         didSet {
             repeatTask?.cancel()
             for event in router.detachConsumer() { oldValue?(event) }
+            buttonMapping = ButtonMapping()
         }
     }
+    /// What controller buttons do. A running game sets its own mapping while it has input. The hub's screens and the
+    /// in-game menu keep the standard one, so a remapped button can never block their navigation.
+    @ObservationIgnored public var buttonMapping = ButtonMapping()
     /// When false, keyboard keys are left to the focused view (a running web game reads them itself).
     /// Only `InputMapping.hubKey` is still translated.
     public var translatesKeyboard = true
@@ -68,19 +73,21 @@ public final class InputHub {
     private func attach(_ controller: GCController) {
         guard let pad = controller.extendedGamepad else { return }
         let id = ObjectIdentifier(controller)
-        for (element, button) in InputMapping.gamepad {
+        for element in GamepadElement.allCases {
             element.input(on: pad)?.pressedChangedHandler = { [weak self] _, _, pressed in
-                self?.receive(.gamepad(id, element), button, pressed: pressed, kind: .gamepad)
+                guard let self else { return }
+                receive(.gamepad(id, element), pressed ? element.action(in: buttonMapping) : nil, kind: .gamepad)
             }
         }
         // Asks the system to hand the Home button to the app. iOS only honors it when the user's settings allow it.
         pad.buttonHome?.preferredSystemGestureState = .disabled
-        let dpad: [(GCControllerButtonInput, VirtualButton)] = [
+        let dpad: [(GCControllerButtonInput, ControlInput)] = [
             (pad.dpad.up, .up), (pad.dpad.down, .down), (pad.dpad.left, .left), (pad.dpad.right, .right),
         ]
         for (input, direction) in dpad {
             input.pressedChangedHandler = { [weak self] _, _, pressed in
-                self?.receive(.dpad(id), direction, pressed: pressed, kind: .gamepad)
+                guard let self else { return }
+                receive(.dpad(id, direction), pressed ? buttonMapping.action(for: direction) : nil, kind: .gamepad)
             }
         }
         sticks[id] = StickDirections()
@@ -90,8 +97,8 @@ public final class InputHub {
     }
 
     private func detach(_ id: ObjectIdentifier) {
-        for (source, button) in router.heldSources where source.controller == id {
-            receive(source, button, pressed: false, kind: .gamepad)
+        for source in router.heldSources where source.controller == id {
+            receive(source, nil, kind: .gamepad)
         }
         sticks[id] = nil
     }
@@ -101,7 +108,7 @@ public final class InputHub {
         let changes = stick.update(x: x, y: y)
         sticks[id] = stick
         for (direction, pressed) in changes {
-            receive(.stick(id), direction, pressed: pressed, kind: .gamepad)
+            receive(.stick(id, direction), pressed ? buttonMapping.action(for: direction) : nil, kind: .gamepad)
         }
     }
 
@@ -115,16 +122,20 @@ public final class InputHub {
             noteInput(.keyboardMouse)
             return
         }
-        receive(.key(code.rawValue), button, pressed: pressed, kind: .keyboardMouse)
+        receive(.key(code.rawValue), pressed ? .button(button) : nil, kind: .keyboardMouse)
     }
 
-    private func receive(_ source: InputSource, _ button: VirtualButton, pressed: Bool, kind: InputKind) {
-        if pressed { noteInput(kind) }
-        let event = router.update(source, button, pressed: pressed, at: .now,
-                                  hasConsumer: onEvent != nil, repeats: repeatsDirections)
-        guard let event else { return }
-        if pressed, button.isDirection, router.repeating != nil { scheduleRepeat() }
-        onEvent?(event)
+    /// A press of `source` doing `action`, or its release when `action` is nil.
+    private func receive(_ source: InputSource, _ action: ControlAction?, kind: InputKind) {
+        let event: ControllerEvent?
+        if let action {
+            noteInput(kind)
+            event = router.press(source, action, at: .now, hasConsumer: onEvent != nil, repeats: repeatsDirections)
+            if event != nil, router.repeating?.action == action { scheduleRepeat() }
+        } else {
+            event = router.release(source)
+        }
+        if let event { onEvent?(event) }
     }
 
     private func scheduleRepeat() {

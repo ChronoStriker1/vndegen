@@ -79,7 +79,7 @@ struct SettingsView: View {
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     #if os(iOS)
-    @AppStorage(TouchControlsMode.storageKey) private var touchMode = TouchControlsMode.gamepad
+    @AppStorage(ControlMethod.storageKey) private var controlMethod = ControlMethod.automatic
     @AppStorage(PlayOrientation.storageKey) private var orientation = PlayOrientation.landscape
     #endif
 
@@ -122,10 +122,10 @@ struct SettingsView: View {
 
                     #if os(iOS)
                     Section {
-                        Picker("Touch controls", selection: $touchMode) {
-                            ForEach(TouchControlsMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                        Picker("Control method", selection: $controlMethod) {
+                            ForEach(ControlMethod.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
-                        .focusRow(.touchControls, nav)
+                        .focusRow(.controlMethod, nav)
                         Picker("In-game orientation", selection: $orientation) {
                             ForEach(PlayOrientation.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
@@ -133,7 +133,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Controls")
                     } footer: {
-                        Text("Touch controls show over a game when you play by touch and no controller is connected. In-game orientation applies while a game plays, and each game page can override it.")
+                        Text("Automatic shows the touch gamepad when you play by touch with no controller connected. Controller only shows no on-screen controls. Each game page can override the control method and orientation, and the VNDegen menu switches the control method while you play.")
                     }
                     #endif
 
@@ -239,20 +239,6 @@ struct SettingsPageSheet: View {
         #endif
     }
 }
-
-#if os(iOS)
-extension TouchControlsMode {
-    static let storageKey = "touchControlsMode"
-
-    var title: String {
-        switch self {
-        case .gamepad: "Gamepad"
-        case .mouse: "Mouse"
-        case .hidden: "Hidden"
-        }
-    }
-}
-#endif
 
 /// Opening the games folder in the system file browser, and how to add games there.
 enum LibraryFolder {

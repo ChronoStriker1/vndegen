@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.2.1",
+          "buildVersion": "77",
+          "date": "2026-10-26T05:59:36Z",
+          "localizedDescription": "Control methods and button mapping, from testing on a real iPhone.\n\n## Downloads\n\n- `VNDegen-0.2.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.2.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n\n## New\n\n- Control method per game: Automatic (overlay unless a controller is connected), Touch gamepad, Touch mouse, or Controller only with no overlay. Set it on the game's page, set the default in Settings, or switch it while playing from the VNDegen menu.\n- Button mapping per game: any overlay button or controller button can send a gamepad action, a keyboard key, a click, or nothing. Edit it from the game's page or the VNDegen menu, by touch or controller. A remapped overlay button shows its key. Options, Home, and the backtick always open the VNDegen menu.\n\n## Fixed\n\n- The Import button on Ready to import no longer wraps onto two lines.\n- The doubled button in the top-right corner while playing is gone. The overlay's Home button opens the VNDegen menu; with no overlay, one small corner button does.\n\n## Known limits\n\n- A very quick tap on a remapped button can be missed by RPG Maker games, which read keys once per frame. A normal press works.\n- If you had picked Mouse or Hidden under the old \"Touch controls\" setting, pick the control method again.\n- The right stick cannot be mapped yet.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.2.1/VNDegen-0.2.1.ipa",
+          "size": 2500516,
+          "sha256": "724d9e55beb517f94ee4b50f7eca0b7f664d7cbbbc09adcbfe095d87985f4836",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.2.0",
           "buildVersion": "70",
           "date": "2026-10-26T03:13:14Z",

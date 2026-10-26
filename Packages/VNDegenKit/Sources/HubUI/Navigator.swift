@@ -26,6 +26,8 @@ final class Navigator {
         case unlock
         case engine(GameID)
         case orientation(GameID)
+        case controlMethod(GameID)
+        case mapping(ButtonMappingEditor)
         case artwork(ArtworkEditor)
         case metadata(MetadataSearch)
         case saves(GameSavesModel)
@@ -37,6 +39,8 @@ final class Navigator {
             case .unlock: "unlock"
             case let .engine(id): "engine:\(id)"
             case let .orientation(id): "orientation:\(id)"
+            case let .controlMethod(id): "controlMethod:\(id)"
+            case let .mapping(editor): "mapping:\(editor.gameID)"
             case let .artwork(editor): "artwork:\(editor.gameID)"
             case let .metadata(search): "metadata:\(search.gameID)"
             case let .saves(model): "saves:\(model.game)"
@@ -73,12 +77,13 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation
+        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageOrientation, pageControls, pageMapping
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
-        case touchControls, playOrientation
+        case controlMethod, playOrientation
         case engineOption(EngineID?)
         case orientationOption(PlayOrientation?)
+        case controlMethodOption(ControlMethod?)
         case artworkSlot(ArtworkSlot)
         case artworkCandidate(Int)
         case metadataQuery
@@ -156,7 +161,7 @@ final class Navigator {
     func rows() -> [Row] {
         if let sheet {
             switch sheet {
-            case .engine, .orientation: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
+            case .engine, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case let .artwork(editor):
                 let columns = max(1, editor.columns)
                 let candidates = stride(from: 0, to: editor.candidates.count, by: columns).enumerated().map { index, start in
@@ -168,7 +173,7 @@ final class Navigator {
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
             // These take controller input through their own models.
-            case .unlock, .saves, .settingsPage, .importGame: return []
+            case .unlock, .saves, .settingsPage, .importGame, .mapping: return []
             }
         }
         switch route {
@@ -193,15 +198,17 @@ final class Navigator {
             }
             return [Row(id: "grid-back", items: [.back])] + tiles
         case .game:
+            // The control method and orientation only matter on a touch device.
+            let touchOnly = [Row(id: "page-orientation", items: [.pageOrientation]), Row(id: "page-controls", items: [.pageControls])]
             return [
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
                 Row(id: "page-engine", items: [.pageEngine]),
-            ] + (Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : [])
+            ] + (Platform.current == .iOS ? touchOnly : []) + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
             var items: [Target] = [.back, .openFolder, .rescan] + SettingsPage.allCases.map { .settingsPage($0) }
             #if os(iOS)
-            items += [.touchControls, .playOrientation]
+            items += [.controlMethod, .playOrientation]
             #endif
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
         }
@@ -315,7 +322,7 @@ final class Navigator {
         case let .importArchive(url): openImport([url])
         case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
-        case .touchControls, .playOrientation: stepSetting(target, by: 1)
+        case .controlMethod, .playOrientation: stepSetting(target, by: 1)
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
@@ -330,12 +337,17 @@ final class Navigator {
         case let .settingsPage(page): sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
+        case .pageControls: if let id = pageGameID { sheet = .controlMethod(id) }
+        case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
         case let .engineOption(engine):
             if case let .engine(id) = sheet { hub.library.update(id) { $0.engineOverride = engine } }
             sheet = nil
         case let .orientationOption(orientation):
             if case let .orientation(id) = sheet { hub.library.update(id) { $0.orientation = orientation } }
+            sheet = nil
+        case let .controlMethodOption(method):
+            if case let .controlMethod(id) = sheet { hub.library.update(id) { $0.controlMethod = method } }
             sheet = nil
         case let .artworkSlot(slot):
             if case let .artwork(editor) = sheet { editor.slot = slot }
@@ -402,7 +414,7 @@ final class Navigator {
     private func stepSetting(_ target: Target, by step: Int) -> Bool {
         #if os(iOS)
         switch target {
-        case .touchControls: cycle(TouchControlsMode.storageKey, fallback: TouchControlsMode.gamepad, by: step)
+        case .controlMethod: cycle(ControlMethod.storageKey, fallback: ControlMethod.automatic, by: step)
         case .playOrientation: cycle(PlayOrientation.storageKey, fallback: PlayOrientation.setting, by: step)
         default: return false
         }
@@ -532,7 +544,10 @@ final class Navigator {
         case .orientation:
             let fixed = PlayOrientation.allCases.map { Choice(target: .orientationOption($0), title: $0.title) }
             return [Choice(target: .orientationOption(nil), title: "Use default", detail: "Currently \(PlayOrientation.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame:
+        case .controlMethod:
+            let fixed = ControlMethod.allCases.map { Choice(target: .controlMethodOption($0), title: $0.title, detail: $0.detail) }
+            return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
+        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping:
             return []
         }
     }
@@ -541,7 +556,8 @@ final class Navigator {
         switch sheet {
         case let .engine(id): .engineOption(hub.library.game(id)?.engineOverride)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
-        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame: nil
+        case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
+        case .unlock, .artwork, .metadata, .saves, .settingsPage, .importGame, .mapping: nil
         }
     }
 
@@ -580,6 +596,9 @@ final class Navigator {
             return
         case .settingsPage(.saves)?:
             if !saveSettings.handle(button), button == .cancel { back() }
+            return
+        case let .mapping(editor)?:
+            if !editor.handle(button), button == .cancel { back() }
             return
         case let .importGame(model, _)?:
             if let button = ArchiveImportModel.Button(button) { model.handle(button) }
