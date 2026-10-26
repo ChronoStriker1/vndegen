@@ -50,9 +50,8 @@ public final class ArchiveImporter {
 
     /// The archive the user picked, which "Delete archive after import" removes.
     private var picked: (source: ArchiveSource, contents: ArchiveContents)?
-    private var securityScoped: [URL] = []
-    /// Folders of dropped files the system could not open in place, deleted when this import closes.
-    private var dropCopies: Set<URL> = []
+    /// The current choice. A listing or extraction whose selection was replaced has nothing left to show.
+    private var selection: Selection?
     /// Extraction folders still on disk. A nested import keeps the outer one until the inner one finishes.
     private var stagings: [URL] = []
     /// The outer extraction's game folder while the nested offer is showing.
@@ -79,26 +78,37 @@ public final class ArchiveImporter {
 
     public var folderNameProblem: String? { GameFolderName.problem(with: folderName, in: gamesRoot) }
 
+    /// Deletes the copies the system made for VNDegen among `urls`, for files from a drop or Open in VNDegen that
+    /// nothing imports.
+    public static func discard(_ urls: [URL]) { DroppedFiles.discard(urls) }
+
     // MARK: Actions
 
-    /// Takes the files from the document picker, open panel, or a drop, and lists the archive.
+    /// Takes the files from the document picker, open panel, a drop, or Open in VNDegen, and lists the archive. The
+    /// importer owns them from here and deletes the ones the system copied for VNDegen when it closes.
     public func choose(_ urls: [URL]) async {
         close()
+        let selection = Selection(urls)
+        self.selection = selection
         step = .opening
-        securityScoped = urls.filter { $0.startAccessingSecurityScopedResource() }
-        dropCopies = Set(urls.filter(DroppedFiles.isCopy).map(DroppedFiles.copyFolder))
         let names = urls.map(\.lastPathComponent)
-        importLog.notice("Chose \(urls.count) files \(names, privacy: .public), security-scoped access granted for \(self.securityScoped.count)")
+        importLog.notice("Chose \(urls.count) files \(names, privacy: .public), security-scoped access granted for \(selection.scopedCount)")
         do {
-            let (source, contents) = try await Self.open(urls)
+            let (source, contents) = try await selection.read { try await Self.open(urls) }
+            guard self.selection === selection else {
+                return importLog.notice("Listed \(names, privacy: .public) after a newer choice replaced it")
+            }
             picked = (source, contents)
             self.source = source
             self.contents = contents
             folderName = source.suggestedFolderName
-            // A dropped copy is deleted anyway, and deleting it never frees the original's space.
-            canDeleteArchive = dropCopies.isEmpty && source.volumes.allSatisfy(isInOwnFolders)
+            // A copy is deleted anyway, and deleting it never frees the original's space.
+            canDeleteArchive = source.volumes.allSatisfy { DroppedFiles.ownedCopy(of: $0) == nil && isInOwnFolders($0) }
             step = .reviewing
         } catch {
+            guard self.selection === selection else {
+                return importLog.notice("Could not list \(names, privacy: .public), which a newer choice replaced")
+            }
             importLog.error("Could not open the chosen files: \(String(describing: error), privacy: .public)")
             fail(error, returningTo: .choosing)
         }
@@ -162,10 +172,8 @@ public final class ArchiveImporter {
         task?.cancel()
         task = nil
         discardStagings()
-        securityScoped.forEach { $0.stopAccessingSecurityScopedResource() }
-        securityScoped = []
-        dropCopies.forEach { try? FileManager.default.removeItem(at: $0) }
-        dropCopies = []
+        selection?.close()
+        selection = nil
         picked = nil
         source = nil
         contents = nil
@@ -179,7 +187,7 @@ public final class ArchiveImporter {
     // MARK: Extraction
 
     private func extract() {
-        guard let source, let contents else { return }
+        guard let selection, let source, let contents else { return }
         errorMessage = nil
         progress = ImportProgress(total: contents)
         if stagings.isEmpty { started = .now }
@@ -192,9 +200,11 @@ public final class ArchiveImporter {
             do {
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
                 try ArchiveExtractor.checkSpace(for: contents, on: gamesRoot)
-                let extracted = try await Self.extract(source, password: password, into: staging, total: contents) { progress in
-                    Task { @MainActor in
-                        if self.task != nil { self.progress = progress }
+                let extracted = try await selection.read {
+                    try await Self.extract(source, password: password, into: staging, total: contents) { progress in
+                        Task { @MainActor in
+                            if self.selection === selection, self.task != nil { self.progress = progress }
+                        }
                     }
                 }
                 // Cancel can land after extraction's last check but before this runs. Nothing may be moved or deleted then.
@@ -209,10 +219,11 @@ public final class ArchiveImporter {
                     finish(root)
                 }
             } catch {
-                task = nil
                 try? FileManager.default.removeItem(at: staging)
-                stagings.removeAll { $0 == staging }
                 Self.liveStagings.remove(staging)
+                guard self.selection === selection else { return }
+                task = nil
+                stagings.removeAll { $0 == staging }
                 switch error {
                 case ArchiveError.wrongPassword:
                     step = .password(wrong: true)
@@ -296,8 +307,7 @@ public final class ArchiveImporter {
 
     @concurrent
     private static func open(_ urls: [URL]) async throws -> (ArchiveSource, ArchiveContents) {
-        let source = try ArchiveSource(picked: urls)
-        return (source, try ArchiveExtractor.list(source))
+        try ArchiveSource(picked: urls).coordinatedRead { ($0, try ArchiveExtractor.list($0)) }
     }
 
     @concurrent
@@ -305,7 +315,9 @@ public final class ArchiveImporter {
         _ source: ArchiveSource, password: String?, into staging: URL, total: ArchiveContents,
         progress: @escaping @Sendable (ImportProgress) -> Void
     ) async throws -> ImportProgress {
-        try ArchiveExtractor.extract(source, password: password, into: staging, total: total, progress: progress)
+        try source.coordinatedRead {
+            try ArchiveExtractor.extract($0, password: password, into: staging, total: total, progress: progress)
+        }
     }
 
     /// Deleting a file that iCloud Drive, Dropbox, OneDrive, or a server shares deletes it on the user's other devices
@@ -314,13 +326,49 @@ public final class ArchiveImporter {
     /// there it is the Games folder.
     private func isInOwnFolders(_ url: URL) -> Bool {
         #if os(iOS)
-        let own = URL.homeDirectory
+        url.isInside(URL.homeDirectory)
         #else
-        let own = gamesRoot
+        url.isInside(gamesRoot)
         #endif
-        let ownPath = own.resolvingSymlinksInPath().standardizedFileURL.path
-        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
-        return path.hasPrefix(ownPath.hasSuffix("/") ? ownPath : ownPath + "/")
+    }
+}
+
+/// The files of one `choose` and what they hold until nothing reads them: security-scoped access, and the copies the
+/// system made for VNDegen. A newer choice can replace this one while its listing or extraction still reads, so the
+/// files are released when the last read finishes rather than when the selection closes.
+private final class Selection {
+    private let urls: [URL]
+    private let scoped: [URL]
+    private var readers = 0
+    private var closed = false
+    private var released = false
+
+    var scopedCount: Int { scoped.count }
+
+    init(_ urls: [URL]) {
+        self.urls = urls
+        scoped = urls.filter { $0.startAccessingSecurityScopedResource() }
+    }
+
+    func read<T>(_ body: () async throws -> T) async throws -> T {
+        readers += 1
+        defer {
+            readers -= 1
+            releaseIfUnused()
+        }
+        return try await body()
+    }
+
+    func close() {
+        closed = true
+        releaseIfUnused()
+    }
+
+    private func releaseIfUnused() {
+        guard closed, readers == 0, !released else { return }
+        released = true
+        scoped.forEach { $0.stopAccessingSecurityScopedResource() }
+        DroppedFiles.discard(urls)
     }
 }
 

@@ -31,10 +31,40 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
         suggestedFolderName = first.1.stem
     }
 
+    private init(volumes: [URL], suggestedFolderName: String) {
+        self.volumes = volumes
+        self.suggestedFolderName = suggestedFolderName
+    }
+
+    /// Runs `body` while every volume is read under file coordination, so a file provider such as iCloud Drive can't
+    /// move, replace, or evict a volume meanwhile. `body` gets the source at the URLs the coordinator handed out.
+    func coordinatedRead<T>(_ body: (ArchiveSource) throws -> T) throws -> T {
+        try NSFileCoordinator.read(volumes) { try body(ArchiveSource(volumes: $0, suggestedFolderName: suggestedFolderName)) }
+    }
+
     /// The first part number missing from a volume set, counted the way the files are named (part1, r00, 001).
     private static func firstGap(_ indexes: [Int], startingAt start: Int) -> Int? {
         for (offset, index) in indexes.enumerated() where index != start + offset { return start + offset }
         return nil
+    }
+}
+
+nonisolated extension NSFileCoordinator {
+    /// Runs `body` inside one coordinated read of each of `urls`, passing the URLs the coordinator handed out. A
+    /// coordinated read also downloads a file the provider evicted.
+    static func read<T>(_ urls: [URL], _ body: ([URL]) throws -> T) throws -> T {
+        let coordinator = NSFileCoordinator()
+        func read(from index: Int, granted: [URL]) throws -> T {
+            guard index < urls.count else { return try body(granted) }
+            var result: Result<T, Error>?
+            var coordinationError: NSError?
+            coordinator.coordinate(readingItemAt: urls[index], options: [], error: &coordinationError) { url in
+                result = Result { try read(from: index + 1, granted: granted + [url]) }
+            }
+            guard let result else { throw coordinationError ?? CocoaError(.fileReadUnknown) }
+            return try result.get()
+        }
+        return try read(from: 0, granted: [])
     }
 }
 

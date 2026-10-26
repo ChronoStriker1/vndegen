@@ -35,12 +35,15 @@ public final class ArchiveImportModel {
         if !initialSelection.isEmpty { await importer.choose(initialSelection) }
     }
 
-    /// Starts over with these files, such as an archive opened from another app while the flow is showing. Does
-    /// nothing while an extraction runs.
+    /// Starts over with these files, such as an archive opened from another app while the flow is showing. While an
+    /// extraction runs, or once the flow ended, it discards them instead.
     public func choose(_ urls: [URL]) {
-        guard let importer, importer.step != .extracting else { return }
-        focus = nil
-        Task { await importer.choose(urls) }
+        // The flow can end before this task runs.
+        Task {
+            guard let importer, onFinish != nil, importer.step != .extracting else { return ArchiveImporter.discard(urls) }
+            focus = nil
+            await importer.choose(urls)
+        }
     }
 
     /// Cancels a running extraction, or ends the flow and reports what was imported. Later calls do nothing.
@@ -202,7 +205,7 @@ public struct ArchiveImportView: View {
             switch result {
             case let .success(urls):
                 importLog.notice("Picker returned \(urls.count) files")
-                if !urls.isEmpty { Task { await importer?.choose(urls) } }
+                if !urls.isEmpty { model.choose(urls) }
             case let .failure(error):
                 importLog.error("Picker failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -214,7 +217,7 @@ public struct ArchiveImportView: View {
 }
 
 /// A drop area for archives, for the hub to place where dropping a game makes sense. Pass the dropped files to
-/// `ArchiveImportView(initialSelection:)`.
+/// `ArchiveImportView(initialSelection:)`, or to `ArchiveImporter.discard` when they won't be imported.
 public struct ArchiveDropTarget: View {
     let onDrop: ([URL]) -> Void
     @State private var targeted = false
@@ -268,7 +271,7 @@ private struct StepView: View {
 
     private var choosing: some View {
         Group {
-            ArchiveDropTarget { urls in Task { await importer.choose(urls) } }
+            ArchiveDropTarget(onDrop: model.choose)
             errorLabel
             Button { model.select(.chooseArchive) } label: { Label("Choose Archive", systemImage: "folder") }
                 .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.chooseArchive)))

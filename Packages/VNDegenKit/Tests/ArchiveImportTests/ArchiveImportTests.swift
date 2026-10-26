@@ -444,6 +444,155 @@ private func provider(for url: URL, inPlace: Bool) -> NSItemProvider {
     #expect(fm.fileExists(atPath: archive.path))
 }
 
+// MARK: File coordination
+
+/// Stands in for a file provider such as iCloud Drive. Counts the coordinated reads of its file, and while holding, keeps
+/// readers waiting the way a provider does while it downloads.
+private final class FakeProvider: NSObject, NSFilePresenter, @unchecked Sendable {
+    let presentedItemURL: URL?
+    let presentedItemOperationQueue = OperationQueue()
+    private let lock = NSLock()
+    private var readCount = 0
+    private var holding = false
+    private var waiting: [@Sendable () -> Void] = []
+
+    init(_ url: URL) {
+        presentedItemURL = url
+        super.init()
+        NSFileCoordinator.addFilePresenter(self)
+    }
+
+    var reads: Int { lock.withLock { readCount } }
+    var hasWaitingReader: Bool { lock.withLock { !waiting.isEmpty } }
+
+    func hold() { lock.withLock { holding = true } }
+
+    func letReadersIn() {
+        let readers = lock.withLock {
+            holding = false
+            defer { waiting = [] }
+            return waiting
+        }
+        readers.forEach { $0() }
+    }
+
+    func remove() { NSFileCoordinator.removeFilePresenter(self) }
+
+    func relinquishPresentedItem(toReader reader: @escaping @Sendable ((@Sendable () -> Void)?) -> Void) {
+        let proceed = lock.withLock {
+            readCount += 1
+            if holding { waiting.append { reader(nil) } }
+            return !holding
+        }
+        if proceed { reader(nil) }
+    }
+}
+
+@MainActor
+private func waitUntil(_ condition: () -> Bool, _ comment: Comment) async throws {
+    let deadline = ContinuousClock.now + .seconds(10)
+    while !condition() {
+        try #require(ContinuousClock.now < deadline, comment)
+        try await Task.sleep(for: .milliseconds(10))
+    }
+}
+
+@MainActor @Test func readsADropInPlaceUnderFileCoordination() async throws {
+    let archive = try temporaryDirectory().appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    let presenter = FakeProvider(archive)
+    defer { presenter.remove() }
+    let urls = await DroppedFiles.urls(from: [provider(for: archive, inPlace: true)])
+
+    let importer = ArchiveImporter(gamesRoot: try temporaryDirectory())
+    let beforeListing = presenter.reads
+    await importer.choose(urls)
+    let afterListing = presenter.reads
+    #expect(afterListing > beforeListing, "listing is coordinated")
+    importer.startImport()
+    try await waitWhileExtracting(importer)
+    #expect(importer.step.isFinished)
+    #expect(presenter.reads > afterListing, "extraction is coordinated")
+}
+
+// MARK: Overlapping choices
+
+@MainActor @Test func aNewChoiceWhileOneIsListingEndsOnTheNewOne() async throws {
+    let first = try temporaryDirectory().appendingPathComponent("split.7z.001")
+    try fm.copyItem(at: fixtures.appendingPathComponent("split.7z.001"), to: first)
+    // A dropped copy, which the importer deletes when it is done with it.
+    let copied = await DroppedFiles.urls(from: [provider(for: first, inPlace: false)])
+    let copy = try #require(copied.first)
+    let presenter = FakeProvider(copy)
+    defer { presenter.remove() }
+    presenter.hold()
+
+    let importer = ArchiveImporter(gamesRoot: try temporaryDirectory())
+    let listingFirst = Task { await importer.choose(copied) }
+    try await waitUntil({ presenter.hasWaitingReader }, "the first choice is listing")
+    await importer.choose([fixtures.appendingPathComponent("two-items.zip")])
+    #expect(importer.step == .reviewing)
+    #expect(fm.fileExists(atPath: copy.path), "the first choice's copy stays while it is read")
+
+    presenter.letReadersIn()
+    await listingFirst.value
+    #expect(importer.step == .reviewing)
+    #expect(importer.source?.fileName == "two-items.zip")
+    #expect(importer.errorMessage == nil)
+    #expect(!fm.fileExists(atPath: copy.deletingLastPathComponent().path), "the first choice's copy is deleted after its read")
+}
+
+@MainActor @Test func aNewChoiceWhileExtractingKeepsTheFilesUntilExtractionStops() async throws {
+    let copied = await DroppedFiles.urls(from: [provider(for: fixtures.appendingPathComponent("two-items.zip"), inPlace: false)])
+    let copy = try #require(copied.first)
+    let presenter = FakeProvider(copy)
+    defer { presenter.remove() }
+    let importer = ArchiveImporter(gamesRoot: try temporaryDirectory())
+    await importer.choose(copied)
+    presenter.hold()
+    importer.startImport()
+    try await waitUntil({ presenter.hasWaitingReader }, "extraction started reading")
+
+    await importer.choose([fixtures.appendingPathComponent("password.zip")])
+    #expect(fm.fileExists(atPath: copy.path), "the extraction's copy stays while it is read")
+    presenter.letReadersIn()
+    try await waitUntil({ !fm.fileExists(atPath: copy.deletingLastPathComponent().path) }, "the copy is deleted once extraction stops")
+    #expect(importer.step == .reviewing)
+    #expect(importer.source?.fileName == "password.zip")
+    #expect(importer.errorMessage == nil, "the cancelled extraction leaves the new choice alone")
+}
+
+// MARK: Deliveries nobody imports
+
+@MainActor @Test func importFlowDiscardsDeliveriesItCannotTake() async throws {
+    let archive = try temporaryDirectory().appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    let presenter = FakeProvider(archive)
+    defer { presenter.remove() }
+    let model = ArchiveImportModel(gamesRoot: try temporaryDirectory())
+    await model.start(initialSelection: [archive]) { _ in }
+    let importer = try #require(model.importer)
+    presenter.hold()
+    importer.startImport()
+    try await waitUntil({ presenter.hasWaitingReader }, "extraction started")
+
+    let duringExtraction = await DroppedFiles.urls(from: [provider(for: fixtures.appendingPathComponent("two-items.zip"), inPlace: false)])
+    model.choose(duringExtraction)
+    try await waitUntil({ !fm.fileExists(atPath: duringExtraction[0].deletingLastPathComponent().path) },
+                       "a drop during extraction is discarded")
+    #expect(importer.step == .extracting)
+
+    presenter.letReadersIn()
+    try await waitWhileExtracting(importer)
+    model.close()
+    let afterClose = await DroppedFiles.urls(from: [provider(for: fixtures.appendingPathComponent("two-items.zip"), inPlace: false)])
+    model.choose(afterClose)
+    try await waitUntil({ !fm.fileExists(atPath: afterClose[0].deletingLastPathComponent().path) },
+                       "a drop after the flow ended is discarded")
+    #expect(importer.source == nil, "the closed importer stays closed")
+    #expect(fm.fileExists(atPath: archive.path))
+}
+
 private extension ArchiveImporter.Step {
     var isFinished: Bool { if case .finished = self { true } else { false } }
 }

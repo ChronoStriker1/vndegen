@@ -5,8 +5,12 @@ import UniformTypeIdentifiers
 /// Files dragged in from another app, such as Files on iPhone and iPad, arrive as item providers holding file
 /// representations rather than file URLs.
 nonisolated enum DroppedFiles {
-    /// Where a drop is copied when it can't be opened in place. `ArchiveImporter` deletes these copies when it closes.
+    /// Where a drop is copied when it can't be opened in place.
     static let copies = URL.temporaryDirectory.appendingPathComponent("Dropped Archives", isDirectory: true)
+    #if os(iOS)
+    /// Where iOS puts a file another app copies to VNDegen, such as a Mail attachment opened in VNDegen.
+    static let inbox = URL.documentsDirectory.appendingPathComponent("Inbox", isDirectory: true)
+    #endif
 
     /// Opens each provider's file in place where its source allows that, so a multi-GB archive is never copied. Other
     /// files are kept in one folder per drop, so the volumes of a split archive stay side by side.
@@ -19,12 +23,22 @@ nonisolated enum DroppedFiles {
         return urls
     }
 
-    static func isCopy(_ url: URL) -> Bool {
-        url.standardizedFileURL.path.hasPrefix(copies.standardizedFileURL.path + "/")
+    /// What to delete once VNDegen is done with `url`, when the system delivered `url` as a copy for VNDegen: the drop's
+    /// folder in `copies`, or the file itself in the inbox. Nil for the user's own files, which are read in place.
+    static func ownedCopy(of url: URL) -> URL? {
+        if url.isInside(copies) { return url.deletingLastPathComponent() }
+        #if os(iOS)
+        if url.isInside(inbox) { return url }
+        #endif
+        return nil
     }
 
-    /// The drop's own folder in `copies`.
-    static func copyFolder(of url: URL) -> URL { url.deletingLastPathComponent() }
+    static func discard(_ urls: [URL]) {
+        for copy in Set(urls.compactMap(ownedCopy)) {
+            try? FileManager.default.removeItem(at: copy)
+            importLog.notice("Deleted the copy \(copy.lastPathComponent, privacy: .public)")
+        }
+    }
 
     @MainActor private static func url(from provider: NSItemProvider, copyingInto folder: URL) async -> URL? {
         // `.data` rather than archive types, because old-style RAR volumes (.r00) and split parts (.001) have no type.
@@ -39,12 +53,13 @@ nonisolated enum DroppedFiles {
                     return continuation.resume(returning: nil)
                 }
                 importLog.notice("Drop delivered \(url.lastPathComponent, privacy: .public), in place: \(inPlace)")
+                // An in-place file is read under coordination when the importer lists and extracts it.
                 if inPlace { return continuation.resume(returning: url) }
-                // The system deletes its copy when this handler returns, so keep it by moving it out first.
+                // The system deletes its copy when this handler returns, so keep a copy of it. On APFS that is a clone.
                 let kept = folder.appendingPathComponent(url.lastPathComponent)
                 do {
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                    do { try FileManager.default.moveItem(at: url, to: kept) } catch { try FileManager.default.copyItem(at: url, to: kept) }
+                    try NSFileCoordinator.read([url]) { try FileManager.default.copyItem(at: $0[0], to: kept) }
                     continuation.resume(returning: kept)
                 } catch {
                     importLog.error("Drop could not be kept: \(error.localizedDescription, privacy: .public)")
@@ -57,7 +72,9 @@ nonisolated enum DroppedFiles {
 
 public extension View {
     /// Accepts archives dropped from Finder, or from Files and other apps on iPhone and iPad, and passes their URLs to
-    /// `perform`. Pass them to `ArchiveImportView(initialSelection:)` or `ArchiveImporter.choose`.
+    /// `perform`. Some may be copies the system made for VNDegen, so `perform` hands them to
+    /// `ArchiveImportView(initialSelection:)`, `ArchiveImportModel.choose`, or `ArchiveImporter.choose`, which delete
+    /// those copies when done, or to `ArchiveImporter.discard`.
     func onArchiveDrop(isTargeted: @escaping (Bool) -> Void = { _ in }, perform: @escaping ([URL]) -> Void) -> some View {
         #if os(macOS)
         dropDestination(for: URL.self) { urls, _ in
@@ -74,5 +91,14 @@ public extension View {
             return true
         }
         #endif
+    }
+}
+
+nonisolated extension URL {
+    /// Compared with symlinks resolved, because iOS hands out `/private/var` paths for the container at `/var`.
+    func isInside(_ folder: URL) -> Bool {
+        let folderPath = folder.resolvingSymlinksInPath().standardizedFileURL.path
+        let path = resolvingSymlinksInPath().standardizedFileURL.path
+        return path.hasPrefix(folderPath.hasSuffix("/") ? folderPath : folderPath + "/")
     }
 }
