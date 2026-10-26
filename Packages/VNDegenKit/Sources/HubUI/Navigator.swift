@@ -354,7 +354,7 @@ final class Navigator {
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
         case .pageVariant: if let id = pageGameID { sheet = .variant(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
-        case .pageControls: if let id = pageGameID { sheet = .controlMethod(id) }
+        case .pageControls: if let id = pageGameID, offersControlMethod(id) { sheet = .controlMethod(id) }
         case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
         case .pageLock: if let id = pageGameID { toggleGameLock(id) }
         case let .engineOption(engine):
@@ -575,6 +575,9 @@ final class Navigator {
             sheet = nil
             syncInputMode()
         }
+        // A rescan can find that an open control method sheet's game reads touches itself, such as a Ren'Py game whose
+        // files finished copying. Closing it returns focus to its row, which the focus check below then moves.
+        if case let .controlMethod(id)? = sheet, !offersControlMethod(id) { sheet = nil }
         // Until the user steers, and always for touch users, keep the default focus current as the library loads.
         if !steered || hub.input.lastInputKind == .touch || focus.map({ position(of: $0, in: rows()) == nil }) ?? true { setFocus(defaultFocus) }
     }

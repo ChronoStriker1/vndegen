@@ -46,6 +46,25 @@ private let dualLineInit = "if PY2:\n    version_tuple = (7, 5, 1, vc_version)\n
     #expect(RenPyLayout.fingerprint(base: root.appendingPathComponent("TestGame/TestGame-1.0-pc")) != nil)
 }
 
+@Test func readsTheVersionOfAMixedCaseRenPyFolderTwoFoldersDown() throws {
+    let layout = try layout([
+        "TestGame/TestGame-1.0-pc/RenPy/__init__.py": "version_tuple = (7, 4, 2, vc_version)\n",
+        "TestGame/TestGame-1.0-pc/game/script.rpyc": "",
+    ])
+    #expect(layout == RenPyLayout(base: "TestGame/TestGame-1.0-pc", version: "7.4.2", runtime: .renPy7, evidence: .version))
+}
+
+@Test func theGameFolderWalksTwoFoldersDownShareOneBudget() throws {
+    var files = Dictionary(uniqueKeysWithValues: (0 ..< 50).map { ("Deep/A/game/images/\($0).png", "") })
+    files["Deep/A/renpy/__init__.py"] = ""
+    files["Deep/B/renpy/__init__.py"] = ""
+    files["Deep/B/game/scripts/story.rpyc"] = ""
+    let probe = FolderProbe(scanning: try folder(files))
+    // A's 51 entries use up a budget of 20, so B is never walked.
+    #expect(RenPyLayout(probe, deepScanLimit: 20) == nil)
+    #expect(RenPyLayout(probe, deepScanLimit: 1_000)?.base == "Deep/B")
+}
+
 @Test func triesTheShallowestOfABoundedSetOfBases() throws {
     var entries: Set<String> = ["Deep/Game/renpy", "Deep/Game/game", "Near/renpy", "Near/game", "Deep/Game/lib/renpy"]
     for index in 0 ..< 40 { entries.insert(String(format: "Many/%02d/renpy", index)) }

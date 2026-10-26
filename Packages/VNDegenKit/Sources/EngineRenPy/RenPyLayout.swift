@@ -48,20 +48,24 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
 
     public func path(_ relative: String) -> String { base.isEmpty ? relative : "\(base)/\(relative)" }
 
-    public init?(_ probe: FolderProbe) {
-        guard let base = Self.candidates(probe).first(where: { Self.isBase($0, probe) }) else { return nil }
+    public init?(_ probe: FolderProbe) { self.init(probe, deepScanLimit: 20_000) }
+
+    /// `deepScanLimit` caps the entries the `game/` walks of bases two folders down visit, all of them together.
+    init?(_ probe: FolderProbe, deepScanLimit: Int) {
+        var deepBudget = deepScanLimit
+        guard let base = Self.candidates(probe).first(where: { Self.isBase($0, probe, deepBudget: &deepBudget) }) else { return nil }
         let prefix = base.isEmpty ? "" : "\(base)/"
-        let text = { (path: String) in probe.read(prefix + path).map { String(decoding: $0, as: UTF8.self) } }
-        // Listed from disk, because the probe stops above `lib/` and `renpy/` of a base two folders down.
-        let children = { (folder: String) in
-            let path = prefix + folder
-            let actual = probe.entries.first { $0.lowercased() == path.lowercased() } ?? path
-            let names = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(actual).path)) ?? []
+        // The probe stops above the contents of `renpy/` and `lib/` in a base two folders down. The folder's name, in its
+        // on-disk case, comes from the probe, and what is inside is read from disk.
+        let folder = { (name: String) in probe.entries.first { $0.lowercased() == (prefix + name).lowercased() } ?? prefix + name }
+        let text = { (name: String, file: String) in probe.read("\(folder(name))/\(file)").map { String(decoding: $0, as: UTF8.self) } }
+        let children = { (name: String) in
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(folder(name)).path)) ?? []
             return names.map { $0.lowercased() }
         }
 
-        let vcVersion = text("renpy/vc_version.py").flatMap(Self.vcVersion)
-        let tuples = vcVersion.map { [$0] } ?? Self.versionTuples(text("renpy/__init__.py"))
+        let vcVersion = text("renpy", "vc_version.py").flatMap(Self.vcVersion)
+        let tuples = vcVersion.map { [$0] } ?? Self.versionTuples(text("renpy", "__init__.py"))
         let runtime: RenPyRuntime, evidence: RuntimeEvidence
         if let line = Self.runtime(versions: tuples) {
             (runtime, evidence) = (line, .version)
@@ -90,12 +94,16 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         return Array(Set(bases).sorted { (depth($0), $0) < (depth($1), $1) }.prefix(limit))
     }
 
-    private static func isBase(_ base: String, _ probe: FolderProbe) -> Bool {
+    /// The probe lists the scripts directly in `game/` for a base up to one folder down, so its walk looks only for
+    /// deeper scripts and has no limit. The probe shows nothing inside `game/` for a base two folders down, so those
+    /// walks share `deepBudget`, and a large `game/` without scripts can't stall detection.
+    private static func isBase(_ base: String, _ probe: FolderProbe, deepBudget: inout Int) -> Bool {
         let prefix = base.isEmpty ? "" : "\(base)/".lowercased()
         guard probe.contains("\(prefix)renpy"), let game = probe.entries.first(where: { $0.lowercased() == "\(prefix)game" })
         else { return false }
         if probe.entries.contains(where: { $0.lowercased().hasPrefix("\(prefix)game/") && isScript($0) }) { return true }
-        return containsScript(probe.root.appendingPathComponent(game, isDirectory: true))
+        let url = probe.root.appendingPathComponent(game, isDirectory: true)
+        return base.contains("/") ? containsScript(url, budget: &deepBudget) : containsScript(url)
     }
 
     private static func isScript(_ path: String) -> Bool {
@@ -106,6 +114,12 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
     /// The walk lists one level at a time and stops at the first script, so the usual shallow scripts turn up before
     /// deep asset folders are listed. It does not follow symlinked folders, so a link loop can't keep it going.
     static func containsScript(_ folder: URL) -> Bool {
+        var unlimited = Int.max
+        return containsScript(folder, budget: &unlimited)
+    }
+
+    /// Gives up once it has visited `budget` entries, and takes them from `budget`.
+    static func containsScript(_ folder: URL, budget: inout Int) -> Bool {
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
         var level = [folder]
         while !level.isEmpty {
@@ -114,6 +128,8 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
                 guard let items = try? FileManager.default.contentsOfDirectory(
                     at: directory, includingPropertiesForKeys: Array(keys), options: .skipsHiddenFiles) else { continue }
                 for item in items {
+                    guard budget > 0 else { return false }
+                    budget -= 1
                     if isScript(item.lastPathComponent) { return true }
                     let values = try? item.resourceValues(forKeys: keys)
                     if values?.isDirectory == true, values?.isSymbolicLink != true { next.append(item) }

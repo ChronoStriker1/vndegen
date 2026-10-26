@@ -119,6 +119,33 @@ private struct SlowPlugin: EnginePlugin {
     #expect(!ControlMethod.applies(to: other, on: .macOS))
 }
 
+@MainActor @Test func aRescanThatFindsRenPyClosesTheControlMethodSheet() async throws {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
+    let game = paths.gamesRoot.appendingPathComponent("Test Game", isDirectory: true)
+    try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+    let library = LibraryStore(paths: paths, engines: [RenPyPlugin()])
+    await library.refresh()
+    let id = GameID("Test Game")
+    let hub = Hub(library: library, metadata: MetadataService(), input: InputHub(),
+                  lock: LockService(keychainService: "vndegen-tests-\(UUID().uuidString)", defaults: UserDefaults(suiteName: UUID().uuidString)!),
+                  saveSync: SaveSyncService(library: library))
+    let nav = Navigator(hub: hub)
+    nav.push(.game(id))
+    nav.sheet = .controlMethod(id)
+
+    // The game's files finish copying, and the next scan detects Ren'Py.
+    for path in ["renpy/__init__.py", "game/script.rpy"] {
+        let file = game.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: file)
+    }
+    await library.refresh()
+    nav.revalidate()
+    #expect(nav.sheet == nil)
+    #expect(nav.focus != .pageControls)
+}
+
 @MainActor @Test func controlMethodKindsAndMouseOptions() {
     #expect(ControlMethod.Kind.allCases.map(ControlMethod.init) == [.automatic, .gamepad, .mouse(.touch), .controller(mouse: nil)])
     #expect(ControlMethod.controller(mouse: .cursor).stepped(by: 1) == .automatic)
