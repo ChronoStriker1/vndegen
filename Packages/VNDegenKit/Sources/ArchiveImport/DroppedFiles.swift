@@ -33,6 +33,20 @@ nonisolated enum DroppedFiles {
         return nil
     }
 
+    static func discardDropCopies() { discardStale([copies]) }
+
+    static func discardInbox() {
+        #if os(iOS)
+        discardStale((try? FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil)) ?? [])
+        #endif
+    }
+
+    private static func discardStale(_ urls: [URL]) {
+        for url in urls where (try? FileManager.default.removeItem(at: url)) != nil {
+            importLog.notice("Deleted the stale copy \(url.lastPathComponent, privacy: .public)")
+        }
+    }
+
     static func discard(_ urls: [URL]) {
         for copy in Set(urls.compactMap(ownedCopy)) {
             try? FileManager.default.removeItem(at: copy)

@@ -5,6 +5,7 @@ import Metadata
 import GameInput
 import Lock
 import SaveSync
+import ArchiveImport
 
 /// App-level state: what is on screen and the services every screen shares.
 @MainActor
@@ -21,6 +22,8 @@ public final class Hub {
     public let lock: LockService
     public let saveSync: SaveSyncService
     public private(set) var screen: Screen = .library
+    /// Archives copied into VNDegen's folder, listed under Ready to import.
+    public private(set) var localArchives: [LocalArchive] = []
     public var launchError: String?
     @ObservationIgnored private var sessionStart: Date?
     @ObservationIgnored private var matching: Task<Void, Never>?
@@ -35,9 +38,12 @@ public final class Hub {
         self.saveSync = saveSync
     }
 
-    /// Rescans the games folder, then looks up metadata for games that have none, without holding up the caller.
+    /// Rescans the games folder and the archives beside it, then looks up metadata for games that have none, without
+    /// holding up the caller.
     public func refreshLibrary() async {
+        async let archives = LocalArchives.find(gamesRoot: library.paths.gamesRoot)
         await library.refresh()
+        localArchives = await archives
         guard matching == nil else { return }
         let unmatched = library.games.filter { $0.metadata == nil }.map(\.id)
         guard !unmatched.isEmpty else { return }

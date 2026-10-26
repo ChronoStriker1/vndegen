@@ -2,6 +2,7 @@ import SwiftUI
 import VNCore
 
 struct LibraryHomeView: View {
+    @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
 
@@ -15,6 +16,9 @@ struct LibraryHomeView: View {
                         HeroStage(game: hero)
                             .frame(height: metrics.stageHeight)
                             .id("stage")
+                        if !hub.localArchives.isEmpty {
+                            ReadyToImportRow(archives: hub.localArchives)
+                        }
                         ForEach(nav.shelves, id: \.shelf) { shelf in
                             ShelfRow(shelf: shelf.shelf, games: shelf.games)
                         }
@@ -27,9 +31,14 @@ struct LibraryHomeView: View {
                 .onChange(of: nav.focus) { _, focus in
                     guard nav.focusMovedByController else { return }
                     withAnimation(Theme.focusAnimation) {
-                        if case let .tile(shelf, _)? = focus {
-                            // Nested scroll views: scroll the page to the shelf, then the shelf to the tile.
-                            proxy.scrollTo(shelf.rawValue, anchor: .bottom)
+                        let row: String? = switch focus {
+                        case let .tile(shelf, _)?: shelf.rawValue
+                        case .importArchive?: Navigator.archivesRowID
+                        default: nil
+                        }
+                        if let row {
+                            // Nested scroll views: scroll the page to the row, then the row to the focused item.
+                            proxy.scrollTo(row, anchor: .bottom)
                             proxy.scrollTo(focus, anchor: UnitPoint(x: 0.35, y: 0.5))
                         } else {
                             proxy.scrollTo("stage", anchor: .top)

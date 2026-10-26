@@ -1,5 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// The state behind `ArchiveImportView`, including gamepad focus. A host that drives the view with a controller keeps the
 /// model it passed to the view and forwards button presses to `handle(_:)`.
@@ -279,6 +282,11 @@ private struct StepView: View {
             Text("Games are extracted into VNDegen's Games folder. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.tertiaryText)
+            #if os(iOS)
+            Text("If Choose Archive does nothing, copy the archive into On My \(UIDevice.current.localizedModel), then VNDegen, in Files. The library lists it under Ready to import.")
+                .font(.system(size: 13))
+                .foregroundStyle(ImportTheme.tertiaryText)
+            #endif
         }
     }
 

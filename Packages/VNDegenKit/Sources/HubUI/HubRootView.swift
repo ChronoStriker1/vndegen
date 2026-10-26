@@ -32,8 +32,14 @@ public struct HubRootView: View {
         .preferredColorScheme(.dark)
         .background(Theme.background)
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { nav.relock() }
+            if phase == .background {
+                nav.relock()
+                nav.discardInboxCopies()
+            }
+            // Picks up games and archives the user copied in with Files or Finder meanwhile.
+            if phase == .active, case .library = hub.screen { Task { await hub.refreshLibrary() } }
         }
+        .task { ArchiveImporter.discardStaleDropCopies() }
         // An archive opened in VNDegen from Files, Finder, or a share sheet. The app declares zip, RAR, and 7z.
         .onOpenURL { url in
             if url.isFileURL { nav.openImport([url]) }
@@ -84,6 +90,7 @@ private struct LibraryContainer: View {
             nav.revalidate()
         }
         .onChange(of: hub.library.games) { nav.revalidate() }
+        .onChange(of: hub.localArchives) { nav.revalidate() }
         .onChange(of: hub.lock.isUnlocked) { nav.revalidate() }
         // Archives dropped anywhere on the library open the import sheet with them chosen.
         .onArchiveDrop(isTargeted: { dropTargeted = $0 && nav.sheet == nil }) { nav.openImport($0) }

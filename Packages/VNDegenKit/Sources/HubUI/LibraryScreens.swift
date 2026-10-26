@@ -258,14 +258,14 @@ extension TouchControlsMode {
 enum LibraryFolder {
     #if os(macOS)
     static let openTitle = "Show in Finder"
-    static let instructions = "Copy each game into its own folder inside ~/Games/VNDegen, then rescan."
+    static let instructions = "Copy each game into its own folder inside ~/Games/VNDegen, then rescan. A zip, RAR, or 7z archive copied there shows up in the library under Ready to import."
     static func open(_ url: URL) {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
     #else
     static let openTitle = "Open in Files"
-    static let instructions = "In the Files app, open On My \(UIDevice.current.localizedModel), then VNDegen, then Games. Copy each game into its own folder there."
+    static let instructions = "In the Files app, open On My \(UIDevice.current.localizedModel), then VNDegen, then Games. Copy each game into its own folder there. A zip, RAR, or 7z archive copied into VNDegen or Games shows up in the library under Ready to import."
     static func open(_ url: URL) {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         // The Files app opens a folder in an app's container through the shareddocuments scheme.
@@ -281,10 +281,14 @@ struct EmptyLibraryView: View {
 
     private var steps: [String] {
         #if os(macOS)
-        ["Open the Games folder in Finder.", "Copy each game into its own folder, for example Games/No Socks RPG.", "Come back here. VNDegen finds the engine and adds the game."]
+        ["Open the Games folder in Finder.",
+         "Copy each game into its own folder, for example Games/No Socks RPG. Or copy in a zip, RAR, or 7z archive.",
+         "Come back here. VNDegen adds game folders and lists archives under Ready to import."]
         #else
         let device = UIDevice.current.localizedModel
-        return ["Open the Files app and go to On My \(device), then VNDegen, then Games.", "Copy each game into its own folder, for example Games/No Socks RPG.", "Come back here. VNDegen finds the engine and adds the game."]
+        return ["Open the Files app and go to On My \(device), then VNDegen.",
+                "Copy each game folder into Games, for example Games/No Socks RPG. Or copy a zip, RAR, or 7z archive into VNDegen or Games.",
+                "Come back here. VNDegen adds game folders and lists archives under Ready to import."]
         #endif
     }
 
@@ -296,6 +300,9 @@ struct EmptyLibraryView: View {
                     .frame(width: metrics.isShort ? 180 : 240, height: metrics.isShort ? 170 : 240)
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Add your first game").font(.display(metrics.isCompact ? 28 : 36))
+                    if !hub.localArchives.isEmpty {
+                        ReadyToImportList(archives: hub.localArchives)
+                    }
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                             HStack(alignment: .firstTextBaseline, spacing: 12) {

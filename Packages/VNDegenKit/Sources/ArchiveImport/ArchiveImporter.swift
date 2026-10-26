@@ -46,6 +46,7 @@ public final class ArchiveImporter {
     public var folderName = ""
     /// Offered only when the picked archive is inside VNDegen's own folders, which no other device or server shares.
     public private(set) var canDeleteArchive = false
+    /// On by default for an archive the library lists under Ready to import, which the user copied in only to import it.
     public var deleteArchiveAfterImport = false
 
     /// The archive the user picked, which "Delete archive after import" removes.
@@ -82,6 +83,13 @@ public final class ArchiveImporter {
     /// nothing imports.
     public static func discard(_ urls: [URL]) { DroppedFiles.discard(urls) }
 
+    /// Deletes the drop copies left by a run that was killed mid-import. Call at launch, before any drop can arrive.
+    public static func discardStaleDropCopies() { DroppedFiles.discardDropCopies() }
+
+    /// Deletes every copy in the Inbox. Call only while no import flow is open. Not safe at launch, because opening an
+    /// archive in VNDegen from another app delivers its Inbox copy before the app launches.
+    public static func discardInboxCopies() { DroppedFiles.discardInbox() }
+
     // MARK: Actions
 
     /// Takes the files from the document picker, open panel, a drop, or Open in VNDegen, and lists the archive. The
@@ -104,6 +112,7 @@ public final class ArchiveImporter {
             folderName = source.suggestedFolderName
             // A copy is deleted anyway, and deleting it never frees the original's space.
             canDeleteArchive = source.volumes.allSatisfy { DroppedFiles.ownedCopy(of: $0) == nil && isInOwnFolders($0) }
+            deleteArchiveAfterImport = canDeleteArchive && source.volumes.allSatisfy { LocalArchives.isListed($0, gamesRoot: gamesRoot) }
             step = .reviewing
         } catch {
             guard self.selection === selection else {

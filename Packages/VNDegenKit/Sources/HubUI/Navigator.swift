@@ -65,6 +65,8 @@ final class Navigator {
 
     enum Target: Hashable {
         case addGame, gridButton, lockButton, settingsButton
+        /// An archive under Ready to import, by its first volume.
+        case importArchive(URL)
         case openFolder, rescan
         /// Hero buttons. They act on `heroGame`.
         case play, details
@@ -147,6 +149,9 @@ final class Navigator {
 
     // MARK: Focus table
 
+    /// The home screen's Ready to import row, also its scroll anchor.
+    static let archivesRowID = "archives"
+
     func rows() -> [Row] {
         if let sheet {
             switch sheet {
@@ -167,12 +172,16 @@ final class Navigator {
         }
         switch route {
         case nil:
+            let archives = hub.localArchives.map { Target.importArchive($0.url) }
             if visibleGames.isEmpty {
-                return [Row(id: "bar", items: [.lockButton, .settingsButton]), Row(id: "empty-add", items: [.addGame]),
-                        Row(id: "empty-folder", items: [.openFolder, .rescan])]
+                // The empty library lists archives one under another.
+                return [Row(id: "bar", items: [.lockButton, .settingsButton])]
+                    + archives.map { Row(id: "\($0)", items: [$0]) }
+                    + [Row(id: "empty-add", items: [.addGame]), Row(id: "empty-folder", items: [.openFolder, .rescan])]
             }
             var rows = [Row(id: "bar", items: [.addGame, .gridButton, .lockButton, .settingsButton])]
             if heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
+            if !archives.isEmpty { rows.append(Row(id: Self.archivesRowID, items: archives)) }
             rows += shelves.map { shelf in Row(id: shelf.shelf.rawValue, items: shelf.games.map { .tile(shelf.shelf, $0.id) }) }
             return rows
         case .grid:
@@ -207,7 +216,7 @@ final class Navigator {
         }
         switch route {
         case nil:
-            if visibleGames.isEmpty { return .addGame }
+            if visibleGames.isEmpty { return hub.localArchives.first.map { .importArchive($0.url) } ?? .addGame }
             if let game = heroGame, let shelf = shelves.first(where: { $0.games.contains { $0.id == game.id } }) {
                 return .tile(shelf.shelf, game.id)
             }
@@ -302,6 +311,7 @@ final class Navigator {
     func activate(_ target: Target) {
         switch target {
         case .addGame: openImport()
+        case let .importArchive(url): openImport([url])
         case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
         case .touchControls, .playOrientation: stepSetting(target, by: 1)
@@ -355,6 +365,13 @@ final class Navigator {
         if case let .importGame(model, _)? = sheet, !urls.isEmpty { return model.choose(urls) }
         guard sheet == nil else { return ArchiveImporter.discard(urls) }
         sheet = .importGame(ArchiveImportModel(gamesRoot: hub.library.paths.gamesRoot), initialSelection: urls)
+    }
+
+    /// Deletes Inbox copies nothing imports. Only the import sheet holds Inbox copies, so with it closed they are left
+    /// from a run killed mid-import.
+    func discardInboxCopies() {
+        if case .importGame? = sheet { return }
+        ArchiveImporter.discardInboxCopies()
     }
 
     /// Closes the import sheet, then shows the new game in the library.

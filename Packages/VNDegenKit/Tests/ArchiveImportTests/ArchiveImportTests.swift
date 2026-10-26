@@ -312,6 +312,40 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     #expect(items(games) == [".importing", "two-items"])
 }
 
+@MainActor @Test func defaultsToDeletingOnlyArchivesListedForImport() async throws {
+    let games = try temporaryDirectory()
+    let listed = games.appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: listed)
+    let nested = games.appendingPathComponent("Some Game/two-items.zip")
+    try fm.createDirectory(at: nested.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: nested)
+
+    let importer = ArchiveImporter(gamesRoot: games)
+    await importer.choose([listed])
+    #expect(importer.deleteArchiveAfterImport)
+    await importer.choose([nested])
+    #expect(importer.canDeleteArchive)
+    #expect(!importer.deleteArchiveAfterImport, "an archive inside a game folder is not listed, so it stays unless the user asks")
+}
+
+// MARK: Ready to import
+
+@Test func listsEachArchiveInVNDegensFolderOnce() throws {
+    let folder = try temporaryDirectory()
+    let files = ["Game A.zip", "Game B.7z", "Game C.part1.rar", "Game C.part2.rar", "Game D.rar", "Game D.r00", "Game D.r01",
+                 "Game E.7z.001", "Game E.7z.002", "Orphan.part2.rar", "Orphan.r00", "readme.txt", ".hidden.zip"]
+    for file in files { try Data(repeating: 1, count: 10).write(to: folder.appendingPathComponent(file)) }
+    // Game folders are never archives, whatever their names.
+    try fm.createDirectory(at: folder.appendingPathComponent("Game F.zip"), withIntermediateDirectories: true)
+    try fm.createDirectory(at: folder.appendingPathComponent("Inbox"), withIntermediateDirectories: true)
+    try Data().write(to: folder.appendingPathComponent("Inbox/Copy.zip"))
+
+    let found = LocalArchives.scan([folder])
+    #expect(found.map(\.fileName) == ["Game A.zip", "Game B.7z", "Game C.part1.rar", "Game D.rar", "Game E.7z.001"])
+    #expect(found.map(\.parts) == [1, 1, 2, 3, 2])
+    #expect(found.map(\.byteCount) == [10, 10, 20, 30, 20])
+}
+
 // MARK: Cleanup
 
 @MainActor @Test func cleansUpAfterAFailedImport() async throws {
