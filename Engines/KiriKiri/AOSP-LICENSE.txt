@@ -1,6 +1,12 @@
-Droid Sans Fallback, the KiriKiri engine's fallback font, from the Android Open Source Project.
+Code and a font in the KiriKiri engine from the Android Open Source Project, each licensed under the
+Apache License, Version 2.0:
+
+Droid Sans Fallback, the engine's fallback font.
 Digitized data copyright (c) 2006, Google Corporation.
-Licensed under the Apache License, Version 2.0.
+
+VelocityTracker.cpp and VelocityTracker.h in the engine's core/utils, which estimate how fast a
+touch moves. Copyright (C) 2012 The Android Open Source Project. The Kirikiri Z authors modified
+them to track each pointer separately and to count time in milliseconds.
 
                                  Apache License
                            Version 2.0, January 2004

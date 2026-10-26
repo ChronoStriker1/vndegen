@@ -83,7 +83,7 @@ lipo -create "$work/mac/KiriKiri.framework/Versions/A/KiriKiri" "$work/mac-x86_6
 rm -rf "$dest/mac" "$dest/ios" "$dest/licenses"
 mkdir -p "$dest/mac/Res" "$dest/ios" "$dest/licenses"
 cp -p "$src/krkrsdl3/LICENSE" "$dest/licenses/KiriKiri engine (krkrsdl3).txt"
-cp -p "$src/DroidSansFallback-LICENSE.txt" "$dest/licenses/Droid Sans Fallback font.txt"
+cp -p "$src/AOSP-LICENSE.txt" "$dest/licenses/Android Open Source Project.txt"
 for copyright in "$work/ios/vcpkg_installed/arm64-ios/share"/*/copyright; do
   cp -p "$copyright" "$dest/licenses/$(basename "$(dirname "$copyright")").txt"
 done
