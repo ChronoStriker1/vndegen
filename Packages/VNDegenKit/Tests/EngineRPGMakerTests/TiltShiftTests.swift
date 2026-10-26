@@ -9,13 +9,18 @@ private let page = """
         function Point(x, y) { this.x = x; this.y = y; }
         Point.prototype.set = function (x, y) { this.x = x; this.y = y; };
         function Filter() { this.uniforms = {}; }
-        Filter.prototype.apply = function () { this.applied = [this.uniforms.texSize.x, this.uniforms.texSize.y]; };
+        Filter.prototype.apply = function () {
+            const u = this.uniforms;
+            this.applied = [u.texSize.x, u.texSize.y, u.start.y, u.end.y];
+        };
         return { Point: Point, Filter: Filter, filters: {} };
     })();
     </script><script>
     (function (t) {
-        function TiltShiftAxisFilter() {
+        function TiltShiftAxisFilter(start, end) {
             t.Filter.call(this);
+            this.uniforms.start = start || new t.Point(0, window.innerHeight / 2);
+            this.uniforms.end = end || new t.Point(600, window.innerHeight / 2);
             this.uniforms.texSize = new t.Point(window.innerWidth, window.innerHeight);
         }
         TiltShiftAxisFilter.prototype = Object.create(t.Filter.prototype);
@@ -40,10 +45,13 @@ private let page = """
         guard ContinuousClock.now < deadline else { throw CancellationError() }
         try await Task.sleep(for: .milliseconds(50))
     }
+    // One filter keeps the default band, across the middle of the window. The other has a band the game placed.
     let applied = try await webView.callAsyncJavaScript("""
-        const filter = new PIXI.filters.TiltShiftAxisFilter();
-        filter.apply();
-        return filter.applied;
-        """, arguments: [:], contentWorld: .page) as? [Int]
-    #expect(applied == [916, 524])
+        const fallback = new PIXI.filters.TiltShiftAxisFilter();
+        const placed = new PIXI.filters.TiltShiftAxisFilter(new PIXI.Point(0, 205.5), new PIXI.Point(600, 205.5));
+        fallback.apply();
+        placed.apply();
+        return [fallback.applied, placed.applied];
+        """, arguments: [:], contentWorld: .page) as? [[Double]]
+    #expect(applied == [[916, 524, 262, 262], [916, 524, 205.5, 205.5]])
 }

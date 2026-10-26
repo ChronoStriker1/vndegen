@@ -32,7 +32,16 @@
     // pixi-filters' tilt-shift takes window.innerWidth and innerHeight, read once when the filter is made, as the size
     // of what it blurs, and blurs more the further a pixel is from its sharp band in that size. NW.js opens the window
     // at the game's resolution, which is what games are tuned for. Here the window is the whole view, so on an iPad the
-    // blur spread over half the game, the more so when the game started in portrait. This uses the game's resolution.
+    // blur spread over half the game, the more so when the game started in portrait. This uses the game's resolution,
+    // and moves a band left at its default, half the window's height, to half the game's.
+    function fitToGame(uniforms) {
+        const { texSize, start, end } = uniforms;
+        const width = window.Graphics.width, height = window.Graphics.height;
+        if (texSize.x === width && texSize.y === height) return;
+        const middle = texSize.y / 2;
+        if (start.x === 0 && start.y === middle && end.x === 600 && end.y === middle) start.y = end.y = height / 2;
+        texSize.set(width, height);
+    }
     let pixi;
     Object.defineProperty(window, 'PIXI', {
         configurable: true,
@@ -45,9 +54,7 @@
             const apply = filter.prototype.apply;
             filter.prototype.apply = function () {
                 const tiltShift = pixi.filters && pixi.filters.TiltShiftAxisFilter;
-                if (tiltShift && this instanceof tiltShift && window.Graphics) {
-                    this.uniforms.texSize.set(window.Graphics.width, window.Graphics.height);
-                }
+                if (tiltShift && this instanceof tiltShift && window.Graphics) fitToGame(this.uniforms);
                 return apply.apply(this, arguments);
             };
         },
