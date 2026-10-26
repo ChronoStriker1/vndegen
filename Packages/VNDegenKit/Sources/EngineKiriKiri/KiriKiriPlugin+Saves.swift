@@ -26,28 +26,73 @@ extension KiriKiriPlugin {
     }
 
     /// The save folder in the game's root as path components: `savedata`, or the folder the `-datapath` option of the
-    /// game's `<exe>.cf` names, resolved the way change 30 in `Engines/KiriKiri/UPSTREAM.md` does. Nil when that folder
-    /// is in the AppData or Documents stand-in, whose own locations cover it, or is the root itself, which holds the
-    /// game's files too.
+    /// game's `<exe>.cf` names, resolved as `TVPResolveDataPath` in `Engines/KiriKiri/krkrsdl3/core/utils/TVPSettings.cpp`
+    /// resolves it. Nil when that folder is in the AppData or Documents stand-in, whose own locations cover it, or is
+    /// the root itself, which holds the game's files too.
     nonisolated static func saveFolder(_ paths: KiriKiriPaths) -> [String]? {
-        guard let option = configuredDataPath(gameRoot: paths.gameRoot), !option.isEmpty else { return ["savedata"] }
         let root = paths.gameRoot.path + "/"
+        guard let realRoot = realFolderPath(root) else { return ["savedata"] }
+        guard let option = configuredDataPath(gameRoot: paths.gameRoot), !option.isEmpty else { return ["savedata"] }
         var path = option
-        for (macro, folder) in [("$(exepath)", root), ("$(personalpath)", paths.documents.path), ("$(appdatapath)", paths.appData.path),
-                                ("$(vistapath)", paths.appData.path), ("$(savedgamespath)", paths.documents.path)] {
-            path = path.replacingOccurrences(of: macro, with: folder.hasSuffix("/") ? String(folder.dropLast()) : folder)
+        for (macro, folder) in [("$(exepath)", paths.gameRoot), ("$(personalpath)", paths.documents), ("$(appdatapath)", paths.appData),
+                                ("$(vistapath)", paths.appData), ("$(savedgamespath)", paths.documents)] {
+            path = path.replacingOccurrences(of: macro, with: folder.path)
         }
         path = path.replacingOccurrences(of: "\\", with: "/")
         if !path.hasPrefix("/") { path = root + path }
         if !path.hasSuffix("/") { path += "/" }
-        // The engine ignores a path that could leave the game's folders, and keeps `savedata`.
-        guard !path.contains("/../"), !path.contains(":"), let folders = storageFolders(path) else { return ["savedata"] }
-        let inside = { (folder: URL) in
-            let top = storageFolders(folder.path) ?? []
-            return folders.starts(with: top) ? Array(folders.dropFirst(top.count)) : nil
+        // The engine keeps `savedata` for a path it cannot resolve, or whose real folder leaves the game's folders.
+        guard !path.contains(":"), let real = resolveFolder(path), resolveFolder(real) == real else { return ["savedata"] }
+        if real.hasPrefix(realRoot) {
+            let rest = real.dropFirst(realRoot.count).split(separator: "/").map(String.init)
+            return rest.isEmpty ? nil : rest
         }
-        if let rest = inside(paths.gameRoot) { return rest.isEmpty ? nil : rest.map(String.init) }
-        return inside(paths.appData) != nil || inside(paths.documents) != nil ? nil : ["savedata"]
+        let userFolders = [paths.appData, paths.documents].compactMap { realFolderPath($0.path + "/") }
+        return userFolders.contains(where: real.hasPrefix) ? nil : ["savedata"]
+    }
+
+    /// The real folder a storage path names, as `TVPResolveFolder` reads it: dots as `storageFolders` reads them, then
+    /// each existing name as `localName` matches it, then symbolic links. Nil when the path climbs above the top, is in
+    /// an archive, or does not resolve.
+    nonisolated private static func resolveFolder(_ path: String) -> String? {
+        guard !path.contains(">"), let folders = storageFolders(path) else { return nil }
+        return realFolderPath(localName(folders))
+    }
+
+    /// The path of `folders` as the engine's file storage names it: each name that exists takes the spelling of the
+    /// first entry in its folder that matches it, ignoring ASCII case, and the names from the first that matches none
+    /// stay as given, with a closing slash.
+    nonisolated private static func localName(_ folders: [Substring]) -> String {
+        let lowered = { (name: Substring) in name.utf8.map { (65...90).contains($0) ? $0 + 32 : $0 } }
+        var name = ""
+        for (index, folder) in folders.enumerated() {
+            name += "/"
+            let wanted = lowered(folder)
+            guard let entries = try? FileManager.default.contentsOfDirectory(atPath: name),
+                  let match = entries.first(where: { lowered($0[...]) == wanted })
+            else { return name + folders[index...].joined(separator: "/") + "/" }
+            name += match
+        }
+        return name
+    }
+
+    /// `path`, which need not exist, with symbolic links resolved as `TVPRealFolderPath` resolves them: the real path of
+    /// its deepest existing folder, then the rest, ending in a slash. Nil when part of it exists but does not resolve to
+    /// a folder, such as a link to nowhere or a file.
+    nonisolated private static func realFolderPath(_ path: String) -> String? {
+        var path = path, rest = "", status = stat()
+        while true {
+            if let real = realpath(path, nil) {
+                defer { free(real) }
+                guard stat(real, &status) == 0, status.st_mode & S_IFMT == S_IFDIR else { return nil }
+                let folder = String(cString: real)
+                return (folder.hasSuffix("/") ? folder : folder + "/") + rest
+            }
+            while path.count > 1, path.hasSuffix("/") { path.removeLast() }
+            guard lstat(path, &status) != 0, let slash = path.lastIndex(of: "/") else { return nil }
+            rest = String(path[path.index(after: slash)...]) + "/" + rest
+            path = String(path[...slash])
+        }
     }
 
     /// The folders of `path` as KiriKiri resolves a storage name: a folder named only with dots climbs one folder fewer

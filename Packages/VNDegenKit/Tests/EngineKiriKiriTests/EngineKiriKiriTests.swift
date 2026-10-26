@@ -234,6 +234,48 @@ private let movedSavesConfig = Data("""
     }
 }
 
+/// `path` with its symbolic links resolved, as the engine sees it.
+private func realPath(_ path: String) throws -> String {
+    let real = try #require(realpath(path, nil))
+    defer { free(real) }
+    return String(cString: real)
+}
+
+@Test func mapsTheSaveFolderOfEachDataPathCaseTheEngineSavesIn() throws {
+    let table = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/datapath-cases.tsv")
+    let rows = try String(contentsOf: table, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") }
+    #expect(rows.count > 20)
+    for row in rows {
+        let columns = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+        try #require(columns.count == 4, "\(row)")
+        let (name, datapath, setup, saves) = (columns[0], columns[1], columns[2], columns[3])
+        let caseFolder = try folder(["a/game/game.exe": Data(), "a/game/game.cf": Data("datapath=\(datapath)\n".utf8), "a/game/data.xp3": xp3])
+        let game = caseFolder.appendingPathComponent("a/game", isDirectory: true)
+        for made in ["data/AppData", "data/Documents", "victim"] {
+            try FileManager.default.createDirectory(at: caseFolder.appendingPathComponent(made), withIntermediateDirectories: true)
+        }
+        for item in setup.split(separator: " ") where item != "-" {
+            if let arrow = item.range(of: "->") {
+                try FileManager.default.createSymbolicLink(atPath: game.appendingPathComponent(String(item[..<arrow.lowerBound])).path,
+                                                           withDestinationPath: String(item[arrow.upperBound...]))
+            } else {
+                try FileManager.default.createDirectory(at: game.appendingPathComponent(String(item)), withIntermediateDirectories: true)
+            }
+        }
+        let locations = KiriKiriPlugin().saveLocations(folder: game, dataDirectory: caseFolder.appendingPathComponent("data"))
+        let expected = try realPath(caseFolder.path) + "/" + saves, realGame = try realPath(game.path)
+        if expected == realGame || saves.hasPrefix("data/") {
+            // The root holds the game's files too, and the AppData and Documents locations cover their own folders.
+            #expect(locations.map { $0.directory.lastPathComponent } == ["AppData", "Documents"], "\(name): \(datapath)")
+        } else {
+            let directory = locations[0].directory.standardizedFileURL.path
+            #expect(locations.count == 3 && realGame + directory.dropFirst(game.standardizedFileURL.path.count) == expected,
+                    "\(name): \(datapath) maps \(directory)")
+        }
+        try FileManager.default.removeItem(at: caseFolder)
+    }
+}
+
 @Test func readsTheConfigOfTheExecutableTheEngineRuns() throws {
     // With several executables and no .cf of their own, the engine reads no .cf.
     let ambiguous = try folder(["game.exe": Data(), "config.exe": Data(), "other.cf": Data("datapath=save".utf8)])

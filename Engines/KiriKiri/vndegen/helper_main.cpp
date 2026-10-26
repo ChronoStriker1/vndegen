@@ -1,6 +1,7 @@
 // KiriKiriHelper: the process VNDegen's macOS app runs a KiriKiri game in.
-//   KiriKiriHelper --game-root <dir> --data <path> [--log <file>]
-// SIGTERM closes the game through its normal close path, so it saves its system data, and the
+//   KiriKiriHelper --game-root <dir> --data <path> [--log <file>] [--app-data <dir>] [--documents <dir>]
+// --app-data and --documents name the folders that stand in for AppData and Documents, as VNDegen's
+// data directory does; without them, the game root stands in. SIGTERM closes the game through its normal close path, so it saves its system data, and the
 // helper exits once the game has quit or after quitTimeout. SIGUSR1 pauses the game and SIGUSR2
 // resumes it, through vnkk_set_paused as the app's pause does, for tests.
 #include "vnkk.h"
@@ -29,9 +30,14 @@ int main(int argc, char *argv[])
             launch.projectData = argv[i + 1];
         else if (!strcmp(argv[i], "--log"))
             launch.logPath = argv[i + 1];
+        else if (!strcmp(argv[i], "--app-data"))
+            launch.appDataDir = argv[i + 1];
+        else if (!strcmp(argv[i], "--documents"))
+            launch.personalDir = argv[i + 1];
     }
     if (!launch.gameRoot || !launch.projectData) {
-        fprintf(stderr, "usage: %s --game-root <dir> --data <path> [--log <file>]\n", argv[0]);
+        fprintf(stderr, "usage: %s --game-root <dir> --data <path> [--log <file>] [--app-data <dir>] [--documents <dir>]\n",
+                argv[0]);
         return 2;
     }
     std::signal(SIGTERM, [](int) { terminateRequested = 1; });

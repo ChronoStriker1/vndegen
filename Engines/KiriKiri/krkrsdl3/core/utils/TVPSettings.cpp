@@ -360,26 +360,30 @@ static void TVPReadConfigFileOptions(const ttstr& exe)
 }
 
 // A native folder path, which need not exist yet, with symbolic links resolved: the real path of its
-// deepest existing folder, then the rest. Ends in a slash. Empty for a path that exists but cannot be
-// resolved, such as a link to nowhere.
+// deepest existing folder, then the rest. Ends in a slash. Empty for a path whose deepest existing
+// part is not a folder, such as a link to nowhere or a file.
 static std::string TVPRealFolderPath(std::string path)
 {
     std::string rest;
     for (;;)
     {
         char real[PATH_MAX];
+        struct stat st;
         if (realpath(path.c_str(), real))
         {
+            // realpath takes a file named with a closing slash, and no folder can be under a file.
+            if (stat(real, &st) != 0 || !S_ISDIR(st.st_mode))
+                return std::string();
             std::string folder = real;
             if (folder.back() != '/')
                 folder += '/';
             return folder + rest;
         }
-        struct stat st;
-        if (lstat(path.c_str(), &st) == 0)
-            return std::string();
+        // lstat follows a link named with a closing slash, so a link to nowhere would read as missing.
         while (path.size() > 1 && path.back() == '/')
             path.pop_back();
+        if (lstat(path.c_str(), &st) == 0)
+            return std::string();
         size_t slash = path.rfind('/');
         if (slash == std::string::npos)
             return std::string();
@@ -419,6 +423,10 @@ static ttstr TVPResolveDataPath(ttstr path, const ttstr& appData, const ttstr& p
     path.Replace(TJS_N("\\"), TJS_N("/"));
     if (!path.StartsWith(TJS_N("/")))
         path = root + path;
+    // The path names a folder. Without a closing slash, the storage name normalizer leaves a last
+    // "." or ".." unresolved.
+    if (path.GetLastChar() != TJS_N('/'))
+        path += TJS_N("/");
     if (path.IndexOf(TJS_N(':')) >= 0)
         return ttstr();
     // The folder the engine will write to, which must also read back as itself, as it will be when

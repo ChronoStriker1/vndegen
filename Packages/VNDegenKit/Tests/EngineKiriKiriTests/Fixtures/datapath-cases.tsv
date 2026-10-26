@@ -1,0 +1,37 @@
+# Where a KiriKiri game saves when its <exe>.cf names a datapath. The engine (scripts/kirikiri-datapath-check.sh)
+# and VNDegen's save mapping (mapsTheSaveFolderOfEachDataPathCaseTheEngineSavesIn in EngineKiriKiriTests) must both pick the
+# folder in the last column. Columns, split by tabs: the case's name; the value after datapath= as the .cf writes it;
+# what the case makes in the game folder first, "name/" a folder and "name->target" a symbolic link, or "-" for
+# nothing; and the folder the saves go to. Each case's folder holds the game in a/game/, the AppData and Documents
+# stand-ins in data/AppData/ and data/Documents/, and an empty victim/. A path that leaves the game's folders, or
+# does not resolve, keeps savedata/.
+inside	$(exepath)/saves	-	a/game/saves
+relative	save/slot	-	a/game/save/slot
+backslashes	$(exepath)\save\	-	a/game/save
+quoted	"$(exepath)\\save"	-	a/game/save
+root	$(exepath)	-	a/game
+trailing-slashes	$(exepath)/save//	-	a/game/save
+dot	$(exepath)/./save/.	-	a/game/save
+dotdot-inside	$(exepath)/a/../save	-	a/game/save
+dotdot-at-end	$(exepath)/save/..	-	a/game
+dotdot-out	$(exepath)/../saves	-	a/game/savedata
+dots-inside	$(exepath)/x/y/.../saves	-	a/game/saves
+dots-out	$(exepath)/.../victim/savedata	-	a/game/savedata
+above-top	$(exepath)/../../../../../../../../../../../../../../../../../../../../save	-	a/game/savedata
+other-case	$(exepath)/SAVES	saves/	a/game/saves
+link-inside	$(exepath)/inner	real/ inner->real	a/game/real
+link-out	$(exepath)/link/savedata	link->../../victim	a/game/savedata
+link-out-itself	$(exepath)/link/	link->../../victim	a/game/savedata
+link-then-dotdot	$(exepath)/link/../save	link->../../victim	a/game/save
+dangling-link	$(exepath)/link/savedata	link->../../nowhere	a/game/savedata
+dangling-link-itself	$(exepath)/link/	link->../../nowhere	a/game/savedata
+link-loop	$(exepath)/loop/save	loop->loop	a/game/savedata
+under-a-file	$(exepath)/game.exe/save	-	a/game/savedata
+in-an-archive	$(exepath)/data.xp3>save	-	a/game/savedata
+appdata	$(appdatapath)/Studio/Game	-	data/AppData/Studio/Game
+vistapath	$(vistapath)\Studio	-	data/AppData/Studio
+personal	$(personalpath)/Studio	-	data/Documents/Studio
+savedgames	$(savedgamespath)/Studio	-	data/Documents/Studio
+appdata-out	$(appdatapath)/../../victim	-	a/game/savedata
+drive	C:\saves	-	a/game/savedata
+outside	../../victim	-	a/game/savedata
