@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Runs on a Mac. Checks two things zz_vndegen.rpy does, on both bundled runtimes, with a small Ren'Py project written to
+# Runs on a Mac. Checks three things zz_vndegen.rpy does, on both bundled runtimes, with a small Ren'Py project written to
 # a temporary folder:
 # - SIGTERM, which VNDegen sends when the player quits from the hub or quits VNDegen, quits the game without Ren'Py's
 #   quit prompt, after an autosave and with the persistent data written;
-# - a stick direction remapped to a key releases that key when the stick reverses straight to the other direction.
+# - a stick direction remapped to a key releases that key when the stick reverses straight to the other direction;
+# - a button remapped to another Xbox button gets that button's Ren'Py bindings, and View keeps Ren'Py's own.
 #   scripts/renpy-hook-test.sh [--keep]
 # --keep leaves the project, logs, and screenshots in the temporary folder and prints its path.
 set -euo pipefail
@@ -42,6 +43,8 @@ label main_menu:
     return
 
 label start:
+    $ bindings = config.pad_bindings
+    $ open(os.path.join(os.environ["VNDEGEN_DATA"], "bindings.txt"), "w").write("%r\n" % (bindings["pad_b_press"] == bindings["pad_a_press"] and "vndegen_menu" not in bindings.get("pad_back_press", [])))
     "Line one."
     "Line two."
     return
@@ -55,7 +58,7 @@ for runtime in 8 7; do
   mkdir -p "$data" "$probe"
   python=$(echo "build/renpy/$runtime"/lib/py*-mac-universal/python)
   env -u PYTHONHOME -u PYTHONPATH PYTHONDONTWRITEBYTECODE=1 VNDEGEN_RENPY_RUNTIME="$PWD/build/renpy/$runtime" \
-    VNDEGEN_DATA="$data" VNDEGEN_WINDOW=80,80,640,360 VNDEGEN_BUTTONS=up=key:K_w,down=key:K_s VNDEGEN_PROBE="$probe" \
+    VNDEGEN_DATA="$data" VNDEGEN_WINDOW=80,80,640,360 VNDEGEN_BUTTONS=leftStickUp=key:K_w,leftStickDown=key:K_s,b=pad:a VNDEGEN_PROBE="$probe" \
     VNDEGEN_PROBE_STEPS="wait:2 axis:lefty:neg axis:lefty:pos axis:lefty:zero wait:1 shot:ready" \
     "$python" Packages/VNDegenKit/Sources/EngineRenPy/Support/launcher.py "$work/game" > "$data/stdout.txt" 2>&1 &
   pid=$!
@@ -77,6 +80,7 @@ for runtime in 8 7; do
   [ "$data/saves/persistent" -nt "$work/signal-$runtime" ] || fail "persistent data not written on quit"
   keys=$(tr '\n' ' ' < "$data/keys.txt" 2>/dev/null || true)
   [ "$keys" = "down w up w down s up s " ] || fail "stick reversal posted '$keys', expected 'down w up w down s up s '"
+  [ "$(cat "$data/bindings.txt" 2>/dev/null)" = True ] || fail "B did not get A's bindings, or View opens the VNDegen menu"
   echo "Ren'Py $runtime: exit $status, saves: $(ls "$data/saves" | tr '\n' ' '), keys: $keys"
 done
 [ "$failed" = 0 ] && echo PASS

@@ -12,17 +12,17 @@ public final class InputHub {
     /// The current consumer: hub navigation or the running game. Set by whoever owns the screen.
     /// Replacing it sends the outgoing consumer a release for every button it still holds,
     /// and the new consumer sees nothing from those buttons until they are pressed again. Events with no consumer are dropped.
-    /// Replacing it also restores the standard button mapping.
+    /// Replacing it also restores the hub's navigation layout.
     @ObservationIgnored public var onEvent: ((ControllerEvent) -> Void)? {
         didSet {
             repeatTask?.cancel()
             for event in router.detachConsumer() { oldValue?(event) }
-            buttonMapping = ButtonMapping()
+            buttonMapping = nil
         }
     }
-    /// What controller buttons do. A running game sets its own mapping while it has input. The hub's screens and the
-    /// in-game menu keep the standard one, so a remapped button can never block their navigation.
-    @ObservationIgnored public var buttonMapping = ButtonMapping()
+    /// What controller and touch gamepad buttons do. A running game sets its own mapping while it has input. Nil is
+    /// the navigation layout of the hub's screens and the in-game menu, so a remapped button can never block them.
+    @ObservationIgnored public var buttonMapping: ButtonMapping?
     /// When false, keyboard keys are left to the focused view (a running web game reads them itself).
     /// Only `InputMapping.hubKey` is still translated.
     public var translatesKeyboard = true
@@ -32,7 +32,7 @@ public final class InputHub {
     public private(set) var controllerNames: [String] = []
 
     @ObservationIgnored private var router = PressRouter()
-    @ObservationIgnored private var sticks: [ObjectIdentifier: StickDirections] = [:]
+    @ObservationIgnored private var sticks: [ObjectIdentifier: [StickDirections]] = [:]
     @ObservationIgnored private var repeatTask: Task<Void, Never>?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
@@ -57,7 +57,7 @@ public final class InputHub {
     /// A touch gamepad button went down or up, or the touch Home button when `input` is nil. Touch buttons share the
     /// controllers' press tracking, so a touch button and a controller button doing the same thing make one press.
     public func touch(_ input: ControlInput?, pressed: Bool) {
-        receive(.touch(input), pressed ? input.map(buttonMapping.action) ?? .button(.hub) : nil, kind: .touch)
+        receive(.touch(input), pressed ? input?.action(in: buttonMapping) ?? .button(.hub) : nil, kind: .touch)
     }
 
     /// A pointer or scroll event from the touch cursor. These hold no button the router tracks, so they go straight to
@@ -110,12 +110,14 @@ public final class InputHub {
         for (input, direction) in dpad {
             input.pressedChangedHandler = { [weak self] _, _, pressed in
                 guard let self else { return }
-                receive(.dpad(id, direction), pressed ? buttonMapping.action(for: direction) : nil, kind: .gamepad)
+                receive(.dpad(id, direction), pressed ? direction.action(in: buttonMapping) : nil, kind: .gamepad)
             }
         }
-        sticks[id] = StickDirections()
-        pad.leftThumbstick.valueChangedHandler = { [weak self] _, x, y in
-            self?.moveStick(id, x: x, y: y)
+        sticks[id] = Stick.allCases.map(StickDirections.init)
+        for (index, stick) in Stick.allCases.enumerated() {
+            stick.input(on: pad).valueChangedHandler = { [weak self] _, x, y in
+                self?.moveStick(id, index, x: x, y: y)
+            }
         }
     }
 
@@ -126,12 +128,10 @@ public final class InputHub {
         sticks[id] = nil
     }
 
-    private func moveStick(_ id: ObjectIdentifier, x: Float, y: Float) {
-        guard var stick = sticks[id] else { return }
-        let changes = stick.update(x: x, y: y)
-        sticks[id] = stick
+    private func moveStick(_ id: ObjectIdentifier, _ index: Int, x: Float, y: Float) {
+        guard let changes = sticks[id]?[index].update(x: x, y: y) else { return }
         for (direction, pressed) in changes {
-            receive(.stick(id, direction), pressed ? buttonMapping.action(for: direction) : nil, kind: .gamepad)
+            receive(.stick(id, direction), pressed ? direction.action(in: buttonMapping) : nil, kind: .gamepad)
         }
     }
 

@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import VNCore
+import GameInput
 import HubUI
 import EngineRPGMaker
 import notify
@@ -15,6 +16,7 @@ import AppKit
 ///   -demoInput "down,right"  plays controller presses after launch, 0.6 s apart ("wait" pauses one step)
 ///   notifyutil -p vndegen.input.down   presses one controller button while the app runs, through
 ///                            `xcrun simctl spawn <device> notifyutil -p ...` on a simulator
+///   notifyutil -p vndegen.touch.l2.down   presses a touch gamepad button, and .up releases it, as a finger would
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
@@ -39,6 +41,14 @@ enum DebugHooks {
 
     /// Registers one Darwin notification per button. The tokens live for the app's lifetime.
     static func listenForInput(_ hub: Hub) {
+        for input in ControlInput.allCases where input.isOnTouchGamepad {
+            for pressed in [true, false] {
+                var token: Int32 = 0
+                notify_register_dispatch("vndegen.touch.\(input.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
+                    MainActor.assumeIsolated { hub.input.touch(input, pressed: pressed) }
+                }
+            }
+        }
         for button in VirtualButton.allCases {
             var token: Int32 = 0
             notify_register_dispatch("vndegen.input.\(button.rawValue)", &token, .main) { _ in

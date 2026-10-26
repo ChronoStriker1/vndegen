@@ -1,6 +1,8 @@
 import Foundation
 import Testing
+import VNCore
 import WebKit
+@testable import WebRuntime
 
 /// A blank page with the real shim injected, logging the key and mouse events that reach it.
 @MainActor
@@ -59,4 +61,65 @@ private final class ShimPage {
     try await page.run("document.body.dispatchEvent(new PointerEvent('pointermove', { clientX: 120, clientY: 80, bubbles: true }))")
     try await page.run("__vndegen.click('began', 0); __vndegen.click('ended', 0)")
     #expect(try await page.takeLog() == ["mousedown 120,80", "mouseup 120,80"])
+}
+
+@Test @MainActor func gamepadButtonsReachThePageAsAStandardXboxGamepad() async throws {
+    let page = try await ShimPage()
+    let state = "JSON.stringify(navigator.getGamepads().map((p) => ({ id: p.id, mapping: p.mapping, connected: p.connected, index: p.index, pressed: p.buttons.flatMap((b, i) => (b.pressed && b.value === 1 ? [i] : [])), axes: p.axes, count: p.buttons.length })))"
+    try await page.run("window.connects = 0; window.addEventListener('gamepadconnected', (e) => { connects++; window.announced = e.gamepad.mapping; })")
+    // Like a browser, the page sees no gamepad before its first press.
+    #expect(try await page.run("navigator.getGamepads().length") as? Int == 0)
+
+    try await page.run(WebGameSession.gamepadScript(.a, pressed: true))
+    try await page.run(WebGameSession.gamepadScript(.l2, pressed: true))
+    try await page.run(WebGameSession.gamepadScript(.view, pressed: true))
+    try await page.run(WebGameSession.gamepadScript(.leftStickUp, pressed: true))
+    try await page.run(WebGameSession.gamepadScript(.rightStickRight, pressed: true))
+    let held = try #require(try await page.run(state) as? String)
+    #expect(held.contains(#""mapping":"standard","connected":true,"index":0,"pressed":[0,6,8],"axes":[0,-1,1,0],"count":17"#), "\(held)")
+    #expect(held.contains("STANDARD GAMEPAD"))
+    #expect(try await page.run("connects") as? Int == 1)
+    #expect(try await page.run("announced") as? String == "standard")
+    // Each call is a new snapshot, so a game can compare it with the last one.
+    #expect(try await page.run("navigator.getGamepads()[0] !== navigator.getGamepads()[0]") as? Bool == true)
+
+    for input in [ControlInput.a, .l2, .view, .leftStickUp, .rightStickRight] {
+        try await page.run(WebGameSession.gamepadScript(input, pressed: false))
+    }
+    #expect(try await page.run(state) as? String == #"[{"id":"Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)","mapping":"standard","connected":true,"index":0,"pressed":[],"axes":[0,0,0,0],"count":17}]"#)
+    #expect(try await page.run("connects") as? Int == 1)
+}
+
+@Test @MainActor func everyXboxButtonMovesTheVirtualGamepad() async throws {
+    let page = try await ShimPage()
+    let snapshot = "JSON.stringify(navigator.getGamepads().map((p) => [p.buttons.map((b) => b.pressed), p.axes]))"
+    try await page.run(WebGameSession.gamepadScript(.a, pressed: false))
+    let idle = try await page.run(snapshot) as? String
+    for input in ControlInput.allCases {
+        try await page.run(WebGameSession.gamepadScript(input, pressed: true))
+        #expect(try await page.run(snapshot) as? String != idle, "\(input)")
+        try await page.run(WebGameSession.gamepadScript(input, pressed: false))
+        #expect(try await page.run(snapshot) as? String == idle, "\(input)")
+    }
+}
+
+@Test @MainActor func touchMovesTheMouseToItFirst() async throws {
+    let page = try await ShimPage()
+    try await page.run("""
+        document.addEventListener('mousemove', (e) => log.push('mousemove ' + e.clientX + ',' + e.clientY));
+        document.addEventListener('touchstart', () => log.push('touchstart'));
+        """)
+    // The Mac's WebKit has no TouchEvent, so a plain event carries the touch.
+    let touch = { (type: String, x: Int) in
+        """
+        const touch = new Event('\(type)', { bubbles: true });
+        Object.defineProperty(touch, 'changedTouches', { value: [{ clientX: \(x), clientY: 80, screenX: \(x), screenY: 80 }] });
+        document.body.dispatchEvent(touch);
+        """
+    }
+    try await page.run(touch("touchstart", 120))
+    #expect(try await page.takeLog() == ["mousemove 120,80", "touchstart"])
+    // A drag leaves the mouse where the touch began.
+    try await page.run(touch("touchmove", 140))
+    #expect(try await page.takeLog() == [])
 }

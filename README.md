@@ -20,7 +20,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Engine detection.** Each engine is a plugin that recognizes its own files, such as `js/rmmz_core.js` for RPG Maker MZ. The game page shows the detected engine and the file that identified it. Games with no detected engine can be assigned one by hand.
 - **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, and genres from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
 - **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place.
-- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Each game also has its own button mapping: any overlay or controller button can send a gamepad action, a keyboard key, or a mouse click.
+- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Every button reaches games as an Xbox controller button by default. Each game also has its own button mapping: any overlay or controller button can send another Xbox button, a keyboard key, or a mouse click.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
@@ -64,19 +64,26 @@ VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Setting
 
 ## Controls
 
-| Action | Controller | Keyboard in the library |
+In a game, the controller is an Xbox controller. Every button, from the touch gamepad or a real controller, reaches the game as the same Xbox button, and the game reads it with its own gamepad support. RPG Maker MV and MZ map a gamepad themselves, so A confirms, B cancels, X dashes, Y opens the menu, LB and RB turn pages, and the D-pad and left stick move. Like a real Xbox controller there, the Menu, View, and trigger buttons do nothing unless the game uses them.
+
+A TyranoScript game reads the gamepad when it turns that on in its Config.tjs (`useGamepad`), and each button its KeyConfig.js binds does what the game says. VNDegen turns every other button into the engine's own action: A reads on or presses the focused button, B cancels, X skips while held, Y and Menu open the game's menu, LB opens the backlog, RB turns auto mode on and off, and the D-pad and left stick move the focus. A Ren'Py game reads the controller itself in Ren'Py's own layout. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method.
+
+The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3, R3, and the sticks come from a real controller.
+
+| Action in the library and the VNDegen menu | Controller | Keyboard in the library |
 |---|---|---|
 | Move | D-pad or left stick | Arrows or WASD |
 | Confirm | A | Return or Space |
 | Cancel | B | Escape or Backspace |
 | Menu | Y or Menu | Tab |
-| Dash (in game) | X | |
-| Previous and next page | L1 and R1 | Q and E, or Page Up and Page Down |
-| VNDegen menu (resume or quit to library) | Options or Home | Backtick (`` ` ``) |
+| Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
+| Open the VNDegen menu in a game (resume or quit to library) | Home, and View while the menu is open | Backtick (`` ` ``) |
 
-The controller layout is the same in the library and in games. While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. Only the backtick is reserved for VNDegen. A Ren'Py game reads the controller itself in Ren'Py's own layout, except that Options and Home open the VNDegen menu, inside the game. Buttons remapped for the game apply there too. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method. The small menu button in the corner opens the VNDegen menu.
+While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W.
 
-These are the standard mappings. In a game, the VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor. Options, Home, the overlay's Home button, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. A remapped overlay button shows its key, for example "Esc".
+Each game has its own button mapping. The VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor, which lists every Xbox button. Each button can send another Xbox button, a keyboard key, a mouse click, or nothing. At the top of the editor, "RPG Maker controls" maps the buttons to the keys RPG Maker reads: A to Return, B to Escape, X to Shift, Y and Menu to X, LB to Q, RB to W, and the D-pad and left stick to the arrows. Return confirms in every RPG Maker, where XP uses Z for another button, and Escape and X both cancel and open the menu. "Reset to gamepad defaults" clears every remap. Ren'Py applies the mapping too. A remapped touch button shows what it sends, for example "Esc".
+
+A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. Remaps saved by earlier versions, which sent actions such as Confirm, convert on first launch to what those actions sent in the game's engine, so remapped games play the same: the Return key in RPG Maker, the matching Xbox button in Ren'Py, and the same TyranoScript action in TyranoScript.
 
 <p align="center">
   <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a D-pad, A B X Y buttons, shoulder buttons, and menu buttons over No Socks RPG gameplay, with the party on the beach map">

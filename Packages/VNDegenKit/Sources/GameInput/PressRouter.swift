@@ -5,6 +5,7 @@ import VNCore
 nonisolated enum InputSource: Hashable, Sendable {
     case gamepad(ObjectIdentifier, GamepadElement)
     case dpad(ObjectIdentifier, ControlInput)
+    /// A stick direction, such as `.leftStickUp`.
     case stick(ObjectIdentifier, ControlInput)
     case key(Int)
     case touch(ControlInput?)
@@ -96,11 +97,16 @@ nonisolated struct StickDirections {
     static let pressThreshold: Float = 0.5
     static let releaseThreshold: Float = 0.3
 
+    let stick: Stick
     private(set) var active: Set<ControlInput> = []
+
+    init(_ stick: Stick) {
+        self.stick = stick
+    }
 
     /// Releases come first, so flicking from left to right releases left before pressing right.
     mutating func update(x: Float, y: Float) -> [(ControlInput, pressed: Bool)] {
-        let axes: [(ControlInput, Float)] = [(.right, x), (.left, -x), (.up, y), (.down, -y)]
+        let axes: [(ControlInput, Float)] = [(stick.right, x), (stick.left, -x), (stick.up, y), (stick.down, -y)]
         var releases: [(ControlInput, pressed: Bool)] = []
         var presses: [(ControlInput, pressed: Bool)] = []
         for (direction, value) in axes {

@@ -1,5 +1,6 @@
 import SwiftUI
 import VNCore
+import GameInput
 
 struct GamePageView: View {
     @Environment(Hub.self) private var hub
@@ -241,7 +242,8 @@ private struct ControlsSection: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Button mapping")
                         .font(.system(size: 17, weight: .bold))
-                    Text(remapped == 0 ? "Standard layout" : remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped")
+                    Text(remapped == 0 ? "Xbox gamepad" : ButtonMapping(game.buttonMapping) == .rpgMaker ? "RPG Maker controls"
+                         : remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.secondaryText)
                 }

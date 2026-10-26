@@ -40,6 +40,7 @@ public final class Hub {
         self.lock = lock
         self.saveSync = saveSync
         ControlMethod.migrateTouchControlsSetting()
+        ButtonMapping.convertLegacyMappings(in: library)
     }
 
     /// Rescans the games folder and the archives beside it, then looks up metadata for games that have none, without

@@ -53,12 +53,13 @@ nonisolated public struct RenPyCommand: Sendable {
         self.environment = environment
     }
 
-    /// The remapped buttons as `zz_vndegen.rpy` reads them, such as `a=key:K_z,b=click:3,x=button:confirm,y=nothing`.
-    /// Nil when nothing is remapped.
+    /// The remapped buttons as `zz_vndegen.rpy` reads them, such as `a=key:K_z,b=click:3,x=pad:a,y=nothing`.
+    /// Nil when nothing is remapped. The hub converts engine-neutral actions from older versions before any launch.
     static func buttonsVariable(_ buttons: [ControlInput: ControlAction]) -> String? {
         let items = ControlInput.allCases.compactMap { input -> String? in
             let action: String? = switch buttons[input] {
-            case let .button(button)?: "button:\(button.rawValue)"
+            case let .gamepad(button)?: "pad:\(button.rawValue)"
+            case .button?: nil
             case let .key(key)?: pygameKey(key).map { "key:\($0)" }
             case .click(.primary)?: "click:1"
             case .click(.secondary)?: "click:3"

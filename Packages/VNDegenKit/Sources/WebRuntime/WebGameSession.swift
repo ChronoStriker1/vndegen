@@ -32,7 +32,8 @@ public struct WebGameConfiguration {
     public var storageDirectory: URL?
     /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
     public var decodesOgg: Bool
-    /// The JavaScript that delivers a button press or release to the game. Nil drops the button.
+    /// The JavaScript that delivers an engine-neutral button press or release to the game, as DEBUG input scripts send
+    /// them. Controllers reach the game as a gamepad instead. Nil drops the button.
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
     public var scriptArgument: String
@@ -217,7 +218,15 @@ final class WebGameSession: NSObject, EngineSession {
         case let .click(button, pressed):
             // The page clicks where the pointer is, which follows the real mouse too.
             run("__vndegen.click('\(pressed ? "began" : "ended")', \(Self.buttonNumber(button)))")
+        case let .gamepad(input, pressed):
+            run(Self.gamepadScript(input, pressed: pressed))
         }
+    }
+
+    /// Presses or releases a button of the page's virtual Xbox gamepad. The engine-neutral action goes along for engine
+    /// scripts that turn the gamepad into their own input when the game reads no gamepad.
+    nonisolated static func gamepadScript(_ input: ControlInput, pressed: Bool) -> String {
+        "__vndegen.gamepad('\(input.rawValue)', \(pressed), \(input.virtualButton.map { "'\($0.rawValue)'" } ?? "null"))"
     }
 
     /// Dispatches a real keydown or keyup, the same way engines deliver their own key strokes.

@@ -304,8 +304,10 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
 @Test func passesRemappedButtonsToTheHook() throws {
     let z = try #require(KeyboardKey.choices.first { $0.code == "KeyZ" })
     let up = try #require(KeyboardKey.choices.first { $0.code == "ArrowUp" })
-    let buttons: [ControlInput: ControlAction] = [.y: .nothing, .a: .key(z), .l: .key(up), .b: .click(.secondary), .x: .button(.confirm)]
-    #expect(RenPyCommand.buttonsVariable(buttons) == "a=key:K_z,b=click:3,x=button:confirm,y=nothing,l=key:K_UP")
+    let buttons: [ControlInput: ControlAction] = [
+        .y: .nothing, .a: .key(z), .l: .key(up), .b: .click(.secondary), .x: .gamepad(.a), .leftStickUp: .gamepad(.view),
+    ]
+    #expect(RenPyCommand.buttonsVariable(buttons) == "a=key:K_z,b=click:3,x=pad:a,y=nothing,l=key:K_UP,leftStickUp=pad:view")
     #expect(RenPyCommand.buttonsVariable([:]) == nil)
     #expect(KeyboardKey.choices.allSatisfy { RenPyCommand.pygameKey($0) != nil })
     #expect(KeyboardKey.choices.compactMap(RenPyCommand.pygameKey).filter { $0.hasPrefix("K_F") }.count == 12)
