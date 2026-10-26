@@ -26,6 +26,8 @@ public enum SSHError: LocalizedError, Equatable {
     case authenticationFailed(user: String)
     case unreachable(String)
     case commandRefused
+    /// The server sent nothing and took nothing for longer than the connection allows.
+    case timedOut
 
     public var errorDescription: String? {
         switch self {
@@ -35,6 +37,7 @@ public enum SSHError: LocalizedError, Equatable {
         case let .authenticationFailed(user): "The server did not accept VNDegen's key for \(user). Add the public key to that account's authorized_keys."
         case let .unreachable(detail): "Can't reach the server: \(detail)"
         case .commandRefused: "The server refused to run a command."
+        case .timedOut: "The server stopped answering, so VNDegen gave up."
         }
     }
 }
@@ -43,15 +46,18 @@ public enum SSHError: LocalizedError, Equatable {
 /// host key matches the pinned one.
 public final class SSHConnection: RsyncConnection {
     private let channel: Channel
+    private let idleTimeout: TimeAmount
 
-    private init(channel: Channel) {
+    private init(channel: Channel, idleTimeout: TimeAmount) {
         self.channel = channel
+        self.idleTimeout = idleTimeout
     }
 
     /// Connects and logs in. Throws `SSHError.unknownHostKey` with the presented key when `hostKey` is nil, so the caller
-    /// can ask the user to trust it and connect again with it pinned.
+    /// can ask the user to trust it and connect again with it pinned. A command that sends and receives nothing for
+    /// `idleTimeout`, including while the server opens its channel and accepts it, closes the whole connection.
     public static func connect(to server: SSHServer, key: Curve25519.Signing.PrivateKey, hostKey: String?,
-                               timeout: Duration = .seconds(15)) async throws -> SSHConnection {
+                               timeout: Duration = .seconds(15), idleTimeout: Duration = .seconds(30)) async throws -> SSHConnection {
         let outcome = ConnectionOutcome()
         let hostCheck = HostKeyCheck(pinned: hostKey, outcome: outcome)
         let login = KeyLogin(user: server.user, key: NIOSSHPrivateKey(ed25519Key: key), outcome: outcome)
@@ -72,13 +78,13 @@ public final class SSHConnection: RsyncConnection {
             throw SSHError.unreachable(error.localizedDescription)
         }
         outcome.channel = channel
-        let timer = channel.eventLoop.scheduleTask(in: .seconds(timeout.components.seconds)) {
+        let timer = channel.eventLoop.scheduleTask(in: TimeAmount(timeout)) {
             outcome.fail(.unreachable("no answer within \(timeout.components.seconds) seconds"))
         }
         defer { timer.cancel() }
         do {
             try await outcome.loggedIn.futureResult.get()
-            return SSHConnection(channel: channel)
+            return SSHConnection(channel: channel, idleTimeout: TimeAmount(idleTimeout))
         } catch {
             try? await channel.close()
             throw outcome.error ?? SSHError.unreachable(error.localizedDescription)
@@ -92,9 +98,16 @@ public final class SSHConnection: RsyncConnection {
     /// Runs `arguments` through the login shell, each one quoted.
     public func start(_ arguments: [String]) async throws -> any RsyncTransport {
         let command = arguments.map(Self.shellQuoted).joined(separator: " ")
-        let exec = ExecHandler(eventLoop: channel.eventLoop)
+        let exec = ExecHandler(eventLoop: channel.eventLoop, idleTimeout: idleTimeout)
         let created = channel.eventLoop.makePromise(of: Channel.self)
         let channel = channel
+        // A server that never opens the channel or never answers the exec request would leave both waits below open.
+        let deadline = channel.eventLoop.scheduleTask(in: idleTimeout) {
+            created.fail(SSHError.timedOut)
+            exec.accepted.fail(SSHError.timedOut)
+            channel.close(promise: nil)
+        }
+        defer { deadline.cancel() }
         try await channel.eventLoop.submit {
             try channel.pipeline.syncOperations.handler(type: NIOSSHHandler.self).createChannel(created, channelType: .session) { child, _ in
                 child.eventLoop.makeCompletedFuture {
@@ -103,7 +116,7 @@ public final class SSHConnection: RsyncConnection {
             }
         }.get()
         let child: Channel
-        do { child = try await created.futureResult.get() } catch { throw SSHError.commandRefused }
+        do { child = try await created.futureResult.get() } catch SSHError.timedOut { throw SSHError.timedOut } catch { throw SSHError.commandRefused }
         try await child.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).get()
         try await child.triggerUserOutboundEvent(SSHChannelRequestEvent.ExecRequest(command: command, wantReply: true)).get()
         try await exec.accepted.futureResult.get()
@@ -216,9 +229,13 @@ private final class LoginWatcher: ChannelInboundHandler, @unchecked Sendable {
 }
 
 /// One exec channel. Its data goes into `stream` as it arrives, and SSH's flow control window reopens as it is read, so
-/// the server never waits for VNDegen to read.
-private final class ExecHandler: ChannelInboundHandler, @unchecked Sendable {
+/// the server never waits for VNDegen to read. When nothing moves either way for `idleTimeout`, it ends the stream and
+/// the exit wait with `SSHError.timedOut` and closes the whole connection, because a stalled server may never answer
+/// a request to close just this channel.
+private final class ExecHandler: ChannelDuplexHandler, @unchecked Sendable {
     typealias InboundIn = SSHChannelData
+    typealias OutboundIn = SSHChannelData
+    typealias OutboundOut = SSHChannelData
 
     let stream: AsyncThrowingStream<[UInt8], any Error>
     private let continuation: AsyncThrowingStream<[UInt8], any Error>.Continuation
@@ -226,14 +243,47 @@ private final class ExecHandler: ChannelInboundHandler, @unchecked Sendable {
     let exited: EventLoopPromise<(status: Int32, errorOutput: String)>
     private var status: Int32?
     private var errorOutput = ""
+    private let idleTimeout: TimeAmount
+    // The fields below change only on the channel's event loop.
+    private var lastActivity = NIODeadline.now()
+    private var watchdog: RepeatedTask?
+    private let timedOutFlag = NIOLockedValueBox(false)
 
-    init(eventLoop: EventLoop) {
+    init(eventLoop: EventLoop, idleTimeout: TimeAmount) {
         (stream, continuation) = AsyncThrowingStream.makeStream()
         accepted = eventLoop.makePromise()
         exited = eventLoop.makePromise()
+        self.idleTimeout = idleTimeout
+    }
+
+    var timedOut: Bool { timedOutFlag.withLockedValue { $0 } }
+
+    func handlerAdded(context: ChannelHandlerContext) {
+        lastActivity = .now()
+        let channel = context.channel
+        let interval = min(idleTimeout, .seconds(1))
+        watchdog = context.eventLoop.scheduleRepeatedTask(initialDelay: interval, delay: interval) { [self] task in
+            guard NIODeadline.now() - lastActivity >= idleTimeout else { return }
+            task.cancel()
+            timedOutFlag.withLockedValue { $0 = true }
+            accepted.fail(SSHError.timedOut)
+            exited.fail(SSHError.timedOut)
+            continuation.finish(throwing: SSHError.timedOut)
+            (channel.parent ?? channel).close(promise: nil)
+        }
+    }
+
+    func handlerRemoved(context: ChannelHandlerContext) {
+        watchdog?.cancel()
+    }
+
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        lastActivity = .now()
+        context.write(data, promise: promise)
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        lastActivity = .now()
         let message = unwrapInboundIn(data)
         guard case let .byteBuffer(buffer) = message.data else { return }
         switch message.type {
@@ -244,6 +294,7 @@ private final class ExecHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        lastActivity = .now()
         switch event {
         case is ChannelSuccessEvent: accepted.succeed()
         case is ChannelFailureEvent: accepted.fail(SSHError.commandRefused)
@@ -259,6 +310,7 @@ private final class ExecHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     func channelInactive(context: ChannelHandlerContext) {
+        watchdog?.cancel()
         continuation.finish()
         accepted.fail(SSHError.commandRefused)
         // A server killed by a signal reports no exit status.
@@ -278,11 +330,22 @@ private final class ExecTransport: RsyncTransport {
     var output: AsyncThrowingStream<[UInt8], any Error> { exec.stream }
 
     func write(_ bytes: [UInt8]) async throws {
-        try await channel.writeAndFlush(SSHChannelData(type: .channel, data: .byteBuffer(ByteBuffer(bytes: bytes))))
+        do {
+            try await channel.writeAndFlush(SSHChannelData(type: .channel, data: .byteBuffer(ByteBuffer(bytes: bytes))))
+        } catch {
+            throw exec.timedOut ? SSHError.timedOut : error
+        }
     }
 
     func finish() async throws -> (status: Int32, errorOutput: String) {
         try await exec.exited.futureResult.get()
+    }
+}
+
+extension TimeAmount {
+    init(_ duration: Duration) {
+        let (seconds, attoseconds) = duration.components
+        self = .nanoseconds(seconds * 1_000_000_000 + attoseconds / 1_000_000_000)
     }
 }
 
