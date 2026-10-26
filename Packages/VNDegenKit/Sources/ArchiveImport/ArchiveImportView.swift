@@ -450,6 +450,12 @@ private struct StepView: View {
                 Text("\(summary(files: result.files, bytes: result.bytes)) in \(result.duration.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated)))")
                     .font(.system(size: 14))
                     .foregroundStyle(ImportTheme.secondaryText)
+                if !result.keptArchives.isEmpty {
+                    Label("Kept \(result.keptArchives.formatted(.list(type: .and))), because \(result.keptArchives.count == 1 ? "it" : "they") changed after you chose the archive.",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(ImportTheme.accent)
+                }
             }
             HStack(spacing: 12) {
                 Button("Import Another") { model.select(.importAnother) }

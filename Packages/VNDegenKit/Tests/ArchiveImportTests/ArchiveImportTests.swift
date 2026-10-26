@@ -124,6 +124,26 @@ func suggestsFolderNameFromArchiveName(fileName: String, expected: String) {
     }
 }
 
+@Test func keepsSplitZipAndSplit7zApart() throws {
+    let folder = try temporaryDirectory()
+    for name in ["Game.zip.001", "Game.zip.002", "Game.7z.001"] { try Data().write(to: folder.appendingPathComponent(name)) }
+    let source = try ArchiveSource(picked: [folder.appendingPathComponent("Game.zip.002")])
+    #expect(source.volumes.map(\.lastPathComponent) == ["Game.zip.001", "Game.zip.002"])
+    #expect(throws: ArchiveError.severalArchives) {
+        try ArchiveSource(picked: ["Game.zip.001", "Game.7z.001"].map { folder.appendingPathComponent($0) })
+    }
+    #expect(LocalArchives.scan([folder]).map(\.fileName) == ["Game.7z.001", "Game.zip.001"])
+}
+
+@Test func refusesTwoFilesForOnePart() throws {
+    let folder = try temporaryDirectory()
+    for name in ["Game.part1.rar", "Game.part01.rar", "Game.part2.rar"] { try Data().write(to: folder.appendingPathComponent(name)) }
+    #expect(throws: ArchiveError.duplicateVolume(1)) { try ArchiveSource(picked: [folder.appendingPathComponent("Game.part2.rar")]) }
+    #expect(throws: ArchiveError.duplicateVolume(1)) {
+        try ArchiveSource(picked: ["Game.part1.rar", "Game.part01.rar"].map { folder.appendingPathComponent($0) })
+    }
+}
+
 @Test func refusesTwoDifferentArchives() {
     #expect(throws: ArchiveError.severalArchives) {
         try ArchiveSource(picked: [URL(fileURLWithPath: "/tmp/a.zip"), URL(fileURLWithPath: "/tmp/b.zip")])
@@ -309,7 +329,25 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     inside.startImport()
     try await waitWhileExtracting(inside)
     #expect(inside.step.isFinished)
+    #expect(inside.step.keptArchives == [])
     #expect(items(games) == [".importing", "two-items"])
+}
+
+@MainActor @Test func keepsAnArchiveReplacedBeforeItsDeletion() async throws {
+    let games = try temporaryDirectory()
+    let archive = games.appendingPathComponent("nested.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("nested.zip"), to: archive)
+    let importer = try await importArchive([archive], into: games)
+    #expect(importer.deleteArchiveAfterImport)
+    #expect(importer.step == .nested(fileName: "inner.7z"))
+
+    // The user copies another archive over it in Files while the nested prompt shows.
+    try fm.removeItem(at: archive)
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    importer.keepNested()
+    #expect(importer.step.isFinished)
+    #expect(importer.step.keptArchives == ["nested.zip"])
+    #expect(try Data(contentsOf: archive) == Data(contentsOf: fixtures.appendingPathComponent("two-items.zip")))
 }
 
 @MainActor @Test func defaultsToDeletingOnlyArchivesListedForImport() async throws {
@@ -598,6 +636,31 @@ private func waitUntil(_ condition: () -> Bool, _ comment: Comment) async throws
 
 // MARK: Deliveries nobody imports
 
+@MainActor @Test func inboxCleanupKeepsCopiesBeingReadAndCopiesThatJustArrived() async throws {
+    let inbox = try temporaryDirectory()
+    let reading = inbox.appendingPathComponent("reading.zip")
+    let abandoned = inbox.appendingPathComponent("abandoned.zip")
+    for url in [reading, abandoned] { try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: url) }
+    let presenter = FakeProvider(reading)
+    defer { presenter.remove() }
+    presenter.hold()
+    let importer = ArchiveImporter(gamesRoot: try temporaryDirectory())
+    let listing = Task { await importer.choose([reading]) }
+    try await waitUntil({ presenter.hasWaitingReader }, "the choice is listing")
+    // Its sheet closed while the listing still reads.
+    importer.close()
+
+    ArchiveImporter.discardCopies(in: inbox, addedBefore: .distantPast)
+    #expect(items(inbox) == ["abandoned.zip", "reading.zip"], "copies added after the cutoff stay")
+    ArchiveImporter.discardCopies(in: inbox, addedBefore: .now.addingTimeInterval(60))
+    #expect(items(inbox) == ["reading.zip"], "a copy a closed choice still reads stays")
+
+    presenter.letReadersIn()
+    await listing.value
+    ArchiveImporter.discardCopies(in: inbox, addedBefore: .now.addingTimeInterval(60))
+    #expect(items(inbox).isEmpty, "the copy goes once nothing reads it")
+}
+
 @MainActor @Test func importFlowDiscardsDeliveriesItCannotTake() async throws {
     let archive = try temporaryDirectory().appendingPathComponent("two-items.zip")
     try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
@@ -629,4 +692,5 @@ private func waitUntil(_ condition: () -> Bool, _ comment: Comment) async throws
 
 private extension ArchiveImporter.Step {
     var isFinished: Bool { if case .finished = self { true } else { false } }
+    var keptArchives: [String]? { if case let .finished(result) = self { result.keptArchives } else { nil } }
 }

@@ -15,13 +15,19 @@ nonisolated public struct ArchiveSource: Sendable, Hashable {
         guard let first = named.first else { throw .notAnArchive }
         guard named.allSatisfy({ $0.1.set == first.1.set }) else { throw .severalArchives }
 
-        var volumes = Dictionary(named.map { ($0.1.index, $0.0) }, uniquingKeysWith: { a, _ in a })
+        var members = named
         if first.1.kind != .single, named.count == 1 {
             let folder = first.0.deletingLastPathComponent()
-            let siblings = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-            for url in siblings {
-                if let name = VolumeName(url.lastPathComponent), name.set == first.1.set { volumes[name.index] = url }
-            }
+            let siblings = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+                .compactMap { url in VolumeName(url.lastPathComponent).map { (url, $0) } }
+                .filter { $0.1.set == first.1.set }
+            // The listing holds the picked file too, unless the folder can't be listed.
+            if !siblings.isEmpty { members = siblings }
+        }
+        var volumes: [Int: URL] = [:]
+        for (url, name) in members {
+            // Such as `game.part1.rar` beside `game.part01.rar`, which read as the same part.
+            guard volumes.updateValue(url, forKey: name.index) == nil else { throw .duplicateVolume(name.index) }
         }
         let order = volumes.keys.sorted()
         if first.1.kind != .single, let missing = Self.firstGap(order, startingAt: first.1.kind.firstIndex) {
@@ -66,6 +72,50 @@ nonisolated extension NSFileCoordinator {
         }
         return try read(from: 0, granted: [])
     }
+
+    /// Deletes `url` inside a coordinated write when the file there still has `identity`. Returns false when a different
+    /// file is there now, which it leaves alone.
+    static func delete(_ url: URL, ifStill identity: FileIdentity) -> Bool {
+        var replaced = false
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { url in
+            let current = FileIdentity(of: url)
+            guard current == identity else {
+                replaced = current != nil
+                return
+            }
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                importLog.error("Could not delete \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        if let coordinationError {
+            importLog.error("Could not delete \(url.lastPathComponent, privacy: .public): \(coordinationError.localizedDescription, privacy: .public)")
+        }
+        return !replaced
+    }
+}
+
+/// Tells a file apart from one saved later under the same name, such as a replacement copied in with Files.
+nonisolated struct FileIdentity: Equatable, Sendable {
+    let volume: Int
+    let fileNumber: Int
+    let size: Int64
+    let modified: Date
+
+    /// Nil when nothing is at `url`.
+    init?(of url: URL) {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let volume = attributes[.systemNumber] as? Int,
+              let fileNumber = attributes[.systemFileNumber] as? Int,
+              let size = attributes[.size] as? Int64,
+              let modified = attributes[.modificationDate] as? Date else { return nil }
+        self.volume = volume
+        self.fileNumber = fileNumber
+        self.size = size
+        self.modified = modified
+    }
 }
 
 /// What a file name says about the file's place in an archive set.
@@ -100,8 +150,8 @@ nonisolated struct VolumeName: Equatable {
             self.init(fileName, stem: match.1, kind: .rarOldStyle, index: Int(match.2)! + 1)
         } else if let match = fileName.wholeMatch(of: /(.+)\.rar/.ignoresCase()) {
             self.init(fileName, stem: match.1, kind: .rarOldStyle, index: 0)
-        } else if let match = fileName.wholeMatch(of: /(.+)\.(?:zip|7z)\.(\d{3})/.ignoresCase()) {
-            self.init(fileName, stem: match.1, kind: .split, index: Int(match.2)!)
+        } else if let match = fileName.wholeMatch(of: /(.+)\.(zip|7z)\.(\d{3})/.ignoresCase()) {
+            self.init(fileName, stem: match.1, kind: .split, index: Int(match.3)!, format: match.2)
         } else if let match = fileName.wholeMatch(of: /(.+)\.(?:zip|7z)/.ignoresCase()) {
             self.init(fileName, stem: match.1, kind: .single, index: 0)
         } else {
@@ -109,12 +159,13 @@ nonisolated struct VolumeName: Equatable {
         }
     }
 
-    private init(_ fileName: String, stem: Substring, kind: Kind, index: Int) {
+    private init(_ fileName: String, stem: Substring, kind: Kind, index: Int, format: Substring = "") {
         self.stem = stem.trimmingCharacters(in: .whitespaces)
         self.kind = kind
         self.index = index
-        // A lone `game.rar` is old-style volume 0 until a `game.r00` shows up, so both share one key.
-        set = "\(stem.lowercased())|\(kind == .single ? fileName.lowercased() : "\(kind)")"
+        // A lone `game.rar` is old-style volume 0 until a `game.r00` shows up, so both share one key. Split parts keep
+        // their format, so `game.zip.001` and `game.7z.001` are two archives.
+        set = "\(stem.lowercased())|\(kind == .single ? fileName.lowercased() : "\(kind)\(format.lowercased())")"
     }
 }
 

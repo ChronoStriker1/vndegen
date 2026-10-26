@@ -35,10 +35,17 @@ nonisolated enum DroppedFiles {
 
     static func discardDropCopies() { discardStale([copies]) }
 
-    static func discardInbox() {
-        #if os(iOS)
-        discardStale((try? FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil)) ?? [])
-        #endif
+    /// Deletes the items in `folder` that were added before `date` and that `isHeld` doesn't claim. An item whose added
+    /// date can't be read stays, because it may have just arrived.
+    @MainActor static func discardCopies(in folder: URL, addedBefore date: Date, keeping isHeld: (URL) -> Bool) {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.addedToDirectoryDateKey])) ?? []
+        discardStale(urls.filter { url in
+            guard let added = try? url.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate else {
+                importLog.error("Kept \(url.lastPathComponent, privacy: .public), whose added date can't be read")
+                return false
+            }
+            return added < date && !isHeld(url)
+        })
     }
 
     private static func discardStale(_ urls: [URL]) {

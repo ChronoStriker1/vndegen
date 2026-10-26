@@ -25,7 +25,7 @@ nonisolated public enum LocalArchives {
     static func folders(gamesRoot: URL) -> [URL] {
         #if os(iOS)
         let documents = URL.documentsDirectory
-        return documents.isSameFolder(gamesRoot) ? [gamesRoot] : [documents, gamesRoot]
+        return documents.isSamePath(as: gamesRoot) ? [gamesRoot] : [documents, gamesRoot]
         #else
         return [gamesRoot]
         #endif
@@ -34,7 +34,7 @@ nonisolated public enum LocalArchives {
     /// Whether `url` sits directly in one of the folders the library lists archives from.
     static func isListed(_ url: URL, gamesRoot: URL) -> Bool {
         let parent = url.deletingLastPathComponent()
-        return folders(gamesRoot: gamesRoot).contains { $0.isSameFolder(parent) }
+        return folders(gamesRoot: gamesRoot).contains { $0.isSamePath(as: parent) }
     }
 
     static func scan(_ folders: [URL]) -> [LocalArchive] {
@@ -61,7 +61,7 @@ nonisolated public enum LocalArchives {
 }
 
 nonisolated extension URL {
-    func isSameFolder(_ other: URL) -> Bool {
+    func isSamePath(as other: URL) -> Bool {
         resolvingSymlinksInPath().standardizedFileURL.path == other.resolvingSymlinksInPath().standardizedFileURL.path
     }
 }

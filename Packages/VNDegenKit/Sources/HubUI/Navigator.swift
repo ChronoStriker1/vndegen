@@ -117,6 +117,7 @@ final class Navigator {
     var gridColumns = 4
     private(set) var rescanning = false
     @ObservationIgnored private var columnMemory: [String: Int] = [:]
+    @ObservationIgnored private var lastBackgrounded: Date?
     /// The unlock view shown in the sheet, kept so controller events reach the same instance.
     @ObservationIgnored private(set) var unlockView: UnlockView?
 
@@ -367,11 +368,11 @@ final class Navigator {
         sheet = .importGame(ArchiveImportModel(gamesRoot: hub.library.paths.gamesRoot), initialSelection: urls)
     }
 
-    /// Deletes Inbox copies nothing imports. Only the import sheet holds Inbox copies, so with it closed they are left
-    /// from a run killed mid-import.
+    /// Deletes Inbox copies nothing imports. Call each time the app goes to the background. A copy is deleted once it
+    /// sat through a whole foreground session with no import reading it, so the first background of a run deletes none.
     func discardInboxCopies() {
-        if case .importGame? = sheet { return }
-        ArchiveImporter.discardInboxCopies()
+        if let lastBackgrounded { ArchiveImporter.discardInboxCopies(addedBefore: lastBackgrounded) }
+        lastBackgrounded = .now
     }
 
     /// Closes the import sheet, then shows the new game in the library.

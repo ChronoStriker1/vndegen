@@ -5,6 +5,7 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
     case notAnArchive
     case severalArchives
     case missingVolume(Int)
+    case duplicateVolume(Int)
     case passwordRequired
     case wrongPassword
     case unsupportedEncryption
@@ -23,6 +24,7 @@ nonisolated public enum ArchiveError: Error, Equatable, Sendable {
         case .notAnArchive: "Choose a zip, RAR, or 7z archive."
         case .severalArchives: "Choose one archive at a time. For a multi-part archive, choose all of its parts."
         case let .missingVolume(part): "Part \(part) of this archive is missing. Choose all of its parts together."
+        case let .duplicateVolume(part): "Two files are part \(part) of this archive. Remove one of them and choose again."
         case .passwordRequired: "This archive needs a password."
         case .wrongPassword: "That password is not correct."
         case .unsupportedEncryption: "This archive uses RAR or 7z encryption, which VNDegen can't open. Extract it on a computer and copy the folder instead."

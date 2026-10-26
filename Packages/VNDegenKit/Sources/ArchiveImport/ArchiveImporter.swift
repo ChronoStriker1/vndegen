@@ -31,6 +31,8 @@ public final class ArchiveImporter {
         public var files: Int
         public var bytes: Int64
         public var duration: Duration
+        /// Volumes "Delete archive after import" left in place because another file replaced them after they were chosen.
+        public var keptArchives: [String] = []
     }
 
     public let gamesRoot: URL
@@ -49,8 +51,9 @@ public final class ArchiveImporter {
     /// On by default for an archive the library lists under Ready to import, which the user copied in only to import it.
     public var deleteArchiveAfterImport = false
 
-    /// The archive the user picked, which "Delete archive after import" removes.
-    private var picked: (source: ArchiveSource, contents: ArchiveContents)?
+    /// The archive the user picked, which "Delete archive after import" removes, and each volume's identity when it was
+    /// listed. A volume whose file changed since then is a different file and stays.
+    private var picked: (source: ArchiveSource, contents: ArchiveContents, identities: [FileIdentity?])?
     /// The current choice. A listing or extraction whose selection was replaced has nothing left to show.
     private var selection: Selection?
     /// Extraction folders still on disk. A nested import keeps the outer one until the inner one finishes.
@@ -86,9 +89,20 @@ public final class ArchiveImporter {
     /// Deletes the drop copies left by a run that was killed mid-import. Call at launch, before any drop can arrive.
     public static func discardStaleDropCopies() { DroppedFiles.discardDropCopies() }
 
-    /// Deletes every copy in the Inbox. Call only while no import flow is open. Not safe at launch, because opening an
-    /// archive in VNDegen from another app delivers its Inbox copy before the app launches.
-    public static func discardInboxCopies() { DroppedFiles.discardInbox() }
+    /// Deletes the Inbox copies that no import reads and that were already in the Inbox at `date`. Pass the time the app
+    /// last went to the background, so a copy has sat through a whole foreground session unclaimed. A copy delivered for
+    /// Open in VNDegen arrives before its URL callback, at a cold launch even before the app starts, so a newer one may
+    /// still be on its way to an import sheet.
+    public static func discardInboxCopies(addedBefore date: Date) {
+        #if os(iOS)
+        discardCopies(in: DroppedFiles.inbox, addedBefore: date)
+        #endif
+    }
+
+    /// `discardInboxCopies` for any folder.
+    static func discardCopies(in folder: URL, addedBefore date: Date) {
+        DroppedFiles.discardCopies(in: folder, addedBefore: date, keeping: Selection.isHeld)
+    }
 
     // MARK: Actions
 
@@ -102,11 +116,11 @@ public final class ArchiveImporter {
         let names = urls.map(\.lastPathComponent)
         importLog.notice("Chose \(urls.count) files \(names, privacy: .public), security-scoped access granted for \(selection.scopedCount)")
         do {
-            let (source, contents) = try await selection.read { try await Self.open(urls) }
+            let (source, contents, identities) = try await selection.read { try await Self.open(urls) }
             guard self.selection === selection else {
                 return importLog.notice("Listed \(names, privacy: .public) after a newer choice replaced it")
             }
-            picked = (source, contents)
+            picked = (source, contents, identities)
             self.source = source
             self.contents = contents
             folderName = source.suggestedFolderName
@@ -260,15 +274,21 @@ public final class ArchiveImporter {
             return
         }
         discardStagings()
+        var kept: [String] = []
         if deleteArchiveAfterImport, canDeleteArchive, let picked {
-            picked.source.volumes.forEach { try? FileManager.default.removeItem(at: $0) }
+            for (volume, identity) in zip(picked.source.volumes, picked.identities) {
+                if let identity, NSFileCoordinator.delete(volume, ifStill: identity) { continue }
+                importLog.notice("Kept \(volume.lastPathComponent, privacy: .public), which changed after it was chosen")
+                kept.append(volume.lastPathComponent)
+            }
         }
         let duration = started.map { ContinuousClock.now - $0 } ?? .zero
         step = .finished(ImportResult(
             folderName: name,
             files: progress?.files ?? 0,
             bytes: progress?.bytes ?? 0,
-            duration: duration))
+            duration: duration,
+            keptArchives: kept))
     }
 
     /// After a failure or cancel inside a nested import, the review screen shows the archive the user picked again.
@@ -315,8 +335,11 @@ public final class ArchiveImporter {
     // MARK: Off the main actor
 
     @concurrent
-    private static func open(_ urls: [URL]) async throws -> (ArchiveSource, ArchiveContents) {
-        try ArchiveSource(picked: urls).coordinatedRead { ($0, try ArchiveExtractor.list($0)) }
+    private static func open(_ urls: [URL]) async throws -> (ArchiveSource, ArchiveContents, [FileIdentity?]) {
+        let source = try ArchiveSource(picked: urls)
+        return try source.coordinatedRead { granted in
+            (source, try ArchiveExtractor.list(granted), granted.volumes.map(FileIdentity.init(of:)))
+        }
     }
 
     @concurrent
@@ -346,6 +369,9 @@ public final class ArchiveImporter {
 /// system made for VNDegen. A newer choice can replace this one while its listing or extraction still reads, so the
 /// files are released when the last read finishes rather than when the selection closes.
 private final class Selection {
+    /// Selections whose files are not released yet, whatever happened to the sheet that chose them.
+    private static var live: [Selection] = []
+
     private let urls: [URL]
     private let scoped: [URL]
     private var readers = 0
@@ -357,6 +383,12 @@ private final class Selection {
     init(_ urls: [URL]) {
         self.urls = urls
         scoped = urls.filter { $0.startAccessingSecurityScopedResource() }
+        Self.live.append(self)
+    }
+
+    /// Whether a selection still holds `url`.
+    static func isHeld(_ url: URL) -> Bool {
+        live.contains { $0.urls.contains { $0.isSamePath(as: url) } }
     }
 
     func read<T>(_ body: () async throws -> T) async throws -> T {
@@ -376,6 +408,7 @@ private final class Selection {
     private func releaseIfUnused() {
         guard closed, readers == 0, !released else { return }
         released = true
+        Self.live.removeAll { $0 === self }
         scoped.forEach { $0.stopAccessingSecurityScopedResource() }
         DroppedFiles.discard(urls)
     }
