@@ -234,6 +234,11 @@ public:
     {
         return SDL_GetAudioStreamQueued(_stream) / _frame_size;
     }
+    virtual tjs_uint GetQueuedSamples() override
+    {
+        return SDL_GetAudioStreamQueued(_stream) / (BitsPerSample / 8 * spec.channels);
+    }
+    virtual void Flush() override { SDL_FlushAudioStream(_stream); }
     virtual int GetRemainBuffers() override
     {
         tTJSCSH lk(_buffer_mtx);

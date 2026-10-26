@@ -7,6 +7,8 @@
 cmake_minimum_required(VERSION 3.28)
 
 set(VCPKG_OVERLAY_TRIPLETS ${CMAKE_CURRENT_LIST_DIR}/triplets)
+# FFmpeg builds with only the formats movies come in; see UPSTREAM.md.
+set(VCPKG_OVERLAY_PORTS ${CMAKE_CURRENT_LIST_DIR}/ports)
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(CMAKE_OSX_DEPLOYMENT_TARGET 18.0)
 else()
@@ -322,6 +324,8 @@ endif()
 # An object library keeps every object file, so the plugins' static registrations survive linking.
 add_library(kirikiri_engine OBJECT
     vndegen/ciphers.cpp
+    vndegen/movie_decoder.cpp
+    vndegen/movie_player.cpp
     vndegen/sigcheck.cpp
     vndegen/steam.cpp
     ${KIRIKIRI_CORE_SOURCES}
@@ -372,6 +376,9 @@ find_package(OpusFile CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
 find_package(SDL3_ttf CONFIG REQUIRED)
 find_package(plutovg CONFIG REQUIRED)
+find_package(FFMPEG REQUIRED)
+target_include_directories(kirikiri_engine PUBLIC ${FFMPEG_INCLUDE_DIRS})
+target_link_directories(kirikiri_engine PUBLIC ${FFMPEG_LIBRARY_DIRS})
 target_link_libraries(kirikiri_engine PUBLIC
     ZLIB::ZLIB
     PNG::PNG
@@ -391,6 +398,7 @@ target_link_libraries(kirikiri_engine PUBLIC
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
     plutovg::plutovg
+    ${FFMPEG_LIBRARIES}
     "-framework Foundation"
     "-framework CoreGraphics"
     "-framework QuartzCore"
@@ -452,6 +460,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     #   build/kirikiri/.build/mac/KiriKiriCipherTest
     add_executable(KiriKiriCipherTest EXCLUDE_FROM_ALL vndegen/cipher_test.cpp vndegen/vnkk.mm)
     target_link_libraries(KiriKiriCipherTest PRIVATE kirikiri_engine)
+
+    # Decodes movies with the engine's movie decoder. Built on demand, like KiriKiriCipherTest.
+    add_executable(KiriKiriMovieTest EXCLUDE_FROM_ALL vndegen/movie_test.cpp vndegen/vnkk.mm)
+    target_link_libraries(KiriKiriMovieTest PRIVATE kirikiri_engine)
 
     add_executable(KiriKiriRestart EXCLUDE_FROM_ALL vndegen/restart_main.mm vndegen/vnkk.mm)
     set_source_files_properties(vndegen/restart_main.mm PROPERTIES COMPILE_OPTIONS -fobjc-arc)

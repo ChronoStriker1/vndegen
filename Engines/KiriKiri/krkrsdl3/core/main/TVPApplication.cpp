@@ -11,6 +11,7 @@
 #include "TVPSystem.h"
 #include "TVPDebug.h"
 #include "TVPMsg.h"
+#include "movie_player.h"
 #include "TVPScript.h"
 #include "TVPPlugin.h"
 
@@ -203,6 +204,7 @@ void tTVPApplication::OnExit()
         delete TVPSystemControl;
     TVPSystemControl = NULL;
     TVPUninitScriptEngine();
+    VNKKDestroyMoviePlayers();
     TVPClearAllAutoPath();
     TVPClearAllWindows();
     krkrsdl3::TVPClearAllTexture();

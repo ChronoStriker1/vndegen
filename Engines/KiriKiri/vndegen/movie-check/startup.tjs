@@ -1,0 +1,207 @@
+// A script-only game that plays movies through VideoOverlay the ways games do and logs what a
+// game's script sees. scripts/kirikiri-movie-check.sh generates red.mpg and blue.wmv beside it,
+// runs it, and reads the log: each check logs "check: pass <name>" or "check: fail <name>".
+
+var win = new Window();
+win.setInnerSize(320, 240);
+win.visible = true;
+var base = new Layer(win, null);
+base.setImageSize(320, 240);
+base.setSize(320, 240);
+base.fillRect(0, 0, 320, 240, 0xff000000);
+base.visible = true;
+var target = new Layer(win, base);
+target.visible = true;
+
+function log(text) { Debug.message("check: " + text); }
+function expect(name, ok, detail) { log((ok ? "pass " : "fail ") + name + " (" + detail + ")"); }
+
+// The color a layer filled with argb reads back as, so movie pixels compare in the engine's order.
+function stored(argb)
+{
+    var probe = new Layer(win, base);
+    probe.setImageSize(1, 1);
+    probe.fillRect(0, 0, 1, 1, argb);
+    var value = probe.getMainPixel(0, 0);
+    invalidate probe;
+    return value;
+}
+function near(a, b)
+{
+    for (var shift = 0; shift < 24; shift += 8) {
+        var d = ((a >> shift) & 0xff) - ((b >> shift) & 0xff);
+        if (d > 24 || d < -24)
+            return false;
+    }
+    return true;
+}
+
+class CheckVideo extends VideoOverlay
+{
+    var statuses = [];
+    var periods = [];
+    var updates = 0;
+    var onPeriodHook;
+    function CheckVideo(w) { super.VideoOverlay(w); }
+    function onStatusChanged(status) { statuses.add(status); log("status " + status + " at frame " + frame); }
+    function onPeriod(reason) { periods.add(reason); log("period " + reason + " at frame " + frame); if (onPeriodHook !== void) onPeriodHook(reason); }
+    function onFrameUpdate(f) { updates++; }
+    function stopped() { return statuses.count && statuses[statuses.count - 1] == "stop"; }
+}
+
+var video;
+function start(mode, file)
+{
+    if (video !== void)
+        invalidate video;
+    video = new CheckVideo(win);
+    video.mode = mode;
+    if (mode == vomLayer)
+        video.layer1 = target;
+    video.open(file);
+    if (mode != vomLayer) {
+        video.setPos(0, 0);
+        video.setSize(320, 240);
+        video.visible = true;
+    }
+}
+
+var ticks = 0;
+var steps = [];
+
+// Overlay mode plays to the end and reports stop, as a game waiting on the movie sees it.
+steps.add(%[
+    "begin" => function { start(vomOverlay, "red.mpg"); video.play(); },
+    "done" => function { return video.stopped(); },
+    "end" => function {
+        expect("overlay plays to the end", video.frame >= video.numberOfFrame - 2,
+               "frame " + video.frame + " of " + video.numberOfFrame + ", " + video.totalTime + " ms");
+    }
+]);
+
+// Layer mode draws each frame into the layer and fires onFrameUpdate and the period event.
+steps.add(%[
+    "begin" => function { start(vomLayer, "red.mpg"); video.setPeriodEvent(30); video.play(); },
+    "done" => function { return video.stopped(); },
+    "end" => function {
+        var pixel = target.getMainPixel(160, 120);
+        expect("layer frames update", video.updates >= video.numberOfFrame - 5,
+               video.updates + " updates of " + video.numberOfFrame + " frames");
+        expect("layer period event", video.periods.find(1) >= 0, "periods " + video.periods.join(","));
+        expect("layer pixel is red", near(pixel, stored(0xffff0000)),
+               "read " + pixel + ", red stores as " + stored(0xffff0000));
+    }
+]);
+
+// loop rewinds at the end with a perLoop period event; clearing it lets the movie end.
+steps.add(%[
+    "begin" => function {
+        start(vomOverlay, "red.mpg");
+        video.loop = true;
+        video.onPeriodHook = function(reason) { if (reason == 0 && video.periods.count >= 2) video.loop = false; };
+        video.play();
+    },
+    "done" => function { return video.stopped(); },
+    "end" => function {
+        var loops = 0;
+        for (var i = 0; i < video.periods.count; i++)
+            if (video.periods[i] == 0) loops++;
+        expect("loop rewinds", loops == 2, loops + " loops");
+    }
+]);
+
+// A segment loop jumps back from its end frame with a perSegLoop period event.
+steps.add(%[
+    "begin" => function {
+        start(vomLayer, "red.mpg");
+        video.setSegmentLoop(10, 40);
+        video.onPeriodHook = function(reason) { if (reason == 3 && video.periods.count >= 2) video.cancelSegmentLoop(); };
+        video.play();
+    },
+    "done" => function { return video.stopped(); },
+    "end" => function {
+        var loops = 0;
+        for (var i = 0; i < video.periods.count; i++)
+            if (video.periods[i] == 3) loops++;
+        expect("segment loop rewinds", loops == 2, loops + " segment loops");
+    }
+]);
+
+// Setting frame seeks; the next frames shown are at the target.
+var seekFrame = -1;
+steps.add(%[
+    "begin" => function { start(vomLayer, "red.mpg"); video.play(); ticks = 0; },
+    "done" => function {
+        if (ticks == 5)
+            video.frame = 60;
+        if (ticks == 8)
+            seekFrame = video.frame;
+        return video.stopped();
+    },
+    "end" => function { expect("frame seeks", seekFrame >= 60 && seekFrame <= 75, "frame " + seekFrame + " just after a seek to 60"); }
+]);
+
+// WMV with WMA audio plays into a layer too.
+steps.add(%[
+    "begin" => function { start(vomLayer, "blue.wmv"); video.play(); },
+    "done" => function { return video.stopped(); },
+    "end" => function {
+        var pixel = target.getMainPixel(160, 120);
+        expect("wmv plays to the end", video.updates >= video.numberOfFrame - 5,
+               video.updates + " updates of " + video.numberOfFrame + " frames");
+        expect("wmv pixel is blue", near(pixel, stored(0xff0000ff)),
+               "read " + pixel + ", blue stores as " + stored(0xff0000ff));
+    }
+]);
+
+// pause() holds the frame and play() continues from it.
+var pausedFrame, laterFrame;
+steps.add(%[
+    "begin" => function { start(vomOverlay, "red.mpg"); video.play(); ticks = 0; },
+    "done" => function {
+        if (ticks == 10) {
+            video.pause();
+            pausedFrame = video.frame;
+        }
+        if (ticks == 20) {
+            laterFrame = video.frame;
+            video.play();
+        }
+        return ticks > 20 && video.stopped();
+    },
+    "end" => function { expect("pause holds the frame", pausedFrame == laterFrame && pausedFrame > 0, "frame " + pausedFrame + " then " + laterFrame); }
+]);
+
+// The runner pauses the engine during this movie (KiriKiriHelper's SIGUSR1, then SIGUSR2) and
+// checks the player's own summary line: no burst of dropped frames after the resume.
+steps.add(%[
+    "begin" => function { start(vomOverlay, "red.mpg"); video.play(); log("engine pause step playing"); },
+    "done" => function { return video.stopped(); },
+    "end" => function { log("engine pause step stopped"); }
+]);
+
+// Steps run in the global context, where the names above live, not in their dictionary's.
+function run(name) { return (steps[current][name] incontextof global)(); }
+
+var current = -1;
+function tick()
+{
+    ticks++;
+    if (current >= 0 && !run("done"))
+        return;
+    if (current >= 0)
+        run("end");
+    current++;
+    if (current < steps.count) {
+        ticks = 0;
+        run("begin");
+        return;
+    }
+    invalidate video;
+    log("done");
+    System.terminate();
+}
+
+var timer = new Timer(tick, "");
+timer.interval = 100;
+timer.enabled = true;

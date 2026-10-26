@@ -37,6 +37,10 @@ struct TVPSprite
     bool isVisible = false;
     // 纹理是否借用于外部（如 GPU 纹理别名）：借用的句柄不由 sprite 销毁
     bool borrowedTexture = false;
+    // An overlay with a placement covers that rectangle of the current window's content, given in
+    // content pixels, instead of filling the window.
+    bool placed = false;
+    float placeLeft = 0, placeTop = 0, placeWidth = 0, placeHeight = 0;
 };
 
 // 获取所有渲染可用后端（SDL 渲染驱动列表，仅作信息展示；选择逻辑见 TVPListRenderBackends）

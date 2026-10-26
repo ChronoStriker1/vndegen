@@ -4,11 +4,15 @@
 
 void NativeEventQueueImplement::PostEvent(const NativeEvent& ev)
 {
-    Application->PostUserMessage([this, ev]() { Dispatch(*const_cast<NativeEvent*>(&ev)); }, this);
+    // The message number lets Clear remove one kind of event.
+    Application->PostUserMessage([this, ev]() { Dispatch(*const_cast<NativeEvent*>(&ev)); }, this,
+                                 ev.Message);
 }
 
 void NativeEventQueueImplement::Clear(int msg)
 {
+    if (!Application)
+        return;
     Application->FilterUserMessage(
         [this, msg](std::vector<std::tuple<void*, int, tTVPApplication::tMsg>>& lst)
         {

@@ -24,8 +24,8 @@ public:
     // Queue の生成
     void Allocate() {}
 
-    // Queue の削除
-    void Deallocate() {}
+    // Queue の削除. Events still queued would reach a deleted owner.
+    void Deallocate() { Clear(); }
 
     void PostEvent(const NativeEvent& event);
 

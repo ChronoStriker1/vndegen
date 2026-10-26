@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-// krnull.h: stand-in for every movie while VNDegen has no video player.
+// krnull.h: stand-in for a movie the player cannot decode.
 // Play() posts EC_COMPLETE once, so the movie ends at once and a game that
 // waits for it continues.
 //---------------------------------------------------------------------------
