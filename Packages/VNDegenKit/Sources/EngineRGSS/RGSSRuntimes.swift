@@ -10,21 +10,28 @@ nonisolated enum RGSSRuntimes {
         id: "rpgmaker-rtp-xp", name: "RPG Maker XP RTP",
         download: URL(string: "https://assets.rpgmakerweb.com/xp_rtp104e.exe")!,
         sha256: "b3bd20ad7f413b40ac233aafd2e061de1dc429c2eadb59d0b3157ba3c47f16b2", size: 22_994_937,
-        installer: .innoSetup(path: nil), licensePage: licensePage)
+        installer: .innoSetup(path: nil), licensePage: licensePage, license: license("xp"))
 
     static let vx = RuntimePackage(
         id: "rpgmaker-rtp-vx", name: "RPG Maker VX RTP",
         download: URL(string: "https://assets.rpgmakerweb.com/vx_rtp102e.zip")!,
         sha256: "8c82c02c876391d9585934454a629748d71b421c4957ada1dff8dc4b013ce403", size: 36_797_892,
-        installer: .innoSetup(path: "RPGVX_RTP/Setup.exe"), licensePage: licensePage)
+        installer: .innoSetup(path: "RPGVX_RTP/Setup.exe"), licensePage: licensePage, license: license("vx"))
 
     static let vxAce = RuntimePackage(
         id: "rpgmaker-rtp-vxace", name: "RPG Maker VX Ace RTP",
         download: URL(string: "https://assets.rpgmakerweb.com/RPGVXAce_RTP.zip")!,
         sha256: "7e93d0ead93a686218b7c671bf099ef42f09f536083bd0b2f0fa6423a39fc19b", size: 194_690_591,
-        installer: .innoSetup(path: "RTP100/Setup.exe"), licensePage: licensePage)
+        installer: .innoSetup(path: "RTP100/Setup.exe"), licensePage: licensePage, license: license("vxace"))
 
     static let licensePage = URL(string: "https://www.rpgmakerweb.com/run-time-package")!
+
+    /// The RTP's license agreement as the download page shows it. Its installers show it on their own, and VNDegen,
+    /// which unpacks them, shows it in their place.
+    private static func license(_ version: String) -> String? {
+        Bundle.module.url(forResource: "rtp-license-\(version)", withExtension: "txt")
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+    }
 
     /// The package for a name in `Game.ini`, as RPG Maker's own installers register them. Nil for a name VNDegen
     /// doesn't know, such as a fan-made RTP.

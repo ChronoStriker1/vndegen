@@ -76,7 +76,7 @@ struct RuntimeLicenseSheet: View {
         SheetScaffold(title: "License", subtitle: request.package.name) {
             VStack(alignment: .leading, spacing: 16) {
                 ScrollView {
-                    Text(request.text ?? "The installer carries no license text. Its license is on \(request.package.licensePage.host ?? "the publisher's site"). Read it there, then accept it here to install the \(request.package.name), as the official installer asks.")
+                    Text(request.text ?? request.package.license ?? "The installer carries no license text. Its license is on \(request.package.licensePage.host ?? "the publisher's site"). Read it there, then accept it here to install the \(request.package.name), as the official installer asks.")
                         .font(.system(size: 13, design: .monospaced))
                         .foregroundStyle(Theme.secondaryText)
                         .textSelection(.enabled)

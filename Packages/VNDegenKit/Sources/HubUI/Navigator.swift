@@ -268,6 +268,8 @@ final class Navigator {
             switch sheet {
             case let .artwork(editor): return .artworkSlot(editor.slot)
             case .metadata: return .metadataQuery
+            // The player asked to install the package, so Accept is the likely answer.
+            case .license: return .licenseAccept
             default: return selectedChoice(for: sheet)
             }
         }

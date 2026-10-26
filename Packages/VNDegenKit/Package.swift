@@ -39,7 +39,7 @@ let package = Package(
         .target(name: "CRenPy"),
         // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
         .target(name: "CRGSS"),
-        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),

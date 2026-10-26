@@ -83,6 +83,7 @@ private let none: @Sendable (RuntimePackage) -> URL? = { _ in nil }
         for package in [RGSSRuntimes.xp, RGSSRuntimes.vx, RGSSRuntimes.vxAce] {
             #expect(package.download.scheme == "https")
             #expect(package.sha256.count == 64)
+            #expect(package.license?.contains("END USER LICENSE AGREEMENT") == true)
         }
     }
 

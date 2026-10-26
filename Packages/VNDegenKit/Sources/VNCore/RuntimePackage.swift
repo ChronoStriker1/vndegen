@@ -23,8 +23,11 @@ public struct RuntimePackage: Hashable, Sendable, Identifiable {
     public let installer: Installer
     /// The publisher's page with the package's license, which the player accepts before it installs.
     public let licensePage: URL
+    /// The license as the publisher's page shows it, for installers that carry none of their own.
+    public let license: String?
 
-    public init(id: String, name: String, download: URL, sha256: String, size: Int64, installer: Installer, licensePage: URL) {
+    public init(id: String, name: String, download: URL, sha256: String, size: Int64, installer: Installer, licensePage: URL,
+                license: String? = nil) {
         self.id = id
         self.name = name
         self.download = download
@@ -32,5 +35,6 @@ public struct RuntimePackage: Hashable, Sendable, Identifiable {
         self.size = size
         self.installer = installer
         self.licensePage = licensePage
+        self.license = license
     }
 }
