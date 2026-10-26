@@ -48,6 +48,7 @@ let package = Package(
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
+        .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync"]),
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]

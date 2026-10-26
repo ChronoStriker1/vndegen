@@ -67,7 +67,9 @@ public struct LudusaviStore: Sendable {
             }
             if stored.backup.hasSuffix(".zip") { throw SaveSyncError.zipBackup(stored.backup) }
             guard let source = mapping.storedPath(of: path, in: stored.backup) else { skipped.append(path); continue }
-            planned[locations[index].directory.appendingPathComponent(relative)] = (gameDir.appendingPathComponent(source), stored.entry, relative)
+            let target = locations[index].directory.appendingPathComponent(relative)
+            try Self.requireInside(locations[index].directory, target)
+            planned[target] = (gameDir.appendingPathComponent(source), stored.entry, relative)
         }
         guard !planned.isEmpty else { throw SaveSyncError.nothingToRestore(skipped.count) }
 
@@ -100,7 +102,9 @@ public struct LudusaviStore: Sendable {
         let plans = try locations.enumerated().map { index, location in
             let saved = snapshot.appendingPathComponent(String(index), isDirectory: true)
             guard fm.fileExists(atPath: saved.path) else { throw SaveSyncError.incompleteSnapshot }
-            return (location: location, saved: saved, keep: Set(try regularFiles(in: saved)), current: try localSaves([location]))
+            let keep = Set(try regularFiles(in: saved))
+            for relative in keep { try requireInside(location.directory, location.directory.appendingPathComponent(relative)) }
+            return (location: location, saved: saved, keep: keep, current: try localSaves([location]))
         }
         for plan in plans {
             for relative in plan.keep {
@@ -351,6 +355,26 @@ public struct LudusaviStore: Sendable {
 
     // MARK: Local files
 
+    /// Throws unless `target`, with the symlinks along it resolved, stays inside `directory`. Engines reject paths that
+    /// climb out with `..`, but a symlink already in the save folder, such as `link -> ../../..`, would still carry
+    /// `link/library.json` out of it.
+    static func requireInside(_ directory: URL, _ target: URL) throws {
+        let inside = resolvedComponents(directory)
+        let resolved = resolvedComponents(target)
+        guard resolved.count > inside.count, resolved.starts(with: inside) else { throw SaveSyncError.outsideSaveFolder(target.path) }
+    }
+
+    /// `url`'s path components with symlinks resolved, also when the end of the path does not exist yet.
+    static func resolvedComponents(_ url: URL) -> [String] {
+        var existing = url.standardizedFileURL
+        var missing: [String] = []
+        while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
+            missing.insert(existing.lastPathComponent, at: 0)
+            existing.deleteLastPathComponent()
+        }
+        return existing.resolvingSymlinksInPath().pathComponents + missing
+    }
+
     struct LocalSave {
         var location: Int
         var relative: String
@@ -467,6 +491,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case unsupportedPath(String)
     case changedDuringBackup
     case engineUnsupported
+    case outsideSaveFolder(String)
 
     public var errorDescription: String? {
         switch self {
@@ -482,6 +507,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case let .unsupportedPath(path): "Can't store \(path) in a Ludusavi backup."
         case .changedDuringBackup: "Ludusavi's mapping.yaml changed while VNDegen was writing. Nothing was recorded. Try again."
         case .engineUnsupported: "Save sync does not support this game's engine yet."
+        case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
         }
     }
 }

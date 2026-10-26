@@ -82,10 +82,26 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         let prefix = base.isEmpty ? "" : "\(base)/".lowercased()
         guard probe.contains("\(prefix)renpy"), let game = probe.entries.first(where: { $0.lowercased() == "\(prefix)game" })
         else { return false }
-        let isScript = { (path: String) in [".rpy", ".rpyc", ".rpa"].contains { path.lowercased().hasSuffix($0) } }
         if probe.entries.contains(where: { $0.lowercased().hasPrefix("\(prefix)game/") && isScript($0) }) { return true }
-        // Ren'Py loads scripts from anywhere under game/, such as game/scripts/, which can sit deeper than the probe looked.
-        return FolderProbe(scanning: probe.root.appendingPathComponent(game, isDirectory: true)).entries.contains(where: isScript)
+        return containsScript(probe.root.appendingPathComponent(game, isDirectory: true))
+    }
+
+    private static func isScript(_ path: String) -> Bool {
+        [".rpy", ".rpyc", ".rpa"].contains { path.lowercased().hasSuffix($0) }
+    }
+
+    /// Ren'Py loads scripts from anywhere under game/, such as game/scripts/act1/scenes/, deeper than the probe looks.
+    /// The walk stops at the first script and gives up after `limit` entries, so a large asset folder can't stall
+    /// detection. It does not follow symlinked folders.
+    static func containsScript(_ folder: URL, limit: Int = 20_000) -> Bool {
+        guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
+        else { return false }
+        var visited = 0
+        while visited < limit, let url = walker.nextObject() as? URL {
+            if isScript(url.lastPathComponent) { return true }
+            visited += 1
+        }
+        return false
     }
 
     /// Decides only when every version names the same line.

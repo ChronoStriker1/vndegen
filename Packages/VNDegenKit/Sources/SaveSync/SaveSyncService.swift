@@ -199,6 +199,16 @@ public final class SaveSyncService {
         }
     }
 
+    /// Makes every restore, undo, and backup started from now on wait for `work`, such as a game that is still quitting
+    /// and writing its saves.
+    public func hold(until work: Task<Void, Never>) {
+        let previous = lastOperation
+        lastOperation = Task {
+            await previous?.value
+            await work.value
+        }
+    }
+
     /// Runs `work` off the main thread after every operation started before it has finished.
     private func serialized<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
         let previous = lastOperation

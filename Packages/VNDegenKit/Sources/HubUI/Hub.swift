@@ -25,6 +25,9 @@ public final class Hub {
     /// Archives copied into VNDegen's folder, listed under Ready to import.
     public private(set) var localArchives: [LocalArchive] = []
     public var launchError: String?
+    /// Games whose last session is still quitting or backing up. One can't launch again until it is done, so two
+    /// sessions never write the same saves. A backup gets at most `closingTimeout` once the game stopped.
+    public private(set) var closing: Set<GameID> = []
     @ObservationIgnored private var sessionStart: Date?
     @ObservationIgnored private var matching: Task<Void, Never>?
     /// The automatic backups that closed sessions started, chained so the last one finishes after all the others.
@@ -56,6 +59,10 @@ public final class Hub {
 
     public func launch(_ id: GameID) {
         guard case .library = screen, let game = library.game(id) else { return }
+        guard !closing.contains(id) else {
+            launchError = "\(game.title) is still closing. Try again in a moment."
+            return
+        }
         guard let plugin = library.plugin(for: game.engine) else {
             launchError = "No engine is set for \(game.title). Pick one on the game's page."
             return
@@ -85,13 +92,33 @@ public final class Hub {
         }
         sessionStart = nil
         screen = .library
+        closing.insert(id)
+        let stopped = Task { await session.waitUntilStopped() }
+        saveSync.hold(until: stopped)
         let previous = sessionEndWork
-        sessionEndWork = Task {
+        let ended = Task {
             await previous?.value
-            await session.waitUntilStopped()
+            await stopped.value
             await saveSync.sessionEnded(id)
         }
+        sessionEndWork = ended
+        // The game can launch again once its backup is done, or `closingTimeout` after it stopped, so a backup stuck on
+        // an unreachable share doesn't block the game until VNDegen restarts. A backup still waiting by then may read
+        // saves the new session is writing, which is the lesser problem.
+        Task {
+            await stopped.value
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await ended.value }
+                group.addTask { try? await Task.sleep(for: Self.closingTimeout) }
+                await group.next()
+                group.cancelAll()
+            }
+            closing.remove(id)
+        }
     }
+
+    /// Longest a stopped game waits for its automatic backup before it can launch again.
+    static let closingTimeout: Duration = .seconds(20)
 
     /// Ends a running game the way quitting it from the hub would, then waits for every pending automatic backup. Call
     /// before the app quits, so the play time and the backups are not lost. Returns at once when nothing is pending.

@@ -57,25 +57,37 @@ extension RenPyPlugin {
     /// A game copied from a PC can carry its saves in `game/saves/`. VNDegen never writes to the game folder, so the
     /// first launch copies them into the empty save folder, where the game finds them. The copy goes to a staging
     /// folder first and replaces the empty save folder only once every file arrived, so a failed copy leaves the save
-    /// folder empty and the next launch tries again.
+    /// folder empty and the next launch tries again. A folder that can't be listed fails the launch the same way. Taken
+    /// for an empty one, it would start the game without the PC saves, and the game's new saves would block a retry.
     nonisolated static func importGameSaves(base: URL, dataDirectory: URL) throws {
         let fileManager = FileManager.default
         let saves = savesDirectory(dataDirectory)
         let gameSaves = base.appendingPathComponent("game/saves", isDirectory: true)
-        guard (try? fileManager.contentsOfDirectory(atPath: saves.path))?.isEmpty ?? true,
-              let items = try? fileManager.contentsOfDirectory(at: gameSaves, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
-              !items.isEmpty else { return }
+        guard try items(in: saves).isEmpty else { return }
+        let pcSaves = try items(in: gameSaves)
+        guard !pcSaves.isEmpty else { return }
         let staging = dataDirectory.appendingPathComponent("saves-import", isDirectory: true)
         try? fileManager.removeItem(at: staging)
         defer { try? fileManager.removeItem(at: staging) }
         do {
             try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
-            for item in items {
+            for item in pcSaves {
                 try fileManager.copyItem(at: item, to: staging.appendingPathComponent(item.lastPathComponent))
             }
             guard fileSizes(in: staging) == fileSizes(in: gameSaves) else { throw CocoaError(.fileWriteUnknown) }
             try? fileManager.removeItem(at: saves)
             try fileManager.moveItem(at: staging, to: saves)
+        } catch {
+            throw RenPyError.savesNotImported(error.localizedDescription)
+        }
+    }
+
+    /// The folder's visible items. None when it does not exist.
+    nonisolated private static func items(in folder: URL) throws -> [URL] {
+        do {
+            return try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
+        } catch CocoaError.fileReadNoSuchFile {
+            return []
         } catch {
             throw RenPyError.savesNotImported(error.localizedDescription)
         }
