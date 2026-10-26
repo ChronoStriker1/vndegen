@@ -207,6 +207,8 @@ void TVPLoadInternalPlugins()
     ncbAutoRegister::LoadModule(TJS_N("win32dialog.dll"));
     ncbAutoRegister::LoadModule(TJS_N("varfile.dll"));
     ncbAutoRegister::LoadModule(TJS_N("shrinkCopy.dll"));
+    // Kirikiri Z games call System.addFont without linking addFont.dll.
+    ncbAutoRegister::LoadModule(TJS_N("addFont.dll"));
 }
 
 void TVPUnloadInternalPlugins()

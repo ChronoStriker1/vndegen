@@ -323,6 +323,7 @@ endif()
 add_library(kirikiri_engine OBJECT
     vndegen/ciphers.cpp
     vndegen/sigcheck.cpp
+    vndegen/steam.cpp
     ${KIRIKIRI_CORE_SOURCES}
     ${KIRIKIRI_ENVIRON_SOURCES}
     ${KIRIKIRI_PLUGINS_SOURCES}
