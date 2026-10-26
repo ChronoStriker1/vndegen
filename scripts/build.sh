@@ -10,6 +10,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 xcodegen generate --quiet
+# Save sync's rclone library, which the package links on every platform.
+scripts/rclone-runtime.sh
 # The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
 case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
 

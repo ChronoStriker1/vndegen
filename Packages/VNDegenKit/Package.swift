@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "HubUI", targets: ["HubUI"]),
         .library(name: "SaveSync", targets: ["SaveSync"]),
         .library(name: "Rsync", targets: ["Rsync"]),
+        .library(name: "Rclone", targets: ["Rclone"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
     ],
     dependencies: [
@@ -39,7 +40,7 @@ let package = Package(
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport"], swiftSettings: mainActorByDefault),
-        .target(name: "SaveSync", dependencies: ["VNCore", "Rsync"]),
+        .target(name: "SaveSync", dependencies: ["VNCore", "Rsync", "Rclone"]),
         // The rsync wire protocol, client side, and the SSH connection it runs over.
         .target(name: "Rsync", dependencies: [
             .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
@@ -47,6 +48,10 @@ let package = Package(
             .product(name: "NIOPosix", package: "swift-nio"),
             .product(name: "NIOSSH", package: "swift-nio-ssh"),
         ]),
+        // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
+        .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
+        .target(name: "Rclone", dependencies: ["CRclone"],
+                linkerSettings: [.linkedFramework("CoreFoundation"), .linkedFramework("Security"), .linkedLibrary("resolv")]),
         // The system libarchive plus zlib's infback9 for Deflate64. Lives inside ArchiveImport's folder.
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
@@ -73,6 +78,7 @@ let package = Package(
             .product(name: "NIOPosix", package: "swift-nio"),
             .product(name: "NIOSSH", package: "swift-nio-ssh"),
         ]),
+        .testTarget(name: "RcloneTests", dependencies: ["Rclone"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
     ]
 )
