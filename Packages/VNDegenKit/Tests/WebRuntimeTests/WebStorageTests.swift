@@ -115,3 +115,17 @@ import Testing
     #expect(try await page.run("localStorage.removeItem('b'); localStorage.clear(); return localStorage.length") as? Int == 0)
     #expect(try storage.load().isEmpty)
 }
+
+@Test func storageReportsAFolderItCannotRead() throws {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    let directory = base.appendingPathComponent("localStorage")
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+        try? FileManager.default.removeItem(at: base)
+    }
+    let storage = WebStorage(directory: directory)
+    try storage.set("save", "kept")
+    try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: directory.path)
+    #expect(throws: (any Error).self) { try storage.load() }
+    #expect(throws: (any Error).self) { try storage.clear() }
+}

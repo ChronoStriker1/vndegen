@@ -28,7 +28,12 @@ nonisolated public struct WebStorage: Sendable {
     /// Every key and value. Files named the way earlier versions named them, with upper-case letters left as they were,
     /// move to their current names first. When a restore brings back an old name beside a current one, the newer file wins.
     public func load() throws -> [String: String] {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return [:] }
+        let names: [String]
+        do {
+            names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        } catch CocoaError.fileReadNoSuchFile {
+            return [:]
+        }
         var items: [String: String] = [:]
         for name in names where name.hasSuffix(Self.suffix) {
             guard let key = String(name.dropLast(Self.suffix.count)).removingPercentEncoding else { continue }

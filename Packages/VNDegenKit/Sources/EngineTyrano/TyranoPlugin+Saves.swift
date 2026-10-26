@@ -53,7 +53,7 @@ extension TyranoPlugin {
     static func adoptSaveKey(of game: TyranoGame, folder: URL, storage: WebStorage) throws {
         guard game.packaging == .electron, game.savesToFiles,
               let url = GameFolder(root: folder, webRoot: "").resolve(virtualPath: "\(GameFolder.virtualRoot)/\(game.projectID)_tyrano_data.sav"),
-              let data = try? Data(contentsOf: url), data.count <= 64 << 20,
+              let data = readBounded(url, limit: 64 << 20),
               let object = try? JSONSerialization.jsonObject(with: Data(jsUnescape(String(decoding: data, as: UTF8.self)).utf8)) as? [String: Any],
               let hash = object["hash"] as? String, !hash.isEmpty
         else { return }
@@ -61,6 +61,15 @@ extension TyranoPlugin {
         guard try storage.load()[name] != hash else { return }
         try storage.set(name, hash)
         tyranoLog.notice("took the save key of restored saves for \(game.projectID, privacy: .public)")
+    }
+
+    /// The file's bytes if it is a regular file of at most `limit` bytes. Reads no more than that, however large it is.
+    static func readBounded(_ url: URL, limit: Int) -> Data? {
+        guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: limit + 1), data.count <= limit else { return nil }
+        return data
     }
 
     /// JavaScript's `unescape`: `%XX` is a Latin-1 character and `%uXXXX` a UTF-16 code unit.

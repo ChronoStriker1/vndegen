@@ -8,10 +8,11 @@ lists=(.audit/library/engine-survey-games.tsv .audit/library/ludusavi-titles.txt
 terms=$(mktemp)
 trap 'rm -f "$terms"' EXIT
 for list in "${lists[@]}"; do
-  [ -f "$list" ] && cut -f1 "$list" | tail -n +2
-done | grep -v -x -i "No Socks RPG" | awk 'length($0) >= 5' | sort -u > "$terms"
+  if [ -f "$list" ]; then cut -f1 "$list" | tail -n +2; fi
+done | { grep -v -x -i "No Socks RPG" || true; } | awk 'length($0) >= 5' | sort -u > "$terms"
 # Short forms of titles, such as a name before a subtitle separator, slip past exact matching.
-sed -E 's/[_:~(].*$//; s/ +$//' "$terms" | awk 'length($0) >= 8' | sort -u >> "$terms"
+short=$(sed -E 's/[_:~(].*$//; s/ +$//' "$terms" | awk 'length($0) >= 8' | sort -u)
+[ -n "$short" ] && printf '%s\n' "$short" >> "$terms"
 found=0
 if [ -s "$terms" ] && git grep -I -n -F -f "$terms" HEAD -- . ':!*.json' ':!**/Fixtures/**'; then found=1; fi
 if git grep -I -n -E '\.arpa\b|/mnt/user|192\.168\.[0-9]+\.[0-9]+|/Users/chronostriker1|chronostriker1@gmail' HEAD -- . ':!scripts/check-public.sh'; then found=1; fi

@@ -199,3 +199,15 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     #expect(TyranoPlugin.jsUnescape("%7B%22a%22%3A%u3000%7D") == "{\"a\":\u{3000}}")
     #expect(TyranoPlugin.jsUnescape("100%25 %zz %u12 %+1 %e9") == "100% %zz %u12 %+1 é")
 }
+
+@Test func saveKeyReaderReadsNoMoreThanItsLimit() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-bounded-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let small = root.appendingPathComponent("small.sav"), large = root.appendingPathComponent("large.sav")
+    try Data(repeating: 1, count: 10).write(to: small)
+    try Data(repeating: 1, count: 11).write(to: large)
+    #expect(TyranoPlugin.readBounded(small, limit: 10)?.count == 10)
+    #expect(TyranoPlugin.readBounded(large, limit: 10) == nil)
+    #expect(TyranoPlugin.readBounded(root, limit: 10) == nil, "a folder is not a save file")
+}
