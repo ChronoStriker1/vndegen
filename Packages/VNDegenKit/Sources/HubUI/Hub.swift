@@ -125,10 +125,12 @@ public final class Hub {
     /// Longest a stopped game waits for its automatic backup before it can launch again.
     static let closingTimeout: Duration = .seconds(20)
 
-    /// Ends a running game the way quitting it from the hub would, then waits for every pending automatic backup. Call
-    /// before the app quits, so the play time and the backups are not lost. Returns at once when nothing is pending.
+    /// Ends a running game the way quitting it from the hub would, then waits for every pending automatic backup, at
+    /// most `closingTimeout`. Call before the app quits, so the play time and the backups are not lost. Returns at once
+    /// when nothing is pending. A backup cut off by the quit leaves no partial backup listed, because its folder goes
+    /// up before the mapping that names it.
     public func prepareToQuit() async {
         endSession()
-        await sessionEndWork?.value
+        if let sessionEndWork { await Self.wait(for: sessionEndWork, atMost: Self.closingTimeout) }
     }
 }
