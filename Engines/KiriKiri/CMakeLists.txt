@@ -1,6 +1,6 @@
 # Builds the KiriKiri engine (krkrsdl3) for VNDegen. scripts/kirikiri-engine.sh drives it.
 #   macOS: KiriKiriHelper, an executable VNDegen runs a game in.
-#   iOS:   KiriKiri.framework, which exports only the vnkk_* functions of vndegen/vnkk.h.
+#   iOS:   KiriKiri.framework, which exports only the vnkk_* functions of vnkk.h.
 # Rendering is software compositing presented through SDL3's renderer (Metal), with no OpenGL and
 # no JIT. Adapted from krkrsdl3_build's CMakeLists.txt and cmake/*.txt; see UPSTREAM.md.
 cmake_minimum_required(VERSION 3.28)
@@ -327,7 +327,10 @@ endif()
 target_compile_definitions(kirikiri_engine PUBLIC _KRKRSDL3_USE_SDL3=1)
 
 set(KRKRSDL krkrsdl3)
+# vnkk.h, the engine's C interface, lives in VNDegenKit so Swift reads the same declarations.
+set(KIRIKIRI_API ${CMAKE_CURRENT_LIST_DIR}/../../Packages/VNDegenKit/Sources/CKiriKiri/include)
 target_include_directories(kirikiri_engine PUBLIC
+    ${KIRIKIRI_API}
     ${KRKRSDL}/core/archive
     ${KRKRSDL}/core/main
     ${KRKRSDL}/core/media/font
@@ -392,11 +395,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         "-framework UIKit"
         "-framework AVFoundation"
     )
-    add_library(KiriKiri SHARED vndegen/vnkk.mm vndegen/vnkk.h)
+    add_library(KiriKiri SHARED vndegen/vnkk.mm ${KIRIKIRI_API}/vnkk.h)
     target_link_libraries(KiriKiri PRIVATE kirikiri_engine)
     set_target_properties(KiriKiri PROPERTIES
         FRAMEWORK TRUE
-        PUBLIC_HEADER vndegen/vnkk.h
+        PUBLIC_HEADER ${KIRIKIRI_API}/vnkk.h
         MACOSX_FRAMEWORK_IDENTIFIER com.chronostriker1.vndegen.KiriKiri
         MACOSX_FRAMEWORK_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/vndegen/Info.plist
     )

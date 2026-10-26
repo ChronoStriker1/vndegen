@@ -29,7 +29,9 @@ let package = Package(
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that the helper process loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
-        .target(name: "EngineKiriKiri", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
+        // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
+        .target(name: "CKiriKiri"),
+        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
