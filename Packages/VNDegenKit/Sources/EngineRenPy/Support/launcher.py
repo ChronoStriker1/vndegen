@@ -107,12 +107,21 @@ def use_python2_division():
             return a // b
         return a / b
 
-    # obj.name /= value and obj[key] /= value evaluate obj and key once, as the augmented assignment does.
-    def python2_divide_attribute(obj, name, value):
-        setattr(obj, name, python2_divide(getattr(obj, name), value))
+    # obj.name /= value and obj[key] /= value evaluate obj and key once, and read the old value before the right-hand
+    # side, as the augmented assignment does. The target helper runs first, as the call's first argument.
+    def python2_attribute(obj, name):
+        return obj, name, getattr(obj, name)
 
-    def python2_divide_item(obj, key, value):
-        obj[key] = python2_divide(obj[key], value)
+    def python2_item(obj, key):
+        return obj, key, obj[key]
+
+    def python2_divide_attribute(target, value):
+        obj, name, old = target
+        setattr(obj, name, python2_divide(old, value))
+
+    def python2_divide_item(target, value):
+        obj, key, old = target
+        obj[key] = python2_divide(old, value)
 
     def call(function, *args):
         return ast.Call(func=ast.Name(id="_vndegen_python2_" + function, ctx=ast.Load()), args=list(args), keywords=[])
@@ -133,9 +142,14 @@ def use_python2_division():
                 value = call("divide", ast.Name(id=target.id, ctx=ast.Load()), node.value)
                 replacement = ast.Assign(targets=[target], value=value)
             elif isinstance(target, ast.Attribute):
-                replacement = ast.Expr(call("divide_attribute", target.value, ast.Constant(target.attr), node.value))
-            elif isinstance(target, ast.Subscript) and not isinstance(target.slice, ast.Slice):
-                replacement = ast.Expr(call("divide_item", target.value, target.slice, node.value))
+                place = call("attribute", target.value, ast.Constant(target.attr))
+                replacement = ast.Expr(call("divide_attribute", place, node.value))
+            elif isinstance(target, ast.Subscript):
+                key = target.slice
+                if isinstance(key, ast.Slice):
+                    bounds = [part or ast.Constant(None) for part in (key.lower, key.upper, key.step)]
+                    key = call("slice", *bounds)
+                replacement = ast.Expr(call("divide_item", call("item", target.value, key), node.value))
             else:
                 return node
             return ast.copy_location(replacement, node)
@@ -164,8 +178,11 @@ def use_python2_division():
 
     helpers = {
         "_vndegen_python2_divide": python2_divide,
+        "_vndegen_python2_attribute": python2_attribute,
+        "_vndegen_python2_item": python2_item,
         "_vndegen_python2_divide_attribute": python2_divide_attribute,
         "_vndegen_python2_divide_item": python2_divide_item,
+        "_vndegen_python2_slice": slice,
     }
 
     def clear_compile_caches():
@@ -329,10 +346,17 @@ def run_in_process():
                 renpy.error.report_exception(e, editor=True)
     finally:
         # Ren'Py stops waiting for an autosave after 3 seconds when a game quits, but the autosave goes on writing
-        # through Ren'Py's save location, which the next game shares. So the game ends once it is done, and the hub
-        # keeps running meanwhile.
-        while not renpy.loadsave.autosave_not_running.is_set():
+        # through Ren'Py's save location, which the next game shares. So the game ends once its autosave thread has,
+        # and the hub keeps running meanwhile. A thread that died before it could mark the autosave finished leaves
+        # the flag down, which would stop the next game's autosaves, so it is raised here.
+        import threading
+
+        def autosaving():
+            return any(thread.is_alive() and "autosave_thread_function" in thread.name for thread in threading.enumerate())
+
+        while not renpy.loadsave.autosave_not_running.is_set() and autosaving():
             host.vndegen_renpy_pump()
+        renpy.loadsave.autosave_not_running.set()
         renpy.display.tts.tts(None)
         if renpy.display.draw:
             renpy.display.im.cache.quit()
