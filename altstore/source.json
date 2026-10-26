@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.3.0",
+          "buildVersion": "121",
+          "date": "2026-10-26T07:47:40Z",
+          "localizedDescription": "Adds Ren'Py on Mac, the third engine. iPhone and iPad support for Ren'Py comes in a later release.\n\n## Downloads\n\n- `VNDegen-0.3.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`. It is larger than before because it includes the official Ren'Py 8 and Ren'Py 7 runtimes.\n- `VNDegen-0.3.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly. On iPhone and iPad, Ren'Py games are detected and listed but do not run yet.\n\n## New\n\n- Ren'Py games on Mac. VNDegen reads each game's Ren'Py version and runs it on the matching bundled runtime, Ren'Py 8 or Ren'Py 7, without changing the game's files. Tested with three games from Ren'Py 7.4 to 8.5.\n- The VNDegen menu opens from the backtick, the controller's Options or Home button, even at a name prompt. Quit to library lets the game save on the way out.\n- Saves go to VNDegen's per-game folder. A game's existing saves are copied in on first launch, and Ludusavi backups map Windows, Steam Deck, and VNDegen paths.\n- Button mapping works inside Ren'Py games too.\n\n## Fixed\n\n- The TyranoScript save-key check reads at most 64 MB, and an unreadable save folder is reported instead of being treated as empty.\n\n## Known limits\n\n- The game window opens exactly over the VNDegen window. Hiding the library while the game runs and bringing it back afterward has not been checked on an unlocked desktop yet.\n- Changes to button mapping made while a Ren'Py game runs apply on its next launch.\n- Opening the VNDegen menu from a Ren'Py game's main menu blanks that menu until you resume.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.3.0/VNDegen-0.3.0.ipa",
+          "size": 2592227,
+          "sha256": "dac6f0793de452d20226b6f52849d80e78d85d177508b9f07ade1e58959735a0",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.2.3",
           "buildVersion": "95",
           "date": "2026-10-26T07:30:53Z",
