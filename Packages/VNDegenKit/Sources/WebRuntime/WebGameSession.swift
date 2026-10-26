@@ -153,7 +153,7 @@ final class WebGameSession: NSObject, EngineSession {
         URL.cachesDirectory.appendingPathComponent("TranscodedAudio", isDirectory: true)
     }
 
-    private static func shimSource(for game: WebGameConfiguration) throws -> String {
+    static func shimSource(for game: WebGameConfiguration) throws -> String {
         guard let url = Bundle.module.url(forResource: "nwjs-shim", withExtension: "js") else { throw WebRuntimeError.shimMissing }
         var config: [String: String] = [
             "mainModule": game.folder.mainModule, "cwd": GameFolder.virtualRoot, "platform": "darwin", "appName": game.appName,
