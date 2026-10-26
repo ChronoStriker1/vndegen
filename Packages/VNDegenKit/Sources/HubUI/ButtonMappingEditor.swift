@@ -8,6 +8,12 @@ extension ControlMethod {
         UserDefaults.standard.string(forKey: storageKey).flatMap(Self.init(rawValue:)) ?? .automatic
     }
 
+    /// Whether a game's control method changes anything: only on a touch device, and only when the game's engine
+    /// leaves touches to VNDegen.
+    static func applies(to engine: (any EnginePlugin)?, on platform: Platform = .current) -> Bool {
+        platform == .iOS && engine?.readsTouches != true
+    }
+
     /// Settings and the in-game menu pick one of these first, then a controller's mouse and the mouse style under it.
     enum Kind: CaseIterable {
         case automatic, gamepad, mouse, controller
