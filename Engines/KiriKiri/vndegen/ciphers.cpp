@@ -6,6 +6,9 @@
 #include <zlib.h>
 
 #include <algorithm>
+#include <array>
+#include <iterator>
+#include <memory>
 #include <string>
 
 // k is the low byte of the file's adler32 in every scheme seen so far.
@@ -45,44 +48,94 @@ static const size_t maxSamples = 8;
 static const uint64_t sampleBudget = 4 * 1024 * 1024;
 // Samples at least this long cover every band of bandedXorAdd, so the schemes cannot agree on them.
 static const uint64_t preferredSampleSize = 0x200;
+// Samples are read, decompressed, and checksummed this many bytes at a time, so detection holds a
+// few of these however large the entries are.
+static const size_t pieceSize = 64 * 1024;
 
 struct Sample {
     uint32_t hash;
-    std::vector<uint8_t> data; // decompressed, still encrypted
+    // The adler32 of the entry's contents without decryption, then decrypted with each scheme.
+    std::array<uint32_t, 1 + std::size(ciphers)> checksums;
 };
+
+// Runs inflate over a compressed segment, handing each decompressed piece to add.
+template <typename Add>
+static void inflateSegment(tTJSBinaryStream *st, const tTVPXP3ArchiveSegment &segment, Add add)
+{
+    z_stream z{};
+    if (inflateInit(&z) != Z_OK)
+        TVPThrowExceptionMessage(TJS_N("vnkk: could not decompress a sample"));
+    std::unique_ptr<z_stream, int (*)(z_stream *)> end(&z, inflateEnd);
+    std::vector<uint8_t> packed(pieceSize), plain(pieceSize);
+    uint64_t packedLeft = segment.ArcSize, plainLeft = segment.OrgSize;
+    for (int result = Z_OK; result != Z_STREAM_END;) {
+        if (z.avail_in == 0 && packedLeft > 0) {
+            size_t size = std::min<uint64_t>(packedLeft, pieceSize);
+            st->ReadBuffer(packed.data(), (tjs_uint)size);
+            packedLeft -= size;
+            z.next_in = packed.data();
+            z.avail_in = (uInt)size;
+        }
+        z.next_out = plain.data();
+        z.avail_out = (uInt)pieceSize;
+        // Z_BUF_ERROR here means the compressed data ended early.
+        result = inflate(&z, Z_NO_FLUSH);
+        size_t produced = pieceSize - z.avail_out;
+        if ((result != Z_OK && result != Z_STREAM_END) || produced > plainLeft)
+            TVPThrowExceptionMessage(TJS_N("vnkk: could not decompress a sample"));
+        add(plain.data(), produced);
+        plainLeft -= produced;
+    }
+    if (plainLeft)
+        TVPThrowExceptionMessage(TJS_N("vnkk: could not decompress a sample"));
+}
 
 static Sample readSample(const tTVPXP3Archive::tArchiveItem &item, tTJSBinaryStream *st)
 {
-    Sample sample{item.FileHash, std::vector<uint8_t>(item.OrgSize)};
-    std::vector<uint8_t> packed;
+    Sample sample{item.FileHash, {}};
+    sample.checksums.fill(adler32(0, nullptr, 0));
+    uint64_t position = 0;
+    std::vector<uint8_t> decrypted(pieceSize);
+    auto add = [&](const uint8_t *data, size_t size) {
+        sample.checksums[0] = adler32(sample.checksums[0], data, (uInt)size);
+        for (size_t i = 0; i < std::size(ciphers); i++) {
+            std::copy(data, data + size, decrypted.begin());
+            ciphers[i].decrypt(item.FileHash, position, decrypted.data(), size);
+            sample.checksums[i + 1] = adler32(sample.checksums[i + 1], decrypted.data(), (uInt)size);
+        }
+        position += size;
+    };
+
+    const uint64_t archiveSize = st->GetSize();
+    std::vector<uint8_t> piece(pieceSize);
     for (const tTVPXP3ArchiveSegment &segment : item.Segments) {
-        if (segment.Offset + segment.OrgSize > item.OrgSize)
-            TVPThrowExceptionMessage(TJS_N("vnkk: segment outside its file"));
-        uint8_t *out = sample.data.data() + segment.Offset;
+        uint64_t stored = segment.IsCompressed ? segment.ArcSize : segment.OrgSize;
+        if (segment.OrgSize > item.OrgSize - position || segment.Start > archiveSize ||
+            stored > archiveSize - segment.Start)
+            TVPThrowExceptionMessage(TJS_N("vnkk: segment outside its file or archive"));
         st->SetPosition(segment.Start);
-        if (!segment.IsCompressed) {
-            st->ReadBuffer(out, (tjs_uint)segment.OrgSize);
+        if (segment.IsCompressed) {
+            inflateSegment(st, segment, add);
             continue;
         }
-        packed.resize(segment.ArcSize);
-        st->ReadBuffer(packed.data(), (tjs_uint)packed.size());
-        uLongf length = segment.OrgSize;
-        if (uncompress(out, &length, packed.data(), packed.size()) != Z_OK || length != segment.OrgSize)
-            TVPThrowExceptionMessage(TJS_N("vnkk: could not decompress a sample"));
+        for (uint64_t left = stored; left > 0;) {
+            size_t size = std::min<uint64_t>(left, pieceSize);
+            st->ReadBuffer(piece.data(), (tjs_uint)size);
+            add(piece.data(), size);
+            left -= size;
+        }
     }
+    // Some archives list files longer than their segments. The engine's reads end with the last
+    // segment, so the sample does too.
     return sample;
 }
 
-static size_t countVerified(const std::vector<Sample> &samples, const VNKKCipher *cipher)
+// Index 0 counts the samples that verify without decryption, then one per scheme.
+static size_t countVerified(const std::vector<Sample> &samples, size_t index)
 {
     size_t verified = 0;
-    std::vector<uint8_t> plain;
-    for (const Sample &sample : samples) {
-        plain = sample.data;
-        if (cipher)
-            cipher->decrypt(sample.hash, 0, plain.data(), plain.size());
-        verified += adler32(adler32(0, nullptr, 0), plain.data(), (uInt)plain.size()) == sample.hash;
-    }
+    for (const Sample &sample : samples)
+        verified += sample.checksums[index] == sample.hash;
     return verified;
 }
 
@@ -119,11 +172,11 @@ const VNKKCipher *VNKKDetectCipher(const ttstr &archiveName,
         // Some archives hold a warning text file under a made-up checksum, so a scheme needs only
         // half of the samples. Plain data wins a tie.
         const VNKKCipher *best = nullptr;
-        size_t bestCount = countVerified(samples, nullptr);
-        for (const VNKKCipher &cipher : ciphers) {
-            size_t count = countVerified(samples, &cipher);
+        size_t bestCount = countVerified(samples, 0);
+        for (size_t i = 0; i < std::size(ciphers); i++) {
+            size_t count = countVerified(samples, i + 1);
             if (count > bestCount)
-                best = &cipher, bestCount = count;
+                best = &ciphers[i], bestCount = count;
         }
         if (bestCount * 2 >= samples.size()) {
             if (best)

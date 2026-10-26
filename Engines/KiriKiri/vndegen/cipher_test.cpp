@@ -7,8 +7,10 @@
 #include "ciphers.h"
 #include "vnkk.h"
 
+#include <malloc/malloc.h>
 #include <zlib.h>
 
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -16,6 +18,8 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <new>
+#include <signal.h>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -24,6 +28,49 @@ using Bytes = std::vector<uint8_t>;
 using Encrypt = std::function<void(uint32_t hash, Bytes &data)>;
 
 static int failures;
+
+// Every operator new in the process goes through these, so a test can see the most memory held at once.
+static std::atomic<int64_t> liveBytes{0}, peakBytes{0};
+
+static void track(int64_t delta)
+{
+    int64_t now = liveBytes += delta;
+    int64_t peak = peakBytes.load();
+    while (now > peak && !peakBytes.compare_exchange_weak(peak, now)) {
+    }
+}
+
+void *operator new(size_t size)
+{
+    void *p = malloc(size ? size : 1);
+    if (!p)
+        throw std::bad_alloc();
+    track((int64_t)malloc_size(p));
+    return p;
+}
+
+void *operator new[](size_t size) { return operator new(size); }
+
+void operator delete(void *p) noexcept
+{
+    if (p) {
+        track(-(int64_t)malloc_size(p));
+        free(p);
+    }
+}
+
+void operator delete[](void *p) noexcept { operator delete(p); }
+void operator delete(void *p, size_t) noexcept { operator delete(p); }
+void operator delete[](void *p, size_t) noexcept { operator delete(p); }
+
+// The most memory held at once while run() runs, beyond what was held before it.
+template <typename Run> static int64_t peakDuring(Run run)
+{
+    int64_t before = liveBytes;
+    peakBytes = before;
+    run();
+    return peakBytes - before;
+}
 
 static void check(bool ok, const std::string &what)
 {
@@ -54,15 +101,60 @@ struct Entry {
     std::string name;
     Bytes plain;
     bool compressed;
+    uint64_t unstored = 0; // listed in the index beyond what the segments hold
 };
+
+struct Segment {
+    bool compressed;
+    uint64_t start, orgSize, arcSize;
+};
+
+// The header, 11 bytes of signature and the index offset, comes before an archive's contents.
+static const uint64_t headerSize = 19;
+
+static Bytes fileChunk(const std::string &name, uint64_t orgSize, uint64_t arcSize,
+                       const std::vector<Segment> &segments, uint32_t checksum)
+{
+    Bytes info, segm, adlr, body, out;
+    put(info, 0, 4);
+    put(info, orgSize, 8);
+    put(info, arcSize, 8);
+    put(info, name.size(), 2);
+    for (char c : name)
+        put(info, (uint8_t)c, 2);
+    for (const Segment &segment : segments) {
+        put(segm, segment.compressed ? 1 : 0, 4);
+        put(segm, segment.start, 8);
+        put(segm, segment.orgSize, 8);
+        put(segm, segment.arcSize, 8);
+    }
+    put(adlr, checksum, 4);
+    chunk(body, "info", info);
+    chunk(body, "segm", segm);
+    chunk(body, "adlr", adlr);
+    chunk(out, "File", body);
+    return out;
+}
+
+// Writes an XP3 archive of contents, at headerSize, and an uncompressed index.
+static void writeXP3(const std::string &path, const Bytes &contents, const Bytes &index)
+{
+    Bytes file = {'X', 'P', '3', 0x0d, 0x0a, 0x20, 0x0a, 0x1a, 0x8b, 0x67, 0x01};
+    put(file, headerSize + contents.size(), 8);
+    file.insert(file.end(), contents.begin(), contents.end());
+    file.push_back(0);
+    put(file, index.size(), 8);
+    file.insert(file.end(), index.begin(), index.end());
+    FILE *out = fopen(path.c_str(), "wb");
+    fwrite(file.data(), 1, file.size(), out);
+    fclose(out);
+}
 
 // Writes an XP3 archive of entries, each encrypted with encrypt and stored under hash(plain).
 static void writeArchive(const std::string &path, const std::vector<Entry> &entries,
                          const Encrypt &encrypt, const std::function<uint32_t(const Bytes &)> &hash)
 {
-    Bytes file = {'X', 'P', '3', 0x0d, 0x0a, 0x20, 0x0a, 0x1a, 0x8b, 0x67, 0x01};
-    put(file, 0, 8);
-    Bytes index;
+    Bytes contents, index;
     for (const Entry &entry : entries) {
         uint32_t checksum = hash(entry.plain);
         Bytes stored = entry.plain;
@@ -74,35 +166,13 @@ static void writeArchive(const std::string &path, const std::vector<Entry> &entr
             packed.resize(size);
             stored = packed;
         }
-        uint64_t start = file.size();
-        file.insert(file.end(), stored.begin(), stored.end());
-
-        Bytes info, segm, adlr, body;
-        put(info, 0, 4);
-        put(info, entry.plain.size(), 8);
-        put(info, stored.size(), 8);
-        put(info, entry.name.size(), 2);
-        for (char c : entry.name)
-            put(info, (uint8_t)c, 2);
-        put(segm, entry.compressed ? 1 : 0, 4);
-        put(segm, start, 8);
-        put(segm, entry.plain.size(), 8);
-        put(segm, stored.size(), 8);
-        put(adlr, checksum, 4);
-        chunk(body, "info", info);
-        chunk(body, "segm", segm);
-        chunk(body, "adlr", adlr);
-        chunk(index, "File", body);
+        uint64_t start = headerSize + contents.size();
+        contents.insert(contents.end(), stored.begin(), stored.end());
+        Bytes file = fileChunk(entry.name, entry.plain.size() + entry.unstored, stored.size(),
+                               {{entry.compressed, start, entry.plain.size(), stored.size()}}, checksum);
+        index.insert(index.end(), file.begin(), file.end());
     }
-    uint64_t indexOffset = file.size();
-    file.push_back(0);
-    put(file, index.size(), 8);
-    file.insert(file.end(), index.begin(), index.end());
-    for (int i = 0; i < 8; i++)
-        file[11 + i] = (uint8_t)(indexOffset >> (8 * i));
-    FILE *out = fopen(path.c_str(), "wb");
-    fwrite(file.data(), 1, file.size(), out);
-    fclose(out);
+    writeXP3(path, contents, index);
 }
 
 static Bytes pattern(size_t size, uint32_t seed)
@@ -134,6 +204,16 @@ static ttstr storageName(const std::string &path)
 static tTVPXP3Archive *openArchive(const std::string &path)
 {
     return dynamic_cast<tTVPXP3Archive *>(TVPOpenArchive(storageName(path), true));
+}
+
+// Opens an archive whose index may be malformed. Null when the engine rejects it.
+static tTVPXP3Archive *tryOpenArchive(const std::string &path)
+{
+    try {
+        return openArchive(path);
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 // Reads an entry in odd-sized pieces, so decryption runs at offsets that start inside each band.
@@ -237,6 +317,13 @@ static int runTests()
     check(largeArchive && cipherName(largeArchive) == "xorByChecksum", "an archive of only large entries is detected");
     check(largeArchive && readsPlain(largeArchive, large), "an archive of only large entries decrypts");
 
+    std::vector<Entry> withLong = entries;
+    withLong.push_back({"long.bin", pattern(3000, 99), false, 100});
+    writeArchive(path("long.xp3"), withLong, encryptXor, adler);
+    tTVPXP3Archive *longArchive = openArchive(path("long.xp3"));
+    check(longArchive && cipherName(longArchive) == "xorByChecksum",
+          "an archive listing a file longer than its segments is still detected");
+
     tTVPXP3Archive *placeholder = openArchive(path("placeholder.xp3"));
     check(placeholder && cipherName(placeholder) == "plain", "an archive with one checksum on every entry is read as plain");
     check(placeholder && readsPlain(placeholder, entries), "an archive with one checksum on every entry reads back unchanged");
@@ -257,7 +344,45 @@ static int runTests()
     check(xorArchive && readsPlain(xorArchive, entries), "an extraction filter replaces the native cipher");
     TVPSetXP3ArchiveExtractionFilter(nullptr);
 
-    for (tTVPXP3Archive *archive : {plain, xorArchive, banded, decoy, largeArchive, placeholder, unknown})
+    // Index fields come straight from the file, so their sizes can be anything.
+    std::vector<Entry> huge;
+    for (uint32_t i = 0; i < 2; i++)
+        huge.push_back({"movie" + std::to_string(i) + ".mpg", pattern(8 << 20, i + 70), false});
+    writeArchive(path("huge.xp3"), huge, encryptXor, adler);
+    huge.clear();
+    tTVPXP3Archive *hugeArchive = nullptr;
+    int64_t held = peakDuring([&] { hugeArchive = openArchive(path("huge.xp3")); });
+    check(hugeArchive && cipherName(hugeArchive) == "xorByChecksum", "an archive of 8 MiB entries is detected");
+    check(held < 1 << 20, "detecting it holds under 1 MiB at once (" + std::to_string(held >> 10) + " KiB)");
+
+    writeXP3(path("packed.xp3"), pattern(4096, 8),
+             fileChunk("packed.bin", 100, 64 << 20, {{true, headerSize, 100, 64 << 20}}, 1));
+    tTVPXP3Archive *packed = nullptr;
+    held = peakDuring([&] { packed = tryOpenArchive(path("packed.xp3")); });
+    check(packed && cipherName(packed) == "plain", "an archive whose compressed size runs past its end opens");
+    check(held < 1 << 20, "the compressed size is not allocated (" + std::to_string(held >> 10) + " KiB held)");
+
+    writeXP3(path("overflow.xp3"), pattern(4096, 7),
+             fileChunk("overflow.bin", 1, 1, {{false, headerSize, 1, 1}, {false, headerSize, UINT64_MAX, UINT64_MAX}}, 1));
+    tTVPXP3Archive *overflow = tryOpenArchive(path("overflow.xp3"));
+    check(overflow && cipherName(overflow) == "plain",
+          "segment sizes that overflow are rejected without writing past the sample");
+
+    Bytes chunkSize = {'F', 'i', 'l', 'e'};
+    put(chunkSize, UINT64_MAX - 11, 8);
+    writeXP3(path("chunksize.xp3"), {}, chunkSize);
+    signal(SIGALRM, [](int) {
+        const char message[] = "FAIL: opening an archive whose chunk size overflows did not finish in 10 s\n";
+        write(STDOUT_FILENO, message, sizeof message - 1);
+        _exit(1);
+    });
+    alarm(10);
+    tTVPXP3Archive *badChunk = tryOpenArchive(path("chunksize.xp3"));
+    alarm(0);
+    check(!badChunk, "an index chunk whose size overflows is rejected");
+
+    for (tTVPXP3Archive *archive :
+         {plain, xorArchive, banded, decoy, largeArchive, longArchive, placeholder, unknown, overflow, hugeArchive, packed})
         if (archive)
             archive->Release();
     std::filesystem::remove_all(dir);
@@ -303,6 +428,8 @@ static int bench(const char *path)
 
 int main(int argc, char *argv[])
 {
+    // Each result reaches the log even if a later check crashes.
+    setvbuf(stdout, nullptr, _IOLBF, 0);
     if (argc == 3 && !strcmp(argv[1], "--bench"))
         return bench(argv[2]);
     return runTests();

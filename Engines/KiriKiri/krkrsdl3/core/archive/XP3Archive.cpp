@@ -267,7 +267,7 @@ void tTVPXP3Archive::Init(tTJSBinaryStream* st, tjs_int64 off, bool normalizeNam
                 for (tjs_uint pos = 0; pos + 12 <= index_size;)
                 {
                     tjs_uint64 csize = ReadI64FromMem(indexdata + pos + 4);
-                    if (pos + 12 + csize > index_size)
+                    if (csize > index_size - pos - 12)
                         break;
                     if (!memcmp(indexdata + pos, "eliF", 4) && csize >= 6)
                     {
