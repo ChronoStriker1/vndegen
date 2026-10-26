@@ -112,12 +112,14 @@ From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH 
 App/                      app entry point, icons, Info.plist
 Packages/VNDegenKit/
   Sources/VNCore/         shared types: games, the library, the engine plugin contract, input events
-  Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, WebKit runtime, NW.js layer
+  Sources/WebRuntime/     shared host for HTML5 engines: WebKit view, game file serving, Node and NW.js layer
+  Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, key mapping, save locations
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
   Sources/Lock/           Face ID, Touch ID, and passcode
   Sources/SaveSync/       Ludusavi backup and restore
+  Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, and simulator helpers
 project.yml               XcodeGen project definition
