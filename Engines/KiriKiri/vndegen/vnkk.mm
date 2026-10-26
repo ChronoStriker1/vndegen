@@ -279,17 +279,21 @@ int vnkk_iterate(void)
     if (running || paused)
         return 0;
     running = true;
-    if (quitRequested && !quitSentAt) {
-        quitSentAt = SDL_GetTicks() | 1;
-        closeWithoutConfirmation();
-    } else if (quitSentAt && !terminated && SDL_GetTicks() - quitSentAt > forcedQuitDelayMS) {
-        // A game with its own quit dialog ignores askOnClose and is still waiting on it.
-        terminated = true;
-        SDL_Log("vnkk: the game did not close, terminating it");
-        TVPDoSaveSystemVariables();
-        TVPTerminateAsync();
-    }
+    struct FrameEnd {
+        ~FrameEnd() { running = false; }
+    } frameEnd;
+    // Closing the window runs the game's own close handlers, which can throw too.
     try {
+        if (quitRequested && !quitSentAt) {
+            quitSentAt = SDL_GetTicks() | 1;
+            closeWithoutConfirmation();
+        } else if (quitSentAt && !terminated && SDL_GetTicks() - quitSentAt > forcedQuitDelayMS) {
+            // A game with its own quit dialog ignores askOnClose and is still waiting on it.
+            terminated = true;
+            SDL_Log("vnkk: the game did not close, terminating it");
+            TVPDoSaveSystemVariables();
+            TVPTerminateAsync();
+        }
         SDL_Event event;
         while (SDL_PollEvent(&event))
             SDL_AppEvent(nullptr, &event);
@@ -298,7 +302,6 @@ int vnkk_iterate(void)
         SDL_Log("vnkk: the game stopped on an error");
         finished = true;
     }
-    running = false;
     return finished;
 }
 
