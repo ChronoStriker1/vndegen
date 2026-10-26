@@ -1,9 +1,10 @@
 import Foundation
 import Rsync
 
-/// The real rsync, run as `rsync --server` with pipes in place of SSH. Homebrew's 3.x when present, as on the build Mac
-/// and the servers VNDegen talks to, else the system's.
-public let rsyncPath = ["/opt/homebrew/bin/rsync", "/usr/local/bin/rsync", "/usr/bin/rsync"].first { FileManager.default.isExecutableFile(atPath: $0) }
+/// The real rsync, run as `rsync --server` with pipes in place of SSH. `VNDEGEN_RSYNC` picks one, such as macOS's
+/// openrsync at /usr/bin/rsync. Else Homebrew's 3.x when present, as on the build Mac and the servers VNDegen talks to.
+public let rsyncPath = ([ProcessInfo.processInfo.environment["VNDEGEN_RSYNC"]].compactMap { $0 }
+    + ["/opt/homebrew/bin/rsync", "/usr/local/bin/rsync", "/usr/bin/rsync"]).first { FileManager.default.isExecutableFile(atPath: $0) }
 
 public struct ProcessConnection: RsyncConnection {
     public init() {}
