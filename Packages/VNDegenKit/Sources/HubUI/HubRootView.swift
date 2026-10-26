@@ -34,6 +34,10 @@ public struct HubRootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { nav.relock() }
         }
+        // An archive opened in VNDegen from Files, Finder, or a share sheet. The app declares zip, RAR, and 7z.
+        .onOpenURL { url in
+            if url.isFileURL { nav.openImport([url]) }
+        }
     }
 }
 
@@ -81,14 +85,8 @@ private struct LibraryContainer: View {
         }
         .onChange(of: hub.library.games) { nav.revalidate() }
         .onChange(of: hub.lock.isUnlocked) { nav.revalidate() }
-        #if os(macOS)
         // Archives dropped anywhere on the library open the import sheet with them chosen.
-        .dropDestination(for: URL.self) { urls, _ in
-            let files = urls.filter(\.isFileURL)
-            guard nav.sheet == nil, !files.isEmpty else { return false }
-            nav.openImport(files)
-            return true
-        } isTargeted: { dropTargeted = $0 && nav.sheet == nil }
+        .onArchiveDrop(isTargeted: { dropTargeted = $0 && nav.sheet == nil }) { nav.openImport($0) }
         .overlay {
             if dropTargeted {
                 // Shown while dragging only. The drop itself lands on the container, so this one takes no hits.
@@ -102,7 +100,6 @@ private struct LibraryContainer: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: dropTargeted)
-        #endif
     }
 
     @ViewBuilder

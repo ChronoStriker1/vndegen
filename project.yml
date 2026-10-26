@@ -31,6 +31,26 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        # Lists VNDegen under Open in and Share for archives, behind the apps that own these types.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Archive
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.zip-archive, com.rarlab.rar-archive, org.7-zip.7-zip-archive]
+        # iOS's built-in type list has no RAR or 7z type. A type another app exports wins over these.
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.rarlab.rar-archive
+            UTTypeDescription: RAR archive
+            UTTypeConformsTo: [public.data, public.archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [rar]
+              public.mime-type: [application/vnd.rar, application/x-rar-compressed]
+          - UTTypeIdentifier: org.7-zip.7-zip-archive
+            UTTypeDescription: 7z archive
+            UTTypeConformsTo: [public.data, public.archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [7z]
+              public.mime-type: [application/x-7z-compressed]
         NSFaceIDUsageDescription: Unlock hidden games.
         UILaunchScreen: {}
         UIStatusBarHidden: true

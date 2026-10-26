@@ -1,8 +1,12 @@
 import Foundation
 import Observation
+import os
 #if canImport(UIKit)
 import UIKit
 #endif
+
+/// Picks, drops, and opens, with file names only, so a device report can be read in Console.
+nonisolated let importLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "archiveimport")
 
 /// Imports one archive as a new game folder. The archive is extracted into `Games/.importing/<id>` and moved into Games
 /// only when everything succeeded, so the library never sees a partial game. The library scan skips dot folders.
@@ -47,6 +51,8 @@ public final class ArchiveImporter {
     /// The archive the user picked, which "Delete archive after import" removes.
     private var picked: (source: ArchiveSource, contents: ArchiveContents)?
     private var securityScoped: [URL] = []
+    /// Folders of dropped files the system could not open in place, deleted when this import closes.
+    private var dropCopies: Set<URL> = []
     /// Extraction folders still on disk. A nested import keeps the outer one until the inner one finishes.
     private var stagings: [URL] = []
     /// The outer extraction's game folder while the nested offer is showing.
@@ -80,15 +86,20 @@ public final class ArchiveImporter {
         close()
         step = .opening
         securityScoped = urls.filter { $0.startAccessingSecurityScopedResource() }
+        dropCopies = Set(urls.filter(DroppedFiles.isCopy).map(DroppedFiles.copyFolder))
+        let names = urls.map(\.lastPathComponent)
+        importLog.notice("Chose \(urls.count) files \(names, privacy: .public), security-scoped access granted for \(self.securityScoped.count)")
         do {
             let (source, contents) = try await Self.open(urls)
             picked = (source, contents)
             self.source = source
             self.contents = contents
             folderName = source.suggestedFolderName
-            canDeleteArchive = source.volumes.allSatisfy(isInOwnFolders)
+            // A dropped copy is deleted anyway, and deleting it never frees the original's space.
+            canDeleteArchive = dropCopies.isEmpty && source.volumes.allSatisfy(isInOwnFolders)
             step = .reviewing
         } catch {
+            importLog.error("Could not open the chosen files: \(String(describing: error), privacy: .public)")
             fail(error, returningTo: .choosing)
         }
     }
@@ -153,6 +164,8 @@ public final class ArchiveImporter {
         discardStagings()
         securityScoped.forEach { $0.stopAccessingSecurityScopedResource() }
         securityScoped = []
+        dropCopies.forEach { try? FileManager.default.removeItem(at: $0) }
+        dropCopies = []
         picked = nil
         source = nil
         contents = nil

@@ -35,6 +35,14 @@ public final class ArchiveImportModel {
         if !initialSelection.isEmpty { await importer.choose(initialSelection) }
     }
 
+    /// Starts over with these files, such as an archive opened from another app while the flow is showing. Does
+    /// nothing while an extraction runs.
+    public func choose(_ urls: [URL]) {
+        guard let importer, importer.step != .extracting else { return }
+        focus = nil
+        Task { await importer.choose(urls) }
+    }
+
     /// Cancels a running extraction, or ends the flow and reports what was imported. Later calls do nothing.
     public func close() {
         guard let onFinish else { return }
@@ -186,6 +194,21 @@ public struct ArchiveImportView: View {
         #endif
         .presentationDetents([.large])
         .interactiveDismissDisabled(importer?.step == .extracting)
+        // The system presents this picker modally. On an iPhone, Open did nothing in the UIDocumentPickerViewController
+        // this replaced, which was embedded in a sheet inside this sheet. `.data` rather than archive types, because
+        // old-style RAR volumes (.r00) and split parts (.001) have no type. The URLs are opened in place and
+        // security-scoped, which `choose` handles.
+        .fileImporter(isPresented: $model.picking, allowedContentTypes: [.data], allowsMultipleSelection: true) { result in
+            switch result {
+            case let .success(urls):
+                importLog.notice("Picker returned \(urls.count) files")
+                if !urls.isEmpty { Task { await importer?.choose(urls) } }
+            case let .failure(error):
+                importLog.error("Picker failed: \(error.localizedDescription, privacy: .public)")
+            }
+        } onCancellation: {
+            importLog.notice("Picker cancelled")
+        }
         .task { await model.start(initialSelection: initialSelection, onFinish: onFinish) }
     }
 }
@@ -217,10 +240,7 @@ public struct ArchiveDropTarget: View {
                 .strokeBorder(targeted ? ImportTheme.accent : ImportTheme.stroke, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
         }
         .animation(.easeOut(duration: 0.15), value: targeted)
-        .dropDestination(for: URL.self) { urls, _ in
-            onDrop(urls)
-            return !urls.isEmpty
-        } isTargeted: { targeted = $0 }
+        .onArchiveDrop(isTargeted: { targeted = $0 }, perform: onDrop)
     }
 }
 
@@ -244,19 +264,6 @@ private struct StepView: View {
         .animation(.easeInOut(duration: 0.2), value: importer.step)
         .onChange(of: model.editing) { _, editing in fieldFocus = editing }
         .onChange(of: fieldFocus) { _, focus in model.editing = focus }
-        #if os(iOS)
-        .sheet(isPresented: $model.picking) {
-            DocumentPicker { urls in
-                model.picking = false
-                if !urls.isEmpty { Task { await importer.choose(urls) } }
-            }
-            .ignoresSafeArea()
-        }
-        #else
-        .fileImporter(isPresented: $model.picking, allowedContentTypes: [.data], allowsMultipleSelection: true) { result in
-            if case let .success(urls) = result, !urls.isEmpty { Task { await importer.choose(urls) } }
-        }
-        #endif
     }
 
     private var choosing: some View {
@@ -529,31 +536,3 @@ struct ImportButtonStyle: ButtonStyle {
             .animation(.spring(response: 0.28, dampingFraction: 0.78), value: configuration.isPressed)
     }
 }
-
-#if os(iOS)
-/// The system document picker, opened in place (`asCopy: false`) so a multi-GB archive is read where it is instead of
-/// being copied into the app first. The picked URLs are security-scoped, which `ArchiveImporter.choose` handles.
-private struct DocumentPicker: UIViewControllerRepresentable {
-    let onPick: ([URL]) -> Void
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        // `.data` rather than archive types, because old-style RAR volumes (.r00) and split parts (.001) have no type.
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: false)
-        picker.allowsMultipleSelection = true
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ picker: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
-
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onPick: ([URL]) -> Void
-        init(onPick: @escaping ([URL]) -> Void) { self.onPick = onPick }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { onPick(urls) }
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { onPick([]) }
-    }
-}
-#endif

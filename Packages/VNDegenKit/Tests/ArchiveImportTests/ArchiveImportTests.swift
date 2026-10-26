@@ -397,6 +397,53 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     #expect(model.editing == .passwordField)
 }
 
+// MARK: Drops
+
+/// What Files hands a drop target: a provider holding a file representation, offered in place or only as a copy.
+private func provider(for url: URL, inPlace: Bool) -> NSItemProvider {
+    let provider = NSItemProvider()
+    provider.registerFileRepresentation(forTypeIdentifier: "public.zip-archive", fileOptions: inPlace ? [.openInPlace] : [],
+                                        visibility: .all) { completion in
+        completion(url, inPlace, nil)
+        return nil
+    }
+    return provider
+}
+
+@MainActor @Test func opensADropInPlace() async throws {
+    let archive = try temporaryDirectory().appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    let urls = await DroppedFiles.urls(from: [provider(for: archive, inPlace: true)])
+    #expect(urls.map(\.standardizedFileURL) == [archive.standardizedFileURL])
+
+    let importer = try await importArchive(urls, into: try temporaryDirectory())
+    #expect(importer.step.isFinished)
+    importer.close()
+    #expect(fm.fileExists(atPath: archive.path), "the user's archive is left alone")
+}
+
+@MainActor @Test func keepsACopiedDropUntilTheImportCloses() async throws {
+    let archive = try temporaryDirectory().appendingPathComponent("two-items.zip")
+    try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
+    let urls = await DroppedFiles.urls(from: [provider(for: archive, inPlace: false)])
+    let copy = try #require(urls.first)
+    #expect(urls.count == 1)
+    #expect(copy.lastPathComponent == "two-items.zip")
+    #expect(copy.standardizedFileURL != archive.standardizedFileURL)
+    #expect(fm.fileExists(atPath: copy.path), "the copy outlives the provider's handler")
+
+    let importer = ArchiveImporter(gamesRoot: try temporaryDirectory())
+    await importer.choose(urls)
+    #expect(importer.step == .reviewing)
+    #expect(!importer.canDeleteArchive, "a copy never offers to delete the original")
+    importer.startImport()
+    try await waitWhileExtracting(importer)
+    #expect(importer.step.isFinished)
+    importer.close()
+    #expect(!fm.fileExists(atPath: copy.deletingLastPathComponent().path), "the copy is deleted after import")
+    #expect(fm.fileExists(atPath: archive.path))
+}
+
 private extension ArchiveImporter.Step {
     var isFinished: Bool { if case .finished = self { true } else { false } }
 }

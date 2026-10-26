@@ -349,7 +349,9 @@ final class Navigator {
 
     // MARK: Adding games
 
+    /// Opens the import sheet with `urls` chosen. An import sheet already showing takes them instead.
     func openImport(_ urls: [URL] = []) {
+        if case let .importGame(model, _)? = sheet, !urls.isEmpty { return model.choose(urls) }
         guard sheet == nil else { return }
         sheet = .importGame(ArchiveImportModel(gamesRoot: hub.library.paths.gamesRoot), initialSelection: urls)
     }
