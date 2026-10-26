@@ -249,20 +249,35 @@ bool TVPParseArguments(int argc, char* argv[])
     TVPNativeExeName = argv[0];
     TVPNativeExeDir = TVPExtractStoragePath(TVPNativeExeName);
     TVPAddImportantLog(TVPFormatMessage("(info) Exe path : %1", TVPNativeExeName));
+    // args
+    TVPInitProgramArguments(argc, argv);
+    TVPDumpOptions();
+
     // datas
     TVPNativeProjectData = argv[1];
-    if (TVPCheckExistentLocalFolder(TVPNativeProjectData))
-    {
-        TVPNativeProjectDir = TVPNativeProjectData;
-    }
-    else if (TVPCheckExistentLocalFile(TVPNativeProjectData))
-    {
-        TVPNativeProjectDir = TVPExtractStoragePath(TVPNativeProjectData);
-    }
-    else
+    if (!TVPCheckExistentLocalFolder(TVPNativeProjectData) &&
+        !TVPCheckExistentLocalFile(TVPNativeProjectData))
     {
         TVPAddImportantLog(TVPFormatMessage("%1 not found.", TVPNativeProjectData));
         return false;
+    }
+    // -gameroot names the folder that holds the game's executable. It becomes
+    // System.exePath and the base for savedata/, as on Windows, wherever the
+    // project data itself lives.
+    tTJSVariant gameRoot;
+    if (TVPGetCommandLine(TJS_N("-gameroot"), &gameRoot))
+    {
+        TVPNativeProjectDir = ttstr(gameRoot);
+        if (TVPNativeProjectDir.GetLastChar() != TJS_N('/'))
+            TVPNativeProjectDir += TJS_N("/");
+    }
+    else if (TVPCheckExistentLocalFolder(TVPNativeProjectData))
+    {
+        TVPNativeProjectDir = TVPNativeProjectData;
+    }
+    else
+    {
+        TVPNativeProjectDir = TVPExtractStoragePath(TVPNativeProjectData);
     }
     // TVPNormalizeStorageName->file://
     TVPProjectData = TVPNormalizeStorageName(TVPNativeProjectData);
@@ -276,10 +291,6 @@ bool TVPParseArguments(int argc, char* argv[])
 
     // set log output directory
     TVPSetLogLocation(TVPNativeDataPath);
-
-    // args 
-    TVPInitProgramArguments(argc, argv);
-    TVPDumpOptions();
 
     // check CPU type
     TVPDetectCPU();

@@ -5,6 +5,7 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_hints.h>
 
 #include <map>
 #include <vector>
@@ -208,6 +209,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     if (!TVPParseArguments(argc, argv))
         return SDL_APP_FAILURE;
 
+#if defined(_KRKRSDL3_IOS)
+    // Mouse events on iOS come from the host app, and touches have their own
+    // handler below, so SDL must not turn touches into mouse events too.
+    SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     { // for format converter
         SDL_Log("Fail to initialize SDL.");
@@ -460,7 +466,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
             krkrsdl3::KRKR_Trig_TextInput(data);
             break;
         }
-#if defined(_KRKRSDL3_WINDOWS) || defined(_KRKRSDL3_LINUX) || defined(_KRKRSDL3_EMSCRIPTEN)  || defined(_KRKRSDL3_MACOS)
+#if defined(_KRKRSDL3_WINDOWS) || defined(_KRKRSDL3_LINUX) || defined(_KRKRSDL3_EMSCRIPTEN) || defined(_KRKRSDL3_MACOS) || defined(_KRKRSDL3_IOS)
         // 鼠标事件
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         {
@@ -584,6 +590,11 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
     SDL_Log("KRKRSDL3 quit successfully!");
     SDL_Quit();
     TVPClearAllArguments();
+}
+
+SDL_Window* TVPGetSDLWindow()
+{
+    return tvp_window;
 }
 
 void TVPSetWindowTitle(const char* title)

@@ -37,4 +37,5 @@ public:
 
 void TVPInitDirectSound(int freq = 48000);
 void TVPUninitDirectSound();
+void TVPSetSoundPaused(bool paused);
 iTVPSoundBuffer* TVPCreateSoundBuffer(tTVPWaveFormat& fmt, int bufcount);

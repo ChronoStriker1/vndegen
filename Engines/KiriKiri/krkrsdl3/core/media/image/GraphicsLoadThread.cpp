@@ -337,7 +337,18 @@ void tTVPAsyncImageLoader::LoadingThread()
 }
 void tTVPAsyncImageLoader::LoadImageFromCommand(tTVPImageLoadCommand* cmd)
 {
-    tTVPRegisterGraphicInfo* handler = TVPGetGraphicLoadHandler(cmd->path_);
+    // Name resolution throws for missing files; this runs on a worker thread,
+    // so report it through the command like other load errors.
+    tTVPRegisterGraphicInfo* handler = nullptr;
+    try
+    {
+        handler = TVPGetGraphicLoadHandler(cmd->path_);
+    }
+    catch (...)
+    {
+        cmd->result_ = TVPFormatMessage(TVPImageLoadError, cmd->path_);
+        return;
+    }
     if (handler)
     {
         try

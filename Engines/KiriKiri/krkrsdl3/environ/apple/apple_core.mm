@@ -10,6 +10,13 @@
 
 #include <string>
 
+// Resources ship in the bundle that holds the engine: the app for a plain
+// executable, or the framework when the engine is embedded in another app.
+@interface TVPResourceBundleAnchor : NSObject
+@end
+@implementation TVPResourceBundleAnchor
+@end
+
 //---------------------------------------------------------------------------
 tTVPMemoryStream* GetResourceStream(const ttstr& filename)
 {
@@ -32,7 +39,7 @@ tTVPMemoryStream* GetResourceStream(const ttstr& filename)
 
     @autoreleasepool
     {
-        NSString* resRoot = [[NSBundle mainBundle] resourcePath];
+        NSString* resRoot = [[NSBundle bundleForClass:TVPResourceBundleAnchor.class] resourcePath];
         if (!resRoot)
             return nullptr;
 

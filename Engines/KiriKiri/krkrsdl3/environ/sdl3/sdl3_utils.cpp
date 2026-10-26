@@ -12,6 +12,8 @@
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_keyboard.h>
 
+#include <mutex>
+
 bool TVP_stat(const char* name, tTVP_stat& s)
 {
     if (!name)
@@ -133,7 +135,27 @@ void TVPOpenPatchLibUrl()
     SDL_OpenURL(url.c_str());
 }
 
+// The engine clock leaves out time spent paused, so timers, transitions and
+// waits resume where they stopped instead of jumping ahead.
+static std::mutex TVPClockMutex;
+static tjs_uint64 TVPPausedTicks = 0;
+static tjs_uint64 TVPPauseStart = 0; // 0 while running
+
+void TVPSetClockPaused(bool paused)
+{
+    std::lock_guard<std::mutex> lock(TVPClockMutex);
+    tjs_uint64 now = SDL_GetTicks();
+    if (paused && !TVPPauseStart)
+        TVPPauseStart = now ? now : 1;
+    else if (!paused && TVPPauseStart)
+    {
+        TVPPausedTicks += now - TVPPauseStart;
+        TVPPauseStart = 0;
+    }
+}
+
 tjs_uint64 TVPGetRoughTickCount()
 {
-    return SDL_GetTicks();
+    std::lock_guard<std::mutex> lock(TVPClockMutex);
+    return (TVPPauseStart ? TVPPauseStart : SDL_GetTicks()) - TVPPausedTicks;
 }

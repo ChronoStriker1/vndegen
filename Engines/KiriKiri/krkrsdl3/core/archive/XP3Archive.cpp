@@ -1,3 +1,5 @@
+#include <unordered_map>
+#include <cstring>
 //---------------------------------------------------------------------------
 /*
     TVP2 ( T Visual Presenter 2 )  A script authoring tool
@@ -256,6 +258,33 @@ void tTVPXP3Archive::Init(tTJSBinaryStream* st, tjs_int64 off, bool normalizeNam
                 TVPThrowExceptionMessage(TVPReadError);
             }
 
+            // Hashed-name archives put each real name in an eliF chunk right
+            // before its File chunk, whose own name is an MD5 of it.
+            std::unordered_map<tjs_uint, ttstr> eliFNames; // keyed by File body offset
+            {
+                ttstr pending;
+                for (tjs_uint pos = 0; pos + 12 <= index_size;)
+                {
+                    tjs_uint64 csize = ReadI64FromMem(indexdata + pos + 4);
+                    if (pos + 12 + csize > index_size)
+                        break;
+                    if (!memcmp(indexdata + pos, "eliF", 4) && csize >= 6)
+                    {
+                        tjs_int len = ReadI16FromMem(indexdata + pos + 16);
+                        if (6 + (tjs_uint64)len * 2 <= csize)
+                            pending = TVPStringFromBMPUnicode(
+                                (const tjs_uint16*)(indexdata + pos + 18), len);
+                    }
+                    else if (!memcmp(indexdata + pos, "File", 4))
+                    {
+                        if (!pending.IsEmpty())
+                            eliFNames[pos + 12] = pending;
+                        pending.Clear();
+                    }
+                    pos += 12 + (tjs_uint)csize;
+                }
+            }
+
             // read index information from memory
             tjs_uint ch_file_start = 0;
             tjs_uint ch_file_size = index_size;
@@ -331,6 +360,13 @@ void tTVPXP3Archive::Init(tTJSBinaryStream* st, tjs_int64 off, bool normalizeNam
 
                 // read 'aldr' sub-chunk
                 item.FileHash = ReadI32FromMem(indexdata + ch_adlr_start);
+                auto eliF = eliFNames.find(ch_file_start);
+                if (eliF != eliFNames.end())
+                {
+                    item.Name = eliF->second;
+                    if (normalizeName)
+                        NormalizeInArchiveStorageName(item.Name);
+                }
 
                 // push information
                 ItemVector.push_back(item);

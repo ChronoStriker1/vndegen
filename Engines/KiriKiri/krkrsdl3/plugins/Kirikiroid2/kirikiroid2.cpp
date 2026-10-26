@@ -71,7 +71,6 @@ extern tTVPArchive* TVPOpen7ZArchive(const ttstr& name, tTJSBinaryStream* st, bo
 extern tTVPRegisterGraphicInfo _jpegGraphicInfo;
 extern tTVPRegisterGraphicInfo _pngGraphicInfo;
 extern tTVPRegisterGraphicInfo _webpGraphicInfo;
-extern tTVPRegisterGraphicInfo _bpgGraphicInfo;
 
 void kirikiroid2_init()
 {
@@ -96,7 +95,6 @@ void kirikiroid2_init()
     TVPRegisterGraphicLoadingHandler(&_jpegGraphicInfo);
     TVPRegisterGraphicLoadingHandler(&_pngGraphicInfo);
     TVPRegisterGraphicLoadingHandler(&_webpGraphicInfo);
-    TVPRegisterGraphicLoadingHandler(&_bpgGraphicInfo);
     // 添加音频格式
     
 }

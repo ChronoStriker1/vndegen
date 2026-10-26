@@ -11,6 +11,14 @@
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_init.h>
 
+#include <mutex>
+
+// Every open buffer, so TVPSetSoundPaused can pause all audio at once.
+class tTVPSoundBufferSDL;
+static std::mutex TVPSoundBuffersMutex;
+static std::unordered_set<tTVPSoundBufferSDL*> TVPSoundBuffers;
+static bool TVPSoundPaused = false;
+
 class tTVPSoundBufferSDL : public iTVPSoundBuffer
 {
 public:
@@ -118,11 +126,19 @@ public:
             return false;
         }
         SDL_BindAudioStream(sdl_audio_device, _stream);
+        std::lock_guard<std::mutex> lock(TVPSoundBuffersMutex);
+        TVPSoundBuffers.insert(this);
+        if (TVPSoundPaused)
+            SDL_PauseAudioDevice(sdl_audio_device);
         return true;
     }
 
     virtual ~tTVPSoundBufferSDL()
     {
+        {
+            std::lock_guard<std::mutex> lock(TVPSoundBuffersMutex);
+            TVPSoundBuffers.erase(this);
+        }
         Stop();
 
         if (_stream)
@@ -140,7 +156,9 @@ public:
     {
         if (_playing)
             return;
-        SDL_ResumeAudioStreamDevice(_stream);
+        std::lock_guard<std::mutex> lock(TVPSoundBuffersMutex);
+        if (!TVPSoundPaused)
+            SDL_ResumeAudioStreamDevice(_stream);
         _playing = true;
     }
     virtual void Pause() override
@@ -258,6 +276,19 @@ void TVPInitDirectSound(int freq)
 
 void TVPUninitDirectSound()
 {
+}
+
+void TVPSetSoundPaused(bool paused)
+{
+    std::lock_guard<std::mutex> lock(TVPSoundBuffersMutex);
+    TVPSoundPaused = paused;
+    for (tTVPSoundBufferSDL* buffer : TVPSoundBuffers)
+    {
+        if (paused)
+            SDL_PauseAudioDevice(buffer->sdl_audio_device);
+        else if (buffer->_playing)
+            SDL_ResumeAudioDevice(buffer->sdl_audio_device);
+    }
 }
 
 iTVPSoundBuffer* TVPCreateSoundBuffer(tTVPWaveFormat& fmt, int bufcount)

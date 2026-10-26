@@ -6,6 +6,8 @@
 /*
 * Windows/View Operation
 */
+struct SDL_Window;
+SDL_Window* TVPGetSDLWindow();
 void TVPSetWindowTitle(const char* title);
 std::string TVPGetWindowTitle();
 void TVPSetWindowFullscreen(bool isFullscreen);
