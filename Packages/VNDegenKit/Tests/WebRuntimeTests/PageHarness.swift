@@ -17,6 +17,7 @@ import WebKit
                                         storageDirectory: storage ? root : nil, buttonScript: { _, _ in nil },
                                         scriptArgument: "test-script", log: Logger())
         let configuration = WKWebViewConfiguration()
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         if let scheme { configuration.setURLSchemeHandler(scheme, forURLScheme: GameFolder.scheme) }
         for source in [try WebGameSession.shimSource(for: game)] + scripts {
             configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -51,10 +52,16 @@ import WebKit
         loaded = nil
     }
 
-    /// Runs `body` as an async function in the page and returns what it returns.
+    /// Runs `body` as an async function in the page and returns what it returns. Fails after 10 seconds, naming the last
+    /// `step('...')` the body reached.
     @discardableResult
     func run(_ body: String) async throws -> Any? {
-        try await webView.callAsyncJavaScript(body, arguments: [:], contentWorld: .page)
+        try await webView.callAsyncJavaScript("""
+            let reached = 'start';
+            const step = (name) => { reached = name; };
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timed out after ' + reached)), 10000));
+            return await Promise.race([(async () => { \(body) })(), timeout]);
+            """, arguments: [:], contentWorld: .page)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
