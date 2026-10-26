@@ -117,6 +117,8 @@ public final class ArchiveImporter {
         importLog.notice("Chose \(urls.count) files \(names, privacy: .public), security-scoped access granted for \(selection.scopedCount)")
         do {
             let (source, contents, identities) = try await selection.read { try await Self.open(urls) }
+            // Sibling volumes found next to the picked file need the same protection from Inbox cleanup.
+            selection.hold(source.volumes)
             guard self.selection === selection else {
                 return importLog.notice("Listed \(names, privacy: .public) after a newer choice replaced it")
             }
@@ -337,8 +339,9 @@ public final class ArchiveImporter {
     @concurrent
     private static func open(_ urls: [URL]) async throws -> (ArchiveSource, ArchiveContents, [FileIdentity?]) {
         let source = try ArchiveSource(picked: urls)
+        // The coordinator hands out where the archive is now, which can differ if it moved while the read waited.
         return try source.coordinatedRead { granted in
-            (source, try ArchiveExtractor.list(granted), granted.volumes.map(FileIdentity.init(of:)))
+            (granted, try ArchiveExtractor.list(granted), granted.volumes.map(FileIdentity.init(of:)))
         }
     }
 
@@ -372,7 +375,7 @@ private final class Selection {
     /// Selections whose files are not released yet, whatever happened to the sheet that chose them.
     private static var live: [Selection] = []
 
-    private let urls: [URL]
+    private var urls: [URL]
     private let scoped: [URL]
     private var readers = 0
     private var closed = false
@@ -384,6 +387,11 @@ private final class Selection {
         self.urls = urls
         scoped = urls.filter { $0.startAccessingSecurityScopedResource() }
         Self.live.append(self)
+    }
+
+    /// Adds files the selection reads beyond the ones it was given, such as the other volumes of a split archive.
+    func hold(_ more: [URL]) {
+        urls += more.filter { added in !urls.contains { $0.isSamePath(as: added) } }
     }
 
     /// Whether a selection still holds `url`.

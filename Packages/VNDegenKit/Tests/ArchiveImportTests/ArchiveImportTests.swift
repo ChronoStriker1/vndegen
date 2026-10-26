@@ -661,6 +661,21 @@ private func waitUntil(_ condition: () -> Bool, _ comment: Comment) async throws
     #expect(items(inbox).isEmpty, "the copy goes once nothing reads it")
 }
 
+@MainActor @Test func inboxCleanupKeepsSiblingVolumesOfAnOpenChoice() async throws {
+    let inbox = try temporaryDirectory()
+    for part in 1...4 {
+        try fm.copyItem(at: fixtures.appendingPathComponent("split.7z.00\(part)"), to: inbox.appendingPathComponent("split.7z.00\(part)"))
+    }
+    let importer = ArchiveImporter(gamesRoot: try temporaryDirectory())
+    // Only the first part is picked; the importer finds the other three beside it.
+    await importer.choose([inbox.appendingPathComponent("split.7z.001")])
+    #expect(importer.step == .reviewing)
+
+    ArchiveImporter.discardCopies(in: inbox, addedBefore: .now.addingTimeInterval(60))
+    #expect(items(inbox).count == 4, "every volume of the open choice stays")
+    importer.close()
+}
+
 @MainActor @Test func importFlowDiscardsDeliveriesItCannotTake() async throws {
     let archive = try temporaryDirectory().appendingPathComponent("two-items.zip")
     try fm.copyItem(at: fixtures.appendingPathComponent("two-items.zip"), to: archive)
