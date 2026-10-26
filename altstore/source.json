@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.1.2",
+          "buildVersion": "56",
+          "date": "2026-10-26T01:58:44Z",
+          "localizedDescription": "Fixes for adding games from archives on iPhone and iPad.\n\n## Downloads\n\n- `VNDegen-0.1.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.1.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n\n## Fixed\n\n- Choose Archive on iPhone and iPad now uses the system file picker the way Apple presents it. Before, picking a file and tapping Open could do nothing.\n- Dragging a zip, RAR, or 7z from the Files app onto VNDegen now works on iPhone and iPad, on the import screen and on the library.\n\n## New\n\n- Open in VNDegen: in Files, tap an archive, then Share, then VNDegen, and the import screen opens with it. On a Mac, use Open With.\n\n## If adding a game still fails\n\nVNDegen now logs every file picker result. Connect the iPhone to a Mac, open Console, select the iPhone, search for `archiveimport`, then try again. The log line shows whether the picker handed the file to VNDegen.\n\n## Known limits\n\n- Only RPG Maker MV and MZ games run so far.\n- The Hidden games and Metadata sources settings pages still need touch or a mouse.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.1.2/VNDegen-0.1.2.ipa",
+          "size": 2238698,
+          "sha256": "635da8fd2a17d5f06291b51ac637788fa0ec2025bafbff04a55485dc48f64d07",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.1.1",
           "buildVersion": "50",
           "date": "2026-10-26T01:26:34Z",
