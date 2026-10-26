@@ -16,6 +16,8 @@
 #include "TVPApplication.h"
 #include "Random.h"
 
+#include <cstring>
+
 //---------------------------------------------------------------------------
 // Window List
 //---------------------------------------------------------------------------
@@ -212,6 +214,11 @@ void TVPClearAllWindows()
     // 确保所有指针都被置空
     TVPMainWindow = nullptr;
     CurrentWindowLayer = nullptr;
+
+    // Keys and buttons still held when a game quits never get their release, and the next game in the process would
+    // start with them down.
+    memset(_scancode, 0, sizeof(_scancode));
+    _mouseBtn = tTVPMouseButton();
 }
 //---------------------------------------------------------------------------
 
