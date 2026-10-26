@@ -280,6 +280,18 @@ static void closeWithoutConfirmation()
     }
 }
 
+// Invalidates the main window without its close query, as terminating does on Windows. Its finalize
+// runs, where games that are not built on KAG save their system data. Engine shutdown deletes the
+// windows without it.
+static void closeMainWindowAnyway()
+{
+    try {
+        TVPExecuteScript(TJS_N("if (Window.mainWindow !== null && isvalid Window.mainWindow) invalidate Window.mainWindow;"));
+    } catch (const eTJS &e) {
+        SDL_Log("vnkk: closing the game's window raised %s", e.GetMessage().AsStdString().c_str());
+    }
+}
+
 int vnkk_iterate(void)
 {
     if (finished)
@@ -295,6 +307,7 @@ int vnkk_iterate(void)
         terminated = true;
         SDL_Log("vnkk: the game did not close, terminating it");
         TVPDoSaveSystemVariables();
+        closeMainWindowAnyway();
         TVPTerminateAsync();
     }
     try {

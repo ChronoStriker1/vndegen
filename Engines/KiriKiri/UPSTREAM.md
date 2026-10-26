@@ -30,7 +30,7 @@ Bundled third-party code keeps its own license: SQLite (public domain), the LZMA
 
 - `vndegen/ciphers.cpp`: native decryption of encrypted archives. Each scheme is one row in its table.
 - `vndegen/sigcheck.cpp`: a `sigcheck.dll` stub. Its `Window.checkSignature` reports every file's signature as valid without checking it.
-- `vndegen/steam.cpp`: stubs for Steam builds. `krkrsteam.dll` defines a `Steam` class whose achievement, stats, cloud, screenshot, and DLC calls do nothing, whose `initialized` is true, and whose `getLanguage` returns Steam's name for the system's preferred language, or `english`. `DrawDeviceForSteam.dll` makes `DrawDeviceForSteam` the engine's `Window.BasicDrawDevice`. `steam_api.dll` needs nothing, since linking a missing plugin is not an error.
+- `vndegen/steam.cpp`: stubs for Steam builds. `krkrsteam.dll` defines a `Steam` class with the members of `DummySteam.tjs`, the stand-in in wamsoft's plugin source: its achievement, cloud, screenshot, broadcast, and DLC calls do nothing, it reports no Steam user, `initialized` is true, and `getLanguage` returns Steam's name for the system's preferred language, or `english`. `DrawDeviceForSteam.dll` makes `DrawDeviceForSteam` the engine's `Window.BasicDrawDevice`. `steam_api.dll` needs nothing, since linking a missing plugin is not an error.
 
 ## VNDegen's changes to upstream files
 

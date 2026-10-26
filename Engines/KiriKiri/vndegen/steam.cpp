@@ -48,16 +48,24 @@ static std::string SteamLanguage()
 }
 
 // The members krkrsteam.dll registers on its Steam class, as TJS that games call on the class.
+// They follow DummySteam.tjs in wamsoft's plugin source, the stand-in it ships for running without
+// Steam.
 static void RegisterSteam()
 {
     std::string script = R"(class Steam {
         property initialized { getter { return true; } }
         property achievementsCount { getter { return 0; } }
-        property cloudEnabled { getter { return false; } }
+        property cloudEnabled { getter { return false; } setter(value) {} }
         property cloudFileCount { getter { return 0; } }
+        property steamID { getter { return ""; } }
+        property accountID { getter { return 0; } }
+        property loggedOn { getter { return false; } }
+        property personaName { getter { return ""; } }
+        property appID { getter { return 0; } }
+        function RestartAppIfNecessary() { return false; }
         function requestInitialize() { return true; }
         function getLanguage() { return ")" + SteamLanguage() + R"("; }
-        function getAchievement() { return false; }
+        function getAchievement() {}
         function setAchievement() { return true; }
         function clearAchievement() { return true; }
         function getCloudQuota() { return %[total: 0, available: 0]; }
