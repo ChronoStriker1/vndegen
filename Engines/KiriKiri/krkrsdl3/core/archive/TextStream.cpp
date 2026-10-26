@@ -1014,6 +1014,12 @@ void TVPSetDefaultReadEncoding(const ttstr& encoding)
     }
 }
 //---------------------------------------------------------------------------
+void TVPResetDefaultReadEncoding()
+{
+    DefaultReadEncoding = TJS_N("UTF-8");
+    mbtowc_for_text_stream = nullptr;
+}
+//---------------------------------------------------------------------------
 const tjs_char* TVPGetDefaultReadEncoding()
 {
     return DefaultReadEncoding.c_str();

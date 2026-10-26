@@ -13,6 +13,7 @@
 #include "TVPMsg.h"
 #include "movie_player.h"
 #include "xp3filter.h"
+#include "TextStream.h"
 #include "TVPScript.h"
 #include "TVPPlugin.h"
 
@@ -224,6 +225,7 @@ void tTVPApplication::OnExit()
     TVPClearXP3Filter();
     TVPUninitScriptEngine();
     VNKKDestroyMoviePlayers();
+    TVPResetDefaultReadEncoding();
     TVPClearAllAutoPath();
     TVPClearAllWindows();
     krkrsdl3::TVPClearAllTexture();

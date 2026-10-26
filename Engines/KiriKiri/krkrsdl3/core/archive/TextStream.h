@@ -20,6 +20,8 @@ iTJSTextReadStream* TVPCreateTextStreamForRead(tTJSBinaryStream* stream, const t
 iTJSTextReadStream* TVPCreateTextStreamForRead(const ttstr& name, const ttstr& modestr);
 iTJSTextWriteStream* TVPCreateTextStreamForWrite(const ttstr& name, const ttstr& modestr);
 void TVPSetDefaultReadEncoding(const ttstr& encoding);
+// Engine shutdown: forgets the encoding a game set, so the next game detects its own.
+void TVPResetDefaultReadEncoding();
 const tjs_char* TVPGetDefaultReadEncoding();
 //---------------------------------------------------------------------------
 
