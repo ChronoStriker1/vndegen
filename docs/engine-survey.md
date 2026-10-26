@@ -4,6 +4,8 @@ Game titles from the surveyed library appear as "Test Game NN" placeholders. The
 
 Survey date 2026-10-25. This picks the next engines to port after RPG Maker MV/MZ and names test games from the library on the NAS.
 
+Status since the survey: RPG Maker MV/MZ, TyranoScript, and Ren'Py on macOS have shipped. Ren'Py on iPhone and iPad and a KiriKiri feasibility test are in progress. `docs/roadmap.md` has the current state.
+
 The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one row per folder under `/path/to/games`.
 
 ## Summary
@@ -35,7 +37,7 @@ Each engine is ranked on three inputs. The first is the number of library games.
 
 | Rank | Engine | Library games (GB) | VNDB releases since 2018 | Runtime to build on | Apple status of that runtime |
 |---:|---|---:|---:|---|---|
-| 0 | RPG Maker MV/MZ | 89 (83.2) | 1,748 (all RPG Maker) | Own WebKit plugin, in progress | Being built now |
+| 0 | RPG Maker MV/MZ | 89 (83.2) | 1,748 (all RPG Maker) | Own WebKit plugin | Shipped in VNDegen 0.1.0 |
 | 1 | TyranoScript | 4 (4.5) | 5,447 | Game's own `tyrano/` JS in WKWebView | Runs in any browser |
 | 2 | Ren'Py | 44 (45.9) | 26,235 | Ren'Py itself | Official iOS and macOS support |
 | 3 | KiriKiri | 48 (124.0) | 2,857 | krkrsdl2 | Release ships iOS and macOS app bundles |
@@ -294,7 +296,7 @@ This covers every engine in the library and every engine in either VNDB top 25. 
 
 | Engine | Best runtime to build on | License | macOS | iOS | Rendering | Notes |
 |---|---|---|---|---|---|---|
-| RPG Maker MV/MZ | Game's own JS (PixiJS) in WKWebView | Game-supplied | Yes | Yes | WebGL | In progress in VNDegen |
+| RPG Maker MV/MZ | Game's own JS (PixiJS) in WKWebView | Game-supplied | Yes | Yes | WebGL | Shipped in VNDegen 0.1.0 |
 | TyranoScript | Game's own `tyrano/` JS in WKWebView | Tyrano terms (free use, no redistribution of Tyrano itself) | Yes | Yes | HTML/WebGL | Same host as MV/MZ |
 | Visual Novel Maker, Twine, Dorian | Game's own HTML in WKWebView | Game-supplied | Yes | Yes | HTML/WebGL | Not in library |
 | Ren'Py | Ren'Py ([renpy/renpy](https://github.com/renpy/renpy)) | MIT plus LGPL parts | Yes | Yes (per-game Xcode project) | OpenGL ES 2 via SDL2 | Needs a generic host and a Python 2 build for older games |

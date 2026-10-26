@@ -7,10 +7,11 @@
     'use strict';
     const config = __VNDEGEN_OGG__;
 
-    // Decodes the first Vorbis stream in an Ogg file with libvorbis compiled to WebAssembly. Each call gets its own instance,
-    // so nothing a malformed file does to the decoder's memory outlives the call. Returns { sampleRate, channels } with one
-    // Float32Array per channel, or { sampleRate, wav } with a 16-bit WAV file when `wav` is set. Throws for anything that is
-    // not Ogg Vorbis, and before the output would pass `maxSamples` sample values.
+    // Decodes the Vorbis stream in an Ogg file, and the streams chained after it, with libvorbis compiled to WebAssembly.
+    // Each call gets its own instance, so nothing a malformed file does to the decoder's memory outlives the call. Returns
+    // { sampleRate, channels } with one Float32Array per channel, or { sampleRate, wav } with a 16-bit WAV file when `wav`
+    // is set. Throws for anything that is not Ogg Vorbis, for a chain whose streams differ in format, and before the
+    // output would pass `maxSamples` sample values.
     function decodeVorbis(module, bytes, maxSamples, wav) {
         const fail = (why) => { throw new Error('Ogg Vorbis: ' + why); };
         const x = new WebAssembly.Instance(module, { a: {
@@ -22,39 +23,50 @@
         const input = x.o(maxPacket), fields = x.o(24), errors = x.o(8 * 128);
         if (!input || !fields || !errors) fail('out of decoder memory');
         const [inputLength, output, channelsAt, rateAt, countAt, errorCount] = [0, 4, 8, 12, 16, 20].map((offset) => fields + offset);
-        const decoder = x.n(input, inputLength, output, channelsAt, rateAt, countAt, errors, errorCount, 128);
-        if (!decoder) fail('out of decoder memory');
         const heap = () => new DataView(x.l.buffer);
-        const send = (packet) => {
-            new Uint8Array(x.l.buffer, input, packet.length).set(packet);
-            heap().setInt32(inputLength, packet.length, true);
-            heap().setInt32(errorCount, 0, true);
-        };
         const failed = () => heap().getInt32(errorCount, true) > 0;
 
         // Ogg pages (RFC 3533): "OggS", version, flags, granule position, serial, sequence, CRC, segment count, lacing values.
+        // Yields the pages of the stream being decoded, one page at a time. That is the first page's stream and, once it
+        // ends, the stream of the next page that begins one, since a chained file (RFC 3533 section 4) follows one stream
+        // with the next. `first` marks the first page of each. A cut-off file ends at its last whole page, and bytes after
+        // the last stream that are not a page, such as a tag, are ignored.
         const data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-        const pages = [];
-        for (let at = 0; at + 27 <= bytes.length;) {
-            if (data.getUint32(at, false) !== 0x4f676753) fail('lost page sync');
-            const segments = bytes[at + 26];
-            let end = at + 27 + segments;
-            if (end > bytes.length) break;
-            for (let i = 0; i < segments; i++) end += bytes[at + 27 + i];
-            // A cut-off file plays up to its last whole page.
-            if (end > bytes.length) break;
-            const serial = data.getUint32(at + 14, true);
-            if (!pages.length || serial === pages[0].serial) {
-                pages.push({ at, serial, flags: bytes[at + 5], granule: data.getUint32(at + 6, true) + data.getInt32(at + 10, true) * 4294967296 });
-                if (bytes[at + 5] & 4) break;
+        function* pages() {
+            let serial = -1, ended = false;
+            for (let at = 0; at + 27 <= bytes.length;) {
+                if (data.getUint32(at, false) !== 0x4f676753) {
+                    if (ended) return;
+                    fail('lost page sync');
+                }
+                const segments = bytes[at + 26], flags = bytes[at + 5], pageSerial = data.getUint32(at + 14, true);
+                let end = at + 27 + segments;
+                if (end > bytes.length) return;
+                for (let i = 0; i < segments; i++) end += bytes[at + 27 + i];
+                if (end > bytes.length) return;
+                const first = serial < 0 || (ended && (flags & 2) !== 0);
+                if (first) {
+                    serial = pageSerial;
+                    ended = false;
+                }
+                if (!ended && pageSerial === serial) {
+                    ended = (flags & 4) !== 0;
+                    yield { first, at, segments, granule: data.getUint32(at + 6, true) + data.getInt32(at + 10, true) * 4294967296 };
+                }
+                at = end;
             }
-            at = end;
         }
-        // The last page's granule position is the stream's length in frames. A file can lie about it, so the output grows if
-        // decoding produces more, and decoding can also run a little past it, which is cut off.
-        const lastGranule = pages.length ? pages[pages.length - 1].granule : -1;
 
-        let packets = 0, channels = 0, rate = 0, frames = 0, store = null, capacity = 0;
+        // Each stream's last granule position is its length in frames. A file can lie about it, so the output grows if
+        // decoding produces more, and decoding can also run a little past it, which is cut off.
+        let expected = 0, granule = 0;
+        for (const page of pages()) {
+            if (page.first) expected += Math.max(granule, 0);
+            granule = page.granule;
+        }
+        expected += Math.max(granule, 0);
+
+        let decoder = 0, packets = 0, channels = 0, rate = 0, frames = 0, start = 0, store = null, capacity = 0;
         const allocate = (size) => {
             if (size * channels > maxSamples) fail('longer than the limit');
             const grown = wav ? new Int16Array(size * channels) : Array.from({ length: channels }, () => new Float32Array(size));
@@ -65,26 +77,34 @@
             store = grown;
             capacity = size;
         };
-        const take = (packet) => {
-            if (packet.length > maxPacket) fail('packet too large');
+        const finish = () => {
+            if (!decoder) return;
+            x.s(decoder);
+            decoder = 0;
+            if (granule > 0 && start + granule < frames) frames = start + granule;
+        };
+        // Decodes the packet of `size` bytes in the decoder's input buffer.
+        const take = (size) => {
+            const type = new Uint8Array(x.l.buffer, input, 1)[0];
+            heap().setInt32(inputLength, size, true);
+            heap().setInt32(errorCount, 0, true);
             if (packets === 0) {
-                if (packet[0] !== 1) fail('not a Vorbis stream');
-                send(packet);
+                if (type !== 1) fail('not a Vorbis stream');
                 x.p(decoder, 1);
                 if (failed()) fail('bad identification header');
             } else if (packets === 2) {
-                if (packet[0] !== 5) fail('missing setup header');
-                send(packet);
+                if (type !== 5) fail('missing setup header');
                 x.p(decoder, 0);
                 if (failed()) fail('bad setup header');
                 x.q(decoder);
                 if (failed()) fail('could not start decoding');
-                channels = heap().getInt32(channelsAt, true);
-                rate = heap().getInt32(rateAt, true);
-                if (channels < 1 || channels > 32 || rate < 3000 || rate > 384000) fail('unsupported format');
-                allocate(lastGranule > 0 && lastGranule * channels <= maxSamples ? lastGranule : 4096);
+                const c = heap().getInt32(channelsAt, true), r = heap().getInt32(rateAt, true);
+                if (c < 1 || c > 32 || r < 3000 || r > 384000) fail('unsupported format');
+                if (store && (c !== channels || r !== rate)) fail('chained streams differ in format');
+                channels = c;
+                rate = r;
+                if (!store) allocate(expected > 0 && expected * channels <= maxSamples ? expected : 4096);
             } else if (packets > 2) {
-                send(packet);
                 x.r(decoder);
                 const count = heap().getInt32(countAt, true);
                 if (count > 0) {
@@ -107,28 +127,33 @@
             packets++;
         };
 
-        let partial = [];
-        for (const page of pages) {
-            const segments = bytes[page.at + 26];
-            let body = page.at + 27 + segments;
-            for (let i = 0; i < segments; i++) {
+        // Packets are put together in the decoder's input buffer as their segments arrive, so a packet over the limit
+        // fails as soon as it passes it.
+        let size = 0;
+        for (const page of pages()) {
+            if (page.first) {
+                finish();
+                decoder = x.n(input, inputLength, output, channelsAt, rateAt, countAt, errors, errorCount, 128);
+                if (!decoder) fail('out of decoder memory');
+                packets = 0;
+                size = 0;
+                start = frames;
+            }
+            granule = page.granule;
+            for (let i = 0, body = page.at + 27 + page.segments; i < page.segments; i++) {
                 const length = bytes[page.at + 27 + i];
-                partial.push(bytes.subarray(body, body + length));
+                if (size + length > maxPacket) fail('packet too large');
+                new Uint8Array(x.l.buffer, input + size, length).set(bytes.subarray(body, body + length));
                 body += length;
+                size += length;
                 if (length === 255) continue;
-                let size = 0;
-                for (const part of partial) size += part.length;
-                if (size > maxPacket) fail('packet too large');
-                const packet = new Uint8Array(size);
-                let offset = 0;
-                for (const part of partial) { packet.set(part, offset); offset += part.length; }
-                partial = [];
-                take(packet);
+                // An empty packet carries nothing for Vorbis.
+                if (size) take(size);
+                size = 0;
             }
         }
-        x.s(decoder);
+        finish();
         if (!frames) fail('no audio');
-        if (lastGranule > 0 && lastGranule < frames) frames = lastGranule;
         if (!wav) return { sampleRate: rate, channels: store.map((channel) => channel.slice(0, frames)) };
 
         const file = new DataView(new ArrayBuffer(44 + frames * channels * 2));
@@ -166,12 +191,14 @@
     const queue = [], idle = [];
     let running = 0;
 
+    // `load` gets the job's abort signal and returns the file's bytes. It runs when the job leaves the queue, so a queued
+    // job holds nothing of its own.
     function decode(load, wav) {
-        let job;
-        const promise = new Promise((resolve, reject) => { job = { load, wav, resolve, reject, waiting: 1, abort: null, done: false }; });
+        const job = { load, wav, controller: new AbortController(), done: false };
+        job.promise = new Promise((resolve, reject) => { job.resolve = resolve; job.reject = reject; });
         queue.push(job);
         pump();
-        return { job, promise };
+        return job;
     }
 
     function pump() {
@@ -183,10 +210,11 @@
     }
 
     async function run(job) {
+        const signal = job.controller.signal;
         try {
-            const bytes = await job.load();
+            const bytes = await job.load(signal);
             const module = await wasm;
-            if (job.waiting <= 0) throw aborted('nobody is waiting for this audio');
+            signal.throwIfAborted();
             let worker = idle.pop();
             if (!worker) {
                 try {
@@ -197,27 +225,33 @@
                 }
                 worker.postMessage({ module });
             }
+            let stop;
             const result = await new Promise((resolve, reject) => {
-                job.abort = () => { worker.terminate(); worker = null; reject(aborted('nobody is waiting for this audio')); };
+                stop = () => { worker.terminate(); worker = null; reject(signal.reason); };
+                signal.addEventListener('abort', stop);
                 worker.onerror = (event) => { worker.terminate(); worker = null; reject(new Error(event.message || 'decoder failed')); };
                 worker.onmessage = ({ data }) => (data.error ? reject(new Error(data.error)) : resolve(data));
                 worker.postMessage({ bytes, maxSamples: config.limits.maxSamples, wav: job.wav }, [bytes]);
-            }).finally(() => { if (worker) idle.push(worker); });
+            }).finally(() => {
+                signal.removeEventListener('abort', stop);
+                if (worker) idle.push(worker);
+            });
             job.resolve(result);
         } catch (e) {
             job.reject(e);
         }
     }
 
+    // Stops a job nobody waits for any more. It leaves the queue, or its fetch or its worker stops and frees the slot.
     function cancel(job) {
-        if (job.done || --job.waiting > 0) return;
+        if (job.done) return;
         const index = queue.indexOf(job);
         if (index >= 0) {
             queue.splice(index, 1);
             job.done = true;
             job.reject(aborted('nobody is waiting for this audio'));
-        } else if (job.abort) {
-            job.abort();
+        } else {
+            job.controller.abort(aborted('nobody is waiting for this audio'));
         }
     }
 
@@ -226,8 +260,8 @@
         if (index > 0) queue.unshift(queue.splice(index, 1)[0]);
     }
 
-    async function fetchOgg(url) {
-        const response = await fetch(url);
+    async function fetchOgg(url, signal) {
+        const response = await fetch(url, { signal });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         if (Number(response.headers.get('Content-Length')) > config.limits.maxInputBytes) throw new Error('file too large');
         const bytes = await response.arrayBuffer();
@@ -242,10 +276,13 @@
     if (Context) {
         const nativeDecode = Context.prototype.decodeAudioData;
         Context.prototype.decodeAudioData = function (buffer, success, failure) {
-            const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : null;
-            if (!bytes || !isOggBytes(bytes) || bytes.length > config.limits.maxInputBytes) return nativeDecode.apply(this, arguments);
-            const copy = bytes.slice().buffer;
-            const promise = decode(() => Promise.resolve(copy), false).promise.then((result) => {
+            const view = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : null;
+            if (!view || !isOggBytes(view) || view.length > config.limits.maxInputBytes) return nativeDecode.apply(this, arguments);
+            // decodeAudioData owns the buffer from the call on and detaches the page's copy, as Chromium does, so a page
+            // that reuses the buffer can't change a queued decode. The worker gets a copy only once the job starts, so
+            // queued requests hold no copies.
+            const bytes = new Uint8Array(buffer.transfer());
+            const promise = decode(() => bytes.slice().buffer, false).promise.then((result) => {
                 const out = this.createBuffer(result.channels.length, result.channels[0].length, result.sampleRate);
                 result.channels.forEach((channel, c) => out.copyToChannel(channel, c));
                 return out;
@@ -259,28 +296,27 @@
     }
 
     // Media elements: each .ogg URL is decoded once to a WAV blob. Blobs no element uses go, oldest first, once the
-    // cache holds more than config.limits.maxCacheBytes.
+    // cache holds more than config.limits.maxCacheBytes. A decode no element waits for stops, and its entry goes at once,
+    // so asking for the URL again starts a new decode rather than joining the cancelled one.
     const tracks = new Map();
     let cachedBytes = 0, uses = 0;
 
     function track(url) {
         let entry = tracks.get(url);
         if (!entry) {
-            entry = { users: 0, size: 0, blobURL: null, used: 0 };
-            const { job, promise } = decode(() => fetchOgg(url), true);
-            entry.job = job;
-            entry.promise = promise.then((result) => {
+            entry = { url, users: 0, size: 0, blobURL: null, used: 0, job: decode((signal) => fetchOgg(url, signal), true) };
+            entry.promise = entry.job.promise.then((result) => {
+                if (tracks.get(url) !== entry) throw aborted('nobody is waiting for this audio');
                 entry.blobURL = URL.createObjectURL(new Blob([result.wav], { type: 'audio/wav' }));
                 entry.size = result.wav.byteLength;
                 cachedBytes += entry.size;
+                trim();
                 return entry.blobURL;
             }, (error) => {
-                tracks.delete(url);
+                forget(entry);
                 throw error;
             });
             tracks.set(url, entry);
-        } else if (!entry.blobURL) {
-            entry.job.waiting++;
         }
         entry.users++;
         entry.used = ++uses;
@@ -288,64 +324,80 @@
         return entry;
     }
 
+    function forget(entry) {
+        if (tracks.get(entry.url) === entry) tracks.delete(entry.url);
+    }
+
     function trim() {
         while (cachedBytes > config.limits.maxCacheBytes) {
             let oldest = null;
-            for (const [url, entry] of tracks) {
-                if (entry.blobURL && entry.users === 0 && (!oldest || entry.used < oldest[1].used)) oldest = [url, entry];
+            for (const entry of tracks.values()) {
+                if (entry.blobURL && entry.users === 0 && (!oldest || entry.used < oldest.used)) oldest = entry;
             }
             if (!oldest) return;
-            tracks.delete(oldest[0]);
-            URL.revokeObjectURL(oldest[1].blobURL);
-            cachedBytes -= oldest[1].size;
+            forget(oldest);
+            URL.revokeObjectURL(oldest.blobURL);
+            cachedBytes -= oldest.size;
         }
     }
 
     const proto = HTMLMediaElement.prototype;
     const src = Object.getOwnPropertyDescriptor(proto, 'src');
     const nativePlay = proto.play, nativePause = proto.pause, nativeLoad = proto.load, nativeCanPlayType = proto.canPlayType;
+    const nativeSetAttribute = Element.prototype.setAttribute, nativeRemoveAttribute = Element.prototype.removeAttribute;
     // Per element: the .ogg URL it was given, its cache entry, and play() calls made before the decode finished.
     const elements = new WeakMap();
     const released = new FinalizationRegistry((state) => release(state));
+
+    // Rejects the play() calls waiting for the decode.
+    function interrupt(state, message) {
+        state.wantsPlay = false;
+        for (const waiter of state.waiters.splice(0)) waiter.reject(aborted(message));
+    }
 
     function release(state) {
         const entry = state.entry;
         if (!entry) return;
         state.entry = null;
         state.url = null;
+        state.generation++;
         if (state.pending) {
             state.pending = false;
-            state.wantsPlay = false;
-            for (const waiter of state.waiters.splice(0)) waiter.reject(aborted('The play() request was interrupted by a new load request.'));
-            cancel(entry.job);
+            interrupt(state, 'The play() request was interrupted by a new load request.');
         }
         entry.users--;
+        if (!entry.blobURL && entry.users === 0) {
+            forget(entry);
+            cancel(entry.job);
+        }
         trim();
     }
 
     function assign(element, url) {
         let state = elements.get(element);
         if (!state) {
-            state = { url: null, entry: null, pending: false, wantsPlay: false, waiters: [] };
+            state = { url: null, entry: null, generation: 0, pending: false, wantsPlay: false, waiters: [] };
             elements.set(element, state);
             released.register(element, state);
         }
         // Taking the new entry first keeps a decode of the same URL alive when the element asks for it again.
         const entry = track(url);
         release(state);
+        // The element can get the same entry back, so only the generation tells this assignment from an earlier one.
+        const generation = ++state.generation;
         state.url = url;
         state.entry = entry;
         // Stop what the element played before, as a new src would, without giving it an empty one, which is an error.
-        element.removeAttribute('src');
+        nativeRemoveAttribute.call(element, 'src');
         nativeLoad.call(element);
         if (entry.blobURL) return src.set.call(element, entry.blobURL);
         state.pending = true;
         entry.promise.catch((error) => {
             // The original bytes are no worse than nothing, and a format this cannot read may still play.
-            console.warn('Ogg decode failed for ' + url + ': ' + error.message);
+            if (state.generation === generation) console.warn('Ogg decode failed for ' + url + ': ' + error.message);
             return url;
         }).then((source) => {
-            if (state.entry !== entry) return;
+            if (state.generation !== generation) return;
             state.pending = false;
             src.set.call(element, source);
             const waiters = state.waiters.splice(0);
@@ -353,6 +405,14 @@
             state.wantsPlay = false;
             nativePlay.call(element).then((v) => waiters.forEach((w) => w.resolve(v)), (e) => waiters.forEach((w) => w.reject(e)));
         });
+    }
+
+    function setSource(element, value) {
+        const url = absolute(value);
+        if (url && isOggURL(url)) return assign(element, url);
+        const state = elements.get(element);
+        if (state) release(state);
+        src.set.call(element, value);
     }
 
     Object.defineProperty(proto, 'src', {
@@ -363,13 +423,22 @@
             return state && state.url ? state.url : src.get.call(this);
         },
         set(value) {
-            const url = absolute(value);
-            if (url && isOggURL(url)) return assign(this, url);
-            const state = elements.get(this);
-            if (state) release(state);
-            src.set.call(this, value);
+            setSource(this, value);
         },
     });
+    // The src attribute is the same source as the property. HTML attribute names are case-insensitive.
+    const isSrc = (name) => String(name).toLowerCase() === 'src';
+    proto.setAttribute = function (name, value) {
+        if (!isSrc(name)) return nativeSetAttribute.apply(this, arguments);
+        setSource(this, String(value));
+    };
+    proto.removeAttribute = function (name) {
+        if (isSrc(name)) {
+            const state = elements.get(this);
+            if (state) release(state);
+        }
+        return nativeRemoveAttribute.apply(this, arguments);
+    };
     proto.play = function () {
         const state = elements.get(this);
         if (!state || !state.pending) return nativePlay.apply(this, arguments);
@@ -379,16 +448,14 @@
     };
     proto.pause = function () {
         const state = elements.get(this);
-        if (state && state.pending) {
-            state.wantsPlay = false;
-            for (const waiter of state.waiters.splice(0)) waiter.reject(aborted('The play() request was interrupted by a call to pause().'));
-        }
+        if (state && state.pending) interrupt(state, 'The play() request was interrupted by a call to pause().');
         return nativePause.apply(this, arguments);
     };
     proto.load = function () {
         const state = elements.get(this);
-        if (state && state.pending) return;
-        return nativeLoad.apply(this, arguments);
+        if (!state || !state.pending) return nativeLoad.apply(this, arguments);
+        // The decode goes on and the source stays, but load() drops the play() calls made before it, as it does natively.
+        interrupt(state, 'The play() request was interrupted by a new load request.');
     };
     proto.canPlayType = function (type) {
         return /^audio\/(ogg|vorbis)\b/i.test(String(type)) && !/opus/i.test(String(type)) ? 'probably' : nativeCanPlayType.apply(this, arguments);
