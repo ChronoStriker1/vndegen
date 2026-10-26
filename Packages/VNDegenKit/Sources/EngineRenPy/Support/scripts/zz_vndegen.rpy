@@ -132,11 +132,11 @@ init 999 python in _vndegen:
 
         Interface.set_mode = place_window
 
-    # VNDEGEN_PYTHON2_PERSISTENT is set for a Ren'Py 7 game on Ren'Py 8. Its persistent data, such as unlocked gallery
+    # VNDEGEN_RENPY7_GAME is set for a Ren'Py 7 game on Ren'Py 8. Its persistent data, such as unlocked gallery
     # images, is written so that the game's PC version, on Ren'Py 7 and Python 2, loads it too: in pickle protocol 2,
     # with each class Ren'Py 7.5 moved under its Ren'Py 7.4 module. Every Ren'Py since 7.4 loads the old names. Saves
     # keep Ren'Py 8's format, because older Ren'Py can't load a newer Ren'Py's save state either way.
-    if os.environ.get("VNDEGEN_PYTHON2_PERSISTENT") == "1" and sys.version_info[0] >= 3:
+    if os.environ.get("VNDEGEN_RENPY7_GAME") == "1" and sys.version_info[0] >= 3:
         import io
         import pickle
         import renpy.persistent as persistent_module

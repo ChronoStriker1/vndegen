@@ -87,6 +87,75 @@ if sys.version_info >= (3, 12):
         sys.meta_path.insert(0, LegacyFinders())
 
 
+def use_python2_division():
+    """
+    Ren'Py 7 games are Python 2, where dividing two integers gives an integer, such as range(n / 3). Ren'Py 8 fixes some
+    Python 2 syntax but not that, so in the game's own code each / becomes a call that divides the Python 2 way. Ren'Py's
+    own code keeps Python 3 division. Returns a function that undoes this.
+    """
+    import ast
+    import builtins
+    import renpy.python
+
+    original_compile = renpy.python.py_compile
+    original_wrap = renpy.python.wrap_node
+    compiling_game = [False]
+
+    def python2_divide(a, b):
+        if isinstance(a, int) and isinstance(b, int):
+            return a // b
+        return a / b
+
+    def call(left, right):
+        return ast.Call(func=ast.Name(id="_vndegen_python2_divide", ctx=ast.Load()), args=[left, right], keywords=[])
+
+    class Python2Division(ast.NodeTransformer):
+        def visit_BinOp(self, node):
+            self.generic_visit(node)
+            if isinstance(node.op, ast.Div):
+                return ast.copy_location(call(node.left, node.right), node)
+            return node
+
+        def visit_AugAssign(self, node):
+            self.generic_visit(node)
+            if isinstance(node.op, ast.Div) and isinstance(node.target, ast.Name):
+                value = call(ast.Name(id=node.target.id, ctx=ast.Load()), node.value)
+                return ast.copy_location(ast.Assign(targets=[node.target], value=value), node)
+            return node
+
+    def future_division(tree):
+        return any(isinstance(node, ast.ImportFrom) and node.module == "__future__"
+                   and any(alias.name == "division" for alias in node.names) for node in ast.walk(tree))
+
+    class WrapGameCode(object):
+        def visit(self, tree):
+            if compiling_game[0] and not future_division(tree):
+                tree = ast.fix_missing_locations(Python2Division().visit(tree))
+            return original_wrap.visit(tree)
+
+    def py_compile(source, mode, filename="<none>", *args, **kwargs):
+        name = getattr(source, "filename", None) or filename
+        compiling_game[0] = str(name).replace("\\", "/").startswith("game/")
+        try:
+            return original_compile(source, mode, filename, *args, **kwargs)
+        finally:
+            compiling_game[0] = False
+
+    builtins._vndegen_python2_divide = python2_divide
+    renpy.python.py_compile = py_compile
+    renpy.python.wrap_node = WrapGameCode()
+
+    def undo():
+        renpy.python.py_compile = original_compile
+        renpy.python.wrap_node = original_wrap
+        del builtins._vndegen_python2_divide
+        # Compiled code is cached by file name and line, and the next game can have a file of the same name.
+        renpy.python.py_compile_cache.clear()
+        renpy.python.old_py_compile_cache.clear()
+
+    return undo
+
+
 def forget_modules(basedir):
     """
     Drops the modules a game brought along, such as a requests in game/python-packages, so the next game imports its
@@ -155,6 +224,7 @@ def run_in_process():
         renpy.session.pop("_keep_renderer", None)
 
     show_view_in_hub()
+    undo_division = use_python2_division() if renpy7_game else None
     sys.excepthook = renpy.bootstrap.excepthook
     args = renpy.arguments.bootstrap()
     basedir = os.path.abspath(args.basedir)
@@ -177,6 +247,10 @@ def run_in_process():
                 renpy.main.main()
             except renpy.game.UtterRestartException:
                 renpy.reload_all()
+                # The reload brings back Ren'Py's own transformer.
+                if undo_division:
+                    undo_division()
+                    undo_division = use_python2_division()
                 restart = True
             except renpy.game.QuitException:
                 pass
@@ -193,6 +267,8 @@ def run_in_process():
         renpy.audio.audio.quit()
         for callback in renpy.config.python_exit_callbacks:
             callback()
+        if undo_division:
+            undo_division()
         forget_modules(basedir)
         sys.meta_path[:] = state.meta_path
         sys.path_hooks[:] = state.path_hooks
@@ -200,8 +276,20 @@ def run_in_process():
         sys.path_importer_cache.clear()
 
 
+# Set for a Ren'Py 7 game on Ren'Py 8, which zz_vndegen.rpy also reads.
+renpy7_game = os.environ.get("VNDEGEN_RENPY7_GAME") == "1" and sys.version_info[0] >= 3
+
 sys.argv[0] = renpy_py
 if renpy.ios:
     run_in_process()
 else:
+    if renpy7_game:
+        # Ren'Py's modules can only be imported once its bootstrap has started importing them.
+        import_all = renpy.import_all
+
+        def import_all_then_divide():
+            import_all()
+            use_python2_division()
+
+        renpy.import_all = import_all_then_divide
     main.main()

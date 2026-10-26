@@ -242,7 +242,7 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
     #expect(command.environment["VNDEGEN_DATA"] == "/data/Test Game")
     #expect(command.environment["VNDEGEN_WINDOW"] == "10,38,1280,772")
     #expect(command.environment["VNDEGEN_FULLSCREEN"] == nil)
-    #expect(command.environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
+    #expect(command.environment["VNDEGEN_RENPY7_GAME"] == nil)
 }
 
 @Test func passesRemappedButtonsToTheHook() throws {
@@ -260,16 +260,16 @@ private func runCompat(_ arguments: [String]) throws -> Int32 {
     #expect(command.environment["VNDEGEN_BUTTONS"] == "r2=click:1")
 }
 
-/// A Ren'Py 7 game on Ren'Py 8 asks the hook for persistent data that its PC version, on Ren'Py 7, can load.
-@Test func renPy7GameOnRenPy8WritesPython2Persistent() {
+/// Only a Ren'Py 7 game on Ren'Py 8 gets the Python 2 compatibility fixes.
+@Test func renPy7GameOnRenPy8GetsPython2Fixes() {
     func command(_ runtime: RenPyRuntime, game: RenPyRuntime) -> RenPyCommand {
         RenPyCommand(base: URL(fileURLWithPath: "/games/Test Game"), runtime: runtime, gameLine: game,
                      runtimes: URL(fileURLWithPath: "/app/RenPy"), support: URL(fileURLWithPath: "/support"),
                      dataDirectory: URL(fileURLWithPath: "/data/Test Game"), placement: nil)
     }
-    #expect(command(.renPy8, game: .renPy7).environment["VNDEGEN_PYTHON2_PERSISTENT"] == "1")
-    #expect(command(.renPy8, game: .renPy8).environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
-    #expect(command(.renPy7, game: .renPy7).environment["VNDEGEN_PYTHON2_PERSISTENT"] == nil)
+    #expect(command(.renPy8, game: .renPy7).environment["VNDEGEN_RENPY7_GAME"] == "1")
+    #expect(command(.renPy8, game: .renPy8).environment["VNDEGEN_RENPY7_GAME"] == nil)
+    #expect(command(.renPy7, game: .renPy7).environment["VNDEGEN_RENPY7_GAME"] == nil)
 }
 
 /// The fingerprint names no game, ignores everything but the scripts and archives directly in game/, and changes with

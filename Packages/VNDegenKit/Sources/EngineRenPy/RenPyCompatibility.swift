@@ -79,9 +79,27 @@ nonisolated public struct RenPyBootRecord: Codable, Equatable, Sendable {
 /// How Ren'Py 7 games run on Ren'Py 8, the only runtime on iPhone and iPad.
 nonisolated public enum RenPyCompatibility {
     /// Ren'Py 7 and 6.99 games from the maintainer's library, booted on Ren'Py 8 with
-    /// `scripts/renpy-compat.sh <folder> --runtime 8`, by `RenPyLayout.fingerprint`. A nil cause means the game reached
-    /// its main menu. Games are listed by fingerprint so the list names no game.
-    static let tested: [String: String?] = [:]
+    /// `scripts/renpy-compat.sh <folder> --runtime 8` on 2026-10-26, by `RenPyLayout.fingerprint`. A nil cause means the
+    /// game reached its main menu, or for the three whose title menu is a choice menu, its story. Games are listed by
+    /// fingerprint so the list names no game.
+    static let tested: [String: String?] = [
+        "daa863b2a5f11e3d": nil, // 6.99.12
+        "abbb157a6989f798": nil, // 6.99.14
+        "9a820c0701dee901": nil, // 7.1.0
+        "4a51c6f94d82b794": nil, // 7.3.5
+        "24a1c66bb18aaf6c": nil, // 7.3.5
+        "8b6e21829176c2b5": nil, // 7.3.5
+        "7d1649bef15c14e9": nil, // 7.3.5, with Python 2 division
+        "e12b4b91abd1d52e": nil, // 7.3.5
+        "ba2a7a4b0b92c1ae": nil, // 7.3.5
+        "a2d1fd94843448be": "its achievements need a Steam module from the modified copy of Ren'Py it ships", // 7.3.5
+        "51027959cee46da4": nil, // 7.4.2
+        "23c79f4861d83268": nil, // 7.4.9
+        "6fafeb91c9bf2fba": nil, // 7.4.11
+        "bfe55bc05a5d09a6": nil, // 7.5.1
+        "dd46b3f7ed2394b7": nil, // 7.5.1
+        "9673208eeba44067": nil, // 7.5.1
+    ]
 
     /// The note for the game page. On iOS, a Ren'Py 7 game gets how it fared: on this device if it ran here, else in
     /// the library test.
