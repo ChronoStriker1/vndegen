@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.1.4",
+          "buildVersion": "65",
+          "date": "2026-10-26T03:04:34Z",
+          "localizedDescription": "Safety fixes for importing archives.\n\n## Downloads\n\n- `VNDegen-0.1.4.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n- `VNDegen-0.1.4-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n\n## Fixed\n\n- \"Delete archive after import\" now deletes an archive only if it is still the same file VNDegen imported. If you replace it in Files during an import, the new file is kept and the result screen says so.\n- Copies delivered through Open in VNDegen are no longer cleaned up while an import is still reading them or before VNDegen has received them.\n- Split archives with the same name in different formats (for example `Game.zip.001` and `Game.7z.001`) are listed as separate archives, and two files for the same part are refused with a clear message.\n\n## Known limits\n\n- Only RPG Maker MV and MZ games run so far.\n- The Hidden games and Metadata sources settings pages still need touch or a mouse.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.1.4/VNDegen-0.1.4.ipa",
+          "size": 2311408,
+          "sha256": "6b8382dc45f5b8e77e849ff9b0a2658a7d799f721eeace72109b04970349eb96",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.1.3",
           "buildVersion": "61",
           "date": "2026-10-26T02:43:19Z",
