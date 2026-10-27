@@ -18,7 +18,7 @@ struct KeyboardBridge: UIViewRepresentable {
     func updateUIView(_ view: TypingView, context: Context) {
         view.type = { [session] in session.type($0) }
         view.onDismiss = onDismiss
-        if !view.isFirstResponder { view.becomeFirstResponder() }
+        view.focus()
     }
 
     static func dismantleUIView(_ view: TypingView, coordinator: ()) {
@@ -26,34 +26,55 @@ struct KeyboardBridge: UIViewRepresentable {
         view.resignFirstResponder()
     }
 
-    final class TypingView: UIView, UIKeyInput {
+    /// A text view, so keyboards that compose characters, such as Japanese, work. It holds only text still being
+    /// composed, and passes on what the keyboard commits.
+    final class TypingView: UITextView, UITextViewDelegate {
         var type: ((TypedText) -> Void)?
         var onDismiss: (() -> Void)?
 
-        // A game reads plain keystrokes, so nothing rewrites what the player types.
-        var autocorrectionType: UITextAutocorrectionType = .no
-        var autocapitalizationType: UITextAutocapitalizationType = .none
-        var spellCheckingType: UITextSpellCheckingType = .no
-        var smartQuotesType: UITextSmartQuotesType = .no
-        var smartDashesType: UITextSmartDashesType = .no
-        var smartInsertDeleteType: UITextSmartInsertDeleteType = .no
-        var inlinePredictionType: UITextInlinePredictionType = .no
-
-        override var canBecomeFirstResponder: Bool { true }
-
-        // Always true, so Backspace reaches the game even though this view holds no text.
-        var hasText: Bool { true }
-
-        func insertText(_ text: String) {
-            // Return arrives as a newline, on its own.
-            for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-                if index > 0 { type?(.newline) }
-                if !line.isEmpty { type?(.text(String(line))) }
-            }
+        init() {
+            super.init(frame: .zero, textContainer: nil)
+            delegate = self
+            backgroundColor = .clear
+            textColor = .clear
+            tintColor = .clear
+            // A game reads plain keystrokes, so nothing rewrites what the player types.
+            autocorrectionType = .no
+            autocapitalizationType = .none
+            spellCheckingType = .no
+            smartQuotesType = .no
+            smartDashesType = .no
+            smartInsertDeleteType = .no
+            inlinePredictionType = .no
         }
 
-        func deleteBackward() {
-            type?(.deleteBackward)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        /// Takes the keyboard once the view is in a window, which it may not be yet at its first update.
+        func focus() {
+            if window != nil, !isFirstResponder { becomeFirstResponder() }
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            focus()
+        }
+
+        // With nothing being composed, Backspace is the game's.
+        override func deleteBackward() {
+            if text.isEmpty { type?(.deleteBackward) } else { super.deleteBackward() }
+        }
+
+        func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+            guard text == "\n", markedTextRange == nil else { return true }
+            type?(.newline)
+            return false
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            guard markedTextRange == nil, !text.isEmpty else { return }
+            type?(.text(text))
+            text = ""
         }
 
         override func resignFirstResponder() -> Bool {

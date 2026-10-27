@@ -63,14 +63,7 @@ public final class VirtualMouse {
             startMoving()
         case let .wheel(direction):
             turn(direction)
-            wheelRepeat?.task.cancel()
-            wheelRepeat = (source, Task { [weak self] in
-                try? await Task.sleep(for: PressRouter.repeatDelay)
-                while !Task.isCancelled {
-                    self?.turn(direction)
-                    try? await Task.sleep(for: PressRouter.repeatInterval)
-                }
-            })
+            repeatWheel(direction, held: source)
         case .showKeyboard:
             showsKeyboard.toggle()
         default:
@@ -87,9 +80,13 @@ public final class VirtualMouse {
             if case .stick = source { break }
             if let count = motion.held[direction] { motion.held[direction] = count > 1 ? count - 1 : nil }
         case .wheel:
-            if wheelRepeat?.source == source {
-                wheelRepeat?.task.cancel()
-                wheelRepeat = nil
+            guard wheelRepeat?.source == source else { break }
+            wheelRepeat?.task.cancel()
+            wheelRepeat = nil
+            // Another button still holding a wheel keeps it turning.
+            for case let (other, .wheel(direction)) in held {
+                repeatWheel(direction, held: other)
+                break
             }
         default:
             break
@@ -125,6 +122,18 @@ public final class VirtualMouse {
         showsKeyboard = false
     }
 
+    /// Turns the wheel again and again while `source` holds it, after a pause, as a held key repeats.
+    private func repeatWheel(_ direction: WheelDirection, held source: InputSource) {
+        wheelRepeat?.task.cancel()
+        wheelRepeat = (source, Task { [weak self] in
+            try? await Task.sleep(for: PressRouter.repeatDelay)
+            while !Task.isCancelled {
+                self?.turn(direction)
+                try? await Task.sleep(for: PressRouter.repeatInterval)
+            }
+        })
+    }
+
     private func turn(_ direction: WheelDirection) {
         // The wheel turned down scrolls the content down, which is a positive scroll.
         send?(.scroll(dy: direction == .down ? Self.notch : -Self.notch))
@@ -138,7 +147,7 @@ public final class VirtualMouse {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.frame)
                 let now = ContinuousClock.now
-                guard let self, motion.isMoving else { break }
+                guard !Task.isCancelled, let self, motion.isMoving else { break }
                 step(seconds: (now - last).seconds)
                 last = now
             }

@@ -206,3 +206,19 @@ import VNCore
     try await Task.sleep(for: .milliseconds(100))
     #expect(mouse.location == held)
 }
+
+@MainActor @Test func aWheelKeepsTurningWhileAnyButtonHoldsIt() async throws {
+    let mouse = VirtualMouse()
+    var notches = 0
+    mouse.send = { if case .scroll = $0 { notches += 1 } }
+    _ = mouse.press(.touch(.l), .wheel(.down), hasConsumer: true)
+    _ = mouse.press(.key(1), .wheel(.down), hasConsumer: true)
+    _ = mouse.release(.key(1))
+    try await Task.sleep(for: .milliseconds(700))
+    // Two presses, then repeats from the button still held.
+    #expect(notches > 2)
+    _ = mouse.release(.touch(.l))
+    let stopped = notches
+    try await Task.sleep(for: .milliseconds(300))
+    #expect(notches == stopped)
+}

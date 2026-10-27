@@ -647,18 +647,23 @@
     }
     function typeText(kind, value) {
         const field = textField();
-        if (kind === 'newline') return typeKey('Enter', 'Enter', 13, '\r');
+        if (kind === 'newline') {
+            if (!field || field.tagName !== 'TEXTAREA') return typeKey('Enter', 'Enter', 13, '\r');
+            kind = 'insert';
+            value = '\n';
+        }
         if (!field) {
             if (kind === 'delete') return typeKey('Backspace', 'Backspace', 8, null);
             for (const character of value) typeKey(character, '', character.toUpperCase().charCodeAt(0), character);
             return;
         }
-        let start = field.selectionStart ?? field.value.length, end = field.selectionEnd ?? start;
-        if (kind === 'delete') {
-            if (start === end && start > 0) start -= 1;
-            field.setRangeText('', start, end, 'end');
+        // Email fields have no selection, so typing there goes at the end.
+        if (field.selectionStart === null) {
+            field.value = kind === 'delete' ? Array.from(field.value).slice(0, -1).join('') : field.value + value;
         } else {
-            field.setRangeText(value, start, end, 'end');
+            let start = field.selectionStart, end = field.selectionEnd;
+            if (kind === 'delete' && start === end && start > 0) start -= 1;
+            field.setRangeText(kind === 'delete' ? '' : value, start, end, 'end');
         }
         field.dispatchEvent(new Event('input', { bubbles: true }));
     }

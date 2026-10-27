@@ -331,6 +331,11 @@ static bool nextEvent(SDL_Event *event)
     return SDL_PollEvent(event);
 }
 
+// Typed text travels through SDL's queue as an event of VNDegen's own, behind the key events pushed before it, so the
+// game sees a key go down before its character, as on Windows.
+static Uint32 textEvent;
+static void deliverText(SDL_Event *event);
+
 int vnkk_iterate(void)
 {
     if (finished)
@@ -355,8 +360,12 @@ int vnkk_iterate(void)
             TVPTerminateAsync();
         }
         SDL_Event event;
-        while (nextEvent(&event))
-            SDL_AppEvent(nullptr, &event);
+        while (nextEvent(&event)) {
+            if (textEvent && event.type == textEvent)
+                deliverText(&event);
+            else
+                SDL_AppEvent(nullptr, &event);
+        }
         finished = SDL_AppIterate(nullptr) != SDL_APP_CONTINUE;
     } catch (...) {
         SDL_Log("vnkk: the game stopped on an error");
@@ -442,8 +451,26 @@ void vnkk_wheel(float notches)
 
 void vnkk_text(const char *utf8)
 {
-    if (utf8 && *utf8)
-        krkrsdl3::KRKR_Trig_TextInput(utf8);
+    if (!utf8 || !*utf8)
+        return;
+    if (!textEvent)
+        textEvent = SDL_RegisterEvents(1);
+    if (!textEvent)
+        return;
+    SDL_Event event = {};
+    event.type = textEvent;
+    event.user.timestamp = SDL_GetTicksNS();
+    event.user.windowID = windowID();
+    event.user.data1 = SDL_strdup(utf8);
+    if (!SDL_PushEvent(&event))
+        SDL_free(event.user.data1);
+}
+
+static void deliverText(SDL_Event *event)
+{
+    char *text = (char *)event->user.data1;
+    krkrsdl3::KRKR_Trig_TextInput(text);
+    SDL_free(text);
 }
 
 void vnkk_set_paused(bool value)
