@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import Observation
 import VNCore
@@ -102,6 +103,8 @@ final class Navigator {
         /// A runtime package a game is missing, by package ID, on the game's page.
         case runtime(String, RuntimeAction)
         case licenseAccept, licenseDecline
+        /// A font package in Settings, by package ID. It downloads, cancels, or removes the package.
+        case fontPackage(String)
     }
 
     enum RuntimeAction: Hashable {
@@ -276,6 +279,7 @@ final class Navigator {
             if method.mouse != nil { items.append(.mouseStyle) }
             items.append(.playOrientation)
             #endif
+            items += FontPack.packages.map { .fontPackage($0.id) }
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
@@ -450,6 +454,15 @@ final class Navigator {
             case .install: runtimes.install(package, for: id)
             case .importFolder: runtimes.pickFolder(for: package)
             case .cancel: runtimes.cancel(package)
+            }
+        case let .fontPackage(packageID):
+            guard let package = FontPack.packages.first(where: { $0.id == packageID }) else { return }
+            if case .running? = runtimes.phases[packageID] {
+                runtimes.cancel(package)
+            } else if runtimes.installedFonts.contains(packageID) {
+                runtimes.remove(package)
+            } else {
+                runtimes.install(package, for: nil)
             }
         case .licenseAccept, .licenseDecline:
             guard case let .license(request) = sheet else { return }

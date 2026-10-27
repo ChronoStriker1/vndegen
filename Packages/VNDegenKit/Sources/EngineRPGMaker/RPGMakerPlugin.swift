@@ -39,8 +39,9 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     /// already report this shape.
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         guard let url = Bundle.module.url(forResource: "rpgmaker", withExtension: "js") else { throw RPGMakerError.scriptMissing }
-        return try WebGameConfiguration(
-            folder: GameFolder(rpgMakerGameAt: launch.folder), appName: "rmmz-game",
+        let folder = GameFolder(rpgMakerGameAt: launch.folder)
+        var configuration = try WebGameConfiguration(
+            folder: folder, appName: "rmmz-game",
             userScripts: [try String(contentsOf: url, encoding: .utf8)], userAgent: Self.userAgent,
             buttonScript: { button, pressed in
                 KeyStroke.key(for: button).map {
@@ -48,7 +49,9 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
                 }
             },
             scriptArgument: "rpgmaker-script", log: rpgLog
-        ).makeSession(launch)
+        )
+        configuration.preloadFonts = folder.fontNames
+        return try configuration.makeSession(launch)
     }
 
     /// Buttons used to press these keys, so a remap from then presses the same key.
