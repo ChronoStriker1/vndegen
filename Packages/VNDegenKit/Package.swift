@@ -14,6 +14,8 @@ let package = Package(
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
+        .library(name: "EngineNScripter", targets: ["EngineNScripter"]),
+        .library(name: "FrameHost", targets: ["FrameHost"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -43,6 +45,16 @@ let package = Package(
         // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
         .target(name: "CRGSS"),
         .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        // VNDegen's own NScripter runtime, in C++, with vnns.h as its C interface. third_party holds stb_image,
+        // stb_vorbis and pl_mpeg, which the runtime's sources include directly rather than compile on their own.
+        .target(
+            name: "CNScripter", exclude: ["third_party", "core/sjis_table.inc"],
+            linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
+                             .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
+        // Presents a frame a runtime drew on the CPU through Metal, and plays the sound it mixes, for the runtimes that
+        // composite in software.
+        .target(name: "FrameHost", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineNScripter", dependencies: ["VNCore", "CNScripter", "FrameHost"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
@@ -79,5 +91,7 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
-    ]
+        .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"]),
+    ],
+    cxxLanguageStandard: .cxx17
 )
