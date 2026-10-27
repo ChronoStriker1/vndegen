@@ -9,7 +9,7 @@ using vnns::Engine;
 
 struct VNNSEngine {
     std::unique_ptr<Engine> engine;
-    std::string caption;
+    std::string caption, status;
 };
 
 static std::string gStartError;
@@ -79,6 +79,11 @@ void vnns_stop(VNNSEngine *e) { delete e; }
 const char *vnns_problem(VNNSEngine *e) {
     const std::string &p = e->engine->problem();
     return p.empty() ? nullptr : p.c_str();
+}
+
+const char *vnns_debug_status(VNNSEngine *e) {
+    e->status = e->engine->debugStatus();
+    return e->status.c_str();
 }
 
 void vnns_set_glyph_function(VNNSGlyphFunction fn, void *ctx) { vnns::setGlyphCallback(fn, ctx); }

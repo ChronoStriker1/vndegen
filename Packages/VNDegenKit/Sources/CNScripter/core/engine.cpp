@@ -260,6 +260,13 @@ bool Engine::step(int ms) {
     return !ended_;
 }
 
+std::string Engine::debugStatus() const {
+    static const char *names[] = {"running", "timer", "click", "text", "effect", "button", "select", "quake", "movie", "dialog"};
+    std::string line = script_.text().substr(script_.lineStart(cur_.line),
+                                             script_.text().find('\n', script_.lineStart(cur_.line)) - script_.lineStart(cur_.line));
+    return "line " + std::to_string(cur_.line + 1) + " (" + names[int(wait_)] + "): " + sjisToUtf8(line);
+}
+
 // ---- input ----
 
 void Engine::mouseMove(int x, int y) {

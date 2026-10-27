@@ -79,6 +79,9 @@ void vnns_save_system_data(VNNSEngine *e);
 // Frees the engine.
 void vnns_stop(VNNSEngine *e);
 
+// For logs and test hosts: the script line the game is on and what it waits for, such as "line 1234 (button)".
+const char *vnns_debug_status(VNNSEngine *e);
+
 // A sentence for the player about the most recent problem, such as a missing file, or NULL.
 const char *vnns_problem(VNNSEngine *e);
 

@@ -163,6 +163,7 @@ public:
     int width() const { return width_; }
     int height() const { return height_; }
     std::string caption() const { return caption_; }
+    std::string debugStatus() const;
     const Script &script() const { return script_; }
 
     // ---- everything below is the interpreter's own state and helpers, shared by the command files ----

@@ -11,7 +11,8 @@ int Engine::hitButton(int x, int y) {
         if (b.kind == Button::Sprite) {
             if (b.sprite < 0 || b.sprite >= kSpriteCount) continue;
             const Sprite &s = shown_.sp[size_t(b.sprite)];
-            if (!s.loaded || !s.visible || !s.img.image) continue;
+            // bsp buttons often sit on hidden sprites that show themselves on hover, so only spbtn needs visibility.
+            if (!s.loaded || (!s.visible && !b.bsp) || !s.img.image) continue;
             int w = s.img.cellWidth, h = s.img.image->h;
             if (x < s.x || y < s.y || x >= s.x + w || y >= s.y + h) continue;
             if (transBtn_) {

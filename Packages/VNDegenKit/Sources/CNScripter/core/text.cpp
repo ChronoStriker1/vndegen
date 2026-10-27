@@ -129,6 +129,7 @@ void Engine::showWindow() {
     // Text output brings the screen up to date, as on the original engine.
     if (sceneDirty_ || !windowShown_) commitScene();
     windowHiddenByEffect_ = false;
+    textOff_ = false;  // textoff hides the window until the next text, which brings it back
     if (!windowShown_ && !textOff_) {
         windowShown_ = true;
         sceneDirty_ = true;
