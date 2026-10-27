@@ -2,6 +2,7 @@
 // For checks on Linux; it opens no window and plays no sound.
 //
 //   wolfplay <game folder> --frames 300 --shot 120:title.png --press 200:confirm
+//   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames; hold a key)
 //   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
 #include "../src/game.h"
 #include "../src/render.h"
@@ -34,6 +35,8 @@ int main(int argc, char **argv) {
     int mapId = -1, mapX = 0, mapY = 0;
     std::multimap<int, std::string> shots;
     std::multimap<int, uint32_t> presses;
+    std::vector<std::pair<int, uint32_t>> repeats;  // press a key every N frames
+    std::vector<std::tuple<int, int, uint32_t>> holds;  // hold a key from one frame to another
     for (int i = 2; i + 1 < argc; i += 2) {
         std::string opt = argv[i], val = argv[i + 1];
         size_t colon = val.find(':');
@@ -43,6 +46,13 @@ int main(int argc, char **argv) {
             shots.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
         else if (opt == "--press" && colon != std::string::npos)
             presses.emplace(std::atoi(val.c_str()), keyNamed(val.substr(colon + 1)));
+        else if (opt == "--every" && colon != std::string::npos)
+            repeats.emplace_back(std::max(1, std::atoi(val.c_str())), keyNamed(val.substr(colon + 1)));
+        else if (opt == "--hold" && colon != std::string::npos) {
+            int from = 0, to = 0;
+            std::sscanf(val.c_str(), "%d-%d", &from, &to);
+            holds.emplace_back(from, to, keyNamed(val.substr(colon + 1)));
+        }
     }
 
     Game game(argv[1]);
@@ -75,6 +85,13 @@ int main(int argc, char **argv) {
             Input in;
             auto [a, b] = presses.equal_range(f);
             for (auto it = a; it != b; ++it) in.pressed |= it->second;
+            for (auto [n, k] : repeats)
+                if (f % n == 0) in.pressed |= k;
+            for (auto [from, to, k] : holds) {
+                if (f == from) in.pressed |= k;
+                if (f >= from && f <= to) held |= k;
+                if (f == to + 1) held &= ~k;
+            }
             // A scripted press holds the key for this frame only.
             in.held = held | in.pressed;
             game.update(in);

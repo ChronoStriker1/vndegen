@@ -47,7 +47,9 @@ bool Game::load(std::string *error) {
     // The game starts at the first entry of the position list.
     int startMap = dbNumber(sdb_, SysPositions, 0, 0);
     hero_.placeAt(dbNumber(sdb_, SysPositions, 0, 1), dbNumber(sdb_, SysPositions, 0, 2));
-    hero_.chara.graphic = gameDat_.startHeroGraphic;
+    // System strings 10 to 15 name the hero's and the party members' character images.
+    if (systemStrings_.size() > 10 && systemStrings_[10].empty()) systemStrings_[10] = gameDat_.startHeroGraphic;
+    syncPartyGraphics();
     if (!loadMap(startMap)) {
         if (error) *error = format("cannot load start map %d", startMap);
         return false;
@@ -107,16 +109,10 @@ int32_t *Game::selfSlot(int32_t id, const Thread &t) {
         return &cself_[ce][(id - 15000000) % 100];
     }
     if (id >= 1100000 && id < 1100010) {
-        int ev = c.map == map_ ? c.mapEvent : -1;
-        if (ev < 0 || ev >= int(events_.size())) return nullptr;
-        return &events_[ev].self[id - 1100000];
+        if (!c.map || c.mapEvent < 0 || c.mapEvent >= int(c.map->events.size())) return nullptr;
+        return &eventSelf_[{c.mapId, c.map->events[c.mapEvent].id}][id - 1100000];
     }
-    if (id >= 1000000 && id < 1100000) {
-        int ev = (id - 1000000) / 10;
-        for (auto &e : events_)
-            if (e.data && e.data->id == ev) return &e.self[(id - 1000000) % 10];
-        return nullptr;
-    }
+    if (id >= 1000000 && id < 1100000) return &eventSelf_[{mapId_, (id - 1000000) / 10}][(id - 1000000) % 10];
     return nullptr;
 }
 
@@ -215,6 +211,7 @@ void Game::writeStr(int32_t id, const std::string &s, const Thread &t) {
         size_t i = id - 9900000;
         if (i >= systemStrings_.size()) systemStrings_.resize(i + 1);
         systemStrings_[i] = s;
+        if (i >= 10 && i <= 15) syncPartyGraphics();
         return;
     }
     const Thread::Call &c = t.stack.back();
@@ -332,7 +329,7 @@ int Game::activePage(const MapEventState &e, const Thread &ctx) {
 void Game::refreshPages() {
     for (size_t i = 0; i < events_.size(); i++) {
         Thread ctx;
-        ctx.stack.push_back({nullptr, 0, -1, int(i)});
+        ctx.stack.push_back({nullptr, 0, -1, int(i), 0, map_, mapId_});
         int page = activePage(events_[i], ctx);
         if (page != events_[i].page) {
             auto &e = events_[i];
@@ -373,7 +370,7 @@ void Game::refreshPages() {
 
 void Game::startPage(int eventIndex, Thread &t) {
     auto &e = events_[eventIndex];
-    t.stack.push_back({&e.data->pages[e.page].commands, 0, -1, eventIndex, 0, map_});
+    t.stack.push_back({&e.data->pages[e.page].commands, 0, -1, eventIndex, 0, map_, mapId_});
 }
 
 bool Game::commonConditionMet(const CommonEvent &ce) {
@@ -510,6 +507,15 @@ void Game::updatePictures() {
         // A picture faded out by an erase with a duration goes once it is invisible.
         return kv.second.erasing && kv.second.opacity.value() <= 0;
     });
+}
+
+void Game::syncPartyGraphics() {
+    auto name = [&](size_t i) { return i < systemStrings_.size() ? systemStrings_[i] : std::string(); };
+    hero_.chara.graphic = name(10);
+    for (size_t i = 0; i < party_.size(); i++) {
+        party_[i].chara.graphic = name(11 + i);
+        party_[i].chara.visible = !party_[i].chara.graphic.empty();
+    }
 }
 
 // Keeps the hero in the middle of the screen, without showing past the map's edges.

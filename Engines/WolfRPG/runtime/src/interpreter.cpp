@@ -279,7 +279,7 @@ bool Game::step(Thread &t) {
                     auto &e = events_[i];
                     if (e.data->id != id) continue;
                     if (page >= 0 && page < int(e.data->pages.size()))
-                        t.stack.push_back({&e.data->pages[page].commands, 0, -1, int(i), 0, map_});
+                        t.stack.push_back({&e.data->pages[page].commands, 0, -1, int(i), 0, map_, mapId_});
                     break;
                 }
             }

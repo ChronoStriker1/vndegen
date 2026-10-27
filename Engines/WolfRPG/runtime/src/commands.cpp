@@ -364,40 +364,40 @@ bool Game::keyInput(Thread &t, const Command &c) {
     return true;
 }
 
-// Party graphics: the hero is member 0 and up to five members follow.
+// Party graphics: the hero is member 0 and up to five members follow. The names live in system strings 10 to 15.
 void Game::partyCommand(Thread &t, const Command &c) {
     uint32_t flags = uint32_t(c.arg(0));
     int exec = flags & 0x0F;
-    if (partyGraphics_.empty()) partyGraphics_.push_back(hero_.chara.graphic);
+    std::vector<std::string> members;
+    for (size_t i = 10; i <= 15; i++) {
+        std::string n = i < systemStrings_.size() ? systemStrings_[i] : "";
+        if (!n.empty() || i == 10) members.push_back(n);
+    }
     int index = value(c.arg(1), t);
     std::string graphic = (flags >> 8) & 0x10 ? readStr(c.arg(2), t) : c.str(0);
     switch (exec) {
         case 0:  // remove a member
-            if (index >= 0 && index < int(partyGraphics_.size())) partyGraphics_.erase(partyGraphics_.begin() + index);
+            if (index >= 0 && index < int(members.size())) members.erase(members.begin() + index);
             break;
         case 1:  // insert a member
-            index = std::clamp(index, 0, int(partyGraphics_.size()));
-            partyGraphics_.insert(partyGraphics_.begin() + index, graphic);
+            index = std::clamp(index, 0, int(members.size()));
+            members.insert(members.begin() + index, graphic);
             break;
         case 2:  // replace a member's graphic
-            if (index >= 0 && index < int(partyGraphics_.size())) partyGraphics_[index] = graphic;
-            else if (index == int(partyGraphics_.size())) partyGraphics_.push_back(graphic);
+            if (index >= 0 && index < int(members.size())) members[index] = graphic;
+            else members.push_back(graphic);
             break;
         case 3:  // remove every member with this graphic
-            std::erase(partyGraphics_, graphic);
+            std::erase(members, graphic);
             break;
-        default: {
-            int special = (flags & 0xF0) >> 4;
-            if (special == 1) partyGraphics_.assign(1, "");  // erase every character
+        default:
+            if (((flags & 0xF0) >> 4) == 1) members.assign(1, "");  // erase every character
             break;
-        }
     }
-    if (partyGraphics_.size() > 6) partyGraphics_.resize(6);
-    hero_.chara.graphic = partyGraphics_.empty() ? "" : partyGraphics_[0];
-    for (size_t i = 0; i < party_.size(); i++) {
-        party_[i].chara.graphic = i + 1 < partyGraphics_.size() ? partyGraphics_[i + 1] : "";
-        party_[i].chara.visible = !party_[i].chara.graphic.empty();
-    }
+    members.resize(6);
+    if (systemStrings_.size() < 16) systemStrings_.resize(16);
+    for (size_t i = 0; i < 6; i++) systemStrings_[10 + i] = members[i];
+    syncPartyGraphics();
 }
 
 void Game::effectCommand(Thread &t, const Command &c) {

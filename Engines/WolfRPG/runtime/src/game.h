@@ -118,6 +118,7 @@ struct Thread {
         int32_t returnTo = 0;  // where a called common event's return value goes, or 0
         // A map event's page keeps its map alive, since the event runs on after moving the hero elsewhere.
         std::shared_ptr<const Map> map;
+        int mapId = -1;
     };
     std::vector<Call> stack;
     int wait = 0;
@@ -256,6 +257,7 @@ private:
     bool commonConditionMet(const CommonEvent &ce);
     void updateCamera();
     void updatePictures();
+    void syncPartyGraphics();
 
     // Characters (characters.cpp).
     Actor *actorFor(int target, const Thread &t);  // -1 this event, -2 the hero, 0 and up a map event id
@@ -290,6 +292,8 @@ private:
     int mapId_ = -1, loadedMap_ = -1;
     std::shared_ptr<Map> map_;
     std::vector<MapEventState> events_;
+    // Self variables of map events, kept per map and event id for as long as the game runs.
+    std::map<std::pair<int, int>, std::array<int32_t, 10>> eventSelf_;
     Actor hero_;
     std::array<Actor, 5> party_;
     double cameraX_ = 0, cameraY_ = 0;
@@ -314,7 +318,6 @@ private:
     TransitionState transition_;
     int transitionFrames_ = 0;
     double scrollX_ = 0, scrollY_ = 0;
-    std::vector<std::string> partyGraphics_;  // member 0 is the hero
 };
 
 }  // namespace wolf
