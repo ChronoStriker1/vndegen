@@ -13,7 +13,6 @@
 #include "UtilStreams.h"
 #include "vnfont.h"
 
-#include <algorithm>
 #include <cstdio>
 
 tTJSHashTable<ttstr, TVPFontNamePathInfo, tTVPttstrHash> TVPFontNames;
@@ -22,9 +21,7 @@ tTJSHashTable<ttstr, TVPFontNamePathInfo, tTVPttstrHash> TVPFontNames;
 
 static ttstr TVPDefaultFontName;
 static ttstr TVPGlyphFallbackFontName;
-// VNDegen: the names registered as Windows font substitutes, and whether the default font is the engine's bundled
-// fallback font, which a substitute replaces.
-static std::vector<ttstr> TVPSubstituteNames;
+// VNDegen: whether the default font is the engine's bundled fallback font, which a substitute replaces.
 static bool TVPDefaultIsBundledFallback;
 static bool TVPFontNamesInit;
 static tTVPFont TVPDefaultFont;
@@ -180,13 +177,13 @@ static void TVPAddSubstitute(const ttstr& fontname, const vnfont_match& match)
     TVPFontNamePathInfo info;
     info.Path = ttstr(path);
     info.Index = match.face;
+    info.Substitute = true;
     info.Getter = [path, fontname](TVPFontNamePathInfo*)
     {
         TVPAddLog(ttstr(TJS_N("VNDegen: font \"")) + fontname + TJS_N("\" draws with ") + ttstr(path));
         return TVPReadSubstitute(path);
     };
     TVPFontNames.Add(fontname, info);
-    TVPSubstituteNames.push_back(fontname);
 }
 
 // Font.getList lists the substitutes under their Windows names, as Windows lists installed fonts. A game that ships no
@@ -210,9 +207,14 @@ static void TVPRegisterSubstitutes()
 
 void TVPRefreshFontSubstitutes()
 {
-    for (const ttstr& name : TVPSubstituteNames)
+    std::vector<ttstr> substitutes;
+    for (auto it = TVPFontNames.GetFirst(); !it.IsNull(); ++it)
+    {
+        if (it.GetValue().Substitute)
+            substitutes.push_back(it.GetKey());
+    }
+    for (const ttstr& name : substitutes)
         TVPFontNames.Delete(name);
-    TVPSubstituteNames.clear();
     if (!TVPFontNamesInit)
         return;
     if (TVPDefaultIsBundledFallback)
@@ -222,7 +224,8 @@ void TVPRefreshFontSubstitutes()
 
 bool TVPIsFontSubstitute(const ttstr& fontname)
 {
-    return std::find(TVPSubstituteNames.begin(), TVPSubstituteNames.end(), fontname) != TVPSubstituteNames.end();
+    TVPFontNamePathInfo* info = TVPFontNames.Find(fontname);
+    return info && info->Substitute;
 }
 
 // Registers the substitute for `fontname` under that name, and returns it, or nullptr when there is none.
@@ -238,8 +241,8 @@ static TVPFontNamePathInfo* TVPFindSubstitute(const ttstr& fontname)
 //---------------------------------------------------------------------------
 void TVPGetAllFontList(std::vector<ttstr>& list)
 {
-    auto itend = TVPFontNames.GetLast();
-    for (auto it = TVPFontNames.GetFirst(); it != itend; ++it)
+    // VNDegen: the list runs to its end. Upstream stopped before the last font.
+    for (auto it = TVPFontNames.GetFirst(); !it.IsNull(); ++it)
     {
         list.push_back(it.GetKey());
     }

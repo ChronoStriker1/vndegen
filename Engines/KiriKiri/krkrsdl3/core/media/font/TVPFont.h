@@ -22,6 +22,9 @@ struct TVPFontNamePathInfo
     ttstr Path;
     std::function<tTJSBinaryStream*(TVPFontNamePathInfo*)> Getter;
     int Index;
+    // VNDegen: true for a Windows font substitute. A font file registered under the same name replaces the whole
+    // entry, so it is never mistaken for one.
+    bool Substitute = false;
 };
 TVPFontNamePathInfo* TVPFindFont(const ttstr& name);
 
