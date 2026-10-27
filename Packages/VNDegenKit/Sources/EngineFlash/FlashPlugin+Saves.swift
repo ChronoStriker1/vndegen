@@ -78,20 +78,23 @@ extension FlashPlugin {
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("/") }) else { return nil }
         if parts.count == 1 { return parts[0] }
         let path = parts.dropLast()
+        // Flash Player keeps a name with slashes in it, saved for the local path `/`, as `#name/...` right after
+        // `localhost`, which is also where a folder at the top of a drive would be. It is a folder only when a movie of
+        // this game follows with another folder between them, such as the game's own folder.
+        let rootName = parts[0].hasPrefix("#")
         // The longest end of the PC path that names a movie, or else a folder that holds one, which is where a movie
         // that asked for a shorter local path saves.
         // A folder is followed only by the save's name, which starts with # when it has slashes in it.
         for (known, isFolder) in [(movies, false), (folders, true)] {
             for end in stride(from: path.count, to: 0, by: -1) where !isFolder || path[end...].first.map({ $0.hasPrefix("#") }) ?? true {
-                for start in 0 ..< end {
+                for start in (rootName ? 2 : 0) ..< max(end, rootName ? 2 : 0) {
                     guard let match = known[path[start ..< end].joined(separator: "/").lowercased()] else { continue }
                     let disk = match.split(separator: "/").map { SharedObjectStore.diskName(String($0)) }
                     return (disk + path[end...] + [parts.last!]).joined(separator: "/")
                 }
             }
         }
-        // A save for the local path `/` whose name has slashes in it, which starts with #.
-        if parts[0].hasPrefix("#") { return parts.joined(separator: "/") }
+        if rootName { return parts.joined(separator: "/") }
         return nil
     }
 

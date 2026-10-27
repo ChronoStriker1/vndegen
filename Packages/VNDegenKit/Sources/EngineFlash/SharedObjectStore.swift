@@ -10,7 +10,7 @@ import WebRuntime
 /// `FlashPlugin.urlComponent` gives. A name with slashes in it starts with `#`, which a URL path never holds unencoded.
 /// The file is `<local path>/<name>.sol` here, decoded, as Flash Player keeps it under `#SharedObjects/<id>/localhost/`,
 /// except that a folder of the local path that starts with `#` starts with `%23` on disk, so it never reads back as a
-/// name. Any other key goes to `others`.
+/// name, and one that already starts like that is escaped once more. Any other key goes to `others`.
 nonisolated struct SharedObjectStore: PageStorage {
     let directory: URL
     let others: WebStorage
@@ -66,7 +66,7 @@ nonisolated struct SharedObjectStore: PageStorage {
         if parts.first == "", parts.count >= 2 { parts.removeFirst() }
         let split = nameStart(parts)
         let path = parts[..<split].map { $0.removingPercentEncoding ?? $0 }
-        guard !parts.isEmpty, path.allSatisfy(isSafePath), parts[split...].allSatisfy(isSafe) else { return nil }
+        guard !parts.isEmpty, path.allSatisfy(isSafe), parts[split...].allSatisfy(isSafe) else { return nil }
         return (path.map(diskName) + parts[split...]).joined(separator: "/")
     }
 
@@ -86,18 +86,27 @@ nonisolated struct SharedObjectStore: PageStorage {
         parts.firstIndex { $0.hasPrefix("#") } ?? max(parts.count - 1, 0)
     }
 
-    /// A folder of the local path as a file name: `#bonus` is `%23bonus`.
+    /// A folder of the local path as a file name. `#bonus` is `%23bonus`, and a name that starts like an escaped one,
+    /// `%`, any number of `25`, then `23`, gets one more `25`, so `%23bonus` is `%2523bonus`. Every other name is as Flash
+    /// Player writes it.
     static func diskName(_ folder: String) -> String {
-        folder.hasPrefix("#") ? "%23" + folder.dropFirst() : folder
+        if folder.hasPrefix("#") { return "%23" + folder.dropFirst() }
+        return looksEscaped(folder) ? "%25" + folder.dropFirst() : folder
     }
 
     /// The inverse of `diskName`.
     static func pathName(_ disk: String) -> String {
-        disk.hasPrefix("%23") ? "#" + disk.dropFirst(3) : disk
+        guard looksEscaped(disk) else { return disk }
+        let rest = disk.dropFirst()
+        return rest.hasPrefix("23") ? "#" + rest.dropFirst(2) : "%" + rest.dropFirst(2)
     }
 
-    private static func isSafePath(_ name: String) -> Bool {
-        isSafe(name) && !name.hasPrefix("%23")
+    /// `%` followed by any number of `25`, then `23`.
+    private static func looksEscaped(_ name: String) -> Bool {
+        guard name.hasPrefix("%") else { return false }
+        var rest = name.dropFirst()
+        while rest.hasPrefix("25") { rest = rest.dropFirst(2) }
+        return rest.hasPrefix("23")
     }
 
     private static func isSafe(_ name: String) -> Bool {

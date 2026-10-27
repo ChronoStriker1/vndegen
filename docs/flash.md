@@ -85,7 +85,8 @@ path such as `My Game/game.swf`, and the file here has the plain name, as Flash 
 different ways, so `flash-page.js` gives every key one encoding before it reaches storage, the one VNDegen gives movie
 URLs, and the save reads back under the key Ruffle asks for. A movie may also ask for a shorter local path, a folder
 above it, and save there. A shared object's name with slashes in it starts with `#`, as in `game.swf/#saves/slot1.sol`.
-A folder of the local path that starts with `#` starts with `%23` on disk instead, so the two never meet. A backup's path maps to the movie in this game folder that the longest end
+A folder of the local path that starts with `#` starts with `%23` on disk instead, so the two never meet, and a folder
+whose name already starts that way, `%23` or `%2523` and so on, gets one more `25`. Every other folder keeps its name. A backup's path maps to the movie in this game folder that the longest end
 of its PC path names, so where the game sat on the PC doesn't matter. A save under a folder that holds a movie maps to that folder. The same goes for Ruffle on the PC, which keeps
 `.sol` files under `ruffle/SharedObjects/localhost/` with percent-encoded folder names, and for movies run from a network drive, under `#localWithNet`.
 Other localStorage keys go to `localStorage/` beside them, as for TyranoScript.
@@ -135,6 +136,9 @@ simulator timing isn't a real device's.
 - Shared objects are written when the game pauses or quits, as Flash Player wrote them when it quit. A game that ends
   without either, as when the app crashes, keeps the saves from its last pause.
 - A launcher page's own layout may suit a desktop browser window more than a phone.
+- Flash Player keeps a name with slashes in it, saved for `/`, as `localhost/#name/...`, where a folder at the top of a
+  PC drive whose name starts with `#` would also be. A PC save there maps as such a name, unless a movie of the game
+  follows it with another folder between them, as the game's own folder would be.
 - Two shared objects of a movie whose names differ only in case share one file on a disk that ignores case, as they
   did with Flash Player on Windows.
 - The `pagehide` that writes saves also reaches a launcher page's own `pagehide` handlers, if it has any, whenever the

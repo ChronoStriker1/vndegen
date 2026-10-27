@@ -148,6 +148,10 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
         ("game/Sub/#saves/chapter/slot", "Sub/#saves/chapter/slot"),
         ("game/game.swf/#chapter.swf/slot", "game.swf/#chapter.swf/slot"),
         ("game/Folder!/game.swf/save", "Folder!/game.swf/save"),
+        // A real folder named %23bonus, or %2523bonus, gets one more 25, so it never reads back as #bonus.
+        ("game/%2523bonus/movie.swf/save", "%2523bonus/movie.swf/save"),
+        ("game/%252523bonus/movie.swf/save", "%252523bonus/movie.swf/save"),
+        ("game/100%25/movie.swf/save", "100%/movie.swf/save"),
     ] {
         #expect(SharedObjectStore.file(forKey: key) == file)
         #expect(SharedObjectStore.key(forFile: file) == key)
@@ -259,6 +263,11 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     // Names with slashes in them, saved for a folder or for /.
     #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/#saves/chapter/slot.sol", movies: movies, folders: folders) == "Sub/#saves/chapter/slot.sol")
     #expect(FlashPlugin.savePath("\(flashPlayer)/#saves/slot.sol", movies: movies, folders: folders) == "#saves/slot.sol")
+    // A name with slashes in it, saved for /, stays one even when a movie's name follows it.
+    #expect(FlashPlugin.savePath("\(flashPlayer)/#slots/game.swf/slot.sol", movies: ["game.swf": "Game.swf"], folders: [:]) == "#slots/game.swf/slot.sol")
+    // A real folder named %23bonus imports as itself.
+    #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/%23bonus/extra.swf/save.sol",
+                                 movies: ["%23bonus/extra.swf": "%23bonus/extra.swf"], folders: [:]) == "%2523bonus/extra.swf/save.sol")
     // A PC folder that starts with # is a folder when a movie follows it, and a game folder that does is %23 on disk.
     #expect(FlashPlugin.savePath("\(flashPlayer)/#Games/Test Game 01/sub/game.swf/save.sol", movies: movies, folders: folders) == "Sub/Game.swf/save.sol")
     #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/#bonus/extra.swf/save.sol",

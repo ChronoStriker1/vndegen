@@ -13,10 +13,10 @@ import WebKit
     private var loaded: CheckedContinuation<Void, any Error>?
     private let origin: URL
 
-    init(origin: URL) throws {
+    init(origin: URL, fileStorage: Bool = true) throws {
         self.origin = origin
         let game = WebGameConfiguration(folder: GameFolder(root: FileManager.default.temporaryDirectory, webRoot: ""), appName: "test",
-                                        runtime: .browser, storageDirectory: FileManager.default.temporaryDirectory,
+                                        runtime: .browser, storageDirectory: fileStorage ? FileManager.default.temporaryDirectory : nil,
                                         buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
         let page = try String(contentsOf: #require(FlashPlugin.hostDirectory).appending(path: "flash-page.js"), encoding: .utf8)
         let configuration = WKWebViewConfiguration()
@@ -123,4 +123,19 @@ import WebKit
     let sets = page.requests.compactMap { if case let .storageSet(key, _) = $0 { key } else { nil } }
     #expect(sets == ["localhost/Folder!/My%20Game/game.swf/save", "localhost/*%E6%89%93/game.swf/#Folder%21/slot", "other/Folder%21/game.swf/save"])
     #expect(try await page.run("return localStorage['localhost/Folder!/My Game/game.swf/save'] + localStorage['localhost/Folder%21/My%20Game/game.swf/save']") as? String == "aa")
+}
+
+@MainActor @Test func webKitsOwnStorageStillWorksThroughThePageScript() async throws {
+    let page = try FlashPage(origin: URL(string: "https://localhost/")!, fileStorage: false)
+    try await page.load()
+    // Storage's own methods run on Storage, and a value stored under another form of a key reads as the key's one form.
+    #expect(try await page.run("""
+        localStorage.clear();
+        localStorage.setItem('localhost/Folder%21/game.swf/save', 'new');
+        localStorage.setItem('x', '1');
+        const read = localStorage['localhost/Folder%21/game.swf/save'] + ' ' + localStorage.getItem('localhost/Folder!/game.swf/save');
+        const first = localStorage.key(0) !== null;
+        localStorage.clear();
+        return read + ' ' + first + ' ' + localStorage.length;
+        """) as? String == "new new true 0")
 }

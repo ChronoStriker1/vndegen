@@ -94,8 +94,16 @@
     if (storage) {
         const methods = { getItem: (key) => storage.getItem(canonical(key)), setItem: (key, value) => storage.setItem(canonical(key), value),
             removeItem: (key) => storage.removeItem(canonical(key)) };
+        const ours = (key) => typeof key === 'string' && key.startsWith(host + '/');
         Object.defineProperty(window, 'localStorage', { configurable: true, enumerable: true, value: new Proxy(storage, {
-            get: (target, key) => (key in methods ? methods[key] : typeof key === 'string' && !(key in target) ? target[canonical(key)] : Reflect.get(target, key)),
+            get: (target, key) => {
+                if (key in methods) return methods[key];
+                // This page's keys always read through their one form, whatever form an older value has.
+                if (ours(key)) return target[canonical(key)];
+                // WebKit's own Storage methods need it as `this`, not the proxy.
+                const value = Reflect.get(target, key);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
             set: (target, key, value) => { target[canonical(key)] = value; return true; },
             deleteProperty: (target, key) => { delete target[canonical(key)]; return true; },
             has: (target, key) => canonical(key) in target,
