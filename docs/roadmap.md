@@ -23,6 +23,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Controller mouse emulation, on `dev` for the next release: sticks and buttons can move the pointer, turn the mouse wheel, and open the on-screen keyboard. KiriKiri and TyranoScript games start with "Keyboard and mouse", the layout of Steam's template, and the mapping editor also offers "Mouse", "RPG Maker controls", and "Xbox gamepad".
 - An RPG Maker MZ fix, on `dev` for the next release: looping WebM movies made from GIFs, which WebKit takes for shorter than they are, now play at their stated length, so they no longer stutter or drift from their sound. Movie frames are uploaded only when they change.
 - An RPG Maker MZ fix, on `dev` for the next release: quick controller, touch gamepad, and key presses all reach the game. Each press and release reaches the game's input on its own update, and a VisuStella Core Engine input clear no longer drops the presses that follow it, so timed attacks that need several quick presses succeed.
+- Game files found whatever case the game names them in, for every engine, on `dev` for the next release. iPhone and iPad disks tell `Img/Title.PNG` from `img/title.png`, and Windows games often mix the two. Every engine plugin must pass the case check in the README's "Adding an engine" section.
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.

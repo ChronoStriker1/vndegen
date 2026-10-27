@@ -85,7 +85,10 @@ public struct LudusaviStore: Sendable {
                 plan.skipped.append(path)
                 continue
             }
-            plan.items.append(.init(location: index, relative: relative, path: path, stored: stored))
+            // A save that exists here in another case, as a PC backup's `Save01.rvdata2` beside a local `save01.rvdata2`,
+            // is that save, so the restore replaces it rather than writing a second file beside it.
+            let local = FileCase.spelling(of: relative, in: locations[index].directory)
+            plan.items.append(.init(location: index, relative: local, path: path, stored: stored))
         }
         guard !plan.items.isEmpty else { throw SaveSyncError.nothingToRestore(plan.skipped.count) }
         return plan

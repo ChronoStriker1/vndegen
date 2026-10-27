@@ -1,6 +1,7 @@
 # The RGSS framework's binary: VNDegen's libretro frontend, ANGLE, and mkxp-z's libretro core, linked as one library
 # that exports only the functions in vnrgss.h. scripts/rgss-engine.sh builds it once per Apple platform, with mkxp-z's
-# subprojects folder beside this file for ANGLE and the static core passed in as `core`.
+# subprojects folder beside this file for ANGLE, Engines/Shared beside it as `shared`, and the static core passed in as
+# `core`.
 project('vnrgss', 'c', 'cpp', 'objcpp', meson_version: '>=1.4.0',
     default_options: ['default_library=static', 'buildtype=release', 'cpp_std=c++17'])
 
@@ -18,10 +19,10 @@ angle = subproject('angle', default_options: {
 frameworks = ['Foundation', 'AVFoundation', 'AudioToolbox', 'CoreAudio', 'CoreGraphics', 'IOSurface', 'Metal', 'QuartzCore']
 frameworks += is_macos ? ['AppKit', 'IOKit'] : ['UIKit']
 
-shared_library('RGSS', 'vnrgss.mm', 'vfs.c',
+shared_library('RGSS', 'vnrgss.mm', 'vfs.c', 'shared/casepath.c',
     name_prefix: '',
     name_suffix: 'dylib',
-    include_directories: include_directories(get_option('api_include')),
+    include_directories: include_directories(get_option('api_include'), 'shared'),
     dependencies: [angle.get_variable('angle_dep'), dependency('appleframeworks', modules: frameworks)],
     objcpp_args: ['-fobjc-arc'],
     link_args: [

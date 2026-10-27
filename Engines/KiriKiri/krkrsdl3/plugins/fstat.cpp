@@ -393,6 +393,10 @@ public:
         bool r = false;
         const ttstr& fromFile(TVPGetLocallyAccessibleName(from));
         const ttstr& toFile(TVPGetLocallyAccessibleName(to));
+        // A move that only changes the name's case finds the file already there, and copying it onto
+        // itself and deleting it would lose it.
+        if (fromFile.length() && fromFile == toFile)
+            return true;
         if (fromFile.length() && toFile.length())
         {
             const std::string& ff = fromFile.AsStdString();

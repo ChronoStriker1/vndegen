@@ -21,6 +21,15 @@ with zipfile.ZipFile("sjis.zip", "w") as z:
         z.writestr(CP932Info(name), data)
 PY
 
+# A zip that names one folder in three cases, as Windows tools write when files are added at different times.
+python3 - <<'PY'
+import zipfile
+with zipfile.ZipFile("mixed-case.zip", "w") as z:
+    z.writestr("Mixed/Img/", b"")
+    for name, data in [("Mixed/Img/a.png", b"a"), ("Mixed/img/b.png", b"b"), ("Mixed/IMG/Sub/c.png", b"c")]:
+        z.writestr(name, data)
+PY
+
 mkdir -p "$work/Deflate Game"
 lines > "$work/Deflate Game/lines.txt"
 echo small > "$work/Deflate Game/small.txt"

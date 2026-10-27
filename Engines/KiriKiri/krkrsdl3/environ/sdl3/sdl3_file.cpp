@@ -6,6 +6,7 @@
 
 #include "TVPStorage.h"
 #include "TVPMsg.h"
+#include "casepath.h"
 
 #include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_filesystem.h>
@@ -103,6 +104,24 @@ static SDL_EnumerationResult SDLCALL TVPRemoveEnumerateCb(void* userdata,
     return SDL_ENUM_CONTINUE;
 }
 
+// Forgets the cached listing of the folder that holds `path`, after a file or folder there was
+// created, removed, or renamed. A folder named with a closing slash is still in its parent.
+static void TVPLocalPathChanged(std::string path)
+{
+    while (path.size() > 1 && path.back() == '/')
+        path.pop_back();
+    casepath_changed(path.c_str());
+}
+
+// Removes a file or an empty folder.
+static bool TVPRemoveLocalPath(const std::string& path)
+{
+    if (!SDL_RemovePath(path.c_str()))
+        return false;
+    TVPLocalPathChanged(path);
+    return true;
+}
+
 static bool TVPRemoveDirectory(const std::string& path)
 {
     TVPRemoveContext ctx;
@@ -119,7 +138,7 @@ static bool TVPRemoveDirectory(const std::string& path)
     if (!SDL_EnumerateDirectory(dirpath.c_str(), TVPRemoveEnumerateCb, &ctx))
     {
         // 如果目录不存在或无法枚举，尝试直接删除
-        return SDL_RemovePath(path.c_str());
+        return TVPRemoveLocalPath(path);
     }
 
     // 先递归删除所有子目录（深度优先）
@@ -134,14 +153,14 @@ static bool TVPRemoveDirectory(const std::string& path)
     // 再删除所有文件
     for (const auto& file : ctx.files)
     {
-        if (!SDL_RemovePath(file.c_str()))
+        if (!TVPRemoveLocalPath(file))
         {
             return false;
         }
     }
 
     // 最后删除自身目录
-    return SDL_RemovePath(path.c_str());
+    return TVPRemoveLocalPath(path);
 }
 
 struct TVPListDirContext
@@ -204,20 +223,8 @@ static SDL_EnumerationResult SDLCALL TVPFileinfoCb(void* userdata,
         fileinfo.ModifyTime = info.modify_time;
         fileinfo.CreationTime = info.create_time;
 
-        ttstr lowerFilename(fname);
-        // Lowercase the filename for case-insensitive auto-path lookup.
-        // NormalizePathName lowercases all lookup keys, so stored keys must match.
-        {
-            tjs_char* p = lowerFilename.Independ();
-            while (*p)
-            {
-                if (*p >= TJS_N('A') && *p <= TJS_N('Z'))
-                    *p += TJS_N('a') - TJS_N('A');
-                p++;
-            }
-        }
-
-        ctx->cb(lowerFilename.AsStdString(), &fileinfo);
+        // The name as on disk, as Windows lists it. The auto path table lowercases its own keys.
+        ctx->cb(fname, &fileinfo);
     }
 
     return SDL_ENUM_CONTINUE;
@@ -299,6 +306,8 @@ tTVPLocalFileStream::tTVPLocalFileStream(const ttstr& origname,
     }
 
     Handle = SDL_IOFromFile(localname.c_str(), mode);
+    if (Handle && access != TJS_BS_READ)
+        TVPLocalPathChanged(localname.AsStdString());
 
     if (!Handle)
     {
@@ -510,7 +519,7 @@ std::string TVPSearchPath(const std::string& filename, const std::string& search
 
 bool TVPDeleteFile(const std::string& filename)
 {
-    return SDL_RemovePath(filename.c_str());
+    return TVPRemoveLocalPath(filename);
 }
 
 bool TVPDeleteFolder(const std::string& foldername)
@@ -520,11 +529,18 @@ bool TVPDeleteFolder(const std::string& foldername)
 
 bool TVPRenameFile(const std::string& from, const std::string& to)
 {
-    return SDL_RenamePath(from.c_str(), to.c_str());
+    if (!SDL_RenamePath(from.c_str(), to.c_str()))
+        return false;
+    TVPLocalPathChanged(from);
+    TVPLocalPathChanged(to);
+    return true;
 }
 
 bool TVPCopyFile(const std::string& from, const std::string& to)
 {
+    // A copy onto itself, as when both names resolve to one file of another case, would truncate it.
+    if (from == to)
+        return true;
     SDL_IOStream* fFrom = SDL_IOFromFile(from.c_str(), "rb");
     if (!fFrom)
     {
@@ -536,6 +552,7 @@ bool TVPCopyFile(const std::string& from, const std::string& to)
         SDL_CloseIO(fFrom);
         return false;
     }
+    TVPLocalPathChanged(to);
     const int bufSize = 1 * 1024 * 1024;
     std::vector<char> buffer(bufSize);
     size_t bytesRead;
@@ -615,5 +632,8 @@ bool TVPCreateFolders(const ttstr& folderttstr)
         }
     }
 
-    return SDL_CreateDirectory(folder.c_str());
+    if (!SDL_CreateDirectory(folder.c_str()))
+        return false;
+    TVPLocalPathChanged(folder);
+    return true;
 }

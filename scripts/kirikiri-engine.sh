@@ -28,7 +28,7 @@ baseline=$(sed -n 's/.*"builtin-baseline": *"\([0-9a-f]*\)".*/\1/p' "$src/vcpkg.
 mkdir -p "$dest"
 dest=$(cd "$dest" && pwd)
 
-stamp=$( (cat "$0" "$root/Packages/VNDegenKit/Sources/CKiriKiri/include/vnkk.h"; cd "$src" && find . -path ./test-host -prune -o -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+stamp=$( (cat "$0" "$root/Packages/VNDegenKit/Sources/CKiriKiri/include/vnkk.h"; cd "$root/Engines" && find KiriKiri Shared -path KiriKiri/test-host -prune -o -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
 if [ -z "$harness" ] && [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "KiriKiri engine is up to date in $dest"
   exit 0

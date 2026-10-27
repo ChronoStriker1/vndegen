@@ -542,3 +542,26 @@ private func freshLibrary() async throws -> (library: LibraryStore, directory: U
     #expect(service.storedPassword() == nil)
 }
 #endif
+
+/// A PC backup's `File1.rmmzsave` restores over a local `file1.rmmzsave`, as it would on Windows, rather than beside it.
+/// `VNDEGEN_TEST_DIR` puts the game on a case-sensitive volume, which `scripts/build.sh test` mounts.
+@Test func restoreReplacesASaveThatDiffersOnlyInCase() throws {
+    let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? fm.temporaryDirectory
+    let base = scratch.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["File1.rmmzsave": "pc"])
+    _ = try store.backUp(folder: nil, title: "Test Game 01", game: GameID("Test Game 01"), locations: locations, retention: nil,
+                         os: "windows", comment: nil)
+    try fm.removeItem(at: locations[0].directory.appendingPathComponent("File1.rmmzsave"))
+    try write(["file1.rmmzsave": "local"], to: locations[0])
+
+    let preview = try store.preview(folder: "Test Game 01", backup: nil, locations: locations)
+    #expect(preview.replaced == ["file1.rmmzsave"] && preview.added.isEmpty)
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 01")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 01", backup: nil, locations: locations, snapshot: snapshot)
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "pc"])
+}
