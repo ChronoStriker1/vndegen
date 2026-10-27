@@ -304,110 +304,6 @@ pub struct Interpreter {
     compiled_macro_files: HashMap<String, String>,
 }
 
-fn json_to_lua_value(lua: &Lua, value: serde_json::Value) -> mlua::Result<mlua::Value> {
-    match value {
-        serde_json::Value::Null => Ok(mlua::Value::Nil),
-        serde_json::Value::Bool(value) => Ok(mlua::Value::Boolean(value)),
-        serde_json::Value::Number(value) => {
-            if let Some(value) = value.as_i64() {
-                Ok(lua_integer_value(value))
-            } else if let Some(value) = value.as_u64() {
-                if value <= i64::MAX as u64 {
-                    Ok(lua_integer_value(value as i64))
-                } else {
-                    Ok(mlua::Value::Number(value as f64))
-                }
-            } else {
-                Ok(mlua::Value::Number(value.as_f64().unwrap_or(0.0)))
-            }
-        }
-        serde_json::Value::String(value) => Ok(mlua::Value::String(lua.create_string(&value)?)),
-        serde_json::Value::Array(values) => {
-            let table = lua.create_table()?;
-            for (index, value) in values.into_iter().enumerate() {
-                table.set((index + 1) as i64, json_to_lua_value(lua, value)?)?;
-            }
-            Ok(mlua::Value::Table(table))
-        }
-        serde_json::Value::Object(values) => {
-            let table = lua.create_table()?;
-            for (key, value) in values {
-                let value = json_to_lua_value(lua, value)?;
-                if let Some(key) = parse_canonical_integer_key(&key) {
-                    table.set(key, value)?;
-                } else {
-                    table.set(key, value)?;
-                }
-            }
-            Ok(mlua::Value::Table(table))
-        }
-    }
-}
-
-fn lua_integer_value(value: i64) -> mlua::Value {
-    #[cfg(feature = "backend-luau")]
-    {
-        if (i32::MIN as i64..=i32::MAX as i64).contains(&value) {
-            mlua::Value::Integer(value as mlua::Integer)
-        } else {
-            mlua::Value::Number(value as f64)
-        }
-    }
-    #[cfg(not(feature = "backend-luau"))]
-    {
-        mlua::Value::Integer(value as mlua::Integer)
-    }
-}
-
-fn lua_value_to_json_value(value: mlua::Value, depth: usize) -> mlua::Result<serde_json::Value> {
-    if depth > 128 {
-        return Err(mlua::Error::external(
-            "JSON encode: Lua table nesting too deep",
-        ));
-    }
-
-    match value {
-        mlua::Value::Nil => Ok(serde_json::Value::Null),
-        mlua::Value::Boolean(value) => Ok(serde_json::Value::Bool(value)),
-        mlua::Value::Integer(value) => Ok(serde_json::Value::Number(value.into())),
-        mlua::Value::Number(value) => serde_json::Number::from_f64(value)
-            .map(serde_json::Value::Number)
-            .ok_or_else(|| mlua::Error::external("JSON encode: invalid number")),
-        mlua::Value::String(value) => Ok(serde_json::Value::String(value.to_string_lossy())),
-        mlua::Value::Table(table) => {
-            let mut object = serde_json::Map::new();
-            for pair in table.pairs::<mlua::Value, mlua::Value>() {
-                let (key, value) = pair?;
-                if let Some(key) = lua_key_to_json_key(key) {
-                    object.insert(key, lua_value_to_json_value(value, depth + 1)?);
-                }
-            }
-            Ok(serde_json::Value::Object(object))
-        }
-        _ => Ok(serde_json::Value::Null),
-    }
-}
-
-fn lua_key_to_json_key(key: mlua::Value) -> Option<String> {
-    match key {
-        mlua::Value::String(value) => Some(value.to_string_lossy()),
-        mlua::Value::Integer(value) => Some(value.to_string()),
-        mlua::Value::Number(value) if value.fract() == 0.0 => Some((value as i64).to_string()),
-        mlua::Value::Number(value) => Some(value.to_string()),
-        mlua::Value::Boolean(value) => Some(if value { "true" } else { "false" }.to_string()),
-        _ => None,
-    }
-}
-
-fn parse_canonical_integer_key(key: &str) -> Option<i64> {
-    let value = key.parse::<i64>().ok()?;
-    if value.to_string() == key {
-        Some(value)
-    } else {
-        None
-    }
-}
-
 /// 当前时间（毫秒），与 `e:now()` 同源，供 getScriptWaitReason 的 time 键使用。
 fn now_millis_i64() -> i64 {
     std::time::SystemTime::now()
@@ -428,47 +324,11 @@ impl Interpreter {
     pub fn new(config: InterpreterConfig) -> Self {
         let lua = Lua::new();
 
-        // 注入 Pluto 序列化——使用 serde_json 作为持久化后端。
-        // Artemis 脚本调用 pluto.persist(refs, tbl) / pluto.unpersist(refs, str)
-        // 来序列化 Lua 表。这里用 JSON 替代原版的 Pluto 二进制格式，功能等价。
-        let pluto_code = r#"
-            pluto = pluto or {}
-            function pluto.persist(refs, tbl)
-                local ok, json = pcall(function() return __art3m1s_json_encode(tbl) end)
-                if ok then return json else return "" end
-            end
-            function pluto.unpersist(refs, str)
-                if type(str) ~= "string" or str == "" then return {} end
-                local ok, tbl = pcall(function() return __art3m1s_json_decode(str) end)
-                if ok and type(tbl) == "table" then return tbl else return {} end
-            end
-        "#;
-
-        if let Err(e) = lua.load(pluto_code).exec() {
-            eprintln!("警告: 注入 Pluto 桩实现失败: {:?}", e);
-        }
-
-        // 注册 JSON 编解码函数
-        let encode = lua.create_function(|lua, value: mlua::Value| {
-            let value = lua_value_to_json_value(value, 0)?;
-            let json = serde_json::to_string(&value)
-                .map_err(|e| mlua::Error::external(format!("JSON encode: {e}")))?;
-            Ok(mlua::Value::String(lua.create_string(json)?))
-        });
-        let decode = lua.create_function(|lua, json_str: mlua::String| {
-            let s: String = json_str.to_string_lossy();
-            if s.is_empty() {
-                return Ok(mlua::Value::Table(lua.create_table()?));
-            }
-            let value: serde_json::Value = serde_json::from_str(&s)
-                .map_err(|e| mlua::Error::external(format!("JSON decode: {e}")))?;
-            json_to_lua_value(lua, value)
-        });
-        if let Err(e) = encode.and_then(|f| lua.globals().set("__art3m1s_json_encode", f)) {
-            eprintln!("警告: 注册 JSON encode 失败: {:?}", e);
-        }
-        if let Err(e) = decode.and_then(|f| lua.globals().set("__art3m1s_json_decode", f)) {
-            eprintln!("警告: 注册 JSON decode 失败: {:?}", e);
+        // pluto.persist / pluto.unpersist keep a game's Lua tables in Artemis
+        // variables in the PC engine's own Pluto format, so they survive a
+        // save moved between the PC version and VNDegen (VNDegen).
+        if let Err(e) = install_pluto(&lua, config.encoding) {
+            eprintln!("警告: 注入 Pluto 失败: {:?}", e);
         }
 
         // 注入 Artemis 兼容的算术强制转换：字符串自动转数字，非数字字符串视为 0。
@@ -4659,4 +4519,35 @@ fn resolve_dollar_params(
         }
     }
     Some(resolved)
+}
+
+fn install_pluto(lua: &Lua, encoding: &'static encoding_rs::Encoding) -> mlua::Result<()> {
+    let pluto = lua.create_table()?;
+    pluto.set(
+        "persist",
+        lua.create_function(move |lua, (_perms, value): (mlua::Value, mlua::Value)| {
+            let bytes = crate::pluto::persist(&value, encoding)?;
+            lua.create_string(crate::pluto::to_variable(&bytes))
+        })?,
+    )?;
+    pluto.set(
+        "unpersist",
+        lua.create_function(move |lua, (_perms, data): (mlua::Value, mlua::Value)| {
+            let bytes = match &data {
+                mlua::Value::String(text) => {
+                    let text = text.as_bytes();
+                    std::str::from_utf8(&text)
+                        .ok()
+                        .and_then(crate::pluto::from_variable)
+                        .unwrap_or_else(|| text.to_vec())
+                }
+                _ => Vec::new(),
+            };
+            if bytes.is_empty() {
+                return Ok(mlua::Value::Table(lua.create_table()?));
+            }
+            crate::pluto::unpersist(lua, &bytes, encoding)
+        })?,
+    )?;
+    lua.globals().set("pluto", pluto)
 }

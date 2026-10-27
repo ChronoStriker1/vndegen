@@ -327,15 +327,15 @@ end
 
     #[test]
     fn test_pluto_unpersist_restores_numeric_table_keys() {
-        // JSON 对象 key 只能是字符串；旧实现用 LuaSerdeExt 反序列化时会把
-        // sys.saveslot["8"] 保成字符串 key，游戏脚本读 sys.saveslot[8] 就为空。
+        // Games read sys.saveslot[8], so a numeric key must come back numeric.
         let interpreter = Interpreter::new(InterpreterConfig::default());
 
         interpreter
             .lua()
             .load(
                 r#"
-local sys = pluto.unpersist({}, '{"saveslot":{"last":8,"8":{"file":"save0004"},"lock":{"8":true}}}')
+local data = pluto.persist({}, {saveslot = {last = 8, [8] = {file = "save0004"}, lock = {[8] = true}}})
+local sys = pluto.unpersist({}, data)
 assert(type(sys.saveslot) == "table")
 assert(sys.saveslot[8] ~= nil, "numeric slot key should be restored")
 assert(sys.saveslot[8].file == "save0004")

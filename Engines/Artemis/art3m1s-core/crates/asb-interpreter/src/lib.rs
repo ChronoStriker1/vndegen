@@ -51,6 +51,7 @@ pub mod event;
 pub mod expression;
 pub mod interpreter;
 pub mod lua_engine;
+pub mod pluto;
 #[cfg(feature = "backend-lua51")]
 pub mod lua51_bytecode;
 #[cfg(feature = "backend-luau")]
