@@ -723,4 +723,6 @@ private extension ArchiveImporter.Step {
     #expect(items(staging.appendingPathComponent("Mixed")) == ["Img"])
     #expect(items(staging.appendingPathComponent("Mixed/Img")) == ["Sub", "a.png", "b.png"])
     #expect(try text(staging.appendingPathComponent("Mixed/Img/Sub/c.png")) == "c")
+    // The archive's later `img/A.PNG` replaced `Img/a.png`.
+    #expect(try text(staging.appendingPathComponent("Mixed/Img/a.png")) == "A")
 }

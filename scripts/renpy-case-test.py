@@ -156,6 +156,40 @@ try:
     os.remove(os.path.join(saves, "CASE.TXT"))
     check(real_names(saves) == ["1-1-lt1.save"], "os.remove removes a file in another case")
 
+    # A rename that only changes case, asked through folders in another case.
+    write(os.path.join(base, "Game", "Images", "Ren.txt"), "r")
+    os.rename(os.path.join(images, "ren.txt"), os.path.join(images, "REN.TXT"))
+    check("REN.TXT" in real_names(os.path.join(base, "Game", "Images")), "a case-only rename keeps the real folders")
+    os.remove(os.path.join(images, "REN.TXT"))
+
+    # A relative path from a current folder inside the game.
+    here = os.getcwd()
+    os.chdir(base)
+    try:
+        check(read(os.path.join("game", "images", "bg.PNG")) == "new bg", "a relative path reads a file in another case")
+        with builtins.open(os.path.join("GAME", "IMAGES", "bg.png"), "w") as f:
+            f.write("relative bg")
+        check(real_names(os.path.join(base, "Game", "Images")) == ["BG.png", "New.png"],
+              "a relative write replaces the file in another case")
+        check(read(os.path.join(images, "BG.png")) == "relative bg", "the relative write went to the existing file")
+    finally:
+        os.chdir(here)
+
+    # A folder put in place of another with the same time is listed again.
+    if not PY2:
+        swapped = os.path.join(base, "Game", "Swapped")
+        write(os.path.join(swapped, "Old.png"), "old")
+        os.utime(swapped, ns=(1000000000 * 10 ** 9, 1000000000 * 10 ** 9))
+        check(os.path.exists(os.path.join(game, "swapped", "old.png")), "a lookup lists the folder to be replaced")
+        case._rename(swapped, swapped + "-gone")
+        case._mkdir(swapped)
+        with case._open(os.path.join(swapped, "New.png"), "w") as f:
+            f.write("new")
+        os.utime(swapped, ns=(1000000000 * 10 ** 9, 1000000000 * 10 ** 9))
+        check(os.path.exists(os.path.join(game, "swapped", "new.PNG")), "a folder replaced with the same time is listed again")
+        shutil.rmtree(swapped)
+        shutil.rmtree(swapped + "-gone")
+
     # Folders.
     check(raises(errno.EEXIST, os.mkdir, os.path.join(game, "IMAGES")), "os.mkdir on a folder in another case fails")
     os.makedirs(os.path.join(game, "images", "Sub", "Deeper"))
@@ -190,7 +224,7 @@ try:
     check(raises(errno.ENOENT, held, os.path.join(images, "bg.png")),
           "a held open passes paths through after uninstall")
     case.install(base, saves)
-    check(read(os.path.join(images, "bg.png"), held) == "new bg", "a held open follows the next install")
+    check(read(os.path.join(images, "bg.png"), held) == "relative bg", "a held open follows the next install")
 
     # Ren'Py's own functions, copied out of its source.
     def functions(path, names, namespace):

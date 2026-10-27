@@ -87,6 +87,9 @@ nonisolated enum ArchiveExtractor {
         var lastReport = ContinuousClock.now
         var lastParent: URL?
         var folders: (entry: ArraySlice<String>, url: URL)?
+        /// Each file written so far, by its path in lowercase. Extraction starts in an empty folder, so these are all its
+        /// files, and reading them here keeps a folder's listing from being read again after every file.
+        var files: [String: URL] = [:]
         var used: Int64 = 0
         var usedSinceSpaceCheck: Int64 = 0
         var lastSpaceCheck: ContinuousClock.Instant?
@@ -112,7 +115,12 @@ nonisolated enum ArchiveExtractor {
             // takes the entries. The previous entry's folder is reused, which keeps the lookup off most entries.
             let names = entry.kind == .directory ? entry.path[...] : entry.path.dropLast()
             if folders?.entry != names { folders = (names, FileCase.resolve(names.joined(separator: "/"), in: folder)) }
-            let url = entry.kind == .directory ? folders!.url : folders!.url.appendingPathComponent(entry.path.last!)
+            var url = entry.kind == .directory ? folders!.url : folders!.url.appendingPathComponent(entry.path.last!)
+            if entry.kind == .file {
+                // A later `img/title.PNG` replaces `Img/Title.png`, as on Windows.
+                let key = url.path.lowercased()
+                if let earlier = files[key] { url = earlier } else { files[key] = url }
+            }
             switch entry.kind {
             case .other:
                 continue

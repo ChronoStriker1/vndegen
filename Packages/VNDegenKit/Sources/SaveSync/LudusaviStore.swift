@@ -80,6 +80,7 @@ public struct LudusaviStore: Sendable {
         guard let files = mapping.effectiveFiles(backup) else { throw SaveSyncError.noBackups }
         let recorded = RecordedPaths(files.keys, locations: locations)
         var plan = RestorePlan(items: [], skipped: [])
+        var planned: [String: Int] = [:]
         for (path, stored) in files.sortedByKey {
             guard let (index, relative) = claim(path, locations), recorded.path(of: relative, in: index) == path else {
                 plan.skipped.append(path)
@@ -88,7 +89,20 @@ public struct LudusaviStore: Sendable {
             // A save that exists here in another case, as a PC backup's `Save01.rvdata2` beside a local `save01.rvdata2`,
             // is that save, so the restore replaces it rather than writing a second file beside it.
             let local = FileCase.spelling(of: relative, in: locations[index].directory)
-            plan.items.append(.init(location: index, relative: local, path: path, stored: stored))
+            let item = RestorePlan.Item(location: index, relative: local, path: path, stored: stored)
+            // A backup from a disk that keeps case can hold `Save01.rvdata2` and `save01.rvdata2`, which are one save
+            // here. The one spelled as on disk wins, otherwise the first.
+            if let earlier = planned[item.key] {
+                if relative == local {
+                    plan.skipped.append(plan.items[earlier].path)
+                    plan.items[earlier] = item
+                } else {
+                    plan.skipped.append(path)
+                }
+                continue
+            }
+            planned[item.key] = plan.items.count
+            plan.items.append(item)
         }
         guard !plan.items.isEmpty else { throw SaveSyncError.nothingToRestore(plan.skipped.count) }
         return plan

@@ -47,11 +47,13 @@ case "${1:?destination}" in
     # VNDEGEN_TEST_DIR. The shared C lookup the RGSS and KiriKiri engines use is tested there first.
     case_volume=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-case.XXXXXX")
     scripts/case-volume.sh attach build/case-sensitive.sparseimage "$case_volume"
-    trap 'scripts/case-volume.sh detach "$case_volume"; rmdir "$case_volume"' EXIT
-    mkdir "$case_volume/casepath"
+    # The image keeps what a run leaves, so each run works in a folder of its own and removes it.
+    case_run=$(mktemp -d "$case_volume/run.XXXXXX")
+    trap 'rm -rf "$case_run"; scripts/case-volume.sh detach "$case_volume"; rmdir "$case_volume"' EXIT
+    mkdir "$case_run/casepath"
     cc -std=c11 -Wall -Wextra -Werror -o build/casepath_test Engines/Shared/casepath.c Engines/Shared/casepath_test.c
-    build/casepath_test "$case_volume/casepath"
-    (cd Packages/VNDegenKit && VNDEGEN_TEST_DIR="$case_volume" swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed') ;;
+    build/casepath_test "$case_run/casepath"
+    (cd Packages/VNDegenKit && VNDEGEN_TEST_DIR="$case_run" swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed') ;;
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;
   ios-sim) xcb -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim build ;;
   ipa)

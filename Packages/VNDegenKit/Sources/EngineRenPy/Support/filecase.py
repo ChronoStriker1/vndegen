@@ -57,7 +57,8 @@ _rmdir = os.rmdir
 # (folder, folder + "/") for each folder whose paths are resolved.
 roots = []
 
-# folder -> (mtime, seconds between the folder's last change and its listing, names, case-folded name -> real name).
+# folder -> ((device, inode, mtime), seconds between the folder's last change and its listing, names, case-folded name
+# -> real name). The device and inode tell a folder from another put in its place with the same time.
 folders = {}
 
 
@@ -78,9 +79,9 @@ def _listing(folder, fresh):
         info = _stat(folder)
     except EnvironmentError:
         return None
-    mtime = getattr(info, "st_mtime_ns", info.st_mtime)
+    identity = (info.st_dev, info.st_ino, getattr(info, "st_mtime_ns", info.st_mtime))
     entry = folders.get(folder)
-    if entry is None or entry[0] != mtime or fresh:
+    if entry is None or entry[0] != identity or fresh:
         try:
             names = _listdir(folder)
         except EnvironmentError:
@@ -89,7 +90,7 @@ def _listing(folder, fresh):
         # When several names fold the same, the first in sorted order wins.
         for name in sorted(name for name in names if isinstance(name, text_type)):
             folded.setdefault(fold(name), name)
-        entry = (mtime, time.time() - info.st_mtime, set(names), folded)
+        entry = (identity, time.time() - info.st_mtime, set(names), folded)
         folders[folder] = entry
     return entry
 
@@ -109,8 +110,10 @@ def _find(folder, name):
 
 
 def _resolve_text(path):
+    # A relative path is the game's too when the current folder is in an installed one.
+    absolute = path if os.path.isabs(path) else os.path.join(os.getcwd(), path)
     for root, inside in roots:
-        if path.startswith(inside):
+        if absolute.startswith(inside):
             break
     else:
         return path
@@ -119,7 +122,7 @@ def _resolve_text(path):
         return path
     except EnvironmentError:
         pass
-    normal = os.path.normpath(path)
+    normal = os.path.normpath(absolute)
     if not normal.startswith(inside):
         return path
     parts = normal[len(inside):].split(os.sep)
@@ -176,6 +179,17 @@ def _retry(function, path, args, kwargs):
     return function(real, *args, **kwargs)
 
 
+def _changed(*paths):
+    """Drops the listings of the folders holding `paths`, which a call has just changed."""
+    if roots:
+        for path in paths:
+            try:
+                text = path if isinstance(path, text_type) else decode(path) if isinstance(path, bytes) else path.__fspath__()
+                folders.pop(os.path.dirname(os.path.normpath(os.path.abspath(text))), None)
+            except Exception:
+                folders.clear()
+
+
 def _creates(args, kwargs):
     mode = args[0] if args else kwargs.get("mode", "r")
     try:
@@ -186,13 +200,19 @@ def _creates(args, kwargs):
 
 def open(file, *args, **kwargs):
     if _creates(args, kwargs):
-        return _open(resolve(file), *args, **kwargs)
+        real = resolve(file)
+        result = _open(real, *args, **kwargs)
+        _changed(real)
+        return result
     return _retry(_open, file, args, kwargs)
 
 
 def io_open(file, *args, **kwargs):
     if _creates(args, kwargs):
-        return _io_open(resolve(file), *args, **kwargs)
+        real = resolve(file)
+        result = _io_open(real, *args, **kwargs)
+        _changed(real)
+        return result
     return _retry(_io_open, file, args, kwargs)
 
 
@@ -213,39 +233,59 @@ def scandir(path="."):
 
 
 def remove(path, *args, **kwargs):
-    return _retry(_remove, path, args, kwargs)
+    result = _retry(_remove, path, args, kwargs)
+    _changed(resolve(path))
+    return result
 
 
 def unlink(path, *args, **kwargs):
-    return _retry(_unlink, path, args, kwargs)
+    result = _retry(_unlink, path, args, kwargs)
+    _changed(resolve(path))
+    return result
 
 
 def rmdir(path, *args, **kwargs):
-    return _retry(_rmdir, path, args, kwargs)
+    result = _retry(_rmdir, path, args, kwargs)
+    _changed(resolve(path))
+    return result
 
 
 def _destination(real_src, dst):
     real = resolve(dst)
-    # A rename that only changes case finds its own source, and keeps the new spelling.
-    return dst if real is not dst and real == real_src else real
+    # A rename that only changes case finds its own source. It keeps the new spelling, in the folder as it is on disk.
+    if real is not dst and real == real_src:
+        return os.path.join(os.path.dirname(real), os.path.basename(dst))
+    return real
 
 
 def rename(src, dst, *args, **kwargs):
     real_src = resolve(src)
-    return _rename(real_src, _destination(real_src, dst), *args, **kwargs)
+    real_dst = _destination(real_src, dst)
+    result = _rename(real_src, real_dst, *args, **kwargs)
+    _changed(real_src, real_dst)
+    return result
 
 
 def replace(src, dst, *args, **kwargs):
     real_src = resolve(src)
-    return _replace(real_src, _destination(real_src, dst), *args, **kwargs)
+    real_dst = _destination(real_src, dst)
+    result = _replace(real_src, real_dst, *args, **kwargs)
+    _changed(real_src, real_dst)
+    return result
 
 
 def mkdir(path, *args, **kwargs):
-    return _mkdir(resolve(path), *args, **kwargs)
+    real = resolve(path)
+    result = _mkdir(real, *args, **kwargs)
+    _changed(real)
+    return result
 
 
 def makedirs(name, *args, **kwargs):
-    return _makedirs(resolve(name), *args, **kwargs)
+    result = _makedirs(resolve(name), *args, **kwargs)
+    # It may have made several folders.
+    folders.clear()
+    return result
 
 
 # (owner, attribute, original, replacement). Python 3's builtins.open is io.open. genericpath's exists, isfile, isdir,

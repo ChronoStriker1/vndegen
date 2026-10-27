@@ -26,7 +26,7 @@ python3 - <<'PY'
 import zipfile
 with zipfile.ZipFile("mixed-case.zip", "w") as z:
     z.writestr("Mixed/Img/", b"")
-    for name, data in [("Mixed/Img/a.png", b"a"), ("Mixed/img/b.png", b"b"), ("Mixed/IMG/Sub/c.png", b"c")]:
+    for name, data in [("Mixed/Img/a.png", b"a"), ("Mixed/img/b.png", b"b"), ("Mixed/IMG/Sub/c.png", b"c"), ("Mixed/img/A.PNG", b"A")]:
         z.writestr(name, data)
 PY
 

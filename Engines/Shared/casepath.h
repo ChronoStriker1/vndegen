@@ -28,6 +28,10 @@ int casepath_resolve(const char *path, char *out, size_t size);
 // creating, removing, or renaming `path`, for file systems whose folder times are too coarse to show the change.
 void casepath_changed(const char *path);
 
+// 1 when `a` and `b` name one existing file, as two spellings of one name do on a volume that ignores case. A copy or
+// move between them must do nothing, since writing the target would empty the source.
+int casepath_same_file(const char *a, const char *b);
+
 #ifdef __cplusplus
 }
 #endif

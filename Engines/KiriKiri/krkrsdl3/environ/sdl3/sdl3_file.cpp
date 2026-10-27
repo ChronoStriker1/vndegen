@@ -538,8 +538,9 @@ bool TVPRenameFile(const std::string& from, const std::string& to)
 
 bool TVPCopyFile(const std::string& from, const std::string& to)
 {
-    // A copy onto itself, as when both names resolve to one file of another case, would truncate it.
-    if (from == to)
+    // A copy onto itself, as when both names resolve to one file of another case or a volume that
+    // ignores case takes both spellings for one file, would truncate it.
+    if (from == to || casepath_same_file(from.c_str(), to.c_str()))
         return true;
     SDL_IOStream* fFrom = SDL_IOFromFile(from.c_str(), "rb");
     if (!fFrom)

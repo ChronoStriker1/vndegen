@@ -13,7 +13,9 @@
 #             open com.chronostriker1.vndegen --relaunch --launch-args -libraryRoot --launch-args <folder>/volume/library
 #             --launch-args -autolaunch --launch-args "<game folder name>"
 # A simulator app reads the Mac's disk, so the library on the case-sensitive volume is what makes the simulator check
-# case. Names inside archives (`.xp3`, `.rpa`, `.rgss3a`, `app.asar`) keep their case; the engines' archive readers
+# case. Names that Windows matches exactly too keep their case: Python modules and packages, which Python imports by
+# exact name on Windows, and Ren'Py's script and archive extensions, which Ren'Py compares exactly (`SCRIPT.rpyc` but
+# not `script.RPYC`). Names inside archives (`.xp3`, `.rpa`, `.rgss3a`, `app.asar`) keep their case; the engines' archive readers
 # are checked by their unit tests.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -37,10 +39,19 @@ case "${1:?setup or teardown}" in
 import os, sys
 top = sys.argv[1]
 renamed = 0
+exact = {".py", ".pyc", ".pyo", ".pyd", ".so"}
+renpy = {".rpy", ".rpyc", ".rpym", ".rpymc", ".rpa", ".rpi", ".rpyb"}
+def python(path):
+    parts = os.path.relpath(path, top).split(os.sep)
+    return "python-packages" in parts or os.path.exists(os.path.join(path, "__init__.py"))
 # Deepest first, so a folder is renamed after everything inside it.
 for parent, folders, files in os.walk(top, topdown=False):
     for name in folders + files:
-        swapped = name.swapcase()
+        path = os.path.join(parent, name)
+        stem, ext = os.path.splitext(name)
+        if python(path) or ext.lower() in exact:
+            continue
+        swapped = stem.swapcase() + ext if ext.lower() in renpy else name.swapcase()
         if swapped != name:
             os.rename(os.path.join(parent, name), os.path.join(parent, swapped))
             renamed += 1

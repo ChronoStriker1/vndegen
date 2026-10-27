@@ -182,3 +182,8 @@ void casepath_changed(const char *path) {
         if (listings[i].dir && !strcmp(listings[i].dir, dir)) release(&listings[i]);
     pthread_mutex_unlock(&lock);
 }
+
+int casepath_same_file(const char *a, const char *b) {
+    struct stat x, y;
+    return stat(a, &x) == 0 && stat(b, &y) == 0 && x.st_dev == y.st_dev && x.st_ino == y.st_ino;
+}

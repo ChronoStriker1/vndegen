@@ -565,3 +565,25 @@ private func freshLibrary() async throws -> (library: LibraryStore, directory: U
     _ = try store.restore(folder: "Test Game 01", backup: nil, locations: locations, snapshot: snapshot)
     #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "pc"])
 }
+
+/// A backup made on a disk that keeps case can hold `File1.rmmzsave` and `file1.rmmzsave`. They are one save on a device
+/// that has one of them, and the one spelled as on disk restores.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"] != nil))
+func aBackupWithTwoSpellingsOfOneSaveRestoresOne() throws {
+    let base = URL(fileURLWithPath: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"]!)
+        .appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["File1.rmmzsave": "upper", "file1.rmmzsave": "lower"])
+    _ = try store.backUp(folder: nil, title: "Test Game 02", game: GameID("Test Game 02"), locations: locations, retention: nil,
+                         os: "linux", comment: nil)
+    try fm.removeItem(at: locations[0].directory.appendingPathComponent("File1.rmmzsave"))
+    try write(["file1.rmmzsave": "local"], to: locations[0])
+
+    #expect(try store.latestHashes(folder: "Test Game 02", locations: locations)?.hashes == ["0:file1.rmmzsave": sha1("lower")])
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 02")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 02", backup: nil, locations: locations, snapshot: snapshot)
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "lower"])
+}
