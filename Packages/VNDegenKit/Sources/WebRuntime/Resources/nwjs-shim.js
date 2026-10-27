@@ -494,15 +494,17 @@
     // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
     // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
     // timeupdate re-arms a timer, so the timer runs only after updates stop, and it sends a looping element that is
-    // stuck at its end back to the start.
+    // stuck at its end back to the start. It does so through the setter as the page found it, so scripts that follow
+    // the game's seeks take this for the loop it is.
     const play = HTMLMediaElement.prototype.play;
+    const setCurrentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime').set;
     const stalledLoops = new WeakMap();
     function rearmLoop(media) {
         clearTimeout(stalledLoops.get(media));
         if (!media.loop || !media.duration) return;
         const remaining = Math.max(0, media.duration - media.currentTime) / (media.playbackRate || 1);
         stalledLoops.set(media, setTimeout(() => {
-            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) media.currentTime = 0;
+            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) setCurrentTime.call(media, 0);
         }, remaining * 1000 + 250));
     }
     HTMLMediaElement.prototype.play = function () {
