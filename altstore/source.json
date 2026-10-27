@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.5.1",
+          "buildVersion": "275",
+          "date": "2026-10-27T04:54:43Z",
+          "localizedDescription": "Fixes the real cause of No Socks RPG's \"RangeError: length cannot be negative\", which 0.4.4 did not fix. After installing, fully close VNDegen and open it again.\n\n## Downloads\n\n- `VNDegen-0.5.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.5.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixed\n\n- RPG Maker MZ games no longer stop with \"RangeError: length cannot be negative\" when they play a sound file that has an Ogg name but holds WAV or MP3 audio. No Socks RPG ships 15 such files and plays two of them when you warp. The PC version decodes them by content, but RPG Maker MZ's Ogg decoder, which VNDegen uses on iPhone, iPad and Mac, can't open them and then read leftover memory. VNDegen now plays any sound that isn't Ogg data through the system's own audio decoder. The 0.4.4 fix for decoder numbering stays in, but it was not the cause of the error players saw.\n- If the Ogg decoder still fails on a sound, the game logs it and carries on, instead of stopping on an error screen that can't be closed. The failed sound may stop partway.\n- A large Ogg sound that finished loading in one step could leave its decoder open. It now closes.\n\n## Known limits\n\n- Checked by following the warp to Patchwork from a real save, many times, on the iPad simulator, and once on the Mac app before the final merge. Not yet checked on a real iPad.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.5.1/VNDegen-0.5.1.ipa",
+          "size": 61489279,
+          "sha256": "097ba619cdda42df36f63a09a357f1406c270fbcf68da2a19950354b195d7608",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.5.0",
           "buildVersion": "267",
           "date": "2026-10-27T04:24:58Z",
