@@ -14,8 +14,9 @@
 #             --launch-args -autolaunch --launch-args "<game folder name>"
 # A simulator app reads the Mac's disk, so the library on the case-sensitive volume is what makes the simulator check
 # case. Names that Windows matches exactly too keep their case: Python modules and packages, which Python imports by
-# exact name on Windows, and Ren'Py's script and archive extensions, which Ren'Py compares exactly (`SCRIPT.rpyc` but
-# not `script.RPYC`). Names inside archives (`.xp3`, `.rpa`, `.rgss3a`, `app.asar`) keep their case; the engines' archive readers
+# exact name on Windows; Ren'Py's scripts and every folder above them, since Ren'Py names a script module by its path
+# (`tl/None/common`) and compares names exactly; and the extension of a Ren'Py archive (`ARCHIVE.rpa` but not
+# `archive.RPA`). Names inside archives (`.xp3`, `.rpa`, `.rgss3a`, `app.asar`) keep their case; the engines' archive readers
 # are checked by their unit tests.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -39,11 +40,19 @@ case "${1:?setup or teardown}" in
 import os, sys
 top = sys.argv[1]
 renamed = 0
-exact = {".py", ".pyc", ".pyo", ".pyd", ".so"}
-renpy = {".rpy", ".rpyc", ".rpym", ".rpymc", ".rpa", ".rpi", ".rpyb"}
+exact = {".py", ".pyc", ".pyo", ".pyd", ".so", ".rpy", ".rpyc", ".rpym", ".rpymc", ".rpyb"}
+renpy = {".rpa", ".rpi"}
+# Every folder that holds a script somewhere below it.
+scripts = set()
+for parent, folders, files in os.walk(top):
+    if any(os.path.splitext(name)[1].lower() in exact for name in files):
+        folder = parent
+        while folder != top and folder not in scripts:
+            scripts.add(folder)
+            folder = os.path.dirname(folder)
 def python(path):
     parts = os.path.relpath(path, top).split(os.sep)
-    return "python-packages" in parts or os.path.exists(os.path.join(path, "__init__.py"))
+    return path in scripts or "python-packages" in parts or os.path.exists(os.path.join(path, "__init__.py"))
 # Deepest first, so a folder is renamed after everything inside it.
 for parent, folders, files in os.walk(top, topdown=False):
     for name in folders + files:
