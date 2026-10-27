@@ -33,7 +33,7 @@ Each item is work on its own branch, not merged into `dev`. New engine plugins a
 - Flash through Ruffle (item 7). All 14 library Flash games reach their title screen on Linux, and a smoke test on the iPad simulator passed.
 - Godot (item 8), with Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. Two library games can't be supported. One needs Steam ownership, and one has an encrypted pack and Windows-only GDExtensions.
 - Artemis (item 5), on art3m1s-core (MPL-2.0) with VNDegen's patches. 7 of 8 test games reach their title screen on Linux, and a smoke test on the iPad simulator passed. Saves that load in the PC version are in progress.
-- A shared Windows font pack. Games that ask for a Windows font get an open font that matches it, as Proton does, such as Ume Gothic for MS Gothic and Liberation Sans for Arial. One table of font name substitutions serves every engine.
+- A shared Windows font pack. Games that ask for a Windows font get an open font that matches it, as Proton does, such as Ume Gothic for MS Gothic and Liberation Sans for Arial. One table of font name substitutions serves every engine. The pack, its C interface, and the RPG Maker MV and MZ and TyranoScript hooks are on `dev` for the next release, with Chinese and Korean fonts as downloads in Settings. The KiriKiri and RGSS hooks follow once the file name case work lands.
 - Paused, to resume later: Wolf RPG Editor (item 6), whose feasibility test is done, with all 3 test games playing past their title screen on Linux. The clean-room runtimes for RGSS and for AliceSoft System 3 and System 4 (item 4).
 
 ## Licenses
