@@ -20,6 +20,14 @@
         upgradeToHttps: false,
         // Device text in the browser's fonts, which cover Japanese where Ruffle's own fallback font does not.
         deviceFontRenderer: 'canvas',
+        // Ruffle prefers its wgpu renderer, whose shaders WebKit on Apple devices fails to translate, which stops the
+        // movie. Its WebGL renderer draws the same.
+        preferredRenderer: 'webgl',
+        // Ruffle would draw at low quality on a phone or tablet, which these can afford.
+        quality: 'high',
+        // Lets movies send fscommand, such as a projector's quit, and call the page through ExternalInterface. The
+        // page is the game's own, as the scripts of the web engines' games are.
+        allowScriptAccess: true,
         logLevel: 'warn',
     };
 

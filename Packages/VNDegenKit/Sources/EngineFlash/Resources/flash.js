@@ -21,6 +21,12 @@
     if (params.get('log')) options.logLevel = params.get('log');
     ruffle.load(options).then(() => player.focus(), (error) => console.error('flash: could not load ' + movie + ': ' + error));
 
+    // A projector's Quit button sends fscommand("quit"), which ends the session as quitting the projector would. The
+    // other commands set up the projector's window, which the session owns.
+    ruffle.addFSCommandHandler((command) => {
+        if (command.toLowerCase() === 'quit' && window.__vndegen) window.__vndegen.quit();
+    });
+
     // The session's pointer, from the touch modes and controllers, arrives as synthetic mouse events on the element under
     // it, which is the player itself. Ruffle reads pointer events on its canvas in the player's shadow root, so they go
     // there as the pointer events a real mouse would make. Real mice and fingers reach the canvas themselves.
