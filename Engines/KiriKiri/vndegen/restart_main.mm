@@ -9,13 +9,16 @@
 // pauseTime at its title, and the next game's engine clock must still start level with SDL's.
 // At its title each game then opens a modal window through script, as KAG's Yes/No dialog is opened,
 // and a timer of the window's own closes it. The window's loop must draw and return within
-// modalTimeout. Its timer can only fire once a pass of the loop has run the engine's events.
+// modalTimeout. Its timer can only fire once a pass of the loop has run the engine's events. The
+// first game opens its window late in its engine time and a later one must open it earlier in its
+// own, so a timestamp an earlier game left behind would hold the window open.
 // The games draw in a window's view and the run loop turns between frames, as in VNDegen's app,
 // and every frame runs with an event of the app's queued, which the frame must leave to the app.
 // A title marker of "movie" quits the game midway through its first movie instead: movieTime after
 // the log shows the movie opening, while its decoder is still reading.
 // Exits nonzero if a game missed its title, did not quit, started with a clock behind SDL's, had a
-// frame take the app's events, or held its modal window open past modalTimeout.
+// frame take the app's events, or held its modal window open past modalTimeout, and also if no later
+// game opened its window early enough for that check to mean anything.
 #include "tjsCommHead.h"
 #include "Platform.h"
 #include "TVPScript.h"
@@ -31,9 +34,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -48,6 +53,12 @@ static const auto clickInterval = std::chrono::seconds(2);
 static const auto pauseTime = std::chrono::milliseconds(500);
 static const auto movieTime = std::chrono::milliseconds(1500);
 static const auto modalTimeout = std::chrono::seconds(2);
+// A window still open this long ends the run, so a loop that never returns fails instead of hanging.
+static const auto modalWatchdog = std::chrono::seconds(20);
+// The first game opens its window this late in its own engine time, and a later game must open one at
+// least modalGap earlier in its own, so a timestamp left over from the earlier game would hold it open.
+static const tjs_uint64 firstModalTick = 20000;
+static const tjs_uint64 modalGap = 2500;
 
 static std::string readLog(const std::string &path)
 {
@@ -160,6 +171,8 @@ int main(int argc, char *argv[])
                                                      backing:NSBackingStoreBuffered defer:NO];
     [window orderFrontRegardless];
     int failures = 0;
+    tjs_uint64 lastModalTick = 0;
+    bool modalAfterGap = false;
     for (int i = 2, n = 1; i < argc; i += 3, n++) {
         const char *root = argv[i], *data = argv[i + 1], *marker = argv[i + 2];
         bool midMovie = !strcmp(marker, "movie");
@@ -213,8 +226,30 @@ int main(int argc, char *argv[])
         bool modalClosed = true;
         char modalReport[96] = "no modal window";
         if (atTitle && !midMovie) {
+            if (!lastModalTick)
+                runUntil(std::chrono::milliseconds(firstModalTick + 5000),
+                         [] { return iterate() != 0 || TVPGetRoughTickCount() >= firstModalTick; });
             tjs_uint64 tick = TVPGetRoughTickCount();
+            if (lastModalTick >= tick + modalGap)
+                modalAfterGap = true;
+            std::mutex watchdogMutex;
+            std::condition_variable watchdogWake;
+            bool windowReturned = false;
+            std::thread watchdog([&] {
+                std::unique_lock<std::mutex> lock(watchdogMutex);
+                if (!watchdogWake.wait_for(lock, modalWatchdog, [&] { return windowReturned; })) {
+                    fprintf(stderr, "game %d: modal window still open after %lld s\n", n, (long long)modalWatchdog.count());
+                    _exit(3);
+                }
+            });
             double seconds = runModalWindow();
+            {
+                std::lock_guard<std::mutex> lock(watchdogMutex);
+                windowReturned = true;
+            }
+            watchdogWake.notify_one();
+            watchdog.join();
+            lastModalTick = TVPGetRoughTickCount();
             modalClosed = seconds >= 0 && seconds < std::chrono::duration<double>(modalTimeout).count();
             snprintf(modalReport, sizeof modalReport, "modal window at engine tick %llu %s after %.1f s",
                      (unsigned long long)tick, seconds < 0 ? "failed" : "closed", seconds);
@@ -240,5 +275,10 @@ int main(int argc, char *argv[])
         failures += !atTitle || !quit || !clockKept || appEventsTaken || !modalClosed;
     }
     printf("%d of %d games failed\n", failures, (argc - 2) / 3);
+    if (lastModalTick && !modalAfterGap) {
+        printf("no game opened its modal window %llu ms earlier in its engine time than the game before it, so the "
+               "check for a timestamp left over from an earlier game did not run\n", (unsigned long long)modalGap);
+        return 1;
+    }
     return failures ? 1 : 0;
 }
