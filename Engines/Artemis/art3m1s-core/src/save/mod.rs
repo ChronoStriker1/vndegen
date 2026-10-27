@@ -212,9 +212,14 @@ fn memsave_entries(variables: &VariableStore) -> Vec<(String, asb_interpreter::V
 }
 
 fn serialized_story_entries(variables: &VariableStore) -> Vec<(String, asb_interpreter::Value)> {
+    // Lua state is serialized into variables such as `scr`, or `lua.scr` in
+    // other games, so any Pluto value counts as story state too (VNDegen).
     variables
         .iter_local()
-        .filter(|(name, _)| matches!(name.as_str(), "scr" | "log" | "btn"))
+        .filter(|(name, value)| {
+            matches!(name.as_str(), "scr" | "log" | "btn")
+                || value.as_string().starts_with(asb_interpreter::pluto::VARIABLE_PREFIX)
+        })
         .map(|(name, value)| (name.clone(), value.clone()))
         .collect()
 }
@@ -458,6 +463,10 @@ mod tests {
         live.set("scr", "latest-story-state".into());
         live.set("log", "latest-backlog".into());
         live.set("btn", "latest-button-state".into());
+        live.set(
+            "lua.scr",
+            asb_interpreter::pluto::to_variable(b"story").as_str().into(),
+        );
         live.set("status", "save".into());
         let data = SaveData {
             version: SAVE_FORMAT_VERSION,
@@ -498,6 +507,10 @@ mod tests {
             Some(&Value::from("latest-button-state"))
         );
         assert_eq!(data.variables.get("status"), Some(&Value::from("adv")));
+        assert_eq!(
+            data.variables.get("lua.scr"),
+            Some(&Value::from(asb_interpreter::pluto::to_variable(b"story").as_str()))
+        );
     }
 
     #[test]
