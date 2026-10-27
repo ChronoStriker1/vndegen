@@ -533,15 +533,17 @@
     // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
     // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
     // timeupdate re-arms a timer, so the timer runs only after updates stop, and it sends a looping element that is
-    // stuck at its end back to the start.
+    // stuck at its end back to the start. It does so through the setter as the page found it, so scripts that follow
+    // the game's seeks take this for the loop it is.
     const play = HTMLMediaElement.prototype.play;
+    const setCurrentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime').set;
     const stalledLoops = new WeakMap();
     function rearmLoop(media) {
         clearTimeout(stalledLoops.get(media));
         if (!media.loop || !media.duration) return;
         const remaining = Math.max(0, media.duration - media.currentTime) / (media.playbackRate || 1);
         stalledLoops.set(media, setTimeout(() => {
-            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) media.currentTime = 0;
+            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) setCurrentTime.call(media, 0);
         }, remaining * 1000 + 250));
     }
     HTMLMediaElement.prototype.play = function () {
@@ -662,6 +664,61 @@
     };
     window.addEventListener('touchstart', moveMouseToTouch, { capture: true, passive: true });
 
+    // The text field typing goes into: the focused one, or else the only one showing, since a click the session sends
+    // does not focus a field the way a real click does.
+    const typable = (element) => !!element && !element.disabled && !element.readOnly
+        && (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && /^(text|search|email|url|tel|password|)$/i.test(element.type || '')));
+    function textField() {
+        if (typable(document.activeElement)) return document.activeElement;
+        const showing = Array.from(document.querySelectorAll('input, textarea')).filter((element) => typable(element) && element.getClientRects().length > 0);
+        if (showing.length !== 1) return null;
+        showing[0].focus();
+        return showing[0];
+    }
+    function typeKey(key, code, keyCode, character) {
+        const charCode = character === null ? 0 : character.charCodeAt(0);
+        const types = character === null ? ['keydown', 'keyup'] : ['keydown', 'keypress', 'keyup'];
+        for (const type of types) {
+            // A keypress carries the character's code where the key events carry the key's.
+            const legacy = type === 'keypress' ? charCode : keyCode;
+            const event = new KeyboardEvent(type, { key: key, code: code, keyCode: legacy, charCode: type === 'keypress' ? charCode : 0, which: legacy, bubbles: true, cancelable: true });
+            for (const name of ['keyCode', 'which']) Object.defineProperty(event, name, { get: () => legacy });
+            (document.activeElement || target()).dispatchEvent(event);
+        }
+    }
+    // The length of the last character the player sees in text, which may be several UTF-16 units, such as an emoji.
+    function lastCharacterLength(text) {
+        if (!text) return 0;
+        if (typeof Intl.Segmenter === 'function') {
+            let last = '';
+            for (const { segment } of new Intl.Segmenter().segment(text)) last = segment;
+            return last.length;
+        }
+        return Array.from(text).pop().length;
+    }
+    function typeText(kind, value) {
+        const field = textField();
+        if (kind === 'newline') {
+            if (!field || field.tagName !== 'TEXTAREA') return typeKey('Enter', 'Enter', 13, '\r');
+            kind = 'insert';
+            value = '\n';
+        }
+        if (!field) {
+            if (kind === 'delete') return typeKey('Backspace', 'Backspace', 8, null);
+            for (const character of value) typeKey(character, '', character.toUpperCase().charCodeAt(0), character);
+            return;
+        }
+        // Email fields have no selection, so typing there goes at the end.
+        if (field.selectionStart === null) {
+            field.value = kind === 'delete' ? field.value.slice(0, field.value.length - lastCharacterLength(field.value)) : field.value + value;
+        } else {
+            let start = field.selectionStart, end = field.selectionEnd;
+            if (kind === 'delete' && start === end) start -= lastCharacterLength(field.value.slice(0, start));
+            field.setRangeText(kind === 'delete' ? '' : value, start, end, 'end');
+        }
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
     // Presses held per key code. Different buttons can send the same key, such as Confirm and a button bound to Enter,
     // so the key goes down with the first press and up with the last release.
     const keysHeld = new Map();
@@ -691,6 +748,10 @@
         },
         wheel(dy) {
             target().dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: pointerX(), clientY: pointerY(), bubbles: true, cancelable: true }));
+        },
+        // Typing from VNDegen's on-screen keyboard: 'insert' with the text, 'newline', or 'delete'.
+        text(kind, value) {
+            typeText(kind, value);
         },
         setPaused(paused) {
             audioPaused = paused;

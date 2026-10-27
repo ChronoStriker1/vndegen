@@ -134,15 +134,19 @@ final class ButtonMappingEditor: Identifiable {
         case input(ControlInput)
         /// Applies a whole layout, such as `ButtonMapping.rpgMaker`.
         case apply(Layout)
+        /// Turns a whole stick into mouse movement, or back into a stick.
+        case stick(Stick)
         case action(ControlAction)
     }
 
     /// The layouts the top of the button list applies.
     enum Layout: CaseIterable {
-        case rpgMaker, gamepad
+        case keyboardAndMouse, mouse, rpgMaker, gamepad
 
         var mapping: ButtonMapping {
             switch self {
+            case .keyboardAndMouse: .keyboardAndMouse
+            case .mouse: .mouse
             case .rpgMaker: .rpgMaker
             case .gamepad: ButtonMapping()
             }
@@ -150,16 +154,25 @@ final class ButtonMappingEditor: Identifiable {
 
         var title: String {
             switch self {
+            case .keyboardAndMouse: "Keyboard and mouse"
+            case .mouse: "Mouse"
             case .rpgMaker: "RPG Maker controls"
-            case .gamepad: "Reset to gamepad defaults"
+            case .gamepad: "Xbox gamepad"
             }
         }
 
         var systemImage: String {
             switch self {
+            case .keyboardAndMouse: "desktopcomputer"
+            case .mouse: "computermouse"
             case .rpgMaker: "keyboard"
-            case .gamepad: "arrow.counterclockwise"
+            case .gamepad: "gamecontroller"
             }
+        }
+
+        /// The layout's name for a game's button mapping, or nil when it is none of them.
+        static func named(_ mapping: ButtonMapping) -> Layout? {
+            allCases.first { $0.mapping == mapping }
         }
     }
 
@@ -173,8 +186,8 @@ final class ButtonMappingEditor: Identifiable {
     static let sections = [
         Section(title: "Gamepad", actions: ControlAction.gamepadChoices, minWidth: 120),
         Section(title: "Keyboard", actions: ControlAction.keyChoices, minWidth: 54),
-        Section(title: "Mouse", actions: ControlAction.mouseChoices, minWidth: 120),
-        Section(title: "Nothing", actions: [.nothing], minWidth: 120),
+        Section(title: "Mouse", actions: ControlAction.mouseChoices, minWidth: 140),
+        Section(title: "Other", actions: [.showKeyboard, .nothing], minWidth: 140),
     ]
     static let spacing: CGFloat = 8
 
@@ -193,19 +206,37 @@ final class ButtonMappingEditor: Identifiable {
         self.gameID = gameID
     }
 
-    var mapping: ButtonMapping { ButtonMapping(library.game(gameID)?.buttonMapping) }
+    var mapping: ButtonMapping { ButtonMapping(stored: library.game(gameID)?.buttonMapping, default: defaultLayout) }
+
+    /// What the game's engine starts its games with.
+    var defaultLayout: ButtonMapping {
+        library.game(gameID).map { ButtonMapping.defaultLayout(for: $0, in: library) } ?? ButtonMapping()
+    }
+
+    /// The button list's rows below the layouts: every button, with a row for each whole stick above its directions.
+    static let inputRows: [Target] = ControlInput.allCases.flatMap { input -> [Target] in
+        let stick = Stick.allCases.first { $0.directions.first == input }
+        return (stick.map { [Target.stick($0)] } ?? []) + [.input(input)]
+    }
 
     func columns(_ section: Section) -> Int {
-        max(1, Int((width + Self.spacing) / (section.minWidth + Self.spacing)))
+        columns(minWidth: section.minWidth)
+    }
+
+    /// The layout buttons sit in a grid as wide as the sheet.
+    var layoutColumns: Int { columns(minWidth: 180) }
+
+    private func columns(minWidth: CGFloat) -> Int {
+        max(1, Int((width + Self.spacing) / (minWidth + Self.spacing)))
     }
 
     func rows() -> [[Target]] {
-        guard picking != nil else { return [Layout.allCases.map(Target.apply)] + ControlInput.allCases.map { [.input($0)] } }
-        return Self.sections.flatMap { section in
-            let targets = section.actions.map(Target.action)
-            let columns = columns(section)
-            return stride(from: 0, to: targets.count, by: columns).map { Array(targets[$0..<min($0 + columns, targets.count)]) }
-        }
+        guard picking != nil else { return Self.chunked(Layout.allCases.map(Target.apply), layoutColumns) + Self.inputRows.map { [$0] } }
+        return Self.sections.flatMap { Self.chunked($0.actions.map(Target.action), columns($0)) }
+    }
+
+    private static func chunked(_ targets: [Target], _ columns: Int) -> [[Target]] {
+        stride(from: 0, to: targets.count, by: columns).map { Array(targets[$0..<min($0 + columns, targets.count)]) }
     }
 
     /// The focused target, or the default when the stored one is not on screen.
@@ -266,20 +297,27 @@ final class ButtonMappingEditor: Identifiable {
         }
     }
 
+    private func save(_ mapping: ButtonMapping) {
+        let stored = mapping.stored(default: defaultLayout)
+        library.update(gameID) { $0.buttonMapping = stored }
+    }
+
     private func activate(_ candidate: Target) {
         switch candidate {
         case let .input(input):
             picking = input
             target = nil
         case let .apply(layout):
-            library.update(gameID) { $0.buttonMapping = layout.mapping.stored }
+            save(layout.mapping)
+        case let .stick(stick):
+            var mapping = mapping
+            mapping.setStick(stick, movesPointer: !mapping.movesPointer(stick))
+            save(mapping)
         case let .action(action):
             guard let input = picking else { return }
-            library.update(gameID) { game in
-                var mapping = ButtonMapping(game.buttonMapping)
-                mapping.set(action, for: input)
-                game.buttonMapping = mapping.stored
-            }
+            var mapping = mapping
+            mapping.set(action, for: input)
+            save(mapping)
             closePicker()
         }
     }
@@ -317,15 +355,18 @@ struct ButtonMappingSheet: View {
     }
 
     private var inputList: some View {
-        let mapping = editor.mapping
+        let mapping = editor.mapping, defaultLayout = editor.defaultLayout
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: ButtonMappingEditor.spacing),
+                                     count: editor.layoutColumns),
+                      spacing: ButtonMappingEditor.spacing) {
                 ForEach(ButtonMappingEditor.Layout.allCases, id: \.self) { layout in
                     let target = ButtonMappingEditor.Target.apply(layout)
                     Button { editor.select(target) } label: {
                         Label(layout.title, systemImage: layout.systemImage)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(target)))
                     .disabled(mapping == layout.mapping)
@@ -333,45 +374,75 @@ struct ButtonMappingSheet: View {
                 }
             }
             .padding(.bottom, 8)
-            ForEach(ControlInput.allCases, id: \.self) { input in
-                let target = ButtonMappingEditor.Target.input(input)
-                Button { editor.select(target) } label: {
-                    HStack(spacing: 14) {
-                        // One width for every button, so the actions line up.
-                        Text(input.title)
-                            .font(.system(size: 14, weight: .heavy, design: .rounded))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .padding(.horizontal, 6)
-                            .frame(width: 104, height: 32)
-                            .background(Theme.surface, in: .capsule)
-                            .overlay { Capsule().strokeBorder(Theme.stroke) }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(mapping.action(for: input).title).font(.system(size: 16, weight: .semibold))
-                            if !input.isOnTouchGamepad {
-                                Text("Controllers only").font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
-                            }
-                        }
-                        Spacer()
-                        if mapping.isRemapped(input) { Tag(text: "Changed", prominent: true) }
-                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.tertiaryText)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(rowFill(target), in: .rect(cornerRadius: 14, style: .continuous))
-                    .overlay { rowStroke(target) }
-                    .contentShape(.rect)
+            ForEach(ButtonMappingEditor.inputRows, id: \.self) { target in
+                switch target {
+                case let .input(input):
+                    row(target, name: input.title, action: mapping.action(for: input).title,
+                        controllersOnly: !input.isOnTouchGamepad,
+                        changed: mapping.action(for: input) != defaultLayout.action(for: input))
+                case let .stick(stick):
+                    let isStick = stick.directions.allSatisfy { mapping.action(for: $0) == .gamepad($0) }
+                    row(target, name: stick.title,
+                        action: mapping.movesPointer(stick) ? "Mouse movement" : isStick ? "Stick" : "Set by direction",
+                        controllersOnly: true, detail: mapping.movesPointer(stick) ? "Use as a stick" : "Use as mouse movement")
+                default:
+                    EmptyView()
                 }
-                .buttonStyle(.plain)
-                .id(target)
             }
-            Text("Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad. Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation.")
+            Text(footnote(defaultLayout))
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
         }
         .animation(Theme.focusAnimation, value: editor.focus)
+    }
+
+    private func footnote(_ defaultLayout: ButtonMapping) -> String {
+        let start = defaultLayout == .keyboardAndMouse
+            ? "This game's engine reads no gamepad, so its games start with Keyboard and mouse, the layout of Steam's template of that name: the left stick is WASD, the right stick moves the pointer, RT and R3 click, LT right clicks, LB and RB turn the wheel, and the other buttons press keys. Mouse puts the pointer on both sticks and the mouse buttons on A and X."
+            : "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad."
+        return start + " Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation."
+    }
+
+    /// A button, or a whole stick, with what it does. A stick's row switches it between moving the pointer and being a
+    /// stick, and says which it would become.
+    private func row(_ target: ButtonMappingEditor.Target, name: String, action: String, controllersOnly: Bool,
+                     changed: Bool = false, detail: String? = nil) -> some View {
+        Button { editor.select(target) } label: {
+            HStack(spacing: 14) {
+                // One width for every button, so the actions line up.
+                Text(name)
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, 6)
+                    .frame(width: 104, height: 32)
+                    .background(Theme.surface, in: .capsule)
+                    .overlay { Capsule().strokeBorder(Theme.stroke) }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(action).font(.system(size: 16, weight: .semibold))
+                    if controllersOnly {
+                        Text("Controllers only").font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
+                    }
+                }
+                Spacer()
+                if changed { Tag(text: "Changed", prominent: true) }
+                if let detail {
+                    Text(detail).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                    Image(systemName: "arrow.left.arrow.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.tertiaryText)
+                } else {
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Theme.tertiaryText)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rowFill(target), in: .rect(cornerRadius: 14, style: .continuous))
+            .overlay { rowStroke(target) }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .id(target)
     }
 
     private func picker(for input: ControlInput) -> some View {

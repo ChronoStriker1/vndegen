@@ -257,6 +257,217 @@
         }
         texSize.set(window.Graphics.width, height);
     }
+
+    // Short looping videos, mostly animated GIFs converted to WebM for picture plugins such as PKD_VPlayer. WebKit takes
+    // such a video's length as its last frame's start plus a guess, not the length the file states, so it ends the loop
+    // early, then seeks back to the start and shows nothing new for about 300 ms: a 0.56 s loop of four frames took
+    // 0.75 s, stuttered at each turn, and fell out of step with the sound made for it. Here the first whole pass of a
+    // WebM that states its length is kept frame by frame, and from then on the texture shows those frames as the video
+    // plays, over the stated length. PIXI also marked a video texture changed on every tick, so WebKit copied the same
+    // frame to the GPU 60 times a second at about 4 ms a copy. Now each new frame is copied once.
+    const loopLimits = { seconds: 10, bytes: 32 << 20, start: 0.02, step: 250 };
+    const videoStates = new WeakMap(), watchedVideos = new WeakMap();
+    const fileLengths = new Map();
+    // Kept frames do not play while the session is paused, whether or not PIXI's shared ticker goes on updating them.
+    let sessionPaused = false, resumedAt = 0;
+    function smoothVideoLoops(pixi) {
+        const VideoResource = pixi.resources && pixi.resources.VideoResource;
+        if (!VideoResource || !pixi.BaseTexture || !('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
+        const update = pixi.BaseTexture.prototype.update;
+        pixi.BaseTexture.prototype.update = function () {
+            const resource = this.resource;
+            if (this.valid && resource instanceof VideoResource && resource.source) {
+                // A resize must reach the texture even when the frame has not changed.
+                const frame = videoFrame(resource) + '/' + this.realWidth + 'x' + this.realHeight;
+                if (frame === this.vndegenFrame) return;
+                this.vndegenFrame = frame;
+            }
+            return update.apply(this, arguments);
+        };
+        const upload = VideoResource.prototype.upload;
+        VideoResource.prototype.upload = function (renderer, baseTexture, glTexture, source) {
+            const state = videoStates.get(this);
+            const kept = state && state.mode === 'kept' ? state.frames[state.shown].canvas : null;
+            return upload.call(this, renderer, baseTexture, glTexture, source || kept);
+        };
+        const dispose = VideoResource.prototype.dispose;
+        VideoResource.prototype.dispose = function () {
+            const state = videoStates.get(this);
+            if (state) dropFrames(state, 'done');
+            videoStates.delete(this);
+            return dispose.apply(this, arguments);
+        };
+        // The game seeks through currentTime. WebKit's own loop seek does not, and cannot be told apart in its events.
+        const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
+        if (!currentTime || !currentTime.set) return;
+        Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+            ...currentTime,
+            set(value) {
+                currentTime.set.call(this, value);
+                const state = watchedVideos.get(this);
+                if (state) seekTo(state, Number(value));
+            },
+        });
+    }
+
+    // What the texture should show now: a count of the frames the video has presented, or which kept frame is due.
+    function videoFrame(resource) {
+        const video = resource.source;
+        let state = videoStates.get(resource);
+        if (!state || state.video !== video) {
+            state = watchVideo(video);
+            videoStates.set(resource, state);
+        }
+        if (state.mode !== 'kept') return state.presented;
+        if (!video.loop) {
+            dropFrames(state, 'native');
+            return state.presented;
+        }
+        // The kept frames play as far as the video has played since the last update. A long gap between updates counts
+        // as one short step, so the clip goes on near where it stopped.
+        const now = performance.now();
+        const elapsed = Math.min(now - Math.max(state.tick, resumedAt), loopLimits.step);
+        state.tick = now;
+        if (!video.paused && !sessionPaused) state.position = (state.position + elapsed / 1000 * video.playbackRate) % state.length;
+        const frames = state.frames;
+        let shown = 0;
+        while (shown + 1 < frames.length && frames[shown + 1].time <= state.position) shown++;
+        state.shown = shown;
+        return -1 - shown;
+    }
+
+    function watchVideo(video) {
+        const state = { video, mode: 'keeping', presented: 0, frames: [], bytes: 0, count: -1, last: 0, position: 0 };
+        const onFrame = (now, meta) => {
+            if (state.mode === 'done') return;
+            state.presented++;
+            video.requestVideoFrameCallback(onFrame);
+            if (state.mode !== 'keeping') return;
+            try {
+                keepFrame(state, now, meta);
+            } catch (e) {
+                dropFrames(state, 'native');
+            }
+        };
+        video.requestVideoFrameCallback(onFrame);
+        // A new source starts over.
+        video.addEventListener('emptied', () => {
+            if (state.mode === 'done') return;
+            dropFrames(state, 'keeping');
+            Object.assign(state, { count: -1, last: 0, position: 0, length: undefined });
+        });
+        watchedVideos.set(video, state);
+        return state;
+    }
+
+    // The game's seek moves the kept frames' position, also while their length is still being read, or starts keeping
+    // over.
+    function seekTo(state, time) {
+        if (state.mode === 'keeping') dropFrames(state, 'keeping');
+        else if (state.mode !== 'done') state.position = time;
+    }
+
+    // Keeps each frame of one whole pass, from a frame at the start up to the next return to it.
+    function keepFrame(state, now, meta) {
+        const video = state.video, time = meta.mediaTime;
+        if (!video.loop || !(video.duration <= loopLimits.seconds)) return dropFrames(state, 'native');
+        if (state.length === undefined) {
+            state.length = null;
+            const url = video.currentSrc;
+            fileLength(url).then((length) => {
+                if (video.currentSrc !== url || state.mode === 'done') return;
+                state.length = length || 0;
+                if (state.mode === 'ready') finishKeeping(state, performance.now());
+            });
+        }
+        // A pass ends where the time goes back to the start. A clip at 60 fps has more than one frame near the start.
+        const atStart = time < loopLimits.start, wrapped = atStart && time < state.last;
+        state.last = time;
+        // A frame skipped while keeping would be missing from every later pass.
+        const skipped = state.count >= 0 && meta.presentedFrames !== state.count + 1;
+        state.count = meta.presentedFrames;
+        if (skipped) dropFrames(state, 'keeping');
+        if (wrapped && state.frames.length) {
+            state.position = time;
+            return finishKeeping(state, now);
+        }
+        if (!atStart && !state.frames.length) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        state.bytes += canvas.width * canvas.height * 4;
+        if (state.bytes > loopLimits.bytes) return dropFrames(state, 'native');
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        state.frames.push({ time, canvas });
+    }
+
+    // Plays the kept frames once the file's length is known, null while it is being read. A video whose length cannot
+    // be read, 0, plays as WebKit plays it.
+    function finishKeeping(state, now) {
+        const frames = state.frames;
+        if (state.length === null) {
+            state.mode = 'ready';
+        } else if (state.length > frames[frames.length - 1].time) {
+            Object.assign(state, { mode: 'kept', position: state.position % state.length, tick: now, shown: 0 });
+        } else {
+            dropFrames(state, 'native');
+        }
+    }
+
+    function dropFrames(state, mode) {
+        for (const frame of state.frames) frame.canvas.width = 0;
+        state.frames = [];
+        state.bytes = 0;
+        state.mode = mode;
+    }
+
+    // The length a WebM file states in its Segment Info, in seconds, or null.
+    function fileLength(url) {
+        if (!fileLengths.has(url)) {
+            fileLengths.set(url, fetch(url).then((response) => response.arrayBuffer()).then(webmLength).catch(() => null));
+        }
+        return fileLengths.get(url);
+    }
+
+    function webmLength(buffer) {
+        const data = new DataView(buffer);
+        let at = 0;
+        // An EBML variable-length integer. IDs keep their length marker, sizes drop it. A size of all ones is unknown.
+        const read = (isID) => {
+            const first = data.getUint8(at);
+            let length = 1;
+            while (length <= 8 && !(first & (0x80 >> (length - 1)))) length++;
+            if (length > 8) throw new RangeError('bad EBML length');
+            let value = isID ? first : first & (0xff >> length), ones = value === 0xff >> length;
+            for (let i = 1; i < length; i++) {
+                const byte = data.getUint8(at + i);
+                value = value * 256 + byte;
+                ones = ones && byte === 0xff;
+            }
+            at += length;
+            return isID || !ones ? value : Infinity;
+        };
+        // Info usually comes first, but may follow the Clusters, which are skipped by their sizes.
+        let end = data.byteLength, scale = 1e6, duration = null, infoEnd = -1;
+        while (at < end && at !== infoEnd) {
+            const id = read(true), size = read(false), body = at;
+            if (id === 0x18538067 || id === 0x1549a966) {
+                // Segment, then its Info, which holds the length.
+                if (size !== Infinity) end = Math.min(end, body + size);
+                if (id === 0x1549a966) infoEnd = size === Infinity ? -1 : body + size;
+                continue;
+            }
+            if (size === Infinity) break;
+            if (id === 0x2ad7b1) {
+                scale = 0;
+                for (let i = 0; i < size; i++) scale = scale * 256 + data.getUint8(body + i);
+            } else if (id === 0x4489) {
+                duration = size === 4 ? data.getFloat32(body) : size === 8 ? data.getFloat64(body) : null;
+            }
+            at = body + size;
+        }
+        return duration > 0 && scale > 0 ? duration * scale / 1e9 : null;
+    }
     let pixi;
     Object.defineProperty(window, 'PIXI', {
         configurable: true,
@@ -264,6 +475,7 @@
         set(value) {
             if (value === pixi) return;
             pixi = value;
+            if (value) smoothVideoLoops(value);
             const filter = value && value.Filter;
             if (!filter) return;
             const apply = filter.prototype.apply;
@@ -277,6 +489,8 @@
 
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
+        sessionPaused = paused;
+        if (!paused) resumedAt = performance.now();
         const scenes = window.SceneManager;
         if (paused) {
             if (scenes && scenes.stop) scenes.stop();

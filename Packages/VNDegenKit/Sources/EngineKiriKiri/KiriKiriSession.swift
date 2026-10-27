@@ -78,6 +78,10 @@ final class KiriKiriSession: EngineSession {
             router.hostKey(scancode, pressed: pressed, isRepeat: isRepeat).forEach(deliver)
         }
         host.onEvent = { [weak self] event in self?.send(event) }
+        host.onText = { [weak self] characters in
+            guard let self, case .running = state, let text = KiriKiriInput.typed(characters) else { return }
+            deliver(text)
+        }
     }
 
     private func start() {
@@ -210,6 +214,11 @@ final class KiriKiriSession: EngineSession {
     func send(_ event: ControllerEvent) {
         guard case .running = state else { return }
         router.translate(event).forEach(deliver)
+    }
+
+    func type(_ typed: TypedText) {
+        guard case .running = state else { return }
+        router.type(typed).forEach(deliver)
     }
 
     func setPaused(_ paused: Bool) {

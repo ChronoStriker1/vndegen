@@ -23,3 +23,8 @@ import VNCore
     #expect(plugin.legacyAction(for: .menu) == .key(KeyboardKey(key: "x", code: "KeyX", keyCode: 88)))
     #expect(plugin.legacyAction(for: .hub) == nil)
 }
+
+@Test func rpgMakerGamesKeepTheGamepadLayout() {
+    #expect(RPGMakerPlugin(.mz).defaultControls == .gamepad)
+    #expect(RPGMakerPlugin(.mv).defaultControls == .gamepad)
+}

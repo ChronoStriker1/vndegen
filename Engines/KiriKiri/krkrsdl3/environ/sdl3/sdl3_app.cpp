@@ -49,6 +49,12 @@ static void* tvp_host_view = NULL;
 // The engine tick of TVPDrawSceneOnce's last frame. Each game's clock starts at zero again, so a
 // tick left from the previous game would hold the next game's modal windows until its clock caught up.
 static tjs_uint64 tvp_last_scene_tick = 0;
+static bool (*tvp_host_event_hook)(SDL_Event* event) = NULL;
+
+void TVPSetHostEventHook(bool (*hook)(SDL_Event* event))
+{
+    tvp_host_event_hook = hook;
+}
 
 void TVPSetHostWindow(void* nswindow, void* nsview)
 {
@@ -454,6 +460,8 @@ static void resetTouches()
 
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
 {
+    if (tvp_host_event_hook && tvp_host_event_hook(event))
+        return SDL_APP_CONTINUE;
     switch (event->type)
     {
         // 退出

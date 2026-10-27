@@ -211,3 +211,7 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     #expect(TyranoPlugin.readBounded(large, limit: 10) == nil)
     #expect(TyranoPlugin.readBounded(root, limit: 10) == nil, "a folder is not a save file")
 }
+
+@Test func tyranoGamesStartWithTheKeyboardAndMouseLayout() {
+    #expect(TyranoPlugin().defaultControls == .keyboardAndMouse)
+}

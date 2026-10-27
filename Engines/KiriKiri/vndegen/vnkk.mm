@@ -31,6 +31,7 @@
 #endif
 
 #include <atomic>
+#include <memory>
 #include <cstdio>
 #include <string>
 
@@ -227,6 +228,28 @@ static bool modalLoopPass()
     return quitRequested;
 }
 
+// Typed text travels through SDL's queue as an event of VNDegen's own, behind the key events pushed before it, so the
+// game sees a key go down before its character, as on Windows. The engine's event handler passes the event to
+// deliverText, in a frame and in a modal window's loop alike. Its text is VNDegen's to free.
+static Uint32 textEvent;
+
+static bool deliverText(SDL_Event *event)
+{
+    if (!textEvent || event->type != textEvent)
+        return false;
+    std::unique_ptr<char, void (*)(void *)> text((char *)event->user.data1, SDL_free);
+    krkrsdl3::KRKR_Trig_TextInput(text.get());
+    return true;
+}
+
+// Text typed after the game's last frame never reaches it.
+static void discardText()
+{
+    SDL_Event event;
+    while (textEvent && SDL_PeepEvents(&event, 1, SDL_GETEVENT, textEvent, textEvent) > 0)
+        SDL_free(event.user.data1);
+}
+
 int vnkk_start(const VNKKLaunch *launch)
 {
     problem = nullptr;
@@ -258,6 +281,7 @@ int vnkk_start(const VNKKLaunch *launch)
     SDL_SetiOSEventPump(false);
 #endif
     TVPSetModalLoopHook(modalLoopPass);
+    TVPSetHostEventHook(deliverText);
     // SDL would catch SIGINT and SIGTERM to quit the game, and the host app could no longer be ended by them.
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, hosted ? "1" : "0");
     // An exception the engine leaves uncaught would end the host app along with the game.
@@ -440,6 +464,23 @@ void vnkk_wheel(float notches)
     SDL_PushEvent(&event);
 }
 
+void vnkk_text(const char *utf8)
+{
+    if (!started || !utf8 || !*utf8)
+        return;
+    if (!textEvent)
+        textEvent = SDL_RegisterEvents(1);
+    if (!textEvent)
+        return;
+    SDL_Event event = {};
+    event.type = textEvent;
+    event.user.timestamp = SDL_GetTicksNS();
+    event.user.windowID = windowID();
+    event.user.data1 = SDL_strdup(utf8);
+    if (!SDL_PushEvent(&event))
+        SDL_free(event.user.data1);
+}
+
 void vnkk_set_paused(bool value)
 {
     if (paused == value)
@@ -465,8 +506,10 @@ void vnkk_stop(void)
 {
     // The engine clock and audio would stay paused into the next game.
     vnkk_set_paused(false);
-    if (started)
+    if (started) {
+        discardText();
         SDL_AppQuit(nullptr, finished ? SDL_APP_SUCCESS : SDL_APP_FAILURE);
+    }
     started = running = quitRequested = terminated = finished = hosted = false;
     quitSentAt = 0;
 #if TARGET_OS_OSX

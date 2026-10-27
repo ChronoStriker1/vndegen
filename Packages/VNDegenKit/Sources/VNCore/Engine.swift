@@ -101,6 +101,9 @@ public protocol EnginePlugin: Sendable {
     /// engine-neutral actions, so VNDegen can convert those remaps. Nil means the Xbox button that sent `button` in the
     /// old standard layout, which is right for engines that read a gamepad or turn its buttons into the same keys.
     func legacyAction(for button: VirtualButton) -> ControlAction?
+    /// The button layout a game follows until the player changes it. Engines with no gamepad support use the keyboard
+    /// and mouse layout.
+    var defaultControls: ControlLayout { get }
 }
 
 extension EnginePlugin {
@@ -112,6 +115,7 @@ extension EnginePlugin {
     public var readsTouches: Bool { false }
     public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] { [] }
     public func legacyAction(for button: VirtualButton) -> ControlAction? { nil }
+    public var defaultControls: ControlLayout { .gamepad }
 }
 
 /// The ways an engine can run one game, such as the Ren'Py runtimes. Automatic, the engine's own choice, is the
@@ -171,11 +175,41 @@ public protocol EngineSession: AnyObject {
     /// game, as Ren'Py does. The hub then shows no touch controls or menu of its own, and its menu button reaches the
     /// game as a `.hub` press.
     var drawsOwnMenu: Bool { get }
+    /// Typing from VNDegen's on-screen keyboard. The default presses the keys for letters, digits, and spaces, and
+    /// Return and Backspace, through `send`. Engines that read text, such as for a name the player types, take it whole.
+    func type(_ typed: TypedText)
 }
 
 extension EngineSession {
     public func waitUntilStopped() async {}
     public var drawsOwnMenu: Bool { false }
+
+    public func type(_ typed: TypedText) {
+        let keys: [KeyboardKey] = switch typed {
+        case .newline: [KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)]
+        case .deleteBackward: [KeyboardKey(key: "Backspace", code: "Backspace", keyCode: 8)]
+        case let .text(text): text.compactMap(KeyboardKey.init(typing:))
+        }
+        for key in keys {
+            send(.key(key, pressed: true))
+            send(.key(key, pressed: false))
+        }
+    }
+}
+
+extension KeyboardKey {
+    /// The key that types `character` on a US keyboard without Shift, for letters, digits, and the space bar.
+    init?(typing character: Character) {
+        guard let ascii = character.asciiValue else { return nil }
+        switch character {
+        case "a"..."z", "A"..."Z":
+            let upper = Character(character.uppercased())
+            self.init(key: String(character).lowercased(), code: "Key\(upper)", keyCode: Int(upper.asciiValue!))
+        case "0"..."9": self.init(key: String(character), code: "Digit\(character)", keyCode: Int(ascii))
+        case " ": self.init(key: " ", code: "Space", keyCode: 32)
+        default: return nil
+        }
+    }
 }
 
 public enum EngineDetector {

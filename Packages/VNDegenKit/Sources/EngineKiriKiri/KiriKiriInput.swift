@@ -11,6 +11,24 @@ nonisolated enum KiriKiriInput: Equatable, Sendable {
     case click(Int32, down: Bool)
     /// Notches, positive turned away from the player.
     case wheel(notches: Int)
+    /// Typed characters, as the key presses Windows sends after a key goes down, which KiriKiri's text fields read.
+    case text(String)
+
+    /// The characters a key typed, as Windows sends them with the key: printable ones, and Return, Backspace, Tab,
+    /// and Escape as control characters. Nil when the key typed none, such as an arrow or a function key.
+    static func typed(_ characters: String) -> KiriKiriInput? {
+        let scalars = characters.unicodeScalars.compactMap { scalar -> UnicodeScalar? in
+            switch scalar.value {
+            // A Mac's Delete key types DEL, where Windows types Backspace.
+            case 0x7F: "\u{8}"
+            case 0x08, 0x09, 0x0D, 0x1B: scalar
+            // AppKit's function keys, such as the arrows, type characters in this private use range.
+            case 0..<0x20, 0xF700...0xF8FF: nil
+            default: scalar
+            }
+        }
+        return scalars.isEmpty ? nil : .text(String(String.UnicodeScalarView(scalars)))
+    }
 }
 
 /// What a button does in a KiriKiri game.
@@ -164,6 +182,18 @@ nonisolated struct KiriKiriInputRouter {
         guard notches != 0 else { return [] }
         scrolled -= Double(notches) * Self.pointsPerNotch
         return [.wheel(notches: -notches)]
+    }
+
+    /// Typing from the on-screen keyboard. Return and Backspace press their keys around their characters, as Windows
+    /// sends a key down, then its character, then the key up.
+    mutating func type(_ typed: TypedText) -> [KiriKiriInput] {
+        let key: Int32, character: String
+        switch typed {
+        case let .text(text): return [.text(text)]
+        case .newline: (key, character) = (SDLScancode.return, "\r")
+        case .deleteBackward: (key, character) = (SDLScancode.backspace, "\u{8}")
+        }
+        return press(.key(key), true) + [.text(character)] + press(.key(key), false)
     }
 
     /// Lets go of everything still held, for when the game stops getting input.
