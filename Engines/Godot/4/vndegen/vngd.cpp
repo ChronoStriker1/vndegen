@@ -3,6 +3,7 @@
 
 #include "vngd_platform.h"
 
+#include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/input/input.h"
 #include "core/os/os.h"
@@ -12,7 +13,10 @@
 #include "scene/main/viewport.h"
 #include "servers/display/display_server.h"
 
+#include <vnfont.h>
 #include <vngd.h>
+
+#include "../../vngd_frames.h"
 
 #include <cstring>
 #include <string>
@@ -33,6 +37,7 @@ struct State {
 };
 
 State state;
+VNGDFrames frames;
 
 // The device number of VNDegen's controller.
 constexpr int joypad = 0;
@@ -94,6 +99,9 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	state.keyboard = p_launch->keyboard;
 	state.context = p_launch->context;
 	state.os = vngd_platform_create_os(p_launch);
+	if (p_launch->fontTable) {
+		vnfont_init(p_launch->fontTable, p_launch->fontFolders, p_launch->fontFolderCount);
+	}
 
 	std::vector<std::string> args = { "--main-pack", p_launch->pack };
 	if (p_launch->renderingMethod) {
@@ -121,6 +129,7 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	}
 	OS::get_singleton()->get_main_loop()->initialize();
 	state.started = true;
+	frames.start();
 
 	// VNDegen's controller, with Godot's own button and axis numbers, so no mapping applies.
 	Dictionary info;
@@ -154,6 +163,7 @@ int vngd_iterate(void) {
 	}
 	DisplayServer::get_singleton()->process_events();
 	const bool quit = Main::iteration();
+	frames.frame();
 	write_snapshot();
 	return quit ? 1 : 0;
 }
@@ -292,6 +302,9 @@ void vngd_set_paused(bool p_paused) {
 		return;
 	}
 	state.paused = p_paused;
+	if (!p_paused) {
+		frames.skip();
+	}
 	// As when a PC game's window loses focus. Godot caps the first frame after the pause at its physics step limit.
 	OS::get_singleton()->get_main_loop()->notification(p_paused ? MainLoop::NOTIFICATION_APPLICATION_FOCUS_OUT : MainLoop::NOTIFICATION_APPLICATION_FOCUS_IN);
 	vngd_platform_set_paused(p_paused);
@@ -314,6 +327,10 @@ void vngd_stop(void) {
 		return;
 	}
 	if (state.started) {
+		// The game's own cap, which the display's refresh rate limits.
+		const int max_fps = Engine::get_singleton()->get_max_fps();
+		const float refresh = DisplayServer::get_singleton()->screen_get_refresh_rate();
+		frames.stop(max_fps > 0 ? MIN(max_fps, refresh) : refresh);
 		OS::get_singleton()->get_main_loop()->finalize();
 	}
 	if (state.setup) {

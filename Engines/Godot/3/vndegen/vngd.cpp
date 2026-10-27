@@ -4,6 +4,7 @@
 #include "vngd_keys.h"
 #include "vngd_platform.h"
 
+#include "core/engine.h"
 #include "core/os/input_event.h"
 #include "main/input_default.h"
 #include "main/main.h"
@@ -11,6 +12,8 @@
 #include "scene/main/viewport.h"
 
 #include <vngd.h>
+
+#include "../../vngd_frames.h"
 
 #include <string>
 #include <vector>
@@ -28,6 +31,7 @@ struct State {
 };
 
 State state;
+VNGDFrames frames;
 
 InputDefault *input() {
 	return static_cast<InputDefault *>(Input::get_singleton());
@@ -94,6 +98,7 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	}
 	vngd_platform_started();
 	state.started = true;
+	frames.start();
 	// VNDegen's controller. With no mapping for it, Godot passes its button and axis numbers on as they are.
 	input()->joy_connection_changed(0, true, "Xbox Controller", "");
 	return 0;
@@ -127,6 +132,7 @@ int vngd_iterate(void) {
 	vngd_platform_begin_frame();
 	input()->flush_buffered_events();
 	const bool quit = Main::iteration();
+	frames.frame();
 	write_snapshot();
 	return quit ? 1 : 0;
 }
@@ -269,6 +275,9 @@ void vngd_set_paused(bool p_paused) {
 		return;
 	}
 	state.paused = p_paused;
+	if (!p_paused) {
+		frames.skip();
+	}
 	// As when a PC game's window loses focus.
 	notify(p_paused ? MainLoop::NOTIFICATION_WM_FOCUS_OUT : MainLoop::NOTIFICATION_WM_FOCUS_IN);
 	vngd_platform_set_audio_paused(p_paused);
@@ -287,6 +296,10 @@ void vngd_stop(void) {
 		return;
 	}
 	if (state.started) {
+		// The game's own cap, which the display's refresh rate limits.
+		const float target = Engine::get_singleton()->get_target_fps();
+		const float refresh = OS::get_singleton()->get_screen_refresh_rate() > 0 ? OS::get_singleton()->get_screen_refresh_rate() : 60;
+		frames.stop(target > 0 ? MIN(target, refresh) : refresh);
 		vngd_platform_stopping();
 	}
 	if (state.setup) {

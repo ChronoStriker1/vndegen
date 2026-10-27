@@ -7,8 +7,11 @@ Import("env_modules")
 env_vndegen = env_modules.Clone()
 # vngd.h lives with the Swift package that calls it.
 env_vndegen.Prepend(CPPPATH=[Dir(".").srcnode().abspath + "/../../../../Packages/VNDegenKit/Sources/CGodot/include"])
+# The Windows font substitutes every engine shares.
+shared = Dir(".").srcnode().abspath + "/../../../Shared"
+env_vndegen.Prepend(CPPPATH=[shared])
 
-sources = ["register_types.cpp", "vngd.cpp", "vngd_keys.cpp"]
+sources = ["register_types.cpp", "vngd.cpp", "vngd_keys.cpp", File(shared + "/vnfont.c")]
 if env["platform"] in ("macos", "ios"):
     sources += ["vngd_apple.mm", "display_server_vndegen.mm"]
     env_vndegen.Append(CCFLAGS=["-fobjc-arc"])

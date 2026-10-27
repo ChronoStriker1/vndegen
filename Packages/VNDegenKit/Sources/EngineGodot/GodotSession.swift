@@ -1,4 +1,5 @@
 import CGodot
+import FontPack
 import Foundation
 import OSLog
 import QuartzCore
@@ -62,16 +63,35 @@ final class GodotSession: EngineSession {
 
     private func start() {
         guard case .waiting = state else { return }
+        #if DEBUG
+        // Test hooks, as launch arguments, since a simulator's app can't be given environment variables: frame timing
+        // for the frame rate checks, frames written to a file, and an input trace. Relative paths go in the game's logs.
+        for (argument, variable) in [("godotFrameLog", "VNGD_FRAME_LOG"), ("godotSnapshot", "VNGD_SNAPSHOT"), ("godotTraceInput", "VNGD_TRACE_INPUT")] {
+            guard let value = UserDefaults.standard.string(forKey: argument) else { continue }
+            let path = value.hasPrefix("/") || variable == "VNGD_TRACE_INPUT" ? value : paths.log.deletingLastPathComponent().appendingPathComponent(value).path
+            setenv(variable, path, 1)
+        }
+        #endif
         let strings = [paths.pack.path, paths.executable.path, paths.appData.path, paths.log.path].map { strdup($0) }
         defer { strings.forEach { free($0) } }
         let rendering = paths.renderingMethod.flatMap { strdup($0) }
         defer { free(rendering) }
         let size = host.bounds.size
+        // The Windows font substitutes, for games that ask for a font by name.
+        let fontTable = FontPack.table.flatMap { strdup($0.path) }
+        defer { free(fontTable) }
+        let folderPaths = FontPack.folders.map { strdup($0.path) }
+        let fontFolders = UnsafeMutablePointer<UnsafePointer<CChar>?>.allocate(capacity: max(folderPaths.count, 1))
+        fontFolders.initialize(from: folderPaths.map { $0.map { UnsafePointer($0) } }, count: folderPaths.count)
+        defer {
+            fontFolders.deallocate()
+            folderPaths.forEach { free($0) }
+        }
         var settings = VNGDLaunch(pack: strings[0], executable: strings[1], dataDir: strings[2], logPath: strings[3],
-                                  renderingMethod: rendering,
-                                  layer: Unmanaged.passUnretained(host.metalLayer).toOpaque(),
+                                  renderingMethod: rendering, layer: Unmanaged.passUnretained(host.metalLayer).toOpaque(),
                                   width: Float(size.width), height: Float(size.height), scale: Float(host.scale),
-                                  keyboard: nil, context: nil)
+                                  keyboard: nil, context: nil, fontTable: fontTable, fontFolders: fontFolders,
+                                  fontFolderCount: Int32(folderPaths.count))
         Self.engineInUse = true
         guard engine.start(&settings) == 0 else {
             godotLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(self.engine.lastProblem ?? "", privacy: .public)")

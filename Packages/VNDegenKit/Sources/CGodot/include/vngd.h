@@ -29,6 +29,11 @@ typedef struct VNGDLaunch {
     // Called when the game wants text typed, such as when a text field takes focus, and when it no longer does.
     void (*keyboard)(bool show, void *context);
     void *context;
+    // The Windows font substitutes of Engines/Shared/vnfont.h: the table and the folders its fonts are in, as
+    // vnfont_init takes them. A game that asks for a Windows font by name gets its substitute. NULL for none.
+    const char *fontTable;
+    const char *const *fontFolders;
+    int fontFolderCount;
 } VNGDLaunch;
 
 // Loads the game and starts it. Returns 0 on success. Call vngd_stop afterwards even when it fails.

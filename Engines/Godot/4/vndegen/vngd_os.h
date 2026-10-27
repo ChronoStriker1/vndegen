@@ -4,6 +4,7 @@
 
 #include "core/string/ustring.h"
 
+#include <vnfont.h>
 #include <vngd.h>
 
 template <class Base>
@@ -19,6 +20,15 @@ public:
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
 	String get_user_data_dir(const String &p_user_dir) const override { return data_path.path_join(p_user_dir); }
+
+	// A Windows font the game asks for by name, such as through a SystemFont, comes from VNDegen's substitutes first.
+	String get_system_font_path(const String &p_font_name, int p_weight = 400, int p_stretch = 100, bool p_italic = false) const override {
+		vnfont_match match;
+		if (vnfont_resolve(p_font_name.utf8().get_data(), p_weight >= 600, p_italic, &match)) {
+			return String::utf8(match.path);
+		}
+		return Base::get_system_font_path(p_font_name, p_weight, p_stretch, p_italic);
+	}
 
 	template <class... Args>
 	OS_VNDegen(const VNGDLaunch *p_launch, Args... p_args) :

@@ -397,6 +397,14 @@ public:
 #endif
 	}
 	float get_screen_scale(int p_screen = -1) const override { return scale; }
+	float get_screen_refresh_rate(int p_screen = -1) const override {
+#if TARGET_OS_IPHONE
+		return UIScreen.mainScreen.maximumFramesPerSecond;
+#else
+		NSScreen *screen = NSScreen.mainScreen;
+		return screen ? screen.maximumFramesPerSecond : SCREEN_REFRESH_RATE_FALLBACK;
+#endif
+	}
 
 	void set_clipboard(const String &p_text) override {
 		NSString *text = [NSString stringWithUTF8String:p_text.utf8().get_data()];

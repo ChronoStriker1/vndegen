@@ -51,7 +51,7 @@ let package = Package(
         .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // The Godot engines' C interface. The engines are frameworks the app embeds, opened at run time.
         .target(name: "CGodot"),
-        .target(name: "EngineGodot", dependencies: ["VNCore", "CGodot"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineGodot", dependencies: ["VNCore", "CGodot", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
