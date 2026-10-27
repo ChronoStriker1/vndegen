@@ -245,6 +245,7 @@ private:
     void partyCommand(Thread &t, const Command &c);
     void effectCommand(Thread &t, const Command &c);
     void soundCommand(Thread &t, const Command &c);
+    void playSoundEffect(int id);  // a sound from the system database's SE list
     void chipCommand(Thread &t, const Command &c);
     void saveCommand(Thread &t, const Command &c);
     Database *databaseKind(int kind);

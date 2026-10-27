@@ -1,5 +1,5 @@
 // Runs a Wolf RPG Editor game headless for a number of frames, with scripted key presses, and saves screenshots.
-// For checks on Linux; it opens no window and plays no sound.
+// For checks on Linux; it opens no window and plays no sound. Frames are drawn on the CPU, as on every platform.
 //
 //   wolfplay <game folder> --frames 300 --shot 120:title.png --press 200:confirm
 //   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames; hold a key)
@@ -68,18 +68,9 @@ int main(int argc, char **argv) {
     }
     std::printf("%s: %dx%d\n", game.gameDat().title.c_str(), game.screenWidth(), game.screenHeight());
 
-    if (!TTF_Init()) {
-        std::fprintf(stderr, "TTF_Init: %s\n", SDL_GetError());
-        return 1;
-    }
-    SDL_Surface *target = SDL_CreateSurface(game.screenWidth(), game.screenHeight(), SDL_PIXELFORMAT_RGBA32);
-    SDL_Renderer *sdl = SDL_CreateSoftwareRenderer(target);
-    if (!sdl) {
-        std::fprintf(stderr, "renderer: %s\n", SDL_GetError());
-        return 1;
-    }
     {
-        Renderer renderer(sdl, game);
+        Renderer renderer(game);
+        Bitmap frame;
         uint32_t held = 0;
         for (int f = 1; f <= frames; f++) {
             Input in;
@@ -97,18 +88,14 @@ int main(int argc, char **argv) {
             game.update(in);
             auto [sa, sb] = shots.equal_range(f);
             if (sa != sb) {
-                renderer.draw();
-                SDL_RenderPresent(sdl);
+                renderer.draw(frame);
                 for (auto it = sa; it != sb; ++it) {
-                    stbi_write_png(it->second.c_str(), target->w, target->h, 4, target->pixels, target->pitch);
+                    stbi_write_png(it->second.c_str(), frame.w, frame.h, 4, frame.px.data(), frame.w * 4);
                     std::printf("frame %d: %s\n", f, it->second.c_str());
                 }
             }
         }
     }
     for (auto [code, n] : game.unsupported()) std::printf("unsupported command %d x%d\n", code, n);
-    SDL_DestroyRenderer(sdl);
-    SDL_DestroySurface(target);
-    TTF_Quit();
     return 0;
 }

@@ -474,6 +474,10 @@ void Game::soundCommand(Thread &t, const Command &c) {
     unsupported(c);
 }
 
+void Game::playSoundEffect(int id) {
+    (void)id;  // sound arrives with the audio module
+}
+
 void Game::chipCommand(Thread &t, const Command &c) {
     if (!map_) return;
     if (c.code == 242) {  // overwrite map tiles

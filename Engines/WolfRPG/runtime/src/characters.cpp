@@ -201,6 +201,13 @@ void Game::runRoute(Actor &a, bool isHero) {
         case AboveOn: a.chara.above = true; break;
         case AboveOff: a.chara.above = false; break;
         case SetOpacity: a.chara.opacity = arg(0); break;
+        case SetGraphic:  // a character image from the system database's list
+            a.chara.graphic = dbString(sdb_, 8, arg(0), 0);
+            a.chara.chip = -1;
+            break;
+        case PlaySound:
+            playSoundEffect(arg(0));
+            break;
         case Wait: a.routeWait = arg(0); break;
         case Pattern1: a.chara.pattern = 0; break;
         case Pattern2: a.chara.pattern = 1; break;
