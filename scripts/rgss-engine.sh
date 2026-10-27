@@ -47,7 +47,8 @@ for tool in meson ninja cmake gmake gsed ggrep automake autoreconf glibtoolize c
   command -v "$tool" >/dev/null || { echo "error: $tool is missing, see the header of $0" >&2; exit 1; }
 done
 ctags --version 2>/dev/null | grep -q "Universal Ctags" || { echo "error: ctags must be Universal Ctags (brew install universal-ctags)" >&2; exit 1; }
-rsync --version 2>/dev/null | head -n 1 | grep -q "^rsync  *version 3" || { echo "error: rsync must be rsync 3 (brew install rsync)" >&2; exit 1; }
+rsync_version=$(rsync --version 2>/dev/null || true)
+[[ ${rsync_version%%$'\n'*} =~ ^rsync\ +version\ 3 ]] || { echo "error: rsync must be rsync 3 (brew install rsync)" >&2; exit 1; }
 
 start=$(date +%s)
 
@@ -96,7 +97,8 @@ for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$
 # folders Meson downloaded the fresh .wrap files' subprojects into, which the notices below read, so those stay too. A
 # folder no current wrap names, such as an older version's, goes, so its notice can't reach the app. Meson reuses a
 # downloaded folder as it is, so when any wrap or overlay changes, every download goes and so do the Meson builds that
-# used them, which download again.
+# used them, which download again. The hash is saved with the engine's stamp, once the whole build has succeeded, so
+# a download that failed or stopped partway is never kept.
 wraps_stamp=$(cd "$work/fresh" && find core/subprojects subprojects \( -name "*.wrap" -o -path "*/packagefiles/*" \) \
   -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-16)
 wraps_changed=false
@@ -120,7 +122,6 @@ rsync -a --checksum --delete --exclude /libretro/build ${keep[@]+"${keep[@]}"} "
 keep=()
 keep_downloads "$work/fresh/subprojects" ""
 rsync -a --checksum --delete ${keep[@]+"${keep[@]}"} "$work/fresh/subprojects/" "$work/subprojects/"
-echo "$wraps_stamp" > "$work/.vndegen-wraps"
 rm -rf "$work/fresh"
 
 # Stage 1, cached by its inputs: the core with its patches outside stage2/, and the tools. Its Makefile expects GNU sed and grep, and an
@@ -258,5 +259,6 @@ for name in Ruby libyaml wasi-libc "wabt (wasm2c)" Boost "Liberation Sans font" 
   cp "$src/licenses/$name.txt" "$licenses/mkxp-z - $name.txt"
 done
 
+echo "$wraps_stamp" > "$work/.vndegen-wraps"
 echo "$stamp" > "$dest/.vndegen-engine"
 echo "RGSS engine built in $dest in $(($(date +%s) - start)) s"
