@@ -2147,6 +2147,12 @@ impl Interpreter {
         self.current_line = self.current_line.saturating_add(1);
     }
 
+    /// Whether the last wait came from a queued tag rather than the script
+    /// (VNDegen).
+    pub fn last_wait_from_queue(&self) -> bool {
+        self.last_wait_from_queue
+    }
+
     /// Release a queued wait without advancing the script PC. This is used by
     /// host-side waits that complete asynchronously (for example video/trans).
     pub fn release_queued_wait(&mut self) -> bool {

@@ -83,6 +83,9 @@ pub struct CoreRuntime {
     input: Arc<Mutex<callbacks::InputSnapshot>>,
     events: Arc<Mutex<Vec<events::RuntimeEvent>>>,
     video_finished: Arc<AtomicBool>,
+    /// Where an inline [trans] or [video] waits, so its resume steps past it.
+    /// A queued one doesn't move the script (VNDegen).
+    inline_stop_at: Option<(Option<String>, usize)>,
     debug_skip_active: Arc<AtomicBool>,
     script_status: Arc<AtomicU8>,
     magic_paths: Arc<magic_path::MagicPathTable>,
@@ -317,6 +320,7 @@ impl CoreRuntime {
             input,
             events,
             video_finished,
+            inline_stop_at: None,
             debug_skip_active,
             script_status,
             magic_paths: Arc::clone(&magic_paths),

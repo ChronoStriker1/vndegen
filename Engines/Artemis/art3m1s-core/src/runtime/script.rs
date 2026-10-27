@@ -92,6 +92,14 @@ impl CoreRuntime {
         }
     }
 
+    /// Records where the script waits if the wait came from the script itself
+    /// (VNDegen).
+    fn note_inline_stop(&mut self) {
+        self.inline_stop_at = (!self.interpreter.last_wait_from_queue()).then(|| {
+            (self.interpreter.current_script().map(str::to_owned), self.interpreter.current_line())
+        });
+    }
+
     fn has_queued_tags(&self) -> bool {
         let ctx = self.interpreter.engine_context();
         !ctx.lock().unwrap().tag_queue.is_empty()
@@ -124,6 +132,7 @@ impl CoreRuntime {
                     break;
                 }
                 Ok(ExecutionResult::Wait(Event::VideoPlay { id: None, .. })) => {
+                    self.note_inline_stop();
                     self.wait_reason = Some(WaitReason::Stop {
                         reason: Some("video".into()),
                     });
@@ -134,6 +143,7 @@ impl CoreRuntime {
                     continue;
                 }
                 Ok(ExecutionResult::Wait(Event::Trans { .. })) => {
+                    self.note_inline_stop();
                     self.wait_reason = Some(WaitReason::Stop {
                         reason: Some("trans".into()),
                     });
@@ -243,10 +253,15 @@ impl CoreRuntime {
             is_trans_wait && !RenderPipeline::new(&self.compositor).is_transition_in_progress();
         if video_resume || trans_resume {
             self.wait_reason = None;
-            // advance_line releases a queued wait without moving the script,
-            // and steps past an inline [trans] or [video], which would
-            // otherwise run again (VNDegen).
-            self.interpreter.advance_line();
+            // An inline [trans] or [video] would run again unless the script
+            // steps past it. A queued one leaves the script where it is: the
+            // queue may have stopped it on its next instruction (VNDegen).
+            let position = (self.interpreter.current_script().map(str::to_owned), self.interpreter.current_line());
+            if self.inline_stop_at.take() == Some(position) {
+                self.interpreter.advance_line();
+            } else {
+                self.interpreter.release_queued_wait();
+            }
             return;
         }
 
