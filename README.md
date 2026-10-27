@@ -19,10 +19,10 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 
 - **Engine detection.** Each engine is a plugin that recognizes its own files, such as `js/rmmz_core.js` for RPG Maker MZ. The game page shows the detected engine and the file that identified it. Games with no detected engine can be assigned one by hand.
 - **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, and genres from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
-- **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place.
+- **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls.
 - **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. A controller alone reaches every screen, including Settings, the button mapping editor, adding a game, and the lock screen, and its text fields open an on-screen keyboard the controller types on. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Every button reaches games as an Xbox controller button by default, except in KiriKiri and TyranoScript games, which start with Steam's Keyboard and Mouse layout. Each game also has its own button mapping: any overlay or controller button can send another Xbox button, a keyboard key, a mouse click, the mouse wheel, mouse movement, or the on-screen keyboard.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
-- **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
+- **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen. In a window, tiled or not, a game follows the window's shape. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
 - **Windows fonts.** RPG Maker MV and MZ and TyranoScript games that ask for MS Gothic, MS Mincho, Arial, Tahoma, and other Windows fonts by name get free fonts with the same metrics, as under Proton, so their text wraps and fits as designed. Chinese and Korean fonts are a download in Settings.
 - **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad, both on Metal.
@@ -224,6 +224,16 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins.
 
 An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [docs/fonts.md](docs/fonts.md).
+
+Windows ignores case in file and folder names, so Windows games often ask for `Img/Title.PNG` when the disk has `img/title.png`. iPhone and iPad disks, and case-sensitive Mac volumes, do not ignore case. Every engine plugin must find a game's files, folders, and archive members whatever case the game uses, for reads, writes, existence checks, and folder listings. A write to a name that exists in another case must replace that file rather than create a second one. Use the lookup of the engine's family rather than a new one:
+
+- Swift code, including the web engines' `GameFolder`, uses `FileCase` in `VNCore/FileCase.swift`.
+- C and C++ engines call `casepath_resolve` in `Engines/Shared/casepath.c` from their file layer, as `Engines/RGSS/host/vfs.c` and KiriKiri's `unix_file.cpp` do.
+- Ren'Py's Python side uses `EngineRenPy/Support/filecase.py`, which `launcher.py` installs. `scripts/renpy-case-test.sh` tests it.
+
+Each looks a name up as written first and reads a folder's listing only when that misses, so games that use the right case pay nothing.
+
+Before a new engine plugin or a change to one ships, it passes the case check on its test games. `scripts/case-check.sh setup` copies each game into a library on a case-sensitive disk image with every name's case swapped. Each game must reach its title, start, save, and load there, on the Mac app and on an iPad simulator, both started with `-libraryRoot` on that library. The script's header has the commands. `scripts/build.sh test` runs the lookups' unit tests on a case-sensitive disk image too.
 
 ## License
 

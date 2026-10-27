@@ -24,16 +24,16 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - An RPG Maker MZ fix (0.6.1): looping WebM movies made from GIFs, which WebKit takes for shorter than they are, now play at their stated length, so they no longer stutter or drift from their sound. Movie frames are uploaded only when they change, and a clip's first pass no longer pauses.
 - An RPG Maker MZ fix (0.6.1): quick controller, touch gamepad, and key presses all reach the game. Each press and release reaches the game's input on its own update, and a VisuStella Core Engine input clear no longer drops the presses that follow it, so timed attacks that need several quick presses succeed.
 - The whole app works with a controller alone (0.6.2): every screen, Settings page, dialog and sheet takes controller focus, text fields open an on-screen keyboard the controller types on, the mapping editor has Reset and LB and RB group jumps, and import lists archives in VNDegen's folder. The Files and Photos pickers say they need touch or a mouse. Settings rows on the Mac show controller focus.
+- iPad windows, on `dev` for the next release: VNDegen fits small and odd window sizes on iPad. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of iPadOS's window controls. A game in a window follows the window's shape. Checked by laying the app out at sizes down to 320 points wide and in real windows on the iPad simulator. Real drag-resizing, tiling, and Slide Over couldn't be driven in the simulator.
+- Game files found whatever case the game names them in, for every engine, on `dev` for the next release. iPhone and iPad disks tell `Img/Title.PNG` from `img/title.png`, and Windows games often mix the two. Every engine plugin must pass the case check in the README's "Adding an engine" section.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- First priority, in final checks: every engine finds a game's files whatever case the game uses for file and folder names, as on Windows, on iPhone, iPad, and case-sensitive Mac volumes. Every new engine plugin must pass the same check.
-- iPad multitasking (item 2).
 - NScripter, on VNDegen's own clean-room runtime (item 2).
 - Flash through Ruffle (item 7). All 14 library Flash games reach their title screen on Linux, and a smoke test on the iPad simulator passed.
 - Godot (item 8), with Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. Two library games can't be supported. One needs Steam ownership, and one has an encrypted pack and Windows-only GDExtensions.
 - Artemis (item 5), on art3m1s-core (MPL-2.0) with VNDegen's patches. 7 of 8 test games reach their title screen on Linux, and a smoke test on the iPad simulator passed. Saves that load in the PC version are in progress.
-- A shared Windows font pack. Games that ask for a Windows font get an open font that matches it, as Proton does, such as Ume Gothic for MS Gothic and Liberation Sans for Arial. One table of font name substitutions serves every engine.
+- A shared Windows font pack. Games that ask for a Windows font get an open font that matches it, as Proton does, such as Ume Gothic for MS Gothic and Liberation Sans for Arial. One table of font name substitutions serves every engine. The pack, its C interface, and the RPG Maker MV and MZ and TyranoScript hooks are on `dev` for the next release, with Chinese and Korean fonts as downloads in Settings. The KiriKiri and RGSS hooks follow once the file name case work lands.
 - Paused, to resume later: Wolf RPG Editor (item 6), whose feasibility test is done, with all 3 test games playing past their title screen on Linux. The clean-room runtimes for RGSS and for AliceSoft System 3 and System 4 (item 4).
 
 ## Licenses
@@ -44,9 +44,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. B
 
 ## Next
 1. A frame rate check of every engine plugin, limited to the games where it matters: games that aren't strictly visual novels, such as RPG Maker games, and visual novels with video, such as movies or animated clips. Text, still images and transitions don't need it. Each of those test games should reach the frame rate it targets, such as 60 fps for RPG Maker MV and MZ, and hold it on average through normal play, including scenes with heavy effects. Where a game falls short, find out whether VNDegen or the engine plugin causes it, or something on the test machine, and fix what is VNDegen's. Every new engine plugin gets the same check, on the same kinds of games, before it ships.
-2. Together:
-   - NScripter, on VNDegen's own clean-room runtime.
-   - iPad multitasking: Split View, Slide Over, and an iPad window of its own. A windowed game follows the window's shape, as Follow device does, whatever in-game orientation Settings sets. The hub, the in-game menu, the touch gamepad, and every engine lay out correctly at small and odd window sizes. The iPhone has no split screen, so it needs no change.
+2. NScripter, on VNDegen's own clean-room runtime.
 3. A controller layout library, like Steam's controller layouts. Each game uses a layout from the library, and the player can pick another, edit it, or save their own. The library starts with VNDegen's built-in layouts, among them "Keyboard and mouse", copied from Steam's template of that name, which engines without gamepad support use by default unless an engine has a better standard layout. It then takes in suggested layouts: on a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse, and proposes a layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. Suggestions may be hard and costly, so they come after the library itself.
 4. AliceSoft System 3 and System 4, on VNDegen's own clean-room runtimes, including the oldest `SYSTEM3.EXE` games.
 5. Artemis, on art3m1s-core (MPL-2.0).

@@ -283,8 +283,6 @@ static ttstr TVPFindGameExe(const ttstr& dir)
     TVPGetLocalFileListAt(dir,
                           [&](const ttstr&, tTVPLocalFileInfo* s)
                           {
-                              // The lister's name is lowercased for the auto path table. The
-                              // file is opened by path, which is case sensitive on iOS.
                               std::string file = s->NativeName;
                               if (!(s->Mode & S_IFREG))
                                   return;

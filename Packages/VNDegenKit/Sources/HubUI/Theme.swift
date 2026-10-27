@@ -24,6 +24,7 @@ struct HubMetrics: Equatable {
     /// The safe area's size.
     var size: CGSize
     var insets = EdgeInsets()
+    var windowControls = WindowControlsInsets()
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -31,6 +32,20 @@ struct HubMetrics: Equatable {
     /// Horizontal content padding for views that ignore the horizontal safe area.
     var leading: CGFloat { padding + insets.leading }
     var trailing: CGFloat { padding + insets.trailing }
+
+    /// How far past the safe area's `edge` an iPad window's controls reach in the top row. Zero without controls there.
+    func topClearance(_ edge: HorizontalEdge) -> CGFloat {
+        max(0, edge == .leading ? windowControls.leading - insets.leading : windowControls.trailing - insets.trailing)
+    }
+
+    /// Padding from the safe area's `edge` for a view in the top row, which also keeps it beside an iPad window's controls.
+    func topRowPadding(_ edge: HorizontalEdge) -> CGFloat {
+        let clearance = topClearance(edge)
+        return clearance > 0 ? max(padding, clearance + 8) : padding
+    }
+
+    /// How far below the safe area's top a view in a top corner starts, to sit below an iPad window's controls.
+    var cornerClearance: CGFloat { max(0, windowControls.top - insets.top) }
 
     var isCompact: Bool { size.width < 600 }
     /// Landscape phones and short windows, where the hero has to share very little height with the shelves.
