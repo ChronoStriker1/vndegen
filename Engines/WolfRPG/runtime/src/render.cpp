@@ -1,11 +1,5 @@
 #include "render.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
-#define STBI_ONLY_JPEG
-#define STBI_ONLY_BMP
-#include "../third_party/stb/stb_image.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -15,36 +9,12 @@ namespace fs = std::filesystem;
 
 namespace wolf {
 
-Renderer::Renderer(SDL_Renderer *renderer, const Game &game) : r_(renderer), game_(game) {}
+Renderer::Renderer(SDL_Renderer *renderer, const Game &game)
+    : r_(renderer), game_(game), images_(renderer, game.files(), game.log) {}
 
 Renderer::~Renderer() {
-    for (auto &[k, i] : images_) SDL_DestroyTexture(i.texture);
     for (auto &[k, i] : textCache_) SDL_DestroyTexture(i.texture);
     if (font_) TTF_CloseFont(font_);
-}
-
-Renderer::Image Renderer::image(const std::string &path) {
-    auto it = images_.find(path);
-    if (it != images_.end()) return it->second;
-    Image img;
-    if (auto bytes = game_.files().read(path)) {
-        int w, h, n;
-        if (stbi_uc *px = stbi_load_from_memory(bytes->data(), int(bytes->size()), &w, &h, &n, 4)) {
-            if (SDL_Surface *s = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32, px, w * 4)) {
-                img.texture = SDL_CreateTextureFromSurface(r_, s);
-                img.w = w;
-                img.h = h;
-                SDL_DestroySurface(s);
-            }
-            stbi_image_free(px);
-        } else {
-            game_.log("cannot decode image " + path);
-        }
-    } else {
-        game_.log("missing image " + path);
-    }
-    images_[path] = img;
-    return img;
 }
 
 // Uses the font Game.dat names when the game ships it, and a fallback font otherwise.
@@ -72,7 +42,7 @@ TTF_Font *Renderer::font() {
     return font_;
 }
 
-Renderer::Image Renderer::text(const std::string &s, std::array<uint8_t, 3> color) {
+Image Renderer::text(const std::string &s, std::array<uint8_t, 3> color) {
     std::string key = s + '\x01' + std::to_string(color[0] << 16 | color[1] << 8 | color[2]);
     auto it = textCache_.find(key);
     if (it != textCache_.end()) return it->second;
@@ -110,7 +80,7 @@ void Renderer::drawWindow(const Image &skin, SDL_FRect d, float alpha) {
 void Renderer::drawPicture(int number, const Picture &p) {
     Image img;
     switch (p.kind) {
-        case PictureKind::File: img = image(p.source); break;
+        case PictureKind::File: img = images_.get(p.source); break;
         case PictureKind::Text: img = text(p.source, {255, 255, 255}); break;
         default: return;
     }
@@ -145,7 +115,7 @@ void Renderer::drawPicture(int number, const Picture &p) {
 void Renderer::drawChoices() {
     const ChoiceState &c = game_.choice();
     if (!c.active || c.visible.empty()) return;
-    Image skin = image(game_.windowSkin());
+    Image skin = images_.get(game_.windowSkin());
     std::vector<Image> lines;
     float maxW = 0, lineH = 0;
     for (int i : c.visible) {
@@ -157,7 +127,7 @@ void Renderer::drawChoices() {
     float w = maxW + pad * 4, h = lineH * lines.size() + pad * 2;
     SDL_FRect box{(game_.screenWidth() - w) / 2, (game_.screenHeight() - h) / 2, w, h};
     drawWindow(skin, box, 0.9f);
-    Image cursor = image(game_.cursorSkin());
+    Image cursor = images_.get(game_.cursorSkin());
     float blink = 0.6f + 0.4f * float(std::sin(game_.frameCount() * 0.1));
     if (cursor.texture)
         drawWindow(cursor, {box.x + pad, box.y + pad + c.cursor * lineH, w - pad * 2, lineH}, blink);
@@ -171,7 +141,7 @@ void Renderer::drawChoices() {
 void Renderer::drawMessage() {
     const MessageState &m = game_.message();
     if (!m.active) return;
-    Image skin = image(game_.windowSkin());
+    Image skin = images_.get(game_.windowSkin());
     float pad = game_.gameDat().tileSize() * 0.4f;
     float h = game_.screenHeight() * 0.27f;
     SDL_FRect box{pad, game_.screenHeight() - h - pad, game_.screenWidth() - pad * 2, h};
@@ -195,6 +165,9 @@ void Renderer::drawMessage() {
 void Renderer::draw() {
     SDL_SetRenderDrawColor(r_, 0, 0, 0, 255);
     SDL_RenderClear(r_);
+#if __has_include("maprender.h")
+    map_.draw();
+#endif
     for (auto &[n, p] : game_.pictures()) drawPicture(n, p);
 
     // Change screen colour darkens or tints everything drawn so far.

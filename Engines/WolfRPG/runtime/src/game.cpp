@@ -82,8 +82,9 @@ bool Game::load(std::string *error) {
 
     // The game starts at the first entry of the position list.
     int startMap = dbNumber(sdb_, SysPositions, 0, 0);
-    heroX_ = dbNumber(sdb_, SysPositions, 0, 1);
-    heroY_ = dbNumber(sdb_, SysPositions, 0, 2);
+    hero_.x = dbNumber(sdb_, SysPositions, 0, 1);
+    hero_.y = dbNumber(sdb_, SysPositions, 0, 2);
+    hero_.graphic = gameDat_.startHeroGraphic;
     if (!loadMap(startMap)) {
         if (error) *error = format("cannot load start map %d", startMap);
         return false;
@@ -341,6 +342,9 @@ bool Game::loadMap(int id) {
     for (auto &ev : map_->events) {
         MapEventState s;
         s.data = &ev;
+        s.chara.x = ev.x;
+        s.chara.y = ev.y;
+        s.chara.visible = false;
         events_.push_back(s);
     }
     mapParallel_.clear();
@@ -369,8 +373,21 @@ void Game::refreshPages() {
         ctx.stack.push_back({nullptr, 0, -1, int(i)});
         int page = activePage(events_[i], ctx);
         if (page != events_[i].page) {
-            events_[i].page = page;
-            events_[i].ranAutorun = false;
+            auto &e = events_[i];
+            e.page = page;
+            e.ranAutorun = false;
+            Character &c = e.chara;
+            c.visible = page >= 0;
+            if (page >= 0) {
+                const MapPage &pg = e.data->pages[page];
+                c.graphic = pg.graphic;
+                c.chip = pg.graphic.empty() && pg.chip > 0 ? pg.chip : -1;
+                c.direction = pg.direction ? pg.direction : 2;
+                c.pattern = pg.frame;
+                c.opacity = pg.opacity;
+                c.blend = pg.blend;
+                c.shadow = pg.shadow;
+            }
         }
     }
 }
@@ -463,6 +480,26 @@ void Game::update(const Input &input) {
     tintR_.step();
     tintG_.step();
     tintB_.step();
+    updateCamera();
+}
+
+// Keeps the hero in the middle of the screen, without showing past the map's edges.
+void Game::updateCamera() {
+    if (!map_) return;
+    double tile = gameDat_.tileSize();
+    double mapW = map_->width * tile, mapH = map_->height * tile;
+    double x = (hero_.x + 0.5) * tile - screenWidth() / 2.0;
+    double y = (hero_.y + 0.5) * tile - screenHeight() / 2.0;
+    cameraX_ = mapW <= screenWidth() ? (mapW - screenWidth()) / 2 : std::clamp(x, 0.0, mapW - screenWidth());
+    cameraY_ = mapH <= screenHeight() ? (mapH - screenHeight()) / 2 : std::clamp(y, 0.0, mapH - screenHeight());
+}
+
+bool Game::debugTeleport(int mapId, int x, int y) {
+    hero_.x = x;
+    hero_.y = y;
+    if (!loadMap(mapId)) return false;
+    updateCamera();
+    return true;
 }
 
 void Game::run(Thread &t) {
@@ -733,8 +770,8 @@ bool Game::step(Thread &t) {
 
         case 130: {  // move to another map or position
             int mapId = value(cmd.arg(1), t);
-            heroX_ = value(cmd.arg(2), t);
-            heroY_ = value(cmd.arg(3), t);
+            hero_.x = value(cmd.arg(2), t);
+            hero_.y = value(cmd.arg(3), t);
             if (cmd.arg(0) == -1 && mapId >= 0 && mapId != mapId_) loadMap(mapId);
             return true;
         }
@@ -743,6 +780,15 @@ bool Game::step(Thread &t) {
             unsupported(cmd);
             return true;
     }
+}
+
+std::vector<const Character *> Game::characters() const {
+    std::vector<const Character *> out{&hero_};
+    for (auto &p : party_)
+        if (p.visible && !p.graphic.empty()) out.push_back(&p);
+    for (auto &e : events_)
+        if (e.chara.visible) out.push_back(&e.chara);
+    return out;
 }
 
 int Game::commonByName(const std::string &name) const {

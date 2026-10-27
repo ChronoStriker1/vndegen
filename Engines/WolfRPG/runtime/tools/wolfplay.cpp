@@ -2,6 +2,7 @@
 // For checks on Linux; it opens no window and plays no sound.
 //
 //   wolfplay <game folder> --frames 300 --shot 120:title.png --press 200:confirm
+//   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
 #include "../src/game.h"
 #include "../src/render.h"
 
@@ -30,12 +31,14 @@ int main(int argc, char **argv) {
         return 2;
     }
     int frames = 120;
+    int mapId = -1, mapX = 0, mapY = 0;
     std::multimap<int, std::string> shots;
     std::multimap<int, uint32_t> presses;
     for (int i = 2; i + 1 < argc; i += 2) {
         std::string opt = argv[i], val = argv[i + 1];
         size_t colon = val.find(':');
         if (opt == "--frames") frames = std::atoi(val.c_str());
+        else if (opt == "--map") std::sscanf(val.c_str(), "%d,%d,%d", &mapId, &mapX, &mapY);
         else if (opt == "--shot" && colon != std::string::npos)
             shots.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
         else if (opt == "--press" && colon != std::string::npos)
@@ -47,6 +50,10 @@ int main(int argc, char **argv) {
     std::string error;
     if (!game.load(&error)) {
         std::fprintf(stderr, "load failed: %s\n", error.c_str());
+        return 1;
+    }
+    if (mapId >= 0 && !game.debugTeleport(mapId, mapX, mapY)) {
+        std::fprintf(stderr, "cannot open map %d\n", mapId);
         return 1;
     }
     std::printf("%s: %dx%d\n", game.gameDat().title.c_str(), game.screenWidth(), game.screenHeight());

@@ -13,7 +13,7 @@ VNDegen's Wolf RPG Editor runtime is its own code under VNDegen's MIT license. N
 | README of [Wolf_RPG_Decompyler](https://github.com/Daviid-P/Wolf_RPG_Decompyler) | No license; prose only was read | Which archive versions and key strings Wolf RPG Editor versions use |
 | The test games' own files, and the original engine run under Wine as a black box | | Checking each format against real data, and engine behavior |
 
-Not used: the DxLib archiver source that UberWolf bundles in `3rdParty/DXLib`. It carries no license. It was read once during the feasibility test, before this rule applied. The archive reader written then was discarded. `src/dxa.cpp` was written again from the format description below by a separate agent that had not seen that source, using only this description and the bytes of the test archives. Its corrections to the description, checked against those bytes, are folded in below.
+Not used: the DxLib archiver source that UberWolf bundles in `3rdParty/DXLib`. It carries no license. During the feasibility test, before the licensing rule reached this thread, it was read and an archive reader was written after it. When the rule arrived, that reader was moved out of the repository, never committed, and is kept out for good; the local DxLib copy was deleted. The archive format was then written down as prose (below), from what had been learned of it. A separate agent that had never seen the DxLib source or the discarded reader wrote `src/dxa.cpp` from that prose and the bytes of the test archives alone, and its corrections to the description, each checked against those bytes, are folded in below.
 
 ## DxLib archive format (.wolf files)
 

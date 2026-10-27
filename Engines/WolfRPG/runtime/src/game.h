@@ -73,7 +73,20 @@ struct MessageState {
     std::string text;
 };
 
-struct Frame;
+// A character on the map: the hero, a party member following the hero, or a map event.
+struct Character {
+    std::string graphic;  // character image file; nothing is drawn when it is empty and chip is negative
+    int chip = -1;        // a tile of the map's tileset, drawn instead of an image
+    double x = 0, y = 0;  // position in tiles, fractional while moving
+    int direction = 2;    // numeric keypad: 2 down, 4 left, 6 right, 8 up, 1 3 7 9 the diagonals
+    int pattern = 1;      // animation frame, from 0; 1 is standing in three-frame sets
+    int opacity = 255;
+    int blend = 0;          // 0 normal, 1 add, 2 subtract, 3 multiply
+    int lift = 0;           // pixels the character is drawn above its tile, for jumps and height settings
+    bool visible = true;    // false for erased events and hidden party members
+    bool above = false;     // drawn over everything else on the map
+    int shadow = 0;         // shadow graphic number from the system database, 0 for none
+};
 
 // One running event: a map event page or a common event, with its call stack.
 struct Thread {
@@ -93,6 +106,7 @@ struct Thread {
 
 struct MapEventState {
     const MapEvent *data = nullptr;
+    Character chara;
     int page = -1;  // active page, or -1
     std::array<int32_t, 10> self{};
     bool erased = false;
@@ -113,6 +127,15 @@ public:
     const ChoiceState &choice() const { return choice_; }
     const MessageState &message() const { return message_; }
     const Map *map() const { return map_.get(); }
+    const std::vector<Tileset> &tilesets() const { return tilesets_; }
+    // The hero, party members and map events, in no particular order. The map renderer sorts them.
+    std::vector<const Character *> characters() const;
+    // The top left of the screen on the map, in pixels.
+    double cameraX() const { return cameraX_; }
+    double cameraY() const { return cameraY_; }
+    int tileSize() const { return gameDat_.tileSize(); }
+    // Moves the hero to a map position at once, for tests.
+    bool debugTeleport(int mapId, int x, int y);
     int screenWidth() const { return gameDat_.screenWidth; }
     int screenHeight() const { return gameDat_.screenHeight; }
     // The tint over the whole screen, as Wolf's change screen colour sets it: 100 is unchanged per channel.
@@ -162,6 +185,7 @@ private:
     void refreshPages();
     void startPage(int eventIndex, Thread &t);
     bool commonConditionMet(const CommonEvent &ce);
+    void updateCamera();
 
     std::filesystem::path root_;
     GameFiles files_;
@@ -180,7 +204,9 @@ private:
     int mapId_ = -1;
     std::unique_ptr<Map> map_;
     std::vector<MapEventState> events_;
-    int heroX_ = 0, heroY_ = 0, heroDir_ = 2;
+    Character hero_;
+    std::array<Character, 5> party_;
+    double cameraX_ = 0, cameraY_ = 0;
 
     std::vector<Thread> threads_;      // autorun and called events, run in order
     std::vector<Thread> parallel_;     // parallel common events, one per event
