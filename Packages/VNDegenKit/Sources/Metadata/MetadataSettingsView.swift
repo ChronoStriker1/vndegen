@@ -35,8 +35,8 @@ public final class MetadataSettingsModel {
         reload()
     }
 
-    /// Reads the stored keys again and forgets old test results, each time the page opens.
-    func reload() {
+    /// Reads the stored keys.
+    private func reload() {
         values = Dictionary(uniqueKeysWithValues: Credential.allCases.map { ($0, service.credential($0)) })
         checks = [:]
     }
@@ -177,7 +177,6 @@ public struct MetadataSettingsView: View {
         }
         .navigationTitle("Metadata Sources")
         .onScreenKeyboard(model.keyboard)
-        .onAppear { model.reload() }
     }
 
     private func field(_ credential: Credential) -> some View {

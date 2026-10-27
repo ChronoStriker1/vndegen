@@ -136,3 +136,16 @@ private final class Field {
     // A target that left the screen falls back to the first.
     #expect(ring.current(in: [["a"]]) == "a")
 }
+
+@MainActor
+@Test func thePagerScrollsByPagesAndStopsAtBothEnds() {
+    let pager = ScrollPager()
+    pager.update(.init(offset: 0, visible: 500, content: 2000, top: 0, bottom: 0))
+    #expect(pager.offset(scrolling: 1) == 460)
+    #expect(pager.offset(scrolling: -1) == 0)
+    pager.update(.init(offset: 1400, visible: 500, content: 2000, top: 0, bottom: 0))
+    #expect(pager.offset(scrolling: 1) == 1500)
+    // Text shorter than the view doesn't move.
+    pager.update(.init(offset: 0, visible: 500, content: 300, top: 0, bottom: 0))
+    #expect(pager.offset(scrolling: 1) == 0)
+}

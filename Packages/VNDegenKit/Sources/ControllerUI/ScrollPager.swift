@@ -20,9 +20,15 @@ public final class ScrollPager {
     /// Scrolls by `pages` heights of the visible area, back for a negative number, less a line's worth of a whole page
     /// so the reader keeps their place.
     public func scroll(pages: Double) {
+        let target = offset(scrolling: pages)
+        withAnimation(.easeOut(duration: 0.25)) { position.scrollTo(y: target) }
+    }
+
+    /// Where scrolling by `pages` lands, kept between the top and the bottom of the content.
+    func offset(scrolling pages: Double) -> CGFloat {
         let target = geometry.offset + (geometry.visible - 40) * pages
         let limit = max(-geometry.top, geometry.content + geometry.bottom - geometry.visible)
-        withAnimation(.easeOut(duration: 0.25)) { position.scrollTo(y: min(max(-geometry.top, target), limit)) }
+        return min(max(-geometry.top, target), limit)
     }
 
     func update(_ geometry: Geometry) {

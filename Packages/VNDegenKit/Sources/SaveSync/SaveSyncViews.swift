@@ -550,7 +550,8 @@ public struct GameSavesView: View {
             case .backUp: Text((model.service.backupWarning(model.game) ?? "") + hint)
             }
         }
-        .sheet(isPresented: $model.choosingGame) {
+        // A swipe closes the picker the way Cancel does, so its keyboard goes with it.
+        .sheet(isPresented: Binding(get: { model.choosingGame }, set: { if !$0 { model.closePicker() } })) {
             LudusaviGamePicker(model: model)
         }
     }

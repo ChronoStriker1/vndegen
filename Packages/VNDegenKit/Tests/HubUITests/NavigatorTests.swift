@@ -142,13 +142,38 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
-@Test func licensesScrollRatherThanLoseFocus() async throws {
+@Test func licensePagesTakeScrollButtonsAndEachSheetGetsItsOwnPager() async throws {
     let (nav, _) = try await makeNavigator()
-    nav.sheet = .settingsPage(.licenses)
+    nav.activate(.settingsPage(.licenses))
     let pager = nav.pager
+    // Directions and shoulder buttons scroll rather than move a focus the page doesn't have. The pager's own tests check
+    // where they land.
     press(nav, .down, .pageDown)
     #expect(nav.sheet != nil)
-    nav.sheet = nil
-    // Each sheet scrolls from its own top.
+    #expect(nav.focus == nil)
+    press(nav, .cancel)
+    #expect(nav.sheet == nil)
     #expect(nav.pager !== pager)
+}
+
+@MainActor
+@Test func settingsPagesOpenFreshExceptLudusaviWhichKeepsWhatWasTyped() async throws {
+    let (nav, _) = try await makeNavigator()
+    nav.activate(.settingsPage(.metadata))
+    let metadata = nav.metadataSettings
+    press(nav, .cancel)
+    nav.activate(.settingsPage(.metadata))
+    #expect(nav.metadataSettings !== metadata)
+
+    nav.hub.input.noteInput(.gamepad)
+    press(nav, .cancel)
+    nav.activate(.settingsPage(.saves))
+    let saves = nav.saveSettings
+    press(nav, .down, .confirm)
+    #expect(nav.keyboard != nil)
+    // Closing the page under its keyboard, as a swipe does, drops the keyboard.
+    nav.sheet = nil
+    #expect(saves.keyboard == nil)
+    nav.activate(.settingsPage(.saves))
+    #expect(nav.saveSettings === saves)
 }

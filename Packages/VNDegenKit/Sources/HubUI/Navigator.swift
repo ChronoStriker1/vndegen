@@ -135,7 +135,11 @@ final class Navigator {
             } else if let sheet, let oldValue, sheet.id != oldValue.id {
                 setFocus(defaultFocus)
             }
-            if sheet?.id != oldValue?.id { pager = ScrollPager() }
+            if sheet?.id != oldValue?.id {
+                pager = ScrollPager()
+                // A swipe can close the Ludusavi page under its keyboard, which would otherwise be open next time.
+                if case .settingsPage(.saves)? = oldValue { saveSettings.keyboard?.close() }
+            }
         }
     }
     @ObservationIgnored private var focusBeforeSheet: Target?
@@ -155,6 +159,7 @@ final class Navigator {
 
     /// The Ludusavi settings page. One for the app, like the service it shows.
     @ObservationIgnored private(set) lazy var saveSettings = SaveSyncSettingsModel(service: hub.saveSync)
+    /// The Metadata sources and Hidden games pages, made again each time their page opens.
     @ObservationIgnored private(set) lazy var metadataSettings = MetadataSettingsModel(service: hub.metadata)
     @ObservationIgnored private(set) lazy var lockSettings = LockSettingsModel(lock: hub.lock)
     /// Scrolls the open sheet's text, such as a license, which has nothing to focus. Each sheet gets a new one.
@@ -394,7 +399,15 @@ final class Navigator {
         case .pageArtwork: if let id = pageGameID { sheet = .artwork(ArtworkEditor(hub: hub, gameID: id)) }
         case .pageMetadata: if let id = pageGameID { sheet = .metadata(MetadataSearch(hub: hub, gameID: id)) }
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
-        case let .settingsPage(page): sheet = .settingsPage(page)
+        case let .settingsPage(page):
+            // These pages start from the stored settings and the top each time. The Ludusavi page keeps what was typed
+            // into it, like the service it shows.
+            switch page {
+            case .metadata: metadataSettings = MetadataSettingsModel(service: hub.metadata)
+            case .lock: lockSettings = LockSettingsModel(lock: hub.lock)
+            case .saves, .licenses: break
+            }
+            sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
         case .pageVariant: if let id = pageGameID { sheet = .variant(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }

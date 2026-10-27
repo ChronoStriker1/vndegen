@@ -110,6 +110,9 @@ public final class ArchiveImportModel {
 
     func isFocused(_ control: Control) -> Bool { showsFocus && current == control }
 
+    /// The control showing the focus ring, for scrolling it into view.
+    var focusedControl: Control? { showsFocus ? current : nil }
+
     public func handle(_ button: Button) {
         if button == .cancel { return close() }
         let rows = rows
@@ -221,13 +224,20 @@ public struct ArchiveImportView: View {
                     .keyboardShortcut(.cancelAction)
             }
             .padding(22)
-            ScrollView {
-                if let importer {
-                    StepView(model: model, importer: importer)
-                        .padding(.horizontal, 22)
-                        .padding(.bottom, 28)
-                        .frame(maxWidth: 640)
-                        .frame(maxWidth: .infinity)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    if let importer {
+                        StepView(model: model, importer: importer)
+                            .padding(.horizontal, 22)
+                            .padding(.bottom, 28)
+                            .frame(maxWidth: 640)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                // A long list of archives runs below the sheet, so the controller's focus scrolls into view.
+                .onChange(of: model.focusedControl) { _, control in
+                    guard let control else { return }
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(control, anchor: .center) }
                 }
             }
         }
@@ -319,6 +329,7 @@ private struct StepView: View {
             Button { model.select(.chooseArchive) } label: { Label("Choose Archive", systemImage: "folder") }
                 .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.chooseArchive)))
                 .keyboardShortcut(.defaultAction)
+                .id(ArchiveImportModel.Control.chooseArchive)
             if model.showsFocus {
                 Text(model.localArchives.isEmpty
                      ? "Choose Archive opens the file picker, which needs touch or a mouse. With a controller, copy archives into VNDegen's folder and they show up here."
@@ -336,6 +347,7 @@ private struct StepView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(control)))
+                    .id(control)
                 }
             }
             Text("Games are extracted into VNDegen's Games folder. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
