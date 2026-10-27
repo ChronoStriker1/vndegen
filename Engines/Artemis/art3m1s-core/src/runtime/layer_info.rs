@@ -130,7 +130,7 @@ pub(super) fn asset_dimensions(
     }
     let resolved = super::magic_path::resolve_path(paths, file);
     // Match the texture provider's lookup order, but only read image headers.
-    for path in [format!("{resolved}.png"), resolved] {
+    for path in [format!("{resolved}.png"), format!("{resolved}.jpg"), resolved] {
         for limit in [4096, 65536, 1048576] {
             let mut bytes = vec![0u8; limit];
             let Ok(read) = resources.read_range(&path, 0, &mut bytes) else {
