@@ -13,6 +13,7 @@ struct KiriKiriEngine {
     let wheel: @convention(c) (Float) -> Void
     let setPaused: @convention(c) (Bool) -> Void
     let requestQuit: @convention(c) () -> Void
+    let saveSystemData: @convention(c) () -> Void
     let stop: @convention(c) () -> Void
     let view: @convention(c) () -> UnsafeMutableRawPointer?
 
@@ -32,12 +33,13 @@ struct KiriKiriEngine {
               let wheel: @convention(c) (Float) -> Void = function("vnkk_wheel"),
               let setPaused: @convention(c) (Bool) -> Void = function("vnkk_set_paused"),
               let requestQuit: @convention(c) () -> Void = function("vnkk_request_quit"),
+              let saveSystemData: @convention(c) () -> Void = function("vnkk_save_system_data"),
               let stop: @convention(c) () -> Void = function("vnkk_stop"),
               let view: @convention(c) () -> UnsafeMutableRawPointer? = function("vnkk_view")
         else { return nil }
         return KiriKiriEngine(start: start, iterate: iterate, key: key, mouseButton: mouseButton, mouseMove: mouseMove,
-                              click: click, wheel: wheel, setPaused: setPaused, requestQuit: requestQuit, stop: stop,
-                              view: view)
+                              click: click, wheel: wheel, setPaused: setPaused, requestQuit: requestQuit,
+                              saveSystemData: saveSystemData, stop: stop, view: view)
     }
 
     func send(_ input: KiriKiriInput) {

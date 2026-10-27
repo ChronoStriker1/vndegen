@@ -21,8 +21,11 @@ final class KiriKiriSession: EngineSession {
         /// Waiting for the view to be on screen.
         case waiting
         case running
-        /// The hub ended the session and the game is closing, until `deadline` at most.
-        case quitting(deadline: ContinuousClock.Instant)
+        /// The hub ended the session at `since` and the game is closing.
+        case quitting(since: ContinuousClock.Instant)
+        /// The game could not close inside a frame the host's own code held open. The hub was told it stopped, and the
+        /// engine stops once that frame returns.
+        case stoppingAfterFrame
         case stopped
     }
 
@@ -32,8 +35,9 @@ final class KiriKiriSession: EngineSession {
     private let launch: GameLaunch
     private let paths: KiriKiriPaths
     private var state = State.waiting
-    /// A native modal loop inside a frame, such as a game's own dialog, can fire the display link or the quit timer
-    /// again before the frame returns. The engine ignores a nested frame, and nothing may stop it under the running one.
+    /// A game's own modal window, such as its Yes/No dialog, runs the host's events inside a frame, which can fire the
+    /// display link or the quit timer again before the frame returns. The engine ignores a nested frame, and nothing
+    /// may stop it under the running one.
     private var inFrame = false
     private var paused = false
     private var router = KiriKiriInputRouter()
@@ -47,6 +51,12 @@ final class KiriKiriSession: EngineSession {
     /// Longest the game gets to close after the hub ends it. The engine itself ends a game after 3 seconds when the
     /// game is still waiting on a quit dialog of its own.
     static let quitTimeout: Duration = .seconds(8)
+    /// Longest the game gets to close while the host's own code holds a frame open above the game's dialog, as
+    /// AppKit's wait for the reply to a quit does.
+    var stuckQuitTimeout: Duration = .seconds(3)
+    /// Whether a session's engine is running. The engine runs one game at a time, and a game the hub ended can still be
+    /// closing when the next one launches.
+    private(set) static var engineInUse = false
     /// KAG handles a key on a later frame and ignores it unless the key is still down then, so a quick tap of a touch
     /// or controller button would be lost. A release sooner than this after its press waits until this has passed.
     static let shortestPress: Duration = .milliseconds(50)
@@ -77,9 +87,11 @@ final class KiriKiriSession: EngineSession {
         #endif
         var settings = VNKKLaunch(gameRoot: strings[0], projectData: strings[1], logPath: strings[2], appDataDir: strings[3],
                                   personalDir: strings[4], hostView: hostView)
+        Self.engineInUse = true
         guard engine.start(&settings) == 0 else {
             kiriKiriLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start, see \(self.paths.log.path, privacy: .public)")
             engine.stop()
+            Self.engineInUse = false
             stopped()
             launch.onExit()
             return
@@ -102,17 +114,31 @@ final class KiriKiriSession: EngineSession {
     }
 
     func step() {
-        guard !inFrame else { return }
+        guard !inFrame else { return giveUpIfQuitIsStuck() }
         inFrame = true
         defer { inFrame = false }
         switch state {
         case .running:
             if engine.iterate() != 0 { finish() }
-        case let .quitting(deadline):
-            if engine.iterate() != 0 || ContinuousClock.now > deadline { finish() }
-        case .waiting, .stopped:
+        case let .quitting(since):
+            if engine.iterate() != 0 || ContinuousClock.now > since + Self.quitTimeout { finish() }
+        case .waiting, .stoppingAfterFrame, .stopped:
             break
         }
+        if case .stoppingAfterFrame = state { finish() }
+    }
+
+    /// Runs when the display link or the quit timer fires inside a frame, which happens only while the game's own modal
+    /// window runs the host's events. Ending the session closes that window, so the frame returns and the game closes
+    /// normally. When the host's own code holds the frame open instead, as AppKit does while it waits for the reply to
+    /// a quit, the game cannot close at all. It then writes its system saves where it waits, and the hub is told it
+    /// stopped so the app can quit.
+    private func giveUpIfQuitIsStuck() {
+        guard case let .quitting(since) = state, ContinuousClock.now > since + stuckQuitTimeout else { return }
+        kiriKiriLog.info("\(self.launch.game.id.rawValue, privacy: .public) could not close inside its frame, saving its system data")
+        engine.saveSystemData()
+        state = .stoppingAfterFrame
+        resumeWaiters()
     }
 
     private func finish() {
@@ -122,6 +148,7 @@ final class KiriKiriSession: EngineSession {
         quitTimer?.invalidate()
         quitTimer = nil
         engine.stop()
+        Self.engineInUse = false
         kiriKiriLog.info("\(self.launch.game.id.rawValue, privacy: .public) stopped\(quitByGame ? " by the game" : "", privacy: .public)")
         stopped()
         if quitByGame { launch.onExit() }
@@ -129,6 +156,10 @@ final class KiriKiriSession: EngineSession {
 
     private func stopped() {
         state = .stopped
+        resumeWaiters()
+    }
+
+    private func resumeWaiters() {
         let waiters = stopWaiters
         stopWaiters = []
         waiters.forEach { $0.resume() }
@@ -154,7 +185,7 @@ final class KiriKiriSession: EngineSession {
             pressedAt[scancode] = nil
             switch state {
             case .running, .quitting: engine.send(input)
-            case .waiting, .stopped: break
+            case .waiting, .stoppingAfterFrame, .stopped: break
             }
         }
     }
@@ -183,7 +214,7 @@ final class KiriKiriSession: EngineSession {
             stopped()
         case .running:
             engine.requestQuit()
-            state = .quitting(deadline: .now + Self.quitTimeout)
+            state = .quitting(since: .now)
             // The hub takes the view off screen, which would stop a display link tied to it. The timer keeps the
             // session alive until the game has closed.
             displayLink?.invalidate()
@@ -193,13 +224,16 @@ final class KiriKiriSession: EngineSession {
             }
             RunLoop.main.add(timer, forMode: .common)
             quitTimer = timer
-        case .quitting, .stopped:
+        case .quitting, .stoppingAfterFrame, .stopped:
             break
         }
     }
 
     func waitUntilStopped() async {
-        if case .stopped = state { return }
+        switch state {
+        case .stoppingAfterFrame, .stopped: return
+        case .waiting, .running, .quitting: break
+        }
         await withCheckedContinuation { stopWaiters.append($0) }
     }
 }

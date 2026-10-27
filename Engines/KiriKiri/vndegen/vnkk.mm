@@ -212,6 +212,21 @@ static void restoreKeyboardHandler()
 }
 #endif
 
+// A game's modal window, such as KAG's Yes/No dialog, runs a loop of its own inside a frame and holds the main thread
+// until it closes. The host's events have to keep running in it, or nothing could answer the dialog: touches reach
+// SDL's view on iOS, and the host's input reaches vnkk_key and the others, only from the host's run loop. The host
+// ending the game closes the dialog as its close button would, so the frame can return and the game close normally.
+static bool modalLoopPass()
+{
+#if TARGET_OS_IOS
+    while (CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true) == kCFRunLoopRunHandledSource) {
+    }
+#else
+    SDL_PumpEvents();
+#endif
+    return quitRequested;
+}
+
 int vnkk_start(const VNKKLaunch *launch)
 {
     problem = nullptr;
@@ -242,6 +257,7 @@ int vnkk_start(const VNKKLaunch *launch)
     // tasks, inside a frame. The host's run loop delivers the touches to SDL's view between frames anyway.
     SDL_SetiOSEventPump(false);
 #endif
+    TVPSetModalLoopHook(modalLoopPass);
     // SDL would catch SIGINT and SIGTERM to quit the game, and the host app could no longer be ended by them.
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, hosted ? "1" : "0");
     // An exception the engine leaves uncaught would end the host app along with the game.
@@ -437,6 +453,12 @@ void vnkk_request_quit(void)
 {
     quitRequested = true;
     vnkk_set_paused(false);
+}
+
+void vnkk_save_system_data(void)
+{
+    SDL_Log("vnkk: saving the game's system data");
+    TVPDoSaveSystemVariables();
 }
 
 void vnkk_stop(void)

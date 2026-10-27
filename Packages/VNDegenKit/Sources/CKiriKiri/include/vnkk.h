@@ -28,7 +28,9 @@ VNKK_API int vnkk_start(const VNKKLaunch *launch);
 
 // Runs one frame. Returns nonzero once the game has quit. A call made while another is running,
 // as happens when a modal dialog spins the run loop, returns 0 and does nothing. On iOS, and on
-// macOS with a host view, a frame leaves the host app's events to the host's run loop.
+// macOS with a host view, a frame leaves the host app's events to the host's run loop, except
+// while the game shows a modal window of its own, such as a Yes/No dialog: that window's loop
+// runs the host's events, so the host's input can answer it.
 VNKK_API int vnkk_iterate(void);
 
 // Input, delivered as SDL events. Only these reach the game: SDL's own keyboard and, on macOS, its
@@ -49,8 +51,14 @@ VNKK_API void vnkk_wheel(float notches);
 VNKK_API void vnkk_set_paused(bool paused);
 
 // Closes the game without its quit confirmation, so it runs its normal close path and writes its
-// system save files. Keep calling vnkk_iterate until it returns nonzero.
+// system save files. A modal window the game shows closes as its close button would. Keep calling
+// vnkk_iterate until it returns nonzero.
 VNKK_API void vnkk_request_quit(void);
+
+// Writes the game's system save files now, for a host that has to give up on a game that cannot
+// close because the host's own code holds a frame open above it, such as an app quitting while
+// the game's modal window runs the host's events. Call vnkk_stop once that frame has returned.
+VNKK_API void vnkk_save_system_data(void);
 
 // Tears the engine down after the game has quit or after vnkk_request_quit.
 VNKK_API void vnkk_stop(void);

@@ -736,6 +736,13 @@ void TVPWindow::BringToFront()
     }
 }
 //---------------------------------------------------------------------------
+static bool (*modalLoopHook)();
+
+void TVPSetModalLoopHook(bool (*hook)())
+{
+    modalLoopHook = hook;
+}
+//---------------------------------------------------------------------------
 void TVPWindow::ShowWindowAsModal()
 {
     pSprite->type = 1;
@@ -747,8 +754,9 @@ void TVPWindow::ShowWindowAsModal()
     modal_result_ = 0;
     while (GetWindowActive() && !modal_result_)
     {
+        bool closeRequested = modalLoopHook && modalLoopHook();
         int remain = TVPDrawSceneOnce(30); // 30 fps
-        if (::Application->IsTarminate())
+        if (::Application->IsTarminate() || closeRequested)
         {
             modal_result_ = mrCancel;
         }

@@ -456,14 +456,17 @@ private func realPath(_ path: String) throws -> String {
     #expect(archive.log.path == "/Data/Test Game 01/logs/kirikiri.txt")
 }
 
-/// An engine that runs no game. It records the calls a session makes while one of its frames is still running.
+/// An engine that runs no game. It records the calls a session makes, and those it makes while one of its frames is
+/// still running.
 private enum FakeEngine {
     nonisolated(unsafe) static var inFrame = false
+    nonisolated(unsafe) static var calls: [String] = []
     nonisolated(unsafe) static var callsInFrame: [String] = []
     /// Runs inside the next frame, as a native modal loop would.
     nonisolated(unsafe) static var duringFrame: (() -> Void)?
 
     static func record(_ call: String) {
+        calls.append(call)
         if inFrame { callsInFrame.append(call) }
     }
 
@@ -481,25 +484,55 @@ private enum FakeEngine {
                 return 0
             },
             key: { _, _ in }, mouseButton: { _, _, _, _ in }, mouseMove: { _, _ in }, click: { _, _ in }, wheel: { _ in },
-            setPaused: { _ in }, requestQuit: {}, stop: { FakeEngine.record("stop") }, view: { nil })
+            setPaused: { _ in }, requestQuit: {}, saveSystemData: { FakeEngine.record("saveSystemData") },
+            stop: { FakeEngine.record("stop") }, view: { nil })
     }
 }
 
-@MainActor @Test func runsNoEngineCallUnderAFrameThatIsStillRunning() throws {
-    let data = try folder([:])
-    let launch = GameLaunch(game: Game(id: GameID("Test Game 08")), folder: URL(fileURLWithPath: "/nonexistent"),
-                            dataDirectory: data, onExit: {})
-    let session = try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
-                                      engine: FakeEngine.engine)
-    try #require(session.view as? KiriKiriHostView).onReady?()
-    FakeEngine.callsInFrame = []
-    FakeEngine.duringFrame = {
-        MainActor.assumeIsolated {
-            session.step()
-            session.terminate()
-            session.step()
+/// The session tests share `FakeEngine`'s records.
+@MainActor @Suite(.serialized) struct KiriKiriSessionTests {
+    @Test func runsNoEngineCallUnderAFrameThatIsStillRunning() throws {
+        let data = try folder([:])
+        let launch = GameLaunch(game: Game(id: GameID("Test Game 08")), folder: URL(fileURLWithPath: "/nonexistent"),
+                                dataDirectory: data, onExit: {})
+        let session = try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
+                                          engine: FakeEngine.engine)
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        FakeEngine.callsInFrame = []
+        FakeEngine.duringFrame = {
+            MainActor.assumeIsolated {
+                session.step()
+                session.terminate()
+                session.step()
+            }
         }
+        session.step()
+        #expect(FakeEngine.callsInFrame.isEmpty)
     }
-    session.step()
-    #expect(FakeEngine.callsInFrame.isEmpty)
+
+    /// AppKit's wait for the reply to a quit runs inside the frame when the quit came through a game's modal window. The
+    /// game cannot close under it, so it saves its system data there, the hub hears it stopped, and the engine stops only
+    /// once the frame returns.
+    @Test func savesAndReportsStoppedWhenTheHostHoldsAQuittingFrame() async throws {
+        let data = try folder([:])
+        let launch = GameLaunch(game: Game(id: GameID("Test Game 01")), folder: URL(fileURLWithPath: "/nonexistent"),
+                                dataDirectory: data, onExit: {})
+        let session = try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
+                                          engine: FakeEngine.engine)
+        session.stuckQuitTimeout = .zero
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        FakeEngine.calls = []
+        FakeEngine.callsInFrame = []
+        FakeEngine.duringFrame = {
+            MainActor.assumeIsolated {
+                session.terminate()
+                session.step()
+            }
+        }
+        session.step()
+        await session.waitUntilStopped()
+        #expect(FakeEngine.callsInFrame == ["saveSystemData"])
+        #expect(FakeEngine.calls == ["iterate", "saveSystemData", "stop"])
+        #expect(!KiriKiriSession.engineInUse)
+    }
 }

@@ -18,6 +18,9 @@ void TVPGetWindowSize(int* w, int* h);
 void TVPGetWindowSizeInPixels(int* w, int* h);
 void TVPSetWindowSize(int w, int h);
 int TVPDrawSceneOnce(int interval);
+// Called on every pass of a modal window's loop, which holds the main thread until the window closes, so that a host
+// app embedding the engine can run its own events there. A true result closes the window as its close button would.
+void TVPSetModalLoopHook(bool (*hook)());
 int TVPConvertKeyCodeToVKCode(int keyCode);
 
 /*
