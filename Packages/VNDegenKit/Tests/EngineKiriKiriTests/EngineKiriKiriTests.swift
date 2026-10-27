@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import GameInput
+import HubUI
 import VNCore
 @testable import EngineKiriKiri
 
@@ -600,6 +601,42 @@ private enum FakeEngine {
         #expect(await stops(session))
         await Task.yield()
         #expect(FakeEngine.calls == ["start", "iterate", "stop", "hub saw it stop"])
+        #expect(!KiriKiriSession.engineInUse)
+    }
+
+    /// The app's quit can arrive through a dialog the game shows while it starts. The quit ends the game, which closes
+    /// the dialog, so it must run while the dialog's loop runs below the start, and the app quits again once the game
+    /// has closed.
+    @Test func anAppQuitDuringADialogTheGameShowsWhileItStartsClosesTheDialog() async throws {
+        let session = try session("Test Game 01")
+        let quit = AppQuit(timeout: .seconds(60), frameIsRunning: { KiriKiriPlugin.frameIsRunning }) {
+            session.terminate()
+            await session.waitUntilStopped()
+        }
+        let (quitAgain, quitsAgain) = AsyncStream<Void>.makeStream()
+        var answer: AppQuit.Answer?
+        FakeEngine.duringStart = {
+            MainActor.assumeIsolated {
+                answer = quit.request(fromSystem: false, reply: {}, quitAgain: { quitsAgain.yield() })
+                // The dialog runs the app's events until the game is asked to quit, which closes it.
+                let deadline = Date.now + 2
+                while !FakeEngine.quitRequested, Date.now < deadline { RunLoop.main.run(mode: .default, before: .now + 0.05) }
+                if FakeEngine.quitRequested { FakeEngine.record("dialog closed") }
+            }
+        }
+        KiriKiriHostView.startAfterLayout(try #require((session.view as? KiriKiriHostView)?.onReady))
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            quitsAgain.finish()
+        }
+        var quitsAgainOnce = false
+        for await _ in quitAgain {
+            quitsAgainOnce = true
+            break
+        }
+        #expect(answer == .cancel)
+        #expect(quitsAgainOnce)
+        #expect(FakeEngine.calls == ["start", "dialog closed", "iterate", "stop"])
         #expect(!KiriKiriSession.engineInUse)
     }
 

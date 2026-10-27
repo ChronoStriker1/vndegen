@@ -56,7 +56,7 @@ let package = Package(
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
-        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri", "GameInput"], exclude: ["Fixtures"]),
+        .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri", "GameInput", "HubUI"], exclude: ["Fixtures"]),
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),

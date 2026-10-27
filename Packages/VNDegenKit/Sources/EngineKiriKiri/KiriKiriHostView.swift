@@ -6,7 +6,7 @@ import UIKit
 /// this view, which takes keyboard focus whenever it is on screen, as the web engines' view does.
 final class KiriKiriHostView: UIView {
     /// Called once, after the view is first in a window at a usable size.
-    var onReady: (() -> Void)?
+    var onReady: (@MainActor () -> Void)?
     /// An SDL scancode going down or up, and whether it is a key repeat.
     var onKey: ((Int32, Bool, Bool) -> Void)?
     /// Unused on iOS, where touches reach SDL's view directly.
@@ -30,11 +30,10 @@ final class KiriKiriHostView: UIView {
         readyIfOnScreen()
     }
 
-    /// Starts the game after the current layout pass, since starting creates SDL's window and draws a frame.
     private func readyIfOnScreen() {
         guard window != nil, bounds.width >= 1, bounds.height >= 1, let onReady else { return }
         self.onReady = nil
-        Task { onReady() }
+        Self.startAfterLayout(onReady)
     }
 
     func embed(_ engineView: UIView) {
@@ -83,7 +82,7 @@ import AppKit
 /// engines' view does, and takes keyboard focus whenever it is on screen.
 final class KiriKiriHostView: NSView {
     /// Called once, after the view is first in a window at a usable size.
-    var onReady: (() -> Void)?
+    var onReady: (@MainActor () -> Void)?
     /// An SDL scancode going down or up, and whether it is a key repeat.
     var onKey: ((Int32, Bool, Bool) -> Void)?
     /// The mouse, as pointer and scroll events.
@@ -114,11 +113,10 @@ final class KiriKiriHostView: NSView {
         readyIfOnScreen()
     }
 
-    /// Starts the game after the current layout pass, since starting creates SDL's window and draws a frame.
     private func readyIfOnScreen() {
         guard window != nil, bounds.width >= 1, bounds.height >= 1, let onReady else { return }
         self.onReady = nil
-        Task { onReady() }
+        Self.startAfterLayout(onReady)
     }
 
     func takeFocus() {
@@ -193,3 +191,13 @@ final class KiriKiriHostView: NSView {
     ]
 }
 #endif
+
+extension KiriKiriHostView {
+    /// Starts the game after the current layout pass, since starting creates SDL's window and draws a frame. The start
+    /// runs from the run loop rather than in a main-actor task: a dialog the game shows while it starts runs the app's
+    /// events in a loop of its own, and while a main-actor task is on the stack the main queue runs no other, so the
+    /// app's quit, which ends the game and so closes that dialog, would wait for the dialog forever.
+    static func startAfterLayout(_ start: @escaping @MainActor () -> Void) {
+        RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated(start) }
+    }
+}
