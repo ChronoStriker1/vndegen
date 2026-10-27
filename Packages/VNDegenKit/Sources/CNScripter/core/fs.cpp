@@ -138,6 +138,13 @@ bool FileSystem::addNs2(const std::string &path) {
     return true;
 }
 
+std::vector<std::string> FileSystem::topLevelFiles() const {
+    std::vector<std::string> out;
+    for (auto &[key, rel] : loose_)
+        if (key.find('\\') == std::string::npos) out.push_back(rel);
+    return out;
+}
+
 bool FileSystem::exists(std::string_view name) const {
     std::string key = normalizePath(name);
     return loose_.count(key) || entries_.count(key);

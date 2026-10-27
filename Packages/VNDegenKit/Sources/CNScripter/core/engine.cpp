@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace vnns {
 
@@ -34,11 +35,34 @@ const std::unordered_map<std::string, CommandFn> &commandTable() {
 }
 
 
+// English translation patches that make NScripter break lines between words add a PE section named ".patch" to the
+// game's exe (two test games' patched engines do; their stock exes don't). Its presence turns on word wrap.
+static bool hasWordWrapPatch(const std::string &exePath) {
+    Bytes d;
+    if (!readFile(exePath, d) || d.size() < 0x40 || d[0] != 'M' || d[1] != 'Z') return false;
+    size_t pe = le32(&d[0x3C]);
+    if (pe + 24 > d.size() || memcmp(&d[pe], "PE\0\0", 4) != 0) return false;
+    size_t sections = le16(&d[pe + 6]), optional = le16(&d[pe + 20]);
+    size_t table = pe + 24 + optional;
+    for (size_t i = 0; i < sections && table + (i + 1) * 40 <= d.size(); i++)
+        if (memcmp(&d[table + i * 40], ".patch\0", 7) == 0) return true;
+    return false;
+}
+
 bool Engine::start(std::string *error) {
     if (!fs_.open(cfg_.gameRoot)) {
         if (error) *error = "The game folder can't be read.";
         return false;
     }
+    if (!cfg_.englishWordWrap)
+        for (const std::string &rel : fs_.topLevelFiles()) {
+            std::string low = sjisLower(rel);
+            if (low.size() > 4 && low.compare(low.size() - 4, 4, ".exe") == 0 && hasWordWrapPatch(fs_.root() + "/" + rel)) {
+                cfg_.englishWordWrap = true;
+                logf("%s has the word-wrap patch: English text breaks between words", rel.c_str());
+                break;
+            }
+        }
     if (!script_.load(fs_, error)) return false;
     const ScriptSettings &st = script_.settings();
     width_ = st.width;

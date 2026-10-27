@@ -31,6 +31,8 @@ public:
     // (saves, logs). Existing folders are matched without regard to case.
     std::string hostPath(std::string_view name) const;
     const std::string &root() const { return root_; }
+    // Loose files in the game's top folder, as paths relative to the root.
+    std::vector<std::string> topLevelFiles() const;
 
 private:
     struct Entry {

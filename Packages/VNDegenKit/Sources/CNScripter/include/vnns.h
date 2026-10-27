@@ -19,7 +19,9 @@ typedef struct VNNSEngine VNNSEngine;
 typedef struct VNNSLaunch {
     const char *gameRoot;   // folder holding the script (0.txt, 00.txt or nscript.dat) and archives
     const char *logPath;    // file the runtime's log is appended to; NULL logs to stderr
-    bool englishWordWrap;   // break English text between words, as some translation patches' engines do
+    // Break English text between words, as some translation patches' engines do. The runtime also turns this on
+    // itself when the game's exe carries such a patch (a PE section named ".patch").
+    bool englishWordWrap;
 } VNNSLaunch;
 
 // Starts a game. Returns NULL when it can't, with the reason in vnns_start_error().
