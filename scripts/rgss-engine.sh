@@ -90,9 +90,10 @@ for patch in "$src"/patches/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$p
 for patch in "$src"/patches/stage2/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
 rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/fresh/subprojects/"
 for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$patch"; done
-# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have.
-rsync -a --checksum --delete --exclude /libretro/build "$work/fresh/core/" "$work/core/"
-rsync -a --checksum --delete "$work/fresh/subprojects/" "$work/subprojects/"
+# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have. The subprojects
+# Meson downloaded into either subprojects folder aren't in the fresh sources either, and the notices below read them.
+rsync -a --checksum --delete --exclude /libretro/build --filter 'P /subprojects/*/' "$work/fresh/core/" "$work/core/"
+rsync -a --checksum --delete --filter 'P /*/' "$work/fresh/subprojects/" "$work/subprojects/"
 rm -rf "$work/fresh"
 
 # Stage 1, cached by its inputs: the core with its patches outside stage2/, and the tools. Its Makefile expects GNU sed and grep, and an
