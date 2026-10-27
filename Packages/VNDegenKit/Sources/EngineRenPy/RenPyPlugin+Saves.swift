@@ -62,7 +62,7 @@ extension RenPyPlugin {
     nonisolated static func importGameSaves(base: URL, dataDirectory: URL) throws {
         let fileManager = FileManager.default
         let saves = savesDirectory(dataDirectory)
-        let gameSaves = base.appendingPathComponent("game/saves", isDirectory: true)
+        let gameSaves = FileCase.resolve("game/saves", in: base)
         guard try items(in: saves).isEmpty else { return }
         let pcSaves = try items(in: gameSaves)
         guard !pcSaves.isEmpty else { return }

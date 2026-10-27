@@ -80,12 +80,46 @@ public struct LudusaviStore: Sendable {
         guard let files = mapping.effectiveFiles(backup) else { throw SaveSyncError.noBackups }
         let recorded = RecordedPaths(files.keys, locations: locations)
         var plan = RestorePlan(items: [], skipped: [])
+        var planned: [String: Int] = [:]
+        // Names this plan writes, and their folders, by location and lowercased path, so a later name that differs only
+        // in case lands on the same file or folder, as on Windows, even where nothing exists yet.
+        var spellings: [Int: [String: String]] = [:]
+        func spelled(_ relative: String, in location: Int) -> String {
+            var parts = relative.split(separator: "/").map(String.init)
+            for index in parts.indices {
+                // Folded as FileCase compares names: ignoring case, with canonically equivalent forms equal.
+                let key = parts[...index].joined(separator: "/").precomposedStringWithCanonicalMapping
+                    .folding(options: .caseInsensitive, locale: nil)
+                if let earlier = spellings[location]?[key] {
+                    parts[index] = earlier
+                } else {
+                    spellings[location, default: [:]][key] = parts[index]
+                }
+            }
+            return parts.joined(separator: "/")
+        }
         for (path, stored) in files.sortedByKey {
             guard let (index, relative) = claim(path, locations), recorded.path(of: relative, in: index) == path else {
                 plan.skipped.append(path)
                 continue
             }
-            plan.items.append(.init(location: index, relative: relative, path: path, stored: stored))
+            // A save that exists here in another case, as a PC backup's `Save01.rvdata2` beside a local `save01.rvdata2`,
+            // is that save, so the restore replaces it rather than writing a second file beside it.
+            let local = spelled(FileCase.spelling(of: relative, in: locations[index].directory), in: index)
+            let item = RestorePlan.Item(location: index, relative: local, path: path, stored: stored)
+            // A backup from a disk that keeps case can hold `Save01.rvdata2` and `save01.rvdata2`, which are one save
+            // here. The one spelled as on disk wins, otherwise the first.
+            if let earlier = planned[item.key] {
+                if relative == local {
+                    plan.skipped.append(plan.items[earlier].path)
+                    plan.items[earlier] = item
+                } else {
+                    plan.skipped.append(path)
+                }
+                continue
+            }
+            planned[item.key] = plan.items.count
+            plan.items.append(item)
         }
         guard !plan.items.isEmpty else { throw SaveSyncError.nothingToRestore(plan.skipped.count) }
         return plan

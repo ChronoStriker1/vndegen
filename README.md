@@ -231,6 +231,16 @@ Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector
 
 An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [docs/fonts.md](docs/fonts.md).
 
+Windows ignores case in file and folder names, so Windows games often ask for `Img/Title.PNG` when the disk has `img/title.png`. iPhone and iPad disks, and case-sensitive Mac volumes, do not ignore case. Every engine plugin must find a game's files, folders, and archive members whatever case the game uses, for reads, writes, existence checks, and folder listings. A write to a name that exists in another case must replace that file rather than create a second one. Use the lookup of the engine's family rather than a new one:
+
+- Swift code, including the web engines' `GameFolder`, uses `FileCase` in `VNCore/FileCase.swift`.
+- C and C++ engines call `casepath_resolve` in `Engines/Shared/casepath.c` from their file layer, as `Engines/RGSS/host/vfs.c` and KiriKiri's `unix_file.cpp` do.
+- Ren'Py's Python side uses `EngineRenPy/Support/filecase.py`, which `launcher.py` installs. `scripts/renpy-case-test.sh` tests it.
+
+Each looks a name up as written first and reads a folder's listing only when that misses, so games that use the right case pay nothing.
+
+Before a new engine plugin or a change to one ships, it passes the case check on its test games. `scripts/case-check.sh setup` copies each game into a library on a case-sensitive disk image with every name's case swapped. Each game must reach its title, start, save, and load there, on the Mac app and on an iPad simulator, both started with `-libraryRoot` on that library. The script's header has the commands. `scripts/build.sh test` runs the lookups' unit tests on a case-sensitive disk image too.
+
 ## License
 
 VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL. Builds with the RPG Maker XP, VX, and VX Ace engine include mkxp-z, which is GPL-2.0-or-later, so they are distributed under the GNU GPL, version 3. Version 3 rather than 2 because the iPhone and iPad app also contains Ren'Py's OpenSSL, whose Apache-2.0 license is compatible with GPL version 3 but not version 2. Their complete source is this repository, which builds the engine from the pinned sources in `Engines/RGSS/UPSTREAM.md`. Settings, Licenses lists the license of every third-party component in the app, and where to get the source. This is not legal advice.
