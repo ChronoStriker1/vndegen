@@ -93,7 +93,9 @@ impl Script {
         let mut line_idx = 0;
 
         'lines: while line_idx < lines.len() {
-            let line = lines[line_idx].trim();
+            // Only ASCII whitespace: a full-width space opening a line is
+            // text the PC engine prints and numbers (VNDegen).
+            let line = lines[line_idx].trim_ascii();
             let line_num = line_idx + 1;
 
             // 跳过空行
@@ -162,15 +164,18 @@ impl Script {
                     let inner = match &segment {
                         LineSegment::Tag(inner) => inner.as_str(),
                         LineSegment::Text(text) => {
-                            let text = text.trim();
-                            if text.is_empty() {
-                                continue;
-                            }
                             // 标签后的行内注释：// 起到行尾，剩余段全部丢弃
                             // （保持旧解析器对尾随注释不产出文本的行为）
-                            if text.starts_with("//") {
+                            if text.trim_ascii_start().starts_with("//") {
                                 break;
                             }
+                            // The PC engine skips text of ASCII whitespace
+                            // alone, and keeps the spaces of other text, such
+                            // as those between words and [ruby] tags (VNDegen).
+                            if text.trim_ascii().is_empty() {
+                                continue;
+                            }
+                            let text = text.as_str();
                             let mut params = HashMap::new();
                             params.insert("text".to_string(), text.to_string());
                             instructions.push(Instruction {
@@ -550,6 +555,30 @@ mod tests {
         assert_eq!(script.labels.get("main"), Some(&0));
         assert_eq!(script.labels.get("next"), Some(&2));
         assert_eq!(script.instructions.len(), 3);
+    }
+
+    #[test]
+    fn text_keeps_its_spaces_and_a_leading_full_width_space() {
+        let content = "*main\n\t\u{3000}Near-[ruby text=\" \"]future [/ruby] [ruby text=\" \"]Japan[/ruby]\n[var name=\"a\" data=\"1\"]\t// note\n";
+        let script = Script::parse("test", content).unwrap();
+        let shown: Vec<_> = script
+            .instructions
+            .iter()
+            .map(|instruction| (instruction.tag.as_str(), instruction.get("text").unwrap_or_default()))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("__text", "\u{3000}Near-"),
+                ("ruby", " "),
+                ("__text", "future "),
+                ("/ruby", ""),
+                ("ruby", " "),
+                ("__text", "Japan"),
+                ("/ruby", ""),
+                ("var", ""),
+            ]
+        );
     }
 
     #[test]

@@ -207,7 +207,9 @@ impl Preprocessor {
         // 指令按行内出现顺序生效（内联生效顺序语义）；指令之外的残余内容
         // 继续走后续管线（典型脚本中指令独占一行，残余为空）。
         let (remainder, had_directive) = self.strip_and_apply_directives(raw);
-        let trimmed = remainder.trim();
+        // Only ASCII whitespace: a full-width space opening a line is text
+        // the PC engine prints (VNDegen).
+        let trimmed = remainder.trim_ascii();
 
         // 空行：&autoinsert blankline 展开。指令行剥离后的空行**不算**脚本
         // 空行（它不是作者写下的空行），不触发展开。
