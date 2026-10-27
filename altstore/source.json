@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.4.4",
+          "buildVersion": "246",
+          "date": "2026-10-27T00:53:09Z",
+          "localizedDescription": "Fixes an RPG Maker MZ error screen, \"RangeError: length cannot be negative\", that could stop No Socks RPG and other MZ games after a long play session.\n\n## Downloads\n\n- `VNDegen-0.4.4-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.4.4.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixed\n\n- RPG Maker MZ games no longer stop with \"RangeError: length cannot be negative\", which could appear on a warp or any other moment that plays a sound. RPG Maker MZ's own Ogg decoder, which VNDegen uses for Ogg audio on iPhone, iPad and Mac, reuses an ID after 1,000 sounds. If a slowly loading music track still held that ID, the new sound picked up the track's half-finished state and failed. VNDegen now keeps every decoder ID unique. The PC version never hits this, because it plays Ogg without that decoder.\n\n## Known limits\n\n- The fix was checked by reproducing the error on the iPad simulator and the Mac app with 1,100 sound effects after a slowly loading track, not yet by playing on a real iPad.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.4.4/VNDegen-0.4.4.ipa",
+          "size": 37370242,
+          "sha256": "a93af5df7a6d121897f851779f1564c4e56d6de978564127fccce8fcdb08458b",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.4.3",
           "buildVersion": "231",
           "date": "2026-10-26T23:37:55Z",
