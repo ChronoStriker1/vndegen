@@ -719,7 +719,8 @@ private extension ArchiveImporter.Step {
     try fm.createDirectory(at: staging, withIntermediateDirectories: true)
     defer { try? fm.removeItem(at: staging) }
     let source = try ArchiveSource(picked: [fixtures.appendingPathComponent("mixed-case.zip")])
-    try ArchiveExtractor.extract(source, password: nil, into: staging, total: try ArchiveExtractor.list(source)) { _ in }
+    // A sparse disk image reports little space for important use, and this test is not about space.
+    try ArchiveExtractor.extract(source, password: nil, into: staging, total: try ArchiveExtractor.list(source), reserve: 0) { _ in }
     #expect(items(staging.appendingPathComponent("Mixed")) == ["Img"])
     #expect(items(staging.appendingPathComponent("Mixed/Img")) == ["Sub", "a.png", "b.png"])
     #expect(try text(staging.appendingPathComponent("Mixed/Img/Sub/c.png")) == "c")
