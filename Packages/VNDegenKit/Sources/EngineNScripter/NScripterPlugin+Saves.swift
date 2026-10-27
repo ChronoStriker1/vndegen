@@ -59,11 +59,17 @@ extension NScripterPlugin {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
         let byLower = Dictionary(names.map { ($0.lowercased(), $0) }, uniquingKeysWith: min)
         let read = { (name: String) in FileManager.default.contents(atPath: root.appendingPathComponent(name).path) }
+        // Each file ends its last line, and carriage returns go, as the runtime joins them.
         for twoDigit in [false, true] where byLower[twoDigit ? "00.txt" : "0.txt"] != nil {
             let files = (0..<100).compactMap { byLower[twoDigit ? String(format: "%02d.txt", $0) : "\($0).txt"] }
-            return files.compactMap(read).reduce(into: []) { $0 += $1 }
+            var script: [UInt8] = []
+            for data in files.compactMap(read) {
+                script += data
+                if let last = script.last, last != 0x0A { script.append(0x0A) }
+            }
+            return script.filter { $0 != 0x0D }
         }
         guard let file = byLower["nscript.dat"], let data = read(file) else { return nil }
-        return data.map { $0 ^ 0x84 }
+        return data.map { $0 ^ 0x84 }.filter { $0 != 0x0D }
     }
 }

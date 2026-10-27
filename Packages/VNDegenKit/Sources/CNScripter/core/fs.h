@@ -30,6 +30,9 @@ public:
     // The real path of a loose file, or the path a new file of that name should get, for files the engine writes
     // (saves, logs). Existing folders are matched without regard to case.
     std::string hostPath(std::string_view name) const;
+    // Writes a file at a path hostPath gave, if it lands inside the game folder once symbolic links are followed:
+    // a script, or a link inside a copied game, can't make the engine write anywhere else.
+    bool write(const std::string &path, const void *data, size_t size) const;
     const std::string &root() const { return root_; }
     // Loose files in the game's top folder, as paths relative to the root.
     std::vector<std::string> topLevelFiles() const;

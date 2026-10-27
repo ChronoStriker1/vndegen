@@ -83,6 +83,9 @@ void Engine::drawGlyphs(Image &out, const std::string &sjis, int x, int y, int f
     }
 }
 
+// String sprites hold at most 16M pixels, 64 MB, however many color cells a script asks for.
+static constexpr int kMaxStringPixels = 1 << 24;
+
 // ":s" string sprites: [/fw,fh,pitch[,mode]][;]#color[#color...]text. Each color is one cell.
 ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     int fw = spFont_.set ? spFont_.fw : win_.fw, fh = spFont_.set ? spFont_.fh : win_.fh;
@@ -101,12 +104,15 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
             while (p < spec.size() && spec[p] != ',' && spec[p] != ';' && spec[p] != '#') p++;
             if (p < spec.size() && spec[p] == ',') p++;
         }
-        // Sizes past any screen are a broken tag; keep them small enough to draw.
-        fw = std::clamp(vals[0], 1, 512);
-        fh = std::clamp(vals[1], 1, 512);
-        pitch = std::clamp(vals[2], -fw, 512);
+        fw = vals[0];
+        fh = vals[1];
+        pitch = vals[2];
         if (vals[3] == 2) shadow = true;  // outlined text, drawn here as shadowed
     }
+    // Sizes past any screen, from the tag, spfont or setwindow, are a broken script; keep them small enough to draw.
+    fw = std::clamp(fw, 1, 512);
+    fh = std::clamp(fh, 1, 512);
+    pitch = std::clamp(pitch, -fw, 512);
     if (p < spec.size() && spec[p] == ';') p++;
     std::vector<uint32_t> colors;
     while (p + 6 < spec.size() + 1 && spec[p] == '#' && isHex6(spec, p + 1)) {
@@ -115,16 +121,17 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     }
     if (colors.empty()) colors.push_back(rgba(255, 255, 255));
     std::string text = spec.substr(p);
-    int width = 0;
+    int64_t advance = 0;
     for (size_t i = 0; i < text.size();) {
         size_t n = sjisCharLen(text, i);
-        width += n == 1 ? (fw + pitch) / 2 : fw + pitch;
+        advance += n == 1 ? (fw + pitch) / 2 : fw + pitch;
         i += n;
     }
-    width = std::clamp(width, 1, 8192);
+    int width = int(std::clamp<int64_t>(advance, 1, 8192));
     int h = fh + (shadow ? shadeY_ : 0);
-    cells = std::min(int(colors.size()), 64);
-    Image img(width * cells, std::max(1, h), 0);
+    h = std::max(1, h);
+    cells = std::clamp(int(colors.size()), 1, std::max(1, kMaxStringPixels / (width * h)));
+    Image img(width * cells, h, 0);
     for (int c = 0; c < cells; c++)
         drawGlyphs(img, text, c * width, 0, fw, fh, pitch, colors[size_t(c)], bold, shadow, 0, 0);
     return std::make_shared<const Image>(std::move(img));
@@ -210,10 +217,9 @@ void Engine::pushLog() {
     while (!text.empty() && text.back() == '\n') text.pop_back();
     log_.push_back(text);
     logTags_.push_back(pageTag_);
-    while (!log_.empty() && int(log_.size()) > maxLogPages_) {
-        log_.erase(log_.begin());
-        logTags_.erase(logTags_.begin());
-    }
+    // A loaded save may hold more or fewer tags than pages, so each list is trimmed on its own.
+    while (!log_.empty() && int(log_.size()) > maxLogPages_) log_.erase(log_.begin());
+    while (!logTags_.empty() && int(logTags_.size()) > maxLogPages_) logTags_.erase(logTags_.begin());
 }
 
 void Engine::clearPage() {
@@ -841,9 +847,13 @@ void cmdStrSp(E &e, const std::string &name) {
     std::vector<uint32_t> colors;
     while (e.readComma()) colors.push_back(parseHexColor(e.readStr()));
     if (colors.empty()) colors.push_back(rgba(255, 255, 255));
-    int x = v[0], y = v[1], cols = v[2], rows = v[3], fw = v[4], fh = v[5], px = v[6], py = v[7];
+    // Sizes past any screen are a broken script; keep them small enough to draw.
+    int x = v[0], y = v[1], cols = std::clamp(v[2], 1, 256), rows = std::clamp(v[3], 1, 256);
+    int fw = std::clamp(v[4], 1, 512), fh = std::clamp(v[5], 1, 512), px = std::clamp(v[6], -fw, 512),
+        py = std::clamp(v[7], -fh, 512);
     bool bold = v[8] != 0, shadow = v[9] != 0;
-    int cellW = cols * (fw + px), cellH = rows * (fh + py);
+    int cellW = std::clamp(cols * (fw + px), 1, 4096), cellH = std::clamp(rows * (fh + py), 1, 4096);
+    colors.resize(std::clamp(colors.size(), size_t(1), size_t(std::max(1, kMaxStringPixels / (cellW * cellH)))));
     std::vector<std::string> lines(1);
     int col = 0;
     for (size_t i = 0; i < text.size();) {

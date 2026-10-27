@@ -271,6 +271,7 @@ struct ExprParser {
     }
 
     std::string strTerm() {
+        NestingGuard guard;
         e.skipSpaces();
         char c = peek();
         if (c == '"') {

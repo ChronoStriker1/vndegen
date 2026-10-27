@@ -77,7 +77,13 @@ const char *vnns_caption(VNNSEngine *e) {
     return e->caption.c_str();
 }
 
-void vnns_audio_render(VNNSEngine *e, float *out, int frames) { e->engine->audio().render(out, frames); }
+void vnns_audio_render(VNNSEngine *e, float *out, int frames) {
+    try {
+        e->engine->audio().render(out, frames);
+    } catch (const std::exception &) {
+        std::fill(out, out + size_t(std::max(0, frames)) * 2, 0.0f);  // a sound that can't be decoded plays silence
+    }
+}
 
 static int toPixel(float v, int size) { return std::clamp(int(std::floor(v * size)), 0, size - 1); }
 
@@ -94,7 +100,12 @@ void vnns_text(VNNSEngine *e, const char *utf8) {
 
 void vnns_set_paused(VNNSEngine *e, bool paused) { e->engine->setPaused(paused); }
 void vnns_request_quit(VNNSEngine *e) { e->engine->requestQuit(); }
-void vnns_save_system_data(VNNSEngine *e) { e->engine->saveSystemData(); }
+void vnns_save_system_data(VNNSEngine *e) {
+    guarded(e, [&] {
+        e->engine->saveSystemData();
+        return true;
+    });
+}
 bool vnns_load_game(VNNSEngine *e, int slot) { return guarded(e, [&] { return e->engine->loadSlot(slot); }); }
 void vnns_stop(VNNSEngine *e) { delete e; }
 

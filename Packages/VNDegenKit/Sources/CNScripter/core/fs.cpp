@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 
 namespace vnns {
@@ -213,6 +215,21 @@ std::string FileSystem::hostPath(std::string_view name) const {
     }
     std::vector<char> out(path.size() + 1024);
     return casepath_resolve(path.c_str(), out.data(), out.size()) >= 0 ? std::string(out.data()) : path;
+}
+
+bool FileSystem::write(const std::string &path, const void *data, size_t size) const {
+    // The deepest folder of the path that exists, followed through links, must be the game folder or inside it.
+    char real[PATH_MAX], realRoot[PATH_MAX];
+    std::string dir = path.substr(0, path.rfind('/'));
+    struct stat st;
+    while (dir.size() > root_.size() && lstat(dir.c_str(), &st) != 0) dir.erase(dir.rfind('/'));
+    if (!realpath(root_.c_str(), realRoot) || !realpath(dir.c_str(), real)) return false;
+    std::string inside = real, top = realRoot;
+    if (inside != top && inside.compare(0, top.size() + 1, top + "/") != 0) {
+        logf("%s leads out of the game folder, so it isn't written", path.c_str());
+        return false;
+    }
+    return writeFile(path, data, size);
 }
 
 // SPB: big-endian width and height, then an MSB-first bit stream with the blue, green and red planes in turn. Each

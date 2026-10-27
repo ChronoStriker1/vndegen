@@ -3,6 +3,7 @@
 #include "casepath.h"
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdarg>
 #include <mutex>
@@ -194,9 +195,17 @@ static void makeParents(const std::string &path) {
 
 bool writeFile(const std::string &path, const void *data, size_t size) {
     makeParents(path);
-    std::string tmp = path + ".tmp";
-    FILE *f = fopen(tmp.c_str(), "wb");
-    if (!f) return false;
+    // A new file of a unique name, which mkstemp creates without following a link already there.
+    std::string tmp = path + ".XXXXXX";
+    int fd = mkstemp(tmp.data());
+    if (fd < 0) return false;
+    fchmod(fd, 0644);  // mkstemp makes it private; saves are ordinary files
+    FILE *f = fdopen(fd, "wb");
+    if (!f) {
+        close(fd);
+        remove(tmp.c_str());
+        return false;
+    }
     bool ok = fwrite(data, 1, size, f) == size;
     ok = fclose(f) == 0 && ok;
     if (ok) ok = rename(tmp.c_str(), path.c_str()) == 0;

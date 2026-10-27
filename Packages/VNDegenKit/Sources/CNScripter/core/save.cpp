@@ -44,6 +44,7 @@ struct Reader {
         while (e < d.size() && d[e]) e++;
         if (e >= d.size()) {
             bad = true;
+            p = d.size();  // every later read fails at once
             return {};
         }
         std::string v(reinterpret_cast<const char *>(&d[p]), e - p);
@@ -484,12 +485,12 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         bgmName_.clear();
     }
     jumpToLine(std::clamp(line, 0, script_.lineCount() - 1));
+    // A statement number past the line's last statement stops at the line's end.
     for (int k = 0; k < stmt; k++) {
         skipStatement();
-        if (peek() == ':') {
-            cur_.pos++;
-            cur_.stmt++;
-        }
+        if (peek() != ':') break;
+        cur_.pos++;
+        cur_.stmt++;
     }
     // The loaded save is the savepoint until the game moves on.
     savepoint_.assign(data.begin(), data.begin() + long(historyAt));
@@ -522,7 +523,7 @@ bool Engine::saveGame(int slot, const std::string &note) {
         data.push_back('*');
     }
     std::string path = savePath(slot);
-    if (!writeFile(path, data.data(), data.size())) {
+    if (!fs_.write(path, data.data(), data.size())) {
         logf("could not write %s", path.c_str());
         return false;
     }
@@ -534,25 +535,34 @@ bool Engine::loadGame(int slot) {
     Bytes data;
     if (!readFile(savePath(slot), data)) return false;
     // A note from savegame2 isn't part of the state.
-    // restoreState finds a broken save only after it has read part of it into the engine. The PC engine goes on as if
-    // nothing happened, so the state as it is now, written as a save, is put back if the load fails.
-    Bytes now;
-    serializeState(now);
-    serializeTail(now, stmtStart_.line, stmtStart_.stmt);
-    Cursor resume = cur_;
-    Bytes keptSavepoint = savepoint_;
-    int keptLine = savepointLine_, keptStmt = savepointStmt_;
-    bool keptLive = savepointLive_;
+    // restoreState finds a broken save only after reading part of it into these; the rest waits until the save has
+    // read through. The PC engine goes on as if nothing happened, so they're put back if the load fails.
+    auto win = win_;
+    auto windowEffect = windowEffect_;
+    auto num = num_;
+    auto str = str_;
+    auto arrays = arrays_;
+    auto rubyFont = rubyFont_;
+    uint32_t textColor = textColor_;
+    int textSpeed = textSpeed_, rubyW = rubyW_, rubyH = rubyH_, underline = underline_;
+    bool rmode = rmode_, eraseOnEffect = eraseOnEffect_, rubyOn = rubyOn_;
     std::string error;
     if (!restoreState(data, &error)) {
         logf("save %d: %s", slot, error.c_str());
-        std::string ignored;
-        restoreState(now, &ignored);
-        cur_ = resume;
-        savepoint_ = std::move(keptSavepoint);
-        savepointLine_ = keptLine;
-        savepointStmt_ = keptStmt;
-        savepointLive_ = keptLive;
+        win_ = std::move(win);
+        windowEffect_ = std::move(windowEffect);
+        num_ = std::move(num);
+        str_ = std::move(str);
+        arrays_ = std::move(arrays);
+        rubyFont_ = std::move(rubyFont);
+        textColor_ = textColor;
+        textSpeed_ = textSpeed;
+        rubyW_ = rubyW;
+        rubyH_ = rubyH;
+        underline_ = underline;
+        rmode_ = rmode;
+        eraseOnEffect_ = eraseOnEffect;
+        rubyOn_ = rubyOn;
         return false;
     }
     if (!loadGosub_.empty()) gosub(cur_.pos, cur_.line, cur_.stmt, loadGosub_);
@@ -678,7 +688,7 @@ void Engine::saveSystemData() {
             w.s(str_[i]);
         }
         std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
-        if (!writeFile(path, out.data(), out.size())) logf("could not write %s", path.c_str());
+        if (!fs_.write(path, out.data(), out.size())) logf("could not write %s", path.c_str());
     }
     auto writeLog = [&](const char *file, const std::vector<std::string> &names) {
         std::string out = std::to_string(names.size()) + "\n";
@@ -687,7 +697,7 @@ void Engine::saveSystemData() {
             for (char c : upperAscii(n)) out += char(uint8_t(c) ^ 0x84);
             out += '"';
         }
-        writeFile(fs_.hostPath(joinPath(saveDir_, file)), out.data(), out.size());
+        fs_.write(fs_.hostPath(joinPath(saveDir_, file)), out.data(), out.size());
     };
     if (fileLogOn_) {
         std::vector<std::string> names;
@@ -704,7 +714,7 @@ void Engine::saveSystemData() {
         writeLog("NScrllog.dat", names);
     }
     if (kidokuOn_ && !kidoku_.empty())
-        writeFile(fs_.hostPath(joinPath(saveDir_, "kidoku.dat")), kidoku_.data(), kidoku_.size());
+        fs_.write(fs_.hostPath(joinPath(saveDir_, "kidoku.dat")), kidoku_.data(), kidoku_.size());
 }
 
 void Engine::noteTextLineStart() { noteStatementStart(true); }
@@ -825,7 +835,7 @@ void cmdSaveScreenshot(E &e, const std::string &name) {
         }
     }
     std::string path = e.fs_.hostPath(file);
-    if (!writeFile(path, out.data(), out.size())) logf("could not write %s", path.c_str());
+    if (!e.fs_.write(path, out.data(), out.size())) logf("could not write %s", path.c_str());
     // The image cache may hold an older picture of this name, such as a save thumbnail.
     e.forgetImage(file);
     if (name == "savescreenshot") e.screenshot_.reset();
