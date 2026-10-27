@@ -302,6 +302,11 @@ impl CoreRuntime {
         self.inline_stop_at = None;
         data.restore(&mut self.interpreter)
             .map_err(|e| format!("恢复存档状态失败: {e:?}"))?;
+        // The PC engine restores a save's scene before onLoad runs, and games
+        // build on it there: one re-prints the page after clearing it.
+        if let Some(slot) = &replay {
+            self.replay_pc_tags(slot)?;
+        }
 
         // Bind the saved wait before onLoad can enter a helper script.
         // Otherwise the checkpoint captures the helper's PC and suspends it.
@@ -337,9 +342,6 @@ impl CoreRuntime {
         self.flush_host_events(&mut profile);
         if let Some(scene) = data.scene.clone() {
             self.compositor.restore_scene(scene);
-        }
-        if let Some(slot) = &replay {
-            self.replay_pc_tags(slot)?;
         }
         self.sync_layer_info_all();
         self.interpreter.append_queued_tags(deferred);
