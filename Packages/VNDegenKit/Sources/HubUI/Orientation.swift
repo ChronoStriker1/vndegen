@@ -83,8 +83,9 @@ enum OrientationLock {
         }
         for scene in scenes {
             for window in scene.windows { window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations() }
-            // iPadOS ignores this for scenes that support multitasking, and reports it here.
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: request)) { error in
+            // iPadOS ignores this for scenes that support multitasking, and reports it here. UIKit also reports a
+            // request that timed out, on a background queue, so the handler must not be isolated to the main actor.
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: request)) { @Sendable error in
                 Logger(subsystem: "com.chronostriker1.vndegen", category: "hub")
                     .error("orientation request refused: \(error.localizedDescription, privacy: .public)")
             }
