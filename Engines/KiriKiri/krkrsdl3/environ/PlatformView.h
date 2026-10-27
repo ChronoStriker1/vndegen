@@ -21,6 +21,10 @@ int TVPDrawSceneOnce(int interval);
 // Called on every pass of a modal window's loop, which holds the main thread until the window closes, so that a host
 // app embedding the engine can run its own events there. A true result closes the window as its close button would.
 void TVPSetModalLoopHook(bool (*hook)());
+// Sees every SDL event before the engine does, in the frame loop and in a modal window's loop alike, so a host app can
+// deliver events of its own in queue order. A true result means the hook handled the event.
+union SDL_Event;
+void TVPSetHostEventHook(bool (*hook)(SDL_Event* event));
 int TVPConvertKeyCodeToVKCode(int keyCode);
 
 /*

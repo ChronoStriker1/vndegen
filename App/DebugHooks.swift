@@ -20,6 +20,10 @@ import AppKit
 ///   notifyutil -s vndegen.pointer.tap 512384 -p vndegen.pointer.tap   taps the running game's view, as a click or touch
 ///                            on it would. The state's last six digits are x then y in thousandths of the view's width
 ///                            and height from its top left, here x 0.512 and y 0.384
+///   notifyutil -p vndegen.pad.a.down   presses a real controller's button (a GamepadElement), and .up releases it
+///   notifyutil -s vndegen.stick.left 20001000 -p vndegen.stick.left   holds a controller's left stick, or .right, at x
+///                            then y, each four digits of 1000 plus a thousandth of a full push, here x 1 and y 0. The
+///                            stick stays there until the next one, such as 10001000 to let go
 ///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
@@ -51,6 +55,23 @@ enum DebugHooks {
                 notify_register_dispatch("vndegen.touch.\(input.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
                     MainActor.assumeIsolated { hub.input.touch(input, pressed: pressed) }
                 }
+            }
+        }
+        for element in GamepadElement.allCases {
+            for pressed in [true, false] {
+                var token: Int32 = 0
+                notify_register_dispatch("vndegen.pad.\(element.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
+                    MainActor.assumeIsolated { hub.input.debugPress(element, pressed: pressed) }
+                }
+            }
+        }
+        for stick in Stick.allCases {
+            var token: Int32 = 0
+            notify_register_dispatch("vndegen.stick.\(stick == .left ? "left" : "right")", &token, .main) { token in
+                var state: UInt64 = 0
+                notify_get_state(token, &state)
+                let x = Float(Int(state / 10000 % 10000) - 1000) / 1000, y = Float(Int(state % 10000) - 1000) / 1000
+                MainActor.assumeIsolated { hub.input.debugStick(stick, x: x, y: y) }
             }
         }
         var tapToken: Int32 = 0

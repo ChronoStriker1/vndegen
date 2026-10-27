@@ -73,11 +73,12 @@ import VNCore
     #expect(!mapping.isRemapped(.a))
 }
 
-@Test func editorChoicesAreXboxButtonsKeysClicksAndNothing() {
+@Test func editorChoicesAreXboxButtonsKeysMouseAndNothing() {
     #expect(ControlAction.gamepadChoices == ControlInput.allCases.map(ControlAction.gamepad))
     #expect(ControlInput.allCases.count == 24)
     #expect(ControlAction.keyChoices.allSatisfy { if case .key = $0 { true } else { false } })
-    #expect(ControlAction.mouseChoices == [.click(.primary), .click(.secondary)])
+    #expect(ControlAction.mouseChoices == [.click(.primary), .click(.secondary), .wheel(.up), .wheel(.down),
+                                           .mouseMove(.up), .mouseMove(.down), .mouseMove(.left), .mouseMove(.right)])
     #expect(ControlInput.allCases.filter { !$0.isOnTouchGamepad }
         == [.l3, .r3, .leftStickUp, .leftStickDown, .leftStickLeft, .leftStickRight,
             .rightStickUp, .rightStickDown, .rightStickLeft, .rightStickRight])

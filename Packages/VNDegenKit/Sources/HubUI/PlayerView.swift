@@ -20,6 +20,10 @@ struct PlayerView: View {
         ZStack {
             SessionViewHost(session: session)
                 .ignoresSafeArea()
+            if !menu.isOpen, !isCovered, !session.drawsOwnMenu {
+                PointerView(mouse: hub.input.mouse, drawsArrow: overlayMode != .cursor)
+                    .ignoresSafeArea()
+            }
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
                 // Full size so every window resize lays it out again.
@@ -40,6 +44,12 @@ struct PlayerView: View {
             }
             if let overlayMode, overlayMode.hasOverlay {
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
+            }
+            if hub.input.mouse.showsKeyboard, !menu.isOpen, !isCovered {
+                KeyboardBridge(session: session) { hub.input.mouse.hideKeyboard() }
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
             #endif
             if menu.isOpen {
@@ -86,6 +96,7 @@ struct PlayerView: View {
                 .environment(nav)
         }
         .onAppear {
+            hub.input.mouse.start()
             applyInputMode()
             #if os(iOS)
             OrientationLock.apply(orientation)
@@ -101,6 +112,10 @@ struct PlayerView: View {
         }
         #if os(iOS)
         .onDisappear { OrientationLock.apply(nil) }
+        // The game's view takes the keyboard back from the on-screen keyboard, so a hardware keyboard reaches it again.
+        .onChange(of: hub.input.mouse.showsKeyboard) { _, shows in
+            if !shows, !menu.isOpen { session.view.becomeFirstResponder() }
+        }
         #endif
     }
 
@@ -113,7 +128,7 @@ struct PlayerView: View {
 
     private var method: ControlMethod { game?.controlMethod ?? defaultMethod }
 
-    private var mapping: ButtonMapping { ButtonMapping(game?.buttonMapping) }
+    private var mapping: ButtonMapping { game.map { ButtonMapping(for: $0, in: hub.library) } ?? ButtonMapping() }
 
     /// What touches do in the game. Nil while the menu or the unlock screen covers it, and on a Mac, which has no touch screen.
     private var overlayMode: TouchControlsMode? {

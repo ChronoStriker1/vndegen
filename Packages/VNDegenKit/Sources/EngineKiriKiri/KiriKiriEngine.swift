@@ -11,6 +11,7 @@ struct KiriKiriEngine {
     let mouseMove: @convention(c) (Float, Float) -> Void
     let click: @convention(c) (Int32, Bool) -> Void
     let wheel: @convention(c) (Float) -> Void
+    let text: @convention(c) (UnsafePointer<CChar>?) -> Void
     let setPaused: @convention(c) (Bool) -> Void
     let requestQuit: @convention(c) () -> Void
     let saveSystemData: @convention(c) () -> Void
@@ -31,6 +32,7 @@ struct KiriKiriEngine {
               let mouseMove: @convention(c) (Float, Float) -> Void = function("vnkk_mouse_move"),
               let click: @convention(c) (Int32, Bool) -> Void = function("vnkk_click"),
               let wheel: @convention(c) (Float) -> Void = function("vnkk_wheel"),
+              let text: @convention(c) (UnsafePointer<CChar>?) -> Void = function("vnkk_text"),
               let setPaused: @convention(c) (Bool) -> Void = function("vnkk_set_paused"),
               let requestQuit: @convention(c) () -> Void = function("vnkk_request_quit"),
               let saveSystemData: @convention(c) () -> Void = function("vnkk_save_system_data"),
@@ -38,7 +40,7 @@ struct KiriKiriEngine {
               let view: @convention(c) () -> UnsafeMutableRawPointer? = function("vnkk_view")
         else { return nil }
         return KiriKiriEngine(start: start, iterate: iterate, key: key, mouseButton: mouseButton, mouseMove: mouseMove,
-                              click: click, wheel: wheel, setPaused: setPaused, requestQuit: requestQuit,
+                              click: click, wheel: wheel, text: text, setPaused: setPaused, requestQuit: requestQuit,
                               saveSystemData: saveSystemData, stop: stop, view: view)
     }
 
@@ -49,6 +51,7 @@ struct KiriKiriEngine {
         case let .mouseMove(to): mouseMove(Float(to.x), Float(to.y))
         case let .click(button, down): click(button, down)
         case let .wheel(notches): wheel(Float(notches))
+        case let .text(string): string.withCString(text)
         }
     }
 }

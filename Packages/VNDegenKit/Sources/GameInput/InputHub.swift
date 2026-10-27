@@ -16,6 +16,7 @@ public final class InputHub {
     @ObservationIgnored public var onEvent: ((ControllerEvent) -> Void)? {
         didSet {
             repeatTask?.cancel()
+            mouse.releaseAll()
             for event in router.detachConsumer() { oldValue?(event) }
             buttonMapping = nil
         }
@@ -30,13 +31,17 @@ public final class InputHub {
     public var repeatsDirections = true
     public private(set) var lastInputKind: InputKind = Platform.current == .macOS ? .keyboardMouse : .touch
     public private(set) var controllerNames: [String] = []
+    /// The pointer, wheel, and on-screen keyboard that buttons mapped to them drive.
+    public let mouse = VirtualMouse()
 
     @ObservationIgnored private var router = PressRouter()
     @ObservationIgnored private var sticks: [ObjectIdentifier: [StickDirections]] = [:]
     @ObservationIgnored private var repeatTask: Task<Void, Never>?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
-    public init() {}
+    public init() {
+        mouse.send = { [weak self] event in self?.onEvent?(event) }
+    }
 
     /// Starts watching controllers and the keyboard. Calling it again does nothing.
     public func start() {
@@ -126,9 +131,11 @@ public final class InputHub {
             receive(source, nil, kind: .gamepad)
         }
         sticks[id] = nil
+        mouse.forget(controller: id)
     }
 
     private func moveStick(_ id: ObjectIdentifier, _ index: Int, x: Float, y: Float) {
+        mouse.moveStick(id, Stick.allCases[index], x: x, y: y, mapping: buttonMapping, hasConsumer: onEvent != nil)
         guard let changes = sticks[id]?[index].update(x: x, y: y) else { return }
         for (direction, pressed) in changes {
             receive(.stick(id, direction), pressed ? direction.action(in: buttonMapping) : nil, kind: .gamepad)
@@ -151,6 +158,11 @@ public final class InputHub {
     /// A press of `source` doing `action`, or its release when `action` is nil.
     private func receive(_ source: InputSource, _ action: ControlAction?, kind: InputKind) {
         let event: ControllerEvent?
+        if let action, mouse.press(source, action, hasConsumer: onEvent != nil) {
+            noteInput(kind)
+            return
+        }
+        if action == nil, mouse.release(source) { return }
         if let action {
             noteInput(kind)
             event = router.press(source, action, at: .now, hasConsumer: onEvent != nil, repeats: repeatsDirections)
@@ -160,6 +172,20 @@ public final class InputHub {
         }
         if let event { onEvent?(event) }
     }
+
+    #if DEBUG
+    /// A controller that only DEBUG hooks press, through the same path as a real one's handlers.
+    private static let debugPad = ObjectIdentifier(InputHub.self)
+
+    public func debugPress(_ element: GamepadElement, pressed: Bool) {
+        receive(.gamepad(Self.debugPad, element), pressed ? element.action(in: buttonMapping) : nil, kind: .gamepad)
+    }
+
+    public func debugStick(_ stick: Stick, x: Float, y: Float) {
+        if sticks[Self.debugPad] == nil { sticks[Self.debugPad] = Stick.allCases.map(StickDirections.init) }
+        moveStick(Self.debugPad, stick == .left ? 0 : 1, x: x, y: y)
+    }
+    #endif
 
     private func scheduleRepeat() {
         repeatTask?.cancel()

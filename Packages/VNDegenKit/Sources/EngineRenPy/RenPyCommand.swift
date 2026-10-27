@@ -64,7 +64,8 @@ nonisolated public struct RenPyCommand: Sendable {
             case .click(.primary)?: "click:1"
             case .click(.secondary)?: "click:3"
             case .nothing?: "nothing"
-            case nil: nil
+            // Ren'Py reads the controller itself, so VNDegen's mouse never runs for it. Those buttons keep Ren'Py's own use.
+            case .mouseMove?, .wheel?, .showKeyboard?, nil: nil
             }
             return action.map { "\(input.rawValue)=\($0)" }
         }

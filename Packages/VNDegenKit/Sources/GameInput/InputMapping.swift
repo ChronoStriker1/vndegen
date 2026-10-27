@@ -51,7 +51,7 @@ nonisolated public enum GamepadElement: String, CaseIterable, Sendable {
 }
 
 /// A controller's analog stick, read as four directions.
-nonisolated enum Stick: CaseIterable, Sendable {
+nonisolated public enum Stick: CaseIterable, Sendable {
     case left, right
 
     func input(on pad: GCExtendedGamepad) -> GCControllerDirectionPad {
@@ -62,6 +62,10 @@ nonisolated enum Stick: CaseIterable, Sendable {
     var down: ControlInput { self == .left ? .leftStickDown : .rightStickDown }
     var left: ControlInput { self == .left ? .leftStickLeft : .rightStickLeft }
     var right: ControlInput { self == .left ? .leftStickRight : .rightStickRight }
+
+    public var directions: [ControlInput] { [up, down, left, right] }
+
+    public var title: String { self == .left ? "Left stick" : "Right stick" }
 }
 
 nonisolated public enum InputMapping {

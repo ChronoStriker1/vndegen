@@ -9,6 +9,8 @@ final class KiriKiriHostView: UIView {
     var onReady: (@MainActor () -> Void)?
     /// An SDL scancode going down or up, and whether it is a key repeat.
     var onKey: ((Int32, Bool, Bool) -> Void)?
+    /// The characters a key going down typed, which reach the game after the key.
+    var onText: ((String) -> Void)?
     /// Unused on iOS, where touches reach SDL's view directly.
     var onEvent: ((ControllerEvent) -> Void)?
 
@@ -71,6 +73,7 @@ final class KiriKiriHostView: UIView {
         presses.filter { press in
             guard let key = press.key else { return true }
             onKey?(Int32(key.keyCode.rawValue), pressed, false)
+            if pressed, !key.modifierFlags.contains(.command) { onText?(key.characters) }
             return false
         }
     }
@@ -85,6 +88,8 @@ final class KiriKiriHostView: NSView {
     var onReady: (@MainActor () -> Void)?
     /// An SDL scancode going down or up, and whether it is a key repeat.
     var onKey: ((Int32, Bool, Bool) -> Void)?
+    /// The characters a key going down typed, which reach the game after the key.
+    var onText: ((String) -> Void)?
     /// The mouse, as pointer and scroll events.
     var onEvent: ((ControllerEvent) -> Void)?
     /// Modifier keys down, by virtual key code. AppKit reports them only as changed flags.
@@ -147,6 +152,7 @@ final class KiriKiriHostView: NSView {
     override func keyDown(with event: NSEvent) {
         guard let scancode = Self.scancodes[event.keyCode] else { return }
         onKey?(scancode, true, event.isARepeat)
+        if !event.modifierFlags.contains(.command), let characters = event.characters { onText?(characters) }
     }
 
     override func keyUp(with event: NSEvent) {

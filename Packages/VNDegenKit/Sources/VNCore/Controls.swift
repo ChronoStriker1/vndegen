@@ -57,6 +57,38 @@ public enum ControlAction: Hashable, Codable, Sendable {
     case click(PointerEvent.Button)
     case nothing
     case gamepad(ControlInput)
+    /// Moves the game's pointer while held: steadily for a button or the D-pad, and for a stick direction as fast as the
+    /// stick is pushed.
+    case mouseMove(PointerDirection)
+    /// Turns the mouse wheel a notch, and keeps turning it while held.
+    case wheel(WheelDirection)
+    /// Shows the on-screen keyboard, whose typing reaches the game, or hides it again.
+    case showKeyboard
+}
+
+/// A direction the game's pointer moves in, as the player sees the screen.
+public enum PointerDirection: String, CaseIterable, Codable, Sendable {
+    case up, down, left, right
+}
+
+/// Which way a mouse wheel turns. Up is away from the player.
+public enum WheelDirection: String, CaseIterable, Codable, Sendable {
+    case up, down
+}
+
+/// The layout a game's buttons follow until the player remaps them.
+public enum ControlLayout: Sendable {
+    /// Every button sends its own Xbox controller button.
+    case gamepad
+    /// Steam's Keyboard and Mouse controller template, for engines with no gamepad support.
+    case keyboardAndMouse
+}
+
+/// Typing on VNDegen's on-screen keyboard.
+public enum TypedText: Sendable, Equatable {
+    case text(String)
+    case newline
+    case deleteBackward
 }
 
 /// How touches work as a mouse.

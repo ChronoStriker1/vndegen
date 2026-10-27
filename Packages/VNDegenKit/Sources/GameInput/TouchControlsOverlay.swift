@@ -21,7 +21,7 @@ typealias TouchPress = (ControlInput?, _ pressed: Bool) -> Void
 
 /// On-screen controls drawn over a running game. Gamepad mode presses buttons through `input`, which does what its
 /// button mapping says, the same as for a controller. `mapping` is that same mapping, for the buttons' badges. Cursor
-/// mode moves a virtual cursor and sends pointer events. Both have a Home button that opens the VNDegen menu. The modes
+/// mode moves the virtual mouse's pointer, which a controller's sticks can move too, and sends pointer events. Both have a Home button that opens the VNDegen menu. The modes
 /// without an overlay draw nothing.
 /// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the cursor surface covers
 /// the full screen like the session view, so its normalized pointer locations match the game's.
@@ -29,7 +29,6 @@ public struct TouchControlsOverlay: View {
     let mode: TouchControlsMode
     let mapping: ButtonMapping
     let input: InputHub
-    @State private var cursor = CGPoint(x: 0.5, y: 0.5)
     @State private var taps = 0
 
     public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub) {
@@ -45,7 +44,7 @@ public struct TouchControlsOverlay: View {
             case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press)
             case .cursor:
                 ZStack(alignment: .topTrailing) {
-                    MouseControls(cursor: $cursor, send: sendPointer)
+                    MouseControls(mouse: input.mouse, send: sendPointer)
                     HomeButton(size: unit * 0.62, press: press)
                         .padding(.top, 8)
                         .padding(.trailing, 16)
@@ -464,8 +463,10 @@ private struct RoundKey: View {
 // MARK: - Cursor mode
 
 private struct MouseControls: View {
-    @Binding var cursor: CGPoint
+    let mouse: VirtualMouse
     let send: (ControllerEvent) -> Void
+
+    private var cursor: CGPoint { mouse.location }
 
     var body: some View {
         GeometryReader { geometry in
@@ -473,13 +474,7 @@ private struct MouseControls: View {
                 #if canImport(UIKit)
                 TrackpadSurface(handle: handle)
                 #endif
-                Image(systemName: "cursorarrow")
-                    .font(.system(size: 26, weight: .regular))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.7), radius: 2)
-                    // The arrow's tip sits about 7 by 3 points into the symbol's frame.
-                    .offset(x: cursor.x * geometry.size.width - 7, y: cursor.y * geometry.size.height - 3)
-                    .allowsHitTesting(false)
+                PointerArrow(location: cursor, size: geometry.size)
             }
         }
         .ignoresSafeArea()
@@ -504,7 +499,7 @@ private struct MouseControls: View {
     }
 
     private func moveCursor(by delta: CGVector) {
-        cursor = CGPoint(x: min(max(cursor.x + delta.dx, 0), 1), y: min(max(cursor.y + delta.dy, 0), 1))
+        mouse.place(at: CGPoint(x: cursor.x + delta.dx, y: cursor.y + delta.dy))
     }
 }
 
