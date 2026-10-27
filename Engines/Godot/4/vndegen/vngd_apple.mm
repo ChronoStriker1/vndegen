@@ -49,7 +49,12 @@ void vngd_platform_destroy_os(OS *p_os) {
 }
 
 void vngd_platform_add_args(std::vector<std::string> &r_args) {
-	r_args.insert(r_args.end(), { "--display-driver", "vndegen", "--rendering-driver", "metal", "--audio-driver", "CoreAudio" });
+#if defined(VNDEGEN_ANGLE)
+	const char *driver = "opengl3";
+#else
+	const char *driver = "metal";
+#endif
+	r_args.insert(r_args.end(), { "--display-driver", "vndegen", "--rendering-driver", driver, "--audio-driver", "CoreAudio" });
 }
 
 void vngd_platform_resize(float p_width, float p_height, float p_scale) {

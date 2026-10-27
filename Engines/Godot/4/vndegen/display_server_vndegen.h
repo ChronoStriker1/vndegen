@@ -12,6 +12,8 @@ class RenderingContextDriver;
 #endif
 
 @class CAMetalLayer;
+@class MGLContext;
+@class MGLLayer;
 
 class DisplayServerVNDegen : public DisplayServer {
 	GDSOFTCLASS(DisplayServerVNDegen, DisplayServer);
@@ -20,9 +22,18 @@ class DisplayServerVNDegen : public DisplayServer {
 	Size2 size_points;
 	float scale = 1;
 	bool focused = true;
+	bool sent_focus = false;
 	DisplayServerEnums::WindowMode mode = DisplayServerEnums::WINDOW_MODE_FULLSCREEN;
 	DisplayServerEnums::VSyncMode vsync_mode = DisplayServerEnums::VSYNC_ENABLED;
+	DisplayServerEnums::MouseMode mouse_mode = DisplayServerEnums::MOUSE_MODE_VISIBLE;
+	DisplayServerEnums::MouseMode mouse_mode_override = DisplayServerEnums::MOUSE_MODE_VISIBLE;
+	bool mouse_mode_override_enabled = false;
+	DisplayServerEnums::CursorShape cursor_shape = DisplayServerEnums::CURSOR_ARROW;
 
+#if defined(VNDEGEN_ANGLE)
+	MGLContext *gl_context = nullptr;
+	MGLLayer *gl_layer = nullptr;
+#endif
 #if defined(RD_ENABLED)
 	RenderingContextDriver *rendering_context = nullptr;
 	RenderingDevice *rendering_device = nullptr;
@@ -58,6 +69,19 @@ public:
 	String get_name() const override { return "vndegen"; }
 	bool has_feature(DisplayServerEnums::Feature p_feature) const override;
 	void process_events() override;
+
+	// The mouse is VNDegen's: the game's mouse modes and cursors are kept for the game to read back, and change nothing.
+	void mouse_set_mode(DisplayServerEnums::MouseMode p_mode) override { mouse_mode = p_mode; }
+	DisplayServerEnums::MouseMode mouse_get_mode() const override { return mouse_mode; }
+	void mouse_set_mode_override(DisplayServerEnums::MouseMode p_mode) override { mouse_mode_override = p_mode; }
+	DisplayServerEnums::MouseMode mouse_get_mode_override() const override { return mouse_mode_override; }
+	void mouse_set_mode_override_enabled(bool p_enabled) override { mouse_mode_override_enabled = p_enabled; }
+	void warp_mouse(const Point2i &p_position) override {}
+	Point2i mouse_get_position() const override;
+	BitField<MouseButtonMask> mouse_get_button_state() const override;
+	void cursor_set_shape(DisplayServerEnums::CursorShape p_shape) override { cursor_shape = p_shape; }
+	DisplayServerEnums::CursorShape cursor_get_shape() const override { return cursor_shape; }
+	void cursor_set_custom_image(const Ref<Resource> &p_cursor, DisplayServerEnums::CursorShape p_shape = DisplayServerEnums::CURSOR_ARROW, const Vector2 &p_hotspot = Vector2()) override {}
 
 	void clipboard_set(const String &p_text) override;
 	String clipboard_get() const override;
@@ -114,7 +138,10 @@ public:
 	void window_set_vsync_mode(DisplayServerEnums::VSyncMode p_vsync_mode, DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) override;
 	DisplayServerEnums::VSyncMode window_get_vsync_mode(DisplayServerEnums::WindowID p_window = DisplayServerEnums::MAIN_WINDOW_ID) const override { return vsync_mode; }
 
-	void swap_buffers() override {}
+#if defined(VNDEGEN_ANGLE)
+	void gl_window_make_current(DisplayServerEnums::WindowID p_window_id) override;
+	void swap_buffers() override;
+#endif
 
 	~DisplayServerVNDegen();
 };

@@ -13,7 +13,12 @@
 #import "drivers/metal/rendering_context_driver_metal.h"
 #endif
 
-#import <Metal/Metal.h>
+#if defined(VNDEGEN_ANGLE)
+#include "drivers/gles3/rasterizer_gles3.h"
+#include "drivers/gles3/storage/texture_storage.h"
+#import <MetalANGLE/MGLContext.h>
+#endif
+
 #import <QuartzCore/CAMetalLayer.h>
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -34,7 +39,11 @@ void DisplayServerVNDegen::register_vndegen_driver() {
 }
 
 Vector<String> DisplayServerVNDegen::get_rendering_drivers_func() {
+#if defined(VNDEGEN_ANGLE)
+	return { "opengl3" };
+#else
 	return { "metal" };
+#endif
 }
 
 DisplayServer *DisplayServerVNDegen::create_func(const String &p_rendering_driver, DisplayServerEnums::WindowMode p_mode, DisplayServerEnums::VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, int p_screen, DisplayServerEnums::Context p_context, int64_t p_parent_window, Error &r_error) {
@@ -48,21 +57,20 @@ DisplayServerVNDegen::DisplayServerVNDegen(const String &p_rendering_driver, Dis
 	scale = host_scale;
 	vsync_mode = p_vsync_mode;
 	ERR_FAIL_NULL_MSG(layer, "VNDegen gave the engine no layer to draw in.");
+#if defined(VNDEGEN_ANGLE)
+	// The iOS Simulator: OpenGL ES through MetalANGLE, in a layer of its own over VNDegen's.
+	ERR_FAIL_COND_MSG(p_rendering_driver != "opengl3", vformat("The %s rendering driver is not available in the iOS Simulator.", p_rendering_driver));
+	gl_layer = [MGLLayer new];
+	gl_layer.drawableColorFormat = MGLDrawableColorFormatRGBA8888;
+	gl_layer.frame = CGRectMake(0, 0, size_points.width, size_points.height);
+	gl_layer.contentsScale = scale;
+	[layer addSublayer:gl_layer];
+	gl_context = [[MGLContext alloc] initWithAPI:kMGLRenderingAPIOpenGLES3];
+	ERR_FAIL_NULL_MSG(gl_context, "OpenGL ES 3 is not available through MetalANGLE.");
+	gl_window_make_current(DisplayServerEnums::MAIN_WINDOW_ID);
+	RasterizerGLES3::make_current(false);
+#elif defined(RD_ENABLED) && defined(METAL_ENABLED)
 	ERR_FAIL_COND_MSG(p_rendering_driver != "metal", vformat("The %s rendering driver is not available in VNDegen.", p_rendering_driver));
-
-#if TARGET_OS_SIMULATOR
-	{
-		id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-		String families;
-		for (int family = MTLGPUFamilyApple1; family <= MTLGPUFamilyApple9; family++) {
-			families += [device supportsFamily:(MTLGPUFamily)family] ? vformat(" Apple%d", family - MTLGPUFamilyApple1 + 1) : "";
-		}
-		families += [device supportsFamily:MTLGPUFamilyMac2] ? " Mac2" : "";
-		families += [device supportsFamily:MTLGPUFamilyMetal3] ? " Metal3" : "";
-		print_line(vformat("VNDegen: simulator Metal device %s, families%s, argument buffers tier %d", String::utf8(device.name.UTF8String), families, (int)device.argumentBuffersSupport + 1));
-	}
-#endif
-#if defined(RD_ENABLED) && defined(METAL_ENABLED)
 	layer.contentsScale = scale;
 	layer.drawableSize = CGSizeMake(size_points.width * scale, size_points.height * scale);
 
@@ -113,8 +121,27 @@ DisplayServerVNDegen::~DisplayServerVNDegen() {
 		rendering_context = nullptr;
 	}
 #endif
+#if defined(VNDEGEN_ANGLE)
+	if ([MGLContext currentContext] == gl_context) {
+		[MGLContext setCurrentContext:nil];
+	}
+	gl_context = nil;
+	[gl_layer removeFromSuperlayer];
+	gl_layer = nil;
+#endif
 	layer = nil;
 }
+
+#if defined(VNDEGEN_ANGLE)
+void DisplayServerVNDegen::gl_window_make_current(DisplayServerEnums::WindowID p_window_id) {
+	[MGLContext setCurrentContext:gl_context forLayer:gl_layer];
+	GLES3::TextureStorage::system_fbo = gl_layer.defaultOpenGLFrameBufferID;
+}
+
+void DisplayServerVNDegen::swap_buffers() {
+	[gl_context present:gl_layer];
+}
+#endif
 
 void DisplayServerVNDegen::resize(Size2 p_points, float p_scale) {
 	if (p_points == size_points && p_scale == scale) {
@@ -122,9 +149,17 @@ void DisplayServerVNDegen::resize(Size2 p_points, float p_scale) {
 	}
 	size_points = p_points;
 	scale = p_scale;
-	layer.contentsScale = scale;
 	Size2i pixels = window_get_size();
+#if defined(VNDEGEN_ANGLE)
+	[CATransaction begin];
+	[CATransaction setDisableActions:YES];
+	gl_layer.frame = CGRectMake(0, 0, size_points.width, size_points.height);
+	gl_layer.contentsScale = scale;
+	[CATransaction commit];
+#else
+	layer.contentsScale = scale;
 	layer.drawableSize = CGSizeMake(pixels.width, pixels.height);
+#endif
 #if defined(RD_ENABLED)
 	if (rendering_context) {
 		rendering_context->window_set_size(DisplayServerEnums::MAIN_WINDOW_ID, pixels.width, pixels.height);
@@ -157,11 +192,20 @@ bool DisplayServerVNDegen::has_feature(DisplayServerEnums::Feature p_feature) co
 }
 
 void DisplayServerVNDegen::process_events() {
+	// The window has focus from the start, as a desktop game's window does once it opens.
+	if (!sent_focus) {
+		sent_focus = true;
+		_window_callback(window_event_callback, int(focused ? DisplayServerEnums::WINDOW_EVENT_FOCUS_IN : DisplayServerEnums::WINDOW_EVENT_FOCUS_OUT));
+	}
 	Input::get_singleton()->flush_buffered_events();
 }
 
 void DisplayServerVNDegen::_dispatch_input_events(const Ref<InputEvent> &p_event) {
 	DisplayServerVNDegen *server = get_singleton();
+	static const bool trace = OS::get_singleton()->get_environment("VNGD_TRACE_INPUT") == "1";
+	if (trace) {
+		print_line(vformat("VNDegen dispatch: %s, callback %s", p_event->as_text(), server->input_event_callback.is_valid() ? "set" : "missing"));
+	}
 	server->_window_callback(server->input_event_callback, p_event);
 }
 
@@ -169,6 +213,14 @@ void DisplayServerVNDegen::_window_callback(const Callable &p_callable, const Va
 	if (p_callable.is_valid()) {
 		p_callable.call(p_arg);
 	}
+}
+
+Point2i DisplayServerVNDegen::mouse_get_position() const {
+	return Input::get_singleton()->get_mouse_position();
+}
+
+BitField<MouseButtonMask> DisplayServerVNDegen::mouse_get_button_state() const {
+	return Input::get_singleton()->get_mouse_button_mask();
 }
 
 void DisplayServerVNDegen::clipboard_set(const String &p_text) {

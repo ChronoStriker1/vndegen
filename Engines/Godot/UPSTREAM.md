@@ -9,7 +9,7 @@ VNDegen runs Godot games on its own builds of Godot, made by `scripts/godot-engi
 | Godot 4.7.2-stable | `https://github.com/godotengine/godot` | `ed1daf0bf001b61586d9930840f2f1394092c079` |
 | SCons 4.10.1, to build Godot | PyPI, into a venv in the build cache | |
 
-Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the build copies to `build/godot/licenses/`. Where a component offers a choice of licenses, VNDegen uses the permissive one: BSD for the ODE-derived collision code and SDL's HIDAPI, and MPL-2.0 for graphite2. The build leaves out graphite2, SDL's input, OpenGL, Vulkan, AccessKit, OpenXR, and the camera, WebXR, and mobile VR modules. glslang's Bison-generated parser is under GPL-3.0 with the Bison exception, which lets the generated file be used under any license.
+Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the build copies to `build/godot/licenses/`. Where a component offers a choice of licenses, VNDegen uses the permissive one: BSD for the ODE-derived collision code and SDL's HIDAPI, and MPL-2.0 for graphite2. The build leaves out graphite2, SDL's input, OpenGL (except in the iOS Simulator), Vulkan, AccessKit, OpenXR, and the camera, WebXR, and mobile VR modules. glslang's Bison-generated parser is under GPL-3.0 with the Bison exception, which lets the generated file be used under any license.
 
 ## Patches to Godot 4 (`4/patches/`)
 
@@ -22,9 +22,9 @@ Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the b
   - The navigation server managers and the scene and servers debuggers clear their singletons.
   - `ClassDB::cleanup` calls each class's deinitializer, where 4.7.2's code differs from the pull request's base.
   - `StringName`'s table keeps `StringName::configured`, which 4.7.2 has in place of the table's own flag.
-- `03-simulator-metal.patch`: builds the Metal renderer for the iOS Simulator, which Godot's build turns off. VNDegen is tested on the simulator.
+- `03-simulator-metal.patch`: keeps the Metal driver in the iOS Simulator build, which Godot's build turns off, so the simulator build compiles the same code as the device's. The simulator runs Godot on OpenGL ES (patch 05).
 - `04-no-swift-app.patch`: leaves out `drivers/apple_embedded/app.swift`, the SwiftUI app of Godot's own iOS template. VNDegen is the app.
-- `05-simulator-gpu-family.patch`: in the iOS Simulator only, the Metal driver goes on when the device reports a GPU family older than Apple4, which the simulator's Metal device does, using the features the device reports.
+- `05-simulator-angle.patch`: lets the iOS Simulator build take its OpenGL ES headers from MetalANGLE. The simulator's Metal device reports only GPU families Apple1 and Apple2, and Godot's Metal renderer needs Apple4: with the family check skipped, Metal's validation aborts on the first texture Godot creates. So in the simulator only, Godot 4 runs its compatibility renderer on OpenGL ES 3 through MetalANGLE, the OpenGL ES on Metal the app embeds for Ren'Py. Devices and the Mac use Metal.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|

@@ -195,8 +195,9 @@ nonisolated struct GodotPaths {
     var executable: URL
     var appData: URL
     var log: URL
-    /// The renderer to use instead of the game's. Godot's compatibility renderer is OpenGL, which VNDegen's Godot 4
-    /// leaves out, so those games use the mobile renderer on Metal.
+    /// The renderer to use instead of the game's. Godot 4 runs every game on its mobile renderer on Metal, since
+    /// VNDegen's Godot 4 has no OpenGL. The iOS Simulator is the exception: its Metal is too limited for that renderer,
+    /// so there every game runs on the compatibility renderer, through MetalANGLE.
     var renderingMethod: String?
 
     init(folder: URL, dataDirectory: URL, layout: GodotLayout) {
@@ -204,7 +205,11 @@ nonisolated struct GodotPaths {
         executable = folder.appendingPathComponent(layout.executable)
         appData = GodotPlugin.appDataDirectory(dataDirectory)
         log = dataDirectory.appendingPathComponent("logs/godot.txt")
+        #if targetEnvironment(simulator)
+        renderingMethod = layout.major >= 4 ? "gl_compatibility" : nil
+        #else
         renderingMethod = layout.major >= 4 ? "mobile" : nil
+        #endif
     }
 
     func prepare() throws {

@@ -22,7 +22,8 @@ typedef struct VNGDLaunch {
     const char *logPath;         // file the engine's log is written to; NULL logs to stderr
     const char *renderingMethod; // Godot 4: "forward_plus", "mobile", or "gl_compatibility"; NULL keeps the game's.
                                  // Godot 3 ignores it
-    void *layer;                 // the CALayer the game draws in, filling it. Godot 4 needs a CAMetalLayer
+    void *layer;                 // the CALayer the game draws in, filling it. Godot 4 needs a CAMetalLayer. In the
+                                 // iOS Simulator it draws through OpenGL ES, in a layer of its own inside this one
     float width, height;         // the layer's size in points
     float scale;                 // pixels per point
     // Called when the game wants text typed, such as when a text field takes focus, and when it no longer does.

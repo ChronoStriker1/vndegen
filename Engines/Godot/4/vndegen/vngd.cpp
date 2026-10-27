@@ -9,6 +9,7 @@
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
+#include "scene/main/viewport.h"
 #include "servers/display/display_server.h"
 
 #include <vngd.h>
@@ -42,6 +43,11 @@ Vector2 window_point(float p_x, float p_y) {
 }
 
 void parse(const Ref<InputEvent> &p_event) {
+	// For VNDegen's tests: VNGD_TRACE_INPUT=1 logs each event VNDegen sends.
+	static const bool trace = OS::get_singleton()->get_environment("VNGD_TRACE_INPUT") == "1";
+	if (trace) {
+		print_line("VNDegen input: " + p_event->as_text());
+	}
 	Input::get_singleton()->parse_input_event(p_event);
 }
 
@@ -123,6 +129,22 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	return 0;
 }
 
+// For VNDegen's tests on macOS, where a window snapshot can't see Metal: with VNGD_SNAPSHOT set to a path, the frame
+// the game drew is written there as a PNG every two seconds.
+static void write_snapshot() {
+	static const String path = OS::get_singleton()->get_environment("VNGD_SNAPSHOT");
+	static uint64_t last = 0;
+	const uint64_t now = OS::get_singleton()->get_ticks_msec();
+	if (path.is_empty() || now - last < 2000) {
+		return;
+	}
+	last = now;
+	Ref<Image> image = SceneTree::get_singleton()->get_root()->get_texture()->get_image();
+	if (image.is_valid()) {
+		image->save_png(path);
+	}
+}
+
 int vngd_iterate(void) {
 	if (!state.started) {
 		return 1;
@@ -131,7 +153,9 @@ int vngd_iterate(void) {
 		return 0;
 	}
 	DisplayServer::get_singleton()->process_events();
-	return Main::iteration() ? 1 : 0;
+	const bool quit = Main::iteration();
+	write_snapshot();
+	return quit ? 1 : 0;
 }
 
 void vngd_resize(float p_width, float p_height, float p_scale) {

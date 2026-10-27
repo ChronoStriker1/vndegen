@@ -1,0 +1,16 @@
+diff --git a/platform/ios/platform_gl.h b/platform/ios/platform_gl.h
+index a3f97cf..49dc3b2 100644
+--- a/platform/ios/platform_gl.h
++++ b/platform/ios/platform_gl.h
+@@ -35,5 +35,11 @@
+ #define GLES_API_ENABLED // Allow using GLES.
+ #endif
+ 
++// VNDegen: in the iOS Simulator, whose Metal Godot's renderer can't use, the compatibility renderer draws through
++// MetalANGLE, OpenGL ES on Metal.
++#ifdef VNDEGEN_ANGLE
++#include <GLES3/gl3.h> // IWYU pragma: export.
++#else
+ #include <ES3/gl.h> // IWYU pragma: export.
+ #endif
++#endif

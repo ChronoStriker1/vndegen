@@ -64,6 +64,14 @@ rm -rf "$work/fresh"
 # iOS builds are always a static library, which Godot builds without its library flag, so the restart support that
 # the flag turns on is turned on by hand there.
 ios_library=(ccflags=-DLIBGODOT_ENABLED)
+# The iOS Simulator's Metal device offers too little of Metal for Godot's renderer, so there Godot 4 uses its
+# compatibility renderer through MetalANGLE, OpenGL ES on Metal, which the app already embeds for Ren'Py. Devices and
+# the Mac keep Metal.
+angle="$root/build/renpy/ios/MetalANGLE.xcframework/ios-arm64_i386_x86_64-simulator"
+case " $slices " in
+  *" ios-sim "*) [ -d "$angle" ] || "$root/scripts/renpy-runtime.sh" "$root/build/renpy" ios >/dev/null ;;
+esac
+simulator_angle=(opengl3=yes "ccflags=-DLIBGODOT_ENABLED -DVNDEGEN_ANGLE -I$angle/MetalANGLE.framework/Headers -F$angle")
 # What VNDegen's Godot leaves out: other renderers and input, the editor's and VR's modules, and the parts the
 # permissive license choice drops (graphite).
 common=(target=template_release custom_modules="$src/4" disable_path_overrides=no
@@ -79,9 +87,25 @@ build_slice() {
     { grep -E 'error|ERROR' "$work/godot4-$name.log" | head -n 40; tail -n 20 "$work/godot4-$name.log"; exit 1; }
 }
 
-link_framework() { # <name> <sdk> <target triple> <library>
-  local name=$1 sdk=$2 triple=$3 library=$4 out="$work/framework-$1/Godot4.framework"
-  rm -rf "$out" && mkdir -p "$out"
+# link_framework <name> <sdk> <target triple> <library> [more libraries]: the framework, from the library that holds
+# vngd.h's functions, which it loads whole, and any other libraries it needs.
+link_framework() {
+  local name=$1 sdk=$2 triple=$3 library=$4
+  shift 4
+  local framework="$work/framework-$name/Godot4.framework" binary resources
+  rm -rf "$framework" && mkdir -p "$framework"
+  if [ "$sdk" = macosx ]; then
+    # A macOS framework keeps its files in a version folder, with links at its top.
+    mkdir -p "$framework/Versions/A/Resources"
+    ln -s A "$framework/Versions/Current"
+    ln -s Versions/Current/Godot4 "$framework/Godot4"
+    ln -s Versions/Current/Resources "$framework/Resources"
+    binary="$framework/Versions/A/Godot4"
+    resources="$framework/Versions/A/Resources"
+  else
+    binary="$framework/Godot4"
+    resources="$framework"
+  fi
   sed -n 's/^VNGD_API [^(]* \**\(vngd_[a-z_]*\)(.*/_\1/p' "$api/vngd.h" > "$work/exports.txt"
   local frameworks=(Foundation CoreFoundation CoreGraphics CoreText CoreServices QuartzCore Metal IOSurface
     AudioToolbox AVFoundation CoreAudio CoreMedia CoreVideo GameController Security SystemConfiguration ImageIO
@@ -90,35 +114,45 @@ link_framework() { # <name> <sdk> <target triple> <library>
   # domains that metal-cpp imports weakly and checks for null.
   local extra=()
   if [ "$sdk" = iphonesimulator ]; then
-    extra=(-Wl,-U,_MTLIOErrorDomain -Wl,-U,_MTLTensorDomain)
+    # MetalANGLE before OpenGLES, so the renderer's OpenGL calls bind to MetalANGLE. Godot's own iOS view, which VNDegen
+    # doesn't use, still needs OpenGLES's EAGL classes.
+    extra=(-Wl,-U,_MTLIOErrorDomain -Wl,-U,_MTLTensorDomain -F"$angle" -framework MetalANGLE -framework OpenGLES)
   else
     frameworks+=(MetalFX)
   fi
   if [ "$sdk" = macosx ]; then
-    frameworks+=(AppKit Carbon IOKit CoreHaptics)
+    frameworks+=(AppKit Carbon IOKit CoreHaptics AudioUnit CoreMIDI)
   else
     frameworks+=(UIKit CoreMotion CoreHaptics MediaPlayer)
   fi
-  xcrun -sdk "$sdk" clang++ -target "$triple" -dynamiclib -o "$out/Godot4" -install_name @rpath/Godot4.framework/Godot4 \
-    -Wl,-force_load,"$library" -Wl,-exported_symbols_list,"$work/exports.txt" -Wl,-dead_strip \
+  xcrun -sdk "$sdk" clang++ -target "$triple" -dynamiclib -o "$binary" -install_name @rpath/Godot4.framework/Godot4 \
+    -Wl,-force_load,"$library" "$@" -Wl,-exported_symbols_list,"$work/exports.txt" -Wl,-dead_strip \
     $(printf -- '-framework %s ' "${frameworks[@]}") ${extra[@]+"${extra[@]}"} -lz \
-    >"$work/link-$name.log" 2>&1 || { head -n 60 "$work/link-$name.log" >&2; exit 1; }
+    >"$work/link-$name.log" 2>&1 || { grep -v 'no longer supported' "$work/link-$name.log" | head -n 60 >&2; exit 1; }
   local platform=iPhoneOS
   case "$name" in ios-sim) platform=iPhoneSimulator ;; mac) platform=MacOSX ;; esac
-  sed -e "s/@PLATFORM@/$platform/" "$src/Info.plist" > "$out/Info.plist"
+  sed -e "s/@PLATFORM@/$platform/" "$src/Info.plist" > "$resources/Info.plist"
+  if [ "$sdk" = macosx ]; then
+    plutil -remove MinimumOSVersion "$resources/Info.plist"
+    plutil -insert LSMinimumSystemVersion -string 15.0 "$resources/Info.plist"
+  fi
 }
 
 for slice in $slices; do
   case "$slice" in
     ios-sim)
-      build_slice ios-sim platform=ios arch=arm64 simulator=yes "${ios_library[@]}"
+      build_slice ios-sim platform=ios arch=arm64 simulator=yes "${simulator_angle[@]}"
       link_framework ios-sim iphonesimulator arm64-apple-ios18.0-simulator "$(ls -t "$work"/godot4/bin/libgodot.ios.template_release.arm64.simulator.a | head -1)" ;;
     ios)
       build_slice ios platform=ios arch=arm64 "${ios_library[@]}"
       link_framework ios iphoneos arm64-apple-ios18.0 "$(ls -t "$work"/godot4/bin/libgodot.ios.template_release.arm64.a | head -1)" ;;
     mac)
       build_slice mac platform=macos arch=arm64 library_type=static_library
-      link_framework mac macosx arm64-apple-macos15.0 "$(ls -t "$work"/godot4/bin/libgodot.macos.template_release.arm64.a | head -1)" ;;
+      # The macOS build leaves Godot in one library per part. VNDegen's module holds vngd.h's functions.
+      link_framework mac macosx arm64-apple-macos15.0 \
+        "$work/godot4/bin/obj/modules/libmodule_vndegen.macos.template_release.arm64.a" \
+        "$work/godot4/bin/libgodot.macos.template_release.arm64.a" \
+        $(find "$work/godot4/bin/obj" -name '*.macos.template_release.arm64.a' ! -name 'libmodule_vndegen.*') ;;
     *) echo "unknown slice $slice" >&2; exit 2 ;;
   esac
 done
