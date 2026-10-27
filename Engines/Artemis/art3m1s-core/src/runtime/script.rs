@@ -204,6 +204,18 @@ impl CoreRuntime {
                 self.advance_exskip_stop(reason, profile);
                 return;
             }
+            // A game's own yes/no dialog ends once a button sets t.yesno.
+            if stop_reason == asb_interpreter::tags::YESNO_WAIT {
+                let answered = self
+                    .interpreter
+                    .get_variable(asb_interpreter::tags::YESNO_RESULT)
+                    .is_some_and(|value| !value.as_string().is_empty());
+                if answered {
+                    self.wait_reason = None;
+                    self.interpreter.advance_line();
+                }
+                return;
+            }
         }
 
         let video_resume = matches!(&reason, WaitReason::Stop { .. })

@@ -316,6 +316,7 @@ impl TagRegistry {
         registry.register("reset", ResetHandler);
         registry.register("@", AtHandler);
         registry.register("tag", TagTagHandler);
+        registry.register(YESNO_WAIT_TAG, YesNoWaitHandler);
 
         // 条件标签
         registry.register("if", IfHandler);
@@ -689,6 +690,25 @@ impl TagHandler for YesNoHandler {
         let se = ctx.instruction.get("se").map(String::from);
 
         Ok(TagResult::Wait(Event::YesNo { file, se }))
+    }
+}
+
+/// The variable a yes/no dialog sets to 1 or 0.
+pub const YESNO_RESULT: &str = "t.yesno";
+/// The [stop] reason while [yesno] waits on a game's own dialog.
+pub const YESNO_WAIT: &str = "yesno";
+/// Internal tag that stands in for the [stop] a game's yes/no dialog queues.
+pub const YESNO_WAIT_TAG: &str = "\u{b}yesno_wait";
+
+struct YesNoWaitHandler;
+
+impl TagHandler for YesNoWaitHandler {
+    fn execute(&self, _ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
+        Ok(TagResult::Wait(Event::Wait {
+            reason: crate::event::WaitReason::Stop {
+                reason: Some(YESNO_WAIT.to_string()),
+            },
+        }))
     }
 }
 

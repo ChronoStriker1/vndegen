@@ -1749,6 +1749,35 @@ impl Interpreter {
             }
         }
 
+        // A game that defines a Lua function `yesno` draws its own yes/no
+        // dialog: [yesno] calls it with the tag's parameters, as [calllua]
+        // would, and the builtin system dialog is only the fallback. The
+        // dialog queues [stop] and its buttons set t.yesno and return to that
+        // stop, so the stop becomes a wait that ends once t.yesno is set
+        // (VNDegen).
+        if instruction.tag == "yesno"
+            && apply_tag_filter
+            && matches!(
+                self.lua.globals().get::<mlua::Value>("yesno"),
+                Ok(mlua::Value::Function(_))
+            )
+        {
+            self.variables
+                .lock()
+                .unwrap()
+                .set(crate::tags::YESNO_RESULT, Value::String(String::new()));
+            let mut call = instruction.clone();
+            call.tag = "calllua".to_string();
+            call.params.insert("function".to_string(), "yesno".to_string());
+            let result = self.execute_tag(&call, false)?;
+            for (tag, _) in &mut self.engine_ctx.lock().unwrap().tag_queue {
+                if tag == "stop" {
+                    *tag = crate::tags::YESNO_WAIT_TAG.to_string();
+                }
+            }
+            return Ok(result);
+        }
+
         // calllua 会同步执行 Lua 函数，而该函数可能回调 e:var（再次锁 variables）。
         // 若在持有 variables 锁期间执行它会自锁死，故像 __lua_block 一样特判：
         // 不持 variables 锁、直接调用。CallLuaHandler 本身也未使用 ctx.variables。
