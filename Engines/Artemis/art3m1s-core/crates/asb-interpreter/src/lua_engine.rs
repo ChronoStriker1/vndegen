@@ -124,6 +124,10 @@ pub trait EngineCallbacks: Send + Sync {
     /// 加载 Lua 文件
     fn include(&self, path: &str);
 
+    /// `e:include` named a file the game doesn't have. Artemis carries on, and
+    /// games ship includes of files they left out (VNDegen).
+    fn include_missing(&self, _path: &str, _error: &str) {}
+
     /// 覆盖按键
     fn override_key(&self, from: u32, to: u32);
 
@@ -783,8 +787,18 @@ impl UserData for EngineApi {
                 return Ok(());
             };
 
-            let bytes = reader(&path)
-                .map_err(|e| mlua::Error::external(format!("include 读取 {path} 失败: {e}")))?;
+            let bytes = match reader(&path) {
+                Ok(bytes) => bytes,
+                Err(crate::error::Error::IoError(error))
+                    if error.kind() == std::io::ErrorKind::NotFound =>
+                {
+                    this.ctx.lock().unwrap().callbacks.include_missing(&path, &error.to_string());
+                    return Ok(());
+                }
+                Err(e) => {
+                    return Err(mlua::Error::external(format!("include 读取 {path} 失败: {e}")));
+                }
+            };
 
             // lua.load 接受 &[u8]，文本源码与 luac 字节码均可。
             #[cfg(feature = "backend-lua51")]

@@ -455,6 +455,10 @@ impl EngineCallbacks for FfiCallbacks {
 
     fn include(&self, _path: &str) {}
 
+    fn include_missing(&self, path: &str, error: &str) {
+        crate::core_warn!("[runtime] include {path} skipped: {error}");
+    }
+
     fn override_key(&self, from: u32, to: u32) {
         // 旧签名回退路径：等价于显式指定 key + status。
         self.override_key_status(Some(from), Some(to));
