@@ -16,14 +16,13 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Xbox gamepad controls by default for the touch gamepad and real controllers, every Xbox button in the mapping editor with an RPG Maker preset, touch buttons that press on touch-down, a cross-shaped D-pad, and the iPad tilt-shift blur fix (0.4.2).
 - Ludusavi save sync over SMB, with Ludusavi's SMB settings and rclone's own code built into the app, replacing SSH and rsync (0.4.3).
 - A fix for RPG Maker MZ's Ogg decoder reusing IDs, which stopped games with "RangeError: length cannot be negative" (0.4.4).
+- RPG Maker XP, VX, and VX Ace on Mac, iPhone, and iPad, built on mkxp-z's libretro core in the app, Apple silicon only on Mac, with the RTPs downloaded and installed in the app (0.5.0). `docs/rgss-spike.md` has the feasibility test and what was built.
+- License notices in Settings, Licenses, for every third-party component in the app (0.5.0).
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
-
-Merged into `dev`, not yet released:
-- RPG Maker XP, VX, and VX Ace, built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac, with the RTPs downloaded and installed in the app. `docs/rgss-spike.md` has the feasibility test and what was built.
-- License notices in Settings, Licenses: rclone and its Go modules, Ren'Py and its libraries, the RPG Maker engine and its libraries, and the code built into the app.
+- No Socks RPG's "RangeError: length cannot be negative", which 0.4.4 did not fully fix (`ws/nosocks-warp-error`).
 
 ## Next
 1. Together, as the next work:
