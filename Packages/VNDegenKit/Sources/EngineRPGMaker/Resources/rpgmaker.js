@@ -16,17 +16,23 @@
     // footsteps and letter sounds soon make, a new sound's bytes went to it, read from past their end, and stopped the
     // game with "RangeError: length cannot be negative". Numbers that never repeat keep every decoder to its own state.
     // The constructor assigns the counter modulo 1000 and then increments it, so only increments are taken. The check runs
-    // after every script loads, so a renamed or cache-busted decoder file is caught too, before the game makes a decoder.
+    // after every script loads, so a renamed or cache-busted decoder file is caught too. MZ makes its first decoder when
+    // the first sound plays, long after the decoder's file has loaded. Only a class shaped like MZ's decoder is changed.
     const numbered = new WeakSet();
     document.addEventListener('load', () => {
-        if (typeof VorbisDecoder !== 'function' || numbered.has(VorbisDecoder)) return;
-        numbered.add(VorbisDecoder);
+        if (typeof VorbisDecoder !== 'function' || numbered.has(VorbisDecoder) || !VorbisDecoder.worker
+            || typeof VorbisDecoder.prototype.send !== 'function' || typeof VorbisDecoder.prototype.destroy !== 'function') return;
         let next = VorbisDecoder.id || 0;
-        Object.defineProperty(VorbisDecoder, 'id', {
-            configurable: true,
-            get: () => next,
-            set: (value) => { if (value > next) next = value; },
-        });
+        try {
+            Object.defineProperty(VorbisDecoder, 'id', {
+                configurable: true,
+                get: () => next,
+                set: (value) => { if (value > next) next = value; },
+            });
+        } catch (e) {
+            return;
+        }
+        numbered.add(VorbisDecoder);
     }, true);
 
     // Reports once which renderer the engine got, so a fall back to PIXI's canvas renderer shows up in the app log.
