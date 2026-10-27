@@ -96,6 +96,9 @@ stage1_stamp=$( (echo "$core_commit $wasi_sdk_sha256 $binaryen_sha256"; cat "$sr
 stage1="$cache/stage1-$stage1_stamp"
 if [ ! -f "$stage1/.complete" ]; then
   echo "Building RGSS stage 1, Ruby through WebAssembly to C. This takes a while the first time."
+  # Ruby's patches apply only when its source is first fetched, and its outputs don't depend on them, so stage 1 always
+  # starts from nothing.
+  rm -rf "$work/core/libretro/build"
   (cd "$work/core/libretro" && gmake -j "$jobs" WASI_SDK="$cache/tools/wasi-sdk-30" \
     WASM_OPT="$cache/tools/binaryen-126/bin/wasm-opt" CTAGS="$(command -v ctags)" RUBY="$(command -v ruby)" \
     SED=gsed GREP=ggrep SHELL=/bin/bash) \
@@ -211,8 +214,9 @@ for folder in "$work/core/subprojects"/*/ "$work/subprojects"/angle-*/ "$work/su
     for file in "${files[@]}"; do printf '\n\n-------- %s --------\n\n' "$(basename "$file")"; cat "$file"; done
   } > "$licenses/mkxp-z - $name.txt"
 done
-# Ruby and libyaml, built in stage 1, whose sources are not kept, Boost, and what the core embeds.
-for name in Ruby libyaml Boost "Liberation Sans font" "SDL GameControllerDB" "GMGSx soundfont"; do
+# What stage 1 builds into the core, whose sources are not kept (Ruby, libyaml, wasi-libc, and wasm2c's templates),
+# Boost, and what the core embeds.
+for name in Ruby libyaml wasi-libc "wabt (wasm2c)" Boost "Liberation Sans font" "SDL GameControllerDB" "GMGSx soundfont"; do
   cp "$src/licenses/$name.txt" "$licenses/mkxp-z - $name.txt"
 done
 

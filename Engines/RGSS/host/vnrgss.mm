@@ -93,8 +93,11 @@ struct Engine {
     bool keys[RETROK_LAST] = {};
     double mouseX = 0.5, mouseY = 0.5;
     bool mouseButtons[3] = {};
-    // A press the core has not seen yet. A tap shorter than a frame is still down for the core's next look.
+    // A press the core has not seen yet. A tap shorter than a frame is still down for the core's next look. The core
+    // skips the game's update on some calls, such as XP's 40 frames a second under a 60 Hz display, so a latch clears
+    // only once the core has read the button.
     bool mouseLatched[3] = {};
+    bool mouseSampled[3] = {};
     double wheel = 0;
 
     AudioRing ring;
@@ -295,6 +298,11 @@ int16_t joypadMask() {
     return (int16_t)mask;
 }
 
+int16_t mouseButton(int button) {
+    engine.mouseSampled[button] = true;
+    return engine.mouseButtons[button] || engine.mouseLatched[button];
+}
+
 int16_t inputState(unsigned port, unsigned device, unsigned, unsigned id) {
     if (port != 0) return 0;
     switch (device) {
@@ -302,9 +310,9 @@ int16_t inputState(unsigned port, unsigned device, unsigned, unsigned id) {
         return id == RETRO_DEVICE_ID_JOYPAD_MASK ? joypadMask() : (joypadMask() >> id) & 1;
     case RETRO_DEVICE_MOUSE:
         switch (id) {
-        case RETRO_DEVICE_ID_MOUSE_LEFT: return engine.mouseButtons[0] || engine.mouseLatched[0];
-        case RETRO_DEVICE_ID_MOUSE_RIGHT: return engine.mouseButtons[1] || engine.mouseLatched[1];
-        case RETRO_DEVICE_ID_MOUSE_MIDDLE: return engine.mouseButtons[2] || engine.mouseLatched[2];
+        case RETRO_DEVICE_ID_MOUSE_LEFT: return mouseButton(0);
+        case RETRO_DEVICE_ID_MOUSE_RIGHT: return mouseButton(1);
+        case RETRO_DEVICE_ID_MOUSE_MIDDLE: return mouseButton(2);
         case RETRO_DEVICE_ID_MOUSE_WHEELUP:
         case RETRO_DEVICE_ID_MOUSE_WHEELDOWN: {
             // The core reads each direction once a frame, so a notch is reported once, then cleared.
@@ -323,7 +331,7 @@ int16_t inputState(unsigned port, unsigned device, unsigned, unsigned id) {
         switch (id) {
         case RETRO_DEVICE_ID_POINTER_X: return (int16_t)std::lround(std::clamp(x * 2 - 1, -1.0, 1.0) * 0x7fff);
         case RETRO_DEVICE_ID_POINTER_Y: return (int16_t)std::lround(std::clamp(y * 2 - 1, -1.0, 1.0) * 0x7fff);
-        case RETRO_DEVICE_ID_POINTER_PRESSED: return engine.mouseButtons[0] || engine.mouseLatched[0];
+        case RETRO_DEVICE_ID_POINTER_PRESSED: return mouseButton(0);
         case RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN: return x < 0 || x > 1 || y < 0 || y > 1;
         default: return 0;
         }
@@ -480,6 +488,7 @@ int vnrgss_start(const VNRGSSLaunch *launch) {
     memset(engine.keys, 0, sizeof engine.keys);
     memset(engine.mouseButtons, 0, sizeof engine.mouseButtons);
     memset(engine.mouseLatched, 0, sizeof engine.mouseLatched);
+    memset(engine.mouseSampled, 0, sizeof engine.mouseSampled);
     engine.wheel = 0;
     engine.systemDir = launch->systemDir;
     engine.saveDir = launch->saveDir;
@@ -532,7 +541,10 @@ int vnrgss_frame(double seconds) {
         engine.frameTime.callback((retro_usec_t)std::lround(std::clamp(seconds, 0.0, 0.25) * 1e6));
     }
     retro_run();
-    memset(engine.mouseLatched, 0, sizeof engine.mouseLatched);
+    for (int button = 0; button < 3; button++) {
+        if (engine.mouseSampled[button]) engine.mouseLatched[button] = false;
+        engine.mouseSampled[button] = false;
+    }
     present();
     return engine.ended ? 1 : 0;
 }

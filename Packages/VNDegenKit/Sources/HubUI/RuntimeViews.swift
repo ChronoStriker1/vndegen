@@ -98,7 +98,7 @@ struct RuntimeLicenseSheet: View {
 extension View {
     /// The folder picker for a runtime package's Import from folder button.
     func runtimeFolderImporter(_ runtimes: RuntimeInstalls, game: GameID) -> some View {
-        fileImporter(isPresented: Binding(get: { runtimes.folderImport != nil }, set: { if !$0 { runtimes.folderImport = nil } }),
+        fileImporter(isPresented: Binding(get: { runtimes.pickingFolder }, set: { runtimes.pickingFolder = $0 }),
                      allowedContentTypes: [.folder]) { result in
             guard let package = runtimes.folderImport else { return }
             runtimes.folderImport = nil

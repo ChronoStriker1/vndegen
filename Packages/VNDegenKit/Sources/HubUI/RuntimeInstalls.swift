@@ -19,8 +19,15 @@ final class RuntimeInstalls {
     private(set) var missing: [GameID: [RuntimePackage]] = [:]
     /// Shows the license an install waits on. The navigator presents it as a sheet.
     @ObservationIgnored var onLicense: ((LicenseRequest) -> Void)?
-    /// A package whose folder the player is picking, for the game page's folder picker.
+    /// The package whose folder the player is picking, and whether the game page's folder picker shows. SwiftUI clears
+    /// the picker's flag before it reports the folder, so the package is kept apart from it.
     var folderImport: RuntimePackage?
+    var pickingFolder = false
+
+    func pickFolder(for package: RuntimePackage) {
+        folderImport = package
+        pickingFolder = true
+    }
 
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]

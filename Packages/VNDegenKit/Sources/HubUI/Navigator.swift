@@ -418,7 +418,7 @@ final class Navigator {
             guard let id = pageGameID, let package = runtimes.missing[id]?.first(where: { $0.id == packageID }) else { return }
             switch action {
             case .install: runtimes.install(package, for: id)
-            case .importFolder: runtimes.folderImport = package
+            case .importFolder: runtimes.pickFolder(for: package)
             case .cancel: runtimes.cancel(package)
             }
         case .licenseAccept, .licenseDecline:
