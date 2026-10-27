@@ -35,7 +35,8 @@ binaryen_sha256=3f1e1379894944531501a8ccc6b59c57f0c7a00fc136dd933f8a6b0c53515a88
 
 mkdir -p "$dest" "$cache"
 dest=$(cd "$dest" && pwd)
-stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$root/Engines" && find RGSS Shared -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+# Engines/Shared counts by its C sources only, so its fonts changing rebuilds nothing.
+stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$root/Engines" && { find RGSS -type f -print0; find Shared -type f \( -name "*.c" -o -name "*.h" \) -print0; } | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
 if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "RGSS engine is up to date in $dest"
   exit 0

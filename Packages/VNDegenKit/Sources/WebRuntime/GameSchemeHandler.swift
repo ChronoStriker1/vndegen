@@ -1,8 +1,9 @@
+import FontPack
 import Foundation
 import OSLog
 import WebKit
 
-/// Serves `vndegen://game/...` from the game's web root. Reads run off the main thread, one chunk at a time, and stop
+/// Serves `vndegen://game/...` from the game's web root, and the font substitutes from `WebGameSession.fontPath`. Reads run off the main thread, one chunk at a time, and stop
 /// when WebKit stops the task. Replies are matched back by a serial, not by task identity, because WebKit throws if a
 /// task is touched after `stop`, and a stopped task's address can be reused by a new one before a slow read returns.
 final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
@@ -30,7 +31,8 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
         let range = request.value(forHTTPHeaderField: "Range")
         let folder = folder
         Task.detached(priority: .userInitiated) {
-            let response = folder.serve(path: path, method: method, range: range)
+            let response = Self.serveFont(path: path, method: method, range: range)
+                ?? folder.serve(path: path, method: method, range: range)
             guard await self.respond(serial, url: url, with: response) else { return }
             do {
                 try await response.body?.stream { await self.send($0, to: serial) }
@@ -39,6 +41,17 @@ final class GameSchemeHandler: NSObject, WKURLSchemeHandler {
                 await self.finish(serial, failing: error)
             }
         }
+    }
+
+    /// The response for a font substitute's path, or nil when the path is not under the font path.
+    nonisolated static func serveFont(path: String, method: String, range: String?) -> FileResponse? {
+        guard path.hasPrefix(WebGameSession.fontPath) else { return nil }
+        let name = String(path.dropFirst(WebGameSession.fontPath.count))
+        var info = stat()
+        guard let file = FontPack.file(named: name), let handle = try? FileHandle(forReadingFrom: file),
+              fstat(handle.fileDescriptor, &info) == 0 else { return .empty(404) }
+        return GameFolder.response(handle, base: 0, size: Int64(info.st_size),
+                                   contentType: GameFolder.mimeType(forExtension: file.pathExtension), method: method, range: range)
     }
 
     func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {

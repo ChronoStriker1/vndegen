@@ -1,10 +1,12 @@
+import FontPack
 import Foundation
 import Observation
 import RuntimePackages
 import VNCore
 
 /// Runtime packages, such as the RPG Maker RTPs, that games in the library need: which ones a game is missing, and the
-/// installs the player started from a game's page. One install per package runs at a time, and every game shares it.
+/// installs the player started from a game's page or, for the font packages, from Settings. One install per package
+/// runs at a time, and every game shares it.
 @MainActor
 @Observable
 final class RuntimeInstalls {
@@ -17,6 +19,8 @@ final class RuntimeInstalls {
     private(set) var phases: [String: Phase] = [:]
     /// The packages each game needs and doesn't have, as of the last look at its page.
     private(set) var missing: [GameID: [RuntimePackage]] = [:]
+    /// The IDs of the font packages that are installed.
+    private(set) var installedFonts: Set<String> = []
     /// Shows the license an install waits on. The navigator presents it as a sheet.
     @ObservationIgnored var onLicense: ((LicenseRequest) -> Void)?
     /// The package whose folder the player is picking, and whether the game page's folder picker shows. SwiftUI clears
@@ -34,6 +38,7 @@ final class RuntimeInstalls {
 
     init(library: LibraryStore) {
         self.library = library
+        installedFonts = Self.installedFonts(in: store)
     }
 
     var store: RuntimePackageStore { RuntimePackageStore(root: library.paths.runtimesDirectory) }
@@ -50,7 +55,8 @@ final class RuntimeInstalls {
         }.value
     }
 
-    func install(_ package: RuntimePackage, for game: GameID) {
+    /// Installs `package`. `game` is the game whose page started it, which it rechecks when done.
+    func install(_ package: RuntimePackage, for game: GameID?) {
         guard tasks[package.id] == nil else { return }
         phases[package.id] = .running(.downloading(received: 0, total: package.size))
         let store = store
@@ -96,14 +102,37 @@ final class RuntimeInstalls {
         }
     }
 
-    private func finished(_ package: RuntimePackage, game: GameID, error: Error?) {
+    /// Removes a font package, which Settings offers. Games started later go without its fonts.
+    func remove(_ package: RuntimePackage) {
+        do {
+            try store.remove(package)
+            phases[package.id] = nil
+        } catch {
+            phases[package.id] = .failed(error.localizedDescription)
+        }
+        fontsChanged()
+    }
+
+    private func finished(_ package: RuntimePackage, game: GameID?, error: Error?) {
         tasks[package.id] = nil
         if let error, !(error is CancellationError), error as? RuntimeInstallError != .declinedLicense {
             phases[package.id] = .failed(Self.describe(error, package))
         } else {
             phases[package.id] = nil
         }
-        Task { await refresh(game) }
+        if FontPack.packages.contains(package) { fontsChanged() }
+        if let game { Task { await refresh(game) } }
+    }
+
+    /// Engines read the font table when a game starts, so games started from now on see the change.
+    private func fontsChanged() {
+        let store = store
+        FontPack.configure { store.installedFolder(for: $0) }
+        installedFonts = Self.installedFonts(in: store)
+    }
+
+    private static func installedFonts(in store: RuntimePackageStore) -> Set<String> {
+        Set(FontPack.packages.filter { store.installedFolder(for: $0) != nil }.map(\.id))
     }
 
     private func askToAccept(_ package: RuntimePackage, text: String?) async -> Bool {

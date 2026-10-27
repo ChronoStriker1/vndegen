@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import OSLog
 import VNCore
@@ -32,6 +33,9 @@ public struct WebGameConfiguration {
     public var storageDirectory: URL?
     /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
     public var decodesOgg: Bool
+    /// Windows font names, as `FontPack.referencedNames` finds them in the game's files, whose substitutes load before
+    /// the page draws. Every other substitute loads when the page first uses it.
+    public var preloadFonts: Set<String> = []
     /// The JavaScript that delivers an engine-neutral button press or release to the game, as DEBUG input scripts send
     /// them. Controllers reach the game as a gamepad instead. Nil drops the button.
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
@@ -94,6 +98,7 @@ final class WebGameSession: NSObject, EngineSession {
         log = game.log
         onExit = launch.onExit
         let shim = try Self.shimSource(for: game)
+        let fonts = try Self.fontScript(preload: game.preloadFonts)
         let ogg = game.decodesOgg ? [try Self.oggScript()] : []
         // Version 0.2.0 transcoded Ogg to AAC files here.
         Task.detached(priority: .background) {
@@ -108,7 +113,7 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        for source in [shim] + ogg + game.userScripts {
+        for source in [shim, fonts] + ogg + game.userScripts {
             configuration.userContentController.addUserScript(
                 WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -173,6 +178,31 @@ final class WebGameSession: NSObject, EngineSession {
         let json = try JSONEncoder().encode(Config(wasm: try Data(contentsOf: wasm).base64EncodedString(), limits: limits))
         return try String(contentsOf: script, encoding: .utf8)
             .replacingOccurrences(of: "__VNDEGEN_OGG__", with: String(decoding: json, as: UTF8.self))
+    }
+
+    /// Where the page finds the font substitutes. No game has a folder by this name.
+    nonisolated static let fontPath = "/.vndegen/fonts/"
+
+    /// Gives the page a font face for each Windows name in the font table whose substitute is installed.
+    static func fontScript(preload: Set<String>) throws -> String {
+        guard let url = Bundle.module.url(forResource: "fonts", withExtension: "js") else { throw WebRuntimeError.fontScriptMissing }
+        struct Face: Encodable {
+            var name: String
+            var file: String
+            var bold: Bool
+            var italic: Bool
+        }
+        struct Config: Encodable {
+            var base: String
+            var faces: [Face]
+            var preload: [String]
+        }
+        let faces = FontPack.entries.map {
+            Face(name: $0.name, file: $0.match.file.lastPathComponent, bold: $0.match.bold, italic: $0.match.italic)
+        }
+        let config = Config(base: GameFolder.origin + fontPath, faces: faces, preload: preload.sorted())
+        let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
+        return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_FONTS__", with: json)
     }
 
     static func shimSource(for game: WebGameConfiguration) throws -> String {
@@ -441,11 +471,13 @@ final class GameWebView: WKWebView {
 nonisolated enum WebRuntimeError: LocalizedError {
     case shimMissing
     case oggDecoderMissing
+    case fontScriptMissing
 
     var errorDescription: String? {
         switch self {
         case .shimMissing: "The NW.js compatibility script is missing from the app bundle."
         case .oggDecoderMissing: "The Ogg Vorbis decoder is missing from the app bundle."
+        case .fontScriptMissing: "The font script is missing from the app bundle."
         }
     }
 }

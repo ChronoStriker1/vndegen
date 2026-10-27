@@ -5,6 +5,7 @@ import EngineTyrano
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
+import FontPack
 import RuntimePackages
 import Metadata
 import GameInput
@@ -26,6 +27,9 @@ let engines: [any EnginePlugin] = {
     for flavor in [RGSSPlugin.Flavor.vxAce, .vx, .xp] {
         engines.append(RGSSPlugin(flavor) { runtimes.installedFolder(for: $0) })
     }
+    // The Windows font substitutes every engine reads: the bundled fonts, and the Chinese and Korean ones the player
+    // downloaded. Settings configures it again after a download.
+    FontPack.configure { runtimes.installedFolder(for: $0) }
     #if DEBUG
     // Registered first, so it wins the MZ engine ID over the real runtime.
     if UserDefaults.standard.bool(forKey: "fakeSession") { engines.insert(FakeSessionPlugin(), at: 0) }
@@ -101,6 +105,8 @@ struct VNDegenApp: App {
         Window("VNDegen", id: "main") { root }
             .windowStyle(.hiddenTitleBar)
             .defaultSize(width: 1280, height: 800)
+        #elseif DEBUG
+        WindowGroup { SimulatedWindow { root } }
         #else
         WindowGroup { root }
         #endif
