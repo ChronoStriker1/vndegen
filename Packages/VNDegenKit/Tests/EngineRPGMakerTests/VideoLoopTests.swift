@@ -215,11 +215,13 @@ private let setUp = """
         await lengthRead();
         const frames = [shown()];
         const kept = resource.uploaded[resource.uploaded.length - 1] !== video;
-        now += 300;
-        frames.push(shown());
+        for (const step of [200, 100]) {
+            now += step;
+            frames.push(shown());
+        }
         return { frames, kept };
         """)
-    // The fourth frame shows from the moment the times arrive, then 0.3 s later the next pass has started.
-    #expect(values["frames"] as? [Int] == [3, 0])
+    // The fourth frame shows from the moment the times arrive, until the next pass starts 0.28 s later.
+    #expect(values["frames"] as? [Int] == [3, 3, 0])
     #expect(values["kept"] as? Bool == true)
 }
