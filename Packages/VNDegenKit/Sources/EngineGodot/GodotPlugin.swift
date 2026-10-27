@@ -45,6 +45,9 @@ nonisolated public struct GodotPlugin: EnginePlugin {
     /// Why VNDegen can't run a game, or nil when it can.
     static func unsupported(_ layout: GodotLayout, folder: URL) -> String? {
         let pack = layout.header
+        if layout.usesDotNet {
+            return "This is a Godot C# game, which needs .NET, and VNDegen runs Godot games written in GDScript only."
+        }
         // GodotSteam built into the game's own copy of Godot, which then links Steam's library. Such games call Steam
         // from their scripts and won't run without it.
         if WindowsExecutable.importedLibraries(folder.appendingPathComponent(layout.executable)).contains(where: { $0.hasPrefix("steam_api") }) {

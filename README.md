@@ -25,7 +25,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen. In a window, tiled or not, a game follows the window's shape. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
 - **Windows fonts.** RPG Maker MV and MZ and TyranoScript games that ask for MS Gothic, MS Mincho, Arial, Tahoma, and other Windows fonts by name get free fonts with the same metrics, as under Proton, so their text wraps and fits as designed. Chinese and Korean fonts are a download in Settings.
-- **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad, both on Metal.
+- **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad. Godot 4 renders on Metal.
 
 <p align="center">
   <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
@@ -41,6 +41,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
 | RPG Maker XP, VX, and VX Ace | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac with Apple silicon, iPhone, iPad |
 | KiriKiri 2 and KiriKiri Z | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |
+| Godot 3 and Godot 4 | a `.pck` file beside the game's `.exe`, or a pack inside the `.exe`, up to two folders down | Mac with Apple silicon, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
@@ -57,6 +58,8 @@ RPG Maker XP, VX, and VX Ace games run on mkxp-z, an open-source reimplementatio
 Many RPG Maker games use the RTP, a set of stock graphics, sounds, and fonts that the PC player installs once instead of every game shipping it. Its license doesn't let VNDegen include it. When a game needs an RTP that isn't installed, its page offers Download and install, which fetches the official installer from the RPG Maker website (rpgmakerweb.com), checks it against the SHA-256 VNDegen expects, shows the RTP's license to accept, and unpacks it inside the app on Mac, iPhone, and iPad. The RTP is then shared by every game that needs it. Import from folder takes an RTP folder copied from a PC instead, such as `C:\Program Files (x86)\Common Files\Enterbrain\RGSS3\RPGVXAce`. The XP RTP is 23 MB to download, VX's 37 MB, and VX Ace's 195 MB. Nothing downloads until you tap the button.
 
 KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDegen builds into the app. The game draws inside VNDegen's window, composited on the CPU and shown through Metal, so the VNDegen menu and touch controls work as for the other engines. Saves stay in the game's `savedata/` folder as on PC. A game that saves to the Windows AppData or Documents folder saves to its data folder instead, and Ludusavi backups from Windows or a Steam Deck restore there. Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives work without any per-game setting: VNDegen recognizes the common ciphers by the checksums inside the archive, and tells you when a game uses one it doesn't know. Common Windows plugins are built in, including `extrans`, `layerExDraw`, `layerExSave`, and Steam builds' `krkrsteam`. Known limits: sound effects and music stored as MP3 don't play, AlphaMovie (`.amv`) animations don't show, and a KiriKiri game that is still starting with a question on screen when the Mac logs out or shuts down doesn't save its settings from that moment.
+
+Godot games run on Godot itself, which VNDegen builds into the app twice: Godot 4.7 runs every Godot 4 game, and Godot 3.6 every Godot 3 game. A game's pack loads unchanged, from its `.pck` or from inside its `.exe`, and games exported with older Godot versions run too, such as Godot 4.2 to 4.5 and Godot 3.3 and 3.5. The game draws inside VNDegen's window: Godot 4 through Metal on Mac, iPhone, and iPad, and Godot 3 through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad. Controllers reach games as an Xbox controller, and touches and the mouse as Godot's mouse. Saves go where the PC version keeps them: `user://` is under the Windows AppData folder's stand-in in the game's data folder, so Ludusavi backups from Windows, a Steam Deck, or Godot's Linux and Mac builds restore there, and games that save beside their `.exe` save in their own folder. Games that can't run say why on their page: games whose files are encrypted with a key built into their own copy of Godot, games that need GDExtension or GDNative libraries, which are Windows code, and games whose own copy of Godot has Steam built in. Godot C# games aren't supported. `docs/godot.md` has the details and the known limits.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -193,6 +196,8 @@ Packages/VNDegenKit/
   Sources/CKiriKiri/      vnkk.h, the KiriKiri engine's C interface
   Sources/EngineRGSS/     RPG Maker XP, VX, and VX Ace: detection, the RTPs they need, saves, and the in-process session
   Sources/CRGSS/          vnrgss.h, the RGSS engine's C interface
+  Sources/EngineGodot/    Godot 3 and 4: detection from the pack, save locations, and the in-process session
+  Sources/CGodot/         vngd.h, the Godot engines' C interface
   Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
   Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
   Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
@@ -207,6 +212,7 @@ Packages/VNDegenKit/
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
 Engines/RGSS/             the RGSS engine's frontend, patches, and build files; UPSTREAM.md lists the pinned sources
 Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
+Engines/Godot/            VNDegen's Godot modules, patches, and test host; UPSTREAM.md lists the pinned sources
 Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, simulator, and Ren'Py runtime helpers

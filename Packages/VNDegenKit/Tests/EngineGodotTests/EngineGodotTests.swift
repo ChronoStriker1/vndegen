@@ -209,6 +209,17 @@ private func executable(with payload: Data) -> Data {
         #expect(layout.header.userDirectory == "Studio/Game")
     }
 
+    @Test func csharpGamesAreUnsupported() throws {
+        let game = try GameFolder([
+            "Game.pck": pack(format: 2, version: (4, 2, 1), files: ["res://project.binary"]),
+            "Game.exe": Data("MZ".utf8),
+            "data_Game_windows_x86_64/GodotSharp.dll": Data(),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.usesDotNet)
+        #expect(GodotPlugin.unsupported(layout, folder: game.root)?.contains("C#") == true)
+    }
+
     @Test func otherGamesAreNotGodot() throws {
         let game = try GameFolder(["Game.exe": Data("MZ".utf8) + Data(count: 400), "data.xp3": Data("XP3".utf8)])
         #expect(GodotLayout(game.probe) == nil)

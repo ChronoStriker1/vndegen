@@ -10,6 +10,9 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
     public var executable: String
     /// The pack's header and file list.
     var header: GodotPack
+    /// The game is a Godot C# game, which needs .NET: a `data_*` folder beside its `.exe` holds `GodotSharp.dll`, or in
+    /// Godot 3 a `Mono` folder.
+    var usesDotNet = false
 
     public var evidence: String { pack }
     public var version: String { header.version }
@@ -20,6 +23,18 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
     public init?(_ probe: FolderProbe) {
         // Copies made on a Mac can hold AppleDouble files such as `._game.pck` beside the real ones.
         let files = probe.entries.filter { !Self.name($0).hasPrefix("._") }
+        guard let found = Self.find(probe, files: files) else { return nil }
+        self = found
+        let root = Self.parent(executable).lowercased()
+        usesDotNet = files.contains { path in
+            let lower = path.lowercased()
+            guard ["godotsharp.dll", "godotsharp", "mono"].contains(Self.name(lower)) else { return false }
+            let data = Self.parent(lower)
+            return Self.name(data).hasPrefix("data_") && Self.parent(data) == root
+        }
+    }
+
+    private static func find(_ probe: FolderProbe, files: Set<String>) -> GodotLayout? {
         let packs = files.filter { $0.lowercased().hasSuffix(".pck") }
         let executables = files.filter { $0.lowercased().hasSuffix(".exe") }
         let depth = { (path: String) in path.split(separator: "/").count }
@@ -32,14 +47,12 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
             let executable = siblings.first { Self.name($0).dropLast(4).lowercased() == base }
                 ?? siblings.first { !$0.lowercased().contains("loader") && !$0.lowercased().contains("console") }
                 ?? (folder.isEmpty ? "" : "\(folder)/") + Self.name(pck).dropLast(4) + ".exe"
-            self.init(pack: pck, executable: executable, header: header)
-            return
+            return GodotLayout(pack: pck, executable: executable, header: header)
         }
         // Executables carrying their pack. Godot's console wrapper beside them holds none.
         for exe in executables.sorted(by: { (depth($0), $0) < (depth($1), $1) }) {
             guard let header = GodotPack(contentsOf: probe.root.appendingPathComponent(exe)) else { continue }
-            self.init(pack: exe, executable: exe, header: header)
-            return
+            return GodotLayout(pack: exe, executable: exe, header: header)
         }
         return nil
     }
