@@ -96,7 +96,10 @@ impl CoreRuntime {
     /// (VNDegen).
     fn note_inline_stop(&mut self) {
         self.inline_stop_at = (!self.interpreter.last_wait_from_queue()).then(|| {
-            (self.interpreter.current_script().map(str::to_owned), self.interpreter.current_line())
+            (
+                self.interpreter.current_script().map(str::to_owned),
+                self.interpreter.current_line(),
+            )
         });
     }
 
@@ -256,7 +259,10 @@ impl CoreRuntime {
             // An inline [trans] or [video] would run again unless the script
             // steps past it. A queued one leaves the script where it is: the
             // queue may have stopped it on its next instruction (VNDegen).
-            let position = (self.interpreter.current_script().map(str::to_owned), self.interpreter.current_line());
+            let position = (
+                self.interpreter.current_script().map(str::to_owned),
+                self.interpreter.current_line(),
+            );
             if self.inline_stop_at.take() == Some(position) {
                 self.interpreter.advance_line();
             } else {
@@ -596,6 +602,17 @@ fn settle_inline_event_frame(
     if saw_queued_call && !claimed_by_jump {
         let frame = active_frame.take().unwrap();
         interpreter.remove_call_frame(frame.stack.len());
+        // That call frame now returns to the interrupted wait, so it stands
+        // for the event: later events share it, and a save marks its wait
+        // (VNDegen).
+        if let Some(call) = interpreter.call_stack().get(frame.stack.len()) {
+            *active_frame = Some(super::InlineEventFrame {
+                script: call.script.clone(),
+                line: call.return_line,
+                stack: frame.stack,
+                claimed_by_jump: true,
+            });
+        }
         return Ok(());
     }
 
@@ -871,7 +888,12 @@ mod tests {
         )
         .unwrap();
 
-        assert!(frame.is_none());
+        assert!(
+            frame
+                .as_ref()
+                .is_some_and(|frame| frame.claimed_by_jump && frame.stack.is_empty()),
+            "the call's frame now stands for the event"
+        );
         assert_eq!(interpreter.call_stack().len(), 1);
         assert!(matches!(
             interpreter.run().unwrap(),
@@ -1146,7 +1168,11 @@ mod tests {
             call_drain.saw_jump,
         )
         .unwrap();
-        assert!(event_frame.is_none());
+        assert!(
+            event_frame
+                .as_ref()
+                .is_some_and(|frame| frame.claimed_by_jump)
+        );
         assert_eq!(interpreter.call_stack().len(), 1);
 
         assert!(matches!(
