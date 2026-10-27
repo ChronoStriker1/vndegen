@@ -78,7 +78,7 @@ struct GamePageView: View {
             .overlay(alignment: .topLeading) {
                 HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
                     .accessibilityLabel("Back")
-                    .padding(.leading, metrics.leading)
+                    .padding(.leading, metrics.insets.leading + metrics.topRowPadding(.leading))
                     .padding(.top, metrics.insets.top + 10)
                     #if os(macOS)
                     .padding(.top, 18)
@@ -89,17 +89,32 @@ struct GamePageView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 16) {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { actionButtons(labels: true) }
-                HStack(spacing: 10) { actionButtons(labels: false) }
+                HStack(spacing: 12) {
+                    playButton
+                    Spacer().frame(width: 4)
+                    secondaryButtons(labels: true)
+                }
+                HStack(spacing: 10) {
+                    playButton
+                    Spacer().frame(width: 4)
+                    secondaryButtons(labels: false)
+                }
+                // The narrowest windows put the other buttons under Play.
+                VStack(alignment: .leading, spacing: 12) {
+                    playButton
+                    HStack(spacing: 10) { secondaryButtons(labels: false) }
+                }
             }
             HeroFacts(game: game)
         }
     }
 
-    @ViewBuilder
-    private func actionButtons(labels: Bool) -> some View {
+    private var playButton: some View {
         HubButton(target: .pagePlay, kind: .primary) { Label("Play", systemImage: "play.fill") }
-        Spacer().frame(width: 4)
+    }
+
+    @ViewBuilder
+    private func secondaryButtons(labels: Bool) -> some View {
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
             labeled("Artwork", "photo.on.rectangle", labels)
         }

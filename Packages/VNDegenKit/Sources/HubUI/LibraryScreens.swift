@@ -27,7 +27,8 @@ private struct ScreenHeader: View {
             }
             Spacer()
         }
-        .padding(.horizontal, metrics.padding)
+        .padding(.leading, metrics.topRowPadding(.leading))
+        .padding(.trailing, metrics.topRowPadding(.trailing))
         .padding(.top, 10)
         #if os(macOS)
         .padding(.top, 18)

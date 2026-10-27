@@ -101,6 +101,8 @@ struct VNDegenApp: App {
         Window("VNDegen", id: "main") { root }
             .windowStyle(.hiddenTitleBar)
             .defaultSize(width: 1280, height: 800)
+        #elseif DEBUG
+        WindowGroup { SimulatedWindow { root } }
         #else
         WindowGroup { root }
         #endif
