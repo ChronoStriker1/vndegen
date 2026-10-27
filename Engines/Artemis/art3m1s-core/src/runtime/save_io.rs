@@ -1,6 +1,5 @@
 use super::CoreRuntime;
 use crate::backend::{TextureData, TextureDesc};
-use crate::save::AudioSnapshot;
 use image::ImageEncoder;
 use std::collections::HashMap;
 
@@ -93,41 +92,20 @@ impl CoreRuntime {
             .fire_save_handler_and_flush_with_params(&HashMap::from([("file".into(), file.into())]))
             .map_err(|e| format!("onSave 处理器失败: {e:?}"))?;
 
-        let mut data = crate::save::SaveData::from_interpreter(&self.interpreter);
-        if let Some(checkpoint) = &self.gameplay_save_checkpoint {
-            if checkpoint.is_ancestor_of(&data.current_script, &data.call_stack) {
-                crate::core_info!(
-                    "[runtime] 编号存档使用点击等待检查点 {}:{} -> {}:{} stack={} -> {}",
-                    data.current_script,
-                    data.current_line,
-                    checkpoint.script,
-                    checkpoint.line,
-                    data.call_stack.len(),
-                    checkpoint.call_stack.len()
-                );
-                data = data.with_gameplay_checkpoint(checkpoint);
-            }
-        }
-        if let Some(snapshot) = &self.save_screenshot {
-            data = data.with_scene(snapshot.scene.clone());
-            if let Some(message_text) = snapshot.message_text.clone() {
-                data = data.with_message_text(message_text);
-            }
-        } else {
-            data = data.with_scene(self.compositor.scene_snapshot_with_animations());
-            if let Some(message_text) = self.capture_message_text_snapshot() {
-                data = data.with_message_text(message_text);
-            }
-        }
-        if data.waiting_for_input.is_none() {
-            data.waiting_for_input = Some(super::script::wait_reason_is_input_wait(
-                self.wait_reason.as_ref(),
-            ));
-        }
-        data = data.with_audio(AudioSnapshot::from_audio(self.audio.as_ref()));
-        let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+        // The PC engine's own format, so the save moves to and from the PC
+        // version (VNDegen). The scene and text are the ones the save
+        // screenshot captured, before any save menu opened over them.
+        let (scene, text) = match &self.save_screenshot {
+            Some(snapshot) => (snapshot.scene.clone(), snapshot.message_text.clone()),
+            None => (
+                self.compositor.scene_snapshot_with_animations(),
+                self.capture_message_text_snapshot(),
+            ),
+        };
+        let save = self.pc_slot_save(&scene, text.as_ref());
+        let bytes = crate::save::pc_slot::write(&save, self.interpreter.config().encoding);
         let path = self.save_path_for(file)?;
-        self.resources.write(&path, json.as_bytes())?;
+        self.resources.write(&path, &bytes)?;
         crate::core_info!("[runtime] 已保存存档: {}", path);
 
         // `store()`/`saveconv(true)` 已把最新 `sys.saveslot` 写入 `g.system`。
@@ -291,7 +269,13 @@ impl CoreRuntime {
         let (data, replay) = if bytes.starts_with(crate::save::pc_slot::MAGIC) {
             let encoding = self.interpreter.config().encoding;
             let slot = crate::save::pc_slot::read(&bytes, encoding)?;
-            (crate::save::SaveData::from_pc_slot(&slot), Some(slot))
+            let interpreter = &mut self.interpreter;
+            let data = crate::save::SaveData::from_pc_slot(&slot, |script, index| {
+                interpreter
+                    .index_from_pc(script, index)
+                    .map_err(|e| format!("存档脚本 {script} 无法加载: {e:?}"))
+            })?;
+            (data, Some(slot))
         } else {
             let data: crate::save::SaveData =
                 serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
@@ -391,7 +375,7 @@ impl CoreRuntime {
     }
 
     /// Recreates the layers, handlers, and music of a PC save from its tags,
-    /// then queues the tags the save held at its position.
+    /// then holds the tags queued in its call frames until they return.
     fn replay_pc_tags(&mut self, slot: &crate::save::pc_slot::SlotSave) -> Result<(), String> {
         let as_queue = |tags: &[crate::save::pc_slot::Tag]| -> Vec<(String, HashMap<String, String>)> {
             tags.iter()
@@ -403,14 +387,19 @@ impl CoreRuntime {
             .map_err(|e| format!("重放存档标签失败: {e:?}"))?;
         let mut profile = crate::profiler::FrameProfile::default();
         self.flush_host_events(&mut profile);
-        // A save made inside a page break holds the tags queued after its
-        // click wait, and the click wait itself was running: wait for the
-        // click again, then run them.
-        let queued = &slot.resume().queued;
-        if !queued.is_empty() {
-            let mut tags = vec![("@".to_string(), HashMap::new())];
-            tags.extend(as_queue(queued));
-            self.interpreter.append_queued_tags(tags);
+        // A frame that called the save routine from a wait resumes that wait
+        // when the routine returns to it, as the PC engine does: a click wait
+        // then runs the tags queued behind it, and a stop stays stopped.
+        for (frame, saved) in slot.call_stack.iter().enumerate() {
+            let mut tags = match saved.wait {
+                1 => vec![("@".to_string(), HashMap::new())],
+                3 => vec![("stop".to_string(), HashMap::new())],
+                _ => Vec::new(),
+            };
+            tags.extend(as_queue(&saved.queued));
+            if !tags.is_empty() {
+                self.interpreter.defer_until_return(frame, tags);
+            }
         }
         Ok(())
     }

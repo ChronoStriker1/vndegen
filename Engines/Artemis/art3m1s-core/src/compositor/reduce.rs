@@ -265,6 +265,11 @@ impl Compositor {
     }
 
     /// 查询指定事件/键组合的已注册处理器。宿主在检测到输入后调用。
+    /// Every input handler, by event name and key.
+    pub fn input_handlers(&self) -> impl Iterator<Item = (&(String, String), &InputHandler)> {
+        self.input_handlers.iter()
+    }
+
     pub fn get_input_handler(&self, event_name: &str, key: &str) -> Option<&InputHandler> {
         self.input_handlers
             .get(&(event_name.to_string(), key.to_string()))

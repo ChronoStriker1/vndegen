@@ -198,6 +198,11 @@ impl RuntimeControlState {
     }
 
     /// 该剧情文本行是否已读。
+    /// The file `[rclick]` calls, if one was set.
+    pub(super) fn rclick_file(&self) -> Option<String> {
+        self.rclick_file.clone()
+    }
+
     pub(super) fn is_read(&self, script: &str, line: usize) -> bool {
         self.read_lines
             .get(script)

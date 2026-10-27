@@ -27,6 +27,7 @@ mod magic_path;
 mod media;
 #[cfg(feature = "ffmpeg")]
 mod media_session;
+mod pc_save;
 mod project;
 mod render;
 mod save_io;
@@ -135,6 +136,10 @@ pub struct CoreRuntime {
     font_override_cached_generation: Option<u64>,
     pending_dialog: Option<PendingDialog>,
     active_inline_event_frame: Option<InlineEventFrame>,
+    /// The wait the script was in when the active inline event frame began,
+    /// as a PC save marks it on that frame: 1 a click wait, 3 a stop
+    /// (VNDegen).
+    inline_event_wait: u32,
     /// 引擎侧最近一次写入 `script_status` 的值。用于区分「引擎状态迁移」与
     /// 「脚本经 e:setScriptStatus 强制改写」：原子量与该值不一致即为脚本改写。
     last_engine_status: u8,
@@ -353,6 +358,7 @@ impl CoreRuntime {
             reported_os: None,
             pending_dialog: None,
             active_inline_event_frame: None,
+            inline_event_wait: 0,
             last_engine_status: 0,
             script_forced_stop: false,
             was_click_wait: false,

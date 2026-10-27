@@ -266,31 +266,39 @@ impl SaveData {
     }
 
     /// The state of a PC engine save that the core restores like its own:
-    /// the local variables and the script position (VNDegen).
-    pub fn from_pc_slot(slot: &pc_slot::SlotSave) -> Self {
+    /// the local variables and the script position (VNDegen). `index` turns
+    /// a script's PC engine instruction index into the core's.
+    pub fn from_pc_slot(
+        slot: &pc_slot::SlotSave,
+        mut index: impl FnMut(&str, usize) -> Result<usize, String>,
+    ) -> Result<Self, String> {
         let mut variables = VariableStore::new();
         for (name, value) in &slot.locals {
             variables.set(name, value.clone());
         }
-        Self {
+        let call_stack = slot
+            .call_stack
+            .iter()
+            .map(|frame| {
+                Ok(CallFrameSnapshot {
+                    script: frame.script.clone(),
+                    return_line: index(&frame.script, frame.index)?,
+                })
+            })
+            .collect::<Result<_, String>>()?;
+        Ok(Self {
             version: SAVE_FORMAT_VERSION,
             variables,
-            current_script: slot.resume().script.clone(),
-            current_line: slot.resume().index,
-            call_stack: slot
-                .call_stack
-                .iter()
-                .take(slot.call_stack.len().saturating_sub(1))
-                .map(|frame| CallFrameSnapshot {
-                    script: frame.script.clone(),
-                    return_line: frame.index,
-                })
-                .collect(),
+            current_script: slot.position.script.clone(),
+            current_line: index(&slot.position.script, slot.position.index)?,
+            call_stack,
             scene: None,
             audio: None,
-            waiting_for_input: None,
+            // The game continues at an instruction of its save routine, not
+            // at a wait.
+            waiting_for_input: Some(false),
             message_text: None,
-        }
+        })
     }
 
     pub fn with_scene(mut self, scene: crate::compositor::Scene) -> Self {

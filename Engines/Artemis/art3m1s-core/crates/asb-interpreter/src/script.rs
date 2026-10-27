@@ -269,6 +269,24 @@ impl Script {
         self.labels.get(label).copied()
     }
 
+    /// The index the PC Artemis engine gives an instruction in its saves. It
+    /// numbers instructions the same way, except that `[/if]` gets no index
+    /// (VNDegen).
+    pub fn pc_index(&self, index: usize) -> usize {
+        let before = &self.instructions[..index.min(self.instructions.len())];
+        index - before.iter().filter(|instruction| instruction.tag == "/if").count()
+    }
+
+    /// The instruction a PC Artemis engine index points at (VNDegen).
+    pub fn index_from_pc(&self, pc_index: usize) -> usize {
+        self.instructions
+            .iter()
+            .enumerate()
+            .filter(|(_, instruction)| instruction.tag != "/if")
+            .nth(pc_index)
+            .map_or(self.instructions.len(), |(index, _)| index)
+    }
+
     /// 获取指令
     pub fn get_instruction(&self, line: usize) -> Option<&Instruction> {
         self.instructions.get(line)
@@ -527,6 +545,15 @@ mod tests {
         assert_eq!(script.labels.get("main"), Some(&0));
         assert_eq!(script.labels.get("next"), Some(&2));
         assert_eq!(script.instructions.len(), 3);
+    }
+
+    #[test]
+    fn pc_indexes_skip_endif() {
+        let content = "*main\n[if exp=\"1\"]\n[var name=\"a\" data=\"1\"]\n[/if]\n[stop]\n";
+        let script = Script::parse("test", content).unwrap();
+        assert_eq!(script.instructions[2].tag, "/if");
+        assert_eq!((0..4).map(|i| script.pc_index(i)).collect::<Vec<_>>(), [0, 1, 2, 2]);
+        assert_eq!((0..4).map(|pc| script.index_from_pc(pc)).collect::<Vec<_>>(), [0, 1, 3, 4]);
     }
 
     #[test]

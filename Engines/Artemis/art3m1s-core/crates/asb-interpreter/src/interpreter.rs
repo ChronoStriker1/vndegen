@@ -2095,6 +2095,50 @@ impl Interpreter {
         Ok(())
     }
 
+    /// The tags queued behind the click wait the script last stopped at, which
+    /// run once it is clicked through (VNDegen).
+    pub fn queued_wait_tags(&self) -> Vec<(String, HashMap<String, String>)> {
+        self.queued_wait_checkpoints
+            .last()
+            .map(|checkpoint| checkpoint.deferred.clone())
+            .unwrap_or_default()
+    }
+
+    /// The macro files loaded so far.
+    pub fn loaded_macro_files(&self) -> Vec<String> {
+        let mut files: Vec<String> = self.macro_files.keys().cloned().collect();
+        files.sort();
+        files
+    }
+
+    /// The PC Artemis engine's index for an instruction of a script (VNDegen).
+    pub fn pc_index(&self, script: &str, index: usize) -> usize {
+        self.scripts
+            .get(script)
+            .map_or(index, |loaded| loaded.pc_index(index))
+    }
+
+    /// The instruction of a script that a PC Artemis engine index points at,
+    /// loading the script first (VNDegen).
+    pub fn index_from_pc(&mut self, script: &str, pc_index: usize) -> Result<usize> {
+        self.load_external_script(script)?;
+        Ok(self.scripts[script].index_from_pc(pc_index))
+    }
+
+    /// Holds tags until the call frame at `frame` returns, as a queued call
+    /// holds the tags queued after it. Runs them next if that frame is gone
+    /// (VNDegen).
+    pub fn defer_until_return(&mut self, frame: usize, tags: Vec<(String, HashMap<String, String>)>) {
+        if frame < self.call_stack.len() {
+            self.queued_call_barriers.push(QueuedCallBarrier {
+                stack_depth: frame + 1,
+                deferred: tags,
+            });
+        } else {
+            self.append_queued_tags(tags);
+        }
+    }
+
     pub fn flush_pending_tags(&mut self) -> Result<()> {
         self.flush_tag_queue()?;
         Ok(())
@@ -2665,6 +2709,40 @@ mod tests {
         let context = it.engine_context().lock().unwrap();
         assert!(context.tag_queue.is_empty());
         assert_eq!(context.immediate_tag_count, 0);
+    }
+
+    #[test]
+    fn deferred_tags_run_when_their_frame_returns() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.load_script("story", "*main\n[var name=\"t.early\" data=\"1\"]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("routine", "*save\n[var name=\"t.saved\" data=\"1\"]\n[return]\n").unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.restore_position(
+            "routine",
+            0,
+            vec![super::CallFrame {
+                script: "story".into(),
+                return_line: 1,
+            }],
+        )
+        .unwrap();
+        it.defer_until_return(
+            0,
+            vec![
+                ("var".into(), HashMap::from([("name".into(), "t.deferred".into()), ("data".into(), "1".into())])),
+                ("stop".into(), HashMap::new()),
+            ],
+        );
+
+        assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(_)));
+        assert_eq!(it.get_variable("t.saved"), Some(Value::Int(1)));
+        assert_eq!(it.get_variable("t.deferred"), Some(Value::Int(1)));
+        assert_eq!(it.get_variable("t.after"), None, "the frame resumes only after the deferred stop");
+        assert_eq!((it.current_script(), it.current_line()), (Some("story"), 1));
     }
 
     #[test]

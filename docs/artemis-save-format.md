@@ -36,7 +36,7 @@ Field 1: a count and that many name and value strings, the `s.` variables.
 - Field 1: a count of scripts, and for each a script name, a count, and that many instruction indexes already run.
 - Field 2: the `g.` variables, as in system.dat.
 
-The engine marks every instruction it runs, not only text. An instruction index counts the instructions of a script after preprocessing, `[lua]` blocks included, from 0.
+The engine marks every instruction it runs, not only text. An instruction index counts the instructions of a script after preprocessing from 0, with each `[lua]` block as one instruction. `[/if]` gets no index, so in a script with `[if]` blocks the index of an instruction is lower than its position in the script.
 
 ### Numbered and quick saves, `BOWS`
 
@@ -44,8 +44,8 @@ The root object has 68 fields, numbered up to 76. The ones identified so far:
 
 | Field | Contents |
 |---|---|
-| 3 | The current position: an object with the script name (field 3), the instruction index to continue at (field 4), the tags queued at that point (field 6, a count and tags), and the tag at that index (field 8) |
-| 4 | The call stack: a count and position objects as in field 3, outermost first |
+| 3 | The position to continue at, a frame object |
+| 4 | The call stack: a count and frame objects, outermost first |
 | 11 | The current message layer id |
 | 13, 14, 59, 60 | Message window state, a tag list keyed by window id whose entries are objects of nine fields |
 | 18 | Message window settings, keyed by window id |
@@ -71,7 +71,21 @@ The root object has 68 fields, numbered up to 76. The ones identified so far:
 
 The other fields hold single flags and counters.
 
-On a load, the PC engine continues in the innermost frame of the call stack, where the story was, not at the position in field 3, which lies inside the game's save routine. When that frame holds queued tags, the save was made at a click wait inside a page break: the engine waits for the click, then runs them. VNDegen loads a save the same way: it restores the local variables and the call stack, replays the tags of fields 26 (layers), 24 (message layers, inside a `chgmsg` for each), 56 and 33 (handlers), and 29 (music), then queues a click wait and the frame's tags.
+A frame object has these fields:
+
+| Field | Contents |
+|---|---|
+| 1 | The wait the frame was in when it called on: 0 none, 1 a click wait, 3 a `[stop]` |
+| 2 | 1 or 4 in some saves, meaning unknown; 0 works |
+| 3 | The script name |
+| 4 | The instruction index: in field 3, where to continue; in the call stack, where to return to |
+| 6 | The tags queued at that point, a count and tags |
+| 7 | A byte, 0 |
+| 8 | In the call stack, the tag at the return index, with its line; in field 3, an empty tag |
+
+A game saves from its own save routine, which a button or the script calls. The position in field 3 is the instruction right after the call that saved, in that routine. On a load, the PC engine restores the local variables and the call stack, recreates the scene, and continues at that position. The routine sees it was loaded and shows the restored screen, often with a `[trans]`, then returns. When it returns to a frame that was in a wait, that wait starts again: at a click wait, the engine waits for the click, then runs the frame's queued tags; at a stop, it stays stopped. A frame whose wait field is 0 carries on at once, so a save written with 0 there loses its page.
+
+VNDegen loads a save the same way. It replays the tags of fields 26 (layers), 24 (message layers, inside a `chgmsg` for each), 56 and 33 (handlers), and 29 (music), continues at field 3, and holds each waiting frame's wait and tags until the routine returns to it. It writes the frame of the button handler that called the save routine with the wait it interrupted.
 
 Variable values are text, except data from Pluto, the Lua persistence library games use to keep Lua tables in variables. Pluto data always holds zero bytes, which text never does.
 

@@ -392,6 +392,11 @@ impl CoreRuntime {
             crate::core_error!("建立事件返回帧失败: {error:?}");
             return;
         }
+        self.inline_event_wait = match &self.wait_reason {
+            Some(asb_interpreter::event::WaitReason::Stop { reason: None }) => 3,
+            reason if super::script::wait_reason_is_input_wait(reason.as_ref()) => 1,
+            _ => 0,
+        };
         self.active_inline_event_frame = Some(InlineEventFrame {
             script,
             line,
