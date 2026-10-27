@@ -457,7 +457,14 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     model.handle(.up)
     #expect(model.isFocused(.folderName))
     model.handle(.confirm)
-    #expect(model.editing == .folderName)
+    // A controller can't type in the system's field, so it gets the on-screen keyboard rather than field focus.
+    #expect(model.editing == nil)
+    let folderName = try #require(model.keyboard)
+    #expect(folderName.title == "Folder name")
+    folderName.handle(.dash)
+    #expect(model.importer?.folderName == folderName.text)
+    folderName.handle(.cancel)
+    #expect(model.keyboard == nil)
 
     model.handle(.down)
     model.handle(.right)
@@ -466,7 +473,16 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
     model.handle(.up)
     #expect(model.isFocused(.passwordField))
     model.handle(.confirm)
+    let password = try #require(model.keyboard)
+    #expect(password.isSecure)
+    password.handle(.confirm)
+    #expect(model.password == "q")
+
+    // Touch focuses the field itself.
+    password.close()
+    model.select(.passwordField)
     #expect(model.editing == .passwordField)
+    #expect(model.keyboard == nil)
 }
 
 // MARK: Drops

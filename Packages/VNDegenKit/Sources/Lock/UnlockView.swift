@@ -52,8 +52,12 @@ public struct UnlockView: View {
         }
     }
 
-    /// Gamepad and keyboard input while the view is shown.
+    /// Gamepad and keyboard input while the view is shown. X, the controller's dash button, tries Face ID or Touch ID again.
     public func handle(_ event: ControllerEvent) {
+        if case .button(.dash, pressed: true) = event {
+            if entry.flow == nil, lock.canUseBiometrics { Task { await tryBiometrics() } }
+            return
+        }
         switch entry.handle(event, expectedLength: expectedLength) {
         case .none: break
         case let .submit(code): submit(code)
@@ -95,11 +99,20 @@ public struct UnlockView: View {
                 Button {
                     Task { await tryBiometrics() }
                 } label: {
-                    Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
-                        .font(.headline)
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 12)
-                        .background(Capsule().fill(.white.opacity(0.14)))
+                    HStack(spacing: 8) {
+                        Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
+                        if entry.showsFocus {
+                            // The controller button that does the same.
+                            Text("X")
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .frame(width: 22, height: 22)
+                                .background(.white.opacity(0.2), in: .circle)
+                        }
+                    }
+                    .font(.headline)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(.white.opacity(0.14)))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)

@@ -6,6 +6,7 @@ import Metadata
 import Lock
 import SaveSync
 import ArchiveImport
+import ControllerUI
 
 /// Where the user is in the hub, what has focus, and how controller events move it.
 ///
@@ -123,14 +124,18 @@ final class Navigator {
             if case let .importGame(model, _)? = oldValue, sheet == nil { model.close() }
             // A license sheet closed by Done or a swipe declines it. Accept answers first, so this does nothing then.
             if case let .license(request)? = oldValue { request.respond(false) }
-            // Focus moves into a sheet and returns to whatever opened it, however the sheet closes.
+            // Focus moves into a sheet and returns to whatever opened it, however the sheet closes. A sheet that replaces
+            // another, such as a license over the artwork editor, starts on its own default.
             if oldValue == nil, sheet != nil {
                 focusBeforeSheet = focus
                 setFocus(defaultFocus)
             } else if sheet == nil, oldValue != nil {
                 setFocus(focusBeforeSheet)
                 focusBeforeSheet = nil
+            } else if let sheet, let oldValue, sheet.id != oldValue.id {
+                setFocus(defaultFocus)
             }
+            if sheet?.id != oldValue?.id { pager = ScrollPager() }
         }
     }
     @ObservationIgnored private var focusBeforeSheet: Target?
@@ -150,6 +155,10 @@ final class Navigator {
 
     /// The Ludusavi settings page. One for the app, like the service it shows.
     @ObservationIgnored private(set) lazy var saveSettings = SaveSyncSettingsModel(service: hub.saveSync)
+    @ObservationIgnored private(set) lazy var metadataSettings = MetadataSettingsModel(service: hub.metadata)
+    @ObservationIgnored private(set) lazy var lockSettings = LockSettingsModel(lock: hub.lock)
+    /// Scrolls the open sheet's text, such as a license, which has nothing to focus. Each sheet gets a new one.
+    private(set) var pager = ScrollPager()
 
     /// Runtime packages games need, such as RPG Maker RTPs, and their installs.
     let runtimes: RuntimeInstalls
@@ -409,7 +418,10 @@ final class Navigator {
         case let .artworkCandidate(index):
             if case let .artwork(editor) = sheet, editor.candidates.indices.contains(index) { editor.apply(editor.candidates[index]) }
         case .metadataQuery:
-            if case let .metadata(search) = sheet { search.editingQuery = true }
+            // A controller can't type in the system's text field, so it gets the on-screen keyboard.
+            if case let .metadata(search) = sheet {
+                if hub.input.lastInputKind == .gamepad { search.openKeyboard() } else { search.editingQuery = true }
+            }
         case let .metadataResult(index):
             if case let .metadata(search) = sheet, let results = search.results, results.indices.contains(index) {
                 apply(results[index], in: search)
@@ -698,6 +710,18 @@ final class Navigator {
         syncInputMode()
     }
 
+    /// The on-screen keyboard a controller is typing with in the open sheet. It takes every button while it is open.
+    var keyboard: OnScreenKeyboard? {
+        switch sheet {
+        case let .metadata(search)?: search.keyboard
+        case let .importGame(model, _)?: model.keyboard
+        case let .saves(model)?: model.keyboard
+        case .settingsPage(.saves)?: saveSettings.keyboard
+        case .settingsPage(.metadata)?: metadataSettings.keyboard
+        default: nil
+        }
+    }
+
     /// The settings screen and its pages, the metadata search, the Ludusavi game search in the saves sheet, and the import
     /// sheet's folder name and password have text fields that need raw keyboard input.
     private func syncInputMode() {
@@ -713,11 +737,21 @@ final class Navigator {
     func handle(_ event: ControllerEvent) {
         focusMovedByController = true
         steered = true
+        defer { logState() }
         if case .unlock = sheet {
             unlockView?.handle(event)
             return
         }
         guard case let .button(button, pressed: true) = event else { return }
+        // The alert covers everything else, and it shows no focus, so A and B both close it.
+        if hub.launchError != nil {
+            if button == .confirm || button == .cancel { hub.launchError = nil }
+            return
+        }
+        if let keyboard {
+            keyboard.handle(button)
+            return
+        }
         switch sheet {
         case let .saves(model)?:
             if !model.handle(button), button == .cancel { back() }
@@ -728,6 +762,19 @@ final class Navigator {
         case .settingsPage(.saves)?:
             if !saveSettings.handle(button), button == .cancel { back() }
             return
+        case .settingsPage(.metadata)?:
+            if !metadataSettings.handle(button), button == .cancel { back() }
+            return
+        case .settingsPage(.lock)?:
+            if !lockSettings.handle(button), button == .cancel { back() }
+            return
+        case .settingsPage(.licenses)?, .license?:
+            // Licenses are text to read: up and down scroll a little, the shoulder buttons a page.
+            switch button {
+            case .up, .down: return pager.scroll(pages: button == .up ? -0.3 : 0.3)
+            case .pageUp, .pageDown: return pager.scroll(pages: button == .pageUp ? -1 : 1)
+            default: break
+            }
         case let .mapping(editor)?:
             if !editor.handle(button), button == .cancel { back() }
             return
@@ -788,3 +835,22 @@ extension Navigator.Target {
         }
     }
 }
+
+#if DEBUG
+extension Navigator {
+    /// With `-logNavigation YES`, logs where the hub is after each controller press, so a script driving the DEBUG hooks
+    /// can check the result without a screenshot.
+    func logState() {
+        guard UserDefaults.standard.bool(forKey: "logNavigation") else { return }
+        let sheet = self.sheet.map { "\($0.id)" } ?? "none"
+        let route = self.route.map { "\($0)" } ?? "home"
+        let keyboard = keyboard.map { "\($0.title):\($0.focusedKey):\($0.isSecure ? "secure" : $0.text)" } ?? "none"
+        NSLog("HUBNAV route=%@ sheet=%@ focus=%@ keyboard=%@ alert=%@", route, sheet, focus.map { "\($0)" } ?? "none", keyboard,
+              hub.launchError ?? "none")
+    }
+}
+#else
+extension Navigator {
+    func logState() {}
+}
+#endif

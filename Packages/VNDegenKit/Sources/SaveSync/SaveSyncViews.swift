@@ -1,5 +1,6 @@
 import SwiftUI
 import VNCore
+import ControllerUI
 #if canImport(UIKit)
 import UIKit
 #else
@@ -7,12 +8,14 @@ import AppKit
 #endif
 
 /// The state behind `SaveSyncSettingsView`, including gamepad focus. A host that drives the view with a controller keeps
-/// the model and forwards button presses to `handle(_:)`. The text fields take touch and keyboard only.
+/// the model and forwards button presses to `handle(_:)`, or to `keyboard` while it is open. A controller types into
+/// the text fields on that on-screen keyboard.
 @MainActor
 @Observable
 public final class SaveSyncSettingsModel {
     enum Target: Hashable {
-        case guest, test, forget, matchRetention, fullBackups, differentialBackups, autoBackup, checkBeforeLaunch
+        case host, port, guest, username, password, path, test, forget, matchRetention, fullBackups, differentialBackups
+        case autoBackup, checkBeforeLaunch
     }
 
     public let service: SaveSyncService
@@ -26,6 +29,8 @@ public final class SaveSyncSettingsModel {
     /// Why the details could not be saved, such as a Keychain error.
     var problem: String?
     var focus = FocusRing<Target>()
+    /// The keyboard a controller is typing into a field with.
+    public private(set) var keyboard: OnScreenKeyboard?
 
     public init(service: SaveSyncService) {
         self.service = service
@@ -44,7 +49,7 @@ public final class SaveSyncSettingsModel {
     var canTest: Bool { !host.isEmpty && !path.isEmpty && Int(port) != nil && (guest || !username.isEmpty) }
 
     var rows: [Target] {
-        var rows: [Target] = [.guest, .test]
+        var rows: [Target] = [.host, .port, .guest] + (guest ? [] : [.username, .password]) + [.path, .test]
         if service.server != nil { rows.append(.forget) }
         if service.configRetention == nil {
             rows.append(.matchRetention)
@@ -84,6 +89,11 @@ public final class SaveSyncSettingsModel {
 
     private func activate(_ target: Target) {
         switch target {
+        case .host: type("Host", \.host)
+        case .port: type("Port", \.port)
+        case .username: type("Username", \.username)
+        case .password: type("Password", \.password, secure: true)
+        case .path: type("Path", \.path)
         case .guest: guest.toggle()
         case .test:
             guard canTest, service.connection != .checking else { return }
@@ -105,6 +115,14 @@ public final class SaveSyncSettingsModel {
         case .differentialBackups: service.manualRetention?.differential = min(255, (service.manualRetention?.differential ?? 0) + 1)
         case .autoBackup: service.autoBackup.toggle()
         case .checkBeforeLaunch: service.checkBeforeLaunch.toggle()
+        }
+    }
+
+    private func type(_ title: String, _ field: ReferenceWritableKeyPath<SaveSyncSettingsModel, String>, secure: Bool = false) {
+        keyboard = OnScreenKeyboard(title: title, text: self[keyPath: field], isSecure: secure) { [weak self] in
+            self?[keyPath: field] = $0
+        } onClose: { [weak self] in
+            self?.keyboard = nil
         }
     }
 }
@@ -135,18 +153,23 @@ public struct SaveSyncSettingsView: View {
                 }
                 Section {
                     LabeledContent("Host") { field("nas.example", text: $model.host) }
+                        .focusRow(model.focus.isFocused(.host, in: rows), id: SaveSyncSettingsModel.Target.host)
                     LabeledContent("Port") { field(String(SMBRemote.defaultPort), text: $model.port) }
+                        .focusRow(model.focus.isFocused(.port, in: rows), id: SaveSyncSettingsModel.Target.port)
                     Toggle("Guest", isOn: Binding(get: { model.guest }, set: { _ in model.select(.guest) }))
                         .focusRow(model.focus.isFocused(.guest, in: rows), id: SaveSyncSettingsModel.Target.guest)
                     if !model.guest {
                         LabeledContent("Username") { field("username", text: $model.username) }
+                            .focusRow(model.focus.isFocused(.username, in: rows), id: SaveSyncSettingsModel.Target.username)
                         LabeledContent("Password") {
                             SecureField("Password", text: $model.password, prompt: Text("password"))
                                 .labelsHidden()
                                 .multilineTextAlignment(.trailing)
                         }
+                        .focusRow(model.focus.isFocused(.password, in: rows), id: SaveSyncSettingsModel.Target.password)
                     }
                     LabeledContent("Path") { field("games/Ludusavi", text: $model.path) }
+                        .focusRow(model.focus.isFocused(.path, in: rows), id: SaveSyncSettingsModel.Target.path)
                     connectionStatus
                     Button(service.connection == .checking ? "Connecting…" : "Test Connection", systemImage: "network") { model.select(.test) }
                         .disabled(!model.canTest || service.connection == .checking)
@@ -180,6 +203,7 @@ public struct SaveSyncSettingsView: View {
                 withAnimation { proxy.scrollTo(target, anchor: .center) }
             }
         }
+        .onScreenKeyboard(model.keyboard)
         .task { await service.refresh() }
     }
 
@@ -251,7 +275,7 @@ public final class GameSavesModel {
     enum Target: Hashable {
         case ludusaviGame, backup(String), restore, backUp, undo
         /// Rows of the Ludusavi game picker.
-        case automaticMatch, folder(String)
+        case search, automaticMatch, folder(String)
     }
 
     struct Status {
@@ -289,6 +313,9 @@ public final class GameSavesModel {
     var choosingGame = false
     var query = ""
     var focus = FocusRing<Target>()
+    /// The keyboard a controller is typing the picker's search with. The host forwards button presses to it while it is
+    /// open.
+    public private(set) var keyboard: OnScreenKeyboard?
 
     public init(service: SaveSyncService, game: GameID) {
         self.service = service
@@ -305,7 +332,7 @@ public final class GameSavesModel {
     private var isSetUp: Bool { service.server != nil }
 
     var rows: [[Target]] {
-        if choosingGame { return [[.automaticMatch]] + filteredFolders.map { [.folder($0.folder)] } }
+        if choosingGame { return [[.search], [.automaticMatch]] + filteredFolders.map { [.folder($0.folder)] } }
         guard isSetUp else { return [] }
         return [[.ludusaviGame]] + backups.reversed().map { [.backup($0.name)] } + [[.restore], [.backUp], [.undo]]
     }
@@ -359,6 +386,12 @@ public final class GameSavesModel {
             guard let judged else { break }
             if service.backupWarning(game) == nil { run { try await self.backUp(on: judged) } } else { confirming = .backUp }
         case .undo: if service.canUndoRestore(game) { confirming = .undo }
+        case .search:
+            keyboard = OnScreenKeyboard(title: "Search", text: query) { [weak self] in
+                self?.query = $0
+            } onClose: { [weak self] in
+                self?.keyboard = nil
+            }
         case .automaticMatch: pick(nil)
         case let .folder(folder): pick(folder)
         }
@@ -381,6 +414,7 @@ public final class GameSavesModel {
 
     /// Focus returns to the row that opened the picker.
     func closePicker() {
+        keyboard = nil
         choosingGame = false
         focus.target = .ludusaviGame
     }
@@ -724,6 +758,13 @@ private struct LudusaviGamePicker: View {
         NavigationStack {
             ScrollViewReader { proxy in
                 List {
+                    // A row rather than `searchable`, so controller focus can reach it.
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("Search", text: $model.query)
+                            .autocorrectionDisabled()
+                    }
+                    .focusRow(model.isFocused(.search), id: GameSavesModel.Target.search)
                     Button { model.select(.automaticMatch) } label: { Label("Match automatically", systemImage: "wand.and.stars") }
                         .focusRow(model.isFocused(.automaticMatch), id: GameSavesModel.Target.automaticMatch)
                     ForEach(model.filteredFolders, id: \.folder) { item in
@@ -745,7 +786,7 @@ private struct LudusaviGamePicker: View {
                     withAnimation { proxy.scrollTo(target, anchor: .center) }
                 }
             }
-            .searchable(text: $model.query)
+            .onScreenKeyboard(model.keyboard)
             .navigationTitle("Ludusavi Game")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { model.closePicker() } }
@@ -874,67 +915,5 @@ public struct LaunchSavesView: View {
         return isConflict
             ? "Your saves here changed since the last sync, and \(source) backed up this game on \(when)."
             : "\(source) backed up newer saves on \(when). Your saves here have not changed since the last sync."
-    }
-}
-
-// MARK: Gamepad focus
-
-/// Which control has gamepad focus, among rows of controls that the owning model derives from its state.
-struct FocusRing<Target: Hashable> {
-    var target: Target?
-    /// The ring shows only once a controller moved it, so touch users never see it.
-    var showsFocus = false
-
-    /// The focused control, or the default when the stored one is no longer on screen. A default that is not on screen
-    /// either, such as a row the search filter hid, falls back to the first control.
-    func current(in rows: [[Target]], default fallback: Target? = nil) -> Target? {
-        for candidate in [target, fallback] {
-            if let candidate, rows.contains(where: { $0.contains(candidate) }) { return candidate }
-        }
-        return rows.first?.first
-    }
-
-    func isFocused(_ candidate: Target, in rows: [[Target]], default fallback: Target? = nil) -> Bool {
-        showsFocus && current(in: rows, default: fallback) == candidate
-    }
-
-    /// Up and down change rows, left and right move within one. Returns false for buttons that are not directions.
-    mutating func move(_ button: VirtualButton, in rows: [[Target]], default fallback: Target? = nil) -> Bool {
-        guard [.up, .down, .left, .right].contains(button) else { return false }
-        defer { showsFocus = true }
-        guard let current = current(in: rows, default: fallback),
-              let r = rows.firstIndex(where: { $0.contains(current) }), let c = rows[r].firstIndex(of: current) else { return true }
-        // The first press only reveals the ring where focus already is.
-        guard showsFocus else { return true }
-        switch button {
-        case .up where r > 0: target = rows[r - 1][min(c, rows[r - 1].count - 1)]
-        case .down where r < rows.count - 1: target = rows[r + 1][min(c, rows[r + 1].count - 1)]
-        case .left: target = rows[r][max(0, c - 1)]
-        case .right: target = rows[r][min(rows[r].count - 1, c + 1)]
-        default: target = current
-        }
-        return true
-    }
-
-    mutating func select(_ candidate: Target) {
-        target = candidate
-        showsFocus = false
-    }
-}
-
-/// The row background for gamepad focus: a tinted fill with a white outline, like the hub's focus ring.
-private struct FocusRowBackground: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(.tint.opacity(0.32))
-            .strokeBorder(.white, lineWidth: 2.5)
-    }
-}
-
-private extension View {
-    func focusRow(_ focused: Bool, id: some Hashable) -> some View {
-        listRowBackground(focused ? FocusRowBackground() : nil)
-            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
-            .id(id)
     }
 }

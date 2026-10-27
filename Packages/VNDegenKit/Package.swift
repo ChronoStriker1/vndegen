@@ -25,6 +25,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "VNCore"),
+        // Controller focus rows, the on-screen keyboard a controller types on, and controller scrolling, for every
+        // module that draws a screen.
+        .target(name: "ControllerUI", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "GameInput", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "WebRuntime", dependencies: ["VNCore"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
@@ -41,10 +44,10 @@ let package = Package(
         .target(name: "CRGSS"),
         .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
-        .target(name: "Metadata", dependencies: ["VNCore"]),
-        .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
-        .target(name: "SaveSync", dependencies: ["VNCore", "Rclone"]),
+        .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
+        .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "ControllerUI", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
+        .target(name: "SaveSync", dependencies: ["VNCore", "ControllerUI", "Rclone"]),
         // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
         .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
         .target(name: "Rclone", dependencies: ["CRclone"],
@@ -53,7 +56,7 @@ let package = Package(
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
-        .target(name: "ArchiveImport", dependencies: ["CArchive"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
+        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
@@ -68,7 +71,8 @@ let package = Package(
         .testTarget(name: "EngineKiriKiriTests", dependencies: ["EngineKiriKiri", "GameInput", "HubUI"], exclude: ["Fixtures"]),
         .testTarget(name: "MetadataTests", dependencies: ["Metadata"], exclude: ["Fixtures"]),
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
-        .testTarget(name: "LockTests", dependencies: ["Lock"]),
+        .testTarget(name: "ControllerUITests", dependencies: ["ControllerUI", "VNCore"]),
+        .testTarget(name: "LockTests", dependencies: ["Lock", "VNCore"]),
         .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy"]),
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
         .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone"]),

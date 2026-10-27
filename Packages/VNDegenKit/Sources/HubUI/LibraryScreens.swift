@@ -233,11 +233,11 @@ struct SettingsPageSheet: View {
             switch page {
             case .metadata:
                 SheetScaffold(title: "Metadata sources", escapeCloses: true) {
-                    MetadataSettingsView(service: hub.metadata).scrollContentBackground(.hidden)
+                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden)
                 }
             case .lock:
                 SheetScaffold(title: "Hidden games") {
-                    LockSettingsView(lock: hub.lock).scrollContentBackground(.hidden)
+                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden)
                 }
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
