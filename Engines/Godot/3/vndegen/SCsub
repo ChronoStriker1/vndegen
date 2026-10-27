@@ -6,8 +6,11 @@ Import("env_modules")
 env_vndegen = env_modules.Clone()
 # vngd.h lives with the Swift package that calls it.
 env_vndegen.Prepend(CPPPATH=[Dir(".").srcnode().abspath + "/../../../../Packages/VNDegenKit/Sources/CGodot/include"])
+# The file name lookup every engine shares.
+shared = Dir(".").srcnode().abspath + "/../../../Shared"
+env_vndegen.Prepend(CPPPATH=[shared])
 
-sources = ["register_types.cpp", "vngd.cpp", "vngd_keys.cpp"]
+sources = ["register_types.cpp", "vngd.cpp", "vngd_keys.cpp", File(shared + "/casepath.c")]
 if env["platform"] in ("iphone", "osx"):
     sources += ["vngd_apple.mm", "vngd_gles_apple.cpp"]
     env_vndegen.Append(CCFLAGS=["-fobjc-arc"])

@@ -20,17 +20,18 @@ public:
 			OS_VNDegen<OS_IOS>(p_launch) {}
 };
 #else
+#import "platform/macos/dir_access_macos.h"
 #import "platform/macos/os_macos.h"
 
 // Godot's macOS OS, without its crash handler, which would take over VNDegen's, and without the controllers it reads
 // itself. VNDegen runs the main loop, so run() is never called.
-class OS_VNDegenApple : public OS_VNDegen<OS_MacOS> {
+class OS_VNDegenApple : public OS_VNDegen<OS_MacOS, DirAccessMacOS> {
 public:
 	void initialize() override { initialize_core(); }
 	void initialize_joypads() override {}
 	void run() override {}
 	OS_VNDegenApple(const VNGDLaunch *p_launch) :
-			OS_VNDegen<OS_MacOS>(p_launch, p_launch->executable, 0, nullptr) {}
+			OS_VNDegen<OS_MacOS, DirAccessMacOS>(p_launch, p_launch->executable, 0, nullptr) {}
 };
 #endif
 

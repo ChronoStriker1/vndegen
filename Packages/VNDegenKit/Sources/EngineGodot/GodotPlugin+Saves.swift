@@ -9,7 +9,8 @@ extension GodotPlugin {
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let layout = GodotLayout(FolderProbe(scanning: folder)) else { return [] }
         let userDirectory = layout.header.userDirectory
-        let directory = Self.appDataDirectory(dataDirectory).appendingPathComponent(userDirectory, isDirectory: true)
+        // Godot finds user:// whatever its case on disk, so a restored folder named in another case is the game's.
+        let directory = FileCase.resolve(userDirectory, in: Self.appDataDirectory(dataDirectory))
         let local = directory.standardizedFileURL.path + "/"
         return [SaveLocation(directory: directory) { path in
             if path.hasPrefix(local) { return Self.insideFolder(String(path.dropFirst(local.count))) }

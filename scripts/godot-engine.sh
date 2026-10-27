@@ -27,7 +27,7 @@ scons_version=4.10.1
 
 mkdir -p "$dest" "$cache"
 dest=$(cd "$dest" && pwd)
-stamp=$( (cat "$0" "$api/vngd.h" "$root/Engines/Shared/vnfont.c" "$root/Engines/Shared/vnfont.h"; echo "$slices $majors"; cd "$src" && find . -path ./test-host -prune -o -type f ! -name "*.o" -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+stamp=$( (cat "$0" "$api/vngd.h" "$root/Engines/Shared/vnfont.c" "$root/Engines/Shared/vnfont.h" "$root/Engines/Shared/casepath.c" "$root/Engines/Shared/casepath.h"; echo "$slices $majors"; cd "$src" && find . -path ./test-host -prune -o -type f ! -name "*.o" -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
 if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "Godot engines are up to date in $dest"
   exit 0

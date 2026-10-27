@@ -4,8 +4,19 @@
 
 #include "platform/linuxbsd/os_linuxbsd.h"
 
+// Godot's Linux OS starts its file access without calling initialize_core, so this installs the case lookup itself.
+class OS_VNDegenLinux : public OS_VNDegen<OS_LinuxBSD> {
+public:
+	using OS_VNDegen<OS_LinuxBSD>::OS_VNDegen;
+
+	void initialize() override {
+		OS_VNDegen<OS_LinuxBSD>::initialize();
+		vngd_use_case_lookup<DirAccessUnix>();
+	}
+};
+
 OS *vngd_platform_create_os(const VNGDLaunch *p_launch) {
-	return new OS_VNDegen<OS_LinuxBSD>(p_launch);
+	return new OS_VNDegenLinux(p_launch);
 }
 
 void vngd_platform_destroy_os(OS *p_os) {

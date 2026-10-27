@@ -18,7 +18,7 @@ Games exported with Godot 3.3 and 3.5 and with Godot 4.2, 4.3, and 4.5 were test
 Every game draws inside VNDegen's window, so the VNDegen menu and touch controls sit over it as over the other engines.
 
 - Godot 4 renders on Metal, on Mac, iPhone, and iPad. VNDegen's Godot 4 has no OpenGL, so games made for the compatibility renderer run on the mobile renderer on Metal. Their 2D games look the same. Shaders written for OpenGL can look different.
-- In the iOS Simulator, Godot 4 runs its compatibility renderer instead, on OpenGL ES 3 through MetalANGLE. The simulator's Metal device reports only GPU families Apple1 and Apple2, and Godot's Metal renderer needs Apple4. A few of the compatibility renderer's shaders fail to link on ANGLE there, and the games still draw. Devices and the Mac don't run that renderer.
+- In the iOS Simulator, Godot 4 runs its compatibility renderer instead, on OpenGL ES 3 through MetalANGLE. The simulator's Metal device reports only GPU families Apple1 and Apple2, and Godot's Metal renderer needs Apple4. A few of the compatibility renderer's shaders fail to link on ANGLE there, and the games still draw. The 2D back buffer's mipmaps use a box filter there in place of Godot's blur, which MetalANGLE can't draw. Devices and the Mac don't run that renderer.
 - Godot 3 renders on OpenGL: Apple's OpenGL on Mac, into IOSurfaces a layer shows, and OpenGL ES through MetalANGLE, ANGLE's Metal backend, on iPhone and iPad.
 
 Both frameworks are arm64 only, so an Intel Mac lists Godot games but can't run them.
@@ -37,6 +37,10 @@ VNDegen sends all input itself, through `vngd.h`. Godot reads no controller of i
 Godot keeps a game's saves in `user://`. On Windows that is `%APPDATA%\Godot\app_userdata\<project name>`, or `%APPDATA%\<folder>` for a project that names its own folder. VNDegen keeps the same layout under `AppData/Roaming` in the game's data folder, taking the project name and folder from the pack's `project.binary`, and reports it to Ludusavi. Backups from Windows, a Steam Deck's Proton, and Godot's Linux and Mac builds map into it.
 
 The game sees its `.exe` in its own folder as its executable path, so games that save beside the `.exe` save in their own folder, as on PC.
+
+## File names
+
+Windows ignores case in file names, and iPhone and iPad disks don't. Godot finds a file inside the pack by its exact name on every platform, Windows too, so games already name those files right. Files outside the pack can differ: a game may read `Items/` beside its `.exe` when the folder is `items`, and a backup may restore `user://` as `godot/app_userdata`. VNDegen's file and folder access in both frameworks finds those whatever their case, through `Engines/Shared/casepath.c`, and a write to a name that exists in another case replaces that file.
 
 ## Starting again
 

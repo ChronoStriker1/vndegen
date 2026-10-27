@@ -2,6 +2,7 @@
 // with OpenGL ES through MetalANGLE, in an MGLLayer inside VNDegen's layer. macOS draws with Apple's OpenGL into
 // IOSurfaces that a layer inside VNDegen's shows.
 
+#include "vngd_files.h"
 #include "vngd_platform.h"
 
 #include "vngd_keys.h"
@@ -289,6 +290,7 @@ public:
 	// The log file needs Godot's file access, which starts here.
 	void initialize_core() override {
 		OS_Unix::initialize_core();
+		vngd_use_case_lookup();
 		if (!log_path.empty()) {
 			Vector<Logger *> loggers;
 			loggers.push_back(memnew(StdLogger));

@@ -1,5 +1,6 @@
 // Linux, for testing the C interface on a Linux build. Games open their own X11 window there. Godot's X11 OS starts and
 // ends the main loop in its own run(), which VNDegen doesn't call, so this does that part.
+#include "vngd_files.h"
 #include "vngd_platform.h"
 
 #include "core/os/main_loop.h"
@@ -21,6 +22,13 @@ public:
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
 
+protected:
+	void initialize_core() override {
+		OS_X11::initialize_core();
+		vngd_use_case_lookup();
+	}
+
+public:
 	OS_VNDegenX11(const VNGDLaunch *p_launch) {
 		executable = String::utf8(p_launch->executable);
 		data_path = String::utf8(p_launch->dataDir);

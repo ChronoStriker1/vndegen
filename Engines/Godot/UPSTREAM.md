@@ -38,6 +38,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
   - `StringName` setup and cleanup run once, so names outlive the engine.
   - Singletons whose destructors left their pointer set now clear it: IP, InputMap, PackedData, ResourceFormatImporter, Performance, Input, ShaderTypes, PhysicsServerSW, VisualServerScene, NavigationMeshGenerator, ZipArchive, and JavaScript.
   - The audio, physics, and 2D physics server managers forget their drivers and servers at cleanup.
+- `03-virtual-fix-path.patch`: makes `FileAccess::fix_path` and `DirAccess::fix_path` virtual, as they are in Godot 4, so VNDegen's file access can find names whatever their case.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|
@@ -58,6 +59,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
   - The functions in `Packages/VNDegenKit/Sources/CGodot/include/vngd.h` (`vngd.cpp`).
   - `DisplayServerVNDegen`, which draws into the CAMetalLayer VNDegen hands it and takes all input through `vngd.h` (`display_server_vndegen.mm`).
   - The OS for each platform (`vngd_apple.mm`, and `vngd_linuxbsd.cpp` for testing on Linux). It gives games their `.exe` as the executable path and keeps `user://` where Windows does, under VNDegen's stand-in for `%APPDATA%`.
+  - File and folder access that finds files outside the pack whatever case the game names them in, through `Engines/Shared/casepath.c` (`vngd_files.h`, also in the Godot 3 module).
 - `3/vndegen/`: the Godot 3 module, with the same functions. Its OS draws with MetalANGLE on iPhone and iPad and with Apple's OpenGL on Mac, into two IOSurfaces a layer shows (`vngd_apple.mm`), and `vngd_x11.cpp` runs it on Linux for testing.
 - `vngd_frames.h`: the frame timing both modules log for `VNGD_FRAME_LOG`.
 - `test-host/vngd_test.c`: runs games through `vngd.h` on Linux, one after another in one process, to test that each engine starts again.
