@@ -476,6 +476,24 @@ extension WebGameSession {
             send(.button(button, pressed: true))
             await sleep(seconds)
             send(.button(button, pressed: false))
+        case let .mash(input, count, hold, gap):
+            for _ in 0..<count {
+                send(.gamepad(input, pressed: true))
+                await sleep(hold)
+                send(.gamepad(input, pressed: false))
+                await sleep(gap)
+            }
+        case let .mashKey(button, count, hold, gap):
+            for _ in 0..<count {
+                send(.button(button, pressed: true))
+                await sleep(hold)
+                send(.button(button, pressed: false))
+                await sleep(gap)
+            }
+        case let .padWhen(input, seconds, condition):
+            if await poll(condition, for: seconds, every: 0.016, label: "padwhen \(input.rawValue)", step: {}) {
+                await perform(.mash(input, count: 1, hold: 0.05, gap: 0))
+            }
         case .tap(let point):
             send(.pointer(PointerEvent(phase: .began, location: point)))
             await sleep(0.08)
@@ -501,7 +519,9 @@ extension WebGameSession {
     }
 
     /// Evaluates `condition` until it is truthy or `seconds` pass, running `step` and waiting `interval` between tries.
-    private func poll(_ condition: String, for seconds: Double, every interval: Double, label: String, step: () async -> Void) async {
+    /// Returns whether the condition was met.
+    @discardableResult
+    private func poll(_ condition: String, for seconds: Double, every interval: Double, label: String, step: () async -> Void) async -> Bool {
         let start = Date()
         var met = false
         var tries = 0
@@ -513,6 +533,7 @@ extension WebGameSession {
             await sleep(interval)
         }
         log.notice("script \(label, privacy: .public): \(met ? "met" : "timed out", privacy: .public) after \(tries) tries, \(Date().timeIntervalSince(start), format: .fixed(precision: 1)) s: \(condition, privacy: .public)")
+        return met
     }
 
     /// Counts requestAnimationFrame callbacks (what the compositor delivers) and RPG Maker's Graphics.frameCount (engine updates)
