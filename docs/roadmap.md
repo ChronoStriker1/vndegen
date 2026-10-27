@@ -25,10 +25,10 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - An RPG Maker MZ fix (0.6.1): quick controller, touch gamepad, and key presses all reach the game. Each press and release reaches the game's input on its own update, and a VisuStella Core Engine input clear no longer drops the presses that follow it, so timed attacks that need several quick presses succeed.
 - The whole app works with a controller alone (0.6.2): every screen, Settings page, dialog and sheet takes controller focus, text fields open an on-screen keyboard the controller types on, the mapping editor has Reset and LB and RB group jumps, and import lists archives in VNDegen's folder. The Files and Photos pickers say they need touch or a mouse. Settings rows on the Mac show controller focus.
 - iPad windows, on `dev` for the next release: VNDegen fits small and odd window sizes on iPad. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of iPadOS's window controls. A game in a window follows the window's shape. Checked by laying the app out at sizes down to 320 points wide and in real windows on the iPad simulator. Real drag-resizing, tiling, and Slide Over couldn't be driven in the simulator.
+- Game files found whatever case the game names them in, for every engine, on `dev` for the next release. iPhone and iPad disks tell `Img/Title.PNG` from `img/title.png`, and Windows games often mix the two. Every engine plugin must pass the case check in the README's "Adding an engine" section.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- First priority, in final checks: every engine finds a game's files whatever case the game uses for file and folder names, as on Windows, on iPhone, iPad, and case-sensitive Mac volumes. Every new engine plugin must pass the same check.
 - NScripter, on VNDegen's own clean-room runtime (item 2).
 - Flash through Ruffle (item 7). All 14 library Flash games reach their title screen on Linux, and a smoke test on the iPad simulator passed.
 - Godot (item 8), with Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. Two library games can't be supported. One needs Steam ownership, and one has an encrypted pack and Windows-only GDExtensions.
