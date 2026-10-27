@@ -117,6 +117,30 @@ import VNCore
         #expect(store.files().isEmpty)
     }
 
+    @Test func installsTheListedFilesOfAZip() async throws {
+        let store = try TemporaryStore()
+        let zip = StoredZip.make([("Fonts/", nil), ("Fonts/A-Regular.otf", [1, 2, 3]), ("Fonts/A-Heavy.otf", [4]),
+                                  ("LICENSE.txt", Array("free".utf8))])
+        let (session, url) = StubURLProtocol.serve(.init(body: .data(zip)))
+        let package = RuntimePackage(id: "TestFonts", name: "Test Fonts", download: url, sha256: sha256(zip),
+                                     size: Int64(zip.count), installer: .zip(files: ["Fonts/A-Regular.otf", "LICENSE.txt"]),
+                                     licensePage: URL(string: "https://example.invalid/license")!)
+        let folder = try await store.store.install(package, session: session, progress: { _ in }, acceptLicense: { _ in
+            Issue.record("a zip package asks for no license")
+            return false
+        })
+        #expect(try tree(folder) == ["A-Regular.otf": sha256(Data([1, 2, 3])), "LICENSE.txt": sha256(Data("free".utf8))])
+
+        // A zip without a listed file installs nothing.
+        let missing = RuntimePackage(id: "TestFonts2", name: package.name, download: url, sha256: package.sha256,
+                                     size: package.size, installer: .zip(files: ["Fonts/A-Bold.otf"]),
+                                     licensePage: package.licensePage)
+        await #expect(throws: RuntimeInstallError.unsupportedInstaller("the download has no Fonts/A-Bold.otf")) {
+            try await store.store.install(missing, session: session, progress: { _ in }, acceptLicense: { _ in true })
+        }
+        #expect(store.store.installedFolder(for: missing) == nil)
+    }
+
     @Test func importsAFolder() throws {
         let store = try TemporaryStore()
         let source = store.root.deletingLastPathComponent().appending(path: "source-\(UUID().uuidString)")
@@ -433,6 +457,28 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {
         stopped.withLock { $0 = true }
     }
+}
+
+/// Builds zips with stored (uncompressed) members. A nil body makes a folder.
+enum StoredZip {
+    static func make(_ members: [(path: String, body: [UInt8]?)]) -> Data {
+        var data: [UInt8] = [], central: [UInt8] = []
+        for (path, body) in members {
+            let bytes = body ?? [], name = Array(path.utf8), offset = UInt32(data.count)
+            let crc = UInt32(crc32(0, bytes, uInt(bytes.count)))
+            let fields = le16(20) + le16(0) + le16(0) + le32(0) + le32(crc) + le32(UInt32(bytes.count)) + le32(UInt32(bytes.count))
+                + le16(UInt16(name.count)) + le16(0)
+            data += le32(0x0403_4b50) + fields + name + bytes
+            central += le32(0x0201_4b50) + le16(20) + fields + le16(0) + le16(0) + le16(0)
+                + le32(body == nil ? 0x10 : 0) + le32(offset) + name
+        }
+        let end = le32(0x0605_4b50) + le16(0) + le16(0) + le16(UInt16(members.count)) + le16(UInt16(members.count))
+            + le32(UInt32(central.count)) + le32(UInt32(data.count)) + le16(0)
+        return Data(data + central + end)
+    }
+
+    private static func le16(_ value: UInt16) -> [UInt8] { [UInt8(value & 0xFF), UInt8(value >> 8)] }
+    private static func le32(_ value: UInt32) -> [UInt8] { (0..<4).map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) } }
 }
 
 /// Builds small Inno Setup 5.1.10 installers with stored (uncompressed) file data, laid out as the reader expects.
