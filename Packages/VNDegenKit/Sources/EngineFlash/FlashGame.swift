@@ -28,6 +28,9 @@ nonisolated struct FlashGame: Equatable, Sendable {
     /// Every movie and projector in the folder, lower-cased, mapped to its path with its case on disk. Saves are named
     /// after the movie that made them.
     let movies: [String: String]
+    /// Every folder that holds a movie or projector, at any depth, lower-cased, mapped to its path with its case on disk.
+    /// A movie may save under one of them rather than under its own path.
+    let folders: [String: String]
 
     var main: Entry { entries[0] }
 
@@ -40,20 +43,22 @@ nonisolated extension FlashGame {
         self.init(FolderProbe(scanning: folder, maxDepth: Self.maxDepth))
     }
 
-    /// `init(folder:)`, kept while the folder's modification date stays the same. The game page asks for its entries
-    /// whenever it draws.
-    static func cached(folder: URL) -> FlashGame? {
+    /// `init(folder:)`, kept for a few seconds while the folder's modification date stays the same, since the game page
+    /// asks for its entries whenever it draws. A change deeper in the folder shows once the few seconds have passed.
+    static func cached(folder: URL, now: Date = .now) -> FlashGame? {
         let modified = (try? folder.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-        if let hit = cache.withLock({ $0[folder.path] }), hit.modified == modified { return hit.game }
+        if let hit = cache.withLock({ $0[folder.path] }), hit.modified == modified, now.timeIntervalSince(hit.read) < 10 {
+            return hit.game
+        }
         let game = FlashGame(folder: folder)
-        cache.withLock { $0[folder.path] = (modified, game) }
+        cache.withLock { $0[folder.path] = (modified, now, game) }
         return game
     }
 
-    private static let cache = Mutex<[String: (modified: Date?, game: FlashGame?)]>([:])
+    private static let cache = Mutex<[String: (modified: Date?, read: Date, game: FlashGame?)]>([:])
 
     init?(_ probe: FolderProbe) {
-        var projectors: [(path: String, movie: FileSlice)] = [], swfs: [String] = [], pages: [(path: String, kind: PageKind)] = []
+        var projectors: [(path: String, movie: FileSlice)] = [], swfs: [String] = [], pages: [String: Page] = [:]
         var movies: [String: String] = [:]
         for path in probe.entries.sorted() {
             let url = probe.root.appendingPathComponent(path)
@@ -67,12 +72,20 @@ nonisolated extension FlashGame {
                 swfs.append(path)
                 movies[path.lowercased()] = path
             case "html", "htm":
-                if let kind = Self.pageKind(url) { pages.append((path, kind)) }
+                if let page = Page(url, path: path) { pages[path.lowercased()] = page }
             default:
                 continue
             }
         }
         guard !projectors.isEmpty || !swfs.isEmpty else { return nil }
+        var folders: [String: String] = [:]
+        for path in movies.values {
+            var parts = path.split(separator: "/").dropLast()
+            while !parts.isEmpty {
+                folders[parts.joined(separator: "/").lowercased()] = parts.joined(separator: "/")
+                parts.removeLast()
+            }
+        }
 
         let depth = { (path: String) in path.split(separator: "/").count }
         let size = { (path: String) in
@@ -81,9 +94,12 @@ nonisolated extension FlashGame {
         // A Mac projector keeps its movie in Game.app/Contents/Resources/movie.swf. It is the same movie as the Windows
         // projector beside it, so it comes last.
         let inMacApp = { (path: String) in path.lowercased().contains(".app/contents/") }
-        // A collection's menu, which links to its other pages, comes before the pages it links to.
-        let launchers = pages.filter { $0.kind != .wrapper }
-            .sorted { ($0.kind == .menu ? 0 : 1, depth($0.path), $0.path) < ($1.kind == .menu ? 0 : 1, depth($1.path), $1.path) }
+        // A collection's menu comes before the pages it links to. Its episode pages often link back to it, so the menu is
+        // the page that links to the most pages with movies.
+        let launchers = pages.values.compactMap { page in page.kind(among: pages).map { (page, $0) } }
+            .filter { $0.1 != .wrapper }
+            .map { (path: $0.0.path, menuLinks: $0.0.flashLinks(among: pages)) }
+            .sorted { (-$0.menuLinks, depth($0.path), $0.path) < (-$1.menuLinks, depth($1.path), $1.path) }
             .map(\.path)
         let rankedProjectors = projectors.sorted { (depth($0.path), $0.path) < (depth($1.path), $1.path) }
         // The game's own movie is the shallowest, and among those the largest. Small ones beside it are loaders and
@@ -97,6 +113,7 @@ nonisolated extension FlashGame {
         entries += launchers.dropFirst().map { .page(path: $0) }
         self.entries = entries
         self.movies = movies
+        self.folders = folders
     }
 
     /// The entries the game page offers: the automatic one and the others no deeper than it, since deeper movies are
@@ -143,14 +160,58 @@ nonisolated extension FlashGame {
         case menu
     }
 
-    /// What an HTML page does with movies. Nil when it names none.
-    static func pageKind(_ url: URL) -> PageKind? {
-        guard let handle = try? FileHandle(forReadingFrom: url), let data = try? handle.read(upToCount: 256 << 10) else { return nil }
-        try? handle.close()
-        let text = String(decoding: data, as: UTF8.self).lowercased()
-        let swfs = text.ranges(of: ".swf").count
-        guard swfs > 0 else { return nil }
-        if text.firstMatch(of: /href\s*=\s*["'][^"'#:]+\.html?["']/) != nil { return .menu }
-        return swfs > 1 ? .player : .wrapper
+    /// What an HTML page names: the movies it plays or links to, and the pages it links to, as lower-cased paths in the
+    /// game folder.
+    struct Page: Equatable, Sendable {
+        let path: String
+        let movies: Set<String>
+        let links: Set<String>
+
+        init?(_ url: URL, path: String) {
+            guard let handle = try? FileHandle(forReadingFrom: url), let data = try? handle.read(upToCount: 256 << 10) else { return nil }
+            try? handle.close()
+            let text = String(decoding: data, as: UTF8.self)
+            let folder = path.split(separator: "/").dropLast().map(String.init)
+            // A reference is any quoted URL, so <embed src>, <param value>, links, and script strings all count.
+            let references = text.matches(of: /["']([^"'<>]+?\.(?i:swf|html?))(?:[?#][^"']*)?["']/).compactMap { match in
+                Self.resolve(String(match.1), from: folder)
+            }
+            self.path = path
+            movies = Set(references.filter { $0.hasSuffix(".swf") })
+            links = Set(references.filter { !$0.hasSuffix(".swf") && $0 != path.lowercased() })
+            guard !movies.isEmpty || !links.isEmpty else { return nil }
+        }
+
+        /// A wrapper plays one movie, as a browser game's page does, and the movie itself is the better entry. A player
+        /// names several movies. A menu also links to other pages that play movies, as a collection's menu does. Nil for a
+        /// page that only links to pages without movies.
+        func kind(among pages: [String: Page]) -> PageKind? {
+            if flashLinks(among: pages) > 0 { return .menu }
+            switch movies.count {
+            case 0: return nil
+            case 1: return .wrapper
+            default: return .player
+            }
+        }
+
+        /// How many of the pages it links to play movies.
+        func flashLinks(among pages: [String: Page]) -> Int {
+            links.count { pages[$0].map { !$0.movies.isEmpty } ?? false }
+        }
+
+        /// `../flash/a.swf` from `pages/index.html` is `flash/a.swf`. Nil for URLs with a scheme and paths that leave the
+        /// game folder.
+        static func resolve(_ reference: String, from folder: [String]) -> String? {
+            guard !reference.contains(":"), let decoded = reference.removingPercentEncoding ?? Optional(reference) else { return nil }
+            var parts = decoded.hasPrefix("/") ? [] : folder
+            for part in decoded.split(separator: "/") {
+                switch part {
+                case ".": continue
+                case "..": guard !parts.isEmpty else { return nil }; parts.removeLast()
+                default: parts.append(String(part))
+                }
+            }
+            return parts.isEmpty ? nil : parts.joined(separator: "/").lowercased()
+        }
     }
 }

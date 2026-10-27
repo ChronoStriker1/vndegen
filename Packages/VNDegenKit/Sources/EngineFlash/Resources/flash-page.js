@@ -73,10 +73,75 @@
     // the VNDegen menu opens or the app leaves the screen, when the page is hidden, and before the session quits.
     const flush = () => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
     document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+
+    // Every Ruffle player on the page, the host page's own and those Ruffle puts in place of a launcher's <embed> and
+    // <object> elements.
+    const players = () => Array.from(document.querySelectorAll('ruffle-player, ruffle-embed, ruffle-object'))
+        .filter((player) => typeof player.ruffle === 'function');
     if (window.__vndegen) {
-        window.__vndegen.onPause = (paused) => { if (paused) flush(); };
+        window.__vndegen.onPause = (paused) => {
+            if (paused) flush();
+            for (const player of players()) {
+                if (paused) {
+                    player.ruffle().suspend();
+                } else {
+                    player.ruffle().resume();
+                }
+            }
+            // Ruffle reads keys only while a player has focus, which the hub's menu takes away.
+            if (!paused && players()[0]) players()[0].focus();
+        };
         window.__vndegen.beforeQuit = flush;
     }
+
+    // A projector's Quit button sends fscommand("quit"), which ends the session as quitting the projector would. The
+    // other commands set up the projector's window, which the session owns.
+    const quitHandled = new WeakSet();
+    const handleQuit = () => {
+        for (const player of players()) {
+            if (quitHandled.has(player)) continue;
+            quitHandled.add(player);
+            player.ruffle().addFSCommandHandler((command) => {
+                if (command.toLowerCase() === 'quit' && window.__vndegen) window.__vndegen.quit();
+            });
+        }
+    };
+    new MutationObserver(handleQuit).observe(document, { childList: true, subtree: true });
+
+    // The session's pointer, from the touch modes and controllers, arrives as synthetic mouse events and wheel events on
+    // the element under it, which is the player itself. Ruffle reads pointer and wheel events on the canvas in the
+    // player's shadow root, so they go there as a real mouse would send them. Real mice and fingers reach the canvas
+    // themselves. The wheel events sent on are marked, since they reach this listener again on their way up.
+    const canvasOf = (target) => {
+        const player = target instanceof Element && target.closest('ruffle-player, ruffle-embed, ruffle-object');
+        return player && player.shadowRoot && player.shadowRoot.querySelector('canvas');
+    };
+    const pointerTypes = { mousedown: 'pointerdown', mousemove: 'pointermove', mouseup: 'pointerup' };
+    for (const type of Object.keys(pointerTypes)) {
+        window.addEventListener(type, (event) => {
+            const canvas = event.isTrusted ? null : canvasOf(event.target);
+            if (!canvas) return;
+            event.stopImmediatePropagation();
+            if (type === 'mousedown') canvas.getRootNode().host.focus();
+            canvas.dispatchEvent(new PointerEvent(pointerTypes[type], {
+                pointerId: 1, pointerType: 'mouse', isPrimary: true,
+                clientX: event.clientX, clientY: event.clientY, screenX: event.screenX, screenY: event.screenY,
+                button: event.button, buttons: event.buttons, bubbles: true, cancelable: true, composed: true, view: window,
+            }));
+        }, true);
+    }
+    const forwarded = new WeakSet();
+    window.addEventListener('wheel', (event) => {
+        const canvas = event.isTrusted || forwarded.has(event) ? null : canvasOf(event.target);
+        if (!canvas) return;
+        event.stopImmediatePropagation();
+        const wheel = new WheelEvent('wheel', {
+            deltaX: event.deltaX, deltaY: event.deltaY, deltaMode: event.deltaMode, clientX: event.clientX, clientY: event.clientY,
+            bubbles: true, cancelable: true, composed: true, view: window,
+        });
+        forwarded.add(wheel);
+        canvas.dispatchEvent(wheel);
+    }, true);
 
     if (location.pathname.startsWith('/__vndegen/')) return;
 
@@ -107,6 +172,7 @@
         const url = new URL(link.getAttribute('href'), location.href);
         if (url.origin !== location.origin || !/\.(swf|exe)$/i.test(url.pathname)) return;
         event.preventDefault();
-        location.href = '/__vndegen/flash.html?movie=' + encodeURIComponent(decodeURIComponent(url.pathname));
+        // The query goes along, as movie parameters do in a browser.
+        location.href = '/__vndegen/flash.html?movie=' + encodeURIComponent(decodeURIComponent(url.pathname) + url.search);
     }, true);
 })();

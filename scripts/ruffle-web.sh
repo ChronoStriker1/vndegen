@@ -59,13 +59,15 @@ EOF
   cd "$src/web"
   npm ci --no-audit --no-fund --loglevel=error
   export ENABLE_VERSION_SEAL=true
+  # Cargo prefers these to RUSTFLAGS, which would drop the path remapping.
+  unset CARGO_ENCODED_RUSTFLAGS CARGO_BUILD_RUSTFLAGS
   export RUSTFLAGS="--remap-path-prefix=$src=/ruffle --remap-path-prefix=$cargo_home=/cargo"
   npm run build --workspace=ruffle-core
   npm run build --workspace=ruffle-selfhosted
 )
 
 dist=$src/web/packages/selfhosted/dist
-if grep -rlF "$HOME" "$dist"/ruffle.js "$dist"/*.wasm; then
+if grep -lF -e "$HOME" -e "$work" -e "$cargo_home" "$dist"/ruffle.js "$dist"/*.wasm; then
   echo "error: the build holds a path from this machine" >&2
   exit 1
 fi

@@ -198,6 +198,8 @@ private func text(of response: FileResponse) async throws -> String {
     #expect(try await text(of: movie) == "FWS-movie")
     #expect(try await text(of: folder.serve(path: "/Game.exe", range: "bytes=4-")) == "movie")
     #expect(folder.read(servedPath: "/Game.exe", limit: 3) == Data("FWS".utf8))
+    // A request in another case gets the movie too, never the whole executable.
+    #expect(try await text(of: folder.serve(path: "/game.EXE")) == "FWS-movie")
 
     // A slice past the end of the file serves nothing.
     folder.embedded = ["/Game.exe": FileSlice(offset: 6, length: 100)]

@@ -7,8 +7,9 @@ extension FlashPlugin {
     /// the movie's path in the game folder. On the PC, Flash Player keeps the same files under
     /// `#SharedObjects/<id>/localhost/` in `%APPDATA%/Macromedia/Flash Player`, named by the movie's whole path there.
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
-        let movies = FlashGame(folder: folder)?.movies ?? [:]
-        return [SaveLocation(directory: Self.savesDirectory(dataDirectory)) { Self.savePath($0, movies: movies) }]
+        let game = FlashGame(folder: folder)
+        let movies = game?.movies ?? [:], folders = game?.folders ?? [:]
+        return [SaveLocation(directory: Self.savesDirectory(dataDirectory)) { Self.savePath($0, movies: movies, folders: folders) }]
     }
 
     /// The player picks which entry starts the game, as the game page's advanced option.
@@ -53,16 +54,18 @@ extension FlashPlugin {
     /// - Ruffle on the PC keeps the same layout under `.../SharedObjects/localhost/`.
     /// - VNDegen on another device keeps it under `.../SharedObjects/`.
     /// Nil for any other file, and for a save of a movie this game doesn't have.
-    static func savePath(_ path: String, movies: [String: String]) -> String? {
+    static func savePath(_ path: String, movies: [String: String], folders: [String: String] = [:]) -> String? {
         let parts = path.split(separator: "/").map(String.init)
         guard let file = parts.last, file.lowercased().hasSuffix(".sol") else { return nil }
         let isHost = { (name: String) in ["localhost", "#localwithnet"].contains(name.lowercased()) }
         if let marker = parts.lastIndex(where: { $0.lowercased() == "#sharedobjects" }), marker + 2 < parts.count - 1, isHost(parts[marker + 2]) {
-            return movieSave(Array(parts[(marker + 3)...]), movies: movies)
+            return movieSave(Array(parts[(marker + 3)...]), movies: movies, folders: folders)
         }
         guard let marker = parts.lastIndex(of: "SharedObjects"), marker < parts.count - 1 else { return nil }
         if marker + 1 < parts.count - 1, isHost(parts[marker + 1]) {
-            return movieSave(Array(parts[(marker + 2)...]), movies: movies)
+            // Ruffle on the PC names folders after the movie's URL, so they are percent-encoded, as `My%20Game`.
+            let decoded = parts[(marker + 2)...].map { $0.removingPercentEncoding ?? $0 }
+            return movieSave(decoded, movies: movies, folders: folders)
         }
         let relative = parts[(marker + 1)...]
         guard relative.allSatisfy({ !$0.hasPrefix(".") }) else { return nil }
@@ -71,14 +74,19 @@ extension FlashPlugin {
 
     /// `["Games", "Test Game 01", "game.swf", "save.sol"]` is `game.swf/save.sol` when the game has `game.swf`. Parts
     /// after the movie, from a shared object name with slashes, stay as they are.
-    private static func movieSave(_ parts: [String], movies: [String: String]) -> String? {
-        guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { return nil }
+    private static func movieSave(_ parts: [String], movies: [String: String], folders: [String: String]) -> String? {
+        guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("/") }) else { return nil }
         if parts.count == 1 { return parts[0] }
-        let folders = parts.dropLast()
-        for end in stride(from: folders.count, to: 0, by: -1) {
-            for start in 0 ..< end {
-                guard let movie = movies[folders[start ..< end].joined(separator: "/").lowercased()] else { continue }
-                return ([movie] + folders[end...] + [parts.last!]).joined(separator: "/")
+        let path = parts.dropLast()
+        // The longest end of the PC path that names a movie, or else a folder that holds one, which is where a movie
+        // that asked for a shorter local path saves.
+        // A folder is followed only by the save's name, which may have #-parts of its own.
+        for (known, isFolder) in [(movies, false), (folders, true)] {
+            for end in stride(from: path.count, to: 0, by: -1) where !isFolder || path[end...].allSatisfy({ $0.hasPrefix("#") }) {
+                for start in 0 ..< end {
+                    guard let match = known[path[start ..< end].joined(separator: "/").lowercased()] else { continue }
+                    return ([match] + path[end...] + [parts.last!]).joined(separator: "/")
+                }
             }
         }
         return nil

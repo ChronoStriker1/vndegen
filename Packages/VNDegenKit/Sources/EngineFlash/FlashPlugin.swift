@@ -21,18 +21,47 @@ nonisolated public struct FlashPlugin: EnginePlugin {
     /// A projector is certainly Flash. A movie alone could be a cutscene in another engine's game, which that engine's
     /// own match outranks.
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
-        let showsFlash = probe.entries.contains { path in
+        // The probe is enough when it shows a movie or projector, which also keeps a non-Flash game with a movie in it
+        // from a deeper scan at each library refresh. Archives often wrap a projector in a few folders, deeper than the
+        // probe looks, so only then does detection look further, and only below the probe's deepest folders.
+        let game: FlashGame? = if Self.showsFlash(probe.entries, in: probe.root) {
+            FlashGame(probe)
+        } else if Self.wrapsFlash(probe) {
+            FlashGame(folder: probe.root)
+        } else {
+            nil
+        }
+        guard let game else { return nil }
+        let confidence: DetectionConfidence = game.entries.contains { if case .projector = $0 { true } else { false } } ? .certain : .likely
+        return EngineMatch(engine: descriptor.id, confidence: confidence, evidence: game.main.path)
+    }
+
+    static func showsFlash(_ paths: some Sequence<String>, in root: URL) -> Bool {
+        paths.contains { path in
             switch (path as NSString).pathExtension.lowercased() {
-            case "swf": true
-            case "exe": FlashGame.projectorMovie(probe.root.appendingPathComponent(path)) != nil
+            case "swf": FlashGame.isMovie(root.appendingPathComponent(path))
+            case "exe": FlashGame.projectorMovie(root.appendingPathComponent(path)) != nil
             default: false
             }
         }
-        // Archives often wrap a projector in a few otherwise empty folders, deeper than the probe looks. Other folders
-        // with no movie in view get no deeper scan, since detection runs on every game at each library refresh.
-        guard showsFlash || probe.entries.count < 16, let game = FlashGame(folder: probe.root) else { return nil }
-        let confidence: DetectionConfidence = game.entries.contains { if case .projector = $0 { true } else { false } } ? .certain : .likely
-        return EngineMatch(engine: descriptor.id, confidence: confidence, evidence: game.main.path)
+    }
+
+    /// Whether a movie or projector lies below the folders at the probe's depth, down to `FlashGame.maxDepth`, looking at
+    /// no more than `budget` entries.
+    static func wrapsFlash(_ probe: FolderProbe, budget: Int = 2000) -> Bool {
+        let probeDepth = probe.entries.map { $0.split(separator: "/").count }.max() ?? 0
+        var pending = probe.entries.sorted().filter { $0.split(separator: "/").count == probeDepth && GameFolder.isDirectory(probe.root.appendingPathComponent($0)) }
+        var seen = 0
+        while let folder = pending.popLast(), seen < budget {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(folder).path)) ?? []
+            seen += names.count
+            let paths = names.filter { !$0.hasPrefix(".") }.map { "\(folder)/\($0)" }
+            if showsFlash(paths, in: probe.root) { return true }
+            if folder.split(separator: "/").count + 1 < FlashGame.maxDepth {
+                pending += paths.filter { GameFolder.isDirectory(probe.root.appendingPathComponent($0)) }
+            }
+        }
+        return false
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
@@ -47,7 +76,8 @@ nonisolated public struct FlashPlugin: EnginePlugin {
         let entry = Self.entry(for: game, dataDirectory: launch.dataDirectory)
         var folder = GameFolder(root: launch.folder, webRoot: "")
         folder.mounts = [Self.hostPath: host, Self.hostPath + "ruffle/": ruffle]
-        if case let .projector(path, movie) = entry { folder.embedded["/" + path] = movie }
+        // Every projector, since a launcher page can open any of them.
+        for case let .projector(path, movie) in game.entries { folder.embedded["/" + path] = movie }
         flashLog.notice("starting \(entry.path, privacy: .public)")
         return try WebGameConfiguration(
             folder: folder, appName: launch.game.title, runtime: .browser, userScripts: [pageScript, ruffleScript],

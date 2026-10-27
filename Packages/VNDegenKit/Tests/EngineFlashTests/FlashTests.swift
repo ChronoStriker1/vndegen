@@ -197,3 +197,45 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(script.contains("vndegen:\\/\\/game\\/.vndegen\\/fonts\\/") || script.contains("vndegen://game/.vndegen/fonts/"))
     #expect(!script.contains("__VNDEGEN_FLASH_FONTS__"))
 }
+
+@Test func launcherPagesAreClassifiedByTheMoviesTheyReach() throws {
+    let root = try game([
+        // A menu that links only to episode pages, which embed the movies.
+        "index.html": html("<a href='episodes/one.html'>1</a> <a href=\"episodes/two.html?x=1\">2</a> <a href='readme.html'>?</a>"),
+        "episodes/one.html": html("<object data='../flash/one.swf'><embed src='../flash/one.swf'></object><a href='../index.html'>Back</a>"),
+        "episodes/two.html": html("<embed src=\"../flash/two.swf\"><a href='../index.html'>Back</a>"),
+        "readme.html": html("<p>no movies</p>"),
+        // The usual <object> with an <embed> fallback names one movie twice: a wrapper, not a player.
+        "play.html": html("<object><param name='movie' value='flash/one.swf'><embed src='flash/one.swf'></object>"),
+        "flash/one.swf": movie(), "flash/two.swf": movie(),
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    let flash = try #require(FlashGame(folder: root))
+    #expect(flash.main == .page(path: "index.html"))
+    #expect(!flash.entries.contains(.page(path: "play.html")))
+    #expect(!flash.entries.contains(.page(path: "readme.html")))
+    #expect(flash.folders == ["flash": "flash"])
+}
+
+@Test func projectorsWrappedDeepAreFoundAmongOtherFiles() throws {
+    var files: [String: Data] = ["Circle/Wrapper/RJ000000/game.exe": projector(movie())]
+    for index in 0 ..< 40 { files["Circle/notes \(index).txt"] = html("") }
+    let root = try game(files)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let match = try #require(FlashPlugin().detect(FolderProbe(scanning: root)))
+    #expect(match.confidence == .certain && match.evidence == "Circle/Wrapper/RJ000000/game.exe")
+}
+
+@Test func savesScopedToAFolderOrFromRuffleMapToo() {
+    let movies = ["sub/game.swf": "Sub/Game.swf", "my game/movie.swf": "My Game/movie.swf"]
+    let folders = ["sub": "Sub", "my game": "My Game"]
+    let flashPlayer = "C:/Users/Player/AppData/Roaming/Macromedia/Flash Player/#SharedObjects/AB12CD34/localhost"
+    // A movie in sub/ that asked for its folder as the local path.
+    #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/save.sol", movies: movies, folders: folders) == "Sub/save.sol")
+    #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/#slots/one.sol", movies: movies, folders: folders) == "Sub/#slots/one.sol")
+    // A folder is no match for a movie this game doesn't have.
+    #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/other.swf/save.sol", movies: movies, folders: folders) == nil)
+    // Ruffle on the PC percent-encodes the movie's path.
+    #expect(FlashPlugin.savePath("C:/Users/Player/AppData/Roaming/ruffle/SharedObjects/localhost/Games/My%20Game/movie.swf/s.sol",
+                                 movies: movies, folders: folders) == "My Game/movie.swf/s.sol")
+}
