@@ -9,31 +9,66 @@
         return /^audio\/ogg/i.test(String(type)) ? '' : canPlayType.call(this, type);
     };
 
-    // NW.js plays Ogg itself, so desktop MZ never runs its VorbisDecoder, which numbers decoders 0 to 999 and then starts
-    // over. Its worker keeps each decoder's state under its number until the page destroys it, and hands the next decoder
-    // with that number the old state. A track whose last chunk of a slow load came through _updateBufferOnFetch never
-    // tells its decoder it has finished, so that state stays open while the track plays. A thousand sounds later, as
-    // footsteps and letter sounds soon make, a new sound's bytes went to it, read from past their end, and stopped the
-    // game with "RangeError: length cannot be negative". Numbers that never repeat keep every decoder to its own state.
-    // The constructor assigns the counter modulo 1000 and then increments it, so only increments are taken. The check runs
-    // after every script loads, so a renamed or cache-busted decoder file is caught too. MZ makes its first decoder when
-    // the first sound plays, long after the decoder's file has loaded. Only a class shaped like MZ's decoder is changed.
-    const numbered = new WeakSet();
+    // NW.js decodes audio itself, so desktop MZ never runs its bundled VorbisDecoder. Here every sound goes through it,
+    // and its faults stopped games on the error screen with "RangeError: length cannot be negative". They are handled
+    // below once a class shaped like MZ's decoder appears. The check runs after every script loads, so a renamed or
+    // cache-busted decoder file is caught too. MZ makes its first decoder when the first sound plays, long after the
+    // decoder's file has loaded.
+    const patched = new WeakSet();
     document.addEventListener('load', () => {
-        if (typeof VorbisDecoder !== 'function' || numbered.has(VorbisDecoder) || !VorbisDecoder.worker
+        if (typeof VorbisDecoder !== 'function' || patched.has(VorbisDecoder) || !VorbisDecoder.worker
             || typeof VorbisDecoder.prototype.send !== 'function' || typeof VorbisDecoder.prototype.destroy !== 'function') return;
-        let next = VorbisDecoder.id || 0;
         try {
-            Object.defineProperty(VorbisDecoder, 'id', {
-                configurable: true,
-                get: () => next,
-                set: (value) => { if (value > next) next = value; },
-            });
+            numberWithoutRepeats(VorbisDecoder);
         } catch (e) {
             return;
         }
-        numbered.add(VorbisDecoder);
+        decodeOtherFormatsInWebKit(VorbisDecoder);
+        VorbisDecoder.worker.addEventListener('error', (event) => {
+            // MZ stops the game on any uncaught error, and an error in the decoder's worker reaches the page as one,
+            // though it costs only the sound being decoded. That sound stays silent instead.
+            event.preventDefault();
+            console.warn('Ogg decoder: ' + event.message);
+        });
+        patched.add(VorbisDecoder);
     }, true);
+
+    // The decoder numbers decoders 0 to 999 and then starts over. Its worker keeps each decoder's state under its number
+    // until the page destroys it, and hands the next decoder with that number the old state. A track whose last chunk of
+    // a slow load came through _updateBufferOnFetch never tells its decoder it has finished, so that state stays open
+    // while the track plays, and a thousand sounds later a new sound's bytes were read from past their end. Numbers that
+    // never repeat keep every decoder to its own state. The constructor assigns the counter modulo 1000 and then
+    // increments it, so only increments are taken.
+    function numberWithoutRepeats(Decoder) {
+        let next = Decoder.id || 0;
+        Object.defineProperty(Decoder, 'id', {
+            configurable: true,
+            get: () => next,
+            set: (value) => { if (value > next) next = value; },
+        });
+    }
+
+    // Games ship WAV and MP3 files under .ogg names, which Chromium decodes by their content. The decoder cannot open
+    // them, goes on as if it had, and reads offsets from whatever memory that leaves. Data that does not start with
+    // Ogg's capture pattern goes to WebKit's decodeAudioData once it has all loaded, and never to the worker.
+    function decodeOtherFormatsInWebKit(Decoder) {
+        const send = Decoder.prototype.send;
+        Decoder.prototype.send = function (arrayBuffer, isLoaded) {
+            if (this.vndegenNative === undefined) {
+                const head = new Uint8Array(arrayBuffer, 0, Math.min(4, arrayBuffer.byteLength));
+                this.vndegenNative = !(head[0] === 0x4f && head[1] === 0x67 && head[2] === 0x67 && head[3] === 0x53)
+                    && !!this.context && typeof this.decodeHandler === 'function' && typeof this.errorHandler === 'function';
+            }
+            if (!this.vndegenNative) return send.apply(this, arguments);
+            if (!isLoaded || this.vndegenDecoding) return;
+            this.vndegenDecoding = true;
+            // A destroyed decoder has left Decoder.instances, and its sound wants nothing more.
+            const current = () => Decoder.instances && Decoder.instances[this.id] === this;
+            this.context.decodeAudioData(arrayBuffer.slice(0)).then(
+                (buffer) => { if (current()) this.decodeHandler(buffer); },
+                () => { if (current()) this.errorHandler(); });
+        };
+    }
 
     // Reports once which renderer the engine got, so a fall back to PIXI's canvas renderer shows up in the app log.
     // MZ keeps it at Graphics._app.renderer, MV at Graphics._renderer. PIXI's WEBGL renderer type is 1.
