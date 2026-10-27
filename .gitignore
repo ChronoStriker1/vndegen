@@ -6,3 +6,4 @@ DerivedData/
 Packages/VNDegenKit/.build/
 .audit/
 *.ipa
+Engines/Artemis/art3m1s-core/target*/

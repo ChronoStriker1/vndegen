@@ -1,0 +1,45 @@
+# A throwaway iOS app that runs one Artemis game on art3m1s-core. Build the core first with
+#   cargo +1.99.1 rustc --release --lib --target aarch64-apple-ios-sim --no-default-features \
+#     --features metal-backend --crate-type staticlib
+# and set ART3M1S_LIB_DIR to the folder holding libart3m1s_core.a, then:
+#   xcodegen --spec Engines/Artemis/test-host/project.yml
+#   xcodebuild -project Engines/Artemis/test-host/ArtemisTestHost.xcodeproj -scheme ArtemisTestHost \
+#     -sdk iphonesimulator -derivedDataPath build/artemis-test-host/dd build
+# Launch it with -game <base PFS archive>. The engine log is Documents/artemis.log.
+name: ArtemisTestHost
+options:
+  bundleIdPrefix: com.chronostriker1
+  deploymentTarget:
+    iOS: "18.0"
+targets:
+  ArtemisTestHost:
+    type: application
+    platform: iOS
+    sources: [main.m, art3m1s_api.h]
+    dependencies:
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+      - sdk: IOSurface.framework
+      - sdk: CoreGraphics.framework
+    info:
+      path: ../../../build/artemis-test-host/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIFileSharingEnabled: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: SceneDelegate
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.chronostriker1.vndegen.artemis-test-host
+      CODE_SIGN_IDENTITY: "-"
+      CLANG_ENABLE_OBJC_ARC: YES
+      ARCHS: arm64
+      TARGETED_DEVICE_FAMILY: "1,2"
+      LIBRARY_SEARCH_PATHS: ["$(ART3M1S_LIB_DIR)"]
+      OTHER_LDFLAGS: ["-lart3m1s_core", "-lc++"]
