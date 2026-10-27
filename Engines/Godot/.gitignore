@@ -1,0 +1,2 @@
+# Godot 3 builds a custom module's objects inside its folder.
+*.o
