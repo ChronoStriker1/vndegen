@@ -1,15 +1,17 @@
 //! Numbered and quick saves of the PC Artemis engine, magic `BOWS` (VNDegen).
 //!
 //! `docs/artemis-save-format.md` in VNDegen describes the format. A save is
-//! a root object of numbered fields. The engine keeps most of its state as
-//! the tags that recreate it, such as an `lyc` and an `lyprop` for each
-//! layer, so a load replays those tags through the interpreter.
+//! a root object of numbered fields, in the format [`super::bow`] reads, in
+//! version 1000 or 1002. The engine keeps most of its state as the tags that
+//! recreate it, such as an `lyc` and an `lyprop` for each layer, so a load
+//! replays those tags through the interpreter.
 
-use super::pc::{Reader, Variables};
+use super::bow::{self, Cursor, Document, Node, Object, ObjectNode, Version};
+use super::pc::Variables;
 use encoding_rs::Encoding;
+use std::ops::Range;
 
 pub const MAGIC: &[u8; 4] = b"BOWS";
-const VERSION: u32 = 1000;
 
 /// A tag as the engine stores it, with its parameters in order.
 #[derive(Debug, Clone, PartialEq)]
@@ -35,6 +37,7 @@ pub struct Frame {
 /// The parts of a numbered save the core restores.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SlotSave {
+    pub version: Version,
     /// Where the game continues after a load: in the save routine the game
     /// called, right after the call that saved.
     pub position: Frame,
@@ -44,60 +47,6 @@ pub struct SlotSave {
     pub locals: Variables,
     /// Tags that recreate the layers, handlers, and music, in replay order.
     pub replay: Vec<Tag>,
-}
-
-/// An object's fields, by number. `body` starts at the field count.
-struct Object<'a> {
-    fields: Vec<(u32, &'a [u8])>,
-}
-
-impl<'a> Object<'a> {
-    fn parse(body: &'a [u8]) -> Result<Self, String> {
-        let mut reader = Reader::new(body);
-        let count = reader.u32()? as usize;
-        let mut table = Vec::with_capacity(count.min(128));
-        for _ in 0..count {
-            let field = reader.u32()?;
-            let offset = reader.u32()? as usize;
-            if offset > body.len() {
-                return Err(format!("field {field} past the end of its object"));
-            }
-            table.push((field, offset));
-        }
-        let mut starts: Vec<usize> = table.iter().map(|(_, offset)| *offset).collect();
-        starts.sort_unstable();
-        let fields = table
-            .into_iter()
-            .map(|(field, start)| {
-                let end = starts
-                    .iter()
-                    .copied()
-                    .find(|&next| next > start)
-                    .unwrap_or(body.len());
-                (field, &body[start..end])
-            })
-            .collect();
-        Ok(Self { fields })
-    }
-
-    /// An object nested with its length in front.
-    fn sized(bytes: &'a [u8]) -> Result<Self, String> {
-        let mut reader = Reader::new(bytes);
-        let len = reader.u32()? as usize;
-        Self::parse(reader.take(len)?)
-    }
-
-    fn field(&self, number: u32) -> Option<&'a [u8]> {
-        self.fields
-            .iter()
-            .find(|(candidate, _)| *candidate == number)
-            .map(|(_, data)| *data)
-    }
-
-    fn require(&self, number: u32) -> Result<&'a [u8], String> {
-        self.field(number)
-            .ok_or_else(|| format!("no field {number}"))
-    }
 }
 
 fn int(bytes: &[u8]) -> Result<i32, String> {
@@ -110,35 +59,54 @@ fn int(bytes: &[u8]) -> Result<i32, String> {
     ))
 }
 
-fn text(bytes: &[u8], encoding: &'static Encoding) -> Result<String, String> {
-    let mut reader = Reader::new(bytes);
-    Ok(encoding.decode(reader.string()?).0.into_owned())
+fn text(
+    document: &Document,
+    field: Range<usize>,
+    encoding: &'static Encoding,
+) -> Result<String, String> {
+    Ok(encoding
+        .decode(document.cursor(field).string()?)
+        .0
+        .into_owned())
+}
+
+/// Where a tag object ends: after its parameter list, its last field.
+fn tag_end(document: &Document, object: &Object) -> Result<usize, String> {
+    let mut params = document.cursor(object.require(4)?);
+    for _ in 0..params.u32()? {
+        params.string()?;
+        params.string()?;
+    }
+    Ok(params.position())
+}
+
+/// Where a frame object ends: after its tag, its last field.
+fn frame_end(document: &Document, object: &Object) -> Result<usize, String> {
+    tag_end(document, &document.object(object.require(8)?)?)
 }
 
 /// A tag object. An empty tag has no name.
-fn tag(object: &Object, encoding: &'static Encoding) -> Result<Tag, String> {
-    let name = text(object.require(3)?, encoding)?;
-    let mut reader = Reader::new(object.require(4)?);
-    let count = reader.u32()?;
+fn tag(document: &Document, object: &Object, encoding: &'static Encoding) -> Result<Tag, String> {
+    let mut reader = document.cursor(object.require(4)?);
     let mut params = Vec::new();
-    for _ in 0..count {
+    for _ in 0..reader.u32()? {
         let key = encoding.decode(reader.string()?).0.into_owned();
         let value = encoding.decode(reader.string()?).0.into_owned();
         params.push((key, value));
     }
     Ok(Tag {
-        name,
+        name: text(document, object.require(3)?, encoding)?,
         params,
-        line: int(object.require(2)?)?,
+        line: int(document.bytes(object.require(2)?))?,
     })
 }
 
-/// Tags written with their lengths, one after another, `count` of them.
-fn tags(reader: &mut Reader, count: u32, encoding: &'static Encoding) -> Result<Vec<Tag>, String> {
+/// The next `count` tags of a list, without the empty ones.
+fn tags(cursor: &mut Cursor, count: u32, encoding: &'static Encoding) -> Result<Vec<Tag>, String> {
+    let document = cursor.document();
     let mut out = Vec::new();
     for _ in 0..count {
-        let len = reader.u32()? as usize;
-        let tag = tag(&Object::parse(reader.take(len)?)?, encoding)?;
+        let tag = tag(document, &cursor.object(tag_end)?, encoding)?;
         if !tag.name.is_empty() {
             out.push(tag);
         }
@@ -146,59 +114,73 @@ fn tags(reader: &mut Reader, count: u32, encoding: &'static Encoding) -> Result<
     Ok(out)
 }
 
-fn frame(object: &Object, encoding: &'static Encoding) -> Result<Frame, String> {
+/// The tag a field holds.
+fn field_tag(
+    document: &Document,
+    field: Range<usize>,
+    encoding: &'static Encoding,
+) -> Result<Tag, String> {
+    tag(document, &document.object(field)?, encoding)
+}
+
+fn frame(
+    document: &Document,
+    object: &Object,
+    encoding: &'static Encoding,
+) -> Result<Frame, String> {
     let queued = match object.field(6) {
-        Some(data) if data.len() > 4 => {
-            let mut reader = Reader::new(data);
-            let count = reader.u32()?;
-            tags(&mut reader, count, encoding)?
+        Some(field) => {
+            let mut list = document.cursor(field);
+            let count = list.u32()?;
+            tags(&mut list, count, encoding)?
         }
-        _ => Vec::new(),
+        None => Vec::new(),
     };
     Ok(Frame {
-        script: text(object.require(3)?, encoding)?,
-        index: usize::try_from(int(object.require(4)?)?).map_err(|_| "a negative index")?,
-        wait: object.field(1).map(int).transpose()?.unwrap_or(0) as u32,
+        script: text(document, object.require(3)?, encoding)?,
+        index: usize::try_from(int(document.bytes(object.require(4)?))?)
+            .map_err(|_| "a negative index")?,
+        wait: object
+            .field(1)
+            .map(|field| int(document.bytes(field)))
+            .transpose()?
+            .unwrap_or(0) as u32,
         queued,
     })
 }
 
 /// A tag list: a count, then for each a key, a count, and that many tags.
-fn keyed_tags(data: &[u8], encoding: &'static Encoding) -> Result<Vec<(String, Vec<Tag>)>, String> {
-    let mut reader = Reader::new(data);
-    let count = reader.u32()?;
+fn keyed_tags(
+    document: &Document,
+    field: Range<usize>,
+    encoding: &'static Encoding,
+) -> Result<Vec<(String, Vec<Tag>)>, String> {
+    let mut cursor = document.cursor(field);
     let mut out = Vec::new();
-    for _ in 0..count {
-        let key = encoding.decode(reader.string()?).0.into_owned();
-        let tag_count = reader.u32()?;
-        out.push((key, tags(&mut reader, tag_count, encoding)?));
+    for _ in 0..cursor.u32()? {
+        let key = encoding.decode(cursor.string()?).0.into_owned();
+        let count = cursor.u32()?;
+        out.push((key, tags(&mut cursor, count, encoding)?));
     }
     Ok(out)
 }
 
 /// Reads a numbered save.
 pub fn read(bytes: &[u8], encoding: &'static Encoding) -> Result<SlotSave, String> {
-    let mut reader = Reader::new(bytes);
-    if reader.take(4)? != MAGIC {
-        return Err("not a BOWS save".into());
-    }
-    let version = reader.u32()?;
-    if version != VERSION {
-        return Err(format!("save version {version}, expected {VERSION}"));
-    }
-    let root = Object::parse(&bytes[8..])?;
+    let document = Document::open(bytes, MAGIC)?;
+    let root = document.root()?;
 
-    let position = frame(&Object::sized(root.require(3)?)?, encoding)?;
+    let position = frame(&document, &document.object(root.require(3)?)?, encoding)?;
     let mut call_stack = Vec::new();
-    let mut stack = Reader::new(root.require(4)?);
+    let mut stack = document.cursor(root.require(4)?);
     for _ in 0..stack.u32()? {
-        let len = stack.u32()? as usize;
-        call_stack.push(frame(&Object::parse(stack.take(len)?)?, encoding)?);
+        let object = stack.object(frame_end)?;
+        call_stack.push(frame(&document, &object, encoding)?);
     }
 
-    let variables = Object::sized(root.require(30)?)?;
+    let variables = document.object(root.require(30)?)?;
     let mut locals = Vec::new();
-    let mut entries = Reader::new(variables.require(2)?);
+    let mut entries = document.cursor(variables.require(2)?);
     for _ in 0..entries.u32()? {
         let name = encoding.decode(entries.string()?).0.into_owned();
         let value = super::pc::variable_value(entries.string()?, encoding);
@@ -206,12 +188,12 @@ pub fn read(bytes: &[u8], encoding: &'static Encoding) -> Result<SlotSave, Strin
     }
 
     let mut replay = Vec::new();
-    for (_, layer) in keyed_tags(root.require(26)?, encoding)? {
+    for (_, layer) in keyed_tags(&document, root.require(26)?, encoding)? {
         replay.extend(layer);
     }
     // Each message layer's tags since it was last cleared, its visible text
     // among them, run inside that layer.
-    for (id, tags) in keyed_tags(root.require(24)?, encoding)? {
+    for (id, tags) in keyed_tags(&document, root.require(24)?, encoding)? {
         if id.is_empty() || tags.is_empty() {
             continue;
         }
@@ -227,17 +209,17 @@ pub fn read(bytes: &[u8], encoding: &'static Encoding) -> Result<SlotSave, Strin
             line: -1,
         });
     }
-    if let Some(data) = root.field(56) {
+    if let Some(field) = root.field(56) {
         // Push handlers: a count, then an int key and a tag for each.
-        let mut reader = Reader::new(data);
-        for _ in 0..reader.u32()? {
-            reader.u32()?;
-            replay.extend(tags(&mut reader, 1, encoding)?);
+        let mut cursor = document.cursor(field);
+        for _ in 0..cursor.u32()? {
+            cursor.u32()?;
+            replay.extend(tags(&mut cursor, 1, encoding)?);
         }
     }
-    for field in [33, 29] {
-        if let Some(data) = root.field(field) {
-            let handler = tag(&Object::sized(data)?, encoding)?;
+    for number in [33, 29] {
+        if let Some(field) = root.field(number) {
+            let handler = field_tag(&document, field, encoding)?;
             if !handler.name.is_empty() {
                 replay.push(handler);
             }
@@ -245,6 +227,7 @@ pub fn read(bytes: &[u8], encoding: &'static Encoding) -> Result<SlotSave, Strin
     }
 
     Ok(SlotSave {
+        version: document.version,
         position,
         call_stack,
         locals,
@@ -322,12 +305,15 @@ pub struct SlotWrite {
     pub bgm: Option<Tag>,
     pub current_message_layer: String,
     pub macro_files: Vec<String>,
-    pub key_click_start: String,
-    pub key_click_end: String,
     pub menu_script: String,
     pub backlog_layer: String,
+    /// The Lua functions `e:setEventHandler` set.
+    pub key_click_start: String,
+    pub key_click_end: String,
     pub on_save: String,
     pub on_load: String,
+    pub on_enter_frame: String,
+    pub on_debug_skip_out: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -341,225 +327,304 @@ pub struct WriteFrame {
     pub at: Option<Tag>,
 }
 
-/// The root fields in the order of the PC engine's table.
-const TABLE_ORDER: [u32; 68] = [
+/// Version 1000's root fields in the order of the PC engine's table. Its
+/// data goes in ascending order.
+const TABLE_ORDER_1000: [u32; 68] = [
     31, 64, 30, 29, 28, 53, 26, 76, 75, 67, 66, 25, 24, 70, 69, 50, 38, 34, 33, 49, 48, 47, 46, 45,
     44, 43, 42, 41, 40, 37, 17, 52, 16, 65, 12, 11, 5, 58, 4, 57, 15, 68, 39, 62, 9, 61, 8, 36, 60,
     7, 51, 56, 3, 13, 18, 71, 35, 59, 6, 74, 63, 20, 73, 2, 72, 19, 14, 1,
 ];
 
+/// Version 1002's root fields in the order of the PC engine's data, then
+/// of its table.
+const DATA_ORDER_1002: [u32; 74] = [
+    1, 72, 19, 2, 73, 74, 36, 71, 3, 4, 6, 51, 7, 8, 5, 9, 39, 57, 58, 35, 68, 81, 82, 11, 12, 63,
+    13, 14, 59, 60, 15, 16, 62, 52, 61, 17, 37, 20, 18, 79, 56, 78, 40, 41, 42, 43, 44, 45, 46, 47,
+    48, 49, 77, 33, 34, 38, 50, 69, 70, 80, 24, 25, 66, 67, 75, 76, 26, 53, 28, 29, 65, 30, 64, 31,
+];
+const TABLE_ORDER_1002: [u32; 74] = [
+    14, 19, 72, 73, 20, 63, 39, 68, 15, 74, 6, 59, 35, 71, 18, 13, 56, 51, 7, 60, 36, 8, 61, 9, 62,
+    57, 4, 58, 5, 2, 81, 3, 82, 11, 12, 16, 52, 17, 37, 79, 78, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+    49, 77, 33, 34, 38, 50, 69, 70, 1, 80, 24, 25, 66, 67, 75, 76, 26, 53, 28, 29, 65, 30, 64, 31,
+];
+
+/// Version 1002's font object fields in the order of its data, then of its
+/// table.
+const FONT_DATA_ORDER_1002: [u32; 34] = [
+    35, 3, 4, 5, 6, 10, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 1, 2, 20, 21, 22, 23, 24, 33,
+    34, 25, 26, 27, 28, 29, 30, 31,
+];
+const FONT_TABLE_ORDER_1002: [u32; 34] = [
+    18, 3, 4, 33, 5, 34, 6, 35, 10, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 19, 1, 2, 20, 21, 22, 23,
+    24, 25, 26, 27, 28, 29, 30, 31,
+];
+
 struct Writer {
     encoding: &'static Encoding,
+    version: Version,
 }
 
 impl Writer {
-    fn int(&self, value: i32) -> Vec<u8> {
-        value.to_le_bytes().to_vec()
+    fn int(&self, value: i32) -> Node {
+        Node::Bytes(value.to_le_bytes().to_vec())
     }
 
-    fn text(&self, text: &str) -> Vec<u8> {
+    fn byte(&self, value: u8) -> Node {
+        Node::Bytes(vec![value])
+    }
+
+    fn float(&self, value: f32) -> Node {
+        Node::Bytes(value.to_le_bytes().to_vec())
+    }
+
+    fn text(&self, text: &str) -> Node {
         let bytes = self.encoding.encode(text).0;
-        [self.int(bytes.len() as i32), bytes.into_owned()].concat()
+        Node::Bytes(
+            [
+                (bytes.len() as u32).to_le_bytes().to_vec(),
+                bytes.into_owned(),
+            ]
+            .concat(),
+        )
     }
 
-    fn texts(&self, texts: &[String]) -> Vec<u8> {
-        let mut out = self.int(texts.len() as i32);
-        for text in texts {
-            out.extend(self.text(text));
-        }
+    fn texts(&self, texts: &[String]) -> Vec<Node> {
+        let mut out = vec![self.int(texts.len() as i32)];
+        out.extend(texts.iter().map(|text| self.text(text)));
         out
     }
 
-    /// An object body: the field count, the table, and the fields.
-    fn object(&self, fields: Vec<(u32, Vec<u8>)>) -> Vec<u8> {
-        let mut table = self.int(fields.len() as i32);
-        let start = 4 + 8 * fields.len();
-        let mut data = Vec::new();
-        for (number, bytes) in fields {
-            table.extend(number.to_le_bytes());
-            table.extend(((start + data.len()) as u32).to_le_bytes());
-            data.extend(bytes);
-        }
-        [table, data].concat()
-    }
-
-    fn sized(&self, body: Vec<u8>) -> Vec<u8> {
-        [self.int(body.len() as i32), body].concat()
-    }
-
-    fn tag(&self, tag: Option<&Tag>) -> Vec<u8> {
+    fn tag(&self, tag: Option<&Tag>) -> Node {
         let empty = Tag {
             name: String::new(),
             params: Vec::new(),
             line: 0,
         };
         let tag = tag.unwrap_or(&empty);
-        let mut params = self.int(tag.params.len() as i32);
+        let mut params = vec![self.int(tag.params.len() as i32)];
         for (key, value) in &tag.params {
-            params.extend(self.text(key));
-            params.extend(self.text(value));
+            params.push(self.text(key));
+            params.push(self.text(value));
         }
-        let body = self.object(vec![
-            (2, self.int(tag.line)),
-            (3, self.text(&tag.name)),
+        Node::Object(ObjectNode::new(vec![
+            (2, vec![self.int(tag.line)]),
+            (3, vec![self.text(&tag.name)]),
             (4, params),
-        ]);
-        self.sized(body)
+        ]))
     }
 
-    fn tags(&self, tags: &[Tag]) -> Vec<u8> {
-        let mut out = self.int(tags.len() as i32);
-        for tag in tags {
-            out.extend(self.tag(Some(tag)));
-        }
+    fn tags(&self, tags: &[Tag]) -> Vec<Node> {
+        let mut out = vec![self.int(tags.len() as i32)];
+        out.extend(tags.iter().map(|tag| self.tag(Some(tag))));
         out
     }
 
-    fn keyed_tags(&self, entries: &[(String, Vec<Tag>)]) -> Vec<u8> {
-        let mut out = self.int(entries.len() as i32);
+    fn keyed_tags(&self, entries: &[(String, Vec<Tag>)]) -> Vec<Node> {
+        let mut out = vec![self.int(entries.len() as i32)];
         for (key, tags) in entries {
-            out.extend(self.text(key));
+            out.push(self.text(key));
             out.extend(self.tags(tags));
         }
         out
     }
 
-    fn frame(&self, frame: &WriteFrame) -> Vec<u8> {
-        let body = self.object(vec![
-            (1, self.int(frame.wait as i32)),
-            (2, self.int(0)),
-            (3, self.text(&frame.script)),
-            (4, self.int(frame.index as i32)),
+    fn frame(&self, frame: &WriteFrame) -> Node {
+        let mut fields = vec![
+            (1, vec![self.int(frame.wait as i32)]),
+            (2, vec![self.int(0)]),
+            (3, vec![self.text(&frame.script)]),
+            (4, vec![self.int(frame.index as i32)]),
             (6, self.tags(&frame.queued)),
-            (7, vec![0]),
-            (8, self.tag(frame.at.as_ref())),
-        ]);
-        self.sized(body)
+            (7, vec![self.byte(0)]),
+            (8, vec![self.tag(frame.at.as_ref())]),
+        ];
+        if self.version == Version::V1002 {
+            fields.retain(|(number, _)| *number != 7);
+        }
+        Node::Object(ObjectNode::new(fields))
     }
 
-    fn font(&self, font: &FontLayout) -> Vec<u8> {
+    /// A font. Version 1000 keeps positions and spacing as ints and scales
+    /// as 65536 or 255 for 1; version 1002 keeps them as floats, and adds
+    /// field 35.
+    fn font(&self, font: &FontLayout) -> Node {
+        let v1002 = self.version == Version::V1002;
+        let number = |value: i32| {
+            if v1002 {
+                self.float(value as f32)
+            } else {
+                self.int(value)
+            }
+        };
+        let one = |fixed: i32| {
+            if v1002 {
+                self.float(1.0)
+            } else {
+                self.int(fixed)
+            }
+        };
         let mut fields = vec![
-            (1, self.text(&font.face)),
-            (2, self.text(&font.ruby_face)),
-            (3, self.int(font.left)),
-            (4, self.int(font.top)),
-            (5, self.int(font.width)),
-            (6, self.int(font.height)),
-            (7, self.int(0)),
-            (8, self.int(0)),
-            (9, vec![1]),
-            (10, self.int(255)),
-            (11, self.int(65536)),
-            (12, self.int(65536)),
-            (13, self.int(0)),
-            (14, self.int(0)),
-            (15, vec![1]),
-            (16, self.int(255)),
-            (17, self.int(65536)),
-            (18, self.int(65536)),
-            (19, self.int(0)),
-            (20, vec![font.size]),
-            (21, vec![font.ruby_size]),
-            (22, self.int(font.space_top)),
-            (23, self.int(font.space_middle)),
-            (24, self.int(font.space_bottom)),
-            (25, self.int(font.color as i32)),
-            (26, self.int(font.shadow_color as i32)),
-            (27, self.int(font.outline_color as i32)),
-            (28, self.int(font.align)),
-            (29, self.int(font.style)),
-            (30, vec![0]),
-            (31, vec![u8::from(font.hung)]),
-            (33, self.int(font.kerning)),
-            (34, self.int(0)),
+            (1, vec![self.text(&font.face)]),
+            (2, vec![self.text(&font.ruby_face)]),
+            (3, vec![number(font.left)]),
+            (4, vec![number(font.top)]),
+            (5, vec![number(font.width)]),
+            (6, vec![number(font.height)]),
+            (7, vec![self.int(0)]),
+            (8, vec![self.int(0)]),
+            (9, vec![self.byte(1)]),
+            (10, vec![one(255)]),
+            (11, vec![one(65536)]),
+            (12, vec![one(65536)]),
+            (13, vec![self.int(0)]),
+            (14, vec![self.int(0)]),
+            (15, vec![self.byte(1)]),
+            (16, vec![one(255)]),
+            (17, vec![one(65536)]),
+            (18, vec![one(65536)]),
+            (19, vec![self.int(0)]),
+            (20, vec![self.byte(font.size)]),
+            (21, vec![self.byte(font.ruby_size)]),
+            (22, vec![number(font.space_top)]),
+            (23, vec![number(font.space_middle)]),
+            (24, vec![number(font.space_bottom)]),
+            (25, vec![self.int(font.color as i32)]),
+            (26, vec![self.int(font.shadow_color as i32)]),
+            (27, vec![self.int(font.outline_color as i32)]),
+            (28, vec![self.int(font.align)]),
+            (29, vec![self.int(font.style)]),
+            (30, vec![self.byte(0)]),
+            (31, vec![self.byte(u8::from(font.hung))]),
+            (33, vec![self.int(font.kerning)]),
+            (34, vec![self.int(0)]),
         ];
-        fields.sort_by_key(|(number, _)| *number);
-        self.sized(self.object(fields))
+        if !v1002 {
+            return Node::Object(ObjectNode::new(fields));
+        }
+        fields.push((35, vec![self.int(1)]));
+        let mut object = ObjectNode::new(
+            FONT_DATA_ORDER_1002
+                .iter()
+                .map(|number| {
+                    let index = fields
+                        .iter()
+                        .position(|(n, _)| n == number)
+                        .expect("font field");
+                    fields.swap_remove(index)
+                })
+                .collect(),
+        );
+        object.table_order = FONT_TABLE_ORDER_1002.to_vec();
+        Node::Object(object)
+    }
+
+    /// A field that is an object of int fields, all 0. Version 1000 writes
+    /// it empty, as the engine reads missing fields as 0.
+    fn zero_object(&self, numbers: &[u32]) -> Node {
+        match self.version {
+            Version::V1000 => self.int(0),
+            Version::V1002 => Node::Object(ObjectNode::new(
+                numbers
+                    .iter()
+                    .map(|number| (*number, vec![self.int(0)]))
+                    .collect(),
+            )),
+        }
+    }
+
+    fn variables(&self, locals: &Variables) -> Node {
+        let mut list = (locals.len() as u32).to_le_bytes().to_vec();
+        for (name, value) in locals {
+            for bytes in [
+                self.encoding.encode(name).0.into_owned(),
+                super::pc::variable_bytes(value, self.encoding),
+            ] {
+                list.extend((bytes.len() as u32).to_le_bytes());
+                list.extend(bytes);
+            }
+        }
+        let list = Node::Bytes(list);
+        let macro_scope = Node::Object(ObjectNode::new(vec![
+            (1, vec![self.int(0)]),
+            (2, vec![self.int(0)]),
+            (3, vec![self.int(0)]),
+        ]));
+        Node::Object(ObjectNode::new(vec![
+            (1, vec![self.text("'")]),
+            (2, vec![list]),
+            (3, vec![self.int(1), macro_scope]),
+        ]))
     }
 }
 
-/// Writes a numbered save the PC engine loads.
-pub fn write(save: &SlotWrite, encoding: &'static Encoding) -> Vec<u8> {
-    let w = Writer { encoding };
-    let empty_list = w.int(0);
-    let mut variables = w.int(save.locals.len() as i32);
-    for (name, value) in &save.locals {
-        variables.extend(w.text(name));
-        let bytes = super::pc::variable_bytes(value, encoding);
-        variables.extend(w.int(bytes.len() as i32));
-        variables.extend(bytes);
-    }
-    let macro_scope = w.sized(w.object(vec![(1, w.int(0)), (2, w.int(0)), (3, w.int(0))]));
-    let variables = w.sized(w.object(vec![
-        (1, w.text("'")),
-        (2, variables),
-        (3, [w.int(1), macro_scope].concat()),
-    ]));
-    let mut stack = w.int(save.call_stack.len() as i32);
-    for frame in &save.call_stack {
-        stack.extend(w.frame(frame));
-    }
-    let mut fonts = w.int(save.fonts.len() as i32);
+/// Writes a numbered save the PC engine loads, in the version its engine
+/// writes.
+pub fn write(save: &SlotWrite, version: Version, encoding: &'static Encoding) -> Vec<u8> {
+    let w = Writer { encoding, version };
+    let v1002 = version == Version::V1002;
+    let mut stack = vec![w.int(save.call_stack.len() as i32)];
+    stack.extend(save.call_stack.iter().map(|frame| w.frame(frame)));
+    let mut fonts = vec![w.int(save.fonts.len() as i32)];
     for (id, font) in &save.fonts {
-        fonts.extend(w.text(id));
-        fonts.extend(w.int(1));
-        fonts.extend(w.font(font));
+        fonts.push(w.text(id));
+        fonts.push(w.int(1));
+        fonts.push(w.font(font));
     }
-    let mut push = w.int(save.push_handlers.len() as i32);
+    let mut push = vec![w.int(save.push_handlers.len() as i32)];
     for tag in &save.push_handlers {
-        push.extend(w.int(0));
-        push.extend(w.tag(Some(tag)));
+        push.push(w.int(0));
+        push.push(w.tag(Some(tag)));
     }
 
-    let field = |number: u32| -> Vec<u8> {
+    let field = |number: u32| -> Vec<Node> {
         match number {
-            1 | 2 | 6 | 28 | 57 | 58 | 61 | 71 => vec![1],
-            7 | 15 | 17 | 52 | 68 | 72 | 73 | 74 => vec![0],
-            5 => w.int(1),
-            12 => [w.int(1), w.int(0)].concat(),
-            3 => w.frame(&save.position),
+            // Flags, as the engine writes them in a fresh save.
+            1 | 2 | 28 | 57 | 58 | 61 | 71 => vec![w.byte(1)],
+            6 => vec![w.byte(u8::from(!v1002))],
+            7 | 15 | 17 | 52 | 68 | 72 | 73 | 74 => vec![w.byte(0)],
+            5 => vec![w.int(1)],
+            79 => vec![w.int(3000)],
+            12 => vec![w.int(1), w.int(0)],
+            3 => vec![w.frame(&save.position)],
             4 => stack.clone(),
-            11 => w.text(&save.current_message_layer),
+            11 => vec![w.text(&save.current_message_layer)],
             24 => w.keyed_tags(&save.message_layers),
             25 => fonts.clone(),
             26 => w.keyed_tags(&save.layers),
-            29 => w.tag(save.bgm.as_ref()),
-            30 => variables.clone(),
-            33 => w.tag(save.dirchg.as_ref()),
+            29 => vec![w.tag(save.bgm.as_ref())],
+            30 => vec![w.variables(&save.locals)],
+            31 => vec![w.zero_object(&[7, 1, 2, 3, 4, 5, 6])],
+            33 => vec![w.tag(save.dirchg.as_ref())],
+            34 => vec![w.text(&save.on_enter_frame)],
             36 => w.texts(&save.macro_files),
-            38 => w.text(&save.key_click_start),
-            50 => w.text(&save.key_click_end),
-            51 => w.text(&save.menu_script),
-            40..=49 => w.tag(None),
-            53 => empty_list.clone(),
+            38 => vec![w.text(&save.key_click_start)],
+            50 => vec![w.text(&save.key_click_end)],
+            51 => vec![w.text(&save.menu_script)],
+            40..=49 | 77 => vec![w.tag(None)],
             56 => push.clone(),
-            62 => w.text(&save.backlog_layer),
-            69 => w.text(&save.on_save),
-            70 => w.text(&save.on_load),
+            62 => vec![w.text(&save.backlog_layer)],
+            // The default font, which 1000 reads fine empty.
+            63 if v1002 => vec![w.font(&FontLayout::default())],
+            65 if v1002 => vec![Node::Object(ObjectNode::new(vec![(1, vec![w.int(0)])]))],
+            69 => vec![w.text(&save.on_save)],
+            70 => vec![w.text(&save.on_load)],
+            80 => vec![w.text(&save.on_debug_skip_out)],
             // Message window settings the engine rebuilds from the game's
             // scripts, which load fine empty, and fields that are zero in a
             // fresh save.
-            _ => empty_list.clone(),
+            _ => vec![w.int(0)],
         }
     };
-    let mut sorted = TABLE_ORDER;
-    sorted.sort_unstable();
-    let mut starts = std::collections::HashMap::new();
-    let mut data = Vec::new();
-    let table_end = 12 + 8 * TABLE_ORDER.len();
-    for number in sorted {
-        starts.insert(number, table_end + data.len());
-        data.extend(field(number));
-    }
-    let mut out = MAGIC.to_vec();
-    out.extend(VERSION.to_le_bytes());
-    out.extend((TABLE_ORDER.len() as u32).to_le_bytes());
-    for number in TABLE_ORDER {
-        out.extend(number.to_le_bytes());
-        out.extend(((starts[&number] - 8) as u32).to_le_bytes());
-    }
-    out.extend(data);
-    out
+    let (data_order, table_order) = if v1002 {
+        (DATA_ORDER_1002.to_vec(), TABLE_ORDER_1002.to_vec())
+    } else {
+        let mut ascending = TABLE_ORDER_1000.to_vec();
+        ascending.sort_unstable();
+        (ascending, TABLE_ORDER_1000.to_vec())
+    };
+    let mut root = ObjectNode::new(data_order.into_iter().map(|n| (n, field(n))).collect());
+    root.table_order = table_order;
+    bow::encode(MAGIC, version, &root)
 }
 
 #[cfg(test)]
@@ -741,21 +806,24 @@ mod tests {
             current_message_layer: "adv".into(),
             ..Default::default()
         };
-        let read_back = read(&write(&save, SHIFT_JIS), SHIFT_JIS).unwrap();
-        assert_eq!(read_back.position.index, 73);
-        assert_eq!(read_back.call_stack[1].script, "scenario/a.txt");
-        assert_eq!(read_back.call_stack[1].queued[0].name, "calllua");
-        assert_eq!(
-            (read_back.call_stack[0].wait, read_back.call_stack[1].wait),
-            (0, 1)
-        );
-        assert_eq!(read_back.locals, save.locals);
-        let names: Vec<_> = read_back
-            .replay
-            .iter()
-            .map(|tag| tag.name.as_str())
-            .collect();
-        assert_eq!(names, ["lyc", "chgmsg", "print", "/chgmsg", "splay"]);
+        for version in [Version::V1000, Version::V1002] {
+            let read_back = read(&write(&save, version, SHIFT_JIS), SHIFT_JIS).unwrap();
+            assert_eq!(read_back.version, version);
+            assert_eq!(read_back.position.index, 73);
+            assert_eq!(read_back.call_stack[1].script, "scenario/a.txt");
+            assert_eq!(read_back.call_stack[1].queued[0].name, "calllua");
+            assert_eq!(
+                (read_back.call_stack[0].wait, read_back.call_stack[1].wait),
+                (0, 1)
+            );
+            assert_eq!(read_back.locals, save.locals);
+            let names: Vec<_> = read_back
+                .replay
+                .iter()
+                .map(|tag| tag.name.as_str())
+                .collect();
+            assert_eq!(names, ["lyc", "chgmsg", "print", "/chgmsg", "splay"]);
+        }
     }
 
     #[test]

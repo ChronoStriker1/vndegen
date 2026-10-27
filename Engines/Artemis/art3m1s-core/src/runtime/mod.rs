@@ -162,6 +162,9 @@ pub struct CoreRuntime {
     /// System variables from the PC engine's system.dat that the core doesn't
     /// load, written back as they were so its settings survive (VNDegen).
     system_passthrough: Vec<(String, asb_interpreter::Value)>,
+    /// The version of the PC engine's save files the game uses, which the
+    /// core writes: from the host, then from any PC save file read (VNDegen).
+    pc_save_version: crate::save::bow::Version,
     profiler: crate::profiler::RuntimeProfiler,
 }
 
@@ -368,12 +371,20 @@ impl CoreRuntime {
             pending_message_text: None,
             read_dirty: false,
             system_passthrough: Vec::new(),
+            pc_save_version: crate::save::bow::Version::V1000,
             profiler: crate::profiler::RuntimeProfiler::new(),
         })
     }
 
     pub fn stage_width(&self) -> u32 {
         self.stage_w
+    }
+
+    /// Sets the version of the PC engine's save files to write until the
+    /// core reads one: 1002 for a game whose archives are `pf8`, else 1000
+    /// (VNDegen).
+    pub fn set_pc_save_version(&mut self, version: crate::save::bow::Version) {
+        self.pc_save_version = version;
     }
 
     pub fn set_resources(&mut self, resources: HostResources) {

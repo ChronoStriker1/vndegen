@@ -103,7 +103,11 @@ impl CoreRuntime {
             ),
         };
         let save = self.pc_slot_save(&scene, text.as_ref());
-        let bytes = crate::save::pc_slot::write(&save, self.interpreter.config().encoding);
+        let bytes = crate::save::pc_slot::write(
+            &save,
+            self.pc_save_version,
+            self.interpreter.config().encoding,
+        );
         let path = self.save_path_for(file)?;
         self.resources.write(&path, &bytes)?;
         crate::core_info!("[runtime] 已保存存档: {}", path);
@@ -150,12 +154,12 @@ impl CoreRuntime {
         for (file, bytes, count) in [
             (
                 SAVEG_FILE,
-                crate::save::pc::write_global(&global, &read_lines, encoding),
+                crate::save::pc::write_global(&global, &read_lines, self.pc_save_version, encoding),
                 global.len(),
             ),
             (
                 SYSTEM_FILE,
-                crate::save::pc::write_system(&written, encoding),
+                crate::save::pc::write_system(&written, self.pc_save_version, encoding),
                 written.len(),
             ),
         ] {
@@ -183,13 +187,19 @@ impl CoreRuntime {
                 }
             };
             let read = if is_global {
-                crate::save::pc::read_global(&bytes, encoding).map(|(variables, read_lines)| {
-                    self.control.read_lines_import(read_lines);
-                    variables
-                })
+                crate::save::pc::read_global(&bytes, encoding).map(
+                    |(variables, read_lines, version)| {
+                        self.control.read_lines_import(read_lines);
+                        (variables, version)
+                    },
+                )
             } else {
                 crate::save::pc::read_system(&bytes, encoding)
             };
+            let read = read.map(|(variables, version)| {
+                self.pc_save_version = version;
+                variables
+            });
             let variables = match read {
                 Ok(variables) => variables,
                 Err(e) => {
@@ -277,6 +287,7 @@ impl CoreRuntime {
         let (data, replay) = if bytes.starts_with(crate::save::pc_slot::MAGIC) {
             let encoding = self.interpreter.config().encoding;
             let slot = crate::save::pc_slot::read(&bytes, encoding)?;
+            self.pc_save_version = slot.version;
             let interpreter = &mut self.interpreter;
             let data = crate::save::SaveData::from_pc_slot(&slot, |script, index| {
                 interpreter

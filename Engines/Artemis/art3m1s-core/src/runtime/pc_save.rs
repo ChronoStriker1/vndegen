@@ -166,20 +166,43 @@ impl CoreRuntime {
         queued: Vec<Tag>,
         with_tag: bool,
     ) -> WriteFrame {
-        let at = self
-            .interpreter
-            .get_script(script)
-            .and_then(|script| script.instructions.get(index))
+        // A macro's position, as the script that defines it.
+        let (script, mut index) = self.interpreter.source_position(script, index);
+        let script = script.as_str();
+        let mut wait = wait;
+        let instruction_at = |index: usize| {
+            self.interpreter
+                .get_script(script)
+                .and_then(|script| script.instructions.get(index))
+        };
+        // A frame that returns into a [stop] the core still points at the
+        // stop; the PC engine points past it and keeps the stop as the wait.
+        if with_tag && instruction_at(index).is_some_and(|instruction| instruction.tag == "stop") {
+            index += 1;
+            wait = 3;
+        }
+        let at = instruction_at(index)
             .filter(|_| with_tag)
             .map(|instruction| {
-                let mut tagged = tag(
-                    &instruction.tag,
-                    instruction
-                        .params
-                        .iter()
-                        .filter(|(key, _)| !key.starts_with('\u{b}'))
-                        .map(|(k, v)| (k.clone(), v.clone())),
-                );
+                // Text is a [print] to the PC engine.
+                let mut tagged = if instruction.tag == "__text" {
+                    tag(
+                        "print",
+                        [(
+                            "data".to_string(),
+                            instruction.get("text").unwrap_or_default().to_string(),
+                        )],
+                    )
+                } else {
+                    tag(
+                        &instruction.tag,
+                        instruction
+                            .params
+                            .iter()
+                            .filter(|(key, _)| !key.starts_with('\u{b}'))
+                            .map(|(k, v)| (k.clone(), v.clone())),
+                    )
+                };
                 tagged.line = instruction.line as i32;
                 tagged
             });
@@ -324,6 +347,8 @@ impl CoreRuntime {
             macro_files: interpreter.loaded_macro_files(),
             key_click_start: handler("onClickWaitIn"),
             key_click_end: handler("onClickWaitOut"),
+            on_enter_frame: handler("onEnterFrame"),
+            on_debug_skip_out: handler("onDebugSkipOut"),
             menu_script: self.control.rclick_file().unwrap_or_default(),
             backlog_layer: "backlog".into(),
             on_save: handler("onSave"),

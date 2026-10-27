@@ -2125,6 +2125,20 @@ impl Interpreter {
         files
     }
 
+    /// Where an instruction is in the game's scripts. A macro runs as a
+    /// script of its own, `__macro__<name>@<depth>`, which copies the
+    /// instructions of the script that defines it (VNDegen).
+    pub fn source_position(&self, script: &str, index: usize) -> (String, usize) {
+        script
+            .strip_prefix("__macro__")
+            .and_then(|rest| rest.rsplit_once('@'))
+            .and_then(|(name, _)| self.macros.get(name))
+            .map_or_else(
+                || (script.to_string(), index),
+                |defined| (defined.source.0.clone(), defined.source.1 + index),
+            )
+    }
+
     /// The PC Artemis engine's index for an instruction of a script (VNDegen).
     pub fn pc_index(&self, script: &str, index: usize) -> usize {
         self.scripts

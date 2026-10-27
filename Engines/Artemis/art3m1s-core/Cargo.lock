@@ -51,6 +51,7 @@ dependencies = [
  "asb-interpreter",
  "ctt-astcenc",
  "encoding_rs",
+ "flate2",
  "glam",
  "glow",
  "image",

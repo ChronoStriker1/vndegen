@@ -256,6 +256,14 @@ fn main() {
     };
     let mut rt = CoreRuntime::create(1280, 720, backend).unwrap();
     rt.set_resources(resources.clone());
+    // Games whose archives are pf8 use the newer save files (VNDegen).
+    let mut magic = [0; 3];
+    let pf8 = std::fs::File::open(input)
+        .and_then(|mut file| std::io::Read::read_exact(&mut file, &mut magic))
+        .is_ok_and(|()| &magic == b"pf8");
+    if pf8 {
+        rt.set_pc_save_version(art3m1s_core::save::bow::Version::V1002);
+    }
     #[cfg(feature = "ffmpeg")]
     if std::env::var_os("PROBE_RUNTIME_MEDIA").is_some() {
         rt.set_runtime_media_enabled(true);

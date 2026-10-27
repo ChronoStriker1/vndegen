@@ -1,128 +1,72 @@
-//! The PC Artemis engine's save files, so saves move between it and VNDegen (VNDegen).
+//! The PC Artemis engine's system and global saves, so saves move between
+//! it and VNDegen (VNDegen).
 //!
-//! Every file is a container: a four-byte magic, the version 1000, a section
-//! count, and a table of `(tag, offset)` pairs, where an offset counts from
-//! byte 8. A section runs to the next section's start or the end of the file.
-//! Integers are little-endian 32-bit, and strings are a length and bytes in
-//! the game's charset.
+//! Both are objects in the format [`super::bow`] reads, in version 1000 or
+//! 1002, whichever the game's engine writes.
 //!
-//! - `system.dat`, magic `BOWX`: section 1 holds the system variables as
-//!   name and value pairs.
-//! - `saveg.dat`, magic `BOWG`: section 1 lists, for each script, the
-//!   indexes of the instructions already run, and section 2 holds the global
+//! - `system.dat`, magic `BOWX`: field 1 holds the system variables as name
+//!   and value pairs.
+//! - `saveg.dat`, magic `BOWG`: field 1 lists, for each script, the indexes
+//!   of the instructions already run, and field 2 holds the global
 //!   variables.
 //!
 //! Variable values are text, except Pluto data (see
 //! [`asb_interpreter::pluto`]), which the core keeps in its text form.
 
+use super::bow::{self, Document, Node, ObjectNode, Version};
 use asb_interpreter::Value;
 use encoding_rs::Encoding;
 use std::collections::HashMap;
 
 pub const SYSTEM_MAGIC: &[u8; 4] = b"BOWX";
 pub const GLOBAL_MAGIC: &[u8; 4] = b"BOWG";
-const VERSION: u32 = 1000;
-const OFFSET_BASE: usize = 8;
-
-/// Sections of a container in the order of its table.
-pub type Sections<'a> = Vec<(u32, &'a [u8])>;
-
-/// Reads a container, checking its magic and version.
-pub fn read_container<'a>(bytes: &'a [u8], magic: &[u8; 4]) -> Result<Sections<'a>, String> {
-    let mut reader = Reader::new(bytes);
-    if reader.take(4)? != magic {
-        return Err(format!("not a {} file", String::from_utf8_lossy(magic)));
-    }
-    let version = reader.u32()?;
-    if version != VERSION {
-        return Err(format!("save version {version}, expected {VERSION}"));
-    }
-    let count = reader.u32()? as usize;
-    let mut table = Vec::with_capacity(count.min(256));
-    for _ in 0..count {
-        let tag = reader.u32()?;
-        let start = (reader.u32()? as usize)
-            .checked_add(OFFSET_BASE)
-            .filter(|start| *start <= bytes.len())
-            .ok_or_else(|| format!("section {tag} starts past the end"))?;
-        table.push((tag, start));
-    }
-    let mut starts: Vec<usize> = table.iter().map(|(_, start)| *start).collect();
-    starts.sort_unstable();
-    Ok(table
-        .into_iter()
-        .map(|(tag, start)| {
-            let end = starts
-                .iter()
-                .copied()
-                .find(|&next| next > start)
-                .unwrap_or(bytes.len());
-            (tag, &bytes[start..end])
-        })
-        .collect())
-}
-
-/// Writes a container. The table lists `table_order`, and the sections follow
-/// in `sections` order.
-pub fn write_container(
-    magic: &[u8; 4],
-    table_order: &[u32],
-    sections: &[(u32, Vec<u8>)],
-) -> Vec<u8> {
-    let header = 12 + 8 * table_order.len();
-    let mut starts = HashMap::new();
-    let mut at = header;
-    for (tag, data) in sections {
-        starts.insert(*tag, at);
-        at += data.len();
-    }
-    let mut out = Vec::with_capacity(at);
-    out.extend_from_slice(magic);
-    out.extend_from_slice(&VERSION.to_le_bytes());
-    out.extend_from_slice(&(table_order.len() as u32).to_le_bytes());
-    for tag in table_order {
-        out.extend_from_slice(&tag.to_le_bytes());
-        out.extend_from_slice(&((starts[tag] - OFFSET_BASE) as u32).to_le_bytes());
-    }
-    for (_, data) in sections {
-        out.extend_from_slice(data);
-    }
-    out
-}
 
 /// The system or global variables, without their `s.` or `g.` prefix.
 pub type Variables = Vec<(String, Value)>;
 /// Instruction indexes already run, by script.
 pub type ReadLines = HashMap<String, Vec<usize>>;
 
-/// Reads `system.dat`.
-pub fn read_system(bytes: &[u8], encoding: &'static Encoding) -> Result<Variables, String> {
-    let sections = read_container(bytes, SYSTEM_MAGIC)?;
-    let section = find(&sections, 1)?;
-    read_variables(section, "s.", encoding)
+/// Reads `system.dat`, with the version it is in.
+pub fn read_system(
+    bytes: &[u8],
+    encoding: &'static Encoding,
+) -> Result<(Variables, Version), String> {
+    let document = Document::open(bytes, SYSTEM_MAGIC)?;
+    let root = document.root()?;
+    let variables = read_variables(document.bytes(root.require(1)?), "s.", encoding)?;
+    Ok((variables, document.version))
 }
 
 /// Writes `system.dat`.
-pub fn write_system(variables: &Variables, encoding: &'static Encoding) -> Vec<u8> {
-    let section = write_variables(variables, "s.", encoding);
-    write_container(SYSTEM_MAGIC, &[1], &[(1, section)])
+pub fn write_system(
+    variables: &Variables,
+    version: Version,
+    encoding: &'static Encoding,
+) -> Vec<u8> {
+    let root = ObjectNode::new(vec![(
+        1,
+        vec![Node::Bytes(write_variables(variables, "s.", encoding))],
+    )]);
+    bow::encode(SYSTEM_MAGIC, version, &root)
 }
 
-/// Reads `saveg.dat`.
+/// Reads `saveg.dat`, with the version it is in.
 pub fn read_global(
     bytes: &[u8],
     encoding: &'static Encoding,
-) -> Result<(Variables, ReadLines), String> {
-    let sections = read_container(bytes, GLOBAL_MAGIC)?;
-    let read_lines = read_read_lines(find(&sections, 1)?, encoding)?;
-    let variables = read_variables(find(&sections, 2)?, "g.", encoding)?;
-    Ok((variables, read_lines))
+) -> Result<(Variables, ReadLines, Version), String> {
+    let document = Document::open(bytes, GLOBAL_MAGIC)?;
+    let root = document.root()?;
+    let read_lines = read_read_lines(document.bytes(root.require(1)?), encoding)?;
+    let variables = read_variables(document.bytes(root.require(2)?), "g.", encoding)?;
+    Ok((variables, read_lines, document.version))
 }
 
 /// Writes `saveg.dat`, with the table order the PC engine writes.
 pub fn write_global(
     variables: &Variables,
     read_lines: &ReadLines,
+    version: Version,
     encoding: &'static Encoding,
 ) -> Vec<u8> {
     let mut lines = Vec::new();
@@ -137,15 +81,12 @@ pub fn write_global(
         }
     }
     let globals = write_variables(variables, "g.", encoding);
-    write_container(GLOBAL_MAGIC, &[2, 1], &[(1, lines), (2, globals)])
-}
-
-fn find<'a>(sections: &Sections<'a>, tag: u32) -> Result<&'a [u8], String> {
-    sections
-        .iter()
-        .find(|(candidate, _)| *candidate == tag)
-        .map(|(_, data)| *data)
-        .ok_or_else(|| format!("no section {tag}"))
+    let mut root = ObjectNode::new(vec![
+        (1, vec![Node::Bytes(lines)]),
+        (2, vec![Node::Bytes(globals)]),
+    ]);
+    root.table_order = vec![2, 1];
+    bow::encode(GLOBAL_MAGIC, version, &root)
 }
 
 fn read_variables(
@@ -279,17 +220,42 @@ mod tests {
         out
     }
 
+    /// The same variables in version 1002: the field's data, then one table
+    /// for the root at offset 0, then the offset of the tables, compressed.
+    fn pc_system_1002() -> Vec<u8> {
+        let mut body = pc_system()[20..].to_vec();
+        let tables_at = body.len() as u32;
+        for value in [1u32, 0, 1, 1, 0, tables_at] {
+            body.extend_from_slice(&value.to_le_bytes());
+        }
+        let mut out = b"BOWX".to_vec();
+        out.extend_from_slice(&1002u32.to_le_bytes());
+        out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        let mut encoder = flate2::write::ZlibEncoder::new(out, flate2::Compression::default());
+        std::io::Write::write_all(&mut encoder, &body).unwrap();
+        encoder.finish().unwrap()
+    }
+
     #[test]
     fn reads_and_writes_system_variables_like_the_pc_engine() {
-        let variables = read_system(&pc_system(), SHIFT_JIS).unwrap();
+        let expected = vec![
+            ("bgmvol".to_string(), Value::Int(500)),
+            ("title".to_string(), Value::String("監獄".to_string())),
+        ];
+        let (variables, version) = read_system(&pc_system(), SHIFT_JIS).unwrap();
+        assert_eq!((&variables, version), (&expected, Version::V1000));
         assert_eq!(
-            variables,
-            vec![
-                ("bgmvol".to_string(), Value::Int(500)),
-                ("title".to_string(), Value::String("監獄".to_string())),
-            ]
+            write_system(&variables, Version::V1000, SHIFT_JIS),
+            pc_system()
         );
-        assert_eq!(write_system(&variables, SHIFT_JIS), pc_system());
+
+        let (variables, version) = read_system(&pc_system_1002(), SHIFT_JIS).unwrap();
+        assert_eq!((&variables, version), (&expected, Version::V1002));
+        let written = write_system(&variables, Version::V1002, SHIFT_JIS);
+        assert_eq!(
+            read_system(&written, SHIFT_JIS).unwrap(),
+            (expected, Version::V1002)
+        );
     }
 
     #[test]
@@ -303,15 +269,20 @@ mod tests {
             ),
         ];
         let read_lines = HashMap::from([("scenario/a.txt".to_string(), vec![0, 1, 2378])]);
-        let bytes = write_global(&variables, &read_lines, SHIFT_JIS);
+        let bytes = write_global(&variables, &read_lines, Version::V1000, SHIFT_JIS);
         assert_eq!(&bytes[..4], b"BOWG");
         // Table: section 2 then 1, with section 1's data right after the table.
         assert_eq!(&bytes[12..16], &2u32.to_le_bytes());
         assert_eq!(&bytes[20..28], &[1, 0, 0, 0, 20, 0, 0, 0]);
         assert!(bytes.windows(blob.len()).any(|window| window == blob));
-        let (read_variables, read_back) = read_global(&bytes, SHIFT_JIS).unwrap();
+        let (read_variables, read_back, _) = read_global(&bytes, SHIFT_JIS).unwrap();
         assert_eq!(read_variables, variables);
         assert_eq!(read_back, read_lines);
+        let bytes = write_global(&variables, &read_lines, Version::V1002, SHIFT_JIS);
+        assert_eq!(
+            read_global(&bytes, SHIFT_JIS).unwrap(),
+            (variables, read_lines, Version::V1002)
+        );
     }
 
     #[test]

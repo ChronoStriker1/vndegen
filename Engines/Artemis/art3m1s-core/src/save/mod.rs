@@ -3,6 +3,7 @@
 //! 负责将解释器的完整运行状态序列化到文件，以及从文件恢复。
 //! 使用 serde_json 作为序列化格式。
 
+pub mod bow;
 pub mod pc;
 pub mod pc_slot;
 

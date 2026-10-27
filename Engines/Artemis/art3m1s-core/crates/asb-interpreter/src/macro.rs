@@ -16,6 +16,9 @@ pub struct Macro {
     pub instructions: Vec<Instruction>,
     /// 参数列表（从宏定义中提取）
     pub params: Vec<String>,
+    /// The script that defines the macro and the index of its first
+    /// instruction there (VNDegen).
+    pub source: (String, usize),
 }
 
 impl Macro {
@@ -43,6 +46,7 @@ impl Macro {
             name: name.to_string(),
             instructions,
             params,
+            source: (script.name.clone(), start_line),
         })
     }
 

@@ -1,4 +1,4 @@
-// pc_save_check <system.dat|saveg.dat>...: reads PC Artemis system and global saves, writes them back, and compares.
+// pc_save_check <save.dat>...: reads PC Artemis saves; writes system and global saves back in their version and compares.
 use art3m1s_core::save::pc;
 use encoding_rs::SHIFT_JIS;
 
@@ -8,7 +8,8 @@ fn main() {
         if bytes.starts_with(art3m1s_core::save::pc_slot::MAGIC) {
             let save = art3m1s_core::save::pc_slot::read(&bytes, SHIFT_JIS).unwrap();
             println!(
-                "{path}: at {}:{} stack {:?}, {} locals, {} replay tags: {:?}",
+                "{path}: {:?} at {}:{} stack {:?}, {} locals, {} replay tags: {:?}",
+                save.version,
                 save.position.script,
                 save.position.index,
                 save.call_stack
@@ -23,17 +24,18 @@ fn main() {
                     .collect::<std::collections::BTreeSet<_>>()
             );
         } else if bytes.starts_with(pc::SYSTEM_MAGIC) {
-            let variables = pc::read_system(&bytes, SHIFT_JIS).unwrap();
-            let written = pc::write_system(&variables, SHIFT_JIS);
+            let (variables, version) = pc::read_system(&bytes, SHIFT_JIS).unwrap();
+            let written = pc::write_system(&variables, version, SHIFT_JIS);
             println!(
-                "{path}: {} system variables, rewrite identical: {}",
+                "{path}: {version:?}, {} system variables, rewrite identical: {}, same after rewrite: {}",
                 variables.len(),
-                written == bytes
+                written == bytes,
+                pc::read_system(&written, SHIFT_JIS).unwrap() == (variables, version)
             );
         } else {
-            let (variables, lines) = pc::read_global(&bytes, SHIFT_JIS).unwrap();
-            let written = pc::write_global(&variables, &lines, SHIFT_JIS);
-            let (variables2, lines2) = pc::read_global(&written, SHIFT_JIS).unwrap();
+            let (variables, lines, version) = pc::read_global(&bytes, SHIFT_JIS).unwrap();
+            let written = pc::write_global(&variables, &lines, version, SHIFT_JIS);
+            let (variables2, lines2, _) = pc::read_global(&written, SHIFT_JIS).unwrap();
             let same_lines = lines.len() == lines2.len()
                 && lines.iter().all(|(k, v)| {
                     let (mut a, mut b) = (v.clone(), lines2[k].clone());
@@ -42,7 +44,7 @@ fn main() {
                     a == b
                 });
             println!(
-                "{path}: {} globals, {} scripts, same after rewrite: {}, size {} -> {}",
+                "{path}: {version:?}, {} globals, {} scripts, same after rewrite: {}, size {} -> {}",
                 variables.len(),
                 lines.len(),
                 variables == variables2 && same_lines,
