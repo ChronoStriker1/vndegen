@@ -29,6 +29,7 @@ bool Script::load(FileSystem &fs, std::string *error) {
     } else if (fs.exists("00.txt")) {
         joinNumbered(true);
     } else if (fs.read("nscript.dat", raw)) {
+        fromDat_ = true;
         joined.resize(raw.size());
         for (size_t i = 0; i < raw.size(); i++) joined[i] = char(raw[i] ^ 0x84);
     } else {
@@ -38,6 +39,7 @@ bool Script::load(FileSystem &fs, std::string *error) {
     text_.reserve(joined.size());
     for (char c : joined)
         if (c != '\r') text_ += c;
+    loadedLength_ = text_.size();
     if (text_.empty() || text_.back() != '\n') text_ += '\n';
 
     lineStarts_.clear();

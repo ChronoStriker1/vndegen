@@ -66,6 +66,13 @@ ImageRef Engine::loadFileImage(const std::string &file, bool *hasAlpha) {
     return ref;
 }
 
+void Engine::forgetImage(const std::string &file) {
+    std::string key = normalizePath(file);
+    imageCache_.erase(key);
+    imageAlpha_.erase(key);
+    imageCacheOrder_.erase(std::remove(imageCacheOrder_.begin(), imageCacheOrder_.end(), key), imageCacheOrder_.end());
+}
+
 // Parses an image tag and loads the image with its transparency applied.
 bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     out = LoadedImage();

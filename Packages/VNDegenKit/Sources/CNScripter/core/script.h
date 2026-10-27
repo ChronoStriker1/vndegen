@@ -26,6 +26,9 @@ public:
 
     const std::string &text() const { return text_; }
     const ScriptSettings &settings() const { return settings_; }
+    // kidoku.dat's size for a new file, as the PC engine sizes it: (length + 106) / 8 bytes for text scripts and
+    // length / 8 for nscript.dat, the length counting the script without carriage returns (checked on four games).
+    size_t kidokuSize() const { return fromDat_ ? loadedLength_ / 8 : (loadedLength_ + 106) / 8; }
     int lineCount() const { return int(lineStarts_.size()); }
     size_t lineStart(int line) const { return lineStarts_[size_t(line)]; }
     int lineAt(size_t offset) const;
@@ -39,6 +42,8 @@ public:
 private:
     void parseSettings();
     std::string text_;
+    bool fromDat_ = false;
+    size_t loadedLength_ = 0;  // the script's length before a closing newline was added
     ScriptSettings settings_;
     std::vector<size_t> lineStarts_;
     std::unordered_map<std::string, int> labels_;  // lowercase name -> label index

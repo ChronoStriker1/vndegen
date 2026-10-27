@@ -145,16 +145,26 @@ std::vector<std::string> FileSystem::topLevelFiles() const {
     return out;
 }
 
+// Files the game wrote after the folder was indexed, such as save thumbnails, are found on disk.
+bool FileSystem::onDisk(std::string_view name, std::string &path) const {
+    path = hostPath(name);
+    struct stat st;
+    return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
 bool FileSystem::exists(std::string_view name) const {
-    std::string key = normalizePath(name);
-    return loose_.count(key) || entries_.count(key);
+    std::string key = normalizePath(name), path;
+    return loose_.count(key) || entries_.count(key) || onDisk(name, path);
 }
 
 bool FileSystem::read(std::string_view name, Bytes &out) {
     std::string key = normalizePath(name);
     if (auto it = loose_.find(key); it != loose_.end()) return readFile(root_ + "/" + it->second, out);
     auto it = entries_.find(key);
-    if (it == entries_.end()) return false;
+    if (it == entries_.end()) {
+        std::string path;
+        return onDisk(name, path) && readFile(path, out);
+    }
     const Entry &e = it->second;
     Bytes raw(e.size);
     {

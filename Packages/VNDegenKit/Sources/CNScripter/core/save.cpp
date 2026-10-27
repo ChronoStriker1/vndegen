@@ -607,10 +607,9 @@ void Engine::loadGlobals() {
         noteLabelVisited(script_.labelIndex("define"));
     }
     if (kidokuOn_) {
-        readFile(fs_.hostPath(joinPath(saveDir_, "kidoku.dat")), kidoku_);
-        // A new file is sized as the PC engine sizes it, one bit per script byte plus some room.
-        size_t want = (script_.text().size() + 100 + 7) / 8;
-        if (kidoku_.size() < want) kidoku_.resize(want, 0);
+        // An existing file keeps its size; a new one is sized as the PC engine sizes it.
+        if (!readFile(fs_.hostPath(joinPath(saveDir_, "kidoku.dat")), kidoku_) || kidoku_.empty())
+            kidoku_.assign(script_.kidokuSize(), 0);
     }
 }
 
@@ -743,6 +742,71 @@ void cmdGetSaveStr(E &e, const std::string &) {
     e.setVar(v, info.note);
 }
 
+// getscreenshot w,h keeps the screen scaled to w x h; savescreenshot writes it as a 24-bit BMP and forgets it,
+// savescreenshot2 keeps it for more files, deletescreenshot forgets it.
+void cmdGetScreenshot(E &e, const std::string &) {
+    int w = e.readInt();
+    e.readComma();
+    int h = e.readInt();
+    if (w <= 0 || h <= 0) return;
+    e.composeFrame();
+    const Image &f = e.frame_;
+    Image shot(w, h);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            // Box-average the source area each target pixel covers.
+            int x0 = x * f.w / w, x1 = std::max(x0 + 1, (x + 1) * f.w / w);
+            int y0 = y * f.h / h, y1 = std::max(y0 + 1, (y + 1) * f.h / h);
+            int r = 0, g = 0, b = 0, n = 0;
+            for (int yy = y0; yy < y1; yy++)
+                for (int xx = x0; xx < x1; xx++) {
+                    uint32_t p = f.row(yy)[xx];
+                    r += chR(p);
+                    g += chG(p);
+                    b += chB(p);
+                    n++;
+                }
+            shot.row(y)[x] = rgba(r / n, g / n, b / n);
+        }
+    e.screenshot_ = std::make_shared<Image>(std::move(shot));
+}
+
+void cmdSaveScreenshot(E &e, const std::string &name) {
+    std::string file = e.readStr();
+    if (!e.screenshot_) return;
+    const Image &img = *e.screenshot_;
+    uint32_t stride = uint32_t(img.w * 3 + 3) & ~3u;
+    Bytes out(54 + size_t(stride) * size_t(img.h), 0);
+    auto put32 = [&](size_t at, uint32_t v) {
+        for (int k = 0; k < 4; k++) out[at + size_t(k)] = uint8_t(v >> (8 * k));
+    };
+    out[0] = 'B';
+    out[1] = 'M';
+    put32(2, uint32_t(out.size()));
+    put32(10, 54);
+    put32(14, 40);
+    put32(18, uint32_t(img.w));
+    put32(22, uint32_t(img.h));
+    out[26] = 1;
+    out[28] = 24;
+    for (int y = 0; y < img.h; y++) {
+        uint8_t *row = &out[54 + size_t(img.h - 1 - y) * stride];
+        for (int x = 0; x < img.w; x++) {
+            uint32_t p = img.row(y)[x];
+            row[x * 3] = uint8_t(chB(p));
+            row[x * 3 + 1] = uint8_t(chG(p));
+            row[x * 3 + 2] = uint8_t(chR(p));
+        }
+    }
+    std::string path = e.fs_.hostPath(file);
+    if (!writeFile(path, out.data(), out.size())) logf("could not write %s", path.c_str());
+    // The image cache may hold an older picture of this name, such as a save thumbnail.
+    e.forgetImage(file);
+    if (name == "savescreenshot") e.screenshot_.reset();
+}
+
+void cmdDeleteScreenshot(E &e, const std::string &) { e.screenshot_.reset(); }
+
 void cmdKidokuSkip(E &e, const std::string &) {
     e.kidokuSkip_ = true;
     e.kidokuOn_ = true;
@@ -762,6 +826,10 @@ void registerSaveCommands(std::unordered_map<std::string, CommandFn> &t) {
     t["savetime"] = cmdSaveTime;
     t["getsavestr"] = cmdGetSaveStr;
     t["kidokuskip"] = cmdKidokuSkip;
+    t["getscreenshot"] = cmdGetScreenshot;
+    t["savescreenshot"] = cmdSaveScreenshot;
+    t["savescreenshot2"] = cmdSaveScreenshot;
+    t["deletescreenshot"] = cmdDeleteScreenshot;
 }
 
 }  // namespace vnns

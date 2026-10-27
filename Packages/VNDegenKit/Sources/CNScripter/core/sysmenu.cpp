@@ -329,13 +329,19 @@ void cmdInput(E &e, const std::string &name) {
     std::string prompt, initial;
     int maxLen = 32;
     if (name == "input") {
-        // input "prompt","default",max,zenkaku
+        // input "prompt","default",max,zenkaku   or   input $var,"prompt","default",max,zenkaku[,window...]
+        e.skipSpaces();
+        if (e.peek() == '$') {
+            v = e.readVar();
+            e.readComma();
+        } else {
+            v.kind = E::VarRef::None;
+        }
         prompt = e.readStr();
         e.readComma();
         initial = e.readStr();
         if (e.readComma()) maxLen = e.readInt();
         e.skipStatement();
-        v.kind = E::VarRef::None;
     } else if (name == "textfield") {
         v = e.readVar();
         initial = e.strVar(v.index);

@@ -288,6 +288,8 @@ public:
     std::unordered_map<std::string, ImageRef> imageCache_;
     std::vector<std::string> imageCacheOrder_;
     std::unordered_set<std::string> imageAlpha_;  // cached images that have an alpha channel
+    std::shared_ptr<Image> screenshot_;
+    void forgetImage(const std::string &file);
     void commitScene();
     // Starts an effect from the shown frame to the pending scene. effectNo 0 commits nothing, 1 is instant.
     void printWithEffect(int effectNo);

@@ -262,7 +262,9 @@ void cmdBtnKey(E &e, const std::string &name) {
         return;
     }
     if (name == "btndown") {
-        e.btnDown_ = true;
+        // btndown [1|0]: button waits return as the button goes down rather than up.
+        e.skipSpaces();
+        e.btnDown_ = e.atStatementEnd() || e.readInt() != 0;
         return;
     }
     e.btnKeys_.insert(key);

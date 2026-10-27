@@ -88,10 +88,13 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     size_t p = 0;
     if (p < spec.size() && spec[p] == '/') {
         p++;
+        // fw,fh,pitch[,mode...]: later settings exist in newer engines; the first four are what this draws.
         int vals[4] = {fw, fh, pitch, 0};
         int k = 0;
-        while (k < 4 && p < spec.size() && spec[p] != ';' && spec[p] != '#') {
-            vals[k++] = atoi(spec.c_str() + p);
+        while (p < spec.size() && spec[p] != ';' && spec[p] != '#') {
+            int v = atoi(spec.c_str() + p);
+            if (k < 4) vals[k] = v;
+            k++;
             while (p < spec.size() && spec[p] != ',' && spec[p] != ';' && spec[p] != '#') p++;
             if (p < spec.size() && spec[p] == ',') p++;
         }

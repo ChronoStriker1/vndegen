@@ -43,6 +43,7 @@ private:
         uint8_t compression;  // 0 stored, 1 SPB
     };
     void indexDir(const std::string &dir, const std::string &prefix);
+    bool onDisk(std::string_view name, std::string &path) const;
     bool addNsa(const std::string &path, bool sar);
     bool addNs2(const std::string &path);
     int openArchive(const std::string &path);
