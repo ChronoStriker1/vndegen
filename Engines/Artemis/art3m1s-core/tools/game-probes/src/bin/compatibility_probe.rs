@@ -14,6 +14,87 @@ use std::{
 
 static OUTPUT_DIR: OnceLock<PathBuf> = OnceLock::new();
 static HOST_EVENTS: OnceLock<host_events::HostEvents> = OnceLock::new();
+static RESOURCES: OnceLock<HostResources> = OnceLock::new();
+
+// VNDegen's headless host: finishes sounds after their Ogg length and
+// fullscreen videos at once, so scripts that wait on them keep running.
+struct Pending {
+    due_ms: u64,
+    sound: Option<Option<String>>,
+    video: Option<Option<String>>,
+}
+static CLOCK: std::sync::Mutex<(u64, Vec<Pending>)> = std::sync::Mutex::new((0, Vec::new()));
+
+fn ogg_duration_ms(bytes: &[u8]) -> Option<u64> {
+    let id = bytes.windows(7).position(|w| w == b"\x01vorbis")?;
+    let rate = u32::from_le_bytes(bytes.get(id + 12..id + 16)?.try_into().ok()?) as u64;
+    let last = bytes.windows(4).rposition(|w| w == b"OggS")?;
+    let granule = u64::from_le_bytes(bytes.get(last + 6..last + 14)?.try_into().ok()?);
+    (rate > 0).then(|| granule * 1000 / rate)
+}
+
+fn media_length_ms(resolved: &str) -> u64 {
+    let resources = RESOURCES.get().unwrap();
+    for ext in ["", ".ogg", ".wav"] {
+        if let Ok(bytes) = resources.read_file(&format!("{resolved}{ext}")) {
+            return ogg_duration_ms(&bytes).unwrap_or(500);
+        }
+    }
+    eprintln!("[HOST] media not found: {resolved}");
+    0
+}
+
+fn handle_host_event(payload: &str) {
+    let Ok(event) = serde_json::from_str::<serde_json::Value>(payload) else { return };
+    let kind = event["kind"].as_str().unwrap_or("");
+    let body = &event["payload"];
+    let file = body["resolved_file"].as_str().or(body["file"].as_str()).unwrap_or("");
+    let looping = body["loop"].as_bool().unwrap_or(false);
+    let mut clock = CLOCK.lock().unwrap();
+    let now = clock.0;
+    match kind {
+        "audio_se_play" | "audio_voice_play" if !looping => {
+            let id = body["id"].as_str().map(str::to_string);
+            let due = now + media_length_ms(file);
+            clock.1.push(Pending { due_ms: due, sound: Some(id), video: None });
+        }
+        "audio_bgm_play" if !looping => {
+            let due = now + media_length_ms(file);
+            clock.1.push(Pending { due_ms: due, sound: Some(None), video: None });
+        }
+        "video_play" => {
+            let id = body["id"].as_str().map(str::to_string);
+            eprintln!("[HOST] video {file} id={id:?}");
+            if id.is_none() {
+                clock.1.push(Pending { due_ms: now + 100, sound: None, video: Some(None) });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn run_due_completions(rt: &mut CoreRuntime) {
+    let due: Vec<Pending> = {
+        let mut clock = CLOCK.lock().unwrap();
+        let now = clock.0;
+        let (due, rest) = std::mem::take(&mut clock.1).into_iter().partition(|p| p.due_ms <= now);
+        clock.1 = rest;
+        due
+    };
+    for pending in due {
+        if let Some(id) = pending.sound {
+            rt.notify_sound_finished(id.as_deref());
+        }
+        if let Some(id) = pending.video {
+            rt.notify_video_finished(id.as_deref());
+        }
+    }
+}
+
+fn host_step(rt: &mut CoreRuntime, ms: u64) {
+    CLOCK.lock().unwrap().0 += ms;
+    run_due_completions(rt);
+}
 
 fn drain_host_events() {
     let events = HOST_EVENTS.get().expect("host events initialized");
@@ -56,6 +137,10 @@ fn drain_host_events() {
                 let level = char::from_u32(aux).unwrap_or('I');
                 let message = String::from_utf8_lossy(&bytes[offset..offset + len]);
                 eprintln!("[{level}] {message}");
+            } else {
+                let payload = String::from_utf8_lossy(&bytes[offset..offset + len]);
+                eprintln!("[EV{kind}] {payload}");
+                handle_host_event(&payload);
             }
             offset += len;
         }
@@ -66,6 +151,7 @@ fn tick(rt: &mut CoreRuntime, count: usize, pixels: &mut Vec<u8>) {
     for _ in 0..count {
         rt.advance_and_render_into(17, pixels);
         drain_host_events();
+        host_step(rt, 17);
     }
 }
 
@@ -124,6 +210,12 @@ fn main() {
         resources.mount_pfs(input, "utf-8").unwrap();
     }
     resources.set_save_dir(Some(&save_dir)).unwrap();
+    RESOURCES.set(resources.clone()).ok();
+    if let Ok(font) = std::env::var("PROBE_DEFAULT_FONT") {
+        resources
+            .set_override("font/sourcehansans-medium.otf", std::fs::read(font).unwrap())
+            .unwrap();
+    }
     let events = HOST_EVENTS.get_or_init(host_events::HostEvents::new);
     events.set_enabled(true);
     unsafe {
@@ -142,6 +234,10 @@ fn main() {
     };
     let mut rt = CoreRuntime::create(1280, 720, backend).unwrap();
     rt.set_resources(resources.clone());
+    #[cfg(feature = "ffmpeg")]
+    if std::env::var_os("PROBE_RUNTIME_MEDIA").is_some() {
+        rt.set_runtime_media_enabled(true);
+    }
     if let Ok(os) = std::env::var("ART3M1S_PROBE_OS") {
         let os = CString::new(os).unwrap();
         unsafe { ffi::art3m1s_runtime_set_reported_os(&mut rt, os.as_ptr()) };
@@ -153,6 +249,7 @@ fn main() {
         for _ in 0..900 {
             rt.advance_without_render(17);
             drain_host_events();
+            host_step(&mut rt, 17);
         }
         tick(&mut rt, 1, &mut pixels);
     } else {
@@ -177,6 +274,7 @@ fn main() {
                     for _ in 0..count.parse().unwrap() {
                         rt.advance_without_render(17);
                         drain_host_events();
+                        host_step(&mut rt, 17);
                     }
                 }
                 ["shot", name] => snapshot(&rt, &pixels, name),
