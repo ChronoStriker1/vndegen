@@ -177,3 +177,20 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     nav.activate(.settingsPage(.saves))
     #expect(nav.saveSettings === saves)
 }
+
+@MainActor
+@Test func stackedPageActionsTakeTheirOwnRowUnderPlay() async throws {
+    let (nav, _) = try await makeNavigator()
+    nav.setFocus(.pagePlay)
+    press(nav, .right)
+    #expect(nav.focus == .pageArtwork)
+    // A narrow window puts Artwork and the rest under Play, so Down reaches them and Right has nowhere to go.
+    nav.pageActionsStacked = true
+    nav.setFocus(.pagePlay)
+    press(nav, .right)
+    #expect(nav.focus == .pagePlay)
+    press(nav, .down)
+    #expect(nav.focus == .pageArtwork)
+    press(nav, .up)
+    #expect(nav.focus == .pagePlay)
+}

@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import SwiftUI
 import VNCore
 import GameInput
 import HubUI
@@ -35,7 +36,11 @@ import AppKit
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
-///   -windowSize 900x600      resizes the window before the snapshot
+///   -windowSize 900x600      resizes the window before the snapshot on macOS. On iPad, in Windowed Apps or Stage Manager,
+///                            the window takes that size the next time it is resized
+///   -layoutSize 320x480      lays the whole app out in a frame of that size in the middle of the screen, as in a window
+///                            of that size, iOS only. Unlike -windowSize it takes any size, below the smallest window
+///                            iPadOS allows too, and needs no resizing, but the frame has no window controls
 ///   -ignoreOcclusion YES     web engine pages keep running while no window shows, as on a Mac whose screen is locked, macOS only
 enum DebugHooks {
     static func run(_ hub: Hub) async {
@@ -48,6 +53,7 @@ enum DebugHooks {
            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
         }
+        if let size = launchWindowSize { pinWindow(to: size) }
         #endif
         if UserDefaults.standard.bool(forKey: "seedDemoLibrary") {
             await DemoLibrary.seed(hub.library)
@@ -131,6 +137,26 @@ enum DebugHooks {
         }
     }
 
+    static var launchWindowSize: CGSize? { size(forKey: "windowSize") }
+    static let layoutSize = size(forKey: "layoutSize")
+
+    /// A launch argument such as `-windowSize 900x600`.
+    private static func size(forKey key: String) -> CGSize? {
+        guard let size = UserDefaults.standard.string(forKey: key)?.split(separator: "x").compactMap({ Double($0) }),
+              size.count == 2 else { return nil }
+        return CGSize(width: size[0], height: size[1])
+    }
+
+    #if canImport(UIKit)
+    /// iPadOS keeps a window within its scene's size restrictions, so equal minimum and maximum sizes give the window that
+    /// size the next time it is resized. iPadOS ignores a size smaller than the smallest window it allows.
+    static func pinWindow(to size: CGSize) {
+        guard let restrictions = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.sizeRestrictions else { return }
+        restrictions.minimumSize = size
+        restrictions.maximumSize = size
+    }
+    #endif
+
     static func playInput(_ hub: Hub) async {
         let script = UserDefaults.standard.string(forKey: "demoInput") ?? ""
         try? await Task.sleep(for: .seconds(1.5))
@@ -144,9 +170,8 @@ enum DebugHooks {
         }
         #if os(macOS)
         if let path = UserDefaults.standard.string(forKey: "snapshot") {
-            if let size = UserDefaults.standard.string(forKey: "windowSize")?.split(separator: "x").compactMap({ Double($0) }),
-               size.count == 2, let window = NSApp.windows.first(where: \.isVisible) {
-                window.setContentSize(NSSize(width: size[0], height: size[1]))
+            if let size = launchWindowSize, let window = NSApp.windows.first(where: \.isVisible) {
+                window.setContentSize(size)
             }
             try? await Task.sleep(for: .seconds(3))
             snapshotWindow(to: URL(fileURLWithPath: path))
@@ -166,6 +191,26 @@ enum DebugHooks {
     }
     #endif
 }
+
+#if canImport(UIKit)
+/// The app in a frame of `-layoutSize`, with the screen around it grey, or the app alone without it.
+struct SimulatedWindow<Content: View>: View {
+    @ViewBuilder let content: Content
+    var body: some View {
+        if let size = DebugHooks.layoutSize {
+            ZStack {
+                Color(white: 0.7).ignoresSafeArea()
+                // Away from the screen's edges, so the frame gets no safe area insets, as a window in the middle wouldn't.
+                content
+                    .frame(width: size.width, height: size.height)
+                    .clipShape(.rect(cornerRadius: 20, style: .continuous))
+            }
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 /// Fake game folders that detect as RPG Maker MZ, dressed with real Steam library art and metadata, so the hub can be
 /// judged with real artwork before the metadata providers exist. Safe to run on every launch: it only fills what is missing.
