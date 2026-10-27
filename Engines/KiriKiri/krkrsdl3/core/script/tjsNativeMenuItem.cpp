@@ -248,7 +248,9 @@ void tTJSNI_MenuItem::SetVisible(bool b)
 //---------------------------------------------------------------------------
 bool tTJSNI_MenuItem::GetVisible() const
 {
-    return IsVisible;
+    // A window's own item is its menu bar, which the engine never draws. Games that read it put their menu commands
+    // on screen instead.
+    return !Window && IsVisible;
 }
 
 //---------------------------------------------------------------------------
