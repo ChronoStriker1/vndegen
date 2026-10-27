@@ -16,6 +16,11 @@
     // decoder's file has loaded.
     const patched = new WeakSet();
     document.addEventListener('load', () => {
+        if (typeof WebAudio === 'function' && !patched.has(WebAudio) && typeof WebAudio.prototype._onFetch === 'function'
+            && typeof WebAudio.prototype._updateBuffer === 'function') {
+            finishFetches(WebAudio);
+            patched.add(WebAudio);
+        }
         if (typeof VorbisDecoder !== 'function' || patched.has(VorbisDecoder) || !VorbisDecoder.worker
             || typeof VorbisDecoder.prototype.send !== 'function' || typeof VorbisDecoder.prototype.destroy !== 'function') return;
         try {
@@ -25,13 +30,36 @@
         }
         decodeOtherFormatsInWebKit(VorbisDecoder);
         VorbisDecoder.worker.addEventListener('error', (event) => {
-            // MZ stops the game on any uncaught error, and an error in the decoder's worker reaches the page as one,
-            // though it costs only the sound being decoded. That sound stays silent instead.
+            // MZ stops the game on any uncaught error, and an error in the decoder's worker reaches the page as one.
+            // The game goes on instead. The sound being decoded never plays, and what waits for it waits on, such as
+            // background music paused for a music effect.
             event.preventDefault();
             console.warn('Ogg decoder: ' + event.message);
         });
         patched.add(VorbisDecoder);
     }, true);
+
+    // MZ's _onFetch tells the decoder a sound has finished loading only when chunks are left over at the end. When
+    // _updateBufferOnFetch has just passed the last one on, the decoder never hears it: an Ogg decoder stays open with
+    // its last seconds undecoded, and a sound decoded in WebKit, which waits for the whole file, never plays. At the end
+    // of a fetch with nothing left over, this passes the complete data on once more, as MZ does when something is left.
+    function finishFetches(Audio) {
+        const onFetch = Audio.prototype._onFetch;
+        Audio.prototype._onFetch = function (response) {
+            if (!response.ok || !response.body) return onFetch.call(this, response);
+            const reader = response.body.getReader();
+            const read = reader.read.bind(reader);
+            reader.read = () => read().then((chunk) => {
+                if (chunk.done && !this._isLoaded && this._fetchedSize === 0 && this._data) {
+                    this._isLoaded = true;
+                    this._updateBuffer();
+                    this._data = null;
+                }
+                return chunk;
+            });
+            return onFetch.call(this, { ok: true, body: { getReader: () => reader } });
+        };
+    }
 
     // The decoder numbers decoders 0 to 999 and then starts over. Its worker keeps each decoder's state under its number
     // until the page destroys it, and hands the next decoder with that number the old state. A track whose last chunk of

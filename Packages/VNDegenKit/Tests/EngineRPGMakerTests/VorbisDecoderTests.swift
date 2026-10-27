@@ -59,6 +59,74 @@ private let decoder = """
     }
     """
 
+/// MZ 1.9's WebAudio fetch path, with _onFetch as rmmz_core.js has it. MZ passes chunks on at most once a second; this
+/// passes every chunk on as it arrives, the case where the last chunk goes before the fetch ends.
+private let webAudio = """
+    function WebAudio(decoder) { this._decoder = decoder; this._data = null; this._fetchedSize = 0; this._fetchedData = []; this._isLoaded = false; }
+    WebAudio.prototype._onFetch = function(response) {
+        if (response.ok) {
+            const reader = response.body.getReader();
+            const readChunk = ({ done, value }) => {
+                if (done) {
+                    this._isLoaded = true;
+                    if (this._fetchedSize > 0) {
+                        this._concatenateFetchedData();
+                        this._updateBuffer();
+                        this._data = null;
+                    }
+                    return 0;
+                } else {
+                    this._onFetchProcess(value);
+                    return reader.read().then(readChunk);
+                }
+            };
+            reader
+                .read()
+                .then(readChunk)
+                .catch(() => this._onError());
+        } else {
+            this._onError();
+        }
+    };
+    WebAudio.prototype._onError = function() { this._isError = true; };
+    WebAudio.prototype._onFetchProcess = function(value) {
+        this._fetchedSize += value.length;
+        this._fetchedData.push(value);
+        this._updateBufferOnFetch();
+    };
+    WebAudio.prototype._updateBufferOnFetch = function() {
+        this._concatenateFetchedData();
+        this._updateBuffer();
+    };
+    WebAudio.prototype._concatenateFetchedData = function() {
+        const currentData = this._data;
+        const currentSize = currentData ? currentData.length : 0;
+        const newData = new Uint8Array(currentSize + this._fetchedSize);
+        let pos = 0;
+        if (currentData) {
+            newData.set(currentData);
+            pos += currentSize;
+        }
+        for (const value of this._fetchedData) {
+            newData.set(value, pos);
+            pos += value.length;
+        }
+        this._data = newData;
+        this._fetchedData = [];
+        this._fetchedSize = 0;
+    };
+    WebAudio.prototype._updateBuffer = function() { this._decoder.send(this._data.buffer.slice(0), this._isLoaded); };
+    """
+
+/// 800 frames of silence as a WAV file, 16-bit mono at 8 kHz.
+private let wav = """
+    const wav = new DataView(new ArrayBuffer(44 + 1600));
+    const tag = (at, s) => [...s].forEach((c, i) => wav.setUint8(at + i, c.charCodeAt(0)));
+    tag(0, 'RIFF'); wav.setUint32(4, 36 + 1600, true); tag(8, 'WAVE'); tag(12, 'fmt ');
+    wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 1, true); wav.setUint32(24, 8000, true);
+    wav.setUint32(28, 16000, true); wav.setUint16(32, 2, true); wav.setUint16(34, 16, true); tag(36, 'data'); wav.setUint32(40, 1600, true);
+    """
+
 /// Page helpers: `ogg(n)` is n bytes that start like an Ogg file, `errors` collects what reaches window.onerror, and
 /// `acknowledged` counts the worker's replies.
 private let helpers = """
@@ -80,8 +148,10 @@ private let helpers = """
     let root = fm.temporaryDirectory.appending(path: "vndegen-vorbis-\(UUID().uuidString)", directoryHint: .isDirectory)
     let libs = root.appending(path: "js/libs", directoryHint: .isDirectory)
     try fm.createDirectory(at: libs, withIntermediateDirectories: true)
-    try Data(#"<html><body><script src="\#(script)"></script></body></html>"#.utf8).write(to: root.appending(path: "index.html"))
+    try Data(#"<html><body><script src="\#(script)"></script><script src="js/rmmz_core.js"></script></body></html>"#.utf8)
+        .write(to: root.appending(path: "index.html"))
     try Data(decoder.utf8).write(to: root.appending(path: String(script.prefix { $0 != "?" })))
+    try Data(webAudio.utf8).write(to: root.appending(path: "js/rmmz_core.js"))
 
     let source = URL(filePath: #filePath).deletingLastPathComponent()
         .appending(path: "../../Sources/EngineRPGMaker/Resources/rpgmaker.js").standardized
@@ -94,7 +164,7 @@ private let helpers = """
     let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
     webView.load(URLRequest(url: folder.indexURL))
     let deadline = ContinuousClock.now + .seconds(20)
-    while try await webView.evaluateJavaScript("document.readyState === 'complete' && typeof VorbisDecoder === 'function' && !!VorbisDecoder.worker") as? Bool != true {
+    while try await webView.evaluateJavaScript("document.readyState === 'complete' && typeof VorbisDecoder === 'function' && !!VorbisDecoder.worker && typeof WebAudio === 'function'") as? Bool != true {
         guard ContinuousClock.now < deadline else { throw CancellationError() }
         try await Task.sleep(for: .milliseconds(50))
     }
@@ -132,13 +202,7 @@ private let helpers = """
 @Test @MainActor func soundsThatAreNotOggDecodeInWebKit() async throws {
     let (webView, root) = try await decoderPage()
     defer { try? FileManager.default.removeItem(at: root) }
-    let result = try await webView.callAsyncJavaScript(helpers + """
-        // 800 frames of silence, 16-bit mono at 8 kHz.
-        const wav = new DataView(new ArrayBuffer(44 + 1600));
-        const tag = (at, s) => [...s].forEach((c, i) => wav.setUint8(at + i, c.charCodeAt(0)));
-        tag(0, 'RIFF'); wav.setUint32(4, 36 + 1600, true); tag(8, 'WAVE'); tag(12, 'fmt ');
-        wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 1, true); wav.setUint32(24, 8000, true);
-        wav.setUint32(28, 16000, true); wav.setUint16(32, 2, true); wav.setUint16(34, 16, true); tag(36, 'data'); wav.setUint32(40, 1600, true);
+    let result = try await webView.callAsyncJavaScript(helpers + wav + """
         const context = new OfflineAudioContext(1, 8000, 8000);
         const decoded = await Promise.race([
             new Promise((resolve) => new VorbisDecoder(context, (b) => resolve(b.length + ' at ' + b.sampleRate), () => resolve('failed')).send(wav.buffer, true)),
@@ -169,4 +233,24 @@ private let helpers = """
         """, arguments: [:], contentWorld: .page) as? [String: Any]
     #expect(result?["errors"] as? [String] == [])
     #expect(result?["decoded"] as? Int == 1024)
+}
+
+/// MZ tells the decoder a sound has loaded only when chunks are left over when the fetch ends. A WAV under an .ogg name,
+/// which WebKit decodes once it has all of it, never played when the last chunk had already been passed on.
+@Test @MainActor func aSoundWhoseLastChunkWentEarlyStillFinishesLoading() async throws {
+    let (webView, root) = try await decoderPage()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let result = try await webView.callAsyncJavaScript(helpers + wav + """
+        const context = new OfflineAudioContext(1, 8000, 8000);
+        const decoded = await Promise.race([
+            new Promise((resolve) => {
+                const decoder = new VorbisDecoder(context, (b) => resolve(b.length + ' at ' + b.sampleRate), () => resolve('failed'));
+                new WebAudio(decoder)._onFetch(new Response(new Blob([wav.buffer])));
+            }),
+            new Promise((resolve) => setTimeout(() => resolve('nothing'), 3000)),
+        ]);
+        return { decoded: decoded, errors: errors };
+        """, arguments: [:], contentWorld: .page) as? [String: Any]
+    #expect(result?["decoded"] as? String == "800 at 8000")
+    #expect(result?["errors"] as? [String] == [])
 }
