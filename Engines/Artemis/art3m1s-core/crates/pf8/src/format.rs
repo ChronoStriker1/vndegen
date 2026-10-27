@@ -137,11 +137,19 @@ pub fn parse_entries_with_encoding(
         ));
     }
 
+    // pf2 has four more header bytes before the count, and twelve bytes
+    // rather than four between an entry's name and its offset (VNDegen).
+    let pf2 = &data[offsets::MAGIC..offsets::MAGIC + 3] == PF2_MAGIC;
+    let (count_at, entries_at, name_gap) = if pf2 {
+        (offsets::INDEX_COUNT + 4, offsets::ENTRIES_START + 4, 12)
+    } else {
+        (offsets::INDEX_COUNT, offsets::ENTRIES_START, 4)
+    };
     let index_size = read_u32_le(data, offsets::INDEX_SIZE)?;
-    let index_count = read_u32_le(data, offsets::INDEX_COUNT)?;
+    let index_count = read_u32_le(data, count_at)?;
 
     let mut file_entries = Vec::new();
-    let mut cursor = offsets::ENTRIES_START;
+    let mut cursor = entries_at;
     let index_end_pos = (offsets::INDEX_DATA_START + index_size as usize).min(data.len());
 
     while cursor < index_end_pos && file_entries.len() < index_count as usize {
@@ -152,13 +160,13 @@ pub fn parse_entries_with_encoding(
         let name_length = read_u32_le(data, cursor)?;
         cursor += 4;
 
-        if cursor + name_length as usize + 12 > data.len() {
+        if cursor + name_length as usize + name_gap + 8 > data.len() {
             break;
         }
 
         let name_bytes = &data[cursor..cursor + name_length as usize];
         let name = decode_filename_impl(name_bytes, encoding);
-        cursor += name_length as usize + 4; // Skip name and 4 zero bytes
+        cursor += name_length as usize + name_gap; // Skip name and reserved bytes
 
         let offset = read_u32_le(data, cursor)?;
         let size = read_u32_le(data, cursor + 4)?;
