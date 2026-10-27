@@ -41,8 +41,8 @@ public struct RuntimePackageStore: Sendable {
         return folder
     }
 
-    /// Downloads, verifies, asks for license acceptance, extracts, installs atomically. Throws CancellationError when the
-    /// task is cancelled, and leaves no partial files behind on any failure.
+    /// Downloads, verifies, asks for license acceptance (Inno Setup installers only), extracts, installs atomically.
+    /// Throws CancellationError when the task is cancelled, and leaves no partial files behind on any failure.
     public func install(_ package: RuntimePackage, session: URLSession = .shared,
                         progress: @escaping @Sendable (RuntimeInstallProgress) -> Void,
                         acceptLicense: @escaping @Sendable (_ licenseText: String?) async -> Bool) async throws -> URL {
@@ -53,8 +53,17 @@ public struct RuntimePackageStore: Sendable {
         let download = work.appending(path: fileExtension.isEmpty ? "download" : "download.\(fileExtension)")
         try await PackageDownload.fetch(package, to: download, session: session, progress: progress)
 
+        let files = work.appending(path: "files")
+        try FileManager.default.createDirectory(at: files, withIntermediateDirectories: false)
         let setup: URL
         switch package.installer {
+        case .zip(let members):
+            try ZipInstaller.extract(download, members: members, to: files) { done, total in
+                progress(.extracting(done: done, total: total))
+            }
+            try Task.checkCancellation()
+            progress(.installing)
+            return try commit(files, as: package, work: work, receiptText: package.sha256)
         case .innoSetup(let path?):
             setup = try ZipInstaller.extract(download, setupPath: path, to: work.appending(path: "installer"))
             try FileManager.default.removeItem(at: download)
@@ -66,8 +75,6 @@ public struct RuntimePackageStore: Sendable {
         guard await acceptLicense(installer.licenseText) else { throw RuntimeInstallError.declinedLicense }
         try Task.checkCancellation()
 
-        let files = work.appending(path: "files")
-        try FileManager.default.createDirectory(at: files, withIntermediateDirectories: false)
         try installer.extractAppFiles(to: files) { done, total in progress(.extracting(done: done, total: total)) }
         try Task.checkCancellation()
         progress(.installing)

@@ -20,6 +20,9 @@ its own:
   wasm module and every JavaScript package in `ruffle.js`, and the texts in `Engines/Flash/licenses/` for the Noto font
   and symphonia.
 - `scripts/app-licenses.sh` writes `build/app/licenses/` for third-party code in VNDegen's own sources.
+- `scripts/fonts-licenses.sh` writes `build/fonts/licenses/` from the license files in `Engines/Shared/fonts/licenses/`
+  for the fonts the app bundles: Liberation, DejaVu, and the Ume fonts, whose license page it turns into text. The
+  Chinese and Korean font downloads install Adobe's `LICENSE.txt` beside the fonts.
 
 `scripts/build.sh` fails when one of these folders has no notices.
 

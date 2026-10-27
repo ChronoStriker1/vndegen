@@ -526,6 +526,15 @@
         },
     });
 
+    // A canvas keeps whatever font its text was drawn in, so text drawn before a font substitute loads would stay in
+    // the fallback font. The boot scene waits for the substitutes the game names (see fonts.js).
+    document.addEventListener('load', () => {
+        if (typeof Scene_Boot !== 'function') return;
+        wrap(Scene_Boot.prototype, 'isReady', (isReady) => function () {
+            return window.__vndegen.fontsReady !== false && isReady.apply(this, arguments);
+        });
+    }, true);
+
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
         sessionPaused = paused;

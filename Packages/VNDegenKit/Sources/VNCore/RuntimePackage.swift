@@ -8,6 +8,9 @@ public struct RuntimePackage: Hashable, Sendable, Identifiable {
         /// An Inno Setup installer. `path` is the setup program inside a downloaded zip, or nil when the download is the
         /// setup program itself. Files the installer puts in its `{app}` folder make up the package.
         case innoSetup(path: String?)
+        /// A zip whose `files`, paths inside it, make up the package, placed at its top level by their file names. For
+        /// packages under licenses that ask for no acceptance, such as fonts under the SIL Open Font License.
+        case zip(files: [String])
     }
 
     /// Stable, persisted in the install folder's name. Never rename one.
