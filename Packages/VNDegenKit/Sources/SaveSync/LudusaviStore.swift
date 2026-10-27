@@ -81,6 +81,23 @@ public struct LudusaviStore: Sendable {
         let recorded = RecordedPaths(files.keys, locations: locations)
         var plan = RestorePlan(items: [], skipped: [])
         var planned: [String: Int] = [:]
+        // Names this plan writes, and their folders, by location and lowercased path, so a later name that differs only
+        // in case lands on the same file or folder, as on Windows, even where nothing exists yet.
+        var spellings: [Int: [String: String]] = [:]
+        func spelled(_ relative: String, in location: Int) -> String {
+            var parts = relative.split(separator: "/").map(String.init)
+            var known = spellings[location, default: [:]]
+            for index in parts.indices {
+                let key = parts[...index].joined(separator: "/").lowercased()
+                if let earlier = known[key] {
+                    parts[index] = earlier
+                } else {
+                    known[key] = parts[index]
+                }
+            }
+            spellings[location] = known
+            return parts.joined(separator: "/")
+        }
         for (path, stored) in files.sortedByKey {
             guard let (index, relative) = claim(path, locations), recorded.path(of: relative, in: index) == path else {
                 plan.skipped.append(path)
@@ -88,7 +105,7 @@ public struct LudusaviStore: Sendable {
             }
             // A save that exists here in another case, as a PC backup's `Save01.rvdata2` beside a local `save01.rvdata2`,
             // is that save, so the restore replaces it rather than writing a second file beside it.
-            let local = FileCase.spelling(of: relative, in: locations[index].directory)
+            let local = spelled(FileCase.spelling(of: relative, in: locations[index].directory), in: index)
             let item = RestorePlan.Item(location: index, relative: local, path: path, stored: stored)
             // A backup from a disk that keeps case can hold `Save01.rvdata2` and `save01.rvdata2`, which are one save
             // here. The one spelled as on disk wins, otherwise the first.

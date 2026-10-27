@@ -53,6 +53,8 @@ _replace = getattr(os, "replace", None)
 _mkdir = os.mkdir
 _makedirs = os.makedirs
 _rmdir = os.rmdir
+# Python 2's os.getcwd returns bytes, which can't join a text path in a folder with a non-ASCII name.
+_getcwd = getattr(os, "getcwdu", os.getcwd)
 
 # (folder, folder + "/") for each folder whose paths are resolved.
 roots = []
@@ -111,7 +113,7 @@ def _find(folder, name):
 
 def _resolve_text(path):
     # A relative path is the game's too when the current folder is in an installed one.
-    absolute = path if os.path.isabs(path) else os.path.join(os.getcwd(), path)
+    absolute = path if os.path.isabs(path) else os.path.join(_getcwd(), path)
     for root, inside in roots:
         if absolute.startswith(inside):
             break
@@ -166,8 +168,15 @@ def resolve(path):
     return path
 
 
+def _at_descriptor(kwargs):
+    """True for a call whose relative paths start at a folder descriptor, which the resolver can't see."""
+    return any(kwargs.get(name) is not None for name in ("dir_fd", "src_dir_fd", "dst_dir_fd"))
+
+
 def _retry(function, path, args, kwargs):
     """Calls `function` on `path` as written, and on its real path if that is missing."""
+    if _at_descriptor(kwargs):
+        return function(path, *args, **kwargs)
     try:
         return function(path, *args, **kwargs)
     except EnvironmentError as error:
@@ -190,6 +199,19 @@ def _changed(*paths):
                 folders.clear()
 
 
+def _absolute(path):
+    text = path if isinstance(path, text_type) else decode(path) if isinstance(path, bytes) else path.__fspath__()
+    return os.path.normpath(os.path.join(_getcwd(), text))
+
+
+def _exists(path):
+    try:
+        _lstat(path)
+        return True
+    except EnvironmentError:
+        return False
+
+
 def _creates(args, kwargs):
     mode = args[0] if args else kwargs.get("mode", "r")
     try:
@@ -201,8 +223,11 @@ def _creates(args, kwargs):
 def open(file, *args, **kwargs):
     if _creates(args, kwargs):
         real = resolve(file)
+        new = not _exists(real)
         result = _open(real, *args, **kwargs)
-        _changed(real)
+        # Only a new file changes the folder's names. Rewriting one keeps the folder's listing.
+        if new:
+            _changed(real)
         return result
     return _retry(_open, file, args, kwargs)
 
@@ -210,8 +235,11 @@ def open(file, *args, **kwargs):
 def io_open(file, *args, **kwargs):
     if _creates(args, kwargs):
         real = resolve(file)
+        new = not _exists(real)
         result = _io_open(real, *args, **kwargs)
-        _changed(real)
+        # Only a new file changes the folder's names. Rewriting one keeps the folder's listing.
+        if new:
+            _changed(real)
         return result
     return _retry(_io_open, file, args, kwargs)
 
@@ -234,31 +262,36 @@ def scandir(path="."):
 
 def remove(path, *args, **kwargs):
     result = _retry(_remove, path, args, kwargs)
-    _changed(resolve(path))
+    if not _at_descriptor(kwargs):
+        _changed(resolve(path))
     return result
 
 
 def unlink(path, *args, **kwargs):
     result = _retry(_unlink, path, args, kwargs)
-    _changed(resolve(path))
+    if not _at_descriptor(kwargs):
+        _changed(resolve(path))
     return result
 
 
 def rmdir(path, *args, **kwargs):
     result = _retry(_rmdir, path, args, kwargs)
-    _changed(resolve(path))
+    if not _at_descriptor(kwargs):
+        _changed(resolve(path))
     return result
 
 
 def _destination(real_src, dst):
     real = resolve(dst)
     # A rename that only changes case finds its own source. It keeps the new spelling, in the folder as it is on disk.
-    if real is not dst and real == real_src:
-        return os.path.join(os.path.dirname(real), os.path.basename(dst))
+    if real is not dst and _absolute(real) == _absolute(real_src):
+        return os.path.join(os.path.dirname(_absolute(real)), os.path.basename(dst))
     return real
 
 
 def rename(src, dst, *args, **kwargs):
+    if _at_descriptor(kwargs):
+        return _rename(src, dst, *args, **kwargs)
     real_src = resolve(src)
     real_dst = _destination(real_src, dst)
     result = _rename(real_src, real_dst, *args, **kwargs)
@@ -267,6 +300,8 @@ def rename(src, dst, *args, **kwargs):
 
 
 def replace(src, dst, *args, **kwargs):
+    if _at_descriptor(kwargs):
+        return _replace(src, dst, *args, **kwargs)
     real_src = resolve(src)
     real_dst = _destination(real_src, dst)
     result = _replace(real_src, real_dst, *args, **kwargs)
@@ -275,6 +310,8 @@ def replace(src, dst, *args, **kwargs):
 
 
 def mkdir(path, *args, **kwargs):
+    if _at_descriptor(kwargs):
+        return _mkdir(path, *args, **kwargs)
     real = resolve(path)
     result = _mkdir(real, *args, **kwargs)
     _changed(real)

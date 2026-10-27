@@ -587,3 +587,23 @@ func aBackupWithTwoSpellingsOfOneSaveRestoresOne() throws {
     _ = try store.restore(folder: "Test Game 02", backup: nil, locations: locations, snapshot: snapshot)
     #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "lower"])
 }
+
+/// Two spellings of one save restore as one file even when the device has neither yet.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"] != nil))
+func twoSpellingsOfANewSaveRestoreAsOneFile() throws {
+    let base = URL(fileURLWithPath: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"]!)
+        .appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["File1.rmmzsave": "upper", "file1.rmmzsave": "lower"])
+    _ = try store.backUp(folder: nil, title: "Test Game 03", game: GameID("Test Game 03"), locations: locations, retention: nil,
+                         os: "linux", comment: nil)
+    try fm.removeItem(at: locations[0].directory)
+
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 03")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 03", backup: nil, locations: locations, snapshot: snapshot)
+    // The backup lists File1 first, as uppercase sorts first, so its spelling and contents win.
+    #expect(try contents(of: locations[0]) == ["File1.rmmzsave": "upper"])
+}

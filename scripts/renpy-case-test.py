@@ -172,8 +172,48 @@ try:
         check(real_names(os.path.join(base, "Game", "Images")) == ["BG.png", "New.png"],
               "a relative write replaces the file in another case")
         check(read(os.path.join(images, "BG.png")) == "relative bg", "the relative write went to the existing file")
+        # A relative rename that only changes case.
+        write(os.path.join(base, "Game", "Images", "Rel.txt"), "r")
+        os.rename(os.path.join("Game", "Images", "Rel.txt"), os.path.join("game", "images", "REL.TXT"))
+        check("REL.TXT" in real_names(os.path.join(base, "Game", "Images")), "a relative case-only rename changes the case")
+        os.remove(os.path.join(images, "REL.TXT"))
+        # Appending to a file in another case keeps the folder's listing.
+        real_images = case._absolute(os.path.join(base, "Game", "Images"))
+        os.path.exists(os.path.join(images, "bg.PNG"))
+        listed = case.folders.get(real_images)
+        with builtins.open(os.path.join("game", "images", "bg.png"), "a") as f:
+            f.write("")
+        check(listed is not None and case.folders.get(real_images) is listed, "an append keeps the folder's listing")
     finally:
         os.chdir(here)
+
+    # A call relative to a folder descriptor isn't resolved against the current folder.
+    if hasattr(os, "O_DIRECTORY") and not PY2:
+        other = os.path.join(work, "other")
+        write(os.path.join(other, "save.dat"), "other")
+        write(os.path.join(base, "Game", "Save.dat"), "game")
+        fd = os.open(other, os.O_RDONLY | os.O_DIRECTORY)
+        os.chdir(os.path.join(base, "Game"))
+        try:
+            os.rename("save.dat", "new.dat", src_dir_fd=fd, dst_dir_fd=fd)
+        finally:
+            os.chdir(here)
+            os.close(fd)
+        check(real_names(other) == ["new.dat"] and "Save.dat" in real_names(os.path.join(base, "Game")),
+              "a rename at a folder descriptor moves that folder's file")
+        os.remove(os.path.join(base, "Game", "Save.dat"))
+
+    # Python 2's current folder comes back as bytes, which must not break a text path in a non-ASCII folder.
+    japanese = os.path.join(base, "Game", u"\u65e5\u672c")
+    write(os.path.join(japanese, "Existing.txt"), "jp")
+    os.chdir(japanese if not PY2 else japanese.encode("utf-8"))
+    try:
+        with builtins.open(u"existing.TXT", "w") as f:
+            f.write(u"rewritten")
+        check(real_names(japanese) == ["Existing.txt"], "a relative write in a non-ASCII folder replaces the file")
+    finally:
+        os.chdir(here)
+    shutil.rmtree(japanese)
 
     # A folder put in place of another with the same time is listed again.
     if not PY2:
