@@ -1,6 +1,7 @@
 #include "audio.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #define STB_VORBIS_NO_STDIO
@@ -55,9 +56,9 @@ public:
         size_t p = 12;
         int format = 0;
         while (p + 8 <= data_.size()) {
-            uint32_t size = le32(&data_[p + 4]);
+            size_t size = le32(&data_[p + 4]), left = data_.size() - (p + 8);
             const uint8_t *body = &data_[p + 8];
-            if (!memcmp(&data_[p], "fmt ", 4) && size >= 16) {
+            if (!memcmp(&data_[p], "fmt ", 4) && size >= 16 && size <= left) {
                 format = le16(body);
                 channels_ = le16(body + 2);
                 rate_ = int(le32(body + 4));
@@ -65,9 +66,10 @@ public:
                 if (format == 0xFFFE && size >= 26) format = le16(body + 24);
             } else if (!memcmp(&data_[p], "data", 4)) {
                 begin_ = p + 8;
-                end_ = std::min(data_.size(), begin_ + size);
+                end_ = begin_ + std::min(size, left);  // a data chunk cut short plays what there is
                 break;
             }
+            if (size + (size & 1) >= left) break;
             p += 8 + size + (size & 1);
         }
         float_ = format == 3;
@@ -133,8 +135,10 @@ std::unique_ptr<AudioSource> openAudio(Bytes data) {
 
 bool AudioMixer::play(int channel, Bytes data, bool loop, int volume, int fadeInMs, double loopStart) {
     auto src = openAudio(std::move(data));
+    Channel old;  // freed after the lock is let go, so the audio thread doesn't wait on it
     std::lock_guard<std::mutex> lock(mutex_);
     Channel &c = ch_[size_t(channel)];
+    old = std::move(c);
     c = Channel();
     if (!src) return false;
     c.src = std::move(src);
@@ -149,6 +153,7 @@ bool AudioMixer::play(int channel, Bytes data, bool loop, int volume, int fadeIn
 }
 
 void AudioMixer::stop(int channel, int fadeOutMs) {
+    Channel old;  // freed after the lock is let go
     std::lock_guard<std::mutex> lock(mutex_);
     Channel &c = ch_[size_t(channel)];
     if (!c.src) return;
@@ -156,6 +161,7 @@ void AudioMixer::stop(int channel, int fadeOutMs) {
         c.fadeStep = -c.gain / (fadeOutMs * kRate / 1000.0f);
         c.stopAfterFade = true;
     } else {
+        old = std::move(c);
         c = Channel();
     }
 }
@@ -176,13 +182,31 @@ void AudioMixer::setPaused(bool paused) {
     paused_ = paused;
 }
 
-void AudioMixer::queueMovieSamples(const float *interleaved, int frames, int volume) {
+void AudioMixer::queueMovieSamples(const float *in, int frames, int volume, int rate) {
+    if (frames <= 0) return;
+    std::vector<float> out;
+    if (rate == kRate || rate <= 0) {
+        out.assign(in, in + frames * 2);
+    } else {
+        // Linear interpolation, carrying the position and last frame across blocks; frame -1 is the previous block's.
+        double step = double(rate) / kRate;
+        auto at = [&](int k, int c) { return k < 0 ? movieLast_[c] : in[k * 2 + c]; };
+        double p = movieSrcPos_;
+        for (; p < frames - 1; p += step) {
+            int i = int(std::floor(p));
+            float t = float(p - i);
+            for (int c = 0; c < 2; c++) out.push_back(at(i, c) + (at(i + 1, c) - at(i, c)) * t);
+        }
+        movieSrcPos_ = p - frames;
+        movieLast_[0] = in[(frames - 1) * 2];
+        movieLast_[1] = in[(frames - 1) * 2 + 1];
+    }
     std::lock_guard<std::mutex> lock(mutex_);
     if (movieRead_ > 0 && movieRead_ * 2 > movie_.size()) {
         movie_.erase(movie_.begin(), movie_.begin() + long(movieRead_));
         movieRead_ = 0;
     }
-    movie_.insert(movie_.end(), interleaved, interleaved + frames * 2);
+    movie_.insert(movie_.end(), out.begin(), out.end());
     movieVolume_ = std::clamp(volume, 0, 100) / 100.0f;
 }
 
@@ -190,6 +214,8 @@ void AudioMixer::clearMovieSamples() {
     std::lock_guard<std::mutex> lock(mutex_);
     movie_.clear();
     movieRead_ = 0;
+    movieSrcPos_ = 0;
+    movieLast_[0] = movieLast_[1] = 0;
 }
 
 int AudioMixer::movieQueuedFrames() {

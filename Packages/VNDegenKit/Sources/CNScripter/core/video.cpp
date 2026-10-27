@@ -79,7 +79,7 @@ void Engine::playMovie(const std::string &file, bool clickStops, bool loop, bool
         m->plm,
         [](plm_t *, plm_samples_t *s, void *user) {
             Engine *e = static_cast<Engine *>(user);
-            e->audio_.queueMovieSamples(s->interleaved, int(s->count), e->volBgm_);
+            e->audio_.queueMovieSamples(s->interleaved, int(s->count), e->volBgm_, plm_get_samplerate(e->movie_->plm));
         },
         this);
     audio_.clearMovieSamples();
@@ -99,11 +99,15 @@ void Engine::stepMovie(int ms) {
         sceneDirty_ = true;
     }
     if (stop || plm_has_ended(m.plm)) {
-        movie_.reset();
-        audio_.clearMovieSamples();
+        stopMovie();
         sceneDirty_ = true;
-        if (wait_ == WaitKind::Movie) wait_ = WaitKind::None;
     }
+}
+
+void Engine::stopMovie() {
+    movie_.reset();
+    audio_.clearMovieSamples();
+    if (wait_ == WaitKind::Movie) wait_ = WaitKind::None;
 }
 
 // Movies draw over everything, text included.

@@ -18,6 +18,7 @@ nonisolated struct NScripterInputRouter {
     /// Scroll distance in points that makes one wheel notch, as for the other mouse-driven engines.
     static let pointsPerNotch = 40.0
     private var held: [Hold: Int] = [:]
+    private var hostKeysDown: Set<Int> = []
     private var scrolled = 0.0
 
     enum Hold: Hashable {
@@ -78,8 +79,15 @@ nonisolated struct NScripterInputRouter {
     }
 
     /// A key the session view read from a hardware keyboard, by USB HID usage.
+    /// The keyboard repeats a held key's down event, so a down for a key already down is ignored here, and each
+    /// physical key counts once toward the key it holds.
     mutating func hostKey(hidUsage: Int, pressed: Bool) -> [NScripterInput] {
         guard let code = Self.vnnsKey(hidUsage: hidUsage) else { return [] }
+        if pressed {
+            guard hostKeysDown.insert(hidUsage).inserted else { return [] }
+        } else {
+            guard hostKeysDown.remove(hidUsage) != nil else { return [] }
+        }
         return press(.key(code), pressed)
     }
 
@@ -91,6 +99,7 @@ nonisolated struct NScripterInputRouter {
             }
         }
         held = [:]
+        hostKeysDown = []
         return out
     }
 

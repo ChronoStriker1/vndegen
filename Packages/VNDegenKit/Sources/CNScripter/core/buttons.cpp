@@ -16,7 +16,10 @@ int Engine::hitButton(int x, int y) {
             int w = s.img.cellWidth, h = s.img.image->h;
             if (x < s.x || y < s.y || x >= s.x + w || y >= s.y + h) continue;
             if (transBtn_) {
-                uint32_t p = s.img.image->row(y - s.y)[s.cell * w + (x - s.x)];
+                int cell = std::clamp(s.cell, 0, std::max(1, s.img.cells) - 1);
+                size_t px = size_t(cell) * size_t(w) + size_t(x - s.x);
+                if (px >= size_t(s.img.image->w)) continue;
+                uint32_t p = s.img.image->row(y - s.y)[px];
                 if (chA(p) == 0) continue;
             }
             return int(i);
@@ -377,7 +380,7 @@ void readChoices(E &e, bool withLabels, std::vector<std::pair<std::string, std::
     // select's arguments may continue on following lines after a trailing comma.
     for (;;) {
         e.skipSpaces();
-        while (e.peek() == '\n') {
+        while (e.peek() == '\n' && e.cur_.pos < e.script().text().size()) {
             e.cur_.pos++;
             e.cur_.line++;
             e.skipSpaces();
@@ -389,7 +392,7 @@ void readChoices(E &e, bool withLabels, std::vector<std::pair<std::string, std::
             label = e.readLabel();
         }
         items.emplace_back(text, label);
-        if (!e.readComma()) break;
+        if (!e.readComma() || e.cur_.pos >= e.script().text().size()) break;
     }
 }
 

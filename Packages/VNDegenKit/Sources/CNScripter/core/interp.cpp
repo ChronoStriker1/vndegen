@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cstdarg>
 #include <cstring>
+#include <stdexcept>
 
 #include "engine.h"
 
@@ -121,12 +122,25 @@ int *Engine::arrayElement(int index, const std::vector<int> &subs) {
         if (subs[i] < 0 || subs[i] > a.dims[i]) return nullptr;
         off = off * size_t(a.dims[i] + 1) + size_t(subs[i]);
     }
-    return &a.data[off];
+    return off < a.data.size() ? &a.data[off] : nullptr;
 }
 
 // ---- expressions ----
 
 namespace {
+// Expressions nest through parentheses, signs and variable indexes. Real scripts nest a few levels; a script nested
+// thousands deep would exhaust the stack, so it ends the game instead.
+struct NestingGuard {
+    static inline thread_local int depth = 0;
+    NestingGuard() {
+        if (++depth > 256) {
+            depth = 0;
+            throw std::runtime_error("an expression is nested too deeply");
+        }
+    }
+    ~NestingGuard() { depth = std::max(0, depth - 1); }
+};
+
 struct ExprParser {
     Engine &e;
     const std::string &t;
@@ -137,6 +151,7 @@ struct ExprParser {
 
     // The index after %, $ or ?: a number, an alias, or another variable.
     int index() {
+        NestingGuard guard;
         e.skipSpaces();
         char c = peek();
         if (isdigit(uint8_t(c))) return number();
@@ -180,6 +195,7 @@ struct ExprParser {
         return p ? *p : 0;
     }
     int factor() {
+        NestingGuard guard;
         e.skipSpaces();
         char c = peek();
         if (c == '-') {

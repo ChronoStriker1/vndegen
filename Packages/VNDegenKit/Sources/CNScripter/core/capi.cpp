@@ -14,6 +14,18 @@ struct VNNSEngine {
 
 static std::string gStartError;
 
+// Game files can be broken in ways that throw, such as a size that can't be allocated. The game then ends with a
+// problem rather than taking the app down.
+template <class F> static bool guarded(VNNSEngine *e, F f) {
+    try {
+        return f();
+    } catch (const std::exception &x) {
+        vnns::logf("stopped: %s", x.what());
+        e->engine->fail(std::string("The game stopped because of a problem in its files (") + x.what() + ").");
+        return false;
+    }
+}
+
 extern "C" {
 
 VNNSEngine *vnns_start(const VNNSLaunch *launch) {
@@ -27,9 +39,16 @@ VNNSEngine *vnns_start(const VNNSLaunch *launch) {
     cfg.gameRoot = launch->gameRoot;
     cfg.saveRoot = launch->gameRoot;
     cfg.englishWordWrap = launch->englishWordWrap;
-    auto engine = std::make_unique<Engine>(cfg);
+    std::unique_ptr<Engine> engine;
     std::string error;
-    if (!engine->start(&error)) {
+    bool started = false;
+    try {
+        engine = std::make_unique<Engine>(cfg);
+        started = engine->start(&error);
+    } catch (const std::exception &x) {
+        error = std::string("The game's files could not be read: ") + x.what();
+    }
+    if (!started) {
         gStartError = error.empty() ? "The game could not be started." : error;
         vnns::logf("start failed: %s", gStartError.c_str());
         return nullptr;
@@ -41,7 +60,9 @@ VNNSEngine *vnns_start(const VNNSLaunch *launch) {
 
 const char *vnns_start_error(void) { return gStartError.empty() ? nullptr : gStartError.c_str(); }
 
-bool vnns_step(VNNSEngine *e, int ms) { return e->engine->step(std::clamp(ms, 0, 1000)); }
+bool vnns_step(VNNSEngine *e, int ms) {
+    return guarded(e, [&] { return e->engine->step(std::clamp(ms, 0, 1000)); });
+}
 
 const uint8_t *vnns_frame(VNNSEngine *e, int *width, int *height, bool *changed) {
     const vnns::Image &f = e->engine->frame();
@@ -74,7 +95,7 @@ void vnns_text(VNNSEngine *e, const char *utf8) {
 void vnns_set_paused(VNNSEngine *e, bool paused) { e->engine->setPaused(paused); }
 void vnns_request_quit(VNNSEngine *e) { e->engine->requestQuit(); }
 void vnns_save_system_data(VNNSEngine *e) { e->engine->saveSystemData(); }
-bool vnns_load_game(VNNSEngine *e, int slot) { return e->engine->loadSlot(slot); }
+bool vnns_load_game(VNNSEngine *e, int slot) { return guarded(e, [&] { return e->engine->loadSlot(slot); }); }
 void vnns_stop(VNNSEngine *e) { delete e; }
 
 const char *vnns_problem(VNNSEngine *e) {

@@ -113,7 +113,7 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
                 mode = "#";
                 keyColor = parseColor(tag.substr(p));
                 keyByColor = true;
-                p += 7;
+                p = std::min(tag.size(), p + 7);
             } else if (m == '!') {
                 mode = "c";  // palette-index keys: modern images have no palette to key on
                 while (p < tag.size() && tag[p] != '/' && tag[p] != ';') p++;

@@ -37,6 +37,7 @@ bool Engine::glyphFor(uint32_t cp, int w, int h, bool bold, const Glyph *&out) {
         out = &it->second;
         return true;
     }
+    if (w <= 0 || h <= 0 || w > 1024 || h > 1024) return false;
     if (!fonts_) fonts_ = makeRasterizer(fontName_);
     if (!fonts_) return false;
     Glyph g;
@@ -100,9 +101,10 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
             while (p < spec.size() && spec[p] != ',' && spec[p] != ';' && spec[p] != '#') p++;
             if (p < spec.size() && spec[p] == ',') p++;
         }
-        fw = vals[0];
-        fh = vals[1];
-        pitch = vals[2];
+        // Sizes past any screen are a broken tag; keep them small enough to draw.
+        fw = std::clamp(vals[0], 1, 512);
+        fh = std::clamp(vals[1], 1, 512);
+        pitch = std::clamp(vals[2], -fw, 512);
         if (vals[3] == 2) shadow = true;  // outlined text, drawn here as shadowed
     }
     if (p < spec.size() && spec[p] == ';') p++;
@@ -119,9 +121,9 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
         width += n == 1 ? (fw + pitch) / 2 : fw + pitch;
         i += n;
     }
-    width = std::max(1, width);
+    width = std::clamp(width, 1, 8192);
     int h = fh + (shadow ? shadeY_ : 0);
-    cells = int(colors.size());
+    cells = std::min(int(colors.size()), 64);
     Image img(width * cells, std::max(1, h), 0);
     for (int c = 0; c < cells; c++)
         drawGlyphs(img, text, c * width, 0, fw, fh, pitch, colors[size_t(c)], bold, shadow, 0, 0);
@@ -422,6 +424,7 @@ void Engine::textStep() {
         // {var,value,var,value...} assigns as the text is shown.
         p++;
         while (peek() != '}' && peek() != '\n') {
+            size_t before = p;
             VarRef v = readVar();
             readComma();
             if (v.kind == VarRef::Str) {
@@ -433,6 +436,9 @@ void Engine::textStep() {
                 setVar(v, readInt());
             }
             readComma();
+            if (p == before) {  // not an assignment: skip to the brace rather than read it again
+                while (peek() != '}' && peek() != '\n') p += sjisCharLen(t, p);
+            }
         }
         if (peek() == '}') p++;
         return;

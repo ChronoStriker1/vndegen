@@ -87,6 +87,7 @@ void Engine::resetGame(bool fromDefine) {
         str_[size_t(i)].clear();
     }
     stack_.clear();
+    stopMovie();
     scene_ = Scene();
     commitScene();
     clearPage();

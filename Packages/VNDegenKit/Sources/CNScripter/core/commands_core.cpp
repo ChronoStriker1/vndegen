@@ -87,8 +87,16 @@ void cmdDim(E &e, const std::string &) {
     E::VarRef v = e.readVar();
     E::ArrayVar a;
     a.dims = v.subs;
+    // Arrays hold at most 16M elements; a script asking for more is broken.
     size_t n = 1;
-    for (int d : a.dims) n *= size_t(std::max(0, d) + 1);
+    for (int &d : a.dims) {
+        d = std::max(0, d);
+        if (size_t(d) + 1 > (size_t(1) << 24) / n) {
+            e.errorf("dim: the array is too large");
+            return;
+        }
+        n *= size_t(d) + 1;
+    }
     a.data.assign(n, 0);
     e.arrays_[v.index] = std::move(a);
     // Saves hold the arrays' contents in the order the script declared them.

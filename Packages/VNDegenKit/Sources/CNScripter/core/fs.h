@@ -46,7 +46,7 @@ private:
     bool onDisk(std::string_view name, std::string &path) const;
     bool addNsa(const std::string &path, bool sar);
     bool addNs2(const std::string &path);
-    int openArchive(const std::string &path);
+    int openArchive(const std::string &path, uint64_t &size);
 
     std::string root_;
     bool nsaEnabled_ = false;

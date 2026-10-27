@@ -49,6 +49,15 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(router.translate(.key(ret, pressed: false)) { $0 } == [.key(Int32(VNNS_KEY_RETURN), down: false)])
 }
 
+@Test func aRepeatingKeyIsReleasedByOneKeyUp() {
+    var router = NScripterInputRouter()
+    let returnKey = 40  // HID usage
+    #expect(router.hostKey(hidUsage: returnKey, pressed: true) == [.key(Int32(VNNS_KEY_RETURN), down: true)])
+    #expect(router.hostKey(hidUsage: returnKey, pressed: true) == [])
+    #expect(router.hostKey(hidUsage: returnKey, pressed: false) == [.key(Int32(VNNS_KEY_RETURN), down: false)])
+    #expect(router.hostKey(hidUsage: returnKey, pressed: true) == [.key(Int32(VNNS_KEY_RETURN), down: true)])
+}
+
 @Test func scrollingTowardThePlayerTurnsTheWheelDown() {
     var router = NScripterInputRouter()
     #expect(router.translate(.scroll(dy: NScripterInputRouter.pointsPerNotch)) { $0 } == [.wheel(-1)])

@@ -50,6 +50,15 @@ struct Reader {
         p = e + 1;
         return v;
     }
+    // A count of strings that follow, each at least one byte, so it can't be more than the bytes left.
+    size_t count() {
+        int n = i();
+        if (n < 0 || size_t(n) > d.size() - std::min(p, d.size())) {
+            bad = true;
+            return 0;
+        }
+        return size_t(n);
+    }
 };
 
 uint32_t rgbOf(uint32_t px) { return uint32_t(chR(px)) << 16 | uint32_t(chG(px)) << 8 | uint32_t(chB(px)); }
@@ -415,9 +424,9 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     r.i();  // standing image centres follow from the screen width
     underline_ = r.i();
     size_t historyAt = r.p;
-    std::vector<std::string> log(size_t(std::max(0, r.i())));
+    std::vector<std::string> log(r.count());
     for (auto &p : log) p = r.s();
-    std::vector<std::string> tags(size_t(std::max(0, r.i())));
+    std::vector<std::string> tags(r.count());
     for (auto &t : tags) t = r.s();
     int line = r.i(), stmt = r.i();
     bool windowUp = x.tail[2] != 0;
@@ -426,7 +435,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         return false;
     }
 
-    // Commit: the scene, sound, text and the script position.
+    // Commit: the scene, sound, text and the script position. A movie playing now belongs to the game left behind.
+    stopMovie();
     if (sc.bgTag == "black" || sc.bgTag == "white" || (!sc.bgTag.empty() && sc.bgTag[0] == '#')) {
         sc.bgColor = sc.bgTag == "white" ? rgba(255, 255, 255) : sc.bgTag == "black" ? rgba(0, 0, 0) : pxOf(uint32_t(strtoul(sc.bgTag.c_str() + 1, nullptr, 16)));
     } else if (!sc.bgTag.empty()) {
@@ -524,9 +534,25 @@ bool Engine::loadGame(int slot) {
     Bytes data;
     if (!readFile(savePath(slot), data)) return false;
     // A note from savegame2 isn't part of the state.
+    // restoreState finds a broken save only after it has read part of it into the engine. The PC engine goes on as if
+    // nothing happened, so the state as it is now, written as a save, is put back if the load fails.
+    Bytes now;
+    serializeState(now);
+    serializeTail(now, stmtStart_.line, stmtStart_.stmt);
+    Cursor resume = cur_;
+    Bytes keptSavepoint = savepoint_;
+    int keptLine = savepointLine_, keptStmt = savepointStmt_;
+    bool keptLive = savepointLive_;
     std::string error;
     if (!restoreState(data, &error)) {
         logf("save %d: %s", slot, error.c_str());
+        std::string ignored;
+        restoreState(now, &ignored);
+        cur_ = resume;
+        savepoint_ = std::move(keptSavepoint);
+        savepointLine_ = keptLine;
+        savepointStmt_ = keptStmt;
+        savepointLive_ = keptLive;
         return false;
     }
     if (!loadGosub_.empty()) gosub(cur_.pos, cur_.line, cur_.stmt, loadGosub_);

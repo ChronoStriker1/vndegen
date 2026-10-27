@@ -2,6 +2,7 @@
 // so the final frame is RGBA8 in memory order.
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -15,7 +16,7 @@ struct Image {
     int w = 0, h = 0;
     std::vector<uint32_t> px;
     Image() = default;
-    Image(int w_, int h_, uint32_t fill = 0) : w(w_), h(h_), px(size_t(w_) * h_, fill) {}
+    Image(int w_, int h_, uint32_t fill = 0) : w(std::max(0, w_)), h(std::max(0, h_)), px(size_t(w) * size_t(h), fill) {}
     uint32_t *row(int y) { return px.data() + size_t(y) * w; }
     const uint32_t *row(int y) const { return px.data() + size_t(y) * w; }
     bool empty() const { return w <= 0 || h <= 0; }

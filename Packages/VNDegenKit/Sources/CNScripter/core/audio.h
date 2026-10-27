@@ -35,7 +35,8 @@ public:
     void setVolume(int channel, int volume);  // 0..100
     void setPaused(bool paused);
     // Movie audio arrives decoded, at 44.1 kHz stereo.
-    void queueMovieSamples(const float *interleaved, int frames, int volume);
+    // A movie's decoded sound, at the movie's sample rate; the mixer resamples it to its own.
+    void queueMovieSamples(const float *interleaved, int frames, int volume, int rate);
     void clearMovieSamples();
     int movieQueuedFrames();
 
@@ -58,6 +59,8 @@ private:
     std::array<Channel, kChannels> ch_;
     std::vector<float> movie_;
     size_t movieRead_ = 0;
+    double movieSrcPos_ = 0;  // resampling position, in source frames from the start of the next block
+    float movieLast_[2] = {0, 0};  // the previous block's last frame
     float movieVolume_ = 1;
     bool paused_ = false;
 };

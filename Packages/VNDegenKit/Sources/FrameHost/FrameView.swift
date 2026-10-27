@@ -30,7 +30,12 @@ public final class FrameView: FrameHostBaseView {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private var samplers: [Filter: MTLSamplerState] = [:]
-    private var texture: MTLTexture?
+    /// The frame on screen. Frames go into three textures in turn, so a new frame never overwrites one the GPU may
+    /// still be drawing; `lastUse` holds the last command buffer that drew each.
+    private var texture: MTLTexture? { textures.isEmpty ? nil : textures[current] }
+    private var textures: [MTLTexture] = []
+    private var lastUse: [MTLCommandBuffer?] = []
+    private var current = 0
     private var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
 
     public init() {
@@ -89,9 +94,15 @@ public final class FrameView: FrameHostBaseView {
         if texture?.width != width || texture?.height != height {
             let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false)
             desc.usage = .shaderRead
-            texture = device.makeTexture(descriptor: desc)
+            textures = (0..<3).compactMap { _ in device.makeTexture(descriptor: desc) }
+            lastUse = Array(repeating: nil, count: textures.count)
+            current = 0
+        } else {
+            current = (current + 1) % textures.count
         }
-        texture?.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: pixels, bytesPerRow: width * 4)
+        guard current < textures.count else { return }
+        if let buffer = lastUse[current], buffer.status != .completed, buffer.status != .error { buffer.waitUntilCompleted() }
+        textures[current].replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: pixels, bytesPerRow: width * 4)
         redraw()
     }
 
@@ -137,6 +148,7 @@ public final class FrameView: FrameHostBaseView {
         encoder.endEncoding()
         buffer.present(drawable)
         buffer.commit()
+        lastUse[current] = buffer
     }
 
     private var contentsScale: CGFloat {

@@ -186,6 +186,11 @@ public:
     bool loadSlot(int slot);
     AudioMixer &audio() { return audio_; }
     const std::string &problem() const { return problem_; }
+    // Ends the game with a problem the runtime can't go on from, such as a script that asks for more memory than exists.
+    void fail(const std::string &why) {
+        problem_ = why;
+        ended_ = true;
+    }
     int width() const { return width_; }
     int height() const { return height_; }
     std::string caption() const { return caption_; }
@@ -566,6 +571,7 @@ public:
     std::unique_ptr<Movie> movie_;
     void playMovie(const std::string &file, bool clickStops, bool loop, bool async, int x, int y, int w, int h);
     void stepMovie(int ms);
+    void stopMovie();
     void drawMovie(Image &out);
 
     // Plugins emulated in place of the game's DLLs (plugins.cpp)

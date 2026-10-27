@@ -35,29 +35,35 @@ extension NScripterPlugin {
         return zip(folders, saveDir).allSatisfy({ $0.lowercased() == $1.lowercased() }) ? name : nil
     }
 
-    /// The folders of the script's `savedir "name"` command, nil when the script has none or it leaves the game folder.
+    /// The folders of the script's `savedir "name"` command below the script folder, nil when there are none.
     nonisolated static func saveDirectory(_ root: URL) -> [String]? {
         guard let script = scriptBytes(root) else { return nil }
         // Commands ignore case. Other bytes become '?', one byte each, so offsets in the text are offsets in the script.
         let text = String(decoding: script.map { $0 < 0x80 ? $0 : 0x3F }, as: UTF8.self).lowercased()
         guard let match = text.firstMatch(of: /^[ \t]*savedir[ \t]+"([^"\r\n]*)"/.anchorsMatchLineEndings()) else { return nil }
         let start = text.utf8.distance(from: text.utf8.startIndex, to: match.1.startIndex)
-        let name = String(decoding: script[start..<start + match.1.utf8.count], as: UTF8.self)
-        let parts = name.split(whereSeparator: { $0 == "\\" || $0 == "/" }).map(String.init)
-        guard !parts.isEmpty, !parts.contains(where: { $0 == "." || $0 == ".." || $0.contains(":") }) else { return nil }
-        return parts
+        // Scripts are Shift-JIS, as the runtime reads them.
+        let bytes = script[start..<start + match.1.utf8.count]
+        let name = String(bytes: bytes, encoding: .shiftJIS) ?? String(decoding: bytes, as: UTF8.self)
+        // ".." climbs but never above the game folder, as the runtime resolves it.
+        var parts: [String] = []
+        for part in name.split(whereSeparator: { $0 == "\\" || $0 == "/" }).map(String.init) where part != "." {
+            if part == ".." { _ = parts.popLast() } else { parts.append(part) }
+        }
+        return parts.isEmpty ? nil : parts
     }
 
-    /// The script: the numbered text files in order, or the decoded nscript.dat when there are none.
+    /// The script, chosen as the runtime chooses it: `0.txt` .. `99.txt` when there is a `0.txt`, else `00.txt` ..
+    /// `99.txt` when there is a `00.txt`, else the decoded `nscript.dat`.
     nonisolated private static func scriptBytes(_ root: URL) -> [UInt8]? {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
-        let numbered = names.compactMap { name -> (Int, String)? in
-            guard let match = name.lowercased().wholeMatch(of: /(\d{1,2})\.txt/), let number = Int(match.1) else { return nil }
-            return (number, name)
-        }.sorted { $0 < $1 }
+        let byLower = Dictionary(names.map { ($0.lowercased(), $0) }, uniquingKeysWith: min)
         let read = { (name: String) in FileManager.default.contents(atPath: root.appendingPathComponent(name).path) }
-        if !numbered.isEmpty { return numbered.compactMap { read($0.1) }.reduce(into: []) { $0 += $1 } }
-        guard let file = names.first(where: { $0.lowercased() == "nscript.dat" }), let data = read(file) else { return nil }
+        for twoDigit in [false, true] where byLower[twoDigit ? "00.txt" : "0.txt"] != nil {
+            let files = (0..<100).compactMap { byLower[twoDigit ? String(format: "%02d.txt", $0) : "\($0).txt"] }
+            return files.compactMap(read).reduce(into: []) { $0 += $1 }
+        }
+        guard let file = byLower["nscript.dat"], let data = read(file) else { return nil }
         return data.map { $0 ^ 0x84 }
     }
 }

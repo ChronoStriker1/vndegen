@@ -123,6 +123,9 @@ final class NScripterSession: EngineSession {
         audio?.stop()
         audio = nil
         if let engine {
+            if let problem = vnns_problem(engine) {
+                nScripterLog.error("\(self.launch.game.id.rawValue, privacy: .public) stopped: \(String(cString: problem), privacy: .public)")
+            }
             vnns_stop(engine)
             self.engine = nil
         }

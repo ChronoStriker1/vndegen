@@ -68,9 +68,11 @@ void FileSystem::enableNsa() {
     }
 }
 
-int FileSystem::openArchive(const std::string &path) {
+int FileSystem::openArchive(const std::string &path, uint64_t &size) {
     FILE *f = fopen(path.c_str(), "rb");
     if (!f) return -1;
+    struct stat st;
+    size = fstat(fileno(f), &st) == 0 ? uint64_t(st.st_size) : 0;
     archives_.push_back(f);
     return int(archives_.size() - 1);
 }
@@ -78,13 +80,14 @@ int FileSystem::openArchive(const std::string &path) {
 // .nsa and .sar: big-endian entry count and data offset, then NUL-terminated names, each with (in .nsa only) a
 // compression byte, then the offset from the data start, the stored size and (in .nsa only) the original size.
 bool FileSystem::addNsa(const std::string &path, bool sar) {
-    int idx = openArchive(path);
+    uint64_t fileSize = 0;
+    int idx = openArchive(path, fileSize);
     if (idx < 0) return false;
     FILE *f = archives_[idx];
     uint8_t head[6];
     if (fread(head, 1, 6, f) != 6) return false;
     uint32_t count = be16(head), base = be32(head + 2);
-    if (base < 6) return false;
+    if (base < 6 || base > fileSize) return false;
     Bytes index(base - 6);
     if (fread(index.data(), 1, index.size(), f) != index.size()) return false;
     size_t p = 0;
@@ -108,7 +111,8 @@ bool FileSystem::addNsa(const std::string &path, bool sar) {
             e.originalSize = be32(&index[p]);
             p += 4;
         }
-        entries_.emplace(normalizePath(name), e);
+        // An entry that runs past the end of the file is skipped rather than read.
+        if (e.offset + e.size <= fileSize) entries_.emplace(normalizePath(name), e);
     }
     return true;
 }
@@ -116,13 +120,14 @@ bool FileSystem::addNsa(const std::string &path, bool sar) {
 // .ns2: a little-endian header size, then entries of a quoted name and a little-endian size, then the data in the
 // same order. The header ends with one byte ('e') after the last entry.
 bool FileSystem::addNs2(const std::string &path) {
-    int idx = openArchive(path);
+    uint64_t fileSize = 0;
+    int idx = openArchive(path, fileSize);
     if (idx < 0) return false;
     FILE *f = archives_[idx];
     uint8_t head[4];
     if (fread(head, 1, 4, f) != 4) return false;
     uint32_t base = le32(head);
-    if (base < 5) return false;
+    if (base < 5 || base > fileSize) return false;
     Bytes index(base - 4);
     if (fread(index.data(), 1, index.size(), f) != index.size()) return false;
     uint64_t offset = base;
@@ -133,7 +138,7 @@ bool FileSystem::addNs2(const std::string &path) {
         if (end + 5 > index.size()) break;
         std::string name(reinterpret_cast<const char *>(&index[p + 1]), end - p - 1);
         uint32_t size = le32(&index[end + 1]);
-        entries_.emplace(normalizePath(name), Entry{idx, offset, size, size, 0});
+        if (offset + size <= fileSize) entries_.emplace(normalizePath(name), Entry{idx, offset, size, size, 0});
         offset += size;
         p = end + 5;
     }
@@ -199,7 +204,12 @@ std::string FileSystem::hostPath(std::string_view name) const {
         size_t slash = utf8.find('/', start);
         std::string part = utf8.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
         start = slash == std::string::npos ? utf8.size() : slash + 1;
-        if (!part.empty() && part != ".") path += "/" + part;
+        // ".." climbs, but never above the game folder: a script writes only inside its own game.
+        if (part == "..") {
+            if (path.size() > root_.size()) path.erase(path.rfind('/'));
+        } else if (!part.empty() && part != ".") {
+            path += "/" + part;
+        }
     }
     std::vector<char> out(path.size() + 1024);
     return casepath_resolve(path.c_str(), out.data(), out.size()) >= 0 ? std::string(out.data()) : path;
@@ -214,6 +224,12 @@ bool decodeSpb(const uint8_t *data, size_t size, Bytes &bmp) {
     if (size < 4) return false;
     uint32_t w = be16(data), h = be16(data + 2);
     if (!w || !h) return false;
+    // Each plane needs at least its 8-bit seed and a 3-bit code per group of four pixels, so the data bounds the size.
+    uint64_t groups = (uint64_t(w) * h + 2) / 4;
+    if (3 * (8 + 3 * groups) > (uint64_t(size) - 4) * 8) {
+        logf("SPB image %ux%u is larger than its data allows", w, h);
+        return false;
+    }
     size_t bitPos = 32, bitEnd = size * 8;
     auto bits = [&](int n) {
         uint32_t v = 0;
