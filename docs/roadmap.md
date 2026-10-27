@@ -21,11 +21,12 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - The real fix for RPG Maker MZ's "RangeError: length cannot be negative": sounds with Ogg names that hold WAV or MP3 data play through the system decoder, and a decoder failure no longer stops the game (0.5.1).
 - KiriKiri 2 and KiriKiri Z on Mac, iPhone, and iPad, built on krkrsdl3, with the common ciphers, Windows plugins, and movie formats built in (0.6.0).
 - Controller mouse emulation, on `dev` for the next release: sticks and buttons can move the pointer, turn the mouse wheel, and open the on-screen keyboard. KiriKiri and TyranoScript games start with "Keyboard and mouse", the layout of Steam's template, and the mapping editor also offers "Mouse", "RPG Maker controls", and "Xbox gamepad".
+- An RPG Maker MZ fix, on `dev` for the next release: looping WebM movies made from GIFs, which WebKit takes for shorter than they are, now play at their stated length, so they no longer stutter or drift from their sound. Movie frames are uploaded only when they change.
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - The whole app works with a controller alone (item 1 under Next).
-- RPG Maker MZ fixes: a cutscene whose animation stutters and drifts from its sound, and timed battle attacks that miss quick presses.
+- An RPG Maker MZ fix for timed battle attacks that miss quick presses.
 
 ## Next
 1. The whole app works with a controller alone: the library, game pages, Settings and every page under it, the button mapping editor including assigning buttons, the in-game VNDegen menu, artwork and metadata pickers, import, save sync, the lock screen, and every dialog and alert. Text fields open a keyboard the controller can type on. Where a system screen such as the Files picker can't take controller input, VNDegen offers a controller-friendly path instead or says so on screen.
