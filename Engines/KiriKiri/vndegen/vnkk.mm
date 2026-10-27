@@ -16,6 +16,7 @@
 #include "PlatformAudio.h"
 #include "PlatformView.h"
 #include "TVPCompositor.h"
+#include "TVPFont.h"
 #include "TVPScript.h"
 #include "TVPSystem.h"
 #include "TVPWindow.h"
@@ -254,6 +255,7 @@ static void discardText()
 void vnkk_set_fonts(const char *table, const char *const *fontDirs, int count)
 {
     vnfont_init(table, fontDirs, count);
+    TVPRefreshFontSubstitutes();
 }
 
 int vnkk_start(const VNKKLaunch *launch)

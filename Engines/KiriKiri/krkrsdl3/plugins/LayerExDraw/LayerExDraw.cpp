@@ -81,9 +81,11 @@ void GdiPlus::addPrivateFont(const tjs_char* fontFileName)
     {
         std::vector<ttstr> ret;
         TVPGetAllFontList(ret);
+        // VNDegen: this renderer draws from one font with no fallback for missing characters, so a Windows font
+        // substitute, which covers fewer scripts, keeps the bundled fallback font as upstream did.
         for (auto& ftN : ret)
         {
-            if (ftN == ttstr(fontFileName))
+            if (ftN == ttstr(fontFileName) && !TVPIsFontSubstitute(ftN))
             {
                 in = TVPCreateFontStream(fontFileName);
                 if (in)

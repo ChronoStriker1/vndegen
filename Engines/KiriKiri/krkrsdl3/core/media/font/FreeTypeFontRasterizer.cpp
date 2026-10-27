@@ -131,13 +131,26 @@ void FreeTypeFontRasterizer::ApplyFont(const tTVPFont& font)
     Face->SetHeight(font.Height < 0 ? -font.Height : font.Height);
     LastBitmap = NULL;
 }
+static bool isUnicodeSpace(char16_t ch)
+{
+    return (ch >= 0x0009 && ch <= 0x000D) || ch == 0x0020 || ch == 0x0085 || ch == 0x00A0 ||
+           ch == 0x1680 || (ch >= 0x2000 && ch <= 0x200A) || ch == 0x2028 || ch == 0x2029 ||
+           ch == 0x202F || ch == 0x205F || ch == 0x3000;
+}
 //---------------------------------------------------------------------------
 void FreeTypeFontRasterizer::GetTextExtent(tjs_wchar ch, tjs_int& w, tjs_int& h)
 {
     if (Face)
     {
         tGlyphMetrics metrics;
-        if (Face->GetGlyphSizeFromCharcode(ch, metrics))
+        bool found = Face->GetGlyphSizeFromCharcode(ch, metrics);
+        // VNDegen: a character the face lacks draws from the fallback face, so it measures from it too.
+        if (!found && !isUnicodeSpace(ch))
+        {
+            ApplyFallbackFace();
+            found = FaceFallback && FaceFallback->GetGlyphSizeFromCharcode(ch, metrics);
+        }
+        if (found)
         {
             w = metrics.CellIncX;
             h = metrics.CellIncY;
@@ -155,12 +168,6 @@ tjs_int FreeTypeFontRasterizer::GetAscentHeight()
     if (Face)
         return Face->GetAscent();
     return 0;
-}
-static bool isUnicodeSpace(char16_t ch)
-{
-    return (ch >= 0x0009 && ch <= 0x000D) || ch == 0x0020 || ch == 0x0085 || ch == 0x00A0 ||
-           ch == 0x1680 || (ch >= 0x2000 && ch <= 0x200A) || ch == 0x2028 || ch == 0x2029 ||
-           ch == 0x202F || ch == 0x205F || ch == 0x3000;
 }
 //---------------------------------------------------------------------------
 tTVPCharacterData* FreeTypeFontRasterizer::GetBitmap(const tTVPFontAndCharacterData& font,
@@ -256,6 +263,16 @@ void FreeTypeFontRasterizer::GetGlyphDrawRect(std::vector<tjs_wchar> text, tTVPR
         tjs_int ax, ay;
         tTVPRect rt(0, 0, 0, 0);
         bool result = Face->GetGlyphRectFromCharcode(rt, ch, ax, ay);
+        // VNDegen: a character the face lacks draws from the fallback face, so its rectangle comes from it too.
+        if (result == false && !isUnicodeSpace(ch))
+        {
+            ApplyFallbackFace();
+            if (FaceFallback)
+            {
+                FaceFallback->ClearOption(TVP_FACE_OPTIONS_NO_ANTIALIASING | TVP_FACE_OPTIONS_NO_HINTING);
+                result = FaceFallback->GetGlyphRectFromCharcode(rt, ch, ax, ay);
+            }
+        }
         if (result == false)
             result = Face->GetGlyphRectFromCharcode(rt, Face->GetDefaultChar(), ax, ay);
         if (result == false)
