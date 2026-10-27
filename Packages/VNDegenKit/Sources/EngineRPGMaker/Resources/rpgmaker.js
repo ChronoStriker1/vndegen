@@ -155,10 +155,10 @@
     // plays, over the stated length. PIXI also marked a video texture changed on every tick, so WebKit copied the same
     // frame to the GPU 60 times a second at about 4 ms a copy. Now each new frame is copied once.
     const loopLimits = { seconds: 10, bytes: 32 << 20, start: 0.02, step: 250 };
-    const videoStates = new WeakMap();
+    const videoStates = new WeakMap(), watchedVideos = new WeakMap();
     const fileLengths = new Map();
-    // PIXI's shared ticker goes on updating video textures while the session is paused, so kept frames hold by this.
-    let sessionPaused = false;
+    // Kept frames do not play while the session is paused, whether or not PIXI's shared ticker goes on updating them.
+    let sessionPaused = false, resumedAt = 0;
     function smoothVideoLoops(pixi) {
         const VideoResource = pixi.resources && pixi.resources.VideoResource;
         if (!VideoResource || !pixi.BaseTexture || !('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
@@ -186,6 +186,17 @@
             videoStates.delete(this);
             return dispose.apply(this, arguments);
         };
+        // The game seeks through currentTime. WebKit's own loop seek does not, and cannot be told apart in its events.
+        const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
+        if (!currentTime || !currentTime.set) return;
+        Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+            ...currentTime,
+            set(value) {
+                currentTime.set.call(this, value);
+                const state = watchedVideos.get(this);
+                if (state) seekTo(state, Number(value));
+            },
+        });
     }
 
     // What the texture should show now: a count of the frames the video has presented, or which kept frame is due.
@@ -204,7 +215,7 @@
         // The kept frames play as far as the video has played since the last update. A long gap between updates counts
         // as one short step, so the clip goes on near where it stopped.
         const now = performance.now();
-        const elapsed = Math.min(now - state.tick, loopLimits.step);
+        const elapsed = Math.min(now - Math.max(state.tick, resumedAt), loopLimits.step);
         state.tick = now;
         if (!video.paused && !sessionPaused) state.position = (state.position + elapsed / 1000 * video.playbackRate) % state.length;
         const frames = state.frames;
@@ -228,20 +239,21 @@
             }
         };
         video.requestVideoFrameCallback(onFrame);
-        // A new source starts over. WebKit's own loop seeks back to 0, so only a seek elsewhere is the game's: it moves
-        // the kept frames' position, also while their length is still being read, or starts keeping over. The target
-        // is read when the seek starts. By the time it ends, playback has often gone on past 20 ms.
+        // A new source starts over.
         video.addEventListener('emptied', () => {
             if (state.mode === 'done') return;
             dropFrames(state, 'keeping');
             Object.assign(state, { count: -1, last: 0, position: 0, length: undefined });
         });
-        video.addEventListener('seeking', () => {
-            if (state.mode === 'done' || !(video.currentTime > loopLimits.start)) return;
-            if (state.mode === 'keeping') dropFrames(state, 'keeping');
-            else state.position = video.currentTime;
-        });
+        watchedVideos.set(video, state);
         return state;
+    }
+
+    // The game's seek moves the kept frames' position, also while their length is still being read, or starts keeping
+    // over.
+    function seekTo(state, time) {
+        if (state.mode === 'keeping') dropFrames(state, 'keeping');
+        else if (state.mode !== 'done') state.position = time;
     }
 
     // Keeps each frame of one whole pass, from a frame at the start up to the next return to it.
@@ -367,6 +379,7 @@
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
         sessionPaused = paused;
+        if (!paused) resumedAt = performance.now();
         const scenes = window.SceneManager;
         if (paused) {
             if (scenes && scenes.stop) scenes.stop();

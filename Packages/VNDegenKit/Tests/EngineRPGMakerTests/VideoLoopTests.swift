@@ -19,8 +19,8 @@ private let page = """
     </script></body></html>
     """
 
-/// What each test starts from. A canvas stands in for the video, so a test presents each frame and sets the clock
-/// itself. The video is a looping GIF made WebM: three frames of 0.14 s and a last one of 0.28 s, so the file states
+/// What each test starts from. The video element plays nothing: a test presents each frame, which drawing the video
+/// paints in that frame's color, and sets the clock itself. The video is a looping GIF made WebM: three frames of 0.14 s and a last one of 0.28 s, so the file states
 /// 0.7 s. WebKit takes such a clip for shorter, and the frames alone suggest 0.56 s.
 private let setUp = """
     let now = 1000;
@@ -44,18 +44,23 @@ private let setUp = """
         await new Promise((done) => setTimeout(done, 0));
     };
     const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
-    const video = document.createElement('canvas');
-    video.width = video.height = 4;
-    let callbacks = [], presented = 0;
-    Object.assign(video, {
-        videoWidth: 4, videoHeight: 4, loop: true, paused: false, playbackRate: 1, duration: 0.44, currentTime: 0,
-        currentSrc: 'data:video/webm;base64,' + clip,
-        requestVideoFrameCallback(callback) { callbacks.push(callback); },
-    });
+    const video = document.createElement('video');
+    video.loop = true;
+    for (const [name, value] of Object.entries({
+        videoWidth: 4, videoHeight: 4, paused: false, duration: 0.44, currentSrc: 'data:video/webm;base64,' + clip,
+    })) {
+        Object.defineProperty(video, name, { value, writable: true });
+    }
+    let callbacks = [], presented = 0, color = colors[0];
+    video.requestVideoFrameCallback = (callback) => callbacks.push(callback);
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (source) {
+        if (source !== video) return drawImage.apply(this, arguments);
+        this.fillStyle = color;
+        this.fillRect(0, 0, 4, 4);
+    };
     const present = (index, time = index * 0.14) => {
-        const context = video.getContext('2d');
-        context.fillStyle = colors[index];
-        context.fillRect(0, 0, 4, 4);
+        color = colors[index];
         presented++;
         const due = callbacks;
         callbacks = [];
@@ -130,7 +135,6 @@ private let setUp = """
         const uploads = resource.uploaded.length;
         // The game seeks.
         video.currentTime = 0.15;
-        video.dispatchEvent(new Event('seeking'));
         at(3160);
         // A new source starts keeping over, and the old frames are let go.
         const kept = resource.uploaded[resource.uploaded.length - 1];
@@ -167,7 +171,6 @@ private let setUp = """
         present(0, 0);
         // The pass is complete, but the length is not read yet. The game seeks to the third frame.
         video.currentTime = 0.04;
-        video.dispatchEvent(new Event('seeking'));
         release();
         await lengthRead();
         const frames = [shown()];
@@ -179,8 +182,19 @@ private let setUp = """
         __vndegen.onPause(false);
         now += 15;
         frames.push(shown());
+        // The game restarts the clip, then the session pauses for two seconds with no updates at all.
+        video.currentTime = 0;
+        frames.push(shown());
+        __vndegen.onPause(true);
+        now += 2000;
+        __vndegen.onPause(false);
+        now += 10;
+        frames.push(shown());
+        now += 10;
+        frames.push(shown());
         return { frames };
         """)
-    // The seek holds through the read, the paused session holds the frame, and 15 ms later the fourth frame is due.
-    #expect(values["frames"] as? [Int] == [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3])
+    // The seek holds through the read, the paused session holds the frame, and 15 ms later the fourth frame is due. A
+    // seek to 0 shows the first frame, and after the pause only the 10 ms since it count, then 20 ms.
+    #expect(values["frames"] as? [Int] == [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 0, 0, 1])
 }
