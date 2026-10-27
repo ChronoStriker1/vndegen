@@ -190,6 +190,8 @@ rm -rf "$licenses" && mkdir -p "$licenses"
   echo "  source at https://github.com/ChronoStriker1/vndegen"
   printf '\n\n-------- COPYING --------\n\n'
   cat "$work/core/COPYING"
+  printf '\n\n-------- GNU GPL version 3 --------\n\n'
+  cat "$src/licenses/GNU GPL version 3.txt"
 } > "$licenses/mkxp-z.txt"
 for folder in "$work/core/subprojects"/*/ "$work/subprojects"/angle-*/ "$work/subprojects"/xxHash-*/; do
   name=$(basename "$folder")
