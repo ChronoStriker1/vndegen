@@ -35,7 +35,10 @@ says it comes from ONScripter-EN, so only its license header and a list of names
 | Images with an alpha channel keep it whatever the tag says | Black box: a test game's title logo, an RGBA PNG loaded with `:a;` |
 | When the screen updates (`print`, effects, text output; not `wait` or `click`) | Black box: lab scripts |
 | English word wrap trigger (`.patch` PE section) | The test games' patched and stock exes, compared by their section tables and strings; one patch's readme credits the patched exe with word wrap |
-| Save files | Black box: saves written by each test game's exe for lab scripts that change one thing at a time |
+| Save files (`saveN.dat`, format 2) | Black box: saves written by four engine versions (2.95, 2.96, 3.02, 3.04) for lab scripts that change one thing at a time, then a test game's real gameplay save. 123 lab saves from the runtime match the engine's byte for byte |
+| Where a save resumes | Black box: lab scripts. Saves record the saving statement until a text page starts, then the page head until the next page, `saveon` or `saveoff`. Loading a save made with `saveon` runs the saving statement again (a second run wrote a save numbered by a global variable it had changed) |
+| Script offsets in saves | Black box: the same lab script with and without carriage returns. Offsets count the script without them |
+| `kidoku.dat`, `NScrflog.dat`, `NScrllog.dat` | Black box: their sizes and contents after lab scripts; the logs are a count line and quoted names XOR 0x84 |
 | Global save (`gloval.sav`) | Black box: its size is 5 bytes per global variable when all strings are empty; one int32 and one NUL-terminated string each |
 | Font metrics and baseline | `docs/fonts.md` (VNDegen's font pack); MS Gothic's metrics |
 
@@ -46,5 +49,7 @@ says it comes from ONScripter-EN, so only its license header and a list of names
   image shows (black and white halves alternate).
 - **Width-1 SPB images**: the packer writes an extra junk column for them. No game image is one pixel wide, so the
   runtime doesn't special-case them.
+- **Movies with a 59.94 fps header**: one test game's MPEG-1 clips hold 29.97 frames a second (ffprobe counts 88
+  frames in 2.92 s), so drawing 30 a second is their full rate.
 - **Compression types 2 (LZSS) and 4 (NBZ) in `.nsa`**: no test game uses them and no sample exists to check a
   decoder against, so they aren't implemented. The runtime logs the file instead.

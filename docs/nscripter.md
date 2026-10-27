@@ -35,8 +35,10 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
 - Scripts: `0.txt` .. `99.txt` or `00.txt` .. `99.txt` joined in order, else `nscript.dat` (each byte XOR 0x84).
   `0.txt` wins over `nscript.dat`, as on Windows. The first line may set the screen size and variable counts
   (`;mode800`, `;value500`, `;$V2000G1000S800,600L10000`).
-- Files, in the order NScripter searches: loose files in the game folder, matched without regard to case; then `.ns2`
-  archives, highest number first; then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`.
+- Files, in the order NScripter searches: loose files in the game folder; then `.ns2` archives, highest number first;
+  then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`. Names match without regard to case, as on
+  Windows: loose files through an index of the folder made at start, archive members by their lowercased names, and
+  files the game writes later (saves, screenshots) through `casepath_resolve` from `Engines/Shared/casepath.c`.
 - Bitmaps NScripter's packer stored with its SPB compression, as well as PNG, JPEG and BMP.
 - Sound: Ogg Vorbis and PCM WAV. Movies: MPEG-1 (`mpegplay`, `movie`, `avi`).
 
@@ -58,6 +60,48 @@ NScripter games call Windows DLLs. The runtime emulates the ones the test games 
 
 Other DLL calls are logged and ignored. NSLua (`nslua.dll`, Lua scripts) isn't supported; no test game uses it.
 
+## Saves
+
+Saves are the PC engine's files, byte for byte, so saves move between VNDegen and a PC copy of the game in both
+directions:
+
+- `saveN.dat` in save format 2, which engine versions 2.95 to 3.04 all write. 123 saves the runtime wrote for lab
+  scripts match the PC engine's own exactly.
+- `gloval.sav` (global variables), `kidoku.dat` (text already read), `NScrflog.dat` and `NScrllog.dat` (files and
+  labels seen), when the script turns each on.
+- Screenshots that `savescreenshot` writes, as 24-bit BMP.
+
+They go in the folder the script's `savedir` names, or the game's script folder, as on Windows. Ludusavi sync finds
+them there (`NScripterPlugin+Saves.swift`). A save made in save-on mode records the statement that saved, and loading
+it runs that statement again, as the PC engine does. Global variables and the read-text record are written at each
+save, when the game ends, and whenever the session pauses, since iOS may stop a paused app without warning.
+
+## Frame rate
+
+The runtime steps on the display link and draws a new frame only when the scene changes. With `-frameMonitor YES`, a
+DEBUG build logs the session's pacing every 10 seconds ("NSFRAMES": display link rate, its 1% low, frames drawn, and
+the slowest step). The runtime is built with `-O2` in Debug builds too, since an unoptimized software compositor
+misses frames that a Release build makes.
+
+Measured on 2026-10-27 on the Mac mini, with other threads' apps and a simulator running:
+
+| Scene | Where | Target | Average | 1% low | Measured |
+|---|---|---|---|---|---|
+| Dungeon walking (Test Game 26) | Mac app | 60 | 60.0 | 60.0 | 30 s |
+| Dungeon walking (Test Game 26) | iPad simulator | 60 | 60.0 | 60.0 | 30 s |
+| Movies (Test Game 98's three clips, looped) | Mac app | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 40 s |
+| Movies (Test Game 98's three clips, looped) | iPad simulator | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 40 s |
+
+The movies' headers say 59.94 fps, but they hold 29.97 frames a second (88 frames in 2.92 s), which the runtime draws
+in full. Loading a save or opening a menu can take one step of 40 to 100 ms while it decodes images.
+
 ## Known limits
 
-Work in progress. Saves are being matched to the PC engine's format.
+- Built-in dialogs (`yesnobox`, `mesbox`, `input`, the default save and load menus) are drawn by the runtime rather
+  than Windows, in its own layout. Their buttons are labelled in English when the message is plain ASCII, as a
+  translated game's is, and in Japanese otherwise. `input`'s window position and size arguments are ignored.
+- Effects 1 to 18 are drawn as NScripter's manual describes them. Effect DLLs (effect 99, such as `breakup.dll`)
+  fall back to a crossfade.
+- MP3 and CD audio aren't played. The test games use Ogg Vorbis and WAV.
+- `.nsa` compression types 2 (LZSS) and 4 (NBZ) aren't read; no test game uses them.
+- NSLua isn't supported, and of `MSpDraw.dll` only the drawing one test game uses is emulated.
