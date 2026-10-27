@@ -595,22 +595,41 @@ extension WebGameSession {
     }
 
     /// Counts requestAnimationFrame callbacks (what the compositor delivers), RPG Maker's Graphics.frameCount (engine
-    /// updates), and frames a WebGL 2 engine presents to the page's canvas, as Ruffle does once per frame it draws, with
-    /// their 1% low. The sampler exists only while this step runs.
+    /// updates), and the animation frames in which WebGL drew to the page's canvas, which is each frame an engine such as
+    /// Ruffle draws, with their 1% low. The sampler exists only while this step runs.
     private func measureFrameRate(_ seconds: Double) async {
         let sampler = """
         const start = performance.now(), engineStart = window.Graphics ? Graphics.frameCount : 0;
-        const proto = window.WebGL2RenderingContext && WebGL2RenderingContext.prototype, blit = proto && proto.blitFramebuffer;
-        const presents = [];
-        if (blit) proto.blitFramebuffer = function (...args) {
-            if (this.getParameter(this.DRAW_FRAMEBUFFER_BINDING) === null) presents.push(performance.now());
-            return blit.apply(this, args);
+        // A draw call reaches the canvas while no framebuffer is bound for drawing. Bindings are tracked as they change,
+        // and a context's binding from before the step is asked for once.
+        const restore = [];
+        let drew = false;
+        const wrap = (proto, name, body) => {
+            const original = proto[name];
+            restore.push(() => { proto[name] = original; });
+            proto[name] = function (...args) { body(this, args); return original.apply(this, args); };
         };
+        const bound = new WeakMap();
+        for (const proto of [window.WebGLRenderingContext, window.WebGL2RenderingContext].filter(Boolean).map((c) => c.prototype)) {
+            wrap(proto, 'bindFramebuffer', (gl, [target, framebuffer]) => {
+                if (target === gl.FRAMEBUFFER || target === gl.DRAW_FRAMEBUFFER) bound.set(gl, framebuffer);
+            });
+            const draw = (gl) => {
+                if (!bound.has(gl)) bound.set(gl, gl.getParameter(gl.FRAMEBUFFER_BINDING));
+                // The default framebuffer is null, or undefined from engines built with wasm-bindgen.
+                if (bound.get(gl) == null) drew = true;
+            };
+            for (const name of ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'blitFramebuffer', 'clear']) {
+                if (proto[name]) wrap(proto, name, draw);
+            }
+        }
+        const presents = [];
         let frames = 0, worst = 0, last = start;
         try {
             await new Promise((done) => {
                 const tick = (now) => {
                     frames++;
+                    if (drew) { presents.push(now); drew = false; }
                     worst = Math.max(worst, now - last);
                     last = now;
                     if (now - start < seconds * 1000) requestAnimationFrame(tick); else done();
@@ -618,13 +637,13 @@ extension WebGameSession {
                 requestAnimationFrame(tick);
             });
         } finally {
-            if (blit) proto.blitFramebuffer = blit;
+            restore.reverse().forEach((undo) => undo());
         }
         const elapsed = (performance.now() - start) / 1000;
         const engine = window.Graphics ? Graphics.frameCount - engineStart : 0;
         const gaps = presents.slice(1).map((t, i) => t - presents[i]).sort((a, b) => a - b);
         const low = gaps.length ? 1000 / gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * 0.99))] : 0;
-        return `raf ${(frames / elapsed).toFixed(1)} fps, engine ${(engine / elapsed).toFixed(1)} fps, presented ${(presents.length / elapsed).toFixed(1)} fps, 1% low ${low.toFixed(1)} fps, worst frame ${worst.toFixed(1)} ms over ${elapsed.toFixed(1)} s`;
+        return `raf ${(frames / elapsed).toFixed(1)} fps, engine ${(engine / elapsed).toFixed(1)} fps, drawn ${(presents.length / elapsed).toFixed(1)} fps, 1% low ${low.toFixed(1)} fps, worst frame ${worst.toFixed(1)} ms over ${elapsed.toFixed(1)} s`;
         """
         do {
             let result = try await webView.callAsyncJavaScript(sampler, arguments: ["seconds": seconds], contentWorld: .page)
