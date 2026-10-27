@@ -2,15 +2,26 @@ import Foundation
 import Testing
 @testable import FontPack
 
-/// Runs against the real table and fonts in Engines/Shared/fonts. FontPack's state is process-wide, so the tests run
-/// one at a time.
-@Suite(.serialized)
+/// Runs against the real table and fonts in Engines/Shared/fonts, with stand-ins for the Korean download. FontPack's
+/// state is process-wide and WebRuntimeTests' FontTests use it at the same time, so every test in both configures the
+/// same folders, and a configure in one never changes what the other sees. vnfont_test.c covers a missing table.
 struct FontPackTests {
     static let bundled = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appending(path: "../../../../Engines/Shared/fonts").standardizedFileURL
 
-    @Test func resolvesWindowsNames() {
-        #expect(FontPack.configure(folders: [Self.bundled]))
+    /// The bundled fonts, then empty files named as the Korean download's fonts.
+    static func configure() throws {
+        let downloaded = FileManager.default.temporaryDirectory.appending(path: "vndegen-font-tests")
+        try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
+        for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
+            try Data().write(to: downloaded.appending(path: name), options: .atomic)
+        }
+        #expect(FontPack.configure(folders: [bundled, downloaded]))
+        #expect(FontPack.folders == [bundled, downloaded])
+    }
+
+    @Test func resolvesWindowsNames() throws {
+        try Self.configure()
         #expect(FontPack.resolve("MS PGothic")?.file.lastPathComponent == "ume-pgo4.ttf")
         #expect(FontPack.resolve("ＭＳ Ｐゴシック")?.file.lastPathComponent == "ume-pgo4.ttf")
         #expect(FontPack.resolve("ＭＳ 明朝")?.file.lastPathComponent == "ume-tmo3.ttf")
@@ -23,8 +34,9 @@ struct FontPackTests {
     }
 
     @Test func everyBundledFileIsInTheTable() throws {
-        #expect(FontPack.configure(folders: [Self.bundled]))
-        let used = Set(FontPack.entries.map(\.match.file.lastPathComponent))
+        try Self.configure()
+        let used = Set(FontPack.entries.map(\.match.file).filter { $0.path.hasPrefix(Self.bundled.path + "/") }
+            .map(\.lastPathComponent))
         let files = try FileManager.default.contentsOfDirectory(atPath: Self.bundled.path).filter { $0.hasSuffix(".ttf") }
         #expect(Set(files) == used)
         #expect(FontPack.file(named: "ume-tgo4.ttf") != nil)
@@ -33,15 +45,8 @@ struct FontPackTests {
     }
 
     @Test func downloadedFontsJoinTheTable() throws {
-        let downloaded = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: downloaded) }
-        for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
-            try Data().write(to: downloaded.appending(path: name))
-        }
-        #expect(FontPack.configure(folders: [Self.bundled, downloaded]))
+        try Self.configure()
         #expect(FontPack.resolve("굴림", bold: true)?.file.lastPathComponent == "SourceHanSansKR-Bold.otf")
-        #expect(FontPack.folders == [Self.bundled, downloaded])
         #expect(FontPack.resolve("SimSun") == nil)
     }
 
@@ -58,17 +63,11 @@ struct FontPackTests {
         }
     }
 
-    @Test func findsNamesInGameFiles() {
-        #expect(FontPack.configure(folders: [Self.bundled]))
+    @Test func findsNamesInGameFiles() throws {
+        try Self.configure()
         let plugins = #"{"name":"MessageCore","parameters":{"Font Name":"ＭＳ　Ｐゴシック","Fallback":"arial, sans-serif"}}"#
         #expect(FontPack.referencedNames(in: plugins) == ["ＭＳ Ｐゴシック", "Arial"])
         #expect(FontPack.referencedNames(in: "GameFont, SimHei") == [])
         #expect(FontPack.referencedNames(in: "") == [])
-    }
-
-    @Test func missingTableLeavesNothing() {
-        #expect(!FontPack.configure(folders: []))
-        #expect(FontPack.entries.isEmpty)
-        #expect(FontPack.resolve("Arial") == nil)
     }
 }

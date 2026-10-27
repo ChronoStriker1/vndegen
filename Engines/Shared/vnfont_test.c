@@ -72,9 +72,17 @@ int main(int argc, char **argv) {
 
     char key[64];
     if (!vnfont_normalize("@ＭＳ　Ｐゴシック Bold", key, sizeof key) || strcmp(key, "mspゴシックbold")
-        || vnfont_normalize("Arial", key, 5)) {
+        || vnfont_normalize("Arial", key, 5) || vnfont_normalize("", key, 0)) {
         failures++;
         printf("FAIL normalize\n");
+    }
+
+    // Malformed UTF-8 compares byte for byte. An overlong NUL must not cut the name short.
+    expect("Arial\xC0\x80suffix", 0, 0, NULL, 0, 0);
+    expect("Arial\xED\xA0\x80", 0, 0, NULL, 0, 0);
+    if (!vnfont_normalize("A\xC0\x80" "B", key, sizeof key) || strcmp(key, "a\xC0\x80" "b")) {
+        failures++;
+        printf("FAIL malformed normalize\n");
     }
 
     // A missing table leaves nothing.

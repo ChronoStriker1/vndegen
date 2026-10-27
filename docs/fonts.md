@@ -110,7 +110,8 @@ the table, and `FontPack.folders` and `FontPack.table` are what a native engine 
   loads those fonts up front, and the boot scene waits for them. MV's Chinese and Korean games ask for SimHei and
   Dotum through the core, which the plugin adds from the database's locale. TyranoScript draws text as HTML, so a late
   font only redraws it; the plugin loads the font `Config.tjs` names up front so the first lines don't change.
-- **KiriKiri and RGSS** read the table through `vnfont.h`. See their notes for where.
+- **KiriKiri and RGSS** don't use the table yet. Their hooks into `vnfont.h` come next, in their font lookup and
+  default font.
 - **Ren'Py** games ship their own fonts, so Ren'Py doesn't use the table.
 
 CSS matches family names exactly, apart from ASCII case, as Windows does. A game that asks for "ＭＳＰ明朝" without

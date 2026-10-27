@@ -24,7 +24,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
-- **Windows fonts.** Games that ask for MS Gothic, MS Mincho, Arial, Tahoma, and other Windows fonts by name get free fonts with the same metrics, as under Proton, so their text wraps and fits as designed. Chinese and Korean fonts are a download in Settings.
+- **Windows fonts.** RPG Maker MV and MZ and TyranoScript games that ask for MS Gothic, MS Mincho, Arial, Tahoma, and other Windows fonts by name get free fonts with the same metrics, as under Proton, so their text wraps and fits as designed. Chinese and Korean fonts are a download in Settings.
 - **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad, both on Metal.
 
 <p align="center">
@@ -107,7 +107,7 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 
 ## Fonts
 
-PC games name Windows fonts that VNDegen can't ship. Like Proton, VNDegen bundles freely licensed fonts with the same metrics and gives each the Windows name the game asks for: Ume fonts for MS Gothic, MS PGothic, MS UI Gothic, MS Mincho, and MS PMincho, Liberation for Arial, Times New Roman, and Courier New, and DejaVu Sans Condensed for Tahoma. A device font with that name, such as Arial on Apple systems, comes first. Chinese and Korean games need Source Han Sans, which Settings, Fonts downloads from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean. Games started after a download use it. One table, `Engines/Shared/fonts/fonts.tsv`, maps the names, and every engine reads it through `vnfont.h` or the `FontPack` module. [docs/fonts.md](docs/fonts.md) lists the fonts, where they come from, and how closely they match.
+PC games name Windows fonts that VNDegen can't ship. Like Proton, VNDegen bundles freely licensed fonts with the same metrics and gives each the Windows name the game asks for: Ume fonts for MS Gothic, MS PGothic, MS UI Gothic, MS Mincho, and MS PMincho, Liberation for Arial, Times New Roman, and Courier New, and DejaVu Sans Condensed for Tahoma. A device font with that name, such as Arial on Apple systems, comes first. Chinese and Korean games need Source Han Sans, which Settings, Fonts downloads from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean. Games started after a download use it. One table, `Engines/Shared/fonts/fonts.tsv`, maps the names. The RPG Maker MV and MZ and TyranoScript engines read it through the `FontPack` module, and native engines read it through `Engines/Shared/vnfont.h`; the KiriKiri and RGSS hooks are still to come. [docs/fonts.md](docs/fonts.md) lists the fonts, where they come from, and how closely they match.
 
 ## Metadata sources
 

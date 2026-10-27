@@ -32,11 +32,18 @@ static unsigned decode(const unsigned char *s, int *length) {
         }
         value = value << 6 | (s[i] & 0x3F);
     }
+    // Overlong forms, surrogates, and values past Unicode are malformed too. An overlong NUL would end the name early.
+    static const unsigned least[] = {0, 0x80, 0x800, 0x10000};
+    if (value < least[extra] || (value >= 0xD800 && value <= 0xDFFF) || value > 0x10FFFF) {
+        *length = 1;
+        return c;
+    }
     *length = extra + 1;
     return value;
 }
 
 int vnfont_normalize(const char *name, char *out, size_t size) {
+    if (size == 0) return 0;
     const unsigned char *s = (const unsigned char *)name;
     size_t n = 0;
     if (*s == '@') s++;

@@ -8,11 +8,21 @@ import WebKit
 private let bundledFonts = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     .appending(path: "../../../../Engines/Shared/fonts").standardizedFileURL
 
-/// The font substitutes in a page served over vndegen://, with the bundled fonts configured. FontPack's state is
-/// process-wide, so the tests run one at a time.
-@Suite(.serialized) @MainActor struct FontTests {
+/// Configures the folders FontPackTests configures: FontPack's state is process-wide and both suites run at once, so
+/// they must agree on it.
+private func configureFonts() throws {
+    let downloaded = FileManager.default.temporaryDirectory.appending(path: "vndegen-font-tests")
+    try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
+    for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
+        try Data().write(to: downloaded.appending(path: name), options: .atomic)
+    }
+    #expect(FontPack.configure(folders: [bundledFonts, downloaded]))
+}
+
+/// The font substitutes in a page served over vndegen://.
+@MainActor struct FontTests {
     private func page(preload: Set<String>) async throws -> PageHarness {
-        #expect(FontPack.configure(folders: [bundledFonts]))
+        try configureFonts()
         let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-fonts-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data("<html><body></body></html>".utf8).write(to: root.appending(path: "index.html"))
@@ -45,8 +55,8 @@ private let bundledFonts = URL(fileURLWithPath: #filePath).deletingLastPathCompo
         #expect(!families.contains { $0.hasPrefix("Microsoft YaHei/") })
     }
 
-    @Test func servesOnlyTheTablesFonts() {
-        #expect(FontPack.configure(folders: [bundledFonts]))
+    @Test func servesOnlyTheTablesFonts() throws {
+        try configureFonts()
         let font = GameSchemeHandler.serveFont(path: WebGameSession.fontPath + "ume-tgo4.ttf", method: "GET", range: "bytes=0-3")
         #expect(font?.status == 206)
         #expect(font?.headers["Content-Type"] == "font/ttf")
