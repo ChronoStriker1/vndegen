@@ -34,7 +34,9 @@ struct OnScreenKeyboardView: View {
         }
         .padding(16)
         .frame(maxWidth: 720)
-        .background(.regularMaterial, in: .rect(cornerRadius: 22, style: .continuous))
+        // Solid, so form rows behind it never show through the keys.
+        .background(Color(white: 0.1), in: .rect(cornerRadius: 22, style: .continuous))
+        .shadow(color: .black.opacity(0.5), radius: 24)
         .overlay { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12)) }
         .padding(12)
         .environment(\.colorScheme, .dark)

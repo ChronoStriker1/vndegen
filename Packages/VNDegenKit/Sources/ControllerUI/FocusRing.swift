@@ -61,8 +61,16 @@ public struct FocusRowBackground: View {
 extension View {
     /// Draws the focus ring behind a form row while it has gamepad focus, and makes the row a scroll target.
     public func focusRow(_ focused: Bool, id: some Hashable) -> some View {
+        #if os(macOS)
+        // A grouped form on macOS ignores `listRowBackground`, so the ring goes behind the row's content, out to the
+        // row's edges.
+        background { if focused { FocusRowBackground().padding(.horizontal, -10).padding(.vertical, -5) } }
+            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
+            .id(id)
+        #else
         listRowBackground(focused ? FocusRowBackground() : nil)
             .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
             .id(id)
+        #endif
     }
 }

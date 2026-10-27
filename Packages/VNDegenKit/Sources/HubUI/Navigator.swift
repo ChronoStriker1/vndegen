@@ -845,8 +845,12 @@ extension Navigator {
         let sheet = self.sheet.map { "\($0.id)" } ?? "none"
         let route = self.route.map { "\($0)" } ?? "home"
         let keyboard = keyboard.map { "\($0.title):\($0.focusedKey):\($0.isSecure ? "secure" : $0.text)" } ?? "none"
-        NSLog("HUBNAV route=%@ sheet=%@ focus=%@ keyboard=%@ alert=%@", route, sheet, focus.map { "\($0)" } ?? "none", keyboard,
-              hub.launchError ?? "none")
+        var detail = ""
+        if case let .mapping(editor)? = self.sheet {
+            detail = " mapping=\(editor.picking.map { "\($0)" } ?? "list"):\(editor.focus.map { "\($0)" } ?? "none")"
+        }
+        NSLog("HUBNAV route=%@ sheet=%@ focus=%@ keyboard=%@ alert=%@%@", route, sheet, focus.map { "\($0)" } ?? "none", keyboard,
+              hub.launchError ?? "none", detail)
     }
 }
 #else

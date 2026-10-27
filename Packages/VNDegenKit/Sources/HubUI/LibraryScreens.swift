@@ -1,4 +1,5 @@
 import SwiftUI
+import ControllerUI
 import VNCore
 import Metadata
 import GameInput
@@ -205,20 +206,8 @@ struct SettingsView: View {
 extension View {
     /// Makes a form row a focus target: pointer hover focuses it, and focus draws the hub's ring around the row.
     func focusRow(_ target: Navigator.Target, _ nav: Navigator) -> some View {
-        let focused = nav.isFocused(target)
-        return onHover { if $0 { nav.hover(target) } }
-            .listRowBackground(focused ? FocusRowBackground() : nil)
-            .animation(Theme.focusAnimation, value: focused)
-            .id(target)
-    }
-}
-
-/// A focused form row: an accent fill and a white outline, as bold as the hub's focused buttons and tiles.
-struct FocusRowBackground: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Theme.accent.opacity(0.32))
-            .strokeBorder(.white, lineWidth: 2.5)
+        onHover { if $0 { nav.hover(target) } }
+            .focusRow(nav.isFocused(target), id: target)
     }
 }
 

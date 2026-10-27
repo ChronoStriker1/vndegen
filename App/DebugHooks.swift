@@ -154,8 +154,11 @@ enum DebugHooks {
     }
 
     #if os(macOS)
+    /// The main window, or the sheet shown over it, and the sheet over that one.
     static func snapshotWindow(to url: URL) {
-        guard let view = NSApp.windows.first(where: \.isVisible)?.contentView,
+        var window = NSApp.windows.first(where: \.isVisible)
+        while let sheet = window?.attachedSheet { window = sheet }
+        guard let view = window?.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
