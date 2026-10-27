@@ -415,6 +415,11 @@ pub struct EngineContext {
 /// 解释器与 [`EngineContext`] 之间共享同一个加载器。
 pub type FileReader = Arc<dyn Fn(&str) -> crate::error::Result<Vec<u8>> + Send + Sync>;
 
+/// Marks a queued tag that an event handler names, such as `handler="luaparam"`
+/// on `[lyevent]`. Artemis runs it like a script tag, so a game's tag filter
+/// sees it, while tags that filters queue themselves skip the filter (VNDegen).
+pub const QUEUED_THROUGH_TAG_FILTER: &str = "\u{b}through_tag_filter";
+
 pub(crate) const MESSAGE_LAYER_STATE_PREAPPLIED: &str = "__art3m1s_message_layer_state_preapplied";
 
 impl EngineContext {

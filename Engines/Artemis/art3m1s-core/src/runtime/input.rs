@@ -1539,6 +1539,10 @@ pub(super) fn enqueue_handler_tags(
         for (k, v) in runtime_params {
             p.insert(k.to_string(), v.to_string());
         }
+        p.insert(
+            asb_interpreter::lua_engine::QUEUED_THROUGH_TAG_FILTER.to_string(),
+            "1".to_string(),
+        );
         queue.tag_queue.push((tag.to_string(), p));
         queued = true;
     }

@@ -1242,9 +1242,12 @@ impl Interpreter {
                     Some(queued)
                 }
             };
-            let Some((tag, params)) = queued else {
+            let Some((tag, mut params)) = queued else {
                 return Ok(None);
             };
+            let through_filter = params
+                .remove(crate::lua_engine::QUEUED_THROUGH_TAG_FILTER)
+                .is_some();
 
             let instruction = Instruction {
                 tag,
@@ -1266,7 +1269,7 @@ impl Interpreter {
             // expanded instruction enters the filter boundary. Direct tags
             // queued by a filter still use the low-level path above and do not
             // recursively re-enter the filter.
-            let mut result = self.execute_tag(&instruction, false)?;
+            let mut result = self.execute_tag(&instruction, through_filter)?;
             if let TagResult::Dynamic(inner) = result {
                 result = self.execute_tag(&inner, true)?;
             }
