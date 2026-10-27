@@ -73,8 +73,8 @@ struct KeyboardBridge: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             guard markedTextRange == nil, !text.isEmpty else { return }
-            // Pasted text can hold line breaks, each a press of Return.
-            for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            // Pasted text can hold line breaks, each a press of Return. Windows' "\r\n" is one Character.
+            for (index, line) in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).enumerated() {
                 if index > 0 { type?(.newline) }
                 if !line.isEmpty { type?(.text(String(line))) }
             }
