@@ -227,7 +227,10 @@ impl CoreRuntime {
             is_trans_wait && !RenderPipeline::new(&self.compositor).is_transition_in_progress();
         if video_resume || trans_resume {
             self.wait_reason = None;
-            self.interpreter.release_queued_wait();
+            // advance_line releases a queued wait without moving the script,
+            // and steps past an inline [trans] or [video], which would
+            // otherwise run again (VNDegen).
+            self.interpreter.advance_line();
             return;
         }
 
