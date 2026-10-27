@@ -645,6 +645,16 @@
             (document.activeElement || target()).dispatchEvent(event);
         }
     }
+    // The length of the last character the player sees in text, which may be several UTF-16 units, such as an emoji.
+    function lastCharacterLength(text) {
+        if (!text) return 0;
+        if (typeof Intl.Segmenter === 'function') {
+            let last = '';
+            for (const { segment } of new Intl.Segmenter().segment(text)) last = segment;
+            return last.length;
+        }
+        return Array.from(text).pop().length;
+    }
     function typeText(kind, value) {
         const field = textField();
         if (kind === 'newline') {
@@ -659,10 +669,10 @@
         }
         // Email fields have no selection, so typing there goes at the end.
         if (field.selectionStart === null) {
-            field.value = kind === 'delete' ? Array.from(field.value).slice(0, -1).join('') : field.value + value;
+            field.value = kind === 'delete' ? field.value.slice(0, field.value.length - lastCharacterLength(field.value)) : field.value + value;
         } else {
             let start = field.selectionStart, end = field.selectionEnd;
-            if (kind === 'delete' && start === end && start > 0) start -= 1;
+            if (kind === 'delete' && start === end) start -= lastCharacterLength(field.value.slice(0, start));
             field.setRangeText(kind === 'delete' ? '' : value, start, end, 'end');
         }
         field.dispatchEvent(new Event('input', { bubbles: true }));
