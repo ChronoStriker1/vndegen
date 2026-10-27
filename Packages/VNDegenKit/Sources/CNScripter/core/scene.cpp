@@ -70,6 +70,10 @@ ImageRef Engine::loadFileImage(const std::string &file, bool *hasAlpha) {
 bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     out = LoadedImage();
     out.tag = tag;
+    if (tag.size() > 1 && tag[0] == '*' && isdigit(uint8_t(tag[1]))) {
+        out.layer = atoi(tag.c_str() + 1);
+        return true;
+    }
     std::string mode = transMode_;
     std::string maskFile, file = tag;
     uint32_t keyColor = 0;
@@ -374,6 +378,7 @@ void Engine::drawEffect(Image &out, double t) {
 
 static void drawSprite(Image &out, const Sprite &s, int ox = 0, int oy = 0) {
     if (!s.loaded || !s.visible || !s.img.image) return;
+    // Layer sprites ("*n") are drawn by Engine::renderScene.
     const Image &img = *s.img.image;
     int cw = s.img.cellWidth > 0 ? s.img.cellWidth : img.w;
     int cell = std::clamp(s.cell, 0, std::max(0, s.img.cells - 1));
@@ -391,8 +396,12 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
         std::fill(out.px.begin(), out.px.end(), s.bgColor);
     }
     int hz = std::clamp(humanz_, -1, kSpriteCount - 1);
+    auto sprite = [&](const Sprite &sp) {
+        if (sp.loaded && sp.visible && sp.img.layer >= 0) drawLayer(sp.img.layer, out);
+        else drawSprite(out, sp);
+    };
     if (!s.allSpHidden)
-        for (int i = kSpriteCount - 1; i >= hz && i >= 0; i--) drawSprite(out, s.sp[size_t(i)]);
+        for (int i = kSpriteCount - 1; i >= hz && i >= 0; i--) sprite(s.sp[size_t(i)]);
     // Standing images: the first letter of humanorder is drawn on top.
     for (int k = int(humanOrder_.size()) - 1; k >= 0; k--) {
         char c = humanOrder_[size_t(k)];
@@ -402,7 +411,7 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
     bool effectsOnScene = s.monocro >= 0 || s.nega;
     if (withWindow && windowBack_) drawWindow(out);
     if (!s.allSpHidden)
-        for (int i = std::min(hz - 1, kSpriteCount - 1); i >= 0; i--) drawSprite(out, s.sp[size_t(i)]);
+        for (int i = std::min(hz - 1, kSpriteCount - 1); i >= 0; i--) sprite(s.sp[size_t(i)]);
     if (!s.allSp2Hidden)
         for (int i = kSprite2Count - 1; i >= 0; i--) {
             const Sprite2 &q = s.sp2[size_t(i)];
@@ -418,7 +427,6 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
         }
     for (const Scene::Bar &b : s.bars)
         if (b.on && b.max > 0) fillRect(out, b.x, b.y, b.w * std::clamp(b.value, 0, b.max) / b.max, b.h, b.color);
-    drawLayers(out);
     if (effectsOnScene) {
         for (uint32_t &p : out.px) {
             int r = chR(p), g = chG(p), b = chB(p);

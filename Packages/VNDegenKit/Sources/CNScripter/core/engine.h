@@ -36,6 +36,7 @@ struct LoadedImage {
     int cellWidth = 0;
     std::vector<int> cellTimes;  // milliseconds per cell; empty or 0 means no animation
     int loop = 0;                // 0 repeat, 1 stop at last, 2 back and forth, 3 none
+    int layer = -1;              // "*n": the sprite shows plugin layer n instead of an image
 };
 
 struct Sprite {
@@ -361,6 +362,14 @@ public:
     int halfAdvance() const;
     int fullAdvance() const;
     void textClickWait(bool page);
+    // setcursor / abssetcursor: the click-wait cursors (0 click, 1 page), shown during the built-in click waits.
+    struct ClickCursor {
+        Sprite sprite;
+        int dx = 0, dy = 0;
+        bool absolute = false;
+        bool set = false;
+    } cursors_[2];
+    void drawClickCursor(Image &out);
     void pushLog();
 
     // Buttons (buttons.cpp)
@@ -506,10 +515,16 @@ public:
     void drawMovie(Image &out);
 
     // Plugins emulated in place of the game's DLLs (plugins.cpp)
-    std::unordered_map<int, std::string> layers_;  // setlayer number -> plugin
+    struct Layer {
+        std::string plugin;
+        int interval = 0;  // ms between the plugin's Timer calls
+        int64_t nextTick = 0;
+    };
+    std::map<int, Layer> layers_;
+    void tickLayers();
+    void drawLayer(int layer, Image &out);
     void layerMessage(int layer, const std::string &msg);
     void execDll(const std::string &call);
-    void drawLayers(Image &out);
     struct GaijiRule {
         std::string ch;
         std::string image;

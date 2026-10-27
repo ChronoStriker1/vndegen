@@ -807,7 +807,7 @@ void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
                           "menu_window", "menu_click_def", "menu_click_page", "repaint", "filelogoff", "windowchip",
                           "lookbacksp", "lookbackbutton", "lookbackcolor", "lookbackvoice", "lookbackoff",
                           "lookbackflush_dummy", "kidokumode", "useescspc2", "shell", "winexec", "flushout",
-                          "setcursor", "abssetcursor", "rubyoff_dummy"})
+                          "rubyoff_dummy"})
         t[n] = ignoreArgs;
 }
 

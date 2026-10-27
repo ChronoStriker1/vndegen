@@ -253,6 +253,7 @@ bool Engine::step(int ms) {
     }
     processWait();
     animateSprites();
+    tickLayers();
     if (!ended_) runUntilBlocked();
     // A wait that started this frame may already be satisfied by this frame's click; leave that to the next frame.
     in_ = Input();

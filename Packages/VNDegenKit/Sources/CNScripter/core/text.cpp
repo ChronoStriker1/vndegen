@@ -158,12 +158,42 @@ void Engine::drawWindow(Image &out) {
         multiplyRect(out, win_.x1, win_.y1, win_.x2 - win_.x1 + 1, win_.y2 - win_.y1 + 1, win_.color);
     }
     if (textHidden_) return;
+    drawClickCursor(out);
     for (const TextChar &c : page_) {
         if (!c.gaiji.empty()) {
             if (ImageRef img = loadFileImage(c.gaiji)) blit(out, *img, c.x, c.y, 0, 0, img->w, img->h);
             continue;
         }
         drawGlyphs(out, c.ch, c.x, c.y, c.ruby ? rubyW_ * 2 : win_.fw, c.h, 0, c.color, win_.bold, win_.shadow, 0, 0);
+    }
+}
+
+// The cursor beside the last character while a built-in click wait runs. Without setcursor the PC engine uses images
+// built into its exe, which VNDegen can't ship, so a small triangle stands in.
+void Engine::drawClickCursor(Image &out) {
+    if (wait_ != WaitKind::Click || !windowShown_ || !inTextLine_) return;
+    ClickCursor &c = cursors_[clickCursorPage_ ? 1 : 0];
+    int x = c.absolute ? c.dx : win_.tx + penX_ + c.dx;
+    int y = c.absolute ? c.dy : win_.ty + penY_ + c.dy;
+    if (c.set) {
+        if (!c.sprite.img.image) return;
+        Sprite s = c.sprite;
+        s.x = x;
+        s.y = y;
+        s.visible = s.loaded = true;
+        int cw = s.img.cellWidth;
+        // Cursor animation runs off the engine clock.
+        int cells = std::max(1, s.img.cells);
+        int t = s.img.cellTimes.empty() ? 0 : s.img.cellTimes[0];
+        int cell = t > 0 ? int((now_ / t) % cells) : 0;
+        blit(out, *s.img.image, x, y, cell * cw, 0, cw, s.img.image->h);
+        return;
+    }
+    int size = std::max(6, win_.fh / 2);
+    int top = y + (win_.fh - size) / 2 + int((now_ / 120) % 4);
+    for (int row = 0; row < size; row++) {
+        int half = (size - row) / 2;
+        fillRect(out, x + size / 2 - half, top + row, half * 2, 1, rgba(255, 255, 255));
     }
 }
 
@@ -848,6 +878,24 @@ void cmdEraseTextBtn(E &e, const std::string &) {
 
 void cmdTextBtnOff(E &e, const std::string &) { e.textBtnOff_ = true; }
 
+void cmdSetCursor(E &e, const std::string &name) {
+    int n = e.readInt();
+    e.readComma();
+    std::string tag = e.readStr();
+    e.readComma();
+    int dx = e.readInt();
+    e.readComma();
+    int dy = e.readInt();
+    if (n < 0 || n > 1) return;
+    E::ClickCursor &c = e.cursors_[n];
+    c = E::ClickCursor();
+    c.set = true;
+    c.dx = dx;
+    c.dy = dy;
+    c.absolute = name == "abssetcursor";
+    if (e.loadImage(tag, c.sprite.img)) c.sprite.loaded = true;
+}
+
 }  // namespace
 
 void registerTextCommands(std::unordered_map<std::string, CommandFn> &t) {
@@ -893,6 +941,8 @@ void registerTextCommands(std::unordered_map<std::string, CommandFn> &t) {
     t["gettextbtnstr"] = cmdGetTextBtnStr;
     t["erasetextbtn"] = cmdEraseTextBtn;
     t["textbtnoff"] = cmdTextBtnOff;
+    t["setcursor"] = cmdSetCursor;
+    t["abssetcursor"] = cmdSetCursor;
 }
 
 }  // namespace vnns
