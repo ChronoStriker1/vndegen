@@ -130,6 +130,10 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	OS::get_singleton()->get_main_loop()->initialize();
 	state.started = true;
 	frames.start();
+	// The game's own cap, which the display's refresh rate limits.
+	const int max_fps = Engine::get_singleton()->get_max_fps();
+	const float refresh = DisplayServer::get_singleton()->screen_get_refresh_rate();
+	frames.set_target(max_fps > 0 ? MIN(max_fps, refresh) : refresh);
 
 	// VNDegen's controller, with Godot's own button and axis numbers, so no mapping applies.
 	Dictionary info;
@@ -327,10 +331,7 @@ void vngd_stop(void) {
 		return;
 	}
 	if (state.started) {
-		// The game's own cap, which the display's refresh rate limits.
-		const int max_fps = Engine::get_singleton()->get_max_fps();
-		const float refresh = DisplayServer::get_singleton()->screen_get_refresh_rate();
-		frames.stop(max_fps > 0 ? MIN(max_fps, refresh) : refresh);
+		frames.stop();
 		OS::get_singleton()->get_main_loop()->finalize();
 	}
 	if (state.setup) {

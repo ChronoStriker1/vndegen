@@ -53,7 +53,7 @@ The game page says why:
 
 ## Testing
 
-- `VNGD_FRAME_LOG=<file>` logs each second's frame count and slowest frame, and a summary when the game stops: its average frame rate and 1% low against its target, the game's own cap or the display's refresh rate.
+- `VNGD_FRAME_LOG=<file>` logs each second's frame count and slowest frame, and a summary every ten seconds and when the game stops: its average frame rate and 1% low against its target, the game's own cap or the display's refresh rate, whichever is lower.
 - `VNGD_SNAPSHOT=<file>` writes the frame the game drew every two seconds, for the Mac, where a window snapshot can't see Metal.
 - `VNGD_TRACE_INPUT=1` logs every input event VNDegen sends.
 - In DEBUG builds, the launch arguments `-godotFrameLog`, `-godotSnapshot`, and `-godotTraceInput` set them, since a simulator's app can't be given environment variables. Relative paths go in the game's log folder.

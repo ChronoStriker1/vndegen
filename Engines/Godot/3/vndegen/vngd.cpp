@@ -99,6 +99,10 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	vngd_platform_started();
 	state.started = true;
 	frames.start();
+	// The game's own cap, which the display's refresh rate limits.
+	const float target = Engine::get_singleton()->get_target_fps();
+	const float refresh = OS::get_singleton()->get_screen_refresh_rate() > 0 ? OS::get_singleton()->get_screen_refresh_rate() : 60;
+	frames.set_target(target > 0 ? MIN(target, refresh) : refresh);
 	// VNDegen's controller. With no mapping for it, Godot passes its button and axis numbers on as they are.
 	input()->joy_connection_changed(0, true, "Xbox Controller", "");
 	return 0;
@@ -296,10 +300,7 @@ void vngd_stop(void) {
 		return;
 	}
 	if (state.started) {
-		// The game's own cap, which the display's refresh rate limits.
-		const float target = Engine::get_singleton()->get_target_fps();
-		const float refresh = OS::get_singleton()->get_screen_refresh_rate() > 0 ? OS::get_singleton()->get_screen_refresh_rate() : 60;
-		frames.stop(target > 0 ? MIN(target, refresh) : refresh);
+		frames.stop();
 		vngd_platform_stopping();
 	}
 	if (state.setup) {
