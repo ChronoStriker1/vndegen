@@ -31,8 +31,8 @@
         decodeOtherFormatsInWebKit(VorbisDecoder);
         VorbisDecoder.worker.addEventListener('error', (event) => {
             // MZ stops the game on any uncaught error, and an error in the decoder's worker reaches the page as one.
-            // The game goes on instead. The sound being decoded never plays, and what waits for it waits on, such as
-            // background music paused for a music effect.
+            // The game goes on instead. The sound being decoded plays at most what was decoded before the error, and
+            // what waits for it to end can wait on, such as background music paused for a music effect.
             event.preventDefault();
             console.warn('Ogg decoder: ' + event.message);
         });
@@ -46,18 +46,25 @@
     function finishFetches(Audio) {
         const onFetch = Audio.prototype._onFetch;
         Audio.prototype._onFetch = function (response) {
-            if (!response.ok || !response.body) return onFetch.call(this, response);
-            const reader = response.body.getReader();
-            const read = reader.read.bind(reader);
-            reader.read = () => read().then((chunk) => {
-                if (chunk.done && !this._isLoaded && this._fetchedSize === 0 && this._data) {
-                    this._isLoaded = true;
-                    this._updateBuffer();
-                    this._data = null;
-                }
-                return chunk;
-            });
-            return onFetch.call(this, { ok: true, body: { getReader: () => reader } });
+            const body = response.ok && response.body;
+            if (body) {
+                // The response goes on unchanged, for plugins that override _onFetch too. Only its reader is wrapped.
+                const getReader = body.getReader;
+                body.getReader = (...args) => {
+                    const reader = getReader.apply(body, args);
+                    const read = reader.read.bind(reader);
+                    reader.read = () => read().then((chunk) => {
+                        if (chunk.done && !this._isLoaded && this._fetchedSize === 0 && this._data) {
+                            this._isLoaded = true;
+                            this._updateBuffer();
+                            this._data = null;
+                        }
+                        return chunk;
+                    });
+                    return reader;
+                };
+            }
+            return onFetch.call(this, response);
         };
     }
 

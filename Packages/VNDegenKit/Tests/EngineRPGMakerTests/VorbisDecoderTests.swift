@@ -216,8 +216,8 @@ private let helpers = """
     #expect(result?["acknowledged"] as? Int == 0)
 }
 
-/// MZ stops the game on any uncaught error, and an error in the decoder's worker reached the page as one. Now it costs
-/// only that sound, and the worker goes on decoding.
+/// MZ stops the game on any uncaught error, and an error in the decoder's worker reached the page as one. Now the game
+/// goes on, and the worker goes on decoding later sounds.
 @Test @MainActor func aDecoderWorkerErrorLeavesTheGameRunning() async throws {
     let (webView, root) = try await decoderPage()
     defer { try? FileManager.default.removeItem(at: root) }
