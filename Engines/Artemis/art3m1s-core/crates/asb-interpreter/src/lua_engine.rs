@@ -930,14 +930,20 @@ impl UserData for EngineApi {
             match args.into_iter().next() {
                 Some(Value::String(path)) => {
                     let path = path.to_str()?.to_owned();
-                    let reader = {
+                    let (reader, encoding) = {
                         let ctx = this.ctx.lock().unwrap();
-                        ctx.file_reader.clone()
+                        (ctx.file_reader.clone(), ctx.script_encoding)
                     };
                     let Some(reader) = reader else {
                         return Ok(Value::Nil);
                     };
                     match reader(&path) {
+                        // Text in the project's charset becomes UTF-8, like the
+                        // scripts, so a game's tables built from CSV files match
+                        // the names its scripts use (VNDegen).
+                        Ok(bytes) if std::str::from_utf8(&bytes).is_err() => Ok(Value::String(
+                            lua.create_string(encoding.decode(&bytes).0.as_bytes())?,
+                        )),
                         Ok(bytes) => Ok(Value::String(lua.create_string(&bytes)?)),
                         Err(_) => Ok(Value::Nil),
                     }
