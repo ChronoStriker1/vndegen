@@ -81,6 +81,9 @@ struct QueuedWaitCheckpoint {
     immediate_count: usize,
     /// When true, onLoad follow-up may run before this wait is re-emitted.
     allow_queue: bool,
+    /// When true, the tags left in the queue run before this wait is
+    /// re-emitted: a handler's own wait sat on top of it (VNDegen).
+    drain_queue_first: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -310,6 +313,16 @@ fn now_millis_i64() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+/// Whether two waits are of the same kind, such as two click waits.
+fn same_wait_kind(a: &Event, b: &Event) -> bool {
+    match (a, b) {
+        (Event::Wait { reason: a }, Event::Wait { reason: b }) => {
+            std::mem::discriminant(a) == std::mem::discriminant(b)
+        }
+        _ => std::mem::discriminant(a) == std::mem::discriminant(b),
+    }
 }
 
 fn same_call_stack(left: &[CallFrame], right: &[CallFrame]) -> bool {
@@ -2245,19 +2258,27 @@ impl Interpreter {
         };
         let line = self.current_line;
         let stack = self.call_stack.clone();
-        if self
+        let same_position = self
             .queued_wait_checkpoints
             .last()
             .is_some_and(|checkpoint| {
                 checkpoint.script == script
                     && checkpoint.line == line
                     && same_call_stack(&checkpoint.stack, &stack)
-            })
-        {
+            });
+        if same_position {
             let index = self.queued_wait_checkpoints.len() - 1;
-            self.queued_wait_checkpoints[index].event = event.clone();
-            self.active_queued_wait = Some(index);
-            return;
+            // The same wait again replaces it. A different one, such as the
+            // timed wait of a button's animation after its handler returned
+            // to a click wait, goes on top, so ending it doesn't end the
+            // click wait under it, which waits for the rest of the handler's
+            // tags instead (VNDegen).
+            if same_wait_kind(&self.queued_wait_checkpoints[index].event, event) {
+                self.queued_wait_checkpoints[index].event = event.clone();
+                self.active_queued_wait = Some(index);
+                return;
+            }
+            self.queued_wait_checkpoints[index].drain_queue_first = true;
         }
         let (deferred, immediate_count) = {
             let mut ctx = self.engine_ctx.lock().unwrap();
@@ -2273,6 +2294,7 @@ impl Interpreter {
             deferred,
             immediate_count,
             allow_queue: false,
+            drain_queue_first: false,
         });
         self.active_queued_wait = Some(self.queued_wait_checkpoints.len() - 1);
     }
@@ -2292,7 +2314,7 @@ impl Interpreter {
         let Some(checkpoint) = self.queued_wait_checkpoints.last() else {
             return false;
         };
-        if !checkpoint.allow_queue {
+        if !checkpoint.allow_queue && !checkpoint.drain_queue_first {
             return true;
         }
         self.engine_ctx.lock().unwrap().tag_queue.is_empty()
@@ -2479,6 +2501,7 @@ impl Interpreter {
             deferred: Vec::new(),
             immediate_count: 0,
             allow_queue: true,
+            drain_queue_first: false,
         });
         self.active_queued_wait = Some(self.queued_wait_checkpoints.len() - 1);
         self.mark_queued_input_wait();
@@ -2765,6 +2788,72 @@ mod tests {
             "the frame resumes only after the deferred stop"
         );
         assert_eq!((it.current_script(), it.current_line()), (Some("story"), 1));
+    }
+
+    #[test]
+    fn a_different_wait_at_a_click_wait_does_not_end_it() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.load_script("story", "*main\n[stop]\n").unwrap();
+        it.start("story", "main").unwrap();
+        let var = |name: &str| {
+            (
+                "var".to_string(),
+                HashMap::from([("name".into(), name.into()), ("data".into(), "1".into())]),
+            )
+        };
+        let click = Event::Wait {
+            reason: crate::event::WaitReason::Generic,
+        };
+        let timed = Event::Wait {
+            reason: crate::event::WaitReason::Timed {
+                milliseconds: 50,
+                input: 0,
+            },
+        };
+
+        it.engine_context()
+            .lock()
+            .unwrap()
+            .tag_queue
+            .push(var("t.next_page"));
+        it.record_queued_wait_checkpoint(&click);
+        // A button's handler returned to the click wait and its animation waits.
+        it.engine_context()
+            .lock()
+            .unwrap()
+            .tag_queue
+            .push(var("t.animation"));
+        it.record_queued_wait_checkpoint(&timed);
+        assert_eq!(it.queued_wait_checkpoints.len(), 2);
+
+        it.last_wait_from_queue = true;
+        it.last_queue_pause_is_wait = true;
+        assert!(it.release_queued_wait());
+        let queue: Vec<_> = it
+            .engine_context()
+            .lock()
+            .unwrap()
+            .tag_queue
+            .iter()
+            .map(|(_, p)| p["name"].clone())
+            .collect();
+        assert_eq!(
+            queue,
+            ["t.animation"],
+            "the page's tags stay behind the click wait"
+        );
+        assert!(matches!(
+            it.queued_wait_checkpoints
+                .last()
+                .map(|checkpoint| &checkpoint.event),
+            Some(Event::Wait {
+                reason: crate::event::WaitReason::Generic
+            })
+        ));
+        assert!(
+            !it.queued_wait_blocks_before_flush(),
+            "the animation finishes first"
+        );
     }
 
     #[test]
