@@ -17,6 +17,9 @@ import AppKit
 ///   notifyutil -p vndegen.input.down   presses one controller button while the app runs, through
 ///                            `xcrun simctl spawn <device> notifyutil -p ...` on a simulator
 ///   notifyutil -p vndegen.touch.l2.down   presses a touch gamepad button, and .up releases it, as a finger would
+///   notifyutil -s vndegen.pointer.tap 512384 -p vndegen.pointer.tap   taps the running game's view, as a click or touch
+///                            on it would. The state's last six digits are x then y in thousandths of the view's width
+///                            and height from its top left, here x 0.512 and y 0.384
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
@@ -49,6 +52,13 @@ enum DebugHooks {
                 }
             }
         }
+        var tapToken: Int32 = 0
+        notify_register_dispatch("vndegen.pointer.tap", &tapToken, .main) { token in
+            var state: UInt64 = 0
+            notify_get_state(token, &state)
+            let point = CGPoint(x: Double(state / 1000 % 1000) / 1000, y: Double(state % 1000) / 1000)
+            MainActor.assumeIsolated { tap(hub, at: point) }
+        }
         for button in VirtualButton.allCases {
             var token: Int32 = 0
             notify_register_dispatch("vndegen.input.\(button.rawValue)", &token, .main) { _ in
@@ -58,6 +68,21 @@ enum DebugHooks {
                     hub.input.onEvent?(.button(button, pressed: false))
                 }
             }
+        }
+    }
+
+    /// Sends the pointer events the game's own view sends for a click, so a verifier can work a game's menus where
+    /// nothing can click in the app, such as a Mac reached over SSH. The pointer rests over the point for 0.5 s before
+    /// it presses, as a real mouse does, since some games' buttons take a press only after the pointer has been over
+    /// them a moment.
+    static func tap(_ hub: Hub, at point: CGPoint) {
+        guard case let .playing(_, session) = hub.screen else { return }
+        Task {
+            session.send(.pointer(PointerEvent(phase: .moved, location: point)))
+            try? await Task.sleep(for: .milliseconds(500))
+            session.send(.pointer(PointerEvent(phase: .began, location: point)))
+            try? await Task.sleep(for: .milliseconds(100))
+            session.send(.pointer(PointerEvent(phase: .ended, location: point)))
         }
     }
 
