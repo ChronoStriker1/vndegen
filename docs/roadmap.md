@@ -26,6 +26,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
+- First priority: every engine finds a game's files whatever case the game uses for file and folder names, as on Windows, on iPhone, iPad, and case-sensitive Mac volumes. Every new engine plugin must pass the same check.
 - The whole app works with a controller alone (item 1 under Next).
 
 ## Next
