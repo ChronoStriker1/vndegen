@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "WebRuntime", targets: ["WebRuntime"]),
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
         .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
+        .library(name: "EngineFlash", targets: ["EngineFlash"]),
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
@@ -33,6 +34,7 @@ let package = Package(
                 swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineFlash", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that Ren'Py loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore", "CRenPy"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
         // Runs Ren'Py inside the app on iOS. Ren'Py's static libraries are linked by the app target, not here.
@@ -65,6 +67,7 @@ let package = Package(
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
+        .testTarget(name: "EngineFlashTests", dependencies: ["EngineFlash", "WebRuntime"]),
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.

@@ -28,8 +28,10 @@ public struct WebGameConfiguration {
     public var userScripts: [String]
     /// Sent instead of WebKit's own user agent.
     public var userAgent: String?
-    /// Where the page's localStorage lives, one file per key. Nil leaves localStorage to WebKit.
-    public var storageDirectory: URL?
+    /// Where the page's localStorage lives. Nil leaves localStorage to WebKit.
+    public var storage: (any PageStorage)?
+    /// The served path, with any query, of the page the game starts on.
+    public var startPage: String
     /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
     public var decodesOgg: Bool
     /// The JavaScript that delivers an engine-neutral button press or release to the game, as DEBUG input scripts send
@@ -39,16 +41,19 @@ public struct WebGameConfiguration {
     public var scriptArgument: String
     public var log: Logger
 
-    /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects.
+    /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects. A
+    /// `storageDirectory` keeps localStorage in `WebStorage` files there, and `storage` replaces it with another store.
     public init(folder: GameFolder, appName: String, runtime: PageRuntime? = nil, userScripts: [String] = [],
-                userAgent: String? = nil, storageDirectory: URL? = nil, decodesOgg: Bool = false,
+                userAgent: String? = nil, storageDirectory: URL? = nil, storage: (any PageStorage)? = nil,
+                startPage: String = "/index.html", decodesOgg: Bool = false,
                 buttonScript: @escaping @MainActor (VirtualButton, _ pressed: Bool) -> String?, scriptArgument: String, log: Logger) {
         self.folder = folder
         self.appName = appName
         self.runtime = runtime ?? .nwjs(execPath: folder.mainModule)
         self.userScripts = userScripts
         self.userAgent = userAgent
-        self.storageDirectory = storageDirectory
+        self.storage = storage ?? storageDirectory.map(WebStorage.init)
+        self.startPage = startPage
         self.decodesOgg = decodesOgg
         self.buttonScript = buttonScript
         self.scriptArgument = scriptArgument
@@ -74,13 +79,15 @@ final class WebGameSession: NSObject, EngineSession {
     private let webView: GameWebView
     private let folder: GameFolder
     private let bridge: NodeBridge
-    private let storage: WebStorage?
+    private let storage: (any PageStorage)?
     private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
     private let scriptArgument: String
     private let log: Logger
     private let onExit: @MainActor () -> Void
     private var ended = false
     private var paused = false
+    /// Ends once the page has had its last word after `terminate()` and the view is torn down.
+    private var stopping: Task<Void, Never>?
     #if DEBUG
     private var script: Task<Void, Never>?
     #endif
@@ -88,7 +95,7 @@ final class WebGameSession: NSObject, EngineSession {
     init(launch: GameLaunch, configuration game: WebGameConfiguration) throws {
         folder = game.folder
         bridge = NodeBridge(folder: folder)
-        storage = game.storageDirectory.map(WebStorage.init)
+        storage = game.storage
         buttonScript = game.buttonScript
         scriptArgument = game.scriptArgument
         log = game.log
@@ -143,7 +150,7 @@ final class WebGameSession: NSObject, EngineSession {
         webView.allowsMagnification = false
         #endif
         log.notice("loading \(launch.game.title, privacy: .public) from \(launch.folder.path, privacy: .public)")
-        webView.load(URLRequest(url: folder.indexURL))
+        webView.load(URLRequest(url: URL(string: GameFolder.origin + game.startPage) ?? folder.indexURL))
         #if DEBUG
         startScriptIfRequested()
         #endif
@@ -191,7 +198,7 @@ final class WebGameSession: NSObject, EngineSession {
         case .browser:
             config["runtime"] = "browser"
         }
-        if game.storageDirectory != nil { config["storage"] = "files" }
+        if game.storage != nil { config["storage"] = "files" }
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
@@ -263,10 +270,42 @@ final class WebGameSession: NSObject, EngineSession {
     }
 
     func terminate() {
+        guard stopping == nil else { return }
         ended = true
         #if DEBUG
         script?.cancel()
         #endif
+        // The page pauses, then writes what it keeps until it quits, such as Flash saves, through the bridge, which needs
+        // the delegates this tears down. A page that doesn't answer gets a few seconds.
+        stopping = Task {
+            await evaluate(Self.beforeQuitScript, within: .seconds(5))
+            tearDown()
+        }
+    }
+
+    func waitUntilStopped() async {
+        await stopping?.value
+    }
+
+    nonisolated static let beforeQuitScript = "window.__vndegen && (__vndegen.setPaused(true), __vndegen.beforeQuit())"
+
+    /// Runs `javaScript` and returns once it has run or `limit` has passed.
+    private func evaluate(_ javaScript: String, within limit: Duration) async {
+        let once = Once()
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            once.action = { done.resume() }
+            webView.evaluateJavaScript(javaScript) { [log] _, error in
+                if let error { log.error("before quit: \(error.localizedDescription, privacy: .public)") }
+                once.run()
+            }
+            Task {
+                try? await Task.sleep(for: limit)
+                once.run()
+            }
+        }
+    }
+
+    private func tearDown() {
         webView.stopLoading()
         webView.configuration.userContentController.removeAllUserScripts()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: Self.messageName)
@@ -398,6 +437,16 @@ extension WebGameSession: WKScriptMessageHandler {
         case "warn": log.warning("js: \(text, privacy: .public)")
         default: log.notice("js: \(text, privacy: .public)")
         }
+    }
+}
+
+/// Runs its action the first time `run` is called.
+@MainActor private final class Once {
+    var action: (() -> Void)?
+
+    func run() {
+        action?()
+        action = nil
     }
 }
 

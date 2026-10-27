@@ -16,6 +16,12 @@ nonisolated public struct GameFolder: Sendable {
     public let webRoot: String
     /// The web root's archive when it is an Electron app.asar. Pages are served from inside it, read only.
     private(set) var archive: AsarArchive?
+    /// Folders the app ships, by the served path the page sees them at, such as `/__vndegen/` for a player. Requests
+    /// under that path read from the folder, never from the game. The longest matching path wins.
+    public var mounts: [String: URL] = [:]
+    /// Files the page sees as part of a file in the game folder, by served path, such as the movie appended to a Flash
+    /// projector. The path is the containing file's, with its case on disk.
+    public var embedded: [String: FileSlice] = [:]
     /// `root` with every symlink resolved. Every path this folder hands out must lead somewhere under it.
     private let realRoot: String
     /// `root` as the kernel names it for an open descriptor. `open` compares descriptors against this, not `realRoot`,
@@ -176,6 +182,17 @@ nonisolated extension GameFolder {
     }
 }
 
+/// Part of a file: `length` bytes from `offset`.
+nonisolated public struct FileSlice: Equatable, Sendable {
+    public var offset: UInt64
+    public var length: Int64
+
+    public init(offset: UInt64, length: Int64) {
+        self.offset = offset
+        self.length = length
+    }
+}
+
 nonisolated struct FileResponse: Equatable, Sendable {
     var status: Int
     var headers: [String: String]
@@ -259,6 +276,14 @@ nonisolated extension GameFolder {
     /// A web root that is an app.asar serves its members from the archive file, or from app.asar.unpacked/ beside it.
     func open(servedPath path: String) -> (FileHandle, UInt64, Int64, String)? {
         let path = path.isEmpty || path == "/" ? "/index.html" : path
+        if let (prefix, folder) = mounts.filter({ path.hasPrefix($0.key) }).max(by: { $0.key.count < $1.key.count }) {
+            return GameFolder(root: folder, webRoot: "").open(servedPath: "/" + path.dropFirst(prefix.count))
+        }
+        if let slice = embedded[path] {
+            guard let url = resolve(servedPath: path), let (handle, size) = openRegularFile(url),
+                  slice.offset <= UInt64(size), slice.length <= size - Int64(slice.offset) else { return nil }
+            return (handle, slice.offset, slice.length, url.lastPathComponent)
+        }
         if let archive, let relative = Self.confine(virtualWebRoot + (path.hasPrefix("/") ? path : "/" + path)),
            relative.lowercased().hasPrefix(webRoot.lowercased() + "/") {
             let inner = String(relative.dropFirst(webRoot.count + 1))

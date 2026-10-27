@@ -1,0 +1,28 @@
+From 385a4e995a3befdc509ed5a9a42aabc9160e376f Mon Sep 17 00:00:00 2001
+From: VNDegen <vndegen@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 14:11:32 -0400
+Subject: [PATCH] avm2: Dispatch unload for loaded content that left the Loader
+
+Flash Player sends unload for a Loader's loaded content even after the movie
+moved the content out of the Loader. Some movies wait for that event before
+they load the next scene.
+---
+ core/src/avm2/object/loaderinfo_object.rs | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/core/src/avm2/object/loaderinfo_object.rs b/core/src/avm2/object/loaderinfo_object.rs
+index b10ed61f..46fc7c02 100644
+--- a/core/src/avm2/object/loaderinfo_object.rs
++++ b/core/src/avm2/object/loaderinfo_object.rs
+@@ -273,7 +273,10 @@ impl<'gc> LoaderInfoObject<'gc> {
+ 
+         let content = loader.child_by_index(0);
+ 
+-        if content.is_some() {
++        // Flash Player sends `unload` for loaded content even after the movie moved it out of the Loader, and some
++        // movies wait for that event before they load the next scene.
++        let loaded = matches!(self.loader_stream(), LoaderStream::Swf(..));
++        if content.is_some() || loaded {
+             let unload_evt = EventObject::bare_default_event(context, "unload");
+             Avm2::dispatch_event(context, unload_evt, self.into());
+         }

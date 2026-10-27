@@ -171,3 +171,35 @@ private func text(of response: FileResponse) async throws -> String {
     #expect(bridge.handle(.writeFile(path: "/game/save/file1.rmmzsave", data: "s", text: true)) == .value(.null))
     #expect(try fm.contentsOfDirectory(atPath: root.appendingPathComponent("Save").path) == ["file1.rmmzsave"])
 }
+
+@Test func mountedAppFoldersAndEmbeddedFilesAreServed() async throws {
+    let root = try temporaryGame()
+    let app = try temporaryGame()
+    defer {
+        try? FileManager.default.removeItem(at: root)
+        try? FileManager.default.removeItem(at: app)
+    }
+    try Data("MZ....FWS-movie....".utf8).write(to: root.appendingPathComponent("Game.exe"))
+    try Data("player".utf8).write(to: app.appendingPathComponent("js/player.js"))
+    var folder = GameFolder(root: root, webRoot: "")
+    folder.mounts = ["/__app/": app, "/__app/js/": app.appendingPathComponent("js")]
+    folder.embedded = ["/Game.exe": FileSlice(offset: 6, length: 9)]
+
+    // The longest mount wins, and a mount never reads from the game.
+    #expect(try await text(of: folder.serve(path: "/__app/index.html")) == "<html></html>")
+    #expect(try await text(of: folder.serve(path: "/__app/js/player.js")) == "player")
+    #expect(folder.serve(path: "/__app/../js/main.js").status == 404)
+    #expect(folder.serve(path: "/__app/js/main.js").status == 200)
+    #expect(try await text(of: folder.serve(path: "/__app/js/main.js")) == "0123456789")
+    #expect(try await text(of: folder.serve(path: "/js/main.js")) == "0123456789")
+
+    let movie = folder.serve(path: "/Game.exe")
+    #expect(movie.headers["Content-Length"] == "9")
+    #expect(try await text(of: movie) == "FWS-movie")
+    #expect(try await text(of: folder.serve(path: "/Game.exe", range: "bytes=4-")) == "movie")
+    #expect(folder.read(servedPath: "/Game.exe", limit: 3) == Data("FWS".utf8))
+
+    // A slice past the end of the file serves nothing.
+    folder.embedded = ["/Game.exe": FileSlice(offset: 6, length: 100)]
+    #expect(folder.serve(path: "/Game.exe").status == 404)
+}
