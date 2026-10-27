@@ -146,6 +146,172 @@
         }
         texSize.set(window.Graphics.width, height);
     }
+
+    // Short looping videos, mostly animated GIFs converted to WebM for picture plugins such as PKD_VPlayer. WebKit takes
+    // such a video's length as its last frame's start plus a guess, not the length the file states, so it ends the loop
+    // early, then seeks back to the start and shows nothing new for about 300 ms: a 0.56 s loop of four frames took
+    // 0.75 s, stuttered at each turn, and fell out of step with the sound made for it. Here the first pass is kept frame
+    // by frame, and from then on the texture shows those frames by the clock over the file's stated length. PIXI also
+    // marked a video texture changed on every tick, so WebKit copied the same frame to the GPU 60 times a second at
+    // about 4 ms a copy. Now each new frame is copied once.
+    const loopLimits = { seconds: 10, bytes: 32 << 20 };
+    const videoStates = new WeakMap();
+    const fileLengths = new Map();
+    function smoothVideoLoops(pixi) {
+        const VideoResource = pixi.resources && pixi.resources.VideoResource;
+        if (!VideoResource || !pixi.BaseTexture || !('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
+        const update = pixi.BaseTexture.prototype.update;
+        pixi.BaseTexture.prototype.update = function () {
+            const resource = this.resource;
+            if (this.valid && resource instanceof VideoResource && resource.source) {
+                const frame = videoFrame(resource);
+                if (frame === this.vndegenFrame) return;
+                this.vndegenFrame = frame;
+            }
+            return update.apply(this, arguments);
+        };
+        const upload = VideoResource.prototype.upload;
+        VideoResource.prototype.upload = function (renderer, baseTexture, glTexture, source) {
+            const state = videoStates.get(this);
+            const kept = state && state.mode === 'kept' ? state.frames[state.shown].canvas : null;
+            return upload.call(this, renderer, baseTexture, glTexture, source || kept);
+        };
+        const dispose = VideoResource.prototype.dispose;
+        VideoResource.prototype.dispose = function () {
+            const state = videoStates.get(this);
+            if (state) dropFrames(state, 'done');
+            videoStates.delete(this);
+            return dispose.apply(this, arguments);
+        };
+    }
+
+    // What the texture should show now: a count of the frames the video has presented, or which kept frame is due.
+    function videoFrame(resource) {
+        const video = resource.source;
+        let state = videoStates.get(resource);
+        if (!state || state.video !== video) {
+            state = { video, mode: 'keeping', presented: 0, frames: [], bytes: 0, last: -1, count: -1, origin: 0, shown: 0 };
+            videoStates.set(resource, state);
+            const onFrame = (now, meta) => {
+                if (state.mode === 'done') return;
+                state.presented++;
+                if (state.mode === 'keeping') keepFrame(state, now, meta);
+                video.requestVideoFrameCallback(onFrame);
+            };
+            video.requestVideoFrameCallback(onFrame);
+        }
+        if (state.mode !== 'kept') return state.presented;
+        if (!video.loop) {
+            dropFrames(state, 'native');
+            return state.presented;
+        }
+        const now = performance.now();
+        if (video.paused) {
+            if (state.pausedAt === undefined) state.pausedAt = now;
+        } else {
+            if (state.pausedAt !== undefined) state.origin += now - state.pausedAt;
+            state.pausedAt = undefined;
+            const time = ((now - state.origin) / 1000 * video.playbackRate) % state.length;
+            const frames = state.frames;
+            let shown = 0;
+            while (shown + 1 < frames.length && frames[shown + 1].time <= time) shown++;
+            state.shown = shown;
+        }
+        return -1 - state.shown;
+    }
+
+    // Keeps each frame of one whole pass, from a frame at time 0 up to the next return to it.
+    function keepFrame(state, now, meta) {
+        const video = state.video, time = meta.mediaTime;
+        if (!video.loop || !(video.duration <= loopLimits.seconds)) return dropFrames(state, 'native');
+        if (state.stated === undefined) {
+            state.stated = null;
+            fileLength(video.currentSrc).then((length) => {
+                state.stated = length;
+                if (state.mode === 'kept' && length > state.frames[state.frames.length - 1].time) state.length = length;
+            });
+        }
+        const restarted = time < state.last || (state.last < 0 && time <= 0.001);
+        // A frame skipped while keeping would be missing from every later pass.
+        const skipped = state.count >= 0 && meta.presentedFrames !== state.count + 1;
+        state.last = time;
+        state.count = meta.presentedFrames;
+        const frames = state.frames;
+        if (restarted && frames.length && !skipped) {
+            const end = frames[frames.length - 1].time;
+            // Without a usable stated length, the last frame lasts as long as the one before it.
+            state.length = state.stated > end ? state.stated
+                : Math.max(video.duration, end + (frames.length > 1 ? end - frames[frames.length - 2].time : 0.1));
+            state.mode = 'kept';
+            state.origin = now - time * 1000 / video.playbackRate;
+            return;
+        }
+        if (skipped || (!restarted && !frames.length)) {
+            dropFrames(state, 'keeping');
+            if (!restarted) return;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        state.bytes += canvas.width * canvas.height * 4;
+        if (state.bytes > loopLimits.bytes) return dropFrames(state, 'native');
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        state.frames.push({ time, canvas });
+    }
+
+    function dropFrames(state, mode) {
+        for (const frame of state.frames) frame.canvas.width = 0;
+        state.frames = [];
+        state.bytes = 0;
+        state.mode = mode;
+    }
+
+    // The length a WebM file states in its Segment Info, in seconds, or null.
+    function fileLength(url) {
+        if (!fileLengths.has(url)) {
+            fileLengths.set(url, fetch(url).then((response) => response.arrayBuffer()).then(webmLength).catch(() => null));
+        }
+        return fileLengths.get(url);
+    }
+
+    function webmLength(buffer) {
+        const data = new DataView(buffer);
+        let at = 0;
+        // An EBML variable-length integer. IDs keep their length marker, sizes drop it. A size of all ones is unknown.
+        const read = (isID) => {
+            const first = data.getUint8(at);
+            let length = 1;
+            while (length <= 8 && !(first & (0x80 >> (length - 1)))) length++;
+            if (length > 8) throw new RangeError('bad EBML length');
+            let value = isID ? first : first & (0xff >> length), ones = value === 0xff >> length;
+            for (let i = 1; i < length; i++) {
+                const byte = data.getUint8(at + i);
+                value = value * 256 + byte;
+                ones = ones && byte === 0xff;
+            }
+            at += length;
+            return isID || !ones ? value : Infinity;
+        };
+        let end = data.byteLength, scale = 1e6, duration = null, inInfo = false;
+        while (at < end) {
+            const id = read(true), size = read(false), body = at;
+            if (id === 0x18538067 || id === 0x1549a966) {
+                // Segment, then its Info, which holds the length. The search ends with Info.
+                if (size !== Infinity) end = Math.min(end, body + size);
+                inInfo = inInfo || id === 0x1549a966;
+                continue;
+            }
+            if (id === 0x1f43b675 || size === Infinity) break;
+            if (inInfo && id === 0x2ad7b1) {
+                scale = 0;
+                for (let i = 0; i < size; i++) scale = scale * 256 + data.getUint8(body + i);
+            } else if (inInfo && id === 0x4489) {
+                duration = size === 4 ? data.getFloat32(body) : size === 8 ? data.getFloat64(body) : null;
+            }
+            at = body + size;
+        }
+        return duration > 0 && scale > 0 ? duration * scale / 1e9 : null;
+    }
     let pixi;
     Object.defineProperty(window, 'PIXI', {
         configurable: true,
@@ -153,6 +319,7 @@
         set(value) {
             if (value === pixi) return;
             pixi = value;
+            if (value) smoothVideoLoops(value);
             const filter = value && value.Filter;
             if (!filter) return;
             const apply = filter.prototype.apply;
