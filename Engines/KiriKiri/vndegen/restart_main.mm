@@ -7,14 +7,18 @@
 // it. After each game's vnkk_stop, stdout gets the resident size, the resident size once malloc has
 // returned its free pages to the system, and the number of open files. Each game is paused for
 // pauseTime at its title, and the next game's engine clock must still start level with SDL's.
+// At its title each game then opens a modal window through script, as KAG's Yes/No dialog is opened,
+// and a timer of the window's own closes it. The window's loop must draw and return within
+// modalTimeout. Its timer can only fire once a pass of the loop has run the engine's events.
 // The games draw in a window's view and the run loop turns between frames, as in VNDegen's app,
 // and every frame runs with an event of the app's queued, which the frame must leave to the app.
 // A title marker of "movie" quits the game midway through its first movie instead: movieTime after
 // the log shows the movie opening, while its decoder is still reading.
-// Exits nonzero if a game missed its title, did not quit, started with a clock behind SDL's, or
-// had a frame take the app's events.
+// Exits nonzero if a game missed its title, did not quit, started with a clock behind SDL's, had a
+// frame take the app's events, or held its modal window open past modalTimeout.
 #include "tjsCommHead.h"
 #include "Platform.h"
+#include "TVPScript.h"
 #include "vnkk.h"
 
 #include <SDL3/SDL_timer.h>
@@ -43,6 +47,7 @@ static const auto clickAfter = std::chrono::seconds(10);
 static const auto clickInterval = std::chrono::seconds(2);
 static const auto pauseTime = std::chrono::milliseconds(500);
 static const auto movieTime = std::chrono::milliseconds(1500);
+static const auto modalTimeout = std::chrono::seconds(2);
 
 static std::string readLog(const std::string &path)
 {
@@ -100,6 +105,30 @@ static int iterate()
     appEventsTaken |= ![NSApp nextEventMatchingMask:NSEventMaskApplicationDefined untilDate:NSDate.distantPast
                                              inMode:NSDefaultRunLoopMode dequeue:YES];
     return quit;
+}
+
+// Opens a modal window that its own timer closes after 100 ms. Returns the seconds the window's
+// loop held the frame, or a negative number if the script failed.
+static double runModalWindow()
+{
+    Clock::time_point start = Clock::now();
+    try {
+        TVPExecuteScript(TJS_N("global.vnkkModalCheck = %[];"
+                               "with (global.vnkkModalCheck) {"
+                               "  .window = new Window();"
+                               "  .timer = new Timer((function { this.timer.enabled = false; this.window.close(); } incontextof global.vnkkModalCheck), '');"
+                               "  .timer.interval = 100;"
+                               "  .timer.enabled = true;"
+                               "  .window.showModal();"
+                               "  invalidate .timer;"
+                               "  invalidate .window;"
+                               "}"
+                               "delete global.vnkkModalCheck;"));
+    } catch (const eTJS &e) {
+        fprintf(stderr, "modal window: %s\n", e.GetMessage().AsStdString().c_str());
+        return -1;
+    }
+    return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
 // Runs frames until done() or the deadline. Returns whether done() became true.
@@ -181,6 +210,16 @@ int main(int argc, char *argv[])
             vnkk_set_paused(false);
         }
 
+        bool modalClosed = true;
+        char modalReport[96] = "no modal window";
+        if (atTitle && !midMovie) {
+            tjs_uint64 tick = TVPGetRoughTickCount();
+            double seconds = runModalWindow();
+            modalClosed = seconds >= 0 && seconds < std::chrono::duration<double>(modalTimeout).count();
+            snprintf(modalReport, sizeof modalReport, "modal window at engine tick %llu %s after %.1f s",
+                     (unsigned long long)tick, seconds < 0 ? "failed" : "closed", seconds);
+        }
+
         bool quit = !started || quitEarly;
         if (!quit) {
             vnkk_request_quit();
@@ -192,12 +231,13 @@ int main(int argc, char *argv[])
         malloc_zone_pressure_relief(nullptr, 0);
         bool clockKept = clockBehind >= 0 && clockBehind < 100;
         printf("game %d: %s after %.1f s, %s, clock %lld ms behind SDL's at start, resident %.1f MB, %.1f MB after relief, "
-               "%d open files, %s\n",
+               "%d open files, %s, %s\n",
                n, atTitle ? (midMovie ? "mid-movie" : "title") : started ? "no title" : "did not start", titleSeconds,
                quit ? "quit" : "did not quit", (long long)clockBehind, resident, residentMB(), openFiles(),
-               appEventsTaken ? "a frame took the app's events" : "frames left the app's events");
+               appEventsTaken ? "a frame took the app's events" : "frames left the app's events",
+               modalReport);
         fflush(stdout);
-        failures += !atTitle || !quit || !clockKept || appEventsTaken;
+        failures += !atTitle || !quit || !clockKept || appEventsTaken || !modalClosed;
     }
     printf("%d of %d games failed\n", failures, (argc - 2) / 3);
     return failures ? 1 : 0;

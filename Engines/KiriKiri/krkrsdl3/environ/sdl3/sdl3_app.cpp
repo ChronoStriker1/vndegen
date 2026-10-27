@@ -46,6 +46,9 @@ static SDL_Renderer* tvp_renderer = NULL;
 static SDL_GLContext tvp_glContext = NULL;
 static void* tvp_host_window = NULL;
 static void* tvp_host_view = NULL;
+// The engine tick of TVPDrawSceneOnce's last frame. Each game's clock starts at zero again, so a
+// tick left from the previous game would hold the next game's modal windows until its clock caught up.
+static tjs_uint64 tvp_last_scene_tick = 0;
 
 void TVPSetHostWindow(void* nswindow, void* nsview)
 {
@@ -233,6 +236,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         return SDL_APP_FAILURE;
     }
     TVPResetClock();
+    tvp_last_scene_tick = 0;
 
     // 窗口（按所选后端决定标志位；创建失败时回退软渲染）
     if (!TVPCreateWindowForBackend(TVPSettings.renderer))
@@ -659,9 +663,8 @@ void TVPSetWindowSize(int w, int h)
 
 int TVPDrawSceneOnce(int interval)
 {
-    static tjs_uint64 lastTick = TVPGetRoughTickCount();
     tjs_uint64 curTick = TVPGetRoughTickCount();
-    int remain = interval - (curTick - lastTick);
+    int remain = interval - (curTick - tvp_last_scene_tick);
     if (remain <= 0)
     {
         SDL_AppIterate(NULL);
@@ -670,7 +673,7 @@ int TVPDrawSceneOnce(int interval)
         {
             SDL_AppEvent(NULL, &event);
         }
-        lastTick = curTick;
+        tvp_last_scene_tick = curTick;
         return 0;
     }
     else
