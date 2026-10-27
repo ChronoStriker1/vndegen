@@ -787,6 +787,14 @@ pub(super) fn apply_font_override(
 }
 
 pub(super) fn font_fallback_candidates(face: &str) -> Vec<String> {
+    // Scripts often name a face without its extension (VNDegen).
+    let file_name = face.rsplit('/').next().unwrap_or(face);
+    if !file_name.contains('.') {
+        return [".ttf", ".otf", ".ttc"]
+            .into_iter()
+            .map(|extension| format!("{face}{extension}"))
+            .collect();
+    }
     let (stem, extension) = face.rsplit_once('.').unwrap_or((face, ""));
     let lower = stem.to_ascii_lowercase();
     for separator in ['-', '_'] {
@@ -832,6 +840,14 @@ mod tests {
             vec!["font/ui_regular.ttf", "font/ui_bold.ttf"]
         );
         assert!(font_fallback_candidates("font/story.otf").is_empty());
+        assert_eq!(
+            font_fallback_candidates("image/font/VL-Gothic-Regular"),
+            [
+                "image/font/VL-Gothic-Regular.ttf",
+                "image/font/VL-Gothic-Regular.otf",
+                "image/font/VL-Gothic-Regular.ttc",
+            ]
+        );
     }
 
     #[test]
