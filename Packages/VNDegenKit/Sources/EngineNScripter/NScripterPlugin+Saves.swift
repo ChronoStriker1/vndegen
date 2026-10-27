@@ -10,7 +10,8 @@ extension NScripterPlugin {
         guard let saveDir = Self.saveDirectory(root) else {
             return [SaveLocation(directory: root) { path in Self.engineFileName(path) }]
         }
-        let directory = Self.existingFolder(saveDir, in: root)
+        // The folder as it is on disk, matched without regard to case as the runtime matches it.
+        let directory = FileCase.resolve(saveDir.joined(separator: "/"), in: root)
         return [SaveLocation(directory: directory) { path in Self.saveRelativePath(path, saveDir: saveDir) }]
     }
 
@@ -58,16 +59,5 @@ extension NScripterPlugin {
         if !numbered.isEmpty { return numbered.compactMap { read($0.1) }.reduce(into: []) { $0 += $1 } }
         guard let file = names.first(where: { $0.lowercased() == "nscript.dat" }), let data = read(file) else { return nil }
         return data.map { $0 ^ 0x84 }
-    }
-
-    /// The save folder as it exists on disk, matching each name without regard to case, as the runtime finds it.
-    nonisolated private static func existingFolder(_ parts: [String], in root: URL) -> URL {
-        var url = root
-        for part in parts {
-            let entries = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
-            let match = entries.first { $0.lowercased() == part.lowercased() } ?? part
-            url = url.appendingPathComponent(match, isDirectory: true)
-        }
-        return url
     }
 }

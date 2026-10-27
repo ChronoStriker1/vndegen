@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include "casepath.h"
+
 #include <sys/stat.h>
 
 #include <cstdarg>
@@ -187,7 +189,7 @@ bool readFile(const std::string &path, Bytes &out) {
 // Creates the folders above path, as the PC engine expects the game to have done.
 static void makeParents(const std::string &path) {
     for (size_t slash = path.find('/', 1); slash != std::string::npos; slash = path.find('/', slash + 1))
-        mkdir(path.substr(0, slash).c_str(), 0755);
+        if (mkdir(path.substr(0, slash).c_str(), 0755) == 0) casepath_changed(path.substr(0, slash).c_str());
 }
 
 bool writeFile(const std::string &path, const void *data, size_t size) {
@@ -199,6 +201,7 @@ bool writeFile(const std::string &path, const void *data, size_t size) {
     ok = fclose(f) == 0 && ok;
     if (ok) ok = rename(tmp.c_str(), path.c_str()) == 0;
     if (!ok) remove(tmp.c_str());
+    if (ok) casepath_changed(path.c_str());
     return ok;
 }
 

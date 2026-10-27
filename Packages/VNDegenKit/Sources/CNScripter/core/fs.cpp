@@ -1,5 +1,7 @@
 #include "fs.h"
 
+#include "casepath.h"
+
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -187,29 +189,20 @@ bool FileSystem::read(std::string_view name, Bytes &out) {
 std::string FileSystem::hostPath(std::string_view name) const {
     std::string key = normalizePath(name);
     if (auto it = loose_.find(key); it != loose_.end()) return root_ + "/" + it->second;
-    // Match each existing folder of the path without regard to case; the remainder keeps the script's spelling.
-    std::string path = root_;
+    // Other names, such as files the game writes, take each existing name's spelling on disk; the rest stays as the
+    // script spells it, so a new file goes into the folder that exists.
     std::string utf8 = sjisToUtf8(name);
     std::replace(utf8.begin(), utf8.end(), '\\', '/');
+    std::string path = root_;
     size_t start = 0;
     while (start < utf8.size()) {
         size_t slash = utf8.find('/', start);
         std::string part = utf8.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
         start = slash == std::string::npos ? utf8.size() : slash + 1;
-        if (part.empty() || part == ".") continue;
-        std::string match = part;
-        if (DIR *d = opendir(path.c_str())) {
-            std::string want = sjisLower(utf8ToSjis(part));
-            while (dirent *e = readdir(d))
-                if (sjisLower(diskNameToSjis(e->d_name)) == want) {
-                    match = e->d_name;
-                    break;
-                }
-            closedir(d);
-        }
-        path += "/" + match;
+        if (!part.empty() && part != ".") path += "/" + part;
     }
-    return path;
+    std::vector<char> out(path.size() + 1024);
+    return casepath_resolve(path.c_str(), out.data(), out.size()) >= 0 ? std::string(out.data()) : path;
 }
 
 // SPB: big-endian width and height, then an MSB-first bit stream with the blue, green and red planes in turn. Each
