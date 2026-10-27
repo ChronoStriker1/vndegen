@@ -20,6 +20,9 @@ final class NScripterSession: EngineSession {
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
     private var lastTimestamp: CFTimeInterval?
+    #if DEBUG
+    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
+    #endif
     private var router = NScripterInputRouter()
     private var paused = false
     private var stopped = false
@@ -96,6 +99,9 @@ final class NScripterSession: EngineSession {
         if let pixels = vnns_frame(engine, &w, &h, &changed), changed {
             frameView.present(pixels, width: Int(w), height: Int(h))
         }
+        #if DEBUG
+        pacing?.note(tick: now, presented: changed, stepEnd: CACurrentMediaTime(), target: link.targetTimestamp - link.timestamp)
+        #endif
     }
 
     private func deliver(_ inputs: [NScripterInput]) {
@@ -151,6 +157,9 @@ final class NScripterSession: EngineSession {
         guard let engine else { return }
         if paused { deliver(router.releaseAll()) }
         vnns_set_paused(engine, paused)
+        // A paused app may be killed without warning, as iOS does in the background. The PC engine writes global
+        // variables and the read-text record only at saves and on exit, so write them now too.
+        if paused { vnns_save_system_data(engine) }
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
         if !paused { frameView.takeFocus() }
@@ -183,3 +192,35 @@ private final class FrameTarget: NSObject {
     init(_ session: NScripterSession) { self.session = session }
     @objc func step(_ link: CADisplayLink) { session?.step(link) }
 }
+
+#if DEBUG
+/// With `-frameMonitor YES`, logs the runtime's pacing every 10 seconds ("NSFRAMES" in the app log): display link ticks
+/// per second on average and over the slowest 1% of ticks, frames the runtime drew, and the slowest step.
+private final class FramePacing {
+    private var last: CFTimeInterval?
+    private var start: CFTimeInterval = 0
+    private var intervals: [Double] = []
+    private var presented = 0
+    private var worstStep = 0.0
+
+    func note(tick: CFTimeInterval, presented drew: Bool, stepEnd: CFTimeInterval, target: CFTimeInterval) {
+        defer { last = tick }
+        guard let last else {
+            start = tick
+            return
+        }
+        intervals.append(tick - last)
+        if drew { presented += 1 }
+        worstStep = max(worstStep, stepEnd - tick)
+        guard tick - start >= 10 else { return }
+        let slowest = intervals.sorted(by: >).prefix(max(1, intervals.count / 100))
+        let low = Double(slowest.count) / slowest.reduce(0, +)
+        NSLog("NSFRAMES seconds=%.1f average=%.1f low1=%.1f drawn=%.1f worstStep=%.1fms target=%.1f", tick - start,
+              Double(intervals.count) / (tick - start), low, Double(presented) / (tick - start), worstStep * 1000, 1 / target)
+        intervals.removeAll(keepingCapacity: true)
+        presented = 0
+        worstStep = 0
+        start = tick
+    }
+}
+#endif

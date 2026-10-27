@@ -54,6 +54,9 @@ let package = Package(
         // stb_vorbis and pl_mpeg, which the runtime's sources include directly rather than compile on their own.
         .target(
             name: "CNScripter", dependencies: ["CVNFont"], exclude: ["third_party", "core/sjis_table.inc"],
+            // The runtime draws every frame on the CPU. Unoptimized, a Debug build misses frames that a Release build
+            // makes, and Debug builds are what the simulators and the Mac app are tested with.
+            cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-O2"])],
             linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         // Presents a frame a runtime drew on the CPU through Metal, and plays the sound it mixes, for the runtimes that

@@ -15,6 +15,7 @@
 //   quit                end the game as closing its window would, writing system data
 //
 // Usage: vnns_host GAME_DIR [--wordwrap] [--log FILE]. Prints "ok" after each command, or "ended" once the game ends.
+#include <chrono>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_OUTLINE_H
@@ -112,11 +113,20 @@ int main(int argc, char **argv) {
     vnns_frame(e, &w, &h, nullptr);
     std::vector<float> audio(2 * 735);
     bool running = true;
+    int drawn = 0;  // frames that changed, for the "drawn" command
+    // VNNS_SLOW_MS reports each step that takes at least that long, with where the script is.
+    double slowMs = getenv("VNNS_SLOW_MS") ? atof(getenv("VNNS_SLOW_MS")) : 0;
     auto stepFor = [&](int ms) {
         while (ms > 0 && running) {
             int d = ms < 16 ? ms : 16;
+            auto t0 = std::chrono::steady_clock::now();
             running = vnns_step(e, d);
+            double took = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            if (slowMs > 0 && took >= slowMs) fprintf(stderr, "slow step %.1f ms at %s\n", took, vnns_debug_status(e));
             vnns_audio_render(e, audio.data(), d * 44100 / 1000);
+            bool changed = false;
+            vnns_frame(e, &w, &h, &changed);
+            if (changed) drawn++;
             ms -= d;
         }
     };
@@ -179,6 +189,9 @@ int main(int argc, char **argv) {
             int slot = 0;
             in >> slot;
             if (!vnns_load_game(e, slot)) std::cout << "load failed" << std::endl;
+        } else if (cmd == "drawn") {
+            std::cout << "drawn " << drawn << std::endl;
+            drawn = 0;
         } else if (cmd == "where") {
             std::cout << vnns_debug_status(e) << std::endl;
         } else if (cmd == "quit") {

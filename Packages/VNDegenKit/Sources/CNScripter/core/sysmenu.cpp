@@ -240,7 +240,11 @@ void Engine::pollSystemUi() {
             i += n;
         }
         typed_.clear();
-        ui.items = {ui.input + "_"};
+        // A byte-counted mid can leave half a character at the end, which would take the cursor as its second byte.
+        size_t last = 0;
+        for (size_t i = 0; i < ui.input.size(); i += sjisCharLen(ui.input, i)) last = i;
+        bool half = !ui.input.empty() && last == ui.input.size() - 1 && sjisLead(uint8_t(ui.input[last]));
+        ui.items = {ui.input.substr(0, half ? last : ui.input.size()) + "_"};
         sceneDirty_ = true;
         for (int k : in_.keys)
             if (k == VNNS_KEY_RETURN) {

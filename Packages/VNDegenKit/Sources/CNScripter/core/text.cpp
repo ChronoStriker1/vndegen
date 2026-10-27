@@ -69,6 +69,8 @@ void Engine::drawGlyphs(Image &out, const std::string &sjis, int x, int y, int f
         size_t n;
         uint32_t cp = sjisDecode(sjis, i, &n);
         i += n;
+        // Half a character, as a byte-counted mid leaves at the end of a string, draws nothing.
+        if (i == sjis.size() && n == 1 && sjisLead(uint8_t(sjis[i - 1]))) break;
         bool half = n == 1;
         int cw = half ? fw / 2 : fw;
         const Glyph *g = nullptr;
