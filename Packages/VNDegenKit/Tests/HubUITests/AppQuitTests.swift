@@ -12,8 +12,8 @@ private final class QuitRecord {
         if event == "reply" || event == "quit again" { finish.yield() }
     }
 
-    func ask(_ quit: AppQuit) -> AppQuit.Answer {
-        quit.request(reply: { self.note("reply") }, quitAgain: { self.note("quit again") })
+    func ask(_ quit: AppQuit, fromSystem: Bool = false) -> AppQuit.Answer {
+        quit.request(fromSystem: fromSystem, reply: { self.note("reply") }, quitAgain: { self.note("quit again") })
     }
 
     /// Waits for the quit to finish.
@@ -75,6 +75,39 @@ private final class Gate {
     await record.waitForFinish()
     #expect(record.events == ["prepared", "quit again"])
     #expect(record.ask(quit) == .now)
+}
+
+/// Cancelling a quit macOS asks for as it logs out, restarts, or shuts down would cancel the log out, and the next try
+/// would quit only VNDegen. It waits inside the frame instead, where the game writes its system saves.
+@MainActor
+@Test func aQuitMacOSAsksForInsideAGameFrameIsNeverCancelled() async {
+    let record = QuitRecord()
+    let gate = Gate()
+    let quit = AppQuit(timeout: .seconds(60), frameIsRunning: { true }) {
+        await gate.wait()
+        record.note("prepared")
+    }
+    #expect(record.ask(quit, fromSystem: true) == .later)
+    gate.open()
+    await record.waitForFinish()
+    #expect(record.events == ["prepared", "reply"])
+}
+
+/// A log out that arrives while a cancelled quit waits for the game finishes that quit instead of cancelling.
+@MainActor
+@Test func aQuitMacOSAsksForAfterACancelledQuitWaitsForIt() async {
+    let record = QuitRecord()
+    let gate = Gate()
+    let quit = AppQuit(timeout: .seconds(60), frameIsRunning: { true }) {
+        await gate.wait()
+        record.note("prepared")
+    }
+    #expect(record.ask(quit) == .cancel)
+    #expect(record.ask(quit, fromSystem: true) == .later)
+    #expect(record.ask(quit, fromSystem: true) == .later)
+    gate.open()
+    await record.waitForFinish()
+    #expect(record.events == ["prepared", "reply"])
 }
 
 @MainActor

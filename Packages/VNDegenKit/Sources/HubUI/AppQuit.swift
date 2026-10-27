@@ -37,15 +37,22 @@ public final class AppQuit {
     /// runs the app's events inside a frame, would hold that frame open until the app exited, so the game could never
     /// close and write its saves. Such a request is cancelled instead, and `quitAgain` runs once the game has stopped and
     /// the backups are done. The request it makes is answered `.now`.
-    public func request(reply: @escaping () -> Void, quitAgain: @escaping () -> Void) -> Answer {
+    ///
+    /// A request `fromSystem`, made as macOS logs out, restarts, or shuts down, is never cancelled, since that would
+    /// cancel the log out too. Inside a frame it waits there, and the game, which cannot close, writes its system saves
+    /// where it waits.
+    public func request(fromSystem: Bool, reply: @escaping () -> Void, quitAgain: @escaping () -> Void) -> Answer {
         if ready { return .now }
         switch pending {
         case .reply: return .later
-        case .quitAgain: return .cancel
+        case .quitAgain:
+            guard fromSystem else { return .cancel }
+            pending = .reply(reply)
+            return .later
         case nil: break
         }
-        let insideFrame = frameIsRunning()
-        pending = insideFrame ? .quitAgain(quitAgain) : .reply(reply)
+        let cancels = !fromSystem && frameIsRunning()
+        pending = cancels ? .quitAgain(quitAgain) : .reply(reply)
         Task {
             await prepare()
             finish()
@@ -54,7 +61,7 @@ public final class AppQuit {
             try? await Task.sleep(for: timeout)
             finish()
         }
-        return insideFrame ? .cancel : .later
+        return cancels ? .cancel : .later
     }
 
     private func finish() {

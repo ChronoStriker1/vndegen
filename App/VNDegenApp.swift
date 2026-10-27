@@ -43,13 +43,23 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     /// and it writes its saves, then waits for automatic backups.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let quit else { return .terminateNow }
-        let answer = quit.request(reply: { sender.reply(toApplicationShouldTerminate: true) },
+        let answer = quit.request(fromSystem: Self.systemIsEnding,
+                                  reply: { sender.reply(toApplicationShouldTerminate: true) },
                                   quitAgain: { sender.terminate(nil) })
         switch answer {
         case .now: return .terminateNow
         case .later: return .terminateLater
         case .cancel: return .terminateCancel
         }
+    }
+
+    /// Whether macOS asked the app to quit because it is logging out, restarting, or shutting down. A quit the player
+    /// asked for carries no such reason.
+    private static var systemIsEnding: Bool {
+        let reasons = [kAELogOut, kAEReallyLogOut, kAEShowRestartDialog, kAERestart, kAEShowShutdownDialog, kAEShutDown]
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              let reason = event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.typeCodeValue else { return false }
+        return reasons.map { OSType($0) }.contains(reason)
     }
 
     private static func makeQuit(_ hub: Hub) -> AppQuit {

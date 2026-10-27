@@ -143,8 +143,9 @@ final class KiriKiriSession: EngineSession {
     /// Runs when the display link or the quit timer fires inside a frame, which happens only while the game's own modal
     /// window runs the host's events. Ending the session closes that window, so the frame returns and the game closes
     /// normally. Should the frame still not return, the game cannot close at all. It then writes its system saves where
-    /// it waits, and the hub is told it stopped so the app can quit. The app's own quit never holds a frame open: it
-    /// cancels a quit that arrives inside one and quits again once the game has stopped.
+    /// it waits, and the hub is told it stopped so the app can quit. The app's own quit holds a frame open only while
+    /// macOS logs out, restarts, or shuts down. It cancels any other quit that arrives inside one and quits again once
+    /// the game has stopped.
     private func giveUpIfQuitIsStuck() {
         guard case let .quitting(since) = state, ContinuousClock.now > since + stuckQuitTimeout else { return }
         kiriKiriLog.info("\(self.launch.game.id.rawValue, privacy: .public) could not close inside its frame, saving its system data")
