@@ -8,6 +8,8 @@ its own:
 - `scripts/renpy-runtime.sh` writes `build/renpy/licenses/` from the texts in `renpy/`, choosing each by evidence in
   the runtimes it installed: a symbol in Ren'Py's native library or a file in the runtime. It copies Ren'Py's own
   `LICENSE.txt` and the font licenses from the runtime itself.
+- `scripts/kirikiri-engine.sh` writes `build/kirikiri/licenses/`: krkrsdl3's license, the Android Open Source Project's
+  Apache-2.0 text for the bundled fallback font and the velocity tracker, and each vcpkg dependency's `copyright` file.
 - `scripts/app-licenses.sh` writes `build/app/licenses/` for third-party code in VNDegen's own sources.
 
 `scripts/build.sh` fails when one of these folders has no notices.

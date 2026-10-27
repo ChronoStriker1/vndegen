@@ -18,7 +18,7 @@ case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;
 
 # The app's Licenses page lists the notices that each bundled runtime writes to build/<runtime>/licenses/. An app build
 # fails when one of these has none, so a missing notice can't reach a release. A new runtime adds its name here.
-licensed=(rclone renpy app)
+licensed=(rclone renpy kirikiri app)
 require_licenses() {
   local runtime
   for runtime in "${licensed[@]}"; do

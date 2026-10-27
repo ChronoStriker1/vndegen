@@ -65,7 +65,7 @@ targets:
             exit 0
           fi
           "$SRCROOT/scripts/renpy-runtime.sh" "$SRCROOT/build/renpy"
-          rsync -a --delete --exclude .vndegen-runtime --exclude ios "$SRCROOT/build/renpy/" "$dest/"
+          rsync -a --delete --exclude .vndegen-runtime --exclude ios --exclude licenses "$SRCROOT/build/renpy/" "$dest/"
           binaries=("$dest"/8/lib/py3-mac-universal/{python,librenpython.dylib} "$dest"/7/lib/py2-mac-universal/{python,librenpython.dylib})
           for binary in "${binaries[@]}"; do
             codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$binary"
