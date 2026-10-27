@@ -91,8 +91,10 @@ rsync -a --checksum --delete "$work/fresh/subprojects/" "$work/subprojects/"
 rm -rf "$work/fresh"
 
 # Stage 1, cached by its inputs: the core with its patches, and the tools. Its Makefile expects GNU sed and grep, and an
-# echo that prints backslashes as they are, as Linux's /bin/sh does but macOS's does not, so it runs under bash.
-stage1_stamp=$( (echo "$core_commit $wasi_sdk_sha256 $binaryen_sha256"; cat "$src"/patches/*.patch) | shasum -a 256 | cut -c1-16)
+# echo that prints backslashes as they are, as Linux's /bin/sh does but macOS's does not, so it runs under bash. Bump
+# stage1_format to rebuild every cached stage 1, as 2 did for caches an earlier build made without starting clean.
+stage1_format=2
+stage1_stamp=$( (echo "$stage1_format $core_commit $wasi_sdk_sha256 $binaryen_sha256"; cat "$src"/patches/*.patch) | shasum -a 256 | cut -c1-16)
 stage1="$cache/stage1-$stage1_stamp"
 if [ ! -f "$stage1/.complete" ]; then
   echo "Building RGSS stage 1, Ruby through WebAssembly to C. This takes a while the first time."
