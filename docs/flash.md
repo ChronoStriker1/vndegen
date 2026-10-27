@@ -49,6 +49,18 @@ controllers, arrives as synthetic mouse events, which `flash.js` turns into poin
 reads keys only while it has focus, so the player takes focus again when the game resumes. Flash Player read no
 gamepad, so games start with the Keyboard and mouse layout.
 
+## Fonts
+
+Most movies embed their fonts. Device text, drawn in a font the computer has, goes through the browser
+(`deviceFontRenderer: 'canvas'`), so it gets VNDegen's Windows font substitutes from `docs/fonts.md` under their Windows
+names: a movie that asks for MS Gothic gets Ume Gothic. Flash's generic fonts, `_sans`, `_serif`, and `_typewriter` and
+their Japanese names `_ゴシック`, `_明朝`, and `_等幅`, become one family each, as Japanese Windows drew them: Latin text in
+Arial, Times New Roman, or Courier New (the device's own where it has them, else Liberation), and other text in the MS UI
+Gothic, MS PMincho, or MS Gothic substitute. `FlashFonts` builds those families from `FontPack`, and they load before
+the movie does. Many movies name fonts from an Office install, such as the HG and DF Japanese fonts, which Windows
+itself lacked, and drew them in the system's UI font. Every font Ruffle asks the browser for falls back to the `_sans`
+family here for the same reason.
+
 ## Saves
 
 Flash games save to shared objects. Ruffle keeps them in localStorage, Base64-encoded under

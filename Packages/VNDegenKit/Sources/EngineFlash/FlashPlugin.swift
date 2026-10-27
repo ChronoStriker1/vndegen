@@ -41,8 +41,9 @@ nonisolated public struct FlashPlugin: EnginePlugin {
               let ruffleScript = try? String(contentsOf: ruffle.appendingPathComponent("ruffle.js"), encoding: .utf8)
         else { throw FlashError.ruffleMissing }
         guard let host = Bundle.module.url(forResource: "flash", withExtension: "html")?.deletingLastPathComponent(),
-              let pageScript = try? String(contentsOf: host.appendingPathComponent("flash-page.js"), encoding: .utf8)
+              let pageSource = try? String(contentsOf: host.appendingPathComponent("flash-page.js"), encoding: .utf8)
         else { throw FlashError.hostMissing }
+        let pageScript = try FlashFonts.pageScript(pageSource)
         let entry = Self.entry(for: game, dataDirectory: launch.dataDirectory)
         var folder = GameFolder(root: launch.folder, webRoot: "")
         folder.mounts = [Self.hostPath: host, Self.hostPath + "ruffle/": ruffle]

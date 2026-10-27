@@ -36,6 +36,7 @@ import AppKit
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
 ///   -windowSize 900x600      resizes the window before the snapshot
+///   -ignoreOcclusion YES     web engine pages keep running while no window shows, as on a Mac whose screen is locked, macOS only
 enum DebugHooks {
     static func run(_ hub: Hub) async {
         listenForInput(hub)

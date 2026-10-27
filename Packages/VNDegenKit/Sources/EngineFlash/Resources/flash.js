@@ -19,7 +19,10 @@
     // For comparing Ruffle's renderers and reading the movie's trace() output: ?renderer=webgl&log=info.
     if (params.get('renderer')) options.preferredRenderer = params.get('renderer');
     if (params.get('log')) options.logLevel = params.get('log');
-    ruffle.load(options).then(() => player.focus(), (error) => console.error('flash: could not load ' + movie + ': ' + error));
+    // The generic fonts load first, for at most a few seconds, so the movie's first text is drawn in them.
+    const fontsLoaded = Promise.race([window.__vndegenFlashFonts, new Promise((done) => setTimeout(done, 3000))]);
+    fontsLoaded.then(() => ruffle.load(options))
+        .then(() => player.focus(), (error) => console.error('flash: could not load ' + movie + ': ' + error));
 
     // A projector's Quit button sends fscommand("quit"), which ends the session as quitting the projector would. The
     // other commands set up the projector's window, which the session owns.

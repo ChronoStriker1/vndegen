@@ -134,6 +134,11 @@ final class WebGameSession: NSObject, EngineSession {
         webView.underPageBackgroundColor = .black
         #if DEBUG
         webView.isInspectable = true
+        #if os(macOS)
+        // -ignoreOcclusion YES keeps the page running while no window shows, as on a test Mac whose screen is locked,
+        // where WebKit would hide the page and stop its animation frames.
+        if UserDefaults.standard.bool(forKey: "ignoreOcclusion") { Self.setOcclusionDetection(false, of: webView) }
+        #endif
         #endif
         webView.allowsLinkPreview = false
         webView.allowsBackForwardNavigationGestures = false
@@ -165,6 +170,16 @@ final class WebGameSession: NSObject, EngineSession {
         log.notice("session released")
     }
 
+    #if DEBUG && os(macOS)
+    /// WebKit's `-[WKWebView _setWindowOcclusionDetectionEnabled:]`, for test runs only.
+    private static func setOcclusionDetection(_ enabled: Bool, of webView: WKWebView) {
+        let selector = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard let method = class_getInstanceMethod(WKWebView.self, selector) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(method), to: Setter.self)(webView, selector, enabled)
+    }
+    #endif
+
     /// What the page may use to decode Ogg Vorbis. A long track at 44.1 kHz in stereo is about 4.5 million samples a
     /// minute, so `maxSamples` allows about 11 minutes.
     struct OggLimits: Encodable {
@@ -188,7 +203,7 @@ final class WebGameSession: NSObject, EngineSession {
     }
 
     /// Where the page finds the font substitutes. No game has a folder by this name.
-    nonisolated static let fontPath = "/.vndegen/fonts/"
+    nonisolated static let fontPath = GameFolder.fontPath
 
     /// Gives the page a font face for each Windows name in the font table whose substitute is installed.
     static func fontScript(preload: Set<String>) throws -> String {

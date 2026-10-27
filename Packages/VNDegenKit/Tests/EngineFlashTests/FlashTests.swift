@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import VNCore
 import WebRuntime
+import FontPack
 @testable import EngineFlash
 
 /// `VNDEGEN_TEST_DIR` puts the games on another volume, such as a case-sensitive disk image.
@@ -164,4 +165,31 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(FlashPlugin.entry(for: flash, dataDirectory: data) == .movie(path: "Loader.swf"))
     try plugin.selectVariant(nil, for: record, dataDirectory: data)
     #expect(FlashPlugin.entry(for: flash, dataDirectory: data) == .movie(path: "Game.swf"))
+}
+
+@Test func genericFontsAreWindowsLatinFontsWithJapaneseFallbacks() throws {
+    // FontPack's state is process-wide, so this configures the folders FontPackTests and WebRuntime's FontTests do,
+    // which run at the same time: the bundled fonts, then empty files named as the Korean download's.
+    let fonts = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        .appending(path: "../../../../Engines/Shared/fonts").standardizedFileURL
+    let downloaded = FileManager.default.temporaryDirectory.appending(path: "vndegen-font-tests")
+    try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
+    for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
+        try Data().write(to: downloaded.appending(path: name), options: .atomic)
+    }
+    #expect(FontPack.configure(folders: [fonts, downloaded]))
+    let families = FlashFonts.families()
+    let sans = try #require(families["sans"])
+    #expect(sans.name == "VNDegen Flash sans")
+    #expect(sans.faces == [
+        FlashFonts.Face(local: "Arial", file: "LiberationSans-Regular.ttf", bold: false, latin: true),
+        FlashFonts.Face(local: "Arial", file: "LiberationSans-Bold.ttf", bold: true, latin: true),
+        FlashFonts.Face(local: "MS UI Gothic", file: "ume-ugo4.ttf", bold: false, latin: false),
+    ])
+    #expect(families["serif"]?.faces.map(\.file) == ["LiberationSerif-Regular.ttf", "LiberationSerif-Bold.ttf", "ume-pmo3.ttf"])
+    #expect(families["typewriter"]?.faces.map(\.file) == ["LiberationMono-Regular.ttf", "LiberationMono-Bold.ttf", "ume-tgo4.ttf"])
+
+    let script = try FlashFonts.pageScript("const fonts = __VNDEGEN_FLASH_FONTS__;")
+    #expect(script.contains("vndegen:\\/\\/game\\/.vndegen\\/fonts\\/") || script.contains("vndegen://game/.vndegen/fonts/"))
+    #expect(!script.contains("__VNDEGEN_FLASH_FONTS__"))
 }
