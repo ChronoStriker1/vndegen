@@ -39,6 +39,117 @@
         patched.add(VorbisDecoder);
     }, true);
 
+    // Input reads keys and the gamepad as state once per engine update, so a key that went down and up between two
+    // updates never counted, and neither did a press that came right after a release. Battles on an iPad simulator ran
+    // at about 25 frames a second with two updates per frame, and about a fifth of Enter taps at 12 a second were
+    // lost. Key handlers still run as each key event arrives, with every key as it is at that moment, so the engine and
+    // its plugins see each event when it happens and can cancel it. What changes is when the button state they set
+    // reaches an update: a change to a button whose last change no update has read yet waits for the next update, so
+    // every press is down for at least one update and up before the next. A waiting release lets go only if no gamepad
+    // button holds the same button. Input.clear drops the changes still waiting, as it drops the button state they
+    // would have set. The NW.js shim does the same for the gamepad.
+    //
+    // VisuMZ's Core Engine, which many MZ games use, stops reading the gamepad for Input.keyRepeatWait frames (0.4 s)
+    // after every Input.clear, so that a button held through the clear does not press again. Plugins clear input often:
+    // VisuMZ's QTE system clears it as each timed attack starts and on each hit, so every gamepad press in the next
+    // 0.4 s was lost, and the touch gamepad and controllers, which reach the game as a gamepad, could not land a chain
+    // of timed hits that keyboard and touch players could. Here a clear that starts such a wait ends it at once. New
+    // presses count at once, and a button held through the clear stays held and acts again when the wait would have
+    // ended, as it did with the wait, so a held direction still scrolls a menu.
+    //
+    // Plugins replace these methods as they load, so each is wrapped again after every script loads, and the wrappers
+    // nest. Only the outermost one acts. Input binds its key handlers when the game starts, after its plugins have
+    // loaded.
+    const wrapped = new WeakSet();
+    // Per button, such as 'ok', with changes waiting: the state updates read now, and the states waiting to follow
+    // it. Also the buttons whose last change has reached Input with no update reading it yet.
+    const waiting = new Map(), buttonChanged = new Set();
+    // Key events already handled by an outer wrapper, which inner ones pass straight on.
+    const routed = new WeakSet();
+    let updating = 0;
+    function wrap(input, name, make) {
+        const original = input[name];
+        if (typeof original !== 'function' || wrapped.has(original)) return;
+        input[name] = make(original);
+        wrapped.add(input[name]);
+    }
+    function padHolds(input, name) {
+        return (input._gamepadStates || []).some((pad) => !!pad && pad.some((down, index) => down
+            && input.gamepadMapper && input.gamepadMapper[index] === name));
+    }
+    function keyEvent(handler, input, event) {
+        if (routed.has(event)) return handler.call(input, event);
+        routed.add(event);
+        const name = input.keyMapper && input.keyMapper[event.keyCode];
+        const state = input._currentState;
+        if (!name || !state) return handler.call(input, event);
+        // Handlers see each button as it is now, then updates see what they have not read yet.
+        for (const [button, queue] of waiting) state[button] = queue.states[queue.states.length - 1];
+        const before = !!state[name];
+        let result;
+        try {
+            result = handler.call(input, event);
+        } finally {
+            // A handler that cleared Input, as MZ does for Num Lock, left nothing waiting.
+            if (input._currentState === state) {
+                const after = !!state[name];
+                const queue = waiting.get(name);
+                if (after !== before) {
+                    if (queue) queue.states.push(after);
+                    else if (buttonChanged.has(name)) waiting.set(name, { shown: before, states: [after] });
+                    else buttonChanged.add(name);
+                }
+                for (const [button, queue] of waiting) state[button] = queue.shown;
+            }
+        }
+        return result;
+    }
+    document.addEventListener('load', () => {
+        const input = window.Input;
+        if (!input) return;
+        wrap(input, 'update', (update) => function () {
+            if (updating++ === 0 && this._currentState) {
+                for (const [name, queue] of waiting) {
+                    if (buttonChanged.has(name)) continue;
+                    queue.shown = queue.states.shift() || padHolds(this, name);
+                    this._currentState[name] = queue.shown;
+                    if (!queue.states.length) waiting.delete(name);
+                    buttonChanged.add(name);
+                }
+            }
+            try {
+                return update.apply(this, arguments);
+            } finally {
+                if (--updating === 0) buttonChanged.clear();
+            }
+        });
+        wrap(input, '_onKeyDown', (onKeyDown) => function (event) { return keyEvent(onKeyDown, this, event); });
+        wrap(input, '_onKeyUp', (onKeyUp) => function (event) { return keyEvent(onKeyUp, this, event); });
+        wrap(input, 'clear', (clear) => function () {
+            waiting.clear();
+            buttonChanged.clear();
+            const held = (this._gamepadStates || []).map((state) => (state ? state.slice() : state));
+            const result = clear.apply(this, arguments);
+            const wait = this._gamepadWait;
+            if (wait > 0 && this.gamepadMapper && this._currentState && this._previousState) {
+                this._gamepadWait = 0;
+                this._gamepadStates = held;
+                for (const state of held) {
+                    (state || []).forEach((down, index) => {
+                        const name = this.gamepadMapper[index];
+                        if (!down || !name) return;
+                        this._currentState[name] = this._previousState[name] = true;
+                        // Input counts _pressedTime up while the latest button is held and presses it at 0, the
+                        // update after the wait's last one, as the Core Engine's next read of the gamepad would.
+                        this._latestButton = name;
+                        this._pressedTime = -wait - 1;
+                    });
+                }
+            }
+            return result;
+        });
+    }, true);
+
     // MZ's _onFetch tells the decoder a sound has finished loading only when chunks are left over at the end. When
     // _updateBufferOnFetch has just passed the last one on, the decoder never hears it: an Ogg decoder stays open with
     // its last seconds undecoded, and a sound decoded in WebKit, which waits for the whole file, never plays. At the end
