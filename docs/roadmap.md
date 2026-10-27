@@ -20,6 +20,9 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
 - RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
+- No Socks RPG's "RangeError: length cannot be negative" when warping to Patchwork on iPad (`ws/nosocks-warp-error`).
+
+Merged into `dev`, shown in the app once the KiriKiri branch adds the Licenses page: the build writes the license notices of rclone and its Go modules, Ren'Py and its libraries, and the code built into the app.
 
 ## Next
 1. Together, as the next work:
