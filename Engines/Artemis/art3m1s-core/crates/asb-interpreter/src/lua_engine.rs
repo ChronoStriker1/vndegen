@@ -1564,7 +1564,7 @@ fn apply_system_var_query_inner(
     }
 }
 
-/// 随机整数（非负 31 位），对应 Artemis 的 `e:random()`。
+/// 随机整数（0 到 65535），对应 Artemis 的 `e:random()`。
 ///
 /// 注意：游戏脚本里清一色是 `e:random() % N + 1` 的整数取模用法（见
 /// sysvo/macro/user/config 等），因此必须返回**整数**而非 [0,1) 浮点，
@@ -1580,8 +1580,10 @@ fn rand_i64() -> i64 {
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407);
     STATE.store(x, Ordering::Relaxed);
-    // 取高位做 31 位非负整数
-    ((x >> 33) & 0x7fff_ffff) as i64
+    // Artemis returns 0 to 65535. Games scale it, as in `floor(e:random() / 32768)`
+    // for 0 or 1, and retry while the result is too large, so a wider range
+    // recursed until the Lua stack overflowed (VNDegen).
+    ((x >> 48) & 0xffff) as i64
 }
 
 /// 初始化 Lua 环境，注入 engine 对象
