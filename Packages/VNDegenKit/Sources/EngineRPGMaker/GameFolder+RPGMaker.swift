@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import WebRuntime
 
@@ -14,4 +15,24 @@ extension GameFolder {
 
     /// Where NW.js builds save: `save/` beside index.html.
     nonisolated var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
+
+    /// The Windows font names the game asks for in its plugins, plugin settings, and database, whose substitutes the
+    /// page loads before the boot scene ends. MV's core asks for SimHei in Chinese games and Dotum in Korean ones.
+    nonisolated var fontNames: Set<String> {
+        let limit = 8 << 20
+        var files = ["js/plugins.js", "data/System.json"]
+        if let plugins = resolve(servedPath: "/js/plugins"),
+           let names = try? FileManager.default.contentsOfDirectory(atPath: plugins.path) {
+            files += names.filter { $0.lowercased().hasSuffix(".js") }.map { "js/plugins/\($0)" }
+        }
+        let texts = files.compactMap { read(servedPath: "/" + $0, limit: limit) }
+        var found = FontPack.referencedNames(in: texts.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "\n"))
+        let system = read(servedPath: "/data/System.json", limit: limit)
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let locale = (system?["locale"] as? String)?.lowercased() ?? ""
+        let installed = Set(FontPack.entries.map(\.name))
+        if locale.hasPrefix("zh"), installed.contains("SimHei") { found.insert("SimHei") }
+        if locale.hasPrefix("ko"), installed.contains("Dotum") { found.insert("Dotum") }
+        return found
+    }
 }

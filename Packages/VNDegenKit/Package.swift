@@ -22,6 +22,7 @@ let package = Package(
         .library(name: "Rclone", targets: ["Rclone"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
         .library(name: "RuntimePackages", targets: ["RuntimePackages"]),
+        .library(name: "FontPack", targets: ["FontPack"]),
     ],
     targets: [
         .target(name: "VNCore"),
@@ -29,10 +30,14 @@ let package = Package(
         // module that draws a screen.
         .target(name: "ControllerUI", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "GameInput", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "WebRuntime", dependencies: ["VNCore"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
+        // Windows font substitutes. CVNFont's files are links to Engines/Shared/vnfont.[ch], which the native engines
+        // compile too.
+        .target(name: "CVNFont"),
+        .target(name: "FontPack", dependencies: ["CVNFont", "VNCore"]),
+        .target(name: "WebRuntime", dependencies: ["VNCore", "FontPack"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
-        .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
-        .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that Ren'Py loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore", "CRenPy"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
         // Runs Ren'Py inside the app on iOS. Ren'Py's static libraries are linked by the app target, not here.
@@ -46,7 +51,7 @@ let package = Package(
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "ControllerUI", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "ControllerUI", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages", "FontPack"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore", "ControllerUI", "Rclone"]),
         // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
         .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
@@ -62,7 +67,7 @@ let package = Package(
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
         .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
-        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
         // RenPyCompat is built for the tests, which run it as a command.
@@ -79,5 +84,6 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
+        .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ]
 )

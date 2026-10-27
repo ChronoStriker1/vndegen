@@ -24,6 +24,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen, not in split screen or a window. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
+- **Windows fonts.** Games that ask for MS Gothic, MS Mincho, Arial, Tahoma, and other Windows fonts by name get free fonts with the same metrics, as under Proton, so their text wraps and fits as designed. Chinese and Korean fonts are a download in Settings.
 - **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py renders through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad, both on Metal.
 
 <p align="center">
@@ -103,6 +104,10 @@ A controller's Home button, the touch gamepad's house button, the small menu but
   <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a cross D-pad, Xbox A B X Y buttons, LB RB LT RT shoulder buttons, a home button, and View and Menu buttons over No Socks RPG gameplay, with the player on the beach map">
   <img src="docs/screenshots/unlock.jpg" width="200" alt="Passcode keypad for unlocking hidden games, with a controller focus ring on one key">
 </p>
+
+## Fonts
+
+PC games name Windows fonts that VNDegen can't ship. Like Proton, VNDegen bundles freely licensed fonts with the same metrics and gives each the Windows name the game asks for: Ume fonts for MS Gothic, MS PGothic, MS UI Gothic, MS Mincho, and MS PMincho, Liberation for Arial, Times New Roman, and Courier New, and DejaVu Sans Condensed for Tahoma. A device font with that name, such as Arial on Apple systems, comes first. Chinese and Korean games need Source Han Sans, which Settings, Fonts downloads from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean. Games started after a download use it. One table, `Engines/Shared/fonts/fonts.tsv`, maps the names, and every engine reads it through `vnfont.h` or the `FontPack` module. [docs/fonts.md](docs/fonts.md) lists the fonts, where they come from, and how closely they match.
 
 ## Metadata sources
 
@@ -189,6 +194,8 @@ Packages/VNDegenKit/
   Sources/EngineRGSS/     RPG Maker XP, VX, and VX Ace: detection, the RTPs they need, saves, and the in-process session
   Sources/CRGSS/          vnrgss.h, the RGSS engine's C interface
   Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
+  Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
+  Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/ControllerUI/   controller focus ring, the on-screen keyboard, and controller scrolling
@@ -200,6 +207,7 @@ Packages/VNDegenKit/
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
 Engines/RGSS/             the RGSS engine's frontend, patches, and build files; UPSTREAM.md lists the pinned sources
 Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
+Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, simulator, and Ren'Py runtime helpers
 project.yml               XcodeGen project definition
@@ -214,6 +222,8 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
 
 Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins.
+
+An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [docs/fonts.md](docs/fonts.md).
 
 ## License
 
