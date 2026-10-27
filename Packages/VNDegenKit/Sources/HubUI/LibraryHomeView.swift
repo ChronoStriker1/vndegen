@@ -100,8 +100,14 @@ struct TopBar: View {
 
     var body: some View {
         HStack(spacing: metrics.isCompact ? 8 : 12) {
-            Wordmark()
-            Spacer()
+            // A narrow iPad window has no room for the name beside the buttons, and less still beside its window controls.
+            ViewThatFits(in: .horizontal) {
+                Wordmark()
+                Wordmark(showsName: false)
+            }
+            .layoutPriority(1)
+            // The stack's own spacing keeps the name off the buttons, so it may use all the room up to them.
+            Spacer(minLength: 0)
             // The empty library has its own, larger Add game button.
             if !nav.visibleGames.isEmpty {
                 HubButton(target: .addGame, kind: .icon) { Image(systemName: "plus") }
@@ -116,7 +122,8 @@ struct TopBar: View {
             HubButton(target: .settingsButton, kind: .icon) { Image(systemName: "gearshape.fill") }
                 .accessibilityLabel("Settings")
         }
-        .padding(.horizontal, metrics.padding)
+        .padding(.leading, metrics.topRowPadding(.leading))
+        .padding(.trailing, metrics.topRowPadding(.trailing))
         .padding(.top, 10)
         #if os(macOS)
         .padding(.top, 18)
@@ -131,6 +138,8 @@ struct TopBar: View {
 }
 
 struct Wordmark: View {
+    var showsName = true
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "play.fill")
@@ -138,13 +147,16 @@ struct Wordmark: View {
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
                 .background(Theme.accent.gradient, in: .rect(cornerRadius: 7, style: .continuous))
-            Text("VNDEGEN")
-                .font(.display(15, weight: .black))
-                .tracking(2)
-                .foregroundStyle(.white)
-                .fixedSize()
+            if showsName {
+                Text("VNDEGEN")
+                    .font(.display(15, weight: .black))
+                    .tracking(2)
+                    .foregroundStyle(.white)
+                    .fixedSize()
+            }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("VNDegen")
     }
 }
 
