@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.5.0",
+          "buildVersion": "267",
+          "date": "2026-10-27T04:24:58Z",
+          "localizedDescription": "Adds RPG Maker XP, VX and VX Ace on Mac, iPhone and iPad, with the RPG Maker RTP downloaded and installed from inside the app. Settings now lists the license of every third-party component in the app.\n\n## Downloads\n\n- `VNDegen-0.5.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.5.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- RPG Maker XP, VX and VX Ace games run on Mac, iPhone and iPad, inside VNDegen, on mkxp-z. Packed games (`Game.rgssad`, `Game.rgss2a`, `Game.rgss3a`) and unpacked ones both work, and saves made on a PC load.\n- A game that needs the RPG Maker RTP offers to download and install it. VNDegen fetches the official RTP installer for XP, VX or VX Ace from the RPG Maker website, checks it against a recorded checksum, shows the RTP's license to accept, and unpacks it inside the app. Every game that needs that RTP shares the one install. Import from folder also works.\n- Settings, Licenses lists the license of every third-party component in the app and where to get its source.\n\n## Fixed\n\n- On iPhone and iPad, the app could crash as a game started on a busy device, when iOS reported a rotation request from a background thread.\n\n## Changed\n\n- Builds that include the RPG Maker XP, VX and VX Ace engine contain mkxp-z, which is GPL-licensed, so the IPA and the Mac app are now distributed under the GNU GPL, version 3. VNDegen's own code stays under the MIT License. The README's License section explains why version 3. This is not legal advice.\n\n## Known limits\n\n- On Mac, RPG Maker XP, VX and VX Ace games need Apple silicon. On an Intel Mac they show as unsupported, and everything else works.\n- Tested with four library games on the Mac and the iPhone simulator, not yet on a real device. Japanese text in games that ship no font of their own has not been checked.\n- No Socks RPG can still show \"RangeError: length cannot be negative\" on iPad. The fix in 0.4.4 did not cover every case, and the cause is still being worked on.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.5.0/VNDegen-0.5.0.ipa",
+          "size": 61488006,
+          "sha256": "f2ef2034d7d42454e6222dae01703568f6540e43d070f63fa66601ea5621c9cf",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.4.4",
           "buildVersion": "246",
           "date": "2026-10-27T00:53:09Z",
