@@ -378,7 +378,12 @@
                 if (video.currentSrc !== url || state.mode === 'done') return;
                 state.length = timeline ? timeline.length : 0;
                 state.times = timeline && timeline.times;
-                if (state.mode === 'ready') finishKeeping(state, performance.now());
+                if (state.mode === 'ready') {
+                    finishKeeping(state, performance.now());
+                } else if (state.mode === 'keeping' && keptAll(state)) {
+                    state.position = state.last;
+                    finishKeeping(state, performance.now());
+                }
             });
         }
         // A pass ends where the time goes back to the start. A clip at 60 fps has more than one frame near the start.
@@ -401,10 +406,14 @@
         canvas.getContext('2d').drawImage(video, 0, 0);
         state.frames.push({ time, canvas });
         // With the file's frame times, the pass is whole at its last frame, before WebKit stalls at its end.
-        if (state.times && state.times.every((start) => state.frames.some((frame) => Math.abs(frame.time - start) < 0.002))) {
+        if (keptAll(state)) {
             state.position = time;
             finishKeeping(state, now);
         }
+    }
+
+    function keptAll(state) {
+        return !!state.times && state.times.every((start) => state.frames.some((frame) => Math.abs(frame.time - start) < 0.002));
     }
 
     // Plays the kept frames once the file's length is known, null while it is being read. A video whose length cannot
@@ -460,6 +469,7 @@
         try {
             while (at < data.byteLength) {
                 const id = read(true), size = read(false), body = at;
+                if (size !== Infinity && body + size > data.byteLength) throw new RangeError('cut short');
                 if (containers.includes(id)) {
                     if (id === 0xae) entry = {};
                     continue;
@@ -480,14 +490,16 @@
                 } else if (id === 0xe7) {
                     cluster = number();
                 } else if (id === 0xa3 || id === 0xa1) {
-                    // A SimpleBlock or Block starts with its track and its time after the Cluster's.
+                    // A SimpleBlock or Block starts with its track, its time after the Cluster's, and flags. A laced
+                    // block holds more than one frame under that one time.
                     const track = read(false);
+                    if ((videoTrack === null || track === videoTrack) && data.getUint8(at + 2) & 0x06) throw new RangeError('laced');
                     blocks.push({ track, time: cluster + data.getInt16(at) });
                 }
                 at = body + size;
             }
         } catch (e) {
-            // A frame list cut short would end a pass early, so a file that does not read to its end gives none.
+            // A frame list that may be short would end a pass early, so a file that does not read cleanly gives none.
             blocks = [];
         }
         if (!(duration > 0 && scale > 0)) return null;

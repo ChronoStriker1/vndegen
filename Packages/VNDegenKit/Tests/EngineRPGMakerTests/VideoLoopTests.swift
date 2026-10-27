@@ -199,3 +199,27 @@ private let setUp = """
     // seek to 0 shows the first frame, and after the pause only the 10 ms since it count, then 20 ms.
     #expect(values["frames"] as? [Int] == [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 0, 0, 1])
 }
+
+/// The file's frame times arrive only after the last frame has been kept. The kept frames take over then, without
+/// waiting for the video to wrap.
+@Test @MainActor func keptFramesTakeOverWhenTheFrameTimesArriveLate() async throws {
+    let values = try await runWithVideo("""
+        let release;
+        held = new Promise((done) => { release = done; });
+        texture.update();
+        for (const index of [0, 1, 2, 3]) {
+            present(index);
+            now += 140;
+        }
+        release();
+        await lengthRead();
+        const frames = [shown()];
+        const kept = resource.uploaded[resource.uploaded.length - 1] !== video;
+        now += 300;
+        frames.push(shown());
+        return { frames, kept };
+        """)
+    // The fourth frame shows from the moment the times arrive, then 0.3 s later the next pass has started.
+    #expect(values["frames"] as? [Int] == [3, 0])
+    #expect(values["kept"] as? Bool == true)
+}
