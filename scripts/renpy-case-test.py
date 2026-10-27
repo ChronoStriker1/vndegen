@@ -187,6 +187,18 @@ try:
     finally:
         os.chdir(here)
 
+    # A file descriptor opens as before.
+    fd = os.open(os.path.join(base, "Game", "Fd.txt"), os.O_WRONLY | os.O_CREAT, 0o644)
+    with os.fdopen(fd, "w") as f:
+        f.write("fd")
+    check(read(os.path.join(images, "..", "fd.TXT")) == "fd", "os.fdopen of a descriptor writes")
+    os.remove(os.path.join(base, "Game", "Fd.txt"))
+    # A case-only rename of bytes paths.
+    write(os.path.join(base, "Game", "Images", "Bytes.txt"), "b")
+    os.rename(os.path.join(images, "bytes.txt").encode("utf-8"), os.path.join(images, "BYTES.TXT").encode("utf-8"))
+    check("BYTES.TXT" in real_names(os.path.join(base, "Game", "Images")), "a case-only rename of bytes paths changes the case")
+    os.remove(os.path.join(images, "BYTES.TXT"))
+
     # A call relative to a folder descriptor isn't resolved against the current folder.
     if hasattr(os, "O_DIRECTORY") and not PY2:
         other = os.path.join(work, "other")

@@ -86,16 +86,16 @@ public struct LudusaviStore: Sendable {
         var spellings: [Int: [String: String]] = [:]
         func spelled(_ relative: String, in location: Int) -> String {
             var parts = relative.split(separator: "/").map(String.init)
-            var known = spellings[location, default: [:]]
             for index in parts.indices {
-                let key = parts[...index].joined(separator: "/").lowercased()
-                if let earlier = known[key] {
+                // Folded as FileCase compares names: ignoring case, with canonically equivalent forms equal.
+                let key = parts[...index].joined(separator: "/").precomposedStringWithCanonicalMapping
+                    .folding(options: .caseInsensitive, locale: nil)
+                if let earlier = spellings[location]?[key] {
                     parts[index] = earlier
                 } else {
-                    known[key] = parts[index]
+                    spellings[location, default: [:]][key] = parts[index]
                 }
             }
-            spellings[location] = known
             return parts.joined(separator: "/")
         }
         for (path, stored) in files.sortedByKey {

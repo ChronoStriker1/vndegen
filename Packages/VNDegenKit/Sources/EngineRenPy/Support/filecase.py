@@ -221,7 +221,8 @@ def _creates(args, kwargs):
 
 
 def open(file, *args, **kwargs):
-    if _creates(args, kwargs):
+    # A file descriptor, as os.fdopen passes, has no name to resolve.
+    if _creates(args, kwargs) and not isinstance(file, int):
         real = resolve(file)
         new = not _exists(real)
         result = _open(real, *args, **kwargs)
@@ -233,7 +234,8 @@ def open(file, *args, **kwargs):
 
 
 def io_open(file, *args, **kwargs):
-    if _creates(args, kwargs):
+    # A file descriptor, as os.fdopen passes, has no name to resolve.
+    if _creates(args, kwargs) and not isinstance(file, int):
         real = resolve(file)
         new = not _exists(real)
         result = _io_open(real, *args, **kwargs)
@@ -285,7 +287,8 @@ def _destination(real_src, dst):
     real = resolve(dst)
     # A rename that only changes case finds its own source. It keeps the new spelling, in the folder as it is on disk.
     if real is not dst and _absolute(real) == _absolute(real_src):
-        return os.path.join(os.path.dirname(_absolute(real)), os.path.basename(dst))
+        # `real` is a changed path, so it is absolute and of the same type as `dst`, text or bytes.
+        return os.path.join(os.path.dirname(real), os.path.basename(dst))
     return real
 
 
