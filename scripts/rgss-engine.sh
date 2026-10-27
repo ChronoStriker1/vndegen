@@ -90,10 +90,24 @@ for patch in "$src"/patches/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$p
 for patch in "$src"/patches/stage2/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
 rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/fresh/subprojects/"
 for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$patch"; done
-# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have. The subprojects
-# Meson downloaded into either subprojects folder aren't in the fresh sources either, and the notices below read them.
-rsync -a --checksum --delete --exclude /libretro/build --filter 'P /subprojects/*/' "$work/fresh/core/" "$work/core/"
-rsync -a --checksum --delete --filter 'P /*/' "$work/fresh/subprojects/" "$work/subprojects/"
+# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have. Neither do the
+# folders Meson downloaded the fresh .wrap files' subprojects into, which the notices below read, so those stay too. A
+# folder no current wrap names, such as an older version's, goes, so its notice can't reach the app.
+# keep_downloads <subprojects folder> <its path in the copy>: adds a protect filter for each wrap's folder to `keep`.
+keep_downloads() {
+  local wrap dir
+  for wrap in "$1"/*.wrap; do
+    [ -f "$wrap" ] || continue
+    dir=$(sed -n 's/^directory *= *//p' "$wrap" | head -n 1 | tr -d '\r')
+    keep+=(--filter "protect $2/${dir:-$(basename "$wrap" .wrap)}/")
+  done
+}
+keep=()
+keep_downloads "$work/fresh/core/subprojects" /subprojects
+rsync -a --checksum --delete --exclude /libretro/build ${keep[@]+"${keep[@]}"} "$work/fresh/core/" "$work/core/"
+keep=()
+keep_downloads "$work/fresh/subprojects" ""
+rsync -a --checksum --delete ${keep[@]+"${keep[@]}"} "$work/fresh/subprojects/" "$work/subprojects/"
 rm -rf "$work/fresh"
 
 # Stage 1, cached by its inputs: the core with its patches outside stage2/, and the tools. Its Makefile expects GNU sed and grep, and an
