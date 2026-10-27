@@ -1,0 +1,680 @@
+use super::CoreRuntime;
+use super::callbacks::FfiCallbacks;
+use super::magic_path;
+use crate::Project;
+use crate::backend::{TextureData, TextureDesc, TextureUsage};
+use crate::runtime::save_io;
+use crate::text::GlyphTextRenderer;
+use asb_interpreter::{CallbackResult, Event};
+use std::sync::Arc;
+
+impl CoreRuntime {
+    /// Load a project from an in-memory system.ini string.
+    pub fn load_project(&mut self, ini_content: &str, platform: &str) -> Result<(), String> {
+        let project =
+            Project::open_from_data("", ini_content, platform).map_err(|e| e.to_string())?;
+        self.load_open_project(project)
+    }
+
+    /// Load a project from raw system.ini bytes.
+    pub fn load_project_bytes(&mut self, ini_content: &[u8], platform: &str) -> Result<(), String> {
+        let project =
+            Project::open_from_bytes("", ini_content, platform).map_err(|e| e.to_string())?;
+        self.load_open_project(project)
+    }
+
+    fn load_open_project(&mut self, project: Project) -> Result<(), String> {
+        self.gpu.begin_access();
+        let result = self.load_open_project_inner(project);
+        self.gpu.end_access();
+        result
+    }
+
+    fn load_open_project_inner(&mut self, project: Project) -> Result<(), String> {
+        // File existence results belong to the currently mounted project.
+        self.resources().clear_overrides();
+        let new_width = project.config().stage_width;
+        let new_height = project.config().stage_height;
+
+        // 如果分辨率改变，重新创建 FBO 和更新渲染器
+        if new_width != self.stage_w || new_height != self.stage_h {
+            self.resize_stage(new_width, new_height)?;
+        }
+
+        self.project_savepath = project.config().savepath.clone();
+        self.boot_script = Some(project.config().boot_script.clone());
+        self.save_screenshot = None;
+        self.loaded_font_face = None;
+        self.pending_dialog = None;
+        self.gameplay_save_checkpoint = None;
+        self.pending_load_resume = None;
+        self.pending_message_text = None;
+        self.clear_pending_text_translation();
+        self.clear_emote_state("project reload");
+        self.install_interpreter(project.create_interpreter());
+
+        self.wire_texture_source();
+        self.load_default_font();
+        self.register_builtin_textures();
+        self.seed_savepath_and_sysload();
+        self.sync_control_status_variables();
+
+        // Boot
+        self.start_configured_boot()?;
+
+        Ok(())
+    }
+
+    /// 设置上报给脚本的机种串覆盖（如 "switch"/"ps4"），None 清除。
+    /// 立即作用于当前解释器，并在项目（重）加载后保持。
+    pub fn set_reported_os(&mut self, reported: Option<String>) {
+        self.reported_os = reported.clone();
+        self.interpreter.set_reported_os(reported);
+    }
+
+    fn install_interpreter(&mut self, interpreter: asb_interpreter::Interpreter) {
+        self.interpreter = interpreter;
+        // 项目重载会重建解释器，上报机种覆盖需要在每次装载后重新应用。
+        let reported = self.reported_os.clone();
+        self.interpreter.set_reported_os(reported);
+        self.wire_engine_callbacks();
+        self.wire_file_loader();
+        self.wire_event_callback();
+    }
+
+    pub(super) fn start_configured_boot(&mut self) -> Result<(), String> {
+        let boot = self
+            .boot_script
+            .clone()
+            .ok_or_else(|| "没有记录 BOOT 脚本，无法启动".to_string())?;
+        self.start_configured_boot_for(&boot)
+    }
+
+    fn start_configured_boot_for(&mut self, boot: &str) -> Result<(), String> {
+        self.interpreter
+            .load_external_script(boot)
+            .map_err(|e| format!("加载 BOOT 脚本 {boot} 失败: {e:?}"))?;
+        if let Some(script) = self.interpreter.get_script(boot) {
+            for label in ["top", "main", "start", "_start"] {
+                if script.get_label_line(label).is_some() {
+                    return self
+                        .interpreter
+                        .start(boot, label)
+                        .map_err(|e| format!("启动 BOOT 脚本 {boot} 失败: {e:?}"));
+                }
+            }
+        }
+        self.interpreter
+            .boot(boot)
+            .map_err(|e| format!("启动 BOOT 脚本 {boot} 失败: {e:?}"))
+    }
+
+    fn wire_engine_callbacks(&mut self) {
+        self.interpreter
+            .set_engine_callbacks(Box::new(FfiCallbacks {
+                input: Arc::clone(&self.input),
+                magic_paths: Arc::clone(&self.magic_paths),
+                layer_info: Arc::clone(&self.layer_info),
+                resources: self.resources().clone(),
+                volumes: Arc::clone(&self.volumes),
+                debug_skip_active: Arc::clone(&self.debug_skip_active),
+                script_status: Arc::clone(&self.script_status),
+                emote: Arc::clone(&self.emote),
+            }));
+    }
+
+    fn wire_file_loader(&mut self) {
+        // Project::create_interpreter already installs a local loader when no
+        // host file callback exists. Keep it for headless/standalone runtime
+        // tests; production FFI projects use the magic-path-aware loader.
+        if !self.resources().is_mounted() {
+            return;
+        }
+        // Override the file loader with magic-path-aware FFI version.
+        // Scripts can reference files via `:name/rest` notation; the
+        // default loader (from create_interpreter) doesn't resolve these.
+        let magic_paths_loader = Arc::clone(&self.magic_paths);
+        let resources = self.resources().clone();
+        self.interpreter
+            .set_file_loader(Box::new(move |name: &str| {
+                let resolved = magic_path::resolve_path(&magic_paths_loader, name);
+                resources.read_file(&resolved).map_err(|m| {
+                    asb_interpreter::Error::IoError(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        m,
+                    ))
+                })
+            }));
+    }
+
+    fn wire_texture_source(&mut self) {
+        // Replace the backend texture source with the current project's
+        // magic-path-aware FFI source.
+        let project_name = self
+            .interpreter
+            .config()
+            .env
+            .get("TITLE")
+            .cloned()
+            .unwrap_or_default();
+        let magic_paths_tex = Arc::clone(&self.magic_paths);
+        let resources = self.resources().clone();
+        self.gpu
+            .replace_asset_source(Box::new(move |name: &str| -> Option<Vec<u8>> {
+                let resolved = magic_path::resolve_path(&magic_paths_tex, name);
+                for try_path in [format!("{resolved}.png"), resolved.clone()] {
+                    match resources.read_file(&try_path).ok() {
+                        Some(bytes) => {
+                            return Some(bytes);
+                        }
+                        None => {
+                            crate::core_debug!(
+                                "[{project_name}] TEX TRY: {name} → {try_path} MISS"
+                            );
+                        }
+                    }
+                }
+                crate::core_debug!("[{project_name}] TEX MISS: {name} → {resolved}");
+                None
+            }));
+    }
+
+    fn wire_event_callback(&mut self) {
+        let events_cb = Arc::clone(&self.events);
+        let engine_ctx = Arc::clone(self.interpreter.engine_context());
+        let layer_info_cb = Arc::clone(&self.layer_info);
+        let exit_requested_cb = Arc::clone(&self.exit_requested);
+        self.interpreter.set_callback(move |e| {
+            let text_source = if matches!(e, Event::ScenarioText { .. }) {
+                engine_ctx.lock().unwrap().scenario_text_source.clone()
+            } else {
+                None
+            };
+            if matches!(e, Event::Exit) {
+                crate::core_info!("[CoreRuntime] Event::Exit received, setting exit flag");
+                exit_requested_cb.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            // Only fullscreen videos block script execution. Layer videos are visual effects
+            // owned by the scene and may loop indefinitely.
+            let pause = event_requires_host_pause(&e);
+            if super::layer_info::LayerQueryState::observes(&e) {
+                layer_info_cb.lock().unwrap().observe(&e);
+            }
+            events_cb.lock().unwrap().push(super::events::RuntimeEvent {
+                event: e,
+                text_source,
+            });
+            if pause {
+                CallbackResult::Pause
+            } else {
+                CallbackResult::Continue
+            }
+        });
+    }
+
+    /// 脚本尚未指定字体前尝试加载的缺省字体（项目常见随包字体）。
+    /// 不存在也无妨：等脚本 [font face=..] 到来再加载。
+    const DEFAULT_FONT_PATH: &'static str = "font/sourcehansans-medium.otf";
+
+    fn load_default_font(&mut self) {
+        let mut text = GlyphTextRenderer::new();
+        let mut errors = Vec::new();
+        for candidate in std::iter::once(Self::DEFAULT_FONT_PATH.to_string()).chain(
+            super::text::font_fallback_candidates(Self::DEFAULT_FONT_PATH),
+        ) {
+            match self
+                .resources
+                .read_file(&candidate)
+                .and_then(|font| text.set_font_owned(font))
+            {
+                Ok(()) => {
+                    if candidate != Self::DEFAULT_FONT_PATH {
+                        crate::core_info!(
+                            "[CoreRuntime] 默认字体回退: {} -> {candidate}",
+                            Self::DEFAULT_FONT_PATH
+                        );
+                    }
+                    self.loaded_font_face = Some(Self::DEFAULT_FONT_PATH.to_string());
+                    break;
+                }
+                Err(error) => errors.push(format!("{candidate}: {error}")),
+            }
+        }
+        if self.loaded_font_face.is_none() {
+            crate::core_debug!(
+                "[CoreRuntime] 默认字体不可用，等待脚本指定字体: {}",
+                errors.join("; ")
+            );
+        }
+        self.set_text_renderer(Box::new(text));
+        // 覆盖字体在项目加载前就可能已安装；渲染器是新建的，缓存为空，
+        // 这里立即应用，保证首个 font 事件之前的文本也用覆盖字体。
+        if let Some((generation, bytes)) = crate::ffi::font_override() {
+            let mut cached = self.font_override_cached_generation;
+            let applied = self.text_renderer.as_mut().is_some_and(|renderer| {
+                super::text::apply_font_override(renderer.as_mut(), &mut cached, generation, &bytes)
+            });
+            if applied {
+                self.font_override_cached_generation = cached;
+                self.font_override_generation = Some(generation);
+            }
+        }
+    }
+
+    fn register_builtin_textures(&mut self) {
+        let mut desc = TextureDesc::sampled_rgba8(2, 2);
+        desc.usage |= TextureUsage::CPU_READABLE;
+        let black = [0, 0, 0, 255].repeat(4);
+        let white = [255, 255, 255, 255].repeat(4);
+        let _ = self
+            .gpu
+            .create_texture(":bg/black", desc, TextureData::Rgba8(&black));
+        let _ = self
+            .gpu
+            .create_texture(":bg/white", desc, TextureData::Rgba8(&white));
+    }
+
+    fn seed_savepath_and_sysload(&mut self) {
+        // Seed `s.savepath` —— 真实 Artemis 由引擎按 system.ini 的 SAVEPATH 种入此系统
+        // 变量；脚本到处用 `e:var("s.savepath").."/"..file` 拼存档/缩略图路径，且 boot
+        // 期间（boot.lua）就会读取它来检测既有存档，故必须在 start_boot 之前种好。
+        //
+        // 我们把它当作沙箱内的逻辑相对子目录前缀：所有存档路径形如
+        // `<savepath>/save0001.dat`，由宿主统一解析到 appSupport 基准下（方案 A1 +
+        // save-files-in-app-sandbox）。原始 SAVEPATH 可能含反斜杠/CSIDL（如
+        // hamidashi 的 `まどそふと\ハミダシクリエイティブ`），这里规范化为正斜杠
+        // 相对路径，缺省退回 `save`。
+        let savepath = save_io::sanitize_savepath(self.project_savepath.as_deref());
+        self.interpreter.set_variable(
+            "s.savepath",
+            asb_interpreter::Value::String(savepath.clone()),
+        );
+        self.savepath = savepath;
+
+        // 读回上次 syssave() 落下的全局/系统域（saveg.dat / system.dat），使
+        // boot.lua 期间 system_dataloading() 能拿到既有的 sys/gscr/conf。
+        // 必须在 start_boot 之前，且在 s.savepath 种好之后（save_path_for 依赖它）。
+        self.sysload();
+        // 已读记录跨会话恢复，使"已读跳过"有意义。
+        self.load_aread();
+    }
+}
+
+fn event_requires_host_pause(e: &Event) -> bool {
+    if super::events::event_requires_state_sync(e) {
+        return true;
+    }
+    matches!(
+        e,
+        // Lifecycle jumps must be handled by CoreRuntime before the old
+        // script can execute its following cleanup/exit instructions.
+        Event::Reset
+            | Event::GoTitle
+            | Event::LoadGame { .. }
+            | Event::Wait { .. }
+            | Event::YesNo { .. }
+            | Event::ShowDialog { .. }
+    ) || matches!(e, Event::VideoPlay { id, .. } if id.is_none())
+        || matches!(e, Event::Trans { trans_type, .. } if *trans_type != 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CoreRuntime, event_requires_host_pause};
+    use asb_interpreter::{CallbackResult, Event, ExecutionResult, Interpreter};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    #[test]
+    fn reset_uses_the_engine_reset_event() {
+        let mut interpreter = Interpreter::new(asb_interpreter::InterpreterConfig::default());
+        interpreter
+            .load_script(
+                "test",
+                r#"
+*main
+[reset]
+"#,
+            )
+            .unwrap();
+        interpreter.start("test", "main").unwrap();
+        let saw_reset = Arc::new(AtomicBool::new(false));
+        let saw_reset_c = Arc::clone(&saw_reset);
+        let saw_go_title = Arc::new(AtomicBool::new(false));
+        let saw_go_title_c = Arc::clone(&saw_go_title);
+        interpreter.set_callback(move |event| {
+            if matches!(event, Event::Reset) {
+                saw_reset_c.store(true, Ordering::SeqCst);
+            }
+            if matches!(event, Event::GoTitle) {
+                saw_go_title_c.store(true, Ordering::SeqCst);
+            }
+            CallbackResult::Continue
+        });
+        let result = interpreter.run().unwrap();
+        assert!(matches!(
+            result,
+            ExecutionResult::Completed | ExecutionResult::Wait(_)
+        ));
+        assert!(saw_reset.load(Ordering::SeqCst));
+        assert!(!saw_go_title.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn layer_video_does_not_pause_script_execution() {
+        assert!(!event_requires_host_pause(&Event::VideoPlay {
+            id: Some("1.0.effect".into()),
+            file: ":ani/snow03.ogv".into(),
+            skip: 1,
+            loop_play: true,
+            delay_margin_ms: None,
+            mode: None,
+        }));
+        assert!(event_requires_host_pause(&Event::VideoPlay {
+            id: None,
+            file: ":mov/op.ogv".into(),
+            skip: 1,
+            loop_play: false,
+            delay_margin_ms: None,
+            mode: None,
+        }));
+    }
+
+    #[test]
+    fn go_title_pauses_before_old_script_fallthrough() {
+        assert!(event_requires_host_pause(&Event::GoTitle));
+    }
+
+    #[test]
+    fn reset_pauses_before_old_script_fallthrough() {
+        assert!(event_requires_host_pause(&Event::Reset));
+    }
+
+    #[test]
+    fn load_pauses_before_old_script_fallthrough() {
+        assert!(event_requires_host_pause(&Event::LoadGame {
+            file: "slot.dat".into(),
+            trans_type: Some(0),
+        }));
+    }
+
+    #[test]
+    fn save_pauses_so_the_snapshot_is_not_a_later_wait() {
+        assert!(event_requires_host_pause(&Event::SaveGame {
+            file: "slot.dat".into(),
+        }));
+    }
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    #[test]
+    fn on_enter_frame_dummy_decide_releases_generic_wait_through_role_zero() {
+        use crate::Project;
+        use crate::backend::BackendSelection;
+        use asb_interpreter::Value;
+
+        let Ok(mut runtime) = CoreRuntime::create(8, 8, BackendSelection::from_legacy_int(0))
+        else {
+            // Headless CGL availability depends on the test session.
+            return;
+        };
+        let root = std::env::temp_dir().join(format!(
+            "art3m1s-dummy-decide-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(
+            root.join("boot.iet"),
+            r#"
+[lua]
+dummy_pending = false
+function push_handler(e, p)
+    if p.key == "1" then dummy_pending = true end
+end
+function vsync(e, p)
+    if dummy_pending then
+        dummy_pending = false
+        e:overrideKey{key=124, status=32}
+    end
+end
+__engine:setEventHandler{onEnterFrame="vsync"}
+[/lua]
+[setonpush key=1 handler="calllua" function="push_handler"]
+[keyconfig role=0 keys=124]
+[var name=before data=1]
+[@]
+[var name=after data=1]
+[stop]
+"#,
+        )
+        .unwrap();
+        let project = Project::open_from_data(
+            &root,
+            "[WINDOWS]\nWIDTH=8\nHEIGHT=8\nBOOT=boot.iet\nCHARSET=UTF-8\n",
+            "windows",
+        )
+        .unwrap();
+        runtime.load_open_project(project).unwrap();
+
+        runtime.advance_without_render(17);
+        assert_eq!(
+            runtime.interpreter.get_variable("before"),
+            Some(Value::Int(1))
+        );
+        assert_eq!(runtime.interpreter.get_variable("after"), None);
+        assert!(matches!(
+            runtime.wait_reason,
+            Some(asb_interpreter::event::WaitReason::Generic)
+        ));
+
+        runtime.feed_click();
+        runtime.advance_without_render(17);
+        assert_eq!(
+            runtime.interpreter.get_variable("after"),
+            None,
+            "the physical click is owned by setonpush and must not advance directly"
+        );
+        assert!(matches!(
+            runtime.wait_reason,
+            Some(asb_interpreter::event::WaitReason::Generic)
+        ));
+        assert_eq!(
+            runtime
+                .interpreter
+                .lua()
+                .globals()
+                .get::<bool>("dummy_pending")
+                .unwrap(),
+            true
+        );
+
+        runtime.advance_without_render(17);
+        assert!(runtime.wait_reason.is_none());
+        runtime.advance_without_render(17);
+        assert_eq!(
+            runtime.interpreter.get_variable("after"),
+            Some(Value::Int(1))
+        );
+        assert!(matches!(
+            runtime.wait_reason,
+            Some(asb_interpreter::event::WaitReason::Stop { .. })
+        ));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    #[test]
+    fn exec_skip_status_is_visible_within_one_runtime_tick() {
+        use crate::backend::BackendSelection;
+        use asb_interpreter::Value;
+
+        let Ok(mut runtime) = CoreRuntime::create(8, 8, BackendSelection::from_legacy_int(0))
+        else {
+            // Headless CGL availability depends on the test session.
+            return;
+        };
+        runtime.wire_event_callback();
+        runtime
+            .interpreter
+            .load_script(
+                "control",
+                r#"
+*main
+[exec command=skip mode=1]
+[var name=after_in data=$s.status.commandskip]
+[exec command=skip mode=0]
+[var name=after_out data=$s.status.commandskip]
+[stop]
+"#,
+            )
+            .unwrap();
+        runtime.interpreter.start("control", "main").unwrap();
+
+        runtime.advance_without_render(17);
+
+        assert_eq!(
+            runtime.interpreter.get_variable("after_in"),
+            Some(Value::Int(1)),
+            "mode=1 的 host effect 必须在后续脚本表达式前可见"
+        );
+        assert_eq!(
+            runtime.interpreter.get_variable("after_out"),
+            Some(Value::Int(0)),
+            "mode=0 的 host effect 必须在同一帧内可见"
+        );
+        assert!(matches!(
+            runtime.wait_reason.as_ref(),
+            Some(asb_interpreter::event::WaitReason::Stop { .. })
+        ));
+    }
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    #[test]
+    fn reset_restarts_boot_without_replacing_lua_runtime() {
+        use crate::Project;
+        use crate::backend::BackendSelection;
+        use asb_interpreter::Value;
+
+        let Ok(mut runtime) = CoreRuntime::create(8, 8, BackendSelection::from_legacy_int(0))
+        else {
+            // Headless CGL availability depends on the test session. The
+            // same behavior is covered on target builds with a GL context.
+            return;
+        };
+        let root = std::env::temp_dir().join(format!(
+            "art3m1s-reset-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(
+            root.join("boot.iet"),
+            r#"
+[lua]
+boot_marker = (boot_marker or 0) + 1
+[/lua]
+*top
+[stop]
+"#,
+        )
+        .unwrap();
+        let project = Project::open_from_data(
+            &root,
+            "[WINDOWS]\nWIDTH=8\nHEIGHT=8\nBOOT=boot.iet\nCHARSET=UTF-8\n",
+            "windows",
+        )
+        .unwrap();
+        runtime.load_open_project(project).unwrap();
+
+        runtime.interpreter.set_variable("g.keep", Value::Int(7));
+        runtime
+            .interpreter
+            .set_variable("s.keep", Value::String("system".into()));
+        runtime
+            .interpreter
+            .lua()
+            .globals()
+            .set("boot_marker", 41_i64)
+            .unwrap();
+        runtime
+            .interpreter
+            .lua()
+            .globals()
+            .set("systemreset", true)
+            .unwrap();
+        runtime
+            .interpreter
+            .engine_context()
+            .lock()
+            .unwrap()
+            .tag_queue
+            .push(("exit".into(), std::collections::HashMap::new()));
+        runtime
+            .events
+            .lock()
+            .unwrap()
+            .push(crate::runtime::events::RuntimeEvent {
+                event: Event::Exit,
+                text_source: Some(("old.iet".into(), 9)),
+            });
+        runtime
+            .exit_requested
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+
+        runtime.handle_engine_reset().unwrap();
+
+        assert!(!runtime.is_exit_requested());
+        assert!(
+            runtime
+                .interpreter
+                .engine_context()
+                .lock()
+                .unwrap()
+                .tag_queue
+                .is_empty()
+        );
+        assert!(runtime.events.lock().unwrap().is_empty());
+        assert_eq!(
+            runtime.interpreter.get_variable("g.keep"),
+            Some(Value::Int(7))
+        );
+        assert_eq!(
+            runtime.interpreter.get_variable("s.keep"),
+            Some(Value::String("system".into()))
+        );
+        let boot_marker: i64 = runtime
+            .interpreter
+            .lua()
+            .globals()
+            .get("boot_marker")
+            .unwrap();
+        assert_eq!(
+            boot_marker, 41,
+            "脚本文件的 Lua 定义块只在载入时执行，reset 只重跑 BOOT 脚本流"
+        );
+        let systemreset: bool = runtime
+            .interpreter
+            .lua()
+            .globals()
+            .get("systemreset")
+            .unwrap_or(false);
+        assert!(systemreset, "脚本 reset 标记必须穿透 boot 重启");
+        assert_eq!(
+            runtime.interpreter.get_variable("s.status.commandskip"),
+            Some(Value::Int(0))
+        );
+
+        runtime.advance_without_render(0);
+        assert!(!runtime.is_exit_requested(), "旧队列尾部 exit 不得执行");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}

@@ -1,0 +1,68 @@
+[package]
+name = "art3m1s-core"
+version = "0.4.0"
+license = "MPL-2.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "compatibility_probe"
+path = "tools/game-probes/src/bin/compatibility_probe.rs"
+required-features = ["game-probes"]
+
+[[bin]]
+name = "probe_caption_test"
+path = "tools/game-probes/src/bin/probe_caption_test.rs"
+required-features = ["game-probes"]
+
+[dependencies]
+art3m1s-emote = { path = "crates/art3m1s-emote" }
+art3m1s-log = { path = "crates/art3m1s-log" }
+art3m1s-render = { path = "crates/art3m1s-render" }
+pfs-upk-rust = { path = "crates/pfs-upk-rust" }
+art3m1s-media = { path = "crates/art3m1s-media" }
+art3m1s-rfvp = { path = "crates/art3m1s-rfvp", optional = true, features = ["host-runtime"] }
+art3m1s-krkr = { path = "crates/art3m1s-krkr", optional = true }
+art3m1s-siglus = { path = "crates/art3m1s-siglus", optional = true }
+encoding_rs = "0.8"
+glam = "0.30"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# GPU texture asset decoding (PNG only).
+image = { version = "0.25", default-features = false, features = ["png"] }
+# 字体光栅化（字形渲染子系统）
+ab_glyph = "0.2"
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+art3m1s-render = { path = "crates/art3m1s-render", features = ["metal"] }
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "android"))'.dependencies]
+art3m1s-render = { path = "crates/art3m1s-render", features = ["vulkan"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+asb-interpreter = { path = "crates/asb-interpreter", default-features = false, features = ["backend-luau"] }
+
+[target.'cfg(any(target_os = "android", target_os = "ios", all(target_os = "macos", target_arch = "aarch64")))'.dependencies]
+ctt-astcenc = "0.5"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+asb-interpreter = { path = "crates/asb-interpreter", default-features = false, features = ["backend-lua51"] }
+
+[features]
+default = ["gl-backend"]
+gl-backend = ["art3m1s-render/gl"]
+# Compatibility aliases; native backends are enabled by target dependencies above.
+metal-backend = ["runtime-shader", "art3m1s-render/metal"]
+vulkan-backend = ["runtime-shader", "art3m1s-render/vulkan"]
+runtime-shader = ["art3m1s-render/runtime-shader"]
+rfvp-engine = ["dep:art3m1s-rfvp"]
+krkr-engine = ["dep:art3m1s-krkr", "art3m1s-krkr/native-upstream"]
+siglus-engine = ["dep:art3m1s-siglus", "art3m1s-siglus/uci-ffmpeg", "art3m1s-siglus/host-audio"]
+ffmpeg = ["art3m1s-media/ffmpeg"]
+game-probes = ["gl-backend"]
+
+[dev-dependencies]
+# 离屏像素回读测试需要在 macOS 上创建一个 CGL headless 上下文。
+glow = "0.16"
