@@ -13,6 +13,11 @@ import VNCore
 ///     wait 2.5            sleep
 ///     press confirm       press and release a VirtualButton (100 ms, longer than one engine frame)
 ///     hold right 1.0      hold a button for the given seconds
+///     mash a 20 0.04 0.04  tap a gamepad button the given times, holding and then pausing for the given seconds, as a
+///                         controller or the touch gamepad sends it
+///     mashkey confirm 20 0.04 0.04  the same with a VirtualButton, as the engine's keys
+///     padwhen a 20 <expr>  tap a gamepad button once the expression is truthy, checking every 16 ms, for at most the
+///                         given seconds. A timeout taps nothing
 ///     tap 0.5 0.5         pointer down and up at normalized view coordinates
 ///     scroll -30          one wheel event
 ///     js <expression>     evaluate in the page and log the result
@@ -25,6 +30,9 @@ nonisolated enum InputStep: Equatable, Sendable {
     case wait(Double)
     case press(VirtualButton)
     case hold(VirtualButton, Double)
+    case mash(ControlInput, count: Int, hold: Double, gap: Double)
+    case mashKey(VirtualButton, count: Int, hold: Double, gap: Double)
+    case padWhen(ControlInput, Double, String)
     case tap(CGPoint)
     case scroll(Double)
     case js(String)
@@ -61,6 +69,20 @@ nonisolated enum InputScript {
         case "wait": if let s = Double(rest) { return .wait(s) }
         case "press": if let b = VirtualButton(rawValue: rest) { return .press(b) }
         case "hold": if words.count == 3, let b = VirtualButton(rawValue: words[1]), let s = Double(words[2]) { return .hold(b, s) }
+        case "mash":
+            if words.count == 5, let input = ControlInput(rawValue: words[1]),
+               let count = Int(words[2]), count >= 0, let hold = Double(words[3]), let gap = Double(words[4]) {
+                return .mash(input, count: count, hold: hold, gap: gap)
+            }
+        case "mashkey":
+            if words.count == 5, let button = VirtualButton(rawValue: words[1]),
+               let count = Int(words[2]), count >= 0, let hold = Double(words[3]), let gap = Double(words[4]) {
+                return .mashKey(button, count: count, hold: hold, gap: gap)
+            }
+        case "padwhen":
+            if words.count >= 4, let input = ControlInput(rawValue: words[1]), let s = Double(words[2]) {
+                return .padWhen(input, s, words.dropFirst(3).joined(separator: " "))
+            }
         case "tap": if words.count == 3, let x = Double(words[1]), let y = Double(words[2]) { return .tap(CGPoint(x: x, y: y)) }
         case "scroll": if let dy = Double(rest) { return .scroll(dy) }
         case "js": if !rest.isEmpty { return .js(rest) }

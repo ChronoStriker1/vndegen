@@ -103,6 +103,38 @@ private final class ShimPage {
     }
 }
 
+@Test @MainActor func aTapBetweenTwoReadsIsSeenByTheNextOne() async throws {
+    let page = try await ShimPage()
+    let a = "navigator.getGamepads()[0].buttons[0].pressed"
+    let tap = WebGameSession.gamepadScript(.a, pressed: true) + ";" + WebGameSession.gamepadScript(.a, pressed: false)
+    // The tap that announces the gamepad counts too.
+    try await page.run(tap)
+    #expect(try await page.run(a) as? Bool == true)
+    #expect(try await page.run(a) as? Bool == false)
+    try await page.run(tap)
+    // Every read in one task sees the press, as two engine updates in one frame would. The next task sees the release.
+    #expect(try await page.run("[\(a), \(a)].join()") as? String == "true,true")
+    #expect(try await page.run(a) as? Bool == false)
+
+    // Two taps between reads make two presses, one read each.
+    try await page.run(tap + ";" + tap)
+    var seen: [Bool] = []
+    for _ in 0..<5 { seen.append(try await page.run(a) as? Bool ?? true) }
+    #expect(seen == [true, false, true, false, false])
+
+    // A page that stops reading keeps only the last few taps.
+    try await page.run(Array(repeating: tap, count: 20).joined(separator: ";"))
+    var presses = 0
+    for _ in 0..<40 where try await page.run(a) as? Bool == true { presses += 1 }
+    #expect(presses == 8)
+
+    // Pausing settles what is still waiting to each button's final state, so no stale press comes after.
+    try await page.run(tap + ";" + tap + "; __vndegen.setPaused(true)")
+    #expect(try await page.run(a) as? Bool == false)
+    try await page.run(WebGameSession.gamepadScript(.a, pressed: true) + "; __vndegen.setPaused(false)")
+    #expect(try await page.run(a) as? Bool == true)
+}
+
 @Test @MainActor func touchMovesTheMouseToItFirst() async throws {
     let page = try await ShimPage()
     try await page.run("""

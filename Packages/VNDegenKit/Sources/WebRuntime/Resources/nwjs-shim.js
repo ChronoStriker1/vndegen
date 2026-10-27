@@ -455,17 +455,36 @@
         leftStickLeft: [0, -1], leftStickRight: [0, 1], leftStickUp: [1, -1], leftStickDown: [1, 1],
         rightStickLeft: [2, -1], rightStickRight: [2, 1], rightStickUp: [3, -1], rightStickDown: [3, 1],
     };
+    // Games read the gamepad once a frame, and each press and release arrives in a task of its own, so a quick tap
+    // could go down and up between two reads and never be seen. RPG Maker battles on an iPad simulator ran at about 25
+    // frames a second, and about a quarter of taps at 12 a second were lost that way, some arriving with press and
+    // release together. Changes queue per button instead, and each read shows at most one more of them, so every press
+    // is seen for at least one read. Reads in the same callback, such as two engine updates in one animation frame, all
+    // see the same state, since the next change waits for a microtask checkpoint.
     const padHeld = new Set();
+    const padPending = new Map();
+    const padQueueLimit = 16;
+    let padAdvanced = false;
+    function advancePad() {
+        if (padAdvanced) return;
+        padAdvanced = true;
+        queueMicrotask(() => { padAdvanced = false; });
+        for (const [name, states] of padPending) {
+            if (states.shift()) padHeld.add(name); else padHeld.delete(name);
+            if (!states.length) padPending.delete(name);
+            padTimestamp = performance.now();
+        }
+    }
     let padConnected = false, padTimestamp = 0;
-    function padSnapshot() {
+    function padSnapshot(held = padHeld) {
         const buttons = [];
         // Button 16 is Home, which always opens the VNDegen menu instead.
         for (let i = 0; i <= 16; i++) {
-            const pressed = Object.keys(padButtons).some((name) => padButtons[name] === i && padHeld.has(name));
+            const pressed = Object.keys(padButtons).some((name) => padButtons[name] === i && held.has(name));
             buttons.push({ pressed: pressed, touched: pressed, value: pressed ? 1 : 0 });
         }
         const axes = [0, 0, 0, 0];
-        for (const name of padHeld) if (padAxes[name]) axes[padAxes[name][0]] += padAxes[name][1];
+        for (const name of held) if (padAxes[name]) axes[padAxes[name][0]] += padAxes[name][1];
         return {
             id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', index: 0, connected: true,
             mapping: 'standard', timestamp: padTimestamp, buttons: buttons, axes: axes, vibrationActuator: null,
@@ -473,7 +492,12 @@
     }
     try {
         Object.defineProperty(Navigator.prototype, 'getGamepads', {
-            value: () => (padConnected ? [padSnapshot()] : []), configurable: true, writable: true,
+            value: () => {
+                if (!padConnected) return [];
+                advancePad();
+                return [padSnapshot()];
+            },
+            configurable: true, writable: true,
         });
     } catch (e) { /* locked down */ }
     // WebKit still announces the real controllers to pages that listen for them.
@@ -482,27 +506,44 @@
     }
     function pressPad(name, pressed) {
         if (!(name in padButtons) && !(name in padAxes)) return;
-        if (pressed) padHeld.add(name); else padHeld.delete(name);
-        padTimestamp = performance.now();
+        const states = padPending.get(name) || [];
+        const last = states.length ? states[states.length - 1] : padHeld.has(name);
+        if (last !== pressed) {
+            // A page that stops reading the gamepad would otherwise replay old presses when it reads again. Dropping
+            // the oldest press and release together keeps the final state.
+            padPending.set(name, states.concat(pressed).slice(states.length >= padQueueLimit ? 2 : 0));
+        }
         if (padConnected) return;
+        // The first press announces the gamepad, holding that press, as a browser does. The press itself still waits
+        // for a read like any other, since engines read the gamepad rather than the announcement.
         padConnected = true;
+        padTimestamp = performance.now();
         const event = new Event('gamepadconnected');
-        Object.defineProperty(event, 'gamepad', { value: padSnapshot() });
+        Object.defineProperty(event, 'gamepad', { value: padSnapshot(pressed ? new Set([name]) : padHeld) });
         window.dispatchEvent(event);
+    }
+    // Changes still waiting when the session pauses or resumes are stale presses. Only each button's final state stays.
+    function settlePad() {
+        for (const [name, states] of padPending) {
+            if (states[states.length - 1]) padHeld.add(name); else padHeld.delete(name);
+        }
+        padPending.clear();
     }
 
     // WebKit's WebM player can stop on the last frame of a looping clip instead of wrapping (the game's 5-frame VP9
     // animations do, over vndegen:// and from a blob alike), and then it fires no more timeupdate events. Each
     // timeupdate re-arms a timer, so the timer runs only after updates stop, and it sends a looping element that is
-    // stuck at its end back to the start.
+    // stuck at its end back to the start. It does so through the setter as the page found it, so scripts that follow
+    // the game's seeks take this for the loop it is.
     const play = HTMLMediaElement.prototype.play;
+    const setCurrentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime').set;
     const stalledLoops = new WeakMap();
     function rearmLoop(media) {
         clearTimeout(stalledLoops.get(media));
         if (!media.loop || !media.duration) return;
         const remaining = Math.max(0, media.duration - media.currentTime) / (media.playbackRate || 1);
         stalledLoops.set(media, setTimeout(() => {
-            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) media.currentTime = 0;
+            if (media.loop && !media.paused && media.currentTime >= media.duration - 0.05) setCurrentTime.call(media, 0);
         }, remaining * 1000 + 250));
     }
     HTMLMediaElement.prototype.play = function () {
@@ -714,6 +755,7 @@
         },
         setPaused(paused) {
             audioPaused = paused;
+            settlePad();
             if (paused) {
                 window.__vndegen.onPause(true);
                 for (const context of audioContexts) if (context.state === 'running') context.suspend();
