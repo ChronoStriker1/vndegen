@@ -2,14 +2,19 @@ import VNCore
 #if canImport(UIKit)
 import UIKit
 
-/// The view the game draws in. ANGLE adds a Metal layer inside the view's layer and keeps it the view's size. Touches
-/// reach the game through the hub's touch controls. A hardware keyboard reaches the game through this view, which takes
-/// keyboard focus whenever it is on screen, as the web engines' view does.
+/// The view the game draws in. ANGLE adds a Metal layer inside the view's layer, which this view keeps its size.
+/// Touches that reach the view, when the hub shows no touch gamepad over it, work as the mouse, so a tap clicks where it
+/// lands. A hardware keyboard reaches the game through this view, which takes keyboard focus whenever it is on screen,
+/// as the web engines' view does.
 final class RGSSHostView: UIView {
     /// Called once, after the view is first in a window at a usable size.
     var onReady: (() -> Void)?
     /// A libretro key going down or up, and whether it is a key repeat.
     var onKey: ((UInt32, Bool, Bool) -> Void)?
+    /// Touches, as pointer events.
+    var onEvent: ((ControllerEvent) -> Void)?
+    /// The touch that works as the mouse. Others are ignored until it lifts.
+    private weak var pointerTouch: UITouch?
 
     init() {
         super.init(frame: .zero)
@@ -26,6 +31,15 @@ final class RGSSHostView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        // ANGLE draws into a Metal layer it adds inside this view's layer. Layers on iOS don't resize with their parent,
+        // so after a rotation the game would draw at the old size.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for sublayer in layer.sublayers ?? [] {
+            sublayer.frame = layer.bounds
+            sublayer.contentsScale = layer.contentsScale
+        }
+        CATransaction.commit()
         readyIfOnScreen()
     }
 
@@ -38,6 +52,34 @@ final class RGSSHostView: UIView {
 
     func takeFocus() {
         if window != nil { becomeFirstResponder() }
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard pointerTouch == nil, let touch = touches.first else { return }
+        pointerTouch = touch
+        pointer(.began, touch)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if let touch = pointerTouch, touches.contains(touch) { pointer(.moved, touch) }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = pointerTouch, touches.contains(touch) else { return }
+        pointerTouch = nil
+        pointer(.ended, touch)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = pointerTouch, touches.contains(touch) else { return }
+        pointerTouch = nil
+        pointer(.cancelled, touch)
+    }
+
+    private func pointer(_ phase: PointerEvent.Phase, _ touch: UITouch) {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let point = touch.location(in: self)
+        onEvent?(.pointer(PointerEvent(phase: phase, location: CGPoint(x: point.x / bounds.width, y: point.y / bounds.height))))
     }
 
     override var canBecomeFirstResponder: Bool { true }

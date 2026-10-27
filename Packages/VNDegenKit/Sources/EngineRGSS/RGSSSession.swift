@@ -54,9 +54,7 @@ final class RGSSSession: EngineSession {
             guard let self, case .running = state else { return }
             router.hostKey(key, pressed: pressed, isRepeat: isRepeat).forEach(deliver)
         }
-        #if canImport(AppKit)
         host.onEvent = { [weak self] event in self?.send(event) }
-        #endif
     }
 
     private func start() {
@@ -136,8 +134,8 @@ final class RGSSSession: EngineSession {
 
     // MARK: EngineSession
 
-    /// Touches reach the game through the hub's touch controls, and on macOS the mouse arrives from the view. Controller
-    /// buttons arrive here.
+    /// Controller and touch gamepad buttons arrive here, and so do the pointer events of the hub's touch mouse and of the
+    /// view itself, which reads direct touches on iOS and the mouse on macOS.
     func send(_ event: ControllerEvent) {
         guard case .running = state else { return }
         router.translate(event).forEach(deliver)

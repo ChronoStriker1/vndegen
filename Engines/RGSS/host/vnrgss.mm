@@ -356,7 +356,18 @@ bool makeFramebuffer(unsigned width, unsigned height) {
 }
 
 // Draws the core's last frame letterboxed into the layer. The core draws with the top row first, so the copy flips it.
+// The core caches GL state, such as the viewport and the scissor test, and draws text into bitmaps assuming its cache is
+// right, so everything this changes goes back as it was.
 void present() {
+    GLint viewport[4], scissorBox[4], drawFramebuffer, readFramebuffer;
+    GLfloat clearColor[4];
+    GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetIntegerv(GL_SCISSOR_BOX, scissorBox);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFramebuffer);
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+
     EGLint width = 0, height = 0;
     eglQuerySurface(engine.display, engine.surface, EGL_WIDTH, &width);
     eglQuerySurface(engine.display, engine.surface, EGL_HEIGHT, &height);
@@ -377,6 +388,13 @@ void present() {
         glBlitFramebuffer(0, 0, (GLint)engine.frameWidth, (GLint)engine.frameHeight, x, y + h, x + w, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
     }
     eglSwapBuffers(engine.display, engine.surface);
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)drawFramebuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)readFramebuffer);
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    glScissor(scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
+    if (scissor) glEnable(GL_SCISSOR_TEST);
+    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
 }
 
 bool startGraphics(void *layer) {
