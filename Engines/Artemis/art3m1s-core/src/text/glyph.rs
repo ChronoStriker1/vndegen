@@ -444,7 +444,23 @@ impl GlyphTextRenderer {
     fn rasterize_glyph(&mut self, c: char, sz: f32) -> Option<GlyphInfo> {
         let sf = scaled(&self.font, PxScale::from(sz))?;
         let glyph_id = sf.glyph_id(c);
-        let q = sf.outline_glyph(glyph_id.with_scale(sz))?;
+        let Some(q) = sf.outline_glyph(glyph_id.with_scale(sz)) else {
+            // A space has no outline but still moves the pen. Dropping it ran
+            // the words of English text together (VNDegen).
+            return (glyph_id.0 != 0 || c.is_whitespace()).then(|| GlyphInfo {
+                character: c.to_string(),
+                texture_id: TextureId(0),
+                atlas_x: 0.0,
+                atlas_y: 0.0,
+                atlas_w: 0.0,
+                atlas_h: 0.0,
+                offset_x: 0.0,
+                offset_y: sf.ascent(),
+                width: 0.0,
+                height: 0.0,
+                advance_x: sf.h_advance(glyph_id),
+            });
+        };
         let b = q.px_bounds();
         let w = b.width().ceil() as u32;
         let h = b.height().ceil() as u32;
