@@ -67,4 +67,5 @@ The game page says why:
 - A text field taking focus doesn't open VNDegen's on-screen keyboard, as described above.
 - A game's own window size and fullscreen settings change nothing, because the game fills VNDegen's view.
 - `OS.alert()` writes its message to the game's log rather than showing a dialog.
+- A game whose files fail to load leaves Godot ready for the next. A failure after that, such as Godot's renderer not starting, can't be undone in the same process, so that Godot runs no more games until VNDegen is opened again, and the game page says so.
 - Games built for the compatibility renderer run on the mobile renderer on Metal, as described above.

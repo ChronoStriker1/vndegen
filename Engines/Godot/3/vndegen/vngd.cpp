@@ -73,6 +73,11 @@ void notify(int p_notification) {
 	}
 }
 
+// A start that failed after setup's first phase leaves the engine half started, and Godot can't take that apart, so
+// Godot stays stopped until VNDegen is opened again. What it made is left in place, since its servers still use the OS.
+bool half_started = false;
+constexpr const char *half_started_problem = "Godot could not start this game. Open VNDegen again to play a Godot game.";
+
 } // namespace
 
 extern "C" {
@@ -80,6 +85,10 @@ extern "C" {
 int vngd_start(const VNGDLaunch *p_launch) {
 	ERR_FAIL_COND_V_MSG(state.os, 1, "A game is still running. Call vngd_stop first.");
 	state = State();
+	if (half_started) {
+		state.problem = half_started_problem;
+		return 2;
+	}
 	state.os = vngd_platform_create_os(p_launch);
 
 	std::vector<std::string> args = { "--main-pack", p_launch->pack, "--audio-driver", vngd_platform_audio_driver() };
@@ -89,15 +98,17 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	}
 	argv.push_back(nullptr);
 
-	if (Main::setup(p_launch->executable, (int)args.size(), argv.data(), true) != OK) {
+	// The two phases run apart, since a failed first phase undoes itself and a failed second doesn't.
+	if (Main::setup(p_launch->executable, (int)args.size(), argv.data(), false) != OK) {
 		state.problem = "The game's files could not be loaded.";
 		return 1;
 	}
-	state.setup = true;
-	if (!Main::start()) {
-		state.problem = "The game did not start.";
-		return 1;
+	if (Main::setup2() != OK || !Main::start()) {
+		half_started = true;
+		state.problem = half_started_problem;
+		return 2;
 	}
+	state.setup = true;
 	vngd_platform_started();
 	state.started = true;
 	frames.start();
@@ -307,6 +318,11 @@ void vngd_stop(void) {
 	if (state.started) {
 		frames.stop();
 		vngd_platform_stopping();
+	}
+	if (half_started) {
+		state = State();
+		state.problem = half_started_problem;
+		return;
 	}
 	if (state.setup) {
 		Main::cleanup();

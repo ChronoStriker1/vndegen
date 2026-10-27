@@ -6,15 +6,18 @@
 
 #include "core/os/dir_access.h"
 #include "core/os/file_access.h"
+#include "core/project_settings.h"
 #include "drivers/unix/dir_access_unix.h"
 #include "drivers/unix/file_access_unix.h"
 
 #include <casepath.h>
 
 #include <initializer_list>
+#include <unistd.h>
 
+// `p_path` as it is on disk. A relative path is resolved from the working directory, as the system resolves it.
 inline String vngd_case_path(const String &p_path) {
-	if (!p_path.is_abs_path()) {
+	if (p_path.empty()) {
 		return p_path;
 	}
 	char found[4096];
@@ -33,6 +36,26 @@ protected:
 	String fix_path(String p_path) const override {
 		const String path = DirAccessUnix::fix_path(p_path);
 		return vngd_case_path(path.is_rel_path() ? current_dir.plus_file(path).simplify_path() : path);
+	}
+
+public:
+	// Two spellings can name one file, and copying it onto itself would empty it.
+	Error copy(String p_from, String p_to, int p_chmod_flags = -1) override {
+		const ProjectSettings *settings = ProjectSettings::get_singleton();
+		const String from = vngd_case_path(settings->globalize_path(p_from));
+		const String to = vngd_case_path(settings->globalize_path(p_to));
+		if (casepath_same_file(from.utf8().get_data(), to.utf8().get_data())) {
+			return OK;
+		}
+		return DirAccessUnix::copy(p_from, p_to, p_chmod_flags);
+	}
+
+	// A link's relative target counts from the link's own folder, so it keeps its text.
+	Error create_link(String p_source, String p_target) override {
+		if (!p_source.is_rel_path()) {
+			return DirAccessUnix::create_link(p_source, p_target);
+		}
+		return symlink(p_source.utf8().get_data(), fix_path(p_target).utf8().get_data()) == 0 ? OK : FAILED;
 	}
 };
 

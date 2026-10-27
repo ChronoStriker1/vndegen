@@ -29,6 +29,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `04-no-swift-app.patch`: leaves out `drivers/apple_embedded/app.swift`, the SwiftUI app of Godot's own iOS template. VNDegen is the app.
 - `05-simulator-angle.patch`: lets the iOS Simulator build take its OpenGL ES headers from MetalANGLE. The simulator's Metal device reports only GPU families Apple1 and Apple2, and Godot's Metal renderer needs Apple4: with the family check skipped, Metal's validation aborts on the first texture Godot creates. So in the simulator only, Godot 4 runs its compatibility renderer on OpenGL ES 3 through MetalANGLE, the OpenGL ES on Metal the app embeds for Ren'Py. Devices and the Mac use Metal.
 - `06-simulator-blur.patch`: in the iOS Simulator only, builds the mipmaps of the 2D back buffer with `glGenerateMipmap` instead of Godot's Gaussian blur. The blur draws into one mip level of a texture while it samples the level above, and MetalANGLE aborts on that draw with a Metal pipeline that has no color format. Shaders that read a blurred screen look slightly different there.
+- `07-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, since a setup that fails frees whatever it finds set.
 
 ## Patches to Godot 3 (`3/patches/`)
 
@@ -39,6 +40,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
   - Singletons whose destructors left their pointer set now clear it: IP, InputMap, PackedData, ResourceFormatImporter, Performance, Input, ShaderTypes, PhysicsServerSW, VisualServerScene, NavigationMeshGenerator, ZipArchive, and JavaScript.
   - The audio, physics, and 2D physics server managers forget their drivers and servers at cleanup.
 - `03-virtual-fix-path.patch`: makes `FileAccess::fix_path` and `DirAccess::fix_path` virtual, as they are in Godot 4, so VNDegen's file access can find names whatever their case.
+- `04-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, as Godot 4's patch 07 does.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|

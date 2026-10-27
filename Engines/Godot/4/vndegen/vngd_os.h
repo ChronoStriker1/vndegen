@@ -23,7 +23,8 @@ public:
 	String get_data_path() const override { return data_path; }
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
-	String get_user_data_dir(const String &p_user_dir) const override { return data_path.path_join(p_user_dir); }
+	// In its spelling on disk, which a backup from another platform can differ in.
+	String get_user_data_dir(const String &p_user_dir) const override { return vngd_case_path(data_path.path_join(p_user_dir)); }
 
 	// Godot's own alert is a modal dialog, which would stop VNDegen's app. VNDegen reports a game that can't start
 	// itself, so alerts go to the log.

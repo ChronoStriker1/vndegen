@@ -41,6 +41,8 @@ final class GodotSession: EngineSession {
     static let quitTimeout: Duration = .seconds(3)
     /// Whether a session's engine is running. Godot runs one game at a time.
     private(set) static var engineInUse = false
+    /// The Godot majors whose engine failed to start a game in a way it can't recover from in this process.
+    private(set) static var unusable: Set<Int> = []
 
     init(_ launch: GameLaunch, paths: GodotPaths, engine: GodotEngine) throws {
         self.launch = launch
@@ -95,7 +97,9 @@ final class GodotSession: EngineSession {
                                   keyboard: nil, context: nil, fontTable: fontTable, fontFolders: fontFolders,
                                   fontFolderCount: Int32(folderPaths.count))
         Self.engineInUse = true
-        guard engine.start(&settings) == 0 else {
+        let result = engine.start(&settings)
+        guard result == 0 else {
+            if result == 2 { Self.unusable.insert(paths.major) }
             godotLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(self.engine.lastProblem ?? "", privacy: .public)")
             engine.stop()
             Self.engineInUse = false
@@ -213,6 +217,8 @@ private final class FrameTarget: NSObject {
 /// The files a launch hands the engine. The game's data directory stands in for the Windows AppData folder, where
 /// Godot keeps `user://`, and holds the engine's log.
 nonisolated struct GodotPaths {
+    /// The Godot major that runs the game.
+    var major: Int
     var pack: URL
     var executable: URL
     var appData: URL
@@ -223,6 +229,7 @@ nonisolated struct GodotPaths {
     var renderingMethod: String?
 
     init(folder: URL, dataDirectory: URL, layout: GodotLayout) {
+        major = layout.major
         pack = folder.appendingPathComponent(layout.pack)
         executable = folder.appendingPathComponent(layout.executable)
         appData = GodotPlugin.appDataDirectory(dataDirectory)

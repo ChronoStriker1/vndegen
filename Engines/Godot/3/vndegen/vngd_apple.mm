@@ -277,6 +277,8 @@ public:
 	String get_data_path() const override { return data_path; }
 	// Godot on Windows names its folder this way, where other platforms use "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
+	// In its spelling on disk, which a backup from another platform can differ in.
+	String get_user_data_dir() const override { return vngd_case_path(OS_Unix::get_user_data_dir()); }
 
 	// Godot's PC exports carry S3TC textures, which Metal reads on Apple silicon, and so does ANGLE on it.
 	bool _check_internal_feature_support(const String &p_feature) override {

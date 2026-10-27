@@ -37,7 +37,8 @@ typedef struct VNGDLaunch {
     int fontFolderCount;
 } VNGDLaunch;
 
-// Loads the game and starts it. Returns 0 on success. Call vngd_stop afterwards even when it fails.
+// Loads the game and starts it. Returns 0 on success, 1 when it fails, and 2 when it fails in a way that leaves this
+// engine unable to start any game until the process starts again. Call vngd_stop afterwards even when it fails.
 VNGD_API int vngd_start(const VNGDLaunch *launch);
 
 // Runs one frame and draws it. Returns nonzero once the game has quit. Does nothing while paused.

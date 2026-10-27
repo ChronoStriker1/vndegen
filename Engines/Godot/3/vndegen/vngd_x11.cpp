@@ -21,6 +21,8 @@ public:
 	String get_data_path() const override { return data_path; }
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
+	// In its spelling on disk, which a backup from another platform can differ in.
+	String get_user_data_dir() const override { return vngd_case_path(OS_X11::get_user_data_dir()); }
 
 	// Godot's X11 alert is a dialog that blocks the test run.
 	void alert(const String &p_alert, const String &p_title = "ALERT!") override {

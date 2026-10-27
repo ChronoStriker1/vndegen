@@ -33,6 +33,7 @@ nonisolated public struct GodotPlugin: EnginePlugin {
         if let reason = Self.unsupported(layout, folder: launch.folder) { throw GodotError.unsupported(reason) }
         guard let engine = GodotEngine.engine(major: layout.major) else { throw GodotError.engineMissing(layout.major) }
         guard !GodotSession.engineInUse else { throw GodotError.stillClosing }
+        guard !GodotSession.unusable.contains(layout.major) else { throw GodotError.engineUnusable(layout.major) }
         let paths = GodotPaths(folder: launch.folder, dataDirectory: launch.dataDirectory, layout: layout)
         return try GodotSession(launch, paths: paths, engine: engine)
     }
@@ -77,6 +78,7 @@ nonisolated public enum GodotError: Error, LocalizedError {
     case engineMissing(Int)
     case unsupported(String)
     case stillClosing
+    case engineUnusable(Int)
 
     public var errorDescription: String? {
         switch self {
@@ -84,6 +86,7 @@ nonisolated public enum GodotError: Error, LocalizedError {
         case let .engineMissing(major): "The Godot \(major) engine is missing from this build of VNDegen."
         case let .unsupported(reason): reason
         case .stillClosing: "The last Godot game is still closing. Try again in a moment."
+        case let .engineUnusable(major): "Godot \(major) couldn't start the last game, and can't start another until VNDegen is opened again."
         }
     }
 }
