@@ -192,7 +192,6 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     return true;
 }
 
-void Engine::noteFileUsed(const std::string &file) { fileLog_.insert(normalizePath(file)); }
 
 Sprite *Engine::spriteRef(int n) {
     if (n < 0 || n >= kSpriteCount) {
@@ -382,7 +381,7 @@ static void drawSprite(Image &out, const Sprite &s, int ox = 0, int oy = 0) {
     const Image &img = *s.img.image;
     int cw = s.img.cellWidth > 0 ? s.img.cellWidth : img.w;
     int cell = std::clamp(s.cell, 0, std::max(0, s.img.cells - 1));
-    blit(out, img, s.x + ox, s.y + oy, cell * cw, 0, cw, img.h, s.alpha);
+    blit(out, img, s.x + ox, s.y + oy, cell * cw, 0, cw, img.h, s.drawAlpha());
 }
 
 void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
@@ -408,7 +407,7 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
         int idx = c == 'l' ? 0 : c == 'c' ? 1 : c == 'r' ? 2 : -1;
         if (idx >= 0) drawSprite(out, s.ld[size_t(idx)]);
     }
-    bool effectsOnScene = s.monocro >= 0 || s.nega;
+    bool effectsOnScene = s.monocro || s.nega;
     if (withWindow && windowBack_) drawWindow(out);
     if (!s.allSpHidden)
         for (int i = std::min(hz - 1, kSpriteCount - 1); i >= 0; i--) sprite(s.sp[size_t(i)]);
@@ -423,10 +422,23 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
             // Counter-clockwise on screen, with y pointing down.
             double m[4] = {std::cos(rad) * sx, std::sin(rad) * sy, -std::sin(rad) * sx, std::cos(rad) * sy};
             blitTransformed(out, img, std::clamp(q.cell, 0, q.img.cells - 1) * cw, 0, cw, img.h, q.cx, q.cy, m,
-                            q.alpha, q.blend);
+                            q.alpha < 0 ? 255 : q.alpha, q.blend);
         }
     for (const Scene::Bar &b : s.bars)
         if (b.on && b.max > 0) fillRect(out, b.x, b.y, b.w * std::clamp(b.value, 0, b.max) / b.max, b.h, b.color);
+    for (const Scene::Prnum &p : s.prnums)
+        if (p.on) {
+            // prnum draws its number in full-width digits, w x h per character.
+            std::string digits;
+            for (char c : std::to_string(p.value)) {
+                if (c == '-') digits += "\x81\x7c";
+                else {
+                    digits += char(0x82);
+                    digits += char(0x4F + (c - '0'));
+                }
+            }
+            drawGlyphs(out, digits, p.x, p.y, p.w, p.h, 0, p.color, win_.bold, win_.shadow, 0, 0);
+        }
     if (effectsOnScene) {
         for (uint32_t &p : out.px) {
             int r = chR(p), g = chG(p), b = chB(p);
@@ -435,9 +447,9 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
                 g = 255 - g;
                 b = 255 - b;
             }
-            if (s.monocro >= 0) {
+            if (s.monocro) {
                 int y = (r * 77 + g * 151 + b * 28) >> 8;
-                uint32_t c = uint32_t(s.monocro);
+                uint32_t c = s.monocroColor;
                 r = int(mul255(uint32_t(y), uint32_t(chR(c))));
                 g = int(mul255(uint32_t(y), uint32_t(chG(c))));
                 b = int(mul255(uint32_t(y), uint32_t(chB(c))));
@@ -541,7 +553,7 @@ void placeStanding(E &e, int idx) {
     int w = s.img.cellWidth, h = s.img.image->h;
     int center = idx == 0 ? e.width_ / 4 : idx == 1 ? e.width_ / 2 : e.width_ * 3 / 4;
     s.x = center - w / 2;
-    s.y = e.underline_ - h + 1;
+    s.y = e.underline_ - h;
 }
 
 void cmdLd(E &e, const std::string &) {
@@ -622,10 +634,10 @@ void loadSprite(E &e, bool visible) {
     int n = e.readInt();
     e.readComma();
     std::string tag = e.readStr();
-    int x = 0, y = 0, alpha = 255;
+    int x = 0, y = 0, alpha = -1;
     if (e.readComma()) x = e.readInt();
     if (e.readComma()) y = e.readInt();
-    if (e.readComma()) alpha = e.readInt();
+    if (e.readComma()) alpha = std::clamp(e.readInt(), 0, 255);
     Sprite *s = e.spriteRef(n);
     if (!s) return;
     *s = Sprite();
@@ -637,18 +649,24 @@ void loadSprite(E &e, bool visible) {
     s->visible = visible;
     s->x = x;
     s->y = y;
-    s->alpha = std::clamp(alpha, 0, 255);
+    s->alpha = alpha;
     s->animClock = e.now_;
 }
 
 void cmdLsp(E &e, const std::string &name) { loadSprite(e, name == "lsp"); }
 
+// csp drops the image; the sprite's position, visibility, cell and alpha stay, as the PC engine's saves show.
+static void clearSprite(Sprite &s) {
+    s.img = LoadedImage();
+    s.loaded = false;
+}
+
 void cmdCsp(E &e, const std::string &) {
     int n = e.readInt();
     if (n == -1) {
-        for (Sprite &s : e.scene_.sp) s = Sprite();
+        for (Sprite &s : e.scene_.sp) clearSprite(s);
     } else if (Sprite *s = e.spriteRef(n)) {
-        *s = Sprite();
+        clearSprite(*s);
     }
 }
 
@@ -680,7 +698,7 @@ void cmdMsp(E &e, const std::string &name) {
     } else {
         s->x += x;
         s->y += y;
-        s->alpha = std::clamp(s->alpha + a, 0, 255);
+        s->alpha = std::clamp(s->drawAlpha() + a, 0, 255);
     }
 }
 
@@ -730,7 +748,12 @@ void cmdSpWait(E &e, const std::string &) {
 void cmdMonocro(E &e, const std::string &) {
     e.skipSpaces();
     std::string s = e.readStr();
-    e.scene_.monocro = sjisLower(s) == "off" ? -1 : int(parseColor(s));
+    if (sjisLower(s) == "off") {
+        e.scene_.monocro = false;
+        return;
+    }
+    e.scene_.monocroColor = parseColor(s);
+    e.scene_.monocro = true;
 }
 
 void cmdNega(E &e, const std::string &) { e.scene_.nega = e.readInt(); }
@@ -777,8 +800,32 @@ void cmdBar(E &e, const std::string &) {
     if (n >= 0 && n < int(e.scene_.bars.size())) e.scene_.bars[size_t(n)] = b;
 }
 
+// barclear turns the bars off; their numbers stay, as saves show.
 void cmdBarClear(E &e, const std::string &) {
-    for (auto &b : e.scene_.bars) b = Scene::Bar();
+    for (auto &b : e.scene_.bars) b.on = false;
+}
+
+void cmdPrnum(E &e, const std::string &) {
+    int n = e.readInt();
+    Scene::Prnum p;
+    p.on = true;
+    e.readComma();
+    p.value = e.readInt();
+    e.readComma();
+    p.x = e.readInt();
+    e.readComma();
+    p.y = e.readInt();
+    e.readComma();
+    p.w = e.readInt();
+    e.readComma();
+    p.h = e.readInt();
+    e.readComma();
+    p.color = parseColor(e.readStr());
+    if (n >= 0 && n < int(e.scene_.prnums.size())) e.scene_.prnums[size_t(n)] = p;
+}
+
+void cmdPrnumClear(E &e, const std::string &) {
+    for (auto &p : e.scene_.prnums) p.on = false;
 }
 
 void loadSprite2(E &e, bool visible, Blend blend) {
@@ -796,6 +843,7 @@ void loadSprite2(E &e, bool visible, Blend blend) {
     q.scaleY = e.readInt();
     e.readComma();
     q.rot = e.readInt();
+    q.alpha = 255;
     if (e.readComma()) q.alpha = std::clamp(e.readInt(), 0, 255);
     q.blend = blend;
     q.visible = visible;
@@ -857,7 +905,7 @@ void cmdMsp2(E &e, const std::string &name) {
         q.scaleX += v[2];
         q.scaleY += v[3];
         q.rot += v[4];
-        q.alpha = std::clamp(q.alpha + v[5], 0, 255);
+        q.alpha = std::clamp((q.alpha < 0 ? 255 : q.alpha) + v[5], 0, 255);
     }
 }
 
@@ -965,6 +1013,8 @@ void registerSceneCommands(std::unordered_map<std::string, CommandFn> &t) {
     t["humanorder"] = cmdHumanOrder;
     t["bar"] = cmdBar;
     t["barclear"] = cmdBarClear;
+    t["prnum"] = cmdPrnum;
+    t["prnumclear"] = cmdPrnumClear;
     for (const char *n : {"lsp2", "lsph2", "lsp2add", "lsph2add", "lsp2sub", "lsph2sub"}) t[n] = cmdLsp2;
     t["csp2"] = cmdCsp2;
     t["vsp2"] = cmdVsp2;

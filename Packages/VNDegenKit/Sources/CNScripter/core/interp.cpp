@@ -76,10 +76,8 @@ bool Engine::jumpToLabel(std::string_view label) {
         errorf("label *%s not found", std::string(label).c_str());
         return false;
     }
-    if (labelLogOn_) {
-        int idx = script_.labelIndex(label);
-        if (idx >= 0 && size_t(idx) < labelLog_.size()) labelLog_[size_t(idx)] = true;
-    }
+    if (labelLogOn_) noteLabelVisited(script_.labelIndex(label));
+    // Execution continues on the line after the label; the label line itself isn't run.
     jumpToLine(line);
     return true;
 }
@@ -510,6 +508,8 @@ void Engine::executeStatement() {
     skipSpaces();
     char c = peek();
     if (c == '\n') {
+        // Read-text marks cover the newline of each line passed in sequence.
+        if (!defineMode_) markRead(cur_.pos);
         cur_.pos++;
         cur_.line++;
         cur_.stmt = 0;
@@ -529,6 +529,13 @@ void Engine::executeStatement() {
     for (size_t p = lineStart; p < cur_.pos; p++)
         if (t[p] != ' ' && t[p] != '\t') atLineStart = false;
     if (atLineStart && (c == '*' || c == '~')) {
+        if (!defineMode_) markRead(cur_.pos);
+        if (c == '*' && labelLogOn_) {
+            // A label passed in sequence counts as visited.
+            size_t p = cur_.pos + 1, start = p;
+            while (p < t.size() && isIdentChar(t[p])) p++;
+            noteLabelVisited(script_.labelIndex(std::string_view(t).substr(start, p - start)));
+        }
         skipToLineEnd();
         return;
     }
@@ -544,6 +551,11 @@ void Engine::executeStatement() {
             if ((head == "v" || head == "dv" || head == "mv") && d < word.size()) known = true;
         }
         if (known) {
+            size_t start = cur_.pos;
+            cur_.pos = save;
+            if (!defineMode_) markRead(save);
+            noteStatementStart(false);
+            cur_.pos = start;
             executeCommand(word);
             return;
         }
@@ -558,6 +570,8 @@ void Engine::executeStatement() {
         skipToLineEnd();
         return;
     }
+    if (skipMode_ && kidokuSkip_ && !isRead(cur_.pos)) skipMode_ = false;  // skip stops at unread text
+    markRead(cur_.pos);
     beginTextLine();
 }
 

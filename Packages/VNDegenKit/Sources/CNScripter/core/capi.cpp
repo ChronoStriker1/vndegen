@@ -74,6 +74,7 @@ void vnns_text(VNNSEngine *e, const char *utf8) {
 void vnns_set_paused(VNNSEngine *e, bool paused) { e->engine->setPaused(paused); }
 void vnns_request_quit(VNNSEngine *e) { e->engine->requestQuit(); }
 void vnns_save_system_data(VNNSEngine *e) { e->engine->saveSystemData(); }
+bool vnns_load_game(VNNSEngine *e, int slot) { return e->engine->loadSlot(slot); }
 void vnns_stop(VNNSEngine *e) { delete e; }
 
 const char *vnns_problem(VNNSEngine *e) {

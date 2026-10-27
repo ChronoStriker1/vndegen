@@ -199,8 +199,14 @@ void Engine::drawClickCursor(Image &out) {
 
 void Engine::pushLog() {
     if (pageText_.empty()) return;
-    log_.push_back(pageText_);
-    if (int(log_.size()) > maxLogPages_) log_.erase(log_.begin());
+    std::string text = pageText_;
+    while (!text.empty() && text.back() == '\n') text.pop_back();
+    log_.push_back(text);
+    logTags_.push_back(pageTag_);
+    while (!log_.empty() && int(log_.size()) > maxLogPages_) {
+        log_.erase(log_.begin());
+        logTags_.erase(logTags_.begin());
+    }
 }
 
 void Engine::clearPage() {
@@ -252,6 +258,11 @@ bool Engine::beginTextLine() {
     pretextDone_ = false;
     lineHadText_ = false;
     noNewlineAtEnd_ = false;
+    // A page wait's clear happens as the next page starts, before that page's head becomes the savepoint.
+    if (pendingPageClear_) {
+        clearPage();
+        pendingPageClear_ = false;
+    }
     noteTextLineStart();
     return true;
 }
@@ -310,6 +321,7 @@ void Engine::textStep() {
                 p = end + 1;
             }
         }
+        if (page_.empty() && pageText_.empty()) pageTag_ = pretextTag_;
         if (pendingPageClear_) {
             clearPage();
             pendingPageClear_ = false;
@@ -586,7 +598,10 @@ void cmdSetWindow(E &e, const std::string &name) {
         }
     }
     e.textSpeed_ = w.speed;
-    if (name != "setwindow3") e.log_.clear();
+    if (name != "setwindow3") {
+        e.log_.clear();
+        e.logTags_.clear();
+    }
     e.page_.clear();
     e.pageText_.clear();
     e.penX_ = e.penY_ = 0;
@@ -709,7 +724,7 @@ void cmdRubyOn(E &e, const std::string &name) {
         e.rubyW_ = e.readInt();
         e.readComma();
         e.rubyH_ = e.readInt();
-        if (e.readComma()) e.readStr();
+            if (e.readComma()) e.rubyFont_ = e.readStr();
     }
     if (name == "rubyon2") e.rubyOn_ = true;
 }
@@ -780,7 +795,10 @@ void cmdTextHide(E &e, const std::string &name) {
     e.sceneDirty_ = true;
 }
 
-void cmdLookbackFlush(E &e, const std::string &) { e.log_.clear(); }
+void cmdLookbackFlush(E &e, const std::string &) {
+    e.log_.clear();
+    e.logTags_.clear();
+}
 
 void cmdGetLog(E &e, const std::string &) {
     E::VarRef v = e.readVar();
@@ -841,7 +859,8 @@ void cmdStrSp(E &e, const std::string &name) {
     Sprite *s = e.spriteRef(n);
     if (!s) return;
     *s = Sprite();
-    s->img.tag = text;
+    // strsp sprites save with no tag and alpha 255, as on the PC, so they don't come back on load.
+    s->alpha = 255;
     s->img.image = std::make_shared<const Image>(std::move(img));
     s->img.cells = int(colors.size());
     s->img.cellWidth = cellW;

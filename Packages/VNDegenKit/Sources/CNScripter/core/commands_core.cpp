@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cmath>
 #include <ctime>
+#include <algorithm>
 
 #include "engine.h"
 
@@ -90,6 +91,9 @@ void cmdDim(E &e, const std::string &) {
     for (int d : a.dims) n *= size_t(std::max(0, d) + 1);
     a.data.assign(n, 0);
     e.arrays_[v.index] = std::move(a);
+    // Saves hold the arrays' contents in the order the script declared them.
+    if (std::find(e.arrayOrder_.begin(), e.arrayOrder_.end(), v.index) == e.arrayOrder_.end())
+        e.arrayOrder_.push_back(v.index);
 }
 
 void cmdMovl(E &e, const std::string &) {
@@ -112,7 +116,7 @@ void cmdMovl(E &e, const std::string &) {
 void cmdTextGosub(E &e, const std::string &) { e.textGosub_ = e.readLabel(); }
 void cmdPreTextGosub(E &e, const std::string &) { e.preTextGosub_ = e.readLabel(); }
 void cmdLoadGosub(E &e, const std::string &) { e.loadGosub_ = e.readLabel(); }
-void cmdMaxKaisouPage(E &e, const std::string &) { e.maxLogPages_ = std::max(1, e.readInt()); }
+void cmdMaxKaisouPage(E &e, const std::string &) { e.maxLogPages_ = std::max(0, e.readInt()); }
 void cmdUseWheel(E &e, const std::string &) { e.useWheel_ = true; }
 void cmdUseEscSpc(E &e, const std::string &) { e.useEscSpc_ = true; }
 void cmdLinePage(E &e, const std::string &) { e.linePage_ = true; }
@@ -120,7 +124,6 @@ void cmdEnglish(E &e, const std::string &) {
     e.english_ = true;
     e.skipStatement();
 }
-void cmdKidokuSkip(E &e, const std::string &) { e.kidokuSkip_ = true; }
 void cmdHumanz(E &e, const std::string &) { e.humanz_ = e.readInt(); }
 void cmdWindowBack(E &e, const std::string &) { e.windowBack_ = true; }
 void cmdUnderline(E &e, const std::string &) { e.underline_ = e.readInt(); }
@@ -731,7 +734,6 @@ void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     t["useescspc"] = cmdUseEscSpc;
     t["linepage"] = cmdLinePage;
     t["english"] = cmdEnglish;
-    t["kidokuskip"] = cmdKidokuSkip;
     t["humanz"] = cmdHumanz;
     t["windowback"] = cmdWindowBack;
     t["underline"] = cmdUnderline;
@@ -801,7 +803,7 @@ void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     // Windows-only or cosmetic settings.
     for (const char *n : {"deletemenu", "resetmenu", "insertmenu", "killmenu", "versionstr", "mode_saya", "mode_ext",
                           "automode", "menusetwindow", "menuselectcolor", "menuselectvoice", "selectvoice",
-                          "clickvoice", "mousecursor", "mousemode", "debuglog", "autosaveoff", "errorsave", "spi",
+                          "clickvoice", "mousecursor", "mousemode", "debuglog", "errorsave", "spi",
                           "arc", "soundpressplgin", "cdfadeout", "noteraseman",
                           "clickskippage", "englishdialog", "minimizewindow", "movemousecursor", "menu_full",
                           "menu_window", "menu_click_def", "menu_click_page", "repaint", "filelogoff", "windowchip",

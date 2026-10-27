@@ -67,9 +67,10 @@ bool Engine::start(std::string *error) {
     const ScriptSettings &st = script_.settings();
     width_ = st.width;
     height_ = st.height;
-    underline_ = height_ - 1;
-    win_.x2 = width_ - 1;
-    win_.y2 = height_ - 1;
+    // Standing images stand on the screen's bottom edge, and the default window covers the screen, as on the PC.
+    underline_ = height_;
+    win_.x2 = width_;
+    win_.y2 = height_;
     globalBorder_ = st.globalBorder;
     num_.assign(size_t(std::max(st.variables, globalBorder_ + 1)), 0);
     str_.assign(num_.size(), std::string());

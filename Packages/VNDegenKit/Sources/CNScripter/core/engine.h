@@ -44,7 +44,8 @@ struct Sprite {
     bool loaded = false;
     bool visible = false;
     int x = 0, y = 0;
-    int alpha = 255;
+    int alpha = -1;  // -1 when the script gave none, drawn opaque; saves keep the distinction
+    int drawAlpha() const { return alpha < 0 ? 255 : alpha; }
     int cell = 0;
     int animDir = 1;
     int64_t animClock = 0;  // engine time of the last cell change
@@ -56,8 +57,8 @@ struct Sprite2 {
     bool loaded = false;
     bool visible = false;
     int cx = 0, cy = 0;
-    int scaleX = 100, scaleY = 100, rot = 0;
-    int alpha = 255;
+    int scaleX = 0, scaleY = 0, rot = 0;
+    int alpha = -1;
     int cell = 0;
     Blend blend = Blend::Normal;
 };
@@ -70,14 +71,36 @@ struct Scene {
     std::array<Sprite, kSpriteCount> sp;
     std::array<Sprite2, kSprite2Count> sp2;
     bool allSpHidden = false, allSp2Hidden = false;
-    int monocro = -1;  // -1 off, else color
+    bool monocro = false;
+    uint32_t monocroColor = 0;  // kept while monocro is off, as saves show
     int nega = 0;
     struct Bar {
         bool on = false;
-        int value = 0, x = 0, y = 0, w = 0, h = 0, max = 1;
+        int value = 0, x = 0, y = 0, w = 0, h = 0, max = 0;
         uint32_t color = 0;
     };
     std::array<Bar, 100> bars;
+    struct Prnum {
+        bool on = false;
+        int value = 0, x = 0, y = 0, w = 0, h = 0;
+        uint32_t color = 0;
+    };
+    std::array<Prnum, 100> prnums;
+};
+
+// Save fields whose meaning the lab didn't settle. A loaded PC save's values are kept and written back; a new game
+// starts from the values the PC engine writes for a fresh one.
+struct SaveExtras {
+    int h12 = 0;
+    std::string h32, h33;
+    int h100[6] = {1, 1, 0, 0, 0, 0};
+    int ldQ[3] = {0, 0, 0};
+    std::string pStr1;
+    int waveA = -1, waveB = 0, waveC = 0;
+    int pInt4 = 1;
+    int qInt1 = 0, qInt2 = 1, qInt3 = 0, qInt4 = 0, qInt5 = 0;
+    int tail[8] = {0, 0, 0, 0, 0, 0, 0, 0};  // [4] mirrors allsphide, [5] allsp2hide
+    std::string tStr;
 };
 
 struct Effect {
@@ -159,6 +182,8 @@ public:
         audio_.setPaused(p);
     }
     void saveSystemData();
+    // A load from outside the script: runs the define block first if the game hasn't left it yet.
+    bool loadSlot(int slot);
     AudioMixer &audio() { return audio_; }
     const std::string &problem() const { return problem_; }
     int width() const { return width_; }
@@ -290,7 +315,8 @@ public:
 
     // Text window (text.cpp)
     struct Window {
-        int tx = 8, ty = 16, cols = 23, rows = 16, fw = 26, fh = 26, px = 0, py = 2, speed = 20;
+        // The PC engine's defaults, read from its saves (its manual says x 8; the engine uses 21).
+        int tx = 21, ty = 16, cols = 23, rows = 16, fw = 26, fh = 26, px = 0, py = 2, speed = 20;
         bool bold = true, shadow = true;
         bool imageWindow = false;
         uint32_t color = rgba(0x99, 0x99, 0x99);
@@ -340,6 +366,8 @@ public:
     std::vector<std::pair<int, std::string>> textButtons_;  // number, text
     int lastCharX_ = 0, lastCharY_ = 0;
     std::vector<std::string> log_;  // lookback pages, oldest first
+    std::vector<std::string> logTags_;  // each page's [tag]
+    std::string pageTag_;               // the current page's [tag]
     int maxLogPages_ = 50;
     std::unique_ptr<FontRasterizer> fonts_;
     struct SpFont {
@@ -475,6 +503,30 @@ public:
     // Saves and system data (save.cpp)
     std::string saveDir_;
     bool saveOn_ = true;
+    bool autoSaveOff_ = false;
+    SaveExtras extras_;
+    // The savepoint: what a save writes. Live while saveon runs top-level statements; frozen at a text page's head,
+    // at saveoff, and at the savepoint command.
+    bool savepointLive_ = true;
+    Bytes savepoint_;
+    Cursor stmtStart_;  // where the statement being executed began
+    void serializeState(Bytes &out);
+    void serializeTail(Bytes &out, int line, int stmt);
+    int savepointLine_ = 0, savepointStmt_ = 0;
+    bool restoreState(const Bytes &data, std::string *error);
+    void freezeSavepoint(bool atTextHead = false);
+    void noteStatementStart(bool text);
+    bool insideTextGosub() const;
+    std::vector<int> arrayOrder_;  // dim order, which saves follow
+    std::vector<std::string> fileLogOrder_;
+    std::vector<int> labelLogOrder_;
+    std::vector<uint8_t> kidoku_;
+    bool kidokuOn_ = false;
+    void markRead(size_t pos);
+    bool isRead(size_t pos) const;
+    bool savegame2_ = false;
+    void noteLabelVisited(int labelIndex);
+    std::string rubyFont_;
     bool globalOn_ = false;
     bool fileLogOn_ = false, labelLogOn_ = false;
     bool kidokuSkip_ = false;

@@ -10,6 +10,7 @@
 //   hold NAME / release NAME
 //   text UTF8...        type text
 //   shot PATH           write the current frame as a PNG
+//   load N              load save slot N
 //   where               print the script line and what the game waits for
 //   quit                end the game as closing its window would, writing system data
 //
@@ -174,6 +175,10 @@ int main(int argc, char **argv) {
             std::vector<uint8_t> rgb(size_t(w) * size_t(h) * 3);
             for (size_t i = 0; i < size_t(w) * size_t(h); i++) memcpy(&rgb[i * 3], &px[i * 4], 3);
             stbi_write_png(path.c_str(), w, h, 3, rgb.data(), w * 3);
+        } else if (cmd == "load") {
+            int slot = 0;
+            in >> slot;
+            if (!vnns_load_game(e, slot)) std::cout << "load failed" << std::endl;
         } else if (cmd == "where") {
             std::cout << vnns_debug_status(e) << std::endl;
         } else if (cmd == "quit") {

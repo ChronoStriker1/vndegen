@@ -74,6 +74,10 @@ void vnns_set_paused(VNNSEngine *e, bool paused);
 
 // Ends the game the way closing its window does: system data (global variables, read text, logs) is written.
 void vnns_request_quit(VNNSEngine *e);
+// Loads save slot N the way the game's own loadgame does. Returns false when the slot can't be read. For hosts and
+// tests; players load through the game's own screens.
+bool vnns_load_game(VNNSEngine *e, int slot);
+
 // Writes the system data now, without ending the game.
 void vnns_save_system_data(VNNSEngine *e);
 // Frees the engine.
