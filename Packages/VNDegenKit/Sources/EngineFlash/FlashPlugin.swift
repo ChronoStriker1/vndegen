@@ -50,12 +50,13 @@ nonisolated public struct FlashPlugin: EnginePlugin {
     /// no more than `budget` entries.
     static func wrapsFlash(_ probe: FolderProbe, budget: Int = 2000) -> Bool {
         let probeDepth = probe.entries.map { $0.split(separator: "/").count }.max() ?? 0
-        var pending = probe.entries.sorted().filter { $0.split(separator: "/").count == probeDepth && GameFolder.isDirectory(probe.root.appendingPathComponent($0)) }
-        var seen = 0
-        while let folder = pending.popLast(), seen < budget {
+        var pending = probe.entries.sorted().filter { $0.split(separator: "/").count == probeDepth }.prefix(budget)
+            .filter { GameFolder.isDirectory(probe.root.appendingPathComponent($0)) }
+        var remaining = budget
+        while let folder = pending.popLast(), remaining > 0 {
             let names = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.appendingPathComponent(folder).path)) ?? []
-            seen += names.count
-            let paths = names.filter { !$0.hasPrefix(".") }.map { "\(folder)/\($0)" }
+            let paths = names.sorted().prefix(remaining).filter { !$0.hasPrefix(".") }.map { "\(folder)/\($0)" }
+            remaining -= min(names.count, remaining)
             if showsFlash(paths, in: probe.root) { return true }
             if folder.split(separator: "/").count + 1 < FlashGame.maxDepth {
                 pending += paths.filter { GameFolder.isDirectory(probe.root.appendingPathComponent($0)) }
@@ -69,7 +70,7 @@ nonisolated public struct FlashPlugin: EnginePlugin {
         guard let ruffle = Self.ruffleDirectory,
               let ruffleScript = try? String(contentsOf: ruffle.appendingPathComponent("ruffle.js"), encoding: .utf8)
         else { throw FlashError.ruffleMissing }
-        guard let host = Bundle.module.url(forResource: "flash", withExtension: "html")?.deletingLastPathComponent(),
+        guard let host = Self.hostDirectory,
               let pageSource = try? String(contentsOf: host.appendingPathComponent("flash-page.js"), encoding: .utf8)
         else { throw FlashError.hostMissing }
         let pageScript = try FlashFonts.pageScript(pageSource)
@@ -92,22 +93,35 @@ nonisolated public struct FlashPlugin: EnginePlugin {
     /// Where the page sees the files VNDegen ships for Flash: the host page, and Ruffle under `ruffle/`.
     static let hostPath = "/__vndegen/"
 
+    /// The host page and its scripts, from this module's resources.
+    static var hostDirectory: URL? { Bundle.module.url(forResource: "flash", withExtension: "html")?.deletingLastPathComponent() }
+
     /// Ruffle's web build, which the app bundles as Ruffle. Missing from package tests.
     static var ruffleDirectory: URL? { Bundle.main.url(forResource: "Ruffle", withExtension: nil) }
 
-    /// The page the session opens: a launcher page itself, and otherwise the host page with the movie's path.
+    /// The page the session opens: a launcher page itself, and otherwise the host page with the movie's URL path, which
+    /// the query escapes once more so that it reaches `flash.js` still encoded.
     static func startPage(for entry: FlashGame.Entry) -> String {
-        let path = escape("/" + entry.path)
+        let path = urlPath(entry.path)
         if case .page = entry { return path }
-        return "\(hostPath)flash.html?movie=\(path)"
+        let query = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/")
+        return "\(hostPath)flash.html?movie=\(path.addingPercentEncoding(withAllowedCharacters: query) ?? path)"
     }
 
-    /// Escapes everything but unreserved ASCII and `/`, so a path with spaces or Japanese reads back the same from the
-    /// URL and its query.
-    static func escape(_ path: String) -> String {
-        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/")
-        return path.addingPercentEncoding(withAllowedCharacters: allowed) ?? path
+    /// A path in the game folder as a URL path, `/My%20Game/game.swf`. Each part is encoded as a browser encodes a path,
+    /// and `%`, `#`, and `?` too, so the part reads back the same. Ruffle names shared objects with this encoding.
+    static func urlPath(_ path: String) -> String {
+        "/" + path.split(separator: "/").map { urlComponent(String($0)) }.joined(separator: "/")
     }
+
+    static func urlComponent(_ name: String) -> String {
+        name.addingPercentEncoding(withAllowedCharacters: urlAllowed) ?? name
+    }
+
+    /// Printable ASCII but the space, `"`, `#`, `%`, `/`, `<`, `>`, `?`, `` ` ``, `{`, and `}`. Everything else, such as
+    /// Japanese, is percent-encoded as UTF-8.
+    private static let urlAllowed = CharacterSet(charactersIn: Unicode.Scalar(0x21) ... Unicode.Scalar(0x7E))
+        .subtracting(CharacterSet(charactersIn: "\"#%/<>?`{}"))
 }
 
 nonisolated enum FlashError: LocalizedError {

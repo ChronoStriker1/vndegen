@@ -58,7 +58,7 @@ nonisolated extension FlashGame {
     private static let cache = Mutex<[String: (modified: Date?, read: Date, game: FlashGame?)]>([:])
 
     init?(_ probe: FolderProbe) {
-        var projectors: [(path: String, movie: FileSlice)] = [], swfs: [String] = [], pages: [String: Page] = [:]
+        var projectors: [(path: String, movie: FileSlice)] = [], swfs: [String] = [], htmlPaths: [String] = []
         var movies: [String: String] = [:]
         for path in probe.entries.sorted() {
             let url = probe.root.appendingPathComponent(path)
@@ -72,12 +72,20 @@ nonisolated extension FlashGame {
                 swfs.append(path)
                 movies[path.lowercased()] = path
             case "html", "htm":
-                if let page = Page(url, path: path) { pages[path.lowercased()] = page }
+                htmlPaths.append(path)
             default:
                 continue
             }
         }
         guard !projectors.isEmpty || !swfs.isEmpty else { return nil }
+        // Pages count links to projectors as movies, so they are read once the projectors are known.
+        let projectorPaths = Set(projectors.map { $0.path.lowercased() })
+        var pages: [String: Page] = [:]
+        for path in htmlPaths {
+            if let page = Page(probe.root.appendingPathComponent(path), path: path, projectors: projectorPaths) {
+                pages[path.lowercased()] = page
+            }
+        }
         var folders: [String: String] = [:]
         for path in movies.values {
             var parts = path.split(separator: "/").dropLast()
@@ -160,25 +168,25 @@ nonisolated extension FlashGame {
         case menu
     }
 
-    /// What an HTML page names: the movies it plays or links to, and the pages it links to, as lower-cased paths in the
-    /// game folder.
+    /// What an HTML page names: the movies and projectors it plays or links to, and the pages it links to, as lower-cased
+    /// paths in the game folder.
     struct Page: Equatable, Sendable {
         let path: String
         let movies: Set<String>
         let links: Set<String>
 
-        init?(_ url: URL, path: String) {
+        init?(_ url: URL, path: String, projectors: Set<String>) {
             guard let handle = try? FileHandle(forReadingFrom: url), let data = try? handle.read(upToCount: 256 << 10) else { return nil }
             try? handle.close()
             let text = String(decoding: data, as: UTF8.self)
             let folder = path.split(separator: "/").dropLast().map(String.init)
             // A reference is any quoted URL, so <embed src>, <param value>, links, and script strings all count.
-            let references = text.matches(of: /["']([^"'<>]+?\.(?i:swf|html?))(?:[?#][^"']*)?["']/).compactMap { match in
+            let references = text.matches(of: /["']([^"'<>]+?\.(?i:swf|exe|html?))(?:[?#][^"']*)?["']/).compactMap { match in
                 Self.resolve(String(match.1), from: folder)
             }
             self.path = path
-            movies = Set(references.filter { $0.hasSuffix(".swf") })
-            links = Set(references.filter { !$0.hasSuffix(".swf") && $0 != path.lowercased() })
+            movies = Set(references.filter { $0.hasSuffix(".swf") || projectors.contains($0) })
+            links = Set(references.filter { $0.hasSuffix(".html") || $0.hasSuffix(".htm") }.filter { $0 != path.lowercased() })
             guard !movies.isEmpty || !links.isEmpty else { return nil }
         }
 

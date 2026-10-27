@@ -76,13 +76,14 @@ extension FlashPlugin {
     /// after the movie, from a shared object name with slashes, stay as they are.
     private static func movieSave(_ parts: [String], movies: [String: String], folders: [String: String]) -> String? {
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("/") }) else { return nil }
-        if parts.count == 1 { return parts[0] }
+        // A save for the local path `/`: a name, or one with slashes in it, which starts with #.
+        if parts.count == 1 || parts[0].hasPrefix("#") { return parts.joined(separator: "/") }
         let path = parts.dropLast()
         // The longest end of the PC path that names a movie, or else a folder that holds one, which is where a movie
         // that asked for a shorter local path saves.
-        // A folder is followed only by the save's name, which may have #-parts of its own.
+        // A folder is followed only by the save's name, which starts with # when it has slashes in it.
         for (known, isFolder) in [(movies, false), (folders, true)] {
-            for end in stride(from: path.count, to: 0, by: -1) where !isFolder || path[end...].allSatisfy({ $0.hasPrefix("#") }) {
+            for end in stride(from: path.count, to: 0, by: -1) where !isFolder || path[end...].first.map({ $0.hasPrefix("#") }) ?? true {
                 for start in 0 ..< end {
                     guard let match = known[path[start ..< end].joined(separator: "/").lowercased()] else { continue }
                     return ([match] + path[end...] + [parts.last!]).joined(separator: "/")

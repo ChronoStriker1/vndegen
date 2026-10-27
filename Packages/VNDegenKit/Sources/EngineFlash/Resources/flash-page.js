@@ -74,6 +74,13 @@
     const flush = () => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
     document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
+    // The player that last had focus, which the game was being played in.
+    let lastFocused = null;
+    document.addEventListener('focusin', (event) => {
+        const player = event.target instanceof Element && event.target.closest('ruffle-player, ruffle-embed, ruffle-object');
+        if (player) lastFocused = player;
+    }, true);
+
     // Every Ruffle player on the page, the host page's own and those Ruffle puts in place of a launcher's <embed> and
     // <object> elements.
     const players = () => Array.from(document.querySelectorAll('ruffle-player, ruffle-embed, ruffle-object'))
@@ -88,8 +95,12 @@
                     player.ruffle().resume();
                 }
             }
-            // Ruffle reads keys only while a player has focus, which the hub's menu takes away.
-            if (!paused && players()[0]) players()[0].focus();
+            // Ruffle reads keys only while a player has focus, which the hub's menu takes away. The player that had it
+            // gets it back.
+            if (!paused) {
+                const player = lastFocused && lastFocused.isConnected ? lastFocused : players()[0];
+                if (player) player.focus();
+            }
         };
         window.__vndegen.beforeQuit = flush;
     }
@@ -112,14 +123,17 @@
     // the element under it, which is the player itself. Ruffle reads pointer and wheel events on the canvas in the
     // player's shadow root, so they go there as a real mouse would send them. Real mice and fingers reach the canvas
     // themselves. The wheel events sent on are marked, since they reach this listener again on their way up.
-    const canvasOf = (target) => {
-        const player = target instanceof Element && target.closest('ruffle-player, ruffle-embed, ruffle-object');
+    // The session sends wheel turns to the page's body at the pointer's place, so the player there takes them.
+    const canvasOf = (event) => {
+        const target = event.target instanceof Element && event.target !== document.body ? event.target
+            : document.elementFromPoint(event.clientX, event.clientY);
+        const player = target && target.closest('ruffle-player, ruffle-embed, ruffle-object');
         return player && player.shadowRoot && player.shadowRoot.querySelector('canvas');
     };
     const pointerTypes = { mousedown: 'pointerdown', mousemove: 'pointermove', mouseup: 'pointerup' };
     for (const type of Object.keys(pointerTypes)) {
         window.addEventListener(type, (event) => {
-            const canvas = event.isTrusted ? null : canvasOf(event.target);
+            const canvas = event.isTrusted ? null : canvasOf(event);
             if (!canvas) return;
             event.stopImmediatePropagation();
             if (type === 'mousedown') canvas.getRootNode().host.focus();
@@ -132,7 +146,7 @@
     }
     const forwarded = new WeakSet();
     window.addEventListener('wheel', (event) => {
-        const canvas = event.isTrusted || forwarded.has(event) ? null : canvasOf(event.target);
+        const canvas = event.isTrusted || forwarded.has(event) ? null : canvasOf(event);
         if (!canvas) return;
         event.stopImmediatePropagation();
         const wheel = new WheelEvent('wheel', {
@@ -172,7 +186,7 @@
         const url = new URL(link.getAttribute('href'), location.href);
         if (url.origin !== location.origin || !/\.(swf|exe)$/i.test(url.pathname)) return;
         event.preventDefault();
-        // The query goes along, as movie parameters do in a browser.
-        location.href = '/__vndegen/flash.html?movie=' + encodeURIComponent(decodeURIComponent(url.pathname) + url.search);
+        // The path stays as the page encoded it, and the query goes along, as movie parameters do in a browser.
+        location.href = '/__vndegen/flash.html?movie=' + encodeURIComponent(url.pathname + url.search);
     }, true);
 })();

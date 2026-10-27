@@ -95,11 +95,15 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(plugin.detect(FolderProbe(scanning: other)) == nil)
 }
 
-@Test func startPagesEscapeTheMoviePath() {
-    #expect(FlashPlugin.startPage(for: .movie(path: "sub/My Game 01.swf"))
-        == "/__vndegen/flash.html?movie=/sub/My%20Game%2001.swf")
+@Test func startPagesCarryTheMoviesURLPath() {
+    // The URL path, escaped once more for the query, so flash.js reads the URL path back.
+    #expect(FlashPlugin.urlPath("sub/My Game 01.swf") == "/sub/My%20Game%2001.swf")
+    #expect(FlashPlugin.urlPath("Hash#Game/100% Done?.swf") == "/Hash%23Game/100%25%20Done%3F.swf")
+    #expect(FlashPlugin.urlPath("打倒!/Game.exe") == "/%E6%89%93%E5%80%92!/Game.exe")
+    #expect(FlashPlugin.startPage(for: .movie(path: "sub/My Game 01.swf")) == "/__vndegen/flash.html?movie=/sub/My%2520Game%252001.swf")
     #expect(FlashPlugin.startPage(for: .projector(path: "打倒!/Game.exe", movie: FileSlice(offset: 0, length: 1)))
-        == "/__vndegen/flash.html?movie=/%E6%89%93%E5%80%92%21/Game.exe")
+        == "/__vndegen/flash.html?movie=/%25E6%2589%2593%25E5%2580%2592%21/Game.exe")
+    #expect(FlashPlugin.startPage(for: .page(path: "My Menu.html")) == "/My%20Menu.html")
 }
 
 @Test func sharedObjectsAreSolFilesNamedByTheirMovie() throws {
@@ -131,6 +135,18 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(try store.load()["game//root_save"] == nil)
     try store.clear()
     #expect(try store.load().isEmpty)
+
+    // Each key comes back as Ruffle asks for it: a literal %, a folder that starts with #, and a name with slashes for
+    // the local path /.
+    for (key, file) in [
+        ("game/My%25Game/movie.swf/save", "My%Game/movie.swf/save"),
+        ("game/%23bonus/movie.swf/save", "#bonus/movie.swf/save"),
+        ("game//#saves/slot", "#saves/slot"),
+        ("game/Sub/#saves/chapter/slot", "Sub/#saves/chapter/slot"),
+    ] {
+        #expect(SharedObjectStore.file(forKey: key) == file)
+        #expect(SharedObjectStore.key(forFile: file) == key)
+    }
 
     // Keys of other hosts and keys that would leave the folder go to the other store.
     #expect(SharedObjectStore.file(forKey: "other.example/game.swf/save") == nil)
@@ -235,7 +251,30 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/#slots/one.sol", movies: movies, folders: folders) == "Sub/#slots/one.sol")
     // A folder is no match for a movie this game doesn't have.
     #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/other.swf/save.sol", movies: movies, folders: folders) == nil)
+    // Names with slashes in them, saved for a folder or for /.
+    #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/#saves/chapter/slot.sol", movies: movies, folders: folders) == "Sub/#saves/chapter/slot.sol")
+    #expect(FlashPlugin.savePath("\(flashPlayer)/#saves/slot.sol", movies: movies, folders: folders) == "#saves/slot.sol")
     // Ruffle on the PC percent-encodes the movie's path.
     #expect(FlashPlugin.savePath("C:/Users/Player/AppData/Roaming/ruffle/SharedObjects/localhost/Games/My%20Game/movie.swf/s.sol",
                                  movies: movies, folders: folders) == "My Game/movie.swf/s.sol")
+}
+
+@Test func aMenuOfProjectorsIsAnEntry() throws {
+    let root = try game([
+        "Menu.html": html("<a href='Episode1.exe'>1</a> <a href=\"Episode2.exe\">2</a> <a href='setup.exe'>setup</a>"),
+        "Episode1.exe": projector(movie()), "Episode2.exe": projector(movie()), "setup.exe": Data("MZ".utf8) + Data(count: 64),
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    let flash = try #require(FlashGame(folder: root))
+    #expect(flash.main == .page(path: "Menu.html"))
+}
+
+@Test func theDeepScanStopsAtItsBudget() throws {
+    var files: [String: Data] = ["a/b/c/z/game.exe": projector(movie())]
+    for index in 0 ..< 50 { files["a/b/c/file\(index).txt"] = html("") }
+    let root = try game(files)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let probe = FolderProbe(scanning: root)
+    #expect(FlashPlugin.wrapsFlash(probe))
+    #expect(!FlashPlugin.wrapsFlash(probe, budget: 10))
 }

@@ -1,5 +1,6 @@
-// Plays a Flash movie in Ruffle. The app opens flash.html?movie=<path>, where <path> is the movie's path in the game
-// folder, such as /game.swf or /Game.exe for a projector, whose embedded movie the app serves at that path. Ruffle, its
+// Plays a Flash movie in Ruffle. The app opens flash.html?movie=<path>, where <path> is the movie's URL path in the game
+// folder, such as /My%20Game/game.swf or /Game.exe for a projector, whose embedded movie the app serves at that path.
+// The query escapes it once more, so it is still a URL path here. Ruffle, its
 // settings, and what ties its players to the session come from the user scripts flash-page.js and ruffle.js.
 (() => {
     'use strict';

@@ -284,7 +284,10 @@ nonisolated extension GameFolder {
         // The file a request names, in whatever case, is embedded when it is the file an embedded path names. A disk that
         // ignores case finds both under the case they were asked for, so the files are compared, not the paths.
         if !embedded.isEmpty, let url = resolve(servedPath: path),
-           let slice = embedded[path] ?? embedded.first(where: { Self.sameFile(resolve(servedPath: $0.key), url) })?.value {
+           let slice = embedded[path] ?? embedded.first(where: {
+               ($0.key as NSString).lastPathComponent.caseInsensitiveCompare(url.lastPathComponent) == .orderedSame
+                   && Self.sameFile(resolve(servedPath: $0.key), url)
+           })?.value {
             guard let (handle, size) = openRegularFile(url),
                   slice.offset <= UInt64(size), slice.length <= size - Int64(slice.offset) else { return nil }
             return (handle, slice.offset, slice.length, url.lastPathComponent)
