@@ -115,27 +115,27 @@ private let setUp = """
             if (index === 0) await lengthRead();
             now += 140;
         }
-        // The first frame again: the pass is complete, and the kept frames play from here.
-        present(0);
-        const start = now;
+        // The file lists four frames, so the pass is complete at the fourth, at 0.42 s, before WebKit would stall at
+        // its end. The kept frames play from there. The first frame started at 1000 ms.
+        const start = 1000;
         const frames = [];
         const at = (ms) => {
             now = start + ms;
             frames.push(shown());
         };
-        for (const ms of [0, 150, 290, 430, 600, 699, 710]) at(ms);
+        for (const ms of [430, 600, 699, 710, 850, 990, 1130]) at(ms);
         // The engine stops for two seconds, then goes on one short step later.
-        at(2710);
+        at(3130);
         video.paused = true;
-        at(3010);
+        at(3430);
         video.paused = false;
-        at(3110);
+        at(3530);
         video.playbackRate = 2;
-        at(3160);
+        at(3580);
         const uploads = resource.uploaded.length;
         // The game seeks.
-        video.currentTime = 0.15;
-        at(3160);
+        video.currentTime = 0.3;
+        at(3580);
         // A new source starts keeping over, and the old frames are let go.
         const kept = resource.uploaded[resource.uploaded.length - 1];
         video.dispatchEvent(new Event('emptied'));
@@ -147,17 +147,18 @@ private let setUp = """
     // One change for the first update, then one for each presented frame however often the engine updates.
     #expect(values["changes"] as? [Int] == [1, 2, 3, 4, 5])
     // The last frame shows from 0.42 s to the stated 0.7 s, where the next pass starts. After the stop, the clip goes
-    // on 0.25 s later. Paused, it holds. At twice the speed, 50 ms moves it 0.1 s. A seek to 0.15 s shows the second
+    // on 0.25 s later. Paused, it holds. At twice the speed, 50 ms moves it 0.1 s. A seek to 0.3 s shows the third
     // frame.
-    #expect(values["frames"] as? [Int] == [0, 1, 2, 3, 3, 3, 0, 1, 1, 2, 3, 1])
+    #expect(values["frames"] as? [Int] == [3, 3, 3, 0, 1, 2, 3, 3, 3, 0, 1, 2])
     // A kept frame is uploaded only when the shown frame changes.
-    #expect(values["uploads"] as? Int == 8)
+    #expect(values["uploads"] as? Int == 7)
     #expect(values["native"] as? Bool == true)
     #expect(values["released"] as? Int == 0)
 }
 
-/// Frames close together at the start, a seek while the length is still being read, and a paused session, during which
-/// PIXI's own ticker goes on updating the texture.
+/// Frames close together at the start, which do not match the file's frame times, so their pass ends where the video
+/// wraps. Then a seek while the length is still being read, and a paused session, during which PIXI's own ticker goes
+/// on updating the texture.
 @Test @MainActor func keptFramesFollowSeeksAndSessionPauses() async throws {
     let values = try await runWithVideo("""
         let release;

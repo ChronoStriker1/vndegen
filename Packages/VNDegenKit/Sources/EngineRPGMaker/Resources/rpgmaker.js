@@ -267,7 +267,7 @@
     // frame to the GPU 60 times a second at about 4 ms a copy. Now each new frame is copied once.
     const loopLimits = { seconds: 10, bytes: 32 << 20, start: 0.02, step: 250 };
     const videoStates = new WeakMap(), watchedVideos = new WeakMap();
-    const fileLengths = new Map();
+    const fileTimelines = new Map();
     // Kept frames do not play while the session is paused, whether or not PIXI's shared ticker goes on updating them.
     let sessionPaused = false, resumedAt = 0;
     function smoothVideoLoops(pixi) {
@@ -354,7 +354,7 @@
         video.addEventListener('emptied', () => {
             if (state.mode === 'done') return;
             dropFrames(state, 'keeping');
-            Object.assign(state, { count: -1, last: 0, position: 0, length: undefined });
+            Object.assign(state, { count: -1, last: 0, position: 0, length: undefined, times: undefined });
         });
         watchedVideos.set(video, state);
         return state;
@@ -374,9 +374,10 @@
         if (state.length === undefined) {
             state.length = null;
             const url = video.currentSrc;
-            fileLength(url).then((length) => {
+            fileTimeline(url).then((timeline) => {
                 if (video.currentSrc !== url || state.mode === 'done') return;
-                state.length = length || 0;
+                state.length = timeline ? timeline.length : 0;
+                state.times = timeline && timeline.times;
                 if (state.mode === 'ready') finishKeeping(state, performance.now());
             });
         }
@@ -399,6 +400,11 @@
         if (state.bytes > loopLimits.bytes) return dropFrames(state, 'native');
         canvas.getContext('2d').drawImage(video, 0, 0);
         state.frames.push({ time, canvas });
+        // With the file's frame times, the pass is whole at its last frame, before WebKit stalls at its end.
+        if (state.times && state.times.every((start) => state.frames.some((frame) => Math.abs(frame.time - start) < 0.002))) {
+            state.position = time;
+            finishKeeping(state, now);
+        }
     }
 
     // Plays the kept frames once the file's length is known, null while it is being read. A video whose length cannot
@@ -421,15 +427,15 @@
         state.mode = mode;
     }
 
-    // The length a WebM file states in its Segment Info, in seconds, or null.
-    function fileLength(url) {
-        if (!fileLengths.has(url)) {
-            fileLengths.set(url, fetch(url).then((response) => response.arrayBuffer()).then(webmLength).catch(() => null));
+    // The length a WebM file states in its Segment Info, in seconds, and when each of its video frames starts, or null.
+    function fileTimeline(url) {
+        if (!fileTimelines.has(url)) {
+            fileTimelines.set(url, fetch(url).then((response) => response.arrayBuffer()).then(webmTimeline).catch(() => null));
         }
-        return fileLengths.get(url);
+        return fileTimelines.get(url);
     }
 
-    function webmLength(buffer) {
+    function webmTimeline(buffer) {
         const data = new DataView(buffer);
         let at = 0;
         // An EBML variable-length integer. IDs keep their length marker, sizes drop it. A size of all ones is unknown.
@@ -447,26 +453,47 @@
             at += length;
             return isID || !ones ? value : Infinity;
         };
-        // Info usually comes first, but may follow the Clusters, which are skipped by their sizes.
-        let end = data.byteLength, scale = 1e6, duration = null, infoEnd = -1;
-        while (at < end && at !== infoEnd) {
-            const id = read(true), size = read(false), body = at;
-            if (id === 0x18538067 || id === 0x1549a966) {
-                // Segment, then its Info, which holds the length.
-                if (size !== Infinity) end = Math.min(end, body + size);
-                if (id === 0x1549a966) infoEnd = size === Infinity ? -1 : body + size;
-                continue;
+        // Segment, Info, Tracks, a TrackEntry, a Cluster and a BlockGroup hold what is read here. Everything else is
+        // skipped by its size.
+        const containers = [0x18538067, 0x1549a966, 0x1654ae6b, 0xae, 0x1f43b675, 0xa0];
+        let scale = 1e6, duration = null, entry = {}, videoTrack = null, cluster = 0, blocks = [];
+        try {
+            while (at < data.byteLength) {
+                const id = read(true), size = read(false), body = at;
+                if (containers.includes(id)) {
+                    if (id === 0xae) entry = {};
+                    continue;
+                }
+                if (size === Infinity) break;
+                const number = () => {
+                    let value = 0;
+                    for (let i = 0; i < size; i++) value = value * 256 + data.getUint8(body + i);
+                    return value;
+                };
+                if (id === 0x2ad7b1) {
+                    scale = number();
+                } else if (id === 0x4489) {
+                    duration = size === 4 ? data.getFloat32(body) : size === 8 ? data.getFloat64(body) : null;
+                } else if (id === 0xd7 || id === 0x83) {
+                    entry[id === 0xd7 ? 'number' : 'type'] = number();
+                    if (entry.type === 1 && entry.number !== undefined && videoTrack === null) videoTrack = entry.number;
+                } else if (id === 0xe7) {
+                    cluster = number();
+                } else if (id === 0xa3 || id === 0xa1) {
+                    // A SimpleBlock or Block starts with its track and its time after the Cluster's.
+                    const track = read(false);
+                    blocks.push({ track, time: cluster + data.getInt16(at) });
+                }
+                at = body + size;
             }
-            if (size === Infinity) break;
-            if (id === 0x2ad7b1) {
-                scale = 0;
-                for (let i = 0; i < size; i++) scale = scale * 256 + data.getUint8(body + i);
-            } else if (id === 0x4489) {
-                duration = size === 4 ? data.getFloat32(body) : size === 8 ? data.getFloat64(body) : null;
-            }
-            at = body + size;
+        } catch (e) {
+            // A frame list cut short would end a pass early, so a file that does not read to its end gives none.
+            blocks = [];
         }
-        return duration > 0 && scale > 0 ? duration * scale / 1e9 : null;
+        if (!(duration > 0 && scale > 0)) return null;
+        const times = [...new Set(blocks.filter((block) => videoTrack === null || block.track === videoTrack)
+            .map((block) => block.time * scale / 1e9))].sort((a, b) => a - b);
+        return { length: duration * scale / 1e9, times: times.length ? times : null };
     }
     let pixi;
     Object.defineProperty(window, 'PIXI', {
