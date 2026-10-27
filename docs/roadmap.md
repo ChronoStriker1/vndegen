@@ -22,11 +22,11 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - KiriKiri 2 and KiriKiri Z on Mac, iPhone, and iPad, built on krkrsdl3, with the common ciphers, Windows plugins, and movie formats built in (0.6.0).
 - Controller mouse emulation, on `dev` for the next release: sticks and buttons can move the pointer, turn the mouse wheel, and open the on-screen keyboard. KiriKiri and TyranoScript games start with "Keyboard and mouse", the layout of Steam's template, and the mapping editor also offers "Mouse", "RPG Maker controls", and "Xbox gamepad".
 - An RPG Maker MZ fix, on `dev` for the next release: looping WebM movies made from GIFs, which WebKit takes for shorter than they are, now play at their stated length, so they no longer stutter or drift from their sound. Movie frames are uploaded only when they change.
+- An RPG Maker MZ fix, on `dev` for the next release: quick controller, touch gamepad, and key presses all reach the game. Each press and release reaches the game's input on its own update, and a VisuStella Core Engine input clear no longer drops the presses that follow it, so timed attacks that need several quick presses succeed.
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - The whole app works with a controller alone (item 1 under Next).
-- An RPG Maker MZ fix for timed battle attacks that miss quick presses.
 
 ## Next
 1. The whole app works with a controller alone: the library, game pages, Settings and every page under it, the button mapping editor including assigning buttons, the in-game VNDegen menu, artwork and metadata pickers, import, save sync, the lock screen, and every dialog and alert. Text fields open a keyboard the controller can type on. Where a system screen such as the Files picker can't take controller input, VNDegen offers a controller-friendly path instead or says so on screen.
