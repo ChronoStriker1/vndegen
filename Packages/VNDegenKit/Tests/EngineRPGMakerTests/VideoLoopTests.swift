@@ -40,12 +40,20 @@ private let page = """
     let result = try await webView.callAsyncJavaScript("""
         let now = 1000;
         performance.now = () => now;
+        // The file's length is read in the background. The test waits for that read rather than for a set time.
+        const reads = [];
+        const arrayBuffer = Response.prototype.arrayBuffer;
+        Response.prototype.arrayBuffer = function () {
+            const read = arrayBuffer.call(this);
+            reads.push(read);
+            return read;
+        };
         const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
         const video = document.createElement('canvas');
         video.width = video.height = 4;
         let callbacks = [], presented = 0;
         Object.assign(video, {
-            videoWidth: 4, videoHeight: 4, loop: true, paused: false, playbackRate: 1, duration: 0.44,
+            videoWidth: 4, videoHeight: 4, loop: true, paused: false, playbackRate: 1, duration: 0.44, currentTime: 0,
             currentSrc: 'data:video/webm;base64,' + clip,
             requestVideoFrameCallback(callback) { callbacks.push(callback); },
         });
@@ -60,12 +68,15 @@ private let page = """
         };
         const resource = new PIXI.resources.VideoResource(video);
         const texture = new PIXI.BaseTexture(resource);
-        // Which frame the texture would show now, by color, and how often the texture has changed.
+        // Like PIXI's renderer, this uploads only when the texture has changed. It returns the shown frame's color.
+        let uploadedAt = -1;
         const shown = () => {
             texture.update();
-            resource.upload(null, texture, {});
-            const uploaded = resource.uploaded[resource.uploaded.length - 1];
-            const pixel = uploaded.getContext('2d').getImageData(0, 0, 1, 1).data;
+            if (texture.dirtyId !== uploadedAt) {
+                uploadedAt = texture.dirtyId;
+                resource.upload(null, texture, {});
+            }
+            const pixel = resource.uploaded[resource.uploaded.length - 1].getContext('2d').getImageData(0, 0, 1, 1).data;
             return colors.indexOf('#' + Array.from(pixel.slice(0, 3), (c) => c.toString(16).padStart(2, '0')).join(''));
         };
         const changes = [];
@@ -77,38 +88,55 @@ private let page = """
             texture.update();
             texture.update();
             changes.push(texture.dirtyId);
-            if (index === 0) await new Promise((done) => setTimeout(done, 200));
+            if (index === 0) {
+                for (let tries = 0; !reads.length; tries++) {
+                    if (tries > 500) throw new Error('the file was never read');
+                    await new Promise((done) => setTimeout(done, 10));
+                }
+                await reads[0];
+                await new Promise((done) => setTimeout(done, 0));
+            }
             now += 140;
         }
-        // The first frame again: the pass is complete, and the clock takes over from here.
+        // The first frame again: the pass is complete, and the kept frames play from here.
         present(0);
         const start = now;
         const frames = [];
-        for (const at of [0, 150, 290, 430, 600, 699, 710, 1430]) {
-            now = start + at;
+        const at = (ms) => {
+            now = start + ms;
             frames.push(shown());
-        }
-        const before = texture.dirtyId;
-        texture.update();
-        const changedWithoutNewFrame = texture.dirtyId !== before;
+        };
+        for (const ms of [0, 150, 290, 430, 600, 699, 710]) at(ms);
+        // The engine stops for two seconds, then goes on one short step later.
+        at(2710);
         video.paused = true;
-        now = start + 1500;
-        const paused = shown();
-        now = start + 1800;
+        at(3010);
         video.paused = false;
-        const resumed = shown();
+        at(3110);
+        video.playbackRate = 2;
+        at(3160);
+        const uploads = resource.uploaded.length;
+        // The game seeks.
+        video.currentTime = 0.15;
+        video.dispatchEvent(new Event('seeked'));
+        at(3160);
+        // A new source starts keeping over, and the old frames are let go.
         const kept = resource.uploaded[resource.uploaded.length - 1];
-        resource.dispose();
-        return { changes, frames, changedWithoutNewFrame, paused, resumed, released: kept.width };
+        video.dispatchEvent(new Event('emptied'));
+        texture.update();
+        resource.upload(null, texture, {});
+        const native = resource.uploaded[resource.uploaded.length - 1] === video;
+        return { changes, frames, uploads, native, released: kept.width };
         """, arguments: ["clip": clip.base64EncodedString()], contentWorld: .page) as? [String: Any]
     let values = try #require(result)
     // One change for the first update, then one for each presented frame however often the engine updates.
     #expect(values["changes"] as? [Int] == [1, 2, 3, 4, 5])
-    // The last frame shows from 0.42 s to the stated 0.7 s, where the next pass starts.
-    #expect(values["frames"] as? [Int] == [0, 1, 2, 3, 3, 3, 0, 0])
-    #expect(values["changedWithoutNewFrame"] as? Bool == false)
-    // Paused at 1.5 s, in the third pass's first frame, the clip resumes where it stopped.
-    #expect(values["paused"] as? Int == 0)
-    #expect(values["resumed"] as? Int == 0)
+    // The last frame shows from 0.42 s to the stated 0.7 s, where the next pass starts. After the stop, the clip goes
+    // on 0.25 s later. Paused, it holds. At twice the speed, 50 ms moves it 0.1 s. A seek to 0.15 s shows the second
+    // frame.
+    #expect(values["frames"] as? [Int] == [0, 1, 2, 3, 3, 3, 0, 1, 1, 2, 3, 1])
+    // A kept frame is uploaded only when the shown frame changes.
+    #expect(values["uploads"] as? Int == 8)
+    #expect(values["native"] as? Bool == true)
     #expect(values["released"] as? Int == 0)
 }

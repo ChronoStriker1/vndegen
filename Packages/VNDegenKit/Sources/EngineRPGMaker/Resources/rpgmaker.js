@@ -150,11 +150,11 @@
     // Short looping videos, mostly animated GIFs converted to WebM for picture plugins such as PKD_VPlayer. WebKit takes
     // such a video's length as its last frame's start plus a guess, not the length the file states, so it ends the loop
     // early, then seeks back to the start and shows nothing new for about 300 ms: a 0.56 s loop of four frames took
-    // 0.75 s, stuttered at each turn, and fell out of step with the sound made for it. Here the first pass is kept frame
-    // by frame, and from then on the texture shows those frames by the clock over the file's stated length. PIXI also
-    // marked a video texture changed on every tick, so WebKit copied the same frame to the GPU 60 times a second at
-    // about 4 ms a copy. Now each new frame is copied once.
-    const loopLimits = { seconds: 10, bytes: 32 << 20 };
+    // 0.75 s, stuttered at each turn, and fell out of step with the sound made for it. Here the first whole pass of a
+    // WebM that states its length is kept frame by frame, and from then on the texture shows those frames as the video
+    // plays, over the stated length. PIXI also marked a video texture changed on every tick, so WebKit copied the same
+    // frame to the GPU 60 times a second at about 4 ms a copy. Now each new frame is copied once.
+    const loopLimits = { seconds: 10, bytes: 32 << 20, start: 0.02, step: 250 };
     const videoStates = new WeakMap();
     const fileLengths = new Map();
     function smoothVideoLoops(pixi) {
@@ -164,7 +164,8 @@
         pixi.BaseTexture.prototype.update = function () {
             const resource = this.resource;
             if (this.valid && resource instanceof VideoResource && resource.source) {
-                const frame = videoFrame(resource);
+                // A resize must reach the texture even when the frame has not changed.
+                const frame = videoFrame(resource) + '/' + this.realWidth + 'x' + this.realHeight;
                 if (frame === this.vndegenFrame) return;
                 this.vndegenFrame = frame;
             }
@@ -190,66 +191,77 @@
         const video = resource.source;
         let state = videoStates.get(resource);
         if (!state || state.video !== video) {
-            state = { video, mode: 'keeping', presented: 0, frames: [], bytes: 0, last: -1, count: -1, origin: 0, shown: 0 };
+            state = watchVideo(video);
             videoStates.set(resource, state);
-            const onFrame = (now, meta) => {
-                if (state.mode === 'done') return;
-                state.presented++;
-                if (state.mode === 'keeping') keepFrame(state, now, meta);
-                video.requestVideoFrameCallback(onFrame);
-            };
-            video.requestVideoFrameCallback(onFrame);
         }
         if (state.mode !== 'kept') return state.presented;
         if (!video.loop) {
             dropFrames(state, 'native');
             return state.presented;
         }
+        // The kept frames play as far as the video has played since the last update. A long gap, such as the session
+        // pausing the game, counts as one short step, so the clip goes on near where it stopped.
         const now = performance.now();
-        if (video.paused) {
-            if (state.pausedAt === undefined) state.pausedAt = now;
-        } else {
-            if (state.pausedAt !== undefined) state.origin += now - state.pausedAt;
-            state.pausedAt = undefined;
-            const time = ((now - state.origin) / 1000 * video.playbackRate) % state.length;
-            const frames = state.frames;
-            let shown = 0;
-            while (shown + 1 < frames.length && frames[shown + 1].time <= time) shown++;
-            state.shown = shown;
-        }
-        return -1 - state.shown;
+        const elapsed = Math.min(now - state.tick, loopLimits.step);
+        state.tick = now;
+        if (!video.paused) state.position = (state.position + elapsed / 1000 * video.playbackRate) % state.length;
+        const frames = state.frames;
+        let shown = 0;
+        while (shown + 1 < frames.length && frames[shown + 1].time <= state.position) shown++;
+        state.shown = shown;
+        return -1 - shown;
     }
 
-    // Keeps each frame of one whole pass, from a frame at time 0 up to the next return to it.
+    function watchVideo(video) {
+        const state = { video, mode: 'keeping', presented: 0, frames: [], bytes: 0, count: -1 };
+        const onFrame = (now, meta) => {
+            if (state.mode === 'done') return;
+            state.presented++;
+            video.requestVideoFrameCallback(onFrame);
+            if (state.mode !== 'keeping') return;
+            try {
+                keepFrame(state, now, meta);
+            } catch (e) {
+                dropFrames(state, 'native');
+            }
+        };
+        video.requestVideoFrameCallback(onFrame);
+        // A new source starts over. WebKit's own loop seeks back to 0, so only a seek elsewhere is the game's: it moves
+        // the kept frames' position, or starts keeping over.
+        video.addEventListener('emptied', () => {
+            if (state.mode === 'done') return;
+            dropFrames(state, 'keeping');
+            state.count = -1;
+            state.length = undefined;
+        });
+        video.addEventListener('seeked', () => {
+            if (state.mode === 'done' || !(video.currentTime > loopLimits.start)) return;
+            if (state.mode === 'kept') state.position = video.currentTime % state.length;
+            else if (state.mode === 'keeping') dropFrames(state, 'keeping');
+        });
+        return state;
+    }
+
+    // Keeps each frame of one whole pass, from a frame at the start up to the next return to it.
     function keepFrame(state, now, meta) {
         const video = state.video, time = meta.mediaTime;
         if (!video.loop || !(video.duration <= loopLimits.seconds)) return dropFrames(state, 'native');
-        if (state.stated === undefined) {
-            state.stated = null;
-            fileLength(video.currentSrc).then((length) => {
-                state.stated = length;
-                if (state.mode === 'kept' && length > state.frames[state.frames.length - 1].time) state.length = length;
+        if (state.length === undefined) {
+            state.length = null;
+            const url = video.currentSrc;
+            fileLength(url).then((length) => {
+                if (video.currentSrc !== url || state.mode === 'done') return;
+                state.length = length || 0;
+                if (state.mode === 'ready') finishKeeping(state, performance.now(), 0);
             });
         }
-        const restarted = time < state.last || (state.last < 0 && time <= 0.001);
+        const atStart = time < loopLimits.start;
         // A frame skipped while keeping would be missing from every later pass.
         const skipped = state.count >= 0 && meta.presentedFrames !== state.count + 1;
-        state.last = time;
         state.count = meta.presentedFrames;
-        const frames = state.frames;
-        if (restarted && frames.length && !skipped) {
-            const end = frames[frames.length - 1].time;
-            // Without a usable stated length, the last frame lasts as long as the one before it.
-            state.length = state.stated > end ? state.stated
-                : Math.max(video.duration, end + (frames.length > 1 ? end - frames[frames.length - 2].time : 0.1));
-            state.mode = 'kept';
-            state.origin = now - time * 1000 / video.playbackRate;
-            return;
-        }
-        if (skipped || (!restarted && !frames.length)) {
-            dropFrames(state, 'keeping');
-            if (!restarted) return;
-        }
+        if (skipped) dropFrames(state, 'keeping');
+        if (atStart && state.frames.length) return finishKeeping(state, now, time);
+        if (!atStart && !state.frames.length) return;
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -257,6 +269,19 @@
         if (state.bytes > loopLimits.bytes) return dropFrames(state, 'native');
         canvas.getContext('2d').drawImage(video, 0, 0);
         state.frames.push({ time, canvas });
+    }
+
+    // Plays the kept frames once the file's length is known, null while it is being read. A video whose length cannot
+    // be read, 0, plays as WebKit plays it.
+    function finishKeeping(state, now, position) {
+        const frames = state.frames;
+        if (state.length === null) {
+            state.mode = 'ready';
+        } else if (state.length > frames[frames.length - 1].time) {
+            Object.assign(state, { mode: 'kept', position, tick: now, shown: 0 });
+        } else {
+            dropFrames(state, 'native');
+        }
     }
 
     function dropFrames(state, mode) {
@@ -292,20 +317,21 @@
             at += length;
             return isID || !ones ? value : Infinity;
         };
-        let end = data.byteLength, scale = 1e6, duration = null, inInfo = false;
-        while (at < end) {
+        // Info usually comes first, but may follow the Clusters, which are skipped by their sizes.
+        let end = data.byteLength, scale = 1e6, duration = null, infoEnd = -1;
+        while (at < end && at !== infoEnd) {
             const id = read(true), size = read(false), body = at;
             if (id === 0x18538067 || id === 0x1549a966) {
-                // Segment, then its Info, which holds the length. The search ends with Info.
+                // Segment, then its Info, which holds the length.
                 if (size !== Infinity) end = Math.min(end, body + size);
-                inInfo = inInfo || id === 0x1549a966;
+                if (id === 0x1549a966) infoEnd = size === Infinity ? -1 : body + size;
                 continue;
             }
-            if (id === 0x1f43b675 || size === Infinity) break;
-            if (inInfo && id === 0x2ad7b1) {
+            if (size === Infinity) break;
+            if (id === 0x2ad7b1) {
                 scale = 0;
                 for (let i = 0; i < size; i++) scale = scale * 256 + data.getUint8(body + i);
-            } else if (inInfo && id === 0x4489) {
+            } else if (id === 0x4489) {
                 duration = size === 4 ? data.getFloat32(body) : size === 8 ? data.getFloat64(body) : null;
             }
             at = body + size;
