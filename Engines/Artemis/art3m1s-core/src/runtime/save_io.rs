@@ -286,8 +286,17 @@ impl CoreRuntime {
             path,
             bytes.len()
         );
-        let data: crate::save::SaveData =
-            serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        // The PC engine's own saves replay the tags that recreate the scene
+        // instead of carrying a scene snapshot (VNDegen).
+        let (data, replay) = if bytes.starts_with(crate::save::pc_slot::MAGIC) {
+            let encoding = self.interpreter.config().encoding;
+            let slot = crate::save::pc_slot::read(&bytes, encoding)?;
+            (crate::save::SaveData::from_pc_slot(&slot), Some(slot))
+        } else {
+            let data: crate::save::SaveData =
+                serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            (data, None)
+        };
         self.gameplay_save_checkpoint = None;
         self.pending_load_resume = None;
         self.pending_message_text = None;
@@ -336,6 +345,9 @@ impl CoreRuntime {
         if let Some(scene) = data.scene.clone() {
             self.compositor.restore_scene(scene);
         }
+        if let Some(slot) = &replay {
+            self.replay_pc_tags(slot)?;
+        }
         self.sync_layer_info_all();
         self.interpreter.append_queued_tags(deferred);
         self.reload_persistent_lua_tables()
@@ -374,6 +386,31 @@ impl CoreRuntime {
             data.call_stack.len(),
             waiting
         );
+        Ok(())
+    }
+
+    /// Recreates the layers, handlers, and music of a PC save from its tags,
+    /// then queues the tags the save held at its position.
+    fn replay_pc_tags(&mut self, slot: &crate::save::pc_slot::SlotSave) -> Result<(), String> {
+        let as_queue = |tags: &[crate::save::pc_slot::Tag]| -> Vec<(String, HashMap<String, String>)> {
+            tags.iter()
+                .map(|tag| (tag.name.clone(), tag.params.iter().cloned().collect()))
+                .collect()
+        };
+        self.interpreter
+            .replay_tags(&as_queue(&slot.replay))
+            .map_err(|e| format!("重放存档标签失败: {e:?}"))?;
+        let mut profile = crate::profiler::FrameProfile::default();
+        self.flush_host_events(&mut profile);
+        // A save made inside a page break holds the tags queued after its
+        // click wait, and the click wait itself was running: wait for the
+        // click again, then run them.
+        let queued = &slot.resume().queued;
+        if !queued.is_empty() {
+            let mut tags = vec![("@".to_string(), HashMap::new())];
+            tags.extend(as_queue(queued));
+            self.interpreter.append_queued_tags(tags);
+        }
         Ok(())
     }
 

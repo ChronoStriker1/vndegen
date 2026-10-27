@@ -4,6 +4,7 @@
 //! 使用 serde_json 作为序列化格式。
 
 pub mod pc;
+pub mod pc_slot;
 
 use asb_interpreter::CallFrame;
 use asb_interpreter::variable::VariableStore;
@@ -256,6 +257,34 @@ impl SaveData {
                 .call_stack()
                 .iter()
                 .map(CallFrameSnapshot::from)
+                .collect(),
+            scene: None,
+            audio: None,
+            waiting_for_input: None,
+            message_text: None,
+        }
+    }
+
+    /// The state of a PC engine save that the core restores like its own:
+    /// the local variables and the script position (VNDegen).
+    pub fn from_pc_slot(slot: &pc_slot::SlotSave) -> Self {
+        let mut variables = VariableStore::new();
+        for (name, value) in &slot.locals {
+            variables.set(name, value.clone());
+        }
+        Self {
+            version: SAVE_FORMAT_VERSION,
+            variables,
+            current_script: slot.resume().script.clone(),
+            current_line: slot.resume().index,
+            call_stack: slot
+                .call_stack
+                .iter()
+                .take(slot.call_stack.len().saturating_sub(1))
+                .map(|frame| CallFrameSnapshot {
+                    script: frame.script.clone(),
+                    return_line: frame.index,
+                })
                 .collect(),
             scene: None,
             audio: None,

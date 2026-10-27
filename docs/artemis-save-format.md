@@ -49,7 +49,7 @@ The root object has 68 fields, numbered up to 76. The ones identified so far:
 | 11 | The current message layer id |
 | 13, 14, 59, 60 | Message window state, a tag list keyed by window id whose entries are objects of nine fields |
 | 18 | Message window settings, keyed by window id |
-| 24 | For each message layer, the font tags that set it up (`fontinit`, `font`) |
+| 24 | For each message layer, its tags since it was last cleared: the font tags that set it up (`fontinit`, `font`) and its visible text (`print`, `rt`) |
 | 25 | For each message layer, its resulting font state: face, ruby face, size, colors, and so on, in 33 fields |
 | 26 | The layers, a tag list keyed by layer id: for each layer, the tags that recreate it, such as `lyc` and a `lyprop` with its current properties |
 | 29 | The background music, as the `splay` tag that plays it |
@@ -70,6 +70,8 @@ The root object has 68 fields, numbered up to 76. The ones identified so far:
 | 76 | `indent` settings by message layer, as tags |
 
 The other fields hold single flags and counters.
+
+On a load, the PC engine continues in the innermost frame of the call stack, where the story was, not at the position in field 3, which lies inside the game's save routine. When that frame holds queued tags, the save was made at a click wait inside a page break: the engine waits for the click, then runs them. VNDegen loads a save the same way: it restores the local variables and the call stack, replays the tags of fields 26 (layers), 24 (message layers, inside a `chgmsg` for each), 56 and 33 (handlers), and 29 (music), then queues a click wait and the frame's tags.
 
 Variable values are text, except data from Pluto, the Lua persistence library games use to keep Lua tables in variables. Pluto data always holds zero bytes, which text never does.
 

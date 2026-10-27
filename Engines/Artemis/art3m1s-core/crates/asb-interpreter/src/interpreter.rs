@@ -2071,6 +2071,30 @@ impl Interpreter {
     /// `e:tag{"var",...}` 把序列化结果排入标签队列，这些 `[var]` 标签返回
     /// `Continue`，一次抽干即可将变量真正写入 `VariableStore`，使随后的存档快照
     /// 或读档恢复看到完整变量。
+    /// Runs `tags` at once and emits their events, ignoring any wait they
+    /// ask for and leaving the script position and the tag queue alone. A
+    /// load replays a PC save's tags this way to rebuild its scene (VNDegen).
+    pub fn replay_tags(&mut self, tags: &[(String, HashMap<String, String>)]) -> Result<()> {
+        for (tag, params) in tags {
+            let instruction = Instruction {
+                tag: tag.clone(),
+                params: params.clone(),
+                line: self.current_line,
+            };
+            let events = match self.execute_tag(&instruction, false)? {
+                TagResult::Emit(event) | TagResult::Wait(event) => vec![event],
+                TagResult::EmitMany(events) => events,
+                _ => Vec::new(),
+            };
+            for event in events {
+                if matches!(self.emit_event(event), CallbackResult::Abort) {
+                    return Err(Error::Aborted);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn flush_pending_tags(&mut self) -> Result<()> {
         self.flush_tag_queue()?;
         Ok(())

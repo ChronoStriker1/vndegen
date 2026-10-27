@@ -5,7 +5,12 @@ use encoding_rs::SHIFT_JIS;
 fn main() {
     for path in std::env::args().skip(1) {
         let bytes = std::fs::read(&path).unwrap();
-        if bytes.starts_with(pc::SYSTEM_MAGIC) {
+        if bytes.starts_with(art3m1s_core::save::pc_slot::MAGIC) {
+            let save = art3m1s_core::save::pc_slot::read(&bytes, SHIFT_JIS).unwrap();
+            println!("{path}: at {}:{} stack {:?}, {} locals, {} replay tags: {:?}", save.position.script, save.position.index,
+                save.call_stack.iter().map(|f| format!("{}:{} +{}", f.script, f.index, f.queued.len())).collect::<Vec<_>>(),
+                save.locals.len(), save.replay.len(), save.replay.iter().map(|t| t.name.as_str()).collect::<std::collections::BTreeSet<_>>());
+        } else if bytes.starts_with(pc::SYSTEM_MAGIC) {
             let variables = pc::read_system(&bytes, SHIFT_JIS).unwrap();
             let written = pc::write_system(&variables, SHIFT_JIS);
             println!("{path}: {} system variables, rewrite identical: {}", variables.len(), written == bytes);
