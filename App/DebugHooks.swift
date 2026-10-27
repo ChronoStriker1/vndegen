@@ -20,6 +20,7 @@ import AppKit
 ///   notifyutil -s vndegen.pointer.tap 512384 -p vndegen.pointer.tap   taps the running game's view, as a click or touch
 ///                            on it would. The state's last six digits are x then y in thousandths of the view's width
 ///                            and height from its top left, here x 0.512 and y 0.384
+///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
@@ -59,6 +60,14 @@ enum DebugHooks {
             let point = CGPoint(x: Double(state / 1000 % 1000) / 1000, y: Double(state % 1000) / 1000)
             MainActor.assumeIsolated { tap(hub, at: point) }
         }
+        #if os(macOS)
+        var quitToken: Int32 = 0
+        notify_register_dispatch("vndegen.app.quit", &quitToken, .main) { _ in
+            // From the run loop, as Command-Q's key event arrives. AppKit waits for the reply to a quit inside
+            // `terminate`, and called from this block it would hold the main queue, where the reply comes from.
+            RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { NSApp.terminate(nil) } }
+        }
+        #endif
         for button in VirtualButton.allCases {
             var token: Int32 = 0
             notify_register_dispatch("vndegen.input.\(button.rawValue)", &token, .main) { _ in

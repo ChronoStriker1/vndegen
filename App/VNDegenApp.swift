@@ -30,40 +30,36 @@ let engines: [any EnginePlugin] = {
 /// The play session lives in the app's one window, so closing it quits, as closing a PC game's window does.
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
     /// Set by the app once its hub exists.
-    var hub: Hub?
+    var hub: Hub? {
+        didSet { quit = hub.map(Self.makeQuit) }
+    }
+    private var quit: AppQuit?
     /// Longest the app waits for an automatic backup before it quits anyway.
     static let quitTimeout: Duration = .seconds(20)
-    /// Whether a quit is waiting on backups. AppKit takes exactly one reply to `.terminateLater`.
-    private var quitPending = false
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
-    /// Quitting by closing the window, Command-Q, or logging out ends a running game first so its play time is recorded,
-    /// then waits for automatic backups, including one still running from a game closed just before. The wait and the
-    /// timeout run separately, because a backup stuck on an unreachable share never returns, cancelled or not.
+    /// Quitting by closing the window, Command-Q, or logging out ends a running game first so its play time is recorded
+    /// and it writes its saves, then waits for automatic backups.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let hub else { return .terminateNow }
-        guard !quitPending else { return .terminateLater }
-        quitPending = true
-        Task {
+        guard let quit else { return .terminateNow }
+        let answer = quit.request(reply: { sender.reply(toApplicationShouldTerminate: true) },
+                                  quitAgain: { sender.terminate(nil) })
+        switch answer {
+        case .now: return .terminateNow
+        case .later: return .terminateLater
+        case .cancel: return .terminateCancel
+        }
+    }
+
+    private static func makeQuit(_ hub: Hub) -> AppQuit {
+        AppQuit(timeout: quitTimeout, frameIsRunning: { KiriKiriPlugin.frameIsRunning }) {
             #if DEBUG
             // `-hangQuitBackup YES` stands in for a backup that never finishes, to test the timeout.
             if UserDefaults.standard.bool(forKey: "hangQuitBackup") { await withUnsafeContinuation { (_: UnsafeContinuation<Void, Never>) in } }
             #endif
             await hub.prepareToQuit()
-            finishQuit(sender)
         }
-        Task {
-            try? await Task.sleep(for: Self.quitTimeout)
-            finishQuit(sender)
-        }
-        return .terminateLater
-    }
-
-    private func finishQuit(_ sender: NSApplication) {
-        guard quitPending else { return }
-        quitPending = false
-        sender.reply(toApplicationShouldTerminate: true)
     }
 }
 #endif
