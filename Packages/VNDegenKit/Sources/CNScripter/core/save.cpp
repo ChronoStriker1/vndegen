@@ -535,8 +535,8 @@ bool Engine::loadGame(int slot) {
     Bytes data;
     if (!readFile(savePath(slot), data)) return false;
     // A note from savegame2 isn't part of the state.
-    // restoreState finds a broken save only after reading part of it into these; the rest waits until the save has
-    // read through. The PC engine goes on as if nothing happened, so they're put back if the load fails.
+    // restoreState finds a broken save only after reading part of it into these, and the file log through the images
+    // it loads; the rest waits until the save has read through. Image caches only hold what's on disk. The PC engine goes on as if nothing happened, so they're put back if the load fails.
     auto win = win_;
     auto windowEffect = windowEffect_;
     auto num = num_;
@@ -546,6 +546,8 @@ bool Engine::loadGame(int slot) {
     uint32_t textColor = textColor_;
     int textSpeed = textSpeed_, rubyW = rubyW_, rubyH = rubyH_, underline = underline_;
     bool rmode = rmode_, eraseOnEffect = eraseOnEffect_, rubyOn = rubyOn_;
+    auto fileLog = fileLog_;  // images loaded on the way count as seen
+    auto fileLogOrder = fileLogOrder_;
     std::string error;
     if (!restoreState(data, &error)) {
         logf("save %d: %s", slot, error.c_str());
@@ -563,6 +565,8 @@ bool Engine::loadGame(int slot) {
         rmode_ = rmode;
         eraseOnEffect_ = eraseOnEffect;
         rubyOn_ = rubyOn;
+        fileLog_ = std::move(fileLog);
+        fileLogOrder_ = std::move(fileLogOrder);
         return false;
     }
     if (!loadGosub_.empty()) gosub(cur_.pos, cur_.line, cur_.stmt, loadGosub_);

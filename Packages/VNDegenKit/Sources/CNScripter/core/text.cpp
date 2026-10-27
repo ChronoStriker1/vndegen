@@ -128,9 +128,9 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
         i += n;
     }
     int width = int(std::clamp<int64_t>(advance, 1, 8192));
-    int h = fh + (shadow ? shadeY_ : 0);
-    h = std::max(1, h);
-    cells = std::clamp(int(colors.size()), 1, std::max(1, kMaxStringPixels / (width * h)));
+    int h = std::max(1, fh + (shadow ? shadeY_ : 0));
+    // At most 8192 x 576 pixels a cell, so the cap still allows one.
+    cells = int(std::clamp<int64_t>(int64_t(colors.size()), 1, std::max<int64_t>(1, kMaxStringPixels / (int64_t(width) * h))));
     Image img(width * cells, h, 0);
     for (int c = 0; c < cells; c++)
         drawGlyphs(img, text, c * width, 0, fw, fh, pitch, colors[size_t(c)], bold, shadow, 0, 0);
@@ -693,9 +693,9 @@ void cmdClickStr(E &e, const std::string &) {
 }
 
 void cmdShadeDistance(E &e, const std::string &) {
-    e.shadeX_ = e.readInt();
+    e.shadeX_ = std::clamp(e.readInt(), -64, 64);  // a shadow is a few pixels; more is a broken script
     e.readComma();
-    e.shadeY_ = e.readInt();
+    e.shadeY_ = std::clamp(e.readInt(), -64, 64);
 }
 
 void cmdSpFont(E &e, const std::string &) {
