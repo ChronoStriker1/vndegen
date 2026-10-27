@@ -22,6 +22,9 @@ art3m1s-emote = { path = "crates/art3m1s-emote" }
 art3m1s-log = { path = "crates/art3m1s-log" }
 art3m1s-render = { path = "crates/art3m1s-render" }
 pfs-upk-rust = { path = "crates/pfs-upk-rust" }
+# Lua 5.1 on every platform, iOS included: games ship Lua 5.1 bytecode
+# (.lub), which Luau can't load. Lua 5.1 is an interpreter, with no JIT.
+asb-interpreter = { path = "crates/asb-interpreter", default-features = false, features = ["backend-lua51"] }
 art3m1s-media = { path = "crates/art3m1s-media" }
 encoding_rs = "0.8"
 glam = "0.30"
@@ -38,14 +41,8 @@ art3m1s-render = { path = "crates/art3m1s-render", features = ["metal"] }
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "android"))'.dependencies]
 art3m1s-render = { path = "crates/art3m1s-render", features = ["vulkan"] }
 
-[target.'cfg(target_os = "ios")'.dependencies]
-asb-interpreter = { path = "crates/asb-interpreter", default-features = false, features = ["backend-luau"] }
-
 [target.'cfg(any(target_os = "android", target_os = "ios", all(target_os = "macos", target_arch = "aarch64")))'.dependencies]
 ctt-astcenc = "0.5"
-
-[target.'cfg(not(target_os = "ios"))'.dependencies]
-asb-interpreter = { path = "crates/asb-interpreter", default-features = false, features = ["backend-lua51"] }
 
 [features]
 default = ["gl-backend"]
@@ -60,3 +57,8 @@ game-probes = ["gl-backend"]
 [dev-dependencies]
 # 离屏像素回读测试需要在 macOS 上创建一个 CGL headless 上下文。
 glow = "0.16"
+
+# Lua 5.1's os.execute calls system(), which iOS doesn't have. This copy of
+# lua-src 547.0.0 makes it raise an error there (VNDegen).
+[patch.crates-io]
+lua-src = { path = "vendor/lua-src" }
