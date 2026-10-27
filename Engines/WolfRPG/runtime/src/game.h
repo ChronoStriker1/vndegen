@@ -232,6 +232,7 @@ private:
     void callCommon(Thread &t, int id, const Command &cmd, int argBase);
     int commonByName(const std::string &name) const;
     void pictureCommand(Thread &t, const Command &c);
+    void pictureCommandOne(Thread &t, const Command &c, int number);
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
     bool condition(Thread &t, const Command &c);

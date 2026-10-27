@@ -243,8 +243,8 @@ bool Game::step(Thread &t) {
             if (c.pc < cmds.size()) c.pc++;
             return true;
         }
-        case 172:  // end this event
-            t.stack.clear();
+        case 172:  // end this event; inside a called common event, only that one ends and its caller goes on
+            c.pc = c.commands->size();
             return true;
         case 173:  // erase this event
             if (c.mapEvent >= 0 && c.map == map_) {
@@ -548,13 +548,22 @@ void Game::setString(Thread &t, const Command &c) {
     }
 }
 
+// Applies a picture command to one picture, or to a range of pictures when its multi-target flag is set.
 void Game::pictureCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(0));
+    bool multi = (flags >> 24) & 0x01;
+    int first = value(c.arg(1), t);
+    int last = first;
+    if (multi) last = value((flags & 0x0F) == 2 ? c.arg(5) : c.arg(14), t);
+    for (int n = first; n <= std::max(first, last) && n - first < 10000; n++) pictureCommandOne(t, c, n);
+}
+
+void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     uint32_t flags = uint32_t(c.arg(0));
     int display = flags & 0xF0;
     int exec = flags & 0x0F;
     int anchor = (flags >> 8) & 0xF0;
     int blend = (flags >> 8) & 0x0F;
-    int number = value(c.arg(1), t);
     int frames = value(c.arg(2), t);
 
     if (exec == 2) {  // erase
