@@ -49,20 +49,24 @@
             const body = response.ok && response.body;
             if (body) {
                 // The response goes on unchanged, for plugins that override _onFetch too. Only its reader is wrapped.
+                // A body or reader that cannot be changed loads as MZ alone would load it.
                 const getReader = body.getReader;
-                body.getReader = (...args) => {
+                const wrapped = (...args) => {
                     const reader = getReader.apply(body, args);
                     const read = reader.read.bind(reader);
-                    reader.read = () => read().then((chunk) => {
-                        if (chunk.done && !this._isLoaded && this._fetchedSize === 0 && this._data) {
-                            this._isLoaded = true;
-                            this._updateBuffer();
-                            this._data = null;
-                        }
-                        return chunk;
-                    });
+                    try {
+                        reader.read = () => read().then((chunk) => {
+                            if (chunk.done && !this._isLoaded && this._fetchedSize === 0 && this._data) {
+                                this._isLoaded = true;
+                                this._updateBuffer();
+                                this._data = null;
+                            }
+                            return chunk;
+                        });
+                    } catch (e) { /* unchanged reader */ }
                     return reader;
                 };
+                try { body.getReader = wrapped; } catch (e) { /* unchanged body */ }
             }
             return onFetch.call(this, response);
         };
