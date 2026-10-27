@@ -51,6 +51,8 @@ pub mod event;
 pub mod expression;
 pub mod interpreter;
 pub mod lua_engine;
+#[cfg(feature = "backend-lua51")]
+pub mod lua51_bytecode;
 #[cfg(feature = "backend-luau")]
 pub mod luau_polyfill;
 pub mod r#macro;

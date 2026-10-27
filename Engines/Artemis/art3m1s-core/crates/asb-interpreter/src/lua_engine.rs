@@ -787,6 +787,8 @@ impl UserData for EngineApi {
                 .map_err(|e| mlua::Error::external(format!("include 读取 {path} 失败: {e}")))?;
 
             // lua.load 接受 &[u8]，文本源码与 luac 字节码均可。
+            #[cfg(feature = "backend-lua51")]
+            let bytes = crate::lua51_bytecode::widen_size_t(&bytes).unwrap_or(bytes);
             lua.load(&bytes[..])
                 .set_name(path.as_str())
                 .exec()
