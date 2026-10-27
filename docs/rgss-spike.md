@@ -10,7 +10,18 @@ Yes, through mkxp-z's libretro core rather than its standalone app.
 - **All four test games run on macOS in the core,** rendered by ANGLE on Metal inside a small headless host written for this spike. Test Games 33, 37 and 14 reach their title menus, and Test Game 55 starts on its map, which is how that game opens. Test Game 33 loaded a save copied from the PC, Test Game 37 played into its story from New Game, and Test Game 55 saved, then loaded that save in a fresh run. Each needed fixes, listed under Evidence, and every fix is general rather than per game.
 - **The same four results hold on the iPhone simulator.** The core, ANGLE and the host built for the arm64 simulator and ran there. Each checked frame is byte-identical to the macOS run at the same frame, including Test Game 55's Load screen listing the save it wrote in the simulator.
 - **The RTP can't ship with VNDegen.** Its license forbids redistribution. Three of the four test games need it. The user downloads the official RTP, and VNDegen extracts it. The official downloads are Inno Setup installers, which innoextract unpacks on any platform.
-- **The GPL applies to the combined app.** mkxp-z is GPL-2.0-or-later. An IPA or Mac app that contains it must be distributed under the GPL with its complete source, which VNDegen's public repository already provides. VNDegen's repository has no license today, so the maintainer has to choose one before an RGSS release. A permissive license such as MIT for VNDegen's own code keeps a later App Store build possible, as long as that build leaves out the GPL engines. No permissively licensed RGSS player is usable today.
+- **The GPL applies to the combined app.** mkxp-z is GPL-2.0-or-later. An IPA or Mac app that contains it must be distributed under the GPL with its complete source, which VNDegen's public repository already provides. VNDegen's own code is now under MIT, which keeps a later App Store build possible, as long as that build leaves out the GPL engines. No permissively licensed RGSS player is usable today.
+
+## Built
+
+The plugin followed the recommended architecture. What changed from the plan, and what was checked:
+
+- **Engine.** `scripts/rgss-engine.sh` builds the core and ANGLE from the pinned sources in `Engines/RGSS/UPSTREAM.md` into an arm64 `RGSS.xcframework` for macOS, iOS, and the simulator, about 58 MB a slice before compression. The first build took about an hour on the Mac mini, most of it stage 1. Stage 1 now runs on a Mac too: its Makefile wants GNU sed and grep, Ruby 3.3 or older as the build machine's Ruby, and bash for its `echo`, since macOS's `/bin/sh` turns the `\x` escapes it writes into raw bytes. The app copies the framework in and opens it at run time instead of linking it, so the universal Mac app builds and an Intel Mac shows these games as unsupported.
+- **Frontend fixes found in the app.** The core reads RGSS's buttons from the libretro joypad only, so the frontend presses the joypad buttons for RPG Maker's keys. RGSS reads input once a frame, so a release sooner than 50 ms after its press waits, and a mouse press stays down until the core has seen it. The core caches GL state, so drawing the frame into the view saves and restores what it changes; without that, text drawn into bitmaps went missing on iOS. On iOS ANGLE's Metal layer doesn't follow its parent layer's size, so the view sizes it after each layout.
+- **Preload script.** Stage 1 packs only the preload scripts its Makefile names, so `zz_vndegen.rb` ships in the framework and each launch copies it into the engine's `Scripts/Preload` folder.
+- **RTP.** The game page offers Download and install and Import from folder for each RTP a game's `Game.ini` names and isn't installed. The installers carry no license text, so the app shows the agreement from the download page, kept in `EngineRGSS/Resources`, and installs only after Accept.
+- **Checked on macOS (Mac mini, DEBUG build, its own library).** All four test games reach their title. Test Game 55 saved through its menu and loaded after a quit to the library and a new launch in the same process. Test Game 33 loaded its PC save. Test Games 37 and 14 played from New Game. Controller input, the hardware keyboard, and the VNDegen menu's Quit to library worked. The three RTPs installed from the official downloads through the game page, a cancel during unpacking left nothing behind, and each install matched innoextract's output file for file.
+- **Checked on the iPhone 18 Pro simulator in landscape**, through T3's device tools: the same four titles with the RTPs installed in the app, Test Game 55's save and load through the touch gamepad, and Test Game 37 played from New Game by touch.
 
 ## Evidence
 
@@ -84,7 +95,7 @@ The archive contents come from `rgssad.py list`. The three games ran with the RT
 What this means:
 
 - **The app becomes a GPL work.** An IPA or Mac app that contains the core is one combined work, and distributing it means offering its complete corresponding source under the GPL. VNDegen's repository is public and its build scripts fetch and patch every runtime, which covers that once the RGSS build script and patches are committed. Each release also needs the license texts in the app.
-- **VNDegen needs a license of its own.** The repository has none today (`gh api repos/ChronoStriker1/vndegen` reports `license: null`), which means all rights reserved, and that can't be combined with GPL code for distribution. Any GPL-compatible license works. A permissive one such as MIT lets VNDegen's own code also go into builds without the GPL engines. GPL-3.0-or-later is the simplest choice if the whole project should stay GPL. Under GPL-2.0 only, FreeType has to be taken under its GPL option and Apache-2.0 code such as OpenSSL must stay out, which the libretro build already does.
+- **VNDegen's own license.** At the time of the spike the repository had none, which means all rights reserved. The maintainer has since licensed VNDegen's own code under MIT, and builds that include mkxp-z are distributed as a whole under GPL-2.0. Under GPL-2.0, FreeType is taken under its GPL option, and Apache-2.0 code such as OpenSSL stays out, which the libretro build already does. The core's EGL headers carry an Apache-2.0 notice. They are API declarations, compiled in but not linked as a library.
 - **App Store.** The FSF holds that Apple's App Store usage rules are further restrictions that the GPL forbids ([FSF, 2010](https://www.fsf.org/blogs/licensing/more-about-the-app-store-gpl-enforcement)), and VLC left the App Store in 2011 over a GPL complaint until it was relicensed. mkxp-z has many authors, so it can't be relicensed. A future App Store build would have to leave out the RGSS engine, which the plugin design allows, and any other GPL engine such as ONScripter. The sideloaded IPA and the Mac app, distributed with source, are the normal route for GPL apps on iOS. Ren'Py's static LGPL libraries are already covered by publishing the source.
 - **Alternatives.** No maintained, permissively licensed RGSS player exists. tapir (MIT or Apache-2.0) was abandoned in 2017 and runs only on Linux. URGE (MIT) is active but Windows only. Other iOS RGSS ports, such as mkxp-z-apple-mobile and RPGViewer-MKXP-Z, are GPL forks of the standalone mkxp-z. They keep one MRI VM for the process, so switching games needs a relaunch, and they link several Ruby versions to cover XP and VX games.
 
@@ -100,14 +111,10 @@ What this means:
 
 ## Remaining work
 
-Each unit ends in a check on the real app. The estimates are rough guesses.
-
-1. **Runtime build script and xcframework** for macOS arm64, iOS and the iOS simulator, plus x86_64 for Intel Macs or an arm64-only RGSS engine. About 2 days.
-2. **Upstream-quality fixes in the core:** the iconv guard and `load_data` raising `ENOENT` in C++, offered upstream. About 1 day.
-3. **`CRGSS` frontend** on a real view, with audio and input. 3 to 4 days.
-4. **`EngineRGSS` plugin:** detection, session, pause, quit and restart, save locations, controls. About 3 days.
-5. **RTP import:** an RTP folder through Files first, then the official installers unpacked in the app. 1 day, then 3 to 5 days for the Inno Setup reader.
-6. **Library run:** all 44 RGSS games through the runner, then fixes for the common failures. 2 to 4 days, then ongoing.
+- **A real device.** Speed and memory are measured only on the M4 and in the simulator.
+- **The library run.** A runner that boots all 44 of the library's RGSS games and reports which reach their title, like `RenPyCompat`, is not built yet.
+- **Japanese text in games with no fonts.** The core's fallback font, Liberation Sans, has no Japanese glyphs. XP games use the Windows system fonts, and VX and VX Ace games without their RTP's font would show empty boxes. Bundling VL Gothic, which is freely licensed, as the engine's fallback would cover them. Not tested.
+- **Upstream.** The iconv and static-core patches, and a fix for Ruby exceptions raised inside the core's bindings, which `zz_vndegen.rb` works around for `load_data`, could go to the libretro pull request.
 
 ## Risks
 

@@ -19,7 +19,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
-- RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
+- RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac, with the RTPs downloaded and installed in the app. `docs/rgss-spike.md` has the feasibility test and what was built.
 - No Socks RPG's "RangeError: length cannot be negative" when warping to Patchwork on iPad (`ws/nosocks-warp-error`).
 
 Merged into `dev`, shown in the app once the KiriKiri branch adds the Licenses page: the build writes the license notices of rclone and its Go modules, Ren'Py and its libraries, and the code built into the app.
@@ -41,7 +41,7 @@ Merged into `dev`, shown in the app once the KiriKiri branch adds the Licenses p
 12. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 
 ## Runtime packages
-When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder.
+When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
 
 ## Out of scope for now
 - Apple TV.
