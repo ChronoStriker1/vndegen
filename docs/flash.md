@@ -107,9 +107,26 @@ The 14 Flash games in the maintainer's library, Test Games 114 to 127:
 | ActionScript 1 and 2, projector | 115, 125, 126 |
 | A collection: an HTML menu over AS2 and AS3 movies, and an AS3 projector | 120 |
 
-On Linux, in Playwright's WebKit with the same host page and Ruffle build, all 14 reach their title and play past it.
-Two `.sol` saves that shipped with games load: a game started with one and Ruffle wrote back the same data, with the
-endings it records unlocked, where a fresh start writes them locked.
+All 14 reach their title and play in the Mac app and on an iPad Pro 13-inch simulator, and Test Game 122 also on an
+iPhone 18 Pro simulator. The 12 that save, save and load there. Test Game 120, a movie collection, and Test Game 125,
+whose movies use no shared objects, save nothing on the PC either. Before that, all 14 reached their title and played in Playwright's WebKit on Linux
+with the same host page and Ruffle build.
+
+Saves were checked by adding a value to each game's `.sol` file, starting the game again, and quitting: Ruffle wrote
+every file back with the value, so it had read it. The `.sol` files that four games ship from the PC loaded in the Mac
+app with the endings they record unlocked.
+
+Frame rates, each over 10 seconds of an animated scene, as frames drawn to the canvas:
+
+| Where | 24 fps movies | 30 fps movies |
+|---|---|---|
+| Mac app, MacBook, unlocked display at 60 Hz | 24.0 to 24.1 average, 1% low 19.6 | 30.0 to 30.1 average, 1% low 20.0 |
+| iPad Pro 13-inch simulator, Mac mini | 24.0 to 24.1 average, one game 22.7 after a 308 ms load hitch | 30.0 to 30.1 average |
+| iPhone 18 Pro simulator, Mac mini | 23.5 average | |
+
+A 24 fps movie on a 60 Hz display shows each frame for two or three refreshes, so its 1% low of 19.6 fps is that 50 ms
+cadence, not a dropped frame. The Mac mini ran other threads' builds and simulators during the simulator runs, and
+simulator timing isn't a real device's.
 
 ## Known limits
 
