@@ -386,6 +386,9 @@ pub struct EngineContext {
     /// 闭包用 mlua 传入的 `lua` 句柄重入执行。宿主通过
     /// [`Interpreter::set_file_loader`](crate::Interpreter::set_file_loader) 注入。
     pub file_reader: Option<FileReader>,
+    /// The project's script charset. `e:include` decodes Lua written in it,
+    /// so strings from included files match strings from scripts (VNDegen).
+    pub script_encoding: &'static encoding_rs::Encoding,
     /// 共享的变量存储，供 `e:var(name)` 读取解释器写入的变量。
     ///
     /// 与 [`Interpreter`](crate::Interpreter) 持有同一个 `Arc<Mutex<_>>`。
@@ -426,6 +429,7 @@ impl EngineContext {
             event_filter: None,
             log_filter: None,
             file_reader: None,
+            script_encoding: encoding_rs::UTF_8,
             variables: None,
             script_stack: Vec::new(),
             scenario_text_source: None,
@@ -775,11 +779,11 @@ impl UserData for EngineApi {
         // 再次锁 ctx，所以必须先克隆出 file_reader 并释放锁，再读文件、再 exec，
         // 否则会自锁死。
         methods.add_method("include", |lua, this, path: String| {
-            let reader = {
+            let (reader, encoding) = {
                 let ctx = this.ctx.lock().unwrap();
                 // 仍通知回调（宿主可借此记录/追踪 include），但实际加载在此处完成。
                 ctx.callbacks.include(&path);
-                ctx.file_reader.clone()
+                (ctx.file_reader.clone(), ctx.script_encoding)
             };
 
             let Some(reader) = reader else {
@@ -801,8 +805,16 @@ impl UserData for EngineApi {
             };
 
             // lua.load 接受 &[u8]，文本源码与 luac 字节码均可。
-            #[cfg(feature = "backend-lua51")]
-            let bytes = crate::lua51_bytecode::widen_size_t(&bytes).unwrap_or(bytes);
+            let bytes = if bytes.starts_with(b"\x1bLua") {
+                #[cfg(feature = "backend-lua51")]
+                let bytes = crate::lua51_bytecode::adapt(&bytes, encoding).unwrap_or(bytes);
+                bytes
+            } else if std::str::from_utf8(&bytes).is_err() {
+                // Lua source in the project's charset, such as Shift_JIS.
+                encoding.decode(&bytes).0.into_owned().into_bytes()
+            } else {
+                bytes
+            };
             lua.load(&bytes[..])
                 .set_name(path.as_str())
                 .exec()

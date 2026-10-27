@@ -536,6 +536,7 @@ impl Interpreter {
         let mut engine_ctx_inner = EngineContext::new(Box::new(DefaultEngineCallbacks));
         // 共享同一份变量存储给 engine 上下文，使 e:var 能读到解释器写入的变量。
         engine_ctx_inner.variables = Some(Arc::clone(&variables));
+        engine_ctx_inner.script_encoding = config.encoding;
         let engine_ctx = Arc::new(Mutex::new(engine_ctx_inner));
         #[cfg(feature = "backend-luau")]
         if let Err(e) = crate::luau_polyfill::install(&lua, Arc::clone(&engine_ctx)) {

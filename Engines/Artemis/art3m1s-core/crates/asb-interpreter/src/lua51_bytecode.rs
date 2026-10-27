@@ -1,29 +1,36 @@
-//! Lua 5.1 bytecode from 32-bit `luac` on a 64-bit Lua (VNDegen).
+//! Lua 5.1 bytecode from a Windows `luac` on this Lua (VNDegen).
 //!
 //! Many Artemis games ship their Lua as `.lub` chunks compiled by a 32-bit
 //! Windows `luac`, whose header records a 4-byte `size_t`. A 64-bit Lua 5.1
 //! rejects them with "bad header in precompiled chunk". `size_t` appears only in
-//! the header and as the length before each string, so widening those lengths
+//! the header and as the length before each string, so rewriting those lengths
 //! gives the same chunk for this Lua. The layout follows `lundump.c` in Lua 5.1.
+//!
+//! The chunk's strings are in the game's charset, often Shift_JIS, while the
+//! interpreter decodes scripts to UTF-8. A tag filter keyed by a Shift_JIS
+//! string would never match the tag a script names, so strings that aren't
+//! valid UTF-8 are decoded with the game's charset as the chunk is rewritten.
+
+use encoding_rs::Encoding;
 
 const SIGNATURE: &[u8] = b"\x1bLua\x51\x00";
 const HEADER_LEN: usize = 12;
 const SIZE_T_AT: usize = 8;
 
-/// Returns `chunk` rewritten for this Lua's `size_t` when it is a little-endian
-/// Lua 5.1 chunk with 4-byte `int`, `size_t` and instructions and 8-byte
-/// numbers, and this Lua's `size_t` is wider. Returns `None` for anything else,
-/// which is then loaded unchanged.
-pub fn widen_size_t(chunk: &[u8]) -> Option<Vec<u8>> {
-    let host = std::mem::size_of::<usize>() as u8;
+/// Returns `chunk` rewritten for this Lua's `size_t`, with its strings in UTF-8,
+/// when it is a little-endian Lua 5.1 chunk with 4-byte `int` and instructions,
+/// 8-byte numbers, and a 4- or 8-byte `size_t`, and the rewrite changes it.
+/// Returns `None` for anything else, which is then loaded unchanged.
+pub fn adapt(chunk: &[u8], encoding: &'static Encoding) -> Option<Vec<u8>> {
+    let host = std::mem::size_of::<usize>();
     let header = chunk.get(..HEADER_LEN)?;
+    let size_t = header[SIZE_T_AT] as usize;
     if !header.starts_with(SIGNATURE)
         || header[6] != 1
         || header[7] != 4
-        || header[SIZE_T_AT] != 4
+        || !matches!(size_t, 4 | 8)
         || header[9] != 4
         || header[10] != 8
-        || host <= 4
     {
         return None;
     }
@@ -31,12 +38,14 @@ pub fn widen_size_t(chunk: &[u8]) -> Option<Vec<u8>> {
         input: chunk,
         at: HEADER_LEN,
         output: Vec::with_capacity(chunk.len() + chunk.len() / 8),
-        size_t: host as usize,
+        size_t,
+        host,
+        encoding,
     };
     writer.output.extend_from_slice(header);
-    writer.output[SIZE_T_AT] = host;
+    writer.output[SIZE_T_AT] = host as u8;
     writer.function()?;
-    (writer.at == chunk.len()).then_some(writer.output)
+    (writer.at == chunk.len() && writer.output != chunk).then_some(writer.output)
 }
 
 struct Writer<'a> {
@@ -44,9 +53,17 @@ struct Writer<'a> {
     at: usize,
     output: Vec<u8>,
     size_t: usize,
+    host: usize,
+    encoding: &'static Encoding,
 }
 
 impl Writer<'_> {
+    fn take(&mut self, len: usize) -> Option<&[u8]> {
+        let bytes = self.input.get(self.at..self.at.checked_add(len)?)?;
+        self.at += len;
+        Some(bytes)
+    }
+
     fn copy(&mut self, len: usize) -> Option<()> {
         let bytes = self.input.get(self.at..self.at.checked_add(len)?)?;
         self.output.extend_from_slice(bytes);
@@ -67,14 +84,35 @@ impl Writer<'_> {
         Some(value)
     }
 
+    /// A string is its length, counting a trailing NUL, then its bytes; a
+    /// length of 0 stands for no string.
     fn string(&mut self) -> Option<()> {
-        let bytes = self.input.get(self.at..self.at + 4)?;
-        let len = u32::from_le_bytes(bytes.try_into().ok()?) as usize;
-        self.at += 4;
-        let mut widened = (len as u64).to_le_bytes().to_vec();
-        widened.truncate(self.size_t);
+        let size_t = self.size_t;
+        let mut len = [0u8; 8];
+        len[..size_t].copy_from_slice(self.take(size_t)?);
+        let len = usize::try_from(u64::from_le_bytes(len)).ok()?;
+        let encoding = self.encoding;
+        let text = match len {
+            0 => Vec::new(),
+            _ => {
+                let bytes = self.take(len)?;
+                let (body, nul) = bytes.split_at(len - 1);
+                if nul != [0] {
+                    return None;
+                }
+                let mut text = match std::str::from_utf8(body) {
+                    Ok(_) => body.to_vec(),
+                    Err(_) => encoding.decode(body).0.into_owned().into_bytes(),
+                };
+                text.push(0);
+                text
+            }
+        };
+        let mut widened = (text.len() as u64).to_le_bytes().to_vec();
+        widened.truncate(self.host);
         self.output.extend_from_slice(&widened);
-        self.copy(len)
+        self.output.extend_from_slice(&text);
+        Some(())
     }
 
     fn function(&mut self) -> Option<()> {
@@ -86,10 +124,10 @@ impl Writer<'_> {
         self.copy(code.checked_mul(4)?)?;
         for _ in 0..self.int()? {
             match self.byte()? {
-                0 => {}                     // nil
-                1 => self.copy(1)?,         // boolean
-                3 => self.copy(8)?,         // number
-                4 => self.string()?,        // string
+                0 => {}              // nil
+                1 => self.copy(1)?,  // boolean
+                3 => self.copy(8)?,  // number
+                4 => self.string()?, // string
                 _ => return None,
             }
         }
@@ -111,34 +149,23 @@ impl Writer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::widen_size_t;
-
-    fn string32(text: &[u8]) -> Vec<u8> {
-        let mut bytes = ((text.len() + 1) as u32).to_le_bytes().to_vec();
-        bytes.extend_from_slice(text);
-        bytes.push(0);
-        bytes
-    }
+    use super::adapt;
+    use encoding_rs::{SHIFT_JIS, UTF_8};
 
     fn int(value: i32) -> Vec<u8> {
         value.to_le_bytes().to_vec()
     }
 
-    /// A 32-bit chunk with one string constant, one nested function, and debug
-    /// names, and the same chunk as 64-bit `luac` would write it.
-    fn chunks() -> (Vec<u8>, Vec<u8>) {
-        let header = |size_t: u8| {
-            let mut bytes = b"\x1bLua\x51\x00\x01\x04".to_vec();
-            bytes.extend_from_slice(&[size_t, 4, 8, 0]);
-            bytes
-        };
-        let string64 = |text: &[u8]| {
-            let mut bytes = ((text.len() + 1) as u64).to_le_bytes().to_vec();
+    /// A chunk with `size_t` bytes per length, holding one string constant, a
+    /// number, a nested function, and debug names.
+    fn chunk(size_t: usize, constant: &[u8]) -> Vec<u8> {
+        let string = |text: &[u8]| {
+            let mut bytes = ((text.len() + 1) as u64).to_le_bytes()[..size_t].to_vec();
             bytes.extend_from_slice(text);
             bytes.push(0);
             bytes
         };
-        let function = |string: &dyn Fn(&[u8]) -> Vec<u8>, empty: Vec<u8>, inner: Vec<u8>| {
+        let function = |inner: Vec<u8>| {
             let mut bytes = string(b"@a.lua");
             bytes.extend(int(0));
             bytes.extend(int(0));
@@ -147,7 +174,7 @@ mod tests {
             bytes.extend([0x1e, 0, 0x80, 0]);
             bytes.extend(int(2));
             bytes.extend([4]);
-            bytes.extend(string(b"hello"));
+            bytes.extend(string(constant));
             bytes.extend([3]);
             bytes.extend(1.5f64.to_le_bytes());
             bytes.extend(int(if inner.is_empty() { 0 } else { 1 }));
@@ -159,31 +186,38 @@ mod tests {
             bytes.extend(int(0));
             bytes.extend(int(1));
             bytes.extend(int(0));
-            bytes.extend(empty);
             bytes
         };
-        let inner32 = function(&string32, Vec::new(), Vec::new());
-        let inner64 = function(&string64, Vec::new(), Vec::new());
-        let mut old = header(4);
-        old.extend(function(&string32, Vec::new(), inner32));
-        let mut new = header(8);
-        new.extend(function(&string64, Vec::new(), inner64));
-        (old, new)
+        let mut bytes = b"\x1bLua\x51\x00\x01\x04".to_vec();
+        bytes.extend_from_slice(&[size_t as u8, 4, 8, 0]);
+        bytes.extend(function(function(Vec::new())));
+        bytes
     }
 
     #[test]
     fn widens_every_string_length_and_the_header() {
-        let (old, new) = chunks();
-        assert_eq!(widen_size_t(&old), Some(new));
+        assert_eq!(adapt(&chunk(4, b"hello"), UTF_8), Some(chunk(8, b"hello")));
+    }
+
+    #[test]
+    fn decodes_strings_in_the_game_charset() {
+        let (sjis, _, _) = SHIFT_JIS.encode("行頭");
+        assert_eq!(
+            adapt(&chunk(4, &sjis), SHIFT_JIS),
+            Some(chunk(8, "行頭".as_bytes()))
+        );
+        assert_eq!(
+            adapt(&chunk(8, &sjis), SHIFT_JIS),
+            Some(chunk(8, "行頭".as_bytes()))
+        );
     }
 
     #[test]
     fn leaves_other_chunks_and_source_alone() {
-        let (_, new) = chunks();
-        assert_eq!(widen_size_t(&new), None);
-        assert_eq!(widen_size_t(b"return 1"), None);
-        let (mut truncated, _) = chunks();
+        assert_eq!(adapt(&chunk(8, b"hello"), UTF_8), None);
+        assert_eq!(adapt(b"return 1", UTF_8), None);
+        let mut truncated = chunk(4, b"hello");
         truncated.pop();
-        assert_eq!(widen_size_t(&truncated), None);
+        assert_eq!(adapt(&truncated, UTF_8), None);
     }
 }

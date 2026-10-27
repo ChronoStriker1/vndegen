@@ -2,5 +2,5 @@
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let bytes = std::fs::read(&a[1]).unwrap();
-    std::fs::write(&a[2], asb_interpreter::lua51_bytecode::widen_size_t(&bytes).expect("not a 32-bit chunk")).unwrap();
+    std::fs::write(&a[2], asb_interpreter::lua51_bytecode::adapt(&bytes, encoding_rs::SHIFT_JIS).expect("not a 32-bit chunk")).unwrap();
 }
