@@ -68,6 +68,40 @@
         });
     }
 
+    // Ruffle names a shared object `<host>/<local path>/<name>`, with the local path as the movie's URL has it, so the
+    // same movie saves under different keys when pages encode its path differently, as `Folder%21` and `Folder!`. Each
+    // key goes to storage in one form: the local path decoded and encoded again the way the app encodes movie URLs,
+    // which is how SharedObjectStore names it when it reads the save back. In a raw key a literal # can only start the
+    // name, since a URL path encodes it, so the first part that starts with # is where the name begins.
+    const host = location.hostname;
+    const keep = (character) => {
+        const code = character.codePointAt(0);
+        return code >= 0x21 && code <= 0x7e && !'"#%/<>?`{}'.includes(character);
+    };
+    const encodePart = (part) => Array.from(part).map((c) => (keep(c) ? c : encodeURIComponent(c))).join('');
+    const decodePart = (part) => { try { return decodeURIComponent(part); } catch (e) { return part; } };
+    const canonical = (key) => {
+        if (typeof key !== 'string' || !key.startsWith(host + '/')) return key;
+        const parts = key.slice(host.length + 1).split('/');
+        if (parts[0] === '' && parts.length >= 2) parts.shift();
+        const marked = parts.findIndex((part) => part.startsWith('#'));
+        const split = marked >= 0 ? marked : parts.length - 1;
+        const path = parts.slice(0, split).map((part) => encodePart(decodePart(part)));
+        const name = parts.slice(split).join('/');
+        return host + '/' + (path.length ? path.join('/') + '/' : '/') + name;
+    };
+    const storage = window.localStorage;
+    if (storage) {
+        const methods = { getItem: (key) => storage.getItem(canonical(key)), setItem: (key, value) => storage.setItem(canonical(key), value),
+            removeItem: (key) => storage.removeItem(canonical(key)) };
+        Object.defineProperty(window, 'localStorage', { configurable: true, enumerable: true, value: new Proxy(storage, {
+            get: (target, key) => (key in methods ? methods[key] : typeof key === 'string' && !(key in target) ? target[canonical(key)] : Reflect.get(target, key)),
+            set: (target, key, value) => { target[canonical(key)] = value; return true; },
+            deleteProperty: (target, key) => { delete target[canonical(key)]; return true; },
+            has: (target, key) => canonical(key) in target,
+        }) });
+    }
+
     // Flash Player writes a movie's shared objects when it quits, and most games never ask for it sooner. Ruffle writes
     // them when the page hides, so a pagehide of our own writes them whenever the game may end: when it pauses, as when
     // the VNDegen menu opens or the app leaves the screen, when the page is hidden, and before the session quits.

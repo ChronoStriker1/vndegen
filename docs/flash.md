@@ -81,8 +81,11 @@ game's data folder:
 | A projector, `getLocal("save")` | `.../localhost/<PC path to the game>/Game.exe/save.sol` | `SharedObjects/Game.exe/save.sol` |
 
 The `.sol` bytes are the same on both sides. Ruffle names a shared object by the movie's URL, which percent-encodes a
-path such as `My Game/game.swf`, and the file here has the plain name, as Flash Player's does. A movie may also ask
-for a shorter local path, a folder above it, and save there. A backup's path maps to the movie in this game folder that the longest end
+path such as `My Game/game.swf`, and the file here has the plain name, as Flash Player's does. Pages encode a path in
+different ways, so `flash-page.js` gives every key one encoding before it reaches storage, the one VNDegen gives movie
+URLs, and the save reads back under the key Ruffle asks for. A movie may also ask for a shorter local path, a folder
+above it, and save there. A shared object's name with slashes in it starts with `#`, as in `game.swf/#saves/slot1.sol`.
+A folder of the local path that starts with `#` starts with `%23` on disk instead, so the two never meet. A backup's path maps to the movie in this game folder that the longest end
 of its PC path names, so where the game sat on the PC doesn't matter. A save under a folder that holds a movie maps to that folder. The same goes for Ruffle on the PC, which keeps
 `.sol` files under `ruffle/SharedObjects/localhost/` with percent-encoded folder names, and for movies run from a network drive, under `#localWithNet`.
 Other localStorage keys go to `localStorage/` beside them, as for TyranoScript.

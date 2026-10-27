@@ -6,8 +6,11 @@ import WebRuntime
 ///
 /// Ruffle names a shared object `<host>/<local path>/<name>` and stores its `.sol` bytes in Base64. The local path is
 /// the movie's path in the game folder, or the shorter one the movie asked for, and is empty for `/`. It comes from the
-/// movie's URL, so it is percent-encoded, as `My%20Game/game.swf`. The file is `<local path>/<name>.sol` here, decoded,
-/// as Flash Player keeps it under `#SharedObjects/<id>/localhost/`. Any other key goes to `others`.
+/// movie's URL, so it is percent-encoded, as `My%20Game/game.swf`, and `flash-page.js` gives every key the encoding
+/// `FlashPlugin.urlComponent` gives. A name with slashes in it starts with `#`, which a URL path never holds unencoded.
+/// The file is `<local path>/<name>.sol` here, decoded, as Flash Player keeps it under `#SharedObjects/<id>/localhost/`,
+/// except that a folder of the local path that starts with `#` starts with `%23` on disk, so it never reads back as a
+/// name. Any other key goes to `others`.
 nonisolated struct SharedObjectStore: PageStorage {
     let directory: URL
     let others: WebStorage
@@ -53,40 +56,48 @@ nonisolated struct SharedObjectStore: PageStorage {
         Self.file(forKey: key).map { directory.appendingPathComponent($0 + Self.suffix) }
     }
 
-    /// `game/My%20Game/movie.swf/save` is `My Game/movie.swf/save`, and `game//save`, from a local path of `/`, is
-    /// `save`. Only the local path is percent-encoded. The name is as the movie gave it, and one with slashes in it
-    /// starts with `#`, as in `game/movie.swf/#saves/slot1` or `game//#saves/slot1`. Nil for keys of another host, and
-    /// for any part that is empty, `.`, `..`, hidden, or holds a `/` once decoded, which Ruffle never makes.
+    /// `game/My%20Game/movie.swf/save` is `My Game/movie.swf/save`, `game//save`, from a local path of `/`, is `save`,
+    /// and `game/movie.swf/#saves/slot1` is `movie.swf/#saves/slot1`. Nil for keys of another host, and for any part
+    /// that is empty, `.`, `..`, hidden, or holds a `/` once decoded, which Ruffle never makes.
     static func file(forKey key: String) -> String? {
         guard key.hasPrefix(host + "/") else { return nil }
         var parts = key.dropFirst(host.count + 1).split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         // An empty local path, from `/`, leaves an empty first part.
         if parts.first == "", parts.count >= 2 { parts.removeFirst() }
         let split = nameStart(parts)
-        let names = parts[..<split].map { $0.removingPercentEncoding ?? $0 } + parts[split...]
-        guard !names.isEmpty, names.allSatisfy(isSafe) else { return nil }
-        return names.joined(separator: "/")
+        let path = parts[..<split].map { $0.removingPercentEncoding ?? $0 }
+        guard !parts.isEmpty, path.allSatisfy(isSafePath), parts[split...].allSatisfy(isSafe) else { return nil }
+        return (path.map(diskName) + parts[split...]).joined(separator: "/")
     }
 
-    /// The inverse of `file(forKey:)`, for a file path relative to the directory without `.sol`. The local path is
-    /// percent-encoded as `FlashPlugin.urlPath` encodes the movie's URL, so the key is the one Ruffle asks for.
+    /// The inverse of `file(forKey:)`, for a file path relative to the directory without `.sol`.
     static func key(forFile relative: String) -> String? {
-        let names = relative.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        guard !names.isEmpty, names.allSatisfy(isSafe) else { return nil }
-        let split = nameStart(names)
-        let path = names[..<split].map(FlashPlugin.urlComponent)
-        let key = (path + names[split...]).joined(separator: "/")
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !parts.isEmpty, parts.allSatisfy(isSafe) else { return nil }
+        let split = nameStart(parts)
+        let path = parts[..<split].map { FlashPlugin.urlComponent(pathName($0)) }
+        let key = (path + parts[split...]).joined(separator: "/")
         return path.isEmpty ? "\(host)//\(key)" : "\(host)/\(key)"
     }
 
-    /// Where the shared object's name starts. A local path ends with the movie unless the movie asked for a shorter
-    /// one, so the name follows the last movie or projector in the path. Otherwise it is the first part that starts
-    /// with `#`, or else the last part.
+    /// Where the shared object's name starts: at the first part that starts with `#`, or else the last part. In a key the
+    /// local path encodes #, and on disk it starts with `%23`, so this finds the same place in both.
     static func nameStart(_ parts: [String]) -> Int {
-        if let movie = parts.dropLast().lastIndex(where: { ["swf", "exe"].contains(($0 as NSString).pathExtension.lowercased()) }) {
-            return movie + 1
-        }
-        return parts.firstIndex { $0.hasPrefix("#") } ?? max(parts.count - 1, 0)
+        parts.firstIndex { $0.hasPrefix("#") } ?? max(parts.count - 1, 0)
+    }
+
+    /// A folder of the local path as a file name: `#bonus` is `%23bonus`.
+    static func diskName(_ folder: String) -> String {
+        folder.hasPrefix("#") ? "%23" + folder.dropFirst() : folder
+    }
+
+    /// The inverse of `diskName`.
+    static func pathName(_ disk: String) -> String {
+        disk.hasPrefix("%23") ? "#" + disk.dropFirst(3) : disk
+    }
+
+    private static func isSafePath(_ name: String) -> Bool {
+        isSafe(name) && !name.hasPrefix("%23")
     }
 
     private static func isSafe(_ name: String) -> Bool {

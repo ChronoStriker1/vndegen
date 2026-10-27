@@ -16,7 +16,8 @@ import WebKit
     init(origin: URL) throws {
         self.origin = origin
         let game = WebGameConfiguration(folder: GameFolder(root: FileManager.default.temporaryDirectory, webRoot: ""), appName: "test",
-                                        runtime: .browser, buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
+                                        runtime: .browser, storageDirectory: FileManager.default.temporaryDirectory,
+                                        buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
         let page = try String(contentsOf: #require(FlashPlugin.hostDirectory).appending(path: "flash-page.js"), encoding: .utf8)
         let configuration = WKWebViewConfiguration()
         for source in [try WebGameSession.shimSource(for: game), try FlashFonts.pageScript(page)] {
@@ -80,8 +81,9 @@ import WebKit
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (String?) -> Void) {
         let json = String(prompt.dropFirst(WebGameSession.bridgePrefix.count))
-        if let request = try? JSONDecoder().decode(BridgeRequest.self, from: Data(json.utf8)) { requests.append(request) }
-        completionHandler(BridgeReply.value(.null).json)
+        let request = try? JSONDecoder().decode(BridgeRequest.self, from: Data(json.utf8))
+        if let request { requests.append(request) }
+        completionHandler((request == .storageLoad ? BridgeReply.value(.dictionary([:])) : BridgeReply.value(.null)).json)
     }
 }
 
@@ -106,4 +108,19 @@ import WebKit
     #expect(try await page.run("return window.hides") as? Int == 2)
     try await page.run("document.getElementById('a').handlers[0]('quit', '');")
     #expect(page.requests.contains(.quit))
+}
+
+@MainActor @Test func ruffleStorageKeysTakeOneForm() async throws {
+    let page = try FlashPage(origin: URL(string: "https://localhost/")!)
+    try await page.load()
+    // A launcher's own encoding of a movie's path, and lowercase escapes, reach storage as the app encodes the path.
+    // The name, and keys of other hosts, stay as they are.
+    try await page.run("""
+        localStorage['localhost/Folder%21/My%20Game/game.swf/save'] = 'a';
+        localStorage['localhost/%2a%e6%89%93/game.swf/#Folder%21/slot'] = 'b';
+        localStorage['other/Folder%21/game.swf/save'] = 'c';
+        """)
+    let sets = page.requests.compactMap { if case let .storageSet(key, _) = $0 { key } else { nil } }
+    #expect(sets == ["localhost/Folder!/My%20Game/game.swf/save", "localhost/*%E6%89%93/game.swf/#Folder%21/slot", "other/Folder%21/game.swf/save"])
+    #expect(try await page.run("return localStorage['localhost/Folder!/My Game/game.swf/save'] + localStorage['localhost/Folder%21/My%20Game/game.swf/save']") as? String == "aa")
 }

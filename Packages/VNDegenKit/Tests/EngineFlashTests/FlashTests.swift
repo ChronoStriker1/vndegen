@@ -136,13 +136,18 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     try store.clear()
     #expect(try store.load().isEmpty)
 
-    // Each key comes back as Ruffle asks for it: a literal %, a folder that starts with #, and a name with slashes for
-    // the local path /.
+    // Each key comes back as Ruffle asks for it: a literal %, a folder that starts with #, which starts with %23 on disk
+    // so it never reads as a name, names with slashes for a movie, a folder, and the local path /, and a name with a
+    // movie's extension in it.
     for (key, file) in [
         ("game/My%25Game/movie.swf/save", "My%Game/movie.swf/save"),
-        ("game/%23bonus/movie.swf/save", "#bonus/movie.swf/save"),
+        ("game/%23bonus/movie.swf/save", "%23bonus/movie.swf/save"),
+        ("game/%23bonus/save", "%23bonus/save"),
+        ("game//#bonus/save", "#bonus/save"),
         ("game//#saves/slot", "#saves/slot"),
         ("game/Sub/#saves/chapter/slot", "Sub/#saves/chapter/slot"),
+        ("game/game.swf/#chapter.swf/slot", "game.swf/#chapter.swf/slot"),
+        ("game/Folder!/game.swf/save", "Folder!/game.swf/save"),
     ] {
         #expect(SharedObjectStore.file(forKey: key) == file)
         #expect(SharedObjectStore.key(forFile: file) == key)
@@ -254,6 +259,10 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     // Names with slashes in them, saved for a folder or for /.
     #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/sub/#saves/chapter/slot.sol", movies: movies, folders: folders) == "Sub/#saves/chapter/slot.sol")
     #expect(FlashPlugin.savePath("\(flashPlayer)/#saves/slot.sol", movies: movies, folders: folders) == "#saves/slot.sol")
+    // A PC folder that starts with # is a folder when a movie follows it, and a game folder that does is %23 on disk.
+    #expect(FlashPlugin.savePath("\(flashPlayer)/#Games/Test Game 01/sub/game.swf/save.sol", movies: movies, folders: folders) == "Sub/Game.swf/save.sol")
+    #expect(FlashPlugin.savePath("\(flashPlayer)/Games/Test Game 01/#bonus/extra.swf/save.sol",
+                                 movies: ["#bonus/extra.swf": "#bonus/extra.swf"], folders: ["#bonus": "#bonus"]) == "%23bonus/extra.swf/save.sol")
     // Ruffle on the PC percent-encodes the movie's path.
     #expect(FlashPlugin.savePath("C:/Users/Player/AppData/Roaming/ruffle/SharedObjects/localhost/Games/My%20Game/movie.swf/s.sol",
                                  movies: movies, folders: folders) == "My Game/movie.swf/s.sol")
