@@ -64,7 +64,11 @@ pub fn read_container<'a>(bytes: &'a [u8], magic: &[u8; 4]) -> Result<Sections<'
 
 /// Writes a container. The table lists `table_order`, and the sections follow
 /// in `sections` order.
-pub fn write_container(magic: &[u8; 4], table_order: &[u32], sections: &[(u32, Vec<u8>)]) -> Vec<u8> {
+pub fn write_container(
+    magic: &[u8; 4],
+    table_order: &[u32],
+    sections: &[(u32, Vec<u8>)],
+) -> Vec<u8> {
     let header = 12 + 8 * table_order.len();
     let mut starts = HashMap::new();
     let mut at = header;
@@ -116,7 +120,11 @@ pub fn read_global(
 }
 
 /// Writes `saveg.dat`, with the table order the PC engine writes.
-pub fn write_global(variables: &Variables, read_lines: &ReadLines, encoding: &'static Encoding) -> Vec<u8> {
+pub fn write_global(
+    variables: &Variables,
+    read_lines: &ReadLines,
+    encoding: &'static Encoding,
+) -> Vec<u8> {
     let mut lines = Vec::new();
     let mut scripts: Vec<_> = read_lines.iter().collect();
     scripts.sort_by(|a, b| a.0.cmp(b.0));
@@ -140,14 +148,21 @@ fn find<'a>(sections: &Sections<'a>, tag: u32) -> Result<&'a [u8], String> {
         .ok_or_else(|| format!("no section {tag}"))
 }
 
-fn read_variables(section: &[u8], prefix: &str, encoding: &'static Encoding) -> Result<Variables, String> {
+fn read_variables(
+    section: &[u8],
+    prefix: &str,
+    encoding: &'static Encoding,
+) -> Result<Variables, String> {
     let mut reader = Reader::new(section);
     let count = reader.u32()?;
     let mut variables = Vec::new();
     for _ in 0..count {
         let name = encoding.decode(reader.string()?).0.into_owned();
         let value = variable_value(reader.string()?, encoding);
-        let name = name.strip_prefix(prefix).map(str::to_string).unwrap_or(name);
+        let name = name
+            .strip_prefix(prefix)
+            .map(str::to_string)
+            .unwrap_or(name);
         variables.push((name, value));
     }
     Ok(variables)

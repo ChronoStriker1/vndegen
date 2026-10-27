@@ -142,7 +142,8 @@ impl Script {
             if tag_left_open(line) {
                 let mut text = line.to_string();
                 let mut next = line_idx + 1;
-                while next < lines.len() && next - line_idx <= MAX_TAG_LINES && tag_left_open(&text) {
+                while next < lines.len() && next - line_idx <= MAX_TAG_LINES && tag_left_open(&text)
+                {
                     text.push(' ');
                     text.push_str(lines[next].trim());
                     next += 1;
@@ -274,7 +275,11 @@ impl Script {
     /// (VNDegen).
     pub fn pc_index(&self, index: usize) -> usize {
         let before = &self.instructions[..index.min(self.instructions.len())];
-        index - before.iter().filter(|instruction| instruction.tag == "/if").count()
+        index
+            - before
+                .iter()
+                .filter(|instruction| instruction.tag == "/if")
+                .count()
     }
 
     /// The instruction a PC Artemis engine index points at (VNDegen).
@@ -552,8 +557,16 @@ mod tests {
         let content = "*main\n[if exp=\"1\"]\n[var name=\"a\" data=\"1\"]\n[/if]\n[stop]\n";
         let script = Script::parse("test", content).unwrap();
         assert_eq!(script.instructions[2].tag, "/if");
-        assert_eq!((0..4).map(|i| script.pc_index(i)).collect::<Vec<_>>(), [0, 1, 2, 2]);
-        assert_eq!((0..4).map(|pc| script.index_from_pc(pc)).collect::<Vec<_>>(), [0, 1, 3, 4]);
+        assert_eq!(
+            (0..4).map(|i| script.pc_index(i)).collect::<Vec<_>>(),
+            [0, 1, 2, 2]
+        );
+        assert_eq!(
+            (0..4)
+                .map(|pc| script.index_from_pc(pc))
+                .collect::<Vec<_>>(),
+            [0, 1, 3, 4]
+        );
     }
 
     #[test]

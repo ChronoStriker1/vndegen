@@ -1628,7 +1628,8 @@ impl Interpreter {
                 .set(crate::tags::YESNO_RESULT, Value::String(String::new()));
             let mut call = instruction.clone();
             call.tag = "calllua".to_string();
-            call.params.insert("function".to_string(), "yesno".to_string());
+            call.params
+                .insert("function".to_string(), "yesno".to_string());
             let result = self.execute_tag(&call, false)?;
             for (tag, _) in &mut self.engine_ctx.lock().unwrap().tag_queue {
                 if tag == "stop" {
@@ -2128,7 +2129,11 @@ impl Interpreter {
     /// Holds tags until the call frame at `frame` returns, as a queued call
     /// holds the tags queued after it. Runs them next if that frame is gone
     /// (VNDegen).
-    pub fn defer_until_return(&mut self, frame: usize, tags: Vec<(String, HashMap<String, String>)>) {
+    pub fn defer_until_return(
+        &mut self,
+        frame: usize,
+        tags: Vec<(String, HashMap<String, String>)>,
+    ) {
         if frame < self.call_stack.len() {
             self.queued_call_barriers.push(QueuedCallBarrier {
                 stack_depth: frame + 1,
@@ -2714,9 +2719,16 @@ mod tests {
     #[test]
     fn deferred_tags_run_when_their_frame_returns() {
         let mut it = Interpreter::new(InterpreterConfig::default());
-        it.load_script("story", "*main\n[var name=\"t.early\" data=\"1\"]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
-            .unwrap();
-        it.load_script("routine", "*save\n[var name=\"t.saved\" data=\"1\"]\n[return]\n").unwrap();
+        it.load_script(
+            "story",
+            "*main\n[var name=\"t.early\" data=\"1\"]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n",
+        )
+        .unwrap();
+        it.load_script(
+            "routine",
+            "*save\n[var name=\"t.saved\" data=\"1\"]\n[return]\n",
+        )
+        .unwrap();
         it.set_callback(|event| match event {
             Event::Wait { .. } => CallbackResult::Pause,
             _ => CallbackResult::Continue,
@@ -2733,7 +2745,13 @@ mod tests {
         it.defer_until_return(
             0,
             vec![
-                ("var".into(), HashMap::from([("name".into(), "t.deferred".into()), ("data".into(), "1".into())])),
+                (
+                    "var".into(),
+                    HashMap::from([
+                        ("name".into(), "t.deferred".into()),
+                        ("data".into(), "1".into()),
+                    ]),
+                ),
                 ("stop".into(), HashMap::new()),
             ],
         );
@@ -2741,7 +2759,11 @@ mod tests {
         assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(_)));
         assert_eq!(it.get_variable("t.saved"), Some(Value::Int(1)));
         assert_eq!(it.get_variable("t.deferred"), Some(Value::Int(1)));
-        assert_eq!(it.get_variable("t.after"), None, "the frame resumes only after the deferred stop");
+        assert_eq!(
+            it.get_variable("t.after"),
+            None,
+            "the frame resumes only after the deferred stop"
+        );
         assert_eq!((it.current_script(), it.current_line()), (Some("story"), 1));
     }
 
@@ -4613,7 +4635,10 @@ fn resolve_dollar_params(
     variables: &crate::variable::VariableStore,
 ) -> Option<Instruction> {
     if SELF_EVALUATING_TAGS.contains(&instruction.tag.as_str())
-        || !instruction.params.values().any(|value| value.starts_with('$'))
+        || !instruction
+            .params
+            .values()
+            .any(|value| value.starts_with('$'))
     {
         return None;
     }

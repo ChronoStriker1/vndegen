@@ -170,7 +170,11 @@ impl Writer {
 fn persistable(value: &Value) -> bool {
     matches!(
         value,
-        Value::Boolean(_) | Value::Integer(_) | Value::Number(_) | Value::String(_) | Value::Table(_)
+        Value::Boolean(_)
+            | Value::Integer(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Table(_)
     )
 }
 
@@ -212,13 +216,17 @@ impl<'a> Reader<'a> {
         }
         self.counter += 1;
         if reference != self.counter {
-            return Err(error(format!("ref {reference} where {} was due", self.counter)));
+            return Err(error(format!(
+                "ref {reference} where {} was due",
+                self.counter
+            )));
         }
         let value = match self.int()? {
             TYPE_BOOLEAN => Value::Boolean(self.int()? != 0),
             TYPE_NUMBER => Value::Number(f64::from_le_bytes(self.take(8)?.try_into().unwrap())),
             TYPE_STRING => {
-                let len = usize::try_from(self.int()?).map_err(|_| error("negative length".into()))?;
+                let len =
+                    usize::try_from(self.int()?).map_err(|_| error("negative length".into()))?;
                 let bytes = self.take(len)?;
                 let text = self.encoding.decode_without_bom_handling(bytes).0;
                 Value::String(self.lua.create_string(text.as_bytes())?)
@@ -254,7 +262,11 @@ const BASE64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 
 fn base64_encode(bytes: &[u8], out: &mut String) {
     for chunk in bytes.chunks(3) {
-        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
         let n = u32::from(b[0]) << 16 | u32::from(b[1]) << 8 | u32::from(b[2]);
         for i in 0..4 {
             if i <= chunk.len() {
@@ -319,7 +331,10 @@ mod tests {
         let adv: Table = root.get("adv").unwrap();
         assert!(adv.get::<bool>("flag").unwrap());
         assert_eq!(root.get::<String>("name").unwrap(), "行頭");
-        assert_eq!(root.get::<Table>("again").unwrap().to_pointer(), adv.to_pointer());
+        assert_eq!(
+            root.get::<Table>("again").unwrap().to_pointer(),
+            adv.to_pointer()
+        );
 
         // Writing it back gives an object the reader takes again, with the
         // shared table still shared and the string back in Shift_JIS.
@@ -341,10 +356,22 @@ mod tests {
         table.raw_set(1, 2.5).unwrap();
         let written = persist(&Value::Table(table), UTF_8).unwrap();
         let expected = [
-            int(1), int(1), int(5), int(0), int(0), int(0), // table, no metatable
-            int(1), int(2), int(3), 1.0f64.to_le_bytes().to_vec(),
-            int(1), int(3), int(3), 2.5f64.to_le_bytes().to_vec(),
-            int(0), int(0),
+            int(1),
+            int(1),
+            int(5),
+            int(0),
+            int(0),
+            int(0), // table, no metatable
+            int(1),
+            int(2),
+            int(3),
+            1.0f64.to_le_bytes().to_vec(),
+            int(1),
+            int(3),
+            int(3),
+            2.5f64.to_le_bytes().to_vec(),
+            int(0),
+            int(0),
         ]
         .concat();
         assert_eq!(written, expected);
@@ -352,7 +379,12 @@ mod tests {
 
     #[test]
     fn variable_form_round_trips_any_bytes() {
-        for bytes in [vec![], vec![0], vec![0, 255], (0..=255).collect::<Vec<u8>>()] {
+        for bytes in [
+            vec![],
+            vec![0],
+            vec![0, 255],
+            (0..=255).collect::<Vec<u8>>(),
+        ] {
             let text = to_variable(&bytes);
             assert!(text.is_ascii() || text.starts_with(VARIABLE_PREFIX));
             assert_eq!(from_variable(&text), Some(bytes));

@@ -50,13 +50,13 @@ pub mod error;
 pub mod event;
 pub mod expression;
 pub mod interpreter;
-pub mod lua_engine;
-pub mod pluto;
 #[cfg(feature = "backend-lua51")]
 pub mod lua51_bytecode;
+pub mod lua_engine;
 #[cfg(feature = "backend-luau")]
 pub mod luau_polyfill;
 pub mod r#macro;
+pub mod pluto;
 pub mod script;
 pub mod tags;
 pub mod variable;

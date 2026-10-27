@@ -148,8 +148,16 @@ impl CoreRuntime {
         // The PC engine's own formats, so saves move both ways (VNDegen).
         let read_lines = self.control.read_lines_export();
         for (file, bytes, count) in [
-            (SAVEG_FILE, crate::save::pc::write_global(&global, &read_lines, encoding), global.len()),
-            (SYSTEM_FILE, crate::save::pc::write_system(&written, encoding), written.len()),
+            (
+                SAVEG_FILE,
+                crate::save::pc::write_global(&global, &read_lines, encoding),
+                global.len(),
+            ),
+            (
+                SYSTEM_FILE,
+                crate::save::pc::write_system(&written, encoding),
+                written.len(),
+            ),
         ] {
             let path = self.save_path_for(file)?;
             self.resources.write(&path, &bytes)?;
@@ -377,11 +385,12 @@ impl CoreRuntime {
     /// Recreates the layers, handlers, and music of a PC save from its tags,
     /// then holds the tags queued in its call frames until they return.
     fn replay_pc_tags(&mut self, slot: &crate::save::pc_slot::SlotSave) -> Result<(), String> {
-        let as_queue = |tags: &[crate::save::pc_slot::Tag]| -> Vec<(String, HashMap<String, String>)> {
-            tags.iter()
-                .map(|tag| (tag.name.clone(), tag.params.iter().cloned().collect()))
-                .collect()
-        };
+        let as_queue =
+            |tags: &[crate::save::pc_slot::Tag]| -> Vec<(String, HashMap<String, String>)> {
+                tags.iter()
+                    .map(|tag| (tag.name.clone(), tag.params.iter().cloned().collect()))
+                    .collect()
+            };
         self.interpreter
             .replay_tags(&as_queue(&slot.replay))
             .map_err(|e| format!("重放存档标签失败: {e:?}"))?;

@@ -173,7 +173,11 @@ impl CoreRuntime {
         self.gpu
             .replace_asset_source(Box::new(move |name: &str| -> Option<Vec<u8>> {
                 let resolved = magic_path::resolve_path(&magic_paths_tex, name);
-                for try_path in [format!("{resolved}.png"), format!("{resolved}.jpg"), resolved.clone()] {
+                for try_path in [
+                    format!("{resolved}.png"),
+                    format!("{resolved}.jpg"),
+                    resolved.clone(),
+                ] {
                     match resources.read_file(&try_path).ok() {
                         Some(bytes) => {
                             return Some(bytes);

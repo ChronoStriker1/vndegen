@@ -809,11 +809,17 @@ impl UserData for EngineApi {
                 Err(crate::error::Error::IoError(error))
                     if error.kind() == std::io::ErrorKind::NotFound =>
                 {
-                    this.ctx.lock().unwrap().callbacks.include_missing(&path, &error.to_string());
+                    this.ctx
+                        .lock()
+                        .unwrap()
+                        .callbacks
+                        .include_missing(&path, &error.to_string());
                     return Ok(());
                 }
                 Err(e) => {
-                    return Err(mlua::Error::external(format!("include 读取 {path} 失败: {e}")));
+                    return Err(mlua::Error::external(format!(
+                        "include 读取 {path} 失败: {e}"
+                    )));
                 }
             };
 
@@ -833,7 +839,9 @@ impl UserData for EngineApi {
                         .load(&bytes[..])
                         .set_name(path.as_str())
                         .into_function()
-                        .map_err(|e| mlua::Error::external(format!("include 执行 {path} 失败: {e}")))?
+                        .map_err(|e| {
+                            mlua::Error::external(format!("include 执行 {path} 失败: {e}"))
+                        })?
                         .dump(false);
                     crate::lua51_bytecode::adapt(&dumped, encoding).unwrap_or(dumped)
                 };
@@ -1668,10 +1676,12 @@ mod tests {
             super::queued_layer_event("lyc", &params(&[("id", "80.0"), ("file", "mw/frame")])),
             Some(Event::Layer(LayerEvent::Create { id, file })) if id == "80.0" && file == "mw/frame"
         ));
-        let Some(Event::Layer(LayerEvent::SetProperties { properties, .. })) = super::queued_layer_event(
-            "lyprop",
-            &params(&[("id", "80.0"), ("top", "452"), ("\u{b}internal", "1")]),
-        ) else {
+        let Some(Event::Layer(LayerEvent::SetProperties { properties, .. })) =
+            super::queued_layer_event(
+                "lyprop",
+                &params(&[("id", "80.0"), ("top", "452"), ("\u{b}internal", "1")]),
+            )
+        else {
             panic!("lyprop has no event");
         };
         assert_eq!(properties, params(&[("top", "452")]));

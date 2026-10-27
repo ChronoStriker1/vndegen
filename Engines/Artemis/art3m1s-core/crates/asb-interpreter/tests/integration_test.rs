@@ -332,7 +332,9 @@ end
         // The string must read 浬 in UTF-8 after the include.
         let mut source = b"names = { [\"".to_vec();
         source.extend_from_slice(&[0x8A, 0x5C, b'\\']);
-        source.extend_from_slice(b"\"] = 1 }\nfunction found(e) return names[\"\xE6\xB5\xAC\"] end\n");
+        source.extend_from_slice(
+            b"\"] = 1 }\nfunction found(e) return names[\"\xE6\xB5\xAC\"] end\n",
+        );
         let script = r#"
 *main
 [lua]

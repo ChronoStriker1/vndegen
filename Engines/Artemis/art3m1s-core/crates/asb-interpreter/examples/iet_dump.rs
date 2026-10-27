@@ -4,7 +4,16 @@ fn main() {
     let text = std::fs::read_to_string(&path).unwrap();
     let s = asb_interpreter::script::Script::parse(&path, &text).unwrap();
     for (i, ins) in s.instructions.iter().enumerate() {
-        let mut keys: Vec<_> = ins.params.iter().map(|(k, v)| format!("{k}={}", v.chars().take(40).collect::<String>().replace('\n', "\\n"))).collect();
+        let mut keys: Vec<_> = ins
+            .params
+            .iter()
+            .map(|(k, v)| {
+                format!(
+                    "{k}={}",
+                    v.chars().take(40).collect::<String>().replace('\n', "\\n")
+                )
+            })
+            .collect();
         keys.sort();
         println!("{i} L{} {} {}", ins.line, ins.tag, keys.join(" "));
     }

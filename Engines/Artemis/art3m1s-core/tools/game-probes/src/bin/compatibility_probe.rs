@@ -45,10 +45,15 @@ fn media_length_ms(resolved: &str) -> u64 {
 }
 
 fn handle_host_event(payload: &str) {
-    let Ok(event) = serde_json::from_str::<serde_json::Value>(payload) else { return };
+    let Ok(event) = serde_json::from_str::<serde_json::Value>(payload) else {
+        return;
+    };
     let kind = event["kind"].as_str().unwrap_or("");
     let body = &event["payload"];
-    let file = body["resolved_file"].as_str().or(body["file"].as_str()).unwrap_or("");
+    let file = body["resolved_file"]
+        .as_str()
+        .or(body["file"].as_str())
+        .unwrap_or("");
     let looping = body["loop"].as_bool().unwrap_or(false);
     let mut clock = CLOCK.lock().unwrap();
     let now = clock.0;
@@ -56,17 +61,29 @@ fn handle_host_event(payload: &str) {
         "audio_se_play" | "audio_voice_play" if !looping => {
             let id = body["id"].as_str().map(str::to_string);
             let due = now + media_length_ms(file);
-            clock.1.push(Pending { due_ms: due, sound: Some(id), video: None });
+            clock.1.push(Pending {
+                due_ms: due,
+                sound: Some(id),
+                video: None,
+            });
         }
         "audio_bgm_play" if !looping => {
             let due = now + media_length_ms(file);
-            clock.1.push(Pending { due_ms: due, sound: Some(None), video: None });
+            clock.1.push(Pending {
+                due_ms: due,
+                sound: Some(None),
+                video: None,
+            });
         }
         "video_play" => {
             let id = body["id"].as_str().map(str::to_string);
             eprintln!("[HOST] video {file} id={id:?}");
             if id.is_none() {
-                clock.1.push(Pending { due_ms: now + 100, sound: None, video: Some(None) });
+                clock.1.push(Pending {
+                    due_ms: now + 100,
+                    sound: None,
+                    video: Some(None),
+                });
             }
         }
         _ => {}
@@ -77,7 +94,9 @@ fn run_due_completions(rt: &mut CoreRuntime) {
     let due: Vec<Pending> = {
         let mut clock = CLOCK.lock().unwrap();
         let now = clock.0;
-        let (due, rest) = std::mem::take(&mut clock.1).into_iter().partition(|p| p.due_ms <= now);
+        let (due, rest) = std::mem::take(&mut clock.1)
+            .into_iter()
+            .partition(|p| p.due_ms <= now);
         clock.1 = rest;
         due
     };
@@ -213,7 +232,10 @@ fn main() {
     RESOURCES.set(resources.clone()).ok();
     if let Ok(font) = std::env::var("PROBE_DEFAULT_FONT") {
         resources
-            .set_override("font/sourcehansans-medium.otf", std::fs::read(font).unwrap())
+            .set_override(
+                "font/sourcehansans-medium.otf",
+                std::fs::read(font).unwrap(),
+            )
             .unwrap();
     }
     let events = HOST_EVENTS.get_or_init(host_events::HostEvents::new);

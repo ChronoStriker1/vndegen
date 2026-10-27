@@ -20,21 +20,37 @@ fn main() {
     for path in std::env::args().skip(1) {
         let data = std::fs::read(&path).unwrap();
         // A Pluto value starts with a new table: 1, 1, 5, 0.
-        let start: Vec<u8> = [1i32, 1, 5, 0].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let start: Vec<u8> = [1i32, 1, 5, 0]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
         let mut at = 0;
         while let Some(found) = data[at..].windows(16).position(|w| w == start) {
             let begin = at + found;
             let len = u32::from_le_bytes(data[begin - 4..begin].try_into().unwrap()) as usize;
             at = begin + 16;
-            if begin + len > data.len() { continue; }
+            if begin + len > data.len() {
+                continue;
+            }
             let blob = &data[begin..begin + len];
             match asb_interpreter::pluto::unpersist(&lua, blob, encoding_rs::SHIFT_JIS) {
                 Ok(value) => {
-                    let written = asb_interpreter::pluto::persist(&value, encoding_rs::SHIFT_JIS).unwrap();
-                    let again = asb_interpreter::pluto::unpersist(&lua, &written, encoding_rs::SHIFT_JIS).unwrap();
-                    if same(&value, &again) { ok += 1 } else { bad += 1; println!("{path}: round trip differs at {begin}") }
+                    let written =
+                        asb_interpreter::pluto::persist(&value, encoding_rs::SHIFT_JIS).unwrap();
+                    let again =
+                        asb_interpreter::pluto::unpersist(&lua, &written, encoding_rs::SHIFT_JIS)
+                            .unwrap();
+                    if same(&value, &again) {
+                        ok += 1
+                    } else {
+                        bad += 1;
+                        println!("{path}: round trip differs at {begin}")
+                    }
                 }
-                Err(e) => { bad += 1; println!("{path}: {e} at {begin} len {len}"); }
+                Err(e) => {
+                    bad += 1;
+                    println!("{path}: {e} at {begin} len {len}");
+                }
             }
         }
     }

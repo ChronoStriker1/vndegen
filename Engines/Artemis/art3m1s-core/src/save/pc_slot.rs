@@ -95,7 +95,8 @@ impl<'a> Object<'a> {
     }
 
     fn require(&self, number: u32) -> Result<&'a [u8], String> {
-        self.field(number).ok_or_else(|| format!("no field {number}"))
+        self.field(number)
+            .ok_or_else(|| format!("no field {number}"))
     }
 }
 
@@ -342,9 +343,9 @@ pub struct WriteFrame {
 
 /// The root fields in the order of the PC engine's table.
 const TABLE_ORDER: [u32; 68] = [
-    31, 64, 30, 29, 28, 53, 26, 76, 75, 67, 66, 25, 24, 70, 69, 50, 38, 34, 33, 49, 48, 47, 46, 45, 44,
-    43, 42, 41, 40, 37, 17, 52, 16, 65, 12, 11, 5, 58, 4, 57, 15, 68, 39, 62, 9, 61, 8, 36, 60, 7, 51, 56,
-    3, 13, 18, 71, 35, 59, 6, 74, 63, 20, 73, 2, 72, 19, 14, 1,
+    31, 64, 30, 29, 28, 53, 26, 76, 75, 67, 66, 25, 24, 70, 69, 50, 38, 34, 33, 49, 48, 47, 46, 45,
+    44, 43, 42, 41, 40, 37, 17, 52, 16, 65, 12, 11, 5, 58, 4, 57, 15, 68, 39, 62, 9, 61, 8, 36, 60,
+    7, 51, 56, 3, 13, 18, 71, 35, 59, 6, 74, 63, 20, 73, 2, 72, 19, 14, 1,
 ];
 
 struct Writer {
@@ -398,7 +399,11 @@ impl Writer {
             params.extend(self.text(key));
             params.extend(self.text(value));
         }
-        let body = self.object(vec![(2, self.int(tag.line)), (3, self.text(&tag.name)), (4, params)]);
+        let body = self.object(vec![
+            (2, self.int(tag.line)),
+            (3, self.text(&tag.name)),
+            (4, params),
+        ]);
         self.sized(body)
     }
 
@@ -594,7 +599,11 @@ mod tests {
             list.extend(string(key));
             list.extend(string(value));
         }
-        object(&[(2, line.to_le_bytes().to_vec()), (3, string(name)), (4, list)])
+        object(&[
+            (2, line.to_le_bytes().to_vec()),
+            (3, string(name)),
+            (4, list),
+        ])
     }
 
     fn frame_object(script: &str, index: u32, queued: &[Vec<u8>]) -> Vec<u8> {
@@ -612,7 +621,9 @@ mod tests {
 
     #[test]
     fn reads_position_stack_variables_and_replay_tags() {
-        let blob = [1u8, 0, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let blob = [
+            1u8, 0, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
         let mut variables_list = int(2);
         variables_list.extend(string("lt.day"));
         variables_list.extend(string("1"));
@@ -623,8 +634,16 @@ mod tests {
         let mut layers = int(1);
         layers.extend(string("1.0"));
         layers.extend(int(2));
-        layers.extend(sized(tag_object("lyc", &[("id", "1.0"), ("file", "背景")], -1)));
-        layers.extend(sized(tag_object("lyprop", &[("id", "1.0"), ("left", "-400")], -1)));
+        layers.extend(sized(tag_object(
+            "lyc",
+            &[("id", "1.0"), ("file", "背景")],
+            -1,
+        )));
+        layers.extend(sized(tag_object(
+            "lyprop",
+            &[("id", "1.0"), ("left", "-400")],
+            -1,
+        )));
 
         let mut stack = int(1);
         stack.extend(sized(frame_object(
@@ -657,38 +676,65 @@ mod tests {
         assert_eq!(save.call_stack.len(), 1);
         assert_eq!(save.call_stack[0].index, 17);
         assert_eq!(save.call_stack[0].queued[0].name, "calllua");
-        assert_eq!(save.locals[0], ("lt.day".to_string(), asb_interpreter::Value::Int(1)));
+        assert_eq!(
+            save.locals[0],
+            ("lt.day".to_string(), asb_interpreter::Value::Int(1))
+        );
         assert_eq!(
             asb_interpreter::pluto::from_variable(&save.locals[1].1.as_string()),
             Some(blob.to_vec())
         );
         let names: Vec<_> = save.replay.iter().map(|tag| tag.name.as_str()).collect();
-        assert_eq!(names, ["lyc", "lyprop", "chgmsg", "print", "/chgmsg", "splay"]);
+        assert_eq!(
+            names,
+            ["lyc", "lyprop", "chgmsg", "print", "/chgmsg", "splay"]
+        );
         assert_eq!(save.call_stack[0].script, "scenario/a.txt");
-        assert_eq!(save.replay[0].params[1], ("file".to_string(), "背景".to_string()));
+        assert_eq!(
+            save.replay[0].params[1],
+            ("file".to_string(), "背景".to_string())
+        );
     }
 
     #[test]
     fn a_written_save_reads_back() {
         let tag = |name: &str, params: &[(&str, &str)]| Tag {
             name: name.into(),
-            params: params.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            params: params
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             line: -1,
         };
         let save = SlotWrite {
-            position: WriteFrame { script: "system/system.iet".into(), index: 73, ..Default::default() },
+            position: WriteFrame {
+                script: "system/system.iet".into(),
+                index: 73,
+                ..Default::default()
+            },
             call_stack: vec![
-                WriteFrame { script: "scenario/main.txt".into(), index: 20, ..Default::default() },
+                WriteFrame {
+                    script: "scenario/main.txt".into(),
+                    index: 20,
+                    ..Default::default()
+                },
                 WriteFrame {
                     script: "scenario/a.txt".into(),
                     index: 17,
                     wait: 1,
                     queued: vec![tag("calllua", &[("function", "clear")])],
-                    at: Some(Tag { name: "行頭".into(), params: Vec::new(), line: 21 }),
+                    at: Some(Tag {
+                        name: "行頭".into(),
+                        params: Vec::new(),
+                        line: 21,
+                    }),
                 },
             ],
             locals: vec![("lt.day".into(), asb_interpreter::Value::Int(1))],
-            layers: vec![("0".into(), vec![tag("lyc", &[("id", "0"), ("file", "背景")])])],
+            layers: vec![(
+                "0".into(),
+                vec![tag("lyc", &[("id", "0"), ("file", "背景")])],
+            )],
             message_layers: vec![("adv".into(), vec![tag("print", &[("data", "本文")])])],
             fonts: vec![("adv".into(), FontLayout::default())],
             bgm: Some(tag("splay", &[("file", "bgm/01")])),
@@ -699,9 +745,16 @@ mod tests {
         assert_eq!(read_back.position.index, 73);
         assert_eq!(read_back.call_stack[1].script, "scenario/a.txt");
         assert_eq!(read_back.call_stack[1].queued[0].name, "calllua");
-        assert_eq!((read_back.call_stack[0].wait, read_back.call_stack[1].wait), (0, 1));
+        assert_eq!(
+            (read_back.call_stack[0].wait, read_back.call_stack[1].wait),
+            (0, 1)
+        );
         assert_eq!(read_back.locals, save.locals);
-        let names: Vec<_> = read_back.replay.iter().map(|tag| tag.name.as_str()).collect();
+        let names: Vec<_> = read_back
+            .replay
+            .iter()
+            .map(|tag| tag.name.as_str())
+            .collect();
         assert_eq!(names, ["lyc", "chgmsg", "print", "/chgmsg", "splay"]);
     }
 

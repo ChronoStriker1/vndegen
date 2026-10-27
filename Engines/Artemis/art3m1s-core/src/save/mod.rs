@@ -221,7 +221,9 @@ fn serialized_story_entries(variables: &VariableStore) -> Vec<(String, asb_inter
         .iter_local()
         .filter(|(name, value)| {
             matches!(name.as_str(), "scr" | "log" | "btn")
-                || value.as_string().starts_with(asb_interpreter::pluto::VARIABLE_PREFIX)
+                || value
+                    .as_string()
+                    .starts_with(asb_interpreter::pluto::VARIABLE_PREFIX)
         })
         .map(|(name, value)| (name.clone(), value.clone()))
         .collect()
@@ -504,7 +506,9 @@ mod tests {
         live.set("btn", "latest-button-state".into());
         live.set(
             "lua.scr",
-            asb_interpreter::pluto::to_variable(b"story").as_str().into(),
+            asb_interpreter::pluto::to_variable(b"story")
+                .as_str()
+                .into(),
         );
         live.set("status", "save".into());
         let data = SaveData {
@@ -548,7 +552,9 @@ mod tests {
         assert_eq!(data.variables.get("status"), Some(&Value::from("adv")));
         assert_eq!(
             data.variables.get("lua.scr"),
-            Some(&Value::from(asb_interpreter::pluto::to_variable(b"story").as_str()))
+            Some(&Value::from(
+                asb_interpreter::pluto::to_variable(b"story").as_str()
+            ))
         );
     }
 

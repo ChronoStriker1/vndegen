@@ -69,12 +69,18 @@ fn layer_tags(layer: &crate::compositor::Layer) -> Vec<Tag> {
     put("yscale", props.y_scale.map(number));
     put("rotate", props.rotate.map(number));
     put("alpha", props.alpha.map(|alpha| alpha.to_string()));
-    put("visible", props.visible.map(|visible| u8::from(visible).to_string()));
+    put(
+        "visible",
+        props.visible.map(|visible| u8::from(visible).to_string()),
+    );
     put(
         "clip",
-        props
-            .clip
-            .map(|clip| clip.iter().map(|v| number(*v)).collect::<Vec<_>>().join(",")),
+        props.clip.map(|clip| {
+            clip.iter()
+                .map(|v| number(*v))
+                .collect::<Vec<_>>()
+                .join(",")
+        }),
     );
     put("layermode", props.layer_mode.clone());
     for (key, value) in &props.custom {
@@ -121,7 +127,11 @@ fn font_layout(layer: &crate::text::render::MessageLayer) -> FontLayout {
     }
     FontLayout {
         face: font.face.clone().unwrap_or_default(),
-        ruby_face: font.ruby_face.clone().or_else(|| font.face.clone()).unwrap_or_default(),
+        ruby_face: font
+            .ruby_face
+            .clone()
+            .or_else(|| font.face.clone())
+            .unwrap_or_default(),
         left: layer.left as i32,
         top: layer.top as i32,
         width: layer.width as i32,
@@ -148,7 +158,14 @@ fn font_layout(layer: &crate::text::render::MessageLayer) -> FontLayout {
 impl CoreRuntime {
     /// A script position with the PC engine's instruction index. A call
     /// frame also holds the tag it returns to.
-    fn write_frame(&self, script: &str, index: usize, wait: u32, queued: Vec<Tag>, with_tag: bool) -> WriteFrame {
+    fn write_frame(
+        &self,
+        script: &str,
+        index: usize,
+        wait: u32,
+        queued: Vec<Tag>,
+        with_tag: bool,
+    ) -> WriteFrame {
         let at = self
             .interpreter
             .get_script(script)
@@ -200,7 +217,10 @@ impl CoreRuntime {
             .collect();
         let (waiting, wait) = match &self.active_inline_event_frame {
             Some(event) => (event.stack.len(), self.inline_event_wait),
-            None => (frames.len().saturating_sub(1), u32::from(!queued.is_empty())),
+            None => (
+                frames.len().saturating_sub(1),
+                u32::from(!queued.is_empty()),
+            ),
         };
         let call_stack = frames
             .iter()
@@ -265,20 +285,30 @@ impl CoreRuntime {
             }
         }
 
-        let bgm = self.audio.audio_state().bgm_channel.as_ref().map(|channel| {
-            tag(
-                "splay",
-                [
-                    ("file".to_string(), channel.file.clone()),
-                    ("gain".to_string(), channel.raw_gain.to_string()),
-                    ("loop".to_string(), u8::from(channel.loop_play).to_string()),
-                    ("pan".to_string(), channel.raw_pan.to_string()),
-                    ("time".to_string(), "0".to_string()),
-                ],
-            )
-        });
+        let bgm = self
+            .audio
+            .audio_state()
+            .bgm_channel
+            .as_ref()
+            .map(|channel| {
+                tag(
+                    "splay",
+                    [
+                        ("file".to_string(), channel.file.clone()),
+                        ("gain".to_string(), channel.raw_gain.to_string()),
+                        ("loop".to_string(), u8::from(channel.loop_play).to_string()),
+                        ("pan".to_string(), channel.raw_pan.to_string()),
+                        ("time".to_string(), "0".to_string()),
+                    ],
+                )
+            });
 
-        let handlers = interpreter.engine_context().lock().unwrap().event_handlers.clone();
+        let handlers = interpreter
+            .engine_context()
+            .lock()
+            .unwrap()
+            .event_handlers
+            .clone();
         let handler = |name: &str| handlers.get(name).cloned().unwrap_or_default();
         SlotWrite {
             position,
