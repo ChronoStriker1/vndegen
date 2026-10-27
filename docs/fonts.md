@@ -123,9 +123,10 @@ Measured in the page with `measureText`, against the widths computed from the fo
 
 - Test Game 35 (TyranoScript) names メイリオ. On an iPad Pro 13-inch simulator and in the macOS app, its text measured
   652.734 px at 100 px, Ume P Gothic's width, and ＭＳ ゴシック measured 650.000 px once loaded, Ume Gothic's width.
-  On the iPad, its dialogue fits the message window on one line.
+  On both, its dialogue fits the message window on one line.
 - No Socks RPG (RPG Maker MZ) lists Arial, Georgia, and Tahoma in its options. On the iPad, the boot scene ended only
   after those loaded, and with Tahoma chosen the options use DejaVu Sans Condensed (908.105 px, its kerned width) with
-  every label inside its window. In the macOS app, Tahoma measured 899.268 px, the system's real Tahoma.
+  every label inside its window. In the macOS app, the boot scene ended the same way, and Tahoma measured 899.268 px,
+  the system's real Tahoma, which the options then used with every label inside its window.
 - The Korean download installs from Settings on the iPad, Dotum then measures 466.300 px, Source Han Sans KR's width,
   and Remove deletes it.
