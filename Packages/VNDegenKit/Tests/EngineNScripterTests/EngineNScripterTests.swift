@@ -99,3 +99,37 @@ private func probe(_ files: [String]) -> FolderProbe {
         #expect([pixels[i], pixels[i + 1], pixels[i + 2]] == [UInt8(16 * x), UInt8(60 * y), UInt8(8 * (x + y))])
     }
 }
+
+@Test func savesGoToTheScriptsSaveFolder() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let game = dir.appendingPathComponent("Game")
+    try FileManager.default.createDirectory(at: game.appendingPathComponent("SAVE"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    // nscript.dat is the script with each byte XOR 0x84.
+    let script = ";mode800\r\n*define\r\n\tsavedir \"save\"\t;comment\r\ngame\r\n"
+    try Data(script.utf8.map { $0 ^ 0x84 }).write(to: game.appendingPathComponent("nscript.dat"))
+    let locations = NScripterPlugin().saveLocations(folder: dir, dataDirectory: dir)
+    let saves = try #require(locations.first)
+    #expect(locations.count == 1)
+    #expect(saves.directory.lastPathComponent == "SAVE")
+    #expect(saves.relativePath("C:/Games/Game/save/save1.dat") == "save1.dat")
+    #expect(saves.relativePath("C:/Games/Game/save/save1.bmp") == "save1.bmp")
+    #expect(saves.relativePath(saves.directory.path + "/gloval.sav") == "gloval.sav")
+    #expect(saves.relativePath("C:/Games/Game/save1.dat") == nil)
+}
+
+@Test func withoutASaveFolderOnlyTheEnginesFilesAreSaves() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    try Data("*define\ngame\n".utf8).write(to: dir.appendingPathComponent("0.txt"))
+    try Data().write(to: dir.appendingPathComponent("arc.nsa"))
+    let saves = try #require(NScripterPlugin().saveLocations(folder: dir, dataDirectory: dir).first)
+    #expect(saves.directory.standardizedFileURL == dir.standardizedFileURL)
+    for name in ["save12.dat", "gloval.sav", "kidoku.dat", "NScrflog.dat", "NScrllog.dat"] {
+        #expect(saves.relativePath("D:/Game/\(name)") == name)
+    }
+    for name in ["nscript.dat", "save.dat", "arc.nsa", "0.txt"] {
+        #expect(saves.relativePath("D:/Game/\(name)") == nil)
+    }
+}
