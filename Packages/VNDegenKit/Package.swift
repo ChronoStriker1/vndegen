@@ -96,12 +96,8 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
-<<<<<<< HEAD
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
+        .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ],
     cxxLanguageStandard: .cxx17
-=======
-        .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
-    ]
->>>>>>> origin/dev
 )
