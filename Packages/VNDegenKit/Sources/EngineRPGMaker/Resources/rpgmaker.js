@@ -157,6 +157,8 @@
     const loopLimits = { seconds: 10, bytes: 32 << 20, start: 0.02, step: 250 };
     const videoStates = new WeakMap();
     const fileLengths = new Map();
+    // PIXI's shared ticker goes on updating video textures while the session is paused, so kept frames hold by this.
+    let sessionPaused = false;
     function smoothVideoLoops(pixi) {
         const VideoResource = pixi.resources && pixi.resources.VideoResource;
         if (!VideoResource || !pixi.BaseTexture || !('requestVideoFrameCallback' in HTMLVideoElement.prototype)) return;
@@ -199,12 +201,12 @@
             dropFrames(state, 'native');
             return state.presented;
         }
-        // The kept frames play as far as the video has played since the last update. A long gap, such as the session
-        // pausing the game, counts as one short step, so the clip goes on near where it stopped.
+        // The kept frames play as far as the video has played since the last update. A long gap between updates counts
+        // as one short step, so the clip goes on near where it stopped.
         const now = performance.now();
         const elapsed = Math.min(now - state.tick, loopLimits.step);
         state.tick = now;
-        if (!video.paused) state.position = (state.position + elapsed / 1000 * video.playbackRate) % state.length;
+        if (!video.paused && !sessionPaused) state.position = (state.position + elapsed / 1000 * video.playbackRate) % state.length;
         const frames = state.frames;
         let shown = 0;
         while (shown + 1 < frames.length && frames[shown + 1].time <= state.position) shown++;
@@ -213,7 +215,7 @@
     }
 
     function watchVideo(video) {
-        const state = { video, mode: 'keeping', presented: 0, frames: [], bytes: 0, count: -1 };
+        const state = { video, mode: 'keeping', presented: 0, frames: [], bytes: 0, count: -1, last: 0, position: 0 };
         const onFrame = (now, meta) => {
             if (state.mode === 'done') return;
             state.presented++;
@@ -227,17 +229,16 @@
         };
         video.requestVideoFrameCallback(onFrame);
         // A new source starts over. WebKit's own loop seeks back to 0, so only a seek elsewhere is the game's: it moves
-        // the kept frames' position, or starts keeping over.
+        // the kept frames' position, also while their length is still being read, or starts keeping over.
         video.addEventListener('emptied', () => {
             if (state.mode === 'done') return;
             dropFrames(state, 'keeping');
-            state.count = -1;
-            state.length = undefined;
+            Object.assign(state, { count: -1, last: 0, position: 0, length: undefined });
         });
         video.addEventListener('seeked', () => {
             if (state.mode === 'done' || !(video.currentTime > loopLimits.start)) return;
-            if (state.mode === 'kept') state.position = video.currentTime % state.length;
-            else if (state.mode === 'keeping') dropFrames(state, 'keeping');
+            if (state.mode === 'keeping') dropFrames(state, 'keeping');
+            else state.position = video.currentTime;
         });
         return state;
     }
@@ -252,15 +253,20 @@
             fileLength(url).then((length) => {
                 if (video.currentSrc !== url || state.mode === 'done') return;
                 state.length = length || 0;
-                if (state.mode === 'ready') finishKeeping(state, performance.now(), 0);
+                if (state.mode === 'ready') finishKeeping(state, performance.now());
             });
         }
-        const atStart = time < loopLimits.start;
+        // A pass ends where the time goes back to the start. A clip at 60 fps has more than one frame near the start.
+        const atStart = time < loopLimits.start, wrapped = atStart && time < state.last;
+        state.last = time;
         // A frame skipped while keeping would be missing from every later pass.
         const skipped = state.count >= 0 && meta.presentedFrames !== state.count + 1;
         state.count = meta.presentedFrames;
         if (skipped) dropFrames(state, 'keeping');
-        if (atStart && state.frames.length) return finishKeeping(state, now, time);
+        if (wrapped && state.frames.length) {
+            state.position = time;
+            return finishKeeping(state, now);
+        }
         if (!atStart && !state.frames.length) return;
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -273,12 +279,12 @@
 
     // Plays the kept frames once the file's length is known, null while it is being read. A video whose length cannot
     // be read, 0, plays as WebKit plays it.
-    function finishKeeping(state, now, position) {
+    function finishKeeping(state, now) {
         const frames = state.frames;
         if (state.length === null) {
             state.mode = 'ready';
         } else if (state.length > frames[frames.length - 1].time) {
-            Object.assign(state, { mode: 'kept', position, tick: now, shown: 0 });
+            Object.assign(state, { mode: 'kept', position: state.position % state.length, tick: now, shown: 0 });
         } else {
             dropFrames(state, 'native');
         }
@@ -359,6 +365,7 @@
 
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
+        sessionPaused = paused;
         const scenes = window.SceneManager;
         if (paused) {
             if (scenes && scenes.stop) scenes.stop();

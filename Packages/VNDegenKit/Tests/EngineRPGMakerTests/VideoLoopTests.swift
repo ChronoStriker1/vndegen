@@ -19,10 +19,64 @@ private let page = """
     </script></body></html>
     """
 
-/// A looping GIF made WebM: three frames of 0.14 s and a last one of 0.28 s, so the file states 0.7 s. WebKit takes such a
-/// clip for shorter, and the frames alone suggest 0.56 s. A canvas stands in for the video, so the test presents each
-/// frame and sets the clock itself.
-@Test @MainActor func aShortLoopPlaysItsKeptFramesOverTheFilesLength() async throws {
+/// What each test starts from. A canvas stands in for the video, so a test presents each frame and sets the clock
+/// itself. The video is a looping GIF made WebM: three frames of 0.14 s and a last one of 0.28 s, so the file states
+/// 0.7 s. WebKit takes such a clip for shorter, and the frames alone suggest 0.56 s.
+private let setUp = """
+    let now = 1000;
+    performance.now = () => now;
+    // The file's length is read in the background. Tests wait for that read rather than for a set time, and can hold
+    // it back.
+    const reads = [];
+    let held = null;
+    const arrayBuffer = Response.prototype.arrayBuffer;
+    Response.prototype.arrayBuffer = function () {
+        const read = held ? held.then(() => arrayBuffer.call(this)) : arrayBuffer.call(this);
+        reads.push(read);
+        return read;
+    };
+    const lengthRead = async () => {
+        for (let tries = 0; !reads.length; tries++) {
+            if (tries > 500) throw new Error('the file was never read');
+            await new Promise((done) => setTimeout(done, 10));
+        }
+        await reads[0];
+        await new Promise((done) => setTimeout(done, 0));
+    };
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
+    const video = document.createElement('canvas');
+    video.width = video.height = 4;
+    let callbacks = [], presented = 0;
+    Object.assign(video, {
+        videoWidth: 4, videoHeight: 4, loop: true, paused: false, playbackRate: 1, duration: 0.44, currentTime: 0,
+        currentSrc: 'data:video/webm;base64,' + clip,
+        requestVideoFrameCallback(callback) { callbacks.push(callback); },
+    });
+    const present = (index, time = index * 0.14) => {
+        const context = video.getContext('2d');
+        context.fillStyle = colors[index];
+        context.fillRect(0, 0, 4, 4);
+        presented++;
+        const due = callbacks;
+        callbacks = [];
+        for (const callback of due) callback(now, { mediaTime: time, presentedFrames: presented });
+    };
+    const resource = new PIXI.resources.VideoResource(video);
+    const texture = new PIXI.BaseTexture(resource);
+    // Like PIXI's renderer, this uploads only when the texture has changed. It returns the shown frame's color.
+    let uploadedAt = -1;
+    const shown = () => {
+        texture.update();
+        if (texture.dirtyId !== uploadedAt) {
+            uploadedAt = texture.dirtyId;
+            resource.upload(null, texture, {});
+        }
+        const pixel = resource.uploaded[resource.uploaded.length - 1].getContext('2d').getImageData(0, 0, 1, 1).data;
+        return colors.indexOf('#' + Array.from(pixel.slice(0, 3), (c) => c.toString(16).padStart(2, '0')).join(''));
+    };
+    """
+
+@MainActor private func runWithVideo(_ body: String) async throws -> [String: Any] {
     let here = URL(filePath: #filePath).deletingLastPathComponent()
     let source = here.appending(path: "../../Sources/EngineRPGMaker/Resources/rpgmaker.js").standardized
     let clip = try Data(contentsOf: here.appending(path: "Fixtures/gif-loop.webm"))
@@ -37,48 +91,13 @@ private let page = """
         guard ContinuousClock.now < deadline else { throw CancellationError() }
         try await Task.sleep(for: .milliseconds(50))
     }
-    let result = try await webView.callAsyncJavaScript("""
-        let now = 1000;
-        performance.now = () => now;
-        // The file's length is read in the background. The test waits for that read rather than for a set time.
-        const reads = [];
-        const arrayBuffer = Response.prototype.arrayBuffer;
-        Response.prototype.arrayBuffer = function () {
-            const read = arrayBuffer.call(this);
-            reads.push(read);
-            return read;
-        };
-        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
-        const video = document.createElement('canvas');
-        video.width = video.height = 4;
-        let callbacks = [], presented = 0;
-        Object.assign(video, {
-            videoWidth: 4, videoHeight: 4, loop: true, paused: false, playbackRate: 1, duration: 0.44, currentTime: 0,
-            currentSrc: 'data:video/webm;base64,' + clip,
-            requestVideoFrameCallback(callback) { callbacks.push(callback); },
-        });
-        const present = (index) => {
-            const context = video.getContext('2d');
-            context.fillStyle = colors[index];
-            context.fillRect(0, 0, 4, 4);
-            presented++;
-            const due = callbacks;
-            callbacks = [];
-            for (const callback of due) callback(now, { mediaTime: index * 0.14, presentedFrames: presented });
-        };
-        const resource = new PIXI.resources.VideoResource(video);
-        const texture = new PIXI.BaseTexture(resource);
-        // Like PIXI's renderer, this uploads only when the texture has changed. It returns the shown frame's color.
-        let uploadedAt = -1;
-        const shown = () => {
-            texture.update();
-            if (texture.dirtyId !== uploadedAt) {
-                uploadedAt = texture.dirtyId;
-                resource.upload(null, texture, {});
-            }
-            const pixel = resource.uploaded[resource.uploaded.length - 1].getContext('2d').getImageData(0, 0, 1, 1).data;
-            return colors.indexOf('#' + Array.from(pixel.slice(0, 3), (c) => c.toString(16).padStart(2, '0')).join(''));
-        };
+    let result = try await webView.callAsyncJavaScript(setUp + body, arguments: ["clip": clip.base64EncodedString()],
+                                                       contentWorld: .page)
+    return try #require(result as? [String: Any])
+}
+
+@Test @MainActor func aShortLoopPlaysItsKeptFramesOverTheFilesLength() async throws {
+    let values = try await runWithVideo("""
         const changes = [];
         texture.update();
         texture.update();
@@ -88,14 +107,7 @@ private let page = """
             texture.update();
             texture.update();
             changes.push(texture.dirtyId);
-            if (index === 0) {
-                for (let tries = 0; !reads.length; tries++) {
-                    if (tries > 500) throw new Error('the file was never read');
-                    await new Promise((done) => setTimeout(done, 10));
-                }
-                await reads[0];
-                await new Promise((done) => setTimeout(done, 0));
-            }
+            if (index === 0) await lengthRead();
             now += 140;
         }
         // The first frame again: the pass is complete, and the kept frames play from here.
@@ -127,8 +139,7 @@ private let page = """
         resource.upload(null, texture, {});
         const native = resource.uploaded[resource.uploaded.length - 1] === video;
         return { changes, frames, uploads, native, released: kept.width };
-        """, arguments: ["clip": clip.base64EncodedString()], contentWorld: .page) as? [String: Any]
-    let values = try #require(result)
+        """)
     // One change for the first update, then one for each presented frame however often the engine updates.
     #expect(values["changes"] as? [Int] == [1, 2, 3, 4, 5])
     // The last frame shows from 0.42 s to the stated 0.7 s, where the next pass starts. After the stop, the clip goes
@@ -139,4 +150,37 @@ private let page = """
     #expect(values["uploads"] as? Int == 8)
     #expect(values["native"] as? Bool == true)
     #expect(values["released"] as? Int == 0)
+}
+
+/// Frames close together at the start, a seek while the length is still being read, and a paused session, during which
+/// PIXI's own ticker goes on updating the texture.
+@Test @MainActor func keptFramesFollowSeeksAndSessionPauses() async throws {
+    let values = try await runWithVideo("""
+        let release;
+        held = new Promise((done) => { release = done; });
+        texture.update();
+        // Frames at 60 fps, two of them within the first 20 ms.
+        for (const index of [0, 1, 2, 3]) {
+            present(index, index / 60);
+            now += 17;
+        }
+        present(0, 0);
+        // The pass is complete, but the length is not read yet. The game seeks to the third frame.
+        video.currentTime = 0.04;
+        video.dispatchEvent(new Event('seeked'));
+        release();
+        await lengthRead();
+        const frames = [shown()];
+        __vndegen.onPause(true);
+        for (let step = 0; step < 10; step++) {
+            now += 100;
+            frames.push(shown());
+        }
+        __vndegen.onPause(false);
+        now += 15;
+        frames.push(shown());
+        return { frames };
+        """)
+    // The seek holds through the read, the paused session holds the frame, and 15 ms later the fourth frame is due.
+    #expect(values["frames"] as? [Int] == [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3])
 }
