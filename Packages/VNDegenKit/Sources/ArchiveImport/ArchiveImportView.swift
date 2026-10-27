@@ -393,6 +393,7 @@ private struct StepView: View {
                 .padding(14)
                 .fieldBackground(ImportTheme.surface, focused: model.isFocused(.folderName))
                 .onSubmit { importer.startImport() }
+                .id(ArchiveImportModel.Control.folderName)
             if let problem = importer.folderNameProblem {
                 Label(problem, systemImage: "exclamationmark.circle.fill")
                     .font(.system(size: 13))
@@ -422,16 +423,19 @@ private struct StepView: View {
                     .strokeBorder(focused ? .white : .clear, lineWidth: 2.5)
             }
             .padding(.horizontal, -12)
+            .id(ArchiveImportModel.Control.deleteToggle)
         }
         errorLabel
         HStack(spacing: 12) {
             Button("Choose Another") { model.select(.chooseAnother) }
                 .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.chooseAnother)))
+                .id(ArchiveImportModel.Control.chooseAnother)
             Spacer()
             Button { model.select(.startImport) } label: { Label("Import", systemImage: "square.and.arrow.down") }
                 .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.startImport)))
                 .keyboardShortcut(.defaultAction)
                 .disabled(importer.folderNameProblem != nil)
+                .id(ArchiveImportModel.Control.startImport)
         }
     }
 
@@ -450,6 +454,7 @@ private struct StepView: View {
                     .fieldBackground(Color.black.opacity(0.3), focused: model.isFocused(.passwordField),
                                      stroke: wrong ? ImportTheme.accent : ImportTheme.stroke)
                     .onSubmit(model.unlock)
+                    .id(ArchiveImportModel.Control.passwordField)
                 if wrong {
                     Label("That password is not correct. Try again.", systemImage: "exclamationmark.circle.fill")
                         .font(.system(size: 13))
@@ -459,11 +464,13 @@ private struct StepView: View {
             HStack(spacing: 12) {
                 Button("Cancel") { model.select(.cancelPassword) }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.cancelPassword)))
+                    .id(ArchiveImportModel.Control.cancelPassword)
                 Spacer()
                 Button { model.select(.unlock) } label: { Label("Unlock", systemImage: "lock.open.fill") }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.unlock)))
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.password.isEmpty)
+                    .id(ArchiveImportModel.Control.unlock)
             }
         }
     }
@@ -489,6 +496,7 @@ private struct StepView: View {
             .foregroundStyle(ImportTheme.tertiaryText)
         Button("Cancel Import", role: .cancel) { model.select(.cancelImport) }
             .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.cancelImport)))
+            .id(ArchiveImportModel.Control.cancelImport)
     }
 
     private func nested(_ fileName: String) -> some View {
@@ -504,10 +512,12 @@ private struct StepView: View {
             HStack(spacing: 12) {
                 Button("Keep As Is") { model.select(.keepNested) }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.keepNested)))
+                    .id(ArchiveImportModel.Control.keepNested)
                 Spacer()
                 Button { model.select(.extractNested) } label: { Label("Extract", systemImage: "arrow.down.doc.fill") }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.extractNested)))
                     .keyboardShortcut(.defaultAction)
+                    .id(ArchiveImportModel.Control.extractNested)
             }
         }
     }
@@ -531,10 +541,12 @@ private struct StepView: View {
             HStack(spacing: 12) {
                 Button("Import Another") { model.select(.importAnother) }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.importAnother)))
+                    .id(ArchiveImportModel.Control.importAnother)
                 Spacer()
                 Button("Done") { model.select(.done) }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.done)))
                     .keyboardShortcut(.defaultAction)
+                    .id(ArchiveImportModel.Control.done)
             }
         }
     }
