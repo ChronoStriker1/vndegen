@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import OSLog
 import VNCore
@@ -34,14 +35,19 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         } catch {
             tyranoLog.error("could not update the save key: \(error.localizedDescription, privacy: .public)")
         }
-        return try WebGameConfiguration(
+        var configuration = try WebGameConfiguration(
             folder: folder, appName: game.projectID, runtime: Self.runtime(for: game),
             userScripts: [try String(contentsOf: url, encoding: .utf8)],
             userAgent: Self.chromeUserAgent + (game.packaging == .electron ? " TyranoErectron" : ""),
             storageDirectory: storage.directory, decodesOgg: true,
             buttonScript: { button, pressed in "__vndegenTyrano.button('\(button.rawValue)', \(pressed))" },
             scriptArgument: "tyrano-script", log: tyranoLog
-        ).makeSession(launch)
+        )
+        // Text is HTML here, so a font face that loads late only redraws it. The game's default font, which its
+        // Config.tjs names, loads up front so the first lines don't show the fallback.
+        configuration.preloadFonts = folder.read(servedPath: "/data/system/Config.tjs", limit: 1 << 20)
+            .map { FontPack.referencedNames(in: String(decoding: $0, as: UTF8.self)) } ?? []
+        return try configuration.makeSession(launch)
     }
 
     /// Buttons used to run Tyrano's actions here directly, which still works. As an Xbox button, such a remap would do

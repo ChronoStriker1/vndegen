@@ -1,0 +1,82 @@
+# Windows font substitutes. Every VNDegen engine reads this table through vnfont_resolve (Engines/Shared/vnfont.h)
+# or the FontPack Swift module. docs/fonts.md explains each choice.
+#
+# One line per Windows font name and style: name, style (regular, bold, italic, or bold-italic), the substitute's
+# file name, and its face index in a collection (0 for a single font). Columns are separated by one tab. Lookups ignore
+# ASCII case, spaces, full-width forms of ASCII letters, and a leading @, so "ＭＳ Ｐゴシック", "MS Pゴシック" and
+# "ms pgothic" all match the same lines. A style with no line of its own falls back to regular, and the caller draws
+# it bolder or slanted. Lines whose file isn't installed, such as the Chinese and Korean fonts before the player
+# downloads them, are skipped.
+Arial	regular	LiberationSans-Regular.ttf	0
+Arial	bold	LiberationSans-Bold.ttf	0
+Microsoft Sans Serif	regular	LiberationSans-Regular.ttf	0
+Microsoft Sans Serif	bold	LiberationSans-Bold.ttf	0
+MS Sans Serif	regular	LiberationSans-Regular.ttf	0
+MS Sans Serif	bold	LiberationSans-Bold.ttf	0
+Times New Roman	regular	LiberationSerif-Regular.ttf	0
+Times New Roman	bold	LiberationSerif-Bold.ttf	0
+Georgia	regular	LiberationSerif-Regular.ttf	0
+Georgia	bold	LiberationSerif-Bold.ttf	0
+MS Serif	regular	LiberationSerif-Regular.ttf	0
+MS Serif	bold	LiberationSerif-Bold.ttf	0
+Courier New	regular	LiberationMono-Regular.ttf	0
+Courier New	bold	LiberationMono-Bold.ttf	0
+Lucida Console	regular	LiberationMono-Regular.ttf	0
+Lucida Console	bold	LiberationMono-Bold.ttf	0
+Tahoma	regular	DejaVuSansCondensed.ttf	0
+Tahoma	bold	DejaVuSansCondensed-Bold.ttf	0
+MS Shell Dlg 2	regular	DejaVuSansCondensed.ttf	0
+MS Shell Dlg 2	bold	DejaVuSansCondensed-Bold.ttf	0
+MS Gothic	regular	ume-tgo4.ttf	0
+ＭＳ ゴシック	regular	ume-tgo4.ttf	0
+MS PGothic	regular	ume-pgo4.ttf	0
+ＭＳ Ｐゴシック	regular	ume-pgo4.ttf	0
+MS UI Gothic	regular	ume-ugo4.ttf	0
+MS Mincho	regular	ume-tmo3.ttf	0
+ＭＳ 明朝	regular	ume-tmo3.ttf	0
+MS PMincho	regular	ume-pmo3.ttf	0
+ＭＳ Ｐ明朝	regular	ume-pmo3.ttf	0
+Meiryo	regular	ume-pgo4.ttf	0
+メイリオ	regular	ume-pgo4.ttf	0
+Meiryo UI	regular	ume-pgo4.ttf	0
+Yu Gothic	regular	ume-pgo4.ttf	0
+游ゴシック	regular	ume-pgo4.ttf	0
+Yu Gothic UI	regular	ume-pgo4.ttf	0
+Yu Mincho	regular	ume-pmo3.ttf	0
+游明朝	regular	ume-pmo3.ttf	0
+Microsoft YaHei	regular	SourceHanSansCN-Regular.otf	0
+Microsoft YaHei	bold	SourceHanSansCN-Bold.otf	0
+微软雅黑	regular	SourceHanSansCN-Regular.otf	0
+微软雅黑	bold	SourceHanSansCN-Bold.otf	0
+SimHei	regular	SourceHanSansCN-Regular.otf	0
+SimHei	bold	SourceHanSansCN-Bold.otf	0
+黑体	regular	SourceHanSansCN-Regular.otf	0
+黑体	bold	SourceHanSansCN-Bold.otf	0
+SimSun	regular	SourceHanSansCN-Regular.otf	0
+SimSun	bold	SourceHanSansCN-Bold.otf	0
+宋体	regular	SourceHanSansCN-Regular.otf	0
+宋体	bold	SourceHanSansCN-Bold.otf	0
+NSimSun	regular	SourceHanSansCN-Regular.otf	0
+NSimSun	bold	SourceHanSansCN-Bold.otf	0
+新宋体	regular	SourceHanSansCN-Regular.otf	0
+新宋体	bold	SourceHanSansCN-Bold.otf	0
+Malgun Gothic	regular	SourceHanSansKR-Regular.otf	0
+Malgun Gothic	bold	SourceHanSansKR-Bold.otf	0
+맑은 고딕	regular	SourceHanSansKR-Regular.otf	0
+맑은 고딕	bold	SourceHanSansKR-Bold.otf	0
+Dotum	regular	SourceHanSansKR-Regular.otf	0
+Dotum	bold	SourceHanSansKR-Bold.otf	0
+돋움	regular	SourceHanSansKR-Regular.otf	0
+돋움	bold	SourceHanSansKR-Bold.otf	0
+DotumChe	regular	SourceHanSansKR-Regular.otf	0
+DotumChe	bold	SourceHanSansKR-Bold.otf	0
+돋움체	regular	SourceHanSansKR-Regular.otf	0
+돋움체	bold	SourceHanSansKR-Bold.otf	0
+Gulim	regular	SourceHanSansKR-Regular.otf	0
+Gulim	bold	SourceHanSansKR-Bold.otf	0
+굴림	regular	SourceHanSansKR-Regular.otf	0
+굴림	bold	SourceHanSansKR-Bold.otf	0
+GulimChe	regular	SourceHanSansKR-Regular.otf	0
+GulimChe	bold	SourceHanSansKR-Bold.otf	0
+굴림체	regular	SourceHanSansKR-Regular.otf	0
+굴림체	bold	SourceHanSansKR-Bold.otf	0

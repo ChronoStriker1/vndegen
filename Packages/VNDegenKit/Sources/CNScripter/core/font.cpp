@@ -1,5 +1,8 @@
 #include "font.h"
 
+#include "common.h"
+#include "vnfont.h"
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -26,14 +29,50 @@ public:
     }
 };
 
+// The font pack's substitute for a Windows face name (Shift-JIS, as scripts write it), or for MS Gothic, NScripter's
+// default, when the script names none or one the table lacks.
+struct FaceFile {
+    std::string path;
+    int face = 0;
+};
+
+bool resolveFace(const std::string &sjisName, FaceFile &out) {
+    vnfont_match m;
+    std::string name = sjisToUtf8(sjisName);
+    if (name.empty() || !vnfont_resolve(name.c_str(), 0, 0, &m)) {
+        if (!vnfont_resolve("MS Gothic", 0, 0, &m)) return false;
+    }
+    out.path = m.path;
+    out.face = m.face;
+    return true;
+}
+
 #if __APPLE__
-// CoreText with the system's Japanese gothic face. Glyphs are scaled horizontally to the cell, as Windows does when
-// a font is created with a width, and sit on MS Gothic's baseline (86% of the cell height down).
+// CoreText with the font pack's face (Ume Gothic for MS Gothic), then Hiragino for characters it lacks, then the
+// system's fallback. Glyphs are scaled horizontally to the cell, as Windows does when a font is created with a width,
+// and sit on MS Gothic's baseline (86% of the cell height down).
 class CoreTextRasterizer : public FontRasterizer {
 public:
-    explicit CoreTextRasterizer(std::string face) : face_(std::move(face)) {}
+    explicit CoreTextRasterizer(const std::string &sjisFace) {
+        FaceFile file;
+        if (!resolveFace(sjisFace, file)) return;
+        CFURLRef url = CFURLCreateFromFileSystemRepresentation(nullptr, reinterpret_cast<const UInt8 *>(file.path.c_str()),
+                                                               CFIndex(file.path.size()), false);
+        if (!url) return;
+        CFArrayRef descriptors = CTFontManagerCreateFontDescriptorsFromURL(url);
+        CFRelease(url);
+        if (!descriptors) return;
+        CFIndex n = CFArrayGetCount(descriptors);
+        if (n > 0) {
+            descriptor_ = static_cast<CTFontDescriptorRef>(CFArrayGetValueAtIndex(descriptors, std::min<CFIndex>(file.face, n - 1)));
+            CFRetain(descriptor_);
+        }
+        CFRelease(descriptors);
+    }
     ~CoreTextRasterizer() override {
         for (auto &[k, f] : fonts_) CFRelease(f);
+        for (auto &[k, f] : fallbacks_) CFRelease(f);
+        if (descriptor_) CFRelease(descriptor_);
     }
     bool render(uint32_t cp, int cellW, int cellH, bool bold, Glyph &out) override {
         out.w = cellW;
@@ -55,6 +94,13 @@ public:
         CTFontRef use = font;
         CTFontRef fallback = nullptr;
         if (!CTFontGetGlyphsForCharacters(font, chars, glyphs, n) || !glyphs[0]) {
+            CTFontRef hiragino = hiraginoFor(cellH);
+            if (hiragino && CTFontGetGlyphsForCharacters(hiragino, chars, glyphs, n) && glyphs[0]) {
+                font = hiragino;
+                use = hiragino;
+            }
+        }
+        if (!glyphs[0]) {
             CFStringRef s = CFStringCreateWithCharacters(nullptr, chars, n);
             fallback = CTFontCreateForString(font, s, CFRangeMake(0, n));
             CFRelease(s);
@@ -94,17 +140,22 @@ public:
     }
 
 private:
-    CTFontRef fontFor(int size, bool bold) {
-        int key = size * 2 + (bold ? 1 : 0);
-        if (auto it = fonts_.find(key); it != fonts_.end()) return it->second;
-        CFStringRef name = CFStringCreateWithCString(nullptr, face_.c_str(), kCFStringEncodingUTF8);
-        CTFontRef f = CTFontCreateWithName(name, size, nullptr);
-        CFRelease(name);
-        fonts_[key] = f;
+    // Bold is drawn by stroking, as Windows emboldens fonts with no bold face, so one font serves both.
+    CTFontRef fontFor(int size, bool) {
+        if (auto it = fonts_.find(size); it != fonts_.end()) return it->second;
+        CTFontRef f = descriptor_ ? CTFontCreateWithFontDescriptor(descriptor_, size, nullptr) : hiraginoFor(size);
+        if (f && !descriptor_) CFRetain(f);
+        fonts_[size] = f;
         return f;
     }
-    std::string face_;
-    std::map<int, CTFontRef> fonts_;
+    CTFontRef hiraginoFor(int size) {
+        if (auto it = fallbacks_.find(size); it != fallbacks_.end()) return it->second;
+        CTFontRef f = CTFontCreateWithName(CFSTR("HiraginoSans-W3"), size, nullptr);
+        fallbacks_[size] = f;
+        return f;
+    }
+    CTFontDescriptorRef descriptor_ = nullptr;
+    std::map<int, CTFontRef> fonts_, fallbacks_;
 };
 #endif
 
@@ -116,11 +167,11 @@ void setGlyphCallback(GlyphCallback fn, void *ctx) {
 }
 
 std::unique_ptr<FontRasterizer> makeRasterizer(const std::string &faceName) {
-    (void)faceName;  // The font pack will map Windows face names here; until then one gothic face serves all.
     if (gCallback) return std::make_unique<CallbackRasterizer>();
 #if __APPLE__
-    return std::make_unique<CoreTextRasterizer>("HiraginoSans-W3");
+    return std::make_unique<CoreTextRasterizer>(faceName);
 #else
+    (void)faceName;
     return nullptr;
 #endif
 }

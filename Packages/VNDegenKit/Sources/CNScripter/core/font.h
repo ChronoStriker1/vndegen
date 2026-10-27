@@ -1,8 +1,9 @@
 // Glyph rendering. NScripter draws every character in a fixed cell: a full-width character fills the font width and
 // height that setwindow names, a half-width one half the width. A rasterizer fills such a cell with 8-bit coverage.
 //
-// The default face is the MS Gothic substitute from VNDegen's shared font pack once that lands; until then the
-// platform's Japanese gothic face. Every lookup goes through makeRasterizer(), so the switch happens in one place.
+// Faces come from VNDegen's font pack (Engines/Shared/vnfont.h, docs/fonts.md): a script's `font` or `defaultfont`
+// name through its table, and MS Gothic's substitute, NScripter's default, otherwise. The app initializes the table
+// at launch through FontPack. Every lookup goes through makeRasterizer().
 #pragma once
 
 #include <cstdint>

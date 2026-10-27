@@ -1,5 +1,6 @@
 import SwiftUI
 import ControllerUI
+import FontPack
 import VNCore
 import Metadata
 import GameInput
@@ -149,6 +150,14 @@ struct SettingsView: View {
                     #endif
 
                     Section {
+                        ForEach(FontPack.packages) { fontRow($0) }
+                    } header: {
+                        Text("Fonts")
+                    } footer: {
+                        Text("Games ask for Windows fonts such as MS Gothic and Arial by name. VNDegen includes free fonts with the same measurements for Western and Japanese text. Chinese and Korean games need these downloads from Adobe's Source Han Sans, under the SIL Open Font License. Games started after a download use it.")
+                    }
+
+                    Section {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                         pageRow("Licenses", systemImage: "doc.text", value: "", page: .licenses)
                     }
@@ -174,6 +183,34 @@ struct SettingsView: View {
         case .connected: hub.saveSync.server?.remote.host ?? "Connected"
         case .failed: "Can't connect"
         }
+    }
+
+    /// A font package: its state, and what pressing the row does, which is download, cancel, or remove.
+    private func fontRow(_ package: RuntimePackage) -> some View {
+        let target = Navigator.Target.fontPackage(package.id)
+        let phase = nav.runtimes.phases[package.id]
+        let installed = nav.runtimes.installedFonts.contains(package.id)
+        let (state, action): (String, String) = switch phase {
+        case let .running(progress)?: (RuntimeSection.status(progress), "Cancel")
+        case let .failed(message)?: (message, "Download, \(RuntimeSection.size(package.size))")
+        case nil: installed ? ("Installed", "Remove") : ("Not installed", "Download, \(RuntimeSection.size(package.size))")
+        }
+        return Button { nav.select(target) } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label(package.name, systemImage: "textformat").foregroundStyle(.white)
+                    Spacer()
+                    Text(action).foregroundStyle(Theme.accent)
+                }
+                Text(state).font(.footnote).foregroundStyle(Theme.secondaryText).fixedSize(horizontal: false, vertical: true)
+                if case let .running(progress)? = phase {
+                    ProgressView(value: RuntimeSection.fraction(progress, package)).tint(Theme.accent)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .focusRow(target, nav)
     }
 
     /// A row that opens a settings page. It is a focus target, so a controller can reach it.
