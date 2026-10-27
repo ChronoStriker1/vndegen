@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import ControllerUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -12,6 +13,8 @@ public final class ArchiveImportModel {
     public enum Button { case up, down, left, right, confirm, cancel }
 
     enum Control: Hashable {
+        /// An archive already in VNDegen's folder, by its first volume.
+        case localArchive(URL)
         case chooseArchive, folderName, deleteToggle, chooseAnother, startImport, passwordField, cancelPassword, unlock, cancelImport
         case keepNested, extractNested, importAnother, done
     }
@@ -20,8 +23,12 @@ public final class ArchiveImportModel {
     private(set) var importer: ArchiveImporter?
     var picking = false
     var password = ""
-    /// The text field with keyboard focus. The controller sets it to bring up the system keyboard.
+    /// The text field with keyboard focus, after a tap or click.
     var editing: Control?
+    /// The keyboard a controller types into a field with. The host routes controller buttons to it while it is open.
+    public private(set) var keyboard: OnScreenKeyboard?
+    /// Archives in VNDegen's folder, which the choosing step lists, so a controller can pick one without the file picker.
+    private(set) var localArchives: [LocalArchive] = []
     private var focus: Control?
     /// The ring shows only once a controller moved it, so touch users never see it.
     private(set) var showsFocus = false
@@ -36,6 +43,11 @@ public final class ArchiveImportModel {
         let importer = ArchiveImporter(gamesRoot: gamesRoot)
         self.importer = importer
         if !initialSelection.isEmpty { await importer.choose(initialSelection) }
+        await findLocalArchives()
+    }
+
+    private func findLocalArchives() async {
+        localArchives = await LocalArchives.find(gamesRoot: gamesRoot)
     }
 
     /// Starts over with these files, such as an archive opened from another app while the flow is showing. While an
@@ -77,7 +89,7 @@ public final class ArchiveImportModel {
     private var rows: [[Control]] {
         guard let importer else { return [] }
         switch importer.step {
-        case .choosing: return [[.chooseArchive]]
+        case .choosing: return [[.chooseArchive]] + localArchives.map { [.localArchive($0.url)] }
         case .opening: return []
         case .reviewing: return [[.folderName]] + (importer.canDeleteArchive ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
         case .password: return [[.passwordField], [.cancelPassword, .unlock]]
@@ -87,14 +99,19 @@ public final class ArchiveImportModel {
         }
     }
 
-    /// The focused control, or the step's main action, which is always last.
+    /// The focused control, or the step's main action, which is always last. An archive in VNDegen's folder needs no
+    /// file picker, so the choosing step starts on the first one.
     private var current: Control? {
         let rows = rows
         if let focus, rows.contains(where: { $0.contains(focus) }) { return focus }
+        if importer?.step == .choosing, let archive = localArchives.first { return .localArchive(archive.url) }
         return rows.last?.last
     }
 
     func isFocused(_ control: Control) -> Bool { showsFocus && current == control }
+
+    /// The control showing the focus ring, for scrolling it into view.
+    var focusedControl: Control? { showsFocus ? current : nil }
 
     public func handle(_ button: Button) {
         if button == .cancel { return close() }
@@ -103,7 +120,7 @@ public final class ArchiveImportModel {
         // The first press only reveals the ring where focus already is.
         guard showsFocus else {
             showsFocus = true
-            if button == .confirm { activate(current) }
+            if button == .confirm { activate(current, byController: true) }
             return
         }
         switch button {
@@ -111,7 +128,7 @@ public final class ArchiveImportModel {
         case .down where r < rows.count - 1: focus = rows[r + 1][min(c, rows[r + 1].count - 1)]
         case .left: focus = rows[r][max(0, c - 1)]
         case .right: focus = rows[r][min(rows[r].count - 1, c + 1)]
-        case .confirm: activate(current)
+        case .confirm: activate(current, byController: true)
         default: break
         }
     }
@@ -122,17 +139,42 @@ public final class ArchiveImportModel {
         activate(control)
     }
 
-    private func activate(_ control: Control) {
+    /// A text field activated by a controller opens the on-screen keyboard, and by touch or a pointer focuses the field.
+    private func activate(_ control: Control, byController: Bool = false) {
         guard let importer else { return }
         switch control {
+        case let .localArchive(url): Task { await importer.choose([url]) }
         case .chooseArchive: picking = true
-        case .folderName, .passwordField:
-            editing = control
+        case .folderName:
+            if byController {
+                keyboard = OnScreenKeyboard(title: "Folder name", text: importer.folderName) { [weak importer] in
+                    importer?.folderName = $0
+                } onClose: { [weak self] in
+                    self?.keyboard = nil
+                }
+            } else {
+                editing = control
+            }
+            return
+        case .passwordField:
+            if byController {
+                keyboard = OnScreenKeyboard(title: "Password", text: password, isSecure: true) { [weak self] in
+                    self?.password = $0
+                } onDone: { [weak self] in
+                    self?.unlock()
+                } onClose: { [weak self] in
+                    self?.keyboard = nil
+                }
+            } else {
+                editing = control
+            }
             return
         case .deleteToggle:
             importer.deleteArchiveAfterImport.toggle()
             return
-        case .chooseAnother, .importAnother: importer.reset()
+        case .chooseAnother, .importAnother:
+            importer.reset()
+            Task { await findLocalArchives() }
         case .startImport: importer.startImport()
         case .cancelPassword, .cancelImport: importer.cancel()
         case .unlock: unlock()
@@ -182,19 +224,27 @@ public struct ArchiveImportView: View {
                     .keyboardShortcut(.cancelAction)
             }
             .padding(22)
-            ScrollView {
-                if let importer {
-                    StepView(model: model, importer: importer)
-                        .padding(.horizontal, 22)
-                        .padding(.bottom, 28)
-                        .frame(maxWidth: 640)
-                        .frame(maxWidth: .infinity)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    if let importer {
+                        StepView(model: model, importer: importer)
+                            .padding(.horizontal, 22)
+                            .padding(.bottom, 28)
+                            .frame(maxWidth: 640)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                // A long list of archives runs below the sheet, so the controller's focus scrolls into view.
+                .onChange(of: model.focusedControl) { _, control in
+                    guard let control else { return }
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(control, anchor: .center) }
                 }
             }
         }
         .foregroundStyle(.white)
         .background(ImportTheme.background.opacity(0.98))
         .preferredColorScheme(.dark)
+        .onScreenKeyboard(model.keyboard)
         #if os(macOS)
         .frame(minWidth: 560, idealWidth: 640, minHeight: 520)
         #endif
@@ -279,6 +329,27 @@ private struct StepView: View {
             Button { model.select(.chooseArchive) } label: { Label("Choose Archive", systemImage: "folder") }
                 .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.chooseArchive)))
                 .keyboardShortcut(.defaultAction)
+                .id(ArchiveImportModel.Control.chooseArchive)
+            if model.showsFocus {
+                Text(model.localArchives.isEmpty
+                     ? "Choose Archive opens the file picker, which needs touch or a mouse. With a controller, copy archives into VNDegen's folder and they show up here."
+                     : "Choose Archive opens the file picker, which needs touch or a mouse. With a controller, pick an archive from VNDegen's folder below.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(ImportTheme.secondaryText)
+            }
+            if !model.localArchives.isEmpty {
+                SectionTitle("In VNDegen's folder")
+                ForEach(model.localArchives) { archive in
+                    let control = ArchiveImportModel.Control.localArchive(archive.url)
+                    Button { model.select(control) } label: {
+                        Label(archive.fileName, systemImage: "archivebox.fill")
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(control)))
+                    .id(control)
+                }
+            }
             Text("Games are extracted into VNDegen's Games folder. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.tertiaryText)
@@ -322,6 +393,7 @@ private struct StepView: View {
                 .padding(14)
                 .fieldBackground(ImportTheme.surface, focused: model.isFocused(.folderName))
                 .onSubmit { importer.startImport() }
+                .id(ArchiveImportModel.Control.folderName)
             if let problem = importer.folderNameProblem {
                 Label(problem, systemImage: "exclamationmark.circle.fill")
                     .font(.system(size: 13))
@@ -351,16 +423,19 @@ private struct StepView: View {
                     .strokeBorder(focused ? .white : .clear, lineWidth: 2.5)
             }
             .padding(.horizontal, -12)
+            .id(ArchiveImportModel.Control.deleteToggle)
         }
         errorLabel
         HStack(spacing: 12) {
             Button("Choose Another") { model.select(.chooseAnother) }
                 .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.chooseAnother)))
+                .id(ArchiveImportModel.Control.chooseAnother)
             Spacer()
             Button { model.select(.startImport) } label: { Label("Import", systemImage: "square.and.arrow.down") }
                 .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.startImport)))
                 .keyboardShortcut(.defaultAction)
                 .disabled(importer.folderNameProblem != nil)
+                .id(ArchiveImportModel.Control.startImport)
         }
     }
 
@@ -379,6 +454,7 @@ private struct StepView: View {
                     .fieldBackground(Color.black.opacity(0.3), focused: model.isFocused(.passwordField),
                                      stroke: wrong ? ImportTheme.accent : ImportTheme.stroke)
                     .onSubmit(model.unlock)
+                    .id(ArchiveImportModel.Control.passwordField)
                 if wrong {
                     Label("That password is not correct. Try again.", systemImage: "exclamationmark.circle.fill")
                         .font(.system(size: 13))
@@ -388,11 +464,13 @@ private struct StepView: View {
             HStack(spacing: 12) {
                 Button("Cancel") { model.select(.cancelPassword) }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.cancelPassword)))
+                    .id(ArchiveImportModel.Control.cancelPassword)
                 Spacer()
                 Button { model.select(.unlock) } label: { Label("Unlock", systemImage: "lock.open.fill") }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.unlock)))
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.password.isEmpty)
+                    .id(ArchiveImportModel.Control.unlock)
             }
         }
     }
@@ -418,6 +496,7 @@ private struct StepView: View {
             .foregroundStyle(ImportTheme.tertiaryText)
         Button("Cancel Import", role: .cancel) { model.select(.cancelImport) }
             .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.cancelImport)))
+            .id(ArchiveImportModel.Control.cancelImport)
     }
 
     private func nested(_ fileName: String) -> some View {
@@ -433,10 +512,12 @@ private struct StepView: View {
             HStack(spacing: 12) {
                 Button("Keep As Is") { model.select(.keepNested) }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.keepNested)))
+                    .id(ArchiveImportModel.Control.keepNested)
                 Spacer()
                 Button { model.select(.extractNested) } label: { Label("Extract", systemImage: "arrow.down.doc.fill") }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.extractNested)))
                     .keyboardShortcut(.defaultAction)
+                    .id(ArchiveImportModel.Control.extractNested)
             }
         }
     }
@@ -460,10 +541,12 @@ private struct StepView: View {
             HStack(spacing: 12) {
                 Button("Import Another") { model.select(.importAnother) }
                     .buttonStyle(ImportButtonStyle(kind: .secondary, focused: model.isFocused(.importAnother)))
+                    .id(ArchiveImportModel.Control.importAnother)
                 Spacer()
                 Button("Done") { model.select(.done) }
                     .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.done)))
                     .keyboardShortcut(.defaultAction)
+                    .id(ArchiveImportModel.Control.done)
             }
         }
     }

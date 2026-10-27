@@ -134,6 +134,8 @@ final class ButtonMappingEditor: Identifiable {
         case input(ControlInput)
         /// Applies a whole layout, such as `ButtonMapping.rpgMaker`.
         case apply(Layout)
+        /// Puts back the layout the game's engine starts with.
+        case reset
         /// Turns a whole stick into mouse movement, or back into a stick.
         case stick(Stick)
         case action(ControlAction)
@@ -231,8 +233,15 @@ final class ButtonMappingEditor: Identifiable {
     }
 
     func rows() -> [[Target]] {
-        guard picking != nil else { return Self.chunked(Layout.allCases.map(Target.apply), layoutColumns) + Self.inputRows.map { [$0] } }
-        return Self.sections.flatMap { Self.chunked($0.actions.map(Target.action), columns($0)) }
+        groups().flatMap(\.self)
+    }
+
+    /// The rows in groups that the shoulder buttons jump between: the layouts and the buttons, or each kind of action.
+    private func groups() -> [[[Target]]] {
+        guard picking != nil else {
+            return [Self.chunked(Layout.allCases.map(Target.apply), layoutColumns) + [[.reset]], Self.inputRows.map { [$0] }]
+        }
+        return Self.sections.map { Self.chunked($0.actions.map(Target.action), columns($0)) }
     }
 
     private static func chunked(_ targets: [Target], _ columns: Int) -> [[Target]] {
@@ -268,9 +277,21 @@ final class ButtonMappingEditor: Identifiable {
             guard picking != nil else { return false }
             closePicker()
             return true
+        case .pageUp, .pageDown:
+            showsFocus = true
+            jumpGroup(by: button == .pageUp ? -1 : 1)
+            return true
         default:
             return false
         }
+    }
+
+    /// Moves focus to the first target of the previous or next group, such as from the gamepad buttons to the keys.
+    private func jumpGroup(by step: Int) {
+        let groups = groups()
+        guard let focus, let index = groups.firstIndex(where: { $0.contains { $0.contains(focus) } }) else { return }
+        let next = min(max(0, index + step), groups.count - 1)
+        target = groups[next].first?.first
     }
 
     /// Touch and pointer: activate without showing the ring.
@@ -309,6 +330,8 @@ final class ButtonMappingEditor: Identifiable {
             target = nil
         case let .apply(layout):
             save(layout.mapping)
+        case .reset:
+            save(defaultLayout)
         case let .stick(stick):
             var mapping = mapping
             mapping.setStick(stick, movesPointer: !mapping.movesPointer(stick))
@@ -373,6 +396,15 @@ struct ButtonMappingSheet: View {
                     .id(target)
                 }
             }
+            Button { editor.select(.reset) } label: {
+                Label("Reset to \(ButtonMappingEditor.Layout.named(defaultLayout)?.title ?? "the default")", systemImage: "arrow.counterclockwise")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(.reset)))
+            .disabled(mapping == defaultLayout)
+            .id(ButtonMappingEditor.Target.reset)
             .padding(.bottom, 8)
             ForEach(ButtonMappingEditor.inputRows, id: \.self) { target in
                 switch target {
@@ -402,7 +434,7 @@ struct ButtonMappingSheet: View {
         let start = defaultLayout == .keyboardAndMouse
             ? "This game's engine reads no gamepad, so its games start with Keyboard and mouse, the layout of Steam's template of that name: the left stick is WASD, the right stick moves the pointer, RT and R3 click, LT right clicks, LB and RB turn the wheel, and the other buttons press keys. Mouse puts the pointer on both sticks and the mouse buttons on A and X."
             : "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad."
-        return start + " Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation."
+        return start + " Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation, so a change here never stops a controller from working them. LB and RB jump between groups."
     }
 
     /// A button, or a whole stick, with what it does. A stick's row switches it between moving the pointer and being a

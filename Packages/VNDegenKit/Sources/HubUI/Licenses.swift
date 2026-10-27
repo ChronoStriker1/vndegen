@@ -1,8 +1,10 @@
 import SwiftUI
+import ControllerUI
 
 /// The licenses of third-party code the app ships. Each is a text file in the app's Licenses folder, named for the
 /// code it covers. The app's build copies them there.
 struct LicensesView: View {
+    @Environment(Navigator.self) private var nav
     private let licenses = ThirdPartyLicense.bundled
 
     var body: some View {
@@ -25,6 +27,7 @@ struct LicensesView: View {
             .padding(.bottom, 22)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollPager(nav.pager)
     }
 }
 

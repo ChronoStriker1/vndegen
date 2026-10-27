@@ -3,6 +3,7 @@ import PhotosUI
 import UniformTypeIdentifiers
 import VNCore
 import Metadata
+import ControllerUI
 
 /// Shared chrome for the hub's sheets: a title, a close button, and the dark surface.
 struct SheetScaffold<Content: View>: View {
@@ -195,6 +196,12 @@ struct ArtworkEditorSheet: View {
                                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
                                 Button { importingFile = true } label: { Label("Files", systemImage: "folder") }
                                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+                                if hub.input.lastInputKind == .gamepad {
+                                    Text("Photos and Files need touch or a mouse. With a controller, pick a suggestion below.")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(Theme.tertiaryText)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
 
@@ -364,8 +371,10 @@ final class MetadataSearch {
     private(set) var searching = false
     private(set) var applying: MetadataCandidate.ID?
     var error: String?
-    /// True while the search field has keyboard focus. The controller sets it to bring up the system keyboard.
+    /// True while the search field has keyboard focus, after a tap or click.
     var editingQuery = false
+    /// The keyboard a controller types the title on. Finishing it searches.
+    private(set) var keyboard: OnScreenKeyboard?
     private let hub: Hub
 
     init(hub: Hub, gameID: GameID) {
@@ -379,6 +388,16 @@ final class MetadataSearch {
         searching = true
         results = await hub.metadata.search(title)
         searching = false
+    }
+
+    func openKeyboard() {
+        keyboard = OnScreenKeyboard(title: "Title", text: query) { [weak self] in
+            self?.query = $0
+        } onDone: { [weak self] in
+            Task { await self?.search() }
+        } onClose: { [weak self] in
+            self?.keyboard = nil
+        }
     }
 
     /// Returns whether the match was applied.
@@ -449,6 +468,7 @@ struct MetadataSearchSheet: View {
             search.query = hub.displayTitle(game)
             await search.search()
         }
+        .onScreenKeyboard(search.keyboard)
         .onChange(of: search.editingQuery) { _, editing in fieldFocused = editing }
         .onChange(of: fieldFocused) { _, focused in search.editingQuery = focused }
         .presentationDetents([.large])

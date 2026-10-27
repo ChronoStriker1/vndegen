@@ -12,6 +12,11 @@ import AppKit
 #endif
 
 /// Launch arguments for screenshots and UI tests. None of this ships in release builds.
+///   -debugHooks <name>       scopes every notification below to this app, as vndegen.<name>.input.down and so on, so
+///                            scripts driving one DEBUG VNDegen never press or quit another on the same Mac. Without it
+///                            the names are as written below
+///   -logNavigation YES       logs the hub's route, sheet, focus, and on-screen keyboard after each controller press
+///                            ("HUBNAV" in the app log)
 ///   -seedDemoLibrary YES     creates demo games with real Steam library art
 ///   -demoInput "down,right"  plays controller presses after launch, 0.6 s apart ("wait" pauses one step)
 ///   notifyutil -p vndegen.input.down   presses one controller button while the app runs, through
@@ -25,6 +30,7 @@ import AppKit
 ///                            then y, each four digits of 1000 plus a thousandth of a full push, here x 1 and y 0. The
 ///                            stick stays there until the next one, such as 10001000 to let go
 ///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
+///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
@@ -47,12 +53,15 @@ enum DebugHooks {
         }
     }
 
+    /// Every notification name starts with this, so `-debugHooks <name>` keeps scripts for one app away from another.
+    static let prefix = UserDefaults.standard.string(forKey: "debugHooks").map { "vndegen.\($0)" } ?? "vndegen"
+
     /// Registers one Darwin notification per button. The tokens live for the app's lifetime.
     static func listenForInput(_ hub: Hub) {
         for input in ControlInput.allCases where input.isOnTouchGamepad {
             for pressed in [true, false] {
                 var token: Int32 = 0
-                notify_register_dispatch("vndegen.touch.\(input.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
+                notify_register_dispatch("\(prefix).touch.\(input.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
                     MainActor.assumeIsolated { hub.input.touch(input, pressed: pressed) }
                 }
             }
@@ -60,14 +69,14 @@ enum DebugHooks {
         for element in GamepadElement.allCases {
             for pressed in [true, false] {
                 var token: Int32 = 0
-                notify_register_dispatch("vndegen.pad.\(element.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
+                notify_register_dispatch("\(prefix).pad.\(element.rawValue).\(pressed ? "down" : "up")", &token, .main) { _ in
                     MainActor.assumeIsolated { hub.input.debugPress(element, pressed: pressed) }
                 }
             }
         }
         for stick in Stick.allCases {
             var token: Int32 = 0
-            notify_register_dispatch("vndegen.stick.\(stick == .left ? "left" : "right")", &token, .main) { token in
+            notify_register_dispatch("\(prefix).stick.\(stick == .left ? "left" : "right")", &token, .main) { token in
                 var state: UInt64 = 0
                 notify_get_state(token, &state)
                 let x = Float(Int(state / 10000 % 10000) - 1000) / 1000, y = Float(Int(state % 10000) - 1000) / 1000
@@ -75,7 +84,7 @@ enum DebugHooks {
             }
         }
         var tapToken: Int32 = 0
-        notify_register_dispatch("vndegen.pointer.tap", &tapToken, .main) { token in
+        notify_register_dispatch("\(prefix).pointer.tap", &tapToken, .main) { token in
             var state: UInt64 = 0
             notify_get_state(token, &state)
             let point = CGPoint(x: Double(state / 1000 % 1000) / 1000, y: Double(state % 1000) / 1000)
@@ -83,15 +92,20 @@ enum DebugHooks {
         }
         #if os(macOS)
         var quitToken: Int32 = 0
-        notify_register_dispatch("vndegen.app.quit", &quitToken, .main) { _ in
+        notify_register_dispatch("\(prefix).app.quit", &quitToken, .main) { _ in
             // From the run loop, as Command-Q's key event arrives. AppKit waits for the reply to a quit inside
             // `terminate`, and called from this block it would hold the main queue, where the reply comes from.
             RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { NSApp.terminate(nil) } }
         }
+        var snapshotToken: Int32 = 0
+        notify_register_dispatch("\(prefix).app.snapshot", &snapshotToken, .main) { _ in
+            guard let path = UserDefaults.standard.string(forKey: "snapshot") else { return }
+            MainActor.assumeIsolated { snapshotWindow(to: URL(fileURLWithPath: path)) }
+        }
         #endif
         for button in VirtualButton.allCases {
             var token: Int32 = 0
-            notify_register_dispatch("vndegen.input.\(button.rawValue)", &token, .main) { _ in
+            notify_register_dispatch("\(prefix).input.\(button.rawValue)", &token, .main) { _ in
                 MainActor.assumeIsolated {
                     hub.input.noteInput(.gamepad)
                     hub.input.onEvent?(.button(button, pressed: true))
@@ -140,8 +154,11 @@ enum DebugHooks {
     }
 
     #if os(macOS)
+    /// The main window, or the sheet shown over it, and the sheet over that one.
     static func snapshotWindow(to url: URL) {
-        guard let view = NSApp.windows.first(where: \.isVisible)?.contentView,
+        var window = NSApp.windows.first(where: \.isVisible)
+        while let sheet = window?.attachedSheet { window = sheet }
+        guard let view = window?.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)

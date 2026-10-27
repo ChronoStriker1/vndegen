@@ -1,3 +1,4 @@
+import ControllerUI
 import RuntimePackages
 import SwiftUI
 import UniformTypeIdentifiers
@@ -40,10 +41,16 @@ struct RuntimeSection: View {
         }
     }
 
+    @ViewBuilder
     private func buttons(_ package: RuntimePackage) -> some View {
         HStack(spacing: 12) {
             HubButton(target: .runtime(package.id, .install), kind: .primary) { Label("Download and install", systemImage: "arrow.down.circle") }
             HubButton(target: .runtime(package.id, .importFolder)) { Label("Import from folder", systemImage: "folder") }
+        }
+        if nav.hub.input.lastInputKind == .gamepad {
+            Text("Import from folder opens the folder picker, which needs touch or a mouse.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.tertiaryText)
         }
     }
 
@@ -82,6 +89,7 @@ struct RuntimeLicenseSheet: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .scrollPager(nav.pager)
                 Link("Read it on \(request.package.licensePage.host ?? "the publisher's site")", destination: request.package.licensePage)
                     .font(.system(size: 13))
                 HStack(spacing: 12) {

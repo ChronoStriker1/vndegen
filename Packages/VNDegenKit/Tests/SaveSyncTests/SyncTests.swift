@@ -206,8 +206,11 @@ struct Setup {
 
     let model = GameSavesModel(service: setup.service, game: setup.id)
     model.choosingGame = true
-    // The filter hides the matched folder, where focus would otherwise start.
+    // The filter hides the matched folder, where focus would otherwise start, so it starts on the search row above
+    // Match automatically.
     model.query = "Other"
+    _ = model.handle(.down)
+    #expect(model.isFocused(.search))
     _ = model.handle(.down)
     _ = model.handle(.down)
     #expect(model.isFocused(.folder("Other Game")))

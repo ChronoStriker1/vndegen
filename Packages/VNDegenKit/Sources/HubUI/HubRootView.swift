@@ -95,7 +95,8 @@ private struct LibraryContainer: View {
         .alert("Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { hub.launchError = nil } })) {
             Button("OK") {}
         } message: {
-            Text(hub.launchError ?? "")
+            // The alert's button shows no controller focus, so controller players get the buttons spelled out.
+            Text((hub.launchError ?? "") + (hub.input.lastInputKind == .gamepad ? " Press A or B to close." : ""))
         }
         .onAppear {
             nav.attachInput()
