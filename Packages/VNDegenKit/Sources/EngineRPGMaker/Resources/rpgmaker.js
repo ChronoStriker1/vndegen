@@ -9,6 +9,23 @@
         return /^audio\/ogg/i.test(String(type)) ? '' : canPlayType.call(this, type);
     };
 
+    // NW.js plays Ogg itself, so desktop MZ never runs its VorbisDecoder, which numbers decoders 0 to 999 and then starts
+    // over. Its worker keeps each decoder's state under its number until the page destroys it, and hands the next decoder
+    // with that number the old state. A track whose last chunk of a slow load came through _updateBufferOnFetch never
+    // tells its decoder it has finished, so that state stays open while the track plays. A thousand sounds later, as
+    // footsteps and letter sounds soon make, a new sound's bytes went to it, read from past their end, and stopped the
+    // game with "RangeError: length cannot be negative". Numbers that never repeat keep every decoder to its own state.
+    // The constructor assigns the counter modulo 1000 and then increments it, so only increments are taken.
+    document.addEventListener('load', (event) => {
+        if (!/\/vorbisdecoder\.js$/i.test(event.target.src || '') || typeof VorbisDecoder !== 'function') return;
+        let next = VorbisDecoder.id || 0;
+        Object.defineProperty(VorbisDecoder, 'id', {
+            configurable: true,
+            get: () => next,
+            set: (value) => { if (value > next) next = value; },
+        });
+    }, true);
+
     // Reports once which renderer the engine got, so a fall back to PIXI's canvas renderer shows up in the app log.
     // MZ keeps it at Graphics._app.renderer, MV at Graphics._renderer. PIXI's WEBGL renderer type is 1.
     function reportRenderer(attempt) {
