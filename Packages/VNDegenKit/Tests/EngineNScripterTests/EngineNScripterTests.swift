@@ -120,7 +120,10 @@ private func probe(_ files: [String]) -> FolderProbe {
     let locations = NScripterPlugin().saveLocations(folder: dir, dataDirectory: dir)
     let saves = try #require(locations.first)
     #expect(locations.count == 1)
-    #expect(saves.directory.lastPathComponent == "SAVE")
+    // The folder on disk, whichever way the volume treats case.
+    var isFolder: ObjCBool = false
+    #expect(FileManager.default.fileExists(atPath: saves.directory.path, isDirectory: &isFolder) && isFolder.boolValue)
+    #expect(saves.directory.lastPathComponent.lowercased() == "save")
     #expect(saves.relativePath("C:/Games/Game/save/save1.dat") == "save1.dat")
     #expect(saves.relativePath("C:/Games/Game/save/save1.bmp") == "save1.bmp")
     #expect(saves.relativePath(saves.directory.path + "/gloval.sav") == "gloval.sav")
