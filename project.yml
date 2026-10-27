@@ -113,7 +113,7 @@ targets:
             iphonesimulator) slice=ios-arm64-simulator ;;
             *) echo "error: no Godot engine for $PLATFORM_NAME" >&2; exit 1 ;;
           esac
-          for engine in Godot4; do
+          for engine in Godot4 Godot3; do
             source="$SRCROOT/build/godot/$engine.xcframework/$slice/$engine.framework"
             dest="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/$engine.framework"
             [ -d "$source" ] || { echo "error: $source is missing" >&2; exit 1; }

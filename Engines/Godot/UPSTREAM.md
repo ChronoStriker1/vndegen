@@ -45,5 +45,5 @@ Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the b
   - The functions in `Packages/VNDegenKit/Sources/CGodot/include/vngd.h` (`vngd.cpp`).
   - `DisplayServerVNDegen`, which draws into the CAMetalLayer VNDegen hands it and takes all input through `vngd.h` (`display_server_vndegen.mm`).
   - The OS for each platform (`vngd_apple.mm`, and `vngd_linuxbsd.cpp` for testing on Linux). It gives games their `.exe` as the executable path and keeps `user://` where Windows does, under VNDegen's stand-in for `%APPDATA%`.
-- `4/test-host/vngd_test.c`: runs games through `vngd.h` on Linux, one after another in one process.
+- `test-host/vngd_test.c`: runs games through `vngd.h` on Linux, one after another in one process, to test that each engine starts again.
 - `Info.plist`: the frameworks' Info.plist.
