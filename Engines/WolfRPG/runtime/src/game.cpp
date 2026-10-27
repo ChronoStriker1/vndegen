@@ -1,4 +1,5 @@
 #include "game.h"
+#include "game_internal.h"
 
 #include "reader.h"
 
@@ -10,43 +11,6 @@ namespace fs = std::filesystem;
 
 namespace wolf {
 
-namespace {
-
-// System database types, in the order every Wolf RPG Editor 2 project has them.
-enum SysType {
-    SysMaps = 0,
-    SysStringVarNames = 4,
-    SysSystemStrings = 5,
-    SysSystemVarNames = 6,
-    SysPositions = 7,
-    SysWindows = 10,
-    SysTextColors = 12,
-    SysNormalVarNames = 14,
-    SysSpare1 = 15,
-};
-
-constexpr int32_t kMillion = 1000000;
-
-bool compare(int32_t a, int32_t b, int op) {
-    switch (op) {
-        case 0: return a > b;
-        case 1: return a >= b;
-        case 2: return a == b;
-        case 3: return a <= b;
-        case 4: return a < b;
-        case 5: return a != b;
-        case 6: return (a & b) != 0;
-    }
-    return false;
-}
-
-std::string format(const char *fmt, auto... args) {
-    char buf[512];
-    std::snprintf(buf, sizeof buf, fmt, args...);
-    return buf;
-}
-
-}  // namespace
 
 Game::Game(fs::path root) : root_(root), files_(root) {}
 
@@ -82,9 +46,8 @@ bool Game::load(std::string *error) {
 
     // The game starts at the first entry of the position list.
     int startMap = dbNumber(sdb_, SysPositions, 0, 0);
-    hero_.x = dbNumber(sdb_, SysPositions, 0, 1);
-    hero_.y = dbNumber(sdb_, SysPositions, 0, 2);
-    hero_.graphic = gameDat_.startHeroGraphic;
+    hero_.placeAt(dbNumber(sdb_, SysPositions, 0, 1), dbNumber(sdb_, SysPositions, 0, 2));
+    hero_.chara.graphic = gameDat_.startHeroGraphic;
     if (!loadMap(startMap)) {
         if (error) *error = format("cannot load start map %d", startMap);
         return false;
@@ -144,7 +107,7 @@ int32_t *Game::selfSlot(int32_t id, const Thread &t) {
         return &cself_[ce][(id - 15000000) % 100];
     }
     if (id >= 1100000 && id < 1100010) {
-        int ev = c.mapEvent;
+        int ev = c.map == map_ ? c.mapEvent : -1;
         if (ev < 0 || ev >= int(events_.size())) return nullptr;
         return &events_[ev].self[id - 1100000];
     }
@@ -332,7 +295,7 @@ bool Game::loadMap(int id) {
         return false;
     }
     try {
-        map_ = std::make_unique<Map>(parseMap(*data));
+        map_ = std::make_shared<Map>(parseMap(*data));
     } catch (const std::exception &e) {
         log("map " + file + ": " + e.what());
         return false;
@@ -342,9 +305,8 @@ bool Game::loadMap(int id) {
     for (auto &ev : map_->events) {
         MapEventState s;
         s.data = &ev;
-        s.chara.x = ev.x;
-        s.chara.y = ev.y;
-        s.chara.visible = false;
+        s.actor.placeAt(ev.x, ev.y);
+        s.actor.chara.visible = false;
         events_.push_back(s);
     }
     mapParallel_.clear();
@@ -376,10 +338,27 @@ void Game::refreshPages() {
             auto &e = events_[i];
             e.page = page;
             e.ranAutorun = false;
-            Character &c = e.chara;
+            Actor &a = e.actor;
+            Character &c = a.chara;
             c.visible = page >= 0;
+            a.route = nullptr;
             if (page >= 0) {
                 const MapPage &pg = e.data->pages[page];
+                a.speed = pg.moveSpeed;
+                a.frequency = pg.moveFrequency;
+                a.animSpeed = pg.animSpeed;
+                // Page option bits: 0x01 idle animation, 0x02 walk animation, 0x04 fixed direction, 0x08 through,
+                // 0x10 drawn above.
+                a.idleAnimation = pg.flags & 0x01;
+                a.walkAnimation = pg.flags & 0x02;
+                a.fixedDirection = pg.flags & 0x04;
+                a.through = pg.flags & 0x08;
+                c.above = pg.flags & 0x10;
+                if (pg.moveType == 1 && !pg.route.steps.empty()) {
+                    a.route = &pg.route;
+                    a.routeStep = 0;
+                    a.routeFromCommand = false;
+                }
                 c.graphic = pg.graphic;
                 c.chip = pg.graphic.empty() && pg.chip > 0 ? pg.chip : -1;
                 c.direction = pg.direction ? pg.direction : 2;
@@ -394,7 +373,7 @@ void Game::refreshPages() {
 
 void Game::startPage(int eventIndex, Thread &t) {
     auto &e = events_[eventIndex];
-    t.stack.push_back({&e.data->pages[e.page].commands, 0, -1, eventIndex});
+    t.stack.push_back({&e.data->pages[e.page].commands, 0, -1, eventIndex, 0, map_});
 }
 
 bool Game::commonConditionMet(const CommonEvent &ce) {
@@ -466,21 +445,71 @@ void Game::update(const Input &input) {
         run(t);
     }
 
+    // Parallel map event pages.
+    if (mapParallel_.size() != events_.size()) mapParallel_.assign(events_.size(), Thread{});
+    for (size_t i = 0; i < events_.size(); i++) {
+        auto &e = events_[i];
+        if (e.page < 0 || e.data->pages[e.page].trigger != 2) continue;
+        Thread &t = mapParallel_[i];
+        if (t.done()) {
+            t = Thread{};
+            startPage(int(i), t);
+        }
+        run(t);
+        if (mapId_ != loadedMap_) break;  // the event moved the hero to another map
+    }
+
     if (!threads_.empty()) {
         run(threads_.front());
-        if (threads_.front().done()) {
+        if (!threads_.empty() && threads_.front().done()) {
             threads_.erase(threads_.begin());
             refreshPages();
         }
     }
+    loadedMap_ = mapId_;
 
-    for (auto &[n, p] : pictures_) {
-        for (Tween *tw : {&p.x, &p.y, &p.opacity, &p.zoomX, &p.zoomY, &p.angle, &p.r, &p.g, &p.b}) tw->step();
+    updateCharacters();
+
+    updatePictures();
+    if (shake_.frames > 0) {
+        shake_.frames--;
+        shake_.offset = shake_.frames ? std::sin(frame_ * 0.3 * shake_.speed) * shake_.power * 2 : 0;
     }
+    if (transition_.frames > 0 && ++transition_.elapsed >= transition_.frames) transition_.frames = 0;
+    autoKeys_ = 0;
     tintR_.step();
     tintG_.step();
     tintB_.step();
     updateCamera();
+}
+
+void Game::updatePictures() {
+    for (auto &[n, p] : pictures_) {
+        for (Tween *tw : {&p.x, &p.y, &p.opacity, &p.zoomX, &p.zoomY, &p.angle, &p.r, &p.g, &p.b}) tw->step();
+        if (p.autoPatternMode && ++p.autoTimer >= p.autoInterval) {
+            p.autoTimer = 0;
+            int next = p.pattern + p.autoDir;
+            int lo = std::min(p.autoFrom, p.autoTo), hi = std::max(p.autoFrom, p.autoTo);
+            if (next < lo || next > hi) {
+                if (p.autoPatternMode == 1) p.autoPatternMode = 0;
+                else if (p.autoPatternMode == 2) next = p.autoFrom;
+                else {
+                    p.autoDir = -p.autoDir;
+                    next = p.pattern + p.autoDir;
+                }
+            }
+            if (p.autoPatternMode) p.pattern = next;
+        }
+        if (p.shakeFrames > 0) {
+            p.shakeFrames--;
+            p.shakeOffset = p.shakeFrames ? std::sin(frame_ * 0.3 * std::max(1, p.shakeSpeed)) * p.shakePower : 0;
+        }
+        if (p.flickerFrames > 0) p.flickerFrames--;
+    }
+    std::erase_if(pictures_, [](auto &kv) {
+        // A picture faded out by an erase with a duration goes once it is invisible.
+        return kv.second.erasing && kv.second.opacity.value() <= 0;
+    });
 }
 
 // Keeps the hero in the middle of the screen, without showing past the map's edges.
@@ -488,458 +517,17 @@ void Game::updateCamera() {
     if (!map_) return;
     double tile = gameDat_.tileSize();
     double mapW = map_->width * tile, mapH = map_->height * tile;
-    double x = (hero_.x + 0.5) * tile - screenWidth() / 2.0;
-    double y = (hero_.y + 0.5) * tile - screenHeight() / 2.0;
+    double x = (hero_.chara.x + 0.5) * tile - screenWidth() / 2.0;
+    double y = (hero_.chara.y + 0.5) * tile - screenHeight() / 2.0;
     cameraX_ = mapW <= screenWidth() ? (mapW - screenWidth()) / 2 : std::clamp(x, 0.0, mapW - screenWidth());
     cameraY_ = mapH <= screenHeight() ? (mapH - screenHeight()) / 2 : std::clamp(y, 0.0, mapH - screenHeight());
 }
 
 bool Game::debugTeleport(int mapId, int x, int y) {
-    hero_.x = x;
-    hero_.y = y;
+    hero_.placeAt(x, y);
     if (!loadMap(mapId)) return false;
     updateCamera();
     return true;
-}
-
-void Game::run(Thread &t) {
-    if (t.wait > 0) {
-        t.wait--;
-        return;
-    }
-    // A thread runs until it waits. The cap stops a loop without waits from hanging the frame.
-    for (int budget = 0; budget < 100000 && !t.done(); budget++) {
-        if (!step(t)) return;
-    }
-}
-
-void Game::jumpToBranchEnd(Thread::Call &c, int indent) {
-    const Commands &cmds = *c.commands;
-    while (c.pc < cmds.size() && !(cmds[c.pc].indent == indent && cmds[c.pc].code == 499)) c.pc++;
-    if (c.pc < cmds.size()) c.pc++;
-}
-
-// After a branching command, moves to the body of the case it chose, or past the branch.
-bool Game::jumpToCase(Thread::Call &c, int indent, int caseValue) {
-    const Commands &cmds = *c.commands;
-    size_t pc = c.pc;
-    for (; pc < cmds.size(); pc++) {
-        auto &cmd = cmds[pc];
-        if (cmd.indent != indent) continue;
-        if (cmd.code == 499) break;
-        bool match = (cmd.code == 401 && cmd.arg(0) == caseValue) || (caseValue == 0 && cmd.code == 420) ||
-                     (caseValue == -2 && cmd.code == 421);
-        if (match) {
-            c.pc = pc + 1;
-            return true;
-        }
-    }
-    c.pc = pc < cmds.size() ? pc + 1 : pc;
-    return false;
-}
-
-void Game::unsupported(const Command &c) {
-    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet", c.code));
-}
-
-bool Game::step(Thread &t) {
-    Thread::Call &c = t.stack.back();
-    if (t.waitingMessage) {
-        if (message_.active) return false;
-        t.waitingMessage = false;
-    }
-    if (t.waitingChoice) {
-        if (choice_.active) return false;
-        t.waitingChoice = false;
-        jumpToCase(c, t.choiceIndent, choice_.result);
-        return true;
-    }
-    if (c.pc >= c.commands->size()) {
-        t.stack.pop_back();
-        return true;
-    }
-    const Command &cmd = (*c.commands)[c.pc];
-    int indent = cmd.indent;
-    c.pc++;
-
-    switch (cmd.code) {
-        case 0:    // blank line
-        case 99:   // checkpoint
-        case 103:  // comment
-        case 106:  // debug text
-        case 107:  // clear debug text
-        case 212:  // label
-            return true;
-
-        case 101:  // message: the thread resumes once the player closes the window
-            message_.active = true;
-            message_.text = expandText(cmd.str(0), &t);
-            t.waitingMessage = true;
-            return false;
-
-        case 102: {  // choices
-            int flags = cmd.arg(0);
-            int count = flags & 0x0F;
-            int cancel = (flags & 0xF0) >> 4;
-            choice_ = ChoiceState{};
-            choice_.active = true;
-            for (int i = 0; i < count; i++) {
-                std::string text = expandText(cmd.str(i), &t);
-                choice_.items.push_back(text);
-                if (!text.empty()) choice_.visible.push_back(i);
-            }
-            // 0 sends cancel to its own case, 1 ignores it, 2 and up pick a choice.
-            choice_.cancelCase = cancel == 1 ? -1 : cancel == 0 ? -2 : cancel - 1;
-            t.waitingChoice = true;
-            t.choiceIndent = indent;
-            return false;
-        }
-
-        case 111: {  // numeric condition
-            int flags = cmd.arg(0);
-            int count = flags & 0x0F;
-            bool elseCase = (flags & 0xF0) != 0;
-            int chosen = 0;
-            for (int i = 0; i < count; i++) {
-                int32_t left = readVar(cmd.arg(1 + i * 3), t);
-                int32_t rflags = cmd.arg(3 + i * 3);
-                int32_t right = (rflags & 0xF0) ? cmd.arg(2 + i * 3) : value(cmd.arg(2 + i * 3), t);
-                if (compare(left, right, rflags & 0x0F)) {
-                    chosen = i + 1;
-                    break;
-                }
-            }
-            if (chosen == 0 && !elseCase) chosen = -1;
-            jumpToCase(c, indent, chosen);
-            return true;
-        }
-
-        case 112: {  // string condition
-            int flags = cmd.arg(0);
-            int count = flags & 0x0F;
-            bool elseCase = (flags & 0xF0) != 0;
-            int chosen = 0;
-            for (int i = 0; i < count; i++) {
-                int32_t leftWord = cmd.arg(1 + i);
-                int32_t leftId = leftWord & 0x00FFFFFF;
-                if (leftId < 1000000) leftId += 0;
-                int op = (leftWord >> 24) & 0xF0;
-                bool rightIsVar = ((leftWord >> 24) & 0x0F) == 1;
-                std::string left = readStr(leftId >= 1000000 ? leftId : 3000000 + leftId, t);
-                std::string right = rightIsVar ? readStr(cmd.arg(1 + count + i), t) : cmd.str(i);
-                bool ok = false;
-                switch (op) {
-                    case 0x00: ok = left == right; break;
-                    case 0x10: ok = left != right; break;
-                    case 0x20: ok = left.find(right) != std::string::npos; break;
-                    case 0x30: ok = left.starts_with(right); break;
-                }
-                if (ok) {
-                    chosen = i + 1;
-                    break;
-                }
-            }
-            if (chosen == 0 && !elseCase) chosen = -1;
-            jumpToCase(c, indent, chosen);
-            return true;
-        }
-
-        case 401:
-        case 420:
-        case 421:
-            // Reaching another case of the same branch ends the case that ran.
-            jumpToBranchEnd(c, indent);
-            return true;
-        case 499:
-            return true;
-
-        case 121:
-            setVariable(t, cmd);
-            return true;
-        case 122:
-            setString(t, cmd);
-            return true;
-
-        case 150:
-            pictureCommand(t, cmd);
-            return true;
-
-        case 151: {  // change screen colour
-            int32_t packed = cmd.arg(0);
-            int frames = value(cmd.arg(1), t);
-            // The colour is three percentages packed into one value, red in the lowest byte.
-            tintR_.set(packed & 0xFF, frames);
-            tintG_.set((packed >> 8) & 0xFF, frames);
-            tintB_.set((packed >> 16) & 0xFF, frames);
-            return true;
-        }
-
-        case 170:  // loop
-            return true;
-        case 179: {  // loop a number of times
-            size_t at = c.pc - 1;
-            auto it = t.loopCounts.find(at);
-            if (it == t.loopCounts.end()) it = t.loopCounts.emplace(at, value(cmd.arg(0), t)).first;
-            if (it->second-- <= 0) {
-                t.loopCounts.erase(it);
-                const Commands &cmds = *c.commands;
-                while (c.pc < cmds.size() && !(cmds[c.pc].indent == indent && cmds[c.pc].code == 498)) c.pc++;
-                if (c.pc < cmds.size()) c.pc++;
-            }
-            return true;
-        }
-        case 498: {  // loop end: back to the loop's start
-            const Commands &cmds = *c.commands;
-            size_t pc = c.pc - 1;
-            while (pc > 0) {
-                pc--;
-                if (cmds[pc].indent == indent && (cmds[pc].code == 170 || cmds[pc].code == 179)) break;
-            }
-            c.pc = pc;
-            return true;
-        }
-        case 171:    // break out of the innermost loop
-        case 176: {  // go back to the start of the innermost loop
-            const Commands &cmds = *c.commands;
-            size_t pc = c.pc - 1;
-            int depth = indent;
-            while (pc > 0) {
-                pc--;
-                if (cmds[pc].indent < depth && (cmds[pc].code == 170 || cmds[pc].code == 179)) break;
-                if (cmds[pc].indent < depth) depth = cmds[pc].indent;
-            }
-            int loopIndent = cmds[pc].indent;
-            if (cmd.code == 176) {
-                c.pc = pc;
-                return true;
-            }
-            t.loopCounts.erase(pc);
-            c.pc = pc + 1;
-            while (c.pc < cmds.size() && !(cmds[c.pc].indent == loopIndent && cmds[c.pc].code == 498)) c.pc++;
-            if (c.pc < cmds.size()) c.pc++;
-            return true;
-        }
-        case 172:  // end this event
-            t.stack.clear();
-            return true;
-        case 173:  // erase this event
-            if (c.mapEvent >= 0) events_[c.mapEvent].erased = true;
-            return true;
-        case 180: {  // wait
-            t.wait = value(cmd.arg(0), t);
-            return t.wait <= 0;
-        }
-
-        case 213: {  // jump to label
-            const Commands &cmds = *c.commands;
-            const std::string &name = cmd.str(0);
-            for (size_t i = 0; i < cmds.size(); i++) {
-                if (cmds[i].code == 212 && cmds[i].str(0) == name) {
-                    c.pc = i + 1;
-                    return true;
-                }
-            }
-            return true;
-        }
-
-        case 210:
-        case 211: {  // call common event, or reserve it
-            int id = value(cmd.arg(0), t);
-            if (id >= 500000 && id < 600000) {
-                callCommon(t, id - 500000, cmd, 1);
-            } else {
-                unsupported(cmd);  // map event pages are called the same way, once map events run
-            }
-            return true;
-        }
-        case 300: {
-            int id = commonByName(cmd.str(0));
-            if (id < 0) {
-                log("no common event named " + cmd.str(0));
-                return true;
-            }
-            callCommon(t, id, cmd, 1);
-            return true;
-        }
-
-        case 221: {  // load one variable from a save slot
-            // No saves exist yet in this spike, so every value reads as 0.
-            writeVar(cmd.arg(0), 0, t);
-            return true;
-        }
-
-        case 130: {  // move to another map or position
-            int mapId = value(cmd.arg(1), t);
-            hero_.x = value(cmd.arg(2), t);
-            hero_.y = value(cmd.arg(3), t);
-            if (cmd.arg(0) == -1 && mapId >= 0 && mapId != mapId_) loadMap(mapId);
-            return true;
-        }
-
-        default:
-            unsupported(cmd);
-            return true;
-    }
-}
-
-std::vector<const Character *> Game::characters() const {
-    std::vector<const Character *> out{&hero_};
-    for (auto &p : party_)
-        if (p.visible && !p.graphic.empty()) out.push_back(&p);
-    for (auto &e : events_)
-        if (e.chara.visible) out.push_back(&e.chara);
-    return out;
-}
-
-int Game::commonByName(const std::string &name) const {
-    for (auto &ce : commons_)
-        if (ce.name == name) return ce.id;
-    return -1;
-}
-
-void Game::callCommon(Thread &t, int id, const Command &cmd, int argBase) {
-    if (id < 0 || id >= int(cself_.size())) return;
-    const CommonEvent *ce = nullptr;
-    for (auto &e : commons_)
-        if (e.id == id) ce = &e;
-    if (!ce) return;
-    int flags = cmd.arg(argBase);
-    int numbers = flags & 0x0F;
-    int strings = (flags >> 4) & 0x0F;
-    int refFlags = (flags >> 8) & 0xFF;
-    bool wantsReturn = ((flags >> 24) & 0xFF) == 1;
-    std::array<int32_t, 100> &self = cself_[id];
-    for (int i = 0; i < numbers && i < 5; i++) self[i] = value(cmd.arg(argBase + 1 + i), t);
-    int next = argBase + 1 + numbers;
-    for (int i = 0; i < strings && i < 5; i++) {
-        if (refFlags & (1 << i)) cselfStr_[id][5 + i] = readStr(cmd.arg(next++), t);
-        else cselfStr_[id][5 + i] = cmd.str(1 + i);
-    }
-    (void)wantsReturn;
-    t.stack.push_back({&ce->commands, 0, id, -1});
-}
-
-void Game::setVariable(Thread &t, const Command &c) {
-    int32_t target = c.arg(0);
-    int32_t r1 = c.arg(1), r2 = c.arg(2);
-    uint32_t flags = uint32_t(c.arg(3));
-    uint8_t b0 = flags & 0xFF, b1 = (flags >> 8) & 0xFF;
-    int calc = b1 & 0xF0, assign = b1 & 0x0F;
-    if (b0 & 0x10) target = readVar(target, t);
-    int32_t a = (b0 & 0x04) ? r1 : value(r1, t);
-    if (b0 & 0x20) a = readVar(readVar(r1, t), t);
-    int32_t b = (b0 & 0x08) ? r2 : value(r2, t);
-    if (b0 & 0x40) b = readVar(readVar(r2, t), t);
-    int32_t rhs = a;
-    switch (calc) {
-        case 0x00: rhs = a + b; break;
-        case 0x10: rhs = a - b; break;
-        case 0x20: rhs = a * b; break;
-        case 0x30: rhs = b ? a / b : 0; break;
-        case 0x40: rhs = b ? a % b : 0; break;
-        case 0x50: rhs = a & b; break;
-        case 0x60: rhs = std::uniform_int_distribution<int>(std::min(a, b), std::max(a, b))(rng_); break;
-        case 0xF0: rhs = int32_t(std::lround(std::atan2(double(a), double(b)) * 1800 / M_PI)); break;
-    }
-    // Right side 2 of exactly zero with addition is how the editor writes "assign the first value".
-    int32_t cur = assign == 0 ? 0 : readVar(target, t);
-    int32_t out = cur;
-    switch (assign) {
-        case 0x00: out = rhs; break;
-        case 0x01: out = cur + rhs; break;
-        case 0x02: out = cur - rhs; break;
-        case 0x03: out = cur * rhs; break;
-        case 0x04: out = rhs ? cur / rhs : cur; break;
-        case 0x05: out = rhs ? cur % rhs : cur; break;
-        case 0x06: out = std::max(cur, rhs); break;
-        case 0x07: out = std::min(cur, rhs); break;
-        case 0x08: out = std::abs(rhs); break;
-        case 0x09: out = int32_t(std::lround(std::atan2(double(rhs), 1.0) * 1800 / M_PI)); break;
-        case 0x0A: out = int32_t(std::lround(std::sin(rhs * M_PI / 1800) * 1000)); break;
-        case 0x0B: out = int32_t(std::lround(std::cos(rhs * M_PI / 1800) * 1000)); break;
-    }
-    writeVar(target, out, t);
-}
-
-void Game::setString(Thread &t, const Command &c) {
-    int32_t target = c.arg(0);
-    uint32_t flags = uint32_t(c.arg(1));
-    int mode = flags & 0x0F;
-    int assign = (flags >> 8) & 0x0F;
-    if (flags & 0xF0) target = readVar(target, t);
-    if (target < 1000000) target += 3000000;
-    std::string rhs;
-    switch (mode) {
-        case 0: rhs = expandText(c.str(0), &t); break;
-        case 1: rhs = readStr(c.arg(2), t); break;
-        case 2: rhs = std::to_string(readVar(c.arg(2), t)); break;
-        default: unsupported(c); return;
-    }
-    std::string cur = readStr(target, t);
-    switch (assign) {
-        case 0x00: writeStr(target, rhs, t); break;
-        case 0x01: writeStr(target, cur + rhs, t); break;
-        default: unsupported(c); break;
-    }
-}
-
-void Game::pictureCommand(Thread &t, const Command &c) {
-    uint32_t flags = uint32_t(c.arg(0));
-    int display = flags & 0xF0;
-    int exec = flags & 0x0F;
-    int anchor = (flags >> 8) & 0xF0;
-    int blend = (flags >> 8) & 0x0F;
-    int number = value(c.arg(1), t);
-    int frames = value(c.arg(2), t);
-
-    if (exec == 2) {  // erase
-        auto it = pictures_.find(number);
-        if (it == pictures_.end()) return;
-        if (frames <= 0) pictures_.erase(it);
-        else it->second.opacity.set(0, frames);
-        return;
-    }
-
-    Picture &p = pictures_[number];
-    bool show = exec == 0;
-    if (show) {
-        Picture fresh;
-        switch (display) {
-            case 0x00: fresh.kind = PictureKind::File; fresh.source = c.str(0); break;
-            case 0x10: fresh.kind = PictureKind::File; fresh.source = readStr(c.arg(11), t); break;
-            case 0x20: fresh.kind = PictureKind::Text; fresh.source = expandText(c.str(0), &t); break;
-            case 0x30: fresh.kind = PictureKind::Window; fresh.source = c.str(0); break;
-            default: fresh.kind = PictureKind::Window; fresh.source = readStr(c.arg(11), t); break;
-        }
-        fresh.generation = ++generation_;
-        fresh.x.set(value(c.arg(7), t), 0);
-        fresh.y.set(value(c.arg(8), t), 0);
-        fresh.opacity.set(0, 0);
-        fresh.zoomX.set(100, 0);
-        fresh.zoomY.set(100, 0);
-        for (Tween *tw : {&fresh.r, &fresh.g, &fresh.b}) tw->set(100, 0);
-        p = fresh;
-    }
-    p.anchor = anchor >> 4;
-    p.blend = blend;
-    p.divX = std::max(1, value(c.arg(3), t));
-    p.divY = std::max(1, value(c.arg(4), t));
-    p.pattern = value(c.arg(5), t);
-    int over = show ? 0 : frames;
-    p.opacity.set(value(c.arg(6), t), show ? frames : over);
-    if (!show) {
-        p.x.set(value(c.arg(7), t), over);
-        p.y.set(value(c.arg(8), t), over);
-    }
-    int zoom = value(c.arg(9), t);
-    p.zoomX.set(zoom, over);
-    p.zoomY.set(c.args.size() > 18 ? value(c.arg(18), t) : zoom, over);
-    p.angle.set(value(c.arg(10), t), over);
-    if (c.args.size() > 17) {
-        p.r.set(value(c.arg(15), t), over);
-        p.g.set(value(c.arg(16), t), over);
-        p.b.set(value(c.arg(17), t), over);
-    }
 }
 
 }  // namespace wolf
