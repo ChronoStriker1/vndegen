@@ -823,8 +823,23 @@ impl UserData for EngineApi {
                 let bytes = crate::lua51_bytecode::adapt(&bytes, encoding).unwrap_or(bytes);
                 bytes
             } else if std::str::from_utf8(&bytes).is_err() {
-                // Lua source in the project's charset, such as Shift_JIS.
-                encoding.decode(&bytes).0.into_owned().into_bytes()
+                // Lua source in the project's charset, such as Shift_JIS. The PC
+                // engine lexes its bytes as they are, and games rely on that: a
+                // second byte of 0x5C is written `\\` so it reads as itself. So
+                // compile the bytes, then turn only the strings into UTF-8.
+                #[cfg(feature = "backend-lua51")]
+                let bytes = {
+                    let dumped = lua
+                        .load(&bytes[..])
+                        .set_name(path.as_str())
+                        .into_function()
+                        .map_err(|e| mlua::Error::external(format!("include 执行 {path} 失败: {e}")))?
+                        .dump(false);
+                    crate::lua51_bytecode::adapt(&dumped, encoding).unwrap_or(dumped)
+                };
+                #[cfg(not(feature = "backend-lua51"))]
+                let bytes = encoding.decode(&bytes).0.into_owned().into_bytes();
+                bytes
             } else {
                 bytes
             };

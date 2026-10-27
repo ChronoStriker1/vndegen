@@ -326,6 +326,44 @@ end
     }
 
     #[test]
+    fn test_shift_jis_lua_include_keeps_its_strings() {
+        // 浬 is 0x8A 0x5C in Shift_JIS. The PC engine lexes Lua bytes as they
+        // are, so games write "浬\\" to keep the 0x5C from escaping the quote.
+        // The string must read 浬 in UTF-8 after the include.
+        let mut source = b"names = { [\"".to_vec();
+        source.extend_from_slice(&[0x8A, 0x5C, b'\\']);
+        source.extend_from_slice(b"\"] = 1 }\nfunction found(e) return names[\"\xE6\xB5\xAC\"] end\n");
+        let script = r#"
+*main
+[lua]
+function bootstrap(e)
+    e:include("lib/names.lua")
+    result = found(e)
+end
+[/lua]
+[calllua function="bootstrap"]
+[stop]
+"#;
+        let config = InterpreterConfig {
+            encoding: encoding_rs::SHIFT_JIS,
+            ..InterpreterConfig::default()
+        };
+        let mut interpreter = Interpreter::new(config);
+        interpreter.set_file_loader(Box::new(move |name: &str| {
+            if name == "lib/names.lua" {
+                Ok(source.clone())
+            } else {
+                Err(asb_interpreter::Error::ScriptNotFound(name.to_string()))
+            }
+        }));
+        interpreter.load_script("test", script).unwrap();
+        interpreter.start("test", "main").unwrap();
+        let _ = interpreter.run();
+        let result: i64 = interpreter.lua().globals().get("result").unwrap();
+        assert_eq!(result, 1);
+    }
+
+    #[test]
     fn test_pluto_unpersist_restores_numeric_table_keys() {
         // Games read sys.saveslot[8], so a numeric key must come back numeric.
         let interpreter = Interpreter::new(InterpreterConfig::default());
