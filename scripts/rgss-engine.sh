@@ -12,7 +12,8 @@
 # the core for each platform. Sources, tools, and stage 1 are cached in ~/Library/Caches/VNDegen/rgss. A build whose
 # inputs have not changed since the last one is skipped.
 #
-# Needs, from Homebrew: meson ninja cmake bison make automake autoconf libtool universal-ctags ruby@3.3 gnu-sed grep.
+# Needs, from Homebrew: meson ninja cmake bison make automake autoconf libtool universal-ctags ruby@3.3 gnu-sed grep
+# rsync. Apple's own rsync handles the filters below differently.
 # Stage 1 runs the build machine's Ruby against the Ruby 3.3 it builds, which a newer Ruby refuses.
 set -euo pipefail
 dest=${1:?destination folder, such as build/rgss}
@@ -46,6 +47,7 @@ for tool in meson ninja cmake gmake gsed ggrep automake autoreconf glibtoolize c
   command -v "$tool" >/dev/null || { echo "error: $tool is missing, see the header of $0" >&2; exit 1; }
 done
 ctags --version 2>/dev/null | grep -q "Universal Ctags" || { echo "error: ctags must be Universal Ctags (brew install universal-ctags)" >&2; exit 1; }
+rsync --version 2>/dev/null | head -n 1 | grep -q "^rsync  *version 3" || { echo "error: rsync must be rsync 3 (brew install rsync)" >&2; exit 1; }
 
 start=$(date +%s)
 
@@ -92,10 +94,20 @@ rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/fre
 for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$patch"; done
 # The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have. Neither do the
 # folders Meson downloaded the fresh .wrap files' subprojects into, which the notices below read, so those stay too. A
-# folder no current wrap names, such as an older version's, goes, so its notice can't reach the app.
+# folder no current wrap names, such as an older version's, goes, so its notice can't reach the app. Meson reuses a
+# downloaded folder as it is, so when any wrap or overlay changes, every download goes and so do the Meson builds that
+# used them, which download again.
+wraps_stamp=$(cd "$work/fresh" && find core/subprojects subprojects \( -name "*.wrap" -o -path "*/packagefiles/*" \) \
+  -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-16)
+wraps_changed=false
+if [ "$(cat "$work/.vndegen-wraps" 2>/dev/null)" != "$wraps_stamp" ]; then
+  wraps_changed=true
+  rm -rf "$work"/core-* "$work"/host-*/build
+fi
 # keep_downloads <subprojects folder> <its path in the copy>: adds a protect filter for each wrap's folder to `keep`.
 keep_downloads() {
   local wrap dir
+  [ "$wraps_changed" = false ] || return 0
   for wrap in "$1"/*.wrap; do
     [ -f "$wrap" ] || continue
     dir=$(sed -n 's/^directory *= *//p' "$wrap" | head -n 1 | tr -d '\r')
@@ -108,6 +120,7 @@ rsync -a --checksum --delete --exclude /libretro/build ${keep[@]+"${keep[@]}"} "
 keep=()
 keep_downloads "$work/fresh/subprojects" ""
 rsync -a --checksum --delete ${keep[@]+"${keep[@]}"} "$work/fresh/subprojects/" "$work/subprojects/"
+echo "$wraps_stamp" > "$work/.vndegen-wraps"
 rm -rf "$work/fresh"
 
 # Stage 1, cached by its inputs: the core with its patches outside stage2/, and the tools. Its Makefile expects GNU sed and grep, and an
