@@ -129,6 +129,12 @@ A 24 fps movie on a 60 Hz display shows each frame for two or three refreshes, s
 cadence, not a dropped frame. The Mac mini ran other threads' builds and simulators during the simulator runs, and
 simulator timing isn't a real device's.
 
+## Review
+
+Codex `gpt-6.1-sol` at xhigh reviewed the branch in four rounds, and every finding was fixed or declined with a reason
+recorded here. Round 4's own fixes, to how saves map between keys, files, and PC paths and to the page's storage
+wrapper, were checked by the coordinator, not re-reviewed by Codex.
+
 ## Known limits
 
 - Ruffle's ActionScript 3 support is less complete than its ActionScript 1 and 2 support. A game that uses an API Ruffle
