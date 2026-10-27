@@ -380,13 +380,27 @@ impl CoreRuntime {
 
     pub(super) fn begin_inline_event_frame(&mut self) {
         self.refresh_inline_event_frame();
-        if self.active_inline_event_frame.is_some() {
-            return;
-        }
         let Some(script) = self.interpreter.current_script().map(str::to_string) else {
             return;
         };
         let line = self.interpreter.current_line();
+        // An event while a handler's frame is active shares that frame, as
+        // in the PC engine, whose saves show one such frame. The exception is
+        // a game's own yes/no dialog that an earlier handler opened: its
+        // buttons return to the dialog's wait, so they need a frame of their
+        // own (VNDegen).
+        let in_yesno_dialog = matches!(
+            &self.wait_reason,
+            Some(asb_interpreter::event::WaitReason::Stop { reason: Some(reason) })
+                if reason == asb_interpreter::tags::YESNO_WAIT
+        );
+        if self
+            .active_inline_event_frame
+            .as_ref()
+            .is_some_and(|frame| !in_yesno_dialog || (frame.script == script && frame.line == line))
+        {
+            return;
+        }
         let stack = self.interpreter.call_stack();
         if let Err(error) = self.interpreter.push_inline_event_frame() {
             crate::core_error!("建立事件返回帧失败: {error:?}");
