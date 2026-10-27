@@ -26,6 +26,10 @@ nonisolated public struct KiriKiriPlugin: EnginePlugin {
         guard let layout = KiriKiriLayout(scanning: launch.folder) else { throw KiriKiriError.notKiriKiri }
         return try KiriKiriSession(launch, layout: layout, engine: engine)
     }
+
+    /// Whether a game's frame or start is on the stack below the caller. Only the game's own modal window, such as its
+    /// Yes/No dialog, runs the app's events there, and the game cannot close until the caller returns.
+    @MainActor public static var frameIsRunning: Bool { KiriKiriSession.inFrame }
 }
 
 nonisolated public enum KiriKiriError: Error, LocalizedError {

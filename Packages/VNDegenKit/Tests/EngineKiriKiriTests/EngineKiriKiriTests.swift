@@ -457,72 +457,115 @@ private func realPath(_ path: String) throws -> String {
 }
 
 /// An engine that runs no game. It records the calls a session makes, and those it makes while one of its frames is
-/// still running.
+/// still running. A frame reports the game quit once the session asked it to.
 private enum FakeEngine {
     nonisolated(unsafe) static var inFrame = false
     nonisolated(unsafe) static var calls: [String] = []
     nonisolated(unsafe) static var callsInFrame: [String] = []
+    nonisolated(unsafe) static var quitRequested = false
+    nonisolated(unsafe) static var startResult: Int32 = 0
     /// Runs inside the next frame, as a native modal loop would.
     nonisolated(unsafe) static var duringFrame: (() -> Void)?
+    /// Runs inside the start, as a dialog the game shows while it starts would.
+    nonisolated(unsafe) static var duringStart: (() -> Void)?
+
+    static func reset() {
+        calls = []
+        callsInFrame = []
+        quitRequested = false
+        startResult = 0
+        duringFrame = nil
+        duringStart = nil
+    }
 
     static func record(_ call: String) {
         calls.append(call)
         if inFrame { callsInFrame.append(call) }
     }
 
+    /// Runs `work` as part of a frame or the start, as the engine's own code would.
+    static func runInFrame(_ work: (() -> Void)?) {
+        inFrame = true
+        defer { inFrame = false }
+        work?()
+    }
+
     @MainActor static var engine: KiriKiriEngine {
         KiriKiriEngine(
-            start: { _ in 0 },
+            start: { _ in
+                FakeEngine.record("start")
+                let work = FakeEngine.duringStart
+                FakeEngine.duringStart = nil
+                FakeEngine.runInFrame(work)
+                return FakeEngine.startResult
+            },
             iterate: {
                 FakeEngine.record("iterate")
                 guard !FakeEngine.inFrame else { return 0 }
-                FakeEngine.inFrame = true
-                defer { FakeEngine.inFrame = false }
                 let work = FakeEngine.duringFrame
                 FakeEngine.duringFrame = nil
-                work?()
-                return 0
+                FakeEngine.runInFrame(work)
+                return FakeEngine.quitRequested ? 1 : 0
             },
             key: { _, _ in }, mouseButton: { _, _, _, _ in }, mouseMove: { _, _ in }, click: { _, _ in }, wheel: { _ in },
-            setPaused: { _ in }, requestQuit: {}, saveSystemData: { FakeEngine.record("saveSystemData") },
+            setPaused: { _ in }, requestQuit: { FakeEngine.quitRequested = true },
+            saveSystemData: { FakeEngine.record("saveSystemData") },
             stop: { FakeEngine.record("stop") }, view: { nil })
     }
 }
 
 /// The session tests share `FakeEngine`'s records.
 @MainActor @Suite(.serialized) struct KiriKiriSessionTests {
+    private func session(_ name: String, onExit: @escaping @MainActor () -> Void = {}) throws -> KiriKiriSession {
+        FakeEngine.reset()
+        let launch = GameLaunch(game: Game(id: GameID(name)), folder: URL(fileURLWithPath: "/nonexistent"),
+                                dataDirectory: try folder([:]), onExit: onExit)
+        return try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
+                                   engine: FakeEngine.engine)
+    }
+
+    /// Whether `session` stops within `timeout`, so a test of a session that never stops fails instead of hanging.
+    private func stops(_ session: KiriKiriSession, within timeout: Duration = .seconds(2)) async -> Bool {
+        let (results, result) = AsyncStream<Bool>.makeStream()
+        Task {
+            await session.waitUntilStopped()
+            result.yield(true)
+        }
+        Task {
+            try? await Task.sleep(for: timeout)
+            result.yield(false)
+        }
+        for await stopped in results { return stopped }
+        return false
+    }
+
     @Test func runsNoEngineCallUnderAFrameThatIsStillRunning() throws {
-        let data = try folder([:])
-        let launch = GameLaunch(game: Game(id: GameID("Test Game 08")), folder: URL(fileURLWithPath: "/nonexistent"),
-                                dataDirectory: data, onExit: {})
-        let session = try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
-                                          engine: FakeEngine.engine)
+        let session = try session("Test Game 08")
         try #require(session.view as? KiriKiriHostView).onReady?()
         FakeEngine.callsInFrame = []
+        var frameWasRunning = false
         FakeEngine.duringFrame = {
             MainActor.assumeIsolated {
+                frameWasRunning = KiriKiriPlugin.frameIsRunning
                 session.step()
                 session.terminate()
                 session.step()
             }
         }
+        #expect(!KiriKiriPlugin.frameIsRunning)
         session.step()
+        #expect(frameWasRunning)
+        #expect(!KiriKiriPlugin.frameIsRunning)
         #expect(FakeEngine.callsInFrame.isEmpty)
     }
 
-    /// AppKit's wait for the reply to a quit runs inside the frame when the quit came through a game's modal window. The
-    /// game cannot close under it, so it saves its system data there, the hub hears it stopped, and the engine stops only
-    /// once the frame returns.
-    @Test func savesAndReportsStoppedWhenTheHostHoldsAQuittingFrame() async throws {
-        let data = try folder([:])
-        let launch = GameLaunch(game: Game(id: GameID("Test Game 01")), folder: URL(fileURLWithPath: "/nonexistent"),
-                                dataDirectory: data, onExit: {})
-        let session = try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
-                                          engine: FakeEngine.engine)
+    /// A frame that stays on the stack after the hub ended the game keeps the game from closing. The game saves its
+    /// system data there, the hub hears it stopped, and the engine stops only once the frame returns.
+    @Test func savesAndReportsStoppedWhenAQuittingFrameDoesNotReturn() async throws {
+        let session = try session("Test Game 01")
         session.stuckQuitTimeout = .zero
         try #require(session.view as? KiriKiriHostView).onReady?()
         FakeEngine.calls = []
-        FakeEngine.callsInFrame = []
         FakeEngine.duringFrame = {
             MainActor.assumeIsolated {
                 session.terminate()
@@ -533,6 +576,43 @@ private enum FakeEngine {
         await session.waitUntilStopped()
         #expect(FakeEngine.callsInFrame == ["saveSystemData"])
         #expect(FakeEngine.calls == ["iterate", "saveSystemData", "stop"])
+        #expect(!KiriKiriSession.engineInUse)
+    }
+
+    /// A game can show a dialog of its own while it starts, and the dialog's loop runs the hub's events, so the hub can
+    /// end the session there. The dialog closes, and the game closes once its start returns, through its normal path.
+    @Test func closesAGameTheHubEndedWhileItStarted() async throws {
+        let session = try session("Test Game 01")
+        FakeEngine.duringStart = {
+            MainActor.assumeIsolated {
+                session.terminate()
+                Task {
+                    await session.waitUntilStopped()
+                    FakeEngine.record("hub saw it stop")
+                }
+            }
+        }
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        #expect(FakeEngine.quitRequested)
+        #expect(KiriKiriSession.engineInUse)
+        // The quit timer would run this frame.
+        session.step()
+        #expect(await stops(session))
+        await Task.yield()
+        #expect(FakeEngine.calls == ["start", "iterate", "stop", "hub saw it stop"])
+        #expect(!KiriKiriSession.engineInUse)
+    }
+
+    /// The hub may have started another game by the time a game it ended fails to start, so the failure must not end it.
+    @Test func aGameTheHubEndedWhileItStartedLeavesTheHubAloneWhenItFailsToStart() async throws {
+        var exits = 0
+        let session = try session("Test Game 01", onExit: { exits += 1 })
+        FakeEngine.startResult = -1
+        FakeEngine.duringStart = { MainActor.assumeIsolated { session.terminate() } }
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        #expect(await stops(session))
+        #expect(exits == 0)
+        #expect(FakeEngine.calls == ["start", "stop"])
         #expect(!KiriKiriSession.engineInUse)
     }
 }
