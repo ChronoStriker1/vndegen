@@ -165,6 +165,10 @@ impl CoreRuntime {
                         self.interpreter.current_line(),
                         self.interpreter.call_stack().len()
                     );
+                    // Artemis reports a script error and carries on with the
+                    // next tag. Staying on the failed tag ran it again every
+                    // frame and the game never moved (VNDegen).
+                    self.interpreter.advance_line();
                     break;
                 }
             }
