@@ -16,6 +16,22 @@ extension GameFolder {
     /// Where NW.js builds save: `save/` beside index.html.
     nonisolated var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
 
+    /// True when the audio folder holds Ogg files, plain or encrypted (.rpgmvo), and no .m4a (.rpgmvm). MV asks for
+    /// .m4a in a browser that cannot play Ogg, and its deployment usually ships both, but many games ship only Ogg.
+    nonisolated var shipsOnlyOggAudio: Bool {
+        guard let audio = resolve(servedPath: "/audio"),
+              let files = FileManager.default.enumerator(at: audio, includingPropertiesForKeys: nil) else { return false }
+        var hasOgg = false
+        for case let file as URL in files {
+            switch file.pathExtension.lowercased() {
+            case "m4a", "rpgmvm": return false
+            case "ogg", "rpgmvo": hasOgg = true
+            default: break
+            }
+        }
+        return hasOgg
+    }
+
     /// The Windows font names the game asks for in its plugins, plugin settings, and database, whose substitutes the
     /// page loads before the boot scene ends. MV's core asks for SimHei in Chinese games and Dotum in Korean ones.
     nonisolated var fontNames: Set<String> {

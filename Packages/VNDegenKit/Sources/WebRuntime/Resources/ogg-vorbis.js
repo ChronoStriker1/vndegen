@@ -468,4 +468,7 @@
         return audio;
     };
     window.Audio.prototype = NativeAudio.prototype;
+
+    // Engine scripts injected after this one, such as the RPG Maker additions, read it to keep Ogg visible.
+    window.__vndegen.decodesOgg = true;
 })();
