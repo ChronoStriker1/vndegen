@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.6.2",
+          "buildVersion": "409",
+          "date": "2026-10-27T17:27:42Z",
+          "localizedDescription": "The whole app now works with a controller alone, with an on-screen keyboard the controller types on.\n\n## Downloads\n\n- `VNDegen-0.6.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.6.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- Every screen takes controller focus: the library, game pages, every Settings page, the button mapping editor, adding a game, the lock screen, and every dialog and sheet. A sheet that opens over another, such as a license over the artwork editor, gets focus too.\n- Text fields open an on-screen keyboard when you press A on them. A types the focused key, X deletes, LB toggles shift, RB switches to symbols, Y finishes, and B closes it without changes. It covers the Ludusavi server fields and game search, metadata source keys and search, and the folder name and password when adding a game.\n- Hidden games can be set up by controller: set, change or remove the passcode with the D-pad and A, and turn biometrics on or off.\n- Adding a game by controller lists the archives in VNDegen's own folder. The Files and Photos pickers need touch or a mouse, and now say so on screen.\n- The button mapping editor has Reset, which returns a game to its engine's default layout, and LB and RB jump between groups of buttons. Remapping A or B never changes how the editor or the VNDegen menu respond.\n- License text scrolls by controller.\n\n## Fixed\n\n- On the Mac, Settings rows now show controller focus. Before, no row showed where focus was.\n- The \"Can't launch\" alert closes with A or B. Before, a controller couldn't close it.\n\n## Known limits\n\n- Checked by controller alone on the Mac app and on iPad and iPhone simulators, with simulated controller input. Not yet checked with a real controller.\n- Retrying Face ID with X wasn't tested, because the simulators have no biometrics. The Ludusavi game search wasn't tested against a real share.\n- On iPhone and iPad, iOS may keep a controller's Home button for itself. The touch gamepad's house button and the corner menu button always open the VNDegen menu.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.6.2/VNDegen-0.6.2.ipa",
+          "size": 71152392,
+          "sha256": "79d7d4859dea9b6ec96db155484ff88e438fad5eb453ab9e4ccad424c0966bd2",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.6.1",
           "buildVersion": "397",
           "date": "2026-10-27T17:23:27Z",
