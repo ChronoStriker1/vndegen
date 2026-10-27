@@ -135,6 +135,25 @@ impl Script {
             // （Artemis 语义：未被 [ 和 ] 包围的部分都是剧情文本，见
             // docs/spec/script_syntax.md；预处理器注入的
             // [onlinehead]text[onlineend] 也依赖此规则）
+            // A tag may run over several lines, as in `[font` with one
+            // parameter per line. Join them so it parses as one tag (VNDegen).
+            let joined;
+            let mut line = line;
+            if tag_left_open(line) {
+                let mut text = line.to_string();
+                let mut next = line_idx + 1;
+                while next < lines.len() && next - line_idx <= MAX_TAG_LINES && tag_left_open(&text) {
+                    text.push(' ');
+                    text.push_str(lines[next].trim());
+                    next += 1;
+                }
+                if !tag_left_open(&text) {
+                    line_idx = next - 1;
+                    joined = text;
+                    line = &joined;
+                }
+            }
+
             if line.contains('[') {
                 let segments = split_line_segments(line);
 
@@ -284,6 +303,28 @@ pub(crate) enum LineSegment {
 /// 标签内的双引号字符串里允许出现 `[`/`]` 而不闭合标签（&autoinsert 的
 /// command 参数「可以包含括号」，见 docs/tag/preprocessor/autoinsert.md）。
 /// 行尾未闭合的 `[...` 按文本处理（旧实现直接丢弃，这里保守地保留为文本）。
+/// The most lines one tag may span.
+const MAX_TAG_LINES: usize = 64;
+
+/// Whether `line` ends inside a tag, so the tag continues on the next line.
+/// A `//` outside a tag starts a comment that runs to the end of the line.
+fn tag_left_open(line: &str) -> bool {
+    let mut in_tag = false;
+    let mut in_quote = false;
+    let mut previous = '\0';
+    for ch in line.chars() {
+        match ch {
+            '/' if !in_tag && previous == '/' => return false,
+            '"' if in_tag => in_quote = !in_quote,
+            '[' if !in_tag => in_tag = true,
+            ']' if in_tag && !in_quote => in_tag = false,
+            _ => {}
+        }
+        previous = ch;
+    }
+    in_tag
+}
+
 pub(crate) fn split_line_segments(line: &str) -> Vec<LineSegment> {
     let mut segments = Vec::new();
     let mut current = String::new();
@@ -564,6 +605,20 @@ mod tests {
         let tags: Vec<&str> = script.instructions.iter().map(|i| i.tag.as_str()).collect();
         assert_eq!(tags, vec!["onlinehead", "__text", "rp"]);
         assert_eq!(script.instructions[1].get("text"), Some("「ぷるぷる」@"));
+    }
+
+    #[test]
+    fn test_tag_over_several_lines_is_one_tag() {
+        let script = Script::parse(
+            "test",
+            "[font\n  face = \"a b.ttf\"\n  size = \"36\"\n]\n[rt] // open [ in a comment\n[wt]",
+        )
+        .unwrap();
+        let tags: Vec<_> = script.instructions.iter().map(|i| i.tag.as_str()).collect();
+        assert_eq!(tags, ["font", "rt", "wt"]);
+        assert_eq!(script.instructions[0].get("face"), Some("a b.ttf"));
+        assert_eq!(script.instructions[0].get("size"), Some("36"));
+        assert_eq!(script.instructions[1].line, 5);
     }
 
     #[test]
