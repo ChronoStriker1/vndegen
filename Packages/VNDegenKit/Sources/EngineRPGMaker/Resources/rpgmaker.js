@@ -15,9 +15,12 @@
     // tells its decoder it has finished, so that state stays open while the track plays. A thousand sounds later, as
     // footsteps and letter sounds soon make, a new sound's bytes went to it, read from past their end, and stopped the
     // game with "RangeError: length cannot be negative". Numbers that never repeat keep every decoder to its own state.
-    // The constructor assigns the counter modulo 1000 and then increments it, so only increments are taken.
-    document.addEventListener('load', (event) => {
-        if (!/\/vorbisdecoder\.js$/i.test(event.target.src || '') || typeof VorbisDecoder !== 'function') return;
+    // The constructor assigns the counter modulo 1000 and then increments it, so only increments are taken. The check runs
+    // after every script loads, so a renamed or cache-busted decoder file is caught too, before the game makes a decoder.
+    const numbered = new WeakSet();
+    document.addEventListener('load', () => {
+        if (typeof VorbisDecoder !== 'function' || numbered.has(VorbisDecoder)) return;
+        numbered.add(VorbisDecoder);
         let next = VorbisDecoder.id || 0;
         Object.defineProperty(VorbisDecoder, 'id', {
             configurable: true,

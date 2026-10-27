@@ -45,14 +45,16 @@ private let decoder = """
 
 /// A track keeps its decoder open while a thousand sounds come and go, as footsteps and letter sounds do in a long stay
 /// on one map. The thousandth sound got the track's number, and the worker read its 4 KB from 300 KB in, past its end.
-@Test @MainActor func decodersNeverShareAWorkerStateWithAnOpenTrack() async throws {
+/// The page loads the decoder as MZ ships it, with a cache-busting query, and under another name.
+@Test(arguments: ["js/libs/vorbisdecoder.js", "js/libs/vorbisdecoder.js?v=1.0.1", "js/libs/ogg.js"])
+@MainActor func decodersNeverShareAWorkerStateWithAnOpenTrack(script: String) async throws {
     let fm = FileManager.default
     let root = fm.temporaryDirectory.appending(path: "vndegen-vorbis-\(UUID().uuidString)", directoryHint: .isDirectory)
     defer { try? fm.removeItem(at: root) }
     let libs = root.appending(path: "js/libs", directoryHint: .isDirectory)
     try fm.createDirectory(at: libs, withIntermediateDirectories: true)
-    try Data(#"<html><body><script src="js/libs/vorbisdecoder.js"></script></body></html>"#.utf8).write(to: root.appending(path: "index.html"))
-    try Data(decoder.utf8).write(to: libs.appending(path: "vorbisdecoder.js"))
+    try Data(#"<html><body><script src="\#(script)"></script></body></html>"#.utf8).write(to: root.appending(path: "index.html"))
+    try Data(decoder.utf8).write(to: root.appending(path: String(script.prefix { $0 != "?" })))
 
     let source = URL(filePath: #filePath).deletingLastPathComponent()
         .appending(path: "../../Sources/EngineRPGMaker/Resources/rpgmaker.js").standardized
