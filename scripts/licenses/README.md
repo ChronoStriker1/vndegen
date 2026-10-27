@@ -31,7 +31,7 @@ files, unchanged. They match Ren'Py 8.5.3.26051504 and 7.8.7.25031702, whose lib
 - SDL2's file adds the notices of the code SDL carries: HIDAPI (`src/hidapi`, under its BSD-style option), yuv2rgb,
   and the libm header from `src/libm/e_atan2.c`. FreeType's adds the licenses of its BDF and PCF drivers (their
   READMEs and `src/pcf/pcfutil.c`), `src/base/fthash.c`, and `src/base/md5.c`. HarfBuzz's adds the header of
-  `src/hb-ucd.cc`.
+  `src/hb-ucd.cc`, and SDL2_image's the headers of `nanosvg.h` and `nanosvgrast.h`.
 
 Notices for code a library carries from other projects go in that library's file. To find such code, look for its
 symbols in the built binaries (`nm`), as was done for the files above.
