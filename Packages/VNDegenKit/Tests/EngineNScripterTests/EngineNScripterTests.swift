@@ -73,3 +73,29 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(w == 400 && h == 300)
     #expect(Array(UnsafeBufferPointer(start: pixels, count: 4)) == [0xFF, 0x80, 0x00, 0xFF])
 }
+
+/// Fixtures/spb/arc.nsa holds synthetic bitmaps packed by NScripter's own nsaarc.exe, which stores bitmaps with its
+/// SPB compression. c_grad.bmp is 16 x 4, pixel (x, y) = (16x, 60y, 8(x + y)).
+@Test func spbBitmapsDecodeExactly() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/spb/arc.nsa")
+    try FileManager.default.copyItem(at: fixture, to: dir.appendingPathComponent("arc.nsa"))
+    try Data("*define\nnsa\ngame\n*start\nbg \"c_grad.bmp\",1\nclick\nend\n".utf8).write(to: dir.appendingPathComponent("0.txt"))
+    let engine = try #require(dir.path.withCString { root in
+        var launch = VNNSLaunch(gameRoot: root, logPath: nil, englishWordWrap: false)
+        return vnns_start(&launch)
+    })
+    defer { vnns_stop(engine) }
+    #expect(vnns_step(engine, 16))
+    var w: Int32 = 0, h: Int32 = 0
+    var changed = false
+    let pixels = try #require(vnns_frame(engine, &w, &h, &changed))
+    // A background smaller than the 640 x 480 screen is centred.
+    let left = (Int(w) - 16) / 2, top = (Int(h) - 4) / 2
+    for (x, y) in [(0, 0), (5, 2), (15, 3)] {
+        let i = ((top + y) * Int(w) + left + x) * 4
+        #expect([pixels[i], pixels[i + 1], pixels[i + 2]] == [UInt8(16 * x), UInt8(60 * y), UInt8(8 * (x + y))])
+    }
+}

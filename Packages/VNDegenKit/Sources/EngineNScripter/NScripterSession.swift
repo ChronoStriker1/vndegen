@@ -172,7 +172,7 @@ final class NScripterSession: EngineSession {
 }
 
 /// The engine pointer, handed to the audio thread. vnns_audio_render is safe to call there.
-private final class EngineBox: @unchecked Sendable {
+nonisolated private final class EngineBox: @unchecked Sendable {
     let engine: OpaquePointer
     init(_ engine: OpaquePointer) { self.engine = engine }
 }

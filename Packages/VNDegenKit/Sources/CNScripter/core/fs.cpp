@@ -240,12 +240,12 @@ bool decodeSpb(const uint8_t *data, size_t size, Bytes &bmp) {
         plane[0] = uint8_t(c);
         for (uint32_t n = 1; n < pixels; n += 4) {
             uint32_t code = bits(3);
+            int m = code == 7 ? int(bits(1)) + 1 : int(code) + 2;  // the delta width, once per group
             for (int k = 0; k < 4; k++) {
                 if (code == 0) {
                 } else if (code == 6) {
                     c = int(bits(8));
                 } else {
-                    int m = code == 7 ? int(bits(1)) + 1 : int(code) + 2;
                     uint32_t v = bits(m);
                     c = (v & 1) ? c + int(v >> 1) + 1 : c - int(v >> 1);
                 }

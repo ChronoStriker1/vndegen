@@ -32,9 +32,13 @@ int Engine::hitButton(int x, int y) {
 }
 
 void Engine::updateHover() {
-    int hit = hitButton(mouseX_, mouseY_);
+    int hit = keyboardButton_ >= 0 ? keyboardButton_ : hitButton(mouseX_, mouseY_);
     if (hit == hoverButton_) return;
     hoverButton_ = hit;
+    if (bexec_) {
+        applyBspHover(hit);
+        return;
+    }
     // Sprite buttons show cell 1 while hovered and cell 0 otherwise; exbtn runs its control string.
     for (size_t i = 0; i < buttons_.size(); i++) {
         const Button &b = buttons_[i];
@@ -87,6 +91,7 @@ void Engine::startButtonWait(const VarRef &result, bool clearAfter, bool textBut
 
 // Called each frame during a button wait. Returns true once the wait has a result.
 bool Engine::pollButtonWait() {
+    if (bexec_) return pollBexec();
     updateHover();
     int result = 0;
     bool done = false;
@@ -306,6 +311,62 @@ void cmdCheckKey(E &e, const std::string &) {
 
 void cmdIsDown(E &e, const std::string &) { e.setVar(e.readVar(), e.mouseDown_ ? 1 : 0); }
 
+// ---- bclear / bsp / bdef / btime / bexec ----
+
+void cmdBclear(E &e, const std::string &) {
+    e.buttons_.clear();
+    e.btnDefault_.clear();
+    e.bCursor_ = e.bDown_ = e.bTrans_ = false;
+}
+
+void cmdBsp(E &e, const std::string &) {
+    Button b;
+    b.kind = Button::Sprite;
+    b.bsp = true;
+    b.sprite = e.readInt();
+    b.number = b.sprite;
+    if (e.readComma()) b.offCtrl = e.readStr();
+    if (e.readComma()) b.onCtrl = e.readStr();
+    if (e.readComma()) b.pressCtrl = e.readStr();
+    e.buttons_.push_back(b);
+}
+
+void cmdBdef(E &e, const std::string &) { e.btnDefault_ = e.readStr(); }
+
+void cmdBtime(E &e, const std::string &) {
+    e.btnTimeout_ = e.readInt();
+    e.btnTimeoutWaitsVoice_ = e.readComma() && e.readInt() != 0;
+    e.bTimeStart_ = -1;
+}
+
+void cmdBflag(E &e, const std::string &name) {
+    if (name == "bcursor") e.bCursor_ = true;
+    else if (name == "bdown") e.bDown_ = true;
+    else e.bTrans_ = true;
+}
+
+void cmdBexec(E &e, const std::string &) {
+    E::VarRef str, num;
+    E::VarRef first = e.readVar();
+    if (first.kind == E::VarRef::Str) {
+        str = first;
+        if (e.readComma()) num = e.readVar();
+    } else {
+        num = first;
+    }
+    e.btnResult_ = str;
+    e.bexecNum_ = num;
+    e.bexec_ = true;
+    e.keyboardButton_ = -1;
+    if (e.bTimeStart_ < 0) e.bTimeStart_ = e.now_;
+    e.transBtn_ = e.bTrans_;
+    e.commitScene();
+    e.hoverButton_ = -2;
+    e.updateHover();
+    e.wait_ = WaitKind::Button;
+    e.composeFrame();
+}
+
 // ---- choices ----
 
 void readChoices(E &e, bool withLabels, std::vector<std::pair<std::string, std::string>> &items) {
@@ -416,6 +477,109 @@ void cmdSelectColor(E &e, const std::string &) {
 
 }  // namespace
 
+// bsp buttons: hovered shows its onCtrl (or cell 1), the others their offCtrl (or cell 0); none hovered runs bdef.
+void Engine::applyBspHover(int hit) {
+    for (size_t i = 0; i < buttons_.size(); i++) {
+        const Button &b = buttons_[i];
+        if (!b.bsp || b.sprite < 0 || b.sprite >= kSpriteCount) continue;
+        bool on = int(i) == hit;
+        const std::string &ctrl = on ? b.onCtrl : b.offCtrl;
+        if (!ctrl.empty()) {
+            applySpStr(ctrl);
+        } else {
+            Sprite &sp = scene_.sp[size_t(b.sprite)];
+            if (sp.img.cells > 1) sp.cell = on ? 1 : 0;
+        }
+    }
+    if (hit < 0 && !btnDefault_.empty()) applySpStr(btnDefault_);
+    commitScene();
+}
+
+bool Engine::finishBexec(const std::string &result, int sprite) {
+    if (btnResult_.kind != VarRef::None) setVar(btnResult_, result);
+    if (bexecNum_.kind != VarRef::None) setVar(bexecNum_, sprite);
+    bexec_ = false;
+    wait_ = WaitKind::None;
+    hoverButton_ = -1;
+    keyboardButton_ = -1;
+    sceneDirty_ = true;
+    return true;
+}
+
+static const char *bexecKeyName(int k) {
+    static char letter[2];
+    if ((k >= 'A' && k <= 'Z') || (k >= '0' && k <= '9')) {
+        letter[0] = char(k);
+        letter[1] = 0;
+        return letter;
+    }
+    switch (k) {
+    case VNNS_KEY_SPACE: return "SPACE";
+    case VNNS_KEY_RETURN: return "RETURN";
+    case VNNS_KEY_CTRL: return "CTRL";
+    case VNNS_KEY_SHIFT: return "SHIFT";
+    case VNNS_KEY_UP: return "UP";
+    case VNNS_KEY_DOWN: return "DOWN";
+    case VNNS_KEY_LEFT: return "LEFT";
+    case VNNS_KEY_RIGHT: return "RIGHT";
+    case VNNS_KEY_PAGEUP: return "PAGEUP";
+    case VNNS_KEY_PAGEDOWN: return "PAGEDOWN";
+    case VNNS_KEY_ESCAPE: return "ESC";
+    default: break;
+    }
+    static char fn[4];
+    if (k >= VNNS_KEY_F1 && k < VNNS_KEY_F1 + 12) {
+        snprintf(fn, sizeof fn, "F%d", k - VNNS_KEY_F1 + 1);
+        return fn;
+    }
+    return nullptr;
+}
+
+bool Engine::pollBexec() {
+    if (in_.click || in_.rclick || in_.wheel) keyboardButton_ = -1;
+    updateHover();
+    auto pressButton = [&](int i) {
+        const Button &b = buttons_[size_t(i)];
+        if (!b.pressCtrl.empty()) {
+            applySpStr(b.pressCtrl);
+        } else if (b.sprite >= 0 && b.sprite < kSpriteCount && scene_.sp[size_t(b.sprite)].img.cells > 2) {
+            scene_.sp[size_t(b.sprite)].cell = 2;
+        }
+        commitScene();
+        return finishBexec("S" + std::to_string(b.sprite), b.sprite);
+    };
+    bool leftEvent = bDown_ ? in_.click : in_.clickUp;
+    if (leftEvent) {
+        lastClickX_ = mouseX_;
+        lastClickY_ = mouseY_;
+        if (hoverButton_ >= 0) return pressButton(hoverButton_);
+        return finishBexec("LCLICK", -1);
+    }
+    if (in_.rclick) return finishBexec("RCLICK", -1);
+    if (in_.mclick) return finishBexec("MCLICK", -1);
+    if (in_.wheel > 0) return finishBexec("WHEELUP", -1);
+    if (in_.wheel < 0) return finishBexec("WHEELDOWN", -1);
+    for (int k : in_.keys) {
+        bool arrow = k == VNNS_KEY_UP || k == VNNS_KEY_DOWN || k == VNNS_KEY_LEFT || k == VNNS_KEY_RIGHT;
+        if (!bCursor_ && arrow && !buttons_.empty()) {
+            // Without bcursor the arrows move between the buttons.
+            int n = int(buttons_.size());
+            int cur = hoverButton_ >= 0 ? hoverButton_ : -1;
+            int dir = (k == VNNS_KEY_DOWN || k == VNNS_KEY_RIGHT) ? 1 : -1;
+            keyboardButton_ = cur < 0 ? (dir > 0 ? 0 : n - 1) : (cur + dir + n) % n;
+            updateHover();
+            continue;
+        }
+        if (!bCursor_ && (k == VNNS_KEY_SPACE || k == VNNS_KEY_RETURN) && hoverButton_ >= 0) return pressButton(hoverButton_);
+        if (const char *name = bexecKeyName(k)) return finishBexec(name, -1);
+    }
+    if (btnTimeout_ > 0 && now_ - bTimeStart_ >= btnTimeout_ && (!btnTimeoutWaitsVoice_ || !audio_.playing(0))) {
+        bTimeStart_ = now_;
+        return finishBexec("TIMEOUT", -1);
+    }
+    return false;
+}
+
 // The built-in choice display: the choices in the text window, one per line, picked with the mouse or keys.
 void Engine::startSelect(SelectMode mode) {
     selectMode_ = mode;
@@ -504,6 +668,12 @@ bool Engine::pollSelect() {
 
 void registerButtonCommands(std::unordered_map<std::string, CommandFn> &t) {
     t["btndef"] = cmdBtnDef;
+    t["bclear"] = cmdBclear;
+    t["bsp"] = cmdBsp;
+    t["bdef"] = cmdBdef;
+    t["btime"] = cmdBtime;
+    for (const char *n : {"bcursor", "bdown", "btrans"}) t[n] = cmdBflag;
+    t["bexec"] = cmdBexec;
     t["btn"] = cmdBtn;
     for (const char *n : {"spbtn", "cellcheckspbtn", "exbtn", "cellcheckexbtn"}) t[n] = cmdSpBtn;
     t["exbtn_d"] = cmdExBtnD;

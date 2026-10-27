@@ -4,8 +4,9 @@ import OSLog
 nonisolated let frameHostLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "framehost")
 
 /// Plays sound a runtime mixes itself: AVAudioEngine pulls interleaved stereo float samples from `render` on its audio
-/// thread. The render function must be safe to call there, as the runtimes' C mixers are.
-public final class PCMAudioOutput {
+/// thread. The render function must be safe to call there, as the runtimes' C mixers are. Nonisolated, so the render
+/// block it builds isn't tied to the main actor.
+nonisolated public final class PCMAudioOutput {
     /// Fills `frames` interleaved stereo frames at `out`.
     public typealias Render = @Sendable (_ out: UnsafeMutablePointer<Float>, _ frames: Int) -> Void
 
@@ -54,7 +55,7 @@ public final class PCMAudioOutput {
 }
 
 /// A buffer the audio thread renders into, allocated once.
-private final class Scratch: @unchecked Sendable {
+nonisolated private final class Scratch: @unchecked Sendable {
     let frames: Int
     let samples: UnsafeMutablePointer<Float>
 

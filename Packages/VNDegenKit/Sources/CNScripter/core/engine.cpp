@@ -245,7 +245,10 @@ void Engine::mouseMove(int x, int y) {
 
 void Engine::mouseButton(int button, bool down) {
     if (button == 1) mouseDown_ = down;
-    if (!down) return;
+    if (!down) {
+        if (button == 1) in_.clickUp = true;
+        return;
+    }
     if (button == 1) in_.click = true;
     if (button == 3) in_.rclick = true;
     if (button == 2) in_.mclick = true;

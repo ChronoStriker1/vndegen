@@ -102,6 +102,9 @@ struct Button {
     int x = 0, y = 0, w = 0, h = 0;  // region buttons, and text links
     int ox = 0, oy = 0;              // btn: hover image's position in the btndef image
     std::string hoverCtrl;           // exbtn control string run while hovered
+    // bsp buttons: control strings for not hovered, hovered and pressed; empty means cells 0, 1 and 2.
+    bool bsp = false;
+    std::string offCtrl, onCtrl, pressCtrl;
 };
 
 enum class WaitKind { None, Timer, Click, Text, Effect, Button, Select, Quake, Movie, Dialog };
@@ -382,6 +385,14 @@ public:
     bool btnClearAfter_ = false;
     std::map<int, std::string> textBtnCtrl_;
     bool pollButtonWait();
+    // bexec, the newer button wait: results are strings ("S12", "LCLICK", "UP", ...).
+    bool bexec_ = false, bCursor_ = false, bDown_ = false, bTrans_ = false;
+    VarRef bexecNum_;
+    int64_t bTimeStart_ = -1;  // btime's clock keeps running across bexec calls until the next btime
+    int keyboardButton_ = -1;  // the button the arrow keys moved to, without bcursor
+    void applyBspHover(int hit);
+    bool finishBexec(const std::string &result, int sprite);
+    bool pollBexec();
     enum class SelectMode { Goto, Gosub, Number };
     SelectMode selectMode_ = SelectMode::Goto;
     void startSelect(SelectMode mode);
@@ -431,7 +442,7 @@ public:
     int autoClick_ = 0;          // autoclick: click waits end by themselves after this many ms
     void resetGame(bool fromDefine = false);
     struct Input {
-        bool click = false, rclick = false, mclick = false;
+        bool click = false, clickUp = false, rclick = false, mclick = false;
         int wheel = 0;
         std::vector<int> keys;  // pressed this frame
     } in_;

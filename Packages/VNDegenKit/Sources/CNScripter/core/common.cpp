@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include <sys/stat.h>
+
 #include <cstdarg>
 #include <mutex>
 #include <unordered_map>
@@ -182,7 +184,14 @@ bool readFile(const std::string &path, Bytes &out) {
     return ok;
 }
 
+// Creates the folders above path, as the PC engine expects the game to have done.
+static void makeParents(const std::string &path) {
+    for (size_t slash = path.find('/', 1); slash != std::string::npos; slash = path.find('/', slash + 1))
+        mkdir(path.substr(0, slash).c_str(), 0755);
+}
+
 bool writeFile(const std::string &path, const void *data, size_t size) {
+    makeParents(path);
     std::string tmp = path + ".tmp";
     FILE *f = fopen(tmp.c_str(), "wb");
     if (!f) return false;

@@ -547,13 +547,11 @@ void Engine::executeStatement() {
             executeCommand(word);
             return;
         }
-        if (!english_) {
-            cur_.pos = save;
-            errorf("unknown command %s", word.c_str());
-            skipStatement();
-            return;
-        }
+        // English mode marks text lines with '>', so an unknown word is a mistake there too.
         cur_.pos = save;
+        errorf("unknown command %s", word.c_str());
+        skipStatement();
+        return;
     }
     if (defineMode_) {
         errorf("text in the define block");

@@ -91,7 +91,7 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
-        .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"]),
+        .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
     ],
     cxxLanguageStandard: .cxx17
 )
