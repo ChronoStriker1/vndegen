@@ -22,22 +22,24 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - KiriKiri 2 and KiriKiri Z on Mac, iPhone, and iPad, built on krkrsdl3, with the common ciphers, Windows plugins, and movie formats built in (0.6.0).
 
 ## In progress
-Each item is planned work on its own branch, not merged into `dev`. Nothing is in progress.
+Each item is planned work on its own branch, not merged into `dev`.
+- RPG Maker MZ fixes: a cutscene whose animation stutters and drifts from its sound, and timed battle attacks that miss quick presses.
+- Controller mouse emulation: sticks and buttons can move the pointer, scroll, and open the on-screen keyboard, and engines without gamepad support default to a "Keyboard and mouse" layout copied from Steam's template, with a "Mouse" preset to pick instead.
 
 ## Next
 1. Together, as the next work:
    - NScripter (ONScripter).
    - iPad multitasking: Split View, Slide Over, and an iPad window of its own. A windowed game follows the window's shape, as Follow device does, whatever in-game orientation Settings sets. The hub, the in-game menu, the touch gamepad, and every engine lay out correctly at small and odd window sizes. The iPhone has no split screen, so it needs no change.
-2. AliceSoft System 3 and 4 (xsystem35, xsystem4).
-3. Artemis.
-4. Wolf RPG Editor, which needs a new runtime.
-5. Flash, through Ruffle (MIT or Apache-2.0) in the web view the RPG Maker MV/MZ and TyranoScript plugins already use. 14 library games.
-6. Godot, on the Godot runtime matching each game's version. A game's `.pck` loads only if it uses no native GDExtension libraries. 6 library games.
-7. NekoSDK. No runtime or reimplementation exists, so this is a reimplementation from the game files, starting with a feasibility test. 16 library games, 45 GB.
-8. Unity. Before any work, decide with the maintainer whether it is feasible and how to proceed, including converting games to run natively on ARM. IL2CPP games are compiled x86 code. Mono games carry their game code as portable .NET assemblies, but run on Unity's x86 Windows player. 60 library games: 44 Mono, 10 IL2CPP, and 6 not yet checked.
-9. After the engine plugins: installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
-10. Cleaning up a game's engine files. After a game is added, VNDegen offers to remove the bundled Windows engine files the game no longer needs to play in VNDegen, such as NW.js or Electron runtimes, Ren'Py's Windows and Linux libraries, and engine `.exe` and `.dll` files. Each engine plugin lists exactly which files it may remove. VNDegen shows the files and the space saved, and removes them only after the user confirms. Saves and the game's own data are never touched.
-11. Suggested controller layouts for games and engines without gamepad support. On a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse. It then proposes a controller layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. This may be hard and costly, so it comes second to last.
+2. A controller layout library, like Steam's controller layouts. Each game uses a layout from the library, and the player can pick another, edit it, or save their own. The library starts with VNDegen's built-in layouts, among them "Keyboard and mouse", copied from Steam's template of that name, which engines without gamepad support use by default unless an engine has a better standard layout. It then takes in suggested layouts: on a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse, and proposes a layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. Suggestions may be hard and costly, so they come after the library itself.
+3. AliceSoft System 3 and 4 (xsystem35, xsystem4).
+4. Artemis.
+5. Wolf RPG Editor, which needs a new runtime.
+6. Flash, through Ruffle (MIT or Apache-2.0) in the web view the RPG Maker MV/MZ and TyranoScript plugins already use. 14 library games.
+7. Godot, on the Godot runtime matching each game's version. A game's `.pck` loads only if it uses no native GDExtension libraries. 6 library games.
+8. NekoSDK. No runtime or reimplementation exists, so this is a reimplementation from the game files, starting with a feasibility test. 16 library games, 45 GB.
+9. Unity. Before any work, decide with the maintainer whether it is feasible and how to proceed, including converting games to run natively on ARM. IL2CPP games are compiled x86 code. Mono games carry their game code as portable .NET assemblies, but run on Unity's x86 Windows player. 60 library games: 44 Mono, 10 IL2CPP, and 6 not yet checked.
+10. After the engine plugins: installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
+11. Cleaning up a game's engine files. After a game is added, VNDegen offers to remove the bundled Windows engine files the game no longer needs to play in VNDegen, such as NW.js or Electron runtimes, Ren'Py's Windows and Linux libraries, and engine `.exe` and `.dll` files. Each engine plugin lists exactly which files it may remove. VNDegen shows the files and the space saved, and removes them only after the user confirms. Saves and the game's own data are never touched.
 12. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 
 ## Runtime packages
