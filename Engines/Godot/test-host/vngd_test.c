@@ -44,6 +44,13 @@ int main(int argc, char **argv) {
             usleep(16000);
         }
         fprintf(stderr, "=== ran %d frames, quit %s after %d more\n", frame, quit ? "yes" : "no", extra);
+        // With VNGD_SNAPSHOT set, the engine writes its frames there. Each run's last frame is kept beside it.
+        const char *snapshot = getenv("VNGD_SNAPSHOT");
+        if (snapshot) {
+            char kept[4096];
+            snprintf(kept, sizeof kept, "%s.%d.png", snapshot, i / 2 - 1);
+            rename(snapshot, kept);
+        }
         p_vngd_stop();
         fprintf(stderr, "=== stopped\n");
     }

@@ -30,7 +30,7 @@ nonisolated public struct GodotPlugin: EnginePlugin {
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         guard let layout = GodotLayout(FolderProbe(scanning: launch.folder)) else { throw GodotError.notGodot }
-        if let reason = Self.unsupported(layout) { throw GodotError.unsupported(reason) }
+        if let reason = Self.unsupported(layout, folder: launch.folder) { throw GodotError.unsupported(reason) }
         guard let engine = GodotEngine.engine(major: layout.major) else { throw GodotError.engineMissing(layout.major) }
         guard !GodotSession.engineInUse else { throw GodotError.stillClosing }
         let paths = GodotPaths(folder: launch.folder, dataDirectory: launch.dataDirectory, layout: layout)
@@ -39,12 +39,17 @@ nonisolated public struct GodotPlugin: EnginePlugin {
 
     public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? {
         guard let layout = GodotLayout(FolderProbe(scanning: folder)) else { return nil }
-        return Self.unsupported(layout)
+        return Self.unsupported(layout, folder: folder)
     }
 
     /// Why VNDegen can't run a game, or nil when it can.
-    static func unsupported(_ layout: GodotLayout) -> String? {
+    static func unsupported(_ layout: GodotLayout, folder: URL) -> String? {
         let pack = layout.header
+        // GodotSteam built into the game's own copy of Godot, which then links Steam's library. Such games call Steam
+        // from their scripts and won't run without it.
+        if WindowsExecutable.importedLibraries(folder.appendingPathComponent(layout.executable)).contains(where: { $0.hasPrefix("steam_api") }) {
+            return "This game needs Steam: Steam is built into its own copy of Godot, and that only runs on a PC with Steam."
+        }
         if pack.encryptedDirectory || pack.encryptedFiles > 0 {
             return "This game's files are encrypted with a key built into its own copy of Godot, so VNDegen can't read them."
         }

@@ -27,7 +27,7 @@ scons_version=4.10.1
 
 mkdir -p "$dest" "$cache"
 dest=$(cd "$dest" && pwd)
-stamp=$( (cat "$0" "$api/vngd.h"; echo "$slices $majors"; cd "$src" && find . -path ./test-host -prune -o -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+stamp=$( (cat "$0" "$api/vngd.h"; echo "$slices $majors"; cd "$src" && find . -path ./test-host -prune -o -type f ! -name "*.o" -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
 if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "Godot engines are up to date in $dest"
   exit 0
@@ -214,7 +214,7 @@ for major in $majors; do
   xcodebuild -create-xcframework "${args[@]}" -output "$dest/Godot$major.xcframework" >/dev/null
 done
 
-mkdir -p "$dest/licenses"
+rm -rf "$dest/licenses" && mkdir -p "$dest/licenses"
 cp "$work/godot4/LICENSE.txt" "$dest/licenses/Godot.txt"
 cp "$work/godot4/COPYRIGHT.txt" "$dest/licenses/Godot 4 third-party notices.txt"
 [ -f "$work/godot3/COPYRIGHT.txt" ] && cp "$work/godot3/COPYRIGHT.txt" "$dest/licenses/Godot 3 third-party notices.txt"

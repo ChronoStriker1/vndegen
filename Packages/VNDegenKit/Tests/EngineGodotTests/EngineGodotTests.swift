@@ -29,8 +29,16 @@ private struct Bytes {
     mutating func zeros(_ count: Int) { data.append(Data(count: count)) }
 }
 
-/// A pack as Godot exports it, with empty files. Format 1 is Godot 3's, 2 Godot 4.0 to 4.4's, 3 Godot 4.5's.
-private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [String], flags: UInt32 = 0) -> Data {
+/// A pack as Godot exports it. Format 1 is Godot 3's, 2 Godot 4.0 to 4.4's, 3 Godot 4.5's. Files are empty unless
+/// `contents` has them. Offsets count from the pack's start, as Godot writes them for an executable's section.
+private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [String], flags: UInt32 = 0,
+                  contents: [String: Data] = [:]) -> Data {
+    let headerSize = 20 + (format >= 2 ? 12 : 0) + (format >= 3 ? 8 : 0) + 64
+    var directorySize = 4
+    for file in files {
+        directorySize += 4 + (Data(file.utf8).count + 3) / 4 * 4 + 8 + 8 + 16 + (format >= 2 ? 4 : 0)
+    }
+    var blobs = Data()
     var directory = Bytes()
     directory.u32(UInt32(files.count))
     for file in files {
@@ -38,10 +46,12 @@ private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [Str
         name.append(Data(count: (4 - name.count % 4) % 4))
         directory.u32(UInt32(name.count))
         directory.data.append(name)
-        directory.u64(0)
-        directory.u64(0)
+        let data = contents[file.replacingOccurrences(of: "res://", with: "")] ?? Data()
+        directory.u64(UInt64(headerSize + directorySize + blobs.count))
+        directory.u64(UInt64(data.count))
         directory.zeros(16)
         if format >= 2 { directory.u32(0) }
+        blobs.append(data)
     }
     var bytes = Bytes()
     bytes.u32(GodotPack.magic)
@@ -50,7 +60,8 @@ private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [Str
     bytes.u32(version.1)
     bytes.u32(version.2)
     if format >= 2 {
-        bytes.u32(flags)
+        // File offsets count from the pack's start, which the relative flag says for format 2.
+        bytes.u32(flags | (format == 2 ? 2 : 0))
         bytes.u64(0)
     }
     if format >= 3 {
@@ -58,6 +69,31 @@ private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [Str
     }
     bytes.zeros(64)
     bytes.data.append(directory.data)
+    bytes.data.append(blobs)
+    return bytes.data
+}
+
+/// A `project.binary` with string and boolean settings, as Godot encodes them.
+private func projectBinary(_ settings: [(String, Any)]) -> Data {
+    var bytes = Bytes()
+    bytes.data.append(Data("ECFG".utf8))
+    bytes.u32(UInt32(settings.count))
+    for (key, value) in settings {
+        bytes.u32(UInt32(Data(key.utf8).count))
+        bytes.data.append(Data(key.utf8))
+        var variant = Bytes()
+        if let text = value as? String {
+            variant.u32(4)
+            variant.u32(UInt32(Data(text.utf8).count))
+            variant.data.append(Data(text.utf8))
+            variant.zeros((4 - Data(text.utf8).count % 4) % 4)
+        } else if let flag = value as? Bool {
+            variant.u32(1)
+            variant.u32(flag ? 1 : 0)
+        }
+        bytes.u32(UInt32(variant.data.count))
+        bytes.data.append(variant.data)
+    }
     return bytes.data
 }
 
@@ -100,7 +136,7 @@ private func executable(with payload: Data) -> Data {
         #expect(layout.executable == "game.exe")
         #expect(layout.version == "3.5.3")
         #expect(layout.header.files == ["project.binary", "main.gdc"])
-        #expect(GodotPlugin.unsupported(layout) == nil)
+        #expect(GodotPlugin.unsupported(layout, folder: game.root) == nil)
     }
 
     @Test func godot4PackInTheExecutablesSection() throws {
@@ -145,14 +181,32 @@ private func executable(with payload: Data) -> Data {
             "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["addons/godotsteam/godotsteam.gdextension", "project.binary"], flags: 2)),
         ])
         let layout = try #require(GodotLayout(game.probe))
-        #expect(GodotPlugin.unsupported(layout)?.contains("godotsteam.gdextension") == true)
+        #expect(GodotPlugin.unsupported(layout, folder: game.root)?.contains("godotsteam.gdextension") == true)
     }
 
     @Test func encryptedPacksAreUnsupported() throws {
         let game = try GameFolder(["game.pck": pack(format: 2, version: (4, 2, 2), files: [], flags: 1), "game.exe": Data()])
         let layout = try #require(GodotLayout(game.probe))
         #expect(layout.header.encryptedDirectory)
-        #expect(GodotPlugin.unsupported(layout) != nil)
+        #expect(GodotPlugin.unsupported(layout, folder: game.root) != nil)
+    }
+
+    @Test func projectSettingsNameTheUserFolder() throws {
+        let settings = projectBinary([("application/config/features", "4.3"), ("application/config/name", "My: Game")])
+        let game = try GameFolder(["game.pck": pack(format: 2, version: (4, 3, 0), files: ["res://project.binary"], contents: ["project.binary": settings]),
+                                   "game.exe": Data()])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.settings["application/config/name"] == .string("My: Game"))
+        #expect(layout.header.userDirectory == "Godot/app_userdata/My- Game")
+    }
+
+    @Test func aCustomUserFolder() throws {
+        let settings = projectBinary([("application/config/name", "Game"), ("application/config/use_custom_user_dir", true),
+                                      ("application/config/custom_user_dir_name", "Studio/Game")])
+        let game = try GameFolder(["game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["project.binary"], flags: 2,
+                                                                      contents: ["project.binary": settings]))])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.userDirectory == "Studio/Game")
     }
 
     @Test func otherGamesAreNotGodot() throws {
@@ -196,5 +250,38 @@ private func executable(with payload: Data) -> Data {
         #expect(HIDKey.usage(code: "ArrowUp") == 82)
         #expect(HIDKey.usage(code: "Numpad0") == 98)
         #expect(HIDKey.usage(code: "Numpad1") == 89)
+    }
+}
+
+@Suite struct SaveTests {
+    @Test func backupsFromEveryPlatformMapIntoTheUserFolder() {
+        let user = "Godot/app_userdata/Game"
+        let windows = "C:/Users/Player/AppData/Roaming/Godot/app_userdata/Game/save1.json"
+        let proton = "/home/deck/.local/share/Steam/steamapps/compatdata/1/pfx/drive_c/users/steamuser/AppData/Roaming/Godot/app_userdata/Game/saves/a.sav"
+        let linux = "/home/deck/.local/share/godot/app_userdata/Game/save1.json"
+        let mac = "/Users/player/Library/Application Support/Godot/app_userdata/Game/save1.json"
+        let vndegen = "/private/var/mobile/Containers/Data/Application/X/Library/Application Support/VNDegen/GameData/Game/AppData/Roaming/Godot/app_userdata/Game/save1.json"
+        #expect(GodotPlugin.userDataRelativePath(windows, userDirectory: user) == "save1.json")
+        #expect(GodotPlugin.userDataRelativePath(proton, userDirectory: user) == "saves/a.sav")
+        #expect(GodotPlugin.userDataRelativePath(linux, userDirectory: user) == "save1.json")
+        #expect(GodotPlugin.userDataRelativePath(mac, userDirectory: user) == "save1.json")
+        #expect(GodotPlugin.userDataRelativePath(vndegen, userDirectory: user) == "save1.json")
+    }
+
+    @Test func otherFoldersAndEscapesDontMap() {
+        let user = "Godot/app_userdata/Game"
+        #expect(GodotPlugin.userDataRelativePath("C:/Users/P/AppData/Roaming/Godot/app_userdata/Other/save1.json", userDirectory: user) == nil)
+        #expect(GodotPlugin.userDataRelativePath("C:/Users/P/AppData/Roaming/Godot/app_userdata/Game/../x", userDirectory: user) == nil)
+        #expect(GodotPlugin.userDataRelativePath("C:/Users/P/AppData/Roaming/Godot/app_userdata/Game", userDirectory: user) == nil)
+    }
+
+    @Test func savesLiveInTheAppDataStandIn() throws {
+        let settings = projectBinary([("application/config/name", "Game")])
+        let game = try GameFolder(["game.pck": pack(format: 1, version: (3, 5, 3), files: ["res://project.binary"], contents: ["project.binary": settings]),
+                                   "game.exe": Data()])
+        let data = URL(fileURLWithPath: "/tmp/data")
+        let location = try #require(GodotPlugin().saveLocations(folder: game.root, dataDirectory: data).first)
+        #expect(location.directory.path == "/tmp/data/AppData/Roaming/Godot/app_userdata/Game")
+        #expect(location.relativePath("/tmp/data/AppData/Roaming/Godot/app_userdata/Game/save1.json") == "save1.json")
     }
 }

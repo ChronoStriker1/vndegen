@@ -15,6 +15,42 @@ nonisolated struct GodotPack: Equatable, Sendable {
     var encryptedFiles = 0
     /// Paths inside the pack, without `res://`. Empty when the list is encrypted.
     var files: [String]
+    /// The project settings VNDegen reads, from the pack's `project.binary`: strings and booleans, by key.
+    var settings: [String: Setting] = [:]
+
+    enum Setting: Equatable, Sendable {
+        case string(String)
+        case bool(Bool)
+
+        var string: String? {
+            if case let .string(value) = self { value } else { nil }
+        }
+    }
+
+    /// The settings `settings` holds.
+    static let settingKeys: Set<String> = [
+        "application/config/name", "application/config/use_custom_user_dir", "application/config/custom_user_dir_name",
+    ]
+
+    /// Where the game keeps `user://`, relative to the Windows %APPDATA% folder, as Godot names it:
+    /// `Godot/app_userdata/<project name>`, or the project's own folder name.
+    var userDirectory: String {
+        let name = Self.safeDirectoryName(settings["application/config/name"].flatMap(\.string) ?? "")
+        if settings["application/config/use_custom_user_dir"] == .bool(true) {
+            let custom = Self.safeDirectoryName(settings["application/config/custom_user_dir_name"].flatMap(\.string) ?? "", allowPaths: true)
+            return custom.isEmpty ? (name.isEmpty ? "[unnamed project]" : name) : custom
+        }
+        return "Godot/app_userdata/" + (name.isEmpty ? "[unnamed project]" : name)
+    }
+
+    /// `OS::get_safe_dir_name`: invalid characters become dashes.
+    static func safeDirectoryName(_ name: String, allowPaths: Bool = false) -> String {
+        var safe = name.replacingOccurrences(of: "\\", with: allowPaths ? "/" : "-").trimmingCharacters(in: .whitespaces)
+        for character in [":", "*", "?", "\"", "<", ">", "|"] + (allowPaths ? [".."] : ["/"]) {
+            safe = safe.replacingOccurrences(of: character, with: "-")
+        }
+        return safe
+    }
 
     static let magic: UInt32 = 0x4350_4447 // "GDPC"
 
@@ -75,8 +111,11 @@ nonisolated struct GodotPack: Equatable, Sendable {
         guard (1...4).contains(format), (2...4).contains(major) else { return nil }
         var flags: UInt32 = 0
         var cursor = offset + 20
+        // Where the offsets in the file list count from.
+        var fileBase = offset
         if format >= 2 {
             flags = header.uint32(at: 20)
+            fileBase = header.uint64(at: 24) + (flags & 2 != 0 || format >= 3 ? offset : 0)
             cursor += 4 + 8 // flags, file base
         }
         if format >= 3 {
@@ -92,17 +131,59 @@ nonisolated struct GodotPack: Equatable, Sendable {
         let entryTail: UInt64 = 8 + 8 + 16 + (format >= 2 ? 4 : 0)
         var files: [String] = []
         files.reserveCapacity(Int(min(count, 200_000)))
+        var project: (offset: UInt64, size: UInt64)?
         for _ in 0..<min(count, 200_000) {
             guard let length = file.readUInt32(at: cursor), length < 4096,
                   let path = file.read(at: cursor + 4, count: Int(length)) else { break }
-            cursor += 4 + UInt64(length) + entryTail
+            let entry = cursor + 4 + UInt64(length)
+            cursor = entry + entryTail
             // Bit 0 of an entry's flags marks an encrypted file.
             if format >= 2, let flags = file.readUInt32(at: cursor - 4), flags & 1 != 0 { pack.encryptedFiles += 1 }
-            let name = String(decoding: path.prefix { $0 != 0 }, as: UTF8.self)
-            files.append(name.hasPrefix("res://") ? String(name.dropFirst(6)) : name)
+            var name = String(decoding: path.prefix { $0 != 0 }, as: UTF8.self)
+            if name.hasPrefix("res://") { name.removeFirst(6) }
+            if name == "project.binary", let start = file.readUInt64(at: entry), let size = file.readUInt64(at: entry + 8) {
+                project = (fileBase + start, size)
+            }
+            files.append(name)
         }
         pack.files = files
+        if let project, project.size < 1 << 22, let data = file.read(at: project.offset, count: Int(project.size)) {
+            pack.settings = settings(data)
+        }
         return pack
+    }
+
+    /// The keys in `settingKeys` from a `project.binary`: "ECFG", a count, then each setting as its key's length and
+    /// UTF-8, the value's length, and the value as Godot encodes a Variant.
+    static func settings(_ data: Data) -> [String: Setting] {
+        guard data.count >= 8, data.prefix(4) == Data("ECFG".utf8) else { return [:] }
+        var result: [String: Setting] = [:]
+        var cursor = 8
+        for _ in 0..<min(Int(data.uint32(at: 4)), 100_000) {
+            guard cursor + 4 <= data.count else { break }
+            let keyLength = Int(data.uint32(at: cursor))
+            guard cursor + 4 + keyLength + 4 <= data.count else { break }
+            let key = String(decoding: data[(data.startIndex + cursor + 4)..<(data.startIndex + cursor + 4 + keyLength)], as: UTF8.self)
+            cursor += 4 + keyLength
+            let valueLength = Int(data.uint32(at: cursor))
+            cursor += 4
+            guard cursor + valueLength <= data.count else { break }
+            if settingKeys.contains(key), valueLength >= 8 {
+                // The type is the low byte of the Variant's header: 1 is a boolean, 4 a string, the same in Godot 3 and 4.
+                switch data.uint32(at: cursor) & 0xFF {
+                case 1: result[key] = .bool(data.uint32(at: cursor + 4) != 0)
+                case 4:
+                    let length = Int(data.uint32(at: cursor + 4))
+                    if 8 + length <= valueLength {
+                        let start = data.startIndex + cursor + 8
+                        result[key] = .string(String(decoding: data[start..<(start + length)], as: UTF8.self))
+                    }
+                default: break
+                }
+            }
+            cursor += valueLength
+        }
+        return result
     }
 }
 
