@@ -44,9 +44,10 @@ struct PlayerView: View {
                     .ignoresSafeArea()
             }
             if let overlayMode, overlayMode.hasOverlay {
-                // In a short iPad window the gamepad's top row would reach the window's controls.
+                // In a short iPad window the gamepad's top row would reach the window's controls. The cursor's pad maps
+                // to the whole game view, so it keeps the full height, and its Home button sits in the other corner.
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
-                    .padding(.top, metrics.cornerClearance)
+                    .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
             }
             if hub.input.mouse.showsKeyboard, !menu.isOpen, !isCovered {
                 KeyboardBridge(session: session) { hub.input.mouse.hideKeyboard() }
@@ -311,10 +312,10 @@ private struct PlayerMenuView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(1)
-            Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: 220) }
+            Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
                 .onHover { if $0 { menu.focus = .resume } }
-            Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: 220) }
+            Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
                 .onHover { if $0 { menu.focus = .quit } }
         }
@@ -327,7 +328,7 @@ private struct PlayerMenuView: View {
             if items.contains(.method) { methods }
             if items.contains(.controllerMouse) { controllerMouse }
             if items.contains(.mouseStyle), let style = method.mouse { mouseStyles(style) }
-            Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: 220) }
+            Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
                 .onHover { if $0 { menu.focus = .mapping } }
         }
@@ -335,6 +336,9 @@ private struct PlayerMenuView: View {
 
     /// Below about 400 pt, the width of an iPhone in portrait, the four methods don't fit in one row, so they take two.
     private var isNarrow: Bool { metrics.size.width < 400 }
+
+    /// The buttons' label width. In a narrow window, room for the button style's 56 pt, the card's padding, and its margin.
+    private var buttonWidth: CGFloat { isNarrow ? max(0, min(220, metrics.size.width - 56 - 40 - 24)) : 220 }
 
     /// One focus target for the whole row. Left and right switch the method, like tabs.
     private var methods: some View {

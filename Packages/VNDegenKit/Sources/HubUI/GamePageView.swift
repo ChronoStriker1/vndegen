@@ -94,16 +94,19 @@ struct GamePageView: View {
                     Spacer().frame(width: 4)
                     secondaryButtons(labels: true)
                 }
+                .onAppear { nav.pageActionsStacked = false }
                 HStack(spacing: 10) {
                     playButton
                     Spacer().frame(width: 4)
                     secondaryButtons(labels: false)
                 }
-                // The narrowest windows put the other buttons under Play.
+                .onAppear { nav.pageActionsStacked = false }
+                // The narrowest windows put the other buttons under Play, and controller focus moves down to them.
                 VStack(alignment: .leading, spacing: 12) {
                     playButton
                     HStack(spacing: 10) { secondaryButtons(labels: false) }
                 }
+                .onAppear { nav.pageActionsStacked = true }
             }
             HeroFacts(game: game)
         }
