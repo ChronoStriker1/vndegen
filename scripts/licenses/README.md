@@ -24,8 +24,15 @@ files, unchanged. They match Ren'Py 8.5.3.26051504 and 7.8.7.25031702, whose lib
   libjpeg-turbo 1.5.3, libwebp 1.3.2, Brotli 1.1.0, XZ Utils 5.4.2, bzip2 1.0.8, zlib 1.3.1, libffi 3.4.5,
   OpenSSL 3.3.2 and 1.1.1s, pyjnius 1.7.0, and pyobjus 1.1.0.
 - From the projects' repositories at the version renpy-build checks out: aom v3.5.0, libavif v0.11.1, libyuv
-  331c361581896292fb46c8c6905e41262b7ca95f, and assimp v5.4.3. MetalANGLE, pygame_sdl2, and SDL_GameControllerDB
-  from their default branches.
+  331c361581896292fb46c8c6905e41262b7ca95f, and assimp v5.4.3 with the licenses of the `contrib/` libraries its
+  binaries contain. MetalANGLE, pygame_sdl2, and SDL_GameControllerDB from their default branches, MetalANGLE with
+  the licenses of its `third_party` code and of glslang, SPIRV-Cross, and SPIRV-Headers at the revisions in its
+  `DEPS`, and Chromium's `LICENSE` at the revision its `base` helpers came from.
+- SDL2's file adds the notices of the code SDL carries: HIDAPI (`src/hidapi`, under its BSD-style option), yuv2rgb,
+  and the libm header from `src/libm/e_atan2.c`.
+
+Notices for code a library carries from other projects go in that library's file. To find such code, look for its
+symbols in the built binaries (`nm`), as was done for the files above.
 - From Ren'Py's repository at the 8.5.3.26051504 tag: libhydrogen (`src/libhydrogen/LICENSE`) and tinyfiledialogs
   (the license in `src/tinyfiledialogs/tinyfiledialogs.h`).
 - From PyPI, at the versions renpy-build installs for Ren'Py 8: future, six, rsa, pyasn1, ecdsa, urllib3, chardet,
