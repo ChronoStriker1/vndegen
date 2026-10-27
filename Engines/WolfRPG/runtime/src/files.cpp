@@ -1,0 +1,108 @@
+#include "files.h"
+
+#include <fstream>
+
+namespace fs = std::filesystem;
+
+namespace wolf {
+
+namespace {
+
+std::string upperAscii(std::string s) {
+    for (auto &c : s)
+        if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
+    return s;
+}
+
+std::vector<uint8_t> readAll(const fs::path &p) {
+    std::ifstream f(p, std::ios::binary);
+    return {std::istreambuf_iterator<char>(f), {}};
+}
+
+}  // namespace
+
+std::string normalizePath(std::string path) {
+    for (auto &c : path)
+        if (c == '\\') c = '/';
+    while (path.starts_with("./")) path.erase(0, 2);
+    if (upperAscii(path.substr(0, 5)) == "DATA/") path.erase(0, 5);
+    return path;
+}
+
+GameFiles::GameFiles(fs::path root) : root_(std::move(root)) {
+    data_ = findCaseless(root_, "Data").value_or(root_ / "Data");
+    if (auto whole = findCaseless(root_, "Data.wolf")) whole_ = Archive::open(whole->string());
+}
+
+std::optional<fs::path> GameFiles::findCaseless(const fs::path &base, const std::string &rel) const {
+    fs::path cur = base;
+    size_t start = 0;
+    while (start <= rel.size()) {
+        size_t slash = rel.find('/', start);
+        std::string part = rel.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+        start = slash == std::string::npos ? rel.size() + 1 : slash + 1;
+        if (part.empty()) continue;
+        fs::path exact = cur / part;
+        std::error_code ec;
+        if (fs::exists(exact, ec)) {
+            cur = exact;
+            continue;
+        }
+        std::string want = upperAscii(part);
+        bool found = false;
+        for (auto &entry : fs::directory_iterator(cur, ec)) {
+            if (upperAscii(entry.path().filename().string()) == want) {
+                cur = entry.path();
+                found = true;
+                break;
+            }
+        }
+        if (!found) return std::nullopt;
+    }
+    return cur;
+}
+
+Archive *GameFiles::archiveFor(const std::string &top) const {
+    std::string key = upperAscii(top);
+    auto it = folders_.find(key);
+    if (it != folders_.end()) return it->second.get();
+    std::unique_ptr<Archive> a;
+    if (auto p = findCaseless(data_.parent_path(), data_.filename().string() + "/" + top + ".wolf"))
+        a = Archive::open(p->string());
+    Archive *raw = a.get();
+    folders_[key] = std::move(a);
+    return raw;
+}
+
+std::optional<fs::path> GameFiles::looseFile(const std::string &path) const {
+    auto p = findCaseless(data_, normalizePath(path));
+    if (p && fs::is_regular_file(*p)) return p;
+    return std::nullopt;
+}
+
+std::optional<std::vector<uint8_t>> GameFiles::read(const std::string &raw) const {
+    std::string path = normalizePath(raw);
+    if (auto p = looseFile(path)) return readAll(*p);
+    size_t slash = path.find('/');
+    if (slash != std::string::npos) {
+        if (Archive *a = archiveFor(path.substr(0, slash))) {
+            if (auto d = a->read(path.substr(slash + 1))) return d;
+        }
+    }
+    if (whole_) {
+        if (auto d = whole_->read(path)) return d;
+    }
+    return std::nullopt;
+}
+
+bool GameFiles::exists(const std::string &raw) const {
+    std::string path = normalizePath(raw);
+    if (looseFile(path)) return true;
+    size_t slash = path.find('/');
+    if (slash != std::string::npos) {
+        if (Archive *a = archiveFor(path.substr(0, slash)); a && a->contains(path.substr(slash + 1))) return true;
+    }
+    return whole_ && whole_->contains(path);
+}
+
+}  // namespace wolf
