@@ -1,0 +1,151 @@
+From fc071a6f46b058cd40c81c03fe872977369e53f9 Mon Sep 17 00:00:00 2001
+From: x <x>
+Date: Tue, 27 Oct 2026 14:22:32 -0400
+Subject: [PATCH 1/2] vndegen compat patches
+
+---
+ core/config/project_settings.cpp              |  5 +--
+ core/io/file_access_pack.cpp                  | 33 +++++++++++++++++++
+ core/object/script_language.cpp               |  5 +--
+ .../gdscript/gdscript_tokenizer_buffer.cpp    | 16 ++++++---
+ modules/gdscript/gdscript_tokenizer_buffer.h  |  2 ++
+ 5 files changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/core/config/project_settings.cpp b/core/config/project_settings.cpp
+index 0e078c3..89a7390 100644
+--- a/core/config/project_settings.cpp
++++ b/core/config/project_settings.cpp
+@@ -1436,10 +1436,11 @@ void ProjectSettings::refresh_global_class_list() {
+ 	Array script_classes = get_global_class_list();
+ 	for (int i = 0; i < script_classes.size(); i++) {
+ 		Dictionary c = script_classes[i];
+-		if (!c.has("class") || !c.has("language") || !c.has("path") || !c.has("base") || !c.has("is_abstract") || !c.has("is_tool")) {
++		// VNDegen: games exported before Godot 4.5 have no "is_abstract" or "is_tool" in their cache.
++		if (!c.has("class") || !c.has("language") || !c.has("path") || !c.has("base")) {
+ 			continue;
+ 		}
+-		ScriptServer::add_global_class(c["class"], c["base"], c["language"], c["path"], c["is_abstract"], c["is_tool"]);
++		ScriptServer::add_global_class(c["class"], c["base"], c["language"], c["path"], c.get("is_abstract", false), c.get("is_tool", false));
+ 	}
+ }
+ 
+diff --git a/core/io/file_access_pack.cpp b/core/io/file_access_pack.cpp
+index cc4bef2..17eff5a 100644
+--- a/core/io/file_access_pack.cpp
++++ b/core/io/file_access_pack.cpp
+@@ -230,6 +230,39 @@ bool PackedSourcePCK::try_open_pack(const String &p_path, bool p_replace_files,
+ 		pck_header_found = true;
+ 	}
+ 
++	// VNDegen: search the "pck" section of a Windows executable, which a game exported as one file carries. Signed
++	// executables have their signature after the pack, so the end of the file holds no header.
++	if (!pck_header_found && p_offset == 0) {
++		f->seek(0);
++		if (f->get_16() == 0x5A4D) {
++			f->seek(0x3c);
++			const uint32_t pe = f->get_32();
++			f->seek(pe);
++			if (f->get_32() == 0x00004550) {
++				f->seek(pe + 6);
++				const uint16_t section_count = f->get_16();
++				f->seek(pe + 20);
++				const uint16_t optional_size = f->get_16();
++				for (uint16_t i = 0; i < section_count && !pck_header_found; i++) {
++					f->seek(pe + 24 + optional_size + i * 40);
++					uint8_t name[8];
++					f->get_buffer(name, 8);
++					f->seek(f->get_position() + 12);
++					const uint32_t section_offset = f->get_32();
++					if (memcmp(name, "pck\0\0\0\0\0", 8) != 0) {
++						continue;
++					}
++					// The header can start a few bytes in, as Godot's own search allows.
++					for (int j = 0; j < 8 && !pck_header_found; j++) {
++						f->seek(section_offset + j);
++						magic = f->get_32();
++						pck_header_found = magic == PACK_HEADER_MAGIC;
++					}
++				}
++			}
++		}
++	}
++
+ 	// Search for the header in the executable "pck" section - self contained executable.
+ 	if (!pck_header_found) {
+ 		// Loading with offset feature not supported for self contained exe files.
+diff --git a/core/object/script_language.cpp b/core/object/script_language.cpp
+index a2322a4..5a4cf34 100644
+--- a/core/object/script_language.cpp
++++ b/core/object/script_language.cpp
+@@ -293,10 +293,11 @@ void ScriptServer::init_languages() {
+ 		Array script_classes = ProjectSettings::get_singleton()->get_global_class_list();
+ 		for (const Variant &script_class : script_classes) {
+ 			Dictionary c = script_class;
+-			if (!c.has("class") || !c.has("language") || !c.has("path") || !c.has("base") || !c.has("is_abstract") || !c.has("is_tool")) {
++			// VNDegen: games exported before Godot 4.5 have no "is_abstract" or "is_tool" in their cache.
++			if (!c.has("class") || !c.has("language") || !c.has("path") || !c.has("base")) {
+ 				continue;
+ 			}
+-			add_global_class(c["class"], c["base"], c["language"], c["path"], c["is_abstract"], c["is_tool"]);
++			add_global_class(c["class"], c["base"], c["language"], c["path"], c.get("is_abstract", false), c.get("is_tool", false));
+ 		}
+ 	}
+ 
+diff --git a/modules/gdscript/gdscript_tokenizer_buffer.cpp b/modules/gdscript/gdscript_tokenizer_buffer.cpp
+index 01ea731..a2ccbff 100644
+--- a/modules/gdscript/gdscript_tokenizer_buffer.cpp
++++ b/modules/gdscript/gdscript_tokenizer_buffer.cpp
+@@ -91,6 +91,10 @@ GDScriptTokenizer::Token GDScriptTokenizerBuffer::_binary_to_token(const uint8_t
+ 
+ 	uint32_t token_type = decode_uint32(b);
+ 	token.type = (Token::Type)(token_type & TOKEN_MASK);
++	// VNDegen: version 100, from Godot 4.3 and 4.4, has no PERIOD_PERIOD_PERIOD, so later types are one lower.
++	if (format_version == 100 && token.type >= Token::PERIOD_PERIOD_PERIOD) {
++		token.type = (Token::Type)(token.type + 1);
++	}
+ 	if (token_type & TOKEN_BYTE_MASK) {
+ 		b += 4;
+ 	} else {
+@@ -141,7 +145,9 @@ Error GDScriptTokenizerBuffer::set_code_buffer(const Vector<uint8_t> &p_buffer)
+ 	ERR_FAIL_COND_V(p_buffer.size() < 12 || p_buffer[0] != 'G' || p_buffer[1] != 'D' || p_buffer[2] != 'S' || p_buffer[3] != 'C', ERR_INVALID_DATA);
+ 
+ 	int version = decode_uint32(&buf[4]);
+-	ERR_FAIL_COND_V_MSG(version != TOKENIZER_VERSION, ERR_INVALID_DATA, "Binary GDScript is not compatible with this engine version.");
++	// VNDegen: also reads version 100, so games exported with Godot 4.3 and 4.4 run on this engine.
++	ERR_FAIL_COND_V_MSG(version != TOKENIZER_VERSION && version != 100, ERR_INVALID_DATA, "Binary GDScript is not compatible with this engine version.");
++	format_version = version;
+ 
+ 	int decompressed_size = decode_uint32(&buf[8]);
+ 
+@@ -159,10 +165,12 @@ Error GDScriptTokenizerBuffer::set_code_buffer(const Vector<uint8_t> &p_buffer)
+ 	uint32_t identifier_count = decode_uint32(&buf[0]);
+ 	uint32_t constant_count = decode_uint32(&buf[4]);
+ 	uint32_t token_line_count = decode_uint32(&buf[8]);
+-	uint32_t token_count = decode_uint32(&buf[12]);
++	// Version 100 has an unused field before the token count.
++	const int header_len = format_version == 100 ? 20 : 16;
++	uint32_t token_count = decode_uint32(&buf[header_len - 4]);
+ 
+-	const uint8_t *b = &buf[16];
+-	total_len -= 16;
++	const uint8_t *b = &buf[header_len];
++	total_len -= header_len;
+ 
+ 	identifiers.resize(identifier_count);
+ 	for (uint32_t i = 0; i < identifier_count; i++) {
+diff --git a/modules/gdscript/gdscript_tokenizer_buffer.h b/modules/gdscript/gdscript_tokenizer_buffer.h
+index 4c2a9f3..f50378d 100644
+--- a/modules/gdscript/gdscript_tokenizer_buffer.h
++++ b/modules/gdscript/gdscript_tokenizer_buffer.h
+@@ -65,6 +65,8 @@ public:
+ 
+ 	static int _token_to_binary(const Token &p_token, Vector<uint8_t> &r_buffer, int p_start, HashMap<StringName, uint32_t> &r_identifiers_map, HashMap<Variant, uint32_t> &r_constants_map);
+ 	Token _binary_to_token(const uint8_t *p_buffer);
++	// The TOKENIZER_VERSION of the buffer being read.
++	uint32_t format_version = TOKENIZER_VERSION;
+ 
+ public:
+ 	Error set_code_buffer(const Vector<uint8_t> &p_buffer);
+-- 
+2.56.0
+

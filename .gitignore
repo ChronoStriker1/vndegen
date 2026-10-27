@@ -4,5 +4,6 @@ DerivedData/
 *.xcodeproj
 .swiftpm/
 Packages/VNDegenKit/.build/
-.audit/
+.audit
 *.ipa
+__pycache__/

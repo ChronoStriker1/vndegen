@@ -1,0 +1,29 @@
+// The paths a game sees, the same on every platform: the game's .exe as the executable, and user:// where Windows
+// keeps it, under VNDegen's stand-in for %APPDATA%.
+#pragma once
+
+#include "core/string/ustring.h"
+
+#include <vngd.h>
+
+template <class Base>
+class OS_VNDegen : public Base {
+	String executable;
+	String data_path;
+
+public:
+	using Base::get_user_data_dir;
+
+	String get_executable_path() const override { return executable; }
+	String get_data_path() const override { return data_path; }
+	// Godot on Windows names its folder this way, where Linux uses "godot".
+	String get_godot_dir_name() const override { return "Godot"; }
+	String get_user_data_dir(const String &p_user_dir) const override { return data_path.path_join(p_user_dir); }
+
+	template <class... Args>
+	OS_VNDegen(const VNGDLaunch *p_launch, Args... p_args) :
+			Base(p_args...) {
+		executable = String::utf8(p_launch->executable);
+		data_path = String::utf8(p_launch->dataDir);
+	}
+};

@@ -35,7 +35,7 @@ targets:
         excludes: ["Icon/**"]
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, RuntimePackages, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineGodot, RuntimePackages, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
@@ -96,6 +96,32 @@ targets:
           rsync -a --delete "$SRCROOT/build/rgss/RGSS.xcframework/$slice/RGSS.framework/" "$dest/"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
           codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
+      # Godot games run on the Godot frameworks, which scripts/godot-engine.sh builds into build/godot and does nothing
+      # when they are up to date. They are arm64 only, and EngineGodot opens the one a game needs at run time, so they
+      # are copied in rather than linked, as the RGSS framework is.
+      - name: Bundle the Godot engines
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} ${VNDEGEN_GODOT_SLICES:+VNDEGEN_GODOT_SLICES="$VNDEGEN_GODOT_SLICES"} \
+            "$SRCROOT/scripts/godot-engine.sh" "$SRCROOT/build/godot"
+          case "$PLATFORM_NAME" in
+            macosx) slice=macos-arm64 ;;
+            iphoneos) slice=ios-arm64 ;;
+            iphonesimulator) slice=ios-arm64-simulator ;;
+            *) echo "error: no Godot engine for $PLATFORM_NAME" >&2; exit 1 ;;
+          esac
+          for engine in Godot4; do
+            source="$SRCROOT/build/godot/$engine.xcframework/$slice/$engine.framework"
+            dest="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/$engine.framework"
+            [ -d "$source" ] || { echo "error: $source is missing" >&2; exit 1; }
+            mkdir -p "$(dirname "$dest")"
+            rsync -a --delete "$source/" "$dest/"
+            codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
+            codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
+          done
       # Settings lists each file in Licenses. Each runtime's script writes its notices to build/<runtime>/licenses, as
       # scripts/licenses/README.md describes.
       - name: Bundle third-party licenses
