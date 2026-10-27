@@ -28,6 +28,7 @@ void Engine::closeUi(int choice) {
     onWaitDone_ = std::move(ui->prevDone);
     waitUntil_ = ui->prevWaitUntil;
     sceneDirty_ = true;
+    if (ui->kind == SystemUi::TextInput) lastInput_ = ui->input;
     if (ui->onChoose) ui->onChoose(choice);
 }
 
@@ -94,7 +95,11 @@ void Engine::yesNo(const std::string &message, std::function<void(bool)> done, b
     SystemUi ui;
     ui.kind = SystemUi::YesNo;
     ui.message = message;
-    ui.items = {okCancel ? "OK" : sjis("はい"), okCancel ? sjis("キャンセル") : sjis("いいえ")};
+    // The PC engine shows a Windows message box, labelled in the system's language. A message in plain ASCII comes
+    // from a translated game, so its buttons are labelled in English.
+    bool english = std::all_of(message.begin(), message.end(), [](char c) { return uint8_t(c) < 0x80; });
+    if (english) ui.items = {okCancel ? "OK" : "Yes", okCancel ? "Cancel" : "No"};
+    else ui.items = {okCancel ? "OK" : sjis("はい"), okCancel ? sjis("キャンセル") : sjis("いいえ")};
     ui.onChoose = [done](int i) { done(i == 0); };
     openUi(std::move(ui));
 }
@@ -169,18 +174,31 @@ void Engine::drawSystemUi(Image &out) {
         return w;
     };
     for (auto &s : ui.items) boxW = std::max(boxW, textWidth(s));
-    boxW = std::max({boxW, textWidth(ui.title), textWidth(ui.message)}) + 48;
+    boxW = std::min(std::max({boxW, textWidth(ui.title), textWidth(ui.message)}) + 48, out.w - 32);
+    // Lines too long for the screen lose their end, or their start for typed text, so its cursor stays in view.
+    auto fit = [&](std::string s, bool keepEnd) {
+        while (textWidth(s) > boxW - 48) {
+            if (keepEnd) {
+                s.erase(0, sjisCharLen(s, 0));
+            } else {
+                size_t last = 0;
+                for (size_t i = 0; i < s.size(); i += sjisCharLen(s, i)) last = i;
+                s.erase(last);
+            }
+        }
+        return s;
+    };
     int boxH = rows * rowH + 32;
     int bx = (out.w - boxW) / 2, by = (out.h - boxH) / 2;
     fillRect(out, bx, by, boxW, boxH, rgba(0x20, 0x20, 0x30));
     int y = by + 16;
     ui.rowTop = 0;
     if (!ui.title.empty()) {
-        drawGlyphs(out, ui.title, bx + 24, y, fw, fh, 0, rgba(0xFF, 0xFF, 0xFF), true, false, 0, 0);
+        drawGlyphs(out, fit(ui.title, false), bx + 24, y, fw, fh, 0, rgba(0xFF, 0xFF, 0xFF), true, false, 0, 0);
         y += rowH;
     }
     if (!ui.message.empty()) {
-        drawGlyphs(out, ui.message, bx + 24, y, fw, fh, 0, rgba(0xFF, 0xFF, 0xFF), true, false, 0, 0);
+        drawGlyphs(out, fit(ui.message, false), bx + 24, y, fw, fh, 0, rgba(0xFF, 0xFF, 0xFF), true, false, 0, 0);
         y += rowH * 2;
     }
     ui.rowTop = y;
@@ -190,7 +208,7 @@ void Engine::drawSystemUi(Image &out) {
     for (size_t i = 0; i < ui.items.size(); i++) {
         bool enabled = i >= ui.enabled.size() || ui.enabled[i];
         uint32_t color = !enabled ? rgba(0x70, 0x70, 0x70) : int(i) == ui.hover ? rgba(0xFF, 0xFF, 0x60) : rgba(0xE0, 0xE0, 0xE0);
-        drawGlyphs(out, ui.items[i], bx + 24, y, fw, fh, 0, color, true, false, 0, 0);
+        drawGlyphs(out, fit(ui.items[i], ui.kind == SystemUi::TextInput), bx + 24, y, fw, fh, 0, color, true, false, 0, 0);
         y += rowH;
     }
 }
@@ -362,8 +380,7 @@ void cmdInput(E &e, const std::string &name) {
     ui.items = {initial};
     e.typed_.clear();
     ui.onChoose = [&e, v](int) {
-        if (v.kind != E::VarRef::None) e.setVar(v, e.ui_ ? e.ui_->input : e.lastInput_);
-        else e.lastInput_ = e.ui_ ? e.ui_->input : e.lastInput_;
+        if (v.kind != E::VarRef::None) e.setVar(v, e.lastInput_);
     };
     e.openUi(std::move(ui));
 }
