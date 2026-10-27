@@ -16,6 +16,9 @@ its own:
   aren't kept), header-only Boost, libretro-common, the Khronos headers, and what the core embeds (the Liberation Sans
   font, SDL's controller database, and the GMGSx soundfont). It fails on a source folder with no license and no text.
 - `scripts/app-licenses.sh` writes `build/app/licenses/` for third-party code in VNDegen's own sources.
+- `scripts/fonts-licenses.sh` writes `build/fonts/licenses/` from the license files in `Engines/Shared/fonts/licenses/`
+  for the fonts the app bundles: Liberation, DejaVu, and the Ume fonts, whose license page it turns into text. The
+  Chinese and Korean font downloads install Adobe's `LICENSE.txt` beside the fonts.
 
 `scripts/build.sh` fails when one of these folders has no notices.
 

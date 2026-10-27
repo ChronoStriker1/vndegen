@@ -13,12 +13,13 @@ xcodegen generate --quiet
 # Save sync's rclone library, which the package links on every platform.
 scripts/rclone-runtime.sh
 scripts/app-licenses.sh
+scripts/fonts-licenses.sh
 # The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
 case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
 
 # The app's Licenses page lists the notices that each bundled runtime writes to build/<runtime>/licenses/. An app build
 # fails when one of these has none, so a missing notice can't reach a release. A new runtime adds its name here.
-licensed=(rclone renpy rgss kirikiri godot app)
+licensed=(rclone renpy rgss kirikiri godot app fonts)
 require_licenses() {
   local runtime
   for runtime in "${licensed[@]}"; do
@@ -44,6 +45,10 @@ filter() {
 
 case "${1:?destination}" in
   test)
+    # The shared font lookup the native engines compile, against the bundled table.
+    mkdir -p build && fonts_run=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-fonts.XXXXXX")
+    cc -std=c11 -Wall -Wextra -Werror -o build/vnfont_test Engines/Shared/vnfont.c Engines/Shared/vnfont_test.c
+    build/vnfont_test Engines/Shared/fonts "$fonts_run" && rm -rf "$fonts_run"
     cd Packages/VNDegenKit
     swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed' ;;
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;

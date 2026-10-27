@@ -10,7 +10,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.6.1"
+    MARKETING_VERSION: "0.6.2"
     CURRENT_PROJECT_VERSION: "1"
 # scripts/kirikiri-engine.sh builds the engine into build/kirikiri, and does nothing when it is up to date. It is a target
 # of its own because Xcode copies the app's frameworks before any of the app target's build phases run. It runs with a
@@ -33,9 +33,13 @@ targets:
       - path: App
         # SVG sources for the app icon. The asset catalog holds the rendered PNGs.
         excludes: ["Icon/**"]
+      # The Windows font substitutes and their table, which FontPack and the engines read from Contents/Resources/fonts.
+      - path: Engines/Shared/fonts
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineGodot, RuntimePackages, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineGodot, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
