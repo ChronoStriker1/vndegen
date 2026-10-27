@@ -7,9 +7,12 @@ VNDegen runs Godot games on its own builds of Godot, made by `scripts/godot-engi
 | What | Repository | Commit |
 |---|---|---|
 | Godot 4.7.2-stable | `https://github.com/godotengine/godot` | `ed1daf0bf001b61586d9930840f2f1394092c079` |
+| Godot 3.6.3-stable | `https://github.com/godotengine/godot` | `a3378686f7196db78d7b3cc7947f72a13bc4864c` |
 | SCons 4.10.1, to build Godot | PyPI, into a venv in the build cache | |
 
 Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the build copies to `build/godot/licenses/`. Where a component offers a choice of licenses, VNDegen uses the permissive one: BSD for the ODE-derived collision code and SDL's HIDAPI, and MPL-2.0 for graphite2. The build leaves out graphite2, SDL's input, OpenGL (except in the iOS Simulator), Vulkan, AccessKit, OpenXR, and the camera, WebXR, and mobile VR modules. glslang's Bison-generated parser is under GPL-3.0 with the Bison exception, which lets the generated file be used under any license.
+
+Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it to `build/godot/licenses/` too. Its build leaves out Mono, UPnP, and the camera, WebXR, and mobile VR modules.
 
 ## Patches to Godot 4 (`4/patches/`)
 
@@ -25,6 +28,16 @@ Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the b
 - `03-simulator-metal.patch`: keeps the Metal driver in the iOS Simulator build, which Godot's build turns off, so the simulator build compiles the same code as the device's. The simulator runs Godot on OpenGL ES (patch 05).
 - `04-no-swift-app.patch`: leaves out `drivers/apple_embedded/app.swift`, the SwiftUI app of Godot's own iOS template. VNDegen is the app.
 - `05-simulator-angle.patch`: lets the iOS Simulator build take its OpenGL ES headers from MetalANGLE. The simulator's Metal device reports only GPU families Apple1 and Apple2, and Godot's Metal renderer needs Apple4: with the family check skipped, Metal's validation aborts on the first texture Godot creates. So in the simulator only, Godot 4 runs its compatibility renderer on OpenGL ES 3 through MetalANGLE, the OpenGL ES on Metal the app embeds for Ren'Py. Devices and the Mac use Metal.
+- `06-simulator-blur.patch`: in the iOS Simulator only, builds the mipmaps of the 2D back buffer with `glGenerateMipmap` instead of Godot's Gaussian blur. The blur draws into one mip level of a texture while it samples the level above, and MetalANGLE aborts on that draw with a Metal pipeline that has no color format. Shaders that read a blurred screen look slightly different there.
+
+## Patches to Godot 3 (`3/patches/`)
+
+- `01-angle-headers.patch`: lets the iOS builds take their OpenGL ES headers from MetalANGLE, which Godot 3 renders through on iPhone and iPad.
+- `02-restart.patch`: starts Godot 3 again in the same process after it stops. Godot 3 has no LibGodot, so these are VNDegen's own fixes:
+  - `ClassDB` counts its generations, and each class registers again in a new one.
+  - `StringName` setup and cleanup run once, so names outlive the engine.
+  - Singletons whose destructors left their pointer set now clear it: IP, InputMap, PackedData, ResourceFormatImporter, Performance, Input, ShaderTypes, PhysicsServerSW, VisualServerScene, NavigationMeshGenerator, ZipArchive, and JavaScript.
+  - The audio, physics, and 2D physics server managers forget their drivers and servers at cleanup.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|
@@ -41,9 +54,11 @@ Godot is MIT. Its third-party code is listed in its `COPYRIGHT.txt`, which the b
 
 ## VNDegen's additions
 
-- `4/vndegen/`: a Godot module, built in with `custom_modules`.
+- `4/vndegen/`: the Godot 4 module, built in with `custom_modules`.
   - The functions in `Packages/VNDegenKit/Sources/CGodot/include/vngd.h` (`vngd.cpp`).
   - `DisplayServerVNDegen`, which draws into the CAMetalLayer VNDegen hands it and takes all input through `vngd.h` (`display_server_vndegen.mm`).
   - The OS for each platform (`vngd_apple.mm`, and `vngd_linuxbsd.cpp` for testing on Linux). It gives games their `.exe` as the executable path and keeps `user://` where Windows does, under VNDegen's stand-in for `%APPDATA%`.
+- `3/vndegen/`: the Godot 3 module, with the same functions. Its OS draws with MetalANGLE on iPhone and iPad and with Apple's OpenGL on Mac, into two IOSurfaces a layer shows (`vngd_apple.mm`), and `vngd_x11.cpp` runs it on Linux for testing.
+- `vngd_frames.h`: the frame timing both modules log for `VNGD_FRAME_LOG`.
 - `test-host/vngd_test.c`: runs games through `vngd.h` on Linux, one after another in one process, to test that each engine starts again.
 - `Info.plist`: the frameworks' Info.plist.
