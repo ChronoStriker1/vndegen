@@ -97,7 +97,9 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
     public var orientation: PlayOrientation?
     /// Overrides the app's control method setting for this game. Nil follows the setting.
     public var controlMethod: ControlMethod?
-    /// Buttons the player remapped for this game. Buttons missing here keep the standard layout.
+    /// Buttons the player remapped for this game, each against the Xbox layout, where every button sends its own Xbox
+    /// button. Buttons missing here keep that layout. Nil follows the engine's default layout instead, so an empty
+    /// mapping is the plain Xbox layout in an engine whose default is another.
     public var buttonMapping: [ControlInput: ControlAction]?
 
     public var engine: EngineID? { engineOverride ?? detected?.engine }

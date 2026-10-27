@@ -440,6 +440,12 @@ void vnkk_wheel(float notches)
     SDL_PushEvent(&event);
 }
 
+void vnkk_text(const char *utf8)
+{
+    if (utf8 && *utf8)
+        krkrsdl3::KRKR_Trig_TextInput(utf8);
+}
+
 void vnkk_set_paused(bool value)
 {
     if (paused == value)

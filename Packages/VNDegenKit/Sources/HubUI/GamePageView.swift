@@ -222,11 +222,13 @@ private struct OrientationSection: View {
 
 /// The game's control method on a touch device, its button mapping, and the buttons that change them.
 private struct ControlsSection: View {
+    @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
     let game: Game
 
     var body: some View {
-        let remapped = game.buttonMapping?.count ?? 0
+        let mapping = ButtonMapping(for: game, in: hub.library)
+        let remapped = mapping.changes(from: ButtonMapping.defaultLayout(for: game, in: hub.library))
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Controls", systemImage: "gamecontroller")
             if nav.offersControlMethod(game.id) {
@@ -246,8 +248,8 @@ private struct ControlsSection: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Button mapping")
                         .font(.system(size: 17, weight: .bold))
-                    Text(remapped == 0 ? "Xbox gamepad" : ButtonMapping(game.buttonMapping) == .rpgMaker ? "RPG Maker controls"
-                         : remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped")
+                    Text(ButtonMappingEditor.Layout.named(mapping)?.title
+                         ?? (remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped"))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.secondaryText)
                 }

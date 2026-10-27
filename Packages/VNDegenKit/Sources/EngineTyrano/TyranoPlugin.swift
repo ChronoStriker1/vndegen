@@ -50,6 +50,11 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         button == .hub ? nil : .button(button)
     }
 
+    /// TyranoScript games are played with a mouse. Clicks read on and press buttons, the right click and the wheel
+    /// hide the text and open the backlog, and only TyranoScript 5 reads a gamepad, when the game turns it on. Games
+    /// that turn it on often bind no buttons, so every game starts with the keyboard and mouse layout.
+    public var defaultControls: ControlLayout { .keyboardAndMouse }
+
     /// The PC builds run on Chromium, and Tyrano branches on the browser it sees. As Safari it would ask for .m4a files
     /// in place of the .ogg files the games ship. Electron builds also mark the user agent, which is how Tyrano tells
     /// Electron from NW.js.

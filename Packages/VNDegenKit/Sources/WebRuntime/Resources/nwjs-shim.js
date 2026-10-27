@@ -623,6 +623,46 @@
     };
     window.addEventListener('touchstart', moveMouseToTouch, { capture: true, passive: true });
 
+    // The text field typing goes into: the focused one, or else the only one showing, since a click the session sends
+    // does not focus a field the way a real click does.
+    const typable = (element) => !!element && !element.disabled && !element.readOnly
+        && (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && /^(text|search|email|url|tel|password|)$/i.test(element.type || '')));
+    function textField() {
+        if (typable(document.activeElement)) return document.activeElement;
+        const showing = Array.from(document.querySelectorAll('input, textarea')).filter((element) => typable(element) && element.getClientRects().length > 0);
+        if (showing.length !== 1) return null;
+        showing[0].focus();
+        return showing[0];
+    }
+    function typeKey(key, code, keyCode, character) {
+        const charCode = character === null ? 0 : character.charCodeAt(0);
+        const types = character === null ? ['keydown', 'keyup'] : ['keydown', 'keypress', 'keyup'];
+        for (const type of types) {
+            // A keypress carries the character's code where the key events carry the key's.
+            const legacy = type === 'keypress' ? charCode : keyCode;
+            const event = new KeyboardEvent(type, { key: key, code: code, keyCode: legacy, charCode: type === 'keypress' ? charCode : 0, which: legacy, bubbles: true, cancelable: true });
+            for (const name of ['keyCode', 'which']) Object.defineProperty(event, name, { get: () => legacy });
+            (document.activeElement || target()).dispatchEvent(event);
+        }
+    }
+    function typeText(kind, value) {
+        const field = textField();
+        if (kind === 'newline') return typeKey('Enter', 'Enter', 13, '\r');
+        if (!field) {
+            if (kind === 'delete') return typeKey('Backspace', 'Backspace', 8, null);
+            for (const character of value) typeKey(character, '', character.toUpperCase().charCodeAt(0), character);
+            return;
+        }
+        let start = field.selectionStart ?? field.value.length, end = field.selectionEnd ?? start;
+        if (kind === 'delete') {
+            if (start === end && start > 0) start -= 1;
+            field.setRangeText('', start, end, 'end');
+        } else {
+            field.setRangeText(value, start, end, 'end');
+        }
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
     // Presses held per key code. Different buttons can send the same key, such as Confirm and a button bound to Enter,
     // so the key goes down with the first press and up with the last release.
     const keysHeld = new Map();
@@ -652,6 +692,10 @@
         },
         wheel(dy) {
             target().dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, clientX: pointerX(), clientY: pointerY(), bubbles: true, cancelable: true }));
+        },
+        // Typing from VNDegen's on-screen keyboard: 'insert' with the text, 'newline', or 'delete'.
+        text(kind, value) {
+            typeText(kind, value);
         },
         setPaused(paused) {
             audioPaused = paused;

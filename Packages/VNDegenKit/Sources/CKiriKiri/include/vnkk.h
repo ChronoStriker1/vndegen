@@ -45,6 +45,9 @@ VNKK_API void vnkk_mouse_move(float x, float y);
 VNKK_API void vnkk_click(int button, bool down);
 // Wheel notches, positive turned away from the player, which in Kirikiri opens the message history.
 VNKK_API void vnkk_wheel(float notches);
+// Characters typed, in UTF-8, as the key presses (WM_CHAR) that follow a key going down on Windows. Kirikiri's
+// text fields read these. Control characters such as "\r" and "\b" go through as Windows sends them.
+VNKK_API void vnkk_text(const char *utf8);
 
 // Stops and resumes the engine clock, its timers, and its audio. vnkk_iterate does nothing while
 // paused.

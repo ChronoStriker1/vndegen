@@ -223,6 +223,15 @@ final class WebGameSession: NSObject, EngineSession {
         }
     }
 
+    /// Text goes into the page's text field, as typing would put it there. A page with none gets key presses.
+    func type(_ typed: TypedText) {
+        switch typed {
+        case let .text(text): run("__vndegen.text('insert', \(Self.jsString(text)))")
+        case .newline: run("__vndegen.text('newline', '')")
+        case .deleteBackward: run("__vndegen.text('delete', '')")
+        }
+    }
+
     /// Presses or releases a button of the page's virtual Xbox gamepad. The engine-neutral action goes along for engine
     /// scripts that turn the gamepad into their own input when the game reads no gamepad.
     nonisolated static func gamepadScript(_ input: ControlInput, pressed: Bool) -> String {

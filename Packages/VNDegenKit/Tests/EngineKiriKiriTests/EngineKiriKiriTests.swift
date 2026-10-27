@@ -509,6 +509,7 @@ private enum FakeEngine {
                 return FakeEngine.quitRequested ? 1 : 0
             },
             key: { _, _ in }, mouseButton: { _, _, _, _ in }, mouseMove: { _, _ in }, click: { _, _ in }, wheel: { _ in },
+            text: { _ in },
             setPaused: { _ in }, requestQuit: { FakeEngine.quitRequested = true },
             saveSystemData: { FakeEngine.record("saveSystemData") },
             stop: { FakeEngine.record("stop") }, view: { nil })
