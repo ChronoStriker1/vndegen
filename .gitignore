@@ -7,3 +7,4 @@ Packages/VNDegenKit/.build/
 .audit/
 *.ipa
 Engines/Artemis/art3m1s-core/target*/
+Engines/Artemis/art3m1s-core/**/target/
