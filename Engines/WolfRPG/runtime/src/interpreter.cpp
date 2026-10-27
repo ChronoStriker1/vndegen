@@ -338,7 +338,7 @@ bool Game::step(Thread &t) {
         case 201: {  // move route
             Actor *a = actorFor(cmd.arg(0), t);
             if (a && cmd.route) {
-                a->route = cmd.route.get();
+                a->route = cmd.route;
                 a->routeStep = 0;
                 a->routeWait = 0;
                 a->routeFromCommand = true;

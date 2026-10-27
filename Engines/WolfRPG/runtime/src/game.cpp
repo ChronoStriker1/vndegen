@@ -298,6 +298,11 @@ bool Game::loadMap(int id) {
         return false;
     }
     mapId_ = id;
+    // Waits on the old map's events end with them.
+    for (auto *list : {&threads_, &parallel_, &mapParallel_})
+        for (auto &t : *list)
+            if (t.waitingRoute && t.waitingRoute != &hero_ && (t.waitingRoute < &party_.front() || t.waitingRoute > &party_.back()))
+                t.waitingRoute = nullptr;
     events_.clear();
     for (auto &ev : map_->events) {
         MapEventState s;
@@ -352,7 +357,7 @@ void Game::refreshPages() {
                 a.through = pg.flags & 0x08;
                 c.above = pg.flags & 0x10;
                 if (pg.moveType == 1 && !pg.route.steps.empty()) {
-                    a.route = &pg.route;
+                    a.route = std::shared_ptr<const MoveRoute>(map_, &pg.route);
                     a.routeStep = 0;
                     a.routeFromCommand = false;
                 }

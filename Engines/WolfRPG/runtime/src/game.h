@@ -142,7 +142,7 @@ struct Actor {
     bool through = false, fixedDirection = false, walkAnimation = true, idleAnimation = false;
     int animTimer = 0, animStep = 0;
     // A move route from the event's page or a move command.
-    const MoveRoute *route = nullptr;
+    std::shared_ptr<const MoveRoute> route;  // shares ownership of the map or command that holds it
     size_t routeStep = 0;
     int routeWait = 0;
     bool routeFromCommand = false;
