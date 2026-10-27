@@ -21,6 +21,7 @@
 #include "TVPWindow.h"
 #include "WindowManager.h"
 #include "ciphers.h"
+#include "vnfont.h"
 
 #import <Foundation/Foundation.h>
 #if TARGET_OS_IOS
@@ -248,6 +249,11 @@ static void discardText()
     SDL_Event event;
     while (textEvent && SDL_PeepEvents(&event, 1, SDL_GETEVENT, textEvent, textEvent) > 0)
         SDL_free(event.user.data1);
+}
+
+void vnkk_set_fonts(const char *table, const char *const *fontDirs, int count)
+{
+    vnfont_init(table, fontDirs, count);
 }
 
 int vnkk_start(const VNKKLaunch *launch)

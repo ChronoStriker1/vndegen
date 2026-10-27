@@ -110,8 +110,14 @@ the table, and `FontPack.folders` and `FontPack.table` are what a native engine 
   loads those fonts up front, and the boot scene waits for them. MV's Chinese and Korean games ask for SimHei and
   Dotum through the core, which the plugin adds from the database's locale. TyranoScript draws text as HTML, so a late
   font only redraws it; the plugin loads the font `Config.tjs` names up front so the first lines don't change.
-- **KiriKiri and RGSS** don't use the table yet. Their hooks into `vnfont.h` come next, in their font lookup and
-  default font.
+- **KiriKiri** resolves every font name the game doesn't ship through the table, lists the substitutes in
+  `Font.getList`, and makes ＭＳ Ｐゴシック, the Windows engine's default, the default font of games that ship none.
+  Droid Sans Fallback, which upstream used for every missing font, now draws only characters the font lacks. The
+  engine log names each substitute when it opens. `Engines/KiriKiri/UPSTREAM.md`, change 57, has the details.
+- **RGSS** (RPG Maker XP, VX, and VX Ace on mkxp-z) draws fonts the game doesn't ship in their substitutes, and
+  `Font.exist?` reports them as present. Games on the Japanese XP player default to ＭＳ Ｐゴシック, as that player
+  does; games on the English one keep Arial, which is Liberation Sans. VX's default list already names MS Gothic.
+  `Engines/RGSS/UPSTREAM.md` describes the patch.
 - **Ren'Py** games ship their own fonts, so Ren'Py doesn't use the table.
 
 CSS matches family names exactly, apart from ASCII case, as Windows does. A game that asks for "ＭＳＰ明朝" without

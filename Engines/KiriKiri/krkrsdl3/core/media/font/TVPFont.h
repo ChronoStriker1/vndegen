@@ -7,6 +7,9 @@ void TVPGetAllFontList(std::vector<ttstr>& list);
 void TVPInitFontNames();
 int TVPEnumFontsProc(const ttstr& FontPath);
 const ttstr& TVPGetDefaultFontName();
+// VNDegen: the font that draws characters the requested font lacks. It is the default font unless the default is a
+// Windows font substitute, whose coverage is narrower.
+const ttstr& TVPGetGlyphFallbackFontName();
 tTJSBinaryStream* TVPCreateFontStream(const ttstr& fontname);
 
 struct TVPFontNamePathInfo

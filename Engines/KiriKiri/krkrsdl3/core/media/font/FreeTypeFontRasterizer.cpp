@@ -6,12 +6,13 @@
 #include <algorithm>
 
 extern void TVPUninitializeFreeFont();
-extern const ttstr& TVPGetDefaultFontName();
+// VNDegen: characters the face lacks come from the glyph fallback font, which covers more scripts than the default
+// font when the default is a Windows font substitute.
 void FreeTypeFontRasterizer::ApplyFallbackFace()
 {
-    if (!FaceFallback && Face && Face->GetFontName() != TVPGetDefaultFontName())
+    if (!FaceFallback && Face && Face->GetFontName() != TVPGetGlyphFallbackFontName())
     {
-        FaceFallback = new tFreeTypeFace(TVPGetDefaultFontName(), 0);
+        FaceFallback = new tFreeTypeFace(TVPGetGlyphFallbackFontName(), 0);
     }
     if (!FaceFallback)
         return;

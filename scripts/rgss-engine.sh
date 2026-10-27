@@ -86,6 +86,8 @@ mkdir -p "$work/fresh"
 # The patched sources.
 rsync -a --exclude .git "$cache/src/core-$core_commit/" "$work/fresh/core/"
 for patch in "$src"/patches/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
+# Patches in stage2/ change only code stage 2 builds, so they stay out of stage 1's cache key below.
+for patch in "$src"/patches/stage2/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
 rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/fresh/subprojects/"
 for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$patch"; done
 # The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have.
@@ -93,7 +95,7 @@ rsync -a --checksum --delete --exclude /libretro/build "$work/fresh/core/" "$wor
 rsync -a --checksum --delete "$work/fresh/subprojects/" "$work/subprojects/"
 rm -rf "$work/fresh"
 
-# Stage 1, cached by its inputs: the core with its patches, and the tools. Its Makefile expects GNU sed and grep, and an
+# Stage 1, cached by its inputs: the core with its patches outside stage2/, and the tools. Its Makefile expects GNU sed and grep, and an
 # echo that prints backslashes as they are, as Linux's /bin/sh does but macOS's does not, so it runs under bash. Bump
 # stage1_format to rebuild every cached stage 1, as 2 did for caches an earlier build made without starting clean.
 stage1_format=2

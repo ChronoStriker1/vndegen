@@ -44,10 +44,10 @@ let package = Package(
         .target(name: "CRenPy"),
         // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
         .target(name: "CKiriKiri"),
-        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri", "FontPack"], swiftSettings: mainActorByDefault),
         // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
         .target(name: "CRGSS"),
-        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
