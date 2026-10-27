@@ -108,6 +108,19 @@ impl Script {
                 continue;
             }
 
+            // A `/*` block comment runs through the line that holds `*/`, and
+            // the tags and [lua] blocks inside it never run (VNDegen).
+            if let Some(rest) = line.strip_prefix("/*") {
+                if !rest.contains("*/") {
+                    line_idx += 1;
+                    while line_idx < lines.len() && !lines[line_idx].contains("*/") {
+                        line_idx += 1;
+                    }
+                }
+                line_idx += 1;
+                continue;
+            }
+
             // 标签定义 (*labelname)
             if let Some(label_name) = line.strip_prefix('*') {
                 let label_name = label_name.trim().to_string();
@@ -551,6 +564,17 @@ mod tests {
         let tags: Vec<&str> = script.instructions.iter().map(|i| i.tag.as_str()).collect();
         assert_eq!(tags, vec!["onlinehead", "__text", "rp"]);
         assert_eq!(script.instructions[1].get("text"), Some("「ぷるぷる」@"));
+    }
+
+    #[test]
+    fn test_block_comment_skips_tags_and_lua_blocks() {
+        let script = Script::parse(
+            "test",
+            "[rt]\n/*\n[rp]\n[lua]\nx = 1\n[/lua]\n*/\n/* one line */\n[wt]",
+        )
+        .unwrap();
+        let tags: Vec<_> = script.instructions.iter().map(|i| i.tag.as_str()).collect();
+        assert_eq!(tags, ["rt", "wt"]);
     }
 
     #[test]
