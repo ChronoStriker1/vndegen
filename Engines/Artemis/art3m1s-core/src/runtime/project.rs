@@ -96,11 +96,22 @@ impl CoreRuntime {
             .map_err(|e| format!("加载 BOOT 脚本 {boot} 失败: {e:?}"))?;
         if let Some(script) = self.interpreter.get_script(boot) {
             for label in ["top", "main", "start", "_start"] {
-                if script.get_label_line(label).is_some() {
-                    return self
-                        .interpreter
+                if let Some(line) = script.get_label_line(label) {
+                    // Artemis runs BOOT from its first line. Start at the label
+                    // only when nothing but Lua blocks, which run at load, comes
+                    // before it, or a game's setup above `*top` never runs (VNDegen).
+                    let setup_above = script.instructions[..line]
+                        .iter()
+                        .any(|instruction| instruction.tag != "__lua_block");
+                    self.interpreter
                         .start(boot, label)
-                        .map_err(|e| format!("启动 BOOT 脚本 {boot} 失败: {e:?}"));
+                        .map_err(|e| format!("启动 BOOT 脚本 {boot} 失败: {e:?}"))?;
+                    if setup_above {
+                        self.interpreter
+                            .restore_position(boot, 0, Vec::new())
+                            .map_err(|e| format!("启动 BOOT 脚本 {boot} 失败: {e:?}"))?;
+                    }
+                    return Ok(());
                 }
             }
         }
