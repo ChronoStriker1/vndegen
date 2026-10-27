@@ -302,12 +302,10 @@ impl CoreRuntime {
         );
         self.savepath = savepath;
 
-        // 读回上次 syssave() 落下的全局/系统域（saveg.dat / system.dat），使
+        // 读回上次 syssave() 落下的全局/系统域与已读记录（saveg.dat / system.dat），使
         // boot.lua 期间 system_dataloading() 能拿到既有的 sys/gscr/conf。
         // 必须在 start_boot 之前，且在 s.savepath 种好之后（save_path_for 依赖它）。
         self.sysload();
-        // 已读记录跨会话恢复，使"已读跳过"有意义。
-        self.load_aread();
     }
 }
 

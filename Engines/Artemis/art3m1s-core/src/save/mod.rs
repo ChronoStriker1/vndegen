@@ -3,6 +3,8 @@
 //! 负责将解释器的完整运行状态序列化到文件，以及从文件恢复。
 //! 使用 serde_json 作为序列化格式。
 
+pub mod pc;
+
 use asb_interpreter::CallFrame;
 use asb_interpreter::variable::VariableStore;
 use serde::{Deserialize, Serialize};

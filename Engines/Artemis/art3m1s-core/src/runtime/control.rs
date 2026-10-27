@@ -49,7 +49,7 @@ pub(super) struct RuntimeControlState {
     /// 本帧最后一条在 `alreadyread mode!=0` 下判定的剧情页是否已读。
     /// `mode=0` 的文本不覆盖它；frame 末消费后清空。
     current_scenario_was_read: Option<bool>,
-    /// 已读记录：脚本名 → 已读的剧情文本行集合。跨会话持久化（aread.dat）。
+    /// 已读记录：脚本名 → 已读的剧情文本行集合。跨会话持久化（saveg.dat）。
     read_lines: HashMap<String, HashSet<usize>>,
     auto_wait_elapsed_ms: u64,
     skip_wait_revealed: bool,

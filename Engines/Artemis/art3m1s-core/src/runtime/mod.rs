@@ -149,8 +149,11 @@ pub struct CoreRuntime {
     pending_load_resume: Option<PendingLoadResume>,
     /// Message-page snapshot restored once onLoad follow-up has rebuilt the MW.
     pending_message_text: Option<crate::save::MessageTextSnapshot>,
-    /// 已读记录自上次持久化后是否有新增（syssave 时落 aread.dat）。
+    /// 已读记录自上次持久化后是否有新增（syssave 时落 saveg.dat）。
     read_dirty: bool,
+    /// System variables from the PC engine's system.dat that the core doesn't
+    /// load, written back as they were so its settings survive (VNDegen).
+    system_passthrough: Vec<(String, asb_interpreter::Value)>,
     profiler: crate::profiler::RuntimeProfiler,
 }
 
@@ -354,6 +357,7 @@ impl CoreRuntime {
             pending_load_resume: None,
             pending_message_text: None,
             read_dirty: false,
+            system_passthrough: Vec::new(),
             profiler: crate::profiler::RuntimeProfiler::new(),
         })
     }

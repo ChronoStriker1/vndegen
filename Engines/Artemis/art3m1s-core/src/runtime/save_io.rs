@@ -10,8 +10,6 @@ const SAVEG_FILE: &str = "saveg.dat";
 const SYSTEM_FILE: &str = "system.dat";
 /// [autosave] 自动保存的存档文件名。
 const AUTOSAVE_FILE: &str = "__Autosave.dat";
-/// 已读记录（alreadyread）持久化文件名。跨会话保留，使"已读跳过"有意义。
-const AREAD_FILE: &str = "aread.dat";
 
 /// System variables that are part of the persistent user configuration.
 ///
@@ -153,62 +151,39 @@ impl CoreRuntime {
         // 若此处抽干全局 tag_queue，会把 dialog_return 的 return+jump 提前消费，
         // 破坏后续恢复到 popfunc02 第二个 fn.pop 的控制流。
         let store = self.interpreter.variables();
-        let global: HashMap<String, asb_interpreter::Value> = store
+        let encoding = self.interpreter.config().encoding;
+        let mut global: Vec<_> = store
             .iter_global()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
+        global.sort_by(|a, b| a.0.cmp(&b.0));
         // `s.*` contains both persistent settings and runtime-derived values.
         // Persist only the documented writable subset; otherwise a later boot
         // inherits stale status/current-layer/path data from the previous run.
-        let system = persistent_system_snapshot(&store);
+        // Values the core read but doesn't use go back as they came.
+        let mut system: Vec<_> = persistent_system_snapshot(&store).into_iter().collect();
+        system.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut written = self.system_passthrough.clone();
+        written.retain(|(name, _)| !is_persistent_system_variable(name));
+        written.extend(system);
 
-        for (file, map) in [(SAVEG_FILE, &global), (SYSTEM_FILE, &system)] {
-            let json = serde_json::to_string_pretty(map).map_err(|e| e.to_string())?;
+        // The PC engine's own formats, so saves move both ways (VNDegen).
+        let read_lines = self.control.read_lines_export();
+        for (file, bytes, count) in [
+            (SAVEG_FILE, crate::save::pc::write_global(&global, &read_lines, encoding), global.len()),
+            (SYSTEM_FILE, crate::save::pc::write_system(&written, encoding), written.len()),
+        ] {
             let path = self.save_path_for(file)?;
-            self.resources.write(&path, json.as_bytes())?;
-            crate::core_info!("[runtime] syssave 已保存 {} ({} 项)", path, map.len());
+            self.resources.write(&path, &bytes)?;
+            crate::core_info!("[runtime] syssave 已保存 {} ({} 项)", path, count);
         }
-        // 已读记录随 syssave 落盘（仅在有新增时写，减少 IO）。
-        self.save_aread()?;
-        Ok(())
-    }
-
-    /// 把已读记录写入 `aread.dat`（脏时才写）。
-    fn save_aread(&mut self) -> Result<(), String> {
-        if !self.read_dirty {
-            return Ok(());
-        }
-        let data = self.control.read_lines_export();
-        let json = serde_json::to_string(&data).map_err(|e| e.to_string())?;
-        let path = self.save_path_for(AREAD_FILE)?;
-        self.resources.write(&path, json.as_bytes())?;
         self.read_dirty = false;
-        crate::core_info!("[runtime] 已读记录已保存 {} ({} 脚本)", path, data.len());
         Ok(())
     }
 
-    /// 启动时读回已读记录（缺文件属首次运行，静默跳过）。
-    pub(super) fn load_aread(&mut self) {
-        let Ok(path) = self.save_path_for(AREAD_FILE) else {
-            return;
-        };
-        let Ok(bytes) = self.resources.read_file(&path) else {
-            return;
-        };
-        match serde_json::from_slice::<std::collections::HashMap<String, Vec<usize>>>(&bytes) {
-            Ok(data) => {
-                let n = data.len();
-                self.control.read_lines_import(data);
-                crate::core_info!("[runtime] 已读记录已载入 {} ({} 脚本)", path, n);
-            }
-            Err(e) => {
-                crate::core_warn!("[runtime] aread.dat 解析失败: {}", e);
-            }
-        }
-    }
-
-    /// 启动时读回 `syssave()` 落下的全局/系统域。缺文件（首次启动）静默跳过。
+    /// 启动时读回 `syssave()` 落下的全局/系统域，以及已读记录。缺文件（首次启动）静默跳过。
     pub(super) fn sysload(&mut self) {
+        let encoding = self.interpreter.config().encoding;
         for (file, is_global) in [(SAVEG_FILE, true), (SYSTEM_FILE, false)] {
             let Ok(path) = self.save_path_for(file) else {
                 continue;
@@ -221,19 +196,30 @@ impl CoreRuntime {
                     continue;
                 }
             };
-            let map: HashMap<String, asb_interpreter::Value> = match serde_json::from_slice(&bytes)
-            {
-                Ok(m) => m,
+            let read = if is_global {
+                crate::save::pc::read_global(&bytes, encoding).map(|(variables, read_lines)| {
+                    self.control.read_lines_import(read_lines);
+                    variables
+                })
+            } else {
+                crate::save::pc::read_system(&bytes, encoding)
+            };
+            let variables = match read {
+                Ok(variables) => variables,
                 Err(e) => {
                     crate::core_warn!("[runtime] sysload 解析 {} 失败: {}", path, e);
                     continue;
                 }
             };
             let prefix = if is_global { "g." } else { "s." };
-            let total = map.len();
+            let total = variables.len();
             let mut loaded = 0;
-            for (k, v) in map {
+            if !is_global {
+                self.system_passthrough.clear();
+            }
+            for (k, v) in variables {
                 if !is_global && !is_persistent_system_variable(&k) {
+                    self.system_passthrough.push((k, v));
                     continue;
                 }
                 loaded += 1;
@@ -244,7 +230,7 @@ impl CoreRuntime {
                 path,
                 loaded,
                 if !is_global && loaded != total {
-                    format!(", 忽略 {} 项运行时变量", total - loaded)
+                    format!(", 保留 {} 项运行时变量", total - loaded)
                 } else {
                     String::new()
                 }
