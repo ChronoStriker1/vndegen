@@ -1919,6 +1919,12 @@ impl Interpreter {
             // 锁定共享变量存储，仅在本次标签执行期间持有。非 Lua 执行类标签不会
             // 重入 e:var，故此处持锁安全（calllua 已在上面特判，不走这里）。
             let mut vars = self.variables.lock().unwrap();
+            // Artemis evaluates every `$` parameter before a tag runs, but many
+            // handlers here parse the raw text, so `time="$t.time"` became no
+            // time at all. Resolve those values once, keeping their string form,
+            // except for tags that evaluate their own expressions (VNDegen).
+            let resolved_instruction = resolve_dollar_params(instruction, &vars);
+            let instruction = resolved_instruction.as_ref().unwrap_or(instruction);
             let mut ctx = ExecutionContext {
                 variables: &mut vars,
                 lua: &self.lua,
@@ -4593,4 +4599,31 @@ mod tests {
             0
         }
     }
+}
+
+/// Tags whose handlers read `$` expressions themselves, in a scope or at a time
+/// that differs from tag execution.
+const SELF_EVALUATING_TAGS: &[&str] = &[
+    "var", "if", "elseif", "else", "/if", "loop", "/loop", "macroadd", "macrodel", "tag", "@",
+];
+
+fn resolve_dollar_params(
+    instruction: &Instruction,
+    variables: &crate::variable::VariableStore,
+) -> Option<Instruction> {
+    if SELF_EVALUATING_TAGS.contains(&instruction.tag.as_str())
+        || !instruction.params.values().any(|value| value.starts_with('$'))
+    {
+        return None;
+    }
+    let evaluator = ExpressionEvaluator::new(variables);
+    let mut resolved = instruction.clone();
+    for value in resolved.params.values_mut() {
+        if value.starts_with('$')
+            && let Ok(result) = evaluator.resolve_param_str(value)
+        {
+            *value = result;
+        }
+    }
+    Some(resolved)
 }
