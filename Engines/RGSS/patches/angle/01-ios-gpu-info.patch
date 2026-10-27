@@ -1,0 +1,13 @@
+diff --git a/subprojects/packagefiles/angle/meson.build b/subprojects/packagefiles/angle/meson.build
+index 3ebc99d..539b090 100644
+--- a/subprojects/packagefiles/angle/meson.build
++++ b/subprojects/packagefiles/angle/meson.build
+@@ -808,7 +808,7 @@ angle_gpu_info_util = static_library(
+         host_machine_is_ios
+             ? [ # libangle_gpu_info_util_ios_sources in src/libGLESv2.gni
+                 'src/gpu_info_util/SystemInfo_apple.mm',
+-                'src/gpu_info_util/SystemInfo_ios.mm',
++                'src/gpu_info_util/SystemInfo_ios.cpp',
+             ]
+             : [],
+         have_vulkan

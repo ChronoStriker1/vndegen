@@ -4,6 +4,8 @@ import EngineRPGMaker
 import EngineTyrano
 import EngineRenPy
 import EngineKiriKiri
+import EngineRGSS
+import RuntimePackages
 import Metadata
 import GameInput
 import Lock
@@ -19,6 +21,11 @@ let engines: [any EnginePlugin] = {
         RenPyPlugin(),
         KiriKiriPlugin(),
     ]
+    // RTPs the player installed, kept once for every game.
+    let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)
+    for flavor in [RGSSPlugin.Flavor.vxAce, .vx, .xp] {
+        engines.append(RGSSPlugin(flavor) { runtimes.installedFolder(for: $0) })
+    }
     #if DEBUG
     // Registered first, so it wins the MZ engine ID over the real runtime.
     if UserDefaults.standard.bool(forKey: "fakeSession") { engines.insert(FakeSessionPlugin(), at: 0) }

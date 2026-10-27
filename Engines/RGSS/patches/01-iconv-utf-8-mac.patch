@@ -1,0 +1,23 @@
+diff --git a/src/filesystem/filesystem.cpp b/src/filesystem/filesystem.cpp
+index 98890ba..aa19ade 100644
+--- a/src/filesystem/filesystem.cpp
++++ b/src/filesystem/filesystem.cpp
+@@ -393,13 +393,17 @@ struct CacheEnumData {
+ 
+   ~CacheEnumData() {
+ #ifdef __APPLE__
+-    iconv_close(nfd2nfc);
++    if (nfd2nfc != (iconv_t)-1)
++      iconv_close(nfd2nfc);
+ #endif
+   }
+ 
+   /* Converts in-place */
+   void toNFC(char *inout) {
+ #ifdef __APPLE__
++    /* GNU libiconv, which libretro builds use, has no utf-8-mac */
++    if (nfd2nfc == (iconv_t)-1)
++      return;
+     size_t srcSize = strlen(inout);
+     size_t bufSize = sizeof(buf);
+     char *bufPtr = buf;

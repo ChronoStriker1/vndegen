@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
+        .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -20,6 +21,7 @@ let package = Package(
         .library(name: "SaveSync", targets: ["SaveSync"]),
         .library(name: "Rclone", targets: ["Rclone"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
+        .library(name: "RuntimePackages", targets: ["RuntimePackages"]),
     ],
     targets: [
         .target(name: "VNCore"),
@@ -35,10 +37,13 @@ let package = Package(
         // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
         .target(name: "CKiriKiri"),
         .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri"], swiftSettings: mainActorByDefault),
+        // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
+        .target(name: "CRGSS"),
+        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore", "Rclone"]),
         // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
         .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
@@ -49,6 +54,10 @@ let package = Package(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
         .target(name: "ArchiveImport", dependencies: ["CArchive"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
+        // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
+        // which Inno Setup installers need.
+        .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
+        .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
@@ -64,5 +73,7 @@ let package = Package(
         .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
         .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
+        .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
+        .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
     ]
 )

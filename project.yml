@@ -10,7 +10,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.4.3"
+    MARKETING_VERSION: "0.5.1"
     CURRENT_PROJECT_VERSION: "1"
 # scripts/kirikiri-engine.sh builds the engine into build/kirikiri, and does nothing when it is up to date. It is a target
 # of its own because Xcode copies the app's frameworks before any of the app target's build phases run. It runs with a
@@ -35,7 +35,7 @@ targets:
         excludes: ["Icon/**"]
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineKiriKiri, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, RuntimePackages, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
@@ -65,7 +65,7 @@ targets:
             exit 0
           fi
           "$SRCROOT/scripts/renpy-runtime.sh" "$SRCROOT/build/renpy"
-          rsync -a --delete --exclude .vndegen-runtime --exclude ios --exclude licenses "$SRCROOT/build/renpy/" "$dest/"
+          rsync -a --delete --delete-excluded --exclude .vndegen-runtime --exclude ios --exclude licenses "$SRCROOT/build/renpy/" "$dest/"
           binaries=("$dest"/8/lib/py3-mac-universal/{python,librenpython.dylib} "$dest"/7/lib/py2-mac-universal/{python,librenpython.dylib})
           for binary in "${binaries[@]}"; do
             codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$binary"
@@ -73,8 +73,31 @@ targets:
           for binary in "${binaries[@]}"; do
             codesign --verify --strict "$binary" || { echo "error: $binary is missing or not signed" >&2; exit 1; }
           done
-      # Settings lists each file in Licenses. Every runtime build writes its own and its dependencies' notices to
-      # build/<runtime>/licenses/, one file per component with a name unique across runtimes, and this collects them all.
+      # RPG Maker XP, VX, and VX Ace run on the RGSS framework, which scripts/rgss-engine.sh builds into build/rgss and
+      # does nothing when it is up to date. It runs with a clean environment, because Meson would take the SDK and
+      # deployment target Xcode exports for the app. The framework is arm64 only and EngineRGSS opens it at run time,
+      # so it is copied in rather than linked, which a universal Mac app could not do. An Intel Mac then has the
+      # framework but can't load it, and shows these games as unsupported.
+      - name: Bundle the RGSS engine
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} "$SRCROOT/scripts/rgss-engine.sh" "$SRCROOT/build/rgss"
+          case "$PLATFORM_NAME" in
+            macosx) slice=macos-arm64 ;;
+            iphoneos) slice=ios-arm64 ;;
+            iphonesimulator) slice=ios-arm64-simulator ;;
+            *) echo "error: no RGSS engine for $PLATFORM_NAME" >&2; exit 1 ;;
+          esac
+          dest="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/RGSS.framework"
+          mkdir -p "$(dirname "$dest")"
+          rsync -a --delete "$SRCROOT/build/rgss/RGSS.xcframework/$slice/RGSS.framework/" "$dest/"
+          codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
+          codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
+      # Settings lists each file in Licenses. Each runtime's script writes its notices to build/<runtime>/licenses, as
+      # scripts/licenses/README.md describes.
       - name: Bundle third-party licenses
         basedOnDependencyAnalysis: false
         shell: /bin/bash
@@ -137,7 +160,7 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: NO
         GENERATE_INFOPLIST_FILE: NO
-        # The Ren'Py build phase reads build/renpy and writes into the app bundle.
+        # The Ren'Py and RGSS build phases read build/ and write into the app bundle.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         # The KiriKiri engine's simulator slice is arm64 only.
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64

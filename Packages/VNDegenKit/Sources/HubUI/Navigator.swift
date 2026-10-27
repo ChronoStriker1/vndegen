@@ -37,6 +37,8 @@ final class Navigator {
         case launchSaves(LaunchSavesModel)
         case settingsPage(SettingsPage)
         case importGame(ArchiveImportModel, initialSelection: [URL])
+        /// A runtime package's license, which its install waits on.
+        case license(LicenseRequest)
 
         var id: String {
             switch self {
@@ -52,6 +54,7 @@ final class Navigator {
             case let .launchSaves(model): "launchSaves:\(model.game)"
             case let .settingsPage(page): "settings:\(page)"
             case .importGame: "import"
+            case let .license(request): "license:\(request.id)"
             }
         }
     }
@@ -95,6 +98,13 @@ final class Navigator {
         case artworkCandidate(Int)
         case metadataQuery
         case metadataResult(Int)
+        /// A runtime package a game is missing, by package ID, on the game's page.
+        case runtime(String, RuntimeAction)
+        case licenseAccept, licenseDecline
+    }
+
+    enum RuntimeAction: Hashable {
+        case install, importFolder, cancel
     }
 
     struct Row {
@@ -111,6 +121,8 @@ final class Navigator {
             syncInputMode()
             // Swiping the import sheet away skips its Done button, so finish the import here too.
             if case let .importGame(model, _)? = oldValue, sheet == nil { model.close() }
+            // A license sheet closed by Done or a swipe declines it. Accept answers first, so this does nothing then.
+            if case let .license(request)? = oldValue { request.respond(false) }
             // Focus moves into a sheet and returns to whatever opened it, however the sheet closes.
             if oldValue == nil, sheet != nil {
                 focusBeforeSheet = focus
@@ -139,7 +151,18 @@ final class Navigator {
     /// The Ludusavi settings page. One for the app, like the service it shows.
     @ObservationIgnored private(set) lazy var saveSettings = SaveSyncSettingsModel(service: hub.saveSync)
 
-    init(hub: Hub) { self.hub = hub }
+    /// Runtime packages games need, such as RPG Maker RTPs, and their installs.
+    let runtimes: RuntimeInstalls
+
+    init(hub: Hub) {
+        self.hub = hub
+        runtimes = RuntimeInstalls(library: hub.library)
+        runtimes.onLicense = { [weak self] request in
+            guard let self else { return request.respond(false) }
+            // Another sheet the player opened meanwhile, such as the artwork editor, gives way to the license.
+            sheet = .license(request)
+        }
+    }
 
     var route: Route? { path.last }
 
@@ -182,6 +205,7 @@ final class Navigator {
             case let .metadata(search):
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
+            case .license: return [Row(id: "license", items: [.licenseAccept, .licenseDecline])]
             // These take controller input through their own models.
             case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping: return []
             }
@@ -211,9 +235,16 @@ final class Navigator {
             // Orientation only matters on a touch device, and the control method only where it changes something.
             let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
             let controls = pageGameID.map(offersControlMethod) == true ? [Row(id: "page-controls", items: [.pageControls])] : []
+            let runtimes = (pageGameID.flatMap { self.runtimes.missing[$0] } ?? []).map { package in
+                let running = if case .running? = self.runtimes.phases[package.id] { true } else { false }
+                let items: [Target] = running ? [.runtime(package.id, .cancel)]
+                    : [.runtime(package.id, .install), .runtime(package.id, .importFolder)]
+                return Row(id: "page-runtime-\(package.id)", items: items)
+            }
             return [
                 Row(id: "page-back", items: [.back]),
                 Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
+            ] + runtimes + [
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
@@ -237,6 +268,8 @@ final class Navigator {
             switch sheet {
             case let .artwork(editor): return .artworkSlot(editor.slot)
             case .metadata: return .metadataQuery
+            // The player asked to install the package, so Accept is the likely answer.
+            case .license: return .licenseAccept
             default: return selectedChoice(for: sheet)
             }
         }
@@ -381,6 +414,17 @@ final class Navigator {
             if case let .metadata(search) = sheet, let results = search.results, results.indices.contains(index) {
                 apply(results[index], in: search)
             }
+        case let .runtime(packageID, action):
+            guard let id = pageGameID, let package = runtimes.missing[id]?.first(where: { $0.id == packageID }) else { return }
+            switch action {
+            case .install: runtimes.install(package, for: id)
+            case .importFolder: runtimes.pickFolder(for: package)
+            case .cancel: runtimes.cancel(package)
+            }
+        case .licenseAccept, .licenseDecline:
+            guard case let .license(request) = sheet else { return }
+            request.respond(target == .licenseAccept)
+            sheet = nil
         }
     }
 
@@ -614,7 +658,7 @@ final class Navigator {
         case .controlMethod:
             let fixed = ControlMethod.allCases.map { Choice(target: .controlMethodOption($0), title: $0.title, detail: $0.detail) }
             return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping:
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license:
             return []
         }
     }
@@ -625,7 +669,7 @@ final class Navigator {
         case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping: nil
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license: nil
         }
     }
 

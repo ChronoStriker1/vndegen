@@ -15,4 +15,6 @@ rm -rf "$out.part" && mkdir -p "$out.part"
 # The rest of the bundled code is VNDegen's: the JavaScript shims and the Ren'Py launcher.
 cp "$kit/Sources/WebRuntime/vorbis.wasm.LICENSE" "$out.part/Ogg Vorbis decoder (libvorbis, libogg).txt"
 cp "$kit/Sources/ArchiveImport/CArchive/LICENSE-zlib.txt" "$out.part/zlib (Deflate64 decoder).txt"
+cp "$kit/Sources/RuntimePackages/LICENSE-innoextract.txt" "$out.part/innoextract (Inno Setup reader).txt"
+cp "$kit/Sources/RuntimePackages/LICENSE-LZMA-SDK.txt" "$out.part/LZMA SDK (installer decoder).txt"
 rm -rf "$out" && mv "$out.part" "$out"

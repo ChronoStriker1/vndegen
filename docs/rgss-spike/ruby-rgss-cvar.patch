@@ -1,0 +1,13 @@
+--- a/vm_insnhelper.c
++++ b/vm_insnhelper.c
+@@ -1148,7 +1148,9 @@ vm_get_cvar_base(const rb_cref_t *cref, const rb_control_frame_t *cfp, int top_level_raise)
+         cref = CREF_NEXT(cref);
+     }
+     if (top_level_raise && !CREF_NEXT(cref)) {
+-        rb_raise(rb_eRuntimeError, "class variable access from toplevel");
++        /* RGSS games come from Ruby 1.8 and 1.9, where this was allowed and the variable belonged to Object, so warn
++           as Ruby 2 did instead of raising. */
++        rb_warn("class variable access from toplevel");
+     }
+ 
+     klass = vm_get_iclass(cfp, CREF_CLASS(cref));

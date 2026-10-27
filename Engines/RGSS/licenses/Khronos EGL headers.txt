@@ -1,0 +1,6 @@
+Khronos EGL headers, from the Khronos EGL registry (https://github.com/KhronosGroup/EGL-Registry), header-only.
+
+Copyright 2013-2020 The Khronos Group Inc.
+SPDX-License-Identifier: Apache-2.0
+
+The Apache License 2.0 is at https://www.apache.org/licenses/LICENSE-2.0.

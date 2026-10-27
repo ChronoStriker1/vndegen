@@ -38,6 +38,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
 | TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
 | Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
+| RPG Maker XP, VX, and VX Ace | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac with Apple silicon, iPhone, iPad |
 | KiriKiri 2 and KiriKiri Z | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work.
@@ -50,7 +51,11 @@ On iPhone and iPad, Ren'Py 8.5.3 is built into the app and every Ren'Py game run
 
 Ren'Py can't load saves made by a newer Ren'Py. VNDegen runs each game on the newest Ren'Py of its line, so saves made here may not load in the game's PC version, and the game's Saves page warns before a Ludusavi backup when that applies. VNDegen on other devices loads them. The exception is a Mac, which runs Ren'Py 7 games on Ren'Py 7.8.7, so it loads a Ren'Py 7 game's saves from an iPhone or iPad only once that game's Ren'Py runtime option is set to Ren'Py 8.5.3. A Ren'Py 7 game's persistent data, such as unlocked gallery images, is written so its PC version loads it.
 
-KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDegen builds into the app. The game draws inside VNDegen's window, composited on the CPU and shown through Metal, so the VNDegen menu and touch controls work as for the other engines. Saves stay in the game's `savedata/` folder as on PC. A game that saves to the Windows AppData or Documents folder saves to its data folder instead, and Ludusavi backups from Windows or a Steam Deck restore there. Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives and MP3 audio don't work yet. Some Windows plugins are missing too, such as `layerExSave`, which one test game's save screen needs.
+RPG Maker XP, VX, and VX Ace games run on mkxp-z, an open-source reimplementation of RPG Maker's RGSS player, built into the app as a libretro core with Ruby 3.3 compiled to plain C, so it needs no JIT. The game draws inside VNDegen's window through ANGLE on Metal, so the VNDegen menu and touch controls work as for the other engines. Packed games (`Game.rgss3a` and its older forms) and unpacked ones both work, as do MIDI music, through a public domain soundfont, and the Windows API calls many games make, which mkxp-z and VNDegen emulate. Saves go to the game's data folder. Saves copied in with a PC game in its folder still load, and the game folder is never written to. On a Mac with an Intel processor these games show as unsupported, since the engine is built for Apple silicon only. Games that need a Windows DLL VNDegen doesn't emulate lose that DLL's feature, and some games written for RPG Maker's old Ruby versions may stop with an error. The game page then says what the error was.
+
+Many RPG Maker games use the RTP, a set of stock graphics, sounds, and fonts that the PC player installs once instead of every game shipping it. Its license doesn't let VNDegen include it. When a game needs an RTP that isn't installed, its page offers Download and install, which fetches the official installer from the RPG Maker website (rpgmakerweb.com), checks it against the SHA-256 VNDegen expects, shows the RTP's license to accept, and unpacks it inside the app on Mac, iPhone, and iPad. The RTP is then shared by every game that needs it. Import from folder takes an RTP folder copied from a PC instead, such as `C:\Program Files (x86)\Common Files\Enterbrain\RGSS3\RPGVXAce`. The XP RTP is 23 MB to download, VX's 37 MB, and VX Ace's 195 MB. Nothing downloads until you tap the button.
+
+KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDegen builds into the app. The game draws inside VNDegen's window, composited on the CPU and shown through Metal, so the VNDegen menu and touch controls work as for the other engines. Saves stay in the game's `savedata/` folder as on PC. A game that saves to the Windows AppData or Documents folder saves to its data folder instead, and Ludusavi backups from Windows or a Steam Deck restore there. Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives work without any per-game setting: VNDegen recognizes the common ciphers by the checksums inside the archive, and tells you when a game uses one it doesn't know. Common Windows plugins are built in, including `extrans`, `layerExDraw`, `layerExSave`, and Steam builds' `krkrsteam`. Known limits: sound effects and music stored as MP3 don't play, AlphaMovie (`.amv`) animations don't show, and a KiriKiri game that is still starting with a question on screen when the Mac logs out or shuts down doesn't save its settings from that moment.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -82,7 +87,7 @@ The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3,
 | Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
 | Open the VNDegen menu in a game (resume or quit to library) | Home, and View while the menu is open | Backtick (`` ` ``) |
 
-While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker those are the arrows, Z or Return, X or Escape, Shift, and Q and W. In a KiriKiri game, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls.
+While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker, MV and MZ as well as XP, VX, and VX Ace, those are the arrows, Z or Return, X or Escape, Shift, and Q and W. In a KiriKiri game, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls.
 
 Each game has its own button mapping. The VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor, which lists every Xbox button. Each button can send another Xbox button, a keyboard key, a mouse click, or nothing. At the top of the editor, "RPG Maker controls" maps the buttons to the keys RPG Maker reads: A to Return, B to Escape, X to Shift, Y and Menu to X, LB to Q, RB to W, and the D-pad and left stick to the arrows. Return confirms in every RPG Maker, where XP uses Z for another button, and Escape and X both cancel and open the menu. "Reset to gamepad defaults" clears every remap. Ren'Py applies the mapping too. A remapped touch button shows what it sends, for example "Esc".
 
@@ -141,6 +146,8 @@ Every app build first builds the KiriKiri engine into `build/kirikiri` with `scr
 
 Each bundled runtime writes the license notices of the code it links into `build/<runtime>/licenses/`: `scripts/rclone-runtime.sh` for rclone and its Go modules, `scripts/renpy-runtime.sh` for Ren'Py and its libraries, and `scripts/app-licenses.sh` for code built into the app itself. `scripts/build.sh` stops an app build when one of them wrote none. Where the texts come from is in `scripts/licenses/README.md`.
 
+Every app build also builds the RPG Maker XP, VX, and VX Ace engine into `build/rgss` with `scripts/rgss-engine.sh`, which does nothing when the engine is up to date. It fetches mkxp-z's libretro core and ANGLE at pinned commits, applies the patches in `Engines/RGSS`, and caches its sources and tools in `~/Library/Caches/VNDegen/rgss`. The first build takes about an hour, most of it compiling Ruby to WebAssembly and back to C. It needs these Homebrew packages: `meson ninja cmake bison make automake autoconf libtool universal-ctags ruby@3.3 gnu-sed grep`.
+
 From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
 
 ### Installing a release
@@ -173,6 +180,9 @@ Packages/VNDegenKit/
   Sources/RenPyCompat/    command-line boot test for a folder of Ren'Py games
   Sources/EngineKiriKiri/ KiriKiri: detection, save locations, and the in-process session on the engine framework
   Sources/CKiriKiri/      vnkk.h, the KiriKiri engine's C interface
+  Sources/EngineRGSS/     RPG Maker XP, VX, and VX Ace: detection, the RTPs they need, saves, and the in-process session
+  Sources/CRGSS/          vnrgss.h, the RGSS engine's C interface
+  Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
@@ -181,6 +191,7 @@ Packages/VNDegenKit/
   Sources/Rclone/         Swift calls into rclone's library
   Rclone/                 VNDegen's build of rclone: the Go library with the SMB and local backends
   Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
+Engines/RGSS/             the RGSS engine's frontend, patches, and build files; UPSTREAM.md lists the pinned sources
 Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, simulator, and Ren'Py runtime helpers
@@ -199,4 +210,4 @@ Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector
 
 ## License
 
-VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL.
+VNDegen's own code is under the MIT License (`LICENSE`). The engines and libraries built into the app keep their own licenses. A build that includes a GPL component is distributed as a whole under that GPL. Builds with the RPG Maker XP, VX, and VX Ace engine include mkxp-z, which is GPL-2.0-or-later, so they are distributed under the GNU GPL, version 3. Version 3 rather than 2 because the iPhone and iPad app also contains Ren'Py's OpenSSL, whose Apache-2.0 license is compatible with GPL version 3 but not version 2. Their complete source is this repository, which builds the engine from the pinned sources in `Engines/RGSS/UPSTREAM.md`. Settings, Licenses lists the license of every third-party component in the app, and where to get the source. This is not legal advice.

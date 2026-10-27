@@ -182,6 +182,13 @@ private struct LibraryContainer: View {
             SettingsPageSheet(page: page)
         case let .importGame(model, initialSelection):
             ArchiveImportView(model: model, initialSelection: initialSelection) { nav.finishImport($0) }
+        case let .license(request):
+            RuntimeLicenseSheet(request: request)
+                .presentationDetents([.large])
+                .interactiveDismissDisabled()
+                #if os(macOS)
+                .frame(minWidth: 560, minHeight: 600)
+                #endif
         }
     }
 }

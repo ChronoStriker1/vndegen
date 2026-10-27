@@ -1,0 +1,20 @@
+diff --git a/src/core.cpp b/src/core.cpp
+index 5c07127..809bddf 100644
+--- a/src/core.cpp
++++ b/src/core.cpp
+@@ -1225,6 +1225,7 @@ static bool init_sandbox() {
+ #endif // _WIN32
+             PHYSFS_setWriteDir(save_path_subdir.c_str());
+ 
++#ifndef MKXPZ_RETRO_FLAT_SAVES
+             {
+                 std::string game_title;
+                 if (!conf->windowTitle.empty()) {
+@@ -1286,6 +1287,7 @@ static bool init_sandbox() {
+                 deinit_sandbox();
+                 return false;
+             }
++#endif // MKXPZ_RETRO_FLAT_SAVES
+ 
+             // Mount the subdirectory
+             PHYSFS_setWriteDir(save_path_subdir.c_str());

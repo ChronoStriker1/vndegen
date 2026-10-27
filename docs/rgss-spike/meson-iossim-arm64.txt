@@ -1,0 +1,14 @@
+[binaries]
+c = ['xcrun', '--sdk', 'iphonesimulator', 'clang', '--target=arm64-apple-ios18.0-simulator']
+cpp = ['xcrun', '--sdk', 'iphonesimulator', 'clang++', '--target=arm64-apple-ios18.0-simulator']
+objc = ['xcrun', '--sdk', 'iphonesimulator', 'clang', '--target=arm64-apple-ios18.0-simulator']
+objcpp = ['xcrun', '--sdk', 'iphonesimulator', 'clang++', '--target=arm64-apple-ios18.0-simulator']
+ar = 'ar'
+strip = 'strip'
+cmake = 'cmake'
+[host_machine]
+system = 'darwin'
+subsystem = 'ios-simulator'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'

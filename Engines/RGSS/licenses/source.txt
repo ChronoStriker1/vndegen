@@ -1,0 +1,5 @@
+VNDegen's RPG Maker XP, VX and VX Ace engine is mkxp-z's libretro core, which is free software under the GNU General
+Public License, version 2 or any later version. mkxp-z's COPYING file, below, is version 2. Because the app contains
+this engine, a VNDegen build that includes it is distributed as a whole under the GNU GPL, version 3, whose text
+follows COPYING. You can get the complete corresponding source of the engine and of the app, and the scripts that build
+them, from the locations below, for no charge. This notice is not legal advice.

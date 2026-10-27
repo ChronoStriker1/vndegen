@@ -15,14 +15,14 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Fixes for Touch mode and for quitting on a landscape iPhone, Ren'Py games two folders deep, and no control method for Ren'Py on iPhone and iPad (0.4.1).
 - Xbox gamepad controls by default for the touch gamepad and real controllers, every Xbox button in the mapping editor with an RPG Maker preset, touch buttons that press on touch-down, a cross-shaped D-pad, and the iPad tilt-shift blur fix (0.4.2).
 - Ludusavi save sync over SMB, with Ludusavi's SMB settings and rclone's own code built into the app, replacing SSH and rsync (0.4.3).
+- A fix for RPG Maker MZ's Ogg decoder reusing IDs, which stopped games with "RangeError: length cannot be negative" (0.4.4).
+- RPG Maker XP, VX, and VX Ace on Mac, iPhone, and iPad, built on mkxp-z's libretro core in the app, Apple silicon only on Mac, with the RTPs downloaded and installed in the app (0.5.0). `docs/rgss-spike.md` has the feasibility test and what was built.
+- License notices in Settings, Licenses, for every third-party component in the app (0.5.0).
+- The real fix for RPG Maker MZ's "RangeError: length cannot be negative": sounds with Ogg names that hold WAV or MP3 data play through the system decoder, and a decoder failure no longer stops the game (0.5.1).
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
-- RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
-- No Socks RPG's "RangeError: length cannot be negative" when warping to Patchwork on iPad (`ws/nosocks-warp-error`).
-
-Merged into `dev`, shown in the app once the KiriKiri branch adds the Licenses page: the build writes the license notices of rclone and its Go modules, Ren'Py and its libraries, and the code built into the app.
 
 ## Next
 1. Together, as the next work:
@@ -41,7 +41,7 @@ Merged into `dev`, shown in the app once the KiriKiri branch adds the Licenses p
 12. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 
 ## Runtime packages
-When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder.
+When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
 
 ## Out of scope for now
 - Apple TV.

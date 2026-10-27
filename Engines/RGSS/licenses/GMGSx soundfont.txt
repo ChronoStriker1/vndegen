@@ -1,0 +1,4 @@
+GMGSx soundfont
+
+The engine plays MIDI music with the GMGSx soundfont, which mkxp-z embeds. mkxp-z's README describes it as a public
+domain soundfont.

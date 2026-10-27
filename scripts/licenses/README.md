@@ -10,6 +10,11 @@ its own:
   `LICENSE.txt` and the font licenses from the runtime itself.
 - `scripts/kirikiri-engine.sh` writes `build/kirikiri/licenses/`: krkrsdl3's license, the Android Open Source Project's
   Apache-2.0 text for the bundled fallback font and the velocity tracker, and each vcpkg dependency's `copyright` file.
+- `scripts/rgss-engine.sh` writes `build/rgss/licenses/`: mkxp-z's license with where to get the source of the build,
+  the license files of ANGLE and of every dependency the core builds from source, and the texts in
+  `Engines/RGSS/licenses/` for code whose source folder has none: Ruby and libyaml (built in stage 1, whose sources
+  aren't kept), header-only Boost, libretro-common, the Khronos headers, and what the core embeds (the Liberation Sans
+  font, SDL's controller database, and the GMGSx soundfont). It fails on a source folder with no license and no text.
 - `scripts/app-licenses.sh` writes `build/app/licenses/` for third-party code in VNDegen's own sources.
 
 `scripts/build.sh` fails when one of these folders has no notices.

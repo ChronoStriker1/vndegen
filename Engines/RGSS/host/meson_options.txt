@@ -1,0 +1,2 @@
+option('core', type: 'string', description: 'Path to the static mkxp-z libretro core, libmkxp-z_libretro.a')
+option('api_include', type: 'string', description: 'Folder holding vnrgss.h')

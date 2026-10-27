@@ -15,6 +15,7 @@ struct GamePageView: View {
                     banner.id("banner")
                     VStack(alignment: .leading, spacing: 28) {
                         actions
+                        RuntimeSection(game: game)
                         if metrics.isCompact {
                             VStack(alignment: .leading, spacing: 28) {
                                 about
@@ -47,6 +48,9 @@ struct GamePageView: View {
                 }
             }
         }
+        // The game's engine decides which runtime packages it needs, and an install finishing changes which are missing.
+        .task(id: "\(game.id)|\(game.engine?.rawValue ?? "")") { await nav.runtimes.refresh(game.id) }
+        .runtimeFolderImporter(nav.runtimes, game: game.id)
         .background {
             GeometryReader { geo in
                 GameArt(game: game, slots: [.hero, .header, .capsule], size: geo.size, blurred: true)
