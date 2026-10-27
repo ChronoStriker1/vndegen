@@ -24,7 +24,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - An RPG Maker MZ fix (0.6.1): looping WebM movies made from GIFs, which WebKit takes for shorter than they are, now play at their stated length, so they no longer stutter or drift from their sound. Movie frames are uploaded only when they change, and a clip's first pass no longer pauses.
 - An RPG Maker MZ fix (0.6.1): quick controller, touch gamepad, and key presses all reach the game. Each press and release reaches the game's input on its own update, and a VisuStella Core Engine input clear no longer drops the presses that follow it, so timed attacks that need several quick presses succeed.
 
-- The whole app works with a controller alone, on `dev` for the next release: every screen, Settings page, dialog and sheet takes controller focus, text fields open an on-screen keyboard the controller types on, the mapping editor has Reset and LB and RB group jumps, and import lists archives in VNDegen's folder. The Files and Photos pickers say they need touch or a mouse.
+- The whole app works with a controller alone (0.6.2): every screen, Settings page, dialog and sheet takes controller focus, text fields open an on-screen keyboard the controller types on, the mapping editor has Reset and LB and RB group jumps, and import lists archives in VNDegen's folder. The Files and Photos pickers say they need touch or a mouse.
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - First priority: every engine finds a game's files whatever case the game uses for file and folder names, as on Windows, on iPhone, iPad, and case-sensitive Mac volumes. Every new engine plugin must pass the same check.
