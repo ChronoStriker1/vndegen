@@ -193,6 +193,12 @@ try:
         f.write("fd")
     check(read(os.path.join(images, "..", "fd.TXT")) == "fd", "os.fdopen of a descriptor writes")
     os.remove(os.path.join(base, "Game", "Fd.txt"))
+    if PY2:
+        fd = os.open(os.path.join(base, "Game", "Fd.txt"), os.O_WRONLY | os.O_CREAT, 0o644)
+        with io.open(long(fd), "w") as f:  # noqa: F821
+            f.write(u"long")
+        check(read(os.path.join(base, "Game", "Fd.txt")) == "long", "io.open of a Python 2 long descriptor writes")
+        os.remove(os.path.join(base, "Game", "Fd.txt"))
     # A case-only rename of bytes paths.
     write(os.path.join(base, "Game", "Images", "Bytes.txt"), "b")
     os.rename(os.path.join(images, "bytes.txt").encode("utf-8"), os.path.join(images, "BYTES.TXT").encode("utf-8"))

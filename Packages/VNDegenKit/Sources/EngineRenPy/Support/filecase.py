@@ -25,6 +25,7 @@ if sys.version_info[0] == 2:
     import __builtin__ as builtins
 
     text_type = unicode  # noqa: F821
+    descriptor_types = (int, long)  # noqa: F821
     filesystem_encoding = sys.getfilesystemencoding() or "utf-8"
 
     def decode(path):
@@ -36,6 +37,7 @@ else:
     import builtins
 
     text_type = str
+    descriptor_types = (int,)
     decode = os.fsdecode
     encode = os.fsencode
 
@@ -222,7 +224,7 @@ def _creates(args, kwargs):
 
 def open(file, *args, **kwargs):
     # A file descriptor, as os.fdopen passes, has no name to resolve.
-    if _creates(args, kwargs) and not isinstance(file, int):
+    if _creates(args, kwargs) and not isinstance(file, descriptor_types):
         real = resolve(file)
         new = not _exists(real)
         result = _open(real, *args, **kwargs)
@@ -235,7 +237,7 @@ def open(file, *args, **kwargs):
 
 def io_open(file, *args, **kwargs):
     # A file descriptor, as os.fdopen passes, has no name to resolve.
-    if _creates(args, kwargs) and not isinstance(file, int):
+    if _creates(args, kwargs) and not isinstance(file, descriptor_types):
         real = resolve(file)
         new = not _exists(real)
         result = _io_open(real, *args, **kwargs)
