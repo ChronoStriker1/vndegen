@@ -170,6 +170,16 @@ private func text(of response: FileResponse) async throws -> String {
     #expect(bridge.handle(.readFile(path: "/game/Img/Pictures/actor1.png", text: true)) == .value(.string("png")))
     #expect(bridge.handle(.writeFile(path: "/game/save/file1.rmmzsave", data: "s", text: true)) == .value(.null))
     #expect(try fm.contentsOfDirectory(atPath: root.appendingPathComponent("Save").path) == ["file1.rmmzsave"])
+
+    // A file the game wrote is found in any case, and writing or renaming onto it in another case replaces it.
+    #expect(bridge.handle(.readFile(path: "/game/SAVE/File1.rmmzsave", text: true)) == .value(.string("s")))
+    #expect(bridge.handle(.writeFile(path: "/game/save/FILE1.rmmzsave", data: "t", text: true)) == .value(.null))
+    #expect(bridge.handle(.writeFile(path: "/game/save/file1.rmmzsave_", data: "u", text: true)) == .value(.null))
+    #expect(bridge.handle(.rename(from: "/game/save/FILE1.RMMZSAVE_", to: "/game/save/File1.rmmzsave")) == .value(.null))
+    #expect(try fm.contentsOfDirectory(atPath: root.appendingPathComponent("Save").path) == ["file1.rmmzsave"])
+    #expect(bridge.handle(.readFile(path: "/game/save/file1.rmmzsave", text: true)) == .value(.string("u")))
+    #expect(bridge.handle(.mkdir(path: "/game/IMG/pictures", recursive: false)) == .failure(BridgeError(code: "EEXIST", message: "file already exists")))
+    #expect(bridge.handle(.readdir(path: "/game/IMG/PICTURES")) == .value(.strings(["Actor1.png"])))
 }
 
 @Test func mountedAppFoldersAndEmbeddedFilesAreServed() async throws {

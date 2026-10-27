@@ -1,4 +1,5 @@
 import Foundation
+import VNCore
 
 /// The game folder as the page and the Node shim see it.
 ///
@@ -51,14 +52,15 @@ nonisolated public struct GameFolder: Sendable {
     /// Maps a virtual absolute path to disk. Nil when the path is relative, climbs out of the game folder, or passes
     /// through a symlink that leads out of it.
     ///
-    /// A name missing on disk matches an entry that differs from it only in case. Windows games often get the case of
-    /// their own files wrong, which Windows and the Mac's disk forgive and an iPhone's disk does not.
+    /// A name missing on disk matches an entry that differs from it only in case, through `FileCase`. Windows games
+    /// often get the case of their own files wrong, which Windows and the Mac's disk forgive and an iPhone's disk does
+    /// not. A write to such a name therefore replaces the file that is there.
     public func resolve(virtualPath: String) -> URL? {
         guard let relative = Self.confine(virtualPath) else { return nil }
         var path = root.path
         var deepestExisting = Self.exists(path) ? path : nil
         for name in relative.split(separator: "/").map(String.init) {
-            if deepestExisting == path, let actual = Self.entry(name, in: path) {
+            if deepestExisting == path, let actual = FileCase.entry(name, in: path) {
                 path += "/" + actual
                 deepestExisting = path
             } else {
@@ -96,15 +98,6 @@ nonisolated public struct GameFolder: Sendable {
         }
         guard parts.first == Substring(virtualRoot.dropFirst()) else { return nil }
         return parts.dropFirst().joined(separator: "/")
-    }
-
-    /// The name of `name` as it is on disk in `directory`: itself when it exists, otherwise the first entry that equals
-    /// it ignoring case. Nil when neither exists.
-    private static func entry(_ name: String, in directory: String) -> String? {
-        if exists(directory + "/" + name) { return name }
-        return (try? FileManager.default.contentsOfDirectory(atPath: directory))?
-            .sorted()
-            .first { $0.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     /// True when anything is at `path`, including a symlink whose target is missing.

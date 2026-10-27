@@ -321,8 +321,12 @@ else()
     list(APPEND KIRIKIRI_ENVIRON_SOURCES krkrsdl3/environ/macos/macos_core.mm)
 endif()
 
+# Finds a game's files whatever case it names them in. The RGSS engine shares it.
+set(KIRIKIRI_SHARED ${CMAKE_CURRENT_LIST_DIR}/../Shared)
+
 # An object library keeps every object file, so the plugins' static registrations survive linking.
 add_library(kirikiri_engine OBJECT
+    ${KIRIKIRI_SHARED}/casepath.c
     vndegen/ciphers.cpp
     vndegen/movie_decoder.cpp
     vndegen/movie_player.cpp
@@ -345,6 +349,7 @@ set(KRKRSDL krkrsdl3)
 set(KIRIKIRI_API ${CMAKE_CURRENT_LIST_DIR}/../../Packages/VNDegenKit/Sources/CKiriKiri/include)
 target_include_directories(kirikiri_engine PUBLIC
     ${KIRIKIRI_API}
+    ${KIRIKIRI_SHARED}
     ${KRKRSDL}/core/archive
     ${KRKRSDL}/core/main
     ${KRKRSDL}/core/media/font

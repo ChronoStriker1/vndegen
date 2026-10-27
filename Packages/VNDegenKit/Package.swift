@@ -63,7 +63,7 @@ let package = Package(
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
-        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
+        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI", "VNCore"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),

@@ -4,11 +4,13 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <dirent.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 
 #include "TVPMsg.h"
+#include "casepath.h"
+
+#include <vector>
 
 //---------------------------------------------------------------------------
 // tTVPFileMedia
@@ -101,78 +103,29 @@ void tTVPFileMedia::GetListAt(const ttstr& _name, iTVPStorageLister* lister)
                           });
 }
 
-static int _utf8_strcasecmp(const char* a, const char* b)
-{
-    for (; *a && *b; ++a, ++b)
-    {
-        int ca = *a, cb = *b;
-        if ('A' <= ca && ca <= 'Z')
-            ca += 'a' - 'A';
-        if ('A' <= cb && cb <= 'Z')
-            cb += 'a' - 'A';
-        int ret = ca - cb;
-        if (ret)
-            return ret;
-    }
-    return *a - *b;
-}
-
 //---------------------------------------------------------------------------
 void tTVPFileMedia::GetLocallyAccessibleName(ttstr& name)
 {
-    ttstr newname;
-
     const tjs_char* ptr = name.c_str();
 
     if (!TJS_strncmp(ptr, TJS_N("./"), 2))
-    {
         ptr += 2; // skip "./"
-        newname.Clear();
-    }
 
-    while (*ptr)
+    // As upstream, nothing after "./", or a name that starts with a slash, has no local name.
+    if (!*ptr || *ptr == TJS_N('/'))
     {
-        const tjs_char* ptr_end = ptr;
-        while (*ptr_end && *ptr_end != TJS_N('/'))
-            ++ptr_end;
-        if (ptr_end == ptr)
-            break;
-        const tjs_char* ptr_cur = ptr;
-        ttstr walker(ptr, ptr_end - ptr);
-        while (*ptr_end && *ptr_end == TJS_N('/'))
-            ++ptr_end;
-        ptr = ptr_end;
-
-        DIR* dirp;
-        struct dirent* direntp;
-        newname += "/";
-        if ((dirp = opendir(newname.c_str())))
-        {
-            bool found = false;
-            while ((direntp = readdir(dirp)) != NULL)
-            {
-                if (!_utf8_strcasecmp(walker.c_str(), direntp->d_name))
-                {
-                    newname += direntp->d_name;
-                    found = true;
-                    break;
-                }
-            }
-            closedir(dirp);
-            if (!found)
-            {
-                newname += ptr_cur;
-                break;
-            }
-        }
-        else
-        {
-            newname += ptr_cur;
-            break;
-        }
+        name.Clear();
+        return;
     }
 
-    name = newname;
+    // Windows games name files in any case, and iOS and case-sensitive Mac volumes keep it. Only
+    // folders below the deepest one that exists as written are listed, since the iOS sandbox
+    // refuses to list those above the app's own. The first name that matches nothing, and the rest
+    // after it, stay as written, so a new file goes into the existing folder of another case.
+    std::string path = std::string("/") + ptr;
+    std::vector<char> real(path.size() + 1);
+    casepath_resolve(path.c_str(), real.data(), real.size());
+    name = ttstr(real.data());
 }
 //---------------------------------------------------------------------------
 void tTVPFileMedia::GetLocalName(ttstr& name)
