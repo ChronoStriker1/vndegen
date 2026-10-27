@@ -1,4 +1,3 @@
-import Rsync
 import SwiftUI
 import VNCore
 #if canImport(UIKit)
@@ -13,32 +12,40 @@ import AppKit
 @Observable
 public final class SaveSyncSettingsModel {
     enum Target: Hashable {
-        case test, trust, forget, copyKey, matchRetention, fullBackups, differentialBackups, autoBackup, checkBeforeLaunch
+        case guest, test, forget, matchRetention, fullBackups, differentialBackups, autoBackup, checkBeforeLaunch
     }
 
     public let service: SaveSyncService
     var host: String
     var port: String
-    var user: String
+    /// Ludusavi's `guest` login, with no password. On for a new setup.
+    var guest: Bool
+    var username: String
+    var password: String
     var path: String
+    /// Why the details could not be saved, such as a Keychain error.
+    var problem: String?
     var focus = FocusRing<Target>()
-    var copied = false
 
     public init(service: SaveSyncService) {
         self.service = service
-        host = service.server?.ssh.host ?? ""
-        port = service.server.map { String($0.ssh.port) } ?? "22"
-        user = service.server?.ssh.user ?? ""
+        let smb: SMBRemote? = switch service.server?.remote {
+        case let .smb(smb)?: smb
+        case nil: nil
+        }
+        host = smb?.host ?? ""
+        port = String(smb?.port ?? SMBRemote.defaultPort)
+        guest = smb?.isGuest ?? true
+        username = smb.flatMap { $0.isGuest ? nil : $0.username } ?? ""
+        password = service.storedPassword() ?? ""
         path = service.server?.path ?? ""
     }
 
-    var canTest: Bool { !host.isEmpty && !user.isEmpty && !path.isEmpty && Int(port) != nil }
+    var canTest: Bool { !host.isEmpty && !path.isEmpty && Int(port) != nil && (guest || !username.isEmpty) }
 
     var rows: [Target] {
-        var rows: [Target] = [.test]
-        if case .untrusted = service.connection { rows.append(.trust) }
+        var rows: [Target] = [.guest, .test]
         if service.server != nil { rows.append(.forget) }
-        rows.append(.copyKey)
         if service.configRetention == nil {
             rows.append(.matchRetention)
             if service.manualRetention != nil { rows += [.fullBackups, .differentialBackups] }
@@ -77,23 +84,22 @@ public final class SaveSyncSettingsModel {
 
     private func activate(_ target: Target) {
         switch target {
+        case .guest: guest.toggle()
         case .test:
             guard canTest, service.connection != .checking else { return }
-            service.setServer(host: host, port: Int(port) ?? 22, user: user, path: path)
+            do {
+                try service.setServer(host: host, port: Int(port) ?? SMBRemote.defaultPort, guest: guest, username: username, password: password,
+                                      path: path)
+                problem = nil
+            } catch {
+                problem = error.localizedDescription
+                return
+            }
             Task { await service.testConnection() }
-        case .trust: Task { await service.trustHostKey() }
         case .forget:
             service.forgetServer()
-            host = ""; port = "22"; user = ""; path = ""
-        case .copyKey:
-            guard let key = try? service.publicKey() else { return }
-            #if canImport(UIKit)
-            UIPasteboard.general.string = key
-            #else
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(key, forType: .string)
-            #endif
-            copied = true
+            host = ""; port = String(SMBRemote.defaultPort); guest = true; username = ""; password = ""; path = ""
+            problem = nil
         case .matchRetention: service.manualRetention = service.manualRetention == nil ? Retention(full: 1, differential: 1) : nil
         case .fullBackups: service.manualRetention?.full = min(255, (service.manualRetention?.full ?? 1) + 1)
         case .differentialBackups: service.manualRetention?.differential = min(255, (service.manualRetention?.differential ?? 0) + 1)
@@ -103,8 +109,11 @@ public final class SaveSyncSettingsModel {
     }
 }
 
-/// The Ludusavi server, VNDegen's SSH key, retention, and automatic sync, shown from the app's Settings screen. It
-/// draws a plain grouped form and takes its colors from the host's color scheme and tint.
+/// What save sync says about settings from VNDegen 0.4.0, which reached the store over SSH.
+let oldServerNote = "Save sync now connects to your Ludusavi share over SMB, the way Ludusavi on your PC does. Enter the share in Settings to turn it back on."
+
+/// The Ludusavi share, retention, and automatic sync, shown from the app's Settings screen. It draws a plain grouped form
+/// and takes its colors from the host's color scheme and tint.
 public struct SaveSyncSettingsView: View {
     @State private var model: SaveSyncSettingsModel
 
@@ -119,19 +128,29 @@ public struct SaveSyncSettingsView: View {
         let rows = model.rows.map { [$0] }
         ScrollViewReader { proxy in
             Form {
+                if service.needsShare {
+                    Section {
+                        Label(oldServerNote, systemImage: "info.circle.fill").foregroundStyle(.orange)
+                    }
+                }
                 Section {
-                    LabeledContent("Host") { field("server.example", text: $model.host) }
-                    LabeledContent("Port") { field("22", text: $model.port) }
-                    LabeledContent("User") { field("root", text: $model.user) }
-                    LabeledContent("Store folder") { field("/srv/ludusavi", text: $model.path) }
+                    LabeledContent("Host") { field("nas.example", text: $model.host) }
+                    LabeledContent("Port") { field(String(SMBRemote.defaultPort), text: $model.port) }
+                    Toggle("Guest", isOn: Binding(get: { model.guest }, set: { _ in model.select(.guest) }))
+                        .focusRow(model.focus.isFocused(.guest, in: rows), id: SaveSyncSettingsModel.Target.guest)
+                    if !model.guest {
+                        LabeledContent("Username") { field("username", text: $model.username) }
+                        LabeledContent("Password") {
+                            SecureField("Password", text: $model.password, prompt: Text("password"))
+                                .labelsHidden()
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    LabeledContent("Path") { field("games/Ludusavi", text: $model.path) }
                     connectionStatus
                     Button(service.connection == .checking ? "Connecting…" : "Test Connection", systemImage: "network") { model.select(.test) }
                         .disabled(!model.canTest || service.connection == .checking)
                         .focusRow(model.focus.isFocused(.test, in: rows), id: SaveSyncSettingsModel.Target.test)
-                    if case .untrusted = service.connection {
-                        Button("Trust This Server", systemImage: "checkmark.shield") { model.select(.trust) }
-                            .focusRow(model.focus.isFocused(.trust, in: rows), id: SaveSyncSettingsModel.Target.trust)
-                    }
                     if service.server != nil {
                         // Hosts may set a plain foreground style, which would otherwise hide the destructive red.
                         Button("Forget Server", systemImage: "xmark.circle", role: .destructive) { model.select(.forget) }
@@ -139,21 +158,9 @@ public struct SaveSyncSettingsView: View {
                             .focusRow(model.focus.isFocused(.forget, in: rows), id: SaveSyncSettingsModel.Target.forget)
                     }
                 } header: {
-                    Text("Ludusavi server")
+                    Text("Ludusavi share")
                 } footer: {
-                    Text("VNDegen logs in over SSH and syncs with rsync. The store folder is the one Ludusavi on your PC and Steam Deck backs up to.")
-                }
-
-                Section {
-                    if let key = try? service.publicKey() {
-                        Text(key).font(.caption.monospaced()).textSelection(.enabled).lineLimit(4)
-                    }
-                    Button(model.copied ? "Copied" : "Copy Key", systemImage: model.copied ? "checkmark" : "doc.on.doc") { model.select(.copyKey) }
-                        .focusRow(model.focus.isFocused(.copyKey, in: rows), id: SaveSyncSettingsModel.Target.copyKey)
-                } header: {
-                    Text("VNDegen's key")
-                } footer: {
-                    Text("Add this line to ~/.ssh/authorized_keys of the user above on the server. The private key stays in this device's Keychain.")
+                    Text("Enter what Ludusavi's SMB cloud settings show. The path is the share, then the folder inside it, such as games/Ludusavi. VNDegen copies new backups to the share and never syncs up to it, so it deletes nothing another device wrote. The password stays on this device.")
                 }
 
                 retention(rows)
@@ -188,26 +195,21 @@ public struct SaveSyncSettingsView: View {
     }
 
     @ViewBuilder private var connectionStatus: some View {
-        switch service.connection {
-        case .notSetUp:
-            Text(service.server == nil ? "Not set up" : "Not tested yet").foregroundStyle(.secondary)
-        case .checking:
-            ProgressView()
-        case let .untrusted(key):
-            Label {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("New server. Check that its fingerprint matches before you trust it.")
-                    Text(SSHKeys.fingerprint(of: key) ?? key).font(.caption.monospaced()).textSelection(.enabled)
-                }
-            } icon: {
-                Image(systemName: "questionmark.diamond.fill").foregroundStyle(.orange)
+        if let problem = model.problem {
+            Label(problem, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        } else {
+            switch service.connection {
+            case .notSetUp:
+                Text(service.server == nil ? "Not set up" : "Not tested yet").foregroundStyle(.secondary)
+            case .checking:
+                ProgressView()
+            case .connected:
+                let count = service.foundGames ?? service.storeGames.count
+                Label(count == 1 ? "Connected. Found 1 game." : "Connected. Found \(count) games.", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            case let .failed(message):
+                Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
-        case .connected:
-            Label(service.storeGames.count == 1 ? "Connected. 1 game backed up." : "Connected. \(service.storeGames.count) games backed up.",
-                  systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        case let .failed(message):
-            Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
         }
     }
 
@@ -235,8 +237,8 @@ public struct SaveSyncSettingsView: View {
             Text("Retention")
         } footer: {
             Text(service.configRetention != nil
-                 ? "From Ludusavi's settings on this Mac. Backups beyond these limits are deleted, as Ludusavi deletes them."
-                 : "Enter the limits from Ludusavi's Other screen. VNDegen then makes full or differential backups and deletes old ones as Ludusavi would. When off, VNDegen follows the backups already on the server and never deletes one.")
+                 ? "From Ludusavi's settings on this Mac. Backups beyond these limits leave the backup list, and Ludusavi on a PC deletes their folders at its next backup."
+                 : "Enter the limits from Ludusavi's Other screen. VNDegen then makes full or differential backups and drops old ones from the backup list as Ludusavi would. Ludusavi on a PC deletes their folders at its next backup. When off, VNDegen follows the backups already on the share and drops none.")
         }
     }
 }
@@ -300,7 +302,7 @@ public final class GameSavesModel {
             .map { ($0.key, $0.value) }
     }
 
-    private var isSetUp: Bool { service.server?.hostKey != nil }
+    private var isSetUp: Bool { service.server != nil }
 
     var rows: [[Target]] {
         if choosingGame { return [[.automaticMatch]] + filteredFolders.map { [.folder($0.folder)] } }
@@ -474,7 +476,7 @@ public struct GameSavesView: View {
         @Bindable var model = model
         ScrollViewReader { proxy in
             Form {
-                if model.service.server?.hostKey != nil {
+                if model.service.server != nil {
                     syncSection
                     matchSection
                     backupList
@@ -482,7 +484,7 @@ public struct GameSavesView: View {
                     locations
                 } else {
                     Section {
-                        Text("Set up your Ludusavi server in Settings to restore and back up this game's saves.")
+                        Text(model.service.needsShare ? oldServerNote : "Set up your Ludusavi share in Settings to restore and back up this game's saves.")
                             .foregroundStyle(.secondary)
                     }
                 }

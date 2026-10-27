@@ -3,7 +3,7 @@ import Foundation
 import VNCore
 
 /// A Ludusavi backup folder: one subfolder per game, each with a mapping.yaml. VNDegen keeps a partial copy of the
-/// server's store this way and syncs it with rsync. New backups go into new folders, mapping.yaml is rewritten, and an
+/// server's store this way and syncs it with rclone. New backups go into new folders, mapping.yaml is rewritten, and an
 /// existing backup is only ever removed by the retention limits the user set, as Ludusavi removes it.
 public struct LudusaviStore: Sendable {
     public let root: URL
@@ -566,14 +566,17 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case changedAfterBackup
     case changedSinceCheck
     case incompleteUpload(String)
+    case commitUnconfirmed(String)
     case timedOut
+    case loginRefused
+    case noStoreFolder(String)
     case engineUnsupported
     case outsideSaveFolder(String)
 
     public var errorDescription: String? {
         switch self {
-        case .notSetUp: "Set up your Ludusavi server in Settings first."
-        case let .keychain(status): "The Keychain refused VNDegen's SSH key (status \(status))."
+        case .notSetUp: "Set up your Ludusavi share in Settings first."
+        case let .keychain(status): "The Keychain refused the share's password (status \(status))."
         case let .unreadable(path): "Can't read \(path)."
         case .noBackups: "Ludusavi has no backups for this game yet."
         case let .nothingToRestore(count): "None of the \(count) files in this backup are saves this game uses."
@@ -588,7 +591,11 @@ public enum SaveSyncError: LocalizedError, Equatable {
             "Another device backed up this game just after VNDegen did, so VNDegen's backup may not be listed. Check the game's backups."
         case .changedSinceCheck: "Another device backed up this game since VNDegen last checked it. Nothing was backed up. Check the game's backups first."
         case let .incompleteUpload(name): "The server's copy of \(name) is incomplete, so VNDegen did not record it. Nothing was changed. Try again."
+        case let .commitUnconfirmed(reason):
+            "The server did not confirm the new backup list (\(reason)), so VNDegen deleted nothing. Check the game's backups before you back up again."
         case .timedOut: "The server stopped answering, so VNDegen gave up. Try again."
+        case .loginRefused: "The share refused the username or password. Check them in Settings."
+        case let .noStoreFolder(path): "The share has no folder \(path). Enter the share, then the folder Ludusavi backs up to, such as games/Ludusavi."
         case .engineUnsupported: "Save sync does not support this game's engine yet."
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
         }

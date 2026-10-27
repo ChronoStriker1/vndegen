@@ -13,15 +13,16 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Ludusavi built into the app (0.4.0). VNDegen connects to the backup server itself over SSH with rsync, matches games through Ludusavi's manifest, and builds in Ludusavi's backup features.
 - Touch and Cursor mouse modes on iPhone and iPad, and the controller's Mouse option (0.4.0).
 - Fixes for Touch mode and for quitting on a landscape iPhone, Ren'Py games two folders deep, and no control method for Ren'Py on iPhone and iPad (0.4.1).
+- Xbox gamepad controls by default for the touch gamepad and real controllers, every Xbox button in the mapping editor with an RPG Maker preset, touch buttons that press on touch-down, a cross-shaped D-pad, and the iPad tilt-shift blur fix (0.4.2).
+- Ludusavi save sync over SMB, with Ludusavi's SMB settings and rclone's own code built into the app, replacing SSH and rsync (0.4.3).
 
 ## In progress
 Each item is planned work on its own branch, not merged into `dev`.
 - KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
 - RPG Maker XP, VX, and VX Ace (`ws/rgss`), built on mkxp-z's libretro core in the app on all three platforms, Apple silicon only on Mac. The feasibility test is written up in `docs/rgss-spike.md` on that branch.
-- Xbox gamepad controls by default for the touch gamepad and real controllers, with every Xbox button in the mapping editor and an RPG Maker preset. The touch gamepad's buttons act on touch-down, and its D-pad becomes one cross-shaped pad (`ws/xbox-controls`).
-- Ludusavi save sync over SMB instead of SSH and rsync (`ws/ludusavi-smb`), reaching the share the PCs already use, as guest or with a password.
+- No Socks RPG's "RangeError: length cannot be negative" when warping to Patchwork on iPad (`ws/nosocks-warp-error`).
 
-Merged into `dev` for the next release: No Socks RPG's tilt-shift blur no longer covers the lower game area on iPad after the game has been in portrait.
+Merged into `dev`, shown in the app once the KiriKiri branch adds the Licenses page: the build writes the license notices of rclone and its Go modules, Ren'Py and its libraries, and the code built into the app.
 
 ## Next
 1. Together, as the next work:

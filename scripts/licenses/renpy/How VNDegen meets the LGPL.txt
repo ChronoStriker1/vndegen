@@ -1,0 +1,30 @@
+How VNDegen meets the GNU LGPL for the libraries in Ren'Py
+
+This is the VNDegen maintainers' reading of the GNU Lesser General Public License version 2.1. It is not legal
+advice.
+
+Ren'Py, which VNDegen bundles to run Ren'Py games, contains libraries under the GNU LGPL version 2.1 or later: FFmpeg,
+GNU FriBidi, the parts of pygame_sdl2 taken from Pygame, and chardet. Their notices are in this list, under their own
+names.
+
+The LGPL lets a program include such a library if the people who receive the program can change the library and use
+their changed version with the program. VNDegen gives them what they need:
+
+- VNDegen is free software under the MIT license. Its complete source, including the scripts that build the app, is
+  public at https://github.com/ChronoStriker1/vndegen.
+- The source of every LGPL library in Ren'Py, and the scripts that build Ren'Py's libraries from it, are public at
+  https://github.com/renpy/renpy-build (the source and tasks folders) and https://github.com/renpy/renpy. VNDegen
+  uses Ren'Py's official builds of them, unchanged.
+
+On iPhone and iPad, the app links Ren'Py's libraries statically. scripts/renpy-runtime.sh in VNDegen's source downloads
+Ren'Py's prebuilt iOS libraries (renios) and combines them into RenPyRuntime.xcframework, and scripts/build.sh ipa
+builds the IPA from that. To use a changed library, build it with renpy-build, have scripts/renpy-runtime.sh take it in
+place of renios's prebuilt copy, and run scripts/build.sh ipa. Sideloading tools such as AltStore and Sideloadly sign
+the IPA with your own certificate, so the rebuilt app installs the same way as a release.
+
+On the Mac, Ren'Py's libraries are in librenpython.dylib, a separate shared library inside the app at
+Contents/Resources/RenPy/8/lib/py3-mac-universal and Contents/Resources/RenPy/7/lib/py2-mac-universal. A rebuilt
+librenpython.dylib can replace it. Sign the app again afterwards, for example with codesign --force --deep --sign -.
+
+The Python libraries, chardet among them, ship as Python bytecode in the runtime's lib folder, where a changed copy can
+replace them in the same way.

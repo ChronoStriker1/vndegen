@@ -1,28 +1,13 @@
 import Foundation
 import Observation
 import OSLog
-import Rsync
+import Rclone
 import VNCore
 #if canImport(UIKit)
 import UIKit
 #endif
 
 private let log = Logger(subsystem: "com.chronostriker1.vndegen", category: "savesync")
-
-/// The server that holds the user's Ludusavi store, and where on it.
-public struct SaveServer: Codable, Equatable, Sendable {
-    public var ssh: SSHServer
-    /// The store folder on the server, such as `/srv/ludusavi`.
-    public var path: String
-    /// The server's host key, pinned when the user trusted it. An OpenSSH public key line.
-    public var hostKey: String?
-
-    public init(ssh: SSHServer, path: String, hostKey: String? = nil) {
-        self.ssh = ssh
-        self.path = path
-        self.hostKey = hostKey
-    }
-}
 
 /// A VNDegen game's Ludusavi game.
 public struct GameMatch: Equatable, Sendable {
@@ -82,25 +67,28 @@ public struct SaveLocationInfo: Equatable, Sendable {
     public var recorded: String?
 }
 
-/// Backs up and restores game saves through the user's Ludusavi store on a server, over SSH and rsync, so saves move
-/// between VNDegen and the PC copies that Ludusavi manages.
+/// Backs up and restores game saves through the user's Ludusavi store on an SMB share, with rclone's own SMB code as
+/// Ludusavi uses it, so saves move between VNDegen and the PC copies that Ludusavi manages.
 @MainActor
 @Observable
 public final class SaveSyncService {
     public enum Connection: Equatable {
         case notSetUp
         case checking
-        /// The server presented a host key that is not pinned yet. The user checks its fingerprint and trusts it.
-        case untrusted(hostKey: String)
         case connected
         case failed(String)
     }
 
-    /// Opens a connection that runs rsync on the server. Tests replace it with a local rsync.
-    public typealias Connector = @Sendable (SaveServer) async throws -> any RsyncConnection
+    /// Reaches the store through rclone. Tests replace it with a local folder and hooks between rc calls.
+    public typealias Connector = @Sendable (SaveServer) async throws -> RemoteAccess
 
+    /// The share, when one is set up.
     public var server: SaveServer? { settings.server }
     public private(set) var connection: Connection = .notSetUp
+    /// How many game folders the last connection test found.
+    public private(set) var foundGames: Int?
+    /// Settings from VNDegen 0.4.0 named an SSH server, which save sync no longer reaches. True until a share is set up.
+    public var needsShare: Bool { settings.droppedOldServer && settings.server == nil }
     /// Game folder in the store to its Ludusavi title.
     public private(set) var storeGames: [String: String] = [:]
     public var autoBackup: Bool {
@@ -138,32 +126,59 @@ public final class SaveSyncService {
     /// Runs right after a backup has read and copied the saves, before anything goes to the server. Tests set it.
     @ObservationIgnored var afterLocalBackup: (@Sendable () -> Void)?
 
-    struct Timeouts {
+    struct Timeouts: Sendable {
         var launchCheck: Duration = .seconds(6)
         var operation: Duration = .seconds(180)
+        /// rclone's, on every call.
+        var rclone = RcloneLimits()
     }
 
     /// Ludusavi's primary manifest, at the address Ludusavi itself reads it from.
     public static let ludusaviManifest = URL(string: "https://raw.githubusercontent.com/mtkennerly/ludusavi-manifest/master/data/manifest.yaml")!
 
-    /// `manifest` nil leaves Ludusavi's manifest out, as tests do.
-    public init(library: LibraryStore, connector: Connector? = nil, manifest: URL? = ludusaviManifest) {
+    /// `manifest` nil leaves Ludusavi's manifest out, as tests do. On a Mac, the retention limits come from Ludusavi's own
+    /// config when it has one.
+    public convenience init(library: LibraryStore, connector: Connector? = nil, manifest: URL? = ludusaviManifest) {
+        self.init(library: library, connector: connector, manifest: manifest, configRetention: LudusaviConfig.load()?.retention)
+    }
+
+    /// `configRetention` stands in for Ludusavi's config, so tests never depend on the config of the Mac they run on.
+    init(library: LibraryStore, connector: Connector?, manifest: URL?, configRetention: Retention?) {
         self.library = library
         let directory = library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)
         self.directory = directory
         settings = (try? JSONDecoder().decode(Settings.self, from: Data(contentsOf: directory.appendingPathComponent("settings.json")))) ?? Settings()
-        configRetention = LudusaviConfig.load()?.retention
-        self.connector = connector ?? { server in
-            try await SSHConnection.connect(to: server.ssh, key: SSHIdentity.key(in: directory), hostKey: server.hostKey)
-        }
+        self.configRetention = configRetention
+        self.connector = connector ?? Self.smbConnector(directory: directory)
         manifestStore = manifest.map { ManifestStore(source: $0, directory: library.paths.support.appendingPathComponent("SaveSync", isDirectory: true)) }
-        if settings.server?.hostKey != nil { connection = .connected }
+        if settings.migrating {
+            // Once, on the first start after 0.4.0: its SSH key goes, and so do the copy of the old store and the sync
+            // records, as when the user forgets a server.
+            OldSSHKey.delete(in: directory)
+            settings.synced = [:]
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent("Store", isDirectory: true))
+            settings.migrating = false
+        }
+        if settings.server != nil { connection = .connected }
         saveSettings()
         loadIndexFromMirror()
     }
 
+    /// The share in `SaveServer`, with the password kept apart: in the Keychain on iPhone and iPad, in a file only this
+    /// user can read on the Mac.
+    public static func smbConnector(directory: URL) -> Connector {
+        { server in
+            guard case let .smb(smb) = server.remote else { throw SaveSyncError.notSetUp }
+            return try await RemoteAccess.smb(server, password: smb.isGuest ? nil : SMBPassword.read(in: directory))
+        }
+    }
+
     private struct Settings: Codable {
         var server: SaveServer?
+        /// The settings named an SSH server, as VNDegen 0.4.0 saved it.
+        var droppedOldServer = false
+        /// Set while reading 0.4.0 settings, and never saved.
+        var migrating = false
         var autoBackup = false
         var checkBeforeLaunch = true
         var retention: Retention?
@@ -180,9 +195,22 @@ public final class SaveSyncService {
             String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
         }
 
+        enum CodingKeys: String, CodingKey {
+            case server, droppedOldServer, autoBackup, checkBeforeLaunch, retention, matches, synced, deviceID
+        }
+
+        private enum OldServerKeys: String, CodingKey { case ssh }
+
         init(from decoder: any Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
-            server = try values.decodeIfPresent(SaveServer.self, forKey: .server)
+            // VNDegen 0.4.0 reached the store over SSH. Those settings leave save sync off until the user enters the share.
+            if let old = try? values.nestedContainer(keyedBy: OldServerKeys.self, forKey: .server), old.contains(.ssh) {
+                droppedOldServer = true
+                migrating = true
+            } else {
+                server = try values.decodeIfPresent(SaveServer.self, forKey: .server)
+                droppedOldServer = try values.decodeIfPresent(Bool.self, forKey: .droppedOldServer) ?? false
+            }
             autoBackup = try values.decodeIfPresent(Bool.self, forKey: .autoBackup) ?? false
             checkBeforeLaunch = try values.decodeIfPresent(Bool.self, forKey: .checkBeforeLaunch) ?? true
             retention = try values.decodeIfPresent(Retention.self, forKey: .retention)
@@ -209,20 +237,29 @@ public final class SaveSyncService {
 
     // MARK: Server
 
-    /// The line to add to the server account's `authorized_keys`.
-    public func publicKey() throws -> String { try SSHIdentity.authorizedKeysLine(in: directory) }
+    /// The share's password as kept on this device. Nil for a guest login or when none is kept.
+    public func storedPassword() -> String? {
+        guard case let .smb(smb)? = settings.server?.remote, !smb.isGuest else { return nil }
+        return try? SMBPassword.read(in: directory)
+    }
 
-    /// Saves the server details. A different server forgets the pinned host key and the copy of the old store.
-    public func setServer(host: String, port: Int, user: String, path: String) {
-        let ssh = SSHServer(host: host.trimmingCharacters(in: .whitespaces), port: port, user: user.trimmingCharacters(in: .whitespaces))
-        let path = path.trimmingCharacters(in: .whitespaces)
+    /// Saves the share's details, as Ludusavi's SMB remote and cloud path name them. A guest login keeps no password and
+    /// deletes a kept one. Another host, port, or path forgets the copy of the old store.
+    public func setServer(host: String, port: Int, guest: Bool, username: String, password: String, path: String) throws {
+        let remote = SMBRemote(host: host.trimmingCharacters(in: .whitespaces), port: port,
+                               username: guest ? SMBRemote.guest : username.trimmingCharacters(in: .whitespaces))
+        let server = SaveServer(remote: .smb(remote), path: path.trimmingCharacters(in: .whitespaces))
+        try SMBPassword.save(remote.isGuest ? nil : password, in: directory)
         let old = settings.server
-        guard old?.ssh != ssh || old?.path != path else { return }
-        settings.server = SaveServer(ssh: ssh, path: path, hostKey: old?.ssh == ssh ? old?.hostKey : nil)
-        settings.synced = [:]
+        guard old != server else { return }
+        settings.server = server
+        if old.map(Self.store) != Self.store(server) {
+            settings.synced = [:]
+            try? FileManager.default.removeItem(at: mirror)
+            storeGames = [:]
+        }
         saveSettings()
-        try? FileManager.default.removeItem(at: mirror)
-        storeGames = [:]
+        foundGames = nil
         connection = .notSetUp
     }
 
@@ -230,31 +267,32 @@ public final class SaveSyncService {
         settings.server = nil
         settings.synced = [:]
         saveSettings()
+        try? SMBPassword.save(nil, in: directory)
         try? FileManager.default.removeItem(at: mirror)
         storeGames = [:]
+        foundGames = nil
         connection = .notSetUp
     }
 
-    /// Connects, and on success reads the store's game list. A host key that is not pinned yet ends in `.untrusted`.
+    /// Where the store is, whatever the login.
+    private static func store(_ server: SaveServer) -> String {
+        switch server.remote {
+        case let .smb(smb): "smb://\(smb.host):\(smb.port)/\(server.path)"
+        }
+    }
+
+    /// Lists the store folder and counts its games. Reads only.
     public func testConnection() async {
         guard let server = settings.server else { connection = .notSetUp; return }
         connection = .checking
         do {
-            try await refreshIndex(server)
+            foundGames = try await withStore(server) { store in
+                try await store.countGames()
+            }
             connection = .connected
-        } catch let SSHError.unknownHostKey(key) {
-            connection = .untrusted(hostKey: key)
         } catch {
             connection = .failed(error.localizedDescription)
         }
-    }
-
-    /// Pins the host key the last test saw, then tests again.
-    public func trustHostKey() async {
-        guard case let .untrusted(key) = connection, settings.server != nil else { return }
-        settings.server?.hostKey = key
-        saveSettings()
-        await testConnection()
     }
 
     /// Reads the store's game list and Ludusavi's manifest when they are due. Run when a save screen appears.
@@ -266,7 +304,7 @@ public final class SaveSyncService {
                 manifestRefresh = nil
             }
         }
-        guard let server = settings.server, server.hostKey != nil else { return }
+        guard let server = settings.server else { return }
         do {
             try await refreshIndex(server)
             connection = .connected
@@ -279,16 +317,15 @@ public final class SaveSyncService {
     func manifestRefreshed() async { await manifestRefresh?.value }
 
     private func refreshIndex(_ server: SaveServer) async throws {
-        let index = try await withStore(server) { store, client in try await store.refreshIndex(client) }
+        let index = try await withStore(server) { store in try await store.refreshIndex() }
         apply(index)
     }
 
     private func loadIndexFromMirror() {
-        let store = RemoteStore(path: ".", mirror: mirror)
         let folders = ((try? FileManager.default.contentsOfDirectory(atPath: mirror.path)) ?? []).filter {
             FileManager.default.fileExists(atPath: mirror.appendingPathComponent($0).appendingPathComponent(LudusaviStore.mappingFile).path)
         }
-        apply(StoreIndex(mirror: store.local, folders: folders, root: nil))
+        apply(StoreIndex(mirror: LudusaviStore(root: mirror), folders: folders))
         Task {
             if let manifestStore { manifest = await manifestStore.current() }
         }
@@ -356,9 +393,9 @@ public final class SaveSyncService {
 
     /// The game's backups on the server, oldest first. Reads the game's mapping.yaml from the server.
     public func backups(for id: GameID) async throws -> [BackupSummary] {
-        guard let server = trustedServer, let match = match(for: id) else { return [] }
-        return try await withStore(server) { store, client in
-            try await store.refreshGame(client, folder: match.folder)
+        guard let server = settings.server, let match = match(for: id) else { return [] }
+        return try await withStore(server) { store in
+            try await store.refreshGame(match.folder)
             return (try? store.local.mapping(match.folder).summaries) ?? []
         }
     }
@@ -366,19 +403,22 @@ public final class SaveSyncService {
     /// What restoring `backup` would change here. Reads only VNDegen's copy of the mapping, so call `backups` first.
     public func preview(_ id: GameID, backup: String) async throws -> RestorePreview {
         guard let match = match(for: id) else { throw SaveSyncError.noBackups }
-        let locations = try saveLocations(id), store = RemoteStore(path: ".", mirror: mirror).local
+        let locations = try saveLocations(id), store = LudusaviStore(root: mirror)
         return try await serialized { try store.preview(folder: match.folder, backup: backup, locations: locations) }
     }
 
     /// Restores `backup`, or the latest when nil. Brings the backup down from the server first.
     public func restore(_ id: GameID, backup: String?) async throws -> RestoreReport {
-        guard let server = trustedServer, let match = match(for: id) else { throw SaveSyncError.notSetUp }
+        guard let server = settings.server, let match = match(for: id) else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id)
         let snapshot = snapshotURL(id)
         try FileManager.default.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let (report, synced) = try await withStore(server) { store, client in
-            try await store.refreshGame(client, folder: match.folder)
-            try await store.fetch(client, folder: match.folder, backup: backup)
+        let (report, synced) = try await withStore(server) { store in
+            try await store.refreshGame(match.folder)
+            try await store.fetch(match.folder, backup: backup)
+            // A download that finished after a cancel still reports success, so the saves here change only if the
+            // restore itself was not cancelled.
+            try Task.checkCancellation()
             let report = try store.local.restore(folder: match.folder, backup: backup, locations: locations, snapshot: snapshot)
             let latest = try store.local.mapping(match.folder).summaries.last?.revision
             return (report, SyncRecord(folder: match.folder, latest: latest, saves: try LudusaviStore.localHashes(locations)))
@@ -400,68 +440,75 @@ public final class SaveSyncService {
 
     /// Adds a backup of the saves here to the server, on top of `judged`, the server state a status check saw. Refuses
     /// with `changedSinceCheck` when the server's mapping.yaml is anything else by now. The new backup folder goes up
-    /// first, then mapping.yaml, and only when the server's mapping.yaml still holds exactly the bytes the backup started
-    /// from.
+    /// first and is checked, then mapping.yaml replaces the server's in one step, and only while the server's still holds
+    /// exactly the bytes the backup started from. Reading it back afterwards reports a change that lands later.
     ///
     /// Retention drops old backups from mapping.yaml only. VNDegen never deletes a backup folder another device might
     /// still list; Ludusavi deletes unlisted `backup-*` folders at its next backup of the game.
     ///
-    /// No lock is shared with Ludusavi or other devices. The mapping upload is set up first and waits until rsync on the
-    /// server asks for the file. Only then does a second channel read the server's mapping.yaml for the last time. As
-    /// soon as its bytes are in and checked, before that read's closing statistics and exit, the new bytes go, or the
-    /// file is skipped and the server's copy stays untouched. What remains is another device writing mapping.yaml during
-    /// about one round trip: after the server sent the bytes of that last read and before rsync renames the new file
-    /// into place. Reading the mapping back afterwards reports a change that lands later.
+    /// No lock is shared with Ludusavi or other devices. VNDegen deletes on the server only this device's own new folder
+    /// and temporary mapping, and only before its mapping goes up.
     public func backUp(_ id: GameID, judged: ServerRevision) async throws -> BackupReport {
-        guard let server = trustedServer, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
+        guard let server = settings.server, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id)
         let retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
         let pcFolders = pcFolders(id, match: match, locations: locations)
         let now = clock(), device = deviceID, afterLocalBackup = afterLocalBackup
-        let (report, synced) = try await withStore(server) { store, client in
-            let before = try await store.refreshGame(client, folder: match.folder)
-            guard judged.mapping == before.mapping else { throw SaveSyncError.changedSinceCheck }
-            let base = try before.mapping.map { try LudusaviMapping(yaml: String(decoding: $0, as: UTF8.self)) }
-            if base?.backups.isEmpty == false {
-                try await store.fetch(client, folder: match.folder, backup: nil)
+        let (report, synced) = try await withStore(server) { store in
+            let folder = match.folder
+            let base = try await store.refreshGame(folder)
+            guard judged.mapping == base else { throw SaveSyncError.changedSinceCheck }
+            if try base.map({ try LudusaviMapping(yaml: String(decoding: $0, as: UTF8.self)) })?.backups.isEmpty == false {
+                try await store.fetch(folder, backup: nil)
             }
-            let mappingURL = store.mirror.appendingPathComponent(match.folder).appendingPathComponent(LudusaviStore.mappingFile)
-            let report = try store.local.backUp(folder: match.folder, title: match.title, game: id, locations: locations, retention: retention,
+            let mappingURL = store.mirror.appendingPathComponent(folder).appendingPathComponent(LudusaviStore.mappingFile)
+            let report = try store.local.backUp(folder: folder, title: match.title, game: id, locations: locations, retention: retention,
                                                 pcFolders: pcFolders, now: now, device: device, os: os, comment: comment)
             afterLocalBackup?()
             let saves = report.saves
             guard let name = report.backup else {
-                let latest = try store.local.mapping(match.folder).summaries.last?.revision
-                return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
+                let latest = try store.local.mapping(folder).summaries.last?.revision
+                return (report, SyncRecord(folder: folder, latest: latest, saves: saves))
             }
             let pushed = try Data(contentsOf: mappingURL)
-            let comparison = Comparison()
+            // Back to the server's state in the mirror: the next read brings its mapping.yaml down again.
+            let forget = {
+                try? FileManager.default.removeItem(at: store.mirror.appendingPathComponent(folder).appendingPathComponent(name))
+                if let base { try? base.write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
+            }
             do {
-                try await store.push(client, folder: match.folder, backup: name, like: before.entries)
-                try await store.verify(client, folder: match.folder, backup: name, differential: report.isDifferential)
-                let sent = try await store.pushMapping(client, folder: match.folder, like: before.entries) {
-                    let (same, rest) = try await store.mappingIs(before.mapping, client, folder: match.folder)
-                    comparison.decided(same, rest: rest)
-                    return same
-                }
-                // The comparison's read ends after the decision. A failure there still fails the backup, without
-                // undoing a mapping already sent.
-                try await comparison.rest?.value
-                guard sent else { throw SaveSyncError.changedDuringBackup }
+                // A game's first backup creates its folder, so the store folder must exist already.
+                if base == nil { _ = try await store.countGames() }
+                try await store.push(folder, backup: name)
+                try await store.verify(folder, backup: name, differential: report.isDifferential)
+                try await store.stageMapping(folder, device: device)
             } catch {
-                // Until mapping.yaml starts going up, nothing names the new folder, and its name is this device's alone.
-                if !comparison.approved { try? await store.delete(client, folder: match.folder, names: [name]) }
-                // Back to the server's state: the next read brings its mapping.yaml down again.
-                try? FileManager.default.removeItem(at: store.mirror.appendingPathComponent(match.folder).appendingPathComponent(name))
-                if let original = before.mapping { try? original.write(to: mappingURL) } else { try? FileManager.default.removeItem(at: mappingURL) }
+                // Nothing names the new folder yet, and its name is this device's alone.
+                try? await store.discard(folder, backup: name, device: device)
+                forget()
                 throw error
             }
-            guard try await store.readGame(client, folder: match.folder).mapping == pushed else {
+            let replaced: Bool
+            do {
+                replaced = try await store.replaceMapping(folder, base: base, device: device)
+            } catch {
+                // VNDegen can't tell whether the rename happened, so it deletes nothing. Ludusavi prunes the folder if
+                // nothing lists it, and the next commit replaces the temporary file.
+                forget()
+                if error is CancellationError { throw error }
+                throw SaveSyncError.commitUnconfirmed(error.localizedDescription)
+            }
+            guard replaced else {
+                try? await store.discard(folder, backup: name, device: device)
+                forget()
+                throw SaveSyncError.changedDuringBackup
+            }
+            guard try await store.readMapping(folder) == pushed else {
                 log.error("the server's mapping of \(id.rawValue) changed right after backup \(name)")
                 throw SaveSyncError.changedAfterBackup
             }
             let latest = try LudusaviMapping(yaml: String(decoding: pushed, as: UTF8.self)).summaries.last?.revision
-            return (report, SyncRecord(folder: match.folder, latest: latest, saves: saves))
+            return (report, SyncRecord(folder: folder, latest: latest, saves: saves))
         }
         record(synced, for: id)
         if !match.inStore { storeGames[match.folder] = match.title }
@@ -483,11 +530,10 @@ public final class SaveSyncService {
 
     /// `status`, with the server state it judged, for a backup that must start from that state.
     public func check(_ id: GameID) async throws -> SyncCheck {
-        guard let server = trustedServer, let match = match(for: id) else { throw SaveSyncError.notSetUp }
+        guard let server = settings.server, let match = match(for: id) else { throw SaveSyncError.notSetUp }
         let locations = try saveLocations(id), previous = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0 : nil }
-        let (check, inSync) = try await withStore(server) { store, client -> (SyncCheck, SyncRecord?) in
-            let state = try await store.refreshGame(client, folder: match.folder)
-            let revision = ServerRevision(mapping: state.mapping)
+        let (check, inSync) = try await withStore(server) { store -> (SyncCheck, SyncRecord?) in
+            let revision = ServerRevision(mapping: try await store.refreshGame(match.folder))
             let local = try LudusaviStore.localHashes(locations)
             guard let latest = try? store.local.latestHashes(folder: match.folder, locations: locations),
                   let summary = try store.local.mapping(match.folder).summaries.last else {
@@ -515,7 +561,7 @@ public final class SaveSyncService {
     /// Before a game starts: a newer backup from another device, or a conflict, when there is one. Nil when there is
     /// nothing to ask, the check is off, or the server did not answer within a few seconds.
     public func launchOffer(_ id: GameID) async -> SyncStatus? {
-        guard checkBeforeLaunch, trustedServer != nil else { return nil }
+        guard checkBeforeLaunch, settings.server != nil else { return nil }
         let check = Task { try await status(for: id) }
         switch await Self.value(of: check, within: timeouts.launchCheck) {
         case let offer?: switch offer {
@@ -523,7 +569,8 @@ public final class SaveSyncService {
             default: return nil
             }
         case nil:
-            // Cancelling closes the check's connection, so the operations queued behind it don't wait for the server.
+            // Cancelling ends the check's rclone call at its next step, or a request already sent when its answer is in
+            // or nothing arrives for the idle deadline. The operations queued behind it start once it has ended.
             check.cancel()
             log.notice("no save check for \(id.rawValue) before launch")
             return nil
@@ -543,7 +590,7 @@ public final class SaveSyncService {
     /// changed too. That conflict waits for the user at the next launch or on the game page. The backup refuses to run
     /// when the server changed after the check, which then waits for the user the same way.
     public func sessionEnded(_ id: GameID) async {
-        guard autoBackup, trustedServer != nil else { return }
+        guard autoBackup, settings.server != nil else { return }
         do {
             let judged = try await check(id)
             switch judged.status {
@@ -559,7 +606,7 @@ public final class SaveSyncService {
     /// Where the game keeps saves here, and where its latest backup recorded them.
     public func locations(for id: GameID) -> [SaveLocationInfo] {
         guard let locations = try? saveLocations(id) else { return [] }
-        let latest = match(for: id).flatMap { try? RemoteStore(path: ".", mirror: mirror).local.mapping($0.folder).effectiveFiles() } ?? [:]
+        let latest = match(for: id).flatMap { try? LudusaviStore(root: mirror).mapping($0.folder).effectiveFiles() } ?? [:]
         let recorded = LudusaviStore.RecordedPaths(latest.keys, locations: locations)
         return locations.indices.map { SaveLocationInfo(device: locations[$0].directory.path, recorded: recorded.commonFolder[$0]) }
     }
@@ -581,31 +628,15 @@ public final class SaveSyncService {
 
     // MARK: Plumbing
 
-    private var trustedServer: SaveServer? {
-        settings.server.flatMap { $0.hostKey == nil ? nil : $0 }
-    }
-
-    /// Runs `work` with one connection to the server, after every operation started before it. When `timeouts.operation`
-    /// passes or the caller is cancelled, cancels the connection attempt or closes the connection, which ends every read
-    /// and write waiting on it, so a stalled server never holds up the operations after this one. The connector must
-    /// end when cancelled, as `SSHConnection.connect` does.
-    private func withStore<T: Sendable>(_ server: SaveServer, _ work: @escaping @Sendable (RemoteStore, RsyncClient) async throws -> T) async throws -> T {
-        let store = RemoteStore(path: server.path, mirror: mirror), connector = connector, limit = timeouts.operation
+    /// Runs `work` with the store, after every operation started before it. When `timeouts.operation` passes or the
+    /// caller is cancelled, cancels the rclone call in progress. That call ends at rclone's next step, or a request
+    /// already sent when its answer is in or nothing arrives for the idle deadline, and the operation ends with it. The
+    /// operations after this one wait until then: a server that keeps trickling bytes can hold them longer.
+    private func withStore<T: Sendable>(_ server: SaveServer, _ work: @escaping @Sendable (RemoteStore) async throws -> T) async throws -> T {
+        let connector = connector, mirror = mirror, limit = timeouts.operation, limits = timeouts.rclone
         return try await serialized {
             let job = Task {
-                let connection = try await connector(server)
-                do {
-                    let result = try await withTaskCancellationHandler {
-                        try await work(store, RsyncClient(connection: connection))
-                    } onCancel: {
-                        Task { await connection.close() }
-                    }
-                    await connection.close()
-                    return result
-                } catch {
-                    await connection.close()
-                    throw error
-                }
+                try await work(RemoteStore(access: connector(server), mirror: mirror, limits: limits, path: server.path))
             }
             let deadline = Task {
                 do { try await Task.sleep(for: limit) } catch { return false }
@@ -746,20 +777,5 @@ struct LudusaviConfig {
            let differential = backup?["retention"]?["differential"]?.string.flatMap({ Int($0) }) {
             retention = Retention(full: full, differential: differential)
         }
-    }
-}
-
-/// The last mapping comparison of a backup, recorded by the upload's confirm closure: whether it let the mapping go,
-/// and the rest of its read, which ends after the decision.
-private final class Comparison: @unchecked Sendable {
-    private let lock = NSLock()
-    private var same = false
-    private var remainder: Task<Void, any Error>?
-
-    var approved: Bool { lock.withLock { same } }
-    var rest: Task<Void, any Error>? { lock.withLock { remainder } }
-
-    func decided(_ same: Bool, rest: Task<Void, any Error>) {
-        lock.withLock { (self.same, remainder) = (same, rest) }
     }
 }

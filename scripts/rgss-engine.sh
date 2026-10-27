@@ -2,8 +2,8 @@
 # Runs on a Mac. Builds the RGSS engine (RPG Maker XP, VX and VX Ace) from Engines/RGSS:
 #   <dest>/RGSS.xcframework   the framework VNDegen embeds: iOS device and simulator, and macOS, all arm64. It holds
 #                             mkxp-z's libretro core, ANGLE, and VNDegen's frontend (Engines/RGSS/host)
-#   <dest>/licenses/          the core's, ANGLE's, and their dependencies' licenses, one text file each, plus where
-#                             to get the source of this build
+#   <dest>/licenses/          the notices of mkxp-z, with where to get the source of this build, and of ANGLE and
+#                             every dependency, one text file each, as scripts/licenses/README.md describes
 #   scripts/rgss-engine.sh build/rgss
 # The core comes from the pinned commit of mkxp-z's libretro branch below, with Engines/RGSS/patches applied. ANGLE's
 # Meson build comes from a pinned mkxp-z commit too. Builds happen in two stages, as the core's own libretro/README.md
@@ -167,31 +167,54 @@ xcodebuild -create-xcframework -framework "$work/frameworks/ios/RGSS.framework" 
   -framework "$work/frameworks/ios-simulator/RGSS.framework" -framework "$work/frameworks/macos/RGSS.framework" \
   -output "$dest/RGSS.xcframework" >/dev/null
 
-# Licenses: the core's, then every dependency the core or ANGLE builds from source, then where the source is.
-mkdir -p "$dest/licenses"
-cp "$work/core/COPYING" "$dest/licenses/RGSS engine, mkxp-z (GPL-2.0-or-later).txt"
+# Notices, one text file each, as scripts/licenses/README.md describes: mkxp-z's own with where to get the source of
+# this build, then those of every dependency the core or ANGLE builds from source, then the code with no license file
+# in its source folder, whose texts are in Engines/RGSS/licenses. A source folder with no license and no text there
+# fails the build, so a new dependency can't ship without its notice.
+licenses="$dest/licenses"
+rm -rf "$licenses" && mkdir -p "$licenses"
+{
+  echo "mkxp-z libretro core, $core_repo at $core_commit"
+  echo
+  cat "$src/licenses/source.txt"
+  echo
+  echo "This build used:"
+  echo "  mkxp-z libretro core: $core_repo/tree/$core_commit"
+  echo "  ANGLE's Meson build: $angle_repo/tree/$angle_commit"
+  echo "  VNDegen's patches, frontend, and build script: the Engines/RGSS folder and scripts/rgss-engine.sh of VNDegen's"
+  echo "  source at https://github.com/ChronoStriker1/vndegen"
+  printf '\n\n-------- COPYING --------\n\n'
+  cat "$work/core/COPYING"
+} > "$licenses/mkxp-z.txt"
 for folder in "$work/core/subprojects"/*/ "$work/subprojects"/angle-*/ "$work/subprojects"/xxHash-*/; do
   name=$(basename "$folder")
-  [ "$name" = packagefiles ] || [ "$name" = packagecache ] || [ "$name" = common ] && continue
-  for file in "$folder"COPYING "$folder"COPYING.* "$folder"LICENSE "$folder"LICENSE.* "$folder"LICENCE "$folder"License.txt; do
-    [ -f "$file" ] && cat "$file" >> "$dest/licenses/RGSS engine, $name.txt"
+  case "$name" in packagefiles | packagecache | common) continue ;; esac
+  files=()
+  for file in "$folder"*; do
+    case "$(basename "$file" | tr '[:upper:]' '[:lower:]')" in
+      licen[cs]e* | copying* | notice*) if [ -f "$file" ]; then files+=("$file"); fi ;;
+    esac
   done
+  if [ ${#files[@]} -eq 0 ]; then
+    case "$name" in
+      boost_*) continue ;; # header-only Boost libraries, all under the Boost license below
+      libretro-common) file="$src/licenses/libretro-common.txt" ;;
+      egl-registry) file="$src/licenses/Khronos EGL headers.txt" ;;
+      opengl-registry) file="$src/licenses/Khronos OpenGL headers.txt" ;;
+      *) echo "error: $name has no license file, add its notice to Engines/RGSS/licenses" >&2; exit 1 ;;
+    esac
+    cp "$file" "$licenses/mkxp-z - $name.txt"
+    continue
+  fi
+  {
+    echo "$name"
+    for file in "${files[@]}"; do printf '\n\n-------- %s --------\n\n' "$(basename "$file")"; cat "$file"; done
+  } > "$licenses/mkxp-z - $name.txt"
 done
-# Components whose license no source folder above holds: Ruby and libyaml, built in stage 1, whose sources are not
-# kept, header-only Boost, and what the core embeds.
-for file in "$src"/licenses/*.txt; do
-  name=$(basename "$file")
-  [ "$name" = source.txt ] || cp "$file" "$dest/licenses/RGSS engine, $name"
+# Ruby and libyaml, built in stage 1, whose sources are not kept, Boost, and what the core embeds.
+for name in Ruby libyaml Boost "Liberation Sans font" "SDL GameControllerDB" "GMGSx soundfont"; do
+  cp "$src/licenses/$name.txt" "$licenses/mkxp-z - $name.txt"
 done
-cat "$src/licenses/source.txt" > "$dest/licenses/RGSS engine source.txt"
-cat >> "$dest/licenses/RGSS engine source.txt" <<EOF
-
-This build used:
-  mkxp-z libretro core: $core_repo/tree/$core_commit
-  ANGLE's Meson build: $angle_repo/tree/$angle_commit
-  VNDegen's patches, frontend, and build script: the Engines/RGSS folder and scripts/rgss-engine.sh of VNDegen's
-  source at https://github.com/ChronoStriker1/vndegen
-EOF
 
 echo "$stamp" > "$dest/.vndegen-engine"
 echo "RGSS engine built in $dest in $(($(date +%s) - start)) s"

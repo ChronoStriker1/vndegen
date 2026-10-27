@@ -10,7 +10,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.4.1"
+    MARKETING_VERSION: "0.4.3"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   VNDegen:
@@ -79,8 +79,8 @@ targets:
           rsync -a --delete "$SRCROOT/build/rgss/RGSS.xcframework/$slice/RGSS.framework/" "$dest/"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
           codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
-      # Settings lists each file in Licenses. Licenses/ holds those of code built into the app itself, and each engine
-      # build collects its own and its dependencies' into build/<engine>/licenses.
+      # Settings lists each file in Licenses. Each runtime's script writes its notices to build/<runtime>/licenses, as
+      # scripts/licenses/README.md describes.
       - name: Bundle third-party licenses
         basedOnDependencyAnalysis: false
         shell: /bin/bash
@@ -88,7 +88,7 @@ targets:
           set -euo pipefail
           dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Licenses"
           rm -rf "$dest" && mkdir -p "$dest"
-          for folder in "$SRCROOT/Licenses" "$SRCROOT"/build/*/licenses; do
+          for folder in "$SRCROOT"/build/*/licenses; do
             [ -d "$folder" ] && rsync -a "$folder/" "$dest/"
           done
     info:
@@ -120,8 +120,8 @@ targets:
               public.filename-extension: [7z]
               public.mime-type: [application/x-7z-compressed]
         NSFaceIDUsageDescription: Unlock hidden games.
-        # Save sync connects to the user's Ludusavi server over SSH, usually on the home network.
-        NSLocalNetworkUsageDescription: VNDegen connects to your Ludusavi server to back up and restore game saves.
+        # Save sync connects to the user's Ludusavi share, usually on the home network.
+        NSLocalNetworkUsageDescription: VNDegen connects to your Ludusavi share over SMB to back up and restore game saves.
         UILaunchScreen: {}
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false

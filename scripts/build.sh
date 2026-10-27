@@ -10,8 +10,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 xcodegen generate --quiet
+# Save sync's rclone library, which the package links on every platform.
+scripts/rclone-runtime.sh
+scripts/app-licenses.sh
 # The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
 case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
+
+# The app's Licenses page lists the notices that each bundled runtime writes to build/<runtime>/licenses/. An app build
+# fails when one of these has none, so a missing notice can't reach a release. A new runtime adds its name here.
+licensed=(rclone renpy rgss app)
+require_licenses() {
+  local runtime
+  for runtime in "${licensed[@]}"; do
+    ls "build/$runtime/licenses/"*.txt >/dev/null 2>&1 || { echo "error: build/$runtime/licenses/ has no notices" >&2; exit 1; }
+  done
+}
 
 # xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS
 # engine builds first, so a failure shows its log. The app's own build phase then finds it up to date.
@@ -53,3 +66,4 @@ case "${1:?destination}" in
     ls -la build/release ;;
   *) echo "unknown destination $1" >&2; exit 2 ;;
 esac
+[ "$1" = test ] || require_licenses

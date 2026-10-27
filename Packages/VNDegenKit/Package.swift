@@ -18,13 +18,9 @@ let package = Package(
         .library(name: "Lock", targets: ["Lock"]),
         .library(name: "HubUI", targets: ["HubUI"]),
         .library(name: "SaveSync", targets: ["SaveSync"]),
-        .library(name: "Rsync", targets: ["Rsync"]),
+        .library(name: "Rclone", targets: ["Rclone"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
         .library(name: "RuntimePackages", targets: ["RuntimePackages"]),
-    ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
-        .package(url: "https://github.com/apple/swift-nio-ssh.git", from: "0.9.1"),
     ],
     targets: [
         .target(name: "VNCore"),
@@ -44,14 +40,11 @@ let package = Package(
         .target(name: "Metadata", dependencies: ["VNCore"]),
         .target(name: "Lock", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
-        .target(name: "SaveSync", dependencies: ["VNCore", "Rsync"]),
-        // The rsync wire protocol, client side, and the SSH connection it runs over.
-        .target(name: "Rsync", dependencies: [
-            .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-            .product(name: "NIOCore", package: "swift-nio"),
-            .product(name: "NIOPosix", package: "swift-nio"),
-            .product(name: "NIOSSH", package: "swift-nio-ssh"),
-        ]),
+        .target(name: "SaveSync", dependencies: ["VNCore", "Rclone"]),
+        // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
+        .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
+        .target(name: "Rclone", dependencies: ["CRclone"],
+                linkerSettings: [.linkedFramework("CoreFoundation"), .linkedFramework("Security"), .linkedLibrary("resolv")]),
         // The system libarchive plus zlib's infback9 for Deflate64. Lives inside ArchiveImport's folder.
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
@@ -60,7 +53,7 @@ let package = Package(
         // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
-        .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md"]),
+        .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"]),
@@ -72,16 +65,8 @@ let package = Package(
         .testTarget(name: "GameInputTests", dependencies: ["GameInput"]),
         .testTarget(name: "LockTests", dependencies: ["Lock"]),
         .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy"]),
-        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rsync", "RsyncTestSupport", "EngineRPGMaker", "EngineRenPy"],
-                    exclude: ["Fixtures"]),
-        .target(name: "RsyncTestSupport", dependencies: ["Rsync"], path: "Tests/RsyncTestSupport"),
-        .testTarget(name: "RsyncTests", dependencies: [
-            "Rsync", "RsyncTestSupport",
-            .product(name: "NIOCore", package: "swift-nio"),
-            .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-            .product(name: "NIOPosix", package: "swift-nio"),
-            .product(name: "NIOSSH", package: "swift-nio-ssh"),
-        ]),
+        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
+        .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),

@@ -1,0 +1,4 @@
+module CRclone {
+    header "vndegen_rclone.h"
+    export *
+}
