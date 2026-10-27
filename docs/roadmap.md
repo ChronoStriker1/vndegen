@@ -19,10 +19,10 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - RPG Maker XP, VX, and VX Ace on Mac, iPhone, and iPad, built on mkxp-z's libretro core in the app, Apple silicon only on Mac, with the RTPs downloaded and installed in the app (0.5.0). `docs/rgss-spike.md` has the feasibility test and what was built.
 - License notices in Settings, Licenses, for every third-party component in the app (0.5.0).
 - The real fix for RPG Maker MZ's "RangeError: length cannot be negative": sounds with Ogg names that hold WAV or MP3 data play through the system decoder, and a decoder failure no longer stops the game (0.5.1).
+- KiriKiri 2 and KiriKiri Z on Mac, iPhone, and iPad, built on krkrsdl3, with the common ciphers, Windows plugins, and movie formats built in (0.6.0).
 
 ## In progress
-Each item is planned work on its own branch, not merged into `dev`.
-- KiriKiri (`ws/kirikiri`) on Mac, iPhone, and iPad, built on krkrsdl3.
+Each item is planned work on its own branch, not merged into `dev`. Nothing is in progress.
 
 ## Next
 1. Together, as the next work:
