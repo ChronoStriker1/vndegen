@@ -111,17 +111,21 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     try store.set("game//root_save", sol.base64EncodedString())
     try store.set("game/game.swf/#folder/slot", sol.base64EncodedString())
     try store.set("volume", "0.5")
+    // Ruffle percent-encodes the movie's path, as its URL has it, and not the shared object's own name.
+    try store.set("game/My%20Game/%E6%89%93%E5%80%92.swf/セーブ", sol.base64EncodedString())
 
     let saves = root.appendingPathComponent("SharedObjects")
     #expect(try Data(contentsOf: saves.appendingPathComponent("sub/scene.swf/save_data.sol")) == sol)
     #expect(try Data(contentsOf: saves.appendingPathComponent("root_save.sol")) == sol)
     #expect(try Data(contentsOf: saves.appendingPathComponent("game.swf/#folder/slot.sol")) == sol)
+    #expect(try Data(contentsOf: saves.appendingPathComponent("My Game/打倒.swf/セーブ.sol")) == sol)
     #expect(!FileManager.default.fileExists(atPath: saves.appendingPathComponent("volume").path))
 
     let loaded = try store.load()
     #expect(loaded == [
         "game/sub/scene.swf/save_data": sol.base64EncodedString(), "game//root_save": sol.base64EncodedString(),
         "game/game.swf/#folder/slot": sol.base64EncodedString(), "volume": "0.5",
+        "game/My%20Game/%E6%89%93%E5%80%92.swf/セーブ": sol.base64EncodedString(),
     ])
     try store.remove("game//root_save")
     #expect(try store.load()["game//root_save"] == nil)

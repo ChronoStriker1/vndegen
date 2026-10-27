@@ -5,9 +5,9 @@ import WebRuntime
 /// from the PC unchanged.
 ///
 /// Ruffle names a shared object `<host>/<local path>/<name>` and stores its `.sol` bytes in Base64. The local path is
-/// the movie's path in the game folder, or the shorter one the movie asked for, and is empty for `/`. The file is
-/// `<local path>/<name>.sol` here, as Flash Player keeps it under `#SharedObjects/<id>/localhost/`. Any other key goes
-/// to `others`.
+/// the movie's path in the game folder, or the shorter one the movie asked for, and is empty for `/`. It comes from the
+/// movie's URL, so it is percent-encoded, as `My%20Game/game.swf`. The file is `<local path>/<name>.sol` here, decoded,
+/// as Flash Player keeps it under `#SharedObjects/<id>/localhost/`. Any other key goes to `others`.
 nonisolated struct SharedObjectStore: PageStorage {
     let directory: URL
     let others: WebStorage
@@ -53,20 +53,42 @@ nonisolated struct SharedObjectStore: PageStorage {
         Self.file(forKey: key).map { directory.appendingPathComponent($0 + Self.suffix) }
     }
 
-    /// `game/sub/movie.swf/save` is `sub/movie.swf/save`, and `game//save`, from a local path of `/`, is `save`. Nil for
-    /// keys of another host, and for any part that is empty, `.`, `..`, or hidden, which Ruffle never makes.
+    /// `game/My%20Game/movie.swf/save` is `My Game/movie.swf/save`, and `game//save`, from a local path of `/`, is
+    /// `save`. Only the local path is percent-encoded. The name is as the movie gave it, and one with slashes in it
+    /// starts with `#`, as in `game/movie.swf/#saves/slot1`. Nil for keys of another host, and for any part that is
+    /// empty, `.`, `..`, hidden, or holds a `/` once decoded, which Ruffle never makes.
     static func file(forKey key: String) -> String? {
         guard key.hasPrefix(host + "/") else { return nil }
-        var parts = key.dropFirst(host.count + 1).split(separator: "/", omittingEmptySubsequences: false)
+        var parts = key.dropFirst(host.count + 1).split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if parts.first == "", parts.count == 2 { parts.removeFirst() }
-        guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return nil }
-        return parts.joined(separator: "/")
+        let split = nameStart(parts)
+        let names = parts[..<split].map { $0.removingPercentEncoding ?? $0 } + parts[split...]
+        guard !names.isEmpty, names.allSatisfy(isSafe) else { return nil }
+        return names.joined(separator: "/")
     }
 
-    /// The inverse of `file(forKey:)`, for a file path relative to the directory without `.sol`.
+    /// The inverse of `file(forKey:)`, for a file path relative to the directory without `.sol`. The local path is
+    /// percent-encoded as a URL path encodes it, so the key is the one Ruffle asks for.
     static func key(forFile relative: String) -> String? {
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
-        guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") }) else { return nil }
-        return parts.count == 1 ? "\(host)//\(relative)" : "\(host)/\(relative)"
+        let names = relative.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !names.isEmpty, names.allSatisfy(isSafe) else { return nil }
+        let split = nameStart(names)
+        let path = names[..<split].map { $0.addingPercentEncoding(withAllowedCharacters: pathAllowed) ?? $0 }
+        let key = (path + names[split...]).joined(separator: "/")
+        return path.isEmpty ? "\(host)//\(key)" : "\(host)/\(key)"
     }
+
+    /// Where the shared object's name starts: at the first part that starts with `#`, or else the last part.
+    private static func nameStart(_ parts: [String]) -> Int {
+        parts.firstIndex { $0.hasPrefix("#") } ?? max(parts.count - 1, 0)
+    }
+
+    private static func isSafe(_ name: String) -> Bool {
+        !name.isEmpty && !name.hasPrefix(".") && !name.contains("/") && !name.contains("\0")
+    }
+
+    /// What a URL path leaves as it is: printable ASCII but the space, `"`, `#`, `<`, `>`, `?`, `` ` ``, `{`, and `}`.
+    /// Everything else, such as Japanese, is percent-encoded as UTF-8.
+    private static let pathAllowed = CharacterSet(charactersIn: Unicode.Scalar(0x21) ... Unicode.Scalar(0x7E))
+        .subtracting(CharacterSet(charactersIn: "\"#<>?`{}"))
 }
