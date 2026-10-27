@@ -549,8 +549,16 @@ impl CoreRuntime {
         };
         self.finish_inline_event_frame(drain.wait.is_some(), drain.saw_call, drain.saw_jump);
         if let Some(event) = drain.wait {
+            // A transition or a video a handler queued waits until it ends,
+            // as one in the script does, not for a click (VNDegen).
             self.wait_reason = Some(match event {
                 Event::Wait { reason } => reason,
+                Event::Trans { .. } => WaitReason::Stop {
+                    reason: Some("trans".into()),
+                },
+                Event::VideoPlay { id: None, .. } => WaitReason::Stop {
+                    reason: Some("video".into()),
+                },
                 _ => WaitReason::Generic,
             });
         }
