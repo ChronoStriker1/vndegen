@@ -32,15 +32,15 @@ files, unchanged. They match Ren'Py 8.5.3.26051504 and 7.8.7.25031702, whose lib
   and the libm header from `src/libm/e_atan2.c`. FreeType's adds the licenses of its BDF and PCF drivers (their
   READMEs and `src/pcf/pcfutil.c`), `src/base/fthash.c`, and `src/base/md5.c`. HarfBuzz's adds the header of
   `src/hb-ucd.cc`, and SDL2_image's the headers of `nanosvg.h` and `nanosvgrast.h`.
-
-Notices for code a library carries from other projects go in that library's file. To find such code, look for its
-symbols in the built binaries (`nm`), as was done for the files above.
 - From Ren'Py's repository at the 8.5.3.26051504 tag: libhydrogen (`src/libhydrogen/LICENSE`) and tinyfiledialogs
   (the license in `src/tinyfiledialogs/tinyfiledialogs.h`).
 - From PyPI, at the versions renpy-build installs for Ren'Py 8: future, six, rsa, pyasn1, ecdsa, urllib3, chardet,
   certifi, idna, requests, pefile, websockets, and PySocks. typing and win_inet_pton at Ren'Py 7's versions. The
   Apache License 2.0 in `rsa.txt` is the copy in requests' `LICENSE`, and the Mozilla Public License 2.0 in
   `certifi.txt` is https://www.mozilla.org/media/MPL/2.0/index.txt.
+
+Notices for code a library carries from other projects go in that library's file. To find such code, look for its
+symbols in the built binaries (`nm`), as was done for the files above.
 
 `How VNDegen meets the LGPL.txt` is VNDegen's own.
 
