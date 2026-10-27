@@ -141,18 +141,17 @@ struct OnScreenKeyboardView: View {
     }
 
     private var hints: some View {
-        HStack(spacing: 14) {
-            hint("A", "Type")
-            hint("X", "Delete")
-            hint("LB", "Shift")
-            hint("RB", "Symbols")
-            hint("Y", "Done")
-            hint("B", "Close")
+        let hints = [("A", "Type"), ("X", "Delete"), ("LB", "Shift"), ("RB", "Symbols"), ("Y", "Done"), ("B", "Close")]
+        // One row where it fits, and two on a phone.
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) { ForEach(hints, id: \.0) { hint($0, $1) } }
+            VStack(spacing: 6) {
+                HStack(spacing: 14) { ForEach(hints.prefix(3), id: \.0) { hint($0, $1) } }
+                HStack(spacing: 14) { ForEach(hints.suffix(3), id: \.0) { hint($0, $1) } }
+            }
         }
         .font(.system(size: 12, weight: .semibold))
         .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
         .frame(maxWidth: .infinity)
     }
 
@@ -166,5 +165,6 @@ struct OnScreenKeyboardView: View {
                 .background(.white.opacity(0.18), in: .capsule)
             Text(action)
         }
+        .fixedSize()
     }
 }
