@@ -22,6 +22,11 @@ public:
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
 
+	// Godot's X11 alert is a dialog that blocks the test run.
+	void alert(const String &p_alert, const String &p_title = "ALERT!") override {
+		ERR_PRINT(p_title + ": " + p_alert);
+	}
+
 protected:
 	void initialize_core() override {
 		OS_X11::initialize_core();

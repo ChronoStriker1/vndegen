@@ -117,13 +117,14 @@ index 01ea731..a2ccbff 100644
  
  	int decompressed_size = decode_uint32(&buf[8]);
  
-@@ -159,10 +165,12 @@ Error GDScriptTokenizerBuffer::set_code_buffer(const Vector<uint8_t> &p_buffer)
+@@ -159,10 +165,13 @@ Error GDScriptTokenizerBuffer::set_code_buffer(const Vector<uint8_t> &p_buffer)
++	// Version 100 has an unused field before the token count.
++	const int header_len = format_version == 100 ? 20 : 16;
++	ERR_FAIL_COND_V_MSG(total_len < header_len, ERR_INVALID_DATA, "Binary GDScript is too short.");
  	uint32_t identifier_count = decode_uint32(&buf[0]);
  	uint32_t constant_count = decode_uint32(&buf[4]);
  	uint32_t token_line_count = decode_uint32(&buf[8]);
 -	uint32_t token_count = decode_uint32(&buf[12]);
-+	// Version 100 has an unused field before the token count.
-+	const int header_len = format_version == 100 ? 20 : 16;
 +	uint32_t token_count = decode_uint32(&buf[header_len - 4]);
  
 -	const uint8_t *b = &buf[16];

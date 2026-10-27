@@ -5,6 +5,7 @@
 
 #include "vngd_files.h"
 
+#include "core/os/os.h"
 #include "core/string/ustring.h"
 
 #include <vnfont.h>
@@ -23,6 +24,10 @@ public:
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }
 	String get_user_data_dir(const String &p_user_dir) const override { return data_path.path_join(p_user_dir); }
+
+	// Godot's own alert is a modal dialog, which would stop VNDegen's app. VNDegen reports a game that can't start
+	// itself, so alerts go to the log.
+	void alert(const String &p_alert, const String &p_title = "ALERT!") override { OS::alert(p_alert, p_title); }
 
 	void initialize_core() override {
 		Base::initialize_core();

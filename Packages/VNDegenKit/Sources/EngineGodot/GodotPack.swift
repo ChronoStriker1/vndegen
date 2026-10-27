@@ -32,22 +32,34 @@ nonisolated struct GodotPack: Equatable, Sendable {
         "application/config/name", "application/config/use_custom_user_dir", "application/config/custom_user_dir_name",
     ]
 
-    /// Where the game keeps `user://`, relative to the Windows %APPDATA% folder, as Godot names it:
-    /// `Godot/app_userdata/<project name>`, or the project's own folder name.
+    /// Where the game keeps `user://`, relative to the Windows %APPDATA% folder, as the Godot that runs it names it:
+    /// `Godot/app_userdata/<project name>`, or the project's own folder name. A project without a name gets no folder
+    /// of its own.
     var userDirectory: String {
-        let name = Self.safeDirectoryName(settings["application/config/name"].flatMap(\.string) ?? "")
+        let name = Self.safeDirectoryName(settings["application/config/name"].flatMap(\.string) ?? "", major: major)
+        guard !name.isEmpty else { return "Godot/app_userdata/[unnamed project]" }
         if settings["application/config/use_custom_user_dir"] == .bool(true) {
-            let custom = Self.safeDirectoryName(settings["application/config/custom_user_dir_name"].flatMap(\.string) ?? "", allowPaths: true)
-            return custom.isEmpty ? (name.isEmpty ? "[unnamed project]" : name) : custom
+            let custom = Self.safeDirectoryName(settings["application/config/custom_user_dir_name"].flatMap(\.string) ?? "",
+                                                allowPaths: true, major: major)
+            return custom.isEmpty ? name : custom
         }
-        return "Godot/app_userdata/" + (name.isEmpty ? "[unnamed project]" : name)
+        return "Godot/app_userdata/" + name
     }
 
-    /// `OS::get_safe_dir_name`: invalid characters become dashes.
-    static func safeDirectoryName(_ name: String, allowPaths: Bool = false) -> String {
-        var safe = name.replacingOccurrences(of: "\\", with: allowPaths ? "/" : "-").trimmingCharacters(in: .whitespaces)
+    /// `OS::get_safe_dir_name` of the Godot that runs the game, 4.7 or 3.6: invalid characters become dashes, and
+    /// Godot 4 also drops trailing periods, as Windows does, and renames `.` and `..`.
+    static func safeDirectoryName(_ name: String, allowPaths: Bool = false, major: Int) -> String {
+        // Godot's strip_edges drops every character up to the space.
+        let edges = CharacterSet(charactersIn: "\u{0}"..."\u{20}")
+        var safe = name.replacingOccurrences(of: "\\", with: "/")
+        if allowPaths, major >= 4 { safe = safe.replacingOccurrences(of: "//", with: "/") }
+        safe = safe.trimmingCharacters(in: edges)
+        if !allowPaths, major >= 4, let renamed = [".": "dot", "..": "twodots"][safe] { safe = renamed }
         for character in [":", "*", "?", "\"", "<", ">", "|"] + (allowPaths ? [".."] : ["/"]) {
             safe = safe.replacingOccurrences(of: character, with: "-")
+        }
+        if major >= 4 {
+            while safe.hasSuffix(".") { safe.removeLast() }
         }
         return safe
     }
@@ -98,11 +110,13 @@ nonisolated struct GodotPack: Equatable, Sendable {
         }
         // Godot 3, and Godot 4 executables from other tools: the pack's size and magic end the file.
         guard let end = try? file.seekToEnd(), end >= 12, file.readUInt32(at: end - 4) == magic,
-              let size = file.readUInt64(at: end - 12), size + 12 <= end else { return nil }
+              let size = file.readUInt64(at: end - 12), size <= end - 12 else { return nil }
         let offset = end - 12 - size
         return file.readUInt32(at: offset) == magic ? offset : nil
     }
 
+    /// Offsets in a pack come from the file, so they add with wrapping: a bad one points past the end, where every read
+    /// fails, rather than trapping.
     private static func read(_ file: FileHandle, at offset: UInt64) -> GodotPack? {
         // Magic, format, version, then from format 2 on flags and file base, and from format 3 on the directory offset.
         guard let header = file.read(at: offset, count: 40) else { return nil }
@@ -115,18 +129,18 @@ nonisolated struct GodotPack: Equatable, Sendable {
         var fileBase = offset
         if format >= 2 {
             flags = header.uint32(at: 20)
-            fileBase = header.uint64(at: 24) + (flags & 2 != 0 || format >= 3 ? offset : 0)
+            fileBase = header.uint64(at: 24) &+ (flags & 2 != 0 || format >= 3 ? offset : 0)
             cursor += 4 + 8 // flags, file base
         }
         if format >= 3 {
-            cursor = offset + header.uint64(at: 32) // directory offset
+            cursor = offset &+ header.uint64(at: 32) // directory offset
         } else {
             cursor += 16 * 4 // reserved
         }
         var pack = GodotPack(major: major, minor: minor, patch: patch, format: format, offset: offset,
                              encryptedDirectory: flags & 1 != 0, files: [])
         guard !pack.encryptedDirectory, let count = file.readUInt32(at: cursor) else { return pack }
-        cursor += 4
+        cursor &+= 4
         // Each entry: path length, path, offset, size, MD5, and from format 2 on, flags.
         let entryTail: UInt64 = 8 + 8 + 16 + (format >= 2 ? 4 : 0)
         var files: [String] = []
@@ -134,15 +148,15 @@ nonisolated struct GodotPack: Equatable, Sendable {
         var project: (offset: UInt64, size: UInt64)?
         for _ in 0..<min(count, 200_000) {
             guard let length = file.readUInt32(at: cursor), length < 4096,
-                  let path = file.read(at: cursor + 4, count: Int(length)) else { break }
-            let entry = cursor + 4 + UInt64(length)
-            cursor = entry + entryTail
+                  let path = file.read(at: cursor &+ 4, count: Int(length)) else { break }
+            let entry = cursor &+ 4 &+ UInt64(length)
+            cursor = entry &+ entryTail
             // Bit 0 of an entry's flags marks an encrypted file.
-            if format >= 2, let flags = file.readUInt32(at: cursor - 4), flags & 1 != 0 { pack.encryptedFiles += 1 }
+            if format >= 2, let flags = file.readUInt32(at: cursor &- 4), flags & 1 != 0 { pack.encryptedFiles += 1 }
             var name = String(decoding: path.prefix { $0 != 0 }, as: UTF8.self)
             if name.hasPrefix("res://") { name.removeFirst(6) }
-            if name == "project.binary", let start = file.readUInt64(at: entry), let size = file.readUInt64(at: entry + 8) {
-                project = (fileBase + start, size)
+            if name == "project.binary", let start = file.readUInt64(at: entry), let size = file.readUInt64(at: entry &+ 8) {
+                project = (fileBase &+ start, size)
             }
             files.append(name)
         }
@@ -189,7 +203,9 @@ nonisolated struct GodotPack: Equatable, Sendable {
 
 nonisolated private extension FileHandle {
     func read(at offset: UInt64, count: Int) -> Data? {
-        guard (try? seek(toOffset: offset)) != nil, let data = try? read(upToCount: count), data.count == count else { return nil }
+        // Offsets past Int64 can't be seeked to, and Foundation may trap on them.
+        guard offset <= UInt64(Int64.max), (try? seek(toOffset: offset)) != nil, let data = try? read(upToCount: count),
+              data.count == count else { return nil }
         return data
     }
 

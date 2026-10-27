@@ -28,7 +28,7 @@ Both frameworks are arm64 only, so an Intel Mac lists Godot games but can't run 
 VNDegen sends all input itself, through `vngd.h`. Godot reads no controller of its own.
 
 - Controllers reach a game as one Xbox controller, in Godot's own button and axis numbers. The triggers are axes, and in Godot 3 also the buttons L2 and R2, as Godot's XInput driver reports them.
-- Keys are sent by their USB HID usage, as UIKit reports them and VNDegen maps macOS keys to them.
+- Keys are sent by their USB HID usage, as UIKit reports them and VNDegen maps macOS keys to them, with the character each types, so a hardware keyboard types into a game's text fields. Keys don't repeat while held. The keyboard reaches the game only while it runs, not while VNDegen's menu is open.
 - Touches work as the mouse, so a tap clicks where it lands. The touch mouse and a Mac's mouse are Godot's mouse.
 - VNDegen's on-screen keyboard types into a game's text field, and the game sees the text as typed keys. A text field taking focus doesn't open the keyboard by itself: the player opens it with a button mapped to Show keyboard.
 
@@ -66,4 +66,5 @@ The game page says why:
 
 - A text field taking focus doesn't open VNDegen's on-screen keyboard, as described above.
 - A game's own window size and fullscreen settings change nothing, because the game fills VNDegen's view.
+- `OS.alert()` writes its message to the game's log rather than showing a dialog.
 - Games built for the compatibility renderer run on the mobile renderer on Metal, as described above.

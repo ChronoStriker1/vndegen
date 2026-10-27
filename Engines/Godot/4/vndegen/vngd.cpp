@@ -11,7 +11,9 @@
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
 #include "scene/main/viewport.h"
+#include "servers/audio/audio_server.h"
 #include "servers/display/display_server.h"
+#include "servers/movie_writer/movie_writer.h"
 
 #include <vnfont.h>
 #include <vngd.h>
@@ -178,12 +180,12 @@ void vngd_resize(float p_width, float p_height, float p_scale) {
 	}
 }
 
-void vngd_key(int p_hid_usage, bool p_down) {
+void vngd_key(int p_hid_usage, bool p_down, uint32_t p_character) {
 	if (!state.started) {
 		return;
 	}
 	Key keycode = vngd_hid_to_key(p_hid_usage);
-	if (keycode == Key::NONE) {
+	if (keycode == Key::NONE && !p_character) {
 		return;
 	}
 	Ref<InputEventKey> event;
@@ -192,6 +194,9 @@ void vngd_key(int p_hid_usage, bool p_down) {
 	event->set_physical_keycode(keycode);
 	event->set_key_label(keycode);
 	event->set_pressed(p_down);
+	if (p_down) {
+		event->set_unicode(p_character);
+	}
 	// Modifier state, as Godot keeps it for a real keyboard.
 	Input *input = Input::get_singleton();
 	event->set_shift_pressed(keycode == Key::SHIFT ? p_down : input->is_key_pressed(Key::SHIFT));
@@ -336,6 +341,13 @@ void vngd_stop(void) {
 	}
 	if (state.setup) {
 		Main::cleanup();
+	} else {
+		// A failed Main::setup frees what it made, but the registries Main::cleanup resets for the next start still
+		// point at drivers the OS owns.
+		MovieWriter::reset();
+		AudioDriverManager::reset();
+		DisplayServer::reset();
+		SceneTree::reset_idle_callbacks();
 	}
 	vngd_platform_destroy_os(state.os);
 	std::string problem = state.problem;

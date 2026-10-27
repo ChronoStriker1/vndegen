@@ -5,11 +5,13 @@
 #include "vngd_platform.h"
 
 #include "core/engine.h"
+#include "core/io/image_loader.h"
 #include "core/os/input_event.h"
 #include "main/input_default.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/viewport.h"
+#include "servers/audio_server.h"
 
 #include <vngd.h>
 
@@ -147,12 +149,12 @@ void vngd_resize(float p_width, float p_height, float p_scale) {
 	}
 }
 
-void vngd_key(int p_hid_usage, bool p_down) {
+void vngd_key(int p_hid_usage, bool p_down, uint32_t p_character) {
 	if (!state.started) {
 		return;
 	}
 	uint32_t key = vngd_hid_to_key(p_hid_usage);
-	if (!key) {
+	if (!key && !p_character) {
 		return;
 	}
 	Ref<InputEventKey> event;
@@ -160,6 +162,9 @@ void vngd_key(int p_hid_usage, bool p_down) {
 	event->set_scancode(key);
 	event->set_physical_scancode(key);
 	event->set_pressed(p_down);
+	if (p_down) {
+		event->set_unicode(p_character);
+	}
 	event->set_shift(key == KEY_SHIFT ? p_down : input()->is_key_pressed(KEY_SHIFT));
 	event->set_control(key == KEY_CONTROL ? p_down : input()->is_key_pressed(KEY_CONTROL));
 	event->set_alt(key == KEY_ALT ? p_down : input()->is_key_pressed(KEY_ALT));
@@ -305,6 +310,11 @@ void vngd_stop(void) {
 	}
 	if (state.setup) {
 		Main::cleanup();
+	} else {
+		// A failed Main::setup frees what it made, but leaves registered the audio drivers the OS owns and the PNG
+		// loader it freed, which Main::cleanup forgets for the next start.
+		AudioDriverManager::reset();
+		ImageLoader::cleanup();
 	}
 	delete state.os;
 	std::string problem = state.problem;

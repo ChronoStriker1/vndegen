@@ -214,9 +214,11 @@ for major in $majors; do
   xcodebuild -create-xcframework "${args[@]}" -output "$dest/Godot$major.xcframework" >/dev/null
 done
 
+# The notices of the majors built. Both versions' LICENSE.txt is Godot's MIT license.
 rm -rf "$dest/licenses" && mkdir -p "$dest/licenses"
-cp "$work/godot4/LICENSE.txt" "$dest/licenses/Godot.txt"
-cp "$work/godot4/COPYRIGHT.txt" "$dest/licenses/Godot 4 third-party notices.txt"
-[ -f "$work/godot3/COPYRIGHT.txt" ] && cp "$work/godot3/COPYRIGHT.txt" "$dest/licenses/Godot 3 third-party notices.txt"
+for major in $majors; do
+  cp "$work/godot$major/LICENSE.txt" "$dest/licenses/Godot.txt"
+  cp "$work/godot$major/COPYRIGHT.txt" "$dest/licenses/Godot $major third-party notices.txt"
+done
 echo "$stamp" > "$dest/.vndegen-engine"
 echo "Godot engines built in $dest in $(($(date +%s) - start)) s"

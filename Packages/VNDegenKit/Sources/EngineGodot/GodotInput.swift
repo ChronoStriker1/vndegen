@@ -5,7 +5,8 @@ import VNCore
 /// Input the engine receives. Keys are USB HID usages, points are normalized over the view the game draws in, and the
 /// controller is the Xbox controller `vngd.h` presents.
 nonisolated enum GodotInput: Equatable, Sendable {
-    case key(Int, down: Bool)
+    /// A key, with the character it types going down, or 0.
+    case key(Int, down: Bool, character: UInt32 = 0)
     case text(String)
     case mouseMove(to: CGPoint)
     /// 1 left, 2 right.
@@ -19,7 +20,7 @@ nonisolated enum GodotInput: Equatable, Sendable {
 extension GodotEngine {
     func send(_ input: GodotInput) {
         switch input {
-        case let .key(usage, down): key(Int32(usage), down)
+        case let .key(usage, down, character): key(Int32(usage), down, character)
         case let .text(string): string.withCString(text)
         case let .mouseMove(to): mouseMove(Float(to.x), Float(to.y))
         case let .mouseButton(button, down): mouseButton(button, down)
@@ -115,13 +116,25 @@ nonisolated struct GodotInputRouter {
         case let .click(button, pressed):
             return [.mouseMove(to: pointer), .mouseButton(button == .primary ? 1 : 2, down: pressed)]
         case let .scroll(dy):
-            return [.wheel(dy / Self.pointsPerNotch)]
+            // VNDegen's scroll is positive for Wheel Down, and Godot's wheel positive for up.
+            return [.wheel(-dy / Self.pointsPerNotch)]
         }
     }
 
-    /// A key from the hardware keyboard.
-    mutating func hostKey(_ usage: Int, pressed: Bool) -> [GodotInput] {
-        hold(.key(usage), pressed)
+    /// A key from the hardware keyboard, with the text it types, which a text field in the game inserts.
+    mutating func hostKey(_ usage: Int, pressed: Bool, text: String? = nil) -> [GodotInput] {
+        hold(.key(usage), pressed).map { input in
+            guard case let .key(usage, true, _) = input else { return input }
+            return .key(usage, down: true, character: Self.character(text))
+        }
+    }
+
+    /// The one printable character `text` holds, or 0 for none, a control character, or the private-use characters
+    /// AppKit gives function and arrow keys.
+    static func character(_ text: String?) -> UInt32 {
+        guard let scalars = text?.unicodeScalars, scalars.count == 1, let scalar = scalars.first,
+              scalar.value >= 0x20, scalar.value != 0x7F, !(0xF700...0xF8FF).contains(scalar.value) else { return 0 }
+        return scalar.value
     }
 
     func type(_ typed: TypedText) -> [GodotInput] {
@@ -134,8 +147,9 @@ nonisolated struct GodotInputRouter {
 
     /// Releases everything held, such as when the hub's menu takes the keyboard and the controller.
     mutating func releaseAll() -> [GodotInput] {
-        defer { held = [:] }
-        return held.keys.flatMap { Self.input(for: $0, down: false) }
+        let items = held.keys
+        held = [:]
+        return items.flatMap { input(for: $0, down: false) }
     }
 
     private static func held(for input: ControlInput) -> Held {
@@ -167,22 +181,32 @@ nonisolated struct GodotInputRouter {
         }
     }
 
-    private static func input(for held: Held, down: Bool) -> [GodotInput] {
-        switch held {
+    /// The input for `item` going down or up, after `held` has changed.
+    private func input(for item: Held, down: Bool) -> [GodotInput] {
+        switch item {
         case let .key(usage): [.key(usage, down: down)]
         case let .button(button): [.joyButton(button, down: down)]
-        case let .axis(axis, sign): [.joyAxis(axis, down ? sign : 0)]
+        case let .axis(axis, _): [.joyAxis(axis, value(of: axis))]
         }
+    }
+
+    /// The sum of the axis's directions held, so opposite directions cancel and releasing one leaves the other.
+    private func value(of axis: Int32) -> Float {
+        var value: Float = 0
+        for case let .axis(other, sign) in held.keys where other == axis {
+            value += sign
+        }
+        return value
     }
 
     private mutating func hold(_ item: Held, _ pressed: Bool) -> [GodotInput] {
         let count = held[item, default: 0]
         if pressed {
             held[item] = count + 1
-            return count == 0 ? Self.input(for: item, down: true) : []
+            return count == 0 ? input(for: item, down: true) : []
         }
         guard count > 0 else { return [] }
         held[item] = count == 1 ? nil : count - 1
-        return count == 1 ? Self.input(for: item, down: false) : []
+        return count == 1 ? input(for: item, down: false) : []
     }
 }

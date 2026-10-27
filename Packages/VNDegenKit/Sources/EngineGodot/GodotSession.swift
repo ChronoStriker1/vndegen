@@ -54,9 +54,11 @@ final class GodotSession: EngineSession {
             guard let self, case .running = state else { return }
             engine.resize(Float(size.width), Float(size.height), Float(scale))
         }
-        host.onKey = { [weak self] usage, pressed in
-            guard let self, case .running = state else { return }
-            router.hostKey(usage, pressed: pressed).forEach(deliver)
+        // The hub's menu keeps the keyboard on this view while it is open, so keys go nowhere while paused. A key held
+        // through the pause was released by setPaused, and its own release is then ignored.
+        host.onKey = { [weak self] usage, pressed, text in
+            guard let self, case .running = state, !paused else { return }
+            router.hostKey(usage, pressed: pressed, text: text).forEach(deliver)
         }
         host.onEvent = { [weak self] event in self?.send(event) }
     }

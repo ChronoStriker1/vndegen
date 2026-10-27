@@ -209,6 +209,43 @@ private func executable(with payload: Data) -> Data {
         #expect(layout.header.userDirectory == "Studio/Game")
     }
 
+    @Test func userFoldersAreNamedAsTheRuntimeNamesThem() {
+        func folder(_ settings: [String: GodotPack.Setting], major: Int) -> String {
+            var pack = GodotPack(major: major, minor: 0, patch: 0, format: major == 3 ? 1 : 3, offset: 0, encryptedDirectory: false, files: [])
+            pack.settings = settings
+            return pack.userDirectory
+        }
+        let name = "application/config/name", custom = "application/config/custom_user_dir_name"
+        let useCustom = "application/config/use_custom_user_dir"
+        // Godot 4 drops trailing periods and renames "." and ".."; Godot 3 keeps them.
+        #expect(folder([name: .string(" Example. ")], major: 4) == "Godot/app_userdata/Example")
+        #expect(folder([name: .string("Example.")], major: 3) == "Godot/app_userdata/Example.")
+        #expect(folder([name: .string("..")], major: 4) == "Godot/app_userdata/twodots")
+        #expect(folder([name: .string("a/b\\c")], major: 4) == "Godot/app_userdata/a-b-c")
+        #expect(folder([name: .string("Game"), useCustom: .bool(true), custom: .string("Studio\\\\Game.")], major: 4) == "Studio/Game")
+        #expect(folder([name: .string("Game"), useCustom: .bool(true), custom: .string("../Game")], major: 3) == "-/Game")
+        // A project without a name gets the unnamed folder, even with a custom folder.
+        #expect(folder([useCustom: .bool(true), custom: .string("Studio")], major: 4) == "Godot/app_userdata/[unnamed project]")
+    }
+
+    @Test func malformedPacksAreNotRead() throws {
+        // A trailer whose size runs past the start of the file.
+        var trailer = Bytes()
+        trailer.u32(0)
+        trailer.u64(.max)
+        trailer.u32(GodotPack.magic)
+        // A format 3 header whose directory offset and file base are out of range.
+        var header = Bytes()
+        for value: UInt32 in [GodotPack.magic, 3, 4, 5, 1, 2] { header.u32(value) }
+        header.u64(.max)
+        header.u64(.max)
+        header.zeros(64)
+        let game = try GameFolder(["trailer.exe": Data("MZ".utf8) + trailer.data, "header.pck": header.data, "header.exe": Data()])
+        #expect(GodotPack(contentsOf: game.root.appendingPathComponent("trailer.exe")) == nil)
+        let pack = try #require(GodotPack(contentsOf: game.root.appendingPathComponent("header.pck")))
+        #expect(pack.files.isEmpty)
+    }
+
     @Test func csharpGamesAreUnsupported() throws {
         let game = try GameFolder([
             "Game.pck": pack(format: 2, version: (4, 2, 1), files: ["res://project.binary"]),
@@ -250,6 +287,29 @@ private func executable(with payload: Data) -> Data {
         let released = router.releaseAll()
         #expect(Set(released.map { "\($0)" }) == Set(["\(GodotInput.joyButton(1, down: false))", "\(GodotInput.key(4, down: false))"]))
         #expect(router.translate(.gamepad(.b, pressed: false)).isEmpty)
+    }
+
+    @Test func oppositeDirectionsCancelAndReleasingOneLeavesTheOther() {
+        var router = GodotInputRouter()
+        #expect(router.translate(.gamepad(.leftStickLeft, pressed: true)) == [.joyAxis(0, -1)])
+        #expect(router.translate(.gamepad(.leftStickRight, pressed: true)) == [.joyAxis(0, 0)])
+        #expect(router.translate(.gamepad(.leftStickRight, pressed: false)) == [.joyAxis(0, -1)])
+        #expect(router.translate(.gamepad(.leftStickLeft, pressed: false)) == [.joyAxis(0, 0)])
+    }
+
+    @Test func scrollingDownTurnsTheWheelDown() {
+        var router = GodotInputRouter()
+        #expect(router.translate(.scroll(dy: GodotInputRouter.pointsPerNotch)) == [.wheel(-1)])
+    }
+
+    @Test func hardwareKeysCarryTheCharacterTheyType() {
+        var router = GodotInputRouter()
+        #expect(router.hostKey(4, pressed: true, text: "a") == [.key(4, down: true, character: 0x61)])
+        #expect(router.hostKey(4, pressed: false) == [.key(4, down: false)])
+        // Return, an arrow's private-use character from AppKit, and nothing typed.
+        #expect(router.hostKey(40, pressed: true, text: "\r") == [.key(40, down: true)])
+        #expect(router.hostKey(82, pressed: true, text: "\u{F700}") == [.key(82, down: true)])
+        #expect(router.hostKey(225, pressed: true, text: nil) == [.key(225, down: true)])
     }
 
     @Test func webKeyCodesMapToHIDUsages() {

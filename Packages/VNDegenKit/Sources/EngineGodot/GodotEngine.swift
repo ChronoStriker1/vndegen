@@ -8,7 +8,7 @@ struct GodotEngine {
     let start: @convention(c) (UnsafePointer<VNGDLaunch>?) -> Int32
     let iterate: @convention(c) () -> Int32
     let resize: @convention(c) (Float, Float, Float) -> Void
-    let key: @convention(c) (Int32, Bool) -> Void
+    let key: @convention(c) (Int32, Bool, UInt32) -> Void
     let text: @convention(c) (UnsafePointer<CChar>?) -> Void
     let mouseMove: @convention(c) (Float, Float) -> Void
     let mouseButton: @convention(c) (Int32, Bool) -> Void
@@ -44,7 +44,7 @@ struct GodotEngine {
         guard let start: @convention(c) (UnsafePointer<VNGDLaunch>?) -> Int32 = function("vngd_start"),
               let iterate: @convention(c) () -> Int32 = function("vngd_iterate"),
               let resize: @convention(c) (Float, Float, Float) -> Void = function("vngd_resize"),
-              let key: @convention(c) (Int32, Bool) -> Void = function("vngd_key"),
+              let key: @convention(c) (Int32, Bool, UInt32) -> Void = function("vngd_key"),
               let text: @convention(c) (UnsafePointer<CChar>?) -> Void = function("vngd_text"),
               let mouseMove: @convention(c) (Float, Float) -> Void = function("vngd_mouse_move"),
               let mouseButton: @convention(c) (Int32, Bool) -> Void = function("vngd_mouse_button"),

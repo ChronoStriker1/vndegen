@@ -6,6 +6,7 @@
 #define VNGD_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 // The engine builds with hidden visibility, so the C API opts back in.
 #define VNGD_API __attribute__((visibility("default")))
@@ -46,8 +47,9 @@ VNGD_API int vngd_iterate(void);
 VNGD_API void vngd_resize(float width, float height, float scale);
 
 // A key going down or up, as its USB HID keyboard usage (UIKey.keyCode on iOS), such as 4 for A, 40 Return, 41 Escape,
-// 44 Space, and 79 to 82 the arrows (right, left, down, up).
-VNGD_API void vngd_key(int hidUsage, bool down);
+// 44 Space, and 79 to 82 the arrows (right, left, down, up). `character` is the Unicode character a key going down
+// types, which a focused text field inserts, or 0. Godot's keyboard drivers put it on the same event.
+VNGD_API void vngd_key(int hidUsage, bool down, uint32_t character);
 // Characters typed, in UTF-8, as text the game's focused text field receives.
 VNGD_API void vngd_text(const char *utf8);
 
