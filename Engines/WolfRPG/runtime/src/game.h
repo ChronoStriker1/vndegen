@@ -180,6 +180,7 @@ public:
     const ChoiceState &choice() const { return choice_; }
     const MessageState &message() const { return message_; }
     const Map *map() const { return map_.get(); }
+    int mapId() const { return mapId_; }
     const std::vector<Tileset> &tilesets() const { return tilesets_; }
     // The hero, party members and map events, in no particular order. The map renderer sorts them.
     std::vector<const Character *> characters() const;
@@ -235,6 +236,7 @@ private:
     void pictureCommandOne(Thread &t, const Command &c, int number);
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
+    std::string textAt(int32_t address, const Thread &t);
     bool condition(Thread &t, const Command &c);
     bool stringCondition(Thread &t, const Command &c);
     void unsupported(const Command &c);

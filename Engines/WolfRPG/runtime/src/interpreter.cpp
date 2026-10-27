@@ -526,6 +526,36 @@ void Game::setVariable(Thread &t, const Command &c) {
     writeVar(target, out, t);
 }
 
+// The text at a variable address: a string variable's text, or a number written out.
+std::string Game::textAt(int32_t address, const Thread &t) {
+    if (isStringVar(address)) return readStr(address, t);
+    if (address >= 1000000000) {
+        const Database &db = address >= 1300000000 ? sdb_ : address >= 1100000000 ? cdb_ : udb_;
+        int type = (address / 1000000) % 100, field = address % 100;
+        if (type < int(db.types.size()) && db.types[type].isString(field)) return readStr(address, t);
+    }
+    return std::to_string(readVar(address, t));
+}
+
+namespace {
+
+// Splits off the first line, without its line break.
+std::pair<std::string, std::string> splitFirstLine(const std::string &s) {
+    size_t nl = s.find('\n');
+    if (nl == std::string::npos) return {s, ""};
+    size_t end = nl > 0 && s[nl - 1] == '\r' ? nl - 1 : nl;
+    return {s.substr(0, end), s.substr(nl + 1)};
+}
+
+size_t utf8Length(const std::string &s) {
+    if (s.empty()) return 0;
+    auto c = static_cast<unsigned char>(s[0]);
+    size_t n = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+    return std::min(n, s.size());
+}
+
+}  // namespace
+
 void Game::setString(Thread &t, const Command &c) {
     int32_t target = c.arg(0);
     uint32_t flags = uint32_t(c.arg(1));
@@ -533,17 +563,52 @@ void Game::setString(Thread &t, const Command &c) {
     int assign = (flags >> 8) & 0x0F;
     if (flags & 0xF0) target = readVar(target, t);
     if (target < 1000000) target += 3000000;
+    // The right side: typed text, the text at an address, or the text at an address held in a variable.
+    int32_t source = 0;
     std::string rhs;
     switch (mode) {
         case 0: rhs = expandText(c.str(0), &t); break;
-        case 1: rhs = readStr(c.arg(2), t); break;
-        case 2: rhs = std::to_string(readVar(c.arg(2), t)); break;
-        default: unsupported(c); return;
+        case 1: source = c.arg(2); rhs = textAt(source, t); break;
+        case 2: source = value(c.arg(2), t); rhs = textAt(source, t); break;
+        default: unsupported(c); return;  // keyboard input
     }
     std::string cur = readStr(target, t);
     switch (assign) {
         case 0x00: writeStr(target, rhs, t); break;
         case 0x01: writeStr(target, cur + rhs, t); break;
+        case 0x02: writeStr(target, splitFirstLine(rhs).first, t); break;  // copy the first line
+        case 0x03: {  // cut the first line out of the source
+            auto [first, rest] = splitFirstLine(rhs);
+            writeStr(target, first, t);
+            if (source && isStringVar(source)) writeStr(source, rest, t);
+            break;
+        }
+        case 0x04: {  // cut the first character out of the source
+            size_t n = utf8Length(rhs);
+            writeStr(target, rhs.substr(0, n), t);
+            if (source && isStringVar(source)) writeStr(source, rhs.substr(n), t);
+            break;
+        }
+        case 0x05: {  // read a text file of the game
+            auto bytes = files_.read(rhs);
+            std::string text = bytes ? std::string(bytes->begin(), bytes->end()) : "";
+            writeStr(target, toUtf8(text, gameDat_.encoding), t);
+            break;
+        }
+        case 0x08: {  // remove every occurrence
+            if (!rhs.empty())
+                for (size_t p; (p = cur.find(rhs)) != std::string::npos;) cur.erase(p, rhs.size());
+            writeStr(target, cur, t);
+            break;
+        }
+        case 0x09: {  // replace every occurrence of the first text with the second
+            std::string from = mode == 0 ? expandText(c.str(0), &t) : rhs, to = expandText(c.str(1), &t);
+            if (!from.empty()) {
+                for (size_t p = 0; (p = cur.find(from, p)) != std::string::npos; p += to.size()) cur.replace(p, from.size(), to);
+            }
+            writeStr(target, cur, t);
+            break;
+        }
         default: unsupported(c); break;
     }
 }

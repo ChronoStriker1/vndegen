@@ -27,6 +27,9 @@ endif()
 add_executable(wolfstat tools/wolfstat.cpp)
 target_link_libraries(wolfstat PRIVATE wolfdata)
 
+add_executable(wolfrun tools/wolfrun.cpp)
+target_link_libraries(wolfrun PRIVATE wolfdata)
+
 add_executable(wolfunpack tools/wolfunpack.cpp)
 target_link_libraries(wolfunpack PRIVATE wolfdata)
 
