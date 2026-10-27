@@ -455,6 +455,10 @@ impl EngineCallbacks for FfiCallbacks {
 
     fn include(&self, _path: &str) {}
 
+    fn preview_layer_event(&self, event: &asb_interpreter::Event) {
+        self.layer_info.lock().unwrap().observe(event);
+    }
+
     fn include_missing(&self, path: &str, error: &str) {
         crate::core_warn!("[runtime] include {path} skipped: {error}");
     }

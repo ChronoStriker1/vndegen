@@ -128,6 +128,11 @@ pub trait EngineCallbacks: Send + Sync {
     /// games ship includes of files they left out (VNDegen).
     fn include_missing(&self, _path: &str, _error: &str) {}
 
+    /// A layer event from `e:tag` that is still queued. Artemis runs the tag at
+    /// once, so a `get_layer_info` later in the same Lua call already sees the
+    /// layer and its image's size (VNDegen).
+    fn preview_layer_event(&self, _event: &crate::event::Event) {}
+
     /// 覆盖按键
     fn override_key(&self, from: u32, to: u32);
 
@@ -651,6 +656,9 @@ impl UserData for EngineApi {
                             store.pop_message_layer();
                         }
                         params.insert(MESSAGE_LAYER_STATE_PREAPPLIED.to_string(), "1".to_string());
+                    }
+                    if let Some(event) = queued_layer_event(&tag_name, &params) {
+                        ctx.callbacks.preview_layer_event(&event);
                     }
                     let insert_at = ctx.immediate_tag_count.min(ctx.tag_queue.len());
                     ctx.tag_queue.insert(insert_at, (tag_name, params));
@@ -1632,6 +1640,30 @@ pub fn init_lua_engine_api(lua: &Lua, ctx: Arc<Mutex<EngineContext>>) -> LuaResu
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn queued_layer_tags_become_the_events_they_will_emit() {
+        use crate::event::{Event, LayerEvent};
+        let params = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect::<HashMap<_, _>>()
+        };
+        assert!(matches!(
+            super::queued_layer_event("lyc", &params(&[("id", "80.0"), ("file", "mw/frame")])),
+            Some(Event::Layer(LayerEvent::Create { id, file })) if id == "80.0" && file == "mw/frame"
+        ));
+        let Some(Event::Layer(LayerEvent::SetProperties { properties, .. })) = super::queued_layer_event(
+            "lyprop",
+            &params(&[("id", "80.0"), ("top", "452"), ("\u{b}internal", "1")]),
+        ) else {
+            panic!("lyprop has no event");
+        };
+        assert_eq!(properties, params(&[("top", "452")]));
+        assert!(super::queued_layer_event("lyc", &params(&[("file", "x")])).is_none());
+        assert!(super::queued_layer_event("seplay", &params(&[("id", "1")])).is_none());
+    }
+
     use super::*;
 
     #[derive(Clone, Default)]
@@ -2259,4 +2291,25 @@ mod tests {
             "nil 应清除过滤函数"
         );
     }
+}
+
+/// The layer event a queued `e:tag` call will emit, for the tags whose effect
+/// a later query in the same Lua call can observe.
+fn queued_layer_event(tag: &str, params: &HashMap<String, String>) -> Option<crate::event::Event> {
+    use crate::event::{Event, LayerEvent};
+    let id = params.get("id")?.clone();
+    let file = || params.get("file").cloned().unwrap_or_default();
+    Some(Event::Layer(match tag {
+        "lyc" | "lyc2" => LayerEvent::Create { id, file: file() },
+        "lydel" => LayerEvent::Delete { id },
+        "lyprop" => LayerEvent::SetProperties {
+            id,
+            properties: params
+                .iter()
+                .filter(|(key, _)| key.as_str() != "id" && !key.starts_with('\u{b}'))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+        },
+        _ => return None,
+    }))
 }
