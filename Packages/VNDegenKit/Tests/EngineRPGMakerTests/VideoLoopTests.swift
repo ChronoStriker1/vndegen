@@ -130,7 +130,7 @@ private let setUp = """
         const uploads = resource.uploaded.length;
         // The game seeks.
         video.currentTime = 0.15;
-        video.dispatchEvent(new Event('seeked'));
+        video.dispatchEvent(new Event('seeking'));
         at(3160);
         // A new source starts keeping over, and the old frames are let go.
         const kept = resource.uploaded[resource.uploaded.length - 1];
@@ -167,7 +167,7 @@ private let setUp = """
         present(0, 0);
         // The pass is complete, but the length is not read yet. The game seeks to the third frame.
         video.currentTime = 0.04;
-        video.dispatchEvent(new Event('seeked'));
+        video.dispatchEvent(new Event('seeking'));
         release();
         await lengthRead();
         const frames = [shown()];

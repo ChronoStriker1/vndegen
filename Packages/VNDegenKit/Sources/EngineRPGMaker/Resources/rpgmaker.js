@@ -229,13 +229,14 @@
         };
         video.requestVideoFrameCallback(onFrame);
         // A new source starts over. WebKit's own loop seeks back to 0, so only a seek elsewhere is the game's: it moves
-        // the kept frames' position, also while their length is still being read, or starts keeping over.
+        // the kept frames' position, also while their length is still being read, or starts keeping over. The target
+        // is read when the seek starts. By the time it ends, playback has often gone on past 20 ms.
         video.addEventListener('emptied', () => {
             if (state.mode === 'done') return;
             dropFrames(state, 'keeping');
             Object.assign(state, { count: -1, last: 0, position: 0, length: undefined });
         });
-        video.addEventListener('seeked', () => {
+        video.addEventListener('seeking', () => {
             if (state.mode === 'done' || !(video.currentTime > loopLimits.start)) return;
             if (state.mode === 'keeping') dropFrames(state, 'keeping');
             else state.position = video.currentTime;
