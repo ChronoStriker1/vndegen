@@ -145,7 +145,10 @@ struct SystemUi {
     int page = 0;  // lookback
     std::string input;
     int maxLen = 64;
+    // input's window and field size, in the units its arguments use (4/3 of a pixel); 0 for the PC's default.
+    int dlgW = 0, dlgH = 0, fieldW = 0, fieldH = 0;
     int rowTop = 0, rowH = 0, boxX = 0, boxW = 0;
+    std::vector<std::array<int, 4>> buttons;  // where the dialogs drew each item, x y w h, for the pointer
     // The wait the screen interrupted, restored when it closes.
     WaitKind prevWait = WaitKind::None;
     std::function<void()> prevDone;
@@ -463,6 +466,7 @@ public:
     int selectHover_ = -1;
     bool keyboardSelect_ = false;
     void drawSystemUi(Image &out);
+    void drawDialog(Image &out, SystemUi &ui);
     std::unique_ptr<SystemUi> ui_;
     void openUi(SystemUi ui);
     void closeUi(int choice);
