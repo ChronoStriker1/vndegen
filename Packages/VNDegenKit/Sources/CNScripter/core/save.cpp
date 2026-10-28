@@ -358,16 +358,25 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
             }
         }
         // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
-        // which getparam may still read. The interpreter's own parser finds that command.
+        // which getparam may still read. The interpreter's own parser finds that command, dispatching names as it
+        // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
+        // variables; its errors aren't the player's, so they aren't logged.
         if (f.kind == Frame::Gosub) {
             Cursor saved = cur_;
             cur_ = Cursor{stmtStart, f.line, f.stmt};
-            std::string word = readWord();
-            while (word == "if" || word == "notif") {
+            quietErrors_++;
+            for (;;) {
+                std::string word = readWord();
+                bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
+                std::string name = builtin ? word.substr(1) : word;
+                if (!builtin && defsubs_.count(name)) {
+                    f.hasParams = cur_.pos <= f.pos;
+                    break;
+                }
+                if (name != "if" && name != "notif") break;
                 readCondition();
-                word = readWord();
             }
-            f.hasParams = defsubs_.count(word) && cur_.pos <= f.pos;
+            quietErrors_--;
             cur_ = saved;
         }
         frames.push_back(f);

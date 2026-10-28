@@ -12,6 +12,7 @@ static bool isIdentStart(char c) { return isalpha(uint8_t(c)) || c == '_'; }
 static bool isIdentChar(char c) { return isalnum(uint8_t(c)) || c == '_'; }
 
 void Engine::errorf(const char *fmt, ...) {
+    if (quietErrors_) return;
     char buf[512];
     va_list ap;
     va_start(ap, fmt);
@@ -236,18 +237,20 @@ struct ExprParser {
         for (;;) {
             e.skipSpaces();
             char c = peek();
+            // In 64 bits, so overflow wraps as the PC engine's 32-bit arithmetic does, and the smallest number divided by
+            // -1 can't trap.
             if (c == '*') {
                 e.cur_.pos++;
-                v *= factor();
+                v = int(int64_t(v) * factor());
             } else if (c == '/') {
                 e.cur_.pos++;
                 int d = factor();
-                v = d ? v / d : 0;
+                v = d ? int(int64_t(v) / d) : 0;
             } else if ((c == 'm' || c == 'M') && (peekAt(1) | 0x20) == 'o' && (peekAt(2) | 0x20) == 'd' &&
                        !isIdentChar(peekAt(3))) {
                 e.cur_.pos += 3;
                 int d = factor();
-                v = d ? v % d : 0;
+                v = d ? int(int64_t(v) % d) : 0;
             } else {
                 return v;
             }

@@ -245,6 +245,7 @@ public:
     bool continueLine_ = false;   // if/notif leave the cursor on the next command of the same line
     void gosub(size_t returnPos, int line, int stmt, std::string_view label);
     void errorf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+    int quietErrors_ = 0;  // while above 0, errorf logs nothing
 
     struct Frame {
         enum Kind { Gosub, For, TextGosub } kind = Gosub;
