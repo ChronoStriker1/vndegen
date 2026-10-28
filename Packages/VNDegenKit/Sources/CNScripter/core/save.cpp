@@ -441,7 +441,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     if (sc.bgTag == "black" || sc.bgTag == "white" || (!sc.bgTag.empty() && sc.bgTag[0] == '#')) {
         sc.bgColor = sc.bgTag == "white" ? rgba(255, 255, 255) : sc.bgTag == "black" ? rgba(0, 0, 0) : pxOf(uint32_t(strtoul(sc.bgTag.c_str() + 1, nullptr, 16)));
     } else if (!sc.bgTag.empty()) {
-        loadImage(sc.bgTag, sc.bg);
+        loadBackground(sc.bgTag, sc.bg);
     }
     extras_ = x;
     scene_ = std::move(sc);

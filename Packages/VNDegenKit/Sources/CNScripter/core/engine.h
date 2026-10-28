@@ -289,6 +289,10 @@ public:
     std::string transMode_ = "l";
     std::unordered_set<int> windowChips_;
     bool loadImage(const std::string &tag, LoadedImage &out);
+    // A background image. Backgrounds are opaque: the default transparency mode (top-left colour) doesn't apply.
+    bool loadBackground(const std::string &tag, LoadedImage &out) {
+        return loadImage(!tag.empty() && tag[0] == ':' ? tag : ":c;" + tag, out);
+    }
     ImageRef loadFileImage(const std::string &file, bool *hasAlpha = nullptr);
     std::unordered_map<std::string, ImageRef> imageCache_;
     std::vector<std::string> imageCacheOrder_;
@@ -310,9 +314,16 @@ public:
         ImageRef mask;
         int64_t start = 0;
         bool active = false;
+        // Effect 99: the DLL's file name, lowercased, its parameter string, and the rectangle that changes.
+        std::string dll, param;
+        int rx = 0, ry = 0, rw = 0, rh = 0;
+        std::vector<uint8_t> dirs;  // breakup.dll: each cell's direction, 0..7
     } effect_;
     void finishEffect();
     void drawEffect(Image &out, double t);
+    // Effect 99, the effect DLLs (dlleffects.cpp). startDllEffect returns false for a DLL that isn't emulated.
+    bool startDllEffect(const Image &to);
+    void drawDllEffect(Image &out, double t);
     int quakeAmp_ = 0, quakeX_ = 0, quakeY_ = 0, quakeKind_ = 0;  // kind: 0 quake, 1 quakex, 2 quakey
     void drawOverlays(Image &out);  // button hover images, the click cursor, system menus
     int64_t quakeEnd_ = 0, quakeDuration_ = 0;

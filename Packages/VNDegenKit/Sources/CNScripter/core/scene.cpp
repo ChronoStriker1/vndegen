@@ -272,7 +272,15 @@ void Engine::printWithEffect(const Effect &e) {
     effect_.from = frame_;
     commitScene();
     effect_.e = e;
-    effect_.mask = e.mask.empty() ? nullptr : loadFileImage(e.mask);
+    effect_.mask = nullptr;
+    if (e.type == 99) {
+        // The DLL works on the old and new frames; one it doesn't know falls back to a crossfade.
+        Image to;
+        renderScene(shown_, to, true);
+        if (!startDllEffect(to)) effect_.e.type = 10;
+    } else if (!e.mask.empty()) {
+        effect_.mask = loadFileImage(e.mask);
+    }
     effect_.start = now_;
     effect_.active = true;
     wait_ = WaitKind::Effect;
@@ -363,6 +371,9 @@ void Engine::drawEffect(Image &out, double t) {
         }
         break;
     }
+    case 99:
+        drawDllEffect(out, t);
+        break;
     case 16: case 17: {
         // Mosaic out (16) grows blocks over the old image; mosaic in (17) shrinks them over the new.
         const Image &src = type == 16 ? from : Image(out);
@@ -539,7 +550,7 @@ void cmdBg(E &e, const std::string &) {
         e.scene_.bgColor = parseColor(s);
     } else {
         LoadedImage img;
-        if (e.loadImage(s, img)) e.scene_.bg = img;
+        if (e.loadBackground(s, img)) e.scene_.bg = img;
         e.scene_.bgColor = rgba(0, 0, 0);
     }
     // A new background clears the standing images.
