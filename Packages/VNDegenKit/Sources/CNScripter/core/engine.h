@@ -557,7 +557,11 @@ public:
     bool loadGame(int slot);
     std::string savePath(int slot) const;
     void loadGlobals();
-    void saveGlobals();
+    // gloval.sav's contents: each global variable as an int32 and a NUL-terminated string.
+    Bytes globalsFile() const;
+    Bytes globalsOnDisk_;  // what gloval.sav holds, as far as the engine knows
+    // Writes gloval.sav if a global variable changed since it was last written.
+    void saveGlobalsIfChanged();
     void noteFileUsed(const std::string &tag);
 
     // Audio (audio.cpp holds the mixer; sound commands live in commands_sound.cpp)

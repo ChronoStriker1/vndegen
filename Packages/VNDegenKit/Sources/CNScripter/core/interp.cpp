@@ -642,10 +642,17 @@ void Engine::executeCommand(const std::string &name) {
 
 void Engine::runUntilBlocked() {
     // A script loop without waits would hang the host; cap the work per frame.
-    for (int budget = 200000; budget > 0; budget--) {
-        if (ended_ || wait_ != WaitKind::None) return;
+    bool ran = false;
+    for (int budget = 200000; budget > 0 && !ended_ && wait_ == WaitKind::None; budget--) {
         executeStatement();
+        ran = true;
     }
+    // The PC engine writes global variables only when it saves and when it quits, so a game that is killed, as iOS
+    // kills apps in the background, loses them: a save slot's date that a custom save menu keeps in a global, say.
+    // Writing them whenever the script stops for the player, if they changed, keeps the same file up to date.
+    bool forPlayer = wait_ == WaitKind::Click || wait_ == WaitKind::Text || wait_ == WaitKind::Button ||
+                     wait_ == WaitKind::Select || wait_ == WaitKind::Dialog;
+    if (ran && forPlayer) saveGlobalsIfChanged();
 }
 
 }  // namespace vnns

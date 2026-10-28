@@ -605,7 +605,9 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 
 void Engine::loadGlobals() {
     Bytes data;
+    globalsOnDisk_.clear();
     if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, "gloval.sav")), data)) {
+        globalsOnDisk_ = data;
         size_t p = 0;
         for (size_t i = size_t(globalBorder_); i < num_.size() && p + 4 <= data.size(); i++) {
             num_[i] = int32_t(le32(&data[p]));
@@ -683,16 +685,30 @@ static std::string upperAscii(std::string s) {
     return s;
 }
 
+Bytes Engine::globalsFile() const {
+    Bytes out;
+    Writer w{out};
+    for (size_t i = size_t(globalBorder_); i < num_.size(); i++) {
+        w.i(num_[i]);
+        w.s(str_[i]);
+    }
+    return out;
+}
+
+void Engine::saveGlobalsIfChanged() {
+    if (!globalOn_ || defineMode_) return;
+    Bytes out = globalsFile();
+    if (out == globalsOnDisk_) return;
+    std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
+    if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
+}
+
 void Engine::saveSystemData() {
     if (globalOn_) {
-        Bytes out;
-        Writer w{out};
-        for (size_t i = size_t(globalBorder_); i < num_.size(); i++) {
-            w.i(num_[i]);
-            w.s(str_[i]);
-        }
+        Bytes out = globalsFile();
         std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
-        if (!fs_.write(path, out.data(), out.size())) logf("could not write %s", path.c_str());
+        if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
+        else logf("could not write %s", path.c_str());
     }
     auto writeLog = [&](const char *file, const std::vector<std::string> &names) {
         std::string out = std::to_string(names.size()) + "\n";
