@@ -345,41 +345,31 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         }
         f.pos = std::min(f.pos, script_.text().size());
         f.line = script_.lineAt(f.pos);
-        // The statement index of a return position: the ':' separators before it on its line, outside strings. A
-        // return into a statement that calls a user command, after an if's condition or not, is a defsub call,
-        // which getparam may still read.
+        // The statement index of a return position: the ':' separators before it on its line, outside strings.
         f.stmt = 0;
         const std::string &t = script_.text();
-        bool quoted = false, callsDefsub = false;
-        for (size_t p = script_.lineStart(f.line); p < f.pos;) {
-            char c = t[p];
-            if (c == '"') {
-                quoted = !quoted;
-                p++;
-            } else if (!quoted && c == ':') {
+        size_t stmtStart = script_.lineStart(f.line);
+        bool quoted = false;
+        for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(t, p)) {
+            if (t[p] == '"') quoted = !quoted;
+            if (!quoted && t[p] == ':') {
                 f.stmt++;
-                callsDefsub = false;
-                p++;
-            } else if (!quoted && (isalpha(uint8_t(c)) || c == '_')) {
-                size_t end = p;
-                while (end < f.pos && (isalnum(uint8_t(t[end])) || t[end] == '_')) end++;
-                // %name and $name are variables, *name a label. A name after an operator, or before a comparison or
-                // && and ||, is an operand of an if's condition (a numalias), not the command; a command's arguments
-                // may start with - or (.
-                auto in = [](char ch, const char *set) { return ch && strchr(set, ch) != nullptr; };
-                size_t before = p, after = end;
-                while (before > 0 && (t[before - 1] == ' ' || t[before - 1] == '\t')) before--;
-                while (after < t.size() && (t[after] == ' ' || t[after] == '\t')) after++;
-                bool variable = p > 0 && (t[p - 1] == '%' || t[p - 1] == '$' || t[p - 1] == '*');
-                bool operand = (before > 0 && in(t[before - 1], "=<>!&|+-*/(,")) ||
-                               (after < t.size() && in(t[after], "=<>!&|"));
-                if (!variable && !operand && defsubs_.count(sjisLower(t.substr(p, end - p)))) callsDefsub = true;
-                p = end;
-            } else {
-                p += sjisCharLen(t, p);
+                stmtStart = p + 1;
             }
         }
-        f.hasParams = f.kind == Frame::Gosub && callsDefsub;
+        // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
+        // which getparam may still read. The interpreter's own parser finds that command.
+        if (f.kind == Frame::Gosub) {
+            Cursor saved = cur_;
+            cur_ = Cursor{stmtStart, f.line, f.stmt};
+            std::string word = readWord();
+            while (word == "if" || word == "notif") {
+                readCondition();
+                word = readWord();
+            }
+            f.hasParams = defsubs_.count(word) && cur_.pos <= f.pos;
+            cur_ = saved;
+        }
         frames.push_back(f);
     }
     std::reverse(frames.begin(), frames.end());
