@@ -235,7 +235,11 @@ private func runScript(_ script: String, files: [String: Data] = [:]) throws -> 
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try Data(script.utf8).write(to: dir.appendingPathComponent("0.txt"))
-    for (name, data) in files { try data.write(to: dir.appendingPathComponent(name)) }
+    for (name, data) in files {
+        let url = dir.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url)
+    }
     let engine = try #require(dir.path.withCString { root in
         var launch = VNNSLaunch(gameRoot: root, logPath: nil, englishWordWrap: false)
         return vnns_start(&launch)
