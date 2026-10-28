@@ -136,3 +136,12 @@ Measured in the page with `measureText`, against the widths computed from the fo
   the system's real Tahoma, which the options then used with every label inside its window.
 - The Korean download installs from Settings on the iPad, Dotum then measures 466.300 px, Source Han Sans KR's width,
   and Remove deletes it.
+
+The native engines were checked through their logs, which name each substitute they open, on an iPad Pro 13-inch
+simulator and in the macOS app:
+
+- Test Game 01 (KiriKiri) ships no default font and sets ＭＳ ゴシック as its message font. The engine took ＭＳ Ｐゴシック's
+  substitute as its default, and its text drew from `ume-tgo4.ttf` (ＭＳ ゴシック) and `ume-tmo3.ttf` (ＭＳ 明朝). Its
+  English dialogue wraps over three lines inside the message window.
+- Test Game 37 (RPG Maker XP, on the Japanese player, with an English translation that sets Arial) drew its text from
+  `LiberationSans-Regular.ttf`, and its dialogue fits the message window.
