@@ -15,7 +15,16 @@ source, or the VNDegen branch that once ported one. This file lists, for each pa
 - **The original engine as a black box**: each test game's NScripter exe, and the author's archive tool
   `nsaarc.exe`, run under Wine on Linux. Small scripts of our own ran on them to settle open questions, and their
   output (screens, save files, archives) was compared. Nothing was disassembled.
-- **Permissive libraries**, used as libraries: stb_image, stb_vorbis, pl_mpeg (see `Engines/NScripter/UPSTREAM.md`).
+- **Permissive libraries**, used as libraries: stb_image, stb_vorbis, pl_mpeg and dr_mp3 (see
+  `Engines/NScripter/UPSTREAM.md`).
+- **The effect DLLs one test game ships** (`breakup.dll`, `lngtwave.dll`, `trvswave.dll`), run as black boxes by that
+  game's own NScripter exe under Wine. No documentation of them was found. Lab scripts of our own ran each call the
+  game makes on synthetic images (grids, and images whose colours encode each pixel's position), and the screen was
+  recorded at 30 frames a second. The effects were worked out from the frames. Nothing was disassembled.
+- **`MSpDraw.dll`'s own distribution**, `MSpDraw.zip` by its author (manual `MSpDraw.txt` version 1.10, a sample
+  script, the DLL), from the author's site as the Internet Archive keeps it, found through a public list of
+  NScripter plugins. Only
+  its manual was read, to describe the plugin in `docs/nscripter.md`; the runtime's emulation didn't change.
 
 Not used: the English "NScripter API reference" hosted inside an ONScripter project's website, though it is prose,
 because of where it lives. GARbro (MIT) was opened to check its NScripter archive support, but its decompression code
@@ -41,6 +50,16 @@ says it comes from ONScripter-EN, so only its license header and a list of names
 | `kidoku.dat`, `NScrflog.dat`, `NScrllog.dat` | Black box: their sizes and contents after lab scripts; the logs are a count line and quoted names XOR 0x84 |
 | Global save (`gloval.sav`) | Black box: its size is 5 bytes per global variable when all strings are empty; one int32 and one NUL-terminated string each |
 | Font metrics and baseline | `docs/fonts.md` (VNDegen's font pack); MS Gothic's metrics |
+| `breakup.dll` | Black box (engine 2.96 with the game's DLL): sprites made of colour-coded pixels, removed with each corner's parameter, at 1000, 4000 and 4500 ms. Tracking each pixel gave the 24-pixel grid laid from the changed rectangle's corner, the start order (one cell a step from the named corner), each piece's 44 steps (4 shrinking in place, then 7 pixels a step in one of 8 directions 19.3 degrees apart), its radius each step (from its pixel counts), the step length (the duration over the number of steps), and that only changed pixels fly |
+| `lngtwave.dll/vwi` | Black box: rows coded by colour ratio, so each screen row's source row survives the crossfade. A sine with a period of half the screen, pinned at the top, running down about 3.8 cycles while its amplitude falls from about 38 pixels to 0; old and new frames move alike and crossfade linearly. Measured at 1000 and 5000 ms: it depends only on the progress |
+| `trvswave.dll/h` | Black box: columns coded the same way. Each row shifts by -16q sin(2 pi q y / 16), q being the progress or its complement, whichever is smaller; a linear crossfade; only the changed rectangle moves. Measured at 1500 and 3000 ms |
+| MP3 | dr_mp3 decodes it; the commands that play it are in the manual (`mp3`, `mp3loop`, `bgm`) and `追加命令一覧.txt` (`mv` voices) |
+| Opaque backgrounds | Black box: a `bg` image whose top-left pixel is white shows that white, with the default transparency mode |
+| `input`'s last four arguments | Black box: the same call with each argument changed. They are the dialog's width and height and its text field's width and height, in 4/3-pixel units (300 makes a window 394 pixels wide inside its frame, 500 makes it 661). The dialog opens at the top left of the game's window, light grey, with an OK button beside the field; with no sizes it is 397 by 92 pixels |
+| `yesnobox` layout | Black box: a Windows message box, 167 by 63 pixels inside its frame for a short message, centred, buttons side by side with the first focused; the game isn't dimmed |
+| Saves inside a `defsub` | Black box (engines 3.04 and 2.96): a defsub frame's saved offset is that of the arguments `getparam` hasn't read (10 lab saves, byte for byte), and loading such a save lets `getparam` read them. The PC engine treats arguments left unread at `return` as text to display, which no working game relies on; the runtime skips them |
+| Unused extended sprites after a load | Black box: a save made after loading writes alpha 255 for unused `lsp2` slots, where a fresh game writes -1 |
+| `gloval.sav` written early | Black box: the file the PC engine writes at exit is the one the runtime writes at the first click wait after the same globals change, byte for byte (engines 3.04 and 2.96) |
 
 ## Open questions and how they were settled
 
@@ -53,3 +72,13 @@ says it comes from ONScripter-EN, so only its license header and a list of names
   frames in 2.92 s), so drawing 30 a second is their full rate.
 - **Compression types 2 (LZSS) and 4 (NBZ) in `.nsa`**: no test game uses them and no sample exists to check a
   decoder against, so they aren't implemented. The runtime logs the file instead.
+- **The effect DLLs' rectangle**: the PC engine passes a DLL the rectangle it redrew, so `breakup.dll`'s grid starts at
+  the removed sprite's corner. The runtime uses the smallest rectangle holding every changed pixel, which can start a
+  few pixels further in when the sprite has a transparent margin. The pieces look the same.
+- **`breakup.dll`'s directions**: each piece's direction comes from a fixed sequence, the same on every run, which no
+  formula tried reproduced. The runtime uses a fixed sequence of its own, so a transition also looks the same each
+  time.
+- **`breakup.dll`'s radius**: the pieces' pixel counts fit a disc of radius 11.85 - 0.995 n after n pairs of steps in
+  flight; the true rule may be a Windows ellipse, but the counts match.
+- **CD audio**: NScripter's manual says `play "*n"` plays a disc's track n; its documentation describes no folder of
+  track files. No test game plays CD tracks, so it isn't implemented.
