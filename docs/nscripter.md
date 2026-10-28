@@ -113,7 +113,17 @@ Measured on 2026-10-27 on the Mac mini, with other threads' apps and a simulator
 | Movies (Test Game 98's three clips, looped) | Mac app | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 40 s |
 | Movies (Test Game 98's three clips, looped) | iPad simulator | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 40 s |
 
-The movies' headers say 59.94 fps, but they hold 29.97 frames a second (88 frames in 2.92 s), which the runtime draws
+Measured again on 2026-10-28, after sound decoding moved to its own thread, on the Mac mini with nothing else running
+(load average about 3, no other simulators):
+
+| Scene | Where | Target | Average | 1% low | Measured |
+|---|---|---|---|---|---|
+| Dungeon walking (Test Game 26) | Mac app | 60 | 60.0 | 60.0 | 50 s |
+| Dungeon walking (Test Game 26) | iPad simulator | 60 | 60.0 | 60.0 | 40 s |
+| Movies (Test Game 98's three clips, looped) | Mac app | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 40 s |
+| Movies (Test Game 98's three clips, looped) | iPad simulator | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 50 s |
+
+Simulator timing isn't iPad timing. The movies' headers say 59.94 fps, but they hold 29.97 frames a second (88 frames in 2.92 s), which the runtime draws
 in full. Loading a save or opening a menu can take one step of 40 to 100 ms while it decodes images.
 
 ## Built-in dialogs
