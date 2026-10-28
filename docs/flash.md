@@ -113,6 +113,10 @@ iPhone 18 Pro simulator. The 12 that save, save and load there. Test Game 120, a
 whose movies use no shared objects, save nothing on the PC either. Before that, all 14 reached their title and played in Playwright's WebKit on Linux
 with the same host page and Ruffle build.
 
+The case check (`scripts/case-check.sh`) passed with all 14, every file and folder name's case swapped, on a
+case-sensitive volume: each reached its title and started on the iPad simulator and in the Mac app, with no file
+missed, and the 12 that save saved and loaded. Saves of a movie are named with the movie's path as the disk spells it.
+
 Saves were checked by adding a value to each game's `.sol` file, starting the game again, and quitting: Ruffle wrote
 every file back with the value, so it had read it. The `.sol` files that four games ship from the PC loaded in the Mac
 app with the endings they record unlocked.
