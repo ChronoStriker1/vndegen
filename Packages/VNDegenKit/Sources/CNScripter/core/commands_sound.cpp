@@ -161,7 +161,7 @@ void cmdLoopBgmStop(E &e, const std::string &) {
     e.audio_.stop(AudioMixer::kLoopBgmTail, e.bgmFadeOut_);
 }
 
-// v123: wave "wav\123.wav"; dv123: dwave 0,"wav\123.wav"; mv123: voice\123.mp3, which no runtime here decodes.
+// v123: wave "wav\123.wav"; dv123: dwave 0,"wav\123.wav"; mv123: voice\123.mp3 as a voice.
 void cmdVoice(E &e, const std::string &name) {
     size_t d = 0;
     while (d < name.size() && isalpha(uint8_t(name[d]))) d++;
@@ -170,8 +170,10 @@ void cmdVoice(E &e, const std::string &name) {
     else if (head == "v") {
         Bytes data;
         if (e.readSound("wav\\" + number + ".wav", data)) e.audio_.play(AudioMixer::kWave, std::move(data), false, e.volVoice_);
+    } else if (head == "mv") {
+        e.playSound(0, "voice\\" + number + ".mp3", false);
     } else {
-        logf("mv voices are MP3, which isn't supported");
+        e.errorf("unknown command %s", name.c_str());
     }
 }
 

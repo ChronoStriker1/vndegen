@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <cstring>
 
 #define STB_VORBIS_NO_STDIO
@@ -11,6 +12,10 @@
 #undef L
 #undef C
 #undef R
+
+#define DR_MP3_IMPLEMENTATION
+#define DR_MP3_NO_STDIO
+#include "../third_party/dr_mp3.h"
 
 namespace vnns {
 
@@ -120,6 +125,39 @@ private:
     bool float_ = false, ok_ = false;
 };
 
+// MP3, which the mp3 and bgm commands play. Mono files play on both channels.
+class Mp3Source : public AudioSource {
+public:
+    explicit Mp3Source(Bytes data) : data_(std::move(data)) {
+        ok_ = drmp3_init_memory(&mp3_, data_.data(), data_.size(), nullptr) && mp3_.channels >= 1;
+    }
+    ~Mp3Source() override {
+        if (ok_) drmp3_uninit(&mp3_);
+    }
+    bool ok() const { return ok_; }
+    int read(float *out, int frames) override {
+        int ch = int(mp3_.channels);
+        if (ch == 2) return int(drmp3_read_pcm_frames_f32(&mp3_, drmp3_uint64(frames), out));
+        tmp_.resize(size_t(frames * ch));
+        int n = int(drmp3_read_pcm_frames_f32(&mp3_, drmp3_uint64(frames), tmp_.data()));
+        for (int i = 0; i < n; i++) {
+            out[i * 2] = tmp_[size_t(i * ch)];
+            out[i * 2 + 1] = tmp_[size_t(i * ch + (ch > 1 ? 1 : 0))];
+        }
+        return n;
+    }
+    bool rewind(double seconds) override {
+        return drmp3_seek_to_pcm_frame(&mp3_, drmp3_uint64(std::max(0.0, seconds) * mp3_.sampleRate)) != 0;
+    }
+    int rate() const override { return int(mp3_.sampleRate); }
+
+private:
+    Bytes data_;
+    drmp3 mp3_{};
+    std::vector<float> tmp_;
+    bool ok_ = false;
+};
+
 }  // namespace
 
 std::unique_ptr<AudioSource> openAudio(Bytes data) {
@@ -128,39 +166,76 @@ std::unique_ptr<AudioSource> openAudio(Bytes data) {
         if (s->ok()) return s;
         return nullptr;
     }
-    auto s = std::make_unique<WavSource>(std::move(data));
+    if (data.size() >= 4 && !memcmp(data.data(), "RIFF", 4)) {
+        auto s = std::make_unique<WavSource>(std::move(data));
+        if (s->ok()) return s;
+        return nullptr;
+    }
+    auto s = std::make_unique<Mp3Source>(std::move(data));
     if (s->ok()) return s;
     return nullptr;
 }
 
+AudioMixer::AudioMixer() : decoder_([this] { decodeLoop(); }) {}
+
+AudioMixer::~AudioMixer() {
+    {
+        std::lock_guard<std::mutex> lock(decodeMutex_);
+        quit_ = true;
+    }
+    decodeWake_.notify_one();
+    decoder_.join();
+}
+
 bool AudioMixer::play(int channel, Bytes data, bool loop, int volume, int fadeInMs, double loopStart) {
     auto src = openAudio(std::move(data));
-    Channel old;  // freed after the lock is let go, so the audio thread doesn't wait on it
-    std::lock_guard<std::mutex> lock(mutex_);
-    Channel &c = ch_[size_t(channel)];
-    old = std::move(c);
-    c = Channel();
-    if (!src) return false;
-    c.src = std::move(src);
-    c.loop = loop;
-    c.loopStart = loopStart;
-    c.volume = std::clamp(volume, 0, 100) / 100.0f;
-    if (fadeInMs > 0) {
-        c.gain = 0;
-        c.fadeStep = 1.0f / (fadeInMs * kRate / 1000.0f);
+    std::shared_ptr<Stream> stream;
+    if (src) {
+        stream = std::make_shared<Stream>();
+        stream->rate = std::max(1, src->rate());
+        stream->src = std::move(src);
+        stream->loop = loop;
+        stream->loopStart = loopStart;
+        stream->capacity = size_t(std::max(stream->rate * 3 / 4, 4096));  // 0.75 s ahead
+        stream->ring.resize(stream->capacity * 2);
     }
+    Channel old;  // freed after the lock is let go, so the audio thread doesn't wait on it
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        Channel &c = ch_[size_t(channel)];
+        release(c);
+        old = std::move(c);
+        c = Channel();
+        if (!stream) return false;
+        c.stream = stream;
+        c.volume = std::clamp(volume, 0, 100) / 100.0f;
+        if (fadeInMs > 0) {
+            c.gain = 0;
+            c.fadeStep = 1.0f / (fadeInMs * kRate / 1000.0f);
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(decodeMutex_);
+        streams_.push_back(std::move(stream));
+    }
+    decodeWake_.notify_one();
     return true;
+}
+
+void AudioMixer::release(Channel &c) {
+    if (c.stream) c.stream->dropped.store(true, std::memory_order_relaxed);
 }
 
 void AudioMixer::stop(int channel, int fadeOutMs) {
     Channel old;  // freed after the lock is let go
     std::lock_guard<std::mutex> lock(mutex_);
     Channel &c = ch_[size_t(channel)];
-    if (!c.src) return;
-    if (fadeOutMs > 0 && !paused_) {
+    if (!c.stream) return;
+    if (fadeOutMs > 0 && !paused_ && !c.ended) {
         c.fadeStep = -c.gain / (fadeOutMs * kRate / 1000.0f);
         c.stopAfterFade = true;
     } else {
+        release(c);
         old = std::move(c);
         c = Channel();
     }
@@ -169,7 +244,7 @@ void AudioMixer::stop(int channel, int fadeOutMs) {
 bool AudioMixer::playing(int channel) {
     std::lock_guard<std::mutex> lock(mutex_);
     Channel &c = ch_[size_t(channel)];
-    return c.src && !c.ended;
+    return c.stream && !c.ended;
 }
 
 void AudioMixer::setVolume(int channel, int volume) {
@@ -180,6 +255,46 @@ void AudioMixer::setVolume(int channel, int volume) {
 void AudioMixer::setPaused(bool paused) {
     std::lock_guard<std::mutex> lock(mutex_);
     paused_ = paused;
+}
+
+// ---- the decoder thread ----
+
+void AudioMixer::fill(Stream &s) {
+    constexpr size_t kChunk = 1024;
+    float tmp[kChunk * 2];
+    size_t w = s.written.load(std::memory_order_relaxed);
+    while (!s.eof.load(std::memory_order_relaxed) && !s.dropped.load(std::memory_order_relaxed) &&
+           s.capacity - (w - s.read.load(std::memory_order_acquire)) >= kChunk) {
+        int n = s.src->read(tmp, int(kChunk));
+        if (n <= 0 && s.loop && s.src->rewind(s.loopStart)) n = s.src->read(tmp, int(kChunk));
+        if (n <= 0) {
+            s.eof.store(true, std::memory_order_release);
+            break;
+        }
+        for (int i = 0; i < n; i++, w++) {
+            size_t k = (w % s.capacity) * 2;
+            s.ring[k] = tmp[i * 2];
+            s.ring[k + 1] = tmp[i * 2 + 1];
+        }
+        s.written.store(w, std::memory_order_release);
+    }
+}
+
+void AudioMixer::decodeLoop() {
+    std::vector<std::shared_ptr<Stream>> work;
+    std::unique_lock<std::mutex> lock(decodeMutex_);
+    while (!quit_) {
+        streams_.erase(std::remove_if(streams_.begin(), streams_.end(),
+                                      [](const auto &s) { return s->dropped.load() || s->eof.load(); }),
+                       streams_.end());
+        work = streams_;
+        lock.unlock();
+        for (auto &s : work) fill(*s);
+        work.clear();  // a stream nobody plays any more is freed here, off the audio thread
+        lock.lock();
+        // Every 10 ms is often enough to keep 0.75 s rings full; play() wakes the thread at once.
+        decodeWake_.wait_for(lock, std::chrono::milliseconds(10));
+    }
 }
 
 void AudioMixer::queueMovieSamples(const float *in, int frames, int volume, int rate) {
@@ -223,48 +338,52 @@ int AudioMixer::movieQueuedFrames() {
     return int((movie_.size() - movieRead_) / 2);
 }
 
-// Next output frame of a channel, resampled linearly from the source's rate.
+bool AudioMixer::popFrame(Stream &s, float *frame) {
+    size_t r = s.read.load(std::memory_order_relaxed);
+    if (r == s.written.load(std::memory_order_acquire)) return false;
+    size_t k = (r % s.capacity) * 2;
+    frame[0] = s.ring[k];
+    frame[1] = s.ring[k + 1];
+    s.read.store(r + 1, std::memory_order_release);
+    return true;
+}
+
+// Next output frame of a channel, resampled linearly from the stream's rate. False when there is nothing to play
+// yet, or any more (c.ended).
 bool AudioMixer::pull(Channel &c, float &l, float &r) {
-    double ratio = double(c.src->rate()) / kRate;
-    // Keep two source frames ahead of the read position for interpolation.
-    while (c.bufIndex + 1 >= c.bufFrames) {
-        if (c.ended) return false;
-        float last[2] = {0, 0};
-        bool haveLast = c.bufFrames > 0 && c.bufIndex < c.bufFrames;
-        if (haveLast) {
-            last[0] = c.buf[size_t(c.bufIndex) * 2];
-            last[1] = c.buf[size_t(c.bufIndex) * 2 + 1];
+    Stream &s = *c.stream;
+    // A frame that isn't there: the end once the decoder has finished, otherwise a late decoder.
+    auto nextFrame = [&](float *f) {
+        if (popFrame(s, f)) return true;
+        if (!s.eof.load(std::memory_order_acquire)) return false;
+        if (popFrame(s, f)) return true;  // written just before the decoder finished
+        c.ended = true;
+        return false;
+    };
+    if (!c.primed) {
+        if (!nextFrame(c.cur)) return false;
+        if (!nextFrame(c.next)) {
+            c.next[0] = c.cur[0];
+            c.next[1] = c.cur[1];
+            c.ended = false;  // the one frame there is still plays
         }
-        c.buf.resize(2 * 1025);
-        int start = 0;
-        if (haveLast) {
-            c.buf[0] = last[0];
-            c.buf[1] = last[1];
-            start = 1;
-        }
-        int got = c.src->read(c.buf.data() + start * 2, 1024);
-        if (got <= 0) {
-            if (c.loop && c.src->rewind(c.loopStart)) got = c.src->read(c.buf.data() + start * 2, 1024);
-            if (got <= 0) {
-                c.ended = true;
-                if (!haveLast) return false;
-                c.buf[2] = last[0];
-                c.buf[3] = last[1];
-                got = 1;
-            }
-        }
-        c.bufFrames = start + got;
-        c.bufIndex = 0;
+        c.primed = true;
+        c.pos = 0;
     }
     float t = float(c.pos);
-    size_t i = size_t(c.bufIndex) * 2;
-    l = c.buf[i] + (c.buf[i + 2] - c.buf[i]) * t;
-    r = c.buf[i + 1] + (c.buf[i + 3] - c.buf[i + 1]) * t;
-    c.pos += ratio;
+    l = c.cur[0] + (c.next[0] - c.cur[0]) * t;
+    r = c.cur[1] + (c.next[1] - c.cur[1]) * t;
+    c.pos += double(s.rate) / kRate;
     while (c.pos >= 1.0) {
         c.pos -= 1.0;
-        c.bufIndex++;
-        if (c.bufIndex + 1 >= c.bufFrames && c.ended) break;
+        c.cur[0] = c.next[0];
+        c.cur[1] = c.next[1];
+        if (!nextFrame(c.next)) {
+            if (c.ended) break;
+            // The decoder is late: hold the last frame until it catches up rather than click.
+            c.next[0] = c.cur[0];
+            c.next[1] = c.cur[1];
+        }
     }
     return true;
 }
@@ -274,13 +393,10 @@ void AudioMixer::render(float *out, int frames) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (paused_) return;
     for (Channel &c : ch_) {
-        if (!c.src || (c.ended && c.bufIndex + 1 >= c.bufFrames)) continue;
-        for (int f = 0; f < frames; f++) {
+        if (!c.stream || c.ended) continue;
+        for (int f = 0; f < frames && !c.ended; f++) {
             float l, r;
-            if (!pull(c, l, r)) {
-                c.ended = true;
-                break;
-            }
+            if (!pull(c, l, r)) break;
             if (c.fadeStep != 0) {
                 c.gain += c.fadeStep;
                 if (c.gain >= 1) {
@@ -291,7 +407,7 @@ void AudioMixer::render(float *out, int frames) {
                     c.fadeStep = 0;
                     if (c.stopAfterFade) {
                         c.ended = true;
-                        c.bufFrames = 0;
+                        release(c);
                         break;
                     }
                 }

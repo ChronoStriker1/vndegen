@@ -109,6 +109,79 @@ private func probe(_ files: [String]) -> FolderProbe {
     }
 }
 
+/// A 24-bit BMP of one colour.
+private func solidBMP(width: Int, height: Int, rgb: (UInt8, UInt8, UInt8)) -> Data {
+    let stride = (width * 3 + 3) & ~3
+    var d = Data("BM".utf8)
+    func le(_ v: Int, _ n: Int) { for i in 0..<n { d.append(UInt8(truncatingIfNeeded: v >> (8 * i))) } }
+    le(54 + stride * height, 4); le(0, 4); le(54, 4)
+    le(40, 4); le(width, 4); le(height, 4); le(1, 2); le(24, 2); le(0, 4); le(stride * height, 4); le(0, 16)
+    let row = (0..<width).flatMap { _ in [rgb.2, rgb.1, rgb.0] } + Array(repeating: 0, count: stride - width * 3)
+    for _ in 0..<height { d.append(contentsOf: row) }
+    return d
+}
+
+/// Starts a script in a fresh folder holding `files`.
+private func runScript(_ script: String, files: [String: Data] = [:]) throws -> (OpaquePointer, URL) {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try Data(script.utf8).write(to: dir.appendingPathComponent("0.txt"))
+    for (name, data) in files { try data.write(to: dir.appendingPathComponent(name)) }
+    let engine = try #require(dir.path.withCString { root in
+        var launch = VNNSLaunch(gameRoot: root, logPath: nil, englishWordWrap: false)
+        return vnns_start(&launch)
+    })
+    return (engine, dir)
+}
+
+/// breakup.dll's pieces leave the sprite's place and fly up: a red square on white, broken with "urb", has red
+/// above where it stood partway through.
+@Test func breakupPiecesFlyOff() throws {
+    let script = ";mode400\n*define\ngame\n*start\nbg white,1\nlsp 1,\":c;sq.bmp\",150,150\nprint 1\nwait 100\n" +
+        "csp 1\nprint 99,1000,\"system\\breakup.dll/urb\"\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["sq.bmp": solidBMP(width: 48, height: 48, rgb: (255, 0, 0))])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    for _ in 0..<8 { #expect(vnns_step(engine, 16)) }  // through the wait; the effect starts
+    for _ in 0..<12 { #expect(vnns_step(engine, 16)) }  // about a fifth of the way through
+    var w: Int32 = 0, h: Int32 = 0
+    var changed = false
+    let pixels = try #require(vnns_frame(engine, &w, &h, &changed))
+    func isRed(_ x: Int, _ y: Int) -> Bool {
+        let i = (y * Int(w) + x) * 4
+        return pixels[i] > 200 && pixels[i + 1] < 60 && pixels[i + 2] < 60
+    }
+    #expect((0..<150).contains { y in (100..<300).contains { x in isRed(x, y) } })
+    // And the effect ends on the new frame: white everywhere.
+    for _ in 0..<60 { #expect(vnns_step(engine, 16)) }
+    let done = try #require(vnns_frame(engine, &w, &h, &changed))
+    #expect(!(0..<Int(w * h)).contains { done[$0 * 4 + 1] < 200 })
+}
+
+/// Music in MP3 and Ogg plays and loops, and stopping it leaves nothing of it in the mix.
+@Test(arguments: ["tone.mp3", "tone.ogg"]) func musicPlaysLoopsAndStops(file: String) throws {
+    let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/audio/\(file)")
+    let script = "*define\ngame\n*start\nmp3loop \"\(file)\"\nwait 2000\nbgmstop\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: [file: try Data(contentsOf: fixture)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    func level(_ frames: Int) -> Double {
+        var buf = [Float](repeating: 0, count: frames * 2)
+        vnns_audio_render(engine, &buf, Int32(frames))
+        return (buf.reduce(0) { $0 + Double($1 * $1) } / Double(buf.count)).squareRoot()
+    }
+    // The decoder runs on its own thread, a little ahead of the mix.
+    #expect(vnns_step(engine, 16))
+    Thread.sleep(forTimeInterval: 0.05)
+    var loud = true
+    for _ in 0..<30 {  // 1.5 s of a 0.5 s file: across the loop point twice
+        loud = loud && level(2205) > 0.05
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+    #expect(loud)
+    for _ in 0..<3 { #expect(vnns_step(engine, 800)) }
+    Thread.sleep(forTimeInterval: 0.05)
+    #expect(level(4410) == 0)
+}
+
 @Test func savesGoToTheScriptsSaveFolder() throws {
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
     let game = dir.appendingPathComponent("Game")
