@@ -150,7 +150,7 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
     /// digits of a SHA-256 over the names and sizes of the scripts and archives directly in `game/`. Another release or
     /// a modded copy gets another fingerprint. Nil when `game/` holds none of those files.
     public static func fingerprint(base: URL) -> String? {
-        let game = base.appendingPathComponent("game", isDirectory: true)
+        let game = FileCase.resolve("game", in: base)
         let keys: Set<URLResourceKey> = [.fileSizeKey, .isRegularFileKey]
         guard let items = try? FileManager.default.contentsOfDirectory(at: game, includingPropertiesForKeys: Array(keys)) else { return nil }
         let lines = items.compactMap { item -> String? in

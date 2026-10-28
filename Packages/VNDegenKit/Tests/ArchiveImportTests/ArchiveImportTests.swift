@@ -725,3 +725,21 @@ private extension ArchiveImporter.Step {
     var isFinished: Bool { if case .finished = self { true } else { false } }
     var keptArchives: [String]? { if case let .finished(result) = self { result.keptArchives } else { nil } }
 }
+
+/// Windows takes `Img/`, `img/`, and `IMG/` in one archive for one folder, so they must stay one folder on an iPhone's
+/// disk too. `VNDEGEN_TEST_DIR` puts the extraction on a case-sensitive volume, which `scripts/build.sh test` mounts.
+@Test func joinsFoldersThatDifferOnlyInCase() throws {
+    let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? fm.temporaryDirectory
+    let staging = scratch.appendingPathComponent("archiveimport-\(UUID().uuidString)", isDirectory: true)
+    try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: staging) }
+    let source = try ArchiveSource(picked: [fixtures.appendingPathComponent("mixed-case.zip")])
+    // A sparse disk image reports little space for important use, and this test is not about space.
+    try ArchiveExtractor.extract(source, password: nil, into: staging, total: try ArchiveExtractor.list(source), reserve: 0) { _ in }
+    #expect(items(staging.appendingPathComponent("Mixed")) == ["Img"])
+    #expect(items(staging.appendingPathComponent("Mixed/Img")) == ["Sub", "a.png", "b.png"])
+    #expect(try text(staging.appendingPathComponent("Mixed/Img/Sub/c.png")) == "c")
+    // The archive's later `img/A.PNG` replaced `Img/a.png`.
+    #expect(try text(staging.appendingPathComponent("Mixed/Img/a.png")) == "A")
+}

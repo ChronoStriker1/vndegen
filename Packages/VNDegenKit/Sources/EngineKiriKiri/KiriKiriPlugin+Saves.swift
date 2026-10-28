@@ -16,7 +16,7 @@ extension KiriKiriPlugin {
         if let saves = Self.saveFolder(paths) {
             // A game that keeps a save folder of that name under AppData, or under VNDegen's own AppData or Documents,
             // saves there, not in its root. A game installed under Windows Documents still saves in its root.
-            let location = SaveLocation(directory: paths.gameRoot.appendingPathComponent(saves.joined(separator: "/"), isDirectory: true)) { path in
+            let location = SaveLocation(directory: FileCase.resolve(saves.joined(separator: "/"), in: paths.gameRoot)) { path in
                 Self.appDataRelativePath(path) == nil && Self.ownUserFolderPath(path, directory: appData) == nil
                     && Self.ownUserFolderPath(path, directory: documents) == nil ? Self.saveRelativePath(path, folder: saves) : nil
             }

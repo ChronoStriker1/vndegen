@@ -129,7 +129,7 @@ nonisolated struct RGSSPaths {
     var preload: URL?
 
     init(folder: URL, dataDirectory: URL, layout: RGSSLayout, runtimes: [String: URL], preload: URL? = nil) {
-        gameIni = folder.appendingPathComponent(layout.gameIni)
+        gameIni = FileCase.resolve(layout.gameIni, in: folder)
         system = dataDirectory.appendingPathComponent("rgss", isDirectory: true)
         saves = RGSSPlugin.saveDirectory(dataDirectory)
         log = dataDirectory.appendingPathComponent("logs/rgss.txt")

@@ -15,6 +15,7 @@ struct PlayerView: View {
     @State private var navigating: Bool?
     @State private var needsRotation = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.hubMetrics) private var metrics
 
     var body: some View {
         ZStack {
@@ -43,7 +44,10 @@ struct PlayerView: View {
                     .ignoresSafeArea()
             }
             if let overlayMode, overlayMode.hasOverlay {
+                // In a short iPad window the gamepad's top row would reach the window's controls. The cursor's pad maps
+                // to the whole game view, so it keeps the full height, and its Home button sits in the other corner.
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
+                    .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
             }
             if hub.input.mouse.showsKeyboard, !menu.isOpen, !isCovered {
                 KeyboardBridge(session: session) { hub.input.mouse.hideKeyboard() }
@@ -71,6 +75,7 @@ struct PlayerView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("VNDegen menu")
                 .padding(10)
+                .padding(.trailing, metrics.topClearance(.trailing))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
             if isCovered {
@@ -293,9 +298,10 @@ private struct PlayerMenuView: View {
                 session
                 controls
             }
-            .padding(28)
+            .padding(isNarrow ? 20 : 28)
             .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
             .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+            .padding(12)
         }
     }
 
@@ -306,10 +312,10 @@ private struct PlayerMenuView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(1)
-            Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: 220) }
+            Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
                 .onHover { if $0 { menu.focus = .resume } }
-            Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: 220) }
+            Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
                 .onHover { if $0 { menu.focus = .quit } }
         }
@@ -322,18 +328,32 @@ private struct PlayerMenuView: View {
             if items.contains(.method) { methods }
             if items.contains(.controllerMouse) { controllerMouse }
             if items.contains(.mouseStyle), let style = method.mouse { mouseStyles(style) }
-            Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: 220) }
+            Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
                 .onHover { if $0 { menu.focus = .mapping } }
         }
     }
 
+    /// Below about 400 pt, the width of an iPhone in portrait, the four methods don't fit in one row, so they take two.
+    private var isNarrow: Bool { metrics.size.width < 400 }
+
+    /// The buttons' label width. In a narrow window, room for the button style's 56 pt, the card's padding, and its margin.
+    private var buttonWidth: CGFloat { isNarrow ? max(0, min(220, metrics.size.width - 56 - 40 - 24)) : 220 }
+
     /// One focus target for the whole row. Left and right switch the method, like tabs.
     private var methods: some View {
-        segments(.method) {
-            ForEach(ControlMethod.Kind.allCases, id: \.self) { kind in
-                segment(kind.shortTitle, selected: kind == method.kind, item: .method) { onMethod(ControlMethod(kind)) }
-                    .accessibilityLabel(kind.title)
+        let kinds = ControlMethod.Kind.allCases
+        let rows = isNarrow ? [Array(kinds.prefix(2)), Array(kinds.dropFirst(2))] : [Array(kinds)]
+        return segments(.method, rows: rows.count) {
+            VStack(spacing: 4) {
+                ForEach(rows, id: \.self) { row in
+                    HStack(spacing: 4) {
+                        ForEach(row, id: \.self) { kind in
+                            segment(kind.shortTitle, selected: kind == method.kind, item: .method) { onMethod(ControlMethod(kind)) }
+                                .accessibilityLabel(kind.title)
+                        }
+                    }
+                }
             }
         }
     }
@@ -356,13 +376,14 @@ private struct PlayerMenuView: View {
         }
     }
 
-    /// A capsule of segments that takes focus as one item.
-    private func segments(_ item: PlayerMenu.Item, @ViewBuilder content: () -> some View) -> some View {
+    /// A capsule of segments that takes focus as one item. Two rows round their corners as one row's ends are.
+    private func segments(_ item: PlayerMenu.Item, rows: Int = 1, @ViewBuilder content: () -> some View) -> some View {
         let focused = isFocused(item)
+        let shape = RoundedRectangle(cornerRadius: rows > 1 ? 21 : .infinity, style: .continuous)
         return HStack(spacing: 4) { content() }
             .padding(4)
-            .background(Theme.surface, in: .capsule)
-            .overlay { Capsule().strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2.5 : 1) }
+            .background(Theme.surface, in: shape)
+            .overlay { shape.strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2.5 : 1) }
             .scaleEffect(focused ? 1.04 : 1)
             .animation(Theme.focusAnimation, value: focused)
             .onHover { if $0 { menu.focus = item } }

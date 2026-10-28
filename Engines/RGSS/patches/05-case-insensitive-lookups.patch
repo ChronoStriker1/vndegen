@@ -1,0 +1,164 @@
+diff --git a/binding-sandbox/wasi.cpp b/binding-sandbox/wasi.cpp
+index 78ebc85..b8f3e1d 100644
+--- a/binding-sandbox/wasi.cpp
++++ b/binding-sandbox/wasi.cpp
+@@ -2481,7 +2481,9 @@ extern "C" void w2c_wasi0x3Afilesystem0x2Ftypes0x4000x2E20x2E0_0x5Bmethod0x5Ddes
+                     return;
+                 }
+ 
+-                if (joined_old_path == joined_new_path) {
++                // Paths that differ only in case name the same file once VNDegen's file layer ignores case,
++                // and copying a file onto itself would empty it
++                if (strcasecmp(joined_old_path.c_str(), joined_new_path.c_str()) == 0) {
+                     wasi->ref<uint8_t>(result) = false;
+                     return;
+                 }
+@@ -2580,7 +2582,9 @@ extern "C" uint32_t w2c_wasi__snapshot__preview1_path_rename(struct w2c_wasi__sn
+                     return WASIP1_EIO;
+                 }
+ 
+-                if (joined_old_path == joined_new_path) {
++                // Paths that differ only in case name the same file once VNDegen's file layer ignores case,
++                // and copying a file onto itself would empty it
++                if (strcasecmp(joined_old_path.c_str(), joined_new_path.c_str()) == 0) {
+                     return WASIP1_ESUCCESS;
+                 }
+ 
+diff --git a/src/crypto/rgssad.cpp b/src/crypto/rgssad.cpp
+index d5117f9..2d960be 100644
+--- a/src/crypto/rgssad.cpp
++++ b/src/crypto/rgssad.cpp
+@@ -85,15 +85,26 @@ struct RGSS_archiveData
+ {
+ 	PHYSFS_Io *archiveIo;
+ 
+-	/* Maps: file path
++	/* Maps: lower case file path
+ 	 * to:   entry data */
+ 	BoostHash<std::string, RGSS_entryData> entryHash;
+ 
+-	/* Maps: directory path,
+-	 * to:   list of contained entries */
++	/* Maps: lower case directory path,
++	 * to:   list of contained entries, as named in the archive */
+ 	BoostHash<std::string, BoostSet<std::string> > dirHash;
+ };
+ 
++/* Archive paths are looked up ignoring ASCII case, as on Windows */
++static std::string
++lowerCase(const char *path)
++{
++	std::string lower(path);
++	for (size_t i = 0; i < lower.size(); ++i)
++		if (lower[i] >= 'A' && lower[i] <= 'Z')
++			lower[i] += 'a' - 'A';
++	return lower;
++}
++
+ static bool
+ readUint32(PHYSFS_Io *io, uint32_t &result)
+ {
+@@ -353,7 +364,7 @@ processDirectories(RGSS_archiveData *data, BoostSet<std::string> &topLevel,
+ 			const char *dir = nameBuf;
+ 			const char *entry = &nameBuf[i+1];
+ 
+-			BoostSet<std::string> &entryList = data->dirHash[dir];
++			BoostSet<std::string> &entryList = data->dirHash[lowerCase(dir)];
+ 			entryList.insert(entry);
+ 		}
+ }
+@@ -427,7 +438,7 @@ RGSS_openArchive(PHYSFS_Io *io, const char *, int forWrite, int *claimed)
+ 		entry.size = entrySize;
+ 		entry.startMagic = magic;
+ 
+-		data->entryHash.insert(nameBuf, entry);
++		data->entryHash.insert(lowerCase(nameBuf), entry);
+ 		processDirectories(data, topLevel, nameBuf, nameLen);
+ 
+ 		io->seek(io, entry.offset + entry.size);
+@@ -443,7 +454,7 @@ RGSS_enumerateFiles(void *opaque, const char *dirname,
+ {
+ 	RGSS_archiveData *data = static_cast<RGSS_archiveData*>(opaque);
+ 
+-	std::string _dirname(dirname);
++	std::string _dirname(lowerCase(dirname));
+ 
+ 	if (!data->dirHash.contains(_dirname))
+ 		return PHYSFS_ENUM_STOP;
+@@ -461,12 +472,13 @@ static PHYSFS_Io*
+ RGSS_openRead(void *opaque, const char *filename)
+ {
+ 	RGSS_archiveData *data = static_cast<RGSS_archiveData*>(opaque);
++	std::string key(lowerCase(filename));
+ 
+-	if (!data->entryHash.contains(filename))
++	if (!data->entryHash.contains(key))
+ 		return 0;
+ 
+ 	RGSS_entryHandle *entry =
+-	        new RGSS_entryHandle(data->entryHash[filename], data->archiveIo);
++	        new RGSS_entryHandle(data->entryHash[key], data->archiveIo);
+ 
+ 	PHYSFS_Io *io = PHYSFS_ALLOC(PHYSFS_Io);
+ 
+@@ -481,8 +493,9 @@ RGSS_stat(void *opaque, const char *filename, PHYSFS_Stat *stat)
+ {
+ 	RGSS_archiveData *data = static_cast<RGSS_archiveData*>(opaque);
+ 
+-	bool hasFile = data->entryHash.contains(filename);
+-	bool hasDir  = data->dirHash.contains(filename);
++	std::string key(lowerCase(filename));
++	bool hasFile = data->entryHash.contains(key);
++	bool hasDir  = data->dirHash.contains(key);
+ 
+ 	if (!hasFile && !hasDir)
+ 	{
+@@ -497,7 +510,7 @@ RGSS_stat(void *opaque, const char *filename, PHYSFS_Stat *stat)
+ 
+ 	if (hasFile)
+ 	{
+-		const RGSS_entryData &entry = data->entryHash[filename];
++		const RGSS_entryData &entry = data->entryHash[key];
+ 
+ 		stat->filesize = entry.size;
+ 		stat->filetype = PHYSFS_FILETYPE_REGULAR;
+@@ -649,7 +662,7 @@ RGSS3_openArchive(PHYSFS_Io *io, const char *, int forWrite, int *claimed)
+ 		entry.size = size;
+ 		entry.startMagic = magic;
+ 
+-		data->entryHash.insert(nameBuf, entry);
++		data->entryHash.insert(lowerCase(nameBuf), entry);
+ 		processDirectories(data, topLevel, nameBuf, nameLen);
+ 
+ 		continue;
+diff --git a/src/filesystem/filesystem.cpp b/src/filesystem/filesystem.cpp
+index aa19ade..bbc3941 100644
+--- a/src/filesystem/filesystem.cpp
++++ b/src/filesystem/filesystem.cpp
+@@ -629,8 +629,9 @@ openReadEnumCB(void *d, const char *dirpath, const char *filename) {
+   if (data.stopSearching)
+     return PHYSFS_ENUM_STOP;
+ 
+-  /* If there's not even a partial match, continue searching */
+-  if (strncmp(filename, data.filename, data.filenameN) != 0)
++  /* If there's not even a partial match, continue searching.
++   * Case is ignored, as on Windows */
++  if (strncasecmp(filename, data.filename, data.filenameN) != 0)
+     return PHYSFS_ENUM_OK;
+ 
+   if (!*dirpath) {
+@@ -728,6 +729,14 @@ void FileSystem::openRead(OpenHandler &handler, const char *filename) {
+ 
+     for (size_t i = 0; i < fileList.size(); ++i)
+       openReadEnumCB(&data, dir, fileList[i].c_str());
++
++    /* Files the game wrote after the cache was made aren't in it,
++     * so look in the folder itself, named as the game wrote it */
++    if (data.matchCount == 0) {
++      std::string mixedDir = filename_nm.substr(0, root ? 0 : delim - buffer);
++      data.pathTrans = 0;
++      PHYSFS_enumerate(mixedDir.c_str(), openReadEnumCB, &data);
++    }
+   } else {
+     PHYSFS_enumerate(dir, openReadEnumCB, &data);
+   }

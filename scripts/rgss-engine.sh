@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs on a Mac. Builds the RGSS engine (RPG Maker XP, VX and VX Ace) from Engines/RGSS:
 #   <dest>/RGSS.xcframework   the framework VNDegen embeds: iOS device and simulator, and macOS, all arm64. It holds
-#                             mkxp-z's libretro core, ANGLE, and VNDegen's frontend (Engines/RGSS/host)
+#                             mkxp-z's libretro core, ANGLE, and VNDegen's frontend (Engines/RGSS/host, with the file
+#                             name matching in Engines/Shared)
 #   <dest>/licenses/          the notices of mkxp-z, with where to get the source of this build, and of ANGLE and
 #                             every dependency, one text file each, as scripts/licenses/README.md describes
 #   scripts/rgss-engine.sh build/rgss
@@ -17,6 +18,7 @@ set -euo pipefail
 dest=${1:?destination folder, such as build/rgss}
 root=$(cd "$(dirname "$0")/.." && pwd)
 src="$root/Engines/RGSS"
+shared="$root/Engines/Shared"
 api="$root/Packages/VNDegenKit/Sources/CRGSS/include"
 cache=${VNDEGEN_RGSS_CACHE:-$HOME/Library/Caches/VNDegen/rgss}
 jobs=${VNDEGEN_RGSS_JOBS:-4}
@@ -33,7 +35,8 @@ binaryen_sha256=3f1e1379894944531501a8ccc6b59c57f0c7a00fc136dd933f8a6b0c53515a88
 
 mkdir -p "$dest" "$cache"
 dest=$(cd "$dest" && pwd)
-stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$src" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+# Engines/Shared counts by its C sources only, so its fonts changing rebuilds nothing.
+stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$root/Engines" && { find RGSS -type f -print0; find Shared -type f \( -name "*.c" -o -name "*.h" \) -print0; } | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
 if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "RGSS engine is up to date in $dest"
   exit 0
@@ -129,8 +132,9 @@ build_slice() {
   ninja -C "$work/core-$name" -j "$jobs" >"$work/core-$name.log" 2>&1 || { tail -n 40 "$work/core-$name.log" >&2; exit 1; }
 
   mkdir -p "$work/host-$name/src"
-  rsync -a --checksum --delete --exclude /subprojects "$src/host/" "$work/host-$name/src/"
+  rsync -a --checksum --delete --exclude /subprojects --exclude /shared "$src/host/" "$work/host-$name/src/"
   ln -sfn "$work/subprojects" "$work/host-$name/src/subprojects"
+  ln -sfn "$shared" "$work/host-$name/src/shared"
   if [ ! -f "$work/host-$name/build/build.ninja" ]; then
     meson setup "$work/host-$name/build" "$work/host-$name/src" --cross-file "$cross" \
       -Dcore="$work/core-$name/mkxp-z_libretro.a" -Dapi_include="$api" \

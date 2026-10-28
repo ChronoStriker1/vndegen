@@ -87,7 +87,7 @@ nonisolated struct AsarArchive: Sendable {
 
     private static func entry(_ name: String, in directory: [String: Node]) -> (String, Node)? {
         if let node = directory[name] { return (name, node) }
-        return directory.keys.sorted().first { $0.caseInsensitiveCompare(name) == .orderedSame }.map { ($0, directory[$0]!) }
+        return directory.keys.filter { $0.caseInsensitiveCompare(name) == .orderedSame }.min().map { ($0, directory[$0]!) }
     }
 
     /// Turns the parsed JSON into nodes, counting entries and depth and checking each packed span against the file.

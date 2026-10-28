@@ -151,6 +151,8 @@ final class Navigator {
     private var heroID: GameID?
     /// Set by the grid view from its width.
     var gridColumns = 4
+    /// Set by the game page when a narrow window puts its other buttons in a row under Play.
+    var pageActionsStacked = false
     private(set) var rescanning = false
     @ObservationIgnored private var columnMemory: [String: Int] = [:]
     @ObservationIgnored private var lastBackgrounded: Date?
@@ -258,10 +260,13 @@ final class Navigator {
                     : [.runtime(package.id, .install), .runtime(package.id, .importFolder)]
                 return Row(id: "page-runtime-\(package.id)", items: items)
             }
+            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock]
+            let pageActions = pageActionsStacked
+                ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
+                : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
             return [
                 Row(id: "page-back", items: [.back]),
-                Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
-            ] + runtimes + [
+            ] + pageActions + runtimes + [
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
