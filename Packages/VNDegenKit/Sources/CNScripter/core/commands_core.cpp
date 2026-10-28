@@ -508,24 +508,7 @@ void cmdReturn(E &e, const std::string &) {
     e.skipSpaces();
     std::string label;
     if (!e.atStatementEnd()) label = e.readLabel();
-    // Leave any for loops opened inside the subroutine.
-    while (!e.stack_.empty() && e.stack_.back().kind == E::Frame::For) e.stack_.pop_back();
-    if (e.stack_.empty()) {
-        e.errorf("return without gosub");
-        return;
-    }
-    E::Frame f = e.stack_.back();
-    e.stack_.pop_back();
-    if (!label.empty()) {
-        e.jumpToLabel(label);
-        return;
-    }
-    e.cur_.pos = f.pos;
-    e.cur_.line = f.line;
-    e.cur_.stmt = f.stmt;
-    if (f.hasParams) e.skipStatement();  // arguments getparam didn't read
-    e.jumps_++;
-    if (f.resumeText) e.inTextLine_ = true;
+    e.returnFromSub(label);
 }
 
 void cmdIf(E &e, const std::string &name) {
@@ -731,6 +714,28 @@ void cmdIsSkip(E &e, const std::string &) { e.setVar(e.readVar(), e.skipMode_ ? 
 void cmdAutoClick(E &e, const std::string &) { e.autoClick_ = e.readInt(); }
 
 }  // namespace
+
+bool Engine::returnFromSub(const std::string &label) {
+    // Leave any for loops opened inside the subroutine.
+    while (!stack_.empty() && stack_.back().kind == Frame::For) stack_.pop_back();
+    if (stack_.empty()) {
+        errorf("return without gosub");
+        return false;
+    }
+    Frame f = stack_.back();
+    stack_.pop_back();
+    if (!label.empty()) {
+        jumpToLabel(label);
+        return true;
+    }
+    cur_.pos = f.pos;
+    cur_.line = f.line;
+    cur_.stmt = f.stmt;
+    if (f.hasParams) skipStatement();  // arguments getparam didn't read
+    jumps_++;
+    if (f.resumeText) inTextLine_ = true;
+    return true;
+}
 
 void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     for (const char *n : {"nsa", "ns2", "ns3", "nsadir"}) t[n] = cmdNsa;

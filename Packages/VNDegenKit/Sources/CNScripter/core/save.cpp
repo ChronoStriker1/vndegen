@@ -349,10 +349,14 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         f.stmt = 0;
         const std::string &t = script_.text();
         size_t stmtStart = script_.lineStart(f.line);
-        bool quoted = false;
+        char quote = 0;
         for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(t, p)) {
-            if (t[p] == '"') quoted = !quoted;
-            if (!quoted && t[p] == ':') {
+            if (quote) {
+                if (t[p] == quote) quote = 0;
+                continue;
+            }
+            if (t[p] == '"' || t[p] == '`') quote = t[p];
+            if (!quote && t[p] == ':') {
                 f.stmt++;
                 stmtStart = p + 1;
             }

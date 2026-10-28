@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace vnns {
 
@@ -57,6 +58,15 @@ std::string trim(std::string s) {
     size_t i = 0;
     while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) i++;
     return s.substr(i);
+}
+// A field's number, or nullopt when it isn't a finite number within what the fields hold.
+std::optional<double> number(const std::string &field) {
+    std::string v = trim(field);
+    if (v.empty()) return std::nullopt;
+    char *end = nullptr;
+    double d = strtod(v.c_str(), &end);
+    if (end == v.c_str() || !std::isfinite(d) || std::fabs(d) > 1e6) return std::nullopt;
+    return d;
 }
 }  // namespace
 
@@ -118,11 +128,18 @@ void Engine::layerMessage(int layer, const std::string &msg) {
             size_t eq = f[i].find('=');
             if (eq == std::string::npos) continue;
             std::string name = sjisLower(trim(f[i].substr(0, eq)));
-            double value = atof(f[i].c_str() + eq + 1);
-            if (name == "time") item.steps = int(value);
-            else if (double *p = item.field(name)) *p = value;
-            else logf("MSpDraw set: unknown value %s", name.c_str());
+            std::optional<double> value = number(f[i].substr(eq + 1));
+            if (!value) {
+                logf("MSpDraw set: %s has no usable value", name.c_str());
+            } else if (name == "time") {
+                item.steps = int(*value);
+            } else if (double *p = item.field(name)) {
+                *p = *value;
+            } else {
+                logf("MSpDraw set: unknown value %s", name.c_str());
+            }
         }
+        sceneDirty_ = true;
         return;
     }
     if (verb != "draw") {
@@ -150,11 +167,11 @@ void Engine::layerMessage(int layer, const std::string &msg) {
                        &item->slope, nullptr,     &item->dcx,   &item->dcy, &item->dalpha, &item->drot,
                        &item->dzx, &item->dzy,    &item->dslope, &item->acx, &item->acy, nullptr};
     for (size_t j = k + 1, n = 0; j < f.size() && n < 18; j++, n++) {
-        std::string v = trim(f[j]);
-        if (v.empty()) continue;
-        if (n == 7) item->steps = atoi(v.c_str());
-        else if (n == 17) item->delay = atoi(v.c_str());
-        else *order[n] = atof(v.c_str());
+        std::optional<double> v = number(f[j]);
+        if (!v) continue;  // an empty field keeps the default, as the manual allows
+        if (n == 7) item->steps = int(*v);
+        else if (n == 17) item->delay = std::max(0, int(*v));
+        else *order[n] = *v;
     }
     if (!loadImage(tag, item->img)) return;
     if (auto old = find(item->id); old != mspdraw_.end()) *old = item;

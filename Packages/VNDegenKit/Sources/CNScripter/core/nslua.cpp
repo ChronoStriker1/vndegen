@@ -98,8 +98,16 @@ NSFN(nsExec) {
     engineOf(L).execString(luaL_checkstring(L, 1));
     return 0;
 }
+// NScripter's notes forbid jumps from a statement NSExec runs; here one would move the cursor of a statement that
+// ends when NSExec returns, so it's refused.
+bool insideExec(Engine &e, const char *what) {
+    if (e.script().execDepth() == 0) return false;
+    logf("%s inside NSExec is not allowed; ignored", what);
+    return true;
+}
 NSFN(nsGoto) {
     Engine &e = engineOf(L);
+    if (insideExec(e, "NSGoto")) return 0;
     std::string label = luaL_checkstring(L, 1);
     if (!label.empty() && label[0] == '*') label.erase(0, 1);
     e.inTextLine_ = false;
@@ -108,6 +116,7 @@ NSFN(nsGoto) {
 }
 NSFN(nsGosub) {
     Engine &e = engineOf(L);
+    if (insideExec(e, "NSGosub")) return 0;
     std::string label = luaL_checkstring(L, 1);
     if (!label.empty() && label[0] == '*') label.erase(0, 1);
     e.inTextLine_ = false;
@@ -115,11 +124,21 @@ NSFN(nsGosub) {
     return 0;
 }
 NSFN(nsReturn) {
-    engineOf(L).execString("return");
+    Engine &e = engineOf(L);
+    if (insideExec(e, "NSReturn")) return 0;
+    e.inTextLine_ = false;
+    e.returnFromSub("");
     return 0;
 }
+// Lua runs on the game thread, so a function that polls NSDoEvents in a loop holds the frame. The PC engine processes
+// its window messages here; the runtime can't, so after a few seconds it answers true, which asks the function to
+// return, as it would when the player closes the window.
+constexpr auto kLuaBudget = std::chrono::seconds(3);
 NSFN(nsDoEvents) {
-    lua_pushboolean(L, engineOf(L).ended_);
+    Engine &e = engineOf(L);
+    bool over = std::chrono::steady_clock::now() - e.luaCallStart_ > kLuaBudget;
+    if (over) logf("NSDoEvents: a Lua function has run for %d s; asking it to return", int(kLuaBudget.count()));
+    lua_pushboolean(L, e.ended_ || over);
     return 1;
 }
 NSFN(nsEnd) {
@@ -148,7 +167,8 @@ NSFN(nsGetSkip) {
     return 1;
 }
 NSFN(nsTimer) {
-    lua_pushinteger(L, lua_Integer(engineOf(L).now_));
+    // Advances while a Lua function runs, as the PC's tick count does, so a timed loop ends.
+    lua_pushinteger(L, lua_Integer(engineOf(L).clockNow()));
     return 1;
 }
 NSFN(nsSleep) {
@@ -393,9 +413,15 @@ NSFN(nsNotEmulated) {
 NSFN(nlDofile) {
     Engine &e = engineOf(L);
     const char *name = luaL_checkstring(L, 1);
-    Bytes data;
-    if (!e.fs_.read(name, data)) return luaL_error(L, "NL_dofile: %s not found", name);
-    if (luaL_loadbuffer(L, reinterpret_cast<const char *>(data.data()), data.size(), name) != 0) return lua_error(L);
+    // Lua errors leave through longjmp, which skips C++ destructors, so the buffer dies before anything can raise.
+    int status;
+    {
+        Bytes data;
+        if (!e.fs_.read(name, data)) status = -1;
+        else status = luaL_loadbuffer(L, reinterpret_cast<const char *>(data.data()), data.size(), name);
+    }
+    if (status < 0) return luaL_error(L, "NL_dofile: %s not found", name);
+    if (status != 0) return lua_error(L);
     lua_call(L, 0, LUA_MULTRET);
     return lua_gettop(L) - 1;
 }
@@ -442,6 +468,21 @@ const char *kDrawingFunctions[] = {"NSDClear", "NSDFill", "NSDLoad", "NSDDelete"
                                    "NSDSpAdd", "NSDSp2", "NSDSp2Add", "NSDPresent", "NSDPresentRect", "NSDCopyToBg",
                                    "NSDOffMode", "NSDTransition", "NSDTransitionF", "NSDDLL", "NSDCall", "NSDSetSprite"};
 
+// Notes when the outermost Lua call of a step began, for NSDoEvents' budget.
+struct LuaCall {
+    Engine &e;
+    bool outermost;
+    explicit LuaCall(Engine &eng) : e(eng), outermost(e.script().execDepth() == 0 && !e.inLua_) {
+        if (outermost) {
+            e.luaCallStart_ = std::chrono::steady_clock::now();
+            e.inLua_ = true;
+        }
+    }
+    ~LuaCall() {
+        if (outermost) e.inLua_ = false;
+    }
+};
+
 void report(lua_State *L, const char *what) {
     const char *msg = lua_tostring(L, -1);
     logf("Lua error in %s: %s", what, msg ? sjisToUtf8(msg).c_str() : "?");
@@ -456,7 +497,17 @@ void Engine::luaStart() {
     lua_ = luaL_newstate();
     if (!lua_) return;
     lua_State *L = lua_;
-    luaL_openlibs(L);
+    // The base, table, string and math libraries. Not io, os, package or debug: a game's script gets files only through
+    // NL_dofile and the engine's commands, and no shell, process or module loading. dofile, loadfile and require read
+    // the host's files, so they go too.
+    for (lua_CFunction open : {luaopen_base, luaopen_table, luaopen_string, luaopen_math}) {
+        lua_pushcfunction(L, open);
+        lua_call(L, 0, 0);
+    }
+    for (const char *name : {"dofile", "loadfile", "require"}) {
+        lua_pushnil(L);
+        lua_setglobal(L, name);
+    }
     for (auto &f : kFunctions) {
         lua_pushlightuserdata(L, this);
         lua_pushcclosure(L, f.fn, 1);
@@ -468,10 +519,11 @@ void Engine::luaStart() {
         lua_setglobal(L, name);
     }
     luaReturn_ = cur_;
+    LuaCall call(*this);
     logf("system.lua: running it (NSLua)");
-    if (luaL_loadbuffer(L, reinterpret_cast<const char *>(src.data()), src.size(), "system.lua") != 0 ||
-        lua_pcall(L, 0, 0, 0) != 0)
-        report(L, "system.lua");
+    int status = luaL_loadbuffer(L, reinterpret_cast<const char *>(src.data()), src.size(), "system.lua");
+    src = Bytes();  // nothing of ours may be alive across a Lua error, which longjmps past destructors
+    if (status != 0 || lua_pcall(L, 0, 0, 0) != 0) report(L, "system.lua");
 }
 
 void Engine::luaStop() {
@@ -487,17 +539,22 @@ bool Engine::luaCommand(const std::string &name) {
     skipStatement();
     Cursor end = cur_;
     cur_ = start;
+    // A command run from inside another Lua call (through NSExec) must leave the outer call's return cursor alone.
+    Cursor outerReturn = luaReturn_;
     luaReturn_ = end;
+    LuaCall call(*this);
     int jumps = jumps_;
     lua_getglobal(L, ("NSCOM_" + name).c_str());
     if (!lua_isfunction(L, -1)) {
         lua_pop(L, 1);
         errorf("luasub %s: NSCOM_%s is not defined", name.c_str(), name.c_str());
         cur_ = end;
+        luaReturn_ = outerReturn;
         return true;
     }
     if (lua_pcall(L, 0, 0, 0) != 0) report(L, ("NSCOM_" + name).c_str());
     if (jumps_ == jumps && !ended_) cur_ = end;
+    luaReturn_ = outerReturn;
     return true;
 }
 
@@ -516,19 +573,22 @@ bool Engine::luaCallback(const std::string &name, int arg, bool *result) {
         lua_pop(L, 1);
         return false;
     }
+    Cursor outerReturn = luaReturn_;
     luaReturn_ = cur_;
+    LuaCall call(*this);
     int args = 0;
     if (arg >= 0) {
         lua_pushinteger(L, arg);
         args = 1;
     }
-    if (lua_pcall(L, args, 1, 0) != 0) {
-        report(L, fn.c_str());
-        return false;
+    bool ok = lua_pcall(L, args, 1, 0) == 0;
+    if (!ok) report(L, fn.c_str());
+    else {
+        if (result) *result = lua_toboolean(L, -1) != 0;
+        lua_pop(L, 1);
     }
-    if (result) *result = lua_toboolean(L, -1) != 0;
-    lua_pop(L, 1);
-    return true;
+    luaReturn_ = outerReturn;
+    return ok;
 }
 
 // Runs one statement given as text, where the script is: NSExec. Jumps aren't allowed in it, so the cursor comes

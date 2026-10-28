@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
@@ -246,6 +247,8 @@ public:
     int jumps_ = 0;               // counts cursor jumps, so a command that jumped isn't checked for leftovers
     bool continueLine_ = false;   // if/notif leave the cursor on the next command of the same line
     void gosub(size_t returnPos, int line, int stmt, std::string_view label);
+    // `return [*label]`: leaves the innermost gosub, defsub or textgosub frame. Returns false with no frame to leave.
+    bool returnFromSub(const std::string &label);
     void errorf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     int quietErrors_ = 0;  // while above 0, errorf logs nothing
 
@@ -491,6 +494,9 @@ public:
     // Timing, waits and input
     int64_t now_ = 0;
     int64_t timerBase_ = 0;
+    // The wall clock when the current step began, so a timer read during a step (NSLua's NSTimer) advances within it.
+    std::chrono::steady_clock::time_point stepStart_ = std::chrono::steady_clock::now();
+    int64_t clockNow() const;  // now_ plus the time this step has taken
     WaitKind wait_ = WaitKind::None;
     int64_t waitUntil_ = 0;
     int64_t waitStart_ = 0;
@@ -626,6 +632,8 @@ public:
     int luaAnimInterval_ = 15;
     int64_t luaAnimNext_ = 0;
     Cursor luaReturn_;  // where NSGosub returns to: after the Lua command's statement, or where a callback was made
+    std::chrono::steady_clock::time_point luaCallStart_;  // when the outermost running Lua call began
+    bool inLua_ = false;
     void luaStart();
     void luaStop();
     bool luaCommand(const std::string &name);

@@ -430,7 +430,7 @@ static bool readComparison(Engine &e) {
     e.cur_.pos = save;
     e.skipSpaces();
     char c = e.peek();
-    bool isString = c == '"' || c == '$';
+    bool isString = c == '"' || c == '`' || c == '$';
     std::string ls, rs;
     int li = 0, ri = 0;
     if (isString) ls = e.readStr();
@@ -491,15 +491,20 @@ void Engine::skipToLineEnd() {
     while (cur_.pos < t.size() && t[cur_.pos] != '\n') cur_.pos += sjisCharLen(t, cur_.pos);
 }
 
-// Skips the rest of the current statement, respecting quoted strings.
+// Skips the rest of the current statement, respecting strings in double quotes or backquotes.
 void Engine::skipStatement() {
     const std::string &t = script_.text();
-    bool quoted = false;
+    char quote = 0;
     while (cur_.pos < t.size()) {
         char c = t[cur_.pos];
         if (c == '\n') return;
-        if (c == '"') quoted = !quoted;
-        if (!quoted && (c == ':' || c == ';')) return;
+        if (quote) {
+            if (c == quote) quote = 0;
+        } else if (c == '"' || c == '`') {
+            quote = c;
+        } else if (c == ':' || c == ';') {
+            return;
+        }
         cur_.pos += sjisCharLen(t, cur_.pos);
     }
 }

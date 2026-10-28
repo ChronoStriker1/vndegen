@@ -12,6 +12,7 @@
 //   shot PATH           write the current frame as a PNG
 //   load N              load save slot N
 //   where               print the script line and what the game waits for
+//   caption             print the game's window title (a script's caption command), for lab scripts
 //   audio               print the peak level of the sound mixed during the last step command, 0 to 1
 //   quit                end the game as closing its window would, writing system data
 //
@@ -200,6 +201,8 @@ int main(int argc, char **argv) {
         } else if (cmd == "drawn") {
             std::cout << "drawn " << drawn << std::endl;
             drawn = 0;
+        } else if (cmd == "caption") {
+            std::cout << "caption " << vnns_caption(e) << std::endl;
         } else if (cmd == "where") {
             std::cout << vnns_debug_status(e) << std::endl;
         } else if (cmd == "quit") {

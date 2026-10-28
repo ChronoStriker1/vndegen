@@ -175,7 +175,11 @@ menus and the right-click menu keep the runtime's own layout.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`
-  don't show a dialog. Lua runs on the game thread, so `NSSleep` sleeps for at most 10 ms.
+  don't show a dialog. A game's Lua gets the base, table, string and math libraries only: no `io`, `os`, `package`
+  or `debug`, and no `dofile`, `loadfile` or `require`, so a script reads files only through `NL_dofile` and the
+  engine's commands. Lua runs on the game thread, so `NSSleep` sleeps for at most 10 ms, and a function that polls
+  `NSDoEvents` for more than 3 seconds is told to return. `NSGoto`, `NSGosub` and `NSReturn` are refused inside a
+  statement `NSExec` runs, as the DLL's notes forbid.
 - Of `MSpDraw.dll`, the messages the test games send are emulated: `draw`, `set` and `clear`. `stop`, `move`,
   `hide`, `disp`, `getphase`, `drawTo` and the program mode its manual describes aren't.
 - `blt` and `ofscpy` aren't implemented; one test game's script has one call of each, outside normal play.

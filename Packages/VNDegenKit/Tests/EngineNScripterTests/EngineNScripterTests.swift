@@ -201,6 +201,43 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(String(cString: vnns_debug_status(engine)).contains("click"))
 }
 
+/// Lua commands nest through NSExec without losing their arguments, NSReturn leaves the subroutine, a timed loop ends,
+/// the file and shell libraries are absent, a bad NL_dofile is an ordinary Lua error, and backquoted strings parse.
+@Test func luaCallsNestReturnAndKeepToTheGame() throws {
+    let lua = """
+    NSExec("luasub inner") NSExec("luasub outer") NSExec("luasub retsub") NSExec("luasub timed") NSExec("luasub bq")
+    NSExec("luasub report")
+    function NSCOM_inner()
+        local a = NSPopInt() NSPopComma()
+        NSExec("mov %10,5")
+        NSSetIntValue(11, a) NSSetIntValue(12, NSPopInt())
+    end
+    function NSCOM_outer() NSExec("inner 111,222") NSSetIntValue(13, 7) end
+    function NSCOM_retsub() NSSetIntValue(14, 1) NSReturn() end
+    function NSCOM_timed()
+        local start, n = NSTimer(), 0
+        while NSTimer() - start < 30 do NSSleep(1) n = n + 1 end
+        NSSetIntValue(15, n)
+    end
+    function NSCOM_bq() NSSetStrValue(5, NSPopStr()) end
+    NSSetIntValue(16, (io == nil and os == nil and dofile == nil) and 1 or 0)
+    NSSetIntValue(17, pcall(NL_dofile, "bad.lua") and 0 or 1)
+    function NSCOM_report()
+        local s = ""
+        for i = 10, 17 do s = s .. NSGetIntValue(i) .. " " end
+        NSSetStrValue(1, s)
+    end
+    """
+    let script = ";mode400\n*define\ngame\n*start\nmov %10,0\nouter\ngosub *sub\nmov $6,\"no\"\nbq `a:b`\n"
+        + "if `x` == `x` mov $6,\"yes\"\ntimed\nreport\ncaption $1+$5+\" \"+$6\nclick\nend\n*sub\nretsub\nmov %14,99\nreturn\n"
+    let (engine, dir) = try runScript(script, files: ["system.lua": Data(lua.utf8), "bad.lua": Data("not lua ((".utf8)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    #expect(vnns_step(engine, 16))
+    let caption = String(cString: vnns_caption(engine))
+    #expect(caption.hasPrefix("5 111 222 7 1 "))
+    #expect(caption.hasSuffix(" 1 1 a:b yes"))
+}
+
 /// A layer plugin's picture moves on the layer's timer by the increments its draw message gives.
 @Test func mspDrawPicturesMoveOnTheLayersTimer() throws {
     let script = ";mode400\n*define\nsetlayer 1,100,\"dll\\MSpDraw.dll\"\ngame\n*start\nlsp 2,\"*1\",0,0\n"

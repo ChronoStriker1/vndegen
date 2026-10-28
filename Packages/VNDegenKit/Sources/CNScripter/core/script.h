@@ -24,13 +24,14 @@ class Script {
 public:
     bool load(FileSystem &fs, std::string *error);
 
-    const std::string &text() const { return *active_; }
-    // NSExec runs one statement given as text: until endExec, the parser reads that text in place of the script.
-    void beginExec(const std::string &statement) {
-        exec_ = statement + "\n";
-        active_ = &exec_;
+    const std::string &text() const { return exec_.empty() ? text_ : exec_.back(); }
+    // NSExec runs one statement given as text: until the matching endExec, the parser reads that text in place of
+    // the script. Calls nest (a statement run this way may run another), so each endExec restores the one below.
+    void beginExec(const std::string &statement) { exec_.push_back(statement + "\n"); }
+    void endExec() {
+        if (!exec_.empty()) exec_.pop_back();
     }
-    void endExec() { active_ = &text_; }
+    int execDepth() const { return int(exec_.size()); }
     Script() = default;
     Script(const Script &) = delete;
     Script &operator=(const Script &) = delete;
@@ -51,8 +52,7 @@ public:
 private:
     void parseSettings();
     std::string text_;
-    std::string exec_;
-    const std::string *active_ = &text_;
+    std::vector<std::string> exec_;  // statements NSExec is running, innermost last
     bool fromDat_ = false;
     size_t loadedLength_ = 0;  // the script's length before a closing newline was added
     ScriptSettings settings_;
