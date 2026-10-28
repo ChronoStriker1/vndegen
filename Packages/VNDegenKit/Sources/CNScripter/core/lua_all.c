@@ -45,6 +45,18 @@
 #include "../third_party/lua/linit.c"
 #include "../third_party/lua/lmathlib.c"
 #include "../third_party/lua/loadlib.c"
+// iOS has no system(); os.execute fails there, as it does on a Windows build without a shell.
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+static int vnns_no_system(const char *command) {
+    (void)command;
+    return -1;
+}
+#define system vnns_no_system
+#endif
+#endif
 #include "../third_party/lua/loslib.c"
+#undef system
 #include "../third_party/lua/lstrlib.c"
 #include "../third_party/lua/ltablib.c"
