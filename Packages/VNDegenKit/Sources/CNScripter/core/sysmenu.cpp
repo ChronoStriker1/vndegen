@@ -402,9 +402,10 @@ void Engine::pollSystemUi() {
         closeUi(ui.kind == SystemUi::YesNo ? 1 : -1);
         return;
     }
-    if (in_.click && ui.hover >= 0) {
-        bool enabled = size_t(ui.hover) >= ui.enabled.size() || ui.enabled[size_t(ui.hover)];
-        if (enabled) closeUi(ui.hover);
+    // A click answers what is under the pointer, not the item the keys focused.
+    if (in_.click && hover >= 0) {
+        bool enabled = size_t(hover) >= ui.enabled.size() || ui.enabled[size_t(hover)];
+        if (enabled) closeUi(hover);
     }
 }
 

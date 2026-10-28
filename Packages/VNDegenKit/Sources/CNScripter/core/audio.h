@@ -72,6 +72,7 @@ private:
         double pos = 0;  // resampler phase between cur and next
         float cur[2] = {0, 0}, next[2] = {0, 0};
         bool primed = false, ended = false;
+        bool lastFrame = false;  // cur is the sound's last frame: it ends once that has played
     };
     bool pull(Channel &c, float &l, float &r);
     static bool popFrame(Stream &s, float *frame);

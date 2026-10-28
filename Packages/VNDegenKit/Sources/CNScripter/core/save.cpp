@@ -345,22 +345,33 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         }
         f.pos = std::min(f.pos, script_.text().size());
         f.line = script_.lineAt(f.pos);
-        // The statement index of a return position: the ':' separators before it on its line.
+        // The statement index of a return position: the ':' separators before it on its line, outside strings. A
+        // return into a statement that calls a user command, after an if's condition or not, is a defsub call,
+        // which getparam may still read.
         f.stmt = 0;
-        size_t stmtStart = script_.lineStart(f.line);
-        for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(script_.text(), p))
-            if (script_.text()[p] == ':') {
+        const std::string &t = script_.text();
+        bool quoted = false, callsDefsub = false;
+        for (size_t p = script_.lineStart(f.line); p < f.pos;) {
+            char c = t[p];
+            if (c == '"') {
+                quoted = !quoted;
+                p++;
+            } else if (!quoted && c == ':') {
                 f.stmt++;
-                stmtStart = p + 1;
+                callsDefsub = false;
+                p++;
+            } else if (!quoted && (isalpha(uint8_t(c)) || c == '_')) {
+                size_t end = p;
+                while (end < f.pos && (isalnum(uint8_t(t[end])) || t[end] == '_')) end++;
+                // %name and $name are variables, *name a label.
+                bool variable = p > 0 && (t[p - 1] == '%' || t[p - 1] == '$' || t[p - 1] == '*');
+                if (!variable && defsubs_.count(sjisLower(t.substr(p, end - p)))) callsDefsub = true;
+                p = end;
+            } else {
+                p += sjisCharLen(t, p);
             }
-        // A return into a user command's statement is a defsub call, which getparam may still read.
-        if (f.kind == Frame::Gosub) {
-            size_t a = stmtStart;
-            while (a < f.pos && (script_.text()[a] == ' ' || script_.text()[a] == '\t')) a++;
-            size_t b = a;
-            while (b < f.pos && (isalnum(uint8_t(script_.text()[b])) || script_.text()[b] == '_')) b++;
-            f.hasParams = b > a && defsubs_.count(sjisLower(script_.text().substr(a, b - a)));
         }
+        f.hasParams = f.kind == Frame::Gosub && callsDefsub;
         frames.push_back(f);
     }
     std::reverse(frames.begin(), frames.end());

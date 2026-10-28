@@ -352,20 +352,21 @@ bool AudioMixer::popFrame(Stream &s, float *frame) {
 // yet, or any more (c.ended).
 bool AudioMixer::pull(Channel &c, float &l, float &r) {
     Stream &s = *c.stream;
-    // A frame that isn't there: the end once the decoder has finished, otherwise a late decoder.
-    auto nextFrame = [&](float *f) {
-        if (popFrame(s, f)) return true;
-        if (!s.eof.load(std::memory_order_acquire)) return false;
-        if (popFrame(s, f)) return true;  // written just before the decoder finished
-        c.ended = true;
-        return false;
+    // The next frame: 1, or 0 while the decoder is late, or -1 at the end of the sound.
+    auto fetch = [&](float *f) {
+        if (popFrame(s, f)) return 1;
+        if (!s.eof.load(std::memory_order_acquire)) return 0;
+        return popFrame(s, f) ? 1 : -1;  // written just before the decoder finished, or the end
     };
     if (!c.primed) {
-        if (!nextFrame(c.cur)) return false;
-        if (!nextFrame(c.next)) {
+        int got = fetch(c.cur);
+        if (got < 0) c.ended = true;
+        if (got <= 0) return false;
+        int more = fetch(c.next);
+        if (more != 1) {
             c.next[0] = c.cur[0];
             c.next[1] = c.cur[1];
-            c.ended = false;  // the one frame there is still plays
+            c.lastFrame = more < 0;
         }
         c.primed = true;
         c.pos = 0;
@@ -376,13 +377,19 @@ bool AudioMixer::pull(Channel &c, float &l, float &r) {
     c.pos += double(s.rate) / kRate;
     while (c.pos >= 1.0) {
         c.pos -= 1.0;
+        if (c.lastFrame) {
+            c.ended = true;
+            break;
+        }
         c.cur[0] = c.next[0];
         c.cur[1] = c.next[1];
-        if (!nextFrame(c.next)) {
-            if (c.ended) break;
-            // The decoder is late: hold the last frame until it catches up rather than click.
+        int got = fetch(c.next);
+        if (got != 1) {
+            // The end: hold the last frame for its turn. A late decoder: hold it until it catches up, rather
+            // than click.
             c.next[0] = c.cur[0];
             c.next[1] = c.cur[1];
+            c.lastFrame = got < 0;
         }
     }
     return true;
