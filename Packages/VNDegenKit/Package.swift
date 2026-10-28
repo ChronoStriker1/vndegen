@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
+        .library(name: "EngineArtemis", targets: ["EngineArtemis"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -48,6 +49,10 @@ let package = Package(
         // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
         .target(name: "CRGSS"),
         .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
+        // library the app links, found at run time.
+        .target(name: "CArtemis", exclude: ["LICENSE-stb_vorbis.txt"]),
+        .target(name: "EngineArtemis", dependencies: ["VNCore", "CArtemis", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
@@ -84,6 +89,7 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
+        .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ]
 )

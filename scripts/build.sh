@@ -19,7 +19,7 @@ case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;
 
 # The app's Licenses page lists the notices that each bundled runtime writes to build/<runtime>/licenses/. An app build
 # fails when one of these has none, so a missing notice can't reach a release. A new runtime adds its name here.
-licensed=(rclone renpy rgss kirikiri app fonts)
+licensed=(rclone renpy rgss kirikiri artemis app fonts)
 require_licenses() {
   local runtime
   for runtime in "${licensed[@]}"; do
@@ -27,12 +27,13 @@ require_licenses() {
   done
 }
 
-# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS
-# and KiriKiri engines build first, so a failure shows its log. The app's own build phases then find them up to date.
+# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS,
+# KiriKiri, and Artemis engines build first, so a failure shows its log. The app's own build phases then find them up to date.
 xcb() {
   mkdir -p build
   scripts/rgss-engine.sh build/rgss >build/rgss-engine.log 2>&1 || { tail -n 40 build/rgss-engine.log; return 1; }
   scripts/kirikiri-engine.sh build/kirikiri >build/kirikiri-engine.log 2>&1 || { tail -n 40 build/kirikiri-engine.log; return 1; }
+  scripts/artemis-engine.sh build/artemis >build/artemis-engine.log 2>&1 || { tail -n 40 build/artemis-engine.log; return 1; }
   xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 | filter 'error:|BUILD (SUCCEEDED|FAILED)|\*\* '
 }
 

@@ -15,7 +15,7 @@ targets:
   ArtemisTestHost:
     type: application
     platform: iOS
-    sources: [main.m, art3m1s_api.h]
+    sources: [main.m]
     dependencies:
       - sdk: Metal.framework
       - sdk: QuartzCore.framework
@@ -42,4 +42,5 @@ targets:
       ARCHS: arm64
       TARGETED_DEVICE_FAMILY: "1,2"
       LIBRARY_SEARCH_PATHS: ["$(ART3M1S_LIB_DIR)"]
+      HEADER_SEARCH_PATHS: ["$(SRCROOT)/../../../Packages/VNDegenKit/Sources/CArtemis/include"]
       OTHER_LDFLAGS: ["-lart3m1s_core", "-lc++"]

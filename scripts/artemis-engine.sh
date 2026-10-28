@@ -16,12 +16,13 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 src="$root/Engines/Artemis/art3m1s-core"
 mkdir -p "$dest"
 dest=$(cd "$dest" && pwd)
+header="$root/Packages/VNDegenKit/Sources/CArtemis/include/art3m1s_api.h"
 ios_target=$(sed -n 's/^ *iOS: *"\([0-9.]*\)".*/\1/p' "$root/project.yml" | head -1)
 mac_target=$(sed -n 's/^ *macOS: *"\([0-9.]*\)".*/\1/p' "$root/project.yml" | head -1)
 
 stamp=$( (cat "$0"; echo "$ios_target $mac_target"; cd "$root/Engines/Artemis" &&
-  find art3m1s-core licenses test-host/art3m1s_api.h \( -path art3m1s-core/target -o -path art3m1s-core/tests \) -prune -o -type f -print0 |
-  LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+  find art3m1s-core licenses \( -path art3m1s-core/target -o -path art3m1s-core/tests \) -prune -o -type f -print0 |
+  LC_ALL=C sort -z | xargs -0 shasum -a 256; shasum -a 256 "$header") | shasum -a 256 | cut -c1-16)
 if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "Artemis engine is up to date in $dest"
   exit 0
@@ -57,7 +58,7 @@ lib=libart3m1s_core.a
 mkdir -p "$work/mac-universal" "$work/include"
 lipo -create "$work/target/aarch64-apple-darwin/release/$lib" "$work/target/x86_64-apple-darwin/release/$lib" \
   -output "$work/mac-universal/$lib"
-cp -p "$root/Engines/Artemis/test-host/art3m1s_api.h" "$work/include/"
+cp -p "$header" "$work/include/"
 rm -rf "$dest/ios" "$dest/licenses"
 mkdir -p "$dest/ios" "$dest/licenses"
 xcodebuild -create-xcframework \

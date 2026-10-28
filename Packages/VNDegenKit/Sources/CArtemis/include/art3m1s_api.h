@@ -76,6 +76,9 @@ typedef int32_t (*ArtRuntimeIsExitRequestedFn)(const CoreRuntime *rt);
 typedef uint64_t (*ArtRuntimeBackendCapabilitiesFn)(const CoreRuntime *rt);
 typedef int32_t (*ArtRuntimeSubmitHttpResultFn)(CoreRuntime *rt, int status_code,
                                                 const uint8_t *body, int body_len);
+typedef int64_t (*ArtResourcesFileSizeFn)(HostResources *resources, const char *path);
+typedef int64_t (*ArtResourcesReadFn)(HostResources *resources, const char *path, uint64_t offset,
+                                      uint8_t *out, size_t len);
 typedef int32_t (*ArtRuntimeSetPcSaveVersionFn)(CoreRuntime *rt, int32_t version);
 typedef void (*ArtRuntimeSetStringVariableFn)(CoreRuntime *rt, const char *name,
                                               const char *value);
@@ -169,6 +172,10 @@ typedef struct Art3m1sApiV1 {
     /* Added by VNDegen: 1000, or 1002 for a game whose archives are pf8.
      * Present when struct_size covers it. */
     ArtRuntimeSetPcSaveVersionFn runtime_set_pc_save_version;
+    /* Added by VNDegen: a game's files, as the core finds them: overrides, save
+     * files, archives with their patches, and loose files, in any case. */
+    ArtResourcesFileSizeFn resources_file_size;
+    ArtResourcesReadFn resources_read;
 } Art3m1sApiV1;
 
 /* Primary Artemis facade symbol. Flat migration symbols, if present, are not

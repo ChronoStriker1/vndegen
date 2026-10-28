@@ -5,6 +5,7 @@ import EngineTyrano
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
+import EngineArtemis
 import FontPack
 import RuntimePackages
 import Metadata
@@ -21,6 +22,7 @@ let engines: [any EnginePlugin] = {
         TyranoPlugin(),
         RenPyPlugin(),
         KiriKiriPlugin(),
+        ArtemisPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)
