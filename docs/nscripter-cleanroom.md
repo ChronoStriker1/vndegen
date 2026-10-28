@@ -85,8 +85,11 @@ says it comes from ONScripter-EN, so only its license header and a list of names
 - **Compression type 4 in `.nsa`**: no test game uses it and no sample exists to check a decoder against, so it
   isn't implemented. The runtime logs the file instead. (Type 2 is implemented; see the table.)
 - **`MSpDraw.dll`'s tilt**: the manual calls `slope` a tilt angle, 0 upright and 90 flat, and lists projection as its
-  slowest drawing mode. It's drawn as the height scaled by the cosine of the angle, which gives the logo in one game's
-  opening the flip-in the script's `dslope=-3` over 30 steps asks for. Not checked against the DLL.
+  slowest drawing mode. Checked as a black box: a lab script ran the DLL in one game's own engine under Wine, drawing
+  a picture at slope 90 and tilting it to 0 over 30 steps, with the screen recorded at 30 frames a second. The
+  picture's width stayed about 230 pixels throughout while its height grew from a sliver to its full 136, within a
+  step of the cosine of the angle, and its top and bottom edges stayed the same width (no perspective). The runtime
+  draws it the same way.
 - **The `\|` pause length** in the backquoted script: 100 ms each, a guess; no engine was available to measure it.
 - **`heartmode`**, a define command one game uses that no manual describes: read and ignored.
 - **The drawing order of `MSpDraw.dll` pictures**: the order they were drawn in, which puts one game's map under its

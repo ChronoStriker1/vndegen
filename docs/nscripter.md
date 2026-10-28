@@ -77,7 +77,8 @@ NScripter games call Windows DLLs. The runtime emulates the ones the test games 
   as its author's manual describes: `draw` with the picture's centre, alpha, rotation, zoom, tilt, step count,
   per-step increments, accelerations and start delay, `set` to change those values and run on, `clear` for one, several
   or all pictures, and the `+` and `-` blending tags. Two test games use it, for a panning picture and an opening
-  sequence. The manual's tilt (a projection) is drawn as the picture's height scaled by its cosine.
+  sequence. The manual's tilt is drawn as the picture's height scaled by the cosine of the angle, which is what the
+  DLL does in the PC engine (checked under Wine).
 - Effect 99, a transition a DLL draws (`print 99,ms,"system\breakup.dll/urb"`), for the four one test game uses,
   drawn as the original DLLs draw them under the PC engine:
   - `breakup.dll` (`urb`, `lrB` and the other corners): the area that changes breaks into round 24-pixel pieces,
@@ -176,5 +177,5 @@ menus and the right-click menu keep the runtime's own layout.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`
   don't show a dialog. Lua runs on the game thread, so `NSSleep` sleeps for at most 10 ms.
 - Of `MSpDraw.dll`, the messages the test games send are emulated: `draw`, `set` and `clear`. `stop`, `move`,
-  `hide`, `disp`, `getphase`, `drawTo` and the program mode its manual describes aren't. Its tilt is approximated.
+  `hide`, `disp`, `getphase`, `drawTo` and the program mode its manual describes aren't.
 - `blt` and `ofscpy` aren't implemented; one test game's script has one call of each, outside normal play.
