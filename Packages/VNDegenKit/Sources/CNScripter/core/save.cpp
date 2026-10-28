@@ -362,9 +362,17 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
         // variables; its errors aren't the player's, so they aren't logged.
         if (f.kind == Frame::Gosub) {
-            Cursor saved = cur_;
-            cur_ = Cursor{stmtStart, f.line, f.stmt};
+            // Restored on every exit, including the exception a corrupt save's nesting guard throws.
             quietErrors_++;
+            struct Restore {
+                Engine &e;
+                Cursor cur;
+                ~Restore() {
+                    e.cur_ = cur;
+                    e.quietErrors_--;
+                }
+            } restore{*this, cur_};
+            cur_ = Cursor{stmtStart, f.line, f.stmt};
             for (;;) {
                 std::string word = readWord();
                 bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
@@ -376,8 +384,6 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                 if (name != "if" && name != "notif") break;
                 readCondition();
             }
-            quietErrors_--;
-            cur_ = saved;
         }
         frames.push_back(f);
     }
