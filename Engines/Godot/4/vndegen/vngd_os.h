@@ -1,6 +1,6 @@
 // The paths a game sees, the same on every platform: the game's .exe as the executable, and user:// where Windows
-// keeps it, under VNDegen's stand-in for %APPDATA%. Its files are found whatever case the game names them in, as on
-// Windows, through Dir, the platform's folder access, and vngd_files.h.
+// keeps it, under VNDegen's stand-in for %APPDATA%. Each platform's OS installs vngd_files.h's case lookup when its file
+// access starts, since Godot's OS classes start it in different ways.
 #pragma once
 
 #include "vngd_files.h"
@@ -11,7 +11,7 @@
 #include <vnfont.h>
 #include <vngd.h>
 
-template <class Base, class Dir = DirAccessUnix>
+template <class Base>
 class OS_VNDegen : public Base {
 	String executable;
 	String data_path;
@@ -29,11 +29,6 @@ public:
 	// Godot's own alert is a modal dialog, which would stop VNDegen's app. VNDegen reports a game that can't start
 	// itself, so alerts go to the log.
 	void alert(const String &p_alert, const String &p_title = "ALERT!") override { OS::alert(p_alert, p_title); }
-
-	void initialize_core() override {
-		Base::initialize_core();
-		vngd_use_case_lookup<Dir>();
-	}
 
 	// A Windows font the game asks for by name, such as through a SystemFont, comes from VNDegen's substitutes first.
 	String get_system_font_path(const String &p_font_name, int p_weight = 400, int p_stretch = 100, bool p_italic = false) const override {
