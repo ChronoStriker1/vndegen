@@ -1,12 +1,12 @@
 // Windows ignores case in file names, so a game may ask for `Items/Sword.json` when the disk has `items/sword.json`.
 // Files outside the pack, beside the game and in user://, are found whatever case the game names them in, through the
-// lookup every engine shares. Lookups inside the pack stay exact, as they are on Windows. fix_path is virtual through
+// lookup every engine shares. Lookups inside the pack stay exact, as they are on Windows. Copying a file onto another
+// spelling of itself is caught in DirAccess::copy, by a patch, since packs bring their own folder access. fix_path is virtual through
 // patches/03-virtual-fix-path.patch.
 #pragma once
 
 #include "core/os/dir_access.h"
 #include "core/os/file_access.h"
-#include "core/project_settings.h"
 #include "drivers/unix/dir_access_unix.h"
 #include "drivers/unix/file_access_unix.h"
 
@@ -39,17 +39,6 @@ protected:
 	}
 
 public:
-	// Two spellings can name one file, and copying it onto itself would empty it.
-	Error copy(String p_from, String p_to, int p_chmod_flags = -1) override {
-		const ProjectSettings *settings = ProjectSettings::get_singleton();
-		const String from = vngd_case_path(settings->globalize_path(p_from));
-		const String to = vngd_case_path(settings->globalize_path(p_to));
-		if (casepath_same_file(from.utf8().get_data(), to.utf8().get_data())) {
-			return OK;
-		}
-		return DirAccessUnix::copy(p_from, p_to, p_chmod_flags);
-	}
-
 	// A link's relative target counts from the link's own folder, so it keeps its text.
 	Error create_link(String p_source, String p_target) override {
 		if (!p_source.is_rel_path()) {

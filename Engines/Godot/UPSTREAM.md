@@ -30,6 +30,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `05-simulator-angle.patch`: lets the iOS Simulator build take its OpenGL ES headers from MetalANGLE. The simulator's Metal device reports only GPU families Apple1 and Apple2, and Godot's Metal renderer needs Apple4: with the family check skipped, Metal's validation aborts on the first texture Godot creates. So in the simulator only, Godot 4 runs its compatibility renderer on OpenGL ES 3 through MetalANGLE, the OpenGL ES on Metal the app embeds for Ren'Py. Devices and the Mac use Metal.
 - `06-simulator-blur.patch`: in the iOS Simulator only, builds the mipmaps of the 2D back buffer with `glGenerateMipmap` instead of Godot's Gaussian blur. The blur draws into one mip level of a texture while it samples the level above, and MetalANGLE aborts on that draw with a Metal pipeline that has no color format. Shaders that read a blurred screen look slightly different there.
 - `07-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, since a setup that fails frees whatever it finds set.
+- `08-copy-same-file.patch`: `DirAccess::copy` does nothing when the destination is the file on disk the source opened, compared by inode. VNDegen finds names whatever their case, so two spellings can name one file, and copying it onto itself would empty it. A file read from the pack never matches.
 
 ## Patches to Godot 3 (`3/patches/`)
 
@@ -41,6 +42,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
   - The audio, physics, and 2D physics server managers forget their drivers and servers at cleanup.
 - `03-virtual-fix-path.patch`: makes `FileAccess::fix_path` and `DirAccess::fix_path` virtual, as they are in Godot 4, so VNDegen's file access can find names whatever their case.
 - `04-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, as Godot 4's patch 07 does.
+- `05-copy-same-file.patch`: the same check in `DirAccess::copy` as Godot 4's patch 08.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|
