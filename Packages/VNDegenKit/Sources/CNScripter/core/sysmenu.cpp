@@ -193,8 +193,9 @@ void Engine::drawDialog(Image &out, SystemUi &ui) {
         fillRect(out, 13, fy + 1, fieldW - 1, fieldH - 1, rgba(0xFF, 0xFF, 0xFF));
         drawGlyphs(out, fit(ui.items.empty() ? std::string() : ui.items[0], fieldW - 10, true), 17, fy + 4, fw, fh, 0,
                    ink, false, false, 0, 0);
-        button(bx, fy, bw, std::min(fieldH, h - fy - 4), "OK", false);
-        ui.buttons.push_back({bx, fy, bw, fieldH});
+        int bh = std::min(fieldH, h - fy - 4);
+        button(bx, fy, bw, bh, "OK", false);
+        ui.buttons.push_back({bx, fy, bw, bh});
         return;
     }
     // A message box: the message, then its buttons in a row, centred on the screen.
