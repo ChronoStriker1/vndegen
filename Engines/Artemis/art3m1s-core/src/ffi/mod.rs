@@ -1990,7 +1990,10 @@ pub unsafe extern "C" fn art3m1s_runtime_submit_http_result(
     feature = "metal-backend",
     feature = "vulkan-backend"
 ))]
-pub unsafe extern "C" fn art3m1s_runtime_set_pc_save_version(rt: *mut CoreRuntime, version: i32) -> i32 {
+pub unsafe extern "C" fn art3m1s_runtime_set_pc_save_version(
+    rt: *mut CoreRuntime,
+    version: i32,
+) -> i32 {
     let version = match version {
         1000 => crate::save::bow::Version::V1000,
         1002 => crate::save::bow::Version::V1002,

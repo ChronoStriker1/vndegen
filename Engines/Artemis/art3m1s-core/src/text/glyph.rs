@@ -195,7 +195,11 @@ struct TextLineMetrics {
 ///
 /// 旧实现直接用字体的 typographic height 作为行高，导致脚本为字体差异设置的
 /// spacetop/spacemiddle/spacebottom 完全失效，正文和姓名层都会出现稳定的纵向偏移。
-fn text_line_metrics(font: &FontDesc, body_height: f32) -> TextLineMetrics {
+///
+/// The PC engine gives the body 1.2 times the font size, whatever the font's own
+/// metrics, so pages break where they do on the PC (VNDegen).
+fn text_line_metrics(font: &FontDesc) -> TextLineMetrics {
+    let body_height = font.size.unwrap_or(DEFAULT_FONT_SIZE) * 1.2;
     let spacetop = font.spacetop.unwrap_or(0.0);
     let ruby_height = font.ruby_size.unwrap_or(0.0).max(0.0);
     let spacemiddle = font.spacemiddle.unwrap_or(0.0);
@@ -694,11 +698,7 @@ impl TextRenderer for GlyphTextRenderer {
             .rev()
             .find(|(_, g)| g.character != "\n")?;
 
-        let sz = ly.font.size.unwrap_or(DEFAULT_FONT_SIZE);
-        let body_height = scaled(&self.font, PxScale::from(sz))
-            .map(|sf| sf.height())
-            .unwrap_or(sz);
-        let metrics = text_line_metrics(&ly.font, body_height);
+        let metrics = text_line_metrics(&ly.font);
         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
         // 与 build_text_commands 走同一套排版，保证图标位置与实际换行一致
         let laid = layout_message_layer(
@@ -936,12 +936,7 @@ impl TextRenderer for GlyphTextRenderer {
             if ly.links.is_empty() || ly.text_buffer.is_empty() {
                 continue;
             }
-            let sz = ly.font.size.unwrap_or(DEFAULT_FONT_SIZE);
-            // 未加载字体时以字号近似行高（与 push_line_break 的近似一致）
-            let body_height = scaled(&self.font, PxScale::from(sz))
-                .map(|sf| sf.height())
-                .unwrap_or(sz);
-            let metrics = text_line_metrics(&ly.font, body_height);
+            let metrics = text_line_metrics(&ly.font);
             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
             let laid = layout_message_layer(
                 &ly.text_buffer,
@@ -998,11 +993,7 @@ impl TextRenderer for GlyphTextRenderer {
         if ly.height <= 0.0 || ly.width <= 0.0 || ly.text_buffer.is_empty() {
             return false;
         }
-        let sz = ly.font.size.unwrap_or(DEFAULT_FONT_SIZE);
-        let body_height = scaled(&self.font, PxScale::from(sz))
-            .map(|sf| sf.height())
-            .unwrap_or(sz);
-        let line_height = text_line_metrics(&ly.font, body_height).line_height;
+        let line_height = text_line_metrics(&ly.font).line_height;
         let laid = layout_message_layer(
             &ly.text_buffer,
             ly.width,
@@ -1037,11 +1028,7 @@ impl TextRenderer for GlyphTextRenderer {
         if ly.text_buffer.is_empty() {
             return Some((0.0, 0.0, 0.0));
         }
-        let sz = ly.font.size.unwrap_or(DEFAULT_FONT_SIZE);
-        let body_height = scaled(&self.font, PxScale::from(sz))
-            .map(|sf| sf.height())
-            .unwrap_or(sz);
-        let metrics = text_line_metrics(&ly.font, body_height);
+        let metrics = text_line_metrics(&ly.font);
         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
         let laid = layout_message_layer(
             &ly.text_buffer,
@@ -1120,13 +1107,10 @@ impl TextRenderer for GlyphTextRenderer {
             let text_hidden = ly.text_hidden;
 
             let sz = ly.font.size.unwrap_or(DEFAULT_FONT_SIZE);
-            let scale = PxScale::from(sz);
-            let sf = scaled(&self.font, scale);
-            let sf = match sf {
-                Some(s) => s,
-                None => continue,
-            };
-            let metrics = text_line_metrics(&ly.font, sf.height());
+            if scaled(&self.font, PxScale::from(sz)).is_none() {
+                continue;
+            }
+            let metrics = text_line_metrics(&ly.font);
             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
 
             let color = ly.font.color.as_deref().map(parse).unwrap_or([1.0; 3]);
@@ -2073,10 +2057,14 @@ mod tests {
             spacebottom: Some(-4.0),
             ..FontDesc::default()
         };
-        let metrics = text_line_metrics(&font, 40.0);
+        let metrics = text_line_metrics(&FontDesc {
+            size: Some(30.0),
+            ..font
+        });
         assert_eq!(metrics.ruby_top, -2.0);
         assert_eq!(metrics.body_top, 2.0);
-        assert_eq!(metrics.line_height, 38.0);
+        // 2 above the body, 36 for a size 30 body, and -4 below it.
+        assert_eq!(metrics.line_height, 34.0);
     }
 
     #[test]
@@ -2527,7 +2515,8 @@ mod tests {
         assert_eq!(areas.len(), 1);
         assert_eq!(
             (areas[0].left, areas[0].top, areas[0].width, areas[0].height),
-            (100.0, 52.0, 30.0, 38.0)
+            // A size 40 body is 48 tall: 2 + 48 - 4.
+            (100.0, 52.0, 30.0, 46.0)
         );
         assert_eq!(areas[0].label.as_deref(), Some("*top"));
 
