@@ -5,6 +5,7 @@ use asb_interpreter::event::{LayerEvent, WaitReason};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
+#[derive(Clone)]
 pub(super) struct RuntimeEvent {
     pub event: Event,
     pub text_source: Option<(String, usize)>,
@@ -89,7 +90,13 @@ impl CoreRuntime {
 
         let mut trace = crate::ffi::debug_enabled()
             .then(|| Vec::with_capacity(events.len().min(EVENT_TRACE_LIMIT)));
-        for RuntimeEvent { event, text_source } in events {
+        for (index, RuntimeEvent { event, text_source }) in events.iter().enumerate() {
+            // Text ran below its window: the rest waits for the click that
+            // starts the next page (VNDegen).
+            if let Some(held) = self.page_overflow_held.as_mut() {
+                held.extend(events[index..].iter().cloned());
+                break;
+            }
             let runtime_started = profile.mark();
             if matches!(event, Event::Exit) {
                 crate::core_info!("[runtime] Event::Exit received");
@@ -478,6 +485,16 @@ impl CoreRuntime {
             let text_started = profile.mark();
             if let Some(pending) = self.apply_text_event(event) {
                 self.begin_text_translation(pending);
+            }
+            if matches!(
+                event,
+                Event::ScenarioText { .. } | Event::LineBreak { .. } | Event::RubyEnd
+            ) && self
+                .text_renderer
+                .as_mut()
+                .is_some_and(|renderer| renderer.split_page_overflow())
+            {
+                self.page_overflow_held = Some(Vec::new());
             }
             // `apply_text_event` has already applied the renderer's real
             // message-layer stack.  Mirror the resulting active ID back to

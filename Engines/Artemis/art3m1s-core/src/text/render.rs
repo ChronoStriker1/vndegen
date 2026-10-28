@@ -639,6 +639,19 @@ pub struct MessageLayer {
     pub page_tags: Vec<BacklogTag>,
     /// 页首字体快照（页开始时当前字体的 raw 参数表），allfont=1 时输出
     pub page_font: HashMap<String, String>,
+    /// Text that ran below the window, waiting for a click to start the
+    /// next page (VNDegen).
+    pub page_overflow: Option<PageOverflow>,
+}
+
+/// The part of a page that didn't fit in its message window, with the
+/// ruby and link ranges in it counted from its own start (VNDegen).
+#[derive(Debug, Clone)]
+pub struct PageOverflow {
+    pub glyphs: Vec<GlyphInfo>,
+    pub rubies: Vec<RubyRange>,
+    pub links: Vec<LinkRange>,
+    pub open_ruby: Option<(usize, String)>,
 }
 
 impl MessageLayer {
@@ -666,6 +679,7 @@ impl MessageLayer {
             open_ruby: None,
             page_tags: Vec::new(),
             page_font: HashMap::new(),
+            page_overflow: None,
         }
     }
 
@@ -679,6 +693,63 @@ impl MessageLayer {
         self.open_ruby = None;
         self.page_tags.clear();
         self.page_font = self.font.to_raw();
+        self.page_overflow = None;
+    }
+
+    /// Moves the text from glyph `at` on into [`Self::page_overflow`]
+    /// (VNDegen).
+    pub fn split_page(&mut self, at: usize) {
+        let glyphs = self.text_buffer.split_off(at);
+        let (rubies, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.rubies)
+            .into_iter()
+            .partition(|ruby| ruby.start >= at);
+        self.rubies = kept;
+        let (links, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut self.links)
+            .into_iter()
+            .partition(|link| link.start >= at);
+        self.links = kept;
+        let open_ruby = self
+            .open_ruby
+            .take()
+            .map(|(start, text)| (start.saturating_sub(at), text));
+        self.reveal_index = self.reveal_index.min(at);
+        self.page_overflow = Some(PageOverflow {
+            glyphs,
+            rubies: rubies
+                .into_iter()
+                .map(|ruby| RubyRange {
+                    start: ruby.start - at,
+                    end: ruby.end - at,
+                    ..ruby
+                })
+                .collect(),
+            links: links
+                .into_iter()
+                .map(|link| LinkRange {
+                    start: link.start - at,
+                    end: link.end.map(|end| end - at),
+                    ..link
+                })
+                .collect(),
+            open_ruby,
+        });
+    }
+
+    /// Starts the next page with the text that didn't fit. The page's tags
+    /// stay, as they record what printed it (VNDegen).
+    pub fn continue_page(&mut self) -> bool {
+        let Some(overflow) = self.page_overflow.take() else {
+            return false;
+        };
+        self.generation = self.generation.wrapping_add(1);
+        self.text_buffer = overflow.glyphs;
+        self.rubies = overflow.rubies;
+        self.links = overflow.links;
+        self.open_ruby = overflow.open_ruby;
+        self.reveal_index = 0;
+        self.reveal_pending = true;
+        self.reveal_clock_ms = 0;
+        true
     }
 
     /// 排版时不可拆行的区间集合（注音区间 + 进行中的注音）。
@@ -1082,6 +1153,17 @@ pub trait TextRenderer {
 
     /// 文本换行。
     fn push_line_break(&mut self);
+
+    /// Splits off the active message layer's text that runs below its
+    /// window, as the PC engine does, and returns whether there was any
+    /// (VNDegen).
+    fn split_page_overflow(&mut self) -> bool {
+        false
+    }
+
+    /// Starts a new page with the text [`Self::split_page_overflow`] split
+    /// off (VNDegen).
+    fn continue_page_overflow(&mut self) {}
 
     /// 文本分页。
     ///

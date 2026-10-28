@@ -26,6 +26,26 @@ impl CoreRuntime {
             return;
         }
 
+        // A page that ran below its window waits for a click, which shows
+        // the rest of its text first if it is still appearing (VNDegen).
+        if self.page_overflow_held.is_some() {
+            let go_on = if tick.advance {
+                self.is_text_reveal_complete() || {
+                    self.reveal_text_now();
+                    false
+                }
+            } else if self.skip_active() {
+                self.reveal_text_for_skip();
+                true
+            } else {
+                self.is_text_reveal_complete() && self.should_auto_advance(delta_ms)
+            };
+            if go_on {
+                self.continue_page_overflow(profile);
+            }
+            return;
+        }
+
         // httpget/httppost 挂起：宿主回填结果前脚本不推进。onEnterFrame 已在
         // 指针派发前触发，Lua 每帧处理仍可把 s.http.cancel 置 1 中断请求。
         if self.http_request_pending() {
@@ -330,6 +350,16 @@ impl CoreRuntime {
         if advance {
             self.advance_wait_line();
         }
+    }
+
+    /// Starts the next page of text that ran below its window, then applies
+    /// the events held behind it (VNDegen).
+    fn continue_page_overflow(&mut self, profile: &mut crate::profiler::FrameProfile) {
+        if let Some(renderer) = self.text_renderer.as_mut() {
+            renderer.continue_page_overflow();
+        }
+        let held = self.page_overflow_held.take().unwrap_or_default();
+        self.dispatch_events(&held, profile);
     }
 
     pub(super) fn advance_wait_line(&mut self) {

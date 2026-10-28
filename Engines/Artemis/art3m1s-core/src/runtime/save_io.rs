@@ -311,6 +311,7 @@ impl CoreRuntime {
         self.hovered_layers.clear();
         self.wait_reason = None;
         self.inline_stop_at = None;
+        self.page_overflow_held = None;
         data.restore(&mut self.interpreter)
             .map_err(|e| format!("恢复存档状态失败: {e:?}"))?;
         // The PC engine restores a save's scene before onLoad runs, and games

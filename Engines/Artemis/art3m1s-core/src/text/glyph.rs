@@ -988,6 +988,49 @@ impl TextRenderer for GlyphTextRenderer {
         changed
     }
 
+    fn split_page_overflow(&mut self) -> bool {
+        let Some(id) = self.state.active_layer.clone() else {
+            return false;
+        };
+        let Some(ly) = self.state.layers.get(&id) else {
+            return false;
+        };
+        if ly.height <= 0.0 || ly.width <= 0.0 || ly.text_buffer.is_empty() {
+            return false;
+        }
+        let sz = ly.font.size.unwrap_or(DEFAULT_FONT_SIZE);
+        let body_height = scaled(&self.font, PxScale::from(sz))
+            .map(|sf| sf.height())
+            .unwrap_or(sz);
+        let line_height = text_line_metrics(&ly.font, body_height).line_height;
+        let laid = layout_message_layer(
+            &ly.text_buffer,
+            ly.width,
+            &self.state.layout,
+            &ly.keep_ranges(),
+            TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
+        );
+        // The first line whose bottom reaches the window's bottom starts the
+        // next page: four lines of 40 in a window of 160 make two pages in
+        // the PC engine. A first line always stays, however tall.
+        let fits = |line: usize| (line as f32 + 1.0) * line_height < ly.height;
+        let Some(at) = laid
+            .iter()
+            .position(|glyph| glyph.line > 0 && !fits(glyph.line))
+        else {
+            return false;
+        };
+        self.state.layers.get_mut(&id).unwrap().split_page(at);
+        true
+    }
+
+    fn continue_page_overflow(&mut self) {
+        // Any layer can hold the overflow; the active one printed it.
+        for layer in self.state.layers.values_mut() {
+            layer.continue_page();
+        }
+    }
+
     fn active_layer_text_metrics(&self) -> Option<(f32, f32, f32)> {
         let id = self.state.active_layer.as_deref()?;
         let ly = self.state.layers.get(id)?;
@@ -1711,6 +1754,42 @@ mod tests {
         provider.0 = true;
         assert!(atlas.flush(&mut provider).is_some());
         assert!(!atlas.dirty);
+    }
+
+    #[test]
+    fn text_below_the_window_waits_for_the_next_page() {
+        let mut renderer = GlyphTextRenderer::new();
+        renderer.switch_message_layer(Some("adv"), true);
+        {
+            // Lines of 20 in a window of 100: four fit, as the fifth would
+            // reach the bottom. Ten glyphs of 10 fill a line of 100.
+            let layer = renderer.font_state_mut().active_layer_mut();
+            layer.width = 100.0;
+            layer.height = 100.0;
+            layer.font.size = Some(20.0);
+            layer.text_buffer = glyphs(&"a".repeat(45));
+            layer.rubies.push(RubyRange {
+                start: 41,
+                end: 43,
+                text: "r".into(),
+                size: 10.0,
+                glyphs: Vec::new(),
+            });
+        }
+        assert!(renderer.split_page_overflow());
+        let layer = &renderer.font_state().layers["adv"];
+        assert_eq!(layer.text_buffer.len(), 40);
+        assert!(layer.rubies.is_empty());
+        assert!(
+            !renderer.split_page_overflow(),
+            "the rest waits for the next page"
+        );
+
+        renderer.continue_page_overflow();
+        let layer = &renderer.font_state().layers["adv"];
+        assert_eq!(layer.text_buffer.len(), 5);
+        assert_eq!((layer.rubies[0].start, layer.rubies[0].end), (1, 3));
+        assert!(layer.reveal_pending);
     }
 
     #[test]

@@ -87,6 +87,10 @@ pub struct CoreRuntime {
     /// Where an inline [trans] or [video] waits, so its resume steps past it.
     /// A queued one doesn't move the script (VNDegen).
     inline_stop_at: Option<(Option<String>, usize)>,
+    /// Events after text that ran below its message window, held until the
+    /// click that starts the next page, as the PC engine waits there
+    /// (VNDegen).
+    page_overflow_held: Option<Vec<events::RuntimeEvent>>,
     debug_skip_active: Arc<AtomicBool>,
     script_status: Arc<AtomicU8>,
     magic_paths: Arc<magic_path::MagicPathTable>,
@@ -329,6 +333,7 @@ impl CoreRuntime {
             events,
             video_finished,
             inline_stop_at: None,
+            page_overflow_held: None,
             debug_skip_active,
             script_status,
             magic_paths: Arc::clone(&magic_paths),
