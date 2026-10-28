@@ -226,7 +226,9 @@ fn main() {
     if input.is_dir() {
         resources.mount_directory(input).unwrap();
     } else {
-        resources.mount_pfs(input, "utf-8").unwrap();
+        // Archive names are in the game's charset, Shift_JIS unless an
+        // archive's names read as UTF-8 (VNDegen).
+        resources.mount_pfs(input, "shift_jis").unwrap();
     }
     resources.set_save_dir(Some(&save_dir)).unwrap();
     RESOURCES.set(resources.clone()).ok();
