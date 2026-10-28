@@ -18,7 +18,8 @@ use crate::ffi::{
     art3m1s_runtime_pixel_buffer_size, art3m1s_runtime_profiler_snapshot,
     art3m1s_runtime_set_external_surface, art3m1s_runtime_set_profiler_enabled,
     art3m1s_runtime_set_render_quality_preset, art3m1s_runtime_set_reported_os,
-    art3m1s_runtime_set_resources, art3m1s_runtime_set_string_variable, art3m1s_runtime_set_volume,
+    art3m1s_runtime_set_pc_save_version, art3m1s_runtime_set_resources,
+    art3m1s_runtime_set_string_variable, art3m1s_runtime_set_volume,
     art3m1s_runtime_stage_height, art3m1s_runtime_stage_width, art3m1s_runtime_submit_dialog,
     art3m1s_runtime_submit_http_result, art3m1s_runtime_submit_text_translation,
     art3m1s_runtime_upload_video_layer_frame, art3m1s_set_angle_path,
@@ -97,6 +98,7 @@ type RuntimeBackendCapabilitiesFn = unsafe extern "C" fn(*const CoreRuntime) -> 
 type RuntimeSubmitHttpResultFn = unsafe extern "C" fn(*mut CoreRuntime, i32, *const u8, i32) -> i32;
 type RuntimeSetStringVariableFn =
     unsafe extern "C" fn(*mut CoreRuntime, *const c_char, *const c_char);
+type RuntimeSetPcSaveVersionFn = unsafe extern "C" fn(*mut CoreRuntime, i32) -> i32;
 type RuntimeSetRuntimeMediaEnabledFn = unsafe extern "C" fn(*mut CoreRuntime, i32);
 type RuntimeUploadVideoLayerFrameFn =
     unsafe extern "C" fn(*mut CoreRuntime, *const c_char, u32, u32, *const u8, usize) -> i32;
@@ -179,6 +181,8 @@ pub struct Art3m1sApiV1 {
     pub set_font_override: Option<unsafe extern "C" fn(*const u8, i32) -> i32>,
     pub clear_font_override: Option<unsafe extern "C" fn()>,
     pub runtime_upload_video_layer_frame: Option<RuntimeUploadVideoLayerFrameFn>,
+    /// Added by VNDegen. A host checks `struct_size` before reading it.
+    pub runtime_set_pc_save_version: Option<RuntimeSetPcSaveVersionFn>,
 }
 
 static API_V1: Art3m1sApiV1 = Art3m1sApiV1 {
@@ -249,6 +253,7 @@ static API_V1: Art3m1sApiV1 = Art3m1sApiV1 {
     set_font_override: Some(art3m1s_set_font_override),
     clear_font_override: Some(art3m1s_clear_font_override),
     runtime_upload_video_layer_frame: Some(art3m1s_runtime_upload_video_layer_frame),
+    runtime_set_pc_save_version: Some(art3m1s_runtime_set_pc_save_version),
 };
 
 /// Returns the process-lifetime v1 API table.

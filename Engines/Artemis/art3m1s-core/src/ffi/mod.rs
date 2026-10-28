@@ -1982,6 +1982,27 @@ pub unsafe extern "C" fn art3m1s_runtime_submit_http_result(
     }
 }
 
+/// Sets the version of the PC engine's save files the core writes until it
+/// reads one: 1000, or 1002 for a game whose archives are `pf8`. Returns 0, or
+/// -1 for another version (VNDegen).
+#[cfg(any(
+    feature = "gl-backend",
+    feature = "metal-backend",
+    feature = "vulkan-backend"
+))]
+pub unsafe extern "C" fn art3m1s_runtime_set_pc_save_version(rt: *mut CoreRuntime, version: i32) -> i32 {
+    let version = match version {
+        1000 => crate::save::bow::Version::V1000,
+        1002 => crate::save::bow::Version::V1002,
+        _ => return -1,
+    };
+    if rt.is_null() {
+        return -1;
+    }
+    unsafe { &mut *rt }.set_pc_save_version(version);
+    0
+}
+
 /// 宿主把字符串结果写回解释器变量（callnative/purchase 的结果回注通道，
 /// 支持 `result.title` 等子键路径）。
 #[cfg(any(

@@ -23,7 +23,11 @@ art3m1s-core is under MPL-2.0 (`art3m1s-core/LICENSE`), a file-level copyleft: t
 
 The upstream FFmpeg media path (the `ffmpeg` feature) is LGPL and is not built. VNDegen decodes audio and video itself.
 
+VNDegen added `flate2` as a direct dependency for compressed PC saves. It was already in the tree through `png`, and it and its `miniz_oxide` backend are MIT or Apache-2.0. The Pluto reader and writer (`crates/asb-interpreter/src/pluto.rs`) follow the format of Pluto, the Lua persistence library the PC engine embeds, which is in the public domain. No Pluto code is copied.
+
 ## Building for Apple platforms
+
+`scripts/artemis-engine.sh build/artemis` builds the core for VNDegen with the settings below: `build/artemis/ios/Art3m1s.xcframework`, a static library for iOS devices, the iOS simulator, and macOS (arm64 and x86_64), and the notices in `build/artemis/licenses/`. It installs the pinned toolchain and its targets through rustup when they are missing, on either Mac.
 
 - Build with `--no-default-features --features metal-backend`. Without `metal-backend` the library builds but exports no C API, and the default `gl-backend` needs ANGLE.
 - Set `IPHONEOS_DEPLOYMENT_TARGET` to the app's deployment target (18.0), and build from clean after changing it: lua-src's build script doesn't rerun when it changes, so stale objects keep the SDK's version.
@@ -36,7 +40,7 @@ The upstream FFmpeg media path (the `ffmpeg` feature) is LGPL and is not built. 
 - Decode JPEG images, and find extensionless images saved as `.jpg`.
 - Read pf2 archives, whose header and entries differ from pf6.
 - Evaluate `$` parameters before a builtin tag runs.
-- Step past an inline `[trans]` or `[video]` when it finishes.
+- Step past an inline `[trans]` or `[video]` when it finishes, and only an inline one: a queued one leaves the script where it is.
 - Run the BOOT script from its first line when setup comes before `*top`.
 - Load Lua 5.1 bytecode compiled by a 32-bit `luac`, and decode its strings with the project's charset.
 - Return 0 to 65535 from `e:random()`.
@@ -48,4 +52,14 @@ The upstream FFmpeg media path (the `ffmpeg` feature) is LGPL and is not built. 
 - Run event handler tags through the game's tag filter.
 - Call a game's own Lua `yesno` for `[yesno]`.
 - Use Lua 5.1 on iOS too, instead of Luau, which can't load `.lub` bytecode. `vendor/lua-src` makes `os.execute` raise an error on iOS, which has no `system()`.
-- Test tooling: the `game-probes` probe answers media commands like a host, and examples dump PFS archives and scripts.
+- Read and write the PC engine's save files, so saves move between a PC and VNDegen: `system.dat`, `saveg.dat`, and numbered and quick saves, in version 1000 and in the compressed version 1002 (`src/save/bow.rs`, `pc.rs`, `pc_slot.rs`, `src/runtime/pc_save.rs`). This replaces upstream's JSON saves. It includes Pluto, the PC engine's Lua persistence format; instruction indexes counted the PC engine's way, without `[/if]`; resuming a save where the PC engine does; and writing the version of the files the game already has, else the one its archives suggest. `docs/artemis-save-format.md` in VNDegen describes the format.
+- Keep the Lua state onSave writes, whatever the variable's name.
+- Decode text `e:file` reads with the project's charset, let `get_layer_info` see layers `e:tag` has queued, and compile Shift_JIS Lua as bytes before converting its strings.
+- Input handlers: keep the call a handler makes as its event frame, return a game's yes/no dialog's buttons to the dialog's wait, keep a click wait when a handler's own wait follows it, and wait for a transition or video a handler queues instead of for a click.
+- Recreate a PC save's scene before onLoad runs.
+- Keep text's spaces and a line's leading full-width space, as the PC engine numbers and prints them.
+- Start a new page when text runs below its message window.
+- Find save files and the loose files beside a game's archives in any case, as VNDegen's `Engines/Shared/casepath.c` does, and use a save folder restored with Windows' cp1252 spelling of its name.
+- Format VNDegen's changes with rustfmt.
+- The C API table gains `runtime_set_pc_save_version` at its end, which a host reads when `struct_size` covers it.
+- Test tooling: the `game-probes` probe answers media commands like a host, sets the save version from the archives, and mounts archive names as Shift_JIS. Examples dump PFS archives, scripts, and PC saves.

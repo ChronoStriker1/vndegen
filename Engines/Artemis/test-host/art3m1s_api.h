@@ -76,6 +76,7 @@ typedef int32_t (*ArtRuntimeIsExitRequestedFn)(const CoreRuntime *rt);
 typedef uint64_t (*ArtRuntimeBackendCapabilitiesFn)(const CoreRuntime *rt);
 typedef int32_t (*ArtRuntimeSubmitHttpResultFn)(CoreRuntime *rt, int status_code,
                                                 const uint8_t *body, int body_len);
+typedef int32_t (*ArtRuntimeSetPcSaveVersionFn)(CoreRuntime *rt, int32_t version);
 typedef void (*ArtRuntimeSetStringVariableFn)(CoreRuntime *rt, const char *name,
                                               const char *value);
 typedef int32_t (*ArtProbeCaptionFn)(HostResources *resources, const uint8_t *ini,
@@ -165,6 +166,9 @@ typedef struct Art3m1sApiV1 {
     ArtSetFontOverrideFn set_font_override;
     ArtClearFontOverrideFn clear_font_override;
     ArtRuntimeUploadVideoLayerFrameFn runtime_upload_video_layer_frame;
+    /* Added by VNDegen: 1000, or 1002 for a game whose archives are pf8.
+     * Present when struct_size covers it. */
+    ArtRuntimeSetPcSaveVersionFn runtime_set_pc_save_version;
 } Art3m1sApiV1;
 
 /* Primary Artemis facade symbol. Flat migration symbols, if present, are not
