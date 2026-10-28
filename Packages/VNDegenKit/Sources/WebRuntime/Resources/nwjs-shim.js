@@ -772,6 +772,9 @@
         },
         // Engine scripts replace this to stop and restart their own loop.
         onPause: noop,
+        // Engine scripts replace this to write, through the bridge, what the game keeps until it quits. The session
+        // waits for it before it closes the page.
+        beforeQuit: noop,
         // Engine scripts whose games may read no gamepad replace this to turn its actions into their own input. It gets the
         // engine-neutral action, or null, then pressed, then the button's VNDegen name.
         onGamepad: noop,
