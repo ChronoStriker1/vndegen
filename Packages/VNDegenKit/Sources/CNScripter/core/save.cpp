@@ -363,14 +363,16 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
             } else if (!quoted && (isalpha(uint8_t(c)) || c == '_')) {
                 size_t end = p;
                 while (end < f.pos && (isalnum(uint8_t(t[end])) || t[end] == '_')) end++;
-                // %name and $name are variables, *name a label. A name next to an operator is an operand of an if's
-                // condition (a numalias), not the command.
-                auto isOperator = [](char ch) { return ch && strchr("=<>!&|+-*/(),", ch) != nullptr; };
+                // %name and $name are variables, *name a label. A name after an operator, or before a comparison or
+                // && and ||, is an operand of an if's condition (a numalias), not the command; a command's arguments
+                // may start with - or (.
+                auto in = [](char ch, const char *set) { return ch && strchr(set, ch) != nullptr; };
                 size_t before = p, after = end;
                 while (before > 0 && (t[before - 1] == ' ' || t[before - 1] == '\t')) before--;
                 while (after < t.size() && (t[after] == ' ' || t[after] == '\t')) after++;
                 bool variable = p > 0 && (t[p - 1] == '%' || t[p - 1] == '$' || t[p - 1] == '*');
-                bool operand = (before > 0 && isOperator(t[before - 1])) || (after < t.size() && isOperator(t[after]));
+                bool operand = (before > 0 && in(t[before - 1], "=<>!&|+-*/(,")) ||
+                               (after < t.size() && in(t[after], "=<>!&|"));
                 if (!variable && !operand && defsubs_.count(sjisLower(t.substr(p, end - p)))) callsDefsub = true;
                 p = end;
             } else {
