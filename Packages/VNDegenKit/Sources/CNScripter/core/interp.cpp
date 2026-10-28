@@ -601,13 +601,11 @@ void Engine::executeCommand(const std::string &name) {
     }
     if (!builtin && defsubs_.count(n)) {
         // A user command: a gosub to the label of that name, whose getparam reads the arguments written here.
-        size_t params = cur_.pos;
-        skipStatement();
+        skipSpaces();
         Frame f;
         f.pos = cur_.pos;
         f.line = cur_.line;
         f.stmt = cur_.stmt;
-        f.paramPos = params;
         f.hasParams = true;
         stack_.push_back(f);
         if (!jumpToLabel(n)) stack_.pop_back();

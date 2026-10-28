@@ -354,7 +354,7 @@ void cmdGetVersion(E &e, const std::string &) { e.setVar(e.readVar(), 304); }
 
 // getparam reads the arguments a user command was called with, in the caller's context.
 void cmdGetParam(E &e, const std::string &) {
-    const E::Frame *frame = nullptr;
+    E::Frame *frame = nullptr;
     for (auto it = e.stack_.rbegin(); it != e.stack_.rend(); ++it)
         if (it->hasParams) {
             frame = &*it;
@@ -383,9 +383,11 @@ void cmdGetParam(E &e, const std::string &) {
         targets.push_back(t);
     } while (e.readComma());
     E::Cursor mine = e.cur_;
-    e.cur_.pos = frame->paramPos;
+    e.cur_.pos = frame->pos;
     for (size_t i = 0; i < targets.size(); i++) {
-        if (i) e.readComma();
+        // After an earlier getparam the arguments left start with a comma.
+        e.skipSpaces();
+        if (i || e.peek() == ',') e.readComma();
         if (e.atStatementEnd()) break;
         Target &t = targets[i];
         if (t.mode) {
@@ -412,6 +414,7 @@ void cmdGetParam(E &e, const std::string &) {
             e.cur_ = caller;
         }
     }
+    frame->pos = e.cur_.pos;
     e.cur_ = mine;
 }
 
@@ -510,6 +513,7 @@ void cmdReturn(E &e, const std::string &) {
     e.cur_.pos = f.pos;
     e.cur_.line = f.line;
     e.cur_.stmt = f.stmt;
+    if (f.hasParams) e.skipStatement();  // arguments getparam didn't read
     e.jumps_++;
     if (f.resumeText) e.inTextLine_ = true;
 }

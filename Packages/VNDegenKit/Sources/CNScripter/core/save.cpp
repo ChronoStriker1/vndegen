@@ -347,8 +347,20 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         f.line = script_.lineAt(f.pos);
         // The statement index of a return position: the ':' separators before it on its line.
         f.stmt = 0;
-        for (size_t p = script_.lineStart(f.line); p < f.pos; p += sjisCharLen(script_.text(), p))
-            if (script_.text()[p] == ':') f.stmt++;
+        size_t stmtStart = script_.lineStart(f.line);
+        for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(script_.text(), p))
+            if (script_.text()[p] == ':') {
+                f.stmt++;
+                stmtStart = p + 1;
+            }
+        // A return into a user command's statement is a defsub call, which getparam may still read.
+        if (f.kind == Frame::Gosub) {
+            size_t a = stmtStart;
+            while (a < f.pos && (script_.text()[a] == ' ' || script_.text()[a] == '\t')) a++;
+            size_t b = a;
+            while (b < f.pos && (isalnum(uint8_t(script_.text()[b])) || script_.text()[b] == '_')) b++;
+            f.hasParams = b > a && defsubs_.count(sjisLower(script_.text().substr(a, b - a)));
+        }
         frames.push_back(f);
     }
     std::reverse(frames.begin(), frames.end());
@@ -403,6 +415,10 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     rubyFont_ = r.s();
     x.qInt5 = r.i();
+    // A fresh game saves an unused slot's alpha as -1, but the PC engine's load leaves it 255, which the next save
+    // writes (black box: a save made after loading). The loaded file stands in for the state until the game moves
+    // on, so it gets the same change; unusedAlpha holds where.
+    std::vector<size_t> unusedAlpha;
     for (Sprite2 &q : sc.sp2) {
         std::string tag = r.s();
         q.cx = r.i();
@@ -411,11 +427,13 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         q.scaleY = r.i();
         q.rot = r.i();
         q.visible = r.i() != 0;
+        if (tag.empty()) unusedAlpha.push_back(r.p);
         q.alpha = r.i();
         int blend = r.i();
         q.blend = blend == 1 ? Blend::Add : blend == 2 ? Blend::Sub : Blend::Normal;
         if (!tag.empty() && loadImage(tag, q.img)) q.loaded = true;
         q.img.tag = tag;
+        if (tag.empty()) q.alpha = 255;
     }
     for (int &v : x.tail) v = r.i();
     sc.allSp2Hidden = x.tail[5] != 0;
@@ -494,6 +512,11 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     // The loaded save is the savepoint until the game moves on.
     savepoint_.assign(data.begin(), data.begin() + long(historyAt));
+    for (size_t at : unusedAlpha)
+        if (at + 4 <= savepoint_.size()) {
+            savepoint_[at] = 255;
+            savepoint_[at + 1] = savepoint_[at + 2] = savepoint_[at + 3] = 0;
+        }
     savepointLine_ = line;
     savepointStmt_ = stmt;
     savepointLive_ = false;

@@ -248,8 +248,8 @@ public:
         size_t pos = 0;  // return position, or the loop body's start
         int line = 0, stmt = 0;
         int var = 0, to = 0, step = 1;  // for loops
-        // defsub calls keep their parameter text for getparam.
-        size_t paramPos = 0;
+        // A defsub call returns to the arguments it hasn't read yet, as the PC engine does (and saves): getparam reads
+        // them from pos and moves it on, and return skips any left.
         bool hasParams = false;
         // textgosub calls resume text output afterwards
         bool resumeText = false;
