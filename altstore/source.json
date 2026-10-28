@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.8.2",
+          "buildVersion": "514",
+          "date": "2026-10-28T11:17:50Z",
+          "localizedDescription": "Fixes for NScripter games.\n\n## Downloads\n\n- `VNDegen-0.8.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixed\n\n- NScripter transitions from the `breakup.dll`, `lngtwave.dll` and `trvswave.dll` effect plugins look as they do on Windows. Characters break apart and fly off, and screens ripple, instead of crossfading.\n- MP3 music and voices play in NScripter games.\n- NScripter's text input and yes/no boxes look and sit as they do on Windows, and input boxes take the size the game asks for.\n- NScripter games keep their global variables, such as the save dates a game's own save screen shows, when VNDegen is closed or the system ends it in the background.\n- NScripter saves made inside a game's subroutines load correctly, and stay byte-identical to the PC version's.\n- NScripter sound is decoded on its own thread, so a slow decode can't cause a dropout.\n- NScripter backgrounds no longer show black holes where a color matched the image's top-left pixel.\n\n## Known limits\n\n- Other NScripter effect plugins still crossfade. CD audio, MIDI music, Lua scripts and two rarely used archive compression types aren't supported, because no tested game uses them.\n- Tested with the 6 NScripter games in the library on the Mac and the iPad simulator. All reach their title, play, save and load, and movies and dungeon walking hold 60 fps.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.2/VNDegen-0.8.2.ipa",
+          "size": 89969482,
+          "sha256": "bc0ebf5d28e136d0562dafe603c33294bd59bcdfe8f6570eb9d33e509d842769",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.8.1",
           "buildVersion": "498",
           "date": "2026-10-28T08:08:58Z",
