@@ -162,6 +162,16 @@ impl HostResources {
         fs::write(&target, data).map_err(|error| format!("write {}: {error}", target.display()))
     }
 
+    /// Whether a folder exists under the save folder, in any case (VNDegen).
+    pub fn save_folder_exists(&self, path: &str) -> bool {
+        self.files
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|files| save_path(files, path))
+            .is_some_and(|folder| folder.is_dir())
+    }
+
     pub fn delete(&self, path: &str) -> Result<(), String> {
         let mut guard = self.files.lock().unwrap();
         let files = guard
@@ -240,12 +250,56 @@ fn normalize_save_path(path: &str) -> Option<PathBuf> {
 
 fn save_path(files: &HostFiles, path: &str) -> Option<PathBuf> {
     let root = files.save_dir.as_ref()?;
-    Some(root.join(normalize_save_path(path)?))
+    Some(on_disk(root, &normalize_save_path(path)?))
 }
 
 fn sidecar_path(files: &HostFiles, path: &str) -> Option<PathBuf> {
     let root = files.directory.as_ref()?;
-    Some(root.join(normalize_save_path(path)?))
+    Some(on_disk(root, &normalize_save_path(path)?))
+}
+
+/// `relative` under `root` as it is on disk, whatever case the game names it
+/// in, as Windows finds it and as `casepath_resolve` in VNDegen's
+/// `Engines/Shared/casepath.c` does (VNDegen). A path that exists as written
+/// costs one check. Otherwise each name below the deepest folder that exists
+/// as written is the exact name, else the first name in sorted order that
+/// equals it ignoring ASCII case. From the first name that matches nothing,
+/// the rest stays as written, so a new file gets the game's spelling.
+fn on_disk(root: &Path, relative: &Path) -> PathBuf {
+    let written = root.join(relative);
+    if fs::symlink_metadata(&written).is_ok() {
+        return written;
+    }
+    let mut path = root.to_path_buf();
+    let mut names = relative.components();
+    while let Some(name) = names.next() {
+        let name = name.as_os_str();
+        let exact = path.join(name);
+        if fs::symlink_metadata(&exact).is_ok() {
+            path = exact;
+            continue;
+        }
+        let wanted = name.to_string_lossy();
+        let mut listing: Vec<_> = fs::read_dir(&path)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.file_name())
+            .collect();
+        listing.sort();
+        match listing
+            .into_iter()
+            .find(|candidate| candidate.to_string_lossy().eq_ignore_ascii_case(&wanted))
+        {
+            Some(found) => path.push(found),
+            None => {
+                path.push(name);
+                path.extend(names);
+                break;
+            }
+        }
+    }
+    path
 }
 
 fn encoding_for(name: &str) -> &'static Encoding {
@@ -718,6 +772,42 @@ pub unsafe extern "C" fn art3m1s_resources_clear_overrides(resources: *mut HostR
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn save_files_are_found_and_replaced_in_any_case() {
+        let root = std::env::temp_dir().join(format!("art3m1s-host-case-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("game")).unwrap();
+        fs::create_dir_all(root.join("saves/Studio Name")).unwrap();
+        fs::write(root.join("saves/Studio Name/QSave01.dat"), b"old").unwrap();
+        fs::write(root.join("game/Movie.OGV"), b"video").unwrap();
+        let resources = HostResources::new();
+        resources.mount_directory(&root.join("game")).unwrap();
+        resources.set_save_dir(Some(&root.join("saves"))).unwrap();
+
+        assert_eq!(
+            resources.read_file("studio name/qsave01.DAT").unwrap(),
+            b"old"
+        );
+        assert_eq!(resources.read_file("movie.ogv").unwrap(), b"video");
+        assert!(resources.save_folder_exists("STUDIO NAME"));
+
+        // A write replaces the file in its own case; a new file lands in the
+        // existing folder with the game's spelling.
+        resources.write("studio name/qsave01.dat", b"new").unwrap();
+        resources.write("studio name/System.dat", b"sys").unwrap();
+        let mut names: Vec<_> = fs::read_dir(root.join("saves/Studio Name"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["QSave01.dat", "System.dat"]);
+        assert_eq!(
+            fs::read(root.join("saves/Studio Name/QSave01.dat")).unwrap(),
+            b"new"
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
 
     /// Minimal unencrypted PF6 fixture, enough to exercise PFS mounting.
     fn build_pf6(files: &[(&[u8], &[u8])]) -> Vec<u8> {
