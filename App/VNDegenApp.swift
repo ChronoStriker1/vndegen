@@ -6,6 +6,7 @@ import EngineFlash
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
+import EngineNScripter
 import FontPack
 import RuntimePackages
 import Metadata
@@ -23,6 +24,7 @@ let engines: [any EnginePlugin] = {
         RenPyPlugin(),
         KiriKiriPlugin(),
         FlashPlugin(),
+        NScripterPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)
