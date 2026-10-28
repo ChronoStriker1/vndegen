@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.8.0",
+          "buildVersion": "490",
+          "date": "2026-10-28T07:47:46Z",
+          "localizedDescription": "Adds NScripter games on Mac, iPhone and iPad, on VNDegen's own NScripter runtime, written for VNDegen and MIT licensed like the rest of the app.\n\n## Downloads\n\n- `VNDegen-0.8.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- NScripter games run inside VNDegen's window. VNDegen finds a game by its `nscript.dat`, or by a `0.txt` or `00.txt` script beside its archives, up to two folders down. The runtime reads `.nsa`, `.sar` and `.ns2` archives, including bitmaps NScripter's packer compressed, and plays Ogg and WAV sound and MPEG-1 movies.\n- NScripter saves are the PC engine's own files, byte for byte, in the game's save folder. They move between VNDegen and a PC copy of the game, and Ludusavi backs them up.\n- English translations whose patched engine wraps text between words get the same word wrap.\n- NScripter games start with the Keyboard and mouse layout. Clicks and taps reach the game as NScripter's mouse buttons.\n\n## Known limits\n\n- MP3 and CD audio don't play. Effect DLLs, such as `breakup.dll`, fall back to a crossfade. NSLua games aren't supported, and the `MSpDraw.dll` layer plugin draws only what one test game needs.\n- The built-in dialogs and the default save and load menus are VNDegen's own drawing, not Windows', so their layout differs from the PC version.\n- A save slot's date is lost if VNDegen is force quit, because the game writes it with its global variables when it quits. Quitting normally keeps it.\n- Tested with the 6 NScripter games in the library. All reach their title, play, save and load on the Mac and the iPad simulator, and one also on the iPhone simulator. Movies and dungeon walking hold 60 fps on the Mac and the iPad simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.0/VNDegen-0.8.0.ipa",
+          "size": 89923055,
+          "sha256": "d9f457861322eadbc5e7f2eef16f1e9833cf585ebba37528719d9f067fb4312e",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.7.0",
           "buildVersion": "462",
           "date": "2026-10-28T03:14:15Z",
