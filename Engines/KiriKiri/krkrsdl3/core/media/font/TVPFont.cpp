@@ -10,12 +10,20 @@
 #include "Platform.h"
 #include "PlatformFile.h"
 #include "StringUtil.h"
+#include "UtilStreams.h"
+#include "vnfont.h"
+
+#include <cstdio>
 
 tTJSHashTable<ttstr, TVPFontNamePathInfo, tTVPttstrHash> TVPFontNames;
 
 //---------------------------------------------------------------------------
 
 static ttstr TVPDefaultFontName;
+static ttstr TVPGlyphFallbackFontName;
+// VNDegen: whether the default font is the engine's bundled fallback font, which a substitute replaces.
+static bool TVPDefaultIsBundledFallback;
+static bool TVPFontNamesInit;
 static tTVPFont TVPDefaultFont;
 
 static FT_Library TVPFontLibrary;
@@ -138,10 +146,103 @@ static int TVPInternalEnumFonts(
 }
 
 //---------------------------------------------------------------------------
+// VNDegen: Windows fonts the game names and doesn't ship, such as ＭＳ Ｐゴシック, come from the substitutes in
+// Engines/Shared/fonts, which the host passes through vnkk_set_fonts.
+static tTJSBinaryStream* TVPReadSubstitute(const std::string& path)
+{
+    FILE* file = fopen(path.c_str(), "rb");
+    if (!file)
+        return nullptr;
+    tTVPMemoryStream* stream = nullptr;
+    if (fseek(file, 0, SEEK_END) == 0)
+    {
+        long size = ftell(file);
+        if (size > 0 && fseek(file, 0, SEEK_SET) == 0)
+        {
+            stream = new tTVPMemoryStream(nullptr, (tjs_uint)size);
+            if (fread(stream->GetInternalBuffer(), 1, (size_t)size, file) != (size_t)size)
+            {
+                delete stream;
+                stream = nullptr;
+            }
+        }
+    }
+    fclose(file);
+    return stream;
+}
+
+static void TVPAddSubstitute(const ttstr& fontname, const vnfont_match& match)
+{
+    std::string path = match.path;
+    TVPFontNamePathInfo info;
+    info.Path = ttstr(path);
+    info.Index = match.face;
+    info.Substitute = true;
+    info.Getter = [path, fontname](TVPFontNamePathInfo*)
+    {
+        TVPAddLog(ttstr(TJS_N("VNDegen: font \"")) + fontname + TJS_N("\" draws with ") + ttstr(path));
+        return TVPReadSubstitute(path);
+    };
+    TVPFontNames.Add(fontname, info);
+}
+
+// Font.getList lists the substitutes under their Windows names, as Windows lists installed fonts. A game that ships no
+// default font gets ＭＳ Ｐゴシック, the Windows engine's default, and the bundled fallback font then only draws the
+// characters it lacks.
+static void TVPRegisterSubstitutes()
+{
+    vnfont_entry entry;
+    for (int i = 0; vnfont_entry_at(i, &entry); i++)
+    {
+        ttstr name(std::string(entry.name));
+        if (!entry.match.bold && !entry.match.italic && !TVPFontNames.Find(name))
+            TVPAddSubstitute(name, entry.match);
+    }
+    if (TVPDefaultIsBundledFallback && TVPFontNames.Find(TJS_N("ＭＳ Ｐゴシック")))
+    {
+        TVPDefaultFontName = TJS_N("ＭＳ Ｐゴシック");
+        TVPAddLog(TJS_N("VNDegen: the default font is ＭＳ Ｐゴシック's substitute"));
+    }
+}
+
+void TVPRefreshFontSubstitutes()
+{
+    std::vector<ttstr> substitutes;
+    for (auto it = TVPFontNames.GetFirst(); !it.IsNull(); ++it)
+    {
+        if (it.GetValue().Substitute)
+            substitutes.push_back(it.GetKey());
+    }
+    for (const ttstr& name : substitutes)
+        TVPFontNames.Delete(name);
+    if (!TVPFontNamesInit)
+        return;
+    if (TVPDefaultIsBundledFallback)
+        TVPDefaultFontName = TVPGlyphFallbackFontName;
+    TVPRegisterSubstitutes();
+}
+
+bool TVPIsFontSubstitute(const ttstr& fontname)
+{
+    TVPFontNamePathInfo* info = TVPFontNames.Find(fontname);
+    return info && info->Substitute;
+}
+
+// Registers the substitute for `fontname` under that name, and returns it, or nullptr when there is none.
+static TVPFontNamePathInfo* TVPFindSubstitute(const ttstr& fontname)
+{
+    vnfont_match match;
+    if (fontname.IsEmpty() || !vnfont_resolve(fontname.AsStdString().c_str(), 0, 0, &match))
+        return nullptr;
+    TVPAddSubstitute(fontname, match);
+    return TVPFontNames.Find(fontname);
+}
+
+//---------------------------------------------------------------------------
 void TVPGetAllFontList(std::vector<ttstr>& list)
 {
-    auto itend = TVPFontNames.GetLast();
-    for (auto it = TVPFontNames.GetFirst(); it != itend; ++it)
+    // VNDegen: the list runs to its end. Upstream stopped before the last font.
+    for (auto it = TVPFontNames.GetFirst(); !it.IsNull(); ++it)
     {
         list.push_back(it.GetKey());
     }
@@ -149,7 +250,6 @@ void TVPGetAllFontList(std::vector<ttstr>& list)
 
 void TVPInitFontNames()
 {
-    static bool TVPFontNamesInit = false;
     // enumlate all fonts
     if (TVPFontNamesInit)
         return;
@@ -184,6 +284,10 @@ void TVPInitFontNames()
         // set default fontface name
         TVPDefaultFontName = TVPFontNames.GetLast().GetKey();
     }
+    TVPGlyphFallbackFontName = TVPDefaultFontName;
+    TVPFontNamePathInfo* shipped = TVPFontNames.Find(TVPDefaultFontName);
+    TVPDefaultIsBundledFallback = shipped && shipped->Path == TJS_N("DroidSansFallback.ttf");
+    TVPRegisterSubstitutes();
 
     // check exePath + "/fonts/*.ttf"
     {
@@ -237,6 +341,11 @@ const ttstr& TVPGetDefaultFontName()
     return TVPDefaultFontName;
 }
 
+const ttstr& TVPGetGlyphFallbackFontName()
+{
+    return TVPGlyphFallbackFontName.IsEmpty() ? TVPDefaultFontName : TVPGlyphFallbackFontName;
+}
+
 tTJSBinaryStream* TVPCreateFontStream(const ttstr& fontname)
 {
     TVPFontNamePathInfo* info = TVPFindFont(fontname);
@@ -268,6 +377,10 @@ TVPFontNamePathInfo* TVPFindFont(const ttstr& fontname)
     {
         info = TVPFontNames.Find(fontname);
     }
+    if (!info)
+    {
+        info = TVPFindSubstitute(!fontname.IsEmpty() && fontname[0] == TJS_N('@') ? ttstr(fontname.c_str() + 1) : fontname);
+    }
     return info;
 }
 
@@ -295,7 +408,7 @@ tjs_uint32 tTVPttstrHash::Make(const ttstr& val)
 bool TVPFontExists(const ttstr& name)
 {
     TVPFontNamePathInfo* t = TVPFontNames.Find(name);
-    return t != NULL;
+    return t != NULL || TVPFindSubstitute(name) != NULL;
 }
 
 ttstr TVPGetBeingFont(ttstr fonts)

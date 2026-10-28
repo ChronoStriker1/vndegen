@@ -10,7 +10,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.6.2"
+    MARKETING_VERSION: "0.7.0"
     CURRENT_PROJECT_VERSION: "1"
 # scripts/kirikiri-engine.sh builds the engine into build/kirikiri, and does nothing when it is up to date. It is a target
 # of its own because Xcode copies the app's frameworks before any of the app target's build phases run. It runs with a
@@ -51,7 +51,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineArtemis, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineArtemis, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
@@ -117,6 +117,17 @@ targets:
           rsync -a --delete "$SRCROOT/build/rgss/RGSS.xcframework/$slice/RGSS.framework/" "$dest/"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
           codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
+      # Flash games play in Ruffle's web build, which scripts/ruffle-web.sh commits to Engines/Flash/ruffle and
+      # scripts/ruffle-runtime.sh checks and stages in build/ruffle. EngineFlash serves it to the game's page.
+      - name: Bundle Ruffle
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          "$SRCROOT/scripts/ruffle-runtime.sh" "$SRCROOT/build/ruffle"
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Ruffle"
+          mkdir -p "$dest"
+          rsync -a --delete --exclude licenses --exclude SHA256SUMS "$SRCROOT/build/ruffle/" "$dest/"
       # Settings lists each file in Licenses. Each runtime's script writes its notices to build/<runtime>/licenses, as
       # scripts/licenses/README.md describes.
       - name: Bundle third-party licenses

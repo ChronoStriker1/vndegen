@@ -34,13 +34,15 @@ import AppKit
 ///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
-///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only
+///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. NScripter sessions
+///                            also log their own pacing every 10 seconds ("NSFRAMES"), on macOS too
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
 ///   -windowSize 900x600      resizes the window before the snapshot on macOS. On iPad, in Windowed Apps or Stage Manager,
 ///                            the window takes that size the next time it is resized
 ///   -layoutSize 320x480      lays the whole app out in a frame of that size in the middle of the screen, as in a window
 ///                            of that size, iOS only. Unlike -windowSize it takes any size, below the smallest window
 ///                            iPadOS allows too, and needs no resizing, but the frame has no window controls
+///   -ignoreOcclusion YES     web engine pages keep running while no window shows, as on a Mac whose screen is locked, macOS only
 enum DebugHooks {
     static func run(_ hub: Hub) async {
         listenForInput(hub)

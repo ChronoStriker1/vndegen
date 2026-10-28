@@ -18,4 +18,6 @@ cp "$kit/Sources/ArchiveImport/CArchive/LICENSE-zlib.txt" "$out.part/zlib (Defla
 cp "$kit/Sources/CArtemis/LICENSE-stb_vorbis.txt" "$out.part/stb_vorbis (Artemis audio decoder).txt"
 cp "$kit/Sources/RuntimePackages/LICENSE-innoextract.txt" "$out.part/innoextract (Inno Setup reader).txt"
 cp "$kit/Sources/RuntimePackages/LICENSE-LZMA-SDK.txt" "$out.part/LZMA SDK (installer decoder).txt"
+cp "$kit/Sources/CNScripter/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (NScripter images and Ogg).txt"
+cp "$kit/Sources/CNScripter/third_party/LICENSE-pl_mpeg.txt" "$out.part/pl_mpeg (NScripter movies).txt"
 rm -rf "$out" && mv "$out.part" "$out"

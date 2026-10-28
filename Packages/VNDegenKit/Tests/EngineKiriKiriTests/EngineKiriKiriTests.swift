@@ -493,6 +493,7 @@ private enum FakeEngine {
 
     @MainActor static var engine: KiriKiriEngine {
         KiriKiriEngine(
+            setFonts: { _, _, _ in },
             start: { _ in
                 FakeEngine.record("start")
                 let work = FakeEngine.duringStart
