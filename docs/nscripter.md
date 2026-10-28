@@ -21,8 +21,9 @@ the runtime's own keeps each playing sound 0.75 s ahead in a ring buffer, so the
 and a slow decode can't make it miss its deadline or hold up the game. Everything runs in the app's process, with no
 JIT, on Mac, iPhone and iPad.
 
-Third-party code: stb_image (PNG, JPEG, BMP), stb_vorbis (Ogg Vorbis), dr_mp3 (MP3) and pl_mpeg (MPEG-1 movies with
-MP2 sound), all MIT, MIT No Attribution or public domain, listed in `Engines/NScripter/UPSTREAM.md`. Text is drawn with the font pack's substitutes
+Third-party code: stb_image (PNG, JPEG, BMP), stb_vorbis (Ogg Vorbis), dr_mp3 (MP3), pl_mpeg (MPEG-1 movies with
+MP2 sound) and Lua 5.1 (NSLua scripts), all MIT, MIT No Attribution or public domain, listed in
+`Engines/NScripter/UPSTREAM.md`, plus the system's bzip2 library for NBZ sounds. Text is drawn with the font pack's substitutes
 (`docs/fonts.md`): MS Gothic, NScripter's default, is Ume Gothic, a script's `font` or `defaultfont` name goes through
 the same table, and Hiragino covers characters the substitute lacks.
 
@@ -38,14 +39,19 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
   `0.txt` wins over `nscript.dat`, as on Windows. The first line may set the screen size and variable counts
   (`;mode800`, `;value500`, `;$V2000G1000S800,600L10000`).
 - Files, in the order NScripter searches: loose files in the game folder; then `.ns2` archives, highest number first;
-  then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`. Names match without regard to case, as on
+  then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`. Archive entries stored plain, with the
+  packer's SPB bitmap compression, or with its LZSS compression (type 2) are read. Names match without regard to case, as on
   Windows: loose files through an index of the folder made at start, archive members by their lowercased names, and
   files the game writes later (saves, screenshots) through `casepath_resolve` from `Engines/Shared/casepath.c`. All
   six test games pass the case check (title, play, save and load with every name's case swapped) on the Mac app and
   the iPad simulator, and one on the iPhone simulator.
 - Bitmaps NScripter's packer stored with its SPB compression, as well as PNG, JPEG and BMP.
-- Sound: Ogg Vorbis, PCM WAV and MP3 (`mp3`, `mp3loop`, `bgm` and the `mv` voices). Movies: MPEG-1 (`mpegplay`,
-  `movie`, `avi`).
+- Sound: Ogg Vorbis, PCM WAV and MP3 (`mp3`, `mp3loop`, `bgm` and the `mv` voices), and NBZ files, the sound
+  plugin `nbzplgin.dll`'s format (a bzip2-packed WAV), wherever a sound command names one. Movies: MPEG-1
+  (`mpegplay`, `movie`, `avi`).
+- CD tracks: `play "*n"` and `playonce "*n"` play `CD\trackNN.ogg` (or `.mp3` or `.wav`) from the game's `CD`
+  folder, looped or once; `playstop` and `stop` stop them and `cdfadeout` sets their fade. The PC engine plays the
+  disc itself; the game that uses these ships its tracks as those files and tells the player to name them so.
 - Backgrounds (`bg`) are opaque, as on the PC engine: the default transparency mode doesn't apply to them.
 
 ## English word wrap
@@ -56,12 +62,22 @@ by itself when any `.exe` in the game's top folder has a PE section named `.patc
 the stock engine doesn't have, and it logs that it did. Two test games have such an exe. `VNNSLaunch.englishWordWrap`
 forces word wrap on for other games.
 
+One English release ships no NScripter exe and writes its text lines for another engine: each line starts with a
+backquote, and the text is half-width English. The runtime draws a backquoted stretch at half width, wrapped between
+words, and treats each `|` inside it as a short pause (100 ms) the player can click past; the script has runs of up to
+128 of them at dramatic moments. Backquotes also quote strings in that script's commands (`rmenu`, `savename`), and
+are never drawn. All of this was settled from the script alone.
+
 ## Plugins
 
 NScripter games call Windows DLLs. The runtime emulates the ones the test games use:
 
 - `NSFont.dll`'s `gaiji`, which draws an image in place of a character.
-- `MSpDraw.dll`, a layer plugin (`setlayer`, `layermessage`), for the drawing one test game asks of it.
+- `MSpDraw.dll`, a layer plugin (`setlayer`, `layermessage`) that moves, turns, scales and fades pictures of its own,
+  as its author's manual describes: `draw` with the picture's centre, alpha, rotation, zoom, tilt, step count,
+  per-step increments, accelerations and start delay, `set` to change those values and run on, `clear` for one, several
+  or all pictures, and the `+` and `-` blending tags. Two test games use it, for a panning picture and an opening
+  sequence. The manual's tilt (a projection) is drawn as the picture's height scaled by its cosine.
 - Effect 99, a transition a DLL draws (`print 99,ms,"system\breakup.dll/urb"`), for the four one test game uses,
   drawn as the original DLLs draw them under the PC engine:
   - `breakup.dll` (`urb`, `lrB` and the other corners): the area that changes breaks into round 24-pixel pieces,
@@ -73,7 +89,20 @@ NScripter games call Windows DLLs. The runtime emulates the ones the test games 
   Other effect DLLs, and other parameters of these, crossfade. The DLL is matched by its file name, whatever its
   case and folder.
 
-Other DLL calls are logged and ignored. NSLua (`nslua.dll`, Lua scripts) isn't supported; no test game uses it.
+Other DLL calls are logged and ignored.
+
+## NSLua
+
+Games that ship `system.lua` beside `nslua.dll` script part of their logic in Lua. The runtime embeds Lua 5.1 and
+does what the DLL's notes describe: `system.lua` runs when the game starts, before the define block; `luasub name`
+makes `name` a command whose arguments the Lua function `NSCOM_name` reads with `NSPopInt`, `NSPopIntRef`, `NSPopStr`,
+`NSPopLabel`, `NSPopComma` and the like; `luacall` asks for the callbacks `NSCALL_animation` (run at its own interval
+while the game waits), `NSCALL_save`, `NSCALL_load` and `NSCALL_reset`. Lua reads and sets the script's variables,
+runs single commands with `NSExec`, jumps with `NSGoto` and `NSGosub`, and reads sprites, the mouse, keys and the
+timer through the documented `NS*` functions. Two test games use it: one for its battle data, menus and a target
+marker animation, the other, a mod, for hooking extra scenes onto the story's labels. The direct drawing functions
+(`NSD*`), `NSDefSpline`, `NSSpline` and `NL_bind` aren't emulated and log when called; `NSOkBox` and `NSYesNoBox`
+log their text and answer yes, since the runtime has no blocking dialog.
 
 ## Saves
 
@@ -139,10 +168,13 @@ menus and the right-click menu keep the runtime's own layout.
 
 - Effects 1 to 18 are drawn as NScripter's manual describes them. Of the effect DLLs, only `breakup.dll`,
   `lngtwave.dll/vwi` and `trvswave.dll/h` are drawn; others crossfade.
-- CD audio (`play "*2"`) isn't played. The PC engine plays a disc's tracks; no test game uses them.
+- CD audio plays only from files in the game's `CD` folder; a disc isn't read.
 - MIDI music (`play "song.mid"`) isn't played; no test game has any.
-- `.nsa` compression types 2 (LZSS) and 4 (NBZ) aren't read; no test game uses them.
-- NSLua isn't supported; the test games ship `nslua.dll`, but their scripts don't call Lua.
-- Of `MSpDraw.dll`, only the drawing one test game uses is emulated. Its author's manual (version 1.10) describes much
-  more: `set`, `stop`, `move`, `hide`, `disp`, `getphase`, `drawTo` and a program mode. By that manual, the field the
-  runtime reads as a horizontal speed is the tilt angle, which that game leaves at 0.
+- `.nsa` compression type 4 isn't read; no test game uses it.
+- The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
+  available to check: the pause's length is a guess.
+- NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`
+  don't show a dialog. Lua runs on the game thread, so `NSSleep` sleeps for at most 10 ms.
+- Of `MSpDraw.dll`, the messages the test games send are emulated: `draw`, `set` and `clear`. `stop`, `move`,
+  `hide`, `disp`, `getphase`, `drawTo` and the program mode its manual describes aren't. Its tilt is approximated.
+- `blt` and `ofscpy` aren't implemented; one test game's script has one call of each, outside normal play.

@@ -109,6 +109,115 @@ private func probe(_ files: [String]) -> FolderProbe {
     }
 }
 
+/// Fixtures/lzss/arc.nsa holds the same 16 x 4 gradient stored with the archive's LZSS compression (type 2), packed by
+/// VNDegen's own encoder of the format the runtime decodes.
+@Test func lzssEntriesDecodeExactly() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/lzss/arc.nsa")
+    try FileManager.default.copyItem(at: fixture, to: dir.appendingPathComponent("arc.nsa"))
+    try Data("*define\nnsa\ngame\n*start\nbg \"c_grad.bmp\",1\nclick\nend\n".utf8).write(to: dir.appendingPathComponent("0.txt"))
+    let engine = try #require(dir.path.withCString { root in
+        var launch = VNNSLaunch(gameRoot: root, logPath: nil, englishWordWrap: false)
+        return vnns_start(&launch)
+    })
+    defer { vnns_stop(engine) }
+    #expect(vnns_step(engine, 16))
+    var w: Int32 = 0, h: Int32 = 0
+    var changed = false
+    let pixels = try #require(vnns_frame(engine, &w, &h, &changed))
+    let left = (Int(w) - 16) / 2, top = (Int(h) - 4) / 2
+    for (x, y) in [(0, 0), (5, 2), (15, 3)] {
+        let i = ((top + y) * Int(w) + left + x) * 4
+        #expect([pixels[i], pixels[i + 1], pixels[i + 2]] == [UInt8(16 * x), UInt8(60 * y), UInt8(8 * (x + y))])
+    }
+}
+
+/// Fixtures/nbz/tone.nbz is half a second of a 440 Hz tone as the NBZ sound plugin stores it: the WAV file's size,
+/// big-endian, then the file as a bzip2 stream.
+@Test func nbzVoicesPlay() throws {
+    let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/nbz/tone.nbz")
+    let script = "*define\ngame\n*start\ndwave 0,\"tone.nbz\"\nwait 400\ndwavestop 0\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["tone.nbz": try Data(contentsOf: fixture)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    func level(_ frames: Int) -> Double {
+        var buf = [Float](repeating: 0, count: frames * 2)
+        vnns_audio_render(engine, &buf, Int32(frames))
+        return (buf.reduce(0) { $0 + Double($1 * $1) } / Double(buf.count)).squareRoot()
+    }
+    #expect(vnns_step(engine, 16))
+    Thread.sleep(forTimeInterval: 0.05)
+    var loud = true
+    for _ in 0..<5 {
+        loud = loud && level(2205) > 0.05
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+    #expect(loud)
+    #expect(vnns_step(engine, 800))
+    Thread.sleep(forTimeInterval: 0.05)
+    #expect(level(4410) == 0)
+}
+
+/// A CD track command plays the track's file from the game's CD folder.
+@Test func cdTracksPlayFromTheCDFolder() throws {
+    let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/audio/tone.ogg")
+    let script = "*define\ngame\n*start\nplay \"*3\"\nwait 400\nplaystop\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["CD/track03.ogg": try Data(contentsOf: fixture)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    func level(_ frames: Int) -> Double {
+        var buf = [Float](repeating: 0, count: frames * 2)
+        vnns_audio_render(engine, &buf, Int32(frames))
+        return (buf.reduce(0) { $0 + Double($1 * $1) } / Double(buf.count)).squareRoot()
+    }
+    #expect(vnns_step(engine, 16))
+    Thread.sleep(forTimeInterval: 0.05)
+    #expect(level(2205) > 0.05)
+    #expect(vnns_step(engine, 800))
+    Thread.sleep(forTimeInterval: 0.05)
+    #expect(level(4410) == 0)
+}
+
+/// system.lua runs at start; a luasub command calls its NSCOM_ function, which reads the arguments and runs commands.
+@Test func luaCommandsReadArgumentsAndRunCommands() throws {
+    let lua = """
+    NSExec("luasub paint")
+    function NSCOM_paint()
+        local v = NSPopIntRef()
+        NSPopComma()
+        local color = NSPopStr()
+        NSSetIntValue(v, NSGetIntValue(v) + 5)
+        NSExec("bg " .. color .. ",1")
+    end
+    """
+    let script = ";mode400\n*define\ngame\n*start\nmov %3,2\npaint %3,\"#0080FF\"\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["system.lua": Data(lua.utf8)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    #expect(vnns_step(engine, 16))
+    var w: Int32 = 0, h: Int32 = 0
+    var changed = false
+    let pixels = try #require(vnns_frame(engine, &w, &h, &changed))
+    #expect([pixels[0], pixels[1], pixels[2]] == [0x00, 0x80, 0xFF])
+    #expect(String(cString: vnns_debug_status(engine)).contains("click"))
+}
+
+/// A layer plugin's picture moves on the layer's timer by the increments its draw message gives.
+@Test func mspDrawPicturesMoveOnTheLayersTimer() throws {
+    let script = ";mode400\n*define\nsetlayer 1,100,\"dll\\MSpDraw.dll\"\ngame\n*start\nlsp 2,\"*1\",0,0\n"
+        + "layermessage 1,\"draw/0,:c;dot.bmp,20,20,255,0,1,1,0,5,10,0\"\nprint 1\nwait 1000\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["dot.bmp": solidBMP(width: 4, height: 4, rgb: (255, 0, 0))])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    var w: Int32 = 0, h: Int32 = 0
+    var changed = false
+    #expect(vnns_step(engine, 16))
+    var pixels = try #require(vnns_frame(engine, &w, &h, &changed))
+    func red(_ x: Int, _ y: Int) -> Bool { pixels[(y * Int(w) + x) * 4] == 255 && pixels[(y * Int(w) + x) * 4 + 1] == 0 }
+    #expect(red(20, 20) && !red(30, 20))  // centred on (20, 20)
+    for _ in 0..<40 { #expect(vnns_step(engine, 16)) }  // six ticks of the 100 ms timer; five steps of 10 pixels
+    pixels = try #require(vnns_frame(engine, &w, &h, &changed))
+    #expect(red(70, 20) && !red(20, 20))
+}
+
 /// A 24-bit BMP of one colour.
 private func solidBMP(width: Int, height: Int, rgb: (UInt8, UInt8, UInt8)) -> Data {
     let stride = (width * 3 + 3) & ~3

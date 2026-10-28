@@ -10,6 +10,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <bzlib.h>
+
 namespace vnns {
 
 FileSystem::~FileSystem() {
@@ -187,6 +189,8 @@ bool FileSystem::read(std::string_view name, Bytes &out) {
         return true;
     case 1:
         return decodeSpb(raw.data(), raw.size(), out);
+    case 2:
+        return decodeLzss(raw.data(), raw.size(), e.originalSize, out);
     default:
         logf("%s: archive compression %d is not supported", sjisToUtf8(name).c_str(), e.compression);
         return false;
@@ -304,6 +308,74 @@ bool decodeSpb(const uint8_t *data, size_t size, Bytes &bmp) {
             }
         }
     }
+    return true;
+}
+
+// LZSS (.nsa compression type 2): an MSB-first bit stream. A 1 bit is followed by a literal byte; a 0 bit by an 8-bit
+// position in a 256-byte ring and a 4-bit length, the run being length + 2 bytes copied from that position. The ring
+// starts zero-filled with its write pointer at 239, so a run may read bytes nothing has written yet, which are zero.
+// Worked out from two games' entries and checked against NScripter's own cursor bitmaps, which they decode to exactly.
+bool decodeLzss(const uint8_t *data, size_t size, uint32_t originalSize, Bytes &out) {
+    if (originalSize > (64u << 20)) {
+        logf("LZSS entry of %u bytes is larger than any game file", originalSize);
+        return false;
+    }
+    out.clear();
+    out.reserve(originalSize);
+    uint8_t ring[256] = {0};
+    unsigned wp = 239;
+    size_t bitPos = 0, bitEnd = size * 8;
+    auto bits = [&](int n) {
+        uint32_t v = 0;
+        for (int i = 0; i < n; i++) {
+            uint32_t bit = (data[bitPos >> 3] >> (7 - (bitPos & 7))) & 1;
+            v = v << 1 | bit;
+            bitPos++;
+        }
+        return v;
+    };
+    while (out.size() < originalSize && bitPos + 9 <= bitEnd) {
+        if (bits(1)) {
+            uint8_t c = uint8_t(bits(8));
+            out.push_back(c);
+            ring[wp++ & 255] = c;
+            continue;
+        }
+        if (bitPos + 12 > bitEnd) break;
+        unsigned pos = bits(8), len = bits(4) + 2;
+        for (unsigned i = 0; i < len && out.size() < originalSize; i++) {
+            uint8_t c = ring[(pos + i) & 255];
+            out.push_back(c);
+            ring[wp++ & 255] = c;
+        }
+    }
+    if (out.size() != originalSize) {
+        logf("LZSS entry ended after %zu of %u bytes", out.size(), originalSize);
+        return false;
+    }
+    return true;
+}
+
+// NBZ, the sound format of NScripter's nbzplgin.dll: the original file's size, big-endian, then a bzip2 stream.
+bool isNbz(const Bytes &data) { return data.size() > 8 && data[4] == 'B' && data[5] == 'Z' && data[6] == 'h'; }
+
+bool decodeNbz(const Bytes &data, Bytes &out) {
+    if (!isNbz(data)) return false;
+    uint32_t originalSize = be32(data.data());
+    if (originalSize > (256u << 20)) {
+        logf("NBZ file of %u bytes is larger than any game sound", originalSize);
+        return false;
+    }
+    out.assign(originalSize, 0);
+    unsigned int written = originalSize;
+    int r = BZ2_bzBuffToBuffDecompress(reinterpret_cast<char *>(out.data()), &written,
+                                       reinterpret_cast<char *>(const_cast<uint8_t *>(data.data() + 4)),
+                                       unsigned(data.size() - 4), 0, 0);
+    if (r != BZ_OK) {
+        logf("NBZ file could not be decompressed (bzip2 error %d)", r);
+        return false;
+    }
+    out.resize(written);
     return true;
 }
 

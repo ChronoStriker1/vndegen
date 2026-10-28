@@ -43,7 +43,7 @@ private:
         uint64_t offset;
         uint32_t size;
         uint32_t originalSize;
-        uint8_t compression;  // 0 stored, 1 SPB
+        uint8_t compression;  // 0 stored, 1 SPB, 2 LZSS
     };
     void indexDir(const std::string &dir, const std::string &prefix);
     bool onDisk(std::string_view name, std::string &path) const;
@@ -61,5 +61,10 @@ private:
 
 // Decodes NScripter's SPB bitmap compression into a 24-bit BMP file.
 bool decodeSpb(const uint8_t *data, size_t size, Bytes &bmp);
+// Decodes an .nsa entry stored with LZSS (compression type 2).
+bool decodeLzss(const uint8_t *data, size_t size, uint32_t originalSize, Bytes &out);
+// NBZ sound files (nbzplgin.dll): a size and a bzip2 stream around an ordinary sound file.
+bool isNbz(const Bytes &data);
+bool decodeNbz(const Bytes &data, Bytes &out);
 
 }  // namespace vnns

@@ -12,10 +12,10 @@ file(GLOB RUNTIME_SOURCES ${RUNTIME}/core/*.cpp)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FREETYPE REQUIRED freetype2)
 set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
-add_executable(vnns_host main.cpp ${RUNTIME_SOURCES} ${SHARED}/vnfont.c ${SHARED}/casepath.c)
+add_executable(vnns_host main.cpp ${RUNTIME_SOURCES} ${RUNTIME}/core/lua_all.c ${SHARED}/vnfont.c ${SHARED}/casepath.c)
 target_include_directories(vnns_host PRIVATE ${RUNTIME}/include ${SHARED} ${FREETYPE_INCLUDE_DIRS})
 target_compile_definitions(vnns_host PRIVATE VNNS_FONTS_DIR="${SHARED}/fonts")
-target_link_libraries(vnns_host PRIVATE ${FREETYPE_LIBRARIES} pthread)
+target_link_libraries(vnns_host PRIVATE ${FREETYPE_LIBRARIES} bz2 pthread)
 target_compile_options(vnns_host PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
-set_source_files_properties(${RUNTIME}/core/audio.cpp ${RUNTIME}/core/gfx.cpp ${RUNTIME}/core/video.cpp
+set_source_files_properties(${RUNTIME}/core/audio.cpp ${RUNTIME}/core/gfx.cpp ${RUNTIME}/core/video.cpp ${RUNTIME}/core/lua_all.c
   PROPERTIES COMPILE_OPTIONS "-w")

@@ -23,6 +23,8 @@
 #include "gfx.h"
 #include "script.h"
 
+struct lua_State;
+
 namespace vnns {
 
 constexpr int kSpriteCount = 1000;
@@ -378,6 +380,7 @@ public:
     bool pretextDone_ = false;     // the line's head (tag, pretextgosub) has been handled
     bool lineHadText_ = false;
     bool noNewlineAtEnd_ = false;  // the line ended in '/', or a page wait right before its end
+    bool halfWidthText_ = false;   // inside a backquoted stretch of a text line: English, wrapped between words
     bool ignoreClickStr_ = false;
     bool clickCursorPage_ = false;
     std::vector<std::string> pendingChars_;  // characters of a variable being shown
@@ -573,7 +576,7 @@ public:
     AudioMixer audio_;
     std::string bgmName_;
     bool bgmLoop_ = true;
-    int bgmFadeOut_ = 0, bgmFadeIn_ = 0;
+    int bgmFadeOut_ = 0, bgmFadeIn_ = 0, cdFadeOut_ = 0;
     int volBgm_ = 100, volSe_ = 100, volVoice_ = 100;
     std::string waveName_;
     bool waveLoop_ = false;
@@ -585,6 +588,7 @@ public:
     void playBgm(const std::string &name, bool loop);
     void playSound(int channel, const std::string &name, bool loop);
     bool readSound(const std::string &name, Bytes &out);
+    std::string cdTrackFile(int track) const;
 
     // Movies (video.cpp)
     struct Movie;
@@ -612,6 +616,24 @@ public:
     std::vector<GaijiRule> gaiji_;
     struct MSpDrawItem;
     std::vector<std::shared_ptr<MSpDrawItem>> mspdraw_;
+
+    // NSLua (nslua.cpp): the game's system.lua run by Lua 5.1, as the PC engine's nslua.dll runs it. luasub names
+    // become commands that call NSCOM_name; luacall names are callbacks (NSCALL_name) the engine makes.
+    lua_State *lua_ = nullptr;
+    std::unordered_set<std::string> luaCommands_;
+    std::unordered_set<std::string> luaCallbacks_;
+    bool luaAnimOn_ = false;
+    int luaAnimInterval_ = 15;
+    int64_t luaAnimNext_ = 0;
+    Cursor luaReturn_;  // where NSGosub returns to: after the Lua command's statement, or where a callback was made
+    void luaStart();
+    void luaStop();
+    bool luaCommand(const std::string &name);
+    // Calls NSCALL_name if the script asked for it with luacall. arg is passed when it isn't negative; *result gets
+    // a boolean return value.
+    bool luaCallback(const std::string &name, int arg = -1, bool *result = nullptr);
+    // Runs one statement given as text, in place: NSExec.
+    void execString(const std::string &statement);
 
     std::string problem_;
     bool ended_ = false;

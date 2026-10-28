@@ -277,13 +277,14 @@ struct ExprParser {
         NestingGuard guard;
         e.skipSpaces();
         char c = peek();
-        if (c == '"') {
+        // A string in double quotes, or in backquotes, which one game's script uses for half-width English strings.
+        if (c == '"' || c == '`') {
             e.cur_.pos++;
             size_t start = e.cur_.pos;
-            while (e.cur_.pos < t.size() && t[e.cur_.pos] != '"' && t[e.cur_.pos] != '\n')
+            while (e.cur_.pos < t.size() && t[e.cur_.pos] != c && t[e.cur_.pos] != '\n')
                 e.cur_.pos += sjisCharLen(t, e.cur_.pos);
             std::string s = t.substr(start, e.cur_.pos - start);
-            if (peek() == '"') e.cur_.pos++;
+            if (peek() == c) e.cur_.pos++;
             return s;
         }
         if (c == '$') {
@@ -349,7 +350,7 @@ std::string Engine::readColorOrStr() { return readStr(); }
 bool Engine::peekIsStringArg() {
     skipSpaces();
     char c = peek();
-    if (c == '"' || c == '$' || c == '#' || c == '*' || c == '(') return true;
+    if (c == '"' || c == '`' || c == '$' || c == '#' || c == '*' || c == '(') return true;
     if (isIdentStart(c)) {
         size_t save = cur_.pos;
         std::string w = readWord();
@@ -563,7 +564,8 @@ void Engine::executeStatement() {
         size_t save = cur_.pos;
         std::string word = readWord();
         // v123 / dv123 / mv123 voice shortcuts carry their number in the name.
-        bool known = commandTable().count(word) || defsubs_.count(word) || (word[0] == '_' && commandTable().count(word.substr(1)));
+        bool known = commandTable().count(word) || defsubs_.count(word) || luaCommands_.count(word) ||
+                     (word[0] == '_' && commandTable().count(word.substr(1)));
         if (!known) {
             size_t d = 0;
             while (d < word.size() && isalpha(uint8_t(word[d]))) d++;
@@ -602,6 +604,7 @@ void Engine::executeCommand(const std::string &name) {
         n.erase(0, 1);
         builtin = true;
     }
+    if (!builtin && luaCommand(n)) return;  // a luasub command, run by its Lua function
     if (!builtin && defsubs_.count(n)) {
         // A user command: a gosub to the label of that name, whose getparam reads the arguments written here.
         skipSpaces();

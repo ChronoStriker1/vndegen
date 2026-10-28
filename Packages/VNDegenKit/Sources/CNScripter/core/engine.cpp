@@ -16,6 +16,7 @@ void registerSaveCommands(std::unordered_map<std::string, CommandFn> &t);
 void registerSystemCommands(std::unordered_map<std::string, CommandFn> &t);
 void registerPluginCommands(std::unordered_map<std::string, CommandFn> &t);
 void registerMovieCommands(std::unordered_map<std::string, CommandFn> &t);
+void registerLuaCommands(std::unordered_map<std::string, CommandFn> &t);
 
 const std::unordered_map<std::string, CommandFn> &commandTable() {
     static const std::unordered_map<std::string, CommandFn> table = [] {
@@ -29,6 +30,7 @@ const std::unordered_map<std::string, CommandFn> &commandTable() {
         registerSystemCommands(t);
         registerPluginCommands(t);
         registerMovieCommands(t);
+        registerLuaCommands(t);
         return t;
     }();
     return table;
@@ -77,6 +79,7 @@ bool Engine::start(std::string *error) {
     frame_ = Image(width_, height_, rgba(0, 0, 0));
     rngState_ = 12345;
     resetGame(true);
+    luaStart();
     return true;
 }
 
@@ -110,6 +113,7 @@ void Engine::resetGame(bool fromDefine) {
     } else {
         defineMode_ = false;
         if (!jumpToLabel("start")) ended_ = true;
+        luaCallback("reset");
     }
 }
 
@@ -256,6 +260,12 @@ bool Engine::step(int ms) {
     processWait();
     animateSprites();
     tickLayers();
+    if (lua_ && luaAnimOn_ && now_ >= luaAnimNext_) {
+        // NSLua's animation callback runs at its interval while the game waits; returning true redraws the screen.
+        luaAnimNext_ = now_ + luaAnimInterval_;
+        bool redraw = false;
+        if (luaCallback("animation", -1, &redraw) && redraw) printWithEffect(1);
+    }
     if (!ended_) runUntilBlocked();
     // A wait that started this frame may already be satisfied by this frame's click; leave that to the next frame.
     in_ = Input();

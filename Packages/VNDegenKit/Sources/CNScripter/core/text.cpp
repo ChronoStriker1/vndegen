@@ -25,6 +25,9 @@ bool isHex6(const std::string &t, size_t p) {
 }
 }  // namespace
 
+// How long each '|' of a backquoted English line pauses.
+static constexpr int kBarPauseMs = 100;
+
 int Engine::fullAdvance() const { return win_.fw + win_.px; }
 int Engine::halfAdvance() const { return (win_.fw + win_.px) / 2; }
 
@@ -74,6 +77,8 @@ void Engine::drawGlyphs(Image &out, const std::string &sjis, int x, int y, int f
         if (i == sjis.size() && n == 1 && sjisLead(uint8_t(sjis[i - 1]))) break;
         bool half = n == 1;
         int cw = half ? fw / 2 : fw;
+        // A backquote marks half-width text in one game's strings (its save names, say); it isn't drawn.
+        if (cp == '`') continue;
         const Glyph *g = nullptr;
         if (cp != ' ' && cp != 0x3000 && glyphFor(cp, cw, fh, bold, g)) {
             if (shadow) drawCoverage(out, *g, px + shadeX_, y + shadeY_, rgba(0, 0, 0));
@@ -271,6 +276,7 @@ bool Engine::beginTextLine() {
     pretextDone_ = false;
     lineHadText_ = false;
     noNewlineAtEnd_ = false;
+    halfWidthText_ = false;
     // A page wait's clear happens as the next page starts, before that page's head becomes the savepoint.
     if (pendingPageClear_) {
         clearPage();
@@ -416,6 +422,23 @@ void Engine::textStep() {
         ignoreClickStr_ = true;
         return;
     }
+    // One game's English script, written for a patched engine, opens its text lines with a backquote: the text is
+    // half-width English, broken between words, and each '|' inside it is a short pause the player can click past.
+    // Settled from that script alone; no engine was available to check it against.
+    if (c == '`') {
+        p++;
+        halfWidthText_ = !halfWidthText_;
+        return;
+    }
+    if (c == '|' && halfWidthText_) {
+        p++;
+        if (!textFast_ && !skipMode_ && !ctrlSkip()) {
+            wait_ = WaitKind::Text;
+            waitUntil_ = now_ + kBarPauseMs;
+            waitSkippable_ = true;
+        }
+        return;
+    }
     if (c == '$' || c == '%') {
         VarRef v = readVar();
         std::string s = v.kind == VarRef::Str ? strVar(v.index) : std::to_string(getNumVar(v.index));
@@ -516,11 +539,11 @@ void Engine::textStep() {
     size_t n = sjisCharLen(t, p);
     std::string ch = t.substr(p, n);
     p += n;
-    if (english_ && cfg_.englishWordWrap && ch == " ") {
+    if (((english_ && cfg_.englishWordWrap) || halfWidthText_) && ch == " ") {
         // Word wrap (the option Test Game 98's patched engine needs): break before a word that won't fit.
         size_t q = p;
         int w = 0;
-        while (q < t.size() && t[q] != ' ' && t[q] != '\n' && t[q] != '@' && t[q] != '\\') {
+        while (q < t.size() && t[q] != ' ' && t[q] != '\n' && t[q] != '@' && t[q] != '\\' && t[q] != '|' && t[q] != '`') {
             size_t m = sjisCharLen(t, q);
             w += m == 1 ? halfAdvance() : fullAdvance();
             q += m;

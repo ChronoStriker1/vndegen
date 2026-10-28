@@ -563,6 +563,8 @@ bool Engine::pollBexec() {
     }
     if (in_.rclick) return finishBexec("RCLICK", -1);
     if (in_.mclick) return finishBexec("MCLICK", -1);
+    // A held Ctrl key answers every bexec, as on the PC engine, which is how a script's text loop skips.
+    if (ctrlSkip()) return finishBexec("CTRL", -1);
     if (in_.wheel > 0) return finishBexec("WHEELUP", -1);
     if (in_.wheel < 0) return finishBexec("WHEELDOWN", -1);
     for (int k : in_.keys) {

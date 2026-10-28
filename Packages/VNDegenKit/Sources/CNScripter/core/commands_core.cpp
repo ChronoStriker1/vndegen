@@ -21,6 +21,7 @@ void cmdGame(E &e, const std::string &) {
     e.defineMode_ = false;
     e.loadGlobals();
     if (!e.jumpToLabel("start")) e.ended_ = true;
+    e.luaCallback("reset");
 }
 
 void cmdNsa(E &e, const std::string &) {
@@ -435,13 +436,22 @@ void cmdGetIni(E &e, const std::string &) {
             size_t nl = text.find('\n', p);
             std::string line = text.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
             p = nl == std::string::npos ? text.size() : nl + 1;
-            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+            auto trim = [](std::string v) {
+                while (!v.empty() && (v.back() == '\r' || v.back() == ' ' || v.back() == '\t')) v.pop_back();
+                size_t i = 0;
+                while (i < v.size() && (v[i] == ' ' || v[i] == '\t')) i++;
+                return v.substr(i);
+            };
+            line = trim(line);
             if (line.size() > 1 && line[0] == '[') {
                 cur = sjisLower(line.substr(1, line.find(']') - 1));
             } else if (cur == section) {
                 size_t eq = line.find('=');
-                if (eq != std::string::npos && sjisLower(line.substr(0, eq)) == key) {
-                    result = line.substr(eq + 1);
+                if (eq != std::string::npos && sjisLower(trim(line.substr(0, eq))) == key) {
+                    result = trim(line.substr(eq + 1));
+                    // Windows drops a matching pair of quotes around the value.
+                    if (result.size() >= 2 && (result.front() == '"' || result.front() == '\'') && result.back() == result.front())
+                        result = result.substr(1, result.size() - 2);
                     break;
                 }
             }
@@ -816,12 +826,12 @@ void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     for (const char *n : {"deletemenu", "resetmenu", "insertmenu", "killmenu", "versionstr", "mode_saya", "mode_ext",
                           "automode", "menusetwindow", "menuselectcolor", "menuselectvoice", "selectvoice",
                           "clickvoice", "mousecursor", "mousemode", "debuglog", "errorsave", "spi",
-                          "arc", "soundpressplgin", "cdfadeout", "noteraseman",
+                          "arc", "soundpressplgin", "noteraseman",
                           "clickskippage", "englishdialog", "minimizewindow", "movemousecursor", "menu_full",
                           "menu_window", "menu_click_def", "menu_click_page", "repaint", "filelogoff", "windowchip",
                           "lookbacksp", "lookbackbutton", "lookbackcolor", "lookbackvoice", "lookbackoff",
                           "lookbackflush_dummy", "kidokumode", "useescspc2", "shell", "winexec", "flushout",
-                          "rubyoff_dummy"})
+                          "rubyoff_dummy", "heartmode"})
         t[n] = ignoreArgs;
 }
 

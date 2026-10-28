@@ -23,8 +23,13 @@ source, or the VNDegen branch that once ported one. This file lists, for each pa
   recorded at 30 frames a second. The effects were worked out from the frames. Nothing was disassembled.
 - **`MSpDraw.dll`'s own distribution**, `MSpDraw.zip` by its author (manual `MSpDraw.txt` version 1.10, a sample
   script, the DLL), from the author's site as the Internet Archive keeps it, found through a public list of
-  NScripter plugins. Only
-  its manual was read, to describe the plugin in `docs/nscripter.md`; the runtime's emulation didn't change.
+  NScripter plugins. Its manual gives the messages and their fields, which the emulation follows.
+- **NSLua's notes** in `nscr_2018.zip` (`NSLua解説１～２.txt`, `NSLua解説３.txt`, `NSLua内部情報.txt`,
+  `NSLua直接描画命令.txt` and the four samples), and **Lua 5.1.5** itself (MIT), used as a library. The games'
+  `system.lua` files showed which functions matter.
+- **The stock cursor bitmaps** in `nscrdoc.zip` (`デフォルトのカーソルファイル`), as plain files to compare LZSS
+  archive entries against.
+- **bzip2**, the system library, for NBZ sounds.
 
 Not used: the English "NScripter API reference" hosted inside an ONScripter project's website, though it is prose,
 because of where it lives. GARbro (MIT) was opened to check its NScripter archive support, but its decompression code
@@ -60,6 +65,13 @@ says it comes from ONScripter-EN, so only its license header and a list of names
 | Saves inside a `defsub` | Black box (engines 3.04 and 2.96): a defsub frame's saved offset is that of the arguments `getparam` hasn't read (10 lab saves, byte for byte), and loading such a save lets `getparam` read them. The PC engine treats arguments left unread at `return` as text to display, which no working game relies on; the runtime skips them |
 | Unused extended sprites after a load | Black box: a save made after loading writes alpha 255 for unused `lsp2` slots, where a fresh game writes -1 |
 | `gloval.sav` written early | Black box: the file the PC engine writes at exit is the one the runtime writes at the first click wait after the same globals change, byte for byte (engines 3.04 and 2.96) |
+| `.nsa` compression type 2 (LZSS) | Two games' 14 entries, read as a bit stream. A flag bit, then a literal byte or an 8-bit position in a 256-byte ring and a 4-bit length + 2; the ring starts zero-filled with its write pointer at 239. 10 of the entries are NScripter's stock cursor bitmaps and decode byte-identical to the files in `nscrdoc.zip`; the other two are the same cursors with two more bytes; all 14 decode to exactly their stored sizes |
+| NBZ sound files | One game's archive entries named `.nbz`, each a 4-byte big-endian size followed by a bzip2 stream of a WAV file; `soundpressplgin "nbzplgin.dll\|nbz"` in the manual names the plugin. Decoded by the system's bzip2 |
+| CD tracks | The manual's `play`, `playonce`, `playstop` and `cdfadeout` pages (a disc's track n; no folder is described); the game's `CD` folder of `track01.ogg` .. `track10.ogg` and its readme, which tells the player to put ripped tracks there under those names |
+| Backquoted English text and `\|` pauses | One game's script alone: text lines open with a backquote and hold half-width English; `\|` appears singly, doubled, and in runs of up to 128 at dramatic moments, so it is read as a pause unit. Backquotes also quote strings in its `rmenu`, `clickstr` and `savename` lines |
+| NSLua | The notes: `system.lua` loads at start; `luasub` binds `NSCOM_name`; `luacall` binds `NSCALL_name`; the `NSPop*`, `NSGet*`/`NSSet*`, `NSExec`, `NSGoto`/`NSGosub`/`NSReturn`, sprite, sound, mouse, key and timer functions, `NSLuaAnimationInterval`/`Mode` and `NSTimer`. Checked by running the two games' `system.lua` files: battle data tables, a target marker that `NSCALL_animation` flashes, and a mod's label hooks with `NSCALL_reset`, `NSCALL_save` and `NSCALL_load` |
+| `MSpDraw.dll` messages | Its manual: `draw/n,tag,cx,cy,alpha,rot,zoomx,zoomy,slope,steps,dcx,dcy,dalpha,drot,dzoomx,dzoomy,dslope,acx,acy,delay`, `set/n,name=value,...,time=count`, `clear/n,...` or `clear/all`, and the `+`/`-` blending suffix of the tag. One game's opening sequence (a scrolling map, a logo tilting in, a spear rising with an additive glow) runs on it |
+| `getini` values | Windows' `GetPrivateProfileString`, as a mod's `list.ini` relies on: spaces around the key and value are dropped, and a matching pair of quotes around the value |
 
 ## Open questions and how they were settled
 
@@ -70,8 +82,15 @@ says it comes from ONScripter-EN, so only its license header and a list of names
   runtime doesn't special-case them.
 - **Movies with a 59.94 fps header**: one test game's MPEG-1 clips hold 29.97 frames a second (ffprobe counts 88
   frames in 2.92 s), so drawing 30 a second is their full rate.
-- **Compression types 2 (LZSS) and 4 (NBZ) in `.nsa`**: no test game uses them and no sample exists to check a
-  decoder against, so they aren't implemented. The runtime logs the file instead.
+- **Compression type 4 in `.nsa`**: no test game uses it and no sample exists to check a decoder against, so it
+  isn't implemented. The runtime logs the file instead. (Type 2 is implemented; see the table.)
+- **`MSpDraw.dll`'s tilt**: the manual calls `slope` a tilt angle, 0 upright and 90 flat, and lists projection as its
+  slowest drawing mode. It's drawn as the height scaled by the cosine of the angle, which gives the logo in one game's
+  opening the flip-in the script's `dslope=-3` over 30 steps asks for. Not checked against the DLL.
+- **The `\|` pause length** in the backquoted script: 100 ms each, a guess; no engine was available to measure it.
+- **`heartmode`**, a define command one game uses that no manual describes: read and ignored.
+- **The drawing order of `MSpDraw.dll` pictures**: the order they were drawn in, which puts one game's map under its
+  logo as the script needs. The manual doesn't say.
 - **The effect DLLs' rectangle**: the PC engine passes a DLL the rectangle it redrew, so `breakup.dll`'s grid starts at
   the removed sprite's corner. The runtime uses the smallest rectangle holding every changed pixel, which can start a
   few pixels further in when the sprite has a transparent margin. The pieces look the same.
@@ -80,5 +99,6 @@ says it comes from ONScripter-EN, so only its license header and a list of names
   time.
 - **`breakup.dll`'s radius**: the pieces' pixel counts fit a disc of radius 11.85 - 0.995 n after n pairs of steps in
   flight; the true rule may be a Windows ellipse, but the counts match.
-- **CD audio**: NScripter's manual says `play "*n"` plays a disc's track n; its documentation describes no folder of
-  track files. No test game plays CD tracks, so it isn't implemented.
+- **CD audio**: NScripter's manual says `play "*n"` plays a disc's track n and describes no folder of track files.
+  The game that plays them ships them as `CD\trackNN.ogg`, the name its readme gives, so that's what the runtime
+  plays, accepting `.mp3` and `.wav` too.

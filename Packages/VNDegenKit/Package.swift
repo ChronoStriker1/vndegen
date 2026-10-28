@@ -59,8 +59,10 @@ let package = Package(
             // The runtime draws every frame on the CPU. Unoptimized, a Debug build misses frames that a Release build
             // makes, and Debug builds are what the simulators and the Mac app are tested with.
             cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-O2"])],
+            // The system's bzip2 unpacks the NBZ sound files one game's plugin would.
             linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
-                             .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
+                             .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS])),
+                             .linkedLibrary("bz2")]),
         // Presents a frame a runtime drew on the CPU through Metal, and plays the sound it mixes, for the runtimes that
         // composite in software.
         .target(name: "FrameHost", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),

@@ -24,7 +24,16 @@ class Script {
 public:
     bool load(FileSystem &fs, std::string *error);
 
-    const std::string &text() const { return text_; }
+    const std::string &text() const { return *active_; }
+    // NSExec runs one statement given as text: until endExec, the parser reads that text in place of the script.
+    void beginExec(const std::string &statement) {
+        exec_ = statement + "\n";
+        active_ = &exec_;
+    }
+    void endExec() { active_ = &text_; }
+    Script() = default;
+    Script(const Script &) = delete;
+    Script &operator=(const Script &) = delete;
     const ScriptSettings &settings() const { return settings_; }
     // kidoku.dat's size for a new file, as the PC engine sizes it: (length + 106) / 8 bytes for text scripts and
     // length / 8 for nscript.dat, the length counting the script without carriage returns (checked on four games).
@@ -42,6 +51,8 @@ public:
 private:
     void parseSettings();
     std::string text_;
+    std::string exec_;
+    const std::string *active_ = &text_;
     bool fromDat_ = false;
     size_t loadedLength_ = 0;  // the script's length before a closing newline was added
     ScriptSettings settings_;

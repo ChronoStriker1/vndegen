@@ -554,6 +554,7 @@ std::string Engine::savePath(int slot) const {
 }
 
 bool Engine::saveGame(int slot, const std::string &note) {
+    luaCallback("save", slot);
     Bytes data;
     if (savepointLive_) {
         serializeState(data);
@@ -616,6 +617,7 @@ bool Engine::loadGame(int slot) {
         fileLogOrder_ = std::move(fileLogOrder);
         return false;
     }
+    luaCallback("load", slot);
     if (!loadGosub_.empty()) gosub(cur_.pos, cur_.line, cur_.stmt, loadGosub_);
     return true;
 }
