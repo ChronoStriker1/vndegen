@@ -35,13 +35,22 @@ private func mvGame(_ files: [String], core: String = "rpg_core.js") throws -> U
         let configuration = try RPGMakerPlugin(flavor).webConfiguration(GameFolder(rpgMakerGameAt: root))
         #expect(configuration.decodesOgg == decodes, "\(flavor) \(files)")
     }
+
+    // A sound folder can be a symlink to a folder elsewhere in the game.
+    let linked = try mvGame(["sounds/Cursor.ogg"])
+    defer { try? FileManager.default.removeItem(at: linked) }
+    try FileManager.default.createDirectory(at: linked.appending(path: "www/audio"), withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(atPath: linked.appending(path: "www/audio/se").path, withDestinationPath: "../sounds")
+    #expect(try RPGMakerPlugin(.mv).webConfiguration(GameFolder(rpgMakerGameAt: linked)).decodesOgg)
 }
 
 /// MV's own codec check, request, and decode, as rpg_core.js 1.6 has them: it asks for .ogg when the page says it can
-/// play Ogg, and hands the file's bytes to decodeAudioData with a success callback only.
+/// play Ogg and the user agent is not a phone's or tablet's, and hands the file's bytes to decodeAudioData with a
+/// success callback only.
 private let mvAudio = """
     window.WebAudio = {
-        ext: () => (document.createElement('audio').canPlayType('audio/ogg') ? '.ogg' : '.m4a'),
+        ext: () => (document.createElement('audio').canPlayType('audio/ogg')
+            && !navigator.userAgent.match(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i) ? '.ogg' : '.m4a'),
         load: (name) => new Promise((resolve) => {
             const xhr = new XMLHttpRequest();
             xhr.open('GET', 'audio/se/' + name + WebAudio.ext());
@@ -69,6 +78,7 @@ private let mvAudio = """
         configuration.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
     let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    webView.customUserAgent = game.userAgent
     webView.load(URLRequest(url: game.folder.indexURL))
     let deadline = ContinuousClock.now + .seconds(20)
     while try await webView.evaluateJavaScript("document.readyState === 'complete' && typeof WebAudio === 'object'") as? Bool != true {

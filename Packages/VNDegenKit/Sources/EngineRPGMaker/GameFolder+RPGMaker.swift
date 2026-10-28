@@ -17,13 +17,15 @@ extension GameFolder {
     nonisolated var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
 
     /// True when the audio folder holds Ogg files, plain or encrypted (.rpgmvo), and no .m4a (.rpgmvm). MV asks for
-    /// .m4a in a browser that cannot play Ogg, and its deployment usually ships both, but many games ship only Ogg.
+    /// .m4a in a browser that cannot play Ogg, and its deployment usually ships both, but many games ship only Ogg. MV
+    /// plays sounds only from these four folders. Listing each one also follows a folder that is a symlink.
     nonisolated var shipsOnlyOggAudio: Bool {
-        guard let audio = resolve(servedPath: "/audio"),
-              let files = FileManager.default.enumerator(at: audio, includingPropertiesForKeys: nil) else { return false }
+        let files = ["bgm", "bgs", "me", "se"].flatMap { folder in
+            resolve(servedPath: "/audio/\(folder)").flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) } ?? []
+        }
         var hasOgg = false
-        for case let file as URL in files {
-            switch file.pathExtension.lowercased() {
+        for file in files {
+            switch (file as NSString).pathExtension.lowercased() {
             case "m4a", "rpgmvm": return false
             case "ogg", "rpgmvo": hasOgg = true
             default: break
