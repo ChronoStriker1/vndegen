@@ -300,6 +300,23 @@ impl CoreRuntime {
         // hamidashi 的 `まどそふと\ハミダシクリエイティブ`），这里规范化为正斜杠
         // 相对路径，缺省退回 `save`。
         let savepath = save_io::sanitize_savepath(self.project_savepath.as_deref());
+        // The PC engine hands Windows its save folder's name in the game's
+        // charset, which a non-Japanese Windows reads as cp1252. A backup
+        // restored from such a PC brings that spelling; use it when only it
+        // exists (VNDegen).
+        let encoding = self.interpreter.config().encoding;
+        let windows_spelling = encoding_rs::WINDOWS_1252
+            .decode_without_bom_handling(&encoding.encode(&savepath).0)
+            .0
+            .into_owned();
+        let savepath = if windows_spelling != savepath
+            && !self.resources.save_folder_exists(&savepath)
+            && self.resources.save_folder_exists(&windows_spelling)
+        {
+            windows_spelling
+        } else {
+            savepath
+        };
         self.interpreter.set_variable(
             "s.savepath",
             asb_interpreter::Value::String(savepath.clone()),
