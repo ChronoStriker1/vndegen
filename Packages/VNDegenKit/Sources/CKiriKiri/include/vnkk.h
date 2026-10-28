@@ -22,6 +22,12 @@ typedef struct VNKKLaunch {
     void *hostView;          // macOS: the NSView the game draws in, filling it. Unused on iOS, see vnkk_view
 } VNKKLaunch;
 
+// The Windows font substitutes, as the FontPack module lists them: the table and the folders its fonts are in, the
+// bundled folder first. A font the game names and doesn't ship resolves through them, and the default font is the
+// substitute for ＭＳ Ｐゴシック, the Windows engine's default, unless the game ships its own default.ttf. Call it before
+// vnkk_start. A game started without it gets no substitutes.
+VNKK_API void vnkk_set_fonts(const char *table, const char *const *fontDirs, int count);
+
 // Creates the SDL window and starts the game. Returns 0 on success. Call vnkk_stop afterwards
 // even when it fails.
 VNKK_API int vnkk_start(const VNKKLaunch *launch);

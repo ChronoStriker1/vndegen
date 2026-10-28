@@ -2,6 +2,7 @@ import SwiftUI
 import VNCore
 import EngineRPGMaker
 import EngineTyrano
+import EngineFlash
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
@@ -22,6 +23,7 @@ let engines: [any EnginePlugin] = {
         TyranoPlugin(),
         RenPyPlugin(),
         KiriKiriPlugin(),
+        FlashPlugin(),
         NScripterPlugin(),
     ]
     // RTPs the player installed, kept once for every game.

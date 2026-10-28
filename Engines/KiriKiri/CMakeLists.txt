@@ -321,12 +321,13 @@ else()
     list(APPEND KIRIKIRI_ENVIRON_SOURCES krkrsdl3/environ/macos/macos_core.mm)
 endif()
 
-# Finds a game's files whatever case it names them in. The RGSS engine shares it.
+# Finds a game's files whatever case it names them in, and the Windows font substitutes. The RGSS engine shares both.
 set(KIRIKIRI_SHARED ${CMAKE_CURRENT_LIST_DIR}/../Shared)
 
 # An object library keeps every object file, so the plugins' static registrations survive linking.
 add_library(kirikiri_engine OBJECT
     ${KIRIKIRI_SHARED}/casepath.c
+    ${KIRIKIRI_SHARED}/vnfont.c
     vndegen/ciphers.cpp
     vndegen/movie_decoder.cpp
     vndegen/movie_player.cpp

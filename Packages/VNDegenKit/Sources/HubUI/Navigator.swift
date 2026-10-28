@@ -562,7 +562,8 @@ final class Navigator {
     func variants(_ id: GameID) -> EngineVariants? {
         _ = variantRevision
         guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return nil }
-        return plugin.variants(for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+        let paths = hub.library.paths
+        return plugin.variants(for: game, folder: paths.folder(for: id), dataDirectory: paths.dataDirectory(for: id))
     }
 
     private func selectVariant(_ variant: String?, for id: GameID) {
