@@ -42,6 +42,8 @@ The game sees its `.exe` in its own folder as its executable path, so games that
 
 Windows ignores case in file names, and iPhone and iPad disks don't. Godot finds a file inside the pack by its exact name on every platform, Windows too, so games already name those files right. Files outside the pack can differ: a game may read `Items/` beside its `.exe` when the folder is `items`, and a backup may restore `user://` as `godot/app_userdata`. VNDegen's file and folder access in both frameworks finds those whatever their case, through `Engines/Shared/casepath.c`, and a write to a name that exists in another case replaces that file.
 
+A folder listing returns names as they are on disk, so a game that compares listed names as text still depends on their case. Test Game 112 keeps only the files in `Dialogues/` whose names end in `.txt` exactly, and looks each one up by its listed name. A copy of the game keeps the names it shipped with, so it runs. Only renaming those files, as the case check's swapped copy does, hides them from the game.
+
 ## Starting again
 
 On iPhone and iPad every game runs inside VNDegen's process, so Godot has to start again in that process after a game quits. Godot doesn't support that upstream yet. The Godot 4 framework carries the open LibGodot pull requests that add it, ported to 4.7.2, and both frameworks carry VNDegen's fixes for the rest: classes register again, string names outlive the engine, and singletons and registries that would point at freed objects are cleared. `Engines/Godot/test-host/vngd_test.c` runs games one after another in one process on Linux, and the restart has been checked there under AddressSanitizer.
