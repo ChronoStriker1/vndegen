@@ -763,6 +763,47 @@ pub unsafe extern "C" fn art3m1s_resources_set_override(
     }
 }
 
+/// The size of a file the game names, found as the core finds it: overrides,
+/// save files, archives with their patches, and loose files, in any case.
+/// Returns -1 when there is none (VNDegen).
+pub unsafe extern "C" fn art3m1s_resources_file_size(
+    resources: *mut HostResources,
+    path: *const c_char,
+) -> i64 {
+    (|| {
+        let resources = unsafe { resources_ref(resources) }?;
+        let path = unsafe { c_path(path) }?;
+        resources.query_size(&path.to_string_lossy())
+    })()
+    .ok()
+    .flatten()
+    .map_or(-1, |size| size as i64)
+}
+
+/// Reads up to `len` bytes of that file from `offset` into `out`. Returns the
+/// bytes read, or -1 (VNDegen).
+pub unsafe extern "C" fn art3m1s_resources_read(
+    resources: *mut HostResources,
+    path: *const c_char,
+    offset: u64,
+    out: *mut u8,
+    len: usize,
+) -> i64 {
+    if len == 0 {
+        return 0;
+    }
+    if out.is_null() {
+        return -1;
+    }
+    let output = unsafe { std::slice::from_raw_parts_mut(out, len) };
+    (|| {
+        let resources = unsafe { resources_ref(resources) }?;
+        let path = unsafe { c_path(path) }?;
+        resources.read_range(&path.to_string_lossy(), offset, output)
+    })()
+    .map_or(-1, |read| read as i64)
+}
+
 pub unsafe extern "C" fn art3m1s_resources_clear_overrides(resources: *mut HostResources) {
     if let Ok(resources) = unsafe { resources_ref(resources) } {
         resources.clear_overrides();

@@ -16,14 +16,14 @@ use crate::ffi::{
     art3m1s_runtime_load_project_bytes, art3m1s_runtime_notify_lifecycle,
     art3m1s_runtime_notify_sound_finished, art3m1s_runtime_notify_video_finished,
     art3m1s_runtime_pixel_buffer_size, art3m1s_runtime_profiler_snapshot,
-    art3m1s_runtime_set_external_surface, art3m1s_runtime_set_profiler_enabled,
-    art3m1s_runtime_set_render_quality_preset, art3m1s_runtime_set_reported_os,
-    art3m1s_runtime_set_pc_save_version, art3m1s_runtime_set_resources,
-    art3m1s_runtime_set_string_variable, art3m1s_runtime_set_volume,
-    art3m1s_runtime_stage_height, art3m1s_runtime_stage_width, art3m1s_runtime_submit_dialog,
-    art3m1s_runtime_submit_http_result, art3m1s_runtime_submit_text_translation,
-    art3m1s_runtime_upload_video_layer_frame, art3m1s_set_angle_path,
-    art3m1s_set_damage_visualization, art3m1s_set_debug, art3m1s_set_font_override,
+    art3m1s_runtime_set_external_surface, art3m1s_runtime_set_pc_save_version,
+    art3m1s_runtime_set_profiler_enabled, art3m1s_runtime_set_render_quality_preset,
+    art3m1s_runtime_set_reported_os, art3m1s_runtime_set_resources,
+    art3m1s_runtime_set_string_variable, art3m1s_runtime_set_volume, art3m1s_runtime_stage_height,
+    art3m1s_runtime_stage_width, art3m1s_runtime_submit_dialog, art3m1s_runtime_submit_http_result,
+    art3m1s_runtime_submit_text_translation, art3m1s_runtime_upload_video_layer_frame,
+    art3m1s_set_angle_path, art3m1s_set_damage_visualization, art3m1s_set_debug,
+    art3m1s_set_font_override,
 };
 use crate::host_events::{
     HostEvents, art3m1s_clear_host_state_v1, art3m1s_host_events_create,
@@ -33,8 +33,9 @@ use crate::host_events::{
 };
 use crate::host_files::{
     HostResources, art3m1s_resources_clear, art3m1s_resources_clear_overrides,
-    art3m1s_resources_create, art3m1s_resources_destroy, art3m1s_resources_mount_directory,
-    art3m1s_resources_mount_pfs, art3m1s_resources_set_override, art3m1s_resources_set_save_dir,
+    art3m1s_resources_create, art3m1s_resources_destroy, art3m1s_resources_file_size,
+    art3m1s_resources_mount_directory, art3m1s_resources_mount_pfs, art3m1s_resources_read,
+    art3m1s_resources_set_override, art3m1s_resources_set_save_dir,
 };
 use crate::runtime::CoreRuntime;
 use std::ffi::{c_char, c_int, c_void};
@@ -98,6 +99,9 @@ type RuntimeBackendCapabilitiesFn = unsafe extern "C" fn(*const CoreRuntime) -> 
 type RuntimeSubmitHttpResultFn = unsafe extern "C" fn(*mut CoreRuntime, i32, *const u8, i32) -> i32;
 type RuntimeSetStringVariableFn =
     unsafe extern "C" fn(*mut CoreRuntime, *const c_char, *const c_char);
+type ResourcesFileSizeFn = unsafe extern "C" fn(*mut HostResources, *const c_char) -> i64;
+type ResourcesReadFn =
+    unsafe extern "C" fn(*mut HostResources, *const c_char, u64, *mut u8, usize) -> i64;
 type RuntimeSetPcSaveVersionFn = unsafe extern "C" fn(*mut CoreRuntime, i32) -> i32;
 type RuntimeSetRuntimeMediaEnabledFn = unsafe extern "C" fn(*mut CoreRuntime, i32);
 type RuntimeUploadVideoLayerFrameFn =
@@ -183,6 +187,9 @@ pub struct Art3m1sApiV1 {
     pub runtime_upload_video_layer_frame: Option<RuntimeUploadVideoLayerFrameFn>,
     /// Added by VNDegen. A host checks `struct_size` before reading it.
     pub runtime_set_pc_save_version: Option<RuntimeSetPcSaveVersionFn>,
+    /// Added by VNDegen: a game's files, as the core finds them.
+    pub resources_file_size: Option<ResourcesFileSizeFn>,
+    pub resources_read: Option<ResourcesReadFn>,
 }
 
 static API_V1: Art3m1sApiV1 = Art3m1sApiV1 {
@@ -254,6 +261,8 @@ static API_V1: Art3m1sApiV1 = Art3m1sApiV1 {
     clear_font_override: Some(art3m1s_clear_font_override),
     runtime_upload_video_layer_frame: Some(art3m1s_runtime_upload_video_layer_frame),
     runtime_set_pc_save_version: Some(art3m1s_runtime_set_pc_save_version),
+    resources_file_size: Some(art3m1s_resources_file_size),
+    resources_read: Some(art3m1s_resources_read),
 };
 
 /// Returns the process-lifetime v1 API table.
