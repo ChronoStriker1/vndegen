@@ -42,6 +42,8 @@ if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "RGSS engine is up to date in $dest"
   exit 0
 fi
+# The stamp comes back only when this build has finished, so a build that fails partway is never taken as current.
+rm -f "$dest/.vndegen-engine"
 # The tools are needed only to build, so a Mac with a copy of an up-to-date build/rgss needs none of them.
 for tool in meson ninja cmake gmake gsed ggrep automake autoreconf glibtoolize ctags ruby zip; do
   command -v "$tool" >/dev/null || { echo "error: $tool is missing, see the header of $0" >&2; exit 1; }
@@ -104,6 +106,8 @@ wraps_stamp=$(cd "$work/fresh" && find core/subprojects subprojects \( -name "*.
 wraps_changed=false
 if [ "$(cat "$work/.vndegen-wraps" 2>/dev/null)" != "$wraps_stamp" ]; then
   wraps_changed=true
+  # The old hash goes first, so a build that fails from here on can't leave downloads it would keep.
+  rm -f "$work/.vndegen-wraps"
   rm -rf "$work"/core-* "$work"/host-*/build
 fi
 # keep_downloads <subprojects folder> <its path in the copy>: adds a protect filter for each wrap's folder to `keep`.
