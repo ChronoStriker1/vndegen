@@ -1,9 +1,11 @@
 import CKiriKiri
 import Darwin
+import FontPack
 
 /// The engine's C functions from `vnkk.h`, found at run time in the KiriKiri framework the app embeds. The package
 /// never links the engine, so it builds and tests without it.
 struct KiriKiriEngine {
+    let setFonts: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<UnsafePointer<CChar>?>?, Int32) -> Void
     let start: @convention(c) (UnsafePointer<VNKKLaunch>?) -> Int32
     let iterate: @convention(c) () -> Int32
     let key: @convention(c) (Int32, Bool) -> Void
@@ -25,7 +27,9 @@ struct KiriKiriEngine {
         func function<T>(_ name: String) -> T? {
             dlsym(everywhere, name).map { unsafeBitCast($0, to: T.self) }
         }
-        guard let start: @convention(c) (UnsafePointer<VNKKLaunch>?) -> Int32 = function("vnkk_start"),
+        guard let setFonts: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<UnsafePointer<CChar>?>?, Int32) -> Void =
+                function("vnkk_set_fonts"),
+              let start: @convention(c) (UnsafePointer<VNKKLaunch>?) -> Int32 = function("vnkk_start"),
               let iterate: @convention(c) () -> Int32 = function("vnkk_iterate"),
               let key: @convention(c) (Int32, Bool) -> Void = function("vnkk_key"),
               let mouseButton: @convention(c) (Int32, Bool, Float, Float) -> Void = function("vnkk_mouse_button"),
@@ -39,9 +43,19 @@ struct KiriKiriEngine {
               let stop: @convention(c) () -> Void = function("vnkk_stop"),
               let view: @convention(c) () -> UnsafeMutableRawPointer? = function("vnkk_view")
         else { return nil }
-        return KiriKiriEngine(start: start, iterate: iterate, key: key, mouseButton: mouseButton, mouseMove: mouseMove,
+        return KiriKiriEngine(setFonts: setFonts, start: start, iterate: iterate, key: key, mouseButton: mouseButton, mouseMove: mouseMove,
                               click: click, wheel: wheel, text: text, setPaused: setPaused, requestQuit: requestQuit,
                               saveSystemData: saveSystemData, stop: stop, view: view)
+    }
+
+    /// Hands the engine the Windows font substitutes FontPack has configured, for the next game it starts.
+    func useFontPack() {
+        guard let table = FontPack.table else { return }
+        let folders = FontPack.folders.map { strdup($0.path) }
+        defer { folders.forEach { free($0) } }
+        folders.map { UnsafePointer($0) }.withUnsafeBufferPointer {
+            setFonts(table.path, $0.baseAddress, Int32($0.count))
+        }
     }
 
     func send(_ input: KiriKiriInput) {

@@ -19,7 +19,7 @@ angle = subproject('angle', default_options: {
 frameworks = ['Foundation', 'AVFoundation', 'AudioToolbox', 'CoreAudio', 'CoreGraphics', 'IOSurface', 'Metal', 'QuartzCore']
 frameworks += is_macos ? ['AppKit', 'IOKit'] : ['UIKit']
 
-shared_library('RGSS', 'vnrgss.mm', 'vfs.c', 'shared/casepath.c',
+shared_library('RGSS', 'vnrgss.mm', 'vfs.c', 'shared/casepath.c', 'shared/vnfont.c',
     name_prefix: '',
     name_suffix: 'dylib',
     include_directories: include_directories(get_option('api_include'), 'shared'),

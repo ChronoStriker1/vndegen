@@ -41,6 +41,7 @@ import AppKit
 ///   -layoutSize 320x480      lays the whole app out in a frame of that size in the middle of the screen, as in a window
 ///                            of that size, iOS only. Unlike -windowSize it takes any size, below the smallest window
 ///                            iPadOS allows too, and needs no resizing, but the frame has no window controls
+///   -ignoreOcclusion YES     web engine pages keep running while no window shows, as on a Mac whose screen is locked, macOS only
 enum DebugHooks {
     static func run(_ hub: Hub) async {
         listenForInput(hub)
