@@ -38,7 +38,9 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
 - Files, in the order NScripter searches: loose files in the game folder; then `.ns2` archives, highest number first;
   then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`. Names match without regard to case, as on
   Windows: loose files through an index of the folder made at start, archive members by their lowercased names, and
-  files the game writes later (saves, screenshots) through `casepath_resolve` from `Engines/Shared/casepath.c`.
+  files the game writes later (saves, screenshots) through `casepath_resolve` from `Engines/Shared/casepath.c`. All
+  six test games pass the case check (title, play, save and load with every name's case swapped) on the Mac app and
+  the iPad simulator, and one on the iPhone simulator.
 - Bitmaps NScripter's packer stored with its SPB compression, as well as PNG, JPEG and BMP.
 - Sound: Ogg Vorbis and PCM WAV. Movies: MPEG-1 (`mpegplay`, `movie`, `avi`).
 
