@@ -240,6 +240,10 @@ fn main() {
             )
             .unwrap();
     }
+    // The font a host such as VNDegen gives for faces the game ships no file for.
+    if let Ok(font) = std::env::var("PROBE_HOST_FONT") {
+        ffi::set_font_override(std::fs::read(font).unwrap()).unwrap();
+    }
     let events = HOST_EVENTS.get_or_init(host_events::HostEvents::new);
     events.set_enabled(true);
     unsafe {

@@ -1099,6 +1099,10 @@ pub trait TextRenderer {
     /// 当前消息层的逻辑字体文件，用于消息层/字体栈恢复后同步光栅化字体。
     fn active_font_face(&self) -> Option<&str>;
 
+    /// Draws ASCII from a face's bitmap font over the current font, or stops
+    /// when None (VNDegen).
+    fn set_bitmap_font(&mut self, _family: Option<std::sync::Arc<super::rft::RftFamily>>) {}
+
     /// 文本渲染器当前持有、需要跨帧保活的纹理名。
     fn retained_texture_names(&self) -> Vec<String> {
         Vec::new()

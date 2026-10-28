@@ -129,6 +129,8 @@ pub struct CoreRuntime {
     savepath: String,
     /// `[takess]` 缓存的游戏画面。`[savess]` 后续从这里缩放/编码，不能重新截保存 UI。
     save_screenshot: Option<save_io::ScreenshotBuffer>,
+    /// Each face's bitmap font, or None when the game ships none (VNDegen).
+    rft_families: HashMap<String, Option<Arc<crate::text::rft::RftFamily>>>,
     loaded_font_face: Option<String>,
     /// 上报给脚本的机种串覆盖（`var system="os"`），None 表示跟随目标平台。
     /// 在 install_interpreter 时重新应用到重建的解释器。
@@ -361,6 +363,7 @@ impl CoreRuntime {
             savepath: "save".to_string(),
             save_screenshot: None,
             loaded_font_face: None,
+            rft_families: HashMap::new(),
             font_override_generation: None,
             font_override_cached_generation: None,
             reported_os: None,

@@ -9,9 +9,11 @@ use crate::text::render::{
     LinkRange, MessageLayer, RubyRange, ScetweenConfig, TextAlignment, TextLayoutConfig,
     TextRenderer, TextSpanToken,
 };
+use crate::text::rft::RftFamily;
 use ab_glyph::{Font, FontArc, PxScale, PxScaleFont, ScaleFont};
 use glam::{Affine2, Vec2};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 const ATLAS_SZ: u32 = 1024;
 /// 文本 atlas 的保留纹理名。runtime 的纹理保活名单也引用它，防止被 retain 驱逐。
@@ -97,6 +99,8 @@ pub struct GlyphTextRenderer {
     cache: HashMap<(u64, u16, u32), (usize, u32, u32, u32, u32)>,
     /// atlas 里的纯白小块（link type=0 hover 强调的白色方形板用），惰性分配
     white_patch: Option<(usize, u32, u32)>,
+    /// The current face's bitmap font (VNDegen).
+    bitmap: Option<Arc<RftFamily>>,
 }
 
 fn replace_layer_span(
@@ -412,6 +416,7 @@ impl GlyphTextRenderer {
             atlases: vec![Atlas::new(0)],
             cache: HashMap::new(),
             white_patch: None,
+            bitmap: None,
         }
     }
     pub fn set_font(&mut self, bytes: &[u8]) -> Result<(), String> {
@@ -446,6 +451,9 @@ impl GlyphTextRenderer {
     /// 正文与注音共用该路径（注音按 rubysize 光栅化）。
     /// 未加载字体或字体不含该字形时返回 None。
     fn rasterize_glyph(&mut self, c: char, sz: f32) -> Option<GlyphInfo> {
+        if let Some(glyph) = self.rasterize_bitmap_glyph(c, sz) {
+            return Some(glyph);
+        }
         let sf = scaled(&self.font, PxScale::from(sz))?;
         let glyph_id = sf.glyph_id(c);
         let Some(q) = sf.outline_glyph(glyph_id.with_scale(sz)) else {
@@ -507,6 +515,80 @@ impl GlyphTextRenderer {
         })
     }
 
+    /// A character from the face's bitmap font, at a size the game ships it
+    /// in, advanced as the PC engine advances it: the image's width, 2 more
+    /// for an outline and 1 for a shadow, and the font's kerning. These
+    /// advances and the space's were fitted to the PC's word positions at
+    /// size 26 with an outline and a shadow (VNDegen).
+    fn rasterize_bitmap_glyph(&mut self, c: char, sz: f32) -> Option<GlyphInfo> {
+        let family = self.bitmap.clone()?;
+        if !family.has_size(sz) {
+            return None;
+        }
+        let id = self
+            .state
+            .active_layer
+            .as_deref()
+            .unwrap_or(DEFAULT_MESSAGE_LAYER);
+        let font = self
+            .state
+            .layers
+            .get(id)
+            .map_or(&self.state.default_font, |layer| &layer.font);
+        let style = font.style.as_deref().unwrap_or("");
+        let outline = style.contains("outline") || font.outline_size.is_some_and(|size| size > 0.0);
+        let shadow = style.contains("shadow") || font.shadow_size.is_some_and(|size| size > 0.0);
+        let padding = if outline { 2.0 } else { 0.0 }
+            + if shadow { 1.0 } else { 0.0 }
+            + font.kerning.unwrap_or(0.0);
+        let mut info = GlyphInfo {
+            character: c.to_string(),
+            texture_id: TextureId(0),
+            atlas_x: 0.0,
+            atlas_y: 0.0,
+            atlas_w: 0.0,
+            atlas_h: 0.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+            width: 0.0,
+            height: 0.0,
+            // The files have no space.
+            advance_x: sz * 0.49 + padding,
+        };
+        if c == ' ' {
+            return Some(info);
+        }
+        let glyph = family.glyph(c, sz)?;
+        let (w, h) = (glyph.width, glyph.height);
+        info.advance_x = w as f32 + padding;
+        if w == 0 || h == 0 || w >= ATLAS_SZ || h >= ATLAS_SZ {
+            return Some(info);
+        }
+        let key = (family.cache_id, c as u16, sz.to_bits());
+        let (page, x, y, w, h) = match self.cache.get(&key).copied() {
+            Some(cached) => cached,
+            None => {
+                let (page, x, y) = self.alloc_atlas_region(w + 1, h + 1);
+                let rgba: Vec<u8> = glyph
+                    .coverage
+                    .iter()
+                    .flat_map(|&a| [255u8, 255, 255, a])
+                    .collect();
+                self.atlases[page].write(x, y, w, h, &rgba);
+                self.cache.insert(key, (page, x, y, w, h));
+                (page, x, y, w, h)
+            }
+        };
+        info.texture_id = TextureId(page as u64);
+        info.atlas_x = x as f32;
+        info.atlas_y = y as f32;
+        info.atlas_w = w as f32;
+        info.atlas_h = h as f32;
+        info.width = w as f32;
+        info.height = h as f32;
+        Some(info)
+    }
+
     /// 确保 atlas 里有一块纯白像素（返回其中心坐标），
     /// 供 link type=0 的白色方形板加法合成强调使用。
     fn ensure_white_patch(&mut self) -> Option<(usize, u32, u32)> {
@@ -560,6 +642,10 @@ impl TextRenderer for GlyphTextRenderer {
         self.fonts
             .insert(face.to_string(), (font, self.font_generation));
         Ok(())
+    }
+
+    fn set_bitmap_font(&mut self, family: Option<Arc<RftFamily>>) {
+        self.bitmap = family;
     }
 
     fn active_font_face(&self) -> Option<&str> {

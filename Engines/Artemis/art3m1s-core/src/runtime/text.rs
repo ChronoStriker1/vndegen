@@ -1,9 +1,10 @@
 use super::CoreRuntime;
 use crate::render_pipeline::draw::DrawCommand;
 use crate::text::render::{ScetweenConfig, TextRenderer, TextSpanToken};
+use crate::text::rft::RftFamily;
 use asb_interpreter::Event;
 use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 fn text_span_ready(state: &crate::text::render::FontState, span: &TextSpanToken) -> Option<bool> {
     let layer = state.layers.get(&span.layer_id)?;
@@ -716,20 +717,8 @@ impl CoreRuntime {
         let Some(renderer) = self.text_renderer.as_mut() else {
             return;
         };
-        if let Some((generation, bytes)) = &font_override {
-            // 覆盖激活：所有脚本 face 请求都光栅化到宿主覆盖字体。
-            if apply_font_override(
-                renderer.as_mut(),
-                &mut self.font_override_cached_generation,
-                *generation,
-                bytes,
-            ) {
-                self.loaded_font_face = Some(face.to_string());
-                return;
-            }
-            // 覆盖字体加载失败时回落脚本字体，不让文本消失。
-        }
         if renderer.select_cached_font(face) {
+            renderer.set_bitmap_font(None);
             self.loaded_font_face = Some(face.to_string());
             return;
         }
@@ -747,13 +736,56 @@ impl CoreRuntime {
                         crate::core_info!("[text] 字体回退: {face} -> {candidate}");
                     }
                     // 记录脚本请求的逻辑字体名，避免每次 [font] 都重复探测缺失实体。
+                    renderer.set_bitmap_font(None);
                     self.loaded_font_face = Some(face.to_string());
                     return;
                 }
                 Err(error) => errors.push(format!("{candidate}: {error}")),
             }
         }
+        // A face the game ships as bitmap .rft files draws ASCII from them,
+        // and the host's font stands in for the rest. The host's font stands
+        // in only for a face the game ships no font file for, so a game's own
+        // fonts keep their metrics (VNDegen).
+        let family = self.rft_family(face);
+        let has_family = family.is_some();
+        let Some(renderer) = self.text_renderer.as_mut() else {
+            return;
+        };
+        renderer.set_bitmap_font(family);
+        if let Some((generation, bytes)) = &font_override {
+            if apply_font_override(
+                renderer.as_mut(),
+                &mut self.font_override_cached_generation,
+                *generation,
+                bytes,
+            ) {
+                crate::core_info!("[text] 宿主字体代替: {face}");
+                self.loaded_font_face = Some(face.to_string());
+                return;
+            }
+        }
+        if has_family {
+            self.loaded_font_face = Some(face.to_string());
+            return;
+        }
         crate::core_warn!("[text] 脚本字体加载失败 {face}: {}", errors.join("; "));
+    }
+
+    fn rft_family(&mut self, face: &str) -> Option<Arc<RftFamily>> {
+        let resources = &self.resources;
+        self.rft_families
+            .entry(face.to_string())
+            .or_insert_with(|| {
+                let family = RftFamily::load(
+                    face,
+                    |path| resources.query_size(path).ok().flatten(),
+                    |path, offset, out| resources.read_range(path, offset, out),
+                )?;
+                crate::core_info!("[text] 位图字体: {face}");
+                Some(Arc::new(family))
+            })
+            .clone()
     }
 }
 

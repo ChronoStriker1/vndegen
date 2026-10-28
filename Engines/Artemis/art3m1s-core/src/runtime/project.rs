@@ -264,7 +264,10 @@ impl CoreRuntime {
         self.set_text_renderer(Box::new(text));
         // 覆盖字体在项目加载前就可能已安装；渲染器是新建的，缓存为空，
         // 这里立即应用，保证首个 font 事件之前的文本也用覆盖字体。
-        if let Some((generation, bytes)) = crate::ffi::font_override() {
+        // It stands in only when the game ships no default font (VNDegen).
+        if self.loaded_font_face.is_none()
+            && let Some((generation, bytes)) = crate::ffi::font_override()
+        {
             let mut cached = self.font_override_cached_generation;
             let applied = self.text_renderer.as_mut().is_some_and(|renderer| {
                 super::text::apply_font_override(renderer.as_mut(), &mut cached, generation, &bytes)
