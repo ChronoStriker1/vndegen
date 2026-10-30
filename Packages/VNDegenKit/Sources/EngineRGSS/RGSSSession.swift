@@ -66,6 +66,7 @@ final class RGSSSession: EngineSession {
         #else
         guard let layer = host.layer else { return }
         #endif
+        engine.useFontPack()
         var settings = VNRGSSLaunch(gameIni: strings[0], systemDir: strings[1], saveDir: strings[2], logPath: strings[3],
                                     layer: Unmanaged.passUnretained(layer).toOpaque())
         guard engine.start(&settings) == 0 else {

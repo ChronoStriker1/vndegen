@@ -2,10 +2,12 @@ import SwiftUI
 import VNCore
 import EngineRPGMaker
 import EngineTyrano
+import EngineFlash
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
 import EngineGodot
+import EngineNScripter
 import FontPack
 import RuntimePackages
 import Metadata
@@ -23,6 +25,8 @@ let engines: [any EnginePlugin] = {
         RenPyPlugin(),
         KiriKiriPlugin(),
         GodotPlugin(),
+        FlashPlugin(),
+        NScripterPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)

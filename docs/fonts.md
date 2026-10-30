@@ -110,8 +110,14 @@ the table, and `FontPack.folders` and `FontPack.table` are what a native engine 
   loads those fonts up front, and the boot scene waits for them. MV's Chinese and Korean games ask for SimHei and
   Dotum through the core, which the plugin adds from the database's locale. TyranoScript draws text as HTML, so a late
   font only redraws it; the plugin loads the font `Config.tjs` names up front so the first lines don't change.
-- **KiriKiri and RGSS** don't use the table yet. Their hooks into `vnfont.h` come next, in their font lookup and
-  default font.
+- **KiriKiri** resolves every font name the game doesn't ship through the table, lists the substitutes in
+  `Font.getList`, and makes ＭＳ Ｐゴシック, the Windows engine's default, the default font of games that ship none.
+  Droid Sans Fallback, which upstream used for every missing font, now draws only characters the font lacks. The
+  engine log names each substitute when it opens. `Engines/KiriKiri/UPSTREAM.md`, change 57, has the details.
+- **RGSS** (RPG Maker XP, VX, and VX Ace on mkxp-z) draws fonts the game doesn't ship in their substitutes, and
+  `Font.exist?` reports them as present. Games on the Japanese XP player default to ＭＳ Ｐゴシック, as that player
+  does; games on the English one keep Arial, which is Liberation Sans. VX's default list already names MS Gothic.
+  `Engines/RGSS/UPSTREAM.md` describes the patch.
 - **Ren'Py** games ship their own fonts, so Ren'Py doesn't use the table.
 
 CSS matches family names exactly, apart from ASCII case, as Windows does. A game that asks for "ＭＳＰ明朝" without
@@ -123,9 +129,19 @@ Measured in the page with `measureText`, against the widths computed from the fo
 
 - Test Game 35 (TyranoScript) names メイリオ. On an iPad Pro 13-inch simulator and in the macOS app, its text measured
   652.734 px at 100 px, Ume P Gothic's width, and ＭＳ ゴシック measured 650.000 px once loaded, Ume Gothic's width.
-  On the iPad, its dialogue fits the message window on one line.
+  On both, its dialogue fits the message window on one line.
 - No Socks RPG (RPG Maker MZ) lists Arial, Georgia, and Tahoma in its options. On the iPad, the boot scene ended only
   after those loaded, and with Tahoma chosen the options use DejaVu Sans Condensed (908.105 px, its kerned width) with
-  every label inside its window. In the macOS app, Tahoma measured 899.268 px, the system's real Tahoma.
+  every label inside its window. In the macOS app, the boot scene ended the same way, and Tahoma measured 899.268 px,
+  the system's real Tahoma, which the options then used with every label inside its window.
 - The Korean download installs from Settings on the iPad, Dotum then measures 466.300 px, Source Han Sans KR's width,
   and Remove deletes it.
+
+The native engines were checked through their logs, which name each substitute they open, on an iPad Pro 13-inch
+simulator and in the macOS app:
+
+- Test Game 01 (KiriKiri) ships no default font and sets ＭＳ ゴシック as its message font. The engine took ＭＳ Ｐゴシック's
+  substitute as its default, and its text drew from `ume-tgo4.ttf` (ＭＳ ゴシック) and `ume-tmo3.ttf` (ＭＳ 明朝). Its
+  English dialogue wraps over three lines inside the message window.
+- Test Game 37 (RPG Maker XP, on the Japanese player, with an English translation that sets Arial) drew its text from
+  `LiberationSans-Regular.ttf`, and its dialogue fits the message window.

@@ -23,6 +23,11 @@ typedef struct VNRGSSLaunch {
     void *layer;           // the CALayer the game draws in, filling it, letterboxed to the game's shape
 } VNRGSSLaunch;
 
+// The Windows font substitutes, as the FontPack module lists them: the table and the folders its fonts are in, the
+// bundled folder first. A font the game names and doesn't ship, such as MS PGothic, draws in its substitute and counts
+// as present for Font.exist?. Call it before vnrgss_start. A game started without it gets no substitutes.
+VNRGSS_API void vnrgss_set_fonts(const char *table, const char *const *fontDirs, int count);
+
 // Loads the game and starts its audio. Returns 0 on success. Call vnrgss_stop afterwards even when it fails.
 VNRGSS_API int vnrgss_start(const VNRGSSLaunch *launch);
 

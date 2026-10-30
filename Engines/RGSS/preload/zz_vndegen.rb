@@ -99,3 +99,13 @@ module Win32API_Impl
     end
   end
 end
+
+# The Japanese RPG Maker XP player (RGSS10xJ.dll) draws text in ＭＳ Ｐゴシック unless a game names another font, and
+# the English one (RGSS10xE.dll) in Arial, mkxp-z's default for XP. Game.ini names the player. VNDegen's font table
+# gives both their substitutes.
+begin
+  if File.binread("Game.ini") =~ /^\s*Library\s*=\s*(?:System[\\\/])?RGSS1\d\dJ\.dll/i
+    Font.default_name = "ＭＳ Ｐゴシック"
+  end
+rescue SystemCallError
+end
