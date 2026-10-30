@@ -97,8 +97,9 @@ says it comes from ONScripter-EN, so only its license header and a list of names
   string and math libraries and withholds file, shell and module loading, since a game's script must not reach
   outside its folder on a phone; the two games' scripts use nothing else (one opens a debug log only behind a flag
   that is off).
-- **`NSTimer` during a Lua call**: the notes describe it as the system's millisecond tick. The runtime's clock
-  advances between frames, so `NSTimer` adds the time the current frame has taken, which lets a timed Lua loop end.
+- **`NSTimer`**: the notes describe it as the system's millisecond tick. The runtime returns the wall time since the
+  engine started, which never goes back and advances during a Lua call, so a timed Lua loop ends. The engine's own
+  clock, which `gettimer` reads, moves only between frames, so it can't serve.
 - **The drawing order of `MSpDraw.dll` pictures**: the order they were drawn in, which puts one game's map under its
   logo as the script needs. The manual doesn't say.
 - **The effect DLLs' rectangle**: the PC engine passes a DLL the rectangle it redrew, so `breakup.dll`'s grid starts at

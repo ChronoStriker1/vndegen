@@ -167,8 +167,8 @@ NSFN(nsGetSkip) {
     return 1;
 }
 NSFN(nsTimer) {
-    // Advances while a Lua function runs, as the PC's tick count does, so a timed loop ends.
-    lua_pushinteger(L, lua_Integer(engineOf(L).clockNow()));
+    // The PC's tick count: wall time, monotonic, advancing while a Lua function runs, so a timed loop ends.
+    lua_pushinteger(L, lua_Integer(engineOf(L).wallMs()));
     return 1;
 }
 NSFN(nsSleep) {

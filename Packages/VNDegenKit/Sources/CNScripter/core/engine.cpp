@@ -117,9 +117,8 @@ void Engine::resetGame(bool fromDefine) {
     }
 }
 
-int64_t Engine::clockNow() const {
-    auto taken = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - stepStart_);
-    return now_ + taken.count();
+int64_t Engine::wallMs() const {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started_).count();
 }
 
 int Engine::nextRandom(int n) {
@@ -254,7 +253,6 @@ bool Engine::step(int ms) {
         return false;
     }
     now_ += ms;
-    stepStart_ = std::chrono::steady_clock::now();
     frameChanged_ = false;
     if (movie_) stepMovie(ms);
     if (loopBgmPending_ && !audio_.playing(AudioMixer::kBgm)) {

@@ -238,6 +238,24 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(caption.hasSuffix(" 1 1 a:b yes"))
 }
 
+/// NSTimer never goes back, across the time system.lua takes to load and across frames.
+@Test func luaTimerIsMonotonic() throws {
+    let lua = """
+    NSExec("luasub check")
+    for i = 1, 20 do NSSleep(10) end
+    stamp = NSTimer()
+    function NSCOM_check()
+        local now = NSTimer()
+        NSSetIntValue(20, (now >= stamp and now - stamp < 1000) and 1 or 0)
+    end
+    """
+    let script = ";mode400\n*define\ngame\n*start\nwait 32\ncheck\ncaption \"t\"+%20\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["system.lua": Data(lua.utf8)])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    for _ in 0..<4 { #expect(vnns_step(engine, 16)) }
+    #expect(String(cString: vnns_caption(engine)) == "t1")
+}
+
 /// blt copies part of the btndef image straight onto the screen, scaled; after ofscpy a print keeps showing it, and
 /// the next image command replaces it.
 @Test func bltDrawsStraightToTheScreen() throws {

@@ -499,9 +499,10 @@ public:
     // Timing, waits and input
     int64_t now_ = 0;
     int64_t timerBase_ = 0;
-    // The wall clock when the current step began, so a timer read during a step (NSLua's NSTimer) advances within it.
-    std::chrono::steady_clock::time_point stepStart_ = std::chrono::steady_clock::now();
-    int64_t clockNow() const;  // now_ plus the time this step has taken
+    // NSLua's NSTimer: milliseconds of wall time since the engine started. Monotonic, and it advances while a Lua
+    // function runs, as the PC's tick count does; the engine clock now_ only moves between steps.
+    std::chrono::steady_clock::time_point started_ = std::chrono::steady_clock::now();
+    int64_t wallMs() const;
     WaitKind wait_ = WaitKind::None;
     int64_t waitUntil_ = 0;
     int64_t waitStart_ = 0;
