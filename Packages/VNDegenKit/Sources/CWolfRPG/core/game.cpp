@@ -253,7 +253,18 @@ std::string Game::expandText(const std::string &text, const Thread *t) const {
             return std::atoi(text.c_str() + open + 1);
         };
         size_t close = 0;
-        if (code("self")) {
+        if (code("cdb") || code("udb") || code("sdb")) {
+            // \cdb[type:row:field], and the same for the user and system databases: the cell's text or number.
+            size_t open = i + 4;
+            close = text.find(']', open);
+            if (close == std::string::npos) break;
+            int type = 0, row = 0, field = 0;
+            std::sscanf(text.c_str() + open + 1, "%d:%d:%d", &type, &row, &field);
+            const Database &db = text[i + 1] == 'c' ? cdb_ : text[i + 1] == 'u' ? udb_ : sdb_;
+            bool isString = type >= 0 && type < int(db.types.size()) && db.types[type].isString(field);
+            out += isString ? dbString(db, type, row, field) : std::to_string(dbNumber(db, type, row, field));
+            i = close;
+        } else if (code("self")) {
             int n = number(i + 5, &close);
             Thread copy = t ? *t : Thread{};
             if (t && !copy.stack.empty())

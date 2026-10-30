@@ -533,7 +533,8 @@ void Game::soundCommand(Thread &t, const Command &c) {
     if (spec == 1) id = value(c.arg(2), t);
     int startMs = value(c.arg(3), t);
     if (spec == 2) {
-        std::string file = c.str(0);
+        // File names may hold codes such as \cself[9] that name the file through a variable.
+        std::string file = expandText(c.str(0), &t);
         int volume = c.args.size() > 4 ? value(c.arg(4), t) : 100, frequency = c.args.size() > 5 ? value(c.arg(5), t) : 100;
         if (kind == SoundKind::SE) {
             audio_->playSE(file, volume, frequency);
