@@ -209,6 +209,7 @@ void Game::runRoute(Actor &a, bool isHero) {
             playSoundEffect(arg(0));
             break;
         case Wait: a.routeWait = arg(0); break;
+        case FullStep: break;  // characters already move a whole tile a step; half steps aren't supported
         case Pattern1: a.chara.pattern = 0; break;
         case Pattern2: a.chara.pattern = 1; break;
         case Pattern3: a.chara.pattern = 2; break;
