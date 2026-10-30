@@ -30,40 +30,53 @@ nonisolated public struct GodotPlugin: EnginePlugin {
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         guard let layout = GodotLayout(FolderProbe(scanning: launch.folder)) else { throw GodotError.notGodot }
-        if let reason = Self.unsupported(layout, folder: launch.folder) { throw GodotError.unsupported(reason) }
+        let requirements = try Self.requirements(layout, folder: launch.folder).get()
         guard let engine = GodotEngine.engine(major: layout.major) else { throw GodotError.engineMissing(layout.major) }
         guard !GodotSession.engineInUse else { throw GodotError.stillClosing }
         guard !GodotSession.unusable.contains(layout.major) else { throw GodotError.engineUnusable(layout.major) }
         let paths = GodotPaths(folder: launch.folder, dataDirectory: launch.dataDirectory, layout: layout)
-        return try GodotSession(launch, paths: paths, engine: engine)
+        return try GodotSession(launch, paths: paths, requirements: requirements, engine: engine)
     }
 
     public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? {
-        guard let layout = GodotLayout(FolderProbe(scanning: folder)) else { return nil }
-        return Self.unsupported(layout, folder: folder)
+        guard let layout = GodotLayout(FolderProbe(scanning: folder)),
+              case let .failure(.unsupported(reason)) = Self.requirements(layout, folder: folder) else { return nil }
+        return reason
     }
 
-    /// Why VNDegen can't run a game, or nil when it can.
-    static func unsupported(_ layout: GodotLayout, folder: URL) -> String? {
+    /// What a game needs from VNDegen's Godot beyond its pack, or why VNDegen can't run it.
+    static func requirements(_ layout: GodotLayout, folder: URL) -> Result<GodotRequirements, GodotError> {
         let pack = layout.header
         if layout.usesDotNet {
-            return "This is a Godot C# game, which needs .NET, and VNDegen runs Godot games written in GDScript only."
-        }
-        // GodotSteam built into the game's own copy of Godot, which then links Steam's library. Such games call Steam
-        // from their scripts and won't run without it.
-        if WindowsExecutable.importedLibraries(folder.appendingPathComponent(layout.executable)).contains(where: { $0.hasPrefix("steam_api") }) {
-            return "This game needs Steam: Steam is built into its own copy of Godot, and that only runs on a PC with Steam."
-        }
-        if pack.encryptedDirectory || pack.encryptedFiles > 0 {
-            return "This game's files are encrypted with a key built into its own copy of Godot, so VNDegen can't read them."
-        }
-        if !pack.nativeLibraries.isEmpty {
-            return "This game needs Windows libraries that only run on a PC (\(pack.nativeLibraries.map(GodotLayout.name).joined(separator: ", ")))."
+            return .failure(.unsupported("This is a Godot C# game, which needs .NET, and VNDegen runs Godot games written in GDScript only."))
         }
         if !(3...4).contains(pack.major) || (pack.major == 3 && pack.minor < 2) {
-            return "VNDegen runs games made with Godot 3.2 and later. This one was made with Godot \(pack.version)."
+            return .failure(.unsupported("VNDegen runs games made with Godot 3.2 and later. This one was made with Godot \(pack.version)."))
         }
-        return nil
+        var requirements = GodotRequirements()
+        var libraries: [String] = []
+        for library in pack.nativeLibraries.map(GodotLayout.name) {
+            switch library.lowercased() {
+            case "godotsteam.gdextension": requirements.steam = true
+            case "eosg.gdextension": requirements.epicOnlineServices = true
+            default: libraries.append(library)
+            }
+        }
+        if !libraries.isEmpty {
+            return .failure(.unsupported("This game needs Windows libraries that only run on a PC (\(libraries.joined(separator: ", ")))."))
+        }
+        // GodotSteam can also be built into the game's own copy of Godot, which then links Steam's library.
+        let executable = folder.appendingPathComponent(layout.executable)
+        if WindowsExecutable(executable)?.importedLibraries.contains(where: { $0.hasPrefix("steam_api") }) == true {
+            requirements.steam = true
+        }
+        if pack.encryptedDirectory || pack.encryptedFiles > 0 {
+            guard let key = pack.encryptionKey(pack: folder.appendingPathComponent(layout.pack), executable: executable) else {
+                return .failure(.unsupported("This game's files are encrypted with a key built into its own copy of Godot, and VNDegen couldn't find the key in its .exe."))
+            }
+            requirements.encryptionKey = key
+        }
+        return .success(requirements)
     }
 
     /// The Windows AppData/Roaming folder's stand-in in a game's data directory. Godot keeps `user://` there, in
@@ -71,6 +84,16 @@ nonisolated public struct GodotPlugin: EnginePlugin {
     nonisolated public static func appDataDirectory(_ dataDirectory: URL) -> URL {
         dataDirectory.appendingPathComponent("AppData/Roaming", isDirectory: true)
     }
+}
+
+/// What a game needs from VNDegen's Godot beyond its pack: stand-ins for what the game's own copy of Godot has in it,
+/// and the key its pack is encrypted with.
+nonisolated struct GodotRequirements: Sendable {
+    /// GodotSteam, built into the game's Godot or loaded as an extension. VNDegen's Godot answers as Steam offline.
+    var steam = false
+    /// The Epic Online Services extension, whose class names VNDegen's Godot 4 provides without the services.
+    var epicOnlineServices = false
+    var encryptionKey: Data?
 }
 
 nonisolated public enum GodotError: Error, LocalizedError {

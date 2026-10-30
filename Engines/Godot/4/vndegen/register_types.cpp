@@ -2,8 +2,12 @@
 
 #include <vngd.h>
 
-// The module registers no classes. It exists for vngd.h. Nothing in Godot calls those functions, so this table keeps
-// a linker from leaving them out of a library built from Godot's static archives.
+#include "../../vngd_steam.h"
+#include "vngd_eos.h"
+
+// The module exists for vngd.h, and registers stand-ins for the extensions games ship that VNDegen can't load.
+// Nothing in Godot calls the vngd.h functions, so this table keeps a linker from leaving them out of a library built
+// from Godot's static archives.
 __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_start,
 	(const void *)&vngd_iterate,
@@ -22,5 +26,31 @@ __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_problem,
 };
 
-void initialize_vndegen_module(ModuleInitializationLevel p_level) {}
-void uninitialize_vndegen_module(ModuleInitializationLevel p_level) {}
+bool vngd::steam_wanted = false;
+bool vngd::eos::wanted = false;
+static vngd::Steam *steam = nullptr;
+static vngd::eos::IEOSStandIn *eos = nullptr;
+
+void initialize_vndegen_module(ModuleInitializationLevel p_level) {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && vngd::steam_wanted) {
+		GDREGISTER_CLASS(vngd::Steam);
+		steam = memnew(vngd::Steam);
+		Engine::get_singleton()->add_singleton(Engine::Singleton("Steam", steam));
+	}
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && vngd::eos::wanted) {
+		eos = vngd::eos::start();
+	}
+}
+
+void uninitialize_vndegen_module(ModuleInitializationLevel p_level) {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && steam) {
+		Engine::get_singleton()->remove_singleton("Steam");
+		memdelete(steam);
+		steam = nullptr;
+	}
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE && eos) {
+		Engine::get_singleton()->remove_singleton("IEOS");
+		memdelete(eos);
+		eos = nullptr;
+	}
+}

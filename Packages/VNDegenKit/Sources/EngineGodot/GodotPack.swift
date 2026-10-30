@@ -1,3 +1,5 @@
+import CommonCrypto
+import CryptoKit
 import Foundation
 
 /// A Godot resource pack's header and file list. The pack is a `.pck` file, or sits inside the game's Windows `.exe`:
@@ -13,6 +15,9 @@ nonisolated struct GodotPack: Equatable, Sendable {
     var encryptedDirectory: Bool
     /// How many files the game encrypted that way.
     var encryptedFiles = 0
+    /// Where an encrypted part of the pack starts in its file: the file list when that is encrypted, else the smallest
+    /// encrypted file. The key search decrypts it.
+    var encryptedSample: UInt64?
     /// Paths inside the pack, without `res://`. Empty when the list is encrypted.
     var files: [String]
     /// The project settings VNDegen reads, from the pack's `project.binary`: strings and booleans, by key.
@@ -139,6 +144,7 @@ nonisolated struct GodotPack: Equatable, Sendable {
         }
         var pack = GodotPack(major: major, minor: minor, patch: patch, format: format, offset: offset,
                              encryptedDirectory: flags & 1 != 0, files: [])
+        if pack.encryptedDirectory { pack.encryptedSample = cursor }
         guard !pack.encryptedDirectory, let count = file.readUInt32(at: cursor) else { return pack }
         cursor &+= 4
         // Each entry: path length, path, offset, size, MD5, and from format 2 on, flags.
@@ -146,13 +152,20 @@ nonisolated struct GodotPack: Equatable, Sendable {
         var files: [String] = []
         files.reserveCapacity(Int(min(count, 200_000)))
         var project: (offset: UInt64, size: UInt64)?
+        var smallestEncrypted = UInt64.max
         for _ in 0..<min(count, 200_000) {
             guard let length = file.readUInt32(at: cursor), length < 4096,
                   let path = file.read(at: cursor &+ 4, count: Int(length)) else { break }
             let entry = cursor &+ 4 &+ UInt64(length)
             cursor = entry &+ entryTail
             // Bit 0 of an entry's flags marks an encrypted file.
-            if format >= 2, let flags = file.readUInt32(at: cursor &- 4), flags & 1 != 0 { pack.encryptedFiles += 1 }
+            if format >= 2, let flags = file.readUInt32(at: cursor &- 4), flags & 1 != 0 {
+                pack.encryptedFiles += 1
+                if let start = file.readUInt64(at: entry), let size = file.readUInt64(at: entry &+ 8), size > 0, size < smallestEncrypted {
+                    smallestEncrypted = size
+                    pack.encryptedSample = fileBase &+ start
+                }
+            }
             var name = String(decoding: path.prefix { $0 != 0 }, as: UTF8.self)
             if name.hasPrefix("res://") { name.removeFirst(6) }
             if name == "project.binary", let start = file.readUInt64(at: entry), let size = file.readUInt64(at: entry &+ 8) {
@@ -198,6 +211,57 @@ nonisolated struct GodotPack: Equatable, Sendable {
             cursor += valueLength
         }
         return result
+    }
+}
+
+nonisolated extension GodotPack {
+    /// The AES-256 key the pack is encrypted with. Godot builds the key into the game's own engine as a 32-byte array,
+    /// which an export keeps in the `.exe`'s `.data` section. Each 32 bytes there, at every fourth byte, decrypts
+    /// `encryptedSample`, and the key is the one that reproduces the MD5 Godot stored with it. Nil when no candidate
+    /// does, or the pack isn't encrypted.
+    func encryptionKey(pack url: URL, executable: URL) -> Data? {
+        // Godot writes an encrypted part as its MD5, its length, and its IV, then the data in whole AES blocks.
+        guard let start = encryptedSample, let file = try? FileHandle(forReadingFrom: url),
+              let header = file.read(at: start, count: 40) else { return nil }
+        let md5 = Data(header.prefix(16)), length = header.uint64(at: 16), iv = Data(header.suffix(16))
+        guard length > 0, length < 1 << 26, let cipher = file.read(at: start + 40, count: Int((length + 15) / 16 * 16)),
+              let data = WindowsExecutable(executable)?.contents(of: ".data"), data.count >= 32 else { return nil }
+        for offset in stride(from: data.startIndex, through: data.endIndex - 32, by: 4) {
+            let key = Data(data[offset..<(offset + 32)])
+            // A file list is large, so its first block rules most keys out first: CFB's first block is the IV encrypted
+            // with the key, XORed with the data, and a file list starts with its count and the first path's length.
+            if encryptedDirectory {
+                guard let stream = Self.aes(key, iv, iv, CCOperation(kCCEncrypt), CCMode(kCCModeECB)) else { continue }
+                let plain = Data(zip(stream, cipher.prefix(16)).map { $0 ^ $1 })
+                guard (1...200_000).contains(plain.uint32(at: 0)), (1..<4096).contains(plain.uint32(at: 4)) else { continue }
+            }
+            if let plain = Self.aes(key, iv, cipher, CCOperation(kCCDecrypt), CCMode(kCCModeCFB)),
+               Data(Insecure.MD5.hash(data: plain.prefix(Int(length)))) == md5 {
+                return key
+            }
+        }
+        return nil
+    }
+
+    /// AES-256 over whole blocks, in Godot's CFB mode, or in ECB mode, which ignores `iv`.
+    private static func aes(_ key: Data, _ iv: Data, _ input: Data, _ operation: CCOperation, _ mode: CCMode) -> Data? {
+        var cryptor: CCCryptorRef?
+        let created = key.withUnsafeBytes { key in
+            iv.withUnsafeBytes { iv in
+                CCCryptorCreateWithMode(operation, mode, CCAlgorithm(kCCAlgorithmAES), CCPadding(ccNoPadding), iv.baseAddress,
+                                        key.baseAddress, key.count, nil, 0, 0, CCModeOptions(0), &cryptor)
+            }
+        }
+        guard created == kCCSuccess, let cryptor else { return nil }
+        defer { CCCryptorRelease(cryptor) }
+        var output = Data(count: input.count)
+        var moved = 0
+        let status = output.withUnsafeMutableBytes { output in
+            input.withUnsafeBytes { input in
+                CCCryptorUpdate(cryptor, input.baseAddress, input.count, output.baseAddress, output.count, &moved)
+            }
+        }
+        return status == kCCSuccess && moved == input.count ? output : nil
     }
 }
 

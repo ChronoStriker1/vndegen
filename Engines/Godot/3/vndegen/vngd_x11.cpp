@@ -18,6 +18,9 @@ class OS_VNDegenX11 : public OS_X11 {
 
 public:
 	String get_executable_path() const override { return executable; }
+	// Files under res:// that the pack doesn't hold are in the game's folder. Windows starts a game in its own folder,
+	// and Godot finds those files from there, which is where games that write to res:// keep their saves.
+	String get_resource_dir() const override { return executable.get_base_dir(); }
 	String get_data_path() const override { return data_path; }
 	// Godot on Windows names its folder this way, where Linux uses "godot".
 	String get_godot_dir_name() const override { return "Godot"; }

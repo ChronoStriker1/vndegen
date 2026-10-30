@@ -2,8 +2,11 @@
 
 #include <vngd.h>
 
-// The module registers no classes. It exists for vngd.h. Nothing in Godot calls those functions, so this table keeps
-// a linker from leaving them out of a library built from Godot's static archives.
+#include "../../vngd_steam.h"
+
+// The module exists for vngd.h, and registers GodotSteam's Steam class for the games that use it.
+// Nothing in Godot calls the vngd.h functions, so this table keeps a linker from leaving them out of a library built
+// from Godot's static archives.
 __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_start,
 	(const void *)&vngd_iterate,
@@ -22,8 +25,24 @@ __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_problem,
 };
 
-void register_vndegen_types() {}
-void unregister_vndegen_types() {}
+bool vngd::steam_wanted = false;
+static vngd::Steam *steam = nullptr;
+
+void register_vndegen_types() {
+	if (vngd::steam_wanted) {
+		ClassDB::register_class<vngd::Steam>();
+		steam = memnew(vngd::Steam);
+		Engine::get_singleton()->add_singleton(Engine::Singleton("Steam", steam));
+	}
+}
+
+// Godot frees the Engine, with its list of singletons, and every registered class when the game stops.
+void unregister_vndegen_types() {
+	if (steam) {
+		memdelete(steam);
+		steam = nullptr;
+	}
+}
 
 #if defined(IPHONE_ENABLED)
 // Godot's iOS export generates these for the game's iOS plugins. VNDegen leaves out Godot's iOS platform code, and runs

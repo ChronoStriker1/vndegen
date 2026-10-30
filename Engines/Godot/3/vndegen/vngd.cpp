@@ -16,6 +16,7 @@
 #include <vngd.h>
 
 #include "../../vngd_frames.h"
+#include "../../vngd_steam.h"
 
 #include <string>
 #include <vector>
@@ -97,6 +98,8 @@ int vngd_start(const VNGDLaunch *p_launch) {
 		argv.push_back(&arg[0]);
 	}
 	argv.push_back(nullptr);
+
+	vngd::steam_wanted = p_launch->steam;
 
 	// The two phases run apart, since a failed first phase undoes itself and a failed second doesn't.
 	if (Main::setup(p_launch->executable, (int)args.size(), argv.data(), false) != OK) {
