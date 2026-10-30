@@ -7,8 +7,8 @@ import Foundation
 final class ArtemisAudio {
     /// A file the game names, as its bytes, or nil when it has none of that name.
     private let read: (String) -> Data?
-    /// Called when a sound that doesn't loop ends, with its id, so the core can end a wait on it.
-    var onFinished: ((String) -> Void)?
+    /// Called when a sound that doesn't loop ends, with its id, or nil for music, so the core can end a wait on it.
+    var onFinished: ((String?) -> Void)?
 
     private let engine = AVAudioEngine()
     private var music: Channel?
@@ -146,9 +146,15 @@ final class ArtemisAudio {
         return channel
     }
 
+    /// A sound that played to its end. Music has no id: the core takes nil for it.
     private func ended(_ channel: Channel, id: String?) {
-        guard let id, sounds[id] === channel else { return }
-        sounds[id] = nil
+        if let id {
+            guard sounds[id] === channel else { return }
+            sounds[id] = nil
+        } else {
+            guard music === channel else { return }
+            music = nil
+        }
         engine.detach(channel.player)
         onFinished?(id)
     }

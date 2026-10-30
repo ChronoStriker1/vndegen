@@ -255,7 +255,7 @@ final class ArtemisSession: EngineSession {
         #endif
     }
 
-    /// A dialog the game shows, which a controller answers too: Confirm, Return, or Space presses OK, Cancel or Escape
+    /// A dialog the game shows, which a controller answers too: Confirm, Return, or Space presses OK, Cancel, Escape, or E
     /// presses Cancel when the dialog has it, and VNDegen's on-screen keyboard types into its text field.
     private struct Prompt {
         let cancels: Bool
@@ -309,7 +309,8 @@ final class ArtemisSession: EngineSession {
             case .button(.confirm, pressed: true): prompt.close(true)
             case let .key(key, pressed: true) where key.keyCode == 13 || key.keyCode == 32: prompt.close(true)
             case .button(.cancel, pressed: true) where prompt.cancels: prompt.close(false)
-            case let .key(key, pressed: true) where key.keyCode == 27 && prompt.cancels: prompt.close(false)
+            case let .key(key, pressed: true) where (key.keyCode == 27 || key.keyCode == 69) && prompt.cancels:
+                prompt.close(false)
             default: break
             }
             return

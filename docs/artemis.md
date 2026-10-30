@@ -32,5 +32,5 @@ VNDegen builds only what its test games need to reach their title, play, save, a
 - Shader effects written in HLSL don't compile, so the sepia, negative, and other screen effects that use them don't show. Test Game 78 loads them at startup.
 - The Steam functions a Steam build calls don't exist. Test Game 77 calls one at startup and carries on without it, so its Steam achievements aren't checked.
 - Only the ASCII glyphs of `.rft` bitmap fonts are drawn. Japanese text and symbols such as full-width commas and curly quotes in those games use MS Gothic, so a line with them can wrap a word earlier or later than on the PC. Test Game 79, Test Game 80, and Test Game 81 ship `.rft` fonts.
-- A game's own native dialog, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, shows as a system alert. Confirm, Return, or Space answers OK, Cancel or Escape answers Cancel, and VNDegen's on-screen keyboard types into its text field.
+- A game's own native dialog, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, shows as a system alert. Confirm, Return, or Space answers OK, Cancel, Escape, or E answers Cancel, and VNDegen's on-screen keyboard types into its text field.
 - After a quick load in Test Game 78 the screen stays black until the next click, which shows the saved page.
