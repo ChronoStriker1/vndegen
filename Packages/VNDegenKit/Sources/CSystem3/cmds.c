@@ -644,8 +644,23 @@ static void cmd_M(S3 *s) {
     case 'L': args(s, "ee", a); { const char *x = str_slot(s, a[1].v); put(s, &a[0], 0, (u16)(x ? sjis_chars(x) : 0)); } return;
     case 'M': args(s, "ee", a); { const char *src = str_slot(s, a[1].v); if (src) { snprintf(buf, sizeof buf, "%s", src); str_set(s, a[0].v, buf); } } return;
     case 'N': args(s, "bee", a); unimpl(s, "MN"); return;
-    case 'P': args(s, "ee", a); { const char *x = str_slot(s, a[0].v); if (x) { snprintf(buf, sizeof buf, "%s", x);
-        int chars = 0; size_t i = 0; while (buf[i] && chars < a[1].v) { i += s3_sjis_lead((u8)buf[i]) ? 2 : 1; chars++; } buf[i] = 0; s3_msg_text(s, buf); } } return;
+    case 'P': { // MP str, n: n full-width cells of the string, padded with spaces. A half-width character takes half a
+        // cell, except under ZH 0, which shows it full-width.
+        args(s, "ee", a);
+        const char *x = str_slot(s, a[0].v);
+        int room = a[1].v * 2;
+        size_t o = 0;
+        for (const u8 *q = (const u8 *)(x ? x : ""); *q && o + 2 < sizeof buf;) {
+            int n = s3_sjis_lead(*q) && q[1] ? 2 : 1, cells = n == 1 && s->zh != 0 ? 1 : 2;
+            if (cells > room) break;
+            memcpy(buf + o, q, (size_t)n);
+            o += (size_t)n; q += n; room -= cells;
+        }
+        while (room > 0 && o + 1 < sizeof buf) { buf[o++] = ' '; room -= s->zh != 0 ? 1 : 2; }
+        buf[o] = 0;
+        s3_msg_text(s, buf);
+        return;
+    }
     case 'S': args(s, "e:", a); { size_t n = 0; while (a[1].s[n] && a[1].s[n] != ':') n += s3_sjis_lead((u8)a[1].s[n]) ? 2 : 1;
         snprintf(buf, sizeof buf, "%.*s", (int)n, a[1].s); str_set(s, a[0].v, buf); } return;
     case 'T': args(s, ":", a); { size_t n = 0; while (a[0].s[n] && a[0].s[n] != ':') n += s3_sjis_lead((u8)a[0].s[n]) ? 2 : 1;

@@ -2,9 +2,10 @@
 //   s3run <gameDir> [--ms N] [--save DIR] [--log FILE] [--final FILE.ppm] [--time UNIX]
 //         [--auto MS] [--prefer TEXT]... [--avoid TEXT]... [events...]
 // Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:shot:FILE.ppm, T:pick:TEXT
-// T:pick:TEXT waits from T until a menu offers an item containing TEXT, then chooses it; picks go in order.
+// T:pick:TEXT waits from T until a menu offers an item containing TEXT, then chooses it; picks go in order, and the
+// autopilot answers the menus in between.
 // From --auto MS on, the autopilot presses Return at message waits, and once a second at other waits, and answers menus: a pending pick first, then the
-// first --prefer text an item contains, then the items in turn, never one containing an --avoid text.
+// first --prefer text an item contains, then a seeded random item, never one containing an --avoid text.
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 // It prints the game's problem, if one stopped it, and exits 1 then.
 #include "vns3.h"
@@ -51,19 +52,22 @@ static void narrow(char *u) {
 }
 
 // Chooses an item of the open menu: the pick if one matches, else the autopilot's choice. Returns -1 for none.
-static int choose(S3 *s, const char *pick, bool autopilot, int *turn) {
+static int choose(S3 *s, const char *pick, bool autopilot, int *turn, bool *picked) {
     char *items[S3_MAX_MENU];
     int count = s->menuCount, choice = -1;
     for (int i = 0; i < count; i++) { items[i] = s3_display_utf8(s, s->menu[i].text); narrow(items[i]); }
     if (pick) for (int i = 0; i < count && choice < 0; i++) if (strstr(items[i], pick)) choice = i;
-    if (choice < 0 && autopilot && !pick) {
+    *picked = choice >= 0;
+    if (choice < 0 && autopilot) {
         for (int p = 0; p < preferCount && choice < 0; p++)
             for (int i = 0; i < count && choice < 0; i++) if (strstr(items[i], prefer[p])) choice = i;
+        // Otherwise a seeded random item, so the run replays the same way without cycling through two menus forever.
+        *turn = *turn * 1103515245 + 12345;
+        int start = (int)((unsigned)*turn >> 16) % count;
         for (int k = 0; k < count && choice < 0; k++) {
-            int i = (*turn + k) % count;
+            int i = (start + k) % count;
             if (!contains_any(items[i], avoid, avoidCount)) choice = i;
         }
-        (*turn)++;
     }
     if (choice >= 0) {
         printf("%llu ms: menu", (unsigned long long)s->clockMs);
@@ -133,12 +137,13 @@ int main(int argc, char **argv) {
         while (nextPick < n && strcmp(ev[nextPick].kind, "pick")) nextPick++;
         const char *pick = nextPick < n && ev[nextPick].t <= t ? ev[nextPick].file : NULL;
         bool autopilot = autoFrom >= 0 && t >= autoFrom;
-        if (releaseAt < 0 && s->wait == S3_WAIT_MENU && (pick || (autopilot && t >= nextAuto))) {
-            int c = choose(s, pick, autopilot, &turn);
+        if (releaseAt < 0 && s->wait == S3_WAIT_MENU && (pick || autopilot) && t >= nextAuto) {
+            bool picked = false;
+            int c = choose(s, pick, autopilot, &turn, &picked);
             if (c >= 0) {
                 s->menuCursorPos = c;
                 vns3_key(g, 0x0d, true); heldKey = 0x0d; releaseAt = t + 96;
-                if (pick) nextPick++;
+                if (picked) nextPick++;
                 nextAuto = t + 300;
             }
         } else if (autopilot && releaseAt < 0 && t >= nextAuto && s->wait != S3_WAIT_MENU) {
