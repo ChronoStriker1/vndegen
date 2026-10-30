@@ -18,14 +18,14 @@ struct ImageFingerprint: Sendable {
     let aspect: Double
 
     init?(_ data: Data) {
+        // The transform applies EXIF orientation, so the copy and its shape are what the picker shows.
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let width = properties[kCGImagePropertyPixelWidth] as? Double,
-              let height = properties[kCGImagePropertyPixelHeight] as? Double, width > 0, height > 0,
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                   kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
                   kCGImageSourceThumbnailMaxPixelSize: 256,
-              ] as CFDictionary)
+              ] as CFDictionary),
+              image.width > 0, image.height > 0
         else { return nil }
         let side = Self.side
         var rgba = [UInt8](repeating: 0, count: side * side * 4)
@@ -42,7 +42,7 @@ struct ImageFingerprint: Sendable {
         }
         guard drawn else { return nil }
         pixels = rgba.enumerated().filter { $0.offset % 4 != 3 }.map(\.element)
-        aspect = width / height
+        aspect = Double(image.width) / Double(image.height)
     }
 
     /// The share of pixels that differ, or nil when the shapes differ.

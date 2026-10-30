@@ -273,6 +273,7 @@ public final class MetadataService {
     /// Steam's capsule. One source's near-identical images are separate uploads, so they all stay. A candidate whose
     /// thumbnail cannot be fetched or decoded stays too.
     private func distinct(_ candidates: [ArtworkCandidate]) async -> [ArtworkCandidate] {
+        guard Set(candidates.map(\.source)).count > 1 else { return candidates }
         let http = http
         let fingerprints = await withTaskGroup(of: (Int, ImageFingerprint?).self) { group in
             for (index, candidate) in candidates.enumerated() {
