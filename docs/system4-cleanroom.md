@@ -160,6 +160,8 @@ byte-identical. A save VNDegen wrote from its own play loads on the PC, which th
   channels) follows the SDK's SACT2 reference. StoatSpriteEngine is SACT2's successor with the same names where they
   overlap; its own calls (MultiSprite, CharSprite, ADVLogList, ADVSceneKeeper, transitions) were read from how the
   games call them: their names, argument names, and the game functions that wrap them.
+- DrawGraph (`hll_drawgraph.cpp`) follows the SDK's `IGraph.h` and `IGraph2.h` interface comments and the SACT2
+  reference's `draw_graph` page; the readings taken where they are silent are commented in the file.
 - Encodings these libraries hand the game to store in its saves (MultiSprite_Encode, CharSpriteManager_Save,
   ADVLogList_Save, ADVSceneKeeper_Save) follow the PC's; see the section above.
 

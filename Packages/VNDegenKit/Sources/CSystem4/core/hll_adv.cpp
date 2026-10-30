@@ -1,7 +1,7 @@
 // StoatSpriteEngine's adventure layer, which the SDK predates: MultiSprite (backgrounds, faces, pictures and text
 // sprites the scenario sets by kind and number), CharSprite (message text drawn as one sprite per character), the
 // backlog (ADVLogList) and saved scenes (ADVSceneKeeper). Their behaviour was read from how the games call them;
-// docs/system4-cleanroom.md lists what each call was taken to mean. Also the DrawGraph calls on sprite pictures.
+// docs/system4-cleanroom.md lists what each call was taken to mean.
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -730,119 +730,6 @@ S4_HLL(StoatSpriteEngine, ADVSceneKeeper_Load) {
     c.retBool(true);
 }
 
-// ---- DrawGraph: drawing on sprite pictures, which the call names by sprite number ----
-
-Surface *surf(int sp) {
-    Sprite *s = G().sprites.find(sp);
-    return s ? &s->writable() : nullptr;
-}
-
-S4_HLL(DrawGraph, Fill) {
-    if (Surface *d = surf(c.i(0))) d->fill(c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), -1);
-}
-S4_HLL(DrawGraph, FillAMap) {
-    if (Surface *d = surf(c.i(0))) { d->hasAlpha = true; d->fill(c.i(1), c.i(2), c.i(3), c.i(4), -1, 0, 0, c.i(5)); }
-}
-S4_HLL(DrawGraph, FillWithAlpha) {
-    if (Surface *d = surf(c.i(0))) { d->hasAlpha = true; d->fill(c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), c.i(8)); }
-}
-S4_HLL(DrawGraph, FillAlphaColor) {
-    Surface *d = surf(c.i(0));
-    if (!d) return;
-    int x0 = std::max(0, c.i(1)), y0 = std::max(0, c.i(2)), x1 = std::min(d->w, c.i(1) + c.i(3)), y1 = std::min(d->h, c.i(2) + c.i(4));
-    int r = c.i(5), g = c.i(6), b = c.i(7), a = c.i(8);
-    for (int y = y0; y < y1; y++)
-        for (int x = x0; x < x1; x++) {
-            uint8_t *p = d->at(x, y);
-            p[0] = uint8_t(p[0] + (r - p[0]) * a / 255);
-            p[1] = uint8_t(p[1] + (g - p[1]) * a / 255);
-            p[2] = uint8_t(p[2] + (b - p[2]) * a / 255);
-        }
-}
-// Copies a rectangle of pixels, or of the alpha map, between sprite pictures.
-void copyRect(int dst, int dx, int dy, int src, int sx, int sy, int w, int h, bool pixels, bool alpha) {
-    Sprite *ss = G().sprites.find(src);
-    Surface *d = surf(dst);
-    if (!ss || !d || !ss->pixels()) return;
-    const uint8_t *sp = ss->pixels();
-    int sw = ss->width(), sh = ss->height();
-    bool sAlpha = ss->hasAlpha();
-    if (alpha) d->hasAlpha = true;
-    for (int y = 0; y < h; y++) {
-        int ty = dy + y, fy = sy + y;
-        if (ty < 0 || ty >= d->h || fy < 0 || fy >= sh) continue;
-        for (int x = 0; x < w; x++) {
-            int tx = dx + x, fx = sx + x;
-            if (tx < 0 || tx >= d->w || fx < 0 || fx >= sw) continue;
-            const uint8_t *s = sp + (size_t(fy) * sw + fx) * 4;
-            uint8_t *p = d->at(tx, ty);
-            if (pixels) { p[0] = s[0]; p[1] = s[1]; p[2] = s[2]; }
-            if (alpha) p[3] = sAlpha ? s[3] : 255;
-        }
-    }
-}
-S4_HLL(DrawGraph, Copy) { copyRect(c.i(0), c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), true, false); }
-S4_HLL(DrawGraph, CopyAMap) { copyRect(c.i(0), c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), false, true); }
-S4_HLL(DrawGraph, CopyWithAlphaMap) { copyRect(c.i(0), c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), true, true); }
-// Bilinear scaling of pixels or the alpha map.
-void stretch(HllCall &c, bool pixels, bool alpha) {
-    Sprite *ss = G().sprites.find(c.i(5));
-    Surface *d = surf(c.i(0));
-    if (!ss || !d || !ss->pixels()) return;
-    int dx = c.i(1), dy = c.i(2), dw = c.i(3), dh = c.i(4), sx = c.i(6), sy = c.i(7), sw = c.i(8), sh = c.i(9);
-    if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) return;
-    const uint8_t *sp = ss->pixels();
-    int W = ss->width(), H = ss->height();
-    bool sAlpha = ss->hasAlpha();
-    if (alpha) d->hasAlpha = true;
-    for (int y = 0; y < dh; y++) {
-        int ty = dy + y;
-        if (ty < 0 || ty >= d->h) continue;
-        float fy = sy + (y + 0.5f) * sh / dh - 0.5f;
-        int y0 = std::clamp(int(std::floor(fy)), 0, H - 1), y1 = std::min(y0 + 1, H - 1);
-        float wy = std::clamp(fy - std::floor(fy), 0.0f, 1.0f);
-        for (int x = 0; x < dw; x++) {
-            int tx = dx + x;
-            if (tx < 0 || tx >= d->w) continue;
-            float fx = sx + (x + 0.5f) * sw / dw - 0.5f;
-            int x0 = std::clamp(int(std::floor(fx)), 0, W - 1), x1 = std::min(x0 + 1, W - 1);
-            float wx = std::clamp(fx - std::floor(fx), 0.0f, 1.0f);
-            uint8_t *p = d->at(tx, ty);
-            for (int ch = 0; ch < 4; ch++) {
-                if (ch < 3 && !pixels) continue;
-                if (ch == 3 && !alpha) continue;
-                auto at = [&](int xx, int yy) { return ch == 3 && !sAlpha ? 255.0f : float(sp[(size_t(yy) * W + xx) * 4 + ch]); };
-                float v = (at(x0, y0) * (1 - wx) + at(x1, y0) * wx) * (1 - wy) + (at(x0, y1) * (1 - wx) + at(x1, y1) * wx) * wy;
-                p[ch] = uint8_t(std::clamp(v + 0.5f, 0.0f, 255.0f));
-            }
-        }
-    }
-}
-S4_HLL(DrawGraph, CopyStretchInterp) { stretch(c, true, false); }
-S4_HLL(DrawGraph, CopyStretchAMapInterp) { stretch(c, false, true); }
-S4_HLL(DrawGraph, CopyStretch) { stretch(c, true, false); }
-S4_HLL(DrawGraph, CopyStretchAMap) { stretch(c, false, true); }
-S4_HLL(DrawGraph, CopyReduce) { stretch(c, true, false); }
-S4_HLL(DrawGraph, CopyReduceAMap) { stretch(c, false, true); }
-S4_HLL(DrawGraph, DrawLine) {
-    Surface *d = surf(c.i(0));
-    if (!d) return;
-    int x0 = c.i(1), y0 = c.i(2), x1 = c.i(3), y1 = c.i(4);
-    int n = std::max(std::abs(x1 - x0), std::abs(y1 - y0));
-    for (int k = 0; k <= n; k++) {
-        int x = n ? x0 + (x1 - x0) * k / n : x0, y = n ? y0 + (y1 - y0) * k / n : y0;
-        if (x >= 0 && y >= 0 && x < d->w && y < d->h) { uint8_t *p = d->at(x, y); p[0] = uint8_t(c.i(5)); p[1] = uint8_t(c.i(6)); p[2] = uint8_t(c.i(7)); }
-    }
-}
-
-TextStyle g_drawFont;
-S4_HLL(DrawGraph, SetFontSize) { g_drawFont.size = c.i(0); }
-S4_HLL(DrawGraph, SetFontName) { g_drawFont.face = c.s(0).find("\x96\xbe\x92\xa9") != std::string::npos ? 1 : 0; }  // 明朝
-S4_HLL(DrawGraph, SetFontWeight) { g_drawFont.weight = c.i(0); }
-S4_HLL(DrawGraph, SetFontUnderline) {}
-S4_HLL(DrawGraph, SetFontStrikeOut) {}
-int g_drawFontSpace = 0;
-
 S4_HLL_RESET {
     g_nextInternal = 1000000;
     g_multi.clear();
@@ -853,37 +740,9 @@ S4_HLL_RESET {
     g_log.clear();
     g_logEnabled = true;
     g_scenes = {};
-    g_drawFont = {};
-    g_drawFontSpace = 0;
     g_msgLog.clear();
     g_msgLogMax = 10000;
     g_viewer.clear();
-}
-S4_HLL(DrawGraph, SetFontSpace) { g_drawFontSpace = c.i(0); }
-S4_HLL(DrawGraph, SetFontColor) { g_drawFont.r = c.i(0); g_drawFont.g = c.i(1); g_drawFont.b = c.i(2); }
-S4_HLL(DrawGraph, GetFontSize) { c.retInt(g_drawFont.size); }
-S4_HLL(DrawGraph, GetFontWeight) { c.retInt(g_drawFont.weight); }
-// Text drawn into the pixels keeps the alpha map; text drawn into the alpha map writes the coverage there.
-S4_HLL(DrawGraph, DrawTextToPMap) {
-    Surface *d = surf(c.i(0));
-    if (!d) return;
-    Surface layer;
-    layer.create(d->w, d->h, true);
-    drawText(layer, c.i(1), c.i(2), c.s(3), g_drawFont, g_drawFontSpace);
-    for (size_t i = 0; i < layer.px.size(); i += 4) {
-        int a = layer.px[i + 3];
-        if (!a) continue;
-        for (int k = 0; k < 3; k++) d->px[i + k] = uint8_t(d->px[i + k] + (layer.px[i + k] - d->px[i + k]) * a / 255);
-    }
-}
-S4_HLL(DrawGraph, DrawTextToAMap) {
-    Surface *d = surf(c.i(0));
-    if (!d) return;
-    Surface layer;
-    layer.create(d->w, d->h, true);
-    drawText(layer, c.i(1), c.i(2), c.s(3), g_drawFont, g_drawFontSpace);
-    d->hasAlpha = true;
-    for (size_t i = 3; i < layer.px.size(); i += 4) d->px[i] = std::max(d->px[i], layer.px[i]);
 }
 
 }  // namespace
