@@ -138,8 +138,18 @@ static void scene_clear(Container *c) {
 
 void rgss_run_game(const HostLaunch *launch) {
     RUBY_INIT_STACK;
+    // The game's folder and its Game.ini, whatever case they have on disk.
+    char iniPath[2048];
+    snprintf(iniPath, sizeof iniPath, "%s", launch->gameIni);
+    char *iniSlash = strrchr(iniPath, '/');
+    if (iniSlash) {
+        *iniSlash = 0;
+        char resolved[2048];
+        if (rgss_resolve_case(iniPath, iniSlash + 1, resolved, sizeof resolved)) snprintf(iniPath, sizeof iniPath, "%s", resolved);
+        else *iniSlash = '/';
+    }
     GameIni ini;
-    if (!read_ini(launch->gameIni, &ini)) {
+    if (!read_ini(iniPath, &ini)) {
         host_set_problem("The game's Game.ini can't be read.");
         return;
     }
@@ -149,7 +159,7 @@ void rgss_run_game(const HostLaunch *launch) {
     if (!ini.scripts[0]) snprintf(ini.scripts, sizeof ini.scripts, "Data/Scripts.rvdata2");
 
     char gameDir[1024];
-    snprintf(gameDir, sizeof gameDir, "%s", launch->gameIni);
+    snprintf(gameDir, sizeof gameDir, "%s", iniPath);
     char *slash = strrchr(gameDir, '/');
     if (slash) *slash = 0;
     else snprintf(gameDir, sizeof gameDir, ".");
