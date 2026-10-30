@@ -204,6 +204,11 @@ struct S3 {
     int mouseX, mouseY;
     bool mouseL, mouseR, keyDown[256];
     u32 clickLatch;         // buttons pressed since IM last read them (16 left, 32 right), so a quick tap still counts
+    // A tap moves the pointer and presses in one go. Games take their hover from the position they last polled, so a
+    // press that comes with a move waits until the game has run a frame at the new position, as a mouse moves first.
+    bool movedThisFrame;
+    u8 buttonQueue[8];      // button << 1 | down, oldest first
+    int buttonsQueued;
     u32 pressedMask;           // keys pressed since the last poll, IK bit layout
     int wheel;
     u32 cursorMoveTime;

@@ -610,7 +610,15 @@ static void cmd_L(S3 *s) {
         rnd(s, ok ? 0 : 255);
         return;
     }
-    case 'L': args(s, "beee", a); unimpl(s, "LL"); return;
+    case 'L': { // LL 0, link, start, count: count words from data link `link` (the DA archive) into variables
+        args(s, "beee", a);
+        S3Blob b;
+        if (!s3_archive_get(&s->da, a[1].v, &b, NULL)) { rnd(s, 255); return; }
+        int n = 0;
+        for (; n < a[3].v && (size_t)n * 2 + 2 <= b.size; n++) if (a[2].isVar) s3_lv_set(s, &a[2].lv, n, s3_le16(b.data + n * 2));
+        rnd(s, n < a[3].v ? 254 : 0);
+        return;
+    }
     case 'E': args(s, "b:ee", a); var_file(s, false, a[0].v, a[1].s, strcspn(a[1].s, ":"), &a[2], a[3].v); return; // old form: the name ends with ':'
     case 'H': { int k2 = s3_byte(s); (void)k2; args(s, "be", a); rnd(s, 0); return; }
     case 'X': { int k2 = s3_byte(s); (void)k2; args(s, "eee", a); unimpl(s, "LX"); return; }

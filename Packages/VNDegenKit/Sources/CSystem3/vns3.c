@@ -152,11 +152,22 @@ void vns3_close(VNS3 *s3) {
     free(s);
 }
 
+static void apply_button(S3 *s, int button, bool down) {
+    if (button == VNS3_MOUSE_LEFT) { s->mouseL = down; if (down) { s->pressedMask |= 16 | 0x10000; s->clickLatch |= 16; } }
+    if (button == VNS3_MOUSE_RIGHT) { s->mouseR = down; if (down) { s->pressedMask |= 32 | 0x20000; s->clickLatch |= 32; } }
+}
+
 bool vns3_frame(VNS3 *s3, uint32_t elapsedMs) {
     S3 *s = (S3 *)s3;
     if (s->quit) return false;
     if (s->paused) return true;
     s->clockMs += elapsedMs > 200 ? 200 : elapsedMs;
+    // One held-back button change per frame, so a tap's down and up each reach the game.
+    if (s->buttonsQueued && !s->movedThisFrame) {
+        u8 e = s->buttonQueue[0];
+        memmove(s->buttonQueue, s->buttonQueue + 1, (size_t)--s->buttonsQueued);
+        apply_button(s, e >> 1, e & 1);
+    }
     s3_sprite_update(s);
     // A frame may finish several short waits in a row, such as a fade followed by a timed pause.
     for (int round = 0; round < 8 && !s->quit; round++) {
@@ -168,6 +179,7 @@ bool vns3_frame(VNS3 *s3, uint32_t elapsedMs) {
         if (s->wait == S3_WAIT_NONE) break; // the budget or a busy loop ended the frame
     }
     s3_gfx_present(s);
+    s->movedThisFrame = false;
     return !s->quit;
 }
 
@@ -183,14 +195,18 @@ uint32_t vns3_frame_serial(VNS3 *s3) { return ((S3 *)s3)->serial; }
 
 void vns3_mouse_move(VNS3 *s3, int x, int y) {
     S3 *s = (S3 *)s3;
+    if (x != s->mouseX || y != s->mouseY) s->movedThisFrame = true;
     s->mouseX = x;
     s->mouseY = y;
 }
 
 void vns3_mouse_button(VNS3 *s3, int button, bool down) {
     S3 *s = (S3 *)s3;
-    if (button == VNS3_MOUSE_LEFT) { s->mouseL = down; if (down) { s->pressedMask |= 16 | 0x10000; s->clickLatch |= 16; } }
-    if (button == VNS3_MOUSE_RIGHT) { s->mouseR = down; if (down) { s->pressedMask |= 32 | 0x20000; s->clickLatch |= 32; } }
+    if (s->movedThisFrame || s->buttonsQueued) {
+        if (s->buttonsQueued < (int)sizeof s->buttonQueue) s->buttonQueue[s->buttonsQueued++] = (u8)(button << 1 | down);
+        return;
+    }
+    apply_button(s, button, down);
 }
 
 // The IK bit for a Windows virtual key, 0 for keys IK doesn't report.
