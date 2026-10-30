@@ -50,7 +50,7 @@ VNDegen added `flate2` as a direct dependency for compressed PC saves. It was al
 - Keep spaces in text layout.
 - Decode included Lua source with the project's charset.
 - Run event handler tags through the game's tag filter.
-- Call a game's own Lua `yesno` for `[yesno]`.
+- Run a game's own `[yesno]` macro in place of the builtin dialog, and call its Lua `yesno` when it has no macro.
 - Use Lua 5.1 on iOS too, instead of Luau, which can't load `.lub` bytecode. `vendor/lua-src` makes `os.execute` raise an error on iOS, which has no `system()`.
 - Read and write the PC engine's save files, so saves move between a PC and VNDegen: `system.dat`, `saveg.dat`, and numbered and quick saves, in version 1000 and in the compressed version 1002 (`src/save/bow.rs`, `pc.rs`, `pc_slot.rs`, `src/runtime/pc_save.rs`). This replaces upstream's JSON saves. It includes Pluto, the PC engine's Lua persistence format; instruction indexes counted the PC engine's way, without `[/if]`; resuming a save where the PC engine does; and writing the version of the files the game already has, else the one its archives suggest. `docs/artemis-save-format.md` in VNDegen describes the format.
 - Keep the Lua state onSave writes, whatever the variable's name.

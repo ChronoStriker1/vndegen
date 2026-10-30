@@ -1622,12 +1622,20 @@ impl Interpreter {
             }
         }
 
-        // A game that defines a Lua function `yesno` draws its own yes/no
-        // dialog: [yesno] calls it with the tag's parameters, as [calllua]
-        // would, and the builtin system dialog is only the fallback. The
-        // dialog queues [stop] and its buttons set t.yesno and return to that
-        // stop, so the stop becomes a wait that ends once t.yesno is set
+        // A game that registers its own [yesno] macro gets it, as on the PC,
+        // in place of the builtin system dialog. Its buttons jump to a label
+        // whose [return] ends the macro's call, so they need that call frame
         // (VNDegen).
+        if instruction.tag == "yesno" && apply_tag_filter && self.macros.contains("yesno") {
+            return self.invoke_macro(instruction, &script_name, current_line);
+        }
+
+        // A game that defines a Lua function `yesno` without a macro draws its
+        // own yes/no dialog: [yesno] calls it with the tag's parameters, as
+        // [calllua] would, and the builtin system dialog is only the
+        // fallback. The dialog queues [stop] and its buttons set t.yesno and
+        // return to that stop, so the stop becomes a wait that ends once
+        // t.yesno is set (VNDegen).
         if instruction.tag == "yesno"
             && apply_tag_filter
             && matches!(
@@ -4310,6 +4318,45 @@ mod tests {
             .count();
         assert_eq!(customs, 1, "macrodel 后 [hello] 应回退为 Custom 事件");
         assert!(!interpreter.macro_registry().contains("hello"));
+    }
+
+    /// A game's own [yesno] macro runs in place of the builtin dialog, as a
+    /// call, so a [return] in it comes back to the line after [yesno].
+    #[test]
+    fn a_games_yesno_macro_replaces_the_builtin_dialog() {
+        let mut interpreter = Interpreter::new(InterpreterConfig::default());
+        interpreter.set_file_loader(Box::new(|path: &str| match path {
+            "system.iet" => Ok(b"*yesno\n[var name=\"t.yesno\" data=\"1\"]\n[return]\n".to_vec()),
+            other => Err(crate::Error::ScriptNotFound(other.to_string())),
+        }));
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&events);
+        interpreter.set_callback(move |event| {
+            sink.lock().unwrap().push(event.clone());
+            match event {
+                Event::Wait { .. } => CallbackResult::Pause,
+                _ => CallbackResult::Continue,
+            }
+        });
+        interpreter
+            .load_script(
+                "test",
+                "*main\n[macroadd file=\"system.iet\"]\n[yesno text=\"Load?\"]\n[var name=\"t.after\" data=\"$t.yesno\"]\n[stop]\n",
+            )
+            .unwrap();
+        interpreter.start("test", "main").unwrap();
+
+        let _ = interpreter.run().unwrap();
+
+        assert_eq!(interpreter.variables().get("t.after"), Some(&Value::Int(1)));
+        assert!(
+            !events
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|e| matches!(e, Event::YesNo { .. })),
+            "the builtin dialog must not open"
+        );
     }
 
     /// e:getScriptStack 暴露真实调用栈；e:getScriptBlock 按 {file,index} 查块。
