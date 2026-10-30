@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.8.3",
+          "buildVersion": "525",
+          "date": "2026-10-30T08:33:42Z",
+          "localizedDescription": "More NScripter games run: ones with CD music, Lua scripts, packed voices and drawing plugins.\n\n## Downloads\n\n- `VNDegen-0.8.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- NScripter CD music plays from the game's `CD` folder (`track01.ogg` and on, or `.mp3` and `.wav`), the layout English releases ship. A disc isn't read.\n- Games that script part of their logic in Lua (`system.lua` beside `nslua.dll`) run it on an embedded Lua 5.1. A game's Lua can't open files, run programs or load modules.\n- Voices packed as NBZ files play, and archive entries packed with the engine's LZSS compression load.\n- The `MSpDraw.dll` drawing plugin moves, turns, scales, tilts and fades pictures as its manual describes.\n- An English release written for backquoted text lines shows them as English text wrapped between words, with its `|` marks as short pauses.\n- `blt` and `ofscpy` draw straight onto the screen, as one game's ending credits use them.\n\n## Known limits\n\n- The `|` pause length is a guess, because the game that uses it ships no NScripter program to compare with.\n- NSLua's direct drawing functions aren't emulated, and of `MSpDraw.dll` only the calls the tested games make are. `docs/nscripter.md` lists the rest.\n- Tested with the 10 NScripter games in the library, 4 of them new. All reach their title, play, save and load on the Mac and the iPad simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.3/VNDegen-0.8.3.ipa",
+          "size": 90040996,
+          "sha256": "04ce7733506add3c1139dcd7582fe652eea84ca0d19c9ac069890302b8a6cebe",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.8.2",
           "buildVersion": "514",
           "date": "2026-10-28T11:17:50Z",
