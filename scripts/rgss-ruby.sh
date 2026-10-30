@@ -144,6 +144,10 @@ case "$platform" in
     # iOS declares fork and exec, which its sandbox refuses at run time; Ruby's process functions then raise, and RGSS
     # games don't call them. system() and daemon() aren't available to iOS apps, and getentropy has no header there.
     ios_cache=(ac_cv_func_system=no ac_cv_func_daemon=no ac_cv_func_getentropy=no)
+    # dir.c includes <sys/vnode.h> on Apple systems for the file types getattrlist reports, and the iOS SDKs have no
+    # such header. The macOS SDK's has the same two enums, which the stand-in takes from it.
+    mkdir -p "$work/ios-shim/sys"
+    sed -n '/^enum vtype/,/};/p; /^enum vtagtype/,/};/p' "$(sdk macosx)/usr/include/sys/vnode.h" >"$work/ios-shim/sys/vnode.h"
     slice mac-arm64 "${base[@]}" --host=aarch64-apple-darwin "${tools[@]}" \
       CC="$clang -target arm64-apple-macos15.0 -isysroot $(sdk macosx)" CFLAGS="-O2"
     slice mac-x86_64 "${base[@]}" --host=x86_64-apple-darwin "${tools[@]}" \
