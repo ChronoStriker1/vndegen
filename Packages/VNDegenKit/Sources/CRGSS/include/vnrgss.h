@@ -34,6 +34,9 @@ int vnrgss_step(double seconds);
 // call returned. The pixels stay valid until the next vnrgss_step or vnrgss_stop. NULL before the first frame.
 const uint8_t *vnrgss_frame(int *width, int *height, bool *changed);
 
+// The frame rate the game runs at, from Graphics.frame_rate.
+int vnrgss_frame_rate(void);
+
 // Mixes `frames` frames of interleaved stereo float at 44100 Hz into `out`. Safe on the real-time audio thread.
 void vnrgss_audio_render(float *out, int frames);
 

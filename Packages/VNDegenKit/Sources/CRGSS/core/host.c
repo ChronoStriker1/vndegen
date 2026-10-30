@@ -266,6 +266,13 @@ const uint8_t *vnrgss_frame(int *width, int *height, bool *changed) {
 
 void vnrgss_audio_render(float *out, int frames) { audio_render(out, frames); }
 
+int vnrgss_frame_rate(void) {
+    pthread_mutex_lock(&lock);
+    int rate = S.frameRate;
+    pthread_mutex_unlock(&lock);
+    return rate;
+}
+
 void vnrgss_key(unsigned code, bool down) {
     if (code >= HOST_KEY_COUNT) return;
     pthread_mutex_lock(&lock);

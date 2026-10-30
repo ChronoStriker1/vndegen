@@ -26,6 +26,9 @@ final class RGSSSession: EngineSession {
     private var keyboardHeld: Set<UInt32> = []
     private var displayLink: CADisplayLink?
     private var lastFrame: CFTimeInterval?
+    #if DEBUG
+    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
+    #endif
     /// When each key the game holds went down, and the releases held back for `shortestPress`.
     private var pressedAt: [UInt32: ContinuousClock.Instant] = [:]
     private var heldReleases: [UInt32: Task<Void, Never>] = [:]
@@ -113,6 +116,9 @@ final class RGSSSession: EngineSession {
         if let pixels = vnrgss_frame(&width, &height, &changed), changed {
             frameView.present(pixels, width: Int(width), height: Int(height))
         }
+        #if DEBUG
+        pacing?.note(tick: now, presented: changed, stepEnd: CACurrentMediaTime())
+        #endif
     }
 
     private static var problem: String? { vnrgss_problem().map { String(cString: $0) } }
@@ -209,3 +215,38 @@ private final class FrameTarget: NSObject {
 
     @objc func step(_ link: CADisplayLink) { session?.step(link) }
 }
+
+#if DEBUG
+/// With `-frameMonitor YES`, logs the game's frame rate every 10 seconds ("RGSSFRAMES" in the app log): frames the
+/// game drew per second on average and over the slowest 1% of them, display link ticks per second, and the slowest step.
+private final class FramePacing {
+    private var start: CFTimeInterval?
+    private var lastPresented: CFTimeInterval?
+    private var gaps: [Double] = []
+    private var ticks = 0
+    private var worstStep = 0.0
+
+    func note(tick: CFTimeInterval, presented: Bool, stepEnd: CFTimeInterval) {
+        guard let start else {
+            self.start = tick
+            return
+        }
+        ticks += 1
+        worstStep = max(worstStep, stepEnd - tick)
+        if presented {
+            if let lastPresented { gaps.append(tick - lastPresented) }
+            lastPresented = tick
+        }
+        let elapsed = tick - start
+        guard elapsed >= 10 else { return }
+        let slowest = gaps.sorted(by: >).prefix(max(1, gaps.count / 100))
+        let low = slowest.isEmpty ? 0 : Double(slowest.count) / slowest.reduce(0, +)
+        NSLog("RGSSFRAMES seconds=%.1f average=%.1f low1=%.1f ticks=%.1f worstStep=%.1fms target=%d", elapsed,
+              Double(gaps.count) / elapsed, low, Double(ticks) / elapsed, worstStep * 1000, Int(vnrgss_frame_rate()))
+        self.start = tick
+        gaps.removeAll(keepingCapacity: true)
+        ticks = 0
+        worstStep = 0
+    }
+}
+#endif
