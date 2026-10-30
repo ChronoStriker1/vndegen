@@ -124,6 +124,7 @@ void vns3_close(VNS3 *s3) {
     if (!s) return;
     if (s->trace && s->dib.p8) {
         int i = s->dib.p8[(size_t)20 * s->dib.w + 20];
+        s3_log(s, "wait %d menus %d pc %d:%x", s->wait, s->menuCount, s->page, s->pc);
         s3_log(s, "pixel 20,20: index %d pal %d,%d,%d shown %d,%d,%d", i, s->pal[i][0], s->pal[i][1], s->pal[i][2], s->shownPal[i][0], s->shownPal[i][1], s->shownPal[i][2]);
     }
     s3_audio_free(s);

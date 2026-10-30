@@ -159,6 +159,7 @@ void s3_service_wait(S3 *s) {
     case S3_WAIT_MENU:
         if (s3_menu_update(s)) {
             int choice = s->waitArg[0];
+            if (s->trace) s3_log(s, "menu choice %d of %d", choice, s->menuCount);
             s3_menu_close(s, choice);
             s->wait = S3_WAIT_NONE;
             if (choice >= 0) {

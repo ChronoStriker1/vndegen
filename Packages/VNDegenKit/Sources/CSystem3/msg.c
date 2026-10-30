@@ -62,6 +62,10 @@ static int next_char(S3 *s, const u8 *p, u32 *cp, bool *half) {
         else if (c == ' ') *cp = 0x3000;
         else if (c > ' ' && c < 0x7f) *cp = c + 0xfee0;
         *half = false;
+    } else if (s->zh == 1 && n == 2) {
+        // Half-width mode narrows full-width ASCII and spaces, such as the digits H prints.
+        if (*cp >= 0xff01 && *cp <= 0xff5e) { *cp -= 0xfee0; *half = true; }
+        else if (*cp == 0x3000) { *cp = ' '; *half = true; }
     }
     return n;
 }
@@ -69,18 +73,20 @@ static int next_char(S3 *s, const u8 *p, u32 *cp, bool *half) {
 void s3_msg_text(S3 *s, const char *sjis) {
     if (s->menuBuild >= 0) { menu_append(s, sjis); return; }
     S3Win *w = msgwin(s);
+    // Text placed with T outside the window (games draw numbers off screen and copy them in) never wraps.
+    bool wraps = s->tx >= w->x && s->tx < w->x + w->w && s->ty >= w->y && s->ty < w->y + w->h;
     const u8 *p = (const u8 *)sjis;
     while (*p) {
         // A half-width word that would not fit starts a new line, so translated text breaks between words.
         if (*p > ' ' && *p < 0x7f && s->zh != 0 && (p == (const u8 *)sjis || p[-1] == ' ')) {
             int word = 0;
             for (const u8 *q = p; *q > ' ' && *q < 0x7f; q++) word += s->fontSize / 2;
-            if (s->tx + word > w->x + w->w && s->tx > w->x && word <= w->w) s3_msg_newline(s);
+            if (wraps && s->tx + word > w->x + w->w && s->tx > w->x && word <= w->w) s3_msg_newline(s);
         }
         u32 cp; bool half;
         p += next_char(s, p, &cp, &half);
         int adv = half ? s->fontSize / 2 : s->fontSize;
-        if (s->tx + adv > w->x + w->w && s->tx > w->x) s3_msg_newline(s);
+        if (wraps && s->tx + adv > w->x + w->w && s->tx > w->x) s3_msg_newline(s);
         s3_draw_char(s, cp, half, s->tx, s->ty, s->fontSize, s->msgColor);
         s->tx += adv;
     }
