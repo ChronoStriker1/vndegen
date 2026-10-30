@@ -225,6 +225,18 @@ pub fn read(bytes: &[u8], encoding: &'static Encoding) -> Result<SlotSave, Strin
             }
         }
     }
+    // The message layer that was current, which text goes to after the load,
+    // whatever was current before it (VNDegen).
+    if let Some(field) = root.field(11) {
+        let id = text(&document, field, encoding)?;
+        if !id.is_empty() {
+            replay.push(Tag {
+                name: "chgmsg".into(),
+                params: vec![("id".into(), id), ("stack".into(), "0".into())],
+                line: -1,
+            });
+        }
+    }
 
     Ok(SlotSave {
         version: document.version,
@@ -822,7 +834,19 @@ mod tests {
                 .iter()
                 .map(|tag| tag.name.as_str())
                 .collect();
-            assert_eq!(names, ["lyc", "chgmsg", "print", "/chgmsg", "splay"]);
+            assert_eq!(
+                names,
+                ["lyc", "chgmsg", "print", "/chgmsg", "splay", "chgmsg"]
+            );
+            let current = read_back.replay.last().unwrap();
+            assert_eq!(
+                current.params,
+                [
+                    ("id".to_string(), "adv".to_string()),
+                    ("stack".to_string(), "0".to_string())
+                ],
+                "the current message layer is current again after the load"
+            );
         }
     }
 
