@@ -253,10 +253,13 @@ public:
             FT_UInt index = FT_Get_Char_Index(f, cp);
             if (!index) continue;
             FT_Set_Pixel_Sizes(f, 0, FT_UInt(px));
-            if (FT_Load_Glyph(f, index, FT_LOAD_DEFAULT)) continue;
+            // The font pack's MS Gothic substitute carries 1-bit bitmap strikes for small sizes; draw the outlines,
+            // whose 8-bit coverage is what the text drawing expects.
+            if (FT_Load_Glyph(f, index, FT_LOAD_NO_BITMAP)) continue;
             if (bold) FT_GlyphSlot_Embolden(f->glyph);
             if (FT_Render_Glyph(f->glyph, FT_RENDER_MODE_NORMAL)) continue;
             const FT_Bitmap &b = f->glyph->bitmap;
+            if (b.pixel_mode != FT_PIXEL_MODE_GRAY) continue;
             out.w = int(b.width);
             out.h = int(b.rows);
             out.left = f->glyph->bitmap_left;
