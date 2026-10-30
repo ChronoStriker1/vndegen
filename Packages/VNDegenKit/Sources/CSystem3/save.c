@@ -218,16 +218,31 @@ bool s3_save_copy(S3 *s, int to, int from) {
     return ok;
 }
 
-// QP: writes count variables from `from` into an existing save, in place.
+// The values of variable page `page` in a save, or NULL when the save has no such page.
+static u8 *page_values(Save *sv, int page, u32 *count) {
+    if (page < 0 || page > 255) return NULL;
+    u32 a = s3_le32(sv->d + 0x870 + (size_t)page * 4);
+    if (!a || a + 16 > sv->n) return NULL;
+    u32 size = s3_le32(sv->d + a);
+    if (s3_le32(sv->d + a + 4) != (u32)page || a + 16 + (size_t)size > sv->n) return NULL;
+    *count = size / 2;
+    return sv->d + a + 16;
+}
+
+// QP: writes count variables from `from` into an existing save, in place. A variable bound to an array writes into
+// that array's page of the save, from the array's current position.
 bool s3_save_write_part(S3 *s, int slot, const S3LV *from, int count) {
     Save sv;
     if (!read_save(s, slot, &sv)) return false;
-    u32 base = from->var;
-    for (int i = 0; i < count && base + (u32)i < 65536; i++) {
+    int page;
+    u32 base, n;
+    s3_lv_locate(s, from, &page, &base);
+    u8 *values = page_values(&sv, page, &n);
+    if (!values) { free(sv.d); return false; }
+    for (int i = 0; i < count && base + (u32)i < n; i++) {
         u16 v = s3_lv_get(s, from, i);
-        size_t at = sv.vars + 16 + (size_t)(base + (u32)i) * 2;
-        sv.d[at] = (u8)v;
-        sv.d[at + 1] = (u8)(v >> 8);
+        values[(base + (u32)i) * 2] = (u8)v;
+        values[(base + (u32)i) * 2 + 1] = (u8)(v >> 8);
     }
     char *path = slot_path(s, slot);
     FILE *f = path ? fopen(path, "wb") : NULL;
@@ -238,13 +253,16 @@ bool s3_save_write_part(S3 *s, int slot, const S3LV *from, int count) {
     return ok;
 }
 
-// LP: reads count variables from a save into `to`.
+// LP: reads count variables from a save into `to`, from the same place QP writes them.
 bool s3_save_load_part(S3 *s, int slot, const S3LV *to, int count) {
     Save sv;
     if (!read_save(s, slot, &sv)) return false;
-    u32 base = to->var;
-    for (int i = 0; i < count && base + (u32)i < 65536; i++)
-        s3_lv_set(s, to, i, s3_le16(sv.d + sv.vars + 16 + (size_t)(base + (u32)i) * 2));
+    int page;
+    u32 base, n;
+    s3_lv_locate(s, to, &page, &base);
+    const u8 *values = page_values(&sv, page, &n);
+    if (!values) { free(sv.d); return false; }
+    for (int i = 0; i < count && base + (u32)i < n; i++) s3_lv_set(s, to, i, s3_le16(values + (base + (u32)i) * 2));
     free(sv.d);
     return true;
 }

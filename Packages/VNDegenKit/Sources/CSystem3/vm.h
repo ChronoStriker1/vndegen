@@ -15,6 +15,7 @@ u16 s3_expr(S3 *s);
 void s3_lvarg(S3 *s, S3LV *lv);
 // A variable reference whose first byte c was already read.
 void s3_var_ref(S3 *s, int c, S3LV *lv);
+void s3_lv_locate(S3 *s, const S3LV *lv, int *page, u32 *index);
 const char *s3_strarg(S3 *s);
 u16 *s3_lv_at(S3 *s, const S3LV *lv, int k);
 u16 s3_lv_get(S3 *s, const S3LV *lv, int k);

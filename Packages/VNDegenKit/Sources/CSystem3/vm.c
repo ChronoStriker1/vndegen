@@ -25,6 +25,20 @@ static u16 *slot(S3 *s, u16 v, int offset, bool element) {
 u16 s3_var_get(S3 *s, u16 v) { return *slot(s, v, 0, false); }
 void s3_var_set(S3 *s, u16 v, u16 value) { *slot(s, v, 0, false) = value; }
 
+// Where a reference points: page 0 and the variable number for a normal variable, or the array page and the index in
+// it for a variable DS bound to an array.
+void s3_lv_locate(S3 *s, const S3LV *lv, int *page, u32 *index) {
+    u16 v = lv->var & 0x3fff;
+    S3Bind *b = &s->bind[v];
+    if (b->on) {
+        *page = b->page;
+        *index = (u32)b->base + (lv->element ? (u32)lv->offset : (u32)s->vars[b->pointer] + (u32)lv->offset);
+    } else {
+        *page = 0;
+        *index = (u32)v + (u32)lv->offset;
+    }
+}
+
 u16 *s3_lv_at(S3 *s, const S3LV *lv, int k) { return slot(s, lv->var, lv->offset + k, lv->element); }
 u16 s3_lv_get(S3 *s, const S3LV *lv, int k) { return *s3_lv_at(s, lv, k); }
 void s3_lv_set(S3 *s, const S3LV *lv, int k, u16 v) { *s3_lv_at(s, lv, k) = v; }
