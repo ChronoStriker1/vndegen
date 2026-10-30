@@ -64,16 +64,17 @@ final class RGSSSession: EngineSession {
         // MIDI music plays with the player's SoundFont from Settings, or the one the app bundles (docs/midi.md).
         let soundFont = MIDISoundFont.url?.path
         let fallback = MIDISoundFont.fallbackURL?.path
-        let strings = [paths.gameIni.path, paths.saves.path, paths.log.path, soundFont, fallback].map { $0.map { strdup($0) } }
+        let strings = [paths.gameIni.path, paths.saves.path, paths.log.path, soundFont, fallback].map { $0.flatMap { strdup($0) } }
         let rtps = paths.runtimes.map { strdup($0.path) }
         defer {
             strings.forEach { free($0) }
             rtps.forEach { free($0) }
         }
         let result = rtps.map { UnsafePointer($0) }.withUnsafeBufferPointer { rtpList in
-            var settings = VNRGSSLaunch(gameIni: strings[0], rtps: rtpList.baseAddress, rtpCount: Int32(rtpList.count),
-                                        saveDir: strings[1], logPath: strings[2], soundFont: strings[3],
-                                        fallbackSoundFont: strings[4])
+            var settings = VNRGSSLaunch(gameIni: UnsafePointer(strings[0]), rtps: rtpList.baseAddress,
+                                        rtpCount: Int32(rtpList.count), saveDir: UnsafePointer(strings[1]),
+                                        logPath: UnsafePointer(strings[2]), soundFont: UnsafePointer(strings[3]),
+                                        fallbackSoundFont: UnsafePointer(strings[4]))
             return vnrgss_start(&settings)
         }
         guard result == 0 else {

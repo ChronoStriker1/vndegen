@@ -21,8 +21,7 @@ endif()
 
 # The runtime: the CRGSS target's sources, which the app builds too.
 file(GLOB RUNTIME_SOURCES ${PACKAGE}/core/*.c)
-list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "casepath.c$")
-add_library(rgss STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c ${SHARED}/vnmidi.c ${SHARED}/casepath.c)
+add_library(rgss STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c ${SHARED}/vnmidi.c)
 target_include_directories(rgss PUBLIC ${PACKAGE}/core ${PACKAGE}/include ${SHARED} ${RUBY_DIR}/headers)
 target_compile_definitions(rgss PUBLIC RGSS_FONTS_DIR="${SHARED}/fonts")
 target_compile_options(rgss PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)

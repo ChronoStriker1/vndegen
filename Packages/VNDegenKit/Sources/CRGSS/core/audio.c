@@ -11,18 +11,45 @@
 #include "rgss.h"
 #include "vnmidi.h"
 
+// The decoders are compiled into this file with internal linkage or an rgss_ prefix, since other engines in the app
+// compile their own copies.
 #define STB_VORBIS_NO_STDIO
 #define STB_VORBIS_NO_PUSHDATA_API
+#define stb_vorbis_close rgss_stb_vorbis_close
+#define stb_vorbis_decode_memory rgss_stb_vorbis_decode_memory
+#define stb_vorbis_get_comment rgss_stb_vorbis_get_comment
+#define stb_vorbis_get_error rgss_stb_vorbis_get_error
+#define stb_vorbis_get_file_offset rgss_stb_vorbis_get_file_offset
+#define stb_vorbis_get_frame_float rgss_stb_vorbis_get_frame_float
+#define stb_vorbis_get_frame_short rgss_stb_vorbis_get_frame_short
+#define stb_vorbis_get_frame_short_interleaved rgss_stb_vorbis_get_frame_short_interleaved
+#define stb_vorbis_get_info rgss_stb_vorbis_get_info
+#define stb_vorbis_get_sample_offset rgss_stb_vorbis_get_sample_offset
+#define stb_vorbis_get_samples_float rgss_stb_vorbis_get_samples_float
+#define stb_vorbis_get_samples_float_interleaved rgss_stb_vorbis_get_samples_float_interleaved
+#define stb_vorbis_get_samples_short rgss_stb_vorbis_get_samples_short
+#define stb_vorbis_get_samples_short_interleaved rgss_stb_vorbis_get_samples_short_interleaved
+#define stb_vorbis_open_memory rgss_stb_vorbis_open_memory
+#define stb_vorbis_seek rgss_stb_vorbis_seek
+#define stb_vorbis_seek_frame rgss_stb_vorbis_seek_frame
+#define stb_vorbis_seek_start rgss_stb_vorbis_seek_start
+#define stb_vorbis_stream_length_in_samples rgss_stb_vorbis_stream_length_in_samples
+#define stb_vorbis_stream_length_in_seconds rgss_stb_vorbis_stream_length_in_seconds
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "../third_party/stb_vorbis.c"
-#pragma GCC diagnostic pop
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_NO_STDIO
+#define DRMP3_API static
+#define DRMP3_PRIVATE static
 #include "../third_party/dr_mp3.h"
 #define DR_WAV_IMPLEMENTATION
 #define DR_WAV_NO_STDIO
+#define DRWAV_API static
+#define DRWAV_PRIVATE static
 #include "../third_party/dr_wav.h"
+#pragma GCC diagnostic pop
 
 enum { MAX_SE = 16, CHUNK = 1024 };
 

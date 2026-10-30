@@ -2,7 +2,7 @@
 // "graphics/system/window.png" on a case-sensitive volume. Every lookup goes through rgss_resolve_case, which uses
 // VNDegen's shared casepath_resolve.
 #include "archive.h"
-#include "casepath.h"
+#include "rgss_casepath.h"
 #include "rgss.h"
 
 #include <stdio.h>

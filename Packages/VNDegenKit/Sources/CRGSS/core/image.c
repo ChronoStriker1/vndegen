@@ -3,6 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Internal linkage, since other engines in the app compile their own stb copies.
+#define STB_IMAGE_STATIC
+#define STB_IMAGE_WRITE_STATIC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #define STBI_ONLY_PNG
 #define STBI_ONLY_JPEG
 #define STBI_ONLY_BMP
@@ -12,6 +17,7 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../third_party/stb_image_write.h"
+#pragma GCC diagnostic pop
 
 bool image_alloc(Image *image, int w, int h) {
     image->w = w;
