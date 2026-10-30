@@ -63,7 +63,8 @@ uint32_t Game::tileFlags(int x, int y) const {
     const Tileset &ts = tilesets_[map_->tileset];
     for (int layer = map_->layers - 1; layer >= 0; layer--) {
         int32_t v = map_->tile(layer, x, y);
-        if (v == 0 && layer > 0) continue;
+        // An upper layer's empty tile, base tile 0 or the empty autotile slot, leaves it to the layers below.
+        if (layer > 0 && (v == 0 || v / 100000 == 1)) continue;
         uint32_t f = tilePassability(ts, v);
         if (layer > 0 && (f & 0x200)) continue;
         return f;
