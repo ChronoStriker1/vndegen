@@ -34,3 +34,4 @@ VNDegen builds only what its test games need to reach their title, play, save, a
 - Only the ASCII glyphs of `.rft` bitmap fonts are drawn. Japanese text and symbols such as full-width commas and curly quotes in those games use MS Gothic, so a line with them can wrap a word earlier or later than on the PC. Test Game 79, Test Game 80, and Test Game 81 ship `.rft` fonts.
 - A game's own native dialog, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, shows as a system alert. Confirm, Return, or Space answers OK, Cancel, Escape, or E answers Cancel, and VNDegen's on-screen keyboard types into its text field.
 - After a quick load in Test Game 78 the screen stays black until the next click, which shows the saved page.
+- The message font a save records, in field 25 of the save, isn't restored on load. Every test game sets its message window up again when a save loads, so none shows a wrong font.
