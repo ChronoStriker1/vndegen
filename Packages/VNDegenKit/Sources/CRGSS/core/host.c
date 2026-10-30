@@ -170,6 +170,13 @@ void host_set_problem(const char *problem) {
 int vnrgss_start(const VNRGSSLaunch *l) {
     vnrgss_stop();
     pthread_mutex_lock(&lock);
+    // A game that didn't stop in time still owns the shared state and its launch strings.
+    if (S.running) {
+        snprintf(S.problem, sizeof S.problem, "The last game is still stopping. Try again in a moment.");
+        S.hasProblem = true;
+        pthread_mutex_unlock(&lock);
+        return -1;
+    }
     free_launch(&S.launch);
     S.launch.gameIni = copy_string(l->gameIni);
     S.launch.saveDir = copy_string(l->saveDir);

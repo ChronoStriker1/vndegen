@@ -144,8 +144,9 @@ class << File
     define_method(name) { |path, *rest, **options| send(:"rgss_#{name}", RGSSFiles.read_path(path), *rest, **options) }
   end
 
+  # Deletes reach only the save folder, so a game cleaning up a failed save never removes a save that came with it.
   alias_method :rgss_delete, :delete unless method_defined?(:rgss_delete)
-  def delete(*paths) = rgss_delete(*paths.map { |path| RGSSFiles.read_path(path) })
+  def delete(*paths) = rgss_delete(*paths.map { |path| RGSSFiles.relative?(path) ? Kernel.rgss_game_path(path.tr('\\', '/'), true) : path })
   alias unlink delete
 end
 

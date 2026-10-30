@@ -29,7 +29,7 @@ typedef struct {
     stbtt_fontinfo info;
 } Face;
 
-static Face *faces;
+static Face **faces;
 static int faceCount, faceCapacity;
 // Faces from the folders registered for the current game, which go away with it.
 
@@ -139,12 +139,14 @@ static void add_font_file(const char *path) {
         if (offset < 0 || !stbtt_InitFont(&info, data, offset)) continue;
         if (faceCount == faceCapacity) {
             faceCapacity = faceCapacity ? faceCapacity * 2 : 32;
-            Face *grown = realloc(faces, sizeof(Face) * (size_t)faceCapacity);
+            Face **grown = realloc(faces, sizeof(Face *) * (size_t)faceCapacity);
             if (!grown) break;
             faces = grown;
         }
-        Face *face = &faces[faceCount++];
-        memset(face, 0, sizeof *face);
+        // Each face is its own allocation, so pointers to it stay valid while the list grows.
+        Face *face = calloc(1, sizeof *face);
+        if (!face) break;
+        faces[faceCount++] = face;
         face->path = strdup(path);
         face->index = i;
         read_names(face, &info);
@@ -179,10 +181,11 @@ static void free_face(Face *face) {
     free(face->data);
     for (int i = 0; i < face->nameCount; i++) free(face->names[i]);
     free(face->names);
+    free(face);
 }
 
 void text_reset(void) {
-    for (int i = 0; i < faceCount; i++) free_face(&faces[i]);
+    for (int i = 0; i < faceCount; i++) free_face(faces[i]);
     faceCount = 0;
 #ifdef RGSS_FONTS_DIR
     // The app reads the font pack's table at launch; the Linux test host reads it here.
@@ -198,26 +201,28 @@ void text_reset(void) {
 // MARK: Lookup
 
 // Faces from VNDegen's font pack, which stand in for Windows fonts. They stay loaded from game to game.
-static Face *packFaces;
+static Face **packFaces;
 static int packCount, packCapacity;
 
+// A face from the pack, loaded once. Its bold and italic say what the file is, so a style the file lacks is drawn
+// bolder or slanted, as Windows does for such a font.
 static Face *pack_face(const vnfont_match *m) {
     for (int i = 0; i < packCount; i++) {
-        if (packFaces[i].index == m->face && !strcmp(packFaces[i].path, m->path)) return &packFaces[i];
+        if (packFaces[i]->index == m->face && !strcmp(packFaces[i]->path, m->path)) return packFaces[i];
     }
     if (packCount == packCapacity) {
         packCapacity = packCapacity ? packCapacity * 2 : 8;
-        Face *grown = realloc(packFaces, sizeof(Face) * (size_t)packCapacity);
+        Face **grown = realloc(packFaces, sizeof(Face *) * (size_t)packCapacity);
         if (!grown) return NULL;
         packFaces = grown;
     }
-    Face *face = &packFaces[packCount++];
-    memset(face, 0, sizeof *face);
+    Face *face = calloc(1, sizeof *face);
+    if (!face) return NULL;
     face->path = strdup(m->path);
     face->index = m->face;
-    // A match without the asked-for style is drawn bolder or slanted, as Windows does for such a font.
-    face->bold = m->bold || !m->embolden;
-    face->italic = m->italic || !m->slant;
+    face->bold = m->bold;
+    face->italic = m->italic;
+    packFaces[packCount++] = face;
     return face;
 }
 
@@ -231,7 +236,7 @@ static Face *face_named(const char *name, bool bold, bool italic) {
     Face *best = NULL;
     int bestScore = -1;
     for (int i = 0; i < faceCount; i++) {
-        Face *face = &faces[i];
+        Face *face = faces[i];
         if (face->broken) continue;
         for (int j = 0; j < face->nameCount; j++) {
             if (strcmp(face->names[j], folded)) continue;
@@ -283,8 +288,8 @@ static Face *primary_face(const FontRequest *font) {
         Face *face = lookup(fallbacks[i], font->bold, font->italic);
         if (face && load_face(face)) return face;
     }
-    for (int i = 0; i < faceCount; i++) if (load_face(&faces[i])) return &faces[i];
-    for (int i = 0; i < packCount; i++) if (load_face(&packFaces[i])) return &packFaces[i];
+    for (int i = 0; i < faceCount; i++) if (load_face(faces[i])) return faces[i];
+    for (int i = 0; i < packCount; i++) if (load_face(packFaces[i])) return packFaces[i];
     return NULL;
 }
 

@@ -223,6 +223,19 @@ static VALUE graphics_resize_screen(VALUE self, VALUE w, VALUE h) {
     rgss_screen_w = width;
     rgss_screen_h = height;
     ensure_screen();
+    // A frozen screen keeps its picture at the new size, cropped or padded with black, for the next transition.
+    if (frozen.px && (frozen.w != width || frozen.h != height)) {
+        Image resized;
+        if (image_alloc(&resized, width, height)) {
+            for (size_t i = 0; i < (size_t)width * height; i++) resized.px[i] = 0xFF000000u;
+            for (int y = 0; y < height && y < frozen.h; y++) {
+                memcpy(resized.px + (size_t)y * width, frozen.px + (size_t)y * frozen.w,
+                       sizeof(Pixel) * (size_t)(width < frozen.w ? width : frozen.w));
+            }
+            image_free(&frozen);
+            frozen = resized;
+        }
+    }
     return Qnil;
 }
 

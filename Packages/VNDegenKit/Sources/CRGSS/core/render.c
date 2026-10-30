@@ -278,9 +278,14 @@ typedef struct {
     int layer;
 } Item;
 
+// Equal z: in VX and VX Ace a sprite lower on the screen (larger y) is in front, then the one made later.
 static int compare_items(const void *a, const void *b) {
     const Item *x = a, *y = b;
     if (x->z != y->z) return x->z < y->z ? -1 : 1;
+    if (rgss_version >= RGSS2 && x->d->kind == DRAW_SPRITE && y->d->kind == DRAW_SPRITE) {
+        int xy = ((const Sprite *)x->d)->y, yy = ((const Sprite *)y->d)->y;
+        if (xy != yy) return xy < yy ? -1 : 1;
+    }
     if (x->d->serial != y->d->serial) return x->d->serial < y->d->serial ? -1 : 1;
     return x->layer - y->layer;
 }
