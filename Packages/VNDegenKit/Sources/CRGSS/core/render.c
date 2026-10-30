@@ -125,6 +125,24 @@ static inline void put(Pixel *dst, Pixel src, int alpha, const Shade *s, int ble
     *dst = px_make(dr, dg, db, 255);
 }
 
+// The common case: no color, tone or flash, normal blending onto the opaque screen.
+static inline void put_plain(Pixel *dst, Pixel src, int alpha) {
+    if (alpha >= 255) {
+        *dst = src | 0xFF000000u;
+        return;
+    }
+    if (alpha <= 0) return;
+    Pixel d = *dst;
+    int inv = 255 - alpha;
+    // (a * s + (255 - a) * d) / 255, with the division done as a multiply and shift.
+    unsigned r = px_r(src) * alpha + px_r(d) * inv, g = px_g(src) * alpha + px_g(d) * inv,
+             b = px_b(src) * alpha + px_b(d) * inv;
+    r = (r + 1 + (r >> 8)) >> 8;
+    g = (g + 1 + (g >> 8)) >> 8;
+    b = (b + 1 + (b >> 8)) >> 8;
+    *dst = px_make((int)r, (int)g, (int)b, 255);
+}
+
 void draw_image_rect(Image *target, IRect clip, const Image *src, IRect sr, int dx, int dy, const Effects *fx) {
     if (fx->opacity <= 0 || (fx->flash && fx->flash->count > 0 && fx->flash->hide)) return;
     IRect clipped = irect_clip(sr, src->w, src->h);
@@ -138,10 +156,17 @@ void draw_image_rect(Image *target, IRect clip, const Image *src, IRect sr, int 
     if (x0 >= x1 || y0 >= y1) return;
     Shade s = shade_for(fx);
     int opacity = fx->opacity > 255 ? 255 : fx->opacity;
+    bool plain = s.plain && fx->blendType == 0;
     for (int y = y0; y < y1; y++) {
         const Pixel *in = src->px + (size_t)(sr.y + y - d.y) * src->w + sr.x - d.x;
         Pixel *out = target->px + (size_t)y * target->w;
-        for (int x = x0; x < x1; x++) put(&out[x], in[x], px_a(in[x]) * opacity / 255, &s, fx->blendType);
+        if (plain && opacity == 255) {
+            for (int x = x0; x < x1; x++) put_plain(&out[x], in[x], px_a(in[x]));
+        } else if (plain) {
+            for (int x = x0; x < x1; x++) put_plain(&out[x], in[x], px_a(in[x]) * opacity / 255);
+        } else {
+            for (int x = x0; x < x1; x++) put(&out[x], in[x], px_a(in[x]) * opacity / 255, &s, fx->blendType);
+        }
     }
 }
 
@@ -173,6 +198,14 @@ static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int off
         if (y0 < clip.y) y0 = clip.y;
         if (x1 > clip.x + clip.w) x1 = clip.x + clip.w;
         if (y1 > clip.y + clip.h) y1 = clip.y + clip.h;
+        if (x1 <= x0 || y1 <= y0) return;
+        // The source column of each screen column, worked out once for the whole sprite.
+        int columns[x1 - x0];
+        for (int x = x0; x < x1; x++) {
+            int sx = (int)floor((x + 0.5 - px) / sp->zoomX + originX);
+            columns[x - x0] = sx < 0 || sx >= sr.w ? -1 : (sp->mirror ? sr.w - 1 - sx : sx);
+        }
+        bool plain = s.plain && sp->blendType == 0;
         for (int y = y0; y < y1; y++) {
             int sy = (int)floor((y + 0.5 - py) / sp->zoomY + originY);
             if (sy < 0 || sy >= sr.h) continue;
@@ -180,10 +213,12 @@ static void draw_sprite(Sprite *sp, Image *target, IRect clip, int offX, int off
             const Pixel *row = img->px + (size_t)(sr.y + sy) * img->w + sr.x;
             Pixel *out = target->px + (size_t)y * target->w;
             for (int x = x0; x < x1; x++) {
-                int sx = (int)floor((x + 0.5 - px) / sp->zoomX + originX);
-                if (sx < 0 || sx >= sr.w) continue;
-                Pixel p = row[sp->mirror ? sr.w - 1 - sx : sx];
-                put(&out[x], p, px_a(p) * alphaRow / 255, &s, sp->blendType);
+                int sx = columns[x - x0];
+                if (sx < 0) continue;
+                Pixel p = row[sx];
+                int alpha = alphaRow == 255 ? px_a(p) : px_a(p) * alphaRow / 255;
+                if (plain) put_plain(&out[x], p, alpha);
+                else put(&out[x], p, alpha, &s, sp->blendType);
             }
         }
         return;

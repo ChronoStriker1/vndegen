@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "audio.h"
 #include "host.h"
@@ -81,6 +82,39 @@ static void present(const Image *frame) {
     if (!host_present(out)) stop_game();
 }
 
+// Where a frame's time goes, logged every 600 frames: the game's scripts between two Graphics.update calls, the
+// composite, and the wait for the host. For the frame rate checks.
+static struct {
+    double last, scripts, render, wait, worstScripts, worstRender;
+    int frames;
+} timing;
+
+static double now_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
+}
+
+static void note_timing(double start, double rendered, double end) {
+    if (timing.last > 0) {
+        double scripts = start - timing.last;
+        timing.scripts += scripts;
+        if (scripts > timing.worstScripts) timing.worstScripts = scripts;
+    }
+    double render = rendered - start;
+    timing.render += render;
+    if (render > timing.worstRender) timing.worstRender = render;
+    timing.wait += end - rendered;
+    timing.last = end;
+    if (++timing.frames == 600) {
+        rgss_log("timing: per frame scripts %.2f ms (worst %.1f), composite %.2f ms (worst %.1f), waiting %.2f ms",
+                 timing.scripts / 600, timing.worstScripts, timing.render / 600, timing.worstRender, timing.wait / 600);
+        double last = timing.last;
+        memset(&timing, 0, sizeof timing);
+        timing.last = last;
+    }
+}
+
 static void update_frame(void) {
     char *code = host_take_eval();
     if (code) {
@@ -94,12 +128,15 @@ static void update_frame(void) {
         free(code);
     }
     ensure_screen();
+    double start = now_ms();
     if (isFrozen) {
         present(&frozen);
         return;
     }
     scene_render(&screen);
+    double rendered = now_ms();
     present(&screen);
+    note_timing(start, rendered, now_ms());
 }
 
 static VALUE graphics_update(VALUE self) {
