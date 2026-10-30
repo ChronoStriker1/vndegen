@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <vector>
 
 namespace wolf {
 
@@ -77,6 +79,41 @@ void Canvas::draw(const Bitmap &src, RectI from, RectF to, const DrawOptions &o)
     const int mb = int(std::lround(std::clamp(o.b, 0.0f, 2.0f) * 256));
     const bool plainColour = mr == 256 && mg == 256 && mb == 256;
     const double sx = from.w / double(to.w), sy = from.h / double(to.h);
+
+    // Most drawing is unrotated and nearest-neighbour: tiles, characters, pictures. That path maps each destination
+    // column and row to a source one once, and copies opaque pixels without blending.
+    if (std::fmod(std::abs(o.angle), 360.0) <= 1e-6 && !o.smooth) {
+        int x0 = std::max(0, int(std::ceil(to.x - 0.5f))), x1 = std::min(t_.w, int(std::ceil(to.x + to.w - 0.5f)));
+        int y0 = std::max(0, int(std::ceil(to.y - 0.5f))), y1 = std::min(t_.h, int(std::ceil(to.y + to.h - 0.5f)));
+        if (x0 >= x1 || y0 >= y1) return;
+        thread_local std::vector<int> columns;
+        columns.resize(size_t(x1 - x0));
+        for (int x = x0; x < x1; x++)
+            columns[x - x0] = (from.x + std::min(from.w - 1, std::max(0, int((x + 0.5 - to.x) * sx)))) * 4;
+        bool plain = opacity == 255 && plainColour && o.blend == Blend::Normal;
+        for (int y = y0; y < y1; y++) {
+            int v = std::min(from.h - 1, std::max(0, int((y + 0.5 - to.y) * sy)));
+            const uint8_t *srow = src.row(from.y + v);
+            uint8_t *d = t_.row(y) + x0 * 4;
+            for (int i = 0; i < x1 - x0; i++, d += 4) {
+                const uint8_t *p = srow + columns[i];
+                int a = p[3];
+                if (a == 0) continue;
+                if (plain && a == 255) {
+                    std::memcpy(d, p, 4);
+                    continue;
+                }
+                int r = p[0], g = p[1], b = p[2];
+                if (!plainColour) {
+                    r = r * mr >> 8;
+                    g = g * mg >> 8;
+                    b = b * mb >> 8;
+                }
+                blendPixel(d, r, g, b, a * opacity / 255, o.blend);
+            }
+        }
+        return;
+    }
 
     // The destination pixels to visit: the rectangle, or the bounding box of the rotated rectangle.
     double cx = to.x + to.w / 2.0, cy = to.y + to.h / 2.0;
