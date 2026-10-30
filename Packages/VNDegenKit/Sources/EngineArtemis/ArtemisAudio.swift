@@ -215,8 +215,8 @@ final class ArtemisAudio {
         var channels: Int32 = 0, rate: Int32 = 0
         var samples: UnsafeMutablePointer<Int16>?
         let frames = data.withUnsafeBytes { bytes in
-            stb_vorbis_decode_memory(bytes.baseAddress?.assumingMemoryBound(to: UInt8.self), Int32(bytes.count),
-                                     &channels, &rate, &samples)
+            artemis_vorbis_decode_memory(bytes.baseAddress?.assumingMemoryBound(to: UInt8.self), Int32(bytes.count),
+                                         &channels, &rate, &samples)
         }
         guard frames > 0, let samples, channels > 0 else { return nil }
         defer { free(samples) }
