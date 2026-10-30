@@ -974,6 +974,7 @@ void VM::run(size_t untilFrames) {
         case OP_SH_MEM_S_ASSIGN_LOCAL: str(thisv(A(0))) = str(localv(A(1))); break;
         case OP_SH_LOCAL_S_EMPTY: push(str(localv(A(0))).empty()); break;
         case OP_SH_MEM_S_EMPTY: push(str(thisv(A(0))).empty()); break;
+        case OP_S_ASSIGN_REF: { int32_t i = pop(), pg = pop(), d = pop(); str(d) = str(var(pg, i)); break; }
         case OP_SREF_EMPTY: { int32_t i = pop(), pg = pop(); push(str(var(pg, i)).empty()); break; }
         case OP_S_ASSIGN_FUNCSTACKNAME: {
             // Seen only in the games' error reporting: f[i] = the name of the function i levels up.

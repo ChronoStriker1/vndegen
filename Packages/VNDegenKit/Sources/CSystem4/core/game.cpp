@@ -112,7 +112,7 @@ bool Game::start(std::string &error) {
     std::error_code ec;
     fs::create_directories(cfg.saveDir, ec);
     frame_.assign(size_t(screenW) * screenH * 4, 0);
-    thread_ = std::thread([this] { vmMain(); });
+    if (!noThread) thread_ = std::thread([this] { vmMain(); });
     return true;
 }
 

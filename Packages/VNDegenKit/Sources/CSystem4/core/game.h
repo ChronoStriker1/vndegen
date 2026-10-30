@@ -31,6 +31,7 @@ public:
     explicit Game(GameConfig cfg);
     ~Game();
     bool start(std::string &error);  // loads the game and starts its VM thread
+    bool noThread = false;           // tools: load the game without running it
 
     // Host side, on the host's thread.
     bool step(int ms);               // runs the game for ms milliseconds of game time; false once it has ended

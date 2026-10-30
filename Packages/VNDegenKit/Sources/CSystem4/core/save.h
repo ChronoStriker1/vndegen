@@ -3,6 +3,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace s4 {
 class VM;
@@ -13,6 +14,9 @@ int32_t globalLoad(VM &vm, const std::string &key, const std::string &file, cons
 int32_t exists(VM &vm, const std::string &name, bool inSaveFolder);
 int32_t remove(VM &vm, const std::string &name);
 int32_t copy(VM &vm, const std::string &dst, const std::string &src);
+// The GD container: zlib under a Mersenne Twister XOR. Read returns the plain bytes.
+bool readGD(const std::string &path, std::vector<uint8_t> &plain);
+bool writeGD(const std::string &path, const std::vector<uint8_t> &plain);
 // The host path of a game path: CP932 to UTF-8, backslashes to slashes, matched case-insensitively.
 std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder);
 

@@ -211,7 +211,7 @@
     {"SH_GLOBAL_A_PUSHBACK_LOCAL", 2},  // 209
     {"SH_LOCAL_A_PUSHBACK_LOCAL", 2},  // 210
     {"SH_IF_SREF_NE_STR", 2},  // 211
-    {"OP_212", 0},  // 212
+    {"S_ASSIGN_REF", 0},  // 212
     {"OP_213", -1},  // 213
     {"SREF_EMPTY", 0},  // 214
     {"SH_MEMS_EQ_LOCS", 2},  // 215
