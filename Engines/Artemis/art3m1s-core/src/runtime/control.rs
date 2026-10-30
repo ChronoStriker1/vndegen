@@ -435,6 +435,14 @@ impl CoreRuntime {
 
     /// frame 末仅依据派发时记录的正文状态执行普通 Skip 的未读停跳。
     pub(super) fn track_read_and_stop_skip_on_unread(&mut self) {
+        // Every other instruction run counts as read too, as in the PC
+        // engine, whose read-skip checks them. Scenario text was marked as it
+        // was shown, after checking whether it had been read (VNDegen).
+        for (script, line) in self.interpreter.take_executed_pc_lines() {
+            if self.control.mark_read(&script, line) {
+                self.read_dirty = true;
+            }
+        }
         // 两个状态都在这里消费，避免 mode=0 的文本或下一帧复用上一帧结果。
         let shown = std::mem::take(&mut self.scenario_text_shown);
         let was_read = self.control.current_scenario_was_read.take();

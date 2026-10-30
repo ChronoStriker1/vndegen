@@ -1315,9 +1315,11 @@ mod tests {
         let mut threshold_provider = AlphaProvider { alpha: 128 };
         assert_eq!(
             c.hit_test(50.0, 50.0, &mut threshold_provider),
-            None,
-            "alpha equal to clickablethreshold must not hit"
+            Some("dock".into()),
+            "alpha equal to clickablethreshold hits, as a threshold of 255 on an opaque save slot needs"
         );
+        let mut below_provider = AlphaProvider { alpha: 127 };
+        assert_eq!(c.hit_test(50.0, 50.0, &mut below_provider), None);
     }
 
     #[test]

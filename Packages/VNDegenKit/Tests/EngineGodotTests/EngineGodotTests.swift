@@ -1,3 +1,5 @@
+import CommonCrypto
+import CryptoKit
 import Foundation
 import Testing
 import VNCore
@@ -32,7 +34,7 @@ private struct Bytes {
 /// A pack as Godot exports it. Format 1 is Godot 3's, 2 Godot 4.0 to 4.4's, 3 Godot 4.5's. Files are empty unless
 /// `contents` has them. Offsets count from the pack's start, as Godot writes them for an executable's section.
 private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [String], flags: UInt32 = 0,
-                  contents: [String: Data] = [:]) -> Data {
+                  contents: [String: Data] = [:], encrypted: Set<String> = [], directoryKey: Data? = nil) -> Data {
     let headerSize = 20 + (format >= 2 ? 12 : 0) + (format >= 3 ? 8 : 0) + 64
     var directorySize = 4
     for file in files {
@@ -50,7 +52,7 @@ private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [Str
         directory.u64(UInt64(headerSize + directorySize + blobs.count))
         directory.u64(UInt64(data.count))
         directory.zeros(16)
-        if format >= 2 { directory.u32(0) }
+        if format >= 2 { directory.u32(encrypted.contains(file) ? 1 : 0) }
         blobs.append(data)
     }
     var bytes = Bytes()
@@ -61,15 +63,43 @@ private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [Str
     bytes.u32(version.2)
     if format >= 2 {
         // File offsets count from the pack's start, which the relative flag says for format 2.
-        bytes.u32(flags | (format == 2 ? 2 : 0))
+        bytes.u32(flags | (format == 2 ? 2 : 0) | (directoryKey == nil ? 0 : 1))
         bytes.u64(0)
     }
     if format >= 3 {
         bytes.u64(UInt64(bytes.data.count + 8 + 64))
     }
     bytes.zeros(64)
-    bytes.data.append(directory.data)
+    // Godot encrypts the entries after the count, and leaves the count as it is.
+    bytes.data.append(directoryKey.map { directory.data.prefix(4) + encrypt(directory.data.dropFirst(4), key: $0) } ?? directory.data)
     bytes.data.append(blobs)
+    return bytes.data
+}
+
+/// `data` encrypted as Godot writes an encrypted file inside a pack: its MD5, its length, and the IV, then the data in
+/// AES-256 CFB, padded to whole blocks.
+private func encrypt(_ data: Data, key: Data) -> Data {
+    let iv = Data((0..<16).map { UInt8($0 * 7) })
+    var plain = data
+    plain.append(Data(count: (16 - data.count % 16) % 16))
+    var cipher = Data(count: plain.count)
+    var cryptor: CCCryptorRef?
+    var moved = 0
+    _ = key.withUnsafeBytes { key in
+        iv.withUnsafeBytes { iv in
+            CCCryptorCreateWithMode(CCOperation(kCCEncrypt), CCMode(kCCModeCFB), CCAlgorithm(kCCAlgorithmAES), CCPadding(ccNoPadding),
+                                    iv.baseAddress, key.baseAddress, key.count, nil, 0, 0, CCModeOptions(0), &cryptor)
+        }
+    }
+    _ = cipher.withUnsafeMutableBytes { cipher in
+        plain.withUnsafeBytes { plain in CCCryptorUpdate(cryptor, plain.baseAddress, plain.count, cipher.baseAddress, cipher.count, &moved) }
+    }
+    CCCryptorRelease(cryptor)
+    var bytes = Bytes()
+    bytes.data.append(Data(Insecure.MD5.hash(data: data)))
+    bytes.u64(UInt64(data.count))
+    bytes.data.append(iv)
+    bytes.data.append(cipher)
     return bytes.data
 }
 
@@ -97,32 +127,71 @@ private func projectBinary(_ settings: [(String, Any)]) -> Data {
     return bytes.data
 }
 
-/// A Windows executable with `payload` in a section named "pck", followed by a signature.
-private func executable(with payload: Data) -> Data {
+/// A 64-bit Windows executable with `payload` in a section named "pck", followed by a signature. It imports `imports`,
+/// and its `.data` section holds `data`.
+private func executable(with payload: Data, data: Data = Data(count: 64), imports: [String] = []) -> Data {
+    let sectionTable = 0x88 + 24 + 0xF0
+    var idata = Bytes()
+    let names = imports.reduce(into: (offsets: [Int](), bytes: Data())) { result, name in
+        result.offsets.append((imports.count + 1) * 20 + result.bytes.count)
+        result.bytes.append(Data(name.utf8) + Data([0]))
+    }
+    for offset in names.offsets {
+        idata.zeros(12)
+        idata.u32(UInt32(0x2000 + offset)) // the name's address
+        idata.zeros(4)
+    }
+    idata.zeros(20)
+    idata.data.append(names.bytes)
+    // Name, address, size, and data for each section. Raw data starts at 0x400, each part 0x200-aligned.
+    let sections: [(String, UInt32, Data)] = [(".text", 0x1000, Data(count: 16)), (".data", 0x3000, data), (".idata", 0x2000, idata.data), ("pck", 0x9000, payload)]
+    var raw = 0x400
+    var placed: [(String, UInt32, Data, Int)] = []
+    for (name, address, contents) in sections {
+        placed.append((name, address, contents, raw))
+        raw += (contents.count + 0x1FF) / 0x200 * 0x200
+    }
+
     var bytes = Bytes()
     bytes.data.append(Data("MZ".utf8))
     bytes.zeros(0x3C - 2)
-    bytes.u32(0x80) // PE header offset
-    bytes.zeros(0x80 - bytes.data.count)
+    bytes.u32(0x88) // PE header offset
+    bytes.zeros(0x88 - bytes.data.count)
     bytes.u32(0x0000_4550) // "PE\0\0"
     bytes.data.append(contentsOf: [0x64, 0x86]) // machine
-    bytes.data.append(contentsOf: [2, 0]) // two sections
+    bytes.data.append(contentsOf: [UInt8(placed.count), 0])
     bytes.zeros(12)
-    bytes.data.append(contentsOf: [0, 0]) // no optional header
+    bytes.data.append(contentsOf: [0xF0, 0]) // optional header size
     bytes.zeros(2)
-    let sectionStart = 0x200
-    for (name, offset) in [(".text", 0), ("pck", sectionStart)] {
+    bytes.data.append(contentsOf: [0x0B, 0x02]) // PE32+
+    bytes.zeros(110)
+    bytes.zeros(8) // export table
+    bytes.u32(0x2000) // import table
+    bytes.u32(UInt32(idata.data.count))
+    bytes.zeros(sectionTable - bytes.data.count)
+    for (name, address, contents, offset) in placed {
         var field = Data(name.utf8)
         field.append(Data(count: 8 - field.count))
         bytes.data.append(field)
-        bytes.zeros(12)
-        bytes.u32(UInt32(offset)) // raw data offset
+        bytes.u32(UInt32(name == "pck" ? 8 : contents.count)) // Godot's pck section claims a tiny size once loaded
+        bytes.u32(address)
+        bytes.u32(UInt32((contents.count + 0x1FF) / 0x200 * 0x200))
+        bytes.u32(UInt32(offset))
         bytes.zeros(16)
     }
-    bytes.zeros(sectionStart - bytes.data.count)
-    bytes.data.append(payload)
+    for (_, _, contents, offset) in placed {
+        bytes.zeros(offset - bytes.data.count)
+        bytes.data.append(contents)
+    }
+    bytes.zeros(raw - bytes.data.count)
     bytes.data.append(Data(repeating: 0xAB, count: 300)) // the signature after the pack
     return bytes.data
+}
+
+/// Why VNDegen can't run the game, or nil when it can.
+private func refusal(_ layout: GodotLayout, _ game: GameFolder) -> String? {
+    guard case let .failure(.unsupported(reason)) = GodotPlugin.requirements(layout, folder: game.root) else { return nil }
+    return reason
 }
 
 @Suite struct PackTests {
@@ -136,7 +205,7 @@ private func executable(with payload: Data) -> Data {
         #expect(layout.executable == "game.exe")
         #expect(layout.version == "3.5.3")
         #expect(layout.header.files == ["project.binary", "main.gdc"])
-        #expect(GodotPlugin.unsupported(layout, folder: game.root) == nil)
+        #expect(refusal(layout, game) == nil)
     }
 
     @Test func godot4PackInTheExecutablesSection() throws {
@@ -178,17 +247,100 @@ private func executable(with payload: Data) -> Data {
 
     @Test func gdExtensionGamesAreUnsupported() throws {
         let game = try GameFolder([
-            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["addons/godotsteam/godotsteam.gdextension", "project.binary"], flags: 2)),
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["addons/godotsteam/godotsteam.gdextension", "addons/fmod/fmod.gdextension", "project.binary"], flags: 2)),
         ])
         let layout = try #require(GodotLayout(game.probe))
-        #expect(GodotPlugin.unsupported(layout, folder: game.root)?.contains("godotsteam.gdextension") == true)
+        #expect(refusal(layout, game)?.contains("(fmod.gdextension)") == true)
     }
 
-    @Test func encryptedPacksAreUnsupported() throws {
-        let game = try GameFolder(["game.pck": pack(format: 2, version: (4, 2, 2), files: [], flags: 1), "game.exe": Data()])
+    @Test func steamAndEpicExtensionsGetStandIns() throws {
+        let game = try GameFolder([
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["addons/godotsteam/godotsteam.gdextension", "addons/epic-online-services-godot/eosg.gdextension", "project.binary"], flags: 2)),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        let requirements = try GodotPlugin.requirements(layout, folder: game.root).get()
+        #expect(requirements.steam)
+        #expect(requirements.epicOnlineServices)
+    }
+
+    @Test func steamBuiltIntoTheGamesGodot() throws {
+        let game = try GameFolder([
+            "Game.pck": pack(format: 1, version: (3, 3, 5), files: ["res://project.binary"]),
+            "Game.exe": executable(with: Data(), imports: ["KERNEL32.dll", "steam_api64.dll"]),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(try GodotPlugin.requirements(layout, folder: game.root).get().steam)
+        let plain = try GameFolder(["Game.pck": pack(format: 1, version: (3, 3, 5), files: ["res://project.binary"]),
+                                    "Game.exe": executable(with: Data(), imports: ["KERNEL32.dll"])])
+        #expect(try !GodotPlugin.requirements(#require(GodotLayout(plain.probe)), folder: plain.root).get().steam)
+    }
+
+    @Test func theKeyOfAnEncryptedPackComesFromTheExecutable() throws {
+        let key = Data((0..<32).map { UInt8(0x40 + $0) })
+        let script = Data("extends Node2D\n".utf8) // shorter than an AES block, so padded
+        // The key sits among other data, at a multiple of four as compilers place it.
+        let data = Data(repeating: 0x11, count: 4092) + key + Data(repeating: 0x22, count: 100)
+        let settings = projectBinary([("application/config/name", "Sealed")])
+        let files = ["res://project.binary", "res://main.gd", "res://big.gd"]
+        let game = try GameFolder([
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: files, flags: 2,
+                                              contents: ["project.binary": encrypt(settings, key: key), "main.gd": encrypt(script, key: key),
+                                                         "big.gd": encrypt(script + script, key: key)],
+                                              encrypted: Set(files)), data: data),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.encryptedFiles == 3)
+        #expect(try GodotPlugin.requirements(layout, folder: game.root).get().encryptionKey == key)
+        // Saves go where the decrypted settings say.
+        #expect(layout.header.userDirectory == "Godot/app_userdata/Sealed")
+    }
+
+    @Test func textThatIsntASCIIFallsBackToAnotherFile() throws {
+        let key = Data((0..<32).map { UInt8(truncatingIfNeeded: 0x31 * $0 + 9) })
+        let files = ["res://project.binary", "res://credits.txt", "res://icon.png"]
+        let game = try GameFolder([
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: files, flags: 2,
+                                              contents: ["credits.txt": encrypt(Data("é\n".utf8), key: key),
+                                                         "icon.png": encrypt(Data(repeating: 0x89, count: 40), key: key)],
+                                              encrypted: ["res://credits.txt", "res://icon.png"]), data: Data(repeating: 0x55, count: 128) + key),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.encryptionKey == key)
+    }
+
+    @Test func aFileWhoseStartCantBeToldStillGivesTheKey() throws {
+        let key = Data((0..<32).map { UInt8(truncatingIfNeeded: 0x10 * $0 + 5) })
+        let game = try GameFolder([
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["res://project.binary", "res://icon.png"], flags: 2,
+                                              contents: ["icon.png": encrypt(Data((0..<300).map { UInt8($0 % 251) }), key: key)],
+                                              encrypted: ["res://icon.png"]), data: Data(repeating: 0x44, count: 256) + key),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.encryptionKey == key)
+    }
+
+    @Test func theKeyOfAnEncryptedFileList() throws {
+        let key = Data((0..<32).map { UInt8(0x90 &+ $0 &* 3) })
+        let game = try GameFolder([
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["a.txt", "addons/godotsteam/godotsteam.gdextension"],
+                                              flags: 2, directoryKey: key),
+                                   data: Data(repeating: 0x33, count: 64) + key),
+        ])
         let layout = try #require(GodotLayout(game.probe))
         #expect(layout.header.encryptedDirectory)
-        #expect(GodotPlugin.unsupported(layout, folder: game.root) != nil)
+        // The decrypted list shows what the game needs.
+        // The first path is short, so zeros pad it in the list.
+        #expect(layout.header.files == ["a.txt", "addons/godotsteam/godotsteam.gdextension"])
+        let requirements = try GodotPlugin.requirements(layout, folder: game.root).get()
+        #expect(requirements.encryptionKey == key)
+        #expect(requirements.steam)
+    }
+
+    @Test func encryptedPacksWithoutTheirKeyAreUnsupported() throws {
+        let game = try GameFolder(["game.pck": pack(format: 2, version: (4, 2, 2), files: ["res://project.binary"], directoryKey: Data(count: 32)), "game.exe": Data()])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.encryptedDirectory)
+        #expect(refusal(layout, game)?.contains("encrypted") == true)
     }
 
     @Test func projectSettingsNameTheUserFolder() throws {
@@ -254,7 +406,7 @@ private func executable(with payload: Data) -> Data {
         ])
         let layout = try #require(GodotLayout(game.probe))
         #expect(layout.usesDotNet)
-        #expect(GodotPlugin.unsupported(layout, folder: game.root)?.contains("C#") == true)
+        #expect(refusal(layout, game)?.contains("C#") == true)
     }
 
     @Test func otherGamesAreNotGodot() throws {

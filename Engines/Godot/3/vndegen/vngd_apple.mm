@@ -274,6 +274,9 @@ public:
 #endif
 	}
 	String get_executable_path() const override { return executable; }
+	// Files under res:// that the pack doesn't hold are in the game's folder. Windows starts a game in its own folder,
+	// and Godot finds those files from there, which is where games that write to res:// keep their saves.
+	String get_resource_dir() const override { return executable.get_base_dir(); }
 	String get_data_path() const override { return data_path; }
 	// Godot on Windows names its folder this way, where other platforms use "godot".
 	String get_godot_dir_name() const override { return "Godot"; }

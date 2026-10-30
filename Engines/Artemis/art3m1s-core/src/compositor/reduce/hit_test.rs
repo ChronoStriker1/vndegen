@@ -148,8 +148,11 @@ impl Compositor {
     /// 按 `clickablethreshold` 判断图层在指定坐标处是否对指针透明。
     ///
     /// Artemis 的 `clickablethreshold` 是指针命中的 alpha 阈值：**坐标处的纹理像素
-    /// alpha** 低于或等于阈值时，指针穿透该图层。例如，圆形按钮四角的透明像素
-    /// alpha=0，低于阈值 128，点击穿透；中心像素 alpha=255，高于阈值，点击被该图层接收。
+    /// alpha** 低于阈值时，指针穿透该图层。例如，圆形按钮四角的透明像素
+    /// alpha=0，低于阈值 128，点击穿透；中心像素 alpha=255，点击被该图层接收。
+    /// A pixel at the threshold takes the pointer: a game sets 255 on a save
+    /// slot that holds a save, to hit only its opaque pixels, and 0 on an
+    /// empty one, to hit all of it (VNDegen).
     /// 图层 alpha 不参与像素阈值判断，否则 alpha=0 的不可见输入热区无法接收 hover。
     ///
     /// 未设 `clickablethreshold` 的图层一律可点（默认行为）。
@@ -196,7 +199,7 @@ impl Compositor {
             None => props.alpha.unwrap_or(255) as i32, // 无法采样时退回图层 alpha
         };
 
-        hit_alpha <= threshold
+        hit_alpha < threshold
     }
 }
 

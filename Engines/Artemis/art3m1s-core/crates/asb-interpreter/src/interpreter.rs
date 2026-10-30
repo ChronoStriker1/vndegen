@@ -296,11 +296,21 @@ pub struct Interpreter {
     /// 每次 step 迭代开头消费并复位；只有 Jump 类结果会重新置位。
     arrived_by_jump: bool,
     /// The scenario text line running now, with the tags its tag filter
-    /// queues and the helpers they call, until the script waits: the text it prints counts as
+    /// queues and the helpers they call, until the script goes on or an
+    /// input handler runs: the text it prints counts as
     /// scenario text, rather than as text a [print] tag writes, and has this
     /// line as its source. The last field is the call depth it ran at
     /// (VNDegen).
-    scenario_text_line: Option<(String, usize, usize)>,
+    /// Behind a lock so an input handler, which holds the interpreter
+    /// shared, can end it.
+    scenario_text_line: Mutex<Option<(String, usize, usize)>>,
+    /// Instructions run since the host last took them, other than scenario
+    /// text and [/if], by script and index. The PC engine marks every
+    /// instruction it runs as read, and its read-skip checks them (VNDegen).
+    executed: Vec<(String, usize)>,
+    /// Macro invocations whose macro may still run, with the call depth they
+    /// ran at, to mark read once the macro's frame is gone (VNDegen).
+    running_macros: Vec<(String, usize, usize)>,
     /// 已执行过的 `__lua_block`（键：脚本名 + 指令下标）。
     ///
     /// Artemis 语义：[lua] 块在**文件加载时**执行且每块只执行一次（见
@@ -449,7 +459,9 @@ impl Interpreter {
             last_flush_saw_jump: false,
             queued_call_barriers: Vec::new(),
             arrived_by_jump: false,
-            scenario_text_line: None,
+            scenario_text_line: Mutex::new(None),
+            executed: Vec::new(),
+            running_macros: Vec::new(),
             executed_lua_blocks: std::collections::HashSet::new(),
             macros: MacroRegistry::new(),
             macro_files: HashMap::new(),
@@ -796,15 +808,33 @@ impl Interpreter {
             }
 
             let instruction = script.instructions[self.current_line].clone();
-            if instruction.tag == "__text" {
-                self.scenario_text_line =
-                    Some((script_name.clone(), self.current_line, self.call_stack.len()));
-            } else if self
-                .scenario_text_line
-                .as_ref()
-                .is_some_and(|(_, _, depth)| self.call_stack.len() <= *depth)
+            // A macro's text takes its invocation as its source, so the
+            // invocation is marked read once the macro has left the stack,
+            // after that text has shown, not here.
+            if instruction.tag != "__text"
+                && instruction.tag != "/if"
+                && !script_name.starts_with("__macro__")
             {
-                self.scenario_text_line = None;
+                if self.macros.contains(&instruction.tag) {
+                    self.running_macros.push((
+                        script_name.clone(),
+                        self.current_line,
+                        self.call_stack.len(),
+                    ));
+                } else {
+                    self.executed.push((script_name.clone(), self.current_line));
+                }
+            }
+            {
+                let mut line = self.scenario_text_line.lock().unwrap();
+                if instruction.tag == "__text" {
+                    *line = Some((script_name.clone(), self.current_line, self.call_stack.len()));
+                } else if line
+                    .as_ref()
+                    .is_some_and(|(_, _, depth)| self.call_stack.len() <= *depth)
+                {
+                    *line = None;
+                }
             }
 
             if std::env::var("ASB_TRACE_STEP").is_ok() {
@@ -1355,6 +1385,15 @@ impl Interpreter {
     }
 
     fn pop_call_frame(&mut self) -> Option<CallFrame> {
+        // A save's frame wait released when control came back into this
+        // frame, and not run yet, leaves with the frame, as on the PC: a game
+        // that returns through several frames at once doesn't stop in each
+        // (VNDegen).
+        self.engine_ctx
+            .lock()
+            .unwrap()
+            .tag_queue
+            .retain(|(_, params)| !params.contains_key(LOAD_WAIT));
         let frame = self.call_stack.pop();
         self.variables
             .lock()
@@ -1386,13 +1425,14 @@ impl Interpreter {
     }
 
     fn emit_event(&mut self, mut event: Event) -> CallbackResult {
+        let scenario_line = self.scenario_text_line.lock().unwrap().clone();
         if let Event::ScenarioText { printed, .. } = &mut event
-            && self.scenario_text_line.is_some()
+            && scenario_line.is_some()
         {
             *printed = false;
         }
         if matches!(event, Event::ScenarioText { .. }) {
-            let mut source = self.scenario_text_line.clone().map(|(file, line, _)| (file, line)).or_else(|| {
+            let mut source = scenario_line.map(|(file, line, _)| (file, line)).or_else(|| {
                 self.current_script
                     .clone()
                     .map(|file| (file, self.current_line))
@@ -2047,9 +2087,6 @@ impl Interpreter {
 
     /// 持续执行直到完成或等待
     pub fn run(&mut self) -> Result<ExecutionResult> {
-        // A scenario line's text is what it prints before the script waits;
-        // a menu opened from that wait prints text of its own (VNDegen).
-        self.scenario_text_line = None;
         self.step()
     }
 
@@ -2244,6 +2281,50 @@ impl Interpreter {
             .map_or(index, |loaded| loaded.pc_index(index))
     }
 
+    /// Ends the current scenario line's hold on the text that follows: an
+    /// input handler's text, such as a menu's, is not that line's (VNDegen).
+    pub fn end_scenario_text_line(&self) {
+        *self.scenario_text_line.lock().unwrap() = None;
+    }
+
+    /// The instructions run since the last call, other than scenario text,
+    /// as PC engine indexes by script (VNDegen).
+    pub fn take_executed_pc_lines(&mut self) -> Vec<(String, usize)> {
+        let stack = &self.call_stack;
+        let (done, running): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.running_macros).into_iter().partition(|(script, line, depth)| {
+                stack.get(*depth).is_none_or(|frame| {
+                    frame.script != *script || frame.return_line != line + 1
+                })
+            });
+        self.running_macros = running;
+        let mut executed = std::mem::take(&mut self.executed);
+        executed.extend(done.into_iter().map(|(script, line, _)| (script, line)));
+        let mut pc_indexes: HashMap<String, Vec<usize>> = HashMap::new();
+        executed
+            .into_iter()
+            .filter_map(|(script, index)| {
+                let loaded = self.scripts.get(&script)?;
+                let indexes = pc_indexes.entry(script.clone()).or_insert_with(|| {
+                    let mut ifs = 0;
+                    loaded
+                        .instructions
+                        .iter()
+                        .enumerate()
+                        .map(|(index, instruction)| {
+                            let pc = index - ifs;
+                            if instruction.tag == "/if" {
+                                ifs += 1;
+                            }
+                            pc
+                        })
+                        .collect()
+                });
+                Some((script, *indexes.get(index)?))
+            })
+            .collect()
+    }
+
     /// The instruction of a script that a PC Artemis engine index points at,
     /// loading the script first (VNDegen).
     pub fn index_from_pc(&mut self, script: &str, pc_index: usize) -> Result<usize> {
@@ -2283,7 +2364,6 @@ impl Interpreter {
 
     /// 只抽干 Lua/事件排入的标签队列，不在队列清空后继续执行主脚本。
     pub fn drain_queued_tags_only(&mut self) -> Result<QueuedTagDrain> {
-        self.scenario_text_line = None;
         let origin = (
             self.current_script.clone(),
             self.current_line,
@@ -2925,6 +3005,173 @@ mod tests {
             it.get_variable("t.after"),
             Some(Value::Int(1)),
             "the saved stop no longer holds the frame"
+        );
+    }
+
+    #[test]
+    fn get_script_stack_sees_a_return_e_tag_made_in_the_same_call() {
+        // As a game's ReturnStack: pop every frame of one file, reading the
+        // stack again for each, in one Lua call.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(
+                r#"
+                function return_from(file)
+                    local ss = __engine:getScriptStack()
+                    for i = #ss, 1, -1 do
+                        if ss[i].file == file then __engine:tag{"return"} else break end
+                    end
+                end
+                function leave_ui()
+                    return_from("system")
+                    return_from("ui")
+                end
+                "#,
+            )
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[call file=\"ui\" label=\"open\"]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("ui", "*open\n[call file=\"system\" label=\"load\"]\n[stop]\n[return]\n")
+            .unwrap();
+        it.load_script("system", "*load\n[calllua function=\"leave_ui\"]\n[return]\n")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+
+        let _ = it.run().unwrap();
+
+        assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)), "both frames returned");
+        assert_eq!(it.current_script(), Some("story"));
+    }
+
+    #[test]
+    fn a_saved_frame_wait_leaves_with_its_frame() {
+        // A save made in a menu: the menu's frame was stopped. onLoad returns
+        // through it to the story at once, so its stop never runs.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(r#"function leave() __engine:tag{"return"} __engine:tag{"return"} end"#)
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[stop]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("menu", "*open\n[stop]\n[return]\n").unwrap();
+        it.load_script("system", "*load\n[calllua function=\"leave\"]\n[return]\n")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.restore_position(
+            "system",
+            0,
+            vec![
+                super::CallFrame {
+                    script: "story".into(),
+                    return_line: 1,
+                },
+                super::CallFrame {
+                    script: "menu".into(),
+                    return_line: 1,
+                },
+            ],
+        )
+        .unwrap();
+        it.defer_until_return(1, vec![("stop".into(), HashMap::new())]);
+
+        let _ = it.run().unwrap();
+
+        assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)), "the menu's stop left with it");
+    }
+
+    #[test]
+    fn instructions_run_are_kept_as_pc_indexes() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.load_script(
+            "story",
+            "*main\n[if estimate=\"1\"]\n[var name=\"t.a\" data=\"1\"]\n[/if]\ntext\n[var name=\"t.b\" data=\"1\"]\n[stop]\n",
+        )
+        .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+        let _ = it.run().unwrap();
+
+        // [if] 0, [var] 1, [/if] 2 (no PC index), text 3, [var] 4, [stop] 5:
+        // PC indexes 0, 1, (text 2), 3, 4.
+        let lines: Vec<_> = it.take_executed_pc_lines().into_iter().map(|(_, line)| line).collect();
+        assert_eq!(lines, [0, 1, 3, 4]);
+        assert!(it.take_executed_pc_lines().is_empty());
+    }
+
+    #[test]
+    fn get_script_stack_follows_a_call_and_return_e_tag_makes() {
+        // A helper calls a script and returns from it, then reads the stack.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(
+                r#"
+                function leave(e, p)
+                    e:tag{"call", file="dummy"}
+                    e:tag{"return"}
+                    local ss = e:getScriptStack()
+                    for i = #ss, 1, -1 do
+                        if ss[i].file == "ui" then e:tag{"return"} else break end
+                    end
+                end
+                "#,
+            )
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[call file=ui]\n[var name=t.after data=1]\n[stop]")
+            .unwrap();
+        it.load_script("ui", "[calllua function=leave]\n[stop]").unwrap();
+        it.load_script("dummy", "[stop]").unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+
+        let _ = it.run().unwrap();
+
+        assert_eq!(it.current_script(), Some("story"));
+        assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)));
+    }
+
+    #[test]
+    fn a_macro_invocation_is_not_read_before_its_text_shows() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.set_script_loader(Box::new(|_| {
+            Ok("*say\n[wait time=100]\nfirst unread page\n[stop]\n[return]".into())
+        }));
+        it.load_macro_file("macro.iet").unwrap();
+        it.load_script("story", "*main\n[say]\n[stop]").unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+
+        let _ = it.run().unwrap();
+
+        assert!(
+            it.take_executed_pc_lines().is_empty(),
+            "[say] is marked read when its text shows"
+        );
+        it.advance_line();
+        let _ = it.run().unwrap();
+        it.advance_line();
+        let _ = it.run().unwrap();
+        assert!(
+            it.take_executed_pc_lines().contains(&("story".to_string(), 0)),
+            "and once the macro returns"
         );
     }
 
@@ -4128,6 +4375,40 @@ mod tests {
                 ("second".to_string(), false, Some(("test".to_string(), 1))),
             ]
         );
+    }
+
+    #[test]
+    fn scenario_text_keeps_its_line_across_a_wait_its_filter_queues() {
+        // As a game's print hook: a transition wait, then the print.
+        let mut interpreter = filtered_interpreter(
+            r#"
+                local filter = {}
+                function filter.print(e, p)
+                    e:enqueueTag{"wait", time="100"}
+                    e:enqueueTag{"print", data=p.data}
+                    return 1
+                end
+                __engine:setTagFilter(filter)
+            "#,
+            "*main\nfirst\n[var name=\"t.a\" data=\"1\"]\n[stop]\n",
+        );
+        let sources = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&sources);
+        let ctx = Arc::clone(interpreter.engine_context());
+        interpreter.set_callback(move |event| match event {
+            Event::ScenarioText { .. } => {
+                sink.lock().unwrap().push(ctx.lock().unwrap().scenario_text_source.clone());
+                CallbackResult::Continue
+            }
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+
+        let _ = interpreter.run().unwrap();
+        interpreter.advance_line();
+        let _ = interpreter.run().unwrap();
+
+        assert_eq!(*sources.lock().unwrap(), [Some(("test".to_string(), 0))]);
     }
 
     #[test]

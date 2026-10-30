@@ -660,6 +660,34 @@ impl UserData for EngineApi {
                     if let Some(event) = queued_layer_event(&tag_name, &params) {
                         ctx.callbacks.preview_layer_event(&event);
                     }
+                    // The PC engine runs e:tag{"return"} at once, so a later
+                    // e:getScriptStack in the same Lua call sees the caller on
+                    // top. Games pop several frames that way, one
+                    // getScriptStack per return (VNDegen).
+                    // A call or jump moves it too, so a helper that calls a
+                    // script and returns from it in the same Lua call keeps
+                    // the view and the real stack in step.
+                    match tag_name.as_str() {
+                        "return" if ctx.script_stack.len() > 1 => {
+                            ctx.script_stack.pop();
+                        }
+                        "call" => {
+                            let file = params.get("file").filter(|f| !f.is_empty()).cloned();
+                            let file = file.or_else(|| ctx.script_stack.last().map(|(f, _)| f.clone()));
+                            if let Some(file) = file {
+                                ctx.script_stack.push((file, 0));
+                            }
+                        }
+                        "jump" => {
+                            if let (Some(file), Some(top)) = (
+                                params.get("file").filter(|f| !f.is_empty()).cloned(),
+                                ctx.script_stack.last_mut(),
+                            ) {
+                                *top = (file, 0);
+                            }
+                        }
+                        _ => {}
+                    }
                     let insert_at = ctx.immediate_tag_count.min(ctx.tag_queue.len());
                     ctx.tag_queue.insert(insert_at, (tag_name, params));
                     ctx.immediate_tag_count += 1;

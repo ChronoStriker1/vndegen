@@ -35,6 +35,14 @@ typedef struct VNGDLaunch {
     const char *fontTable;
     const char *const *fontFolders;
     int fontFolderCount;
+    // The game's own copy of Godot has GodotSteam in it, built in or as an extension. The engine then provides
+    // GodotSteam's Steam class and singleton, answering as Steam does offline with the player signed in.
+    bool steam;
+    // Godot 4: the game ships the Epic Online Services extension, which VNDegen can't load. The engine then provides
+    // its class names, without Epic Online Services behind them, so scripts that name them compile.
+    bool epicOnlineServices;
+    // Godot 4: the 32-byte AES key the game's pack is encrypted with, found in its .exe, or NULL.
+    const uint8_t *encryptionKey;
 } VNGDLaunch;
 
 // Loads the game and starts it. Returns 0 on success, 1 when it fails, and 2 when it fails in a way that leaves this
