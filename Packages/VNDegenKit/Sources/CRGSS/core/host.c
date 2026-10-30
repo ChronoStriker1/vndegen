@@ -239,8 +239,10 @@ int vnrgss_step(double seconds) {
     if (!S.paused) {
         if (seconds < 0) seconds = 0;
         if (seconds > 0.25) seconds = 0.25;
+        // Rounded rather than truncated: display refreshes jitter around 1/60 s, and truncating would grant no frame on
+        // one refresh and two on the next, so one of the two would never be shown. The carry stays within half a frame.
         S.carry += seconds * S.frameRate;
-        int frames = (int)S.carry;
+        int frames = (int)(S.carry + 0.5);
         S.carry -= frames;
         S.granted += frames;
         // A game that falls behind runs at its own pace rather than racing to catch up.
