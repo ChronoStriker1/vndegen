@@ -75,7 +75,9 @@ void Game::databaseCommand(Thread &t, const Command &c) {
         return;
     }
     if (!dt) return;
-    if (c.arg(1) == -2 || c.arg(2) == -2) {  // reset a row, or a field in every row, to the defaults
+    // Row -2 resets every row of the type to the defaults, and field -2 every field of one row (WodiLib's
+    // DBManagementClearData and DBManagementClearField).
+    if (c.arg(1) == -2 || c.arg(2) == -2) {
         auto reset = [&](DatabaseType::Row &r, int f) {
             if (dt->isString(f)) {
                 if (dt->slot(f) < r.strings.size()) r.strings[dt->slot(f)].clear();
@@ -83,10 +85,13 @@ void Game::databaseCommand(Thread &t, const Command &c) {
                 r.numbers[dt->slot(f)] = f < int(dt->defaults.size()) ? dt->defaults[f] : 0;
             }
         };
-        if (c.arg(1) == -2 && row >= 0 && row < int(dt->rows.size())) {
-            for (int f = 0; f < int(dt->fieldKinds.size()); f++) reset(dt->rows[row], f);
-        } else if (c.arg(2) == -2 && field >= 0) {
-            for (auto &r : dt->rows) reset(r, field);
+        auto resetRow = [&](DatabaseType::Row &r) {
+            for (int f = 0; f < int(dt->fieldKinds.size()); f++) reset(r, f);
+        };
+        if (c.arg(1) == -2) {
+            for (auto &r : dt->rows) resetRow(r);
+        } else if (row >= 0 && row < int(dt->rows.size())) {
+            resetRow(dt->rows[row]);
         }
         return;
     }

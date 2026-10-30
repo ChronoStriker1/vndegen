@@ -267,9 +267,9 @@ bool Game::step(Thread &t) {
             return t.wait <= 0;
         }
 
-        case 213: {  // jump to label
+        case 213: {  // jump to label, whose name may hold text codes, as "Back\cself[90]"
             const Commands &cmds = *c.commands;
-            const std::string &name = cmd.str(0);
+            const std::string name = expandText(cmd.str(0), &t);
             for (size_t i = 0; i < cmds.size(); i++) {
                 if (cmds[i].code == 212 && cmds[i].str(0) == name) {
                     c.pc = i + 1;
