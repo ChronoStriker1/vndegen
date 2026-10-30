@@ -107,3 +107,4 @@ last save read or written. `docs/wolfrpg-save-format.md` describes the format an
 - System variable 115, the engine version the standard systems read, is set to 2.24 for Shift-JIS games and 3.28 for
   UTF-8 ones, since no Game.dat field is known to hold the real one.
 - The picture flash effect tints a picture toward its colour and leaves it there instead of returning to normal.
+- The effect command's map effects, such as zooming the map, aren't drawn. Of the library, one game zooms the map.
