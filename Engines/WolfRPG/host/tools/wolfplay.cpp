@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
             game.update(in);
             if (std::getenv("WOLF_HERO") && f % 30 == 0) {
                 auto h = game.heroTile();
-                std::printf("frame %d: map %d hero %d,%d facing %d%s\n", f, game.mapId(), h[0], h[1], h[2],
-                            game.message().active ? " (message)" : "");
+                std::printf("frame %d: map %d hero %d,%d facing %d%s%s\n", f, game.mapId(), h[0], h[1], h[2],
+                            game.message().active ? " (message)" : "", game.choice().active ? " (choice)" : "");
             }
             auto [sa, sb] = shots.equal_range(f);
             if (sa != sb) {

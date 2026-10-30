@@ -675,40 +675,47 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
                 imageSize(*bytes, fresh.imageW, fresh.imageH);
             }
         }
-        fresh.x.set(value(c.arg(7), t), 0);
-        fresh.y.set(value(c.arg(8), t), 0);
+        fresh.x.set(value(c.arg(7), t) == -1000000 ? 0 : value(c.arg(7), t), 0);
+        fresh.y.set(value(c.arg(8), t) == -1000000 ? 0 : value(c.arg(8), t), 0);
         fresh.opacity.set(0, 0);
         fresh.zoomX.set(100, 0);
         fresh.zoomY.set(100, 0);
         for (Tween *tw : {&fresh.r, &fresh.g, &fresh.b}) tw->set(100, 0);
         p = fresh;
     }
+    // A field of -1,000,000 leaves the picture's current value as it is.
+    constexpr int32_t keep = -1000000;
+    auto field = [&](size_t i, int32_t fallback) {
+        if (i >= c.args.size()) return fallback;
+        int32_t v = value(c.arg(i), t);
+        return v == keep ? fallback : v;
+    };
     p.anchor = anchor >> 4;
     p.blend = blend;
     if (p.kind == PictureKind::Window) {
         // A window picture's two division fields are its width and height.
-        p.windowW = value(c.arg(3), t);
-        p.windowH = value(c.arg(4), t);
+        p.windowW = field(3, p.windowW);
+        p.windowH = field(4, p.windowH);
         p.divX = p.divY = 1;
     } else {
-        p.divX = std::max(1, value(c.arg(3), t));
-        p.divY = std::max(1, value(c.arg(4), t));
+        p.divX = std::max(1, field(3, p.divX));
+        p.divY = std::max(1, field(4, p.divY));
     }
-    p.pattern = value(c.arg(5), t);
+    p.pattern = field(5, p.pattern);
     int over = show ? 0 : frames;
-    p.opacity.set(value(c.arg(6), t), show ? frames : over);
+    p.opacity.set(field(6, int32_t(p.opacity.to)), show ? frames : over);
     if (!show) {
-        p.x.set(value(c.arg(7), t), over);
-        p.y.set(value(c.arg(8), t), over);
+        p.x.set(field(7, int32_t(p.x.to)), over);
+        p.y.set(field(8, int32_t(p.y.to)), over);
     }
-    int zoom = value(c.arg(9), t);
+    int zoom = field(9, int32_t(p.zoomX.to));
     p.zoomX.set(zoom, over);
-    p.zoomY.set(c.args.size() > 18 ? value(c.arg(18), t) : zoom, over);
-    p.angle.set(value(c.arg(10), t), over);
+    p.zoomY.set(c.args.size() > 18 ? field(18, int32_t(p.zoomY.to)) : zoom, over);
+    p.angle.set(field(10, int32_t(p.angle.to)), over);
     if (c.args.size() > 17) {
-        p.r.set(value(c.arg(15), t), over);
-        p.g.set(value(c.arg(16), t), over);
-        p.b.set(value(c.arg(17), t), over);
+        p.r.set(field(15, int32_t(p.r.to)), over);
+        p.g.set(field(16, int32_t(p.g.to)), over);
+        p.b.set(field(17, int32_t(p.b.to)), over);
     }
 }
 
