@@ -1,5 +1,5 @@
---- a/core/os/dir_access.cpp	2026-10-30 05:02:04.843240524 -0400
-+++ b/core/os/dir_access.cpp	2026-10-30 05:02:04.850036602 -0400
+--- a/core/os/dir_access.cpp	2026-10-30 05:13:35.896886984 -0400
++++ b/core/os/dir_access.cpp	2026-10-30 05:13:35.904076346 -0400
 @@ -35,6 +35,8 @@
  #include "core/os/os.h"
  #include "core/project_settings.h"
@@ -15,7 +15,7 @@
  
 +// VNDegen: VNDegen finds files whatever case a game names them in, so two spellings can open one file on disk, and
 +// copying it onto itself would empty it. The destination is opened as FileAccess::open opens the write below, without
-+// looking in the pack first. A file read from the pack is never the same file.
++// looking in the pack first. A file stored inside a pack is never the same file.
 +static bool _vndegen_same_file(const String &p_a, const String &p_b) {
 +	struct stat a, b;
 +	return !p_a.empty() && !p_b.empty() && stat(p_a.utf8().get_data(), &a) == 0 && stat(p_b.utf8().get_data(), &b) == 0 && a.st_dev == b.st_dev && a.st_ino == b.st_ino;
