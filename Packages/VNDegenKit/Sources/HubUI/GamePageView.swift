@@ -50,6 +50,7 @@ struct GamePageView: View {
         }
         // The game's engine decides which runtime packages it needs, and an install finishing changes which are missing.
         .task(id: "\(game.id)|\(game.engine?.rawValue ?? "")") { await nav.runtimes.refresh(game.id) }
+        .task(id: game.id) { await hub.metadata.fillAbout(game.id, in: hub.library) }
         .runtimeFolderImporter(nav.runtimes, game: game.id)
         .background {
             GeometryReader { geo in
@@ -156,6 +157,9 @@ struct GamePageView: View {
             }
             if let genres = metadata?.genres, !genres.isEmpty {
                 FlowTags(tags: genres)
+            }
+            if let screenshots = metadata?.screenshots, !screenshots.isEmpty {
+                ScreenshotRow(screenshots: screenshots)
             }
         }
     }
@@ -354,6 +358,30 @@ private struct EngineSection: View {
         case .likely: "likely"
         case .certain: "certain"
         }
+    }
+}
+
+/// The game's screenshots in a row that scrolls sideways.
+private struct ScreenshotRow: View {
+    let screenshots: [Screenshot]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 10) {
+                ForEach(screenshots, id: \.url) { screenshot in
+                    AsyncImage(url: screenshot.thumbnail) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Theme.surface
+                    }
+                    .frame(width: 256, height: 144)
+                    .clipShape(.rect(cornerRadius: 8, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.stroke) }
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityLabel("Screenshots")
     }
 }
 

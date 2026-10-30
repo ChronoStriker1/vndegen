@@ -6,6 +6,8 @@ import Synchronization
 /// so a test can tell which candidate ended up in a slot.
 final class StubNetwork: Sendable {
     static let steamGridDBKey = "test-key"
+    /// A Steam app whose store page answers with a server error.
+    static let failingAppID = "500"
     private let log = Mutex<[URLRequest]>([])
 
     var http: HTTP {
@@ -44,7 +46,8 @@ final class StubNetwork: Sendable {
                 let term = query.first { $0.name == "term" }?.value ?? ""
                 return json(term.contains("Doki") ? "steam-search-ddlc" : "steam-search-nosocks")
             }
-            return json("steam-appdetails-\(query.first { $0.name == "appids" }!.value!)")
+            let appID = query.first { $0.name == "appids" }!.value!
+            return appID == failingAppID ? (500, nil, Data()) : json("steam-appdetails-\(appID)")
         case "api.steampowered.com":
             let input = query.first { $0.name == "input_json" }!.value!
             return json(input.contains("698780") ? "steam-assets-698780" : "steam-assets-4929970")

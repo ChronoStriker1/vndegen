@@ -6,7 +6,7 @@ struct IGDBProvider: MetadataProvider {
     private static let api = URL(string: "https://api.igdb.com/v4/")!
     private static let gameFields = "fields name,summary,url,first_release_date,total_rating,genres.name,"
         + "involved_companies.developer,involved_companies.publisher,involved_companies.company.name,"
-        + "external_games.external_game_source,external_games.uid,cover.image_id,artworks.image_id;"
+        + "external_games.external_game_source,external_games.uid,cover.image_id,artworks.image_id,screenshots.image_id;"
     /// IGDB's external game source for Steam.
     private static let steamSource = 1
 
@@ -40,7 +40,10 @@ struct IGDBProvider: MetadataProvider {
             releaseDate: game.releaseDate,
             genres: (game.genres ?? []).map(\.name),
             rating: game.total_rating,
-            refs: [ref(game)] + (steamID.map { [SteamProvider.ref($0)] } ?? [])
+            refs: [ref(game)] + (steamID.map { [SteamProvider.ref($0)] } ?? []),
+            screenshots: (game.screenshots ?? []).map {
+                Screenshot(url: Self.image($0.image_id, size: "t_1080p"), thumbnail: Self.image($0.image_id, size: "t_screenshot_med"))
+            }
         )
     }
 
@@ -155,6 +158,7 @@ private struct IGDBGame: Decodable {
     var external_games: [External]?
     var cover: Image?
     var artworks: [Image]?
+    var screenshots: [Image]?
 
     var releaseDate: String? {
         first_release_date.map { Date(timeIntervalSince1970: $0).formatted(.iso8601.year().month().day()) }

@@ -48,6 +48,16 @@ public struct ExternalRef: Codable, Hashable, Sendable {
     }
 }
 
+public struct Screenshot: Codable, Hashable, Sendable {
+    public var url: URL
+    public var thumbnail: URL
+
+    public init(url: URL, thumbnail: URL) {
+        self.url = url
+        self.thumbnail = thumbnail
+    }
+}
+
 public struct GameMetadata: Codable, Hashable, Sendable {
     public var title: String?
     public var summary: String?
@@ -59,9 +69,12 @@ public struct GameMetadata: Codable, Hashable, Sendable {
     /// 0 to 100.
     public var rating: Double?
     public var refs: [ExternalRef]
+    /// Nil until a lookup finishes, so games matched before screenshots existed fetch them once.
+    public var screenshots: [Screenshot]?
 
     public init(title: String? = nil, summary: String? = nil, developers: [String] = [], publishers: [String] = [],
-                releaseDate: String? = nil, genres: [String] = [], rating: Double? = nil, refs: [ExternalRef] = []) {
+                releaseDate: String? = nil, genres: [String] = [], rating: Double? = nil, refs: [ExternalRef] = [],
+                screenshots: [Screenshot]? = nil) {
         self.title = title
         self.summary = summary
         self.developers = developers
@@ -70,6 +83,7 @@ public struct GameMetadata: Codable, Hashable, Sendable {
         self.genres = genres
         self.rating = rating
         self.refs = refs
+        self.screenshots = screenshots
     }
 }
 

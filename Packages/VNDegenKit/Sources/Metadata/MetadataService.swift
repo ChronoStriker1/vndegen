@@ -50,6 +50,9 @@ public final class MetadataService {
         .header: [.steam, .steamGridDB],
         .icon: [.steamGridDB],
     ]
+    /// Which sources fill the About section (summary, genres, and screenshots), best first. Each field comes from the
+    /// first of these that has it, whichever source the user confirmed.
+    static let aboutPriority: [MetadataSource] = [.steam, .igdb]
 
     @ObservationIgnored private let http: HTTP
     @ObservationIgnored private let credentials: any CredentialStore
@@ -90,20 +93,15 @@ public final class MetadataService {
         let first = try await primary.details(candidate.ref.id)
         let refs = await resolveRefs(title: first.title ?? candidate.title, known: first.refs)
 
-        // The confirmed source wins every field it has. The others fill gaps in search priority order.
+        // The confirmed source wins every field it has, except the About fields. The others fill gaps in search priority order.
         let others = refs.filter { $0.source != candidate.ref.source }
-        let extra = await withTaskGroup(of: (MetadataSource, GameMetadata?).self) { group in
-            for ref in others {
-                guard let provider = provider(for: ref.source) else { continue }
-                group.addTask { (ref.source, await Self.attempt(ref.source, "details") { try await provider.details(ref.id) }) }
-            }
-            var bySource: [MetadataSource: GameMetadata] = [:]
-            for await (source, metadata) in group { bySource[source] = metadata }
-            return bySource
-        }
+        var details = await details(others)
         var merged = first
         merged.refs = refs
-        for source in TitleMatch.searchPriority { merged = merged.filling(from: extra[source]) }
+        for source in TitleMatch.searchPriority { merged = merged.filling(from: details[source]) }
+        details[candidate.ref.source] = first
+        let asked = Set(others.compactMap { provider(for: $0.source)?.source } + [candidate.ref.source])
+        merged = Self.preferringAbout(merged, details: details, asked: asked)
 
         library.update(id) { game in
             // A title still equal to the folder name was never chosen by anyone.
@@ -122,6 +120,18 @@ public final class MetadataService {
             try await apply(match, to: id, in: library)
         } catch {
             log.error("auto-match of \(id.rawValue, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Brings the About section of a game matched before it took Steam's text and screenshots first up to date.
+    /// Does nothing once the game has a screenshot list, even an empty one.
+    public func fillAbout(_ id: GameID, in library: LibraryStore) async {
+        guard let metadata = library.game(id)?.metadata, metadata.screenshots == nil else { return }
+        let refs = metadata.refs.filter { Self.aboutPriority.contains($0.source) && provider(for: $0.source) != nil }
+        let details = await details(refs)
+        library.update(id) { game in
+            guard let current = game.metadata, current.screenshots == nil else { return }
+            game.metadata = Self.preferringAbout(current, details: details, asked: Set(refs.map(\.source)))
         }
     }
 
@@ -170,6 +180,42 @@ public final class MetadataService {
 
     private func provider(for source: MetadataSource) -> (any MetadataProvider)? {
         providers.first { $0.source == source }
+    }
+
+    /// Details from each ref's source, keyed by source. Sources that are not set up or fail are left out.
+    private func details(_ refs: [ExternalRef]) async -> [MetadataSource: GameMetadata] {
+        await withTaskGroup(of: (MetadataSource, GameMetadata?).self) { group in
+            for ref in refs {
+                guard let provider = provider(for: ref.source) else { continue }
+                group.addTask { (ref.source, await Self.attempt(ref.source, "details") { try await provider.details(ref.id) }) }
+            }
+            var bySource: [MetadataSource: GameMetadata] = [:]
+            for await (source, metadata) in group { bySource[source] = metadata }
+            return bySource
+        }
+    }
+
+    /// Takes each About field from the first source in `aboutPriority` that has it. `details` holds the answers from
+    /// the sources in `asked`. When a source was asked and did not answer before one with screenshots, the screenshots
+    /// stay unknown so `fillAbout` tries again later.
+    private static func preferringAbout(_ metadata: GameMetadata, details: [MetadataSource: GameMetadata],
+                                        asked: Set<MetadataSource>) -> GameMetadata {
+        let ordered = aboutPriority.filter(asked.contains)
+        var result = metadata
+        if let summary = ordered.lazy.compactMap({ details[$0]?.summary }).first(where: { !$0.isEmpty }) { result.summary = summary }
+        if let genres = ordered.lazy.compactMap({ details[$0]?.genres }).first(where: { !$0.isEmpty }) { result.genres = genres }
+        result.screenshots = []
+        for source in ordered {
+            guard let answer = details[source] else {
+                result.screenshots = nil
+                break
+            }
+            if let screenshots = answer.screenshots, !screenshots.isEmpty {
+                result.screenshots = screenshots
+                break
+            }
+        }
+        return result
     }
 
     /// `known` plus a ref for every other active source: translated from a known ref where the source supports it,

@@ -60,6 +60,7 @@ extension GameMetadata {
         merged.releaseDate = releaseDate ?? other.releaseDate
         merged.genres = genres.isEmpty ? other.genres : genres
         merged.rating = rating ?? other.rating
+        merged.screenshots = screenshots ?? other.screenshots
         let known = Set(refs.map(\.source))
         merged.refs = refs + other.refs.filter { !known.contains($0.source) }
         return merged
