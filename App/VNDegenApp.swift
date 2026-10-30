@@ -2,9 +2,14 @@ import SwiftUI
 import VNCore
 import EngineRPGMaker
 import EngineTyrano
+import EngineFlash
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
+import EngineArtemis
+import EngineGodot
+import EngineNScripter
+import FontPack
 import RuntimePackages
 import Metadata
 import GameInput
@@ -20,12 +25,19 @@ let engines: [any EnginePlugin] = {
         TyranoPlugin(),
         RenPyPlugin(),
         KiriKiriPlugin(),
+        ArtemisPlugin(),
+        GodotPlugin(),
+        FlashPlugin(),
+        NScripterPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)
     for flavor in [RGSSPlugin.Flavor.vxAce, .vx, .xp] {
         engines.append(RGSSPlugin(flavor) { runtimes.installedFolder(for: $0) })
     }
+    // The Windows font substitutes every engine reads: the bundled fonts, and the Chinese and Korean ones the player
+    // downloaded. Settings configures it again after a download.
+    FontPack.configure { runtimes.installedFolder(for: $0) }
     #if DEBUG
     // Registered first, so it wins the MZ engine ID over the real runtime.
     if UserDefaults.standard.bool(forKey: "fakeSession") { engines.insert(FakeSessionPlugin(), at: 0) }
@@ -101,6 +113,8 @@ struct VNDegenApp: App {
         Window("VNDegen", id: "main") { root }
             .windowStyle(.hiddenTitleBar)
             .defaultSize(width: 1280, height: 800)
+        #elseif DEBUG
+        WindowGroup { SimulatedWindow { root } }
         #else
         WindowGroup { root }
         #endif

@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import Observation
 import VNCore
@@ -102,6 +103,8 @@ final class Navigator {
         /// A runtime package a game is missing, by package ID, on the game's page.
         case runtime(String, RuntimeAction)
         case licenseAccept, licenseDecline
+        /// A font package in Settings, by package ID. It downloads, cancels, or removes the package.
+        case fontPackage(String)
     }
 
     enum RuntimeAction: Hashable {
@@ -148,6 +151,8 @@ final class Navigator {
     private var heroID: GameID?
     /// Set by the grid view from its width.
     var gridColumns = 4
+    /// Set by the game page when a narrow window puts its other buttons in a row under Play.
+    var pageActionsStacked = false
     private(set) var rescanning = false
     @ObservationIgnored private var columnMemory: [String: Int] = [:]
     @ObservationIgnored private var lastBackgrounded: Date?
@@ -255,10 +260,13 @@ final class Navigator {
                     : [.runtime(package.id, .install), .runtime(package.id, .importFolder)]
                 return Row(id: "page-runtime-\(package.id)", items: items)
             }
+            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock]
+            let pageActions = pageActionsStacked
+                ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
+                : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
             return [
                 Row(id: "page-back", items: [.back]),
-                Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
-            ] + runtimes + [
+            ] + pageActions + runtimes + [
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
@@ -271,6 +279,7 @@ final class Navigator {
             if method.mouse != nil { items.append(.mouseStyle) }
             items.append(.playOrientation)
             #endif
+            items += FontPack.packages.map { .fontPackage($0.id) }
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
@@ -446,6 +455,15 @@ final class Navigator {
             case .importFolder: runtimes.pickFolder(for: package)
             case .cancel: runtimes.cancel(package)
             }
+        case let .fontPackage(packageID):
+            guard let package = FontPack.packages.first(where: { $0.id == packageID }) else { return }
+            if case .running? = runtimes.phases[packageID] {
+                runtimes.cancel(package)
+            } else if runtimes.installedFonts.contains(packageID) {
+                runtimes.remove(package)
+            } else {
+                runtimes.install(package, for: nil)
+            }
         case .licenseAccept, .licenseDecline:
             guard case let .license(request) = sheet else { return }
             request.respond(target == .licenseAccept)
@@ -544,7 +562,8 @@ final class Navigator {
     func variants(_ id: GameID) -> EngineVariants? {
         _ = variantRevision
         guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return nil }
-        return plugin.variants(for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+        let paths = hub.library.paths
+        return plugin.variants(for: game, folder: paths.folder(for: id), dataDirectory: paths.dataDirectory(for: id))
     }
 
     private func selectVariant(_ variant: String?, for id: GameID) {

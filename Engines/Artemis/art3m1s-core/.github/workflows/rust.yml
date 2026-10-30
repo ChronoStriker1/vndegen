@@ -1,0 +1,30 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RFVP_REPOSITORY: https://github.com/Alphaly2K/rfvp.git
+  SIGLUS_REPOSITORY: https://github.com/Alphaly2K/siglus_rs.git
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Checkout RFVP dependency
+      run: git clone --depth 1 "$RFVP_REPOSITORY" "${GITHUB_WORKSPACE}/../rfvp"
+    - name: Checkout Siglus dependency
+      run: git clone --depth 1 "$SIGLUS_REPOSITORY" "${GITHUB_WORKSPACE}/../siglus_rs"
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: ./scripts/test-all.sh

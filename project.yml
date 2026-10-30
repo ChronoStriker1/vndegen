@@ -10,12 +10,24 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.6.1"
+    MARKETING_VERSION: "0.9.0"
     CURRENT_PROJECT_VERSION: "1"
 # scripts/kirikiri-engine.sh builds the engine into build/kirikiri, and does nothing when it is up to date. It is a target
 # of its own because Xcode copies the app's frameworks before any of the app target's build phases run. It runs with a
 # clean environment, because CMake would take the SDK and deployment target Xcode exports for the app.
 aggregateTargets:
+  # scripts/artemis-engine.sh builds the Artemis engine, art3m1s-core, into build/artemis as a static library, and does
+  # nothing when it is up to date. It runs with a clean environment, because Cargo's C builds would take the SDK and
+  # deployment target Xcode exports for the app.
+  ArtemisEngine:
+    buildScripts:
+      - name: Build the Artemis engine
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} "$SRCROOT/scripts/artemis-engine.sh" "$SRCROOT/build/artemis"
   KiriKiriEngine:
     buildScripts:
       - name: Build the KiriKiri engine
@@ -33,9 +45,13 @@ targets:
       - path: App
         # SVG sources for the app icon. The asset catalog holds the rendered PNGs.
         excludes: ["Icon/**"]
+      # The Windows font substitutes and their table, which FontPack and the engines read from Contents/Resources/fonts.
+      - path: Engines/Shared/fonts
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineRenPy, EngineRGSS, EngineKiriKiri, RuntimePackages, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineGodot, EngineArtemis, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
@@ -43,6 +59,11 @@ targets:
         platformFilter: iOS
       - framework: build/renpy/ios/MetalANGLE.xcframework
         platformFilter: iOS
+      # The Artemis engine, a static library ArtemisEngine below builds first. EngineArtemis finds it at run time, so the
+      # linker keeps its API table, which nothing calls by name.
+      - target: ArtemisEngine
+      - framework: build/artemis/ios/Art3m1s.xcframework
+        embed: false
       # The KiriKiri engine, which KiriKiriEngine below builds first. EngineKiriKiri finds it at run time.
       - target: KiriKiriEngine
       - framework: build/kirikiri/ios/KiriKiri.xcframework
@@ -96,6 +117,43 @@ targets:
           rsync -a --delete "$SRCROOT/build/rgss/RGSS.xcframework/$slice/RGSS.framework/" "$dest/"
           codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
           codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
+      # Godot games run on the Godot frameworks, which scripts/godot-engine.sh builds into build/godot and does nothing
+      # when they are up to date. They are arm64 only, and EngineGodot opens the one a game needs at run time, so they
+      # are copied in rather than linked, as the RGSS framework is.
+      - name: Bundle the Godot engines
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} ${VNDEGEN_GODOT_SLICES:+VNDEGEN_GODOT_SLICES="$VNDEGEN_GODOT_SLICES"} \
+            "$SRCROOT/scripts/godot-engine.sh" "$SRCROOT/build/godot"
+          case "$PLATFORM_NAME" in
+            macosx) slice=macos-arm64 ;;
+            iphoneos) slice=ios-arm64 ;;
+            iphonesimulator) slice=ios-arm64-simulator ;;
+            *) echo "error: no Godot engine for $PLATFORM_NAME" >&2; exit 1 ;;
+          esac
+          for engine in Godot4 Godot3; do
+            source="$SRCROOT/build/godot/$engine.xcframework/$slice/$engine.framework"
+            dest="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/$engine.framework"
+            [ -d "$source" ] || { echo "error: $source is missing" >&2; exit 1; }
+            mkdir -p "$(dirname "$dest")"
+            rsync -a --delete "$source/" "$dest/"
+            codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" --timestamp=none "$dest"
+            codesign --verify --strict "$dest" || { echo "error: $dest is not signed" >&2; exit 1; }
+          done
+      # Flash games play in Ruffle's web build, which scripts/ruffle-web.sh commits to Engines/Flash/ruffle and
+      # scripts/ruffle-runtime.sh checks and stages in build/ruffle. EngineFlash serves it to the game's page.
+      - name: Bundle Ruffle
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          "$SRCROOT/scripts/ruffle-runtime.sh" "$SRCROOT/build/ruffle"
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Ruffle"
+          mkdir -p "$dest"
+          rsync -a --delete --exclude licenses --exclude SHA256SUMS "$SRCROOT/build/ruffle/" "$dest/"
       # Settings lists each file in Licenses. Each runtime's script writes its notices to build/<runtime>/licenses, as
       # scripts/licenses/README.md describes.
       - name: Bundle third-party licenses
@@ -167,4 +225,5 @@ targets:
         # The macOS app keeps embedded frameworks in Contents/Frameworks, not beside the executable as on iOS.
         LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]: ["$(inherited)", "@executable_path/../Frameworks"]
         # What Ren'Py's static libraries need from the system, as in renios's own Xcode project.
-        "OTHER_LDFLAGS[sdk=iphone*]": "$(inherited) -lc++ -framework AudioToolbox -framework AVFoundation -framework CoreMotion -framework CoreHaptics -framework GameController -framework ImageIO -framework QuartzCore -framework CoreServices"
+        "OTHER_LDFLAGS[sdk=macosx*]": "$(inherited) -lc++ -Wl,-u,_art3m1s_get_api_v1 -framework Metal -framework QuartzCore -framework IOSurface"
+        "OTHER_LDFLAGS[sdk=iphone*]": "$(inherited) -lc++ -Wl,-u,_art3m1s_get_api_v1 -framework Metal -framework IOSurface -framework AudioToolbox -framework AVFoundation -framework CoreMotion -framework CoreHaptics -framework GameController -framework ImageIO -framework QuartzCore -framework CoreServices"

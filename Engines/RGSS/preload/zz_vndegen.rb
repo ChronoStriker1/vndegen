@@ -17,6 +17,41 @@ module Kernel
   end
 end
 
+# Windows ignores case in file names, so a game that globs for "Save*.rvdata2" expects to find "save01.rvdata2". Ruby
+# ignores File::FNM_CASEFOLD in Dir.glob outside Windows, so each ASCII letter in a name with a wildcard becomes a set
+# of both its cases. Names without a wildcard need nothing, since VNDegen's file layer finds them in any case.
+class Dir
+  def self.vndegen_casefold(pattern)
+    path = File.path(pattern)
+    return path unless path.valid_encoding?
+    path.split("/", -1).map do |name|
+      next name unless name.include?("*") || name.include?("?") || name.include?("[")
+      escaped = in_set = false
+      name.each_char.map do |c|
+        letter = !escaped && !in_set && (c.between?("A", "Z") || c.between?("a", "z"))
+        if escaped then escaped = false
+        elsif c == "\\" then escaped = true
+        elsif in_set then in_set = c != "]"
+        elsif c == "[" then in_set = true
+        end
+        letter ? "[#{c.downcase}#{c.upcase}]" : c
+      end.join
+    end.join("/")
+  end
+
+  class << self
+    alias_method :vndegen_glob, :glob
+    def glob(pattern, *args, **options, &block)
+      patterns = pattern.is_a?(Array) ? pattern.map { |p| vndegen_casefold(p) } : vndegen_casefold(pattern)
+      vndegen_glob(patterns, *args, **options, &block)
+    end
+
+    def [](*patterns, **options)
+      vndegen_glob(patterns.map { |p| vndegen_casefold(p) }, **options)
+    end
+  end
+end
+
 # Japanese games convert between Shift-JIS and UTF-8 through kernel32's MultiByteToWideChar and WideCharToMultiByte.
 # Both follow Windows: a length of -1 means up to and including the terminating NUL, which a Ruby string passed to
 # Windows always has after its bytes, a zero output size asks for the length the result needs, and an output buffer
@@ -63,4 +98,14 @@ module Win32API_Impl
       end
     end
   end
+end
+
+# The Japanese RPG Maker XP player (RGSS10xJ.dll) draws text in ＭＳ Ｐゴシック unless a game names another font, and
+# the English one (RGSS10xE.dll) in Arial, mkxp-z's default for XP. Game.ini names the player. VNDegen's font table
+# gives both their substitutes.
+begin
+  if File.binread("Game.ini") =~ /^\s*Library\s*=\s*(?:System[\\\/])?RGSS1\d\dJ\.dll/i
+    Font.default_name = "ＭＳ Ｐゴシック"
+  end
+rescue SystemCallError
 end

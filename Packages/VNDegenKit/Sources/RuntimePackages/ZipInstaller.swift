@@ -11,12 +11,8 @@ enum ZipInstaller {
         let slicePrefix = (setupName as NSString).deletingPathExtension.lowercased() + "-"
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        guard let archive = archive_read_new() else { throw RuntimeInstallError.corrupt("cannot open the zip") }
+        let archive = try open(zip)
         defer { archive_read_free(archive) }
-        archive_read_support_format_zip_seekable(archive)
-        guard archive_read_open_filename(archive, zip.path, 1 << 16) == ARCHIVE_OK else {
-            throw RuntimeInstallError.corrupt("not a zip: \(message(archive))")
-        }
         var found: URL?
         var entry: OpaquePointer?
         while true {
@@ -42,6 +38,43 @@ enum ZipInstaller {
             throw RuntimeInstallError.unsupportedInstaller("the download has no \(setupPath)")
         }
         return found
+    }
+
+    /// Extracts the regular files at `members`, paths inside the zip, into `folder` by their file names. Fails unless
+    /// the zip has every one.
+    static func extract(_ zip: URL, members: [String], to folder: URL,
+                        progress: (_ done: Int, _ total: Int) -> Void) throws {
+        let archive = try open(zip)
+        defer { archive_read_free(archive) }
+        var remaining = Set(members)
+        var entry: OpaquePointer?
+        while !remaining.isEmpty {
+            try Task.checkCancellation()
+            let status = archive_read_next_header(archive, &entry)
+            if status == ARCHIVE_EOF { break }
+            guard status == ARCHIVE_OK || status == ARCHIVE_WARN, let entry,
+                  let rawPath = archive_entry_pathname(entry) else {
+                throw RuntimeInstallError.corrupt("damaged zip: \(message(archive))")
+            }
+            let path = String(cString: rawPath)
+            guard archive_entry_filetype(entry) == AE_IFREG, remaining.remove(path) != nil else { continue }
+            try write(archive, to: folder.appending(path: (path as NSString).lastPathComponent))
+            progress(members.count - remaining.count, members.count)
+        }
+        if let missing = remaining.sorted().first {
+            throw RuntimeInstallError.unsupportedInstaller("the download has no \(missing)")
+        }
+    }
+
+    private static func open(_ zip: URL) throws -> OpaquePointer {
+        guard let archive = archive_read_new() else { throw RuntimeInstallError.corrupt("cannot open the zip") }
+        archive_read_support_format_zip_seekable(archive)
+        guard archive_read_open_filename(archive, zip.path, 1 << 16) == ARCHIVE_OK else {
+            let reason = message(archive)
+            archive_read_free(archive)
+            throw RuntimeInstallError.corrupt("not a zip: \(reason)")
+        }
+        return archive
     }
 
     private static func message(_ archive: OpaquePointer) -> String {

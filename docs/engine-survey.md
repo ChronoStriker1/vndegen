@@ -4,7 +4,7 @@ Game titles are the library folder names. The per-game list is [engine-survey-ga
 
 Survey date 2026-10-25. This picks the next engines to port after RPG Maker MV/MZ and names test games from the library on the NAS.
 
-Status since the survey: RPG Maker MV/MZ, TyranoScript, and Ren'Py on macOS have shipped. Ren'Py on iPhone and iPad and a KiriKiri feasibility test are in progress. `docs/roadmap.md` has the current state.
+Status since the survey: RPG Maker MV/MZ, TyranoScript, Ren'Py, RPG Maker XP, VX and VX Ace, KiriKiri, Flash, NScripter, Godot, and Artemis have shipped. NScripter runs on VNDegen's own clean-room runtime instead of ONScripter, and AliceSoft System 3 and 4 get clean-room runtimes instead of xsystem35 and xsystem4. `docs/roadmap.md` has the current state.
 
 The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one row per library folder.
 
@@ -83,7 +83,7 @@ Two popular engines have good runtimes but no library games, so nothing can be t
 
 ### License note
 
-mkxp-z, ONScripter, xsystem35-sdl2 and xsystem4 are GPL-2.0. EasyRPG Player is GPL-3.0. Linking them into VNDegen makes the combined app subject to the GPL. That is fine for personal builds and sideloading. It conflicts with App Store distribution terms. MIT, BSD-style and MPL-2.0 runtimes (Ren'Py core, krkrsdl2, art3m1s-core, siglus_rs, Ruffle, Godot) avoid this.
+mkxp-z, ONScripter, xsystem35-sdl2 and xsystem4 are GPL-2.0. EasyRPG Player is GPL-3.0. Linking them into VNDegen makes the combined app subject to the GPL. That is fine for personal builds and sideloading. It conflicts with App Store distribution terms. MIT, BSD-style and MPL-2.0 runtimes (Ren'Py core, krkrsdl2, art3m1s-core, siglus_rs, Ruffle, Godot) avoid this. VNDegen now uses only permissive licenses for new engines, and replaces the GPL runtimes with clean-room MIT ones. The Licenses section of `docs/roadmap.md` has the plan.
 
 ## Test picks
 

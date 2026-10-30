@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include "libretro.h"
+#include "vnfont.h"
 #include "vnrgss.h"
 
 extern "C" struct retro_vfs_interface vndegen_posix_vfs;
@@ -476,6 +477,20 @@ void stopAudio() {
 } // namespace
 
 extern "C" {
+
+void vnrgss_set_fonts(const char *table, const char *const *fontDirs, int count) {
+    vnfont_init(table, fontDirs, count);
+}
+
+// The core's font lookup asks this for a font the game doesn't ship (patches/stage2/06-windows-fonts.patch).
+int vnrgss_font_substitute(const char *name, char *path, size_t size, int *face) {
+    vnfont_match match;
+    if (!vnfont_resolve(name, 0, 0, &match) || strlen(match.path) >= size)
+        return 0;
+    strcpy(path, match.path);
+    *face = match.face;
+    return 1;
+}
 
 int vnrgss_start(const VNRGSSLaunch *launch) {
     engine.ended = false;

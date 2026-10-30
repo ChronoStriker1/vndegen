@@ -11,9 +11,14 @@ let package = Package(
         .library(name: "WebRuntime", targets: ["WebRuntime"]),
         .library(name: "EngineRPGMaker", targets: ["EngineRPGMaker"]),
         .library(name: "EngineTyrano", targets: ["EngineTyrano"]),
+        .library(name: "EngineFlash", targets: ["EngineFlash"]),
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
+        .library(name: "EngineArtemis", targets: ["EngineArtemis"]),
+        .library(name: "EngineGodot", targets: ["EngineGodot"]),
+        .library(name: "EngineNScripter", targets: ["EngineNScripter"]),
+        .library(name: "FrameHost", targets: ["FrameHost"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -22,6 +27,7 @@ let package = Package(
         .library(name: "Rclone", targets: ["Rclone"]),
         .library(name: "ArchiveImport", targets: ["ArchiveImport"]),
         .library(name: "RuntimePackages", targets: ["RuntimePackages"]),
+        .library(name: "FontPack", targets: ["FontPack"]),
     ],
     targets: [
         .target(name: "VNCore"),
@@ -29,24 +35,51 @@ let package = Package(
         // module that draws a screen.
         .target(name: "ControllerUI", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "GameInput", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
-        .target(name: "WebRuntime", dependencies: ["VNCore"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
+        // Windows font substitutes. CVNFont's files are links to Engines/Shared/vnfont.[ch], which the native engines
+        // compile too.
+        .target(name: "CVNFont"),
+        .target(name: "FontPack", dependencies: ["CVNFont", "VNCore"]),
+        .target(name: "WebRuntime", dependencies: ["VNCore", "FontPack"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
-        .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
-        .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineTyrano", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineFlash", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // Support holds the Python launcher and the Ren'Py hook script that Ren'Py loads from disk.
         .target(name: "EngineRenPy", dependencies: ["VNCore", "CRenPy"], resources: [.copy("Support")], swiftSettings: mainActorByDefault),
         // Runs Ren'Py inside the app on iOS. Ren'Py's static libraries are linked by the app target, not here.
         .target(name: "CRenPy"),
         // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
         .target(name: "CKiriKiri"),
-        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri", "FontPack"], swiftSettings: mainActorByDefault),
         // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
         .target(name: "CRGSS"),
-        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        // The Godot engines' C interface. The engines are frameworks the app embeds, opened at run time.
+        .target(name: "CGodot"),
+        .target(name: "EngineGodot", dependencies: ["VNCore", "CGodot", "FontPack"], swiftSettings: mainActorByDefault),
+        // VNDegen's own NScripter runtime, in C++, with vnns.h as its C interface. third_party holds stb_image,
+        // stb_vorbis and pl_mpeg, which the runtime's sources include directly rather than compile on their own.
+        .target(
+            name: "CNScripter", dependencies: ["CVNFont"], exclude: ["third_party", "core/sjis_table.inc"],
+            // The runtime draws every frame on the CPU. Unoptimized, a Debug build misses frames that a Release build
+            // makes, and Debug builds are what the simulators and the Mac app are tested with.
+            cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-O2"])],
+            // The system's bzip2 unpacks the NBZ sound files one game's plugin would.
+            linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
+                             .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS])),
+                             .linkedLibrary("bz2")]),
+        // Presents a frame a runtime drew on the CPU through Metal, and plays the sound it mixes, for the runtimes that
+        // composite in software.
+        .target(name: "FrameHost", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineNScripter", dependencies: ["VNCore", "CNScripter", "FrameHost"], swiftSettings: mainActorByDefault),
+        // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
+        // library the app links, found at run time.
+        .target(name: "CArtemis", exclude: ["third_party"]),
+        .target(name: "EngineArtemis", dependencies: ["VNCore", "CArtemis", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
-        .target(name: "HubUI", dependencies: ["VNCore", "ControllerUI", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages"], swiftSettings: mainActorByDefault),
+        .target(name: "HubUI", dependencies: ["VNCore", "ControllerUI", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages", "FontPack"], swiftSettings: mainActorByDefault),
         .target(name: "SaveSync", dependencies: ["VNCore", "ControllerUI", "Rclone"]),
         // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
         .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
@@ -56,15 +89,16 @@ let package = Package(
         .target(
             name: "CArchive", path: "Sources/ArchiveImport/CArchive", exclude: ["LICENSE-zlib.txt"],
             linkerSettings: [.linkedLibrary("archive"), .linkedLibrary("z")]),
-        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
+        .target(name: "ArchiveImport", dependencies: ["CArchive", "ControllerUI", "VNCore"], exclude: ["CArchive", "README.md"], swiftSettings: mainActorByDefault),
         // Downloads, checks, and unpacks runtime packages such as the RPG Maker RTPs. CLzmaDec is the LZMA SDK's decoder,
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
         .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
-        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime"], exclude: ["Fixtures"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
+        .testTarget(name: "EngineFlashTests", dependencies: ["EngineFlash", "WebRuntime", "FontPack"]),
         // RenPyCompat is built for the tests, which run it as a command.
         .testTarget(name: "EngineRenPyTests", dependencies: ["EngineRenPy", "GameInput", "RenPyCompat"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
@@ -79,5 +113,10 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
-    ]
+        .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis"]),
+        .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot"]),
+        .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
+        .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
+    ],
+    cxxLanguageStandard: .cxx17
 )

@@ -1,10 +1,12 @@
 import CRGSS
+import FontPack
 import Foundation
 
 /// The engine's C functions from `vnrgss.h`, in the RGSS framework the app embeds. The app doesn't link the framework,
 /// because it is arm64 only and the Mac app is universal, so it is opened here at run time. On an Intel Mac, or in a
 /// build without it, there is no engine.
 struct RGSSEngine {
+    let setFonts: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<UnsafePointer<CChar>?>?, Int32) -> Void
     let start: @convention(c) (UnsafePointer<VNRGSSLaunch>?) -> Int32
     let frame: @convention(c) (Double) -> Int32
     let key: @convention(c) (UInt32, Bool) -> Void
@@ -32,7 +34,9 @@ struct RGSSEngine {
         func function<T>(_ name: String) -> T? {
             dlsym(handle, name).map { unsafeBitCast($0, to: T.self) }
         }
-        guard let start: @convention(c) (UnsafePointer<VNRGSSLaunch>?) -> Int32 = function("vnrgss_start"),
+        guard let setFonts: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<UnsafePointer<CChar>?>?, Int32) -> Void =
+                function("vnrgss_set_fonts"),
+              let start: @convention(c) (UnsafePointer<VNRGSSLaunch>?) -> Int32 = function("vnrgss_start"),
               let frame: @convention(c) (Double) -> Int32 = function("vnrgss_frame"),
               let key: @convention(c) (UInt32, Bool) -> Void = function("vnrgss_key"),
               let mouseMove: @convention(c) (Float, Float) -> Void = function("vnrgss_mouse_move"),
@@ -42,12 +46,22 @@ struct RGSSEngine {
               let stop: @convention(c) () -> Void = function("vnrgss_stop"),
               let problem: @convention(c) () -> UnsafePointer<CChar>? = function("vnrgss_problem")
         else { return nil }
-        return RGSSEngine(start: start, frame: frame, key: key, mouseMove: mouseMove, mouseButton: mouseButton,
+        return RGSSEngine(setFonts: setFonts, start: start, frame: frame, key: key, mouseMove: mouseMove, mouseButton: mouseButton,
                           wheel: wheel, setPaused: setPaused, stop: stop, problem: problem)
         #else
         return nil
         #endif
     }()
+
+    /// Hands the engine the Windows font substitutes FontPack has configured, for the next game it starts.
+    func useFontPack() {
+        guard let table = FontPack.table else { return }
+        let folders = FontPack.folders.map { strdup($0.path) }
+        defer { folders.forEach { free($0) } }
+        folders.map { UnsafePointer($0) }.withUnsafeBufferPointer {
+            setFonts(table.path, $0.baseAddress, Int32($0.count))
+        }
+    }
 
     func send(_ input: RGSSInput) {
         switch input {

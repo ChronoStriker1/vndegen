@@ -6,6 +6,7 @@
 
 #include "TVPStorage.h"
 #include "TVPEvent.h"
+#include "casepath.h"
 
 #define NCB_MODULE_NAME TJS_N("sqlite3.dll")
 
@@ -195,6 +196,8 @@ public:
 				if (filename.length() && !std::strstr(filename.c_str(), (const tjs_char*)">")) {
 					TVPGetLocalName(filename);
 					sqlite3_open(filename.c_str(), &db);
+					// The database may be new, and its folder's time too coarse to show it.
+					casepath_changed(filename.c_str());
 				}
 			}
 		}
