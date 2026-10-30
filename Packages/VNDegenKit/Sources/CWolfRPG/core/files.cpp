@@ -25,8 +25,10 @@ std::vector<uint8_t> readAll(const fs::path &p) {
 }  // namespace
 
 std::string normalizePath(std::string path) {
-    // Names built from text lines can end in a line break, which no Windows file name has.
-    while (!path.empty() && (path.back() == '\r' || path.back() == '\n' || path.back() == ' ')) path.pop_back();
+    // A file name ends at the first line break or NUL. Games pass strings whose first line is the file and whose next
+    // lines hold other values, such as a sound's volume and frequency, and the PC engine uses the first line.
+    if (size_t end = path.find_first_of(std::string("\r\n\0", 3)); end != std::string::npos) path.resize(end);
+    while (!path.empty() && path.back() == ' ') path.pop_back();
     for (auto &c : path)
         if (c == '\\') c = '/';
     while (path.starts_with("./")) path.erase(0, 2);
