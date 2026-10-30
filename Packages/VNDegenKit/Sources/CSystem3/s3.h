@@ -193,6 +193,7 @@ struct S3 {
 
     // timing
     u64 clockMs;               // runtime clock
+    long long startTime;       // wall-clock seconds when the game opened; ZT0 counts from here with clockMs
     u64 timerBase[8];
     int polls;                 // input polls this frame, to yield busy loops
 

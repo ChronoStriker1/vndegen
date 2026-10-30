@@ -865,7 +865,7 @@ static void cmd_Z(S3 *s) {
         args(s, "e", a);
         u64 t = s->clockMs - s->timerBase[0];
         switch (sub) {
-        case 0: { time_t now = time(NULL); struct tm tm; localtime_r(&now, &tm);
+        case 0: { time_t now = (time_t)(s->startTime + (long long)(s->clockMs / 1000)); struct tm tm; localtime_r(&now, &tm);
             int v[7] = { tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tm.tm_wday };
             for (int i = 0; i < 7; i++) put(s, &a[0], i, (u16)v[i]); } break;
         case 1: s->timerBase[0] = s->clockMs - (u64)a[0].v * 10; break;

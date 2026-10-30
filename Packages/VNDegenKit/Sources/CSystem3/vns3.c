@@ -2,6 +2,7 @@
 #include "vm.h"
 #include "vnfont.h"
 #include <dirent.h>
+#include <time.h>
 
 static bool ends_with_nocase(const char *s, const char *suffix) {
     size_t a = strlen(s), b = strlen(suffix);
@@ -78,6 +79,7 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
     s->cfg.saveDir = s->saveDir;
     if (config->logPath) s->log = fopen(config->logPath, "a");
     s->trace = getenv("S3_TRACE") != NULL;
+    s->startTime = (long long)time(NULL);
     s->vars = s3_alloc(65536 * sizeof(u16));
     s->bind = s3_alloc(16384 * sizeof(S3Bind));
     defaults(s);
