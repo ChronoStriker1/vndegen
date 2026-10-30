@@ -28,7 +28,7 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
         guard let layout = AliceSoftLayout(FolderProbe(scanning: launch.folder)) else { throw AliceSoftError.notAliceSoft }
         switch layout.system {
         case .system30, .system39: throw AliceSoftError.notAvailable
-        case .system4: throw AliceSoftError.notAvailable
+        case .system4: return try System4Session.make(launch, root: layout.url(in: launch.folder))
         }
     }
 
@@ -36,7 +36,7 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
         guard let layout = AliceSoftLayout(FolderProbe(scanning: folder)) else { return [] }
         switch layout.system {
         case .system30, .system39: return []
-        case .system4: return []
+        case .system4: return System4Session.saveLocations(root: layout.url(in: folder), dataDirectory: dataDirectory)
         }
     }
 

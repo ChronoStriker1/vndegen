@@ -25,4 +25,5 @@ cp "$kit/Sources/CNScripter/third_party/LICENSE-lua.txt" "$out.part/Lua (NScript
 cp "$kit/Sources/CNScripter/third_party/LICENSE-bzip2.txt" "$out.part/bzip2 (NScripter NBZ sounds).txt"
 cp "$kit/Sources/CWolfRPG/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (Wolf RPG Editor images and Ogg).txt"
 cp "$kit/Sources/CWolfRPG/third_party/LICENSE-dr_libs.txt" "$out.part/dr_mp3 and dr_wav (Wolf RPG Editor MP3 and WAV).txt"
+cp "$kit/Sources/CSystem4/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (System 4 images and Ogg).txt"
 rm -rf "$out" && mv "$out.part" "$out"

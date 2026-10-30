@@ -86,8 +86,11 @@ VM::VM(Ain a) : ain(std::move(a)) {
     auto &table = HllRegistry::table();
     for (auto &lib : ain.libraries) {
         std::vector<HllImpl> fns;
+        // SACT2 is StoatSpriteEngine's predecessor; a call they share, with the same arguments, runs Stoat's code.
+        std::string alias = lib.name == "SACT2" ? "StoatSpriteEngine" : "";
         for (auto &fn : lib.functions) {
             auto it = table.find(lib.name + "." + fn.name);
+            if (it == table.end() && !alias.empty()) it = table.find(alias + "." + fn.name);
             fns.push_back(it == table.end() ? nullptr : it->second);
         }
         hll_.push_back(std::move(fns));

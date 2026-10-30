@@ -84,7 +84,7 @@ namespace {
 // the game asks for foo.asd.
 std::string caseless(const fs::path &base, const std::string &rel) {
     fs::path cur(base);
-    for (auto &part : fs::path(rel)) {
+    for (const auto &part : fs::path(rel)) {
         std::string ps = part.string();
         if (ps.empty() || ps == ".") continue;
         fs::path exact = cur / ps;

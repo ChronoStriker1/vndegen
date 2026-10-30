@@ -348,6 +348,12 @@ S4_HLL(StoatSpriteEngine, Sound_StopFade) { G().audio.stopFade(handleOf(g_sound,
 S4_HLL(StoatSpriteEngine, Sound_IsFade) { c.retInt(G().audio.fading(handleOf(g_sound, c.i(0)))); }
 S4_HLL(StoatSpriteEngine, Sound_GetTimeLength) { c.retInt(int32_t(G().audio.lengthMs(handleOf(g_sound, c.i(0))))); }
 S4_HLL(StoatSpriteEngine, Sound_GetGroupNum) { c.retInt(0); }
+S4_HLL(SACT2, Sound_SetLoopCount) { G().audio.setLoops(handleOf(g_sound, c.i(0)), c.i(1)); c.retInt(1); }
+S4_HLL(SACT2, Sound_GetLoopCount) { c.retInt(G().audio.loops(handleOf(g_sound, c.i(0)))); }
+S4_HLL(SACT2, Sound_GetPos) { c.retInt(int32_t(G().audio.positionMs(handleOf(g_sound, c.i(0))))); }
+S4_HLL(SACT2, Sound_GetLength) { c.retInt(int32_t(G().audio.lengthMs(handleOf(g_sound, c.i(0))))); }
+S4_HLL(SACT2, Sound_ReverseLR) { c.retInt(1); }
+S4_HLL(SACT2, Sound_GetVolume) { c.retInt(100); }
 S4_HLL(StoatSpriteEngine, Sound_GetGroupNumFromDataNum) { c.retInt(0); }
 
 // ---- transitions: the screen as it was blends into the screen as it is ----
@@ -370,6 +376,98 @@ S4_HLL(StoatSpriteEngine, TRANS_Update) {
     c.retBool(true);
 }
 S4_HLL(StoatSpriteEngine, TRANS_End) { g_transFrom.clear(); c.retBool(true); }
+
+// ---- SACT2's screen effects, wallpaper and quake (the SACT2 reference) ----
+
+// Runs a transition from the screen as last shown to the screen as the sprites are now, over ms of game time. Keys
+// cancel it when key is set. Kinds 2 and 3 fade through black, 4 and 5 through white; every other kind crossfades
+// (the games mostly use 1, the crossfade).
+void runEffect(int kind, int ms, bool key) {
+    std::vector<uint8_t> from, to(size_t(G().screenW) * G().screenH * 4);
+    int w, h;
+    G().takeFrame(from, w, h);
+    G().sprites.compose(to, G().screenW, G().screenH, 0, 0);
+    if (from.size() != to.size() || ms <= 0) { G().showFrame(std::move(to)); return; }
+    uint32_t start = G().now();
+    std::vector<uint8_t> out(to.size());
+    for (;;) {
+        uint32_t t = G().now() - start;
+        if (t >= uint32_t(ms)) break;
+        if (key && (G().keyDown(1) || G().keyDown(13) || G().keyDown(32))) break;
+        float r = float(t) / float(ms);
+        int mid = kind == 4 || kind == 5 ? 255 : 0;
+        for (size_t i = 0; i < out.size(); i++) {
+            int a = from[i], b = to[i], v;
+            if (kind >= 2 && kind <= 5) v = r < 0.5f ? a + int((mid - a) * r * 2) : mid + int((b - mid) * (r - 0.5f) * 2);
+            else v = a + int((b - a) * r);
+            out[i] = uint8_t(v);
+        }
+        G().showFrame(out);
+        G().yieldFrame();
+    }
+    G().showFrame(std::move(to));
+}
+
+S4_HLL(SACT2, Effect) { runEffect(c.i(0), c.i(1), c.i(2) != 0); c.retInt(1); }
+S4_HLL(SACT2, EffectSetMask) { c.retInt(1); }
+S4_HLL(SACT2, EffectSetMaskSP) { c.retInt(1); }
+
+// Shakes the screen by moving every sprite, back and forth, for ms.
+S4_HLL(SACT2, QuakeScreen) {
+    int ax = c.i(0), ay = c.i(1), ms = c.i(2);
+    uint32_t start = G().now();
+    std::vector<uint8_t> f(size_t(G().screenW) * G().screenH * 4);
+    for (int k = 0; G().now() - start < uint32_t(std::max(0, ms)); k++) {
+        int dx = ax ? (k % 2 ? ax : -ax) * int(ms - (G().now() - start)) / std::max(1, ms) : 0;
+        int dy = ay ? (k % 2 ? ay : -ay) * int(ms - (G().now() - start)) / std::max(1, ms) : 0;
+        G().sprites.compose(f, G().screenW, G().screenH, dx, dy);
+        G().showFrame(f);
+        G().yieldFrame();
+    }
+    G().present();
+}
+S4_HLL(SACT2, QUAKE_SET_CROSS) {}
+S4_HLL(SACT2, QUAKE_SET_ROTATION) {}
+
+// The wallpaper is the picture behind every sprite: sprite 0 here, which no game creates itself.
+S4_HLL(SACT2, SetWP) {
+    auto img = G().cgCached(c.i(0));
+    Sprite &s = G().sprites.get(0);
+    s = Sprite{};
+    s.used = img != nullptr;
+    s.cg = img;
+    s.z = INT32_MIN;
+    c.retInt(img ? 1 : 0);
+}
+S4_HLL(StoatSpriteEngine, SetWP_Color) {
+    Sprite &s = G().sprites.get(0);
+    s = Sprite{};
+    s.used = true;
+    s.hasOwn = true;
+    s.own.create(G().screenW, G().screenH, false);
+    s.own.fill(0, 0, G().screenW, G().screenH, c.i(0), c.i(1), c.i(2), 255);
+    s.z = INT32_MIN;
+    c.retInt(1);
+}
+S4_HLL(SACT2, WP_GetSP) { c.retInt(0); }
+S4_HLL(SACT2, WP_SetSP) { c.retInt(1); }
+S4_HLL(SACT2, GetMainSurfaceNumber) { c.retInt(-1); }
+S4_HLL(SACT2, SP_GetMaxZ) {
+    int z = 0;
+    for (auto &[n, sp] : G().sprites.all())
+        if (sp.used && n != 0) z = std::max(z, sp.z);
+    c.retInt(z);
+}
+S4_HLL(SACT2, Mouse_SetPos) { G().mouseMove(c.i(0), c.i(1)); c.retInt(1); }
+S4_HLL(SACT2, Joypad_ClearKeyDownFlag) {}
+S4_HLL(SACT2, Joypad_IsKeyDown) { c.retInt(0); }
+S4_HLL(SACT2, Joypad_GetNumof) { c.retInt(0); }
+S4_HLL(SACT2, JoypadQuake_Set) {}
+S4_HLL(SACT2, Joypad_GetAnalogStickStatus) { c.refF(2) = 0; c.refF(3) = 0; c.retBool(false); }
+S4_HLL(SACT2, Joypad_GetDigitalStickStatus) {
+    for (int k = 2; k < 6; k++) c.ref(k) = 0;
+    c.retBool(false);
+}
 
 // ---- clock ----
 

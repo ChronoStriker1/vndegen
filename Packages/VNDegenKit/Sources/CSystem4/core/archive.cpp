@@ -26,6 +26,7 @@ bool Archive::read(const ArchiveEntry &e, std::vector<uint8_t> &out) {
 std::unique_ptr<AldArchive> AldArchive::open(const std::string &first) {
     auto a = std::make_unique<AldArchive>();
     fs::path p(first);
+    if (p.parent_path().empty()) p = fs::path(".") / p;
     std::string stem = p.stem().string();
     if (stem.empty()) return nullptr;
     char disk0 = stem.back();

@@ -1,8 +1,16 @@
 #include "cg.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <zlib.h>
+
+#if __APPLE__
+#include <CoreGraphics/CoreGraphics.h>
+#include <ImageIO/ImageIO.h>
+#else
+#include <webp/decode.h>
+#endif
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
@@ -152,6 +160,8 @@ bool decodeQNT(const uint8_t *d, size_t n, Image &out) {
     return true;
 }
 
+bool decodeWebP(const uint8_t *d, size_t n, Image &out);
+
 bool decodeAJP(const uint8_t *d, size_t n, Image &out) {
     if (n < 0x38 || std::memcmp(d, "AJP", 3) != 0) return false;
     uint32_t jpgOff = rd32(d + 20), jpgSize = rd32(d + 24), maskOff = rd32(d + 28), maskSize = rd32(d + 32);
@@ -167,15 +177,65 @@ bool decodeAJP(const uint8_t *d, size_t n, Image &out) {
     stbi_image_free(px);
     out.hasAlpha = maskSize != 0;
     if (maskSize) {
-        // The mask is an 8-bit PMS whose pixel values are the alpha.
+        // The mask is an 8-bit PMS whose pixel values are the alpha, or (in Test Game 46) a grey WebP.
         Image m;
-        if (!decodePMS(mask.data(), mask.size(), m) || m.w != w || m.h != h) return false;
-        for (size_t i = 0; i < size_t(w) * h; i++) out.rgba[i * 4 + 3] = m.rgba[i * 4 + 3];
+        bool webp = mask.size() >= 12 && std::memcmp(mask.data(), "RIFF", 4) == 0;
+        if (!(webp ? decodeWebP(mask.data(), mask.size(), m) : decodePMS(mask.data(), mask.size(), m)) || m.w != w || m.h != h)
+            return false;
+        for (size_t i = 0; i < size_t(w) * h; i++) out.rgba[i * 4 + 3] = webp ? m.rgba[i * 4] : m.rgba[i * 4 + 3];
     }
     return true;
 }
 
+// WebP (Test Game 46's pictures): the system's decoder on Apple systems, libwebp on the Linux test host.
+bool decodeWebP(const uint8_t *d, size_t n, Image &out) {
+#if __APPLE__
+    CFDataRef data = CFDataCreate(nullptr, d, CFIndex(n));
+    CGImageSourceRef src = CGImageSourceCreateWithData(data, nullptr);
+    CFRelease(data);
+    if (!src) return false;
+    CGImageRef img = CGImageSourceCreateImageAtIndex(src, 0, nullptr);
+    CFRelease(src);
+    if (!img) return false;
+    int w = int(CGImageGetWidth(img)), h = int(CGImageGetHeight(img));
+    CGImageAlphaInfo ai = CGImageGetAlphaInfo(img);
+    out.w = w;
+    out.h = h;
+    out.hasAlpha = ai != kCGImageAlphaNone && ai != kCGImageAlphaNoneSkipLast && ai != kCGImageAlphaNoneSkipFirst;
+    out.rgba.assign(size_t(w) * h * 4, 0);
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(out.rgba.data(), size_t(w), size_t(h), 8, size_t(w) * 4, cs,
+                                             kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(cs);
+    if (!ctx) { CGImageRelease(img); return false; }
+    CGContextSetBlendMode(ctx, kCGBlendModeCopy);
+    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+    CGContextRelease(ctx);
+    CGImageRelease(img);
+    // Core Graphics draws premultiplied; the runtime keeps straight alpha.
+    for (size_t i = 0; i < out.rgba.size(); i += 4) {
+        int a = out.rgba[i + 3];
+        if (a && a < 255)
+            for (int k = 0; k < 3; k++) out.rgba[i + k] = uint8_t(std::min(255, out.rgba[i + k] * 255 / a));
+    }
+    return true;
+#else
+    int w, h;
+    WebPBitstreamFeatures f;
+    if (WebPGetFeatures(d, n, &f) != VP8_STATUS_OK) return false;
+    uint8_t *px = WebPDecodeRGBA(d, n, &w, &h);
+    if (!px) return false;
+    out.w = w;
+    out.h = h;
+    out.hasAlpha = f.has_alpha;
+    out.rgba.assign(px, px + size_t(w) * h * 4);
+    WebPFree(px);
+    return true;
+#endif
+}
+
 bool decodeImage(const uint8_t *d, size_t n, Image &out) {
+    if (n >= 12 && std::memcmp(d, "RIFF", 4) == 0 && std::memcmp(d + 8, "WEBP", 4) == 0) return decodeWebP(d, n, out);
     if (n >= 4 && std::memcmp(d, "QNT", 3) == 0) return decodeQNT(d, n, out);
     if (n >= 4 && std::memcmp(d, "AJP", 3) == 0) return decodeAJP(d, n, out);
     if (n >= 4 && d[0] == 'P' && d[1] == 'M') return decodePMS(d, n, out);

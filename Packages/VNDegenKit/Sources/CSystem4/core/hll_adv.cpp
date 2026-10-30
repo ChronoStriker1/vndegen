@@ -270,7 +270,12 @@ S4_HLL(StoatSpriteEngine, MultiSprite_Decode) {
 
 // ---- CharSprite: one sprite per character of message text ----
 
-struct CharSpr { int sprite = 0; std::string ch; int alpha = 255; };
+struct CharSpr {
+    int sprite = 0;
+    std::string ch;
+    int alpha = 255;
+    CharProps props;
+};
 std::map<int, CharSpr> g_chars;
 int g_nextCharHandle = 1;
 
@@ -301,18 +306,9 @@ S4_HLL(StoatSpriteEngine, CharSpriteManager_Clear) {
     g_chars.clear();
 }
 S4_HLL(StoatSpriteEngine, CharSpriteManager_Rebuild) {}
-S4_HLL(StoatSpriteEngine, CharSpriteManager_Save) { if (Page *a = c.page(0)) a->v.clear(); c.retBool(true); }
-S4_HLL(StoatSpriteEngine, CharSpriteManager_Load) { c.retBool(true); }
-S4_HLL(StoatSpriteEngine, CharSprite_Release) {
-    auto it = g_chars.find(c.i(0));
-    if (it != g_chars.end()) { G().sprites.remove(it->second.sprite); g_chars.erase(it); }
-}
-S4_HLL(StoatSpriteEngine, CharSprite_SetChar) {
-    auto it = g_chars.find(c.i(0));
-    if (it == g_chars.end()) return;
-    CharSpr &cs = it->second;
-    cs.ch = c.s(1);
-    TextStyle st = styleOf(propsFrom(c.page(2)));
+// Save and Load keep every character sprite in an int array the game stores in its saves.
+void drawChar(CharSpr &cs) {
+    TextStyle st = styleOf(cs.props);
     int edge = int(st.edgeWeight + 0.5f);
     Sprite &s = G().sprites.get(cs.sprite);
     int x = s.x, y = s.y, z = s.z;
@@ -324,6 +320,62 @@ S4_HLL(StoatSpriteEngine, CharSprite_SetChar) {
     drawText(s.own, edge, edge, cs.ch, st, 0);
     s.x = x; s.y = y; s.z = z; s.show = show;
     s.blendRate = cs.alpha;
+}
+S4_HLL(StoatSpriteEngine, CharSpriteManager_Save) {
+    std::vector<int32_t> out{1, int32_t(g_chars.size()), g_nextCharHandle};
+    for (auto &[h, cs] : g_chars) {
+        Sprite *s = G().sprites.find(cs.sprite);
+        int32_t fb, fe;
+        std::memcpy(&fb, &cs.props.bold, 4);
+        std::memcpy(&fe, &cs.props.edge, 4);
+        for (int32_t v : {h, cs.alpha, s ? s->x : 0, s ? s->y : 0, s ? s->z : 0, s ? int32_t(s->show) : 0, cs.props.type,
+                          cs.props.size, cs.props.r, cs.props.g, cs.props.b, fb, fe, cs.props.er, cs.props.eg, cs.props.eb})
+            out.push_back(v);
+        putString(out, cs.ch);
+    }
+    if (Page *a = c.page(0)) a->v = std::move(out);
+    c.retBool(true);
+}
+S4_HLL(StoatSpriteEngine, CharSpriteManager_Load) {
+    Page *a = c.page(0);
+    for (auto &[h, cs] : g_chars) G().sprites.remove(cs.sprite);
+    g_chars.clear();
+    if (!a || a->v.size() < 3 || a->v[0] != 1) { c.retBool(false); return; }
+    const auto &in = a->v;
+    size_t i = 1;
+    int n = in[i++];
+    g_nextCharHandle = in[i++];
+    for (int k = 0; k < n && i + 16 <= in.size(); k++) {
+        int h = in[i++];
+        CharSpr &cs = g_chars[h];
+        cs.sprite = g_nextInternal++;
+        cs.alpha = in[i++];
+        int x = in[i++], y = in[i++], z = in[i++], show = in[i++];
+        cs.props.type = in[i++];
+        cs.props.size = in[i++];
+        cs.props.r = in[i++]; cs.props.g = in[i++]; cs.props.b = in[i++];
+        std::memcpy(&cs.props.bold, &in[i++], 4);
+        std::memcpy(&cs.props.edge, &in[i++], 4);
+        cs.props.er = in[i++]; cs.props.eg = in[i++]; cs.props.eb = in[i++];
+        cs.ch = getString(in, i);
+        Sprite &s = G().sprites.get(cs.sprite);
+        s.x = x; s.y = y; s.z = z;
+        drawChar(cs);
+        s.show = show;
+    }
+    c.retBool(true);
+}
+S4_HLL(StoatSpriteEngine, CharSprite_Release) {
+    auto it = g_chars.find(c.i(0));
+    if (it != g_chars.end()) { G().sprites.remove(it->second.sprite); g_chars.erase(it); }
+}
+S4_HLL(StoatSpriteEngine, CharSprite_SetChar) {
+    auto it = g_chars.find(c.i(0));
+    if (it == g_chars.end()) return;
+    CharSpr &cs = it->second;
+    cs.ch = c.s(1);
+    cs.props = propsFrom(c.page(2));
+    drawChar(cs);
 }
 #define CS(h) auto it = g_chars.find(h); if (it == g_chars.end()) return; Sprite &s = G().sprites.get(it->second.sprite)
 S4_HLL(StoatSpriteEngine, CharSprite_SetPos) { CS(c.i(0)); s.x = c.i(1); s.y = c.i(2); }
@@ -543,6 +595,10 @@ void stretch(HllCall &c, bool pixels, bool alpha) {
 }
 S4_HLL(DrawGraph, CopyStretchInterp) { stretch(c, true, false); }
 S4_HLL(DrawGraph, CopyStretchAMapInterp) { stretch(c, false, true); }
+S4_HLL(DrawGraph, CopyStretch) { stretch(c, true, false); }
+S4_HLL(DrawGraph, CopyStretchAMap) { stretch(c, false, true); }
+S4_HLL(DrawGraph, CopyReduce) { stretch(c, true, false); }
+S4_HLL(DrawGraph, CopyReduceAMap) { stretch(c, false, true); }
 S4_HLL(DrawGraph, DrawLine) {
     Surface *d = surf(c.i(0));
     if (!d) return;
