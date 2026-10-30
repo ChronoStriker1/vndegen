@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// The General MIDI SoundFont for engines that play MIDI music with vnmidi (`Engines/Shared/vnmidi.h`, the `CVNMidi`
 /// module): one the player chose in Settings, or the one the app bundles. The bundled font lives in
@@ -18,12 +19,19 @@ nonisolated public enum MIDISoundFont {
     /// The file types a player can choose.
     public static let fileExtensions = ["sf2", "sf3"]
 
-    /// Where the player's font is kept: a copy in VNDegen's Application Support folder, so it doesn't depend on access
-    /// to the file it came from. The folder holds at most that one file.
-    public static var userDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("VNDegen/SoundFont", isDirectory: true)
+    /// Where the player's font is kept: a copy in the library's support folder, so it doesn't depend on access to the
+    /// file it came from. The folder holds at most that one file.
+    public static var userDirectory: URL { directory.withLock { $0 } }
+
+    /// Keeps the player's font in `support`/SoundFont, the library's support folder, which a DEBUG `-libraryRoot`
+    /// moves. Until the app calls this it is Application Support/VNDegen/SoundFont.
+    public static func configure(support: URL) {
+        directory.withLock { $0 = support.appendingPathComponent("SoundFont", isDirectory: true) }
     }
+
+    private static let directory = Mutex(
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VNDegen/SoundFont", isDirectory: true))
 
     /// The player's font in `directory`, if one is there.
     public static func userFont(in directory: URL = userDirectory) -> URL? {

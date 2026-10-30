@@ -45,7 +45,8 @@ problems, a smaller font is the next step. VNDegen doesn't store samples in 16 b
 ## The player's SoundFont
 
 Settings › MIDI music lets the player choose an .sf2 or .sf3 file to use instead of the bundled font. VNDegen copies
-it into `Application Support/VNDegen/SoundFont/`, so it doesn't need access to the original later, and Settings shows
+it into `SoundFont/` in its support folder (`Application Support/VNDegen`, or the DEBUG `-libraryRoot`'s `Support`), so
+it doesn't need access to the original later, and Settings shows
 its name with a button that goes back to the bundled font. The choice is app-wide and applies to games started after
 it.
 
