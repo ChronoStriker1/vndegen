@@ -117,6 +117,7 @@ void vns3_close(VNS3 *s3) {
     s3_audio_free(s);
     s3_font_close(s);
     s3_unitmap_free(s);
+    s3_sprite_free(s);
     s3_archive_close(&s->sa);
     s3_archive_close(&s->ga);
     s3_archive_close(&s->wa);
@@ -142,6 +143,7 @@ bool vns3_frame(VNS3 *s3, uint32_t elapsedMs) {
     if (s->quit) return false;
     if (s->paused) return true;
     s->clockMs += elapsedMs > 200 ? 200 : elapsedMs;
+    s3_sprite_update(s);
     // A frame may finish several short waits in a row, such as a fade followed by a timed pause.
     for (int round = 0; round < 8 && !s->quit; round++) {
         if (s->wait != S3_WAIT_NONE) {

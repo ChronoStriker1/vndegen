@@ -204,6 +204,7 @@ struct S3 {
     // fonts and audio (opaque here)
     struct S3Font *font;
     struct S3UnitMap *unitMap;
+    struct S3Sprites *sprites;
     struct S3Audio *audio;
     u32 rand;
     int cdLoops, cdTrack, midiLoops, midiPlaying;

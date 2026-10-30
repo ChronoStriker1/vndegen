@@ -29,6 +29,11 @@ void s3_message(S3 *s, u32 index);
 void s3_unitmap_command(S3 *s, int k, const u16 *args, const S3LV *lv);
 void s3_unitmap_free(S3 *s);
 
+// sprite.c: VA
+void s3_sprite_command(S3 *s, int sub, int n, u16 a, u16 b, const S3LV *va, const S3LV *vb);
+void s3_sprite_update(S3 *s);
+void s3_sprite_free(S3 *s);
+
 // cmds.c
 void s3_command(S3 *s);
 void s3_cmd_wait_key(S3 *s);

@@ -473,6 +473,36 @@ static void cmd_E(S3 *s) {
     }
 }
 
+// LE and QE: variables or strings to and from a file in the save folder. Numbers are little-endian u16, strings
+// NUL-terminated, as System39.exe writes them. A file too short for the count still loads what it has (RND 0).
+static void var_file(S3 *s, bool write, int type, const char *name, size_t nameLen, const Arg *start, int count) {
+    char file[256];
+    snprintf(file, sizeof file, "%.*s", (int)nameLen, name);
+    char *path = s3_find_file(s->saveDir, file);
+    if (!path) path = s3_path(s->saveDir, file);
+    if (write) {
+        FILE *f = fopen(path, "wb");
+        if (!f) { free(path); rnd(s, 255); return; }
+        for (int i = 0; i < count; i++) {
+            if (type == 0) { u16 v = start->isVar ? s3_lv_get(s, &start->lv, i) : 0; u8 b[2] = { (u8)v, (u8)(v >> 8) }; fwrite(b, 1, 2, f); }
+            else { const char *x = str_slot(s, start->v + i); fwrite(x ? x : "", 1, x ? strlen(x) + 1 : 1, f); }
+        }
+        rnd(s, fclose(f) == 0 ? 0 : 201);
+    } else {
+        size_t n;
+        u8 *d = s3_read_file(path, &n);
+        if (!d) { free(path); rnd(s, 255); return; }
+        size_t p = 0;
+        for (int i = 0; i < count; i++) {
+            if (type == 0) { if (p + 2 > n) break; if (start->isVar) s3_lv_set(s, &start->lv, i, s3_le16(d + p)); p += 2; }
+            else { if (p >= n) break; str_set(s, start->v + i, (const char *)d + p); p += strlen((const char *)d + p) + 1; }
+        }
+        free(d);
+        rnd(s, 0);
+    }
+    free(path);
+}
+
 static void table_read(S3 *s, int sub, Arg *a) {
     // Data tables hold u16 words (from [n] data) and NUL-terminated strings (from "str").
     S3Blob b;
@@ -557,7 +587,7 @@ static void cmd_L(S3 *s) {
         return;
     }
     case 'L': args(s, "beee", a); unimpl(s, "LL"); return;
-    case 'E': args(s, "b:ee", a); rnd(s, 255); unimpl(s, "LE"); return; // old form: the file name ends with ':'
+    case 'E': args(s, "b:ee", a); var_file(s, false, a[0].v, a[1].s, strcspn(a[1].s, ":"), &a[2], a[3].v); return; // old form: the name ends with ':'
     case 'H': { int k2 = s3_byte(s); (void)k2; args(s, "be", a); rnd(s, 0); return; }
     case 'X': { int k2 = s3_byte(s); (void)k2; args(s, "eee", a); unimpl(s, "LX"); return; }
     default: s->vmError = true;
@@ -704,7 +734,7 @@ static void cmd_Q(S3 *s) {
     case 'C': args(s, "ee", a); rnd(s, (u16)(s3_save_copy(s, a[0].v, a[1].v) ? 1 : 255)); return;
     case 'D': args(s, "e", a); rnd(s, (u16)(s3_save_write(s, a[0].v) ? 1 : 255)); return;
     case 'P': args(s, "eee", a); rnd(s, (u16)(s3_save_write_part(s, a[0].v, &a[1].lv, a[2].v) ? 1 : 255)); return;
-    case 'E': args(s, "b:ee", a); rnd(s, 255); unimpl(s, "QE"); return; // old form: the file name ends with ':'
+    case 'E': args(s, "b:ee", a); var_file(s, true, a[0].v, a[1].s, strcspn(a[1].s, ":"), &a[2], a[3].v); return; // old form: the name ends with ':'
     default: s->vmError = true;
     }
 }
@@ -878,7 +908,12 @@ static void cmd_V(S3 *s) {
     u16 v[10] = {0};
     const char *sig;
     switch (k) {
-    case 'A': { s3_byte(s); args(s, "eee", a); unimpl(s, "VA"); return; } // VA n: three arguments for every n
+    case 'A': { // VA sub,n,a,b: sprites (sprite.c)
+        int sub = s3_byte(s);
+        args(s, "eee", a);
+        s3_sprite_command(s, sub, a[0].v, a[1].v, a[2].v, a[1].isVar ? &a[1].lv : NULL, a[2].isVar ? &a[2].lv : NULL);
+        return;
+    }
     case 'B': case 'C': sig = "eeeeeee"; break;
     case 'E': case 'H': case 'P': sig = "eeeeee"; break;
     case 'F': sig = ""; break;
@@ -933,9 +968,9 @@ static void cmd_slash(S3 *s) {
         if (d && s3_cg_decode(d, n, &img)) { s3_draw_image(s, &img, a[0].v, a[1].v, -1); s3_image_free(&img); }
         free(d); free(p);
     } return;
-    case 0x24: args(s, "bsee", a); rnd(s, 255); unimpl(s, "LE"); return;
+    case 0x24: args(s, "bsee", a); var_file(s, false, a[0].v, a[1].s, strlen(a[1].s), &a[2], a[3].v); return; // LE
     case 0x26: args(s, "ees", a); unimpl(s, "MI"); return;
-    case 0x2a: args(s, "bsee", a); rnd(s, 255); unimpl(s, "QE"); return;
+    case 0x2a: args(s, "bsee", a); var_file(s, true, a[0].v, a[1].s, strlen(a[1].s), &a[2], a[3].v); return; // QE
     case 0x47: return;  // emitted before ]; no visible effect found
     case 0x00: case 0x01: case 0x04: // TOC TOS TOP
         if (s->textSp > 0) { s->textSp--; int *t = s->textStack[s->textSp];
