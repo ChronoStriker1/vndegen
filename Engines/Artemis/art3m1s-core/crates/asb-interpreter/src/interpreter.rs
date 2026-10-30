@@ -65,6 +65,9 @@ pub struct CallFrame {
 /// A queued call temporarily owns execution of the script stream. Tags that
 /// were already queued after the call are held until that call returns; tags
 /// emitted by the called script itself continue to be processed normally.
+/// Marks the wait tag a save's frame resumes with (VNDegen).
+const LOAD_WAIT: &str = "\u{b}load_wait";
+
 #[derive(Debug, Default)]
 struct QueuedCallBarrier {
     stack_depth: usize,
@@ -935,6 +938,16 @@ impl Interpreter {
                     }
                 }
                 TagResult::Wait(event) => {
+                    // The script's own stop or click wait stands in for a
+                    // save's frame wait that has not run yet (VNDegen).
+                    if matches!(
+                        event,
+                        Event::Wait {
+                            reason: WaitReason::Stop { reason: None } | WaitReason::Generic
+                        }
+                    ) {
+                        self.drop_pending_load_waits();
+                    }
                     let result = self.emit_event(event.clone());
                     match result {
                         CallbackResult::Continue => {
@@ -1305,6 +1318,19 @@ impl Interpreter {
                 TagResult::Dynamic(_) => continue,
             }
         }
+    }
+
+    /// Drops a save's frame wait that has not run yet (VNDegen).
+    fn drop_pending_load_waits(&mut self) {
+        let is_load_wait = |(_, params): &(String, HashMap<String, String>)| params.contains_key(LOAD_WAIT);
+        for barrier in &mut self.queued_call_barriers {
+            barrier.deferred.retain(|tag| !is_load_wait(tag));
+        }
+        self.engine_ctx
+            .lock()
+            .unwrap()
+            .tag_queue
+            .retain(|tag| !is_load_wait(tag));
     }
 
     fn pop_call_frame(&mut self) -> Option<CallFrame> {
@@ -2201,13 +2227,20 @@ impl Interpreter {
     }
 
     /// Holds tags until the call frame at `frame` returns, as a queued call
-    /// holds the tags queued after it. Runs them next if that frame is gone
-    /// (VNDegen).
+    /// holds the tags queued after it. Runs them next if that frame is gone.
+    /// A save's frame wait, a leading `stop` or `@`, is dropped instead once
+    /// the script reaches a wait of its own first: the game's onLoad has then
+    /// rebuilt that wait itself (VNDegen).
     pub fn defer_until_return(
         &mut self,
         frame: usize,
-        tags: Vec<(String, HashMap<String, String>)>,
+        mut tags: Vec<(String, HashMap<String, String>)>,
     ) {
+        if let Some((tag, params)) = tags.first_mut()
+            && (tag == "stop" || tag == "@")
+        {
+            params.insert(LOAD_WAIT.to_string(), "1".to_string());
+        }
         if frame < self.call_stack.len() {
             self.queued_call_barriers.push(QueuedCallBarrier {
                 stack_depth: frame + 1,
@@ -2798,6 +2831,39 @@ mod tests {
         let context = it.engine_context().lock().unwrap();
         assert!(context.tag_queue.is_empty());
         assert_eq!(context.immediate_tag_count, 0);
+    }
+
+    #[test]
+    fn a_saves_frame_wait_yields_to_a_wait_the_game_rebuilds() {
+        // The routine stands in for a game's onLoad that rebuilds the saved
+        // choice and stops there before control returns to the saved frame.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.load_script("story", "*main\n[stop]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("routine", "*load\n[stop]\n[return]\n").unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.restore_position(
+            "routine",
+            0,
+            vec![super::CallFrame {
+                script: "story".into(),
+                return_line: 1,
+            }],
+        )
+        .unwrap();
+        it.defer_until_return(0, vec![("stop".into(), HashMap::new())]);
+
+        assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(_)));
+        it.advance_line();
+        let _ = it.run().unwrap();
+        assert_eq!(
+            it.get_variable("t.after"),
+            Some(Value::Int(1)),
+            "the saved stop no longer holds the frame"
+        );
     }
 
     #[test]
