@@ -2,7 +2,7 @@
 // For checks on Linux; it opens no window and plays no sound. Frames are drawn on the CPU, as on every platform.
 //
 //   wolfplay <game folder> --frames 300 --shot 120:title.png --press 200:confirm
-//   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames; hold a key)
+//   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames, until frame U with 20:confirm:U; hold a key)
 //   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
 #include "game.h"
 #include "render.h"
@@ -11,6 +11,8 @@
 #include "../../../../Packages/VNDegenKit/Sources/CWolfRPG/third_party/stb/stb_image_write.h"
 
 #include <cstdio>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -35,7 +37,7 @@ int main(int argc, char **argv) {
     int mapId = -1, mapX = 0, mapY = 0;
     std::multimap<int, std::string> shots;
     std::multimap<int, uint32_t> presses;
-    std::vector<std::pair<int, uint32_t>> repeats;  // press a key every N frames
+    std::vector<std::tuple<int, uint32_t, int>> repeats;  // press a key every N frames, until a frame
     std::vector<std::tuple<int, int, uint32_t>> holds;  // hold a key from one frame to another
     for (int i = 2; i + 1 < argc; i += 2) {
         std::string opt = argv[i], val = argv[i + 1];
@@ -47,7 +49,16 @@ int main(int argc, char **argv) {
         else if (opt == "--press" && colon != std::string::npos)
             presses.emplace(std::atoi(val.c_str()), keyNamed(val.substr(colon + 1)));
         else if (opt == "--every" && colon != std::string::npos)
-            repeats.emplace_back(std::max(1, std::atoi(val.c_str())), keyNamed(val.substr(colon + 1)));
+        {
+            // N:key, or N:key:until
+            std::string key = val.substr(colon + 1);
+            int until = INT32_MAX;
+            if (size_t c2 = key.find(':'); c2 != std::string::npos) {
+                until = std::atoi(key.c_str() + c2 + 1);
+                key.resize(c2);
+            }
+            repeats.emplace_back(std::max(1, std::atoi(val.c_str())), keyNamed(key), until);
+        }
         else if (opt == "--hold" && colon != std::string::npos) {
             int from = 0, to = 0;
             std::sscanf(val.c_str(), "%d-%d", &from, &to);
@@ -76,8 +87,8 @@ int main(int argc, char **argv) {
             Input in;
             auto [a, b] = presses.equal_range(f);
             for (auto it = a; it != b; ++it) in.pressed |= it->second;
-            for (auto [n, k] : repeats)
-                if (f % n == 0) in.pressed |= k;
+            for (auto [n, k, until] : repeats)
+                if (f % n == 0 && f <= until) in.pressed |= k;
             for (auto [from, to, k] : holds) {
                 if (f == from) in.pressed |= k;
                 if (f >= from && f <= to) held |= k;
@@ -86,6 +97,11 @@ int main(int argc, char **argv) {
             // A scripted press holds the key for this frame only.
             in.held = held | in.pressed;
             game.update(in);
+            if (std::getenv("WOLF_HERO") && f % 30 == 0) {
+                auto h = game.heroTile();
+                std::printf("frame %d: map %d hero %d,%d facing %d%s\n", f, game.mapId(), h[0], h[1], h[2],
+                            game.message().active ? " (message)" : "");
+            }
             auto [sa, sb] = shots.equal_range(f);
             if (sa != sb) {
                 renderer.draw(frame);

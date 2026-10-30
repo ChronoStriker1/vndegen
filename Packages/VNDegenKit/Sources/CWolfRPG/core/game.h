@@ -185,6 +185,8 @@ public:
     const MessageState &message() const { return message_; }
     const Map *map() const { return map_.get(); }
     int mapId() const { return mapId_; }
+    // The hero's tile and facing, for tests and the debug status.
+    std::array<int, 3> heroTile() const { return {hero_.tx, hero_.ty, hero_.chara.direction}; }
     const std::vector<Tileset> &tilesets() const { return tilesets_; }
     // The hero, party members and map events, in no particular order. The map renderer sorts them.
     std::vector<const Character *> characters() const;

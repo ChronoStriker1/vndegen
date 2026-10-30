@@ -685,8 +685,15 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     }
     p.anchor = anchor >> 4;
     p.blend = blend;
-    p.divX = std::max(1, value(c.arg(3), t));
-    p.divY = std::max(1, value(c.arg(4), t));
+    if (p.kind == PictureKind::Window) {
+        // A window picture's two division fields are its width and height.
+        p.windowW = value(c.arg(3), t);
+        p.windowH = value(c.arg(4), t);
+        p.divX = p.divY = 1;
+    } else {
+        p.divX = std::max(1, value(c.arg(3), t));
+        p.divY = std::max(1, value(c.arg(4), t));
+    }
     p.pattern = value(c.arg(5), t);
     int over = show ? 0 : frames;
     p.opacity.set(value(c.arg(6), t), show ? frames : over);

@@ -420,6 +420,7 @@ void Game::update(const Input &input) {
             choice_.result = choice_.cancelCase;
             choice_.active = false;
         }
+        input_.pressed &= ~(KeyConfirm | KeyCancel);
     }
     // Messages type one character a frame. The first confirm shows the rest at once, the next closes the window.
     if (message_.active) {
@@ -429,6 +430,8 @@ void Game::update(const Input &input) {
         } else if (input.pressed & (KeyConfirm | KeyCancel)) {
             message_.active = false;
         }
+        // The press that finishes or closes a message is used up, so it doesn't also talk to the event in front.
+        input_.pressed &= ~(KeyConfirm | KeyCancel);
     }
 
     // Autorun map events start once per page activation, one at a time, ahead of anything else.
