@@ -695,10 +695,11 @@ static void cmd_N(S3 *s) {
     case '\\': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, !s3_lv_get(s, &a[0].lv, i)); return;
     case '~': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, (u16)~s3_lv_get(s, &a[0].lv, i)); return;
     case '&': case '|': case '^': {
+        // N& var1, count, var2: var2's values become var1's AND var2's; var1 keeps its own (System39.exe under Wine).
         args(s, "eee", a);
         for (int i = 0; i < a[1].v; i++) {
             u16 x = s3_lv_get(s, &a[0].lv, i), y = s3_lv_get(s, &a[2].lv, i);
-            put(s, &a[0], i, k == '&' ? x & y : k == '|' ? x | y : x ^ y);
+            put(s, &a[2], i, k == '&' ? x & y : k == '|' ? x | y : x ^ y);
         }
         return;
     }
