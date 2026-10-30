@@ -18,7 +18,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 ## Features
 
 - **Engine detection.** Each engine is a plugin that recognizes its own files, such as `js/rmmz_core.js` for RPG Maker MZ. The game page shows the detected engine and the file that identified it. Games with no detected engine can be assigned one by hand.
-- **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, and genres from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
+- **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, genres, and screenshots from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
 - **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls.
 - **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. A controller alone reaches every screen, including Settings, the button mapping editor, adding a game, and the lock screen, and its text fields open an on-screen keyboard the controller types on. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Every button reaches games as an Xbox controller button by default, except in KiriKiri, TyranoScript, and Flash games, which start with Steam's Keyboard and Mouse layout. Each game also has its own button mapping: any overlay or controller button can send another Xbox button, a keyboard key, a mouse click, the mouse wheel, mouse movement, or the on-screen keyboard.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
@@ -130,6 +130,8 @@ Steam and VNDB work without setup. SteamGridDB and IGDB need keys, entered in Se
 
 - **SteamGridDB:** an API key from your SteamGridDB profile preferences.
 - **IGDB:** the client ID and secret of a Twitch developer application.
+
+A game page's About section takes its description, genres, and screenshots from Steam, or from IGDB when Steam has none. The match you confirm in Find metadata supplies the other details, and the remaining sources fill any gaps.
 
 ## Ludusavi
 
