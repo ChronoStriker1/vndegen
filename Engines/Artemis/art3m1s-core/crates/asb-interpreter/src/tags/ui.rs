@@ -160,9 +160,12 @@ impl TagHandler for LypropHandler {
         let id = ctx.resolve_param_str("id")?;
 
         // 收集所有属性
+        // `color` belongs to [lyc]: the PC engine ignores it on [lyprop], so a
+        // game whose helper passes [lyc]'s parameters to both keeps an image
+        // layer an image (VNDegen).
         let mut properties = HashMap::new();
         for (key, value) in &ctx.instruction.params {
-            if key != "id" {
+            if key != "id" && key != "color" {
                 // 解析表达式
                 let resolved = ctx.evaluator().resolve_param(value)?;
                 properties.insert(key.clone(), resolved.as_string());
@@ -304,6 +307,19 @@ mod tests {
             properties.get("color").map(String::as_str),
             Some("AARRGGBB")
         );
+    }
+
+    #[test]
+    fn lyprop_ignores_lycs_color() {
+        let TagResult::Emit(Event::Layer(LayerEvent::SetProperties { properties, .. })) = exec(
+            &LypropHandler,
+            "lyprop",
+            &[("id", "1.0"), ("color", "FF000000"), ("left", "0")],
+        ) else {
+            panic!("lyprop should set properties");
+        };
+        assert_eq!(properties.get("left").map(String::as_str), Some("0"));
+        assert!(properties.get("color").is_none());
     }
 
     #[test]
