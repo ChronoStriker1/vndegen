@@ -330,6 +330,11 @@ public:
     } effect_;
     void finishEffect();
     void drawEffect(Image &out, double t);
+    // blt draws the btndef image straight onto the screen, past the scene (a credits roll, say). The screen keeps that
+    // drawing until the next commit of the scene; after ofscpy, until the one after, so a plain print still shows it.
+    Image bltScreen_;
+    LoadedImage bltSource_;  // the btndef image, loaded without its transparency for blt
+    int bltState_ = 0;  // 0 none, 1 the screen shows blt's drawing, 2 the same and ofscpy has run
     // Effect 99, the effect DLLs (dlleffects.cpp). startDllEffect returns false for a DLL that isn't emulated.
     bool startDllEffect(const Image &to);
     void drawDllEffect(Image &out, double t);

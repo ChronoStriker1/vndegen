@@ -53,6 +53,9 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
   folder, looped or once; `playstop` and `stop` stop them and `cdfadeout` sets their fade. The PC engine plays the
   disc itself; the game that uses these ships its tracks as those files and tells the player to name them so.
 - Backgrounds (`bg`) are opaque, as on the PC engine: the default transparency mode doesn't apply to them.
+- `blt` copies part of the `btndef` image straight onto the screen, scaled to the rectangle it names, past the scene;
+  a game's ending credits roll scrolls that way. The drawing stays until the scene is next committed, or the commit
+  after that once `ofscpy` has run, as the manual describes.
 
 ## English word wrap
 
@@ -182,4 +185,3 @@ menus and the right-click menu keep the runtime's own layout.
   statement `NSExec` runs, as the DLL's notes forbid.
 - Of `MSpDraw.dll`, the messages the test games send are emulated: `draw`, `set` and `clear`. `stop`, `move`,
   `hide`, `disp`, `getphase`, `drawTo` and the program mode its manual describes aren't.
-- `blt` and `ofscpy` aren't implemented; one test game's script has one call of each, outside normal play.

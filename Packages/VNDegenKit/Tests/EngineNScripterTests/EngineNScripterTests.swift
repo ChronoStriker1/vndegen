@@ -238,6 +238,29 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(caption.hasSuffix(" 1 1 a:b yes"))
 }
 
+/// blt copies part of the btndef image straight onto the screen, scaled; after ofscpy a print keeps showing it, and
+/// the next image command replaces it.
+@Test func bltDrawsStraightToTheScreen() throws {
+    let script = ";mode400\n*define\ngame\n*start\nbg #0000FF,1\nbtndef \"red.bmp\"\nblt 10,10,40,20,0,0,4,4\n"
+        + "wait 100\nofscpy\nprint 1\nwait 100\nbg #FFFFFF,1\nclick\nend\n"
+    let (engine, dir) = try runScript(script, files: ["red.bmp": solidBMP(width: 4, height: 4, rgb: (255, 0, 0))])
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    var w: Int32 = 0, h: Int32 = 0
+    var changed = false
+    func pixel(_ x: Int, _ y: Int) throws -> [UInt8] {
+        let p = try #require(vnns_frame(engine, &w, &h, &changed))
+        let i = (y * Int(w) + x) * 4
+        return [p[i], p[i + 1], p[i + 2]]
+    }
+    #expect(vnns_step(engine, 16))
+    #expect(try pixel(45, 25) == [255, 0, 0])  // inside the scaled rectangle, though the image's corner colour is red
+    #expect(try pixel(60, 25) == [0, 0, 255])
+    for _ in 0..<8 { #expect(vnns_step(engine, 16)) }  // ofscpy and print: still drawn
+    #expect(try pixel(45, 25) == [255, 0, 0])
+    for _ in 0..<8 { #expect(vnns_step(engine, 16)) }  // the next bg replaces it
+    #expect(try pixel(45, 25) == [255, 255, 255])
+}
+
 /// A layer plugin's picture moves on the layer's timer by the increments its draw message gives.
 @Test func mspDrawPicturesMoveOnTheLayersTimer() throws {
     let script = ";mode400\n*define\nsetlayer 1,100,\"dll\\MSpDraw.dll\"\ngame\n*start\nlsp 2,\"*1\",0,0\n"

@@ -245,6 +245,8 @@ bool Engine::readEffectArgs(Effect &e) {
 void Engine::commitScene() {
     shown_ = scene_;
     sceneDirty_ = true;
+    // A commit ends blt's direct drawing; after ofscpy the drawing is the offscreen image, so it lasts one more.
+    if (bltState_ > 0) bltState_--;
 }
 
 void Engine::printWithEffect(int effectNo) {
@@ -271,6 +273,7 @@ void Engine::printWithEffect(const Effect &e) {
     composeFrame();
     effect_.from = frame_;
     commitScene();
+    bltState_ = 0;  // an effect runs from blt's drawing to the scene
     effect_.e = e;
     effect_.mask = nullptr;
     if (e.type == 99) {
@@ -515,6 +518,13 @@ void Engine::animateSprites() {
 }
 
 void Engine::composeFrame() {
+    if (bltState_ > 0) {
+        frame_ = bltScreen_;
+        drawOverlays(frame_);
+        frameChanged_ = true;
+        sceneDirty_ = false;
+        return;
+    }
     renderScene(shown_, frame_, true);
     if (effect_.active) {
         double t = effect_.e.duration > 0 ? double(now_ - effect_.start) / effect_.e.duration : 1;
@@ -1003,7 +1013,60 @@ void Engine::applySpStr(const std::string &ctrl) {
     }
 }
 
+namespace {
+using E = Engine;
+
+// blt sx..: the manual's "blt screen x, y, w, h, button-image x, y, w, h". Copies that part of the btndef image onto
+// the screen, scaled to the screen rectangle, without going through the scene.
+void cmdBlt(E &e, const std::string &) {
+    int v[8];
+    for (int i = 0; i < 8; i++) {
+        if (i) e.readComma();
+        v[i] = e.readInt();
+    }
+    // blt copies the image as it is (a Windows BitBlt), so the default transparency mode doesn't apply to it; an image
+    // the script tagged itself keeps its tag.
+    const std::string &tag = e.btnImage_.tag;
+    if (tag.empty()) return;
+    std::string opaque = tag[0] == ':' ? tag : ":c;" + tag;
+    if (e.bltSource_.tag != opaque && !e.loadImage(opaque, e.bltSource_)) return;
+    if (!e.bltSource_.image) return;
+    const Image &src = *e.bltSource_.image;
+    if (e.bltState_ == 0) {
+        e.composeFrame();
+        e.bltScreen_ = e.frame_;
+        e.bltState_ = 1;
+    }
+    Image &dst = e.bltScreen_;
+    int dx = v[0], dy = v[1], dw = v[2], dh = v[3], sx = v[4], sy = v[5], sw = v[6], sh = v[7];
+    if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) return;
+    int y0 = std::max(0, dy), y1 = std::min(dst.h, dy + dh), x0 = std::max(0, dx), x1 = std::min(dst.w, dx + dw);
+    for (int y = y0; y < y1; y++) {
+        int ty = sy + int(int64_t(y - dy) * sh / dh);
+        if (ty < 0 || ty >= src.h) continue;
+        uint32_t *row = dst.row(y);
+        const uint32_t *srow = src.row(ty);
+        for (int x = x0; x < x1; x++) {
+            int tx = sx + int(int64_t(x - dx) * sw / dw);
+            if (tx >= 0 && tx < src.w) row[x] = over(row[x], srow[tx]);
+        }
+    }
+    e.frame_ = e.bltScreen_;
+    e.drawOverlays(e.frame_);
+    e.frameChanged_ = true;
+}
+
+// ofscpy (or ofscopy): blt's drawing becomes the offscreen image, so the next plain print shows it too.
+void cmdOfscpy(E &e, const std::string &) {
+    if (e.bltState_ > 0) e.bltState_ = 2;
+}
+
+}  // namespace
+
 void registerSceneCommands(std::unordered_map<std::string, CommandFn> &t) {
+    t["blt"] = cmdBlt;
+    t["ofscpy"] = cmdOfscpy;
+    t["ofscopy"] = cmdOfscpy;
     t["bg"] = cmdBg;
     t["ld"] = cmdLd;
     t["cl"] = cmdCl;
