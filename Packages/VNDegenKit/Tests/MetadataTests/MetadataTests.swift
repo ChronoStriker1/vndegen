@@ -133,6 +133,22 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(metadata.screenshots?.allSatisfy { $0.url.host == "shared.akamai.steamstatic.com" } == true)
 }
 
+@Test @MainActor func fillAboutLeavesAMatchConfirmedWhileItRan() async throws {
+    let id = GameID("No Socks RPG")
+    let library = try await makeLibrary([id.rawValue])
+    library.update(id) { $0.metadata = GameMetadata(summary: "A", refs: [ExternalRef(source: .steam, id: "4929970")]) }
+    let rematch = GameMetadata(summary: "B", refs: [ExternalRef(source: .vndb, id: "v21905")])
+    let network = StubNetwork { request in
+        guard request.url?.host == "store.steampowered.com" else { return }
+        await MainActor.run { library.update(id) { $0.metadata = rematch } }
+    }
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+
+    await service.fillAbout(id, in: library)
+
+    #expect(library.game(id)?.metadata == rematch)
+}
+
 @Test func mergingMetadataLeavesScreenshotsToTheAboutRule() {
     let saved = GameMetadata(screenshots: [])
     #expect(GameMetadata().filling(from: saved).screenshots == nil, "an unfinished lookup stays retryable")

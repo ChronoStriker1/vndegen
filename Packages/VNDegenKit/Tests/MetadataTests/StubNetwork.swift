@@ -11,10 +11,17 @@ final class StubNetwork: Sendable {
     /// An IGDB game that names no Steam app: No Socks RPG's entry without its external games.
     static let igdbOnlyGameID = "1"
     private let log = Mutex<[URLRequest]>([])
+    /// Runs before each answer, so a test can change app state while a request is in flight.
+    private let beforeAnswer: @Sendable (URLRequest) async -> Void
+
+    init(beforeAnswer: @escaping @Sendable (URLRequest) async -> Void = { _ in }) {
+        self.beforeAnswer = beforeAnswer
+    }
 
     var http: HTTP {
         HTTP { [self] request in
             log.withLock { $0.append(request) }
+            await beforeAnswer(request)
             let (status, mime, body) = Self.route(request)
             let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
                                            headerFields: mime.map { ["Content-Type": $0] } ?? [:])!
