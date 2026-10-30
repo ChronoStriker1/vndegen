@@ -85,6 +85,8 @@ struct HubMetrics: Equatable {
     /// Height of the home screen's hero area above the first shelf.
     var stageHeight: CGFloat {
         if isShort { return max(220, size.height * 0.66) }
+        // Room for the title, facts, and buttons, so a portrait phone shows the shelves sooner.
+        if isCompact { return max(300, size.height * 0.4) }
         let share = size.width > size.height ? 0.6 : 0.56
         return min(780, max(300, size.height * share))
     }
@@ -95,7 +97,7 @@ struct HubMetrics: Equatable {
     }
     var bannerHeight: CGFloat {
         let wide = size.width / (3840.0 / 1240.0)
-        return min(size.height * (isShort ? 0.62 : 0.5), max(isCompact ? size.height * 0.4 : 280, wide))
+        return min(size.height * (isShort ? 0.62 : 0.5), max(isCompact ? size.height * 0.28 : 280, wide))
     }
     var titleSize: CGFloat { isCompact ? 30 : (isShort ? 30 : 44) }
 }
