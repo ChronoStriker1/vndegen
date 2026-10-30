@@ -336,6 +336,9 @@ private struct HeaderShelf: View {
         }
         .padding(.leading, metrics.leading)
         .padding(.trailing, metrics.trailing)
+        // With its padding the grid is as wide as the screen, wider than the safe area the scroll view is first offered.
+        // A rigid width there would widen the whole screen, top bar included.
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .id(shelf.rawValue)
     }
 }
