@@ -172,8 +172,14 @@ fs::path Game::saveFilePath(const std::string &name) const {
     }
     std::string full = (root_ / rel).string();
     std::vector<char> out(full.size() + 1024);
-    if (casepath_resolve(full.c_str(), out.data(), out.size()) < 0) return full;
-    return fs::path(out.data());
+    fs::path path = casepath_resolve(full.c_str(), out.data(), out.size()) < 0 ? fs::path(full) : fs::path(out.data());
+    // A folder on the way that is a link elsewhere mustn't take the file out of the game folder either.
+    std::error_code e1, e2;
+    fs::path real = fs::weakly_canonical(path, e1), base = fs::weakly_canonical(root_, e2);
+    if (e1 || e2) return {};
+    auto [r, b] = std::mismatch(real.begin(), real.end(), base.begin(), base.end());
+    if (b != base.end()) return {};
+    return path;
 }
 
 std::shared_ptr<SaveFile> Game::readSave(const fs::path &path, std::string *error) const {

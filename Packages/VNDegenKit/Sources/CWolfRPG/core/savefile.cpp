@@ -390,8 +390,19 @@ template <class IO, class D> void variableDb(IO &io, D &db) {
         size_t numbers = 0;
         for (auto k : t.fieldKinds) numbers += k < 2000;
         size_t strings = t.fieldKinds.size() - numbers;
-        // A row of a type with no fields takes no bytes, so its count is bounded by the file's size instead.
-        io.count32(t.rows, t.fieldKinds.empty() ? 1 : 4);
+        // A row of a type with no fields takes no bytes, so a fixed cap bounds its count instead of the file's size.
+        if constexpr (IO::reading) {
+            if (t.fieldKinds.empty()) {
+                uint32_t n = 0;
+                io.u32(n);
+                if (n > 100000) throw FormatError("database type with " + std::to_string(n) + " rows");
+                t.rows.resize(n);
+            } else {
+                io.count32(t.rows, 4);
+            }
+        } else {
+            io.count32(t.rows, 4);
+        }
         for (auto &row : t.rows) {
             if constexpr (IO::reading) {
                 row.numbers.resize(numbers);

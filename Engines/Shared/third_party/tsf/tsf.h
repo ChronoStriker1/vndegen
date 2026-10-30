@@ -958,6 +958,13 @@ static int tsf_decode_sf3_samples(const void* rawBuffer, float** pFloatBuffer, u
 		else // raw PCM sample
 		{
 			float *out; short *in = (short*)smplBuffer + resNum, *inEnd; tsf_u32 oldResNum = resNum;
+			// VNDegen change: after compressed samples a PCM sample is read from its own start, which must lie inside the
+			// sample chunk, or the pointer below would leave it.
+			if (is_sf3 && (shdr->start > shdr->end || shdr->start >= smplLength / sizeof(short)))
+			{
+				shdr->start = shdr->end = shdr->startLoop = shdr->endLoop = 0;
+				continue;
+			}
 			if (is_sf3) // Fix up sample indices in shdr
 			{
 				tsf_u32 fix_offset = resNum - shdr->start;

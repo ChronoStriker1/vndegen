@@ -128,7 +128,8 @@ void Game::returnToTitle() {
     shake_ = {};
     mapZoom_ = {100, 100};
     mapZoomX_ = mapZoomY_ = {};
-    transition_ = {};
+    // The generation keeps counting, so the renderer never takes an old frozen frame for a new transition.
+    transition_ = {.generation = transition_.generation + 1};
     transitionFrames_ = 0;
     pendingLoad_.reset();
     loadedPlaySeconds_ = loadedPlayFrames_ = 0;
