@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import WebRuntime
 
@@ -14,4 +15,42 @@ extension GameFolder {
 
     /// Where NW.js builds save: `save/` beside index.html.
     nonisolated var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
+
+    /// True when the audio folder holds Ogg files, plain or encrypted (.rpgmvo), and no .m4a (.rpgmvm). MV asks for
+    /// .m4a in a browser that cannot play Ogg, and its deployment usually ships both, but many games ship only Ogg. MV
+    /// plays sounds only from these four folders. Listing each one also follows a folder that is a symlink.
+    nonisolated var shipsOnlyOggAudio: Bool {
+        let files = ["bgm", "bgs", "me", "se"].flatMap { folder in
+            resolve(servedPath: "/audio/\(folder)").flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) } ?? []
+        }
+        var hasOgg = false
+        for file in files {
+            switch (file as NSString).pathExtension.lowercased() {
+            case "m4a", "rpgmvm": return false
+            case "ogg", "rpgmvo": hasOgg = true
+            default: break
+            }
+        }
+        return hasOgg
+    }
+
+    /// The Windows font names the game asks for in its plugins, plugin settings, and database, whose substitutes the
+    /// page loads before the boot scene ends. MV's core asks for SimHei in Chinese games and Dotum in Korean ones.
+    nonisolated var fontNames: Set<String> {
+        let limit = 8 << 20
+        var files = ["js/plugins.js", "data/System.json"]
+        if let plugins = resolve(servedPath: "/js/plugins"),
+           let names = try? FileManager.default.contentsOfDirectory(atPath: plugins.path) {
+            files += names.filter { $0.lowercased().hasSuffix(".js") }.map { "js/plugins/\($0)" }
+        }
+        let texts = files.compactMap { read(servedPath: "/" + $0, limit: limit) }
+        var found = FontPack.referencedNames(in: texts.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "\n"))
+        let system = read(servedPath: "/data/System.json", limit: limit)
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let locale = (system?["locale"] as? String)?.lowercased() ?? ""
+        let installed = Set(FontPack.entries.map(\.name))
+        if locale.hasPrefix("zh"), installed.contains("SimHei") { found.insert("SimHei") }
+        if locale.hasPrefix("ko"), installed.contains("Dotum") { found.insert("Dotum") }
+        return found
+    }
 }

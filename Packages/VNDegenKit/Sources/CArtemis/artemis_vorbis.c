@@ -1,0 +1,26 @@
+// The Ogg Vorbis decoder for the Artemis engine's audio: stb_vorbis (third_party/stb_vorbis.c, MIT or public domain).
+// Its functions are global, and the NScripter engine compiles its own copy into the same app, so this copy takes
+// names of its own. artemis_vorbis.h declares the one the engine calls.
+#define STB_VORBIS_NO_STDIO
+#define STB_VORBIS_NO_PUSHDATA_API
+#define stb_vorbis_close artemis_vorbis_close
+#define stb_vorbis_decode_memory artemis_vorbis_decode_memory
+#define stb_vorbis_get_comment artemis_vorbis_get_comment
+#define stb_vorbis_get_error artemis_vorbis_get_error
+#define stb_vorbis_get_file_offset artemis_vorbis_get_file_offset
+#define stb_vorbis_get_frame_float artemis_vorbis_get_frame_float
+#define stb_vorbis_get_frame_short artemis_vorbis_get_frame_short
+#define stb_vorbis_get_frame_short_interleaved artemis_vorbis_get_frame_short_interleaved
+#define stb_vorbis_get_info artemis_vorbis_get_info
+#define stb_vorbis_get_sample_offset artemis_vorbis_get_sample_offset
+#define stb_vorbis_get_samples_float artemis_vorbis_get_samples_float
+#define stb_vorbis_get_samples_float_interleaved artemis_vorbis_get_samples_float_interleaved
+#define stb_vorbis_get_samples_short artemis_vorbis_get_samples_short
+#define stb_vorbis_get_samples_short_interleaved artemis_vorbis_get_samples_short_interleaved
+#define stb_vorbis_open_memory artemis_vorbis_open_memory
+#define stb_vorbis_seek artemis_vorbis_seek
+#define stb_vorbis_seek_frame artemis_vorbis_seek_frame
+#define stb_vorbis_seek_start artemis_vorbis_seek_start
+#define stb_vorbis_stream_length_in_samples artemis_vorbis_stream_length_in_samples
+#define stb_vorbis_stream_length_in_seconds artemis_vorbis_stream_length_in_seconds
+#include "third_party/stb_vorbis.c"

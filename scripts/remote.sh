@@ -11,5 +11,5 @@ root=$(git rev-parse --show-toplevel)
 dest="vndegen-build/${VNDEGEN_REMOTE_NAME:-$(basename "$root")}"
 ssh -o BatchMode=yes "chronostriker1@$host" "mkdir -p ~/$dest"
 rsync -az --delete --exclude .git --exclude build --exclude '*.xcodeproj' --exclude .audit \
-  --exclude .build --exclude .swiftpm "$root/" "chronostriker1@$host:$dest/"
+  --exclude .build --exclude .swiftpm --exclude /Engines/Artemis/art3m1s-core/target "$root/" "chronostriker1@$host:$dest/"
 ssh -o BatchMode=yes "chronostriker1@$host" "export PATH=/opt/homebrew/bin:\$PATH; cd ~/$dest && $*"

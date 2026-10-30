@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs on a Mac. Builds the RGSS engine (RPG Maker XP, VX and VX Ace) from Engines/RGSS:
 #   <dest>/RGSS.xcframework   the framework VNDegen embeds: iOS device and simulator, and macOS, all arm64. It holds
-#                             mkxp-z's libretro core, ANGLE, and VNDegen's frontend (Engines/RGSS/host)
+#                             mkxp-z's libretro core, ANGLE, and VNDegen's frontend (Engines/RGSS/host, with the file
+#                             name matching in Engines/Shared)
 #   <dest>/licenses/          the notices of mkxp-z, with where to get the source of this build, and of ANGLE and
 #                             every dependency, one text file each, as scripts/licenses/README.md describes
 #   scripts/rgss-engine.sh build/rgss
@@ -11,12 +12,14 @@
 # the core for each platform. Sources, tools, and stage 1 are cached in ~/Library/Caches/VNDegen/rgss. A build whose
 # inputs have not changed since the last one is skipped.
 #
-# Needs, from Homebrew: meson ninja cmake bison make automake autoconf libtool universal-ctags ruby@3.3 gnu-sed grep.
+# Needs, from Homebrew: meson ninja cmake bison make automake autoconf libtool universal-ctags ruby@3.3 gnu-sed grep
+# rsync. Apple's own rsync handles the filters below differently.
 # Stage 1 runs the build machine's Ruby against the Ruby 3.3 it builds, which a newer Ruby refuses.
 set -euo pipefail
 dest=${1:?destination folder, such as build/rgss}
 root=$(cd "$(dirname "$0")/.." && pwd)
 src="$root/Engines/RGSS"
+shared="$root/Engines/Shared"
 api="$root/Packages/VNDegenKit/Sources/CRGSS/include"
 cache=${VNDEGEN_RGSS_CACHE:-$HOME/Library/Caches/VNDegen/rgss}
 jobs=${VNDEGEN_RGSS_JOBS:-4}
@@ -33,16 +36,21 @@ binaryen_sha256=3f1e1379894944531501a8ccc6b59c57f0c7a00fc136dd933f8a6b0c53515a88
 
 mkdir -p "$dest" "$cache"
 dest=$(cd "$dest" && pwd)
-stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$src" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
+# Engines/Shared counts by its C sources only, so its fonts changing rebuilds nothing.
+stamp=$( (cat "$0" "$api/vnrgss.h"; cd "$root/Engines" && { find RGSS -type f -print0; find Shared -type f \( -name "*.c" -o -name "*.h" \) -print0; } | LC_ALL=C sort -z | xargs -0 shasum -a 256) | shasum -a 256 | cut -c1-16)
 if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
   echo "RGSS engine is up to date in $dest"
   exit 0
 fi
+# The stamp comes back only when this build has finished, so a build that fails partway is never taken as current.
+rm -f "$dest/.vndegen-engine"
 # The tools are needed only to build, so a Mac with a copy of an up-to-date build/rgss needs none of them.
 for tool in meson ninja cmake gmake gsed ggrep automake autoreconf glibtoolize ctags ruby zip; do
   command -v "$tool" >/dev/null || { echo "error: $tool is missing, see the header of $0" >&2; exit 1; }
 done
 ctags --version 2>/dev/null | grep -q "Universal Ctags" || { echo "error: ctags must be Universal Ctags (brew install universal-ctags)" >&2; exit 1; }
+rsync_version=$(rsync --version 2>/dev/null || true)
+[[ ${rsync_version%%$'\n'*} =~ ^rsync\ +version\ 3 ]] || { echo "error: rsync must be rsync 3 (brew install rsync)" >&2; exit 1; }
 
 start=$(date +%s)
 
@@ -83,14 +91,44 @@ mkdir -p "$work/fresh"
 # The patched sources.
 rsync -a --exclude .git "$cache/src/core-$core_commit/" "$work/fresh/core/"
 for patch in "$src"/patches/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
+# Patches in stage2/ change only code stage 2 builds, so they stay out of stage 1's cache key below.
+for patch in "$src"/patches/stage2/*.patch; do patch -s -p1 -d "$work/fresh/core" < "$patch"; done
 rsync -a --exclude .git "$cache/src/angle-$angle_commit/subprojects/" "$work/fresh/subprojects/"
 for patch in "$src"/patches/angle/*.patch; do patch -s -p1 -d "$work/fresh" < "$patch"; done
-# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have.
-rsync -a --checksum --delete --exclude /libretro/build "$work/fresh/core/" "$work/core/"
-rsync -a --checksum --delete "$work/fresh/subprojects/" "$work/subprojects/"
+# The core's libretro/build folder holds stage 1 and its downloads, which the fresh sources don't have. Neither do the
+# folders Meson downloaded the fresh .wrap files' subprojects into, which the notices below read, so those stay too. A
+# folder no current wrap names, such as an older version's, goes, so its notice can't reach the app. Meson reuses a
+# downloaded folder as it is, so when any wrap or overlay changes, every download goes and so do the Meson builds that
+# used them, which download again. The hash is saved with the engine's stamp, once the whole build has succeeded, so
+# a download that failed or stopped partway is never kept.
+wraps_stamp=$(cd "$work/fresh" && find core/subprojects subprojects \( -name "*.wrap" -o -path "*/packagefiles/*" \) \
+  -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-16)
+wraps_changed=false
+if [ "$(cat "$work/.vndegen-wraps" 2>/dev/null)" != "$wraps_stamp" ]; then
+  wraps_changed=true
+  # The old hash goes first, so a build that fails from here on can't leave downloads it would keep.
+  rm -f "$work/.vndegen-wraps"
+  rm -rf "$work"/core-* "$work"/host-*/build
+fi
+# keep_downloads <subprojects folder> <its path in the copy>: adds a protect filter for each wrap's folder to `keep`.
+keep_downloads() {
+  local wrap dir
+  [ "$wraps_changed" = false ] || return 0
+  for wrap in "$1"/*.wrap; do
+    [ -f "$wrap" ] || continue
+    dir=$(sed -n 's/^directory *= *//p' "$wrap" | head -n 1 | tr -d '\r')
+    keep+=(--filter "protect $2/${dir:-$(basename "$wrap" .wrap)}/")
+  done
+}
+keep=()
+keep_downloads "$work/fresh/core/subprojects" /subprojects
+rsync -a --checksum --delete --exclude /libretro/build ${keep[@]+"${keep[@]}"} "$work/fresh/core/" "$work/core/"
+keep=()
+keep_downloads "$work/fresh/subprojects" ""
+rsync -a --checksum --delete ${keep[@]+"${keep[@]}"} "$work/fresh/subprojects/" "$work/subprojects/"
 rm -rf "$work/fresh"
 
-# Stage 1, cached by its inputs: the core with its patches, and the tools. Its Makefile expects GNU sed and grep, and an
+# Stage 1, cached by its inputs: the core with its patches outside stage2/, and the tools. Its Makefile expects GNU sed and grep, and an
 # echo that prints backslashes as they are, as Linux's /bin/sh does but macOS's does not, so it runs under bash. Bump
 # stage1_format to rebuild every cached stage 1, as 2 did for caches an earlier build made without starting clean.
 stage1_format=2
@@ -129,8 +167,9 @@ build_slice() {
   ninja -C "$work/core-$name" -j "$jobs" >"$work/core-$name.log" 2>&1 || { tail -n 40 "$work/core-$name.log" >&2; exit 1; }
 
   mkdir -p "$work/host-$name/src"
-  rsync -a --checksum --delete --exclude /subprojects "$src/host/" "$work/host-$name/src/"
+  rsync -a --checksum --delete --exclude /subprojects --exclude /shared "$src/host/" "$work/host-$name/src/"
   ln -sfn "$work/subprojects" "$work/host-$name/src/subprojects"
+  ln -sfn "$shared" "$work/host-$name/src/shared"
   if [ ! -f "$work/host-$name/build/build.ninja" ]; then
     meson setup "$work/host-$name/build" "$work/host-$name/src" --cross-file "$cross" \
       -Dcore="$work/core-$name/mkxp-z_libretro.a" -Dapi_include="$api" \
@@ -224,5 +263,6 @@ for name in Ruby libyaml wasi-libc "wabt (wasm2c)" Boost "Liberation Sans font" 
   cp "$src/licenses/$name.txt" "$licenses/mkxp-z - $name.txt"
 done
 
+echo "$wraps_stamp" > "$work/.vndegen-wraps"
 echo "$stamp" > "$dest/.vndegen-engine"
 echo "RGSS engine built in $dest in $(($(date +%s) - start)) s"

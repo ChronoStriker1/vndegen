@@ -5,11 +5,12 @@
 # On macOS each game runs in its own helper process. On iOS VNDegen runs this file in the app's one interpreter for each
 # game it starts, so everything below must hold up when it runs again in the same process.
 #
-# It runs the runtime's own renpy.py with three changes, all in memory:
+# It runs the runtime's own renpy.py with four changes, all in memory:
 # - saves, save tokens, and logs go to VNDegen's per-game data directory instead of the game folder or ~/Library;
 # - Ren'Py's read-only mode (renpy.macapp, meant for games inside a signed .app) is on, so Ren'Py never compiles
 #   .rpyc files, writes caches, or deletes anything in the game folder;
-# - the folder holding zz_vndegen.rpy joins the search path, so every game loads VNDegen's hook.
+# - the folder holding zz_vndegen.rpy joins the search path, so every game loads VNDegen's hook;
+# - files in the game folder and the saves folder open in any case, as on Windows, through filecase.py.
 
 from __future__ import print_function
 
@@ -22,7 +23,19 @@ sys.dont_write_bytecode = True
 
 runtime = os.environ["VNDEGEN_RENPY_RUNTIME"]
 data = os.environ["VNDEGEN_DATA"]
-scripts = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
+support = os.path.dirname(os.path.abspath(__file__))
+scripts = os.path.join(support, "scripts")
+
+# This comes before Ren'Py's first import, because Ren'Py's modules keep the open they find then. The module loads once
+# per process, so on iOS those copies follow each later game's install.
+case = sys.modules.get("_vndegen_case")
+if case is None:
+    case = types.ModuleType("_vndegen_case")
+    case.__file__ = os.path.join(support, "filecase.py")
+    with open(case.__file__) as f:
+        exec(compile(f.read(), case.__file__, "exec"), case.__dict__)
+    sys.modules["_vndegen_case"] = case
+case.install(sys.argv[1], os.path.join(data, "saves"))
 
 # Ren'Py's log goes to stdout, which VNDegen writes to the data directory, because read-only mode turns log.txt off.
 # Ren'Py on iOS logs to stdout already, and with this set it would drop what the game prints.
@@ -54,6 +67,21 @@ def predefined_searchpath(commondir):
     return searchpath(commondir) + [scripts]
 
 
+find_gamedir = main.path_to_gamedir
+
+
+def path_to_gamedir(basedir, name):
+    # Ren'Py looks for a game/ folder, which with filecase.py also finds Game/. Its real name goes on to Ren'Py.
+    gamedir = case.resolve(find_gamedir(basedir, name))
+    if not renpy.mobile:
+        # Ren'Py imports this next to show the presplash, whose file SDL opens.
+        import renpy.display.presplash as presplash
+
+        case.patch_presplash(presplash)
+    return gamedir
+
+
+main.path_to_gamedir = path_to_gamedir
 main.path_to_saves = path_to_saves
 main.path_to_logdir = path_to_logdir
 main.predefined_searchpath = predefined_searchpath
@@ -304,6 +332,7 @@ def run_in_process():
         renpy.session["_keep_renderer"] = True
         renpy.reload_all()
         renpy.session.pop("_keep_renderer", None)
+    case.patch_loader(renpy.loader)
 
     import ctypes
 
@@ -367,6 +396,7 @@ def run_in_process():
             callback()
         if undo_division:
             undo_division()
+        case.uninstall()
         forget_modules(basedir)
         sys.meta_path[:] = state.meta_path
         sys.path_hooks[:] = state.path_hooks
@@ -381,13 +411,14 @@ sys.argv[0] = renpy_py
 if renpy.ios:
     run_in_process()
 else:
-    if renpy7_game:
-        # Ren'Py's modules can only be imported once its bootstrap has started importing them.
-        import_all = renpy.import_all
+    # Ren'Py's modules can only be imported once its bootstrap has started importing them.
+    import_all = renpy.import_all
 
-        def import_all_then_divide():
-            import_all()
+    def import_all_then_patch():
+        import_all()
+        case.patch_loader(renpy.loader)
+        if renpy7_game:
             use_python2_division()
 
-        renpy.import_all = import_all_then_divide
+    renpy.import_all = import_all_then_patch
     main.main()

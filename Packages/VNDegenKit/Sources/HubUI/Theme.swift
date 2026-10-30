@@ -24,6 +24,7 @@ struct HubMetrics: Equatable {
     /// The safe area's size.
     var size: CGSize
     var insets = EdgeInsets()
+    var windowControls = WindowControlsInsets()
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -31,6 +32,29 @@ struct HubMetrics: Equatable {
     /// Horizontal content padding for views that ignore the horizontal safe area.
     var leading: CGFloat { padding + insets.leading }
     var trailing: CGFloat { padding + insets.trailing }
+
+    /// How far past the safe area's `edge` an iPad window's controls reach in the top row. Zero without controls there.
+    func topClearance(_ edge: HorizontalEdge) -> CGFloat {
+        max(0, edge == .leading ? windowControls.leading - insets.leading : windowControls.trailing - insets.trailing)
+    }
+
+    /// Padding from the safe area's `edge` for a view in the top row, which also keeps it beside an iPad window's controls.
+    func topRowPadding(_ edge: HorizontalEdge) -> CGFloat {
+        let clearance = topClearance(edge)
+        return clearance > 0 ? max(padding, clearance + 8) : padding
+    }
+
+    /// How far below the safe area's top a view in a top corner starts, to sit below an iPad window's controls.
+    var cornerClearance: CGFloat { max(0, windowControls.top - insets.top) }
+
+    var topBarSpacing: CGFloat { isCompact ? 8 : 12 }
+
+    /// Whether the home screen's top bar fits its `buttons` beside an iPad window's controls, with the wordmark hidden.
+    /// When it doesn't, the bar moves below the controls and takes the full width.
+    func topBarFitsBesideControls(buttons: Int) -> Bool {
+        let content = CGFloat(buttons) * 44 + CGFloat(buttons + 1) * topBarSpacing
+        return content + topRowPadding(.leading) + topRowPadding(.trailing) <= size.width
+    }
 
     var isCompact: Bool { size.width < 600 }
     /// Landscape phones and short windows, where the hero has to share very little height with the shelves.
@@ -45,9 +69,24 @@ struct HubMetrics: Equatable {
     }
     var tileSize: CGSize { CGSize(width: tileWidth, height: tileWidth * 1.5) }
 
+    /// Capsule width in the capsule rows layout. With no hero above them, the shelves have the height for larger art.
+    var largeTileWidth: CGFloat {
+        let byWidth = isCompact ? (size.width - padding * 2 - tileSpacing) / 2.2 : size.width / 5.5
+        return min(300, max(110, min(byWidth, size.height * 0.36)))
+    }
+
+    /// Columns in the header list: one on a phone held upright, two or more as the width allows.
+    var headerColumns: Int { max(1, Int((size.width - padding * 2 + tileSpacing) / (320 + tileSpacing))) }
+    var headerWidth: CGFloat {
+        let columns = CGFloat(headerColumns)
+        return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
+    }
+
     /// Height of the home screen's hero area above the first shelf.
     var stageHeight: CGFloat {
         if isShort { return max(220, size.height * 0.66) }
+        // Room for the title, facts, and buttons, so a portrait phone shows the shelves sooner.
+        if isCompact { return max(300, size.height * 0.4) }
         let share = size.width > size.height ? 0.6 : 0.56
         return min(780, max(300, size.height * share))
     }
@@ -58,7 +97,7 @@ struct HubMetrics: Equatable {
     }
     var bannerHeight: CGFloat {
         let wide = size.width / (3840.0 / 1240.0)
-        return min(size.height * (isShort ? 0.62 : 0.5), max(isCompact ? size.height * 0.4 : 280, wide))
+        return min(size.height * (isShort ? 0.62 : 0.5), max(isCompact ? size.height * 0.28 : 280, wide))
     }
     var titleSize: CGFloat { isCompact ? 30 : (isShort ? 30 : 44) }
 }

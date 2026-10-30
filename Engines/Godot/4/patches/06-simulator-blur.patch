@@ -1,0 +1,22 @@
+--- a/drivers/gles3/effects/copy_effects.cpp	2026-10-27 19:06:19.135328551 -0400
++++ b/drivers/gles3/effects/copy_effects.cpp	2026-10-27 19:06:19.142189317 -0400
+@@ -251,6 +251,19 @@
+ 
+ // Intended for approximating a gaussian blur. Used for 2D backbuffer mipmaps. Slightly less efficient than bilinear_blur().
+ void CopyEffects::gaussian_blur(GLuint p_source_texture, int p_mipmap_count, const Rect2i &p_region, const Size2i &p_size) {
++#ifdef VNDEGEN_ANGLE
++	// VNDegen: MetalANGLE in the iOS Simulator aborts on a draw into one mip level of a texture while sampling the level
++	// above, so the simulator builds the mipmaps with a box filter instead.
++	glActiveTexture(GL_TEXTURE0);
++	glBindTexture(GL_TEXTURE_2D, p_source_texture);
++	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
++	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, p_mipmap_count - 1);
++	glGenerateMipmap(GL_TEXTURE_2D);
++	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
++	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
++	glBindTexture(GL_TEXTURE_2D, 0);
++	return;
++#endif
+ 	GLuint framebuffer;
+ 	glGenFramebuffers(1, &framebuffer);
+ 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);

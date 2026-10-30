@@ -50,6 +50,7 @@ struct GamePageView: View {
         }
         // The game's engine decides which runtime packages it needs, and an install finishing changes which are missing.
         .task(id: "\(game.id)|\(game.engine?.rawValue ?? "")") { await nav.runtimes.refresh(game.id) }
+        .task(id: game.id) { await hub.metadata.fillAbout(game.id, in: hub.library) }
         .runtimeFolderImporter(nav.runtimes, game: game.id)
         .background {
             GeometryReader { geo in
@@ -78,7 +79,7 @@ struct GamePageView: View {
             .overlay(alignment: .topLeading) {
                 HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
                     .accessibilityLabel("Back")
-                    .padding(.leading, metrics.leading)
+                    .padding(.leading, metrics.insets.leading + metrics.topRowPadding(.leading))
                     .padding(.top, metrics.insets.top + 10)
                     #if os(macOS)
                     .padding(.top, 18)
@@ -89,17 +90,35 @@ struct GamePageView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 16) {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { actionButtons(labels: true) }
-                HStack(spacing: 10) { actionButtons(labels: false) }
+                HStack(spacing: 12) {
+                    playButton
+                    Spacer().frame(width: 4)
+                    secondaryButtons(labels: true)
+                }
+                .onAppear { nav.pageActionsStacked = false }
+                HStack(spacing: 10) {
+                    playButton
+                    Spacer().frame(width: 4)
+                    secondaryButtons(labels: false)
+                }
+                .onAppear { nav.pageActionsStacked = false }
+                // The narrowest windows put the other buttons under Play, and controller focus moves down to them.
+                VStack(alignment: .leading, spacing: 12) {
+                    playButton
+                    HStack(spacing: 10) { secondaryButtons(labels: false) }
+                }
+                .onAppear { nav.pageActionsStacked = true }
             }
             HeroFacts(game: game)
         }
     }
 
-    @ViewBuilder
-    private func actionButtons(labels: Bool) -> some View {
+    private var playButton: some View {
         HubButton(target: .pagePlay, kind: .primary) { Label("Play", systemImage: "play.fill") }
-        Spacer().frame(width: 4)
+    }
+
+    @ViewBuilder
+    private func secondaryButtons(labels: Bool) -> some View {
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
             labeled("Artwork", "photo.on.rectangle", labels)
         }
@@ -138,6 +157,9 @@ struct GamePageView: View {
             }
             if let genres = metadata?.genres, !genres.isEmpty {
                 FlowTags(tags: genres)
+            }
+            if let screenshots = metadata?.screenshots, !screenshots.isEmpty {
+                ScreenshotRow(screenshots: screenshots)
             }
         }
     }
@@ -336,6 +358,30 @@ private struct EngineSection: View {
         case .likely: "likely"
         case .certain: "certain"
         }
+    }
+}
+
+/// The game's screenshots in a row that scrolls sideways.
+private struct ScreenshotRow: View {
+    let screenshots: [Screenshot]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 10) {
+                ForEach(screenshots, id: \.url) { screenshot in
+                    AsyncImage(url: screenshot.thumbnail) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Theme.surface
+                    }
+                    .frame(width: 256, height: 144)
+                    .clipShape(.rect(cornerRadius: 8, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.stroke) }
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityLabel("Screenshots")
     }
 }
 

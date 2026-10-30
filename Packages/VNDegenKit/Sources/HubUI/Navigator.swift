@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import Observation
 import VNCore
@@ -78,7 +79,7 @@ final class Navigator {
     }
 
     enum Target: Hashable {
-        case addGame, gridButton, lockButton, settingsButton
+        case addGame, layoutButton, gridButton, lockButton, settingsButton
         /// An archive under Ready to import, by its first volume.
         case importArchive(URL)
         case openFolder, rescan
@@ -102,6 +103,10 @@ final class Navigator {
         /// A runtime package a game is missing, by package ID, on the game's page.
         case runtime(String, RuntimeAction)
         case licenseAccept, licenseDecline
+        /// A font package in Settings, by package ID. It downloads, cancels, or removes the package.
+        case fontPackage(String)
+        /// The MIDI SoundFont rows in Settings: choose a file, and go back to the bundled font.
+        case soundFont, soundFontReset
     }
 
     enum RuntimeAction: Hashable {
@@ -148,7 +153,19 @@ final class Navigator {
     private var heroID: GameID?
     /// Set by the grid view from its width.
     var gridColumns = 4
+    var layout = LibraryLayout.setting {
+        didSet { UserDefaults.standard.set(layout.rawValue, forKey: LibraryLayout.storageKey) }
+    }
+    /// Set by the home screen's header list from its width.
+    var headerColumns = 1
+    /// Set by the game page when a narrow window puts its other buttons in a row under Play.
+    var pageActionsStacked = false
     private(set) var rescanning = false
+    /// Settings' SoundFont file picker is open.
+    var pickingSoundFont = false
+    /// The file name of the player's MIDI SoundFont, nil for the bundled one, and why the last choice failed.
+    private(set) var soundFontName = MIDISoundFont.userFont()?.lastPathComponent
+    private(set) var soundFontError: String?
     @ObservationIgnored private var columnMemory: [String: Int] = [:]
     @ObservationIgnored private var lastBackgrounded: Date?
     /// The unlock view shown in the sheet, kept so controller events reach the same instance.
@@ -187,8 +204,11 @@ final class Navigator {
 
     var shelves: [(shelf: Shelf, games: [Game])] {
         let visible = visibleGames
+        // The header list stacks every game, so Recently played would only repeat the top of All games, which already
+        // lists the last played first.
+        let recent = layout == .headers ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
         let all: [(Shelf, [Game])] = [
-            (.recent, Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))),
+            (.recent, recent),
             (.all, visible.filter { !$0.isLocked }),
             (.hidden, visible.filter(\.isLocked)),
         ]
@@ -210,11 +230,7 @@ final class Navigator {
             switch sheet {
             case .engine, .variant, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case let .artwork(editor):
-                let columns = max(1, editor.columns)
-                let candidates = stride(from: 0, to: editor.candidates.count, by: columns).enumerated().map { index, start in
-                    Row(id: "candidates-\(index)", items: (start..<min(start + columns, editor.candidates.count)).map { .artworkCandidate($0) },
-                        remembersColumn: false)
-                }
+                let candidates = Self.gridRows("candidates", editor.candidates.indices.map { .artworkCandidate($0) }, columns: editor.columns)
                 return [Row(id: "slots", items: ArtworkSlot.allCases.map { .artworkSlot($0) })] + candidates
             case let .metadata(search):
                 return [Row(id: "query", items: [.metadataQuery])]
@@ -233,18 +249,20 @@ final class Navigator {
                     + archives.map { Row(id: "\($0)", items: [$0]) }
                     + [Row(id: "empty-add", items: [.addGame]), Row(id: "empty-folder", items: [.openFolder, .rescan])]
             }
-            var rows = [Row(id: "bar", items: [.addGame, .gridButton, .lockButton, .settingsButton])]
-            if heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
+            var rows = [Row(id: "bar", items: [.addGame, .layoutButton, .gridButton, .lockButton, .settingsButton])]
+            if layout == .featured, heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
             if !archives.isEmpty { rows.append(Row(id: Self.archivesRowID, items: archives)) }
-            rows += shelves.map { shelf in Row(id: shelf.shelf.rawValue, items: shelf.games.map { .tile(shelf.shelf, $0.id) }) }
+            for (shelf, games) in shelves {
+                let tiles = games.map { Target.tile(shelf, $0.id) }
+                if layout == .headers {
+                    rows += Self.gridRows(shelf.rawValue, tiles, columns: headerColumns)
+                } else {
+                    rows.append(Row(id: shelf.rawValue, items: tiles))
+                }
+            }
             return rows
         case .grid:
-            let ids = visibleGames.map(\.id)
-            let columns = max(1, gridColumns)
-            let tiles = stride(from: 0, to: ids.count, by: columns).enumerated().map { index, start in
-                Row(id: "grid-\(index)", items: ids[start..<min(start + columns, ids.count)].map { .gridTile($0) }, remembersColumn: false)
-            }
-            return [Row(id: "grid-back", items: [.back])] + tiles
+            return [Row(id: "grid-back", items: [.back])] + Self.gridRows("grid", visibleGames.map { .gridTile($0.id) }, columns: gridColumns)
         case .game:
             // Orientation only matters on a touch device, and the control method only where it changes something.
             let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
@@ -255,10 +273,13 @@ final class Navigator {
                     : [.runtime(package.id, .install), .runtime(package.id, .importFolder)]
                 return Row(id: "page-runtime-\(package.id)", items: items)
             }
+            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock]
+            let pageActions = pageActionsStacked
+                ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
+                : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
             return [
                 Row(id: "page-back", items: [.back]),
-                Row(id: "page-actions", items: [.pagePlay, .pageArtwork, .pageMetadata, .pageSaves, .pageLock]),
-            ] + runtimes + [
+            ] + pageActions + runtimes + [
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
@@ -271,9 +292,20 @@ final class Navigator {
             if method.mouse != nil { items.append(.mouseStyle) }
             items.append(.playOrientation)
             #endif
+            items += FontPack.packages.map { .fontPackage($0.id) }
+            items.append(.soundFont)
+            if soundFontName != nil { items.append(.soundFontReset) }
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
+        }
+    }
+
+    /// `items` in rows of `columns`. Moving between them keeps the column, as moving through a grid should.
+    private static func gridRows(_ id: String, _ items: [Target], columns: Int) -> [Row] {
+        let columns = max(1, columns)
+        return stride(from: 0, to: items.count, by: columns).enumerated().map { index, start in
+            Row(id: "\(id)-\(index)", items: Array(items[start..<min(start + columns, items.count)]), remembersColumn: false)
         }
     }
 
@@ -354,6 +386,8 @@ final class Navigator {
     /// Screens scroll to keep focus in view only when a controller or the keyboard moved it. Scrolling under a hovering
     /// pointer or a touch user's finger would fight them.
     private(set) var focusMovedByController = false
+    /// A target the home screen or the grid scrolls into view once, whatever the input. The screen clears it when it scrolls.
+    var revealRequest: Target?
     /// Set once a controller, the keyboard, or the pointer has moved focus. Until then focus follows the library as it loads.
     @ObservationIgnored private var steered = false
 
@@ -388,6 +422,7 @@ final class Navigator {
         case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
         case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
+        case .layoutButton: layout = layout.next
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
@@ -446,6 +481,25 @@ final class Navigator {
             case .importFolder: runtimes.pickFolder(for: package)
             case .cancel: runtimes.cancel(package)
             }
+        case let .fontPackage(packageID):
+            guard let package = FontPack.packages.first(where: { $0.id == packageID }) else { return }
+            if case .running? = runtimes.phases[packageID] {
+                runtimes.cancel(package)
+            } else if runtimes.installedFonts.contains(packageID) {
+                runtimes.remove(package)
+            } else {
+                runtimes.install(package, for: nil)
+            }
+        case .soundFont: pickingSoundFont = true
+        case .soundFontReset:
+            do {
+                try MIDISoundFont.reset()
+                soundFontName = nil
+                soundFontError = nil
+                setFocus(.soundFont)
+            } catch {
+                soundFontError = error.localizedDescription
+            }
         case .licenseAccept, .licenseDecline:
             guard case let .license(request) = sheet else { return }
             request.respond(target == .licenseAccept)
@@ -487,7 +541,23 @@ final class Navigator {
             let id = GameID(folderName)
             guard hub.library.game(id) != nil else { return }
             heroID = id
-            if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) { setFocus(tile) }
+            if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) {
+                setFocus(tile)
+                // The new game can sort far down the header list, so the library scrolls to it whatever the input.
+                revealRequest = tile
+            }
+        }
+    }
+
+    /// Copies the SoundFont the player chose into the app, for engines started after this.
+    func installSoundFont(_ result: Result<URL, Error>) {
+        do {
+            soundFontName = try MIDISoundFont.install(result.get()).lastPathComponent
+            soundFontError = nil
+        } catch let error as CocoaError where error.code == .userCancelled {
+            return
+        } catch {
+            soundFontError = error.localizedDescription
         }
     }
 
@@ -544,7 +614,8 @@ final class Navigator {
     func variants(_ id: GameID) -> EngineVariants? {
         _ = variantRevision
         guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return nil }
-        return plugin.variants(for: game, dataDirectory: hub.library.paths.dataDirectory(for: id))
+        let paths = hub.library.paths
+        return plugin.variants(for: game, folder: paths.folder(for: id), dataDirectory: paths.dataDirectory(for: id))
     }
 
     private func selectVariant(_ variant: String?, for id: GameID) {
@@ -759,6 +830,15 @@ final class Navigator {
         // The alert covers everything else, and it shows no focus, so A and B both close it.
         if hub.launchError != nil {
             if button == .confirm || button == .cancel { hub.launchError = nil }
+            return
+        }
+        // A system file picker covers the hub and takes no controller input, so presses mustn't reach the rows behind
+        // it. B closes it.
+        if pickingSoundFont || runtimes.pickingFolder {
+            if button == .cancel {
+                pickingSoundFont = false
+                runtimes.pickingFolder = false
+            }
             return
         }
         if let keyboard {

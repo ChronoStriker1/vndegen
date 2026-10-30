@@ -1,15 +1,15 @@
 import Foundation
 
-/// A page's localStorage as files in an app-owned directory, one file per key. Keys are percent-encoded into file names,
-/// so no key can name a path outside the directory. Upper-case letters are encoded too, so keys that differ only in case
-/// get different files on a case-insensitive volume such as the Mac's.
-nonisolated public struct WebStorage: Sendable {
-    public let directory: URL
+/// Where a page's localStorage lives. The shim calls it before each change reaches the page, so every write is on disk
+/// when setItem returns. Keys and values are the strings the page used.
+nonisolated public protocol PageStorage: Sendable {
+    func load() throws -> [String: String]
+    func set(_ key: String, _ value: String) throws
+    func remove(_ key: String) throws
+    func clear() throws
+}
 
-    public init(directory: URL) {
-        self.directory = directory
-    }
-
+nonisolated extension PageStorage {
     func handle(_ request: BridgeRequest) -> BridgeReply {
         do {
             switch request {
@@ -23,6 +23,17 @@ nonisolated public struct WebStorage: Sendable {
         } catch {
             return .failure(BridgeError(code: "EIO", message: error.localizedDescription))
         }
+    }
+}
+
+/// A page's localStorage as files in an app-owned directory, one file per key. Keys are percent-encoded into file names,
+/// so no key can name a path outside the directory. Upper-case letters are encoded too, so keys that differ only in case
+/// get different files on a case-insensitive volume such as the Mac's.
+nonisolated public struct WebStorage: PageStorage {
+    public let directory: URL
+
+    public init(directory: URL) {
+        self.directory = directory
     }
 
     /// Every key and value. Files named the way earlier versions named them, with upper-case letters left as they were,
@@ -66,13 +77,13 @@ nonisolated public struct WebStorage: Sendable {
         try Data(value.utf8).write(to: file(for: key), options: .atomic)
     }
 
-    func remove(_ key: String) throws {
+    public func remove(_ key: String) throws {
         do {
             try FileManager.default.removeItem(at: file(for: key))
         } catch CocoaError.fileNoSuchFile {}
     }
 
-    func clear() throws {
+    public func clear() throws {
         for key in try load().keys { try remove(key) }
     }
 

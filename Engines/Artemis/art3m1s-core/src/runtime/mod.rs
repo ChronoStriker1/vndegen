@@ -1,0 +1,1119 @@
+//! Core runtime: wires together a GPU backend, compositor, interpreter,
+//! text rendering and input handling into a single frame-oriented API
+//! that the Flutter frontend calls from its game loop.
+
+use crate::audio::AudioBackend;
+use crate::backend::{BackendInfo, BackendSelection, GpuBackend, NativeSurface};
+use crate::compositor::Compositor;
+use crate::host_files::HostResources;
+use crate::render_pipeline::post_process::{
+    PostProcessPass, PostProcessPipeline, RenderDimensions, RenderQualityPreset, UpscaleConfig,
+};
+use crate::text::TextRenderer;
+use crate::video::VideoBackend;
+use asb_interpreter::event::WaitReason;
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, AtomicU8};
+use std::sync::{Arc, Mutex};
+
+mod callbacks;
+mod control;
+mod dialog;
+pub(crate) mod emote;
+mod events;
+mod input;
+mod layer_info;
+mod magic_path;
+mod media;
+#[cfg(feature = "ffmpeg")]
+mod media_session;
+mod pc_save;
+mod project;
+mod render;
+mod save_io;
+mod script;
+mod telemetry;
+mod text;
+
+#[derive(Default)]
+struct PointerDragState {
+    layer_id: Option<String>,
+    start_mouse_x: f32,
+    start_mouse_y: f32,
+    start_left: f32,
+    start_top: f32,
+}
+
+#[derive(Debug, Clone)]
+struct PendingDialog {
+    varname: Option<String>,
+    textfield: Option<String>,
+    textfield_size: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+struct InlineEventFrame {
+    script: String,
+    line: usize,
+    stack: Vec<asb_interpreter::CallFrame>,
+    claimed_by_jump: bool,
+}
+
+pub struct CoreRuntime {
+    gpu: Box<dyn GpuBackend>,
+    compositor: Compositor,
+    /// 上一帧已经提交的逻辑场景。转场源帧需保留旧图像层，同时按当前状态
+    /// 剔除刚隐藏或删除的消息文字，不能直接复用已经烘入文字的 FBO。
+    last_rendered_scene: Option<crate::compositor::Scene>,
+    last_rendered_clock_ms: u64,
+    /// Draw list and texture generation last delivered to the host. Logic still
+    /// advances every tick, but identical visual frames skip GPU work/readback.
+    last_submitted_frame: Option<crate::render_pipeline::draw::DrawList>,
+    last_submitted_texture_revision: u64,
+    text_renderer: Option<Box<dyn TextRenderer>>,
+    /// core 内部文本注入链。宿主 FFI 注入在该链之前执行。
+    text_inject: crate::text::InjectionChain,
+    pending_text_translations: HashMap<u64, text::PendingTextTranslation>,
+    text_translation_serial: u64,
+    audio: Box<dyn AudioBackend>,
+    video: Box<dyn VideoBackend>,
+    resources: HostResources,
+    #[cfg(feature = "ffmpeg")]
+    media_session: media_session::RuntimeMediaSession,
+    interpreter: asb_interpreter::Interpreter,
+    input: Arc<Mutex<callbacks::InputSnapshot>>,
+    events: Arc<Mutex<Vec<events::RuntimeEvent>>>,
+    video_finished: Arc<AtomicBool>,
+    /// Where an inline [trans] or [video] waits, so its resume steps past it.
+    /// A queued one doesn't move the script (VNDegen).
+    inline_stop_at: Option<(Option<String>, usize)>,
+    /// Events after text that ran below its message window, held until the
+    /// click that starts the next page, as the PC engine waits there
+    /// (VNDegen).
+    page_overflow_held: Option<Vec<events::RuntimeEvent>>,
+    debug_skip_active: Arc<AtomicBool>,
+    script_status: Arc<AtomicU8>,
+    magic_paths: Arc<magic_path::MagicPathTable>,
+    layer_info: callbacks::LayerInfoTable,
+    /// Whether interpreter-visible `get_layer_info` data must be rebuilt.
+    /// Static ticks reuse the previous snapshot instead of allocating one
+    /// property map per scene layer at 60 Hz.
+    layer_info_dirty: bool,
+    /// Conservative per-tick invalidation for CPU-side frame construction.
+    /// Texture revisions are checked separately immediately before rendering.
+    frame_visual_dirty: bool,
+    emote: emote::SharedEmoteState,
+
+    stage_w: u32,
+    stage_h: u32,
+    /// 上次下发的系统音量 (bgm, se)，用于跳过重复下发。
+    last_system_volume: (Option<f32>, Option<f32>),
+    /// 上次下发的 `s.segain.<id>`，键为 SE/Voice ID，值为 Artemis 0..1000 增益。
+    last_system_se_gain: HashMap<String, i32>,
+    wait_reason: Option<WaitReason>,
+    timed_remaining_ms: u64,
+    control: control::RuntimeControlState,
+    voice_serial: u64,
+    hovered_layers: HashSet<String>,
+    pointer_drag: PointerDragState,
+    last_pointer_hit_position: Option<(i32, i32)>,
+    last_pointer_hit_texture_revision: u64,
+    pointer_hit_test_dirty: bool,
+    volumes: Arc<Mutex<HashMap<String, f32>>>,
+    exit_requested: Arc<AtomicBool>,
+    /// system.ini 的 SAVEPATH 原值（可能含反斜杠/CSIDL），由 load_project 捕获。
+    project_savepath: Option<String>,
+    /// system.ini 的 BOOT 脚本，由 load_project 捕获；gotitle 回标题时优先用它。
+    boot_script: Option<String>,
+    /// 规范化后的存档逻辑相对前缀（如 `save`/`savedata`），种入 `s.savepath`。
+    savepath: String,
+    /// `[takess]` 缓存的游戏画面。`[savess]` 后续从这里缩放/编码，不能重新截保存 UI。
+    save_screenshot: Option<save_io::ScreenshotBuffer>,
+    /// Each face's bitmap font, or None when the game ships none (VNDegen).
+    rft_families: HashMap<String, Option<Arc<crate::text::rft::RftFamily>>>,
+    loaded_font_face: Option<String>,
+    /// 上报给脚本的机种串覆盖（`var system="os"`），None 表示跟随目标平台。
+    /// 在 install_interpreter 时重新应用到重建的解释器。
+    reported_os: Option<String>,
+    /// 宿主覆盖字体最近已见的世代号（None=当前无覆盖）。世代变化时作废
+    /// `loaded_font_face` 并按当前活动 face 重解，使覆盖切换立即生效。
+    font_override_generation: Option<u64>,
+    /// 已解析进 renderer 字体缓存的覆盖世代号，同一字节块只解析一次。
+    font_override_cached_generation: Option<u64>,
+    pending_dialog: Option<PendingDialog>,
+    active_inline_event_frame: Option<InlineEventFrame>,
+    /// The wait the script was in when the active inline event frame began,
+    /// as a PC save marks it on that frame: 1 a click wait, 3 a stop
+    /// (VNDegen).
+    inline_event_wait: u32,
+    /// 引擎侧最近一次写入 `script_status` 的值。用于区分「引擎状态迁移」与
+    /// 「脚本经 e:setScriptStatus 强制改写」：原子量与该值不一致即为脚本改写。
+    last_engine_status: u8,
+    /// 脚本经 e:setScriptStatus 强制设了非 0 停止码（如 4「停止，不接受用户输入」）。
+    /// 置位期间剧情不推进（onEnterFrame 仍每帧运行以便自我恢复），直到 setScriptStatus(0)。
+    script_forced_stop: bool,
+    /// 上一帧是否处于点击等待，用于检测 onClickWaitIn/Out 边沿。
+    was_click_wait: bool,
+    /// 本帧是否派发了剧情文本（用于已读判定：只在文本展示后的点击等待处标记已读）。
+    scenario_text_shown: bool,
+    /// Click/key-wait interpreter snapshot. Numbered saves taken from a nested
+    /// menu persist this instead of the menu program counter.
+    gameplay_save_checkpoint: Option<crate::save::GameplayCheckpoint>,
+    /// After `[load]`, keep running onLoad follow-up until this wait is restored.
+    pending_load_resume: Option<PendingLoadResume>,
+    /// Message-page snapshot restored once onLoad follow-up has rebuilt the MW.
+    pending_message_text: Option<crate::save::MessageTextSnapshot>,
+    /// 已读记录自上次持久化后是否有新增（syssave 时落 saveg.dat）。
+    read_dirty: bool,
+    /// System variables from the PC engine's system.dat that the core doesn't
+    /// load, written back as they were so its settings survive (VNDegen).
+    system_passthrough: Vec<(String, asb_interpreter::Value)>,
+    /// The version of the PC engine's save files the game uses, which the
+    /// core writes: from the host, then from any PC save file read (VNDegen).
+    pc_save_version: crate::save::bow::Version,
+    profiler: crate::profiler::RuntimeProfiler,
+}
+
+/// Restored click-wait that must not run until onLoad follow-up returns.
+struct PendingLoadResume {
+    script: String,
+    line: usize,
+    stack_len: usize,
+}
+
+impl CoreRuntime {
+    #[cfg(feature = "ffmpeg")]
+    pub fn set_runtime_media_enabled(&mut self, enabled: bool) {
+        self.media_session.set_enabled(enabled);
+    }
+
+    #[cfg(feature = "ffmpeg")]
+    pub fn runtime_media_enabled(&self) -> bool {
+        self.media_session.is_enabled()
+    }
+
+    pub fn backend_info(&self) -> BackendInfo {
+        self.gpu.backend_info()
+    }
+
+    /// Returns the scene render size and presentation output size separately.
+    pub fn render_dimensions(&self) -> Option<RenderDimensions> {
+        self.gpu.render_dimensions()
+    }
+
+    /// Configures the linear post-process chain. Native GPU objects are kept
+    /// inside the selected backend and are recreated only when dimensions or
+    /// formats require it.
+    pub fn configure_post_process(&mut self, pipeline: PostProcessPipeline) -> Result<(), String> {
+        self.gpu.begin_access();
+        let result = self.gpu.configure_post_process(pipeline);
+        self.gpu.end_access();
+        result
+    }
+
+    /// Changes SceneColor scale relative to the native output while preserving
+    /// logical coordinates. Native backends never resolve below the game's
+    /// logical scene size.
+    pub fn set_render_scale(&mut self, scale: f32) -> Result<(), String> {
+        let mut pipeline = PostProcessPipeline::default();
+        pipeline.render_scale = scale;
+        self.configure_post_process(pipeline)
+    }
+
+    /// 应用统一渲染质量策略。MetalFX 不可用时由 backend 自动回退 native。
+    pub fn set_render_quality_preset(&mut self, preset: RenderQualityPreset) -> Result<(), String> {
+        let (scale, mode) = preset.policy();
+        let mut pipeline = PostProcessPipeline::default();
+        pipeline.render_scale = scale;
+        pipeline.passes[0] = PostProcessPass::Upscale(UpscaleConfig {
+            mode,
+            sharpness: 0.0,
+        });
+        self.configure_post_process(pipeline)
+    }
+
+    /// Configures one backend-native spatial pass with an explicit SceneColor
+    /// scale relative to the output surface. Hosts use this for fixed upscale
+    /// ratios or fixed output resolutions without exposing native GPU handles.
+    pub fn configure_spatial_upscale(
+        &mut self,
+        render_scale: f32,
+        sharpness: f32,
+    ) -> Result<(), String> {
+        let mut pipeline = PostProcessPipeline::default();
+        pipeline.render_scale = render_scale;
+        pipeline.passes[0] = PostProcessPass::Upscale(UpscaleConfig {
+            mode: crate::render_pipeline::UpscaleMode::Spatial,
+            sharpness,
+        });
+        self.configure_post_process(pipeline)
+    }
+
+    /// Registers or replaces a backend-neutral Artemis HLSL effect.
+    pub fn register_hlsl_shader(
+        &mut self,
+        name: &str,
+        source: &[u8],
+    ) -> Result<crate::render_pipeline::hlsl::ShaderId, crate::backend::ShaderCompileError> {
+        self.gpu.register_hlsl_shader(name, source)
+    }
+
+    /// Recompiles an effect while preserving its logical shader identity.
+    pub fn replace_hlsl_shader(
+        &mut self,
+        name: &str,
+        source: &[u8],
+    ) -> Result<crate::render_pipeline::hlsl::ShaderId, crate::backend::ShaderCompileError> {
+        self.gpu.replace_hlsl_shader(name, source)
+    }
+
+    pub fn reload_hlsl_shader(
+        &mut self,
+        name: &str,
+        source: &[u8],
+    ) -> Result<crate::render_pipeline::hlsl::ShaderId, crate::backend::ShaderCompileError> {
+        self.gpu.reload_hlsl_shader(name, source)
+    }
+
+    pub fn unregister_hlsl_shader(&mut self, name: &str) -> bool {
+        self.gpu.unregister_shader(name)
+    }
+
+    /// Create a new runtime with the given rendering backend.
+    pub fn create(
+        stage_width: u32,
+        stage_height: u32,
+        backend: impl Into<BackendSelection>,
+    ) -> Result<Self, String> {
+        let gpu = crate::backend::create_backend(backend.into(), stage_width, stage_height)?;
+        let backend_info = gpu.backend_info();
+        crate::core_info!(
+            "[GpuBackend] selected name={} kind={:?} stability={:?} capabilities=0x{:x} stage={}x{}",
+            backend_info.name,
+            backend_info.kind,
+            backend_info.stability,
+            backend_info.capabilities.bits(),
+            stage_width,
+            stage_height
+        );
+
+        let compositor = Compositor::new();
+        let audio = Box::new(crate::audio::AudioStateBackend::new()) as Box<dyn AudioBackend>;
+        let video = Box::new(crate::video::VideoStateBackend::new()) as Box<dyn VideoBackend>;
+        #[cfg(feature = "ffmpeg")]
+        let media_session = media_session::RuntimeMediaSession::default();
+        let interpreter =
+            asb_interpreter::Interpreter::new(asb_interpreter::InterpreterConfig::default());
+
+        let input = Arc::new(Mutex::new(callbacks::InputSnapshot::default()));
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let video_finished = Arc::new(AtomicBool::new(false));
+        let debug_skip_active = Arc::new(AtomicBool::new(false));
+        let script_status = Arc::new(AtomicU8::new(0));
+        let magic_paths: Arc<magic_path::MagicPathTable> = Arc::new(Mutex::new(HashMap::new()));
+        let layer_info = Arc::new(Mutex::new(layer_info::LayerQueryState::default()));
+        let emote = Arc::new(Mutex::new(emote::EmoteState::default()));
+
+        Ok(Self {
+            gpu,
+            compositor,
+            last_rendered_scene: None,
+            last_rendered_clock_ms: 0,
+            last_submitted_frame: None,
+            last_submitted_texture_revision: 0,
+            text_renderer: None,
+            text_inject: crate::text::InjectionChain::new(),
+            pending_text_translations: HashMap::new(),
+            text_translation_serial: 0,
+            audio,
+            video,
+            resources: crate::host_files::default_resources().clone(),
+            #[cfg(feature = "ffmpeg")]
+            media_session,
+            interpreter,
+            input,
+            events,
+            video_finished,
+            inline_stop_at: None,
+            page_overflow_held: None,
+            debug_skip_active,
+            script_status,
+            magic_paths: Arc::clone(&magic_paths),
+            layer_info: Arc::clone(&layer_info),
+            layer_info_dirty: true,
+            frame_visual_dirty: true,
+            emote,
+            stage_w: stage_width,
+            stage_h: stage_height,
+            last_system_volume: (None, None),
+            last_system_se_gain: HashMap::new(),
+            wait_reason: None,
+            timed_remaining_ms: 0,
+            control: control::RuntimeControlState::default(),
+            voice_serial: 0,
+            hovered_layers: HashSet::new(),
+            pointer_drag: PointerDragState::default(),
+            last_pointer_hit_position: None,
+            last_pointer_hit_texture_revision: 0,
+            pointer_hit_test_dirty: true,
+            volumes: Arc::new(Mutex::new(HashMap::new())),
+            exit_requested: Arc::new(AtomicBool::new(false)),
+            project_savepath: None,
+            boot_script: None,
+            savepath: "save".to_string(),
+            save_screenshot: None,
+            loaded_font_face: None,
+            rft_families: HashMap::new(),
+            font_override_generation: None,
+            font_override_cached_generation: None,
+            reported_os: None,
+            pending_dialog: None,
+            active_inline_event_frame: None,
+            inline_event_wait: 0,
+            last_engine_status: 0,
+            script_forced_stop: false,
+            was_click_wait: false,
+            scenario_text_shown: false,
+            gameplay_save_checkpoint: None,
+            pending_load_resume: None,
+            pending_message_text: None,
+            read_dirty: false,
+            system_passthrough: Vec::new(),
+            pc_save_version: crate::save::bow::Version::V1000,
+            profiler: crate::profiler::RuntimeProfiler::new(),
+        })
+    }
+
+    pub fn stage_width(&self) -> u32 {
+        self.stage_w
+    }
+
+    /// Sets the version of the PC engine's save files to write until the
+    /// core reads one: 1002 for a game whose archives are `pf8`, else 1000
+    /// (VNDegen).
+    pub fn set_pc_save_version(&mut self, version: crate::save::bow::Version) {
+        self.pc_save_version = version;
+    }
+
+    pub fn set_resources(&mut self, resources: HostResources) {
+        self.resources = resources;
+    }
+
+    pub(crate) fn resources(&self) -> &HostResources {
+        &self.resources
+    }
+
+    pub fn stage_height(&self) -> u32 {
+        self.stage_h
+    }
+
+    /// 返回一帧像素数据的字节数（width * height * 4）。
+    pub fn pixel_buffer_size(&self) -> usize {
+        (self.stage_w as usize)
+            .saturating_mul(self.stage_h as usize)
+            .saturating_mul(4)
+    }
+
+    /// Advance logic and render one frame. Returns the RGBA pixel buffer.
+    /// The caller owns the returned `Vec<u8>`.
+    pub fn advance_and_render(&mut self, delta_ms: u64) -> Vec<u8> {
+        let mut pixels = vec![0; self.pixel_buffer_size()];
+        let written = self.advance_and_render_into(delta_ms, &mut pixels);
+        pixels.truncate(written);
+        pixels
+    }
+
+    /// Advance logic and render directly into a caller-owned RGBA buffer.
+    /// Returns the number of bytes written, or zero when the buffer is too small.
+    pub fn advance_and_render_into(&mut self, delta_ms: u64, out_pixels: &mut [u8]) -> usize {
+        if out_pixels.len() < self.pixel_buffer_size() {
+            return 0;
+        }
+
+        let mut profile = self.begin_profile_frame();
+        // The backend preserves any host graphics state before runtime work.
+        self.gpu.begin_access();
+
+        self.advance_logic(delta_ms, &mut profile);
+        let written = if self.render_current_frame(&mut profile).is_some() {
+            let started = profile.mark();
+            let written = self.read_current_frame_into(out_pixels);
+            profile.readback_ns = crate::profiler::FrameProfile::elapsed(started);
+            written
+        } else {
+            0
+        };
+        // A render attempt consumes all visual invalidations accumulated by
+        // earlier logic-only ticks, even when the rebuilt draw list is equal.
+        self.frame_visual_dirty = false;
+        self.clear_input_edges();
+
+        // Restore the host graphics state after backend work.
+        self.gpu.collect_retired_resources();
+        self.gpu.end_access();
+        self.finish_profile_frame(&mut profile);
+
+        written
+    }
+
+    /// Configures a host-owned output surface as the presentation target.
+    pub fn set_native_surface(&mut self, surface: NativeSurface) -> Result<(), String> {
+        self.gpu.begin_access();
+        let result = self.gpu.set_native_surface(surface);
+        if result.is_ok() {
+            // A newly attached or recreated host surface has no previous frame.
+            self.last_submitted_frame = None;
+        }
+        self.gpu.end_access();
+        result
+    }
+
+    pub fn clear_native_surface(&mut self) {
+        self.gpu.begin_access();
+        self.gpu.clear_native_surface();
+        self.gpu.end_access();
+    }
+
+    /// Advances logic and presents a changed frame through the host texture.
+    /// Returns `Ok(false)` when no visual update was necessary.
+    pub fn advance_and_present(&mut self, delta_ms: u64) -> Result<bool, String> {
+        let mut profile = self.begin_profile_frame();
+        self.gpu.begin_access();
+        self.advance_logic(delta_ms, &mut profile);
+        let repaint = self.render_current_frame(&mut profile);
+        let result = if let Some(repaint) = repaint {
+            (|| {
+                let present_started = profile.mark();
+                self.gpu.present(repaint.damage())?;
+                profile.present_ns = crate::profiler::FrameProfile::elapsed(present_started);
+                Ok(true)
+            })()
+        } else {
+            Ok(false)
+        };
+        if result.is_ok() {
+            self.frame_visual_dirty = false;
+        }
+        self.clear_input_edges();
+        self.gpu.collect_retired_resources();
+        self.gpu.end_access();
+        self.finish_profile_frame(&mut profile);
+        result
+    }
+
+    /// Advance one engine tick while a previously rendered frame is still
+    /// being consumed by the host. This keeps `onEnterFrame`-driven systems
+    /// such as E-Mote lip sync on the audio clock without paying for a GPU
+    /// readback whose pixels cannot be displayed yet.
+    pub fn advance_without_render(&mut self, delta_ms: u64) {
+        let mut profile = self.begin_profile_frame();
+        self.gpu.begin_access();
+        self.advance_logic(delta_ms, &mut profile);
+        self.clear_input_edges();
+        self.gpu.collect_retired_resources();
+        self.gpu.end_access();
+        self.finish_profile_frame(&mut profile);
+    }
+
+    fn advance_logic(&mut self, delta_ms: u64, profile: &mut crate::profiler::FrameProfile) {
+        let logic_started = profile.mark();
+        self.interpreter.begin_frame();
+        let input_started = profile.mark();
+        // isPush 的按键重复语义依赖每键按下时间戳，逐帧维护。
+        self.input
+            .lock()
+            .unwrap()
+            .note_frame_for_push(std::time::Instant::now());
+        // getScriptStatus 的引擎状态自动迁移 + setScriptStatus(0) 的唤醒语义。
+        self.sync_script_status();
+        // onEnterFrame / overrideKey 必须在指针、setonpush 和 keyconfig 之前运行，
+        // 这样本帧 effective bits 才包含 dummy decide 与 status=0 屏蔽。
+        // 原生对话框期间不跑脚本回调；HTTP 挂起和 setScriptStatus 强制停止仍要跑。
+        if self.pending_dialog.is_none() {
+            if let Err(e) = self.interpreter.fire_enter_frame() {
+                crate::core_error!("onEnterFrame 错误: {e:?}");
+            }
+        }
+        let trace_input = crate::runtime::telemetry::input_telemetry_enabled();
+        let telemetry_before = trace_input.then(|| {
+            let now = std::time::Instant::now();
+            let raw = {
+                let input = self.input.lock().unwrap();
+                crate::runtime::telemetry::capture_raw_input_state(&input, now)
+            };
+            let script = self
+                .interpreter
+                .current_script()
+                .map(|file| (file.to_string(), self.interpreter.current_line()));
+            let queue_len = self
+                .interpreter
+                .engine_context()
+                .lock()
+                .unwrap()
+                .tag_queue
+                .len();
+            let (overrides, override_all) = {
+                let input = self.input.lock().unwrap();
+                (
+                    input
+                        .key_overrides
+                        .iter()
+                        .map(|(key, bits)| (*key, *bits))
+                        .collect(),
+                    input.override_all_keys,
+                )
+            };
+            (
+                raw,
+                overrides,
+                override_all,
+                self.wait_reason.clone(),
+                script,
+                queue_len,
+            )
+        });
+        let (tick, input_trace) = self.process_pointer_handlers();
+        let tick_advance = tick.advance;
+        let tick_user_input = tick.user_input;
+        profile.input_ns = crate::profiler::FrameProfile::elapsed(input_started);
+
+        let interpreter_started = profile.mark();
+        let events_before = profile.events_ns;
+        self.advance_script(tick, delta_ms, profile);
+        profile.interpreter_ns = crate::profiler::FrameProfile::elapsed(interpreter_started)
+            .saturating_sub(profile.events_ns - events_before);
+
+        if let Some((raw, overrides, override_all, wait_before, script_before, queue_len_before)) =
+            telemetry_before
+        {
+            let script_after = self
+                .interpreter
+                .current_script()
+                .map(|file| (file.to_string(), self.interpreter.current_line()));
+            let queue_len_after = self
+                .interpreter
+                .engine_context()
+                .lock()
+                .unwrap()
+                .tag_queue
+                .len();
+            crate::runtime::telemetry::InputTelemetry {
+                raw,
+                overrides,
+                override_all,
+                effective: input_trace.effective,
+                pointer_target: input_trace.pointer_target,
+                layer_outcome: input_trace.layer_outcome,
+                push_outcome: input_trace.push_outcome,
+                default_role_allowed: input_trace.default_role_allowed,
+                user_input: tick_user_input,
+                advance: tick_advance,
+                wait_before,
+                wait_after: self.wait_reason.clone(),
+                script_before,
+                script_after,
+                queue_len_before,
+                queue_len_after,
+            }
+            .emit();
+        }
+
+        self.flush_host_events(profile);
+        let event_post_started = profile.mark();
+        // 已读跟踪 + 未读停跳：在文本展示后的点击等待处标记已读，
+        // 已读跳过遇未读剧情时停止跳过（[alreadyread]/[skip unread=] 语义）。
+        self.track_read_and_stop_skip_on_unread();
+        // 点击等待进入/退出边沿：触发 e:setEventHandler{onClickWaitIn/Out}。
+        self.sync_click_wait_handlers();
+        profile.event_post_ns = crate::profiler::FrameProfile::elapsed(event_post_started);
+        profile.events_ns += profile.event_post_ns;
+
+        let emote_started = profile.mark();
+        self.sync_emote_scene();
+        profile.emote_ns = crate::profiler::FrameProfile::elapsed(emote_started);
+
+        let audio_started = profile.mark();
+        self.apply_system_audio_volume();
+        let pending_volumes: Vec<(String, f32)> = {
+            let mut pending = self.volumes.lock().unwrap();
+            ["master", "bgm", "se", "voice"]
+                .into_iter()
+                .filter_map(|key| pending.remove(key).map(|value| (key.to_string(), value)))
+                .collect()
+        };
+        for (kind, value) in pending_volumes {
+            self.set_volume(&kind, value);
+        }
+        profile.audio_media_ns = crate::profiler::FrameProfile::elapsed(audio_started);
+
+        let compositor_started = profile.mark();
+        let transition_was_active = crate::render_pipeline::RenderPipeline::new(&self.compositor)
+            .is_transition_in_progress();
+        let layer_info_clock_changed = self.compositor.advance(delta_ms);
+        self.frame_visual_dirty |= layer_info_clock_changed || transition_was_active;
+        self.pointer_hit_test_dirty |= layer_info_clock_changed;
+        // get_layer_info 必须反映本帧缓动后的实际位置，而不是缓动开始前的
+        // 静态 LayerProps。下一帧输入回调执行 Lua 前会读取这份快照。
+        if self.layer_info_dirty || layer_info_clock_changed {
+            self.sync_layer_info_all();
+        }
+        self.dispatch_tween_handlers();
+        profile.compositor_ns = crate::profiler::FrameProfile::elapsed(compositor_started);
+
+        let emote_started = profile.mark();
+        let mut emote = self.emote.lock().unwrap();
+        self.frame_visual_dirty |= emote.advance(delta_ms);
+        drop(emote);
+        profile.emote_ns = profile
+            .emote_ns
+            .saturating_add(crate::profiler::FrameProfile::elapsed(emote_started));
+
+        let text_started = profile.mark();
+        let reveal_changed = self.advance_text(delta_ms);
+        let translation_changed = self.apply_ready_text_translations();
+        let text_changed = reveal_changed || translation_changed;
+        self.frame_visual_dirty |= text_changed;
+        self.pointer_hit_test_dirty |= text_changed;
+        profile.text_ns = crate::profiler::FrameProfile::elapsed(text_started);
+
+        let media_started = profile.mark();
+        self.advance_media_and_enqueue_finish_handlers(delta_ms);
+        profile.audio_media_ns = profile
+            .audio_media_ns
+            .saturating_add(crate::profiler::FrameProfile::elapsed(media_started));
+        profile.logic_ns = crate::profiler::FrameProfile::elapsed(logic_started);
+    }
+
+    pub fn set_profiler_enabled(&self, enabled: bool) {
+        self.gpu.set_profile_enabled(enabled);
+        self.emote.lock().unwrap().set_profile_enabled(enabled);
+        self.profiler.set_enabled(enabled);
+    }
+
+    pub fn profiler_snapshot_json(&self) -> String {
+        self.profiler.snapshot_json()
+    }
+
+    fn begin_profile_frame(&self) -> crate::profiler::FrameProfile {
+        let profile = self.profiler.begin_frame();
+        if profile.enabled {
+            let _ = crate::ffi::take_profile_io_counters();
+        }
+        profile
+    }
+
+    fn finish_profile_frame(&mut self, profile: &mut crate::profiler::FrameProfile) {
+        if !profile.enabled {
+            return;
+        }
+        let io = crate::ffi::take_profile_io_counters();
+        profile.host_ffi_calls = io.calls;
+        profile.host_ffi_ns = io.elapsed_ns;
+        profile.host_ffi_bytes = io.bytes;
+        let gpu = self.gpu.take_profile_stats();
+        profile.texture_upload_ns = gpu.texture_upload_ns;
+        profile.uploaded_bytes = gpu.uploaded_bytes;
+        profile.video_upload_ns = gpu.video_upload_ns;
+        profile.video_uploaded_bytes = gpu.video_uploaded_bytes;
+        profile.video_uploaded_frames = gpu.video_uploaded_frames;
+        profile.draw_calls = gpu.draw_calls;
+        profile.vertices = gpu.vertices;
+        profile.texture_binds = gpu.texture_binds;
+        profile.dynamic_mesh_uploaded_bytes = gpu.dynamic_mesh_uploaded_bytes;
+        profile.texture_count = gpu.texture_count;
+        profile.texture_gpu_bytes = gpu.texture_gpu_bytes;
+        profile.texture_cpu_bytes = gpu.texture_cpu_bytes;
+        profile.upscale_enabled = gpu.upscale_enabled;
+        profile.upscale_cpu_encode_ns = gpu.upscale_cpu_encode_ns;
+        profile.upscale_gpu_ns = gpu.upscale_gpu_ns;
+        let emote = self.emote.lock().unwrap();
+        let (emote_layers, emote_source_bytes) = emote.profile_memory();
+        let emote_stats = emote.take_profile_stats();
+        drop(emote);
+        profile.emote_layers = emote_layers as u64;
+        profile.emote_source_bytes = emote_source_bytes;
+        profile.emote_worker_eval_ns = emote_stats.worker_eval_ns;
+        profile.emote_scene_publish_ns = emote_stats.scene_clone_ns;
+        profile.emote_draw_build_ns = emote_stats.draw_build_ns;
+        profile.emote_mesh_build_ns = emote_stats.mesh_build_ns;
+        profile.emote_worker_updates = emote_stats.worker_updates;
+        profile.emote_worker_input_frames = emote_stats.worker_input_frames;
+        profile.emote_worker_dropped_scenes = emote_stats.worker_dropped_scenes;
+        profile.emote_sprites = emote_stats.sprites;
+        profile.emote_mesh_sprites = emote_stats.mesh_sprites;
+        profile.emote_mesh_vertices = emote_stats.mesh_vertices;
+        profile.finish();
+        self.profiler.submit(*profile);
+    }
+
+    pub fn is_exit_requested(&self) -> bool {
+        self.exit_requested
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// 每帧同步脚本引擎执行状态（getScriptStatus 语义，见
+    /// docs/lua/engine/getScriptStatus.txt）到 `script_status` 原子量，
+    /// 并落实 e:setScriptStatus 的两类强制改写：
+    /// - 设 0（运行中）：从等待/停止状态唤醒（setScriptStatus.txt 提到的
+    ///   「相对安全用法」——从停止切换到执行）；
+    /// - 设非 0：尊重脚本值，直到引擎自身状态迁移产生新状态。
+    fn sync_script_status(&mut self) {
+        use std::sync::atomic::Ordering;
+
+        let current = self.script_status.load(Ordering::SeqCst);
+        if current != self.last_engine_status {
+            // 原子量与引擎上次写入不一致 ⇒ 脚本经 e:setScriptStatus 改写过。
+            if current == 0 {
+                // 设 0 唤醒：清除当前等待并越过触发等待的指令，解除强制停止。
+                if self.wait_reason.is_some() {
+                    self.advance_wait_line();
+                }
+                self.script_forced_stop = false;
+                self.last_engine_status = 0;
+            } else {
+                // 非零强制值：脚本强制停止执行（如 setScriptStatus(4)「停止，不接受
+                // 用户输入」）。置位后剧情暂停，直到脚本 setScriptStatus(0) 自我恢复。
+                self.script_forced_stop = true;
+                self.last_engine_status = current;
+                return;
+            }
+        }
+
+        // 强制停止期间不做引擎态自动迁移：保持脚本设定的停止码，直到 setScriptStatus(0)。
+        if self.script_forced_stop {
+            return;
+        }
+
+        let computed = engine_status_for(
+            self.wait_reason.as_ref(),
+            self.pending_dialog.is_some(),
+            self.debug_skip_active.load(Ordering::SeqCst),
+            self.is_exit_requested(),
+            self.http_request_pending(),
+            self.hide_active(),
+        );
+        if computed != self.last_engine_status {
+            self.script_status.store(computed, Ordering::SeqCst);
+            self.last_engine_status = computed;
+        }
+    }
+}
+
+impl Drop for CoreRuntime {
+    fn drop(&mut self) {
+        text::clear_process_snapshots();
+        media::clear_sound_info_snapshot();
+        callbacks::clear_surface_cache();
+    }
+}
+
+/// 把引擎运行状态映射为脚本可见的执行状态码（getScriptStatus.txt）：
+/// 0 执行中 / 1 等待点击 / 2 过渡中 / 3 停止（计时器或输入恢复）/
+/// 4 停止（仅计时器）/ 5 消息窗隐藏 / 7 全屏视频 / 8 HTTP 通信中 /
+/// 9 对话框显示中 / 14 引擎退出。
+fn engine_status_for(
+    wait_reason: Option<&WaitReason>,
+    dialog_open: bool,
+    debug_skip: bool,
+    exit_requested: bool,
+    http_pending: bool,
+    hide_active: bool,
+) -> u8 {
+    if exit_requested {
+        return 14;
+    }
+    if debug_skip {
+        // debugSkip 快进：既有约定为 4（不接受用户输入的停止）。
+        return 4;
+    }
+    if dialog_open {
+        return 9;
+    }
+    if http_pending {
+        return 8;
+    }
+    if hide_active {
+        return 5;
+    }
+    match wait_reason {
+        None => 0,
+        Some(WaitReason::Stop { reason: Some(r) }) if r == "video" => 7,
+        Some(WaitReason::Stop { reason: Some(r) }) if r == "trans" || r.starts_with("tween:") => 2,
+        Some(WaitReason::Stop { .. }) => 3,
+        // 等待点击（@ / 文本推进 / wait input=1）。
+        Some(WaitReason::Generic) | Some(WaitReason::Generic0) => 1,
+        Some(WaitReason::Timed { input: 1, .. }) => 1,
+        // 纯计时等待：仅计时器恢复。
+        Some(WaitReason::Timed { .. }) => 4,
+        // SE / 视频层 / 文本缓动等事件等待：停止、由事件恢复。
+        Some(_) => 3,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::engine_status_for;
+    use asb_interpreter::event::WaitReason;
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    use super::CoreRuntime;
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    use crate::backend::{BackendSelection, FrameTarget};
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    use asb_interpreter::event::{Event, LayerEvent};
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    use std::collections::HashMap;
+
+    #[test]
+    fn engine_status_maps_wait_states_to_script_status_codes() {
+        // 0 执行中。
+        assert_eq!(
+            engine_status_for(None, false, false, false, false, false),
+            0
+        );
+        // 1 等待点击（@ 与 wait input=1）。
+        assert_eq!(
+            engine_status_for(
+                Some(&WaitReason::Generic),
+                false,
+                false,
+                false,
+                false,
+                false
+            ),
+            1
+        );
+        assert_eq!(
+            engine_status_for(
+                Some(&WaitReason::Timed {
+                    milliseconds: 100,
+                    input: 1
+                }),
+                false,
+                false,
+                false,
+                false,
+                false
+            ),
+            1
+        );
+        // 4 纯计时等待。
+        assert_eq!(
+            engine_status_for(
+                Some(&WaitReason::Timed {
+                    milliseconds: 100,
+                    input: 0
+                }),
+                false,
+                false,
+                false,
+                false,
+                false
+            ),
+            4
+        );
+        // 2 过渡中 / 7 全屏视频 / 3 一般停止。
+        assert_eq!(
+            engine_status_for(
+                Some(&WaitReason::Stop {
+                    reason: Some("trans".into())
+                }),
+                false,
+                false,
+                false,
+                false,
+                false
+            ),
+            2
+        );
+        assert_eq!(
+            engine_status_for(
+                Some(&WaitReason::Stop {
+                    reason: Some("video".into())
+                }),
+                false,
+                false,
+                false,
+                false,
+                false
+            ),
+            7
+        );
+        assert_eq!(
+            engine_status_for(
+                Some(&WaitReason::Stop { reason: None }),
+                false,
+                false,
+                false,
+                false,
+                false
+            ),
+            3
+        );
+        // 5 消息窗隐藏 / 8 HTTP 通信中。
+        assert_eq!(engine_status_for(None, false, false, false, false, true), 5);
+        assert_eq!(engine_status_for(None, false, false, false, true, false), 8);
+        assert_eq!(
+            engine_status_for(Some(&WaitReason::Generic), false, false, false, true, true),
+            8
+        );
+    }
+
+    #[test]
+    fn dialog_debug_skip_and_exit_take_precedence() {
+        // 9 对话框优先于等待状态。
+        assert_eq!(
+            engine_status_for(Some(&WaitReason::Generic), true, false, false, true, true),
+            9
+        );
+        // 4 debugSkip 快进。
+        assert_eq!(
+            engine_status_for(Some(&WaitReason::Generic), false, true, false, true, true),
+            4
+        );
+        // 14 引擎退出最高优先。
+        assert_eq!(engine_status_for(None, true, true, true, true, true), 14);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    #[test]
+    fn static_runtime_emits_first_frame_then_skips_identical_frame() {
+        let Ok(mut runtime) = CoreRuntime::create(8, 8, BackendSelection::from_legacy_int(0))
+        else {
+            // Headless CGL availability varies with the macOS login/session
+            // state. Target builds still cover this code when no context can
+            // be created in the test process.
+            return;
+        };
+        let mut pixels = vec![0; runtime.pixel_buffer_size()];
+
+        runtime.advance_without_render(17);
+        assert_eq!(runtime.compositor.clock_ms(), 17);
+        assert!(runtime.last_submitted_frame.is_none());
+        assert!(runtime.frame_visual_dirty);
+        assert_eq!(
+            runtime.advance_and_render_into(0, &mut pixels),
+            pixels.len()
+        );
+        assert_eq!(runtime.advance_and_render_into(17, &mut pixels), 0);
+        assert!(!runtime.frame_visual_dirty);
+
+        runtime.frame_visual_dirty = true;
+        runtime.advance_without_render(17);
+        assert!(
+            runtime.frame_visual_dirty,
+            "logic-only ticks must preserve pending visual invalidation"
+        );
+    }
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    #[test]
+    fn damage_render_matches_a_forced_full_redraw() {
+        let Ok(mut runtime) = CoreRuntime::create(64, 64, BackendSelection::from_legacy_int(0))
+        else {
+            return;
+        };
+        runtime
+            .compositor
+            .apply_event(&Event::Layer(LayerEvent::Create {
+                id: "1".into(),
+                file: String::new(),
+            }));
+        runtime
+            .compositor
+            .apply_event(&Event::Layer(LayerEvent::SetProperties {
+                id: "1".into(),
+                properties: HashMap::from([
+                    ("color".into(), "#ff0000".into()),
+                    ("width".into(), "10".into()),
+                    ("height".into(), "10".into()),
+                    ("left".into(), "5".into()),
+                    ("top".into(), "5".into()),
+                ]),
+            }));
+
+        let mut first = vec![0; runtime.pixel_buffer_size()];
+        assert_eq!(runtime.advance_and_render_into(0, &mut first), first.len());
+        runtime
+            .compositor
+            .apply_event(&Event::Layer(LayerEvent::SetProperties {
+                id: "1".into(),
+                properties: HashMap::from([("left".into(), "20".into())]),
+            }));
+
+        let mut damaged = vec![0; runtime.pixel_buffer_size()];
+        assert_eq!(
+            runtime.advance_and_render_into(0, &mut damaged),
+            damaged.len()
+        );
+
+        runtime.last_submitted_frame = None;
+        let mut full = vec![0; runtime.pixel_buffer_size()];
+        assert_eq!(runtime.advance_and_render_into(0, &mut full), full.len());
+        assert_eq!(damaged, full);
+    }
+
+    #[cfg(all(target_os = "macos", feature = "gl-backend"))]
+    #[test]
+    fn damage_visualization_is_transient_and_cleans_to_the_scene() {
+        let Ok(mut runtime) = CoreRuntime::create(32, 32, BackendSelection::from_legacy_int(0))
+        else {
+            return;
+        };
+        runtime
+            .compositor
+            .apply_event(&Event::Layer(LayerEvent::Create {
+                id: "1".into(),
+                file: String::new(),
+            }));
+        runtime
+            .compositor
+            .apply_event(&Event::Layer(LayerEvent::SetProperties {
+                id: "1".into(),
+                properties: HashMap::from([
+                    ("color".into(), "#ffffff".into()),
+                    ("width".into(), "20".into()),
+                    ("height".into(), "20".into()),
+                    ("left".into(), "4".into()),
+                    ("top".into(), "4".into()),
+                ]),
+            }));
+
+        let mut initial = vec![0; runtime.pixel_buffer_size()];
+        assert_eq!(
+            runtime.advance_and_render_into(0, &mut initial),
+            initial.len()
+        );
+        let frame = runtime.last_submitted_frame.clone().unwrap();
+        runtime.gpu.begin_frame(FrameTarget::Main).unwrap();
+        runtime.gpu.render(&frame);
+        runtime
+            .gpu
+            .render_damage_visualized(&frame, [4.0, 4.0, 12.0, 12.0]);
+        runtime.gpu.end_frame();
+        let mut flashed = vec![0; runtime.pixel_buffer_size()];
+        runtime.read_current_frame_into(&mut flashed);
+
+        runtime.gpu.begin_frame(FrameTarget::Main).unwrap();
+        assert!(runtime.gpu.clear_damage_overlay(&frame).is_some());
+        runtime.gpu.end_frame();
+        let mut cleaned = vec![0; runtime.pixel_buffer_size()];
+        runtime.read_current_frame_into(&mut cleaned);
+
+        runtime.gpu.begin_frame(FrameTarget::Main).unwrap();
+        runtime.gpu.render(&frame);
+        runtime.gpu.end_frame();
+        let mut full = vec![0; runtime.pixel_buffer_size()];
+        runtime.read_current_frame_into(&mut full);
+
+        assert_eq!(cleaned, full);
+        let changed_pixels = flashed
+            .chunks_exact(4)
+            .zip(cleaned.chunks_exact(4))
+            .filter(|(left, right)| left != right)
+            .count();
+        assert!(changed_pixels > 0);
+        assert!(changed_pixels <= 12 * 12);
+        assert!(runtime.gpu.clear_damage_overlay(&frame).is_none());
+    }
+}

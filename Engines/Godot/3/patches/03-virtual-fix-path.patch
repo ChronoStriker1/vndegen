@@ -1,0 +1,24 @@
+--- a/core/os/dir_access.h	2026-10-27 19:10:57.699489550 -0400
++++ b/core/os/dir_access.h	2026-10-27 19:10:57.700736823 -0400
+@@ -57,7 +57,8 @@
+ 	virtual String _get_root_string() const;
+ 
+ 	AccessType get_access_type() const;
+-	String fix_path(String p_path) const;
++	// VNDegen: virtual, so its folder access can find names whatever their case.
++	virtual String fix_path(String p_path) const;
+ 	bool next_is_dir;
+ 
+ 	template <class T>
+--- a/core/os/file_access.h	2026-10-27 19:10:57.697546735 -0400
++++ b/core/os/file_access.h	2026-10-27 19:10:57.699897696 -0400
+@@ -60,7 +60,8 @@
+ 
+ protected:
+ 	AccessType get_access_type() const;
+-	String fix_path(const String &p_path) const;
++	// VNDegen: virtual, so its file access can find names whatever their case.
++	virtual String fix_path(const String &p_path) const;
+ 	virtual Error _open(const String &p_path, int p_mode_flags) = 0; ///< open a file
+ 	virtual uint64_t _get_modified_time(const String &p_file) = 0;
+ 

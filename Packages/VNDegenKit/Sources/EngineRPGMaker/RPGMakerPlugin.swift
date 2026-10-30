@@ -34,13 +34,19 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         return nil
     }
 
-    /// Runs the game in the shared web host. The desktop user agent hides the iPhone from MZ's `Utils.isMobileDevice`,
-    /// which would otherwise give up 10% of the height to browser chrome that a web view does not have. iPad and macOS
-    /// already report this shape.
+    /// Runs the game in the shared web host.
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
+        try webConfiguration(GameFolder(rpgMakerGameAt: launch.folder)).makeSession(launch)
+    }
+
+    /// The desktop user agent hides the iPhone from MZ's `Utils.isMobileDevice`, which would otherwise give up 10% of
+    /// the height to browser chrome that a web view does not have. iPad and macOS already report this shape. MV's
+    /// `Utils.isMobileDevice` would also make it ask for .m4a files. An MV game that ships only Ogg audio gets the shared
+    /// Ogg decoder, and MV plays its .ogg files through it. MZ decodes Ogg with its own bundled decoder.
+    @MainActor func webConfiguration(_ folder: GameFolder) throws -> WebGameConfiguration {
         guard let url = Bundle.module.url(forResource: "rpgmaker", withExtension: "js") else { throw RPGMakerError.scriptMissing }
-        return try WebGameConfiguration(
-            folder: GameFolder(rpgMakerGameAt: launch.folder), appName: "rmmz-game",
+        var configuration = try WebGameConfiguration(
+            folder: folder, appName: "rmmz-game",
             userScripts: [try String(contentsOf: url, encoding: .utf8)], userAgent: Self.userAgent,
             buttonScript: { button, pressed in
                 KeyStroke.key(for: button).map {
@@ -48,7 +54,13 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
                 }
             },
             scriptArgument: "rpgmaker-script", log: rpgLog
-        ).makeSession(launch)
+        )
+        configuration.preloadFonts = folder.fontNames
+        if flavor == .mv && folder.shipsOnlyOggAudio {
+            configuration.decodesOgg = true
+            rpgLog.notice("MV game ships only Ogg audio, decoding it in the page")
+        }
+        return configuration
     }
 
     /// Buttons used to press these keys, so a remap from then presses the same key.
