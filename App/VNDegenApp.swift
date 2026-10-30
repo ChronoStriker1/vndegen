@@ -6,6 +6,7 @@ import EngineFlash
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
+import EngineArtemis
 import EngineGodot
 import EngineNScripter
 import FontPack
@@ -24,6 +25,7 @@ let engines: [any EnginePlugin] = {
         TyranoPlugin(),
         RenPyPlugin(),
         KiriKiriPlugin(),
+        ArtemisPlugin(),
         GodotPlugin(),
         FlashPlugin(),
         NScripterPlugin(),

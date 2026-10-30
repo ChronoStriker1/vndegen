@@ -16,6 +16,18 @@ settings:
 # of its own because Xcode copies the app's frameworks before any of the app target's build phases run. It runs with a
 # clean environment, because CMake would take the SDK and deployment target Xcode exports for the app.
 aggregateTargets:
+  # scripts/artemis-engine.sh builds the Artemis engine, art3m1s-core, into build/artemis as a static library, and does
+  # nothing when it is up to date. It runs with a clean environment, because Cargo's C builds would take the SDK and
+  # deployment target Xcode exports for the app.
+  ArtemisEngine:
+    buildScripts:
+      - name: Build the Artemis engine
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} "$SRCROOT/scripts/artemis-engine.sh" "$SRCROOT/build/artemis"
   KiriKiriEngine:
     buildScripts:
       - name: Build the KiriKiri engine
@@ -39,7 +51,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineGodot, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineGodot, EngineArtemis, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
@@ -47,6 +59,11 @@ targets:
         platformFilter: iOS
       - framework: build/renpy/ios/MetalANGLE.xcframework
         platformFilter: iOS
+      # The Artemis engine, a static library ArtemisEngine below builds first. EngineArtemis finds it at run time, so the
+      # linker keeps its API table, which nothing calls by name.
+      - target: ArtemisEngine
+      - framework: build/artemis/ios/Art3m1s.xcframework
+        embed: false
       # The KiriKiri engine, which KiriKiriEngine below builds first. EngineKiriKiri finds it at run time.
       - target: KiriKiriEngine
       - framework: build/kirikiri/ios/KiriKiri.xcframework
@@ -208,4 +225,5 @@ targets:
         # The macOS app keeps embedded frameworks in Contents/Frameworks, not beside the executable as on iOS.
         LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]: ["$(inherited)", "@executable_path/../Frameworks"]
         # What Ren'Py's static libraries need from the system, as in renios's own Xcode project.
-        "OTHER_LDFLAGS[sdk=iphone*]": "$(inherited) -lc++ -framework AudioToolbox -framework AVFoundation -framework CoreMotion -framework CoreHaptics -framework GameController -framework ImageIO -framework QuartzCore -framework CoreServices"
+        "OTHER_LDFLAGS[sdk=macosx*]": "$(inherited) -lc++ -Wl,-u,_art3m1s_get_api_v1 -framework Metal -framework QuartzCore -framework IOSurface"
+        "OTHER_LDFLAGS[sdk=iphone*]": "$(inherited) -lc++ -Wl,-u,_art3m1s_get_api_v1 -framework Metal -framework IOSurface -framework AudioToolbox -framework AVFoundation -framework CoreMotion -framework CoreHaptics -framework GameController -framework ImageIO -framework QuartzCore -framework CoreServices"

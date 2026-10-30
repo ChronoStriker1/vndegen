@@ -1,0 +1,24 @@
+[package]
+name = "art3m1s-krkr"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+description = "KrKr/Kirikiri runtime adaptation boundary for Art3m1s"
+build = "build.rs"
+links = "art3m1s_krkr_native"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+native-bootstrap = []
+native-upstream = []
+native-upstream-smoke = []
+
+[dependencies]
+
+[[bin]]
+name = "krkr_upstream_smoke"
+path = "src/bin/krkr_upstream_smoke.rs"
+required-features = ["native-upstream-smoke"]

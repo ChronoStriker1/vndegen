@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "EngineRenPy", targets: ["EngineRenPy"]),
         .library(name: "EngineKiriKiri", targets: ["EngineKiriKiri"]),
         .library(name: "EngineRGSS", targets: ["EngineRGSS"]),
+        .library(name: "EngineArtemis", targets: ["EngineArtemis"]),
         .library(name: "EngineGodot", targets: ["EngineGodot"]),
         .library(name: "EngineNScripter", targets: ["EngineNScripter"]),
         .library(name: "FrameHost", targets: ["FrameHost"]),
@@ -71,6 +72,10 @@ let package = Package(
         // composite in software.
         .target(name: "FrameHost", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "EngineNScripter", dependencies: ["VNCore", "CNScripter", "FrameHost"], swiftSettings: mainActorByDefault),
+        // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
+        // library the app links, found at run time.
+        .target(name: "CArtemis", exclude: ["third_party"]),
+        .target(name: "EngineArtemis", dependencies: ["VNCore", "CArtemis", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
@@ -108,6 +113,7 @@ let package = Package(
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
         .testTarget(name: "EngineRGSSTests", dependencies: ["EngineRGSS"]),
+        .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis"]),
         .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot"]),
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
