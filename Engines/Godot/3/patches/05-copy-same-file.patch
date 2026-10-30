@@ -1,5 +1,5 @@
---- a/core/os/dir_access.cpp	2026-10-27 20:01:42.964907099 -0400
-+++ b/core/os/dir_access.cpp	2026-10-27 20:01:42.970488076 -0400
+--- a/core/os/dir_access.cpp	2026-10-30 04:35:01.394015330 -0400
++++ b/core/os/dir_access.cpp	2026-10-30 04:35:01.402380280 -0400
 @@ -35,6 +35,8 @@
  #include "core/os/os.h"
  #include "core/project_settings.h"
@@ -9,12 +9,13 @@
  String DirAccess::_get_root_path() const {
  	switch (_access_type) {
  		case ACCESS_RESOURCES:
-@@ -280,6 +282,13 @@
+@@ -280,6 +282,14 @@
  	return full;
  }
  
 +// VNDegen: VNDegen finds files whatever case a game names them in, so two spellings can open one file on disk, and
-+// copying it onto itself would empty it. A file read from a pack reports no disk path, so it never matches.
++// copying it onto itself would empty it. The destination is the file on disk the copy would write, even where the pack
++// has a file of that name, and a file read from the pack reports no disk path, so it never matches.
 +static bool _vndegen_same_file(const String &p_a, const String &p_b) {
 +	struct stat a, b;
 +	return !p_a.empty() && !p_b.empty() && stat(p_a.utf8().get_data(), &a) == 0 && stat(p_b.utf8().get_data(), &b) == 0 && a.st_dev == b.st_dev && a.st_ino == b.st_ino;
@@ -23,12 +24,13 @@
  Error DirAccess::copy(String p_from, String p_to, int p_chmod_flags) {
  	//printf("copy %s -> %s\n",p_from.ascii().get_data(),p_to.ascii().get_data());
  	Error err;
-@@ -290,6 +299,18 @@
+@@ -290,6 +300,19 @@
  		return err;
  	}
  
-+	if (FileAccess::exists(p_to)) {
-+		FileAccess *existing = FileAccess::open(p_to, FileAccess::READ);
++	const String target = ProjectSettings::get_singleton()->globalize_path(p_to);
++	if (FileAccess::exists(target)) {
++		FileAccess *existing = FileAccess::open(target, FileAccess::READ);
 +		const bool same = existing && _vndegen_same_file(fsrc->get_path_absolute(), existing->get_path_absolute());
 +		if (existing) {
 +			memdelete(existing);
