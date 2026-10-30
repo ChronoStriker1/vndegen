@@ -27,7 +27,10 @@ case "$platform" in
   linux) product=$out/linux ;;
   *) echo "unknown platform $platform" >&2; exit 2 ;;
 esac
-if [ "$(cat "$product/.vndegen-runtime" 2>/dev/null)" = "$stamp" ] && ls "$out/licenses/"*.txt >/dev/null 2>&1; then
+# The runtime's own third-party notices go beside Ruby's, current on every run.
+mkdir -p "$out/licenses"
+cp "$root"/Engines/RGSSRuntime/licenses/*.txt "$out/licenses/"
+if [ "$(cat "$product/.vndegen-runtime" 2>/dev/null)" = "$stamp" ] && [ -f "$out/licenses/ruby.txt" ]; then
   echo "Ruby is up to date in $product"
   exit 0
 fi
@@ -59,11 +62,14 @@ options=(--disable-shared --enable-static --disable-install-doc --disable-instal
 slice() {
   local name=$1; shift
   local dir=$work/$name
+  # A slice already built with the same stamp and arguments stays.
+  local recipe="$stamp $*"
+  if [ -f "$dir/out/libruby.a" ] && [ "$(cat "$dir/.vndegen-slice" 2>/dev/null)" = "$recipe" ]; then return; fi
   unpack "$dir"
   (cd "$dir" && ./configure "${options[@]}" "$@" >configure.log 2>&1) || { tail -n 30 "$dir/configure.log"; exit 1; }
   (cd "$dir" && make -j"$jobs" >make.log 2>&1) || { tail -n 40 "$dir/make.log"; exit 1; }
   # libruby-static.a carries stand-ins for the encoding and extension tables, which the real ones replace.
-  cp "$dir/libruby-static.a" "$dir/libruby-core.a"
+  cp "$(ls "$dir"/libruby*-static.a | head -n 1)" "$dir/libruby-core.a"
   ar d "$dir/libruby-core.a" dmyext.o dmyenc.o 2>/dev/null || true
   mkdir -p "$dir/out"
   local parts=("$dir/libruby-core.a" "$dir/enc/libenc.a" "$dir/enc/libtrans.a" "$dir/ext/zlib/zlib.a"
@@ -90,6 +96,7 @@ slice() {
   rm -rf "$dir/headers" && mkdir -p "$dir/headers"
   cp -R "$dir/include/ruby.h" "$dir/include/ruby" "$dir/headers/"
   cp "$dir"/.ext/include/*/ruby/config.h "$dir/headers/ruby/config.h"
+  echo "$recipe" > "$dir/.vndegen-slice"
 }
 
 write_licenses() {
@@ -133,6 +140,10 @@ case "$platform" in
     tools=(AR="$(xcrun -f ar)" RANLIB="$(xcrun -f ranlib)" NM="$(xcrun -f nm)" STRIP="$(xcrun -f strip)")
     # iOS has no fork or exec for an app; Ruby's process functions then raise NotImplementedError, which RGSS games
     # don't call.
+    # dir.c includes <sys/vnode.h> on Apple systems for the file and file system types getattrlist reports, and the
+    # iOS SDK has no such header. The macOS SDK's has the same two enums, which the stand-in takes from it.
+    mkdir -p "$work/ios-shim/sys"
+    sed -n '/^enum vtype/,/};/p; /^enum vtagtype/,/};/p' "$(sdk macosx)/usr/include/sys/vnode.h" >"$work/ios-shim/sys/vnode.h"
     ios_cache=(ac_cv_func_fork=no ac_cv_func_vfork=no ac_cv_func_fork_works=no ac_cv_func_vfork_works=no
                ac_cv_func_execv=no ac_cv_func_execve=no ac_cv_func_posix_spawn=no ac_cv_func_system=no
                ac_cv_func_daemon=no ac_cv_func_getentropy=no ac_cv_func_setpgrp=no ac_cv_func_setsid=no)
@@ -141,9 +152,11 @@ case "$platform" in
     slice mac-x86_64 "${base[@]}" --host=x86_64-apple-darwin "${tools[@]}" \
       CC="$clang -target x86_64-apple-macos15.0 -isysroot $(sdk macosx)" CFLAGS="-O2"
     slice ios-arm64 "${base[@]}" --host=aarch64-apple-darwin "${tools[@]}" \
-      CC="$clang -target arm64-apple-ios18.0 -isysroot $(sdk iphoneos)" CFLAGS="-O2" "${ios_cache[@]}"
+      CC="$clang -target arm64-apple-ios18.0 -isysroot $(sdk iphoneos)" CFLAGS="-O2" CPPFLAGS="-I$work/ios-shim" \
+      "${ios_cache[@]}"
     slice sim-arm64 "${base[@]}" --host=aarch64-apple-darwin "${tools[@]}" \
-      CC="$clang -target arm64-apple-ios18.0-simulator -isysroot $(sdk iphonesimulator)" CFLAGS="-O2" "${ios_cache[@]}"
+      CC="$clang -target arm64-apple-ios18.0-simulator -isysroot $(sdk iphonesimulator)" CFLAGS="-O2" \
+      CPPFLAGS="-I$work/ios-shim" "${ios_cache[@]}"
     mkdir -p "$work/mac/out"
     lipo -create "$work/mac-arm64/out/libruby.a" "$work/mac-x86_64/out/libruby.a" -output "$work/mac/out/libruby.a"
     rm -rf "$product"

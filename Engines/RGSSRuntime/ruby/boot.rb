@@ -1,8 +1,11 @@
 # Runs once, when Ruby starts, before any game. Ruby can start only once per process, so between games RGSSBoot.reset
 # puts the interpreter back the way this snapshot found it: the game's constants, globals, threads and changes to
 # Ruby's own classes go. A module a game included into a core class stays included, because Ruby can't remove it.
+# Games redefine constants and methods as a matter of course; Ruby's warnings about it would only fill the log.
+$VERBOSE = nil
+
 module RGSSBoot
-  CONSTANTS = Object.constants
+  CONSTANTS = Object.constants(false)
   GLOBALS = global_variables
 
   def self.method_table(mod)
@@ -44,7 +47,11 @@ module RGSSBoot
     @games += 1
     return if @games == 1
     Thread.list.each { |thread| thread.kill unless thread == Thread.main }
-    (Object.constants - CONSTANTS).each { |name| Object.send(:remove_const, name) }
+    (Object.constants(false) - CONSTANTS).each do |name|
+      Object.send(:remove_const, name)
+    rescue NameError
+      nil
+    end
     (global_variables - GLOBALS).each do |name|
       eval("#{name} = nil")
     rescue StandardError, SyntaxError

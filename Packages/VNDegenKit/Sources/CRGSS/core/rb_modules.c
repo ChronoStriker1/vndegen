@@ -261,8 +261,7 @@ static const struct { int button; unsigned keys[4]; } bindings[] = {
 
 static HostInput input;
 static int held[BUTTON_COUNT]; // frames each button has been down, 0 when up
-static int lastDirection;      // the direction pressed most recently, for dir4
-static long directionOrder[10];
+static long directionOrder[10]; // when each direction went down, for dir4
 static long inputTick;
 
 HostInput *rgss_input_state(void) { return &input; }
@@ -278,7 +277,6 @@ static VALUE input_update(VALUE self) {
         held[b] = down ? held[b] + 1 : 0;
         if (b <= B_UP && held[b] == 1) directionOrder[b] = inputTick;
     }
-    (void)lastDirection;
     return Qnil;
 }
 

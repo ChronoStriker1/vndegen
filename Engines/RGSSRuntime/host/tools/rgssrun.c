@@ -1,12 +1,14 @@
 // Runs an RGSS game headless, one frame at a time, pressing keys from a script and saving frames as PNG files.
 //
 //   rgssrun --ini Game.ini --save DIR [--rtp DIR]... [--frames N] [--log FILE] [--script FILE] [--shot N:FILE]...
-//           [--audio FILE.raw]
+//           [--audio FILE.raw] [--then ARGS...]
 //
 // A script has one command per line: "N tap KEY" presses a key at frame N and releases it two frames later,
 // "N down KEY" and "N up KEY" hold and release it, "N shot FILE" saves frame N, "N eval CODE" runs the rest of the
 // line as Ruby in the game. KEY is a libretro key code or a
 // name: up, down, left, right, enter, esc, space, shift, or a single letter. Lines starting with # are comments.
+// Everything after --then is a second game's arguments; it starts in the same process once the first has stopped, as
+// the app starts one game after another.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -89,7 +91,26 @@ static void save_frame(const char *path) {
     if (!image_write_png(&image, path)) fprintf(stderr, "could not write %s\n", path);
 }
 
+static int run(int argc, char **argv);
+
 int main(int argc, char **argv) {
+    int split = argc;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--then")) {
+            split = i;
+            break;
+        }
+    }
+    int status = run(split, argv);
+    if (split < argc) {
+        commandCount = 0;
+        argv[split] = argv[0];
+        status |= run(argc - split, argv + split);
+    }
+    return status;
+}
+
+static int run(int argc, char **argv) {
     const char *ini = NULL, *save = NULL, *log = NULL, *audioPath = NULL;
     const char *rtps[4];
     int rtpCount = 0;

@@ -122,6 +122,9 @@ static VALUE run_caught(VALUE path) { return rb_catch_obj(rgss_stop_tag(), catch
 // The sentence RGSS shows for an exception, naming the script section and line it came from (rgss.rb).
 static VALUE describe_safely(VALUE error) { return rb_funcall(rb_mKernel, rb_intern("rgss_describe_error"), 1, error); }
 
+// Ruby's own description of an error, for failures in VNDegen's preludes, where the game's section names don't apply.
+static VALUE full_message(VALUE error) { return rb_funcall(error, rb_intern("full_message"), 0); }
+
 // Detaches every object the last game left, so nothing of it draws in the next. Ruby frees them later.
 static void scene_clear(Container *c) {
     for (Drawable *d = c->first, *next; d; d = next) {
@@ -167,7 +170,11 @@ void rgss_run_game(const HostLaunch *launch) {
     if (!rubyReady) setup_ruby();
     int state = 0;
     rb_eval_string_protect("RGSSBoot.reset", &state);
-    if (state) rgss_log("reset failed");
+    if (state) {
+        VALUE message = rb_protect(full_message, rb_errinfo(), &state);
+        rgss_log("reset failed: %s", state ? "?" : StringValueCStr(message));
+        rb_set_errinfo(Qnil);
+    }
 
     scene_clear(&rgss_screen);
     rgss_modules_reset();
@@ -191,7 +198,7 @@ void rgss_run_game(const HostLaunch *launch) {
     for (size_t i = 0; i < sizeof preludes / sizeof preludes[0]; i++) {
         rb_protect(eval_prelude, (VALUE)preludes[i], &state);
         if (state) {
-            VALUE message = rb_protect(describe_safely, rb_errinfo(), &state);
+            VALUE message = rb_protect(full_message, rb_errinfo(), &state);
             rgss_log("prelude %zu failed: %s", i, state ? "?" : StringValueCStr(message));
             rb_set_errinfo(Qnil);
             host_set_problem("VNDegen's RGSS runtime could not start.");

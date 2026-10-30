@@ -17,7 +17,7 @@ end
 
 module Marshal
   class << self
-    alias_method :rgss_load, :load
+    alias_method :rgss_load, :load unless method_defined?(:rgss_load)
 
     # Saves and data the game reads itself through Marshal get the same treatment as load_data.
     def load(source, proc = nil, **options)
@@ -90,7 +90,7 @@ RGSSCompat.add(Hash, :index) { |value| key(value) }
 module Kernel
   RGSS_BUILT_IN = %w[zlib jcode Win32API win32api dl nkf kconv rbconfig enumerator rational complex].freeze
 
-  alias_method :rgss_require, :require
+  alias_method :rgss_require, :require unless private_method_defined?(:rgss_require)
   private :rgss_require
 
   def require(name)
@@ -133,18 +133,18 @@ module RGSSFiles
 end
 
 class << File
-  alias_method :rgss_open, :open
+  alias_method :rgss_open, :open unless method_defined?(:rgss_open)
   def open(path, mode = 'r', *rest, **options, &block)
     path = RGSSFiles.writing?(mode) ? RGSSFiles.write_path(path) : RGSSFiles.read_path(path)
     rgss_open(path, mode, *rest, **options, &block)
   end
 
   %i[exist? file? directory? mtime size read binread readlines].each do |name|
-    alias_method :"rgss_#{name}", name
+    alias_method :"rgss_#{name}", name unless method_defined?(:"rgss_#{name}")
     define_method(name) { |path, *rest, **options| send(:"rgss_#{name}", RGSSFiles.read_path(path), *rest, **options) }
   end
 
-  alias_method :rgss_delete, :delete
+  alias_method :rgss_delete, :delete unless method_defined?(:rgss_delete)
   def delete(*paths) = rgss_delete(*paths.map { |path| RGSSFiles.read_path(path) })
   alias unlink delete
 end
@@ -152,14 +152,14 @@ end
 module FileTest
   class << self
     %i[exist? file? directory? size].each do |name|
-      alias_method :"rgss_#{name}", name
+      alias_method :"rgss_#{name}", name unless method_defined?(:"rgss_#{name}")
       define_method(name) { |path| send(:"rgss_#{name}", RGSSFiles.read_path(path)) }
     end
   end
 end
 
 class << Dir
-  alias_method :rgss_glob, :glob
+  alias_method :rgss_glob, :glob unless method_defined?(:rgss_glob)
   def glob(pattern, *rest, **options, &block)
     names = RGSSFiles.glob(pattern) || rgss_glob(pattern, *rest, **options)
     block ? names.each(&block) : names

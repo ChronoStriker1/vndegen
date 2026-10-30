@@ -1,6 +1,8 @@
 // Tilemaps. VX and VX Ace draw two layers: tiles below characters at z 0 and tiles flagged as above them (the star,
 // flag 0x10) at z 200. The tile ID ranges, the autotile quarter tables and the A1 to A4 sheet layouts are those of
-// RPG Maker MV's corescript (MIT), which kept VX Ace's tile format; docs/rgss-cleanroom.md has the details.
+// RPG Maker MV's corescript (MIT), which kept VX Ace's tile format. XP draws priority 0 tiles at z 0 and each row of
+// higher priority tiles at its own z, as the XP help's Tilemap topic gives; XP's autotile quarter table was measured
+// from RPG Maker XP's own engine. docs/rgss-cleanroom.md has the details.
 #include "scene.h"
 
 #include <stdlib.h>
@@ -34,6 +36,23 @@ static const unsigned char wallTable[16][4][2] = {
 
 static const unsigned char waterfallTable[4][4][2] = {
     {{2,0},{1,0},{2,1},{1,1}},{{0,0},{1,0},{0,1},{1,1}},{{2,0},{3,0},{2,1},{3,1}},{{0,0},{3,0},{0,1},{3,1}},
+};
+
+// XP's autotiles are 96x128, three tiles across and four down. For each of the 48 shapes, where its four quarters come
+// from in quarter-tile units, as RPG Maker XP's engine draws them (Engines/RGSSRuntime/tools/xp-autotile-probe.rb).
+static const unsigned char xpTable[48][4][2] = {
+    {{2,4},{3,4},{2,5},{3,5}},{{4,0},{3,4},{2,5},{3,5}},{{2,4},{5,0},{2,5},{3,5}},{{4,0},{5,0},{2,5},{3,5}},
+    {{2,4},{3,4},{2,5},{5,1}},{{4,0},{3,4},{2,5},{5,1}},{{2,4},{5,0},{2,5},{5,1}},{{4,0},{5,0},{2,5},{5,1}},
+    {{2,4},{3,4},{4,1},{3,5}},{{4,0},{3,4},{4,1},{3,5}},{{2,4},{5,0},{4,1},{3,5}},{{4,0},{5,0},{4,1},{3,5}},
+    {{2,4},{3,4},{4,1},{5,1}},{{4,0},{3,4},{4,1},{5,1}},{{2,4},{5,0},{4,1},{5,1}},{{4,0},{5,0},{4,1},{5,1}},
+    {{0,4},{1,4},{0,5},{1,5}},{{0,4},{5,0},{0,5},{1,5}},{{0,4},{1,4},{0,5},{5,1}},{{0,4},{5,0},{0,5},{5,1}},
+    {{2,2},{3,2},{2,3},{3,3}},{{2,2},{3,2},{2,3},{5,1}},{{2,2},{3,2},{4,1},{3,3}},{{2,2},{3,2},{4,1},{5,1}},
+    {{4,4},{5,4},{4,5},{5,5}},{{4,4},{5,4},{4,1},{5,5}},{{4,0},{5,4},{4,5},{5,5}},{{4,0},{5,4},{4,1},{5,5}},
+    {{2,6},{3,6},{2,7},{3,7}},{{4,0},{3,6},{2,7},{3,7}},{{2,6},{5,0},{2,7},{3,7}},{{4,0},{5,0},{2,7},{3,7}},
+    {{0,4},{5,4},{0,5},{5,5}},{{2,2},{3,2},{2,7},{3,7}},{{0,2},{1,2},{0,3},{1,3}},{{0,2},{1,2},{0,3},{5,1}},
+    {{4,2},{5,2},{4,3},{5,3}},{{4,2},{5,2},{4,1},{5,3}},{{4,6},{5,6},{4,7},{5,7}},{{4,0},{5,6},{4,7},{5,7}},
+    {{0,6},{1,6},{0,7},{1,7}},{{0,6},{5,0},{0,7},{1,7}},{{0,2},{5,2},{0,3},{5,3}},{{0,2},{1,2},{0,7},{1,7}},
+    {{0,6},{5,6},{0,7},{5,7}},{{4,2},{5,2},{4,7},{5,7}},{{0,2},{5,2},{0,7},{5,7}},{{0,0},{1,0},{0,1},{1,1}},
 };
 
 static const Effects plain = {NULL, NULL, NULL, 255, 0};
@@ -180,9 +199,90 @@ static void draw_shadow(int bits, Image *target, IRect clip, int dx, int dy) {
     }
 }
 
+// MARK: XP
+
+enum { XP_PRIORITIES = 5 };
+
+static int xp_priority(const Tilemap *tm, int id) {
+    if (!tm->flags || id < 0 || id >= tm->flags->xs) return 0;
+    int p = tm->flags->data[id];
+    return p < 0 ? 0 : p > XP_PRIORITIES ? XP_PRIORITIES : p;
+}
+
+static void xp_draw_tile(const Tilemap *tm, int id, Image *target, IRect clip, int dx, int dy) {
+    if (id < 48) return;
+    if (id >= 384) {
+        if (!tm->tileset || tm->tileset->disposed) return;
+        int n = id - 384;
+        put(target, clip, &tm->tileset->image, n % 8 * TILE, n / 8 * TILE, TILE, TILE, dx, dy);
+        return;
+    }
+    int index = id / 48 - 1, shape = id % 48;
+    Bitmap *bitmap = tm->bitmaps[index];
+    if (!bitmap || bitmap->disposed) return;
+    const Image *src = &bitmap->image;
+    // A single 32x32 tile is drawn as it is; a wider sheet animates in 96-pixel frames, one every 16 updates.
+    if (src->h == TILE) {
+        int frames = src->w / TILE;
+        put(target, clip, src, frames > 1 ? tm->animCount / 16 % frames * TILE : 0, 0, TILE, TILE, dx, dy);
+        return;
+    }
+    int frames = src->w / 96;
+    int frameX = frames > 1 ? tm->animCount / 16 % frames * 96 : 0;
+    for (int i = 0; i < 4; i++) {
+        int sx = frameX + xpTable[shape][i][0] * HALF, sy = xpTable[shape][i][1] * HALF;
+        put(target, clip, src, sx, sy, HALF, HALF, dx + i % 2 * HALF, dy + i / 2 * HALF);
+    }
+}
+
+// The first map row the screen shows, and how many, for XP's per-row layers.
+static void xp_rows(const Tilemap *tm, int *first, int *count) {
+    *first = (tm->oy >= 0 ? tm->oy : tm->oy - TILE + 1) / TILE;
+    *count = rgss_screen_h / TILE + 2;
+}
+
+static int xp_layers(Tilemap *tm, int *zs, int max) {
+    int first, count;
+    xp_rows(tm, &first, &count);
+    int n = 0;
+    zs[n++] = 0;
+    for (int row = 0; row < count; row++) {
+        for (int p = 1; p <= XP_PRIORITIES && n < max; p++) zs[n++] = (first + row) * TILE - tm->oy + TILE + TILE * p;
+    }
+    return n;
+}
+
+static void xp_draw(Tilemap *tm, int layer, Image *target, IRect clip, int offX, int offY) {
+    const Table *map = tm->mapData;
+    int originX = offX - tm->ox, originY = offY - tm->oy;
+    int x0 = (clip.x - originX) / TILE - 1, x1 = (clip.x + clip.w - originX) / TILE + 1;
+    int y0, y1, priority = 0;
+    if (layer == 0) {
+        y0 = (clip.y - originY) / TILE - 1;
+        y1 = (clip.y + clip.h - originY) / TILE + 1;
+    } else {
+        int first, count;
+        xp_rows(tm, &first, &count);
+        y0 = y1 = first + (layer - 1) / XP_PRIORITIES;
+        priority = (layer - 1) % XP_PRIORITIES + 1;
+    }
+    for (int my = y0; my <= y1; my++) {
+        for (int mx = x0; mx <= x1; mx++) {
+            int dx = originX + mx * TILE, dy = originY + my * TILE;
+            if (dx >= clip.x + clip.w || dy >= clip.y + clip.h || dx + TILE <= clip.x || dy + TILE <= clip.y) continue;
+            for (int z = 0; z < 3; z++) {
+                int id = map_tile(map, mx, my, z);
+                if (id >= 48 && xp_priority(tm, id) == priority) xp_draw_tile(tm, id, target, clip, dx, dy);
+            }
+        }
+    }
+}
+
+// MARK: Both
+
 int tilemap_layers(Tilemap *tm, int *zs, int max) {
     if (!tm->visible || tm->disposed || !tm->mapData || max < 2) return 0;
-    if (rgss_version == RGSS1) return 0;
+    if (rgss_version == RGSS1) return xp_layers(tm, zs, max);
     zs[0] = 0;
     zs[1] = 200;
     return 2;
@@ -191,6 +291,7 @@ int tilemap_layers(Tilemap *tm, int *zs, int max) {
 void tilemap_draw(Tilemap *tm, int layer, Image *target, IRect clip, int offX, int offY) {
     const Table *map = tm->mapData;
     if (!map) return;
+    if (rgss_version == RGSS1) return xp_draw(tm, layer, target, clip, offX, offY);
     int originX = offX - tm->ox, originY = offY - tm->oy;
     int x0 = (clip.x - originX) / TILE - 1, y0 = (clip.y - originY) / TILE - 1;
     int x1 = (clip.x + clip.w - originX) / TILE + 1, y1 = (clip.y + clip.h - originY) / TILE + 1;
