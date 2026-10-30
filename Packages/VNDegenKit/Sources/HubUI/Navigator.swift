@@ -377,7 +377,7 @@ final class Navigator {
     /// Screens scroll to keep focus in view only when a controller or the keyboard moved it. Scrolling under a hovering
     /// pointer or a touch user's finger would fight them.
     private(set) var focusMovedByController = false
-    /// A target the home screen scrolls into view once, whatever the input. The screen clears it when it scrolls.
+    /// A target the home screen or the grid scrolls into view once, whatever the input. The screen clears it when it scrolls.
     var revealRequest: Target?
     /// Set once a controller, the keyboard, or the pointer has moved focus. Until then focus follows the library as it loads.
     @ObservationIgnored private var steered = false

@@ -11,7 +11,7 @@ struct LibraryHomeView: View {
         #if os(macOS)
         88
         #else
-        70 + (metrics.topBarFitsBesideControls(buttons: TopBar.libraryButtons) ? 0 : metrics.cornerClearance)
+        70 + TopBar.lowered(metrics)
         #endif
     }
 
@@ -149,6 +149,11 @@ struct TopBar: View {
     /// Icon buttons in the bar over a library with games. The empty library shows only Lock and Settings.
     static let libraryButtons = 5
 
+    /// How far the bar over a library with games moves down to clear window controls it can't fit beside.
+    static func lowered(_ metrics: HubMetrics) -> CGFloat {
+        metrics.topBarFitsBesideControls(buttons: libraryButtons) ? 0 : metrics.cornerClearance
+    }
+
     var body: some View {
         let besideControls = metrics.topBarFitsBesideControls(buttons: nav.visibleGames.isEmpty ? 2 : Self.libraryButtons)
         HStack(spacing: metrics.topBarSpacing) {
@@ -224,7 +229,7 @@ private struct HeroStage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.isShort ? 10 : 16) {
-            Spacer(minLength: 64)
+            Spacer(minLength: 64 + TopBar.lowered(metrics))
             if let game {
                 VStack(alignment: .leading, spacing: metrics.isShort ? 10 : 16) {
                     GameLogo(game: game, maxSize: metrics.logoMaxSize)

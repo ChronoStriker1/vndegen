@@ -69,6 +69,11 @@ struct LibraryGridView: View {
                         withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
                     }
                 }
+                .onChange(of: nav.revealRequest) { _, target in
+                    guard let target else { return }
+                    nav.revealRequest = nil
+                    withAnimation(Theme.focusAnimation) { proxy.scrollTo(target, anchor: .center) }
+                }
             }
         }
         .onChange(of: columns, initial: true) { _, columns in nav.gridColumns = columns }
