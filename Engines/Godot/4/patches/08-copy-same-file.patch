@@ -1,5 +1,5 @@
---- a/core/io/dir_access.cpp	2026-10-30 04:51:01.082574220 -0400
-+++ b/core/io/dir_access.cpp	2026-10-30 04:51:01.090633303 -0400
+--- a/core/io/dir_access.cpp	2026-10-30 04:57:09.815389550 -0400
++++ b/core/io/dir_access.cpp	2026-10-30 04:57:09.822852242 -0400
 @@ -37,6 +37,8 @@
  #include "core/os/time.h"
  #include "core/templates/local_vector.h"
@@ -14,8 +14,8 @@
  }
  
 +// VNDegen: VNDegen finds files whatever case a game names them in, so two spellings can open one file on disk, and
-+// copying it onto itself would empty it. The destination is opened as the write below opens it, on disk, even where the
-+// pack has a file of that name, and a file read from the pack reports no disk path, so it never matches.
++// copying it onto itself would empty it. The destination is opened as FileAccess::open opens the write below, without
++// looking in the pack first, and a file read from the pack reports no disk path, so it never matches.
 +static bool _vndegen_same_file(const String &p_a, const String &p_b) {
 +	struct stat a, b;
 +	return !p_a.is_empty() && !p_b.is_empty() && stat(p_a.utf8().get_data(), &a) == 0 && stat(p_b.utf8().get_data(), &b) == 0 && a.st_dev == b.st_dev && a.st_ino == b.st_ino;
@@ -28,8 +28,8 @@
  		Ref<FileAccess> fsrc = FileAccess::open(p_from, FileAccess::READ, &err);
  		ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Failed to open '%s'.", p_from));
  
-+		Ref<FileAccess> existing = FileAccess::create(FileAccess::ACCESS_FILESYSTEM);
-+		if (existing->reopen(ProjectSettings::get_singleton()->globalize_path(p_to), FileAccess::READ) == OK &&
++		Ref<FileAccess> existing = FileAccess::create_for_path(p_to);
++		if (existing->reopen(p_to, FileAccess::READ) == OK &&
 +				_vndegen_same_file(fsrc->get_path_absolute(), existing->get_path_absolute())) {
 +			return OK;
 +		}
