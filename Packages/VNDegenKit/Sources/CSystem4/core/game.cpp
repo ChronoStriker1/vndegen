@@ -117,11 +117,16 @@ bool Game::start(std::string &error) {
     vm->saveDir = cfg.saveDir;
     vm->rootDir = cfg.root;
     if (ini.count("SaveFolder")) vm->saveFolderName = ini["SaveFolder"];
+    // Test Game 19's 2009 Sys42VM writes plain GD containers and version 7 resume saves (checked with a PC save
+    // made under Wine). Sys43VM (Test Game 46) uses the XOR and version 8, the default.
+    if (lower(ini["MainVM"]) == "sys42vm") vm->saveFormat = {false, 7};
     vm->gameName = ini.count("GameName") ? ini["GameName"] : stem;
     vm->log = [this](const std::string &s) { log(s); };
     vm->timeMs = [this] { return now(); };
     vm->peek = [this] { yieldFrame(); };
     if (std::getenv("S4_TRACE")) vm->trace = [this](const std::string &t) { log("call " + t); };
+    if (std::getenv("S4_HLLMISSING"))
+        for (auto &n : vm->unboundHll()) log("unbound HLL " + n);
     if (std::getenv("S4_HLLTRACE")) vm->hllTrace = [this](const std::string &t) { log("hll " + t); };
     std::error_code ec;
     fs::create_directories(cfg.saveDir, ec);

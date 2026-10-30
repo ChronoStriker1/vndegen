@@ -15,9 +15,10 @@
 //   u32 n, then each heap slot: -1 when free, else a record by kind:
 //     0 globals    u32 0, u32 refs, i32 -1, u32 n, n types, u32 bytes, values
 //     1 locals     u32 1, u32 refs, function name, u32 n, n types, i32 `this` (version 8), u32 bytes, values
-//     2 string     u32 2, u32 refs, u32 0, u32 length with its NUL, the bytes and NUL
+//     2 string     u32 2, u32 refs, u32 0, u32 n, n bytes: the text, a NUL, and on the PC sometimes stale bytes
 //     3 array      u32 3, u32 refs, u32 0, u32 array type, struct name, u32 rank, u32 1, u32 bytes, values
-//     4 struct     u32 4, u32 refs, u32 0, two NULs, struct name, u32 n, n types, u32 bytes, values
+//     4 struct     u32 4, u32 refs, constructor name, destructor name (each empty for none), u32 0, struct name,
+//                  u32 n, n types, u32 bytes, values
 //   u32 n, every function name, by index
 #include <cstring>
 
@@ -27,7 +28,6 @@
 namespace s4 {
 namespace {
 
-constexpr uint32_t kVersion = 8;
 
 struct Out {
     std::vector<uint8_t> b;
@@ -95,7 +95,7 @@ uint32_t insnLength(const std::vector<uint8_t> &code, uint32_t at) {
 std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeIp) {
     Out o;
     o.b.insert(o.b.end(), {'R', 'S', 'M', 0});
-    o.u32(kVersion);
+    o.u32(saveFormat.resumeVersion);
     o.str(key);
     o.u32(0);
     auto point = [&](uint32_t next, uint32_t callSite, int32_t fn) {
@@ -128,13 +128,18 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
     o.u32(0);
     o.u32(0);
     o.u32(0);
+    // The PC's counts leave out the reference each method frame holds on its `this`, which this VM counts.
+    std::vector<int32_t> frameRefs(heap.size());
+    for (auto &f : frames)
+        if (f.structPage >= 0 && size_t(f.structPage) < heap.size()) frameRefs[size_t(f.structPage)]++;
     o.u32(uint32_t(heap.size()));
     for (size_t s = 0; s < heap.size(); s++) {
         const Slot &sl = heap[s];
         if (!sl.inUse) { o.u32(uint32_t(-1)); continue; }
+        int32_t refs = sl.refs - frameRefs[s];
         if (sl.str) {
             o.u32(2);
-            o.u32(uint32_t(sl.refs));
+            o.u32(uint32_t(refs));
             o.u32(0);
             o.u32(uint32_t(sl.str->size() + 1));
             o.str(*sl.str);
@@ -152,26 +157,26 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         switch (p.kind) {
         case PageKind::Global:
             o.u32(0);
-            o.u32(uint32_t(sl.refs));
+            o.u32(uint32_t(refs));
             o.u32(uint32_t(-1));
             types();
             values();
             break;
         case PageKind::Local: {
             o.u32(1);
-            o.u32(uint32_t(sl.refs));
+            o.u32(uint32_t(refs));
             o.str(ain.functions[p.index].name);
             types();
             int32_t self = -1;
             for (auto &f : frames)
                 if (f.localPage == int32_t(s)) self = f.structPage;
-            o.u32(uint32_t(self));
+            if (saveFormat.resumeVersion >= 8) o.u32(uint32_t(self));
             values();
             break;
         }
         case PageKind::Array: {
             o.u32(3);
-            o.u32(uint32_t(sl.refs));
+            o.u32(uint32_t(refs));
             o.u32(0);
             o.u32(uint32_t(arrayTypeOf(p.elemType)));
             o.str(p.elemType == T_STRUCT && p.elemStruct >= 0 ? ain.structs[p.elemStruct].name : "");
@@ -182,11 +187,13 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         }
         case PageKind::Struct:
             o.u32(4);
-            o.u32(uint32_t(sl.refs));
+            o.u32(uint32_t(refs));
+            const Struct &st = ain.structs[p.index];
+            auto fnName = [&](int32_t fn) { return fn >= 0 && size_t(fn) < ain.functions.size() ? ain.functions[fn].name : ""; };
+            o.str(fnName(st.constructor));
+            o.str(fnName(st.destructor));
             o.u32(0);
-            o.b.push_back(0);
-            o.b.push_back(0);
-            o.str(ain.structs[p.index].name);
+            o.str(st.name);
             types();
             values();
             break;
@@ -281,9 +288,12 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         }
         case 2: {
             in.u32();
+            // The length is the PC's buffer, which can be longer than the text: the text ends at its first NUL.
             uint32_t len = in.u32();
-            std::string str = in.str();
-            (void)len;
+            if (len > data.size() - std::min(data.size(), in.i)) { in.bad = true; break; }
+            std::string str(reinterpret_cast<const char *>(data.data() + in.i), len);
+            in.i += len;
+            str.resize(std::strlen(str.c_str()));
             sl.str = std::make_unique<std::string>(std::move(str));
             continue;
         }
@@ -300,8 +310,9 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         }
         case 4: {
             page->kind = PageKind::Struct;
+            in.str();  // constructor and destructor names: the struct's own, found by its name below
+            in.str();
             in.u32();
-            in.i += 2;
             page->index = ain.findStruct(in.str());
             readTypes();
             readValues(*page);
@@ -341,6 +352,9 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     }
     // The first frame is the entry; when it returns, the game ends.
     if (!frames.empty()) frames.front().native = true;
+    // Each method frame holds a reference on its `this`, which the saved counts leave out.
+    for (auto &f : frames)
+        if (f.structPage >= 0) incref(f.structPage);
     ip = curCall + insnLength(ain.code, curCall);
     curInsn_ = curCall;
     push(0);  // ResumeSave returns 0 after a load

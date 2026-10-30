@@ -461,6 +461,75 @@ S4_HLL(StoatSpriteEngine, ADVLogList_Load) {
     c.retBool(true);
 }
 
+// ---- MsgLogManager and MsgLogViewer: Test Game 46's backlog ----
+// The game adds typed entries to the manager as it shows a message: 1001 text, 1101 a new line, 1102 the wait for
+// a click that ends a message, 1211 a voice, and style codes (13xx and others) the backlog doesn't need. The viewer
+// turns them into sact_log_data_t lines (text, voice, separator); a separator is a line of its own between messages,
+// which the game's backlog walks back to.
+
+struct MsgLogEntry { int type; int value; std::string text; };
+std::vector<MsgLogEntry> g_msgLog;
+size_t g_msgLogMax = 10000;
+struct ViewerLine { std::string text; int voice = 0; bool separator = false; };
+std::vector<ViewerLine> g_viewer;
+
+void msgLogAdd(MsgLogEntry e) {
+    g_msgLog.push_back(std::move(e));
+    if (g_msgLog.size() > g_msgLogMax) g_msgLog.erase(g_msgLog.begin(), g_msgLog.begin() + ptrdiff_t(g_msgLog.size() - g_msgLogMax));
+}
+const MsgLogEntry *msgLogAt(int n) { return n >= 0 && size_t(n) < g_msgLog.size() ? &g_msgLog[size_t(n)] : nullptr; }
+
+S4_HLL(MsgLogManager, Numof) { c.retInt(int32_t(g_msgLog.size())); }
+S4_HLL(MsgLogManager, AddInt) { msgLogAdd({c.i(0), c.i(1), {}}); }
+S4_HLL(MsgLogManager, AddString) { msgLogAdd({c.i(0), 0, c.s(1)}); }
+S4_HLL(MsgLogManager, GetType) { auto e = msgLogAt(c.i(0)); c.retInt(e ? e->type : 0); }
+S4_HLL(MsgLogManager, GetInt) { auto e = msgLogAt(c.i(0)); c.retInt(e ? e->value : 0); }
+S4_HLL(MsgLogManager, GetString) { auto e = msgLogAt(c.i(0)); c.refS(1) = e ? e->text : ""; }
+S4_HLL(MsgLogManager, SetLineMax) { g_msgLogMax = size_t(std::max(1, c.i(0))); }
+S4_HLL(MsgLogManager, GetInterface) { c.retInt(1); }  // the handle the viewer converts from; there is one manager
+
+S4_HLL(MsgLogViewer, Numof) { c.retInt(int32_t(g_viewer.size())); }
+S4_HLL(MsgLogViewer, Clear) { g_viewer.clear(); }
+S4_HLL(MsgLogViewer, Add) {
+    Page *p = c.page(0);
+    if (!p || p->v.size() < 3) return;
+    g_viewer.push_back({c.vm.valid(p->v[0]) ? c.vm.str(p->v[0]) : "", p->v[1], p->v[2] != 0});
+}
+S4_HLL(MsgLogViewer, Get) {
+    Page *p = c.page(1);
+    int n = c.i(0);
+    if (!p || p->v.size() < 3) return;
+    ViewerLine l = n >= 0 && size_t(n) < g_viewer.size() ? g_viewer[size_t(n)] : ViewerLine{};
+    if (c.vm.valid(p->v[0])) c.vm.str(p->v[0]) = l.text;
+    else p->v[0] = c.vm.newString(l.text);
+    p->v[1] = l.voice;
+    p->v[2] = l.separator;
+}
+S4_HLL(MsgLogViewer, ConvertFromMsgLogManager) {
+    g_viewer.clear();
+    ViewerLine line;
+    bool any = false;  // the current message has a line in it
+    auto endLine = [&] {
+        g_viewer.push_back(line);
+        line = {};
+        any = true;
+    };
+    for (auto &e : g_msgLog) {
+        switch (e.type) {
+        case 1001: line.text += e.text; break;
+        case 1101: endLine(); break;
+        case 1211: line.voice = e.value; break;
+        case 1102:
+            if (!line.text.empty()) endLine();
+            if (any) g_viewer.push_back({{}, 0, true});
+            any = false;
+            break;
+        default: break;
+        }
+    }
+    if (!line.text.empty()) g_viewer.push_back(line);
+}
+
 // ---- ADVSceneKeeper: copies of a scene struct the game hands over, for the scene replay list ----
 
 std::vector<std::vector<int32_t>> g_scenes;  // the struct's int members
@@ -629,6 +698,9 @@ S4_HLL_RESET {
     g_scenes.clear();
     g_drawFont = {};
     g_drawFontSpace = 0;
+    g_msgLog.clear();
+    g_msgLogMax = 10000;
+    g_viewer.clear();
 }
 S4_HLL(DrawGraph, SetFontSpace) { g_drawFontSpace = c.i(0); }
 S4_HLL(DrawGraph, SetFontColor) { g_drawFont.r = c.i(0); g_drawFont.g = c.i(1); g_drawFont.b = c.i(2); }

@@ -3,6 +3,7 @@
 // SDK manuals where they describe a library, otherwise the names and how the games use the results.
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -196,28 +197,58 @@ S4_HLL(PassRegister, ExistNumber) { c.retBool(g_pass[c.i(0)].numbers.count(c.i(1
 S4_HLL(PassRegister, ExistText) { c.retBool(g_pass[c.i(0)].texts.count(c.s(1)) > 0); }
 
 // ---- VSFile: a binary file the game writes and reads value by value, in the save folder ----
+// The PC's layout, from a file Test Game 19 wrote under Wine: "VSF\0", four zero bytes, then each value as a type
+// byte and its data. Ints are type 1 with 4 bytes, strings type 3 ending in a NUL. Bytes (0) and floats (2, 4
+// bytes) follow the order of the Write calls; no test game writes them.
 std::fstream g_vs;
+enum VsType : char { kVsByte = 0, kVsInt = 1, kVsFloat = 2, kVsString = 3 };
+constexpr char kVsHeader[8] = {'V', 'S', 'F', 0, 0, 0, 0, 0};
 S4_HLL(VSFile, OpenForWrite) {
     g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), false), std::ios::out | std::ios::binary | std::ios::trunc);
-    c.retBool(g_vs.is_open());
+    if (g_vs.is_open()) g_vs.write(kVsHeader, sizeof kVsHeader);
+    c.retBool(g_vs.is_open() && bool(g_vs));
 }
 S4_HLL(VSFile, OpenForRead) {
     g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), false), std::ios::in | std::ios::binary);
-    c.retBool(g_vs.is_open());
+    char h[sizeof kVsHeader] = {};
+    bool ok = g_vs.is_open() && g_vs.read(h, sizeof h) && std::memcmp(h, kVsHeader, 4) == 0;
+    if (!ok) g_vs.close();
+    c.retBool(ok);
 }
 S4_HLL(VSFile, Close) { g_vs.close(); c.retBool(true); }
-S4_HLL(VSFile, WriteByte) { char b = char(c.i(0)); g_vs.write(&b, 1); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, WriteInt) { int32_t v = c.i(0); g_vs.write(reinterpret_cast<char *>(&v), 4); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, WriteFloat) { int32_t v = c.i(0); g_vs.write(reinterpret_cast<char *>(&v), 4); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, WriteString) { const std::string &s = c.s(0); g_vs.write(s.c_str(), std::streamsize(s.size() + 1)); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, ReadByte) { char b = 0; g_vs.read(&b, 1); c.ref(0) = uint8_t(b); c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, ReadInt) { int32_t v = 0; g_vs.read(reinterpret_cast<char *>(&v), 4); c.ref(0) = v; c.retBool(bool(g_vs)); }
-S4_HLL(VSFile, ReadFloat) { int32_t v = 0; g_vs.read(reinterpret_cast<char *>(&v), 4); c.ref(0) = v; c.retBool(bool(g_vs)); }
+void vsWrite(VsType t, const void *data, size_t n) {
+    g_vs.put(t);
+    g_vs.write(static_cast<const char *>(data), std::streamsize(n));
+}
+// Reads a value's type byte; false when the next value is of another type.
+bool vsExpect(VsType t) { return g_vs.get() == t && bool(g_vs); }
+S4_HLL(VSFile, WriteByte) { char b = char(c.i(0)); vsWrite(kVsByte, &b, 1); c.retBool(bool(g_vs)); }
+S4_HLL(VSFile, WriteInt) { int32_t v = c.i(0); vsWrite(kVsInt, &v, 4); c.retBool(bool(g_vs)); }
+S4_HLL(VSFile, WriteFloat) { int32_t v = c.i(0); vsWrite(kVsFloat, &v, 4); c.retBool(bool(g_vs)); }
+S4_HLL(VSFile, WriteString) { const std::string &s = c.s(0); vsWrite(kVsString, s.c_str(), s.size() + 1); c.retBool(bool(g_vs)); }
+S4_HLL(VSFile, ReadByte) {
+    char b = 0;
+    bool ok = vsExpect(kVsByte) && g_vs.read(&b, 1);
+    c.ref(0) = uint8_t(b);
+    c.retBool(ok);
+}
+S4_HLL(VSFile, ReadInt) {
+    int32_t v = 0;
+    bool ok = vsExpect(kVsInt) && g_vs.read(reinterpret_cast<char *>(&v), 4);
+    c.ref(0) = v;
+    c.retBool(ok);
+}
+S4_HLL(VSFile, ReadFloat) {
+    int32_t v = 0;
+    bool ok = vsExpect(kVsFloat) && g_vs.read(reinterpret_cast<char *>(&v), 4);
+    c.ref(0) = v;
+    c.retBool(ok);
+}
 S4_HLL(VSFile, ReadString) {
     std::string s;
-    std::getline(g_vs, s, '\0');
+    bool ok = vsExpect(kVsString) && std::getline(g_vs, s, '\0');
     c.refS(0) = s;
-    c.retBool(bool(g_vs));
+    c.retBool(ok);
 }
 
 // ---- FileOperation: paths relative to the game folder ----

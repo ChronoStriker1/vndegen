@@ -18,6 +18,7 @@ namespace s4::save {
 // "GD", two bytes 1 1, the plain length (u32), then zlib data (level 9) XORed with the low byte of each output of a
 // Mersenne Twister. The generator is seeded the old way (each state word the previous times 69069) from 0x12320F.
 // Worked out from saves the SDK runtime and Test Game 46 wrote, and the SDK runtime's routine that writes the header.
+// Test Game 19's VM (a 2009 Sys42VM) writes the zlib data without the XOR; see VM::SaveFormat.
 
 namespace {
 
@@ -52,13 +53,18 @@ bool readGD(const std::string &path, std::vector<uint8_t> &plain) {
     if (d.size() < 8 || d[0] != 'G' || d[1] != 'D') return false;
     uint32_t len;
     std::memcpy(&len, d.data() + 4, 4);
-    cipher(d.data() + 8, d.size() - 8);
     plain.resize(len);
-    uLongf out = len;
-    return uncompress(plain.data(), &out, d.data() + 8, uLong(d.size() - 8)) == Z_OK && out == len;
+    auto inflate = [&] {
+        uLongf out = len;
+        return uncompress(plain.data(), &out, d.data() + 8, uLong(d.size() - 8)) == Z_OK && out == len;
+    };
+    // Plain zlib first: XORed data never inflates cleanly, since its header bytes are scrambled.
+    if (inflate()) return true;
+    cipher(d.data() + 8, d.size() - 8);
+    return inflate();
 }
 
-bool writeGD(const std::string &path, const std::vector<uint8_t> &plain) {
+bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xorData) {
     uLongf cap = compressBound(uLong(plain.size()));
     std::vector<uint8_t> d(8 + cap);
     if (compress2(d.data() + 8, &cap, plain.data(), uLong(plain.size()), 9) != Z_OK) return false;
@@ -66,7 +72,7 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain) {
     d[0] = 'G'; d[1] = 'D'; d[2] = 1; d[3] = 1;
     uint32_t len = uint32_t(plain.size());
     std::memcpy(d.data() + 4, &len, 4);
-    cipher(d.data() + 8, cap);
+    if (xorData) cipher(d.data() + 8, cap);
     // Write beside the target, then rename, so a crash never leaves half a save.
     std::error_code ec;
     fs::create_directories(fs::path(path).parent_path(), ec);
@@ -277,7 +283,7 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
     std::memcpy(out.data() + headerAt, hdr, 56);
     (void)keyLen;
     if (count) *count = int32_t(saved.size());
-    return writeGD(hostPath(vm, file, true), out) ? 1 : 0;
+    return writeGD(hostPath(vm, file, true), out, vm.saveFormat.xorData) ? 1 : 0;
 }
 
 namespace {

@@ -103,6 +103,14 @@ VM::VM(Ain a) : ain(std::move(a)) {
     }
 }
 
+std::vector<std::string> VM::unboundHll() const {
+    std::vector<std::string> out;
+    for (size_t l = 0; l < hll_.size(); l++)
+        for (size_t f = 0; f < hll_[l].size(); f++)
+            if (!hll_[l][f]) out.push_back(ain.libraries[l].name + "." + ain.libraries[l].functions[f].name);
+    return out;
+}
+
 int32_t VM::alloc() {
     int32_t s;
     if (!freeSlots.empty()) {

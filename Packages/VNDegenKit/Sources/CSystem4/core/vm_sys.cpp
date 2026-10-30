@@ -43,7 +43,7 @@ void VM::callSys(int32_t n) {
         int32_t ri = pop(), rp = pop();
         std::string file = popStr(), key = popStr();
         std::vector<uint8_t> snap = resumeSnapshot(key, ip);
-        bool ok = save::writeGD(save::hostPath(*this, file, true), snap);
+        bool ok = save::writeGD(save::hostPath(*this, file, true), snap, saveFormat.xorData);
         if (log) log(std::string(ok ? "resume saved: " : "resume save failed: ") + sjis::toUtf8(file));
         if (Page *p = page(rp); p && ri >= 0 && size_t(ri) < p->v.size()) p->v[ri] = ok;
         push(1);
