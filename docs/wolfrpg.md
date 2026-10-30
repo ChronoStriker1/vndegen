@@ -86,9 +86,10 @@ last save read or written. `docs/wolfrpg-save-format.md` describes the format an
 - A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
   playing. The PC engine shows no saved pictures after a load either; the map's own music starts.
 - Wolf RPG Editor 3.5 games, whose data files are compressed, and DxLib archive versions 7 and 8 (Wolf RPG Editor 2.225
-  and later, and 3.x) aren't read yet. None of the test games uses them.
-- Wolf RPG Editor Pro's encrypted data isn't read.
-- Mouse input, CSV import (command 251) and file downloads (260) aren't supported; the test games don't use them.
+  and later, and 3.x) aren't read yet. None of the test games uses them; one library game each does.
+- Wolf RPG Editor Pro's encrypted data isn't read. One library game is a Pro game.
+- Mouse input, CSV import (command 251) and file downloads (260) aren't supported. The test games don't use them; two
+  library games need the mouse, one to pick its control scheme on its first screen and one for its action battles.
 - Typing text on the keyboard (a string command mode) isn't supported: the command keeps the text already in the
   variable after a frame. Games that offer a default, such as a name, go on with it.
 - Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
