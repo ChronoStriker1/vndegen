@@ -27,6 +27,23 @@
      "description": "RPG"
     }
    ],
+   "screenshots": [
+    {
+     "id": 0,
+     "path_thumbnail": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/4eeabf71c81b89ecc03f4ee30765631fd54bdd14/ss_4eeabf71c81b89ecc03f4ee30765631fd54bdd14.600x338.jpg?t=1785651574",
+     "path_full": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/4eeabf71c81b89ecc03f4ee30765631fd54bdd14/ss_4eeabf71c81b89ecc03f4ee30765631fd54bdd14.1920x1080.jpg?t=1785651574"
+    },
+    {
+     "id": 1,
+     "path_thumbnail": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/9aed37f2cc0c2f4b3c4c29c994c4e325df4730f6/ss_9aed37f2cc0c2f4b3c4c29c994c4e325df4730f6.600x338.jpg?t=1785651574",
+     "path_full": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/9aed37f2cc0c2f4b3c4c29c994c4e325df4730f6/ss_9aed37f2cc0c2f4b3c4c29c994c4e325df4730f6.1920x1080.jpg?t=1785651574"
+    },
+    {
+     "id": 2,
+     "path_thumbnail": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/b8003d50810d10fd7f1aa975e427103914acfa08/ss_b8003d50810d10fd7f1aa975e427103914acfa08.600x338.jpg?t=1785651574",
+     "path_full": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4929970/b8003d50810d10fd7f1aa975e427103914acfa08/ss_b8003d50810d10fd7f1aa975e427103914acfa08.1920x1080.jpg?t=1785651574"
+    }
+   ],
    "release_date": {
     "coming_soon": false,
     "date": "Jul 27, 2026"

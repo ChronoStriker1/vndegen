@@ -27,6 +27,23 @@
      "description": "Indie"
     }
    ],
+   "screenshots": [
+    {
+     "id": 0,
+     "path_thumbnail": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/ss_3941e57f278958dd15c9855f42ab069da3a19608.600x338.jpg?t=1681943582",
+     "path_full": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/ss_3941e57f278958dd15c9855f42ab069da3a19608.1920x1080.jpg?t=1681943582"
+    },
+    {
+     "id": 1,
+     "path_thumbnail": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/ss_fb10c409c498a8f2f512d2195a169fed0bbb1526.600x338.jpg?t=1681943582",
+     "path_full": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/ss_fb10c409c498a8f2f512d2195a169fed0bbb1526.1920x1080.jpg?t=1681943582"
+    },
+    {
+     "id": 2,
+     "path_thumbnail": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/ss_3030d47cf865cb5910746bc3897217c9cc8ce5fb.600x338.jpg?t=1681943582",
+     "path_full": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/ss_3030d47cf865cb5910746bc3897217c9cc8ce5fb.1920x1080.jpg?t=1681943582"
+    }
+   ],
    "release_date": {
     "coming_soon": false,
     "date": "Oct 6, 2017"

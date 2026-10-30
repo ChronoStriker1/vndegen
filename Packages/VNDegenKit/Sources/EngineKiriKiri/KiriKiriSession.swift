@@ -95,6 +95,7 @@ final class KiriKiriSession: EngineSession {
         #endif
         var settings = VNKKLaunch(gameRoot: strings[0], projectData: strings[1], logPath: strings[2], appDataDir: strings[3],
                                   personalDir: strings[4], hostView: hostView)
+        engine.useFontPack()
         Self.engineInUse = true
         state = .starting(cancelled: false)
         Self.inFrame = true

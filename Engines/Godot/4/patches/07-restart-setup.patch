@@ -1,0 +1,25 @@
+--- a/main/main.cpp	2026-10-27 19:49:24.033342503 -0400
++++ b/main/main.cpp	2026-10-27 19:49:24.039629524 -0400
+@@ -1040,6 +1040,22 @@
+ 
+ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_phase) {
+ 	GodotProfileZone("setup");
++	// VNDegen: the last start's Main::cleanup freed these without clearing them, and a failed setup frees what it
++	// finds set.
++	engine = nullptr;
++	globals = nullptr;
++	input = nullptr;
++	input_map = nullptr;
++	translation_server = nullptr;
++	performance = nullptr;
++	packed_data = nullptr;
++#ifdef MINIZIP_ENABLED
++	zip_packed_data = nullptr;
++#endif
++	message_queue = nullptr;
++#if defined(STEAMAPI_ENABLED)
++	steam_tracker = nullptr;
++#endif
+ 	Thread::make_main_thread();
+ 	set_current_thread_safe_for_nodes(true);
+ 

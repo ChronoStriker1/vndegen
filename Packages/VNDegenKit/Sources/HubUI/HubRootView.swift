@@ -9,6 +9,7 @@ public struct HubRootView: View {
     // Owned here so the route and focus survive size changes, such as folding an iPhone Duo, and play sessions.
     @State private var nav: Navigator
     @Environment(\.scenePhase) private var scenePhase
+    @State private var windowControls = WindowControlsInsets()
 
     public init(hub: Hub) {
         self.hub = hub
@@ -23,8 +24,15 @@ public struct HubRootView: View {
                 case let .playing(_, session): PlayerView(hub: hub, session: session)
                 }
             }
-            .environment(\.hubMetrics, HubMetrics(size: geo.size, insets: geo.safeAreaInsets))
+            .environment(\.hubMetrics, HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls))
         }
+        #if os(iOS)
+        .background {
+            WindowControlsReader { windowControls = $0 }
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+        }
+        #endif
         .environment(hub)
         .environment(nav)
         .foregroundStyle(.white)

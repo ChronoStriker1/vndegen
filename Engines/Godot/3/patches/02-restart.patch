@@ -1,0 +1,445 @@
+diff --git a/core/class_db.cpp b/core/class_db.cpp
+index 5117de7..1e4c271 100644
+--- a/core/class_db.cpp
++++ b/core/class_db.cpp
+@@ -1408,8 +1408,11 @@ void ClassDB::cleanup_defaults() {
+ 	default_values_cached.clear();
+ }
+ 
++uint32_t ClassDB::generation = 0;
++
+ void ClassDB::cleanup() {
+ 	//OBJTYPE_LOCK; hah not here
++	generation++;
+ 
+ 	const StringName *k = nullptr;
+ 
+diff --git a/core/class_db.h b/core/class_db.h
+index 82bcb8d..6875547 100644
+--- a/core/class_db.h
++++ b/core/class_db.h
+@@ -139,6 +139,12 @@ public:
+ 
+ 	static RWLock lock;
+ 	static HashMap<StringName, ClassInfo> classes;
++
++public:
++	// VNDegen: counts the engine's starts in this process, so classes register again after cleanup().
++	static uint32_t generation;
++
++private:
+ 	static HashMap<StringName, StringName> resource_base_extensions;
+ 	static HashMap<StringName, StringName> compat_classes;
+ 
+diff --git a/core/input_map.cpp b/core/input_map.cpp
+index 71bc592..12acf2b 100644
+--- a/core/input_map.cpp
++++ b/core/input_map.cpp
+@@ -373,3 +373,9 @@ InputMap::InputMap() {
+ 	ERR_FAIL_COND_MSG(singleton, "Singleton in InputMap already exist.");
+ 	singleton = this;
+ }
++
++InputMap::~InputMap() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/core/input_map.h b/core/input_map.h
+index 8cf8160..378b177 100644
+--- a/core/input_map.h
++++ b/core/input_map.h
+@@ -88,6 +88,8 @@ public:
+ 	String suggest_actions(const StringName &p_action) const;
+ 
+ 	InputMap();
++
++	~InputMap();
+ };
+ 
+ #endif // INPUT_MAP_H
+diff --git a/core/io/file_access_pack.cpp b/core/io/file_access_pack.cpp
+index 809845d..dc3a428 100644
+--- a/core/io/file_access_pack.cpp
++++ b/core/io/file_access_pack.cpp
+@@ -117,6 +117,9 @@ void PackedData::_free_packed_dirs(PackedDir *p_dir) {
+ }
+ 
+ PackedData::~PackedData() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ 	for (int i = 0; i < sources.size(); i++) {
+ 		memdelete(sources[i]);
+ 	}
+diff --git a/core/io/file_access_zip.cpp b/core/io/file_access_zip.cpp
+index af68e38..6ec0308 100644
+--- a/core/io/file_access_zip.cpp
++++ b/core/io/file_access_zip.cpp
+@@ -228,6 +228,9 @@ ZipArchive::ZipArchive() {
+ }
+ 
+ ZipArchive::~ZipArchive() {
++	if (instance == this) {
++		instance = nullptr;
++	}
+ 	for (int i = 0; i < packages.size(); i++) {
+ 		unzClose(packages[i].zfile);
+ 	}
+diff --git a/core/io/ip.cpp b/core/io/ip.cpp
+index bb7a0f6..8a0d534 100644
+--- a/core/io/ip.cpp
++++ b/core/io/ip.cpp
+@@ -347,6 +347,9 @@ IP::IP() {
+ }
+ 
+ IP::~IP() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ 	resolver->thread_abort = true;
+ 	resolver->sem.post();
+ 	resolver->thread.wait_to_finish();
+diff --git a/core/io/resource_importer.cpp b/core/io/resource_importer.cpp
+index 9c67f6f..d920a00 100644
+--- a/core/io/resource_importer.cpp
++++ b/core/io/resource_importer.cpp
+@@ -426,3 +426,9 @@ void ResourceImporter::_bind_methods() {
+ 	BIND_ENUM_CONSTANT(IMPORT_ORDER_DEFAULT);
+ 	BIND_ENUM_CONSTANT(IMPORT_ORDER_SCENE);
+ }
++
++ResourceFormatImporter::~ResourceFormatImporter() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/core/io/resource_importer.h b/core/io/resource_importer.h
+index 142ba20..08a2e26 100644
+--- a/core/io/resource_importer.h
++++ b/core/io/resource_importer.h
+@@ -90,6 +90,7 @@ public:
+ 
+ 	String get_import_base_path(const String &p_for_file) const;
+ 	ResourceFormatImporter();
++	~ResourceFormatImporter();
+ };
+ 
+ class ResourceImporter : public Reference {
+diff --git a/core/object.cpp b/core/object.cpp
+index b413839..5904adf 100644
+--- a/core/object.cpp
++++ b/core/object.cpp
+@@ -1585,13 +1585,14 @@ Variant Object::_get_indexed_bind(const NodePath &p_name) const {
+ }
+ 
+ void Object::initialize_class() {
+-	static bool initialized = false;
+-	if (initialized) {
++	// VNDegen: once per start of the engine, which can start again in the same process.
++	static uint32_t initialized_generation = UINT32_MAX;
++	if (initialized_generation == ClassDB::generation) {
+ 		return;
+ 	}
+ 	ClassDB::_add_class<Object>();
+ 	_bind_methods();
+-	initialized = true;
++	initialized_generation = ClassDB::generation;
+ }
+ 
+ StringName Object::tr(const StringName &p_message) const {
+diff --git a/core/object.h b/core/object.h
+index 39eb17a..abe3f3c 100644
+--- a/core/object.h
++++ b/core/object.h
+@@ -322,14 +322,15 @@ protected:
+                                                                                                                                         \
+ public:                                                                                                                                 \
+ 	static void initialize_class() {                                                                                                    \
+-		static bool initialized = false;                                                                                                \
+-		if (initialized)                                                                                                                \
++		/* VNDegen: once per start of the engine, which can start again in the same process. */                                         \
++		static uint32_t initialized_generation = UINT32_MAX;                                                                            \
++		if (initialized_generation == ClassDB::generation)                                                                              \
+ 			return;                                                                                                                     \
+ 		m_inherits::initialize_class();                                                                                                 \
+ 		ClassDB::_add_class<m_class>();                                                                                                 \
+ 		if (m_class::_get_bind_methods() != m_inherits::_get_bind_methods())                                                            \
+ 			_bind_methods();                                                                                                            \
+-		initialized = true;                                                                                                             \
++		initialized_generation = ClassDB::generation;                                                                                   \
+ 	}                                                                                                                                   \
+                                                                                                                                         \
+ protected:                                                                                                                              \
+diff --git a/core/os/input.cpp b/core/os/input.cpp
+index 6dff586..5d5a5a1 100644
+--- a/core/os/input.cpp
++++ b/core/os/input.cpp
+@@ -168,3 +168,9 @@ Input::Input() {
+ }
+ 
+ //////////////////////////////////////////////////////////
++
++Input::~Input() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/core/os/input.h b/core/os/input.h
+index 22ca6eb..0fe84b5 100644
+--- a/core/os/input.h
++++ b/core/os/input.h
+@@ -150,6 +150,8 @@ public:
+ 	virtual void set_use_accumulated_input(bool p_enable) = 0;
+ 
+ 	Input();
++
++	~Input();
+ };
+ 
+ VARIANT_ENUM_CAST(Input::MouseMode);
+diff --git a/core/string_name.cpp b/core/string_name.cpp
+index 22632d4..f2ed55d 100644
+--- a/core/string_name.cpp
++++ b/core/string_name.cpp
+@@ -49,7 +49,10 @@ bool StringName::configured = false;
+ Mutex StringName::lock;
+ 
+ void StringName::setup() {
+-	ERR_FAIL_COND(configured);
++	// VNDegen: the table outlives the engine, because static StringNames keep their data across a restart.
++	if (configured) {
++		return;
++	}
+ 	for (int i = 0; i < STRING_TABLE_LEN; i++) {
+ 		_table[i] = nullptr;
+ 	}
+@@ -57,6 +60,8 @@ void StringName::setup() {
+ }
+ 
+ void StringName::cleanup() {
++	// VNDegen: the engine can start again in the same process, and static StringNames still point into the table.
++	return;
+ 	lock.lock();
+ 
+ 	int lost_strings = 0;
+diff --git a/main/main.cpp b/main/main.cpp
+index 1f4e98f..22f6d60 100644
+--- a/main/main.cpp
++++ b/main/main.cpp
+@@ -2671,6 +2671,7 @@ void Main::cleanup(bool p_force) {
+ 	OS::get_singleton()->benchmark_dump();
+ 
+ 	OS::get_singleton()->finalize_core();
++	AudioDriverManager::reset();
+ 
+ #ifdef RID_HANDLES_ENABLED
+ 	g_rid_database.shutdown();
+diff --git a/main/performance.cpp b/main/performance.cpp
+index a349672..68cfdf0 100644
+--- a/main/performance.cpp
++++ b/main/performance.cpp
+@@ -256,3 +256,9 @@ Performance::Performance() {
+ 	_physics_process_time = 0;
+ 	singleton = this;
+ }
++
++Performance::~Performance() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/main/performance.h b/main/performance.h
+index f929ab7..53858d7 100644
+--- a/main/performance.h
++++ b/main/performance.h
+@@ -102,6 +102,8 @@ public:
+ 	static Performance *get_singleton() { return singleton; }
+ 
+ 	Performance();
++
++	~Performance();
+ };
+ 
+ VARIANT_ENUM_CAST(Performance::Monitor);
+diff --git a/modules/navigation/navigation_mesh_generator.cpp b/modules/navigation/navigation_mesh_generator.cpp
+index 5fc5d50..591add9 100644
+--- a/modules/navigation/navigation_mesh_generator.cpp
++++ b/modules/navigation/navigation_mesh_generator.cpp
+@@ -699,6 +699,9 @@ NavigationMeshGenerator::NavigationMeshGenerator() {
+ }
+ 
+ NavigationMeshGenerator::~NavigationMeshGenerator() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void NavigationMeshGenerator::bake(Ref<NavigationMesh> p_nav_mesh, Node *p_node) {
+diff --git a/platform/javascript/api/api.cpp b/platform/javascript/api/api.cpp
+index b785202..1f79f97 100644
+--- a/platform/javascript/api/api.cpp
++++ b/platform/javascript/api/api.cpp
+@@ -58,7 +58,11 @@ JavaScript::JavaScript() {
+ 	singleton = this;
+ }
+ 
+-JavaScript::~JavaScript() {}
++JavaScript::~JavaScript() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+ 
+ void JavaScript::_bind_methods() {
+ 	ClassDB::bind_method(D_METHOD("eval", "code", "use_global_execution_context"), &JavaScript::eval, DEFVAL(false));
+diff --git a/servers/audio_server.cpp b/servers/audio_server.cpp
+index 39ca25d..b2ee35d 100644
+--- a/servers/audio_server.cpp
++++ b/servers/audio_server.cpp
+@@ -228,6 +228,11 @@ AudioDriver *AudioDriverManager::get_driver(int p_driver) {
+ 	return drivers[p_driver];
+ }
+ 
++void AudioDriverManager::reset() {
++	drivers[0] = &AudioDriverManager::dummy_driver;
++	driver_count = 1;
++}
++
+ //////////////////////////////////////////////
+ //////////////////////////////////////////////
+ //////////////////////////////////////////////
+diff --git a/servers/audio_server.h b/servers/audio_server.h
+index 4cbd949..598262c 100644
+--- a/servers/audio_server.h
++++ b/servers/audio_server.h
+@@ -139,6 +139,8 @@ public:
+ 	static void initialize(int p_driver);
+ 	static int get_driver_count();
+ 	static AudioDriver *get_driver(int p_driver);
++	// VNDegen: forgets the drivers the OS added, which go with it, so the engine can start again in the same process.
++	static void reset();
+ };
+ 
+ class AudioBusLayout;
+diff --git a/servers/physics/physics_server_sw.cpp b/servers/physics/physics_server_sw.cpp
+index d78a87e..97d01a7 100644
+--- a/servers/physics/physics_server_sw.cpp
++++ b/servers/physics/physics_server_sw.cpp
+@@ -1450,5 +1450,8 @@ PhysicsServerSW::PhysicsServerSW() {
+ };
+ 
+ PhysicsServerSW::~PhysicsServerSW(){
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ 
+ };
+diff --git a/servers/physics_2d_server.cpp b/servers/physics_2d_server.cpp
+index d6d9f4b..e841044 100644
+--- a/servers/physics_2d_server.cpp
++++ b/servers/physics_2d_server.cpp
+@@ -795,3 +795,9 @@ Physics2DServer *Physics2DServerManager::new_server(const String &p_name) {
+ 		return physics_2d_servers[id].create_callback();
+ 	}
+ }
++
++void Physics2DServerManager::reset() {
++	physics_2d_servers.clear();
++	default_server_id = -1;
++	default_server_priority = -1;
++}
+diff --git a/servers/physics_2d_server.h b/servers/physics_2d_server.h
+index b583ac3..60b301d 100644
+--- a/servers/physics_2d_server.h
++++ b/servers/physics_2d_server.h
+@@ -635,6 +635,8 @@ class Physics2DServerManager {
+ 
+ public:
+ 	static const String setting_property_name;
++	// VNDegen: forgets the registered servers, so the engine can start again in the same process.
++	static void reset();
+ 
+ private:
+ 	static void on_servers_changed();
+diff --git a/servers/physics_server.cpp b/servers/physics_server.cpp
+index 06b9bcd..1eab9b0 100644
+--- a/servers/physics_server.cpp
++++ b/servers/physics_server.cpp
+@@ -871,3 +871,9 @@ PhysicsServer *PhysicsServerManager::new_server(const String &p_name) {
+ 		return physics_servers[id].create_callback();
+ 	}
+ }
++
++void PhysicsServerManager::reset() {
++	physics_servers.clear();
++	default_server_id = -1;
++	default_server_priority = -1;
++}
+diff --git a/servers/physics_server.h b/servers/physics_server.h
+index 4ffc9c0..02484ef 100644
+--- a/servers/physics_server.h
++++ b/servers/physics_server.h
+@@ -807,6 +807,8 @@ class PhysicsServerManager {
+ 
+ public:
+ 	static const String setting_property_name;
++	// VNDegen: forgets the registered servers, so the engine can start again in the same process.
++	static void reset();
+ 	static int current_server_id;
+ 
+ private:
+diff --git a/servers/register_server_types.cpp b/servers/register_server_types.cpp
+index dc4344f..fa24ba7 100644
+--- a/servers/register_server_types.cpp
++++ b/servers/register_server_types.cpp
+@@ -206,6 +206,8 @@ void register_server_types() {
+ 
+ void unregister_server_types() {
+ 	memdelete(shader_types);
++	PhysicsServerManager::reset();
++	Physics2DServerManager::reset();
+ }
+ 
+ void register_server_singletons() {
+diff --git a/servers/visual/shader_types.cpp b/servers/visual/shader_types.cpp
+index 0aace25..878c067 100644
+--- a/servers/visual/shader_types.cpp
++++ b/servers/visual/shader_types.cpp
+@@ -305,3 +305,9 @@ ShaderTypes::ShaderTypes() {
+ 	shader_types.insert("canvas_item");
+ 	shader_types.insert("particles");
+ }
++
++ShaderTypes::~ShaderTypes() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/servers/visual/shader_types.h b/servers/visual/shader_types.h
+index 779e004..031a104 100644
+--- a/servers/visual/shader_types.h
++++ b/servers/visual/shader_types.h
+@@ -55,6 +55,8 @@ public:
+ 	const Set<String> &get_types();
+ 
+ 	ShaderTypes();
++
++	~ShaderTypes();
+ };
+ 
+ #endif // SHADER_TYPES_H
+diff --git a/servers/visual/visual_server_scene.cpp b/servers/visual/visual_server_scene.cpp
+index bdea223..c2ae071 100644
+--- a/servers/visual/visual_server_scene.cpp
++++ b/servers/visual/visual_server_scene.cpp
+@@ -4563,6 +4563,9 @@ VisualServerScene::VisualServerScene() {
+ }
+ 
+ VisualServerScene::~VisualServerScene() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ 	probe_bake_thread_exit = true;
+ 	probe_bake_sem.post();
+ 	probe_bake_thread.wait_to_finish();

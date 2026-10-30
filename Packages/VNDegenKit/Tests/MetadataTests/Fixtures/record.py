@@ -57,10 +57,11 @@ def steam_search(term):
 save("steam-search-ddlc", steam_search("Doki Doki Literature Club"))
 save("steam-search-nosocks", steam_search("No Socks RPG"))
 KEEP = {"type", "name", "steam_appid", "short_description", "developers", "publishers", "release_date", "genres",
-        "metacritic", "header_image"}
+        "metacritic", "header_image", "screenshots"}
 for app in ("698780", "4929970"):
     details = fetch(f"https://store.steampowered.com/api/appdetails?appids={app}&cc=us&l=english")
     details[app]["data"] = {k: v for k, v in details[app]["data"].items() if k in KEEP}
+    details[app]["data"]["screenshots"] = details[app]["data"].get("screenshots", [])[:3]
     save(f"steam-appdetails-{app}", details)
     input_json = json.dumps({"ids": [{"appid": int(app)}], "context": {"language": "english", "country_code": "US"},
                              "data_request": {"include_assets": True}}, separators=(",", ":"))
@@ -98,7 +99,7 @@ def igdb(body):
 
 GAME_FIELDS = ("fields name,summary,url,first_release_date,total_rating,genres.name,involved_companies.developer,"
                "involved_companies.publisher,involved_companies.company.name,external_games.external_game_source,"
-               "external_games.uid,cover.image_id,artworks.image_id;")
+               "external_games.uid,cover.image_id,artworks.image_id,screenshots.image_id;")
 save("igdb-search-ddlc", igdb('search "Doki Doki Literature Club"; fields name,first_release_date,cover.image_id; limit 10;'))
 save("igdb-search-nosocks", igdb('search "No Socks RPG"; fields name,first_release_date,cover.image_id; limit 10;'))
 save("igdb-game-55935", igdb(f"{GAME_FIELDS} where id = 55935;"))

@@ -1,4 +1,5 @@
 import Foundation
+import VNCore
 
 /// The game folder as the page and the Node shim see it.
 ///
@@ -9,6 +10,8 @@ nonisolated public struct GameFolder: Sendable {
     public static let virtualRoot = "/game"
     public static let scheme = "vndegen"
     public static let origin = "\(scheme)://game"
+    /// Where pages find the Windows font substitutes, by file name, such as `/.vndegen/fonts/ume-pgo4.ttf`.
+    public static let fontPath = "/.vndegen/fonts/"
 
     /// The game folder on disk, as the user copied it in.
     public let root: URL
@@ -16,6 +19,12 @@ nonisolated public struct GameFolder: Sendable {
     public let webRoot: String
     /// The web root's archive when it is an Electron app.asar. Pages are served from inside it, read only.
     private(set) var archive: AsarArchive?
+    /// Folders the app ships, by the served path the page sees them at, such as `/__vndegen/` for a player. Requests
+    /// under that path read from the folder, never from the game. The longest matching path wins.
+    public var mounts: [String: URL] = [:]
+    /// Files the page sees as part of a file in the game folder, by served path, such as the movie appended to a Flash
+    /// projector. The path is the containing file's, with its case on disk.
+    public var embedded: [String: FileSlice] = [:]
     /// `root` with every symlink resolved. Every path this folder hands out must lead somewhere under it.
     private let realRoot: String
     /// `root` as the kernel names it for an open descriptor. `open` compares descriptors against this, not `realRoot`,
@@ -43,14 +52,15 @@ nonisolated public struct GameFolder: Sendable {
     /// Maps a virtual absolute path to disk. Nil when the path is relative, climbs out of the game folder, or passes
     /// through a symlink that leads out of it.
     ///
-    /// A name missing on disk matches an entry that differs from it only in case. Windows games often get the case of
-    /// their own files wrong, which Windows and the Mac's disk forgive and an iPhone's disk does not.
+    /// A name missing on disk matches an entry that differs from it only in case, through `FileCase`. Windows games
+    /// often get the case of their own files wrong, which Windows and the Mac's disk forgive and an iPhone's disk does
+    /// not. A write to such a name therefore replaces the file that is there.
     public func resolve(virtualPath: String) -> URL? {
         guard let relative = Self.confine(virtualPath) else { return nil }
         var path = root.path
         var deepestExisting = Self.exists(path) ? path : nil
         for name in relative.split(separator: "/").map(String.init) {
-            if deepestExisting == path, let actual = Self.entry(name, in: path) {
+            if deepestExisting == path, let actual = FileCase.entry(name, in: path) {
                 path += "/" + actual
                 deepestExisting = path
             } else {
@@ -88,15 +98,6 @@ nonisolated public struct GameFolder: Sendable {
         }
         guard parts.first == Substring(virtualRoot.dropFirst()) else { return nil }
         return parts.dropFirst().joined(separator: "/")
-    }
-
-    /// The name of `name` as it is on disk in `directory`: itself when it exists, otherwise the first entry that equals
-    /// it ignoring case. Nil when neither exists.
-    private static func entry(_ name: String, in directory: String) -> String? {
-        if exists(directory + "/" + name) { return name }
-        return (try? FileManager.default.contentsOfDirectory(atPath: directory))?
-            .sorted()
-            .first { $0.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     /// True when anything is at `path`, including a symlink whose target is missing.
@@ -173,6 +174,17 @@ nonisolated extension GameFolder {
     /// look up only that one name, without following a symlink, so nothing between the check and the write can move.
     func openParent(of url: URL) throws(OpenFailure) -> (directory: FileHandle, name: String) {
         (try open(url.deletingLastPathComponent(), flags: O_RDONLY | O_DIRECTORY), url.lastPathComponent)
+    }
+}
+
+/// Part of a file: `length` bytes from `offset`.
+nonisolated public struct FileSlice: Equatable, Sendable {
+    public var offset: UInt64
+    public var length: Int64
+
+    public init(offset: UInt64, length: Int64) {
+        self.offset = offset
+        self.length = length
     }
 }
 
@@ -259,6 +271,20 @@ nonisolated extension GameFolder {
     /// A web root that is an app.asar serves its members from the archive file, or from app.asar.unpacked/ beside it.
     func open(servedPath path: String) -> (FileHandle, UInt64, Int64, String)? {
         let path = path.isEmpty || path == "/" ? "/index.html" : path
+        if let (prefix, folder) = mounts.filter({ path.hasPrefix($0.key) }).max(by: { $0.key.count < $1.key.count }) {
+            return GameFolder(root: folder, webRoot: "").open(servedPath: "/" + path.dropFirst(prefix.count))
+        }
+        // The file a request names, in whatever case, is embedded when it is the file an embedded path names. A disk that
+        // ignores case finds both under the case they were asked for, so the files are compared, not the paths.
+        if !embedded.isEmpty, let url = resolve(servedPath: path),
+           let slice = embedded[path] ?? embedded.first(where: {
+               ($0.key as NSString).lastPathComponent.caseInsensitiveCompare(url.lastPathComponent) == .orderedSame
+                   && Self.sameFile(resolve(servedPath: $0.key), url)
+           })?.value {
+            guard let (handle, size) = openRegularFile(url),
+                  slice.offset <= UInt64(size), slice.length <= size - Int64(slice.offset) else { return nil }
+            return (handle, slice.offset, slice.length, url.lastPathComponent)
+        }
         if let archive, let relative = Self.confine(virtualWebRoot + (path.hasPrefix("/") ? path : "/" + path)),
            relative.lowercased().hasPrefix(webRoot.lowercased() + "/") {
             let inner = String(relative.dropFirst(webRoot.count + 1))
@@ -274,6 +300,12 @@ nonisolated extension GameFolder {
         }
         guard let url = resolve(servedPath: path) else { return nil }
         return openRegularFile(url).map { ($0, 0, $1, url.lastPathComponent) }
+    }
+
+    private static func sameFile(_ a: URL?, _ b: URL) -> Bool {
+        var first = stat(), second = stat()
+        guard let a, stat(a.path, &first) == 0, stat(b.path, &second) == 0 else { return false }
+        return first.st_dev == second.st_dev && first.st_ino == second.st_ino
     }
 
     private func openRegularFile(virtualPath: String) -> (FileHandle, Int64)? {

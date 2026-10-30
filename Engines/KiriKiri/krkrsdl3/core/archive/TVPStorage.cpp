@@ -924,10 +924,12 @@ static tjs_uint TVPRebuildAutoPathTable()
                 void Add(const ttstr& file) { list.push_back(file); }
             } lister;
 
+            // The lister gives names as on disk. TVPGetPlacedPath looks names up as given, then
+            // lowercased, as archive member names already are.
             TVPStorageMediaManager.GetListAt(path, &lister);
             for (std::vector<ttstr>::iterator i = lister.list.begin(); i != lister.list.end(); i++)
             {
-                TVPAutoPathTable.Add(*i, path);
+                TVPAutoPathTable.Add(i->AsLowerCase(), path);
                 count++;
             }
         }

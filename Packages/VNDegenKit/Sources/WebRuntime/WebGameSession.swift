@@ -1,3 +1,4 @@
+import FontPack
 import Foundation
 import OSLog
 import VNCore
@@ -28,10 +29,15 @@ public struct WebGameConfiguration {
     public var userScripts: [String]
     /// Sent instead of WebKit's own user agent.
     public var userAgent: String?
-    /// Where the page's localStorage lives, one file per key. Nil leaves localStorage to WebKit.
-    public var storageDirectory: URL?
+    /// Where the page's localStorage lives. Nil leaves localStorage to WebKit.
+    public var storage: (any PageStorage)?
+    /// The served path, with any query, of the page the game starts on.
+    public var startPage: String
     /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
     public var decodesOgg: Bool
+    /// Windows font names, as `FontPack.referencedNames` finds them in the game's files, whose substitutes load before
+    /// the page draws. Every other substitute loads when the page first uses it.
+    public var preloadFonts: Set<String> = []
     /// The JavaScript that delivers an engine-neutral button press or release to the game, as DEBUG input scripts send
     /// them. Controllers reach the game as a gamepad instead. Nil drops the button.
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
@@ -39,16 +45,19 @@ public struct WebGameConfiguration {
     public var scriptArgument: String
     public var log: Logger
 
-    /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects.
+    /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects. A
+    /// `storageDirectory` keeps localStorage in `WebStorage` files there, and `storage` replaces it with another store.
     public init(folder: GameFolder, appName: String, runtime: PageRuntime? = nil, userScripts: [String] = [],
-                userAgent: String? = nil, storageDirectory: URL? = nil, decodesOgg: Bool = false,
+                userAgent: String? = nil, storageDirectory: URL? = nil, storage: (any PageStorage)? = nil,
+                startPage: String = "/index.html", decodesOgg: Bool = false,
                 buttonScript: @escaping @MainActor (VirtualButton, _ pressed: Bool) -> String?, scriptArgument: String, log: Logger) {
         self.folder = folder
         self.appName = appName
         self.runtime = runtime ?? .nwjs(execPath: folder.mainModule)
         self.userScripts = userScripts
         self.userAgent = userAgent
-        self.storageDirectory = storageDirectory
+        self.storage = storage ?? storageDirectory.map(WebStorage.init)
+        self.startPage = startPage
         self.decodesOgg = decodesOgg
         self.buttonScript = buttonScript
         self.scriptArgument = scriptArgument
@@ -74,13 +83,15 @@ final class WebGameSession: NSObject, EngineSession {
     private let webView: GameWebView
     private let folder: GameFolder
     private let bridge: NodeBridge
-    private let storage: WebStorage?
+    private let storage: (any PageStorage)?
     private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
     private let scriptArgument: String
     private let log: Logger
     private let onExit: @MainActor () -> Void
     private var ended = false
     private var paused = false
+    /// Ends once the page has had its last word after `terminate()` and the view is torn down.
+    private var stopping: Task<Void, Never>?
     #if DEBUG
     private var script: Task<Void, Never>?
     #endif
@@ -88,12 +99,13 @@ final class WebGameSession: NSObject, EngineSession {
     init(launch: GameLaunch, configuration game: WebGameConfiguration) throws {
         folder = game.folder
         bridge = NodeBridge(folder: folder)
-        storage = game.storageDirectory.map(WebStorage.init)
+        storage = game.storage
         buttonScript = game.buttonScript
         scriptArgument = game.scriptArgument
         log = game.log
         onExit = launch.onExit
         let shim = try Self.shimSource(for: game)
+        let fonts = try Self.fontScript(preload: game.preloadFonts)
         let ogg = game.decodesOgg ? [try Self.oggScript()] : []
         // Version 0.2.0 transcoded Ogg to AAC files here.
         Task.detached(priority: .background) {
@@ -108,7 +120,7 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        for source in [shim] + ogg + game.userScripts {
+        for source in [shim, fonts] + ogg + game.userScripts {
             configuration.userContentController.addUserScript(
                 WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -122,6 +134,11 @@ final class WebGameSession: NSObject, EngineSession {
         webView.underPageBackgroundColor = .black
         #if DEBUG
         webView.isInspectable = true
+        #if os(macOS)
+        // -ignoreOcclusion YES keeps the page running while no window shows, as on a test Mac whose screen is locked,
+        // where WebKit would hide the page and stop its animation frames.
+        if UserDefaults.standard.bool(forKey: "ignoreOcclusion") { Self.setOcclusionDetection(false, of: webView) }
+        #endif
         #endif
         webView.allowsLinkPreview = false
         webView.allowsBackForwardNavigationGestures = false
@@ -143,7 +160,7 @@ final class WebGameSession: NSObject, EngineSession {
         webView.allowsMagnification = false
         #endif
         log.notice("loading \(launch.game.title, privacy: .public) from \(launch.folder.path, privacy: .public)")
-        webView.load(URLRequest(url: folder.indexURL))
+        webView.load(URLRequest(url: URL(string: GameFolder.origin + game.startPage) ?? folder.indexURL))
         #if DEBUG
         startScriptIfRequested()
         #endif
@@ -152,6 +169,16 @@ final class WebGameSession: NSObject, EngineSession {
     deinit {
         log.notice("session released")
     }
+
+    #if DEBUG && os(macOS)
+    /// WebKit's `-[WKWebView _setWindowOcclusionDetectionEnabled:]`, for test runs only.
+    private static func setOcclusionDetection(_ enabled: Bool, of webView: WKWebView) {
+        let selector = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard let method = class_getInstanceMethod(WKWebView.self, selector) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method_getImplementation(method), to: Setter.self)(webView, selector, enabled)
+    }
+    #endif
 
     /// What the page may use to decode Ogg Vorbis. A long track at 44.1 kHz in stereo is about 4.5 million samples a
     /// minute, so `maxSamples` allows about 11 minutes.
@@ -175,6 +202,31 @@ final class WebGameSession: NSObject, EngineSession {
             .replacingOccurrences(of: "__VNDEGEN_OGG__", with: String(decoding: json, as: UTF8.self))
     }
 
+    /// Where the page finds the font substitutes. No game has a folder by this name.
+    nonisolated static let fontPath = GameFolder.fontPath
+
+    /// Gives the page a font face for each Windows name in the font table whose substitute is installed.
+    static func fontScript(preload: Set<String>) throws -> String {
+        guard let url = Bundle.module.url(forResource: "fonts", withExtension: "js") else { throw WebRuntimeError.fontScriptMissing }
+        struct Face: Encodable {
+            var name: String
+            var file: String
+            var bold: Bool
+            var italic: Bool
+        }
+        struct Config: Encodable {
+            var base: String
+            var faces: [Face]
+            var preload: [String]
+        }
+        let faces = FontPack.entries.map {
+            Face(name: $0.name, file: $0.match.file.lastPathComponent, bold: $0.match.bold, italic: $0.match.italic)
+        }
+        let config = Config(base: GameFolder.origin + fontPath, faces: faces, preload: preload.sorted())
+        let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
+        return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_FONTS__", with: json)
+    }
+
     static func shimSource(for game: WebGameConfiguration) throws -> String {
         guard let url = Bundle.module.url(forResource: "nwjs-shim", withExtension: "js") else { throw WebRuntimeError.shimMissing }
         var config: [String: String] = [
@@ -191,7 +243,7 @@ final class WebGameSession: NSObject, EngineSession {
         case .browser:
             config["runtime"] = "browser"
         }
-        if game.storageDirectory != nil { config["storage"] = "files" }
+        if game.storage != nil { config["storage"] = "files" }
         let json = String(decoding: try JSONEncoder().encode(config), as: UTF8.self)
         return try String(contentsOf: url, encoding: .utf8).replacingOccurrences(of: "__VNDEGEN_CONFIG__", with: json)
     }
@@ -263,10 +315,42 @@ final class WebGameSession: NSObject, EngineSession {
     }
 
     func terminate() {
+        guard stopping == nil else { return }
         ended = true
         #if DEBUG
         script?.cancel()
         #endif
+        // The page pauses, then writes what it keeps until it quits, such as Flash saves, through the bridge, which needs
+        // the delegates this tears down. A page that doesn't answer gets a few seconds.
+        stopping = Task {
+            await evaluate(Self.beforeQuitScript, within: .seconds(5))
+            tearDown()
+        }
+    }
+
+    func waitUntilStopped() async {
+        await stopping?.value
+    }
+
+    nonisolated static let beforeQuitScript = "window.__vndegen && (__vndegen.setPaused(true), __vndegen.beforeQuit())"
+
+    /// Runs `javaScript` and returns once it has run or `limit` has passed.
+    private func evaluate(_ javaScript: String, within limit: Duration) async {
+        let once = Once()
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            once.action = { done.resume() }
+            webView.evaluateJavaScript(javaScript) { [log] _, error in
+                if let error { log.error("before quit: \(error.localizedDescription, privacy: .public)") }
+                once.run()
+            }
+            Task {
+                try? await Task.sleep(for: limit)
+                once.run()
+            }
+        }
+    }
+
+    private func tearDown() {
         webView.stopLoading()
         webView.configuration.userContentController.removeAllUserScripts()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: Self.messageName)
@@ -401,6 +485,16 @@ extension WebGameSession: WKScriptMessageHandler {
     }
 }
 
+/// Runs its action the first time `run` is called.
+@MainActor private final class Once {
+    var action: (() -> Void)?
+
+    func run() {
+        action?()
+        action = nil
+    }
+}
+
 /// WKUserContentController retains its handlers, so the session goes behind a weak link to avoid a cycle with its web view.
 private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     private weak var target: WebGameSession?
@@ -441,11 +535,13 @@ final class GameWebView: WKWebView {
 nonisolated enum WebRuntimeError: LocalizedError {
     case shimMissing
     case oggDecoderMissing
+    case fontScriptMissing
 
     var errorDescription: String? {
         switch self {
         case .shimMissing: "The NW.js compatibility script is missing from the app bundle."
         case .oggDecoderMissing: "The Ogg Vorbis decoder is missing from the app bundle."
+        case .fontScriptMissing: "The font script is missing from the app bundle."
         }
     }
 }
@@ -545,24 +641,56 @@ extension WebGameSession {
         return met
     }
 
-    /// Counts requestAnimationFrame callbacks (what the compositor delivers) and RPG Maker's Graphics.frameCount (engine updates)
-    /// over a window. The sampler exists only while this step runs.
+    /// Counts requestAnimationFrame callbacks (what the compositor delivers), RPG Maker's Graphics.frameCount (engine
+    /// updates), and the animation frames in which WebGL drew to the page's canvas, which is each frame an engine such as
+    /// Ruffle draws, with their 1% low. The sampler exists only while this step runs.
     private func measureFrameRate(_ seconds: Double) async {
         let sampler = """
         const start = performance.now(), engineStart = window.Graphics ? Graphics.frameCount : 0;
-        let frames = 0, worst = 0, last = start;
-        await new Promise((done) => {
-            const tick = (now) => {
-                frames++;
-                worst = Math.max(worst, now - last);
-                last = now;
-                if (now - start < seconds * 1000) requestAnimationFrame(tick); else done();
+        // A draw call reaches the canvas while no framebuffer is bound for drawing. Bindings are tracked as they change,
+        // and a context's binding from before the step is asked for once.
+        const restore = [];
+        let drew = false;
+        const wrap = (proto, name, body) => {
+            const original = proto[name];
+            restore.push(() => { proto[name] = original; });
+            proto[name] = function (...args) { body(this, args); return original.apply(this, args); };
+        };
+        const bound = new WeakMap();
+        for (const proto of [window.WebGLRenderingContext, window.WebGL2RenderingContext].filter(Boolean).map((c) => c.prototype)) {
+            wrap(proto, 'bindFramebuffer', (gl, [target, framebuffer]) => {
+                if (target === gl.FRAMEBUFFER || target === gl.DRAW_FRAMEBUFFER) bound.set(gl, framebuffer);
+            });
+            const draw = (gl) => {
+                if (!bound.has(gl)) bound.set(gl, gl.getParameter(gl.FRAMEBUFFER_BINDING));
+                // The default framebuffer is null, or undefined from engines built with wasm-bindgen.
+                if (bound.get(gl) == null) drew = true;
             };
-            requestAnimationFrame(tick);
-        });
+            for (const name of ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'blitFramebuffer', 'clear']) {
+                if (proto[name]) wrap(proto, name, draw);
+            }
+        }
+        const presents = [];
+        let frames = 0, worst = 0, last = start;
+        try {
+            await new Promise((done) => {
+                const tick = (now) => {
+                    frames++;
+                    if (drew) { presents.push(now); drew = false; }
+                    worst = Math.max(worst, now - last);
+                    last = now;
+                    if (now - start < seconds * 1000) requestAnimationFrame(tick); else done();
+                };
+                requestAnimationFrame(tick);
+            });
+        } finally {
+            restore.reverse().forEach((undo) => undo());
+        }
         const elapsed = (performance.now() - start) / 1000;
         const engine = window.Graphics ? Graphics.frameCount - engineStart : 0;
-        return `raf ${(frames / elapsed).toFixed(1)} fps, engine ${(engine / elapsed).toFixed(1)} fps, worst frame ${worst.toFixed(1)} ms over ${elapsed.toFixed(1)} s`;
+        const gaps = presents.slice(1).map((t, i) => t - presents[i]).sort((a, b) => a - b);
+        const low = gaps.length ? 1000 / gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * 0.99))] : 0;
+        return `raf ${(frames / elapsed).toFixed(1)} fps, engine ${(engine / elapsed).toFixed(1)} fps, drawn ${(presents.length / elapsed).toFixed(1)} fps, 1% low ${low.toFixed(1)} fps, worst frame ${worst.toFixed(1)} ms over ${elapsed.toFixed(1)} s`;
         """
         do {
             let result = try await webView.callAsyncJavaScript(sampler, arguments: ["seconds": seconds], contentWorld: .page)

@@ -6,12 +6,27 @@ import Synchronization
 /// so a test can tell which candidate ended up in a slot.
 final class StubNetwork: Sendable {
     static let steamGridDBKey = "test-key"
+    /// A Steam app whose store page answers with a server error.
+    static let failingAppID = "500"
+    /// An IGDB game that names no Steam app: No Socks RPG's entry without its external games.
+    static let igdbOnlyGameID = "1"
     private let log = Mutex<[URLRequest]>([])
+    /// Runs before each answer, so a test can change app state while a request is in flight.
+    private let beforeAnswer: @Sendable (URLRequest) async -> Void
+    /// Real image bytes for the image URLs a test cares about. Other image URLs answer with their own URL string.
+    private let images: @Sendable (URL) -> Data?
+
+    init(images: @escaping @Sendable (URL) -> Data? = { _ in nil },
+         beforeAnswer: @escaping @Sendable (URLRequest) async -> Void = { _ in }) {
+        self.images = images
+        self.beforeAnswer = beforeAnswer
+    }
 
     var http: HTTP {
         HTTP { [self] request in
             log.withLock { $0.append(request) }
-            let (status, mime, body) = Self.route(request)
+            await beforeAnswer(request)
+            let (status, mime, body) = images(request.url!).map { (200, "image/png", $0) } ?? Self.route(request)
             let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
                                            headerFields: mime.map { ["Content-Type": $0] } ?? [:])!
             return (body, response)
@@ -44,7 +59,8 @@ final class StubNetwork: Sendable {
                 let term = query.first { $0.name == "term" }?.value ?? ""
                 return json(term.contains("Doki") ? "steam-search-ddlc" : "steam-search-nosocks")
             }
-            return json("steam-appdetails-\(query.first { $0.name == "appids" }!.value!)")
+            let appID = query.first { $0.name == "appids" }!.value!
+            return appID == failingAppID ? (500, nil, Data()) : json("steam-appdetails-\(appID)")
         case "api.steampowered.com":
             let input = query.first { $0.name == "input_json" }!.value!
             return json(input.contains("698780") ? "steam-assets-698780" : "steam-assets-4929970")
@@ -67,6 +83,11 @@ final class StubNetwork: Sendable {
         case "api.igdb.com":
             guard request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture-token" else { return (401, nil, Data()) }
             if body.hasPrefix("search") { return json(body.contains("No Socks") ? "igdb-search-nosocks" : "igdb-search-ddlc") }
+            if body.contains("id = \(igdbOnlyGameID);") {
+                var games = try! JSONSerialization.jsonObject(with: fixture("igdb-game-411478")) as! [[String: Any]]
+                games[0]["external_games"] = nil
+                return (200, "application/json", try! JSONSerialization.data(withJSONObject: games))
+            }
             if body.contains("id = 55935") { return json("igdb-game-55935") }
             if body.contains("id = 411478") { return json("igdb-game-411478") }
             return (200, "application/json", Data("[]".utf8))

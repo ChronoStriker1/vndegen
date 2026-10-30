@@ -5,16 +5,45 @@
 #   quit prompt, after an autosave and with the persistent data written;
 # - a stick direction remapped to a key releases that key when the stick reverses straight to the other direction;
 # - a button remapped to another Xbox button gets that button's Ren'Py bindings, and View keeps Ren'Py's own.
+# It also checks launcher.py's filecase.py: the project sits on a case-sensitive APFS disk image, in a Game/ folder, and
+# the game reads and writes files in another case than they have on disk.
 #   scripts/renpy-hook-test.sh [--keep]
 # --keep leaves the project, logs, and screenshots in the temporary folder and prints its path.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 scripts/renpy-runtime.sh build/renpy >&2
 work=$(mktemp -d)
-[ "${1:-}" = --keep ] && echo "output in $work" || trap 'rm -rf "$work"' EXIT
+scripts/case-volume.sh attach "$work/case.sparseimage" "$work/case"
+if [ "${1:-}" = --keep ]; then
+  echo "output in $work, on a disk image mounted at $work/case"
+else
+  trap 'scripts/case-volume.sh detach "$work/case"; rm -rf "$work"' EXIT
+fi
 
-mkdir -p "$work/game/game"
-cat > "$work/game/game/script.rpy" <<'EOF'
+base="$work/case/game"
+mkdir -p "$base/Game/Images"
+printf data > "$base/Game/Images/Data.TXT"
+cat > "$base/Game/case.rpy" <<'EOF'
+# Runs after Ren'Py indexed the game's files, so Runtime.txt is new to its loader.
+init python:
+    import os
+
+    def hooktest_case():
+        gamedir = config.gamedir
+        results = [os.path.basename(gamedir) == "Game"]
+        with open(os.path.join(gamedir, "images", "data.txt")) as f:
+            results.append(f.read() == "data")
+        results.append(renpy.loadable("IMAGES/DATA.txt"))
+        with open(os.path.join(gamedir, "IMAGES", "Runtime.txt"), "w") as f:
+            f.write("runtime")
+        results.append(sorted(os.listdir(os.path.join(gamedir, "images"))) == ["Data.TXT", "Runtime.txt"])
+        results.append(renpy.file("images/RUNTIME.TXT").read() == b"runtime")
+        with open(os.path.join(os.environ["VNDEGEN_DATA"], "case.txt"), "w") as f:
+            f.write("%r\n" % (all(results) or results,))
+
+    hooktest_case()
+EOF
+cat > "$base/Game/script.rpy" <<'EOF'
 init python:
     import os
     import pygame
@@ -60,7 +89,7 @@ for runtime in 8 7; do
   env -u PYTHONHOME -u PYTHONPATH PYTHONDONTWRITEBYTECODE=1 VNDEGEN_RENPY_RUNTIME="$PWD/build/renpy/$runtime" \
     VNDEGEN_DATA="$data" VNDEGEN_WINDOW=80,80,640,360 VNDEGEN_BUTTONS=leftStickUp=key:K_w,leftStickDown=key:K_s,b=pad:a VNDEGEN_PROBE="$probe" \
     VNDEGEN_PROBE_STEPS="wait:2 axis:lefty:neg axis:lefty:pos axis:lefty:zero wait:1 shot:ready" \
-    "$python" Packages/VNDegenKit/Sources/EngineRenPy/Support/launcher.py "$work/game" > "$data/stdout.txt" 2>&1 &
+    "$python" Packages/VNDegenKit/Sources/EngineRenPy/Support/launcher.py "$base" > "$data/stdout.txt" 2>&1 &
   pid=$!
 
   for _ in $(seq 120); do [ -f "$probe/ready.png" ] || ! kill -0 "$pid" 2>/dev/null && break; sleep 0.5; done
@@ -81,6 +110,8 @@ for runtime in 8 7; do
   keys=$(tr '\n' ' ' < "$data/keys.txt" 2>/dev/null || true)
   [ "$keys" = "down w up w down s up s " ] || fail "stick reversal posted '$keys', expected 'down w up w down s up s '"
   [ "$(cat "$data/bindings.txt" 2>/dev/null)" = True ] || fail "B did not get A's bindings, or View opens the VNDegen menu"
+  [ "$(cat "$data/case.txt" 2>/dev/null)" = True ] || fail "file name case checks gave $(cat "$data/case.txt" 2>/dev/null)"
+  rm -f "$base/Game/Images/Runtime.txt"
   echo "Ren'Py $runtime: exit $status, saves: $(ls "$data/saves" | tr '\n' ' '), keys: $keys"
 done
 [ "$failed" = 0 ] && echo PASS

@@ -1,0 +1,21 @@
+# Linux test host for VNDegen's NScripter runtime. Builds the runtime from its SwiftPM target's sources and runs a
+# game headless, driven by commands on stdin. Not part of the app.
+cmake_minimum_required(VERSION 3.20)
+project(vnns_host CXX C)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+set(RUNTIME ${CMAKE_CURRENT_SOURCE_DIR}/../../../Packages/VNDegenKit/Sources/CNScripter)
+file(GLOB RUNTIME_SOURCES ${RUNTIME}/core/*.cpp)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FREETYPE REQUIRED freetype2)
+set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
+add_executable(vnns_host main.cpp ${RUNTIME_SOURCES} ${RUNTIME}/core/lua_all.c ${SHARED}/vnfont.c ${SHARED}/casepath.c)
+target_include_directories(vnns_host PRIVATE ${RUNTIME}/include ${SHARED} ${FREETYPE_INCLUDE_DIRS})
+target_compile_definitions(vnns_host PRIVATE VNNS_FONTS_DIR="${SHARED}/fonts")
+target_link_libraries(vnns_host PRIVATE ${FREETYPE_LIBRARIES} bz2 pthread)
+target_compile_options(vnns_host PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
+set_source_files_properties(${RUNTIME}/core/audio.cpp ${RUNTIME}/core/gfx.cpp ${RUNTIME}/core/video.cpp ${RUNTIME}/core/lua_all.c
+  PROPERTIES COMPILE_OPTIONS "-w")
