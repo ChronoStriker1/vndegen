@@ -29,6 +29,7 @@ void usage() {
                  "  --se-count N --se-every MS      play the sound as an SE N times\n"
                  "  --pause-at S --resume-at S\n"
                  "  --soundfont FILE.sf2\n"
+                 "  --fallback-soundfont FILE.sf2   loaded when --soundfont can't be\n"
                  "  --rate HZ          output rate (default 44100)\n"
                  "  --device           play on the SDL audio device instead of writing a file\n");
 }
@@ -80,7 +81,7 @@ int main(int argc, char **argv) {
         usage();
         return 2;
     }
-    std::string root = argv[1], sound = argv[2], out = "wolfaudio.wav", kind = "bgm", soundfont;
+    std::string root = argv[1], sound = argv[2], out = "wolfaudio.wav", kind = "bgm", soundfont, fallback;
     wolf::MusicParams params;
     double seconds = 10, stopAt = -1, replayAt = -1, freqAt = -1, pauseAt = -1, resumeAt = -1;
     int fadeOut = 0, seCount = 1, seEvery = 100, freqAtValue = 100, rate = 44100;
@@ -111,6 +112,7 @@ int main(int argc, char **argv) {
         else if (a == "--pause-at") pauseAt = std::atof(next());
         else if (a == "--resume-at") resumeAt = std::atof(next());
         else if (a == "--soundfont") soundfont = next();
+        else if (a == "--fallback-soundfont") fallback = next();
         else if (a == "--rate") rate = std::atoi(next());
         else if (a == "--device") device = true;
         else {
@@ -152,7 +154,7 @@ int main(int argc, char **argv) {
         std::printf("SDL audio driver %s\n", SDL_GetCurrentAudioDriver());
         SDL_ResumeAudioStreamDevice(stream.get());
     }
-    if (!soundfont.empty()) audio.setSoundFontPath(soundfont);
+    if (!soundfont.empty()) audio.setSoundFontPath(soundfont, fallback);
     auto channel = kind == "bgs" ? wolf::SoundKind::BGS : wolf::SoundKind::BGM;
     bool se = kind == "se";
 
