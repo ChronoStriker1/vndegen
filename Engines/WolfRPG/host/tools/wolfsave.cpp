@@ -69,9 +69,9 @@ void dumpCharacter(const Printer &p, const SaveCharacter &c) {
     p.num("unknown4", c.unknown4);
     p.num("unknown5", c.unknown5);
     p.str("graphic", c.graphic);
-    p.list("unknown6", c.unknown6);
+    p.list("appearance", c.appearance);
     p.num("unknown7", c.unknown7);
-    p.num("unknown8", c.unknown8);
+    p.num("hidden", c.hidden);
     dumpRoute(p.sub("route"), c.route);
     dumpRoute(p.sub("route2"), c.route2);
     p.list("unknown9", c.unknown9);
@@ -97,14 +97,16 @@ void dump(const SaveFile &f) {
     p.num("version", f.version);
 
     auto m = p.sub("map");
+    m.num("mapId", f.map.mapId);
     m.list("unknown1", f.map.unknown1);
     m.num("width", f.map.width);
     m.num("height", f.map.height);
     m.num("hasTiles", f.map.hasTiles);
     m.wrapped("tiles", f.map.tiles);
-    m.str("unknown2", f.map.unknown2);
-    for (size_t i = 0; i < f.map.strings.size(); i++) m.str("strings[" + std::to_string(i) + "]", f.map.strings[i]);
-    m.wrapped("values", f.map.values);
+    m.str("tilesetBase", f.map.tilesetBase);
+    for (size_t i = 0; i < f.map.autotiles.size(); i++)
+        m.str("autotiles[" + std::to_string(i) + "]", f.map.autotiles[i]);
+    m.wrapped("tileFlags", f.map.tileFlags);
     for (size_t i = 0; i < f.map.events.size(); i++)
         dumpCharacter(m.sub("events[" + std::to_string(i) + "]"), f.map.events[i]);
     m.list("v72", f.map.v72);
@@ -135,8 +137,8 @@ void dump(const SaveFile &f) {
     s.list("v101", y.v101);
     s.num("v102", y.v102);
     for (size_t i = 0; i < 2; i++) s.str("v103[" + std::to_string(i) + "]", y.v103[i]);
-    s.num("v104", y.v104);
-    s.list("v106", y.v106);
+    s.num("frameCount", y.frameCount);
+    s.list("volumes", y.volumes);
     s.str("v108s1", y.v108s1);
     s.list("v108a", y.v108a);
     s.str("v108s2", y.v108s2);
@@ -165,27 +167,25 @@ void dump(const SaveFile &f) {
     s.list("v8d2", y.v8d2);
     s.num("v8e", y.v8e);
 
-    auto t = p.sub("section3");
-    t.num("unknown1", f.section3.unknown1);
-    for (size_t i = 0; i < f.section3.lists.size(); i++)
-        for (size_t j = 0; j < f.section3.lists[i].size(); j++)
-            t.list("lists[" + std::to_string(i) + "][" + std::to_string(j) + "]", f.section3.lists[i][j]);
-    for (size_t i = 0; i < f.section3.numbers.size(); i++)
-        t.wrapped("numbers[" + std::to_string(i) + "]", f.section3.numbers[i]);
-    for (size_t i = 0; i < f.section3.strings.size(); i++)
-        t.str("strings[" + std::to_string(i) + "]", f.section3.strings[i]);
-    for (size_t i = 0; i < f.section3.numbers2.size(); i++)
-        t.list("numbers2[" + std::to_string(i) + "]", f.section3.numbers2[i]);
-    for (size_t i = 0; i < f.section3.strings2.size(); i++)
-        for (size_t j = 0; j < f.section3.strings2[i].size(); j++)
-            t.str("strings2[" + std::to_string(i) + "][" + std::to_string(j) + "]", f.section3.strings2[i][j]);
+    auto t = p.sub("variables");
+    auto &v = f.variables;
+    t.num("tickCount", v.tickCount);
+    for (size_t i = 0; i < v.eventSelf.size(); i++)
+        for (size_t j = 0; j < v.eventSelf[i].size(); j++)
+            t.list("eventSelf[" + std::to_string(i) + "][" + std::to_string(j) + "]", v.eventSelf[i][j]);
+    for (size_t i = 0; i < v.numbers.size(); i++) t.wrapped("numbers[" + std::to_string(i) + "]", v.numbers[i]);
+    for (size_t i = 0; i < v.strings.size(); i++) t.str("strings[" + std::to_string(i) + "]", v.strings[i]);
+    for (size_t i = 0; i < v.commonSelf.size(); i++) t.list("commonSelf[" + std::to_string(i) + "]", v.commonSelf[i]);
+    for (size_t i = 0; i < v.commonSelfStrings.size(); i++)
+        for (size_t j = 0; j < v.commonSelfStrings[i].size(); j++)
+            t.str("commonSelfStrings[" + std::to_string(i) + "][" + std::to_string(j) + "]", v.commonSelfStrings[i][j]);
 
     auto q = p.sub("party");
     dumpCharacter(q.sub("hero"), f.party.hero);
     for (size_t i = 0; i < f.party.members.size(); i++)
         dumpCharacter(q.sub("members[" + std::to_string(i) + "]"), f.party.members[i]);
     q.list("unknown1", f.party.unknown1);
-    q.wrapped("values", f.party.values);
+    q.wrapped("trail", f.party.trail);
     q.list("v8a", f.party.v8a);
 
     auto pp = p.sub("pictures");
@@ -193,10 +193,10 @@ void dump(const SaveFile &f) {
     for (size_t i = 0; i < f.pictures.pictures.size(); i++) {
         auto &pic = f.pictures.pictures[i];
         auto o = pp.sub("[" + std::to_string(i) + "]");
-        o.num("unknown1", pic.unknown1);
+        o.num("number", pic.number);
         o.list("unknown2", pic.unknown2);
         o.num("unknown3", pic.unknown3);
-        o.list("unknown4", pic.unknown4);
+        o.list("kind", pic.kind);
         o.str("file", pic.file);
         o.list("a", pic.a);
         o.list("b", pic.b);
@@ -221,7 +221,7 @@ void dump(const SaveFile &f) {
         auto &ty = f.variableDb.types[i];
         auto o = d.sub("types[" + std::to_string(i) + "]");
         o.num("head", ty.head);
-        o.num("unknown", ty.unknown);
+        o.num("idMethod", ty.idMethod);
         o.list("fieldKinds", ty.fieldKinds);
         for (size_t r = 0; r < ty.rows.size(); r++) {
             auto ro = o.sub("rows[" + std::to_string(r) + "]");

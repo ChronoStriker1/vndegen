@@ -18,7 +18,7 @@ struct SaveString {
     bool terminated = true;
 };
 
-// One step of a move route.
+// One step of a move route, as in map data.
 struct SaveRouteStep {
     uint8_t id = 0;
     std::vector<int32_t> args;
@@ -26,20 +26,23 @@ struct SaveRouteStep {
 };
 
 struct SaveRoute {
+    // For the page's own route: move type, speed, frequency, animation speed, the page's option bits (as MapPage::flags)
+    // and the route's flags (as MoveRoute::flags). Compared against map data, not tested by changing them.
     std::array<uint8_t, 6> flags{};
     std::vector<SaveRouteStep> steps;
 };
 
 // The state of one character on the map: a map event, the hero, or a party member.
 struct SaveCharacter {
-    int32_t id = 0;          // event id; -1 for the hero and party members
-    int32_t x = 0, y = 0;    // position in tiles
+    int32_t id = 0;          // map event id; -2 for the hero, -3 to -7 for the party members
+    int32_t x = 0, y = 0;    // position in half tiles
     int32_t unknown3 = 0;
     uint8_t unknown4 = 0;
     int32_t unknown5 = 0;
-    SaveString graphic;      // character chip file
-    std::array<uint16_t, 4> unknown6{};
-    uint8_t unknown7 = 0, unknown8 = 0;
+    SaveString graphic;      // character image file, empty when none
+    std::array<uint16_t, 4> appearance{};  // opacity, blend mode, direction (numeric keypad), animation frame
+    uint8_t unknown7 = 0;
+    uint8_t hidden = 0;      // 1 when nothing is shown: an event without an active page, an empty party slot
     SaveRoute route, route2;
     std::array<uint16_t, 6> unknown9{};
     std::array<uint8_t, 3> unknown10{};
@@ -59,16 +62,19 @@ struct SaveCharacter {
 
 // Section 1: the current map.
 struct SaveMap {
-    std::array<int32_t, 3> unknown1{};
+    int32_t mapId = -1;  // row of the system database's map list; -1 in a save made before any map
+    std::array<int32_t, 2> unknown1{};
     // From file version 0x69: the map's size and, unless the file stores -1 instead, its three tile layers, laid out
     // like Map::tiles.
     int32_t width = 0, height = 0;
     bool hasTiles = false;
     std::vector<int32_t> tiles;
-    SaveString unknown2;
-    std::vector<SaveString> strings;   // 7, 15 from version 0x73, 31 from 0x8A
-    std::vector<int32_t> values;       // u32 from version 0x64, u8 before
-    std::vector<SaveCharacter> events;
+    // The map's tileset: base image, autotile images (7, 15 from version 0x73, 31 from 0x8A) and the passability of
+    // every tile, as Tileset holds them.
+    SaveString tilesetBase;
+    std::vector<SaveString> autotiles;
+    std::vector<int32_t> tileFlags;    // u32 from version 0x64, u8 before
+    std::vector<SaveCharacter> events;  // every event of the map, in map order
     std::array<int32_t, 11> v72{};     // from version 0x72
     std::vector<int32_t> values2;
 };
@@ -76,6 +82,7 @@ struct SaveMap {
 // Section 2: the system state. The fields are listed in file order; see the doc for what is known of them.
 struct SaveSystem {
     std::array<uint8_t, 2> a{};
+    // b[0] play time in seconds (system variable 29); b[6] to b[13] system variables 0 to 7.
     std::array<int32_t, 19> b{};
     std::array<uint16_t, 3> c{};
     int32_t d = 0;
@@ -99,8 +106,8 @@ struct SaveSystem {
     std::array<int32_t, 6> v101{};
     uint16_t v102 = 0;
     std::array<SaveString, 2> v103;
-    int32_t v104 = 0;
-    std::array<int32_t, 3> v106{};
+    int32_t frameCount = 0;          // system variable 28, version >= 104
+    std::array<int32_t, 3> volumes{};  // system variables 100 to 102, the BGM, BGS and SE volume in percent, >= 106
     SaveString v108s1;
     std::array<int32_t, 3> v108a{};
     SaveString v108s2;
@@ -124,14 +131,16 @@ struct SaveSystem {
     int32_t v8e = 0;
 };
 
-// Section 3.
-struct SaveSection3 {
-    int32_t unknown1 = 0;
-    std::vector<std::vector<std::vector<int32_t>>> lists;  // u32 count, u8 count, u32 values
-    std::vector<std::vector<int32_t>> numbers;             // u32 count, u32 values
-    std::vector<SaveString> strings;
-    std::vector<std::vector<int32_t>> numbers2;            // u8 count, u32 values
-    std::vector<std::vector<SaveString>> strings2;         // u8 count, strings
+// Section 3: the variables.
+struct SaveVariables {
+    int32_t tickCount = 0;  // differs from session to session (the engine's start time?); any value loads
+    // Map event self variables: eventSelf[map][event], each list cut after its last nonzero value.
+    std::vector<std::vector<std::vector<int32_t>>> eventSelf;
+    // Normal variables, then spare variables 1 to 9, each as long as the system database lists names for them.
+    std::vector<std::vector<int32_t>> numbers;
+    std::vector<SaveString> strings;                    // string variables
+    std::vector<std::vector<int32_t>> commonSelf;       // common event self variables 0-99, one list per common event
+    std::vector<std::vector<SaveString>> commonSelfStrings;  // common event self variables 5-9, the string ones
 };
 
 // Section 4: the hero and the party.
@@ -139,17 +148,19 @@ struct SaveParty {
     SaveCharacter hero;
     std::vector<SaveCharacter> members;
     std::array<uint8_t, 2> unknown1{};
-    std::vector<int32_t> values;
-    std::vector<uint64_t> v8a;  // version >= 0x8A
+    std::vector<int32_t> trail;  // the hero's last steps as directions, newest last, which the members follow
+    std::vector<uint64_t> v8a;   // version >= 0x8A
 };
 
 // Section 5: one shown picture.
 struct SavePicture {
-    int32_t unknown1 = 0;
+    int32_t number = 0;
     std::array<uint8_t, 2> unknown2{};
     uint16_t unknown3 = 0;
-    std::array<uint8_t, 2> unknown4{};
-    SaveString file;
+    std::array<uint8_t, 2> kind{};  // 0 0 an image file, 1 0 text, 0 1 a window or <SQUARE>
+    SaveString file;                // image file, the text with the engine's own control codes, or the window image
+    // x, y, divisions across and down (width and height for a window), frame, opacity, three unknown, zoom across,
+    // zoom down, angle.
     std::array<int32_t, 12> a{};
     std::array<int32_t, 6> b{};
     std::array<int32_t, 18> v69{};
@@ -172,10 +183,10 @@ struct SavePictures {
     std::vector<SavePicture> pictures;
 };
 
-// The variable database (CDataBase) as it stands in the save.
+// The variable database (CDataBase, the CDB) as it stands in the save. Rows hold values the way DatabaseType::Row does.
 struct SaveDbType {
     int32_t head = 0;      // the field count, or -1 or -2 followed by the fields below
-    int32_t unknown = 0;   // only when head <= -2
+    int32_t idMethod = 0;  // only when head <= -2; as DatabaseType::idMethod
     std::vector<uint32_t> fieldKinds;  // below 2000 a number field, 2000 and up a string field
     struct Row {
         std::vector<int32_t> numbers;     // the number fields in field order
@@ -207,10 +218,10 @@ struct SaveFile {
     uint16_t version = 0;
     SaveMap map;
     SaveSystem system;
-    SaveSection3 section3;
+    SaveVariables variables;
     SaveParty party;
     SavePictures pictures;
-    SaveVariableDb variableDb;
+    SaveVariableDb variableDb;  // the CDB
     SaveSection7 section7;
     uint8_t endMarker = 0x19;
 

@@ -264,6 +264,34 @@ private:
     // engine does.
     void saveCommand(Thread &t, const Command &c);
     // --- savestate.cpp: declarations for saving and loading go here ---
+public:
+    // Writes the game as it stands to Save/SaveDataNN.sav (slot 1 is SaveData01.sav), in the PC engine's format.
+    bool saveSlot(int slot, std::string *error = nullptr);
+    // Reads Save/SaveDataNN.sav. The game goes on from it at the start of the next frame, and every running event
+    // ends. False, with the game unchanged, when the slot is empty or unreadable.
+    bool loadSlot(int slot, std::string *error = nullptr);
+
+private:
+    std::filesystem::path saveFilePath(const std::string &name) const;  // a file under the game folder, any case
+    std::shared_ptr<struct SaveFile> readSave(const std::filesystem::path &path, std::string *error) const;
+    bool writeSave(const std::filesystem::path &path, const SaveFile &save, std::string *error);
+    SaveFile snapshot();       // the current state, unknown fields from saveBase_
+    SaveFile blankSave();      // what the engine writes when a variable goes into a save that doesn't exist yet
+    void applyPendingLoad();   // Game::update calls it first thing while pendingLoad_ is set
+    void applySave(const SaveFile &s);
+    // Reads or writes the variable at `address` in a save, for commands 221 and 222.
+    void readSavedVariable(const SaveFile *s, int32_t address, int32_t target, Thread &t);
+    void writeSavedVariable(SaveFile &s, int32_t address, int32_t source, Thread &t);
+    std::filesystem::path saveTarget(int32_t slotArg, const Thread &t);
+    int playSeconds() const;
+    int playFrames() const;
+
+    std::shared_ptr<SaveFile> pendingLoad_;
+    // The save this session last read or wrote. New saves copy the fields VNDegen doesn't model from it, so the PC
+    // engine finds them as it left them.
+    std::shared_ptr<SaveFile> saveBase_;
+    int32_t loadedPlaySeconds_ = 0, loadedPlayFrames_ = 0;
+    uint64_t frameAtLoad_ = 0;
     // --- end of savestate.cpp declarations ---
     Database *databaseKind(int kind);
     uint32_t keysNow() const;

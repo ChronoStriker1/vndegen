@@ -159,9 +159,9 @@ template <class IO, class C> void character(IO &io, C &c) {
     io.u8(c.unknown4);
     io.s32(c.unknown5);
     io.str(c.graphic, true);
-    io.u16s(c.unknown6);
+    io.u16s(c.appearance);
     io.u8(c.unknown7);
-    io.u8(c.unknown8);
+    io.u8(c.hidden);
     route(io, c.route);
     route(io, c.route2);
     io.u16s(c.unknown9);
@@ -185,23 +185,24 @@ template <class IO, class C> void character(IO &io, C &c) {
 }
 
 template <class IO, class M> void mapSection(IO &io, M &m) {
+    io.s32(m.mapId);
     io.s32s(m.unknown1);
     if (io.version >= 0x69) {
         io.s32(m.width);
         io.s32(m.height);
         io.tiles(m);
     }
-    io.str(m.unknown2);
+    io.str(m.tilesetBase);
     size_t n = io.version >= 0x8A ? 31 : io.version >= 0x73 ? 15 : 7;
-    if constexpr (IO::reading) m.strings.resize(n);
-    else if (m.strings.size() != n) throw FormatError("map section needs " + std::to_string(n) + " strings");
-    for (auto &s : m.strings) io.str(s);
+    if constexpr (IO::reading) m.autotiles.resize(n);
+    else if (m.autotiles.size() != n) throw FormatError("map section needs " + std::to_string(n) + " autotiles");
+    for (auto &s : m.autotiles) io.str(s);
     if (io.version >= 0x64) {
-        io.count32(m.values, 4);
-        for (auto &v : m.values) io.s32(v);
+        io.count32(m.tileFlags, 4);
+        for (auto &v : m.tileFlags) io.s32(v);
     } else {
-        io.count32(m.values, 1);
-        for (auto &v : m.values) {
+        io.count32(m.tileFlags, 1);
+        for (auto &v : m.tileFlags) {
             uint8_t b = uint8_t(v);
             io.u8(b);
             if constexpr (IO::reading) v = b;
@@ -242,8 +243,8 @@ template <class IO, class S> void systemSection(IO &io, S &s) {
     if (io.version >= 101) io.s32s(s.v101);
     if (io.version >= 102) io.u16(s.v102);
     if (io.version >= 103) for (auto &x : s.v103) io.str(x, true);
-    if (io.version >= 104) io.s32(s.v104);
-    if (io.version >= 106) io.s32s(s.v106);
+    if (io.version >= 104) io.s32(s.frameCount);
+    if (io.version >= 106) io.s32s(s.volumes);
     if (io.version >= 108) {
         io.str(s.v108s1, true);
         io.s32s(s.v108a);
@@ -282,10 +283,10 @@ template <class IO, class S> void systemSection(IO &io, S &s) {
     if (io.version >= 0x8E) io.s32(s.v8e);
 }
 
-template <class IO, class S> void section3(IO &io, S &s) {
-    io.s32(s.unknown1);
-    io.count32(s.lists, 4);
-    for (auto &l : s.lists) {
+template <class IO, class S> void variablesSection(IO &io, S &s) {
+    io.s32(s.tickCount);
+    io.count32(s.eventSelf, 4);
+    for (auto &l : s.eventSelf) {
         io.count32(l, 1);
         for (auto &inner : l) {
             io.count8(inner, 4);
@@ -300,15 +301,16 @@ template <class IO, class S> void section3(IO &io, S &s) {
     }
     io.count32(s.strings, 2);
     for (auto &x : s.strings) oldOrNewStr(io, x);
-    io.count32(s.numbers2, 1);
-    if (s.numbers2.size() > 10000) throw FormatError("section 3: too many lists");
-    for (auto &l : s.numbers2) {
+    io.count32(s.commonSelf, 1);
+    if (s.commonSelf.size() > 10000) throw FormatError("section 3: too many lists");
+    for (auto &l : s.commonSelf) {
         io.count8(l, 4);
         for (auto &v : l) io.s32(v);
     }
-    io.count32(s.strings2, 1);
-    if (s.strings2.empty() || s.strings2.size() > 10000) throw FormatError("section 3: bad string list count");
-    for (auto &l : s.strings2) {
+    io.count32(s.commonSelfStrings, 1);
+    if (s.commonSelfStrings.empty() || s.commonSelfStrings.size() > 10000)
+        throw FormatError("section 3: bad string list count");
+    for (auto &l : s.commonSelfStrings) {
         io.count8(l, 2);
         for (auto &x : l) oldOrNewStr(io, x);
     }
@@ -319,8 +321,8 @@ template <class IO, class P> void partySection(IO &io, P &p) {
     io.count32(p.members, 40);
     for (auto &m : p.members) character(io, m);
     io.u8s(p.unknown1);
-    io.count32(p.values, 4);
-    for (auto &v : p.values) io.s32(v);
+    io.count32(p.trail, 4);
+    for (auto &v : p.trail) io.s32(v);
     if (io.version >= 0x8A) {
         io.count32(p.v8a, 8);
         for (auto &v : p.v8a) io.u64(v);
@@ -328,10 +330,10 @@ template <class IO, class P> void partySection(IO &io, P &p) {
 }
 
 template <class IO, class P> void picture(IO &io, P &p) {
-    io.s32(p.unknown1);
+    io.s32(p.number);
     io.u8s(p.unknown2);
     io.u16(p.unknown3);
-    io.u8s(p.unknown4);
+    io.u8s(p.kind);
     io.str(p.file, true);
     io.s32s(p.a);
     io.s32s(p.b);
@@ -378,7 +380,7 @@ template <class IO, class D> void variableDb(IO &io, D &db) {
     io.count32(db.types, 8);
     for (auto &t : db.types) {
         io.s32(t.head);
-        if (t.head <= -2) io.s32(t.unknown);
+        if (t.head <= -2) io.s32(t.idMethod);
         if (t.head <= -1) io.count32(t.fieldKinds, 4);
         else {
             if constexpr (IO::reading) io.sized(t.fieldKinds, uint32_t(t.head), 4);
@@ -421,7 +423,7 @@ template <class IO, class F> void body(IO &io, F &f) {
     io.version = f.version;
     mapSection(io, f.map);
     systemSection(io, f.system);
-    section3(io, f.section3);
+    variablesSection(io, f.variables);
     partySection(io, f.party);
     pictures(io, f.pictures);
     variableDb(io, f.variableDb);
