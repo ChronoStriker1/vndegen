@@ -1,7 +1,8 @@
 // GodotSteam's Steam class and singleton, for games whose own copy of Godot has GodotSteam in it, built in or as an
 // extension. VNDegen runs them as Steam would run offline: Steam starts, the player is signed in and owns the game,
-// achievements and stats last until the game quits, and leaderboard requests fail. The members follow GodotSteam's,
-// covering what the library's Steam games call. Both Godot modules include this after their own Godot headers.
+// stats load and store at once, achievements and stats last until the game quits, and leaderboard requests fail. The
+// members follow GodotSteam's, covering what the library's Steam games call. Both Godot modules include this after their
+// own Godot headers.
 #pragma once
 
 #include "core/version.h"
@@ -16,6 +17,8 @@
 #include "core/os/os.h"
 #endif
 
+#include <initializer_list>
+
 namespace vngd {
 
 // Set by vngd_start for the game about to start. The module registers the class when it is set.
@@ -24,8 +27,11 @@ extern bool steam_wanted;
 class Steam : public Object {
 	GDCLASS(Steam, Object);
 
-	// Achievements set since the game started. Games keep their own records and only report to Steam.
+	// What the game set since it started. Games keep their own records and only report to Steam.
 	Dictionary achievements;
+	Dictionary stats;
+	// The app ID the game started Steam with, or 0 when it set its environment's SteamAppId instead.
+	uint32_t app_id = 0;
 
 	// What Steam answers a request with, on the next frame as a callback would arrive.
 	template <typename... Args>
@@ -82,16 +88,16 @@ protected:
 		ClassDB::bind_method(D_METHOD("getCurrentGameLanguage"), &Steam::language);
 		ClassDB::bind_method(D_METHOD("getSteamUILanguage"), &Steam::language);
 
-		ClassDB::bind_method(D_METHOD("requestCurrentStats"), &Steam::yes);
-		ClassDB::bind_method(D_METHOD("storeStats"), &Steam::yes);
+		ClassDB::bind_method(D_METHOD("requestCurrentStats"), &Steam::requestCurrentStats);
+		ClassDB::bind_method(D_METHOD("storeStats"), &Steam::storeStats);
 		ClassDB::bind_method(D_METHOD("resetAllStats", "achievements_too"), &Steam::resetAllStats, DEFVAL(true));
 		ClassDB::bind_method(D_METHOD("getAchievement", "achievement_name"), &Steam::getAchievement);
 		ClassDB::bind_method(D_METHOD("setAchievement", "achievement_name"), &Steam::setAchievement);
 		ClassDB::bind_method(D_METHOD("clearAchievement", "achievement_name"), &Steam::clearAchievement);
 		ClassDB::bind_method(D_METHOD("getStatInt", "stat_name"), &Steam::getStatInt);
 		ClassDB::bind_method(D_METHOD("getStatFloat", "stat_name"), &Steam::getStatFloat);
-		ClassDB::bind_method(D_METHOD("setStatInt", "stat_name", "value"), &Steam::setStat);
-		ClassDB::bind_method(D_METHOD("setStatFloat", "stat_name", "value"), &Steam::setStat);
+		ClassDB::bind_method(D_METHOD("setStatInt", "stat_name", "value"), &Steam::setStatInt);
+		ClassDB::bind_method(D_METHOD("setStatFloat", "stat_name", "value"), &Steam::setStatFloat);
 
 		ClassDB::bind_method(D_METHOD("findLeaderboard", "leaderboard_name"), &Steam::findLeaderboard);
 		ClassDB::bind_method(D_METHOD("getLeaderboardName", "leaderboard_handle"), &Steam::getLeaderboardName, DEFVAL(0));
@@ -113,10 +119,18 @@ protected:
 	}
 
 public:
-	// steamInit answers with Steam's k_EResultOK, steamInitEx with k_ESteamAPIInitResult_OK.
-	Dictionary steamInit(const Variant &, const Variant &, const Variant &) { return status(1); }
-	Dictionary steamInitEx(const Variant &, const Variant &, const Variant &) { return status(0); }
-	static Dictionary status(int p_status) {
+	// steamInit answers with Steam's k_EResultOK, steamInitEx with k_ESteamAPIInitResult_OK. Steam then loads the
+	// player's stats.
+	Dictionary steamInit(const Variant &p_a, const Variant &p_b, const Variant &p_c) { return start(1, p_a, p_b, p_c); }
+	Dictionary steamInitEx(const Variant &p_a, const Variant &p_b, const Variant &p_c) { return start(0, p_a, p_b, p_c); }
+	Dictionary start(int p_status, const Variant &p_a, const Variant &p_b, const Variant &p_c) {
+		// GodotSteam versions order the arguments differently. The app ID is the only number among them.
+		for (const Variant *argument : { &p_a, &p_b, &p_c }) {
+			if (argument->get_type() == Variant::INT && (int64_t)*argument > 0) {
+				app_id = (int64_t)*argument;
+			}
+		}
+		requestCurrentStats();
 		Dictionary result;
 		result["status"] = p_status;
 		result["verbal"] = "Steamworks active.";
@@ -124,14 +138,23 @@ public:
 	}
 	void nothing() {}
 	bool yes() { return true; }
-	// The game sets its app ID in its environment before it starts Steam.
-	uint32_t getAppID() { return OS::get_singleton()->get_environment("SteamAppId").to_int(); }
+	uint32_t getAppID() { return app_id ? app_id : OS::get_singleton()->get_environment("SteamAppId").to_int(); }
 	// The first individual account ID, as a Steam ID.
 	uint64_t getSteamID() { return 76561197960265729ULL; }
 	String getPersonaName() { return "Player"; }
 	String getFriendPersonaName(const Variant &) { return getPersonaName(); }
 
+	bool requestCurrentStats() {
+		answer("current_stats_received", getAppID(), 1, getSteamID());
+		answer("user_stats_received", getAppID(), 1, getSteamID());
+		return true;
+	}
+	bool storeStats() {
+		answer("user_stats_stored", getAppID(), 1);
+		return true;
+	}
 	bool resetAllStats(bool p_achievements_too) {
+		stats.clear();
 		if (p_achievements_too) {
 			achievements.clear();
 		}
@@ -151,9 +174,16 @@ public:
 		achievements.erase(p_name);
 		return true;
 	}
-	int32_t getStatInt(const String &) { return 0; }
-	float getStatFloat(const String &) { return 0; }
-	bool setStat(const String &, const Variant &) { return true; }
+	int32_t getStatInt(const String &p_name) { return stats.get(p_name, 0); }
+	float getStatFloat(const String &p_name) { return stats.get(p_name, 0.0); }
+	bool setStatInt(const String &p_name, int32_t p_value) {
+		stats[p_name] = p_value;
+		return true;
+	}
+	bool setStatFloat(const String &p_name, float p_value) {
+		stats[p_name] = p_value;
+		return true;
+	}
 
 	void findLeaderboard(const String &) { answer("leaderboard_find_result", 0, 0); }
 	String getLeaderboardName(const Variant &) { return ""; }

@@ -40,18 +40,20 @@ nonisolated public struct GodotLayout: Equatable, Sendable {
         let depth = { (path: String) in path.split(separator: "/").count }
 
         for pck in packs.sorted(by: { (depth($0), $0) < (depth($1), $1) }) {
-            guard let header = GodotPack(contentsOf: probe.root.appendingPathComponent(pck)) else { continue }
             let folder = Self.parent(pck)
             let base = Self.name(pck).dropLast(4).lowercased()
             let siblings = executables.filter { Self.parent($0) == folder }.sorted()
             let executable = siblings.first { Self.name($0).dropLast(4).lowercased() == base }
                 ?? siblings.first { !$0.lowercased().contains("loader") && !$0.lowercased().contains("console") }
                 ?? (folder.isEmpty ? "" : "\(folder)/") + Self.name(pck).dropLast(4) + ".exe"
+            guard let header = GodotPack(contentsOf: probe.root.appendingPathComponent(pck),
+                                         executable: probe.root.appendingPathComponent(executable)) else { continue }
             return GodotLayout(pack: pck, executable: executable, header: header)
         }
         // Executables carrying their pack. Godot's console wrapper beside them holds none.
         for exe in executables.sorted(by: { (depth($0), $0) < (depth($1), $1) }) {
-            guard let header = GodotPack(contentsOf: probe.root.appendingPathComponent(exe)) else { continue }
+            let url = probe.root.appendingPathComponent(exe)
+            guard let header = GodotPack(contentsOf: url, executable: url) else { continue }
             return GodotLayout(pack: exe, executable: exe, header: header)
         }
         return nil

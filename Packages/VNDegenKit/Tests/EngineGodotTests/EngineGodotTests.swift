@@ -70,7 +70,8 @@ private func pack(format: UInt32, version: (UInt32, UInt32, UInt32), files: [Str
         bytes.u64(UInt64(bytes.data.count + 8 + 64))
     }
     bytes.zeros(64)
-    bytes.data.append(directoryKey.map { encrypt(directory.data, key: $0) } ?? directory.data)
+    // Godot encrypts the entries after the count, and leaves the count as it is.
+    bytes.data.append(directoryKey.map { directory.data.prefix(4) + encrypt(directory.data.dropFirst(4), key: $0) } ?? directory.data)
     bytes.data.append(blobs)
     return bytes.data
 }
@@ -276,29 +277,49 @@ private func refusal(_ layout: GodotLayout, _ game: GameFolder) -> String? {
 
     @Test func theKeyOfAnEncryptedPackComesFromTheExecutable() throws {
         let key = Data((0..<32).map { UInt8(0x40 + $0) })
-        let script = Data("extends Node\nfunc _ready():\n\tpass\n".utf8)
+        let script = Data("extends Node2D\n".utf8) // shorter than an AES block, so padded
         // The key sits among other data, at a multiple of four as compilers place it.
         let data = Data(repeating: 0x11, count: 4092) + key + Data(repeating: 0x22, count: 100)
+        let settings = projectBinary([("application/config/name", "Sealed")])
         let files = ["res://project.binary", "res://main.gd", "res://big.gd"]
         let game = try GameFolder([
             "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: files, flags: 2,
-                                              contents: ["main.gd": encrypt(script, key: key), "big.gd": encrypt(script + script, key: key)],
-                                              encrypted: ["res://main.gd", "res://big.gd"]), data: data),
+                                              contents: ["project.binary": encrypt(settings, key: key), "main.gd": encrypt(script, key: key),
+                                                         "big.gd": encrypt(script + script, key: key)],
+                                              encrypted: Set(files)), data: data),
         ])
         let layout = try #require(GodotLayout(game.probe))
-        #expect(layout.header.encryptedFiles == 2)
+        #expect(layout.header.encryptedFiles == 3)
         #expect(try GodotPlugin.requirements(layout, folder: game.root).get().encryptionKey == key)
+        // Saves go where the decrypted settings say.
+        #expect(layout.header.userDirectory == "Godot/app_userdata/Sealed")
+    }
+
+    @Test func aFileWhoseStartCantBeToldStillGivesTheKey() throws {
+        let key = Data((0..<32).map { UInt8(truncatingIfNeeded: 0x10 * $0 + 5) })
+        let game = try GameFolder([
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["res://project.binary", "res://icon.png"], flags: 2,
+                                              contents: ["icon.png": encrypt(Data((0..<300).map { UInt8($0 % 251) }), key: key)],
+                                              encrypted: ["res://icon.png"]), data: Data(repeating: 0x44, count: 256) + key),
+        ])
+        let layout = try #require(GodotLayout(game.probe))
+        #expect(layout.header.encryptionKey == key)
     }
 
     @Test func theKeyOfAnEncryptedFileList() throws {
         let key = Data((0..<32).map { UInt8(0x90 &+ $0 &* 3) })
         let game = try GameFolder([
-            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["res://project.binary"], flags: 2, directoryKey: key),
+            "game.exe": executable(with: pack(format: 3, version: (4, 5, 1), files: ["res://project.binary", "addons/godotsteam/godotsteam.gdextension"],
+                                              flags: 2, directoryKey: key),
                                    data: Data(repeating: 0x33, count: 64) + key),
         ])
         let layout = try #require(GodotLayout(game.probe))
         #expect(layout.header.encryptedDirectory)
-        #expect(try GodotPlugin.requirements(layout, folder: game.root).get().encryptionKey == key)
+        // The decrypted list shows what the game needs.
+        #expect(layout.header.files == ["project.binary", "addons/godotsteam/godotsteam.gdextension"])
+        let requirements = try GodotPlugin.requirements(layout, folder: game.root).get()
+        #expect(requirements.encryptionKey == key)
+        #expect(requirements.steam)
     }
 
     @Test func encryptedPacksWithoutTheirKeyAreUnsupported() throws {

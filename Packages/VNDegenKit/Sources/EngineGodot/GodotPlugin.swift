@@ -70,12 +70,10 @@ nonisolated public struct GodotPlugin: EnginePlugin {
         if WindowsExecutable(executable)?.importedLibraries.contains(where: { $0.hasPrefix("steam_api") }) == true {
             requirements.steam = true
         }
-        if pack.encryptedDirectory || pack.encryptedFiles > 0 {
-            guard let key = pack.encryptionKey(pack: folder.appendingPathComponent(layout.pack), executable: executable) else {
-                return .failure(.unsupported("This game's files are encrypted with a key built into its own copy of Godot, and VNDegen couldn't find the key in its .exe."))
-            }
-            requirements.encryptionKey = key
+        if pack.encrypted && pack.encryptionKey == nil {
+            return .failure(.unsupported("This game's files are encrypted with a key built into its own copy of Godot, and VNDegen couldn't find the key in its .exe."))
         }
+        requirements.encryptionKey = pack.encryptionKey
         return .success(requirements)
     }
 
