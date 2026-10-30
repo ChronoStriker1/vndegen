@@ -29,7 +29,8 @@ Editor 2 game ships.
 ## What the runtime reads
 
 - Game data: `Game.dat`, `CommonEvent.dat`, the user, changeable and system databases with their `.project` files,
-  `TileSetData.dat`, and the maps (`.mps`). Text is Shift-JIS in Wolf RPG Editor 2 and UTF-8 in Wolf RPG Editor 3
+  `TileSetData.dat`, and the maps (`.mps`). `Game.dat`, `CommonEvent.dat` and `TileSetData.dat` may be encrypted with
+  Wolf RPG Editor 2's basic data encryption. Text is Shift-JIS in Wolf RPG Editor 2 and UTF-8 in Wolf RPG Editor 3
   games that say so. Translated games often hold bytes that aren't valid Shift-JIS; they become U+FFFD.
 - Archives: `Data.wolf`, or one `.wolf` archive per top-level data folder, as DxLib archives of versions 1 to 6 with
   the encryption keys of Wolf RPG Editor 2. Loose files win over archives.

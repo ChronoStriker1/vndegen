@@ -22,13 +22,19 @@ bool Game::load(std::string *error) {
             if (!d) throw FormatError("missing " + p);
             return *d;
         };
-        gameDat_ = parseGameDat(need("BasicData/Game.dat"));
+        // Encrypted files are decrypted first (data.h).
+        auto basic = [&](const std::string &p, BasicFile kind) {
+            auto d = need(p);
+            decryptBasicData(d, kind);
+            return d;
+        };
+        gameDat_ = parseGameDat(basic("BasicData/Game.dat", BasicFile::GameDat));
         Encoding enc = gameDat_.encoding;
-        commons_ = parseCommonEvents(need("BasicData/CommonEvent.dat"));
+        commons_ = parseCommonEvents(basic("BasicData/CommonEvent.dat", BasicFile::CommonEvent));
         udb_ = parseDatabase(need("BasicData/DataBase.project"), need("BasicData/DataBase.dat"), enc);
         cdb_ = parseDatabase(need("BasicData/CDataBase.project"), need("BasicData/CDataBase.dat"), enc);
         sdb_ = parseDatabase(need("BasicData/SysDataBase.project"), need("BasicData/SysDataBase.dat"), enc);
-        tilesets_ = parseTilesets(need("BasicData/TileSetData.dat"));
+        tilesets_ = parseTilesets(basic("BasicData/TileSetData.dat", BasicFile::Other));
     } catch (const std::exception &e) {
         if (error) *error = e.what();
         return false;

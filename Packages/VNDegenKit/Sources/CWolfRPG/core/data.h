@@ -139,4 +139,11 @@ Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t
 Map parseMap(std::span<const uint8_t> data);
 std::vector<Tileset> parseTilesets(std::span<const uint8_t> data);
 
+// Encrypted basic data files start with a nonzero byte where a plain file has zero: ten bytes of header take the place
+// of the magic number, and the rest is scrambled by seeds taken from the header. This turns such a file back into a
+// plain one in place and returns true, or returns false and leaves `bytes` alone when the file is plain. The scheme is
+// the one UberWolf's FileCoder (MIT) names v2.0, as docs/wolfrpg-cleanroom.md records.
+enum class BasicFile { GameDat, CommonEvent, Other };
+bool decryptBasicData(std::vector<uint8_t> &bytes, BasicFile kind);
+
 }  // namespace wolf

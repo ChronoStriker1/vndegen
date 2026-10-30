@@ -1,4 +1,5 @@
 #include "data.h"
+#include <array>
 
 #include "reader.h"
 
@@ -393,6 +394,35 @@ std::vector<Tileset> parseTilesets(std::span<const uint8_t> data) {
         for (uint32_t i = 0; i < n; i++) t.passability.push_back(p.r.u32());
     }
     return sets;
+}
+
+// Microsoft C's rand(), which the protection draws its key stream from.
+namespace {
+struct MsvcRand {
+    uint32_t state;
+    int next() {
+        state = state * 214013 + 2531011;
+        return int((state >> 16) & 0x7FFF);
+    }
+};
+}  // namespace
+
+bool decryptBasicData(std::vector<uint8_t> &bytes, BasicFile kind) {
+    constexpr size_t headerSize = 10;
+    if (bytes.size() < headerSize || bytes[0] == 0) return false;
+    // Three passes, each seeded by one byte of the header, flip the low bits of every first, second and fifth byte.
+    const std::array<size_t, 3> seedAt = kind == BasicFile::GameDat ? std::array<size_t, 3>{0, 8, 6}
+                                                                      : std::array<size_t, 3>{0, 3, 9};
+    constexpr size_t steps[3] = {1, 2, 5};
+    std::vector<uint8_t> out = {0x00, 'W', 0x00, 0x00, 'O', 'L', 0x00, 'F', kind == BasicFile::CommonEvent ? uint8_t('C') : uint8_t('M'), 0x00};
+    size_t body = out.size();
+    out.insert(out.end(), bytes.begin() + headerSize, bytes.end());
+    for (size_t pass = 0; pass < 3; pass++) {
+        MsvcRand rng{bytes[seedAt[pass]]};
+        for (size_t j = body; j < out.size(); j += steps[pass]) out[j] ^= uint8_t(rng.next() >> 12);
+    }
+    bytes = std::move(out);
+    return true;
 }
 
 }  // namespace wolf
