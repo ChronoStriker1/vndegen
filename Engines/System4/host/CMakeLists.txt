@@ -18,8 +18,10 @@ file(GLOB RUNTIME_SOURCES ${RUNTIME}/core/*.cpp ${RUNTIME}/core/*.c)
 add_library(system4 STATIC ${RUNTIME_SOURCES})
 target_include_directories(system4 PUBLIC ${RUNTIME}/core ${RUNTIME}/include ${SHARED})
 target_link_libraries(system4 PUBLIC ZLIB::ZLIB pthread)
+# Tools write PNGs with stb_image_write, from the Wolf runtime's copy of stb.
+target_include_directories(system4 PUBLIC ${RUNTIME}/../CWolfRPG/third_party)
 
-foreach(tool s4dis s4run)
+foreach(tool s4dis s4run s4cg s4cgcheck)
   add_executable(${tool} tools/${tool}.cpp)
   # HLL modules register themselves from static initializers, so keep every object.
   target_link_libraries(${tool} PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,system4>")
