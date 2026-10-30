@@ -660,6 +660,13 @@ impl UserData for EngineApi {
                     if let Some(event) = queued_layer_event(&tag_name, &params) {
                         ctx.callbacks.preview_layer_event(&event);
                     }
+                    // The PC engine runs e:tag{"return"} at once, so a later
+                    // e:getScriptStack in the same Lua call sees the caller on
+                    // top. Games pop several frames that way, one
+                    // getScriptStack per return (VNDegen).
+                    if tag_name == "return" && ctx.script_stack.len() > 1 {
+                        ctx.script_stack.pop();
+                    }
                     let insert_at = ctx.immediate_tag_count.min(ctx.tag_queue.len());
                     ctx.tag_queue.insert(insert_at, (tag_name, params));
                     ctx.immediate_tag_count += 1;

@@ -1355,6 +1355,15 @@ impl Interpreter {
     }
 
     fn pop_call_frame(&mut self) -> Option<CallFrame> {
+        // A save's frame wait released when control came back into this
+        // frame, and not run yet, leaves with the frame, as on the PC: a game
+        // that returns through several frames at once doesn't stop in each
+        // (VNDegen).
+        self.engine_ctx
+            .lock()
+            .unwrap()
+            .tag_queue
+            .retain(|(_, params)| !params.contains_key(LOAD_WAIT));
         let frame = self.call_stack.pop();
         self.variables
             .lock()
@@ -2926,6 +2935,86 @@ mod tests {
             Some(Value::Int(1)),
             "the saved stop no longer holds the frame"
         );
+    }
+
+    #[test]
+    fn get_script_stack_sees_a_return_e_tag_made_in_the_same_call() {
+        // As a game's ReturnStack: pop every frame of one file, reading the
+        // stack again for each, in one Lua call.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(
+                r#"
+                function return_from(file)
+                    local ss = __engine:getScriptStack()
+                    for i = #ss, 1, -1 do
+                        if ss[i].file == file then __engine:tag{"return"} else break end
+                    end
+                end
+                function leave_ui()
+                    return_from("system")
+                    return_from("ui")
+                end
+                "#,
+            )
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[call file=\"ui\" label=\"open\"]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("ui", "*open\n[call file=\"system\" label=\"load\"]\n[stop]\n[return]\n")
+            .unwrap();
+        it.load_script("system", "*load\n[calllua function=\"leave_ui\"]\n[return]\n")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+
+        let _ = it.run().unwrap();
+
+        assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)), "both frames returned");
+        assert_eq!(it.current_script(), Some("story"));
+    }
+
+    #[test]
+    fn a_saved_frame_wait_leaves_with_its_frame() {
+        // A save made in a menu: the menu's frame was stopped. onLoad returns
+        // through it to the story at once, so its stop never runs.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(r#"function leave() __engine:tag{"return"} __engine:tag{"return"} end"#)
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[stop]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("menu", "*open\n[stop]\n[return]\n").unwrap();
+        it.load_script("system", "*load\n[calllua function=\"leave\"]\n[return]\n")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.restore_position(
+            "system",
+            0,
+            vec![
+                super::CallFrame {
+                    script: "story".into(),
+                    return_line: 1,
+                },
+                super::CallFrame {
+                    script: "menu".into(),
+                    return_line: 1,
+                },
+            ],
+        )
+        .unwrap();
+        it.defer_until_return(1, vec![("stop".into(), HashMap::new())]);
+
+        let _ = it.run().unwrap();
+
+        assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)), "the menu's stop left with it");
     }
 
     #[test]

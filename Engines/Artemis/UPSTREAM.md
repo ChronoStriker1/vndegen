@@ -57,7 +57,7 @@ VNDegen added `flate2` as a direct dependency for compressed PC saves. It was al
 - Keep the Lua state onSave writes, whatever the variable's name.
 - Decode text `e:file` reads with the project's charset, let `get_layer_info` see layers `e:tag` has queued, and compile Shift_JIS Lua as bytes before converting its strings.
 - Input handlers: keep the call a handler makes as its event frame, return a game's yes/no dialog's buttons to the dialog's wait, keep a click wait when a handler's own wait follows it, and wait for a transition or video a handler queues instead of for a click.
-- Recreate a PC save's scene before onLoad runs. Drop a save's frame wait that has not run once the script reaches a wait of its own, as when onLoad rebuilds a choice.
+- Recreate a PC save's scene before onLoad runs. Drop a save's frame wait that has not run once the script reaches a wait of its own, as when onLoad rebuilds a choice. Drop it too when a [return] leaves its frame before it runs, and let e:getScriptStack see a return e:tag made in the same Lua call, as the PC engine runs it at once, so a game that returns through several frames after a load goes back to its story.
 - Keep text's spaces and a line's leading full-width space, as the PC engine numbers and prints them.
 - Open a quoted value only at the start of a token, as the PC engine does, so a tag with a quote missing, such as `[var name="t.menu data="0"]`, still closes at its `]` instead of showing as text.
 - Pass scenario text to a game's tag filter as `[print data=...]`, as the PC engine does, so games whose `print` hook marks the page and queues the click wait break their pages and allow their menu. Read a short color such as `631` as the hex number 0x000631.
