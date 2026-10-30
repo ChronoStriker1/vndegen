@@ -197,6 +197,8 @@ std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data) {
         CommonEvent ev;
         p.r.expect({0x8E}, "common event");
         ev.id = p.r.s32();
+        // Variable addresses give common events four digits (15000000 + id * 100 + n), so ids are 0 to 9999.
+        if (ev.id < 0 || ev.id > 9999) throw FormatError("common event id " + std::to_string(ev.id));
         uint8_t cond = p.r.u8();
         ev.conditionOperator = cond >> 4;
         ev.runCondition = cond & 0x0F;

@@ -968,7 +968,7 @@ static int tsf_decode_sf3_samples(const void* rawBuffer, float** pFloatBuffer, u
 			if (is_sf3) // Fix up sample indices in shdr
 			{
 				tsf_u32 fix_offset = resNum - shdr->start;
-				in -= fix_offset;
+				in = (short*)smplBuffer + shdr->start; // VNDegen change: not in -= fix_offset, which wraps when start > resNum
 				shdr->start = resNum;
 				shdr->end += fix_offset;
 				shdr->startLoop += fix_offset;
@@ -995,9 +995,11 @@ static int tsf_decode_sf3_samples(const void* rawBuffer, float** pFloatBuffer, u
 	}
 
 	// Trim the sample buffer down then return success (unless out of memory)
-	if (!(*pFloatBuffer = (float*)TSF_REALLOC(res, resNum * sizeof(float)))) *pFloatBuffer = res;
+	// VNDegen change: four silent samples follow the last, which the voice's interpolation reads one past.
+	if (!(*pFloatBuffer = (float*)TSF_REALLOC(res, (resNum + 4) * sizeof(float)))) { TSF_FREE(res); return 0; }
+	TSF_MEMSET(*pFloatBuffer + resNum, 0, 4 * sizeof(float));
 	*pSmplCount = resNum;
-	return (res ? 1 : 0);
+	return 1;
 }
 #endif
 
@@ -1015,9 +1017,11 @@ static int tsf_load_samples(void** pRawBuffer, float** pFloatBuffer, unsigned in
 	resNum = resMax = 0;
 	if (!tsf_decode_ogg((tsf_u8*)*pRawBuffer, (tsf_u8*)*pRawBuffer + chunkSmpl->size, pFloatBuffer, &resNum, &resMax, 65536)) return 0;
 	oldres = *pFloatBuffer;
-	if (!(*pFloatBuffer = (float*)TSF_REALLOC(*pFloatBuffer, resNum * sizeof(float)))) *pFloatBuffer = oldres;
+	// VNDegen change: four silent samples follow the last, which the voice's interpolation reads one past.
+	if (!(*pFloatBuffer = (float*)TSF_REALLOC(*pFloatBuffer, (resNum + 4) * sizeof(float)))) { TSF_FREE(oldres); return 0; }
+	TSF_MEMSET(*pFloatBuffer + resNum, 0, 4 * sizeof(float));
 	*pSmplCount = resNum;
-	return (*pFloatBuffer ? 1 : 0);
+	return 1;
 	#else
 	// Inline convert the samples from short to float
 	float *res, *out; const short *in;

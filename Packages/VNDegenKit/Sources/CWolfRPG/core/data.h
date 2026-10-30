@@ -64,7 +64,11 @@ struct GameDat {
     int screenWidth = 0, screenHeight = 0;
     int editorVersion = 0;
     std::vector<uint8_t> randoms;
-    int tileSize() const { return settings.size() > 0 ? settings[0] : 16; }
+    // Wolf's tile sizes are 16, 32, 40 and 48 pixels; anything else from a damaged file counts as 16.
+    int tileSize() const {
+        int t = settings.size() > 0 ? settings[0] : 16;
+        return t == 32 || t == 40 || t == 48 ? t : 16;
+    }
     int fps() const { return settings.size() > 4 && settings[4] == 30 ? 30 : 60; }
 };
 

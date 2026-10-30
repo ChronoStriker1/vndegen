@@ -208,6 +208,8 @@ bool Game::writeSave(const fs::path &path, const SaveFile &save, std::string *er
         // Written beside the slot and renamed over it, so a failed write leaves the old save as it was.
         fs::path tmp = path;
         tmp += ".tmp";
+        // Whatever is at the temporary name goes first, so a link left there can't send the write elsewhere.
+        fs::remove(tmp);
         {
             std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
             out.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size()));
@@ -433,7 +435,8 @@ void Game::applySave(const SaveFile &s) {
     message_ = {};
     choice_ = {};
     shake_ = {};
-    transition_ = {};
+    // The generation keeps counting, so the renderer never takes a frozen frame from before the load.
+    transition_ = {.generation = transition_.generation + 1};
     scrollX_ = scrollY_ = 0;
     pictures_.clear();  // the PC engine shows no pictures after a load, not even those in the save
     autoKeys_ = 0;
