@@ -296,9 +296,11 @@ pub struct Interpreter {
     /// 每次 step 迭代开头消费并复位；只有 Jump 类结果会重新置位。
     arrived_by_jump: bool,
     /// The scenario text line running now, with the tags its tag filter
-    /// queues: the text it prints counts as scenario text, rather than as
-    /// text a [print] tag writes, and has this line as its source (VNDegen).
-    scenario_text_line: Option<(String, usize)>,
+    /// queues and the helpers they call, until the script waits: the text it prints counts as
+    /// scenario text, rather than as text a [print] tag writes, and has this
+    /// line as its source. The last field is the call depth it ran at
+    /// (VNDegen).
+    scenario_text_line: Option<(String, usize, usize)>,
     /// 已执行过的 `__lua_block`（键：脚本名 + 指令下标）。
     ///
     /// Artemis 语义：[lua] 块在**文件加载时**执行且每块只执行一次（见
@@ -794,8 +796,16 @@ impl Interpreter {
             }
 
             let instruction = script.instructions[self.current_line].clone();
-            self.scenario_text_line =
-                (instruction.tag == "__text").then(|| (script_name.clone(), self.current_line));
+            if instruction.tag == "__text" {
+                self.scenario_text_line =
+                    Some((script_name.clone(), self.current_line, self.call_stack.len()));
+            } else if self
+                .scenario_text_line
+                .as_ref()
+                .is_some_and(|(_, _, depth)| self.call_stack.len() <= *depth)
+            {
+                self.scenario_text_line = None;
+            }
 
             if std::env::var("ASB_TRACE_STEP").is_ok() {
                 eprintln!(
@@ -1382,7 +1392,7 @@ impl Interpreter {
             *printed = false;
         }
         if matches!(event, Event::ScenarioText { .. }) {
-            let mut source = self.scenario_text_line.clone().or_else(|| {
+            let mut source = self.scenario_text_line.clone().map(|(file, line, _)| (file, line)).or_else(|| {
                 self.current_script
                     .clone()
                     .map(|file| (file, self.current_line))
@@ -2037,6 +2047,9 @@ impl Interpreter {
 
     /// 持续执行直到完成或等待
     pub fn run(&mut self) -> Result<ExecutionResult> {
+        // A scenario line's text is what it prints before the script waits;
+        // a menu opened from that wait prints text of its own (VNDegen).
+        self.scenario_text_line = None;
         self.step()
     }
 
@@ -2270,6 +2283,7 @@ impl Interpreter {
 
     /// 只抽干 Lua/事件排入的标签队列，不在队列清空后继续执行主脚本。
     pub fn drain_queued_tags_only(&mut self) -> Result<QueuedTagDrain> {
+        self.scenario_text_line = None;
         let origin = (
             self.current_script.clone(),
             self.current_line,
@@ -4073,6 +4087,46 @@ mod tests {
             interpreter.engine_context().lock().unwrap().scenario_text_source,
             Some(("test".to_string(), 0)),
             "its source is the scenario line"
+        );
+    }
+
+    #[test]
+    fn scenario_text_keeps_its_line_through_a_helper_the_filter_calls() {
+        let mut interpreter = filtered_interpreter(
+            r#"
+                local filter = {}
+                function filter.print(e, p)
+                    e:enqueueTag{"call", file="test", label="helper"}
+                    e:enqueueTag{"print", data=p.data}
+                    return 1
+                end
+                __engine:setTagFilter(filter)
+            "#,
+            "*main\nfirst\nsecond\n[stop]\n*helper\n[return]\n",
+        );
+        let texts = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&texts);
+        let ctx = Arc::clone(interpreter.engine_context());
+        interpreter.set_callback(move |event| match event {
+            Event::ScenarioText {
+                content, printed, ..
+            } => {
+                let source = ctx.lock().unwrap().scenario_text_source.clone();
+                sink.lock().unwrap().push((content.clone(), printed, source));
+                CallbackResult::Continue
+            }
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+
+        let _ = interpreter.run().unwrap();
+
+        assert_eq!(
+            *texts.lock().unwrap(),
+            [
+                ("first".to_string(), false, Some(("test".to_string(), 0))),
+                ("second".to_string(), false, Some(("test".to_string(), 1))),
+            ]
         );
     }
 

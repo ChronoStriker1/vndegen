@@ -356,6 +356,8 @@ impl CoreRuntime {
     /// the events held behind it. A page that runs below the window too
     /// waits for another click first, with the events still held (VNDegen).
     fn continue_page_overflow(&mut self, profile: &mut crate::profiler::FrameProfile) {
+        // Auto mode waits its full delay on each page, as on the PC.
+        self.reset_control_wait_flags();
         let overflows_again = self.text_renderer.as_mut().is_some_and(|renderer| {
             renderer.continue_page_overflow();
             renderer.split_page_overflow()
