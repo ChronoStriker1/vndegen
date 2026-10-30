@@ -641,10 +641,15 @@ void Game::pictureCommand(Thread &t, const Command &c) {
 
 void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     uint32_t flags = uint32_t(c.arg(0));
+    // The flags hold, from the low byte up: the display type and the operation; the anchor and the blend mode (15
+    // keeps the current one); the zoom type and the relative flag; and the multi-target, scroll link and free
+    // position flags (WodiLib's PictureDrawBase).
     int display = flags & 0xF0;
     int exec = flags & 0x0F;
     int anchor = (flags >> 8) & 0xF0;
     int blend = (flags >> 8) & 0x0F;
+    int zoomType = (flags >> 16) & 0xF0;
+    bool relative = ((flags >> 16) & 0x0F) == 0x01;
     int frames = value(c.arg(2), t);
 
     if (exec == 2) {  // erase
@@ -657,9 +662,19 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         }
         return;
     }
+    if (exec == 3) return;  // reset delays: the runtime runs every picture command at once, so none wait
 
-    Picture &p = pictures_[number];
     bool show = exec == 0;
+    if (!show && !pictures_.count(number)) return;  // moving a picture that isn't shown does nothing
+    Picture &p = pictures_[number];
+    double oldX = p.x.value(), oldY = p.y.value();
+    // A field of -1,000,000 leaves the picture's current value as it is.
+    constexpr int32_t keep = -1000000;
+    auto field = [&](size_t i, int32_t fallback) {
+        if (i >= c.args.size()) return fallback;
+        int32_t v = value(c.arg(i), t);
+        return v == keep ? fallback : v;
+    };
     if (show) {
         Picture fresh;
         switch (display) {
@@ -671,48 +686,52 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         }
         fresh.generation = ++generation_;
         if (fresh.kind == PictureKind::File) {
-            if (auto bytes = files_.read(fresh.source)) {
-                imageSize(*bytes, fresh.imageW, fresh.imageH);
-            }
+            if (auto bytes = files_.read(fresh.source)) imageSize(*bytes, fresh.imageW, fresh.imageH);
+            fresh.divX = std::max(1, field(3, 1));
+            fresh.divY = std::max(1, field(4, 1));
+        } else if (fresh.kind == PictureKind::Window) {
+            // A window picture's two division fields are its size, which is also the size it reports.
+            fresh.windowW = fresh.imageW = field(3, 0);
+            fresh.windowH = fresh.imageH = field(4, 0);
+        } else {
+            // The picture variable command reads a text picture's size, which the standard systems use to centre
+            // text and to shrink names too wide for their column.
+            if (!textMeasure_) textMeasure_ = std::make_shared<TextRenderer>(*this, nullptr);
+            auto size = textMeasure_->measure(fresh.source, baseTextStyle(*this));
+            fresh.imageW = size[0];
+            fresh.imageH = size[1];
         }
-        fresh.x.set(value(c.arg(7), t) == -1000000 ? 0 : value(c.arg(7), t), 0);
-        fresh.y.set(value(c.arg(8), t) == -1000000 ? 0 : value(c.arg(8), t), 0);
+        fresh.anchor = anchor >> 4;
         fresh.opacity.set(0, 0);
         fresh.zoomX.set(100, 0);
         fresh.zoomY.set(100, 0);
         for (Tween *tw : {&fresh.r, &fresh.g, &fresh.b}) tw->set(100, 0);
         p = fresh;
-    }
-    // A field of -1,000,000 leaves the picture's current value as it is.
-    constexpr int32_t keep = -1000000;
-    auto field = [&](size_t i, int32_t fallback) {
-        if (i >= c.args.size()) return fallback;
-        int32_t v = value(c.arg(i), t);
-        return v == keep ? fallback : v;
-    };
-    p.anchor = anchor >> 4;
-    p.blend = blend;
-    if (p.kind == PictureKind::Window) {
-        // A window picture's two division fields are its width and height.
-        p.windowW = field(3, p.windowW);
-        p.windowH = field(4, p.windowH);
-        p.divX = p.divY = 1;
+        p.x.set(field(7, 0) + (relative ? oldX : 0), 0);
+        p.y.set(field(8, 0) + (relative ? oldY : 0), 0);
     } else {
-        p.divX = std::max(1, field(3, p.divX));
-        p.divY = std::max(1, field(4, p.divY));
+        // A move sets no division or size: the standard systems pass 0 there.
+        p.x.set(field(7, int32_t(p.x.to)) + (relative ? oldX : 0), frames);
+        p.y.set(field(8, int32_t(p.y.to)) + (relative ? oldY : 0), frames);
     }
+    if (blend != 0x0F) p.blend = blend;
     p.pattern = field(5, p.pattern);
     int over = show ? 0 : frames;
-    p.opacity.set(field(6, int32_t(p.opacity.to)), show ? frames : over);
-    if (!show) {
-        p.x.set(field(7, int32_t(p.x.to)), over);
-        p.y.set(field(8, int32_t(p.y.to)), over);
+    p.opacity.set(field(6, int32_t(p.opacity.to)), frames);
+    // Zoom type 0x00 gives one zoom for both directions, 0x40 keeps the current zoom, and the others give the width's
+    // zoom here and the height's in field 18.
+    if (zoomType == 0x00) {
+        int zoom = field(9, int32_t(p.zoomX.to));
+        p.zoomX.set(zoom, over);
+        p.zoomY.set(zoom, over);
+    } else if (zoomType != 0x40) {
+        p.zoomX.set(field(9, int32_t(p.zoomX.to)), over);
+        p.zoomY.set(field(18, int32_t(p.zoomY.to)), over);
     }
-    int zoom = field(9, int32_t(p.zoomX.to));
-    p.zoomX.set(zoom, over);
-    p.zoomY.set(c.args.size() > 18 ? field(18, int32_t(p.zoomY.to)) : zoom, over);
     p.angle.set(field(10, int32_t(p.angle.to)), over);
-    if (c.args.size() > 17) {
+    // Field 12's top byte is 1 when the colour stays as it is.
+    bool sameColor = c.args.size() > 12 && (uint32_t(c.arg(12)) >> 24) == 1;
+    if (c.args.size() > 17 && !sameColor) {
         p.r.set(field(15, int32_t(p.r.to)), over);
         p.g.set(field(16, int32_t(p.g.to)), over);
         p.b.set(field(17, int32_t(p.b.to)), over);

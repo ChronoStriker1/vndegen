@@ -3,6 +3,7 @@
 #include "game.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -46,6 +47,11 @@ std::vector<TextToken> parseText(const std::string &s) {
             i++;
             continue;
         }
+        if (c == '<' && i + 2 < s.size() && s[i + 2] == '>' && (s[i + 1] == 'L' || s[i + 1] == 'C' || s[i + 1] == 'R')) {
+            out.push_back({TextToken::Align, 0, s[i + 1] == 'L' ? 0 : s[i + 1] == 'C' ? 1 : 2});
+            i += 3;
+            continue;
+        }
         if (c != '\\' || i + 1 >= s.size()) {
             out.push_back({TextToken::Char, decodeUtf8(s, i)});
             continue;
@@ -57,8 +63,11 @@ std::vector<TextToken> parseText(const std::string &s) {
             TextToken::Kind kind;
         };
         static const Code numeric[] = {
-            {"sp", TextToken::Speed}, {"ax", TextToken::AbsX}, {"ay", TextToken::AbsY}, {"mx", TextToken::MoveX},
-            {"my", TextToken::MoveY}, {"c", TextToken::Color}, {"f", TextToken::Size}, {"i", TextToken::Icon},
+            {"sp", TextToken::Speed},  {"ax", TextToken::AbsX},      {"ay", TextToken::AbsY},
+            {"mx", TextToken::MoveX},  {"my", TextToken::MoveY},     {"c", TextToken::Color},
+            {"f", TextToken::Size},    {"i", TextToken::Icon},       {"space", TextToken::LineSpace},
+            {"-", TextToken::Tighten}, {"cE", TextToken::EdgeColor}, {"font", TextToken::Face},
+            {"m", TextToken::LineMax},
         };
         bool matched = false;
         if (codeWithArg(s, at, "r", arg, next)) {
@@ -89,9 +98,11 @@ std::vector<TextToken> parseText(const std::string &s) {
             case '>': out.push_back({TextToken::Instant, 0, 1}); i = at + 1; continue;
             case '<': out.push_back({TextToken::Instant, 0, 0}); i = at + 1; continue;
             case 'n': out.push_back({TextToken::Newline}); i = at + 1; continue;
+            case 'E': out.push_back({TextToken::Edge, 0, 1}); i = at + 1; continue;
+            case 'N': out.push_back({TextToken::Edge, 0, 0}); i = at + 1; continue;
             default: break;
         }
-        // Codes this runtime draws nothing for, such as \font[n] or \E: skip the name and any bracket.
+        // Codes this runtime draws nothing for, such as \A+ or \cS[n]: skip the name and any bracket.
         size_t j = at;
         while (j < s.size() && std::isalpha(static_cast<unsigned char>(s[j]))) j++;
         if (j == at) j++;
@@ -113,88 +124,146 @@ size_t visibleChars(const std::string &text) {
     return n;
 }
 
-TextRenderer::TextRenderer(const Game &game, ImageCache &images) : game_(game), images_(images) {}
-
-Font &TextRenderer::font() {
-    if (!font_) font_ = openFont(game_.files(), game_.gameDat().fonts[0]);
-    return *font_;
+TextStyle baseTextStyle(const Game &game) {
+    TextStyle s;
+    // Wolf sizes message text to the screen: 18 pixels at 640 by 480.
+    s.size = std::max(12, int(std::lround(game.screenHeight() * 18.0 / 480)));
+    const auto &settings = game.gameDat().settings;
+    if (settings.size() > 11) s.lineSpacing = settings[11];
+    if (settings.size() > 10) s.letterSpacing = 0;
+    if (game.screenWidth() == 320 && game.screenHeight() == 240) s.unit = 2;
+    return s;
 }
 
-const GlyphImage *TextRenderer::glyph(uint32_t cp, int size) {
-    auto key = std::make_pair(cp, size);
+TextRenderer::TextRenderer(const Game &game, ImageCache *images) : game_(game), images_(images) {}
+
+Font &TextRenderer::font(int face) {
+    const auto &names = game_.gameDat().fonts;
+    // A sub font the game leaves unnamed draws with the base font.
+    if (face < 0 || face >= int(names.size()) || (face > 0 && names[face].empty())) face = 0;
+    if (!fonts_[face]) fonts_[face] = openFont(game_.files(), names[face]);
+    return *fonts_[face];
+}
+
+const GlyphImage *TextRenderer::glyph(uint32_t cp, int size, int face) {
+    auto key = std::make_tuple(cp, size, face);
     auto it = glyphs_.find(key);
     if (it != glyphs_.end()) return &it->second;
     GlyphImage g;
-    if (!font().glyph(cp, size, false, g)) {
+    if (!font(face).glyph(cp, size, false, g)) {
         g = GlyphImage{};
         g.advance = cp < 0x80 ? size / 2 : size;
     }
     return &glyphs_.emplace(key, std::move(g)).first->second;
 }
 
-TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, size_t visible) {
+struct TextRenderer::Layout {
     struct Item {
-        int x, y;            // pen position: x, and the line's top
-        int size;
-        std::array<uint8_t, 3> color;
+        float x;
+        int y;  // the line's top
+        int size, face, segment;
+        std::array<uint8_t, 3> color, edgeColor;
+        bool edge;
         const GlyphImage *g = nullptr;
         BitmapPtr icon;
     };
+    // A run of text with one alignment on one line. <C> and <R> place a segment within the widest line.
+    struct Segment {
+        int align;
+        float start, end;
+    };
     std::vector<Item> items;
-    auto tokens = parseText(text);
-    int x = 0, lineTop = 0, size = style.size, maxW = 0, maxH = 0;
-    auto color = style.color;
-    size_t shown = 0;
-    int lineSize = size;
+    std::vector<Segment> segments;
+    int w = 0, h = 0;
+    size_t chars = 0;
+};
 
+TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextStyle &style, size_t visible) {
+    Layout out;
+    const float unit = float(std::max(1, style.unit));
+    float x = 0, spacing = float(style.letterSpacing), width = 0;
+    int lineTop = 0, size = style.size, lineSize = size, lineSpacing = style.lineSpacing, height = 0, face = 0;
+    auto color = style.color;
+    std::array<uint8_t, 3> edgeColor{0, 0, 0};
+    bool edge = false;
+    size_t shown = 0;
+    out.segments.push_back({0, 0, 0});
+
+    auto extend = [&] {
+        Layout::Segment &seg = out.segments.back();
+        seg.end = std::max(seg.end, x);
+        width = std::max(width, x);
+    };
     auto place = [&](uint32_t cp, int sz) {
-        const GlyphImage *g = glyph(cp, sz);
-        if (shown < visible) items.push_back({x, lineTop, sz, color, g, nullptr});
+        const GlyphImage *g = glyph(cp, sz, face);
+        if (shown < visible)
+            out.items.push_back({x, lineTop, sz, face, int(out.segments.size()) - 1, color, edgeColor, edge, g, nullptr});
         shown++;
-        x += g->advance + style.letterSpacing;
+        x += g->advance + spacing;
         lineSize = std::max(lineSize, sz);
-        maxW = std::max(maxW, x);
-        maxH = std::max(maxH, lineTop + lineSize + style.lineSpacing);
+        extend();
+        height = std::max(height, lineTop + lineSize);
     };
 
-    for (auto &t : tokens) {
+    for (auto &t : parseText(text)) {
         switch (t.kind) {
             case TextToken::Char: place(t.cp, size); break;
             case TextToken::Newline:
-                lineTop += lineSize + style.lineSpacing;
+                lineTop += lineSize + lineSpacing;
                 lineSize = size;
                 x = 0;
+                out.segments.push_back({out.segments.back().align, 0, 0});
+                break;
+            case TextToken::Align:
+                out.segments.push_back({t.value, x, x});
                 break;
             case TextToken::Color: color = game_.textColor(t.value); break;
             case TextToken::Size: size = std::max(4, t.value); break;
-            case TextToken::AbsX: x = t.value; break;
-            case TextToken::AbsY: lineTop = t.value; break;
-            case TextToken::MoveX: x += t.value; break;
-            case TextToken::MoveY: lineTop += t.value; break;
+            case TextToken::LineSpace: lineSpacing = t.value; break;
+            case TextToken::Tighten: spacing = float(style.letterSpacing) - t.value / unit; break;
+            case TextToken::Edge: edge = t.value != 0; break;
+            case TextToken::EdgeColor: edgeColor = game_.textColor(t.value); break;
+            case TextToken::Face: face = std::clamp(t.value, 0, 3); break;
+            case TextToken::LineMax:
+                lineSize = std::max(lineSize, t.value);
+                height = std::max(height, lineTop + lineSize);
+                break;
+            // \ax[n] also widens the text to n, which the standard systems use to right-align a later line.
+            case TextToken::AbsX: x = t.value / unit; extend(); break;
+            case TextToken::AbsY: lineTop = int(std::lround(t.value / unit)); break;
+            case TextToken::MoveX: x += t.value / unit; extend(); break;
+            case TextToken::MoveY: lineTop += int(std::lround(t.value / unit)); break;
             case TextToken::Icon: {
-                char path[64];
-                std::snprintf(path, sizeof path, "BasicData/icon%03d.png", t.value);
-                BitmapPtr icon = images_.get(path);
-                if (shown < visible) items.push_back({x, lineTop, size, color, nullptr, icon});
+                BitmapPtr icon;
+                if (images_) {
+                    char path[64];
+                    std::snprintf(path, sizeof path, "BasicData/icon%03d.png", t.value);
+                    icon = images_->get(path);
+                }
+                if (shown < visible)
+                    out.items.push_back({x, lineTop, size, face, int(out.segments.size()) - 1, color, edgeColor, edge,
+                                         nullptr, icon});
                 shown++;
-                x += size + style.letterSpacing;
-                maxW = std::max(maxW, x);
-                maxH = std::max(maxH, lineTop + size + style.lineSpacing);
+                x += size + spacing;
+                extend();
+                height = std::max(height, lineTop + size);
                 break;
             }
             case TextToken::Ruby: {
-                int start = x;
+                float start = x;
                 size_t i = 0;
                 while (i < t.base.size()) place(decodeUtf8(t.base, i), size);
                 // The reading sits above the base text, at half size, centred over it.
-                int rubySize = std::max(4, size / 2), width = 0;
+                int rubySize = std::max(4, size / 2), rubyWidth = 0;
                 std::vector<uint32_t> cps;
                 for (size_t k = 0; k < t.ruby.size();) cps.push_back(decodeUtf8(t.ruby, k));
-                for (uint32_t cp : cps) width += glyph(cp, rubySize)->advance;
-                int rx = start + (x - start - width) / 2;
+                for (uint32_t cp : cps) rubyWidth += glyph(cp, rubySize, face)->advance;
+                float rx = start + (x - start - rubyWidth) / 2;
                 for (uint32_t cp : cps) {
-                    const GlyphImage *g = glyph(cp, rubySize);
-                    if (shown <= visible) items.push_back({rx, lineTop - rubySize, rubySize, color, g, nullptr});
+                    const GlyphImage *g = glyph(cp, rubySize, face);
+                    if (shown <= visible)
+                        out.items.push_back({rx, lineTop - rubySize, rubySize, face, int(out.segments.size()) - 1,
+                                             color, edgeColor, edge, g, nullptr});
                     rx += g->advance;
                 }
                 break;
@@ -202,47 +271,69 @@ TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, 
             default: break;
         }
     }
+    out.w = int(std::ceil(width));
+    out.h = height;
+    out.chars = shown;
+    return out;
+}
 
+std::array<int, 2> TextRenderer::measure(const std::string &text, const TextStyle &style) {
+    Layout l = layout(text, style, 0);
+    return {l.w, l.h};
+}
+
+TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, size_t visible) {
+    Layout l = layout(text, style, visible);
     TextBlock block;
-    block.chars = shown;
-    int pad = style.shadow ? 1 : 0;
-    // Ruby may sit above the first line; the bitmap starts at the highest point drawn.
+    block.chars = l.chars;
+    // Shadows and outlines reach a pixel past the text; ruby may sit above the first line.
+    int pad = block.origin;
     int minY = 0;
-    for (auto &it : items) minY = std::min(minY, it.y);
-    int w = std::max(1, maxW + pad + 2), h = std::max(1, maxH - minY + pad);
+    for (auto &it : l.items) minY = std::min(minY, it.y);
+    int w = std::max(1, l.w + pad * 2 + 2), h = std::max(1, l.h - minY + pad * 2);
     block.bitmap = Bitmap(w, h);
     Canvas canvas(block.bitmap);
-    for (auto &it : items) {
-        int top = it.y - minY;
-        if (it.icon && !it.icon->empty()) {
-            canvas.draw(*it.icon, {0, 0, it.icon->w, it.icon->h}, {float(it.x), float(top), float(it.size), float(it.size)});
+
+    auto blendCoverage = [&](const GlyphImage &g, int gx, int gy, std::array<uint8_t, 3> c, int scale) {
+        for (int yy = 0; yy < g.h; yy++) {
+            int ty = gy + yy;
+            if (ty < 0 || ty >= h) continue;
+            uint8_t *row = block.bitmap.row(ty);
+            for (int xx = 0; xx < g.w; xx++) {
+                int tx = gx + xx;
+                if (tx < 0 || tx >= w) continue;
+                int a = g.coverage[size_t(yy) * g.w + xx] * scale / 256;
+                if (!a) continue;
+                uint8_t *d = row + tx * 4;
+                int da = d[3], outA = a + da * (255 - a) / 255;
+                if (!outA) continue;
+                for (int ch = 0; ch < 3; ch++) d[ch] = uint8_t((c[ch] * a + d[ch] * da * (255 - a) / 255) / outA);
+                d[3] = uint8_t(outA);
+            }
+        }
+    };
+
+    for (auto &it : l.items) {
+        const Layout::Segment &seg = l.segments[it.segment];
+        float shift = seg.align == 2 ? l.w - seg.end : seg.align == 1 ? (l.w - (seg.end - seg.start)) / 2 - seg.start : 0;
+        int left = int(std::lround(it.x + shift)) + pad, top = it.y - minY + pad;
+        if (it.icon) {
+            if (!it.icon->empty())
+                canvas.draw(*it.icon, {0, 0, it.icon->w, it.icon->h},
+                            {float(left), float(top), float(it.size), float(it.size)});
             continue;
         }
         if (!it.g || it.g->coverage.empty()) continue;
-        int baseline = top + font().ascent(it.size);
-        int gx = it.x + it.g->left, gy = baseline - it.g->top;
-        for (int pass = style.shadow ? 0 : 1; pass < 2; pass++) {
-            int ox = pass == 0 ? 1 : 0, oy = pass == 0 ? 1 : 0;
-            auto c = pass == 0 ? std::array<uint8_t, 3>{0, 0, 0} : it.color;
-            for (int yy = 0; yy < it.g->h; yy++) {
-                int ty = gy + yy + oy;
-                if (ty < 0 || ty >= h) continue;
-                uint8_t *row = block.bitmap.row(ty);
-                for (int xx = 0; xx < it.g->w; xx++) {
-                    int tx = gx + xx + ox;
-                    if (tx < 0 || tx >= w) continue;
-                    int a = it.g->coverage[size_t(yy) * it.g->w + xx];
-                    if (pass == 0) a = a * 3 / 4;
-                    if (!a) continue;
-                    uint8_t *d = row + tx * 4;
-                    int da = d[3], outA = a + da * (255 - a) / 255;
-                    if (!outA) continue;
-                    for (int ch = 0; ch < 3; ch++)
-                        d[ch] = uint8_t((c[ch] * a + d[ch] * da * (255 - a) / 255) / outA);
-                    d[3] = uint8_t(outA);
-                }
-            }
+        int gx = left + it.g->left, gy = top + font(it.face).ascent(it.size) - it.g->top;
+        if (it.edge) {
+            // \E outlines each character: the edge colour one pixel out in every direction, then the character.
+            for (int oy = -1; oy <= 1; oy++)
+                for (int ox = -1; ox <= 1; ox++)
+                    if (ox || oy) blendCoverage(*it.g, gx + ox, gy + oy, it.edgeColor, 256);
+        } else if (style.shadow) {
+            blendCoverage(*it.g, gx + 1, gy + 1, {0, 0, 0}, 192);
         }
+        blendCoverage(*it.g, gx, gy, it.color, 256);
     }
     return block;
 }

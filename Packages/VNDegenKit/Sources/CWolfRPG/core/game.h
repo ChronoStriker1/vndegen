@@ -53,11 +53,12 @@ struct Tween {
 struct Picture {
     PictureKind kind = PictureKind::None;
     std::string source;  // file path or text
-    int anchor = 0;      // 0 top left, 1 centre, 2 bottom left, 3 bottom right? (Wolf's anchor codes divided by 16)
+    int anchor = 0;      // Wolf's anchor code divided by 16: 0 top left, 1 centre, 2 bottom left, 3 top right,
+                         // 4 bottom right, 5 top centre
     int blend = 0;       // 0 normal, 1 add, 2 subtract, 3 multiply
     int divX = 1, divY = 1, pattern = 1;
-    int imageW = 0, imageH = 0;  // size of the image file, for the variable command
-    int windowW = 0, windowH = 0;  // size of a window picture
+    int imageW = 0, imageH = 0;  // size of the image file, the text or the window, for the variable command
+    int windowW = 0, windowH = 0;  // size of a window picture: a window skin stretched, or a shape
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
     // Effects from the effect command.
@@ -65,6 +66,11 @@ struct Picture {
     int autoFrom = 1, autoTo = 1, autoInterval = 1, autoTimer = 0, autoDir = 1;
     int shakePower = 0, shakeSpeed = 0, shakeFrames = 0;
     double shakeOffset = 0;
+    int shiftX = 0, shiftY = 0;  // the effect command's draw position shift, added to the position when drawing
+    // The effect command's pulse (点滅A): the colour swings to its value plus these offsets and back, once every two
+    // intervals. An interval of 0 stops it.
+    std::array<int, 3> pulse{0, 0, 0};
+    int pulseInterval = 0;
     int flickerFrames = 0, flickerInterval = 0;
     bool erasing = false;
 };
@@ -356,6 +362,7 @@ private:
     Tween tintR_, tintG_, tintB_;
     Input input_;
     uint64_t frame_ = 0, generation_ = 0;
+    std::shared_ptr<class TextRenderer> textMeasure_;  // sizes text pictures (pictureCommandOne; text.h)
     std::mt19937 rng_{12345};
     std::map<int, int> unsupported_;
     std::unique_ptr<Audio> audio_;

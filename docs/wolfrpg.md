@@ -47,7 +47,24 @@ shake and transitions, sound, map changes, move routes, party graphics, map tile
 Battles and menus are common events in each game's own data, so they need nothing of their own.
 
 Text uses a font file the game ships whose family name matches the one Game.dat names, then VNDegen's Windows font pack
-(`docs/fonts.md`), then Hiragino on Apple systems.
+(`docs/fonts.md`), then Hiragino on Apple systems. `\font[n]` switches to the sub fonts Game.dat names.
+
+Wolf RPG Editor's standard systems (2 and 3) draw their menus, shops and status windows with pictures, and the runtime
+draws what they use, following the picture page of the official manual:
+
+- Window pictures stretch a 3 by 3 base image to the size the picture's division fields give, and report that size to
+  the picture variable command. Their file name can instead be a generated shape: `<SQUARE>`, `<LINE>` and `<LINE-n>`,
+  `<TRI-UP>`, `<TRI-DOWN>`, `<TRI-LEFT>` and `<TRI-RIGHT>`, each with `FRAME` for the outline, and the gradients
+  `<GRADX-aaa-bbb>` and `<GRADY-aaa-bbb>`.
+- Text pictures report their laid-out size, which the standard systems read to centre text and to shrink long names.
+  They align with `<L>`, `<C>` and `<R>`, which apply to the rest of their line and the lines after; `\ax[n]` at the end
+  of a line widens the text so that a later right-aligned line lines up with it. `\space[n]`, `\-[n]`, `\E`, `\N`,
+  `\cE[n]` and `\m[n]` change line spacing, letter spacing, outlines and line height.
+- Wolf draws 320 by 240 games at twice the size, so in those games `\ax`, `\ay`, `\mx`, `\my` and `\-` count in half
+  pixels, as the standard systems' own layout assumes.
+- Pictures place by the anchors the games use (top left, centre, bottom left, top right, bottom right, top centre),
+  move relative to where they are, keep their anchor, size and blend mode on a move, keep their
+  zoom or colour when the command says so, and take the effect command's draw position shift and colour pulse.
 
 ## Controls
 
@@ -74,3 +91,14 @@ last save read or written. `docs/wolfrpg-save-format.md` describes the format an
   aren't supported; the test games don't use them.
 - Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
   variables other than the choice window's top may place them differently.
+- Picture commands with a start delay run at once, and the delay reset command does nothing. The standard systems
+  repeat their slide-in moves with delays of 3 and 5 frames toward the same place, so the result looks the same.
+- Free-form pictures (the four-corner flag) draw as plain rectangles. Only Test Game 02's developer debug tool uses
+  them.
+- Not drawn, as no test game uses them: the `<CIRCLE>` shape, `<SCREENSHOT>`, `<MAP_SCREENSHOT>`, `<CUT/...>` and
+  `<XY_IMAGE/...>` pictures, video pictures, the centre bottom anchor, and the text codes `\f+`, `\fR`, `\wE`, `\cS`,
+  `\cR`, `\img`, `\isize`, `\bx` and `\se`. `\A+` and `\A-` are read but text is always antialiased.
+- Pictures numbered 100,000 and above draw below the message window, not above it. Only Test Game 02's debug tool
+  uses such numbers.
+- Game.dat's picture behaviour setting (Ver1 or Ver2) isn't read: showing a picture that is already shown starts it
+  afresh, and `\space` counts whole pixels in every game.
