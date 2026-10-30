@@ -299,7 +299,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
 
 uint32_t Game::keysNow() const { return input_.held | autoKeys_; }
 
-// Key input. Basic keys give 2 4 6 8 for the directions (1 3 7 9 for diagonals), 11 confirm, 12 cancel, 13 sub,
+// Key input. Basic keys give 2 4 6 8 for the directions (1 3 7 9 for diagonals), 10 confirm, 11 cancel, 12 sub,
 // and 0 for none. With "wait for input" the event waits until one of the accepted keys is pressed.
 bool Game::keyInput(Thread &t, const Command &c) {
     int32_t target = c.arg(0);
@@ -311,9 +311,9 @@ bool Game::keyInput(Thread &t, const Command &c) {
     if (kind == 0) {
         int dirs = flags & 0x0F;
         bool ok = flags & 0x10, cancel = flags & 0x20, sub = flags & 0x40;
-        if (ok && (keys & KeyConfirm)) v = 11;
-        else if (cancel && (keys & KeyCancel)) v = 12;
-        else if (sub && (keys & KeySub)) v = 13;
+        if (ok && (keys & KeyConfirm)) v = 10;
+        else if (cancel && (keys & KeyCancel)) v = 11;
+        else if (sub && (keys & KeySub)) v = 12;
         else if (dirs) {
             bool d = keys & KeyDown, l = keys & KeyLeft, r = keys & KeyRight, u = keys & KeyUp;
             if (dirs == 2) {

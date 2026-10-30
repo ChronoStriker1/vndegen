@@ -468,7 +468,8 @@ void Game::update(const Input &input) {
         if (ce.runCondition == 2 && !threads_.empty()) continue;
         Thread &t = parallel_[i];
         if (t.done()) {
-            if (!commonConditionMet(ce)) continue;
+            // Run condition 3, parallel always, runs whatever its condition says.
+            if (ce.runCondition != 3 && !commonConditionMet(ce)) continue;
             t = Thread{};
             t.stack.push_back({&ce.commands, 0, ce.id, -1});
         }
