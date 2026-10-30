@@ -4,11 +4,11 @@
 //   wolfplay <game folder> --frames 300 --shot 120:title.png --press 200:confirm
 //   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames; hold a key)
 //   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
-#include "../src/game.h"
-#include "../src/render.h"
+#include "game.h"
+#include "render.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "../third_party/stb/stb_image_write.h"
+#include "../../../../Packages/VNDegenKit/Sources/CWolfRPG/third_party/stb/stb_image_write.h"
 
 #include <cstdio>
 #include <cstring>

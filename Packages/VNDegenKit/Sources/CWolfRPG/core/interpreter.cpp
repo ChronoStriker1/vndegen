@@ -1,6 +1,7 @@
 // The event interpreter: runs map event pages and common events one command at a time.
 #include "game.h"
 #include "game_internal.h"
+#include "text.h"
 
 #include <algorithm>
 #include <cmath>
@@ -96,8 +97,7 @@ bool Game::step(Thread &t) {
             return true;
 
         case 101:  // message: the thread resumes once the player closes the window
-            message_.active = true;
-            message_.text = expandText(cmd.str(0), &t);
+            showMessage(expandText(cmd.str(0), &t));
             t.waitingMessage = true;
             return false;
 
@@ -524,6 +524,22 @@ void Game::setVariable(Thread &t, const Command &c) {
         case 0x0B: out = int32_t(std::lround(std::cos(rhs * M_PI / 1800) * 1000)); break;
     }
     writeVar(target, out, t);
+}
+
+// A message starting with "@n" shows face graphic n beside it; the code's line is not text.
+void Game::showMessage(std::string text) {
+    message_ = MessageState{};
+    if (text.size() > 1 && text[0] == '@' && std::isdigit(static_cast<unsigned char>(text[1]))) {
+        size_t end = 1;
+        while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) end++;
+        message_.face = std::atoi(text.c_str() + 1);
+        if (end < text.size() && text[end] == '\r') end++;
+        if (end < text.size() && text[end] == '\n') end++;
+        text.erase(0, end);
+    }
+    message_.text = std::move(text);
+    message_.total = visibleChars(message_.text);
+    message_.active = true;
 }
 
 // The text at a variable address: a string variable's text, or a number written out.

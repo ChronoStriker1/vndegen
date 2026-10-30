@@ -1,5 +1,5 @@
 // Lists or extracts a Wolf RPG Editor archive.
-#include "../src/dxa.h"
+#include "dxa.h"
 
 #include <cstdio>
 #include <filesystem>

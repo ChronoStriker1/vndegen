@@ -90,6 +90,12 @@ std::string Game::windowSkin() const { return dbString(sdb_, SysWindows, 1, 0); 
 
 std::string Game::cursorSkin() const { return dbString(sdb_, SysWindows, 2, 0); }
 
+std::string Game::pauseIcon() const { return dbString(sdb_, SysWindows, 0, 0); }
+
+int Game::pauseIconFrames() const { return std::max(1, dbNumber(sdb_, SysWindows, 0, 1)); }
+
+std::string Game::faceGraphic(int n) const { return dbString(sdb_, SysFaces, n, 0); }
+
 std::array<uint8_t, 3> Game::textColor(int i) const {
     if (i <= 0 || i >= int(sdb_.types.size() > SysTextColors ? sdb_.types[SysTextColors].rows.size() : 0))
         return {255, 255, 255};
@@ -404,7 +410,15 @@ void Game::update(const Input &input) {
             choice_.active = false;
         }
     }
-    if (message_.active && (input.pressed & (KeyConfirm | KeyCancel))) message_.active = false;
+    // Messages type one character a frame. The first confirm shows the rest at once, the next closes the window.
+    if (message_.active) {
+        if (message_.shown < message_.total) {
+            if (input.pressed & (KeyConfirm | KeyCancel)) message_.shown = message_.total;
+            else message_.shown++;
+        } else if (input.pressed & (KeyConfirm | KeyCancel)) {
+            message_.active = false;
+        }
+    }
 
     // Autorun map events start once per page activation, one at a time, ahead of anything else.
     if (threads_.empty()) {

@@ -2,7 +2,7 @@
 // game state and the commands it couldn't run out.
 //
 //   wolfrun <game folder> --frames 3000 --press 300:confirm --every 40:confirm
-#include "../src/game.h"
+#include "game.h"
 
 #include <cstdio>
 #include <map>

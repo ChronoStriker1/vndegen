@@ -41,12 +41,13 @@ void Game::databaseCommand(Thread &t, const Command &c) {
     int type = byName & 0x01 ? -1 : value(c.arg(0), t);
     if (byName & 0x01) {
         for (size_t i = 0; i < db.types.size(); i++)
-            if (db.types[i].name == c.str(0)) type = int(i);
+            if (db.types[i].name == c.str(1)) type = int(i);
     }
     int row = value(c.arg(1), t), field = value(c.arg(2), t);
     DatabaseType *dt = type >= 0 && type < int(db.types.size()) ? &db.types[type] : nullptr;
-    if (dt && (byName & 0x02)) row = findName(dt->dataNames, c.str(1));
-    if (dt && (byName & 0x04)) field = findName(dt->fieldNames, c.str(2));
+    // The command's strings are the text to write, then the type, row and field names.
+    if (dt && (byName & 0x02)) row = findName(dt->dataNames, c.str(2));
+    if (dt && (byName & 0x04)) field = findName(dt->fieldNames, c.str(3));
     int32_t target = c.arg(4);
 
     // Queries: names, ids and sizes.
@@ -114,7 +115,7 @@ void Game::databaseCommand(Thread &t, const Command &c) {
             writeStr(target, r.strings[slot], t);
         } else {
             // Low code 2 assigns, with 0x10 appending; the text is given or comes from a string variable.
-            std::string rhs = c.strings.size() > 3 ? expandText(c.str(3), &t) : readStr(target, t);
+            std::string rhs = (flags & 0x0F) == 0x02 ? expandText(c.str(0), &t) : readStr(target, t);
             if (op == 0x10) r.strings[slot] += rhs;
             else r.strings[slot] = rhs;
         }

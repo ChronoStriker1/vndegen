@@ -1,6 +1,6 @@
 // Parses a Wolf RPG Editor game's Data folder and prints what it holds, with a count of every event command code.
-#include "../src/data.h"
-#include "../src/reader.h"
+#include "data.h"
+#include "reader.h"
 
 #include <cstdio>
 #include <filesystem>

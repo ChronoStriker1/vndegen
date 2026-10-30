@@ -56,7 +56,7 @@ struct Picture {
     int blend = 0;       // 0 normal, 1 add, 2 subtract, 3 multiply
     int divX = 1, divY = 1, pattern = 1;
     int imageW = 0, imageH = 0;  // size of the image file, for the variable command
-    int windowW = 0, windowH = 0;
+    int windowW = 0, windowH = 0;  // size of a window picture
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
     // Effects from the effect command.
@@ -90,7 +90,10 @@ struct ChoiceState {
 
 struct MessageState {
     bool active = false;
-    std::string text;
+    std::string text;        // without a leading face code
+    int face = -1;           // face graphic from "@n" at the start of the text, or -1
+    size_t shown = 0, total = 0;  // characters typed so far, and in all
+    bool instant = false;
 };
 
 // A character on the map: the hero, a party member following the hero, or a map event.
@@ -196,6 +199,10 @@ public:
     std::array<double, 3> screenColor() const { return {tintR_.value(), tintG_.value(), tintB_.value()}; }
     std::string windowSkin() const;
     std::string cursorSkin() const;
+    std::string pauseIcon() const;
+    int pauseIconFrames() const;
+    std::string faceGraphic(int n) const;
+    int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
     std::string systemString(int i) const;
     std::array<uint8_t, 3> textColor(int i) const;
     uint64_t frameCount() const { return frame_; }
@@ -237,6 +244,7 @@ private:
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
     std::string textAt(int32_t address, const Thread &t);
+    void showMessage(std::string text);
     bool condition(Thread &t, const Command &c);
     bool stringCondition(Thread &t, const Command &c);
     void unsupported(const Command &c);

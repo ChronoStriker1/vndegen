@@ -18,6 +18,7 @@ enum SysType {
     SysTextColors = 12,
     SysNormalVarNames = 14,
     SysSpare1 = 15,
+    SysFaces = 24,
 };
 
 constexpr int32_t kMillion = 1000000;

@@ -2,9 +2,9 @@
 //   wolfsave dump <SaveDataNN.sav>        prints every field, one per line, so two dumps diff cleanly
 //   wolfsave check <file.sav>...          parses and re-serializes each file and compares the bytes
 //   wolfsave decrypt <in.sav> <out.bin>   writes the file with the XOR layer removed
-#include "../src/data.h"
-#include "../src/reader.h"
-#include "../src/savefile.h"
+#include "data.h"
+#include "reader.h"
+#include "savefile.h"
 
 #include <cstdio>
 #include <fstream>
