@@ -122,11 +122,22 @@ module RGSSFiles
 
   def self.writing?(mode) = mode.is_a?(String) ? mode =~ /[wa+]/ : mode.is_a?(Integer) && (mode & (File::WRONLY | File::RDWR)) != 0
 
+  # A glob pattern that matches whatever the case of each letter, since Dir.glob ignores File::FNM_CASEFOLD. Letters
+  # inside brackets are left alone.
+  def self.caseless(pattern)
+    depth = 0
+    pattern.each_char.map do |char|
+      depth += 1 if char == '['
+      depth -= 1 if char == ']' && depth > 0
+      depth == 0 && char =~ /[A-Za-z]/ ? "[#{char.downcase}#{char.upcase}]" : char
+    end.join
+  end
+
   # Matches in the save folder and the game folder, as the relative names a game expects.
   def self.glob(pattern)
     return nil unless relative?(pattern)
     names = Kernel.rgss_game_dirs.uniq.flat_map do |dir|
-      Dir.rgss_glob(File.join(dir, pattern.tr('\\', '/')), File::FNM_CASEFOLD).map { |path| path.delete_prefix("#{dir}/") }
+      Dir.rgss_glob(File.join(dir, caseless(pattern.tr('\\', '/')))).map { |path| path.delete_prefix("#{dir}/") }
     end
     names.uniq.sort
   end
