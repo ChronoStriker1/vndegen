@@ -1,5 +1,8 @@
 #include "files.h"
 
+#include "casepath.h"
+
+#include <cstring>
 #include <fstream>
 
 namespace fs = std::filesystem;
@@ -34,32 +37,13 @@ GameFiles::GameFiles(fs::path root) : root_(std::move(root)) {
     if (auto whole = findCaseless(root_, "Data.wolf")) whole_ = Archive::open(whole->string());
 }
 
+// The path as it is on disk, matched without regard to case as Windows matches it (casepath, shared by the engines).
 std::optional<fs::path> GameFiles::findCaseless(const fs::path &base, const std::string &rel) const {
-    fs::path cur = base;
-    size_t start = 0;
-    while (start <= rel.size()) {
-        size_t slash = rel.find('/', start);
-        std::string part = rel.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
-        start = slash == std::string::npos ? rel.size() + 1 : slash + 1;
-        if (part.empty()) continue;
-        fs::path exact = cur / part;
-        std::error_code ec;
-        if (fs::exists(exact, ec)) {
-            cur = exact;
-            continue;
-        }
-        std::string want = upperAscii(part);
-        bool found = false;
-        for (auto &entry : fs::directory_iterator(cur, ec)) {
-            if (upperAscii(entry.path().filename().string()) == want) {
-                cur = entry.path();
-                found = true;
-                break;
-            }
-        }
-        if (!found) return std::nullopt;
-    }
-    return cur;
+    std::string want = (base / rel).string();
+    std::string out(want.size() + 1024, '\0');
+    if (casepath_resolve(want.c_str(), out.data(), out.size()) != 1) return std::nullopt;
+    out.resize(std::strlen(out.c_str()));
+    return fs::path(out);
 }
 
 Archive *GameFiles::archiveFor(const std::string &top) const {

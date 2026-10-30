@@ -19,6 +19,7 @@ let package = Package(
         .library(name: "EngineGodot", targets: ["EngineGodot"]),
         .library(name: "EngineNScripter", targets: ["EngineNScripter"]),
         .library(name: "FrameHost", targets: ["FrameHost"]),
+        .library(name: "EngineWolfRPG", targets: ["EngineWolfRPG"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -72,6 +73,17 @@ let package = Package(
         // composite in software.
         .target(name: "FrameHost", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         .target(name: "EngineNScripter", dependencies: ["VNCore", "CNScripter", "FrameHost"], swiftSettings: mainActorByDefault),
+        // VNDegen's own Wolf RPG Editor runtime, in C++20, with vnwolf.h as its C interface. third_party holds stb,
+        // dr_libs and TinySoundFont, which the runtime's sources include directly. Engines/WolfRPG/host builds the same
+        // sources for the Linux test tools.
+        .target(
+            name: "CWolfRPG", dependencies: ["CVNFont"], exclude: ["third_party"],
+            // The package builds C++17; the runtime needs C++20. It draws every frame on the CPU, so Debug builds are
+            // optimized too, as NScripter's are.
+            cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-std=c++20", "-O2"])],
+            linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
+                             .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
+        .target(name: "EngineWolfRPG", dependencies: ["VNCore", "CWolfRPG", "FrameHost"], swiftSettings: mainActorByDefault),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
