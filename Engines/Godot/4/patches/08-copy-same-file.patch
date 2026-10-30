@@ -1,15 +1,17 @@
---- a/core/io/dir_access.cpp	2026-10-30 04:35:01.377015337 -0400
-+++ b/core/io/dir_access.cpp	2026-10-30 04:35:01.385387464 -0400
-@@ -37,6 +37,8 @@
+--- a/core/io/dir_access.cpp	2026-10-30 04:45:43.823729930 -0400
++++ b/core/io/dir_access.cpp	2026-10-30 04:45:43.829910706 -0400
+@@ -37,6 +37,10 @@
  #include "core/os/time.h"
  #include "core/templates/local_vector.h"
  
++#include <limits.h>
 +#include <sys/stat.h>
++#include <unistd.h>
 +
  String DirAccess::_get_root_path() const {
  	switch (_access_type) {
  		case ACCESS_RESOURCES:
-@@ -416,6 +418,14 @@
+@@ -416,6 +420,14 @@
  	return full;
  }
  
@@ -24,11 +26,18 @@
  Error DirAccess::copy(const String &p_from, const String &p_to, int p_chmod_flags) {
  	ERR_FAIL_COND_V_MSG(p_from == p_to, ERR_INVALID_PARAMETER, "Source and destination path are equal.");
  
-@@ -425,6 +435,14 @@
+@@ -425,6 +437,21 @@
  		Ref<FileAccess> fsrc = FileAccess::open(p_from, FileAccess::READ, &err);
  		ERR_FAIL_COND_V_MSG(err != OK, err, vformat("Failed to open '%s'.", p_from));
  
-+		const String target = ProjectSettings::get_singleton()->globalize_path(p_to);
++		String target = ProjectSettings::get_singleton()->globalize_path(p_to);
++		if (target.is_relative_path()) {
++			// A relative path counts from the working directory, as the write's does, not from the pack.
++			char cwd[PATH_MAX];
++			if (getcwd(cwd, sizeof(cwd))) {
++				target = String::utf8(cwd).path_join(target);
++			}
++		}
 +		if (FileAccess::exists(target)) {
 +			Ref<FileAccess> existing = FileAccess::open(target, FileAccess::READ);
 +			if (existing.is_valid() && _vndegen_same_file(fsrc->get_path_absolute(), existing->get_path_absolute())) {

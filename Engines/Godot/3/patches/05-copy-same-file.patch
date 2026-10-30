@@ -1,15 +1,17 @@
---- a/core/os/dir_access.cpp	2026-10-30 04:35:01.394015330 -0400
-+++ b/core/os/dir_access.cpp	2026-10-30 04:35:01.402380280 -0400
-@@ -35,6 +35,8 @@
+--- a/core/os/dir_access.cpp	2026-10-30 04:45:43.834729925 -0400
++++ b/core/os/dir_access.cpp	2026-10-30 04:45:43.841521101 -0400
+@@ -35,6 +35,10 @@
  #include "core/os/os.h"
  #include "core/project_settings.h"
  
++#include <limits.h>
 +#include <sys/stat.h>
++#include <unistd.h>
 +
  String DirAccess::_get_root_path() const {
  	switch (_access_type) {
  		case ACCESS_RESOURCES:
-@@ -280,6 +282,14 @@
+@@ -280,6 +284,14 @@
  	return full;
  }
  
@@ -24,11 +26,18 @@
  Error DirAccess::copy(String p_from, String p_to, int p_chmod_flags) {
  	//printf("copy %s -> %s\n",p_from.ascii().get_data(),p_to.ascii().get_data());
  	Error err;
-@@ -290,6 +300,19 @@
+@@ -290,6 +302,26 @@
  		return err;
  	}
  
-+	const String target = ProjectSettings::get_singleton()->globalize_path(p_to);
++	String target = ProjectSettings::get_singleton()->globalize_path(p_to);
++	if (target.is_rel_path()) {
++		// A relative path counts from the working directory, as the write's does, not from the pack.
++		char cwd[PATH_MAX];
++		if (getcwd(cwd, sizeof(cwd))) {
++			target = String::utf8(cwd).plus_file(target);
++		}
++	}
 +	if (FileAccess::exists(target)) {
 +		FileAccess *existing = FileAccess::open(target, FileAccess::READ);
 +		const bool same = existing && _vndegen_same_file(fsrc->get_path_absolute(), existing->get_path_absolute());
