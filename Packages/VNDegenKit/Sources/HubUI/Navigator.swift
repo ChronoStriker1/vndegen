@@ -811,6 +811,15 @@ final class Navigator {
             if button == .confirm || button == .cancel { hub.launchError = nil }
             return
         }
+        // A system file picker covers the hub and takes no controller input, so presses mustn't reach the rows behind
+        // it. B closes it.
+        if pickingSoundFont || runtimes.pickingFolder {
+            if button == .cancel {
+                pickingSoundFont = false
+                runtimes.pickingFolder = false
+            }
+            return
+        }
         if let keyboard {
             keyboard.handle(button)
             return

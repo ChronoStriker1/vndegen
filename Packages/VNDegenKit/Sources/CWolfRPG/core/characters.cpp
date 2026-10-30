@@ -60,12 +60,11 @@ Actor *Game::actorFor(int target, const Thread &t) {
 uint32_t Game::tileFlags(int x, int y) const {
     if (!map_ || x < 0 || y < 0 || x >= map_->width || y >= map_->height) return 0x0F;
     if (map_->tileset < 0 || map_->tileset >= int(tilesets_.size())) return 0;
-    const auto &pass = tilesets_[map_->tileset].passability;
+    const Tileset &ts = tilesets_[map_->tileset];
     for (int layer = map_->layers - 1; layer >= 0; layer--) {
         int32_t v = map_->tile(layer, x, y);
-        size_t index = v >= 100000 ? size_t(v / 100000) : size_t(v) + 16;
         if (v == 0 && layer > 0) continue;
-        uint32_t f = index < pass.size() ? pass[index] : 0;
+        uint32_t f = tilePassability(ts, v);
         if (layer > 0 && (f & 0x200)) continue;
         return f;
     }
@@ -169,12 +168,12 @@ void Game::runRoute(Actor &a, bool isHero) {
         }
         case TurnRight90: {
             static const int next[10] = {0, 4, 1, 2, 7, 0, 3, 8, 9, 6};
-            turn(a, next[a.chara.direction]);
+            turn(a, next[validDirection(a.chara.direction)]);
             break;
         }
         case TurnLeft90: {
             static const int next[10] = {0, 2, 3, 6, 1, 0, 9, 4, 7, 8};
-            turn(a, next[a.chara.direction]);
+            turn(a, next[validDirection(a.chara.direction)]);
             break;
         }
         case TurnRightOrLeft: turn(a, std::uniform_int_distribution<int>(0, 1)(rng_) ? 4 : 6); break;
@@ -318,13 +317,15 @@ bool Game::anyRouteRunning() const {
 }
 
 void Game::heroControl() {
-    if (!threads_.empty() || message_.active || choice_.active || hero_.moving() || hero_.route) return;
+    // Commands 230 and 231 let the hero walk while an event runs; the event goes on meanwhile.
+    bool eventRunning = !threads_.empty();
+    if ((eventRunning && !moveDuringEvents_) || message_.active || choice_.active || hero_.moving() || hero_.route) return;
     int dir = 0;
     if (input_.held & KeyDown) dir = 2;
     else if (input_.held & KeyLeft) dir = 4;
     else if (input_.held & KeyRight) dir = 6;
     else if (input_.held & KeyUp) dir = 8;
-    if (input_.pressed & KeyConfirm) {
+    if ((input_.pressed & KeyConfirm) && !eventRunning) {
         // The event on the hero's tile, then the one in front, then one across a counter.
         int fx = hero_.tx + dirX(hero_.chara.direction), fy = hero_.ty + dirY(hero_.chara.direction);
         if (eventAt(hero_.tx, hero_.ty, 0, true) || eventAt(fx, fy, 0, true)) return;

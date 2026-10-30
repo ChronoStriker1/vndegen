@@ -159,9 +159,17 @@ std::vector<int32_t> savedList(const std::vector<int32_t> &vars, const Database 
 // ---------------------------------------------------------------------------------------------------------------
 // Files
 
+// A save file a game names, such as "Save/System.sav", always inside the game folder: a name that is absolute or climbs
+// out with ".." gives an empty path, which reads and writes nothing.
 fs::path Game::saveFilePath(const std::string &name) const {
     std::string rel = name;
     std::replace(rel.begin(), rel.end(), '\\', '/');
+    if (rel.empty() || rel[0] == '/' || rel.find(':') != std::string::npos) return {};
+    for (size_t at = 0; at <= rel.size();) {
+        size_t end = std::min(rel.find('/', at), rel.size());
+        if (rel.compare(at, end - at, "..") == 0) return {};
+        at = end + 1;
+    }
     std::string full = (root_ / rel).string();
     std::vector<char> out(full.size() + 1024);
     if (casepath_resolve(full.c_str(), out.data(), out.size()) < 0) return full;
@@ -184,6 +192,10 @@ std::shared_ptr<SaveFile> Game::readSave(const fs::path &path, std::string *erro
 }
 
 bool Game::writeSave(const fs::path &path, const SaveFile &save, std::string *error) {
+    if (path.empty()) {
+        if (error) *error = "save file name outside the game folder";
+        return false;
+    }
     try {
         std::vector<uint8_t> bytes = serializeSave(save);
         fs::create_directories(path.parent_path());
@@ -494,10 +506,13 @@ void Game::applySave(const SaveFile &s) {
         a.chara.y = c.y / 2.0;
         a.chara.opacity = c.appearance[0];
         a.chara.blend = c.appearance[1];
-        if (c.appearance[2]) a.chara.direction = c.appearance[2];
+        if (c.appearance[2]) a.chara.direction = validDirection(c.appearance[2]);
         a.chara.pattern = c.appearance[3];
-        a.route = nullptr;
-        a.routeFromCommand = false;
+        // A route a command gave doesn't survive a load; one the event's page gives, which loadMap installed, does.
+        if (a.routeFromCommand) {
+            a.route = nullptr;
+            a.routeFromCommand = false;
+        }
     };
     place(hero_, s.party.hero);
     for (size_t i = 0; i < party_.size() && i < s.party.members.size(); i++) place(party_[i], s.party.members[i]);

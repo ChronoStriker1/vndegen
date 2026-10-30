@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "usage: wolfplay <game folder> [--frames N] [--shot F:file.png] [--press F:key]\n");
         return 2;
     }
-    int frames = 120;
+    int frames = 120, titleAt = -1;
     int mapId = -1, mapX = 0, mapY = 0;
     std::multimap<int, std::string> shots;
     std::multimap<int, uint32_t> presses;
@@ -43,6 +43,7 @@ int main(int argc, char **argv) {
         std::string opt = argv[i], val = argv[i + 1];
         size_t colon = val.find(':');
         if (opt == "--frames") frames = std::atoi(val.c_str());
+        else if (opt == "--title") titleAt = std::atoi(val.c_str());
         else if (opt == "--map") std::sscanf(val.c_str(), "%d,%d,%d", &mapId, &mapX, &mapY);
         else if (opt == "--shot" && colon != std::string::npos)
             shots.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
@@ -96,6 +97,7 @@ int main(int argc, char **argv) {
             }
             // A scripted press holds the key for this frame only.
             in.held = held | in.pressed;
+            if (f == titleAt) game.debugReturnToTitle();
             game.update(in);
             if (std::getenv("WOLF_HERO") && f % 30 == 0) {
                 auto h = game.heroTile();

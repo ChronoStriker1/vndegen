@@ -1,6 +1,7 @@
 // Little-endian reader over a byte buffer, for Wolf RPG Editor's data files.
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -34,6 +35,14 @@ public:
         return v;
     }
     int32_t s32() { return int32_t(u32()); }
+    // A count of items that follow, refused when the bytes left can't hold that many items of at least `minBytesEach`
+    // bytes, so a damaged count can't make the parser allocate more than the file could fill.
+    uint32_t count(size_t minBytesEach) {
+        uint32_t n = u32();
+        if (minBytesEach && n > (data_.size() - std::min(pos_, data_.size())) / minBytesEach)
+            throw FormatError("count " + std::to_string(n) + " runs past the end at " + std::to_string(pos_));
+        return n;
+    }
 
     std::span<const uint8_t> bytes(size_t n) {
         need(n);

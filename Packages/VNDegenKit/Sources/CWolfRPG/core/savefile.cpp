@@ -390,7 +390,8 @@ template <class IO, class D> void variableDb(IO &io, D &db) {
         size_t numbers = 0;
         for (auto k : t.fieldKinds) numbers += k < 2000;
         size_t strings = t.fieldKinds.size() - numbers;
-        io.count32(t.rows, t.fieldKinds.empty() ? 0 : 4);
+        // A row of a type with no fields takes no bytes, so its count is bounded by the file's size instead.
+        io.count32(t.rows, t.fieldKinds.empty() ? 1 : 4);
         for (auto &row : t.rows) {
             if constexpr (IO::reading) {
                 row.numbers.resize(numbers);

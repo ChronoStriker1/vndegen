@@ -705,6 +705,25 @@ static void tsf_region_envtosecs(struct tsf_envelope* p, TSF_BOOL sustainIsGain)
 	else p->sustain = 1.0f - (p->sustain / 1000.0f);
 }
 
+// VNDegen change: tsf_load_presets follows the font's index tables without checking them, so a font whose bag,
+// generator or sample indices point past their tables would read outside them. Such a font is refused here.
+static int tsf_hydra_valid(const struct tsf_hydra *h)
+{
+	int i;
+	if (h->phdrNum < 1 || h->pbagNum < 1 || h->pgenNum < 1 || h->instNum < 1 || h->ibagNum < 1 || h->igenNum < 1) return 0;
+	for (i = 0; i + 1 < h->phdrNum; i++)
+		if (h->phdrs[i].presetBagNdx > h->phdrs[i + 1].presetBagNdx || h->phdrs[i + 1].presetBagNdx >= h->pbagNum) return 0;
+	for (i = 0; i + 1 < h->pbagNum; i++)
+		if (h->pbags[i].genNdx > h->pbags[i + 1].genNdx || h->pbags[i + 1].genNdx > h->pgenNum) return 0;
+	for (i = 0; i + 1 < h->instNum; i++)
+		if (h->insts[i].instBagNdx > h->insts[i + 1].instBagNdx || h->insts[i + 1].instBagNdx >= h->ibagNum) return 0;
+	for (i = 0; i + 1 < h->ibagNum; i++)
+		if (h->ibags[i].instGenNdx > h->ibags[i + 1].instGenNdx || h->ibags[i + 1].instGenNdx > h->igenNum) return 0;
+	for (i = 0; i < h->igenNum; i++)
+		if (h->igens[i].genOper == 53 && h->igens[i].genAmount.wordAmount >= h->shdrNum) return 0;
+	return 1;
+}
+
 static int tsf_load_presets(tsf* res, struct tsf_hydra *hydra, unsigned int fontSampleCount)
 {
 	enum { GenInstrument = 41, GenKeyRange = 43, GenVelRange = 44, GenSampleID = 53 };
@@ -747,7 +766,7 @@ static int tsf_load_presets(tsf* res, struct tsf_hydra *hydra, unsigned int font
 				if (ppgen->genOper == GenKeyRange) { plokey = ppgen->genAmount.range.lo; phikey = ppgen->genAmount.range.hi; continue; }
 				if (ppgen->genOper == GenVelRange) { plovel = ppgen->genAmount.range.lo; phivel = ppgen->genAmount.range.hi; continue; }
 				if (ppgen->genOper != GenInstrument) continue;
-				if (ppgen->genAmount.wordAmount >= hydra->instNum) continue;
+				if (ppgen->genAmount.wordAmount + 1 >= hydra->instNum) continue; // VNDegen change: pinst[1] is read
 				pinst = hydra->insts + ppgen->genAmount.wordAmount;
 				for (pibag = hydra->ibags + pinst->instBagNdx, pibagEnd = hydra->ibags + pinst[1].instBagNdx; pibag != pibagEnd; pibag++)
 				{
@@ -786,7 +805,7 @@ static int tsf_load_presets(tsf* res, struct tsf_hydra *hydra, unsigned int font
 				{
 					struct tsf_region instRegion;
 					tsf_u16 whichInst = ppgen->genAmount.wordAmount;
-					if (whichInst >= hydra->instNum) continue;
+					if (whichInst + 1 >= hydra->instNum) continue; // VNDegen change: pinst[1] is read
 
 					tsf_region_clear(&instRegion, TSF_FALSE);
 					pinst = &hydra->insts[whichInst];
@@ -918,7 +937,10 @@ static int tsf_decode_sf3_samples(const void* rawBuffer, float** pFloatBuffer, u
 		struct tsf_hydra_shdr *shdr = &hydra->shdrs[i];
 		if (shdr->sampleType & 0x30) // compression flags (sometimes Vorbis flag)
 		{
-			const tsf_u8 *pSmpl = smplBuffer + shdr->start, *pSmplEnd = smplBuffer + shdr->end;
+			const tsf_u8 *pSmpl, *pSmplEnd;
+			// VNDegen change: a compressed sample's byte range must lie inside the sample chunk.
+			if (shdr->start > shdr->end || shdr->end > smplLength) { shdr->start = shdr->end = shdr->startLoop = shdr->endLoop = 0; continue; }
+			pSmpl = smplBuffer + shdr->start; pSmplEnd = smplBuffer + shdr->end;
 			if (pSmpl + 4 > pSmplEnd || !TSF_FourCCEquals(pSmpl, "OggS"))
 			{
 				shdr->start = shdr->end = shdr->startLoop = shdr->endLoop = 0;
@@ -1428,6 +1450,9 @@ TSFDEF tsf* tsf_load(struct tsf_stream* stream)
 	else if (!rawBuffer && !floatBuffer)
 	{
 		//if (e) *e = TSF_INVALID_NOSAMPLEDATA;
+	}
+	else if (!tsf_hydra_valid(&hydra)) // VNDegen change
+	{
 	}
 	else
 	{

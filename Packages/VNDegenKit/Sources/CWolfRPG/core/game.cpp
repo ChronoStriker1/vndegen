@@ -15,31 +15,50 @@ namespace wolf {
 
 Game::Game(fs::path root) : root_(root), files_(root) {}
 
+std::vector<uint8_t> Game::readData(const std::string &path) const {
+    auto d = files_.read(path);
+    if (!d) throw FormatError("missing " + path);
+    return *d;
+}
+
+// The three databases, which games change as they run, as the files have them.
+void Game::readDatabases() {
+    Encoding enc = gameDat_.encoding;
+    udb_ = parseDatabase(readData("BasicData/DataBase.project"), readData("BasicData/DataBase.dat"), enc);
+    cdb_ = parseDatabase(readData("BasicData/CDataBase.project"), readData("BasicData/CDataBase.dat"), enc);
+    sdb_ = parseDatabase(readData("BasicData/SysDataBase.project"), readData("BasicData/SysDataBase.dat"), enc);
+}
+
 bool Game::load(std::string *error) {
     try {
-        auto need = [&](const std::string &p) {
-            auto d = files_.read(p);
-            if (!d) throw FormatError("missing " + p);
-            return *d;
-        };
         // Encrypted files are decrypted first (data.h).
         auto basic = [&](const std::string &p, BasicFile kind) {
-            auto d = need(p);
+            auto d = readData(p);
             decryptBasicData(d, kind);
             return d;
         };
         gameDat_ = parseGameDat(basic("BasicData/Game.dat", BasicFile::GameDat));
-        Encoding enc = gameDat_.encoding;
         commons_ = parseCommonEvents(basic("BasicData/CommonEvent.dat", BasicFile::CommonEvent));
-        udb_ = parseDatabase(need("BasicData/DataBase.project"), need("BasicData/DataBase.dat"), enc);
-        cdb_ = parseDatabase(need("BasicData/CDataBase.project"), need("BasicData/CDataBase.dat"), enc);
-        sdb_ = parseDatabase(need("BasicData/SysDataBase.project"), need("BasicData/SysDataBase.dat"), enc);
+        readDatabases();
         tilesets_ = parseTilesets(basic("BasicData/TileSetData.dat", BasicFile::Other));
     } catch (const std::exception &e) {
         if (error) *error = e.what();
         return false;
     }
+    audio_ = std::make_unique<Audio>(files_, 44100, true, log);
+    audio_->setFrameRate(gameDat_.fps());
+    if (!soundFont_.empty()) audio_->setSoundFontPath(soundFont_, soundFontFallback_);
+    return startNewGame(error);
+}
 
+void Game::setSoundFont(std::string path, std::string fallback) {
+    soundFont_ = std::move(path);
+    soundFontFallback_ = std::move(fallback);
+    if (audio_) audio_->setSoundFontPath(soundFont_, soundFontFallback_);
+}
+
+// Variables at their starts, the hero at the first start position, and the start map with its music.
+bool Game::startNewGame(std::string *error) {
     auto rows = [&](int type) { return type < int(sdb_.types.size()) ? sdb_.types[type].rows.size() : 0; };
     normal_.assign(std::max<size_t>(rows(SysNormalVarNames), 100), 0);
     for (int i = 0; i < 9; i++) spare_[i].assign(std::max<size_t>(rows(SysSpare1 + i), 100), 0);
@@ -73,13 +92,53 @@ bool Game::load(std::string *error) {
         if (error) *error = format("cannot load start map %d", startMap);
         return false;
     }
-    audio_ = std::make_unique<Audio>(files_, 44100, true, log);
-    audio_->setFrameRate(gameDat_.fps());
     playMapMusic();
     tintR_.set(100, 0);
     tintG_.set(100, 0);
     tintB_.set(100, 0);
     return true;
+}
+
+// Returning to the title starts the game afresh, as the PC engine does: the databases as the files have them, every
+// variable and picture cleared, and the start map again. The sound engine stays, since the host's audio thread holds
+// it; its sounds stop.
+void Game::returnToTitle() {
+    pendingTitle_ = false;
+    try {
+        readDatabases();
+    } catch (const std::exception &e) {
+        log(std::string("cannot reread the databases: ") + e.what());
+    }
+    eventSelf_.clear();
+    threads_.clear();
+    parallel_.clear();
+    mapParallel_.clear();
+    pictures_.clear();
+    events_.clear();
+    map_.reset();
+    mapId_ = loadedMap_ = -1;
+    choice_ = {};
+    message_ = {};
+    hero_ = {};
+    party_ = {};
+    cameraX_ = cameraY_ = scrollX_ = scrollY_ = 0;
+    moveDuringEvents_ = haltNonPicture_ = scrollLocked_ = false;
+    autoKeys_ = 0;
+    keyControl_ = 0;
+    shake_ = {};
+    mapZoom_ = {100, 100};
+    mapZoomX_ = mapZoomY_ = {};
+    transition_ = {};
+    transitionFrames_ = 0;
+    pendingLoad_.reset();
+    loadedPlaySeconds_ = loadedPlayFrames_ = 0;
+    frameAtLoad_ = frame_;
+    if (audio_) {
+        for (SoundKind k : {SoundKind::BGM, SoundKind::BGS}) audio_->stopMusic(k);
+        audio_->stopAllSE();
+    }
+    std::string error;
+    if (!startNewGame(&error)) log(error);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -380,10 +439,13 @@ bool Game::loadMap(int id) {
     }
     mapId_ = id;
     // Waits on the old map's events end with them.
-    for (auto *list : {&threads_, &parallel_, &mapParallel_})
-        for (auto &t : *list)
-            if (t.waitingRoute && t.waitingRoute != &hero_ && (t.waitingRoute < &party_.front() || t.waitingRoute > &party_.back()))
-                t.waitingRoute = nullptr;
+    auto dropMapWait = [&](Thread &t) {
+        if (t.waitingRoute && t.waitingRoute != &hero_ && (t.waitingRoute < &party_.front() || t.waitingRoute > &party_.back()))
+            t.waitingRoute = nullptr;
+    };
+    for (auto &t : threads_) dropMapWait(t);
+    for (auto *list : {&parallel_, &mapParallel_})
+        for (auto &t : *list) dropMapWait(t);
     events_.clear();
     for (auto &ev : map_->events) {
         MapEventState s;
@@ -449,7 +511,7 @@ void Game::refreshPages() {
                 }
                 c.graphic = pg.graphic;
                 c.chip = pg.graphic.empty() && pg.chip > 0 ? pg.chip : -1;
-                c.direction = pg.direction ? pg.direction : 2;
+                c.direction = validDirection(pg.direction);
                 c.pattern = pg.frame;
                 c.opacity = pg.opacity;
                 c.blend = pg.blend;
@@ -478,6 +540,7 @@ void Game::update(const Input &input) {
     frame_++;
     // A load requested last frame takes effect before anything runs (savestate.cpp).
     if (pendingLoad_) applyPendingLoad();
+    if (pendingTitle_) returnToTitle();
     // System variables 28 and 29 count frames and seconds of play; saves keep them and clocks in games read them.
     if (system_.size() > 29) {
         system_[28]++;

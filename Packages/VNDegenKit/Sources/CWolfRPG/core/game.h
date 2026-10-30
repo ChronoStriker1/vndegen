@@ -7,6 +7,7 @@
 #include "files.h"
 
 #include <array>
+#include <deque>
 #include <cstdlib>
 #include <cstdint>
 #include <functional>
@@ -185,6 +186,11 @@ public:
     explicit Game(std::filesystem::path root);
 
     bool load(std::string *error);
+    // The General MIDI SoundFont, and the one to load when it can't be read. Set before load, so the start map's MIDI
+    // music has it.
+    void setSoundFont(std::string path, std::string fallback);
+    // For test hosts: goes back to the title at the next frame, as the event command does.
+    void debugReturnToTitle() { pendingTitle_ = true; }
     // Advances one frame.
     void update(const Input &input);
 
@@ -291,6 +297,10 @@ public:
     bool loadSlot(int slot, std::string *error = nullptr);
 
 private:
+    std::vector<uint8_t> readData(const std::string &path) const;
+    void readDatabases();
+    bool startNewGame(std::string *error);
+    void returnToTitle();
     std::filesystem::path saveFilePath(const std::string &name) const;  // a file under the game folder, any case
     std::shared_ptr<struct SaveFile> readSave(const std::filesystem::path &path, std::string *error) const;
     bool writeSave(const std::filesystem::path &path, const SaveFile &save, std::string *error);
@@ -364,7 +374,9 @@ private:
     std::array<Actor, 5> party_;
     double cameraX_ = 0, cameraY_ = 0;
 
-    std::vector<Thread> threads_;      // autorun and called events, run in order
+    // Autorun and called events, run in order. A deque, so an event that queues another (command 211) while it runs
+    // keeps its own place in memory.
+    std::deque<Thread> threads_;
     std::vector<Thread> parallel_;     // parallel common events, one per event
     std::vector<Thread> mapParallel_;  // parallel map event pages
     std::map<int, Picture> pictures_;
@@ -382,6 +394,7 @@ private:
 
     bool moveDuringEvents_ = false, haltNonPicture_ = false, scrollLocked_ = false;
     bool pendingTitle_ = false, quitRequested_ = false;
+    std::string soundFont_, soundFontFallback_;
     uint32_t autoKeys_ = 0;
     int keyControl_ = 0;
     ShakeState shake_;

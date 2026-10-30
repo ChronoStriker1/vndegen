@@ -132,6 +132,14 @@ struct MapTreeNode {
     int32_t parent = -1;
 };
 
+// The passability word of a map tile value. Autotile slot 0 is the empty tile and slots 1 onwards are the tileset's
+// autotile files (values 100000 and up, by hundred thousands); the base image's tiles follow the autotile slots.
+inline uint32_t tilePassability(const Tileset &ts, int32_t value) {
+    if (value < 0) return 0;
+    size_t index = value >= 100000 ? size_t(value / 100000 - 1) : ts.autotileFiles.size() + 1 + size_t(value);
+    return index < ts.passability.size() ? ts.passability[index] : 0;
+}
+
 GameDat parseGameDat(std::span<const uint8_t> data);
 std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data);
 // A database is a .project file with types, field names and row names, and a .dat file with the values.

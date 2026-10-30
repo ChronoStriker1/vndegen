@@ -70,15 +70,14 @@ VNWolfEngine *vnwolf_start(const VNWolfLaunch *launch) {
         std::fflush(log);
         if (line.starts_with("missing") || line.starts_with("cannot")) raw->problem = line;
     };
+    if (launch->soundFontPath)
+        e->game->setSoundFont(launch->soundFontPath, launch->fallbackSoundFontPath ? launch->fallbackSoundFontPath : "");
     std::string error;
     if (!e->game->load(&error)) {
         gStartError = error;
         if (e->log) std::fclose(e->log);
         return nullptr;
     }
-    if (launch->soundFontPath && e->game->audio())
-        e->game->audio()->setSoundFontPath(launch->soundFontPath,
-                                           launch->fallbackSoundFontPath ? launch->fallbackSoundFontPath : "");
     e->renderer = std::make_unique<Renderer>(*e->game);
     e->caption = e->game->gameDat().title;
     e->renderer->draw(e->frame);

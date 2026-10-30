@@ -14,7 +14,9 @@ same project. It reads .sf2 SoundFonts and .sf3 ones, whose samples are Ogg Vorb
 through `third_party/vnmidi_libs.h`, with internal linkage or a `vnmidi_` prefix, so an engine that
 compiles its own copies of them links beside it without duplicate symbols.
 
-`tml.h` has one change of VNDegen's, marked "VNDegen change" in the file. Upstream TinyMidiLoader moves the first event
+`tsf.h` has VNDegen changes, marked "VNDegen change", that refuse a font whose preset, instrument, generator or sample
+indices point past their tables and an .sf3 sample whose byte range lies outside the sample chunk, which upstream
+follows without checking. `tml.h` has one change of VNDegen's, marked "VNDegen change" in the file. Upstream TinyMidiLoader moves the first event
 it puts in order into its first slot while it still reads the tracks. When that slot held a track's first event, the
 track stops at once, and its later events are lost. In the Wolf RPG test games that lost every tempo change of 4 of
 93 songs, which then played up to 36 s too short or 40 s too long.

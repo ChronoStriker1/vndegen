@@ -31,12 +31,7 @@ Blend blendFor(int blend) {
 
 MapRenderer::MapRenderer(ImageCache &images, const Game &game) : images_(images), game_(game) {}
 
-// Autotile slot 0 is the empty tile, and slots 1 onwards are the tileset's autotile files. The base image's tiles
-// follow the autotile slots.
-uint32_t MapRenderer::tileFlags(const Tileset &ts, int32_t value) const {
-    size_t index = value >= 100000 ? size_t(value / 100000 - 1) : ts.autotileFiles.size() + 1 + size_t(value);
-    return index < ts.passability.size() ? ts.passability[index] : 0;
-}
+uint32_t MapRenderer::tileFlags(const Tileset &ts, int32_t value) const { return tilePassability(ts, value); }
 
 void MapRenderer::drawTile(Canvas &canvas, const Tileset &ts, int32_t value, int x, int y, const DrawOptions &o) {
     int tile = game_.tileSize();

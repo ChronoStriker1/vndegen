@@ -206,6 +206,8 @@ void Archive::walk(const std::vector<uint8_t> &head, uint64_t fileTable, uint64_
             if (address == 0 || address > dirs || width * 4 > dirs - address ||
                 t.addr(dirTable + address) != e || t.addr(dirTable + address + width) != dir)
                 throw FormatError("bad directory record for " + path);
+            // Games nest a few folders deep; a deeper chain is damage and would only use up the stack.
+            if (std::count(path.begin(), path.end(), '/') >= 64) throw FormatError("folders nest too deep at " + path);
             walk(head, fileTable, dirTable, address, path + "/");
             continue;
         }

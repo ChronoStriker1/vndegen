@@ -470,8 +470,10 @@ struct Audio::Impl {
 
     void mix(float *out, int frames) {
         std::fill_n(out, size_t(frames) * 2, 0.0f);
-        std::lock_guard lock(mutex);
-        if (paused) return;
+        // The audio thread never waits for the game thread: while the game holds the lock, as when it adds a sound
+        // and its lists grow, this block stays silent rather than late.
+        std::unique_lock lock(mutex, std::try_to_lock);
+        if (!lock.owns_lock() || paused) return;
         for (auto &sp : sources) mixOne(*sp, out, frames);
         for (int i = 0; i < frames * 2; i++) out[i] = softClip(out[i]);
         for (size_t i = 0; i < sources.size();) {

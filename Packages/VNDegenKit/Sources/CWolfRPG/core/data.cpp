@@ -91,7 +91,7 @@ struct Parser {
     MoveRoute route(uint8_t flags) {
         MoveRoute route;
         route.flags = flags;
-        uint32_t n = r.u32();
+        uint32_t n = r.count(4);  // id, argument count, and the 01 00 that ends a step
         route.steps.reserve(n);
         for (uint32_t i = 0; i < n; i++) {
             RouteStep step;
@@ -130,7 +130,7 @@ struct Parser {
     }
 
     Commands commands() {
-        uint32_t n = r.u32();
+        uint32_t n = r.count(8);  // argument count, code, indent, string count, terminator
         Commands cmds;
         cmds.reserve(n);
         for (uint32_t i = 0; i < n; i++) cmds.push_back(command());
@@ -190,7 +190,7 @@ std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data) {
     Parser p{r, enc};
     uint8_t version = p.r.u8();
     if (version == 0x93 || version == 0xCC) throw FormatError("compressed CommonEvent.dat (Wolf RPG Editor 3.5) is not supported yet");
-    uint32_t count = p.r.u32();
+    uint32_t count = p.r.count(16);
     std::vector<CommonEvent> events;
     events.reserve(count);
     for (uint32_t i = 0; i < count; i++) {
@@ -246,7 +246,7 @@ std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data) {
 Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t> dat, Encoding enc) {
     Database db;
     Parser pp{Reader(project), enc};
-    uint32_t typeCount = pp.r.u32();
+    uint32_t typeCount = pp.r.count(28);  // a name and six counts at least
     db.types.resize(typeCount);
     for (auto &t : db.types) {
         t.name = pp.str();
@@ -279,7 +279,7 @@ Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t
     for (auto &t : db.types) {
         dp.r.expect({0xFE, 0xFF, 0xFF, 0xFF}, "database type");
         t.idMethod = dp.r.u32();
-        uint32_t fields = dp.r.u32();
+        uint32_t fields = dp.r.count(4);
         if (t.idMethod == 0x1D4C0) dp.str();
         size_t numbers = 0, strings = 0;
         for (uint32_t i = 0; i < fields; i++) {
@@ -288,7 +288,7 @@ Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t
             if (kind >= 2000) strings++;
             else numbers++;
         }
-        uint32_t rows = dp.r.u32();
+        uint32_t rows = dp.r.count(std::max<size_t>(1, (numbers + strings) * 4));
         t.rows.resize(rows);
         for (auto &row : t.rows) {
             for (size_t i = 0; i < numbers; i++) row.numbers.push_back(dp.r.s32());
@@ -314,6 +314,10 @@ Map parseMap(std::span<const uint8_t> data) {
     m.width = p.r.s32();
     m.height = p.r.s32();
     uint32_t eventCount = p.r.u32();
+    // The editor makes maps of at most 9999 tiles a side; anything larger is damage, as is a size the file can't hold.
+    if (m.width < 0 || m.height < 0 || m.width > 9999 || m.height > 9999 ||
+        size_t(m.width) * size_t(m.height) > size_t(4) << 20)
+        throw FormatError("bad map size " + std::to_string(m.width) + "x" + std::to_string(m.height));
     bool tiles = true;
     if (enc == Encoding::UTF8) {
         size_t at = p.r.pos();
@@ -322,6 +326,7 @@ Map parseMap(std::span<const uint8_t> data) {
     }
     if (tiles) {
         size_t n = size_t(m.width) * m.height * m.layers;
+        if (n * 4 > p.r.size() - p.r.pos()) throw FormatError("map tiles run past the end");
         m.tiles.resize(n);
         for (auto &t : m.tiles) t = p.r.s32();
     } else {
