@@ -267,21 +267,34 @@ nonisolated extension GodotPack {
             case let .magic(starts): return starts.contains { block.starts(with: $0) }
             case .text: return printable(block)
             case .fileList:
+                // Godot pads each path with zeros to a multiple of four bytes.
                 let length = Int(block.uint32(at: 0))
-                return (1..<4096).contains(length) && printable(block.dropFirst(4).prefix(length))
+                return (1..<4096).contains(length) && printable(block.dropFirst(4).prefix(length).filter { $0 != 0 })
             case .unknown: return true
             }
         }
     }
 
-    /// The key for one of the encrypted files: the smallest whose first block can be told, else the smallest small one.
+    /// The key for one of the encrypted files. The smallest file of each kind is tried, the surest kind first: a file
+    /// with a magic number, then a text file, which may not be ASCII after all, then a small file of another kind.
     fileprivate static func encryptionKey(_ file: FileHandle, among files: [(name: String, offset: UInt64, size: UInt64)],
                                           executable: URL) -> Data? {
-        let sized = files.filter { $0.size > 0 }.sorted { $0.size < $1.size }
-        guard let sample = sized.first(where: { Plaintext(path: $0.name) != .unknown }) ?? sized.first(where: { $0.size <= 1 << 16 }) else {
-            return nil
+        let rank = { (plaintext: Plaintext) in
+            switch plaintext {
+            case .magic: 0
+            case .text: 1
+            case .fileList, .unknown: 2
+            }
         }
-        return encryptionKey(file, sample: sample.offset, plaintext: Plaintext(path: sample.name), executable: executable)
+        var tried: Set<Int> = []
+        let samples = files.filter { $0.size > 0 }.map { (file: $0, plaintext: Plaintext(path: $0.name)) }
+        for (sample, plaintext) in samples.sorted(by: { (rank($0.plaintext), $0.file.size) < (rank($1.plaintext), $1.file.size) }) {
+            let kind = rank(plaintext)
+            guard !tried.contains(kind), plaintext != .unknown || sample.size <= 1 << 16 else { continue }
+            tried.insert(kind)
+            if let key = encryptionKey(file, sample: sample.offset, plaintext: plaintext, executable: executable) { return key }
+        }
+        return nil
     }
 
     /// Keys already searched for, by executable and part, since the game's page and its launch both read the pack.

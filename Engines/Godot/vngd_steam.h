@@ -124,10 +124,11 @@ public:
 	Dictionary steamInit(const Variant &p_a, const Variant &p_b, const Variant &p_c) { return start(1, p_a, p_b, p_c); }
 	Dictionary steamInitEx(const Variant &p_a, const Variant &p_b, const Variant &p_c) { return start(0, p_a, p_b, p_c); }
 	Dictionary start(int p_status, const Variant &p_a, const Variant &p_b, const Variant &p_c) {
-		// GodotSteam versions order the arguments differently. The app ID is the only number among them.
+		// GodotSteam versions order the arguments differently. The app ID is the first number among them.
 		for (const Variant *argument : { &p_a, &p_b, &p_c }) {
 			if (argument->get_type() == Variant::INT && (int64_t)*argument > 0) {
 				app_id = (int64_t)*argument;
+				break;
 			}
 		}
 		requestCurrentStats();
