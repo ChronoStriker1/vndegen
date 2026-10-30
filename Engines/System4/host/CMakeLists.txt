@@ -13,15 +13,17 @@ endif()
 set(RUNTIME ${CMAKE_CURRENT_SOURCE_DIR}/../../../Packages/VNDegenKit/Sources/CSystem4)
 set(SHARED ${CMAKE_CURRENT_SOURCE_DIR}/../../Shared)
 find_package(ZLIB REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
 
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/core/*.cpp ${RUNTIME}/core/*.c)
-add_library(system4 STATIC ${RUNTIME_SOURCES})
+add_library(system4 STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(system4 PUBLIC ${RUNTIME}/core ${RUNTIME}/include ${SHARED})
-target_link_libraries(system4 PUBLIC ZLIB::ZLIB pthread)
+target_link_libraries(system4 PUBLIC ZLIB::ZLIB PkgConfig::FREETYPE pthread)
 # Tools write PNGs with stb_image_write, from the Wolf runtime's copy of stb.
 target_include_directories(system4 PUBLIC ${RUNTIME}/../CWolfRPG/third_party)
 
-foreach(tool s4dis s4run s4cg s4cgcheck)
+foreach(tool s4dis s4play s4cg s4cgcheck)
   add_executable(${tool} tools/${tool}.cpp)
   # HLL modules register themselves from static initializers, so keep every object.
   target_link_libraries(${tool} PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,system4>")
