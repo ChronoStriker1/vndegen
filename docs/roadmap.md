@@ -32,10 +32,10 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - An RPG Maker MV fix (0.8.1): games that ship only Ogg audio, which every MV game in the library does, have sound. VNDegen decodes their Ogg files in the page instead of asking for `.m4a` files they don't have.
 - NScripter fixes (0.8.2): the `breakup.dll`, `lngtwave.dll` and `trvswave.dll` effects drawn as on Windows, MP3 sound, input and yes/no boxes laid out as on Windows, global variables kept when the app is killed, saves made inside subroutines byte-identical to the PC's, and sound decoded off the audio thread. Only features a library game uses were built. The rest stay in `docs/nscripter.md`'s Known limits.
 - NScripter features for more games (0.8.3): CD music from a game's `CD` folder, Lua scripts on an embedded Lua 5.1, NBZ voices, LZSS archive entries, the `MSpDraw.dll` drawing plugin, and backquoted English text. Built for the 4 library games that use them.
+- Godot (0.9.0), on Godot 4.7.2 for Godot 4 games and Godot 3.6.3 for Godot 3 games, on Mac with Apple silicon, iPhone, and iPad. Packs load unchanged, from a `.pck` or from inside the `.exe`. Godot 4 draws through Metal, and Godot 3 through OpenGL on Mac and ANGLE on iPhone and iPad. Saves go where Windows keeps them. All 4 test games reach their title, save, and load on the Mac and the iPad simulator, and pass the case check. Two library games can't be supported: one needs Steam ownership, and one has an encrypted pack and Windows-only GDExtensions. `docs/godot.md` has the known limits.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Godot (item 8), with Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. Two library games can't be supported. One needs Steam ownership, and one has an encrypted pack and Windows-only GDExtensions.
 - Artemis (item 5), on art3m1s-core (MPL-2.0) with VNDegen's patches. 7 of 8 test games reach their title screen on Linux, and a smoke test on the iPad simulator passed. Saves that load in the PC version are in progress.
 - Paused, to resume later: Wolf RPG Editor (item 6), whose feasibility test is done, with all 3 test games playing past their title screen on Linux. The clean-room runtimes for RGSS and for AliceSoft System 3 and System 4 (item 4).
 
@@ -53,7 +53,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. B
 5. Artemis, on art3m1s-core (MPL-2.0).
 6. Wolf RPG Editor, which needs a new runtime.
 7. Flash, through Ruffle (MIT or Apache-2.0) in the web view the RPG Maker MV/MZ and TyranoScript plugins already use. 14 library games. Shipped in 0.7.0.
-8. Godot, on Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. A game's `.pck` loads only if it uses no native GDExtension libraries. 6 library games.
+8. Godot, on Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. Shipped in 0.9.0.
 9. NekoSDK, parked for later. No runtime or reimplementation exists, so this is a reimplementation from the game files. A feasibility test on branch `ws/nekosdk` (`docs/nekosdk.md` there) found that every game's archives and story scripts parse, but each game's title, save, config and gallery screens, and in 6 games the story order, are compiled into its exe. It estimated 10 to 14 weeks for the 10 games whose story order is data, with VNDegen-style menus. 16 library games, 45 GB.
 10. Unity. Before any work, decide with the maintainer whether it is feasible and how to proceed, including converting games to run natively on ARM. IL2CPP games are compiled x86 code. Mono games carry their game code as portable .NET assemblies, but run on Unity's x86 Windows player. 60 library games: 44 Mono, 10 IL2CPP, and 6 not yet checked.
 11. After the engine plugins: installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
