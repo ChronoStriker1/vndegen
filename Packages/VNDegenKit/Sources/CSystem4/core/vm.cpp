@@ -20,6 +20,7 @@ bool isRefPair(int32_t t) { return t == T_REF_INT || t == T_REF_FLOAT || t == T_
 int retWords(int32_t t) { return t == T_VOID ? 0 : isRefPair(t) ? 2 : 1; }
 
 bool isString(int32_t t) { return t == T_STRING; }
+bool isDelegate(int32_t t) { return t == 63; }
 bool isStructValue(int32_t t) { return t == T_STRUCT; }
 bool isArray(int32_t t) {
     return t == T_ARRAY_INT || t == T_ARRAY_FLOAT || t == T_ARRAY_STRING || t == T_ARRAY_STRUCT ||
@@ -127,6 +128,15 @@ int32_t VM::newString(std::string str) {
     return s;
 }
 
+int32_t VM::newDelegate(Delegate d) {
+    int32_t s = alloc();
+    for (auto &e : d) incref(e.first);
+    heap[s].dg = std::make_unique<Delegate>(std::move(d));
+    return s;
+}
+
+Delegate *VM::delegate(int32_t slot) { return valid(slot) ? heap[slot].dg.get() : nullptr; }
+
 Page *VM::page(int32_t slot) { return valid(slot) ? heap[slot].page.get() : nullptr; }
 
 std::string &VM::str(int32_t slot) {
@@ -144,6 +154,13 @@ void VM::decref(int32_t slot) {
     if (!valid(slot)) return;
     if (--heap[slot].refs > 0) return;
     Slot &s = heap[slot];
+    if (s.dg) {
+        std::unique_ptr<Delegate> d = std::move(s.dg);
+        s.inUse = false;
+        for (auto &e : *d) decref(e.first);
+        freeSlots.push_back(slot);
+        return;
+    }
     if (s.page) {
         Page &p = *s.page;
         if (p.kind == PageKind::Struct && p.index >= 0 && size_t(p.index) < ain.structs.size()) {
@@ -192,8 +209,7 @@ VarType VM::varType(const Page &p, size_t i) const {
 }
 
 void VM::releaseValue(const VarType &t, int32_t v) {
-    if (isString(t.type) || isStructValue(t.type) || isArray(t.type) || isRefSlot(t.type) ||
-        (t.type == T_INT && false)) {
+    if (isString(t.type) || isStructValue(t.type) || isArray(t.type) || isRefSlot(t.type) || isDelegate(t.type)) {
         decref(v);
     }
 }
@@ -211,7 +227,9 @@ void VM::freePage(Page &p) {
 }
 
 void VM::initVar(Page &p, size_t i, const VarType &t) {
-    if (isString(t.type)) {
+    if (isDelegate(t.type)) {
+        p.v[i] = newDelegate();
+    } else if (isString(t.type)) {
         p.v[i] = newString();
     } else if (isArray(t.type)) {
         int32_t s = newPage(PageKind::Array, -1, 0);
@@ -260,6 +278,7 @@ int32_t VM::newArray(int32_t elemType, int32_t elemStruct, int32_t rank, const i
         if (rank > 1) v = newArray(elemType, elemStruct, rank - 1, dims + 1, ndims - 1);
         else if (elemType == T_STRING) v = newString();
         else if (elemType == T_STRUCT) v = newStruct(elemStruct);
+        else if (elemType == 63) v = newDelegate();
         else v = 0;
         heap[s].page->v[i] = v;
     }
@@ -291,6 +310,7 @@ int32_t VM::copyPage(int32_t slot) {
             continue;
         }
         if (isString(t.type)) out = newString(str(v));
+        else if (isDelegate(t.type)) out = newDelegate(delegate(v) ? *delegate(v) : Delegate{});
         else if (isStructValue(t.type) || isArray(t.type)) out = valid(v) ? copyPage(v) : -1;
         else if (isRefSlot(t.type)) incref(v);
         heap[s].page->v[i] = out;
@@ -362,7 +382,8 @@ void VM::leave() {
     frames.pop_back();
     decref(fr.localPage);
     if (fr.structPage >= 0) decref(fr.structPage);
-    for (int32_t v : ret) stack.push_back(v);
+    if (!fr.discardReturn)
+        for (int32_t v : ret) stack.push_back(v);
     ip = fr.returnAddress;
 }
 
@@ -496,7 +517,7 @@ void VM::run(size_t untilFrames) {
             return a;
         };
         auto releaseElem = [&](Page &a, int32_t v) {
-            if (a.rank > 1 || a.elemType == T_STRING || a.elemType == T_STRUCT) decref(v);
+            if (a.rank > 1 || a.elemType == T_STRING || a.elemType == T_STRUCT || a.elemType == 63) decref(v);
         };
         auto jump = [&](uint32_t to) { next = to; };
         auto binop = [&](auto f) { int32_t b = pop(), a = pop(); push(f(a, b)); };
@@ -978,6 +999,92 @@ void VM::run(size_t untilFrames) {
         case OP_SH_LOCAL_S_EMPTY: push(str(localv(A(0))).empty()); break;
         case OP_SH_MEM_S_EMPTY: push(str(thisv(A(0))).empty()); break;
         case OP_S_ASSIGN_REF: { int32_t i = pop(), pg = pop(), d = pop(); str(d) = str(var(pg, i)); break; }
+        // Delegates. A delegate value is a slot holding (this, function) pairs.
+        case OP_DG_NEW: push(newDelegate()); break;
+        case OP_DG_COPY: { int32_t d = pop(); push(newDelegate(delegate(d) ? *delegate(d) : Delegate{})); break; }
+        case OP_DG_ASSIGN: case OP_DG_PLUSA: case OP_DG_MINUSA: {
+            int32_t src = pop(), dst = pop();
+            Delegate *d = delegate(dst), *sd = delegate(src);
+            if (d) {
+                Delegate add = sd ? *sd : Delegate{};
+                if (op == OP_DG_ASSIGN) {
+                    Delegate old = std::move(*d);
+                    *d = {};
+                    for (auto &e : add) { incref(e.first); d->push_back(e); }
+                    for (auto &e : old) decref(e.first);
+                } else if (op == OP_DG_PLUSA) {
+                    for (auto &e : add) { incref(e.first); d->push_back(e); }
+                } else {
+                    for (auto &e : add) {
+                        auto it = std::find(d->begin(), d->end(), e);
+                        if (it != d->end()) { int32_t obj = it->first; d->erase(it); decref(obj); }
+                    }
+                }
+            }
+            decref(src);
+            push(dst);
+            incref(dst);
+            break;
+        }
+        case OP_DG_POP: decref(pop()); break;
+        case OP_DG_CLEAR: {
+            int32_t dsl = pop();
+            if (Delegate *d = delegate(dsl)) {
+                Delegate old = std::move(*d);
+                *d = {};
+                for (auto &e : old) decref(e.first);
+            }
+            break;
+        }
+        case OP_DG_NUMOF: { int32_t dsl = pop(); push(delegate(dsl) ? int32_t(delegate(dsl)->size()) : 0); break; }
+        case OP_DG_EXIST: {
+            int32_t fn = pop(), obj = pop(), dsl = pop();
+            Delegate *d = delegate(dsl);
+            push(d && std::find(d->begin(), d->end(), std::make_pair(obj, fn)) != d->end());
+            break;
+        }
+        case OP_DG_ADD: {
+            int32_t fn = pop(), obj = pop(), dsl = pop();
+            if (Delegate *d = delegate(dsl)) { incref(obj); d->push_back({obj, fn}); }
+            break;
+        }
+        case OP_DG_NEW_FROM_METHOD: { int32_t fn = pop(), obj = pop(); push(newDelegate(Delegate{{obj, fn}})); break; }
+        case OP_DG_STR_TO_METHOD: {
+            pop();  // the delegate type
+            int32_t s = pop();
+            int f = ain.findFunction(str(s));
+            decref(s);
+            push(f < 0 ? 0 : f);
+            break;
+        }
+        // A delegate call: CALLBEGIN finds the delegate below the arguments and pushes an index; each DG_CALL calls
+        // the next method with copies of the arguments, or when none are left drops them and jumps past the loop.
+        case OP_DG_CALLBEGIN: push(0); break;
+        case OP_DG_CALL: {
+            const FuncType &ft = ain.delegates.at(A(0));
+            int nargs = 0;
+            for (int k = 0; k < ft.argc; k++) nargs++;
+            size_t top = stack.size();
+            if (top < size_t(nargs) + 2) fatal("delegate call without its delegate");
+            int32_t idx = stack[top - 1];
+            int32_t dsl = stack[top - 2 - nargs];
+            Delegate *d = delegate(dsl);
+            if (!d || idx >= int32_t(d->size())) {
+                stack.resize(top - 2 - nargs);
+                jump(A(1));
+                break;
+            }
+            auto [obj, fn] = (*d)[idx];
+            stack[top - 1] = idx + 1;
+            for (int k = 0; k < nargs; k++) push(stack[top - 1 - nargs + k]);
+            ip = next;
+            enter(fn, obj >= 0 ? obj : -1, false);
+            frames.back().discardReturn = true;
+            frames.back().returnAddress = curInsn_;  // back to this instruction for the next method
+            next = ip;
+            break;
+        }
+        case OP_SH_LOC_OUT_OF_RANGE: { int32_t v = localv(A(0)); push(v < A(1) || v >= A(2)); break; }
         case OP_SREF_EMPTY: { int32_t i = pop(), pg = pop(); push(str(var(pg, i)).empty()); break; }
         case OP_S_ASSIGN_FUNCSTACKNAME: {
             // Seen only in the games' error reporting: f[i] = the name of the function i levels up.

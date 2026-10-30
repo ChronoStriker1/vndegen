@@ -2,7 +2,9 @@
 
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 #include <filesystem>
+#include <zlib.h>
 
 namespace fs = std::filesystem;
 
@@ -95,6 +97,56 @@ std::unique_ptr<AldArchive> AldArchive::open(const std::string &first) {
         std::fclose(f);
     }
     return a;
+}
+
+// AFA version 2, from the files: "AFAH", u32 28, "AlicArch", u32 2, u32 1, u32 offset of the data, then "INFO", u32 its
+// size, u32 the index's plain length, u32 the entry count and the zlib index. Each entry: u32 name length, u32 padded
+// length, the name, two words, u32 offset from the data start, u32 size.
+std::unique_ptr<AfaArchive> AfaArchive::open(const std::string &path) {
+    FILE *f = std::fopen(path.c_str(), "rb");
+    if (!f) return nullptr;
+    uint8_t h[44];
+    bool ok = std::fread(h, 1, sizeof h, f) == sizeof h && !std::memcmp(h, "AFAH", 4) && !std::memcmp(h + 8, "AlicArch", 8) &&
+              !std::memcmp(h + 28, "INFO", 4);
+    auto rd = [&](size_t o) { uint32_t v; std::memcpy(&v, h + o, 4); return v; };
+    if (!ok) { std::fclose(f); return nullptr; }
+    uint32_t dataOff = rd(24), infoSize = rd(32), plainSize = rd(36), count = rd(40);
+    std::vector<uint8_t> comp(infoSize > 16 ? infoSize - 16 : 0), plain(plainSize);
+    ok = std::fread(comp.data(), 1, comp.size(), f) == comp.size();
+    std::fclose(f);
+    uLongf out = plainSize;
+    if (!ok || uncompress(plain.data(), &out, comp.data(), uLong(comp.size())) != Z_OK) return nullptr;
+    auto a = std::make_unique<AfaArchive>();
+    a->paths_.push_back(path);
+    size_t i = 0;
+    auto u32 = [&]() -> uint32_t {
+        if (i + 4 > plain.size()) { i = plain.size(); return 0; }
+        uint32_t v; std::memcpy(&v, plain.data() + i, 4); i += 4; return v;
+    };
+    for (uint32_t k = 0; k < count && i < plain.size(); k++) {
+        uint32_t len = u32(), padded = u32();
+        if (i + padded > plain.size()) break;
+        ArchiveEntry e;
+        e.file = 0;
+        e.name.assign(reinterpret_cast<char *>(plain.data() + i), std::min(len, padded));
+        i += padded;
+        u32();
+        u32();
+        e.offset = uint64_t(dataOff) + u32();
+        e.size = u32();
+        std::string key = e.name;
+        for (char &c : key) c = c == '\\' ? '/' : char(std::tolower(static_cast<unsigned char>(c)));
+        a->byName_[key] = a->list_.size();
+        a->list_.push_back(std::move(e));
+    }
+    return a;
+}
+
+const ArchiveEntry *AfaArchive::find(const std::string &name) const {
+    std::string key = name;
+    for (char &c : key) c = c == '\\' ? '/' : char(std::tolower(static_cast<unsigned char>(c)));
+    auto it = byName_.find(key);
+    return it == byName_.end() ? nullptr : &list_[it->second];
 }
 
 const ArchiveEntry *AldArchive::find(int number) const {

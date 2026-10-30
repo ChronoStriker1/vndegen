@@ -39,4 +39,16 @@ private:
     std::map<int, ArchiveEntry> entries_;
 };
 
+// AFA ("AlicArch"): a zlib-compressed index of named files, version 2. Lookups ignore case and backslashes.
+class AfaArchive : public Archive {
+public:
+    static std::unique_ptr<AfaArchive> open(const std::string &path);
+    const ArchiveEntry *find(const std::string &name) const;  // CP932 name, any case
+    const std::vector<ArchiveEntry> &entries() const { return list_; }
+
+private:
+    std::vector<ArchiveEntry> list_;
+    std::map<std::string, size_t> byName_;  // lower-case name
+};
+
 }  // namespace s4

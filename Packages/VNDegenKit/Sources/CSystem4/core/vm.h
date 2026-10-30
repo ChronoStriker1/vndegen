@@ -28,11 +28,15 @@ struct Page {
     std::vector<int32_t> v;
 };
 
+// A delegate: methods to call in order, each a `this` page (or -1) and a function.
+using Delegate = std::vector<std::pair<int32_t, int32_t>>;
+
 struct Slot {
     int32_t refs = 0;
     bool inUse = false;
     std::unique_ptr<Page> page;
     std::unique_ptr<std::string> str;
+    std::unique_ptr<Delegate> dg;
 };
 
 class VM;
@@ -86,6 +90,7 @@ struct Frame {
     bool native = false;  // a call from native code: returning ends VM::call
     uint32_t callSite = 0;  // address of the call instruction in the caller
     bool method = false;
+    bool discardReturn = false;  // a delegate call: its return value is dropped
 };
 
 // Thrown when system.ResumeLoad has replaced the VM's state: the runner continues with VM::run(0).
@@ -105,6 +110,8 @@ public:
     int32_t alloc();
     int32_t newPage(PageKind kind, int32_t index, size_t size);
     int32_t newString(std::string s = {});
+    int32_t newDelegate(Delegate d = {});
+    Delegate *delegate(int32_t slot);
     Page *page(int32_t slot);
     std::string &str(int32_t slot);
     void incref(int32_t slot);
