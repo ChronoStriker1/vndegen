@@ -2,6 +2,7 @@
 
 #include "wolf_casepath.h"
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 
@@ -66,6 +67,20 @@ std::optional<fs::path> GameFiles::looseFile(const std::string &path) const {
     auto p = findCaseless(data_, normalizePath(path));
     if (p && fs::is_regular_file(*p)) return p;
     return std::nullopt;
+}
+
+std::optional<std::vector<std::string>> GameFiles::listFolder(std::string path) const {
+    for (auto &c : path)
+        if (c == '\\') c = '/';
+    while (!path.empty() && path.back() == '/') path.pop_back();
+    auto folder = path.empty() ? std::optional<fs::path>(root_) : findCaseless(root_, path);
+    std::error_code ec;
+    if (!folder || !fs::is_directory(*folder, ec)) return std::nullopt;
+    std::vector<std::string> names;
+    for (auto &entry : fs::directory_iterator(*folder, ec))
+        if (entry.is_regular_file(ec)) names.push_back(entry.path().filename().string());
+    std::sort(names.begin(), names.end());
+    return names;
 }
 
 std::optional<std::vector<uint8_t>> GameFiles::read(const std::string &raw) const {

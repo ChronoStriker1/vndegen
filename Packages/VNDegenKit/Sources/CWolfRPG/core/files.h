@@ -25,6 +25,9 @@ public:
     const std::filesystem::path &root() const { return root_; }
     // A loose file on disk, if the path names one.
     std::optional<std::filesystem::path> looseFile(const std::string &path) const;
+    // The names of the files in a folder on disk, relative to the game folder ("" is the game folder itself), sorted.
+    // Nullopt when there is no such folder, as for one packed in an archive.
+    std::optional<std::vector<std::string>> listFolder(std::string path) const;
 
 private:
     std::optional<std::filesystem::path> findCaseless(const std::filesystem::path &base, const std::string &rel) const;

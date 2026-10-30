@@ -191,6 +191,13 @@ bool Game::step(Thread &t) {
             setVariable(t, cmd);
             return true;
         case 122:
+            // Typing text on the keyboard waits for the player in Wolf. With no text entry yet the command keeps the
+            // text already there and takes a frame, so a loop around it runs once a frame instead of spinning.
+            if ((uint32_t(cmd.arg(1)) & 0x0F) == 3) {
+                unsupported(cmd);
+                t.wait = 1;
+                return false;
+            }
             setString(t, cmd);
             return true;
 
@@ -605,7 +612,7 @@ void Game::setString(Thread &t, const Command &c) {
         case 0: rhs = expandText(c.str(0), &t); break;
         case 1: source = c.arg(2); rhs = textAt(source, t); break;
         case 2: source = value(c.arg(2), t); rhs = textAt(source, t); break;
-        default: unsupported(c); return;  // keyboard input
+        default: unsupported(c); return;
     }
     std::string cur = readStr(target, t);
     switch (assign) {
@@ -628,6 +635,16 @@ void Game::setString(Thread &t, const Command &c) {
             auto bytes = files_.read(rhs);
             std::string text = bytes ? std::string(bytes->begin(), bytes->end()) : "";
             writeStr(target, toUtf8(text, gameDat_.encoding), t);
+            break;
+        }
+        case 0x07: {  // the files in a folder, one name a line; <<ERROR>> for a folder packed in an archive
+            std::string list;
+            if (auto names = files_.listFolder(rhs)) {
+                for (auto &n : *names) list += (list.empty() ? "" : "\n") + n;
+            } else {
+                list = "<<ERROR>>";
+            }
+            writeStr(target, list, t);
             break;
         }
         case 0x08: {  // remove every occurrence
