@@ -102,3 +102,6 @@ last save read or written. `docs/wolfrpg-save-format.md` describes the format an
   uses such numbers.
 - Game.dat's picture behaviour setting (Ver1 or Ver2) isn't read: showing a picture that is already shown starts it
   afresh, and `\space` counts whole pixels in every game.
+- System variable 115, the engine version the standard systems read, is set to 2.24 for Shift-JIS games and 3.28 for
+  UTF-8 ones, since no Game.dat field is known to hold the real one.
+- The picture flash effect tints a picture toward its colour and leaves it there instead of returning to normal.
