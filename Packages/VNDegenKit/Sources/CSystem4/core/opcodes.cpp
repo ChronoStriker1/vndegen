@@ -3,7 +3,7 @@
 namespace s4 {
 
 const OpInfo kOps[kOpCount] = {
-#include "opcodes.inc"
+#include "opcodes_table.h"
 };
 
 }  // namespace s4

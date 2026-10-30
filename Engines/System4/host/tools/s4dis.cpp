@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "../src/util/sjis.h"
-#include "../src/vm/ain.h"
-#include "../src/vm/opcodes.h"
+#include "sjis.h"
+#include "ain.h"
+#include "opcodes.h"
 
 using namespace s4;
 

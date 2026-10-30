@@ -7,7 +7,7 @@ namespace s4::sjis {
 namespace {
 
 const char16_t kTable[60][192] = {
-#include "sjis_table.inc"
+#include "sjis_table.h"
 };
 
 int leadRow(unsigned char c) {
