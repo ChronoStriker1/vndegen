@@ -17,7 +17,7 @@ pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
 
 # The runtime: data, interpreter, drawing on the CPU, sound. Text uses FreeType here and CoreText on Apple systems.
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/core/*.cpp ${RUNTIME}/core/*.c)
-add_library(wolfrpg STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
+add_library(wolfrpg STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c ${SHARED}/vnmidi.c)
 target_include_directories(wolfrpg PUBLIC ${RUNTIME}/core ${RUNTIME}/include ${SHARED})
 target_compile_definitions(wolfrpg PUBLIC WOLF_FONTS_DIR="${SHARED}/fonts")
 target_link_libraries(wolfrpg PUBLIC PkgConfig::FREETYPE pthread)

@@ -80,13 +80,13 @@ let package = Package(
         // dr_libs and TinySoundFont, which the runtime's sources include directly. Engines/WolfRPG/host builds the same
         // sources for the Linux test tools.
         .target(
-            name: "CWolfRPG", dependencies: ["CVNFont"], exclude: ["third_party"],
+            name: "CWolfRPG", dependencies: ["CVNFont", "CVNMidi"], exclude: ["third_party"],
             // The package builds C++17; the runtime needs C++20. It draws every frame on the CPU, so Debug builds are
             // optimized too, as NScripter's are.
             cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-std=c++20", "-O2"])],
             linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
-        .target(name: "EngineWolfRPG", dependencies: ["VNCore", "CWolfRPG", "FrameHost"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineWolfRPG", dependencies: ["VNCore", "CWolfRPG", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),

@@ -1,4 +1,5 @@
 import CWolfRPG
+import FontPack
 import FrameHost
 import Foundation
 import OSLog
@@ -45,10 +46,15 @@ final class WolfRPGSession: EngineSession {
         let logURL = launch.dataDirectory.appendingPathComponent("logs/wolfrpg.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
+        // MIDI music plays with the SoundFont the app bundles (docs/midi.md).
+        let soundFont = MIDISoundFont.url?.path ?? ""
         let started: OpaquePointer? = root.path.withCString { rootPath in
             logURL.path.withCString { logPath in
-                var settings = VNWolfLaunch(gameRoot: rootPath, logPath: logPath, soundFontPath: nil)
-                return vnwolf_start(&settings)
+                soundFont.withCString { fontPath in
+                    var settings = VNWolfLaunch(gameRoot: rootPath, logPath: logPath,
+                                                soundFontPath: soundFont.isEmpty ? nil : fontPath)
+                    return vnwolf_start(&settings)
+                }
             }
         }
         guard let started else {

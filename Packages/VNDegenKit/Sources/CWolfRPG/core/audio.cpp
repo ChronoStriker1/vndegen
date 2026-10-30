@@ -1,5 +1,7 @@
 #include "audio.h"
 
+#include "vnmidi.h"
+
 #include "files.h"
 
 #include <algorithm>
@@ -26,10 +28,6 @@
 #define DRWAV_PRIVATE static
 #define DR_WAV_IMPLEMENTATION
 #include "../third_party/dr_libs/dr_wav.h"
-#define TSF_IMPLEMENTATION
-#include "../third_party/tsf/tsf.h"
-#define TML_IMPLEMENTATION
-#include "../third_party/tsf/tml.h"
 #define STB_VORBIS_NO_STDIO
 #define STB_VORBIS_NO_PUSHDATA_API
 #define stb_vorbis_close wolf_vorbis_close
@@ -188,82 +186,33 @@ struct WavDecoder : Decoder {
     }
 };
 
-// MIDI. Everything that uses TinySoundFont is in this section, behind openMidi, so a different synthesizer only
-// replaces this part.
+// MIDI, through VNDegen's shared MIDI player (Engines/Shared/vnmidi.h).
 
 struct SoundFont {
-    std::mutex mutex;  // TinySoundFont's shared reference count is not atomic
+    std::mutex mutex;
     std::string path;
-    tsf *font = nullptr;
+    vnmidi_font *font = nullptr;
     bool tried = false;
 
-    ~SoundFont() { if (font) tsf_close(font); }
+    ~SoundFont() { if (font) vnmidi_font_free(font); }
 };
 
 struct MidiDecoder : Decoder {
-    SoundFont *sf = nullptr;
-    tml_message *song = nullptr;
-    tsf *synth = nullptr;
-    const tml_message *next = nullptr;
-    double ms = 0;  // song time
-    std::atomic<double> tempo{1};
-    int key = 0;
+    vnmidi_player *player = nullptr;
 
-    ~MidiDecoder() override {
-        if (synth) {
-            std::lock_guard lock(sf->mutex);
-            tsf_close(synth);
-        }
-        tml_free(song);
-    }
-    void apply(const tml_message *m, bool notes) {
-        switch (m->type) {
-        case TML_PROGRAM_CHANGE:
-            tsf_channel_set_presetnumber(synth, m->channel, m->program, m->channel == 9);
-            break;
-        case TML_NOTE_ON:
-            if (notes) tsf_channel_note_on(synth, m->channel, transpose(m), m->velocity / 127.0f);
-            break;
-        case TML_NOTE_OFF:
-            if (notes) tsf_channel_note_off(synth, m->channel, transpose(m));
-            break;
-        case TML_PITCH_BEND:
-            tsf_channel_set_pitchwheel(synth, m->channel, m->pitch_bend);
-            break;
-        case TML_CONTROL_CHANGE:
-            tsf_channel_midi_control(synth, m->channel, m->control, m->control_value);
-            break;
-        }
-    }
-    int transpose(const tml_message *m) const {
-        return m->channel == 9 ? m->key : std::clamp(m->key + key, 0, 127);
-    }
+    ~MidiDecoder() override { vnmidi_player_close(player); }
     int read(float *out, int frames) override {
-        double end = double(length) * 1000.0 / rate;
-        int done = 0;
-        while (done < frames && ms < end) {
-            int block = std::min(frames - done, TSF_RENDER_EFFECTSAMPLEBLOCK);
-            ms += block * 1000.0 / rate * tempo.load(std::memory_order_relaxed);
-            for (; next && next->time <= ms; next = next->next) apply(next, true);
-            tsf_render_float(synth, out + done * 2, block, 0);
-            done += block;
-        }
-        pos = int64_t(ms * rate / 1000.0);
-        return done;
+        int n = vnmidi_player_render(player, out, frames);
+        pos += n;
+        return n;
     }
-    // Plays the controllers and program changes before `frame` without their notes. Sounding notes are released,
-    // so their tails carry over a loop.
     bool seek(int64_t frame) override {
-        double target = double(frame) * 1000.0 / rate;
-        tsf_note_off_all(synth);
-        if (target < ms) next = song;
-        for (; next && next->time < target; next = next->next) apply(next, false);
-        ms = target;
+        vnmidi_player_seek(player, int(frame * 1000 / rate));
         pos = frame;
         return true;
     }
     bool setTempo(double t) override {
-        tempo.store(t, std::memory_order_relaxed);
+        vnmidi_player_set_tempo(player, float(t));
         return true;
     }
 };
@@ -271,43 +220,32 @@ struct MidiDecoder : Decoder {
 // `keyShift` transposes every channel but the drums by that many semitones.
 std::unique_ptr<Decoder> openMidi(std::vector<uint8_t> bytes, SoundFont &sf, int rate, int keyShift,
                                   const std::function<void(const std::string &)> &log) {
-    tsf *synth = nullptr;
+    vnmidi_font *font = nullptr;
     {
         std::lock_guard lock(sf.mutex);
         if (!sf.tried) {
             sf.tried = true;
-            if (sf.path.empty()) {
-                log("audio: no SoundFont set, MIDI files play silently");
-            } else if (!(sf.font = tsf_load_filename(sf.path.c_str()))) {
-                log("audio: can't load SoundFont " + sf.path + ", MIDI files play silently");
-            } else {
-                // At 0 dB a General MIDI song is about four times as loud as the games' Ogg and MP3 music.
-                tsf_set_output(sf.font, TSF_STEREO_INTERLEAVED, rate, -12);
-            }
+            char error[256] = "";
+            if (sf.path.empty()) log("audio: no SoundFont set, MIDI files play silently");
+            else if (!(sf.font = vnmidi_font_load(sf.path.c_str(), error, sizeof error)))
+                log("audio: can't load SoundFont " + sf.path + ": " + error);
         }
-        if (!sf.font) return nullptr;
-        synth = tsf_copy(sf.font);
+        font = sf.font;
     }
-    auto d = std::make_unique<MidiDecoder>();
-    d->sf = &sf;
-    d->synth = synth;
-    d->rate = rate;
-    d->key = keyShift;
-    d->song = tml_load_memory(bytes.data(), int(bytes.size()));
-    if (!d->song) {
-        log("audio: can't read MIDI file");
+    if (!font) return nullptr;
+    char error[256] = "";
+    vnmidi_player *player = vnmidi_player_open(font, bytes.data(), bytes.size(), rate, error, sizeof error);
+    if (!player) {
+        log(std::string("audio: can't read MIDI file: ") + error);
         return nullptr;
     }
-    d->next = d->song;
-    tsf_channel_set_bank_preset(synth, 9, 128, 0);
-    unsigned last = 0;
-    for (const tml_message *m = d->song; m; m = m->next) {
-        last = m->time;
-        // CC111 marks the loop start, as RPG Maker MIDI files do.
-        if (m->type == TML_CONTROL_CHANGE && m->control == 111 && d->tagLoopStart < 0)
-            d->tagLoopStart = int64_t(m->time) * rate / 1000;
-    }
-    d->length = int64_t(last) * rate / 1000;
+    auto d = std::make_unique<MidiDecoder>();
+    d->player = player;
+    d->rate = rate;
+    vnmidi_player_set_transpose(player, keyShift);
+    d->length = int64_t(vnmidi_player_length_ms(player)) * rate / 1000;
+    // CC111 marks the loop start, as RPG Maker MIDI files do. The mixer loops the song itself, by seeking.
+    if (int marker = vnmidi_player_marker_ms(player); marker >= 0) d->tagLoopStart = int64_t(marker) * rate / 1000;
     return d;
 }
 
@@ -627,7 +565,7 @@ void Audio::setSoundFontPath(std::string path) {
     if (path == impl_->font.path) return;
     impl_->font.path = std::move(path);
     impl_->font.tried = false;
-    if (impl_->font.font) tsf_close(impl_->font.font);
+    if (impl_->font.font) vnmidi_font_free(impl_->font.font);
     impl_->font.font = nullptr;
 }
 
