@@ -20,6 +20,7 @@ let package = Package(
         .library(name: "EngineNScripter", targets: ["EngineNScripter"]),
         .library(name: "FrameHost", targets: ["FrameHost"]),
         .library(name: "EngineWolfRPG", targets: ["EngineWolfRPG"]),
+        .library(name: "EngineAliceSoft", targets: ["EngineAliceSoft"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -87,6 +88,8 @@ let package = Package(
             linkerSettings: [.linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         .target(name: "EngineWolfRPG", dependencies: ["VNCore", "CWolfRPG", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
+        // AliceSoft System 3.x and System 4 games, each on VNDegen's own clean-room runtime.
+        .target(name: "EngineAliceSoft", dependencies: ["VNCore", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
@@ -132,6 +135,7 @@ let package = Package(
         .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot"]),
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
+        .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ],
     cxxLanguageStandard: .cxx17
