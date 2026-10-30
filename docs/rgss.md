@@ -31,8 +31,10 @@ Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's stri
 
 ## Test games
 
-Checked on the Linux host, the Mac app and an iPad simulator, with every game file name's case swapped on a
-case-sensitive volume as well, and Test Games 33 and 55 on an iPhone simulator.
+Every game reached its title, played and loaded saves on the Linux host, the Mac app and an iPad simulator, and on
+the iPad simulator again with every game file name's case swapped on a case-sensitive volume. Test Games 33 and 55
+also ran on an iPhone simulator. Test Game 55 saved in the app on all three; the other games' saves were made on the
+Linux host and loaded in the app.
 
 | Game | Version | Packed | Checked |
 | --- | --- | --- | --- |
