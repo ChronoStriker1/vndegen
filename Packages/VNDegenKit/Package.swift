@@ -131,6 +131,7 @@ let package = Package(
         .testTarget(name: "EngineArtemisTests", dependencies: ["EngineArtemis"]),
         .testTarget(name: "EngineGodotTests", dependencies: ["EngineGodot"]),
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
+        .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ],
     cxxLanguageStandard: .cxx17
