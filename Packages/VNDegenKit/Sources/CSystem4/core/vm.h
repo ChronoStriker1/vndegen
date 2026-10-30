@@ -74,6 +74,17 @@ struct HllRegistry {
     static std::unordered_map<std::string, HllImpl> &table();
     struct Add { Add(const char *name, HllImpl fn) { table()[name] = fn; } };
 };
+// Library state lives for one game. Each library file registers a function that returns its state to how a new
+// game finds it; Game::start runs them all, so a second game in the same process starts clean.
+struct HllState {
+    static std::vector<void (*)()> &resets();
+    struct Add { explicit Add(void (*fn)()) { resets().push_back(fn); } };
+    static void resetAll() { for (auto fn : resets()) fn(); }
+};
+#define S4_HLL_RESET \
+    static void hllReset(); \
+    static s4::HllState::Add regHllReset_(hllReset); \
+    static void hllReset()
 #define S4_HLL(lib, fn) \
     static void hll_##lib##_##fn(s4::HllCall &c); \
     static s4::HllRegistry::Add reg_##lib##_##fn(#lib "." #fn, hll_##lib##_##fn); \

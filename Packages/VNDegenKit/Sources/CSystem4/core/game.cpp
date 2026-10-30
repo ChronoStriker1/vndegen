@@ -63,6 +63,7 @@ void Game::problem(const std::string &s) {
 
 bool Game::start(std::string &error) {
     if (!cfg.logPath.empty()) logFile_ = std::fopen(cfg.logPath.c_str(), "a");
+    HllState::resetAll();
     if (!cfg.fontsDir.empty()) setFontPackDir(cfg.fontsDir);
     // The ini names the code file and the screen size. Both AliceStart.ini and System40.ini use "Key = value".
     std::string iniPath = findCaseless(cfg.root, "AliceStart.ini");
@@ -100,6 +101,13 @@ bool Game::start(std::string &error) {
         if (first.empty()) return nullptr;
         return AldArchive::open(first);
     };
+    // The game's own font library, such as Rance7Font.fnl.
+    {
+        std::error_code ec2;
+        setGameFontLibrary("");
+        for (auto &e : fs::directory_iterator(cfg.root, ec2))
+            if (lower(e.path().extension().string()) == ".fnl") { setGameFontLibrary(e.path().string()); break; }
+    }
     cgArchive = openAld("G");
     waveArchive = openAld("W");
     bgmArchive = openAld("B");
@@ -164,7 +172,8 @@ void Game::yieldFrame() {
     if (!call.empty()) {
         int fn = vm->ain.findFunction(call);
         log("debug call " + std::to_string(fn));
-        if (fn > 0) vm->call(fn, {});
+        // Arguments are zero (false, empty); string and struct arguments aren't supported.
+        if (fn > 0) vm->call(fn, std::vector<int32_t>(size_t(vm->ain.functions[fn].argc), 0));
     }
     std::unique_lock<std::mutex> lock(mu_);
     vmTurn_ = false;

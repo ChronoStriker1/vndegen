@@ -2,6 +2,7 @@
 // Usage: s4play <game folder> <save folder> <frames> [script]
 // The script is lines of "<frame> <command>": "key <vk> down|up", "click <x> <y>", "move <x> <y>", "shot <file.png>",
 // "wheel <n>". Each frame advances the game clock by 16 ms. At the end the last frame is saved to s4play-last.png.
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -41,7 +42,11 @@ int main(int argc, char **argv) {
     VNS4Engine *e = vns4_start(&l);
     if (!e) { std::fprintf(stderr, "start failed: %s\n", vns4_start_error()); return 1; }
     long frames = std::atol(argv[3]);
-    std::vector<float> audio(2 * 735);
+    // Audio is pulled at the game clock's rate, 16 ms a frame. S4_AUDIOLOG prints the mix's RMS level each second.
+    std::vector<float> audio(2 * 736);
+    bool audioLog = std::getenv("S4_AUDIOLOG") != nullptr;
+    double sumSq = 0;
+    long sampled = 0;
     long f = 0;
     for (; f < frames; f++) {
         auto range = script.equal_range(f);
@@ -59,7 +64,17 @@ int main(int argc, char **argv) {
             else if (cmd == "shot") { std::string file; ss >> file; shot(e, file); }
         }
         if (!vns4_step(e, 16)) { std::printf("game ended at frame %ld\n", f); break; }
-        vns4_audio_render(e, audio.data(), 735);
+        int n = int((f + 1) * 16 * 441 / 10 - f * 16 * 441 / 10);
+        vns4_audio_render(e, audio.data(), n);
+        if (audioLog) {
+            for (int i = 0; i < n * 2; i++) sumSq += double(audio[i]) * audio[i];
+            sampled += n;
+            if (sampled >= 44100) {
+                std::printf("audio at frame %ld: rms %.4f\n", f, std::sqrt(sumSq / double(sampled * 2)));
+                sumSq = 0;
+                sampled = 0;
+            }
+        }
     }
     shot(e, "s4play-last.png");
     if (const char *p = vns4_problem(e)) std::printf("problem: %s\n", p);

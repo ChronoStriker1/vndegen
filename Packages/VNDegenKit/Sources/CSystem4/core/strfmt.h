@@ -1,5 +1,5 @@
 // String helpers for the VM. Game strings are CP932, and the language counts characters, so a two-byte
-// character is one character for indexes and lengths. A character value is its byte, or lead << 8 | trail.
+// character is one character for indexes and lengths. A character value is its byte, or lead | trail << 8.
 #pragma once
 #include <cstdint>
 #include <string>

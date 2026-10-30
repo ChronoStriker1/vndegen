@@ -31,6 +31,7 @@ struct TextStyle {
     int shadowL = 0, shadowU = 0, shadowR = 0, shadowD = 0;
     int sr = 0, sg = 0, sb = 0;
     float boldWeight = 0, edgeWeight = 0;
+    bool gameFont = false;       // draw with the game's own font library (font.h) where it has the character
     int er = 0, eg = 0, eb = 0;
 };
 

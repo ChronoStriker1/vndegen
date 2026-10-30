@@ -214,6 +214,21 @@ void Audio::setGroup(int h, int g) { WITH(h); it->second->group = g; }
 #undef WITH
 void Audio::setGroupVolume(int g, int v) { std::lock_guard<std::mutex> lock(mu_); groupVolume_[g] = std::clamp(v, 0, 100); }
 
+void Audio::setStream(std::function<int(float *, int)> read, int group, int volume) {
+    std::lock_guard<std::mutex> lock(mu_);
+    stream_ = std::move(read);
+    streamGroup_ = group;
+    streamVolume_ = std::clamp(volume, 0, 100) / 100.0f;
+}
+void Audio::setStreamVolume(int volume) {
+    std::lock_guard<std::mutex> lock(mu_);
+    streamVolume_ = std::clamp(volume, 0, 100) / 100.0f;
+}
+void Audio::clearStream() {
+    std::lock_guard<std::mutex> lock(mu_);
+    stream_ = nullptr;
+}
+
 void Audio::render(float *out, int frames) {
     std::memset(out, 0, sizeof(float) * 2 * frames);
     std::lock_guard<std::mutex> lock(mu_);
@@ -238,6 +253,13 @@ void Audio::render(float *out, int frames) {
             out[i * 2] += l * v;
             out[i * 2 + 1] += r * v;
         }
+    }
+    if (stream_) {
+        streamBuf_.resize(size_t(frames) * 2);
+        int got = stream_(streamBuf_.data(), frames);
+        auto gv = groupVolume_.find(streamGroup_);
+        float v = streamVolume_ * (gv == groupVolume_.end() ? 1.0f : gv->second / 100.0f);
+        for (int i = 0; i < got * 2; i++) out[i] += streamBuf_[i] * v;
     }
     for (int i = 0; i < frames * 2; i++) out[i] = std::clamp(out[i], -1.0f, 1.0f);
 }

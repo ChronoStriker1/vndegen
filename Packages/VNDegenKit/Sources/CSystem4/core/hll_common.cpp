@@ -271,5 +271,18 @@ S4_HLL(IbisInputEngine, Joystick_GetAxis) { c.retFloat(0); }
 S4_HLL(DrawPluginManager, Load) { c.retInt(1); }
 S4_HLL(DrawPluginManager, IsLoad) { c.retInt(1); }
 
+S4_HLL_RESET {
+    g_rng.seed(1);
+    g_skip = {};
+    std::fill(std::begin(g_mixerVolume), std::end(g_mixerVolume), 80);
+    std::fill(std::begin(g_mixerMute), std::end(g_mixerMute), false);
+    g_windowSettings.clear();
+    g_cursorConfig.clear();
+    g_inputResult.clear();
+    g_pass.clear();
+    g_vs.close();
+    g_confirm.close();
+}
+
 }  // namespace
 }  // namespace s4

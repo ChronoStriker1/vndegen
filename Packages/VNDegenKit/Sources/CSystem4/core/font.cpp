@@ -9,6 +9,7 @@
 #include <mutex>
 #include <tuple>
 
+#include "fnl.h"
 #include "vnfont.h"
 
 #if __APPLE__
@@ -211,6 +212,70 @@ Face &faceFor(int f) {
 }
 
 }  // namespace
+
+namespace {
+std::unique_ptr<FnlFont> g_fnl;
+std::map<std::tuple<int, uint16_t, int>, GlyphImage> g_fnlCache;
+// The stored size to scale down from for a pixel size: the smallest at least px tall, else the largest.
+int fnlSize(int face, int px) {
+    std::vector<int> sizes = g_fnl->sizes(face);
+    if (sizes.empty()) return -1;
+    int best = -1;
+    for (int z : sizes)
+        if (z >= px && (best < 0 || z < best)) best = z;
+    return best < 0 ? *std::max_element(sizes.begin(), sizes.end()) : best;
+}
+}  // namespace
+
+void setGameFontLibrary(const std::string &path) {
+    std::lock_guard<std::mutex> lock(mu);
+    g_fnlCache.clear();
+    g_fnl.reset();
+    if (path.empty()) return;
+    auto f = std::make_unique<FnlFont>();
+    if (f->open(path)) g_fnl = std::move(f);
+}
+
+// Box-filters the stored 1-bit glyph to the pixel size, which also gives it anti-aliased edges.
+bool gameGlyph(int face, uint16_t code, int px, GlyphImage &out) {
+    auto &cache = g_fnlCache;
+    std::lock_guard<std::mutex> lock(mu);
+    if (!g_fnl || face < 0 || face >= g_fnl->faceCount() || px <= 0) return false;
+    std::tuple<int, uint16_t, int> k{face, code, px};
+    auto it = cache.find(k);
+    if (it != cache.end()) { out = it->second; return true; }
+    int size = fnlSize(face, px);
+    FnlGlyph g;
+    if (size < 0 || !g_fnl->glyph(face, size, code, g, 1)) return false;
+    double f = double(px) / double(size);
+    int ow = std::max(1, int(std::lround(g.w * f))), oh = std::max(1, int(std::lround(g.h * f)));
+    out.w = ow;
+    out.h = oh;
+    out.left = 0;
+    out.top = int(std::lround(g.top * f));
+    out.advance = std::max(1, int(std::lround(g.advance * f)));
+    out.coverage.assign(size_t(ow) * oh, 0);
+    for (int y = 0; y < oh; y++) {
+        int y0 = int(y / f), y1 = std::max(y0 + 1, std::min(g.h, int((y + 1) / f)));
+        for (int x = 0; x < ow; x++) {
+            int x0 = int(x / f), x1 = std::max(x0 + 1, std::min(g.w, int((x + 1) / f)));
+            int sum = 0, n = 0;
+            for (int yy = y0; yy < y1 && yy < g.h; yy++)
+                for (int xx = x0; xx < x1 && xx < g.w; xx++, n++) sum += g.coverage[size_t(yy) * g.w + xx];
+            out.coverage[size_t(y) * ow + x] = uint8_t(n ? sum / n : 0);
+        }
+    }
+    if (cache.size() > 20000) cache.clear();
+    cache[k] = out;
+    return true;
+}
+
+int gameFontAscent(int face, int px) {
+    std::lock_guard<std::mutex> lock(mu);
+    if (!g_fnl || face < 0 || face >= g_fnl->faceCount()) return px * 86 / 100;
+    int size = fnlSize(face, px);
+    return size < 0 ? px * 86 / 100 : int(std::lround(g_fnl->ascent(face, size, 1) * double(px) / size));
+}
 
 void setFontPackDir(const std::string &dir) {
     std::lock_guard<std::mutex> lock(mu);

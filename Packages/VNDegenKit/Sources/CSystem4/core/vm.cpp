@@ -48,6 +48,11 @@ int32_t arrayElem(int32_t t) {
 
 }  // namespace
 
+std::vector<void (*)()> &HllState::resets() {
+    static std::vector<void (*)()> r;
+    return r;
+}
+
 std::unordered_map<std::string, HllImpl> &HllRegistry::table() {
     static std::unordered_map<std::string, HllImpl> t;
     return t;

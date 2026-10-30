@@ -26,8 +26,10 @@ port. This file lists where each part of the runtime came from, and what was unc
   the SDK's runtime, to see the save layout of a later VM.
 - **Minimal disassembly** of the SDK's `Sys42VM.dll`, only where a file format couldn't be settled otherwise: the
   routine that writes a save file's "GD" header and the XOR routine it calls (see Saves).
-- **Permissive code**: stb_image and stb_vorbis (public domain or MIT), pl_mpeg (MIT), zlib, FreeType on the Linux
-  test host only. The text and font code is adapted from VNDegen's own Wolf RPG Editor runtime.
+- **Permissive code**: stb_image and stb_vorbis (public domain or MIT), pl_mpeg (MIT), zlib, and FreeType and libwebp
+  on the Linux test host only. The text and font code is adapted from VNDegen's own Wolf RPG Editor runtime.
+- **Reference outputs**: the ffmpeg and mpg123 command-line programs decoded the games' movies so the movie
+  decoder's output could be compared with theirs. Only their output was used; none of their code was read or linked.
 
 ## Parts
 
@@ -87,6 +89,32 @@ save file and 28 copy one were read from the game functions that wrap them (thei
 - AJP: a JPEG and an 8-bit PMS mask, each with its first 16 bytes XORed with a fixed key. The key was recovered by
   comparing many files with the fixed JFIF and PMS headers they must start with. All 1,741 pictures in Test Game 19
   decode.
+- AFA (Test Game 56): an "AFAH" header naming "AlicArch", then an "INFO" block holding a zlib-compressed index. Each
+  index entry is a name length, a padded length, the name, two unused words, the offset from the data block and the
+  size. Read from the files and checked by listing every entry of Test Game 56's archives.
+- WebP: some later pictures, and some AJP masks, are WebP files. They decode with ImageIO on Apple and libwebp on
+  the Linux host.
+
+### Fonts (`fnl.cpp`)
+
+The `.fnl` font libraries were decoded from the game files' bytes. The header is "FNA\0", a zero, the file size, an
+index size and the face count. Each face lists its sizes; each size is a cell height, an unused metric, a slot count
+and a 10-byte record per slot (advance, file offset, compressed length). The records carry no character codes: the
+slot number follows the Shift-JIS code (ASCII, then half-width kana, then JIS X 0208 rows of 94). This was confirmed
+because the empty slots in Test Game 46's file line up with the unused cells of JIS X 0208. Each glyph is a zlib
+stream of a 1-bit bitmap, bottom row first, rows padded to 32 bits. The runtime box-filters the large stored cells
+down to the text size. Every glyph of Test Games 46 and 56 decodes. Test Game 46 picks a face with font type 0 or
+256; 256 was taken to be face 1 (the high byte), from the title menu's look.
+
+### Movies (`movie.cpp`, `hll_movie.cpp`)
+
+The `.alm` movies are MPEG program streams: MPEG-1 system streams, or MPEG-2 program streams around MPEG-1 video
+(Test Game 56). `movie.cpp` has its own demuxer for the pack and PES headers, written from the public MPEG-1 and
+MPEG-2 stream syntax and the files' bytes. pl_mpeg (https://github.com/phoboslab/pl_mpeg, MIT), vendored at commit
+c871f2be022ece7ef4f64230b4fb8e1fb9eb6023, decodes the video and the MP2 audio, with one local fix to its MP2
+requantization step that follows the MPEG-1 Layer II formula. The resampler and the audio ring are original. The
+decoded frames and sound were compared with the reference outputs above. The DrawMovie2, DrawMovie3 and PlayMovie
+calls were read from how the games call them.
 
 ### Saves (`save.cpp`, `resume.cpp`)
 

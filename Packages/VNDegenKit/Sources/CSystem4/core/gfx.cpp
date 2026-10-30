@@ -127,17 +127,27 @@ void putGlyph(Surface &dst, int x, int y, const GlyphImage &g, int r, int gg, in
 
 }  // namespace
 
+// A character's glyph: the game's font library first when the style asks for it, then VNDegen's fonts.
+static bool glyphFor(const TextStyle &st, const std::string &s, size_t at, int len, char32_t cp, bool bold, GlyphImage &g) {
+    if (st.gameFont) {
+        uint16_t code = len == 2 ? uint16_t(uint8_t(s[at]) << 8 | uint8_t(s[at + 1])) : uint8_t(s[at]);
+        if (gameGlyph(st.face, code, st.size, g)) return true;
+    }
+    return glyph(st.gameFont ? 0 : st.face, cp, st.size, bold, g);
+}
+
 int drawText(Surface &dst, int x, int y, const std::string &s, const TextStyle &st, int charSpace) {
     bool bold = st.weight >= 600 || st.boldWeight > 0;
-    int ascent = fontAscent(st.face, st.size);
+    int ascent = st.gameFont ? gameFontAscent(st.face, st.size) : fontAscent(st.face, st.size);
     int pen = x;
     for (size_t i = 0; i < s.size();) {
         int len;
+        size_t at = i;
         char32_t cp = sjis::decodeAt(s, i, &len);
         i += len;
         GlyphImage g;
         int adv = len == 2 ? st.size : st.size / 2;
-        if (glyph(st.face, cp, st.size, bold, g)) {
+        if (glyphFor(st, s, at, len, cp, bold, g)) {
             adv = g.advance > 0 ? g.advance : adv;
             int gx = pen + g.left, gy = y + ascent - g.top;
             int edge = int(st.edgeWeight + 0.5f);
@@ -159,11 +169,12 @@ int textWidth(const std::string &s, const TextStyle &st, int charSpace) {
     int w = 0;
     for (size_t i = 0; i < s.size();) {
         int len;
+        size_t at = i;
         char32_t cp = sjis::decodeAt(s, i, &len);
         i += len;
         GlyphImage g;
         int adv = len == 2 ? st.size : st.size / 2;
-        if (glyph(st.face, cp, st.size, bold, g) && g.advance > 0) adv = g.advance;
+        if (glyphFor(st, s, at, len, cp, bold, g) && g.advance > 0) adv = g.advance;
         w += adv + charSpace;
     }
     return w;

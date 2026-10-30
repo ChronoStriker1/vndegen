@@ -2,6 +2,7 @@
 // the host's audio thread pulls the mix with render().
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -38,6 +39,11 @@ public:
     void seekMs(int h, int64_t ms);
     void setGroupVolume(int group, int volume);  // master, music and so on: 0..100
     void setGroup(int h, int group);
+    // A stream mixed in with the players, such as a movie's sound: read fills interleaved stereo at 44.1 kHz and
+    // returns the frames written. It runs on the audio thread; once clearStream returns it is no longer called.
+    void setStream(std::function<int(float *, int)> read, int group, int volume);
+    void setStreamVolume(int volume);  // 0..100
+    void clearStream();
     void render(float *out, int frames);  // the audio thread
 
 private:
@@ -46,6 +52,10 @@ private:
     std::map<int, std::unique_ptr<Player>> players_;
     std::map<int, int> groupVolume_;
     int next_ = 1;
+    std::function<int(float *, int)> stream_;
+    int streamGroup_ = 0;
+    float streamVolume_ = 1;
+    std::vector<float> streamBuf_;
 };
 
 }  // namespace s4

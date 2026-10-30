@@ -525,6 +525,17 @@ S4_HLL(StoatSpriteEngine, KeepPreviousView_GetMode) { c.retBool(g_keepPrevious);
 S4_HLL(StoatSpriteEngine, DX_GetUsePower2Texture) { c.retBool(false); }
 S4_HLL(StoatSpriteEngine, DX_SetUsePower2Texture) {}
 bool g_sysFlags[8] = {};
+
+S4_HLL_RESET {
+    g_textSpriteStyle = {};
+    g_wheelForward = g_wheelBack = 0;
+    g_music.clear();
+    g_sound.clear();
+    g_transFrom.clear();
+    g_viewMode = 0;
+    g_keepPrevious = false;
+    std::fill(std::begin(g_sysFlags), std::end(g_sysFlags), false);
+}
 S4_HLL(StoatSpriteEngine, SYSTEM_IsResetOnce) { c.retBool(false); }
 S4_HLL(StoatSpriteEngine, SYSTEM_SetConfigOverFrameRateSleep) { g_sysFlags[0] = c.b(0); }
 S4_HLL(StoatSpriteEngine, SYSTEM_GetConfigOverFrameRateSleep) { c.retBool(g_sysFlags[0]); }

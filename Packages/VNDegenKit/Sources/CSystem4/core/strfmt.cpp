@@ -63,9 +63,11 @@ std::string substr(const std::string &s, int32_t start, int32_t len) {
     return b > a ? s.substr(a, b - a) : std::string();
 }
 
+// A two-byte character's code holds the lead byte low and the trail byte high, as the SDK compiler encodes 'あ'
+// (CP932 0x82 0xA0) as 0xA082.
 void pushChar(std::string &s, int32_t ch) {
-    if (ch > 0xFF) s += char(ch >> 8);
     s += char(ch & 0xFF);
+    if (ch > 0xFF) s += char((ch >> 8) & 0xFF);
 }
 
 void popChar(std::string &s) {
@@ -83,7 +85,7 @@ int32_t charAt(const std::string &s, int32_t i) {
     if (i < 0) return 0;
     size_t a = byteOffset(s, i);
     if (a >= s.size()) return 0;
-    if (sjis::charLength(s, a) == 2) return (uint8_t(s[a]) << 8) | uint8_t(s[a + 1]);
+    if (sjis::charLength(s, a) == 2) return uint8_t(s[a]) | (uint8_t(s[a + 1]) << 8);
     return uint8_t(s[a]);
 }
 

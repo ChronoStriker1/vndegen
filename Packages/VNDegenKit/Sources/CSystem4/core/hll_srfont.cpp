@@ -3,6 +3,8 @@
 // names, the TextStyle struct it passes, and the game functions that wrap the calls.
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 
@@ -26,10 +28,16 @@ struct SpriteText {
 
 std::map<int, SpriteText> g_state;
 SpriteText g_global;  // the style SetFontType and SetFontSize set, for GetTextWidth
+S4_HLL_RESET {
+    g_state.clear();
+    g_global = {};
+}
 
 TextStyle styleOf(const SpriteText &t) {
     TextStyle st;
-    st.face = t.type;
+    st.gameFont = true;
+    // The game uses font types 0 and 256: the high byte picks the library's face when it is set.
+    st.face = t.type >= 256 ? t.type >> 8 : t.type;
     st.size = std::max(1, int(std::lround(t.size)));
     st.r = t.r; st.g = t.g; st.b = t.b;
     st.boldWeight = t.bold;
@@ -52,7 +60,7 @@ void draw(int sp, const std::string &text) {
             sjis::decodeAt(text, i, &len);
             last = i;
         }
-        t.lastChar = len == 2 && last + 1 < text.size() ? (uint8_t(text[last]) << 8 | uint8_t(text[last + 1])) : uint8_t(text[last]);
+        t.lastChar = len == 2 && last + 1 < text.size() ? (uint8_t(text[last]) | uint8_t(text[last + 1]) << 8) : uint8_t(text[last]);
     }
 }
 
@@ -115,7 +123,18 @@ S4_HLL(SengokuRanceFont, SP_SetTextStyle) {
     t.spacing = f(12);
 }
 S4_HLL(SengokuRanceFont, SP_TextDrawClassic) { draw(c.i(0), c.s(1)); }
-S4_HLL(SengokuRanceFont, SP_TextDraw) { draw(c.i(0), c.s(1)); }
+S4_HLL(SengokuRanceFont, SP_TextDraw) {
+    if (std::getenv("S4_TEXTLOG")) {
+        std::string hex;
+        for (unsigned char ch : c.s(1)) { char b[4]; std::snprintf(b, 4, "%02x ", ch); hex += b; }
+        auto &t = g_state[c.i(0)];
+        Sprite *sp = G().sprites.find(c.i(0));
+        G().log("SP_TextDraw sp " + std::to_string(c.i(0)) + " at " + std::to_string(t.x) + "," + std::to_string(t.y) +
+                " size " + std::to_string(t.size) + " type " + std::to_string(t.type) + " rgb " + std::to_string(t.r) + "," +
+                std::to_string(t.g) + "," + std::to_string(t.b) + " sprite " + (sp ? std::to_string(sp->width()) + "x" + std::to_string(sp->height()) : "none") + " : " + hex);
+    }
+    draw(c.i(0), c.s(1));
+}
 S4_HLL(SengokuRanceFont, SP_TextDrawPreload) {}
 S4_HLL(SengokuRanceFont, SP_GetTextLastCharCode) { c.retInt(g_state[c.i(0)].lastChar); }
 S4_HLL(SengokuRanceFont, SP_SetTextLastCharCode) { g_state[c.i(0)].lastChar = c.i(1); }

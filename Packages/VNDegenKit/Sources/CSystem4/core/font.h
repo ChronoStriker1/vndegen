@@ -18,6 +18,12 @@ struct GlyphImage {
 
 // face: 0 gothic (MS Gothic), 1 mincho (MS Mincho). Thread safe; glyphs are cached.
 bool glyph(int face, uint32_t codepoint, int px, bool bold, GlyphImage &out);
+// The game's own font library (a .fnl file), whose faces the game picks by number. A glyph comes from it, scaled to px,
+// when it has the character; sjisCode is the character's CP932 code. False when the library lacks the face or glyph.
+// An empty path, or a file that fails to open, leaves no library.
+void setGameFontLibrary(const std::string &path);
+bool gameGlyph(int face, uint16_t sjisCode, int px, GlyphImage &out);
+int gameFontAscent(int face, int px);
 int fontAscent(int face, int px);
 // Where the font pack is: its folder holding fonts.tsv. Call before drawing text.
 void setFontPackDir(const std::string &dir);

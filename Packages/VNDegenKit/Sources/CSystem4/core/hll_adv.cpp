@@ -617,6 +617,19 @@ S4_HLL(DrawGraph, SetFontWeight) { g_drawFont.weight = c.i(0); }
 S4_HLL(DrawGraph, SetFontUnderline) {}
 S4_HLL(DrawGraph, SetFontStrikeOut) {}
 int g_drawFontSpace = 0;
+
+S4_HLL_RESET {
+    g_nextInternal = 1000000;
+    g_multi.clear();
+    g_messageFrameShown = true;
+    g_chars.clear();
+    g_nextCharHandle = 1;
+    g_log.clear();
+    g_logEnabled = true;
+    g_scenes.clear();
+    g_drawFont = {};
+    g_drawFontSpace = 0;
+}
 S4_HLL(DrawGraph, SetFontSpace) { g_drawFontSpace = c.i(0); }
 S4_HLL(DrawGraph, SetFontColor) { g_drawFont.r = c.i(0); g_drawFont.g = c.i(1); g_drawFont.b = c.i(2); }
 S4_HLL(DrawGraph, GetFontSize) { c.retInt(g_drawFont.size); }

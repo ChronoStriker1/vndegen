@@ -1,6 +1,6 @@
 // Disassembles an .ain file and checks that every function decodes cleanly: instructions end
 // exactly at the next function, and every jump lands on an instruction.
-// Usage: s4dis <file.ain> [--verify] [--func name-substring] [--op number]
+// Usage: s4dis <file.ain> [--verify] [--func name-substring] [--op number] [--lib library-name]
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,7 +22,7 @@ static int32_t arg(const Ain &a, uint32_t p, int k) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { std::fprintf(stderr, "usage: s4dis file.ain [--verify] [--func s] [--op n]\n"); return 2; }
+    if (argc < 2) { std::fprintf(stderr, "usage: s4dis file.ain [--verify] [--func s] [--op n] [--lib name]\n"); return 2; }
     Ain a;
     std::string err = a.load(argv[1]);
     if (!err.empty()) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
@@ -33,6 +33,19 @@ int main(int argc, char **argv) {
         if (!std::strcmp(argv[i], "--verify")) verify = true;
         else if (!std::strcmp(argv[i], "--func") && i + 1 < argc) func = argv[++i];
         else if (!std::strcmp(argv[i], "--op") && i + 1 < argc) onlyOp = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--lib") && i + 1 < argc) {
+            // A library's function signatures: return type, then each argument's name and type.
+            for (auto &l : a.libraries) {
+                if (l.name != argv[i + 1]) continue;
+                for (auto &f : l.functions) {
+                    std::printf("%d %s(", f.retType, f.name.c_str());
+                    for (size_t k = 0; k < f.args.size(); k++)
+                        std::printf("%s%s:%d", k ? ", " : "", sjis::toUtf8(f.args[k].name).c_str(), f.args[k].t.type);
+                    std::printf(")\n");
+                }
+            }
+            return 0;
+        }
     }
     std::printf("version %d, %zu functions, %zu globals, %zu structs, %zu libraries, %zu messages\n",
                 a.version, a.functions.size(), a.globals.size(), a.structs.size(), a.libraries.size(),
