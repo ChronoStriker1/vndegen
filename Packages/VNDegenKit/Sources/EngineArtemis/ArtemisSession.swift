@@ -184,9 +184,15 @@ final class ArtemisSession: EngineSession {
         let body = command["payload"] as? [String: Any] ?? [:]
         switch name {
         case "video_play":
-            // Videos don't play yet. A fullscreen one, which the script waits on, ends at once.
+            // Videos don't play yet. Each ends at once, a fullscreen one and one on a layer the script waits on alike,
+            // so a title movie leaves its menu.
             writeLog("[W] video not played: \(body["file"] as? String ?? "")")
-            if body["id"] == nil || body["id"] is NSNull, let runtime { core.api.runtime_notify_video_finished!(runtime, nil) }
+            guard let runtime else { break }
+            if let id = body["id"] as? String {
+                _ = id.withCString { core.api.runtime_notify_video_finished!(runtime, $0) }
+            } else {
+                core.api.runtime_notify_video_finished!(runtime, nil)
+            }
         case "dialog_show":
             showDialog(body)
         case "openbrowser":
