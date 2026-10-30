@@ -295,10 +295,10 @@ pub struct Interpreter {
     ///
     /// 每次 step 迭代开头消费并复位；只有 Jump 类结果会重新置位。
     arrived_by_jump: bool,
-    /// Whether the script line running now, with the tags its tag filter
-    /// queues, is scenario text, so the text it prints counts as scenario
-    /// text rather than as text a [print] tag writes (VNDegen).
-    in_scenario_text: bool,
+    /// The scenario text line running now, with the tags its tag filter
+    /// queues: the text it prints counts as scenario text, rather than as
+    /// text a [print] tag writes, and has this line as its source (VNDegen).
+    scenario_text_line: Option<(String, usize)>,
     /// 已执行过的 `__lua_block`（键：脚本名 + 指令下标）。
     ///
     /// Artemis 语义：[lua] 块在**文件加载时**执行且每块只执行一次（见
@@ -447,7 +447,7 @@ impl Interpreter {
             last_flush_saw_jump: false,
             queued_call_barriers: Vec::new(),
             arrived_by_jump: false,
-            in_scenario_text: false,
+            scenario_text_line: None,
             executed_lua_blocks: std::collections::HashSet::new(),
             macros: MacroRegistry::new(),
             macro_files: HashMap::new(),
@@ -794,7 +794,8 @@ impl Interpreter {
             }
 
             let instruction = script.instructions[self.current_line].clone();
-            self.in_scenario_text = instruction.tag == "__text";
+            self.scenario_text_line =
+                (instruction.tag == "__text").then(|| (script_name.clone(), self.current_line));
 
             if std::env::var("ASB_TRACE_STEP").is_ok() {
                 eprintln!(
@@ -1153,6 +1154,7 @@ impl Interpreter {
             let through_filter = params
                 .remove(crate::lua_engine::QUEUED_THROUGH_TAG_FILTER)
                 .is_some();
+            let load_wait = params.remove(LOAD_WAIT).is_some();
 
             let instruction = Instruction {
                 tag,
@@ -1179,6 +1181,15 @@ impl Interpreter {
                 result = self.execute_tag(&inner, true)?;
             }
 
+            // A stop or click wait the game queues, as from onLoad, stands in
+            // for a save's frame wait that has not run yet (VNDegen).
+            if !load_wait
+                && let TagResult::Wait(Event::Wait {
+                    reason: WaitReason::Stop { reason: None } | WaitReason::Generic,
+                }) = &result
+            {
+                self.drop_pending_load_waits();
+            }
             match result {
                 TagResult::Continue => continue,
                 TagResult::Emit(event) | TagResult::Wait(event) => {
@@ -1366,15 +1377,16 @@ impl Interpreter {
 
     fn emit_event(&mut self, mut event: Event) -> CallbackResult {
         if let Event::ScenarioText { printed, .. } = &mut event
-            && self.in_scenario_text
+            && self.scenario_text_line.is_some()
         {
             *printed = false;
         }
         if matches!(event, Event::ScenarioText { .. }) {
-            let mut source = self
-                .current_script
-                .clone()
-                .map(|file| (file, self.current_line));
+            let mut source = self.scenario_text_line.clone().or_else(|| {
+                self.current_script
+                    .clone()
+                    .map(|file| (file, self.current_line))
+            });
             // Macros are tags: their text belongs to the invocation in the
             // caller, not to a shared printing helper used by every page.
             for frame in self.call_stack.iter().rev() {
@@ -2867,6 +2879,42 @@ mod tests {
     }
 
     #[test]
+    fn a_saves_frame_wait_yields_to_a_wait_the_game_queues() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(r#"function rebuild(e) e:enqueueTag{"stop"} end"#)
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[stop]\n[var name=\"t.after\" data=\"1\"]\n[stop]\n")
+            .unwrap();
+        it.load_script("routine", "*load\n[calllua function=\"rebuild\"]\n[return]\n")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.restore_position(
+            "routine",
+            0,
+            vec![super::CallFrame {
+                script: "story".into(),
+                return_line: 1,
+            }],
+        )
+        .unwrap();
+        it.defer_until_return(0, vec![("stop".into(), HashMap::new())]);
+
+        assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(_)));
+        it.advance_line();
+        let _ = it.run().unwrap();
+        assert_eq!(
+            it.get_variable("t.after"),
+            Some(Value::Int(1)),
+            "the saved stop no longer holds the frame"
+        );
+    }
+
+    #[test]
     fn deferred_tags_run_when_their_frame_returns() {
         let mut it = Interpreter::new(InterpreterConfig::default());
         it.load_script(
@@ -4020,6 +4068,11 @@ mod tests {
             *texts.lock().unwrap(),
             [("[$5 a line]".to_string(), false)],
             "what the filter prints counts as scenario text"
+        );
+        assert_eq!(
+            interpreter.engine_context().lock().unwrap().scenario_text_source,
+            Some(("test".to_string(), 0)),
+            "its source is the scenario line"
         );
     }
 

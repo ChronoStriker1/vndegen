@@ -412,6 +412,10 @@ impl CoreRuntime {
     /// `AlreadyReadConfig(1) -> ScenarioText -> AlreadyReadConfig(0)` 不会丢掉前一条
     /// 正文的有效门控。
     pub(super) fn record_scenario_text_source(&mut self, script: &str, line: usize) {
+        // Read lines hold the PC engine's instruction indexes, which skip
+        // [/if], so saveg.dat's read history moves between it and the core
+        // (VNDegen).
+        let line = self.interpreter.pc_index(script, line);
         let was_read = self.control.is_read(script, line);
         self.interpreter.set_variable(
             "s.status.alreadyread",
