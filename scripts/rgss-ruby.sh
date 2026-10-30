@@ -4,7 +4,8 @@
 #   scripts/rgss-ruby.sh build/rgss        Apple: Packages/VNDegenKit/build/RGSSRuby.xcframework, which the CRGSS target
 #                                          links, for macOS, iOS and the iOS simulator
 #   scripts/rgss-ruby.sh build/rgss linux  Linux test host: build/rgss/linux, which Engines/RGSSRuntime/host links
-# Does nothing when the output matches this script and the patches. Writes Ruby's notices to build/rgss/licenses/.
+# Does nothing when the output matches the version, options and patches. Writes Ruby's notice and the runtime's other
+# third-party notices to build/rgss/licenses/.
 set -euo pipefail
 
 out=${1:?output folder}
@@ -27,15 +28,17 @@ case "$platform" in
   linux) product=$out/linux ;;
   *) echo "unknown platform $platform" >&2; exit 2 ;;
 esac
-# The runtime's own third-party notices go beside Ruby's, current on every run.
-mkdir -p "$out/licenses"
+work=$out/ruby-work
+ruby_notice="$work/Ruby (RGSS game scripts).txt"
+# The notices are written afresh on every run: Ruby's, kept from its build, and the runtime's own third-party ones.
+rm -rf "$out/licenses" && mkdir -p "$out/licenses"
 cp "$root"/Engines/RGSSRuntime/licenses/*.txt "$out/licenses/"
-if [ "$(cat "$product/.vndegen-runtime" 2>/dev/null)" = "$stamp" ] && [ -f "$out/licenses/ruby.txt" ]; then
+[ -f "$ruby_notice" ] && cp "$ruby_notice" "$out/licenses/"
+if [ "$(cat "$product/.vndegen-runtime" 2>/dev/null)" = "$stamp" ] && [ -f "$ruby_notice" ]; then
   echo "Ruby is up to date in $product"
   exit 0
 fi
 
-work=$out/ruby-work
 mkdir -p "$work"
 tarball=$work/ruby-$version.tar.gz
 if ! echo "$sha256  $tarball" | shasum -a 256 -c >/dev/null 2>&1; then
@@ -101,7 +104,6 @@ slice() {
 
 write_licenses() {
   local src=$1
-  mkdir -p "$out/licenses"
   {
     echo "Ruby $version, the interpreter that runs RPG Maker XP, VX and VX Ace games' scripts."
     echo "Source: $url"
@@ -112,7 +114,8 @@ write_licenses() {
     echo
     echo "---- LEGAL ----"
     cat "$src/LEGAL"
-  } >"$out/licenses/ruby.txt"
+  } >"$ruby_notice"
+  cp "$ruby_notice" "$out/licenses/"
 }
 
 case "$platform" in

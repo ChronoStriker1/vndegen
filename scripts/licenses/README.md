@@ -10,11 +10,9 @@ its own:
   `LICENSE.txt` and the font licenses from the runtime itself.
 - `scripts/kirikiri-engine.sh` writes `build/kirikiri/licenses/`: krkrsdl3's license, the Android Open Source Project's
   Apache-2.0 text for the bundled fallback font and the velocity tracker, and each vcpkg dependency's `copyright` file.
-- `scripts/rgss-engine.sh` writes `build/rgss/licenses/`: mkxp-z's license with where to get the source of the build,
-  the license files of ANGLE and of every dependency the core builds from source, and the texts in
-  `Engines/RGSS/licenses/` for code whose source folder has none: Ruby and libyaml (built in stage 1, whose sources
-  aren't kept), header-only Boost, libretro-common, the Khronos headers, and what the core embeds (the Liberation Sans
-  font, SDL's controller database, and the GMGSx soundfont). It fails on a source folder with no license and no text.
+- `scripts/rgss-ruby.sh` writes `build/rgss/licenses/`: Ruby's BSD license and its LEGAL file, and the texts in
+  `Engines/RGSSRuntime/licenses/` for the code VNDegen's RGSS runtime vendors (stb, dr_libs) and the tile tables it
+  takes from RPG Maker MV's corescript.
 - `scripts/ruffle-runtime.sh` copies `build/ruffle/licenses/` from `Engines/Flash/ruffle/licenses/`, which
   `scripts/ruffle-web.sh` writes when it builds Ruffle: Ruffle's license, the license files of every Rust crate in its
   wasm module and every JavaScript package in `ruffle.js`, and the texts in `Engines/Flash/licenses/` for the Noto font
