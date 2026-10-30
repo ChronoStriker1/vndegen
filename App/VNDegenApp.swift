@@ -7,6 +7,7 @@ import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
 import EngineArtemis
+import EngineGodot
 import EngineNScripter
 import FontPack
 import RuntimePackages
@@ -25,6 +26,7 @@ let engines: [any EnginePlugin] = {
         RenPyPlugin(),
         KiriKiriPlugin(),
         ArtemisPlugin(),
+        GodotPlugin(),
         FlashPlugin(),
         NScripterPlugin(),
     ]

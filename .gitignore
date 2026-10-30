@@ -4,7 +4,8 @@ DerivedData/
 *.xcodeproj
 .swiftpm/
 Packages/VNDegenKit/.build/
-.audit/
+.audit
 *.ipa
 Engines/Artemis/art3m1s-core/target*/
 Engines/Artemis/art3m1s-core/**/target/
+__pycache__/

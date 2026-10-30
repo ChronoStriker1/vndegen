@@ -345,10 +345,50 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         }
         f.pos = std::min(f.pos, script_.text().size());
         f.line = script_.lineAt(f.pos);
-        // The statement index of a return position: the ':' separators before it on its line.
+        // The statement index of a return position: the ':' separators before it on its line, outside strings.
         f.stmt = 0;
-        for (size_t p = script_.lineStart(f.line); p < f.pos; p += sjisCharLen(script_.text(), p))
-            if (script_.text()[p] == ':') f.stmt++;
+        const std::string &t = script_.text();
+        size_t stmtStart = script_.lineStart(f.line);
+        char quote = 0;
+        for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(t, p)) {
+            if (quote) {
+                if (t[p] == quote) quote = 0;
+                continue;
+            }
+            if (t[p] == '"' || t[p] == '`') quote = t[p];
+            if (!quote && t[p] == ':') {
+                f.stmt++;
+                stmtStart = p + 1;
+            }
+        }
+        // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
+        // which getparam may still read. The interpreter's own parser finds that command, dispatching names as it
+        // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
+        // variables; its errors aren't the player's, so they aren't logged.
+        if (f.kind == Frame::Gosub) {
+            // Restored on every exit, including the exception a corrupt save's nesting guard throws.
+            quietErrors_++;
+            struct Restore {
+                Engine &e;
+                Cursor cur;
+                ~Restore() {
+                    e.cur_ = cur;
+                    e.quietErrors_--;
+                }
+            } restore{*this, cur_};
+            cur_ = Cursor{stmtStart, f.line, f.stmt};
+            for (;;) {
+                std::string word = readWord();
+                bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
+                std::string name = builtin ? word.substr(1) : word;
+                if (!builtin && defsubs_.count(name)) {
+                    f.hasParams = cur_.pos <= f.pos;
+                    break;
+                }
+                if (name != "if" && name != "notif") break;
+                readCondition();
+            }
+        }
         frames.push_back(f);
     }
     std::reverse(frames.begin(), frames.end());
@@ -403,6 +443,10 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     rubyFont_ = r.s();
     x.qInt5 = r.i();
+    // A fresh game saves an unused slot's alpha as -1, but the PC engine's load leaves it 255, which the next save
+    // writes (black box: a save made after loading). The loaded file stands in for the state until the game moves
+    // on, so it gets the same change; unusedAlpha holds where.
+    std::vector<size_t> unusedAlpha;
     for (Sprite2 &q : sc.sp2) {
         std::string tag = r.s();
         q.cx = r.i();
@@ -411,11 +455,13 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         q.scaleY = r.i();
         q.rot = r.i();
         q.visible = r.i() != 0;
+        if (tag.empty()) unusedAlpha.push_back(r.p);
         q.alpha = r.i();
         int blend = r.i();
         q.blend = blend == 1 ? Blend::Add : blend == 2 ? Blend::Sub : Blend::Normal;
         if (!tag.empty() && loadImage(tag, q.img)) q.loaded = true;
         q.img.tag = tag;
+        if (tag.empty()) q.alpha = 255;
     }
     for (int &v : x.tail) v = r.i();
     sc.allSp2Hidden = x.tail[5] != 0;
@@ -441,7 +487,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     if (sc.bgTag == "black" || sc.bgTag == "white" || (!sc.bgTag.empty() && sc.bgTag[0] == '#')) {
         sc.bgColor = sc.bgTag == "white" ? rgba(255, 255, 255) : sc.bgTag == "black" ? rgba(0, 0, 0) : pxOf(uint32_t(strtoul(sc.bgTag.c_str() + 1, nullptr, 16)));
     } else if (!sc.bgTag.empty()) {
-        loadImage(sc.bgTag, sc.bg);
+        loadBackground(sc.bgTag, sc.bg);
     }
     extras_ = x;
     scene_ = std::move(sc);
@@ -494,6 +540,11 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     // The loaded save is the savepoint until the game moves on.
     savepoint_.assign(data.begin(), data.begin() + long(historyAt));
+    for (size_t at : unusedAlpha)
+        if (at + 4 <= savepoint_.size()) {
+            savepoint_[at] = 255;
+            savepoint_[at + 1] = savepoint_[at + 2] = savepoint_[at + 3] = 0;
+        }
     savepointLine_ = line;
     savepointStmt_ = stmt;
     savepointLive_ = false;
@@ -507,6 +558,7 @@ std::string Engine::savePath(int slot) const {
 }
 
 bool Engine::saveGame(int slot, const std::string &note) {
+    luaCallback("save", slot);
     Bytes data;
     if (savepointLive_) {
         serializeState(data);
@@ -569,6 +621,8 @@ bool Engine::loadGame(int slot) {
         fileLogOrder_ = std::move(fileLogOrder);
         return false;
     }
+    clearBlt();  // blt's drawing isn't part of a save
+    luaCallback("load", slot);
     if (!loadGosub_.empty()) gosub(cur_.pos, cur_.line, cur_.stmt, loadGosub_);
     return true;
 }
@@ -605,7 +659,9 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 
 void Engine::loadGlobals() {
     Bytes data;
+    globalsOnDisk_.clear();
     if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, "gloval.sav")), data)) {
+        globalsOnDisk_ = data;
         size_t p = 0;
         for (size_t i = size_t(globalBorder_); i < num_.size() && p + 4 <= data.size(); i++) {
             num_[i] = int32_t(le32(&data[p]));
@@ -683,16 +739,30 @@ static std::string upperAscii(std::string s) {
     return s;
 }
 
+Bytes Engine::globalsFile() const {
+    Bytes out;
+    Writer w{out};
+    for (size_t i = size_t(globalBorder_); i < num_.size(); i++) {
+        w.i(num_[i]);
+        w.s(str_[i]);
+    }
+    return out;
+}
+
+void Engine::saveGlobalsIfChanged() {
+    if (!globalOn_ || defineMode_) return;
+    Bytes out = globalsFile();
+    if (out == globalsOnDisk_) return;
+    std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
+    if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
+}
+
 void Engine::saveSystemData() {
     if (globalOn_) {
-        Bytes out;
-        Writer w{out};
-        for (size_t i = size_t(globalBorder_); i < num_.size(); i++) {
-            w.i(num_[i]);
-            w.s(str_[i]);
-        }
+        Bytes out = globalsFile();
         std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
-        if (!fs_.write(path, out.data(), out.size())) logf("could not write %s", path.c_str());
+        if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
+        else logf("could not write %s", path.c_str());
     }
     auto writeLog = [&](const char *file, const std::vector<std::string> &names) {
         std::string out = std::to_string(names.size()) + "\n";

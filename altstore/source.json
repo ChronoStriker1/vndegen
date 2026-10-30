@@ -49,6 +49,56 @@
       },
       "versions": [
         {
+          "version": "0.9.0",
+          "buildVersion": "552",
+          "date": "2026-10-30T09:29:29Z",
+          "localizedDescription": "Adds Godot games on Mac, iPhone and iPad.\n\n## Downloads\n\n- `VNDegen-0.9.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.9.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- Godot games run inside VNDegen's window. Godot 4 games run on Godot 4.7, and Godot 3 games on Godot 3.6, which covers games exported with Godot 4.2 to 4.5 and Godot 3.3 to 3.6. VNDegen loads the game's pack unchanged, from a `.pck` beside the `.exe` or from inside the `.exe`.\n- Godot 4 draws through Metal on Mac, iPhone and iPad. Godot 3 draws through OpenGL on Mac and through ANGLE on iPhone and iPad. Godot needs a Mac with Apple silicon.\n- Controllers reach the game as an Xbox controller, and touch and the mouse as Godot's mouse. A hardware keyboard types into the game's text fields, and the Mac keyboard and mouse wheel work.\n- Saves go where Windows keeps them. `user://` is under the game's AppData stand-in, so Ludusavi backups from Windows, a Steam Deck, or Godot's Linux and Mac builds restore there. Games that save beside their `.exe` save in their own folder.\n- Files outside the pack are found whatever case the game names them in.\n- Games VNDegen can't run say why on their page: Godot C# games, encrypted packs, GDExtension and GDNative games, and games with Steam built in.\n\n## Known limits\n\n- A focused text field doesn't open the on-screen keyboard, and held keys don't repeat.\n- `OS.alert()` writes to the log instead of showing a dialog.\n- If Godot fails partway through starting a game, for example because its renderer doesn't start, it runs no more games until VNDegen is reopened.\n- Godot 4 games written for the compatibility renderer run on the mobile renderer on Metal.\n- Tested with the 4 Godot games in the library that VNDegen supports. All reach their title, save and load on the Mac and the iPad simulator, and one also on the iPhone simulator. `docs/godot.md` has the details.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.9.0/VNDegen-0.9.0.ipa",
+          "size": 123770064,
+          "sha256": "f94b9f880efceb1f771e08af11560c1b4bf31c0968b4b57f87b8094608967ba4",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.8.3",
+          "buildVersion": "525",
+          "date": "2026-10-30T08:33:42Z",
+          "localizedDescription": "More NScripter games run: ones with CD music, Lua scripts, packed voices and drawing plugins.\n\n## Downloads\n\n- `VNDegen-0.8.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- NScripter CD music plays from the game's `CD` folder (`track01.ogg` and on, or `.mp3` and `.wav`), the layout English releases ship. A disc isn't read.\n- Games that script part of their logic in Lua (`system.lua` beside `nslua.dll`) run it on an embedded Lua 5.1. A game's Lua can't open files, run programs or load modules.\n- Voices packed as NBZ files play, and archive entries packed with the engine's LZSS compression load.\n- The `MSpDraw.dll` drawing plugin moves, turns, scales, tilts and fades pictures as its manual describes.\n- An English release written for backquoted text lines shows them as English text wrapped between words, with its `|` marks as short pauses.\n- `blt` and `ofscpy` draw straight onto the screen, as one game's ending credits use them.\n\n## Known limits\n\n- The `|` pause length is a guess, because the game that uses it ships no NScripter program to compare with.\n- NSLua's direct drawing functions aren't emulated, and of `MSpDraw.dll` only the calls the tested games make are. `docs/nscripter.md` lists the rest.\n- Tested with the 10 NScripter games in the library, 4 of them new. All reach their title, play, save and load on the Mac and the iPad simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.3/VNDegen-0.8.3.ipa",
+          "size": 90040996,
+          "sha256": "04ce7733506add3c1139dcd7582fe652eea84ca0d19c9ac069890302b8a6cebe",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.8.2",
+          "buildVersion": "514",
+          "date": "2026-10-28T11:17:50Z",
+          "localizedDescription": "Fixes for NScripter games.\n\n## Downloads\n\n- `VNDegen-0.8.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixed\n\n- NScripter transitions from the `breakup.dll`, `lngtwave.dll` and `trvswave.dll` effect plugins look as they do on Windows. Characters break apart and fly off, and screens ripple, instead of crossfading.\n- MP3 music and voices play in NScripter games.\n- NScripter's text input and yes/no boxes look and sit as they do on Windows, and input boxes take the size the game asks for.\n- NScripter games keep their global variables, such as the save dates a game's own save screen shows, when VNDegen is closed or the system ends it in the background.\n- NScripter saves made inside a game's subroutines load correctly, and stay byte-identical to the PC version's.\n- NScripter sound is decoded on its own thread, so a slow decode can't cause a dropout.\n- NScripter backgrounds no longer show black holes where a color matched the image's top-left pixel.\n\n## Known limits\n\n- Other NScripter effect plugins still crossfade. CD audio, MIDI music, Lua scripts and two rarely used archive compression types aren't supported, because no tested game uses them.\n- Tested with the 6 NScripter games in the library on the Mac and the iPad simulator. All reach their title, play, save and load, and movies and dungeon walking hold 60 fps.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.2/VNDegen-0.8.2.ipa",
+          "size": 89969482,
+          "sha256": "bc0ebf5d28e136d0562dafe603c33294bd59bcdfe8f6570eb9d33e509d842769",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.8.1",
+          "buildVersion": "498",
+          "date": "2026-10-28T08:08:58Z",
+          "localizedDescription": "Gives sound to RPG Maker MV games that ship only Ogg audio.\n\n## Downloads\n\n- `VNDegen-0.8.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixed\n\n- RPG Maker MV games that ship only Ogg audio, which is most of them, now have sound on Mac, iPhone and iPad. Before, VNDegen asked them for `.m4a` files they don't have, so they played silent. Encrypted audio and looping music work. MV games that ship `.m4a` files and RPG Maker MZ games play as before.\n\n## Known limits\n\n- Tested with an MV game with encrypted audio and one with plain Ogg files on the Mac and the iPad simulator. Music, background sounds, jingles and sound effects all play, and both hold about 60 fps on the map and in battle.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.1/VNDegen-0.8.1.ipa",
+          "size": 89925240,
+          "sha256": "45c19b3b4f7d6fb754dad94bd98b2829d4c4a7aca890ffe4f1cc9d2038bee6fc",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.8.0",
+          "buildVersion": "490",
+          "date": "2026-10-28T07:47:46Z",
+          "localizedDescription": "Adds NScripter games on Mac, iPhone and iPad, on VNDegen's own NScripter runtime, written for VNDegen and MIT licensed like the rest of the app.\n\n## Downloads\n\n- `VNDegen-0.8.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.8.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New\n\n- NScripter games run inside VNDegen's window. VNDegen finds a game by its `nscript.dat`, or by a `0.txt` or `00.txt` script beside its archives, up to two folders down. The runtime reads `.nsa`, `.sar` and `.ns2` archives, including bitmaps NScripter's packer compressed, and plays Ogg and WAV sound and MPEG-1 movies.\n- NScripter saves are the PC engine's own files, byte for byte, in the game's save folder. They move between VNDegen and a PC copy of the game, and Ludusavi backs them up.\n- English translations whose patched engine wraps text between words get the same word wrap.\n- NScripter games start with the Keyboard and mouse layout. Clicks and taps reach the game as NScripter's mouse buttons.\n\n## Known limits\n\n- MP3 and CD audio don't play. Effect DLLs, such as `breakup.dll`, fall back to a crossfade. NSLua games aren't supported, and the `MSpDraw.dll` layer plugin draws only what one test game needs.\n- The built-in dialogs and the default save and load menus are VNDegen's own drawing, not Windows', so their layout differs from the PC version.\n- A save slot's date is lost if VNDegen is force quit, because the game writes it with its global variables when it quits. Quitting normally keeps it.\n- Tested with the 6 NScripter games in the library. All reach their title, play, save and load on the Mac and the iPad simulator, and one also on the iPhone simulator. Movies and dungeon walking hold 60 fps on the Mac and the iPad simulator.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.8.0/VNDegen-0.8.0.ipa",
+          "size": 89923055,
+          "sha256": "d9f457861322eadbc5e7f2eef16f1e9833cf585ebba37528719d9f067fb4312e",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.7.0",
           "buildVersion": "462",
           "date": "2026-10-28T03:14:15Z",

@@ -21,6 +21,7 @@ void cmdGame(E &e, const std::string &) {
     e.defineMode_ = false;
     e.loadGlobals();
     if (!e.jumpToLabel("start")) e.ended_ = true;
+    e.luaCallback("reset");
 }
 
 void cmdNsa(E &e, const std::string &) {
@@ -354,7 +355,7 @@ void cmdGetVersion(E &e, const std::string &) { e.setVar(e.readVar(), 304); }
 
 // getparam reads the arguments a user command was called with, in the caller's context.
 void cmdGetParam(E &e, const std::string &) {
-    const E::Frame *frame = nullptr;
+    E::Frame *frame = nullptr;
     for (auto it = e.stack_.rbegin(); it != e.stack_.rend(); ++it)
         if (it->hasParams) {
             frame = &*it;
@@ -383,9 +384,11 @@ void cmdGetParam(E &e, const std::string &) {
         targets.push_back(t);
     } while (e.readComma());
     E::Cursor mine = e.cur_;
-    e.cur_.pos = frame->paramPos;
+    e.cur_.pos = frame->pos;
     for (size_t i = 0; i < targets.size(); i++) {
-        if (i) e.readComma();
+        // After an earlier getparam the arguments left start with a comma.
+        e.skipSpaces();
+        if (i || e.peek() == ',') e.readComma();
         if (e.atStatementEnd()) break;
         Target &t = targets[i];
         if (t.mode) {
@@ -412,6 +415,7 @@ void cmdGetParam(E &e, const std::string &) {
             e.cur_ = caller;
         }
     }
+    frame->pos = e.cur_.pos;
     e.cur_ = mine;
 }
 
@@ -432,13 +436,22 @@ void cmdGetIni(E &e, const std::string &) {
             size_t nl = text.find('\n', p);
             std::string line = text.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
             p = nl == std::string::npos ? text.size() : nl + 1;
-            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+            auto trim = [](std::string v) {
+                while (!v.empty() && (v.back() == '\r' || v.back() == ' ' || v.back() == '\t')) v.pop_back();
+                size_t i = 0;
+                while (i < v.size() && (v[i] == ' ' || v[i] == '\t')) i++;
+                return v.substr(i);
+            };
+            line = trim(line);
             if (line.size() > 1 && line[0] == '[') {
                 cur = sjisLower(line.substr(1, line.find(']') - 1));
             } else if (cur == section) {
                 size_t eq = line.find('=');
-                if (eq != std::string::npos && sjisLower(line.substr(0, eq)) == key) {
-                    result = line.substr(eq + 1);
+                if (eq != std::string::npos && sjisLower(trim(line.substr(0, eq))) == key) {
+                    result = trim(line.substr(eq + 1));
+                    // Windows drops a matching pair of quotes around the value.
+                    if (result.size() >= 2 && (result.front() == '"' || result.front() == '\'') && result.back() == result.front())
+                        result = result.substr(1, result.size() - 2);
                     break;
                 }
             }
@@ -495,23 +508,7 @@ void cmdReturn(E &e, const std::string &) {
     e.skipSpaces();
     std::string label;
     if (!e.atStatementEnd()) label = e.readLabel();
-    // Leave any for loops opened inside the subroutine.
-    while (!e.stack_.empty() && e.stack_.back().kind == E::Frame::For) e.stack_.pop_back();
-    if (e.stack_.empty()) {
-        e.errorf("return without gosub");
-        return;
-    }
-    E::Frame f = e.stack_.back();
-    e.stack_.pop_back();
-    if (!label.empty()) {
-        e.jumpToLabel(label);
-        return;
-    }
-    e.cur_.pos = f.pos;
-    e.cur_.line = f.line;
-    e.cur_.stmt = f.stmt;
-    e.jumps_++;
-    if (f.resumeText) e.inTextLine_ = true;
+    e.returnFromSub(label);
 }
 
 void cmdIf(E &e, const std::string &name) {
@@ -718,6 +715,28 @@ void cmdAutoClick(E &e, const std::string &) { e.autoClick_ = e.readInt(); }
 
 }  // namespace
 
+bool Engine::returnFromSub(const std::string &label) {
+    // Leave any for loops opened inside the subroutine.
+    while (!stack_.empty() && stack_.back().kind == Frame::For) stack_.pop_back();
+    if (stack_.empty()) {
+        errorf("return without gosub");
+        return false;
+    }
+    Frame f = stack_.back();
+    stack_.pop_back();
+    if (!label.empty()) {
+        jumpToLabel(label);
+        return true;
+    }
+    cur_.pos = f.pos;
+    cur_.line = f.line;
+    cur_.stmt = f.stmt;
+    if (f.hasParams) skipStatement();  // arguments getparam didn't read
+    jumps_++;
+    if (f.resumeText) inTextLine_ = true;
+    return true;
+}
+
 void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     for (const char *n : {"nsa", "ns2", "ns3", "nsadir"}) t[n] = cmdNsa;
     t["game"] = cmdGame;
@@ -812,12 +831,12 @@ void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     for (const char *n : {"deletemenu", "resetmenu", "insertmenu", "killmenu", "versionstr", "mode_saya", "mode_ext",
                           "automode", "menusetwindow", "menuselectcolor", "menuselectvoice", "selectvoice",
                           "clickvoice", "mousecursor", "mousemode", "debuglog", "errorsave", "spi",
-                          "arc", "soundpressplgin", "cdfadeout", "noteraseman",
+                          "arc", "soundpressplgin", "noteraseman",
                           "clickskippage", "englishdialog", "minimizewindow", "movemousecursor", "menu_full",
                           "menu_window", "menu_click_def", "menu_click_page", "repaint", "filelogoff", "windowchip",
                           "lookbacksp", "lookbackbutton", "lookbackcolor", "lookbackvoice", "lookbackoff",
                           "lookbackflush_dummy", "kidokumode", "useescspc2", "shell", "winexec", "flushout",
-                          "rubyoff_dummy"})
+                          "rubyoff_dummy", "heartmode"})
         t[n] = ignoreArgs;
 }
 

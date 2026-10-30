@@ -12,10 +12,14 @@
 //   shot PATH           write the current frame as a PNG
 //   load N              load save slot N
 //   where               print the script line and what the game waits for
+//   caption             print the game's window title (a script's caption command), for lab scripts
+//   audio               print the peak level of the sound mixed during the last step command, 0 to 1
 //   quit                end the game as closing its window would, writing system data
 //
 // Usage: vnns_host GAME_DIR [--wordwrap] [--log FILE]. Prints "ok" after each command, or "ended" once the game ends.
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_OUTLINE_H
@@ -114,6 +118,7 @@ int main(int argc, char **argv) {
     std::vector<float> audio(2 * 735);
     bool running = true;
     int drawn = 0;  // frames that changed, for the "drawn" command
+    float peak = 0;  // loudest sample mixed during the last step, for the "audio" command
     // VNNS_SLOW_MS reports each step that takes at least that long, with where the script is.
     double slowMs = getenv("VNNS_SLOW_MS") ? atof(getenv("VNNS_SLOW_MS")) : 0;
     auto stepFor = [&](int ms) {
@@ -124,6 +129,7 @@ int main(int argc, char **argv) {
             double took = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
             if (slowMs > 0 && took >= slowMs) fprintf(stderr, "slow step %.1f ms at %s\n", took, vnns_debug_status(e));
             vnns_audio_render(e, audio.data(), d * 44100 / 1000);
+            for (int i = 0; i < 2 * d * 44100 / 1000; i++) peak = std::max(peak, std::fabs(audio[size_t(i)]));
             bool changed = false;
             vnns_frame(e, &w, &h, &changed);
             if (changed) drawn++;
@@ -139,7 +145,10 @@ int main(int argc, char **argv) {
         if (cmd == "step") {
             int ms = 0;
             in >> ms;
+            peak = 0;
             stepFor(ms);
+        } else if (cmd == "audio") {
+            std::cout << "audio peak " << peak << std::endl;
         } else if (cmd == "move" || cmd == "click") {
             float x, y;
             if (in >> x >> y) vnns_mouse_move(e, (x + 0.5f) / w, (y + 0.5f) / h);
@@ -192,6 +201,8 @@ int main(int argc, char **argv) {
         } else if (cmd == "drawn") {
             std::cout << "drawn " << drawn << std::endl;
             drawn = 0;
+        } else if (cmd == "caption") {
+            std::cout << "caption " << vnns_caption(e) << std::endl;
         } else if (cmd == "where") {
             std::cout << vnns_debug_status(e) << std::endl;
         } else if (cmd == "quit") {

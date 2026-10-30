@@ -24,7 +24,7 @@ struct Engine::Movie {
 
 // The engine is built and destroyed here, where its movie type is complete.
 Engine::Engine(Config cfg) : cfg_(std::move(cfg)) {}
-Engine::~Engine() = default;
+Engine::~Engine() { luaStop(); }
 
 static uint8_t clamp8(int v) { return uint8_t(v < 0 ? 0 : v > 255 ? 255 : v); }
 

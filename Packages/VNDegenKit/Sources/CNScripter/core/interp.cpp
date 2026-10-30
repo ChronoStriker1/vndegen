@@ -12,6 +12,7 @@ static bool isIdentStart(char c) { return isalpha(uint8_t(c)) || c == '_'; }
 static bool isIdentChar(char c) { return isalnum(uint8_t(c)) || c == '_'; }
 
 void Engine::errorf(const char *fmt, ...) {
+    if (quietErrors_) return;
     char buf[512];
     va_list ap;
     va_start(ap, fmt);
@@ -236,18 +237,20 @@ struct ExprParser {
         for (;;) {
             e.skipSpaces();
             char c = peek();
+            // In 64 bits, so overflow wraps as the PC engine's 32-bit arithmetic does, and the smallest number divided by
+            // -1 can't trap.
             if (c == '*') {
                 e.cur_.pos++;
-                v *= factor();
+                v = int(int64_t(v) * factor());
             } else if (c == '/') {
                 e.cur_.pos++;
                 int d = factor();
-                v = d ? v / d : 0;
+                v = d ? int(int64_t(v) / d) : 0;
             } else if ((c == 'm' || c == 'M') && (peekAt(1) | 0x20) == 'o' && (peekAt(2) | 0x20) == 'd' &&
                        !isIdentChar(peekAt(3))) {
                 e.cur_.pos += 3;
                 int d = factor();
-                v = d ? v % d : 0;
+                v = d ? int(int64_t(v) % d) : 0;
             } else {
                 return v;
             }
@@ -274,13 +277,14 @@ struct ExprParser {
         NestingGuard guard;
         e.skipSpaces();
         char c = peek();
-        if (c == '"') {
+        // A string in double quotes, or in backquotes, which one game's script uses for half-width English strings.
+        if (c == '"' || c == '`') {
             e.cur_.pos++;
             size_t start = e.cur_.pos;
-            while (e.cur_.pos < t.size() && t[e.cur_.pos] != '"' && t[e.cur_.pos] != '\n')
+            while (e.cur_.pos < t.size() && t[e.cur_.pos] != c && t[e.cur_.pos] != '\n')
                 e.cur_.pos += sjisCharLen(t, e.cur_.pos);
             std::string s = t.substr(start, e.cur_.pos - start);
-            if (peek() == '"') e.cur_.pos++;
+            if (peek() == c) e.cur_.pos++;
             return s;
         }
         if (c == '$') {
@@ -346,7 +350,7 @@ std::string Engine::readColorOrStr() { return readStr(); }
 bool Engine::peekIsStringArg() {
     skipSpaces();
     char c = peek();
-    if (c == '"' || c == '$' || c == '#' || c == '*' || c == '(') return true;
+    if (c == '"' || c == '`' || c == '$' || c == '#' || c == '*' || c == '(') return true;
     if (isIdentStart(c)) {
         size_t save = cur_.pos;
         std::string w = readWord();
@@ -426,7 +430,7 @@ static bool readComparison(Engine &e) {
     e.cur_.pos = save;
     e.skipSpaces();
     char c = e.peek();
-    bool isString = c == '"' || c == '$';
+    bool isString = c == '"' || c == '`' || c == '$';
     std::string ls, rs;
     int li = 0, ri = 0;
     if (isString) ls = e.readStr();
@@ -487,15 +491,20 @@ void Engine::skipToLineEnd() {
     while (cur_.pos < t.size() && t[cur_.pos] != '\n') cur_.pos += sjisCharLen(t, cur_.pos);
 }
 
-// Skips the rest of the current statement, respecting quoted strings.
+// Skips the rest of the current statement, respecting strings in double quotes or backquotes.
 void Engine::skipStatement() {
     const std::string &t = script_.text();
-    bool quoted = false;
+    char quote = 0;
     while (cur_.pos < t.size()) {
         char c = t[cur_.pos];
         if (c == '\n') return;
-        if (c == '"') quoted = !quoted;
-        if (!quoted && (c == ':' || c == ';')) return;
+        if (quote) {
+            if (c == quote) quote = 0;
+        } else if (c == '"' || c == '`') {
+            quote = c;
+        } else if (c == ':' || c == ';') {
+            return;
+        }
         cur_.pos += sjisCharLen(t, cur_.pos);
     }
 }
@@ -560,7 +569,8 @@ void Engine::executeStatement() {
         size_t save = cur_.pos;
         std::string word = readWord();
         // v123 / dv123 / mv123 voice shortcuts carry their number in the name.
-        bool known = commandTable().count(word) || defsubs_.count(word) || (word[0] == '_' && commandTable().count(word.substr(1)));
+        bool known = commandTable().count(word) || defsubs_.count(word) || luaCommands_.count(word) ||
+                     (word[0] == '_' && commandTable().count(word.substr(1)));
         if (!known) {
             size_t d = 0;
             while (d < word.size() && isalpha(uint8_t(word[d]))) d++;
@@ -599,15 +609,14 @@ void Engine::executeCommand(const std::string &name) {
         n.erase(0, 1);
         builtin = true;
     }
+    if (!builtin && luaCommand(n)) return;  // a luasub command, run by its Lua function
     if (!builtin && defsubs_.count(n)) {
         // A user command: a gosub to the label of that name, whose getparam reads the arguments written here.
-        size_t params = cur_.pos;
-        skipStatement();
+        skipSpaces();
         Frame f;
         f.pos = cur_.pos;
         f.line = cur_.line;
         f.stmt = cur_.stmt;
-        f.paramPos = params;
         f.hasParams = true;
         stack_.push_back(f);
         if (!jumpToLabel(n)) stack_.pop_back();
@@ -642,10 +651,17 @@ void Engine::executeCommand(const std::string &name) {
 
 void Engine::runUntilBlocked() {
     // A script loop without waits would hang the host; cap the work per frame.
-    for (int budget = 200000; budget > 0; budget--) {
-        if (ended_ || wait_ != WaitKind::None) return;
+    bool ran = false;
+    for (int budget = 200000; budget > 0 && !ended_ && wait_ == WaitKind::None; budget--) {
         executeStatement();
+        ran = true;
     }
+    // The PC engine writes global variables only when it saves and when it quits, so a game that is killed, as iOS
+    // kills apps in the background, loses them: a save slot's date that a custom save menu keeps in a global, say.
+    // Writing them whenever the script stops for the player, if they changed, keeps the same file up to date.
+    bool forPlayer = wait_ == WaitKind::Click || wait_ == WaitKind::Text || wait_ == WaitKind::Button ||
+                     wait_ == WaitKind::Select || wait_ == WaitKind::Dialog;
+    if (ran && forPlayer) saveGlobalsIfChanged();
 }
 
 }  // namespace vnns

@@ -4,6 +4,11 @@ import Foundation
 import OSLog
 import QuartzCore
 import VNCore
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 
 nonisolated let nScripterLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "nscripter")
 
@@ -27,6 +32,7 @@ final class NScripterSession: EngineSession {
     private var paused = false
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    private var lifeCycleObservers: [NSObjectProtocol] = []
 
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
@@ -82,6 +88,28 @@ final class NScripterSession: EngineSession {
         #endif
         link.add(to: .main, forMode: .common)
         displayLink = link
+        observeLifeCycle()
+    }
+
+    /// iOS may end an app in the background without warning, and a player may force-quit it. The PC engine writes
+    /// global variables and the read-text record only at saves and on exit, so they are written whenever the app
+    /// leaves the foreground too.
+    private func observeLifeCycle() {
+        #if canImport(UIKit)
+        let names = [UIApplication.willResignActiveNotification, UIApplication.didEnterBackgroundNotification,
+                     UIApplication.willTerminateNotification]
+        #else
+        let names = [NSApplication.willResignActiveNotification, NSApplication.willTerminateNotification]
+        #endif
+        lifeCycleObservers = names.map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.saveSystemData() }
+            }
+        }
+    }
+
+    private func saveSystemData() {
+        if let engine { vnns_save_system_data(engine) }
     }
 
     fileprivate func step(_ link: CADisplayLink) {
@@ -120,6 +148,8 @@ final class NScripterSession: EngineSession {
     private func finish(byGame: Bool) {
         displayLink?.invalidate()
         displayLink = nil
+        lifeCycleObservers.forEach(NotificationCenter.default.removeObserver)
+        lifeCycleObservers = []
         audio?.stop()
         audio = nil
         if let engine {
@@ -160,8 +190,7 @@ final class NScripterSession: EngineSession {
         guard let engine else { return }
         if paused { deliver(router.releaseAll()) }
         vnns_set_paused(engine, paused)
-        // A paused app may be killed without warning, as iOS does in the background. The PC engine writes global
-        // variables and the read-text record only at saves and on exit, so write them now too.
+        // A paused app may be killed without warning too.
         if paused { vnns_save_system_data(engine) }
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil

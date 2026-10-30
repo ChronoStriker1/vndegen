@@ -4,26 +4,77 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace vnns {
 
-// MSpDraw.dll, a third-party layer plugin with no documentation available. One test game sends it
-//   draw/<id>,<image tag>,<x>,<y>,<alpha>,<rotation>,<x scale>,<y scale>,<a>,<b>,<c>,<d>
-// to pan a tall picture past the screen, and clear/all. Read as: the picture centred on (x, y), moving d pixels down
-// on each of b timer ticks. The two calls it makes (y -200 moving +2, y 790 moving -2, b = 200) then keep the
-// 998 x 1778 picture covering the 800 x 600 screen throughout, which supports that reading.
+// MSpDraw.dll, a layer plugin that moves, turns and scales sprites of its own. Its manual (version 1.10) gives the
+// draw message as
+//   draw/n,tag,cx,cy[,alpha,rot,zoomx,zoomy,slope,steps,dcx,dcy,dalpha,drot,dzoomx,dzoomy,dslope,acx,acy,delay]
+// placing the picture by its centre; the d* values are added on each of the layer's timer ticks for `steps` ticks
+// (-1 for ever), the a* values are added to dcx and dcy each tick, and `delay` ticks pass before it shows. The tag's
+// mode letter may be followed by '+' or '-' for additive or subtractive blending. `set/n,name=value,...,time=count`
+// changes those values and runs for count more ticks; `clear/n,n,...` and `clear/all` remove pictures. The manual
+// calls slope a tilt, 0 upright and 90 flat; it's drawn as the picture's height scaled by its cosine.
 struct Engine::MSpDrawItem {
     int id = 0;
     LoadedImage img;
-    double cx = 0, cy = 0, vx = 0, vy = 0;
-    int alpha = 255, rot = 0, ticks = 0;
-    double sx = 1, sy = 1;
+    Blend blend = Blend::Normal;
+    double cx = 0, cy = 0, alpha = 255, rot = 0, zx = 1, zy = 1, slope = 0;
+    double dcx = 0, dcy = 0, dalpha = 0, drot = 0, dzx = 0, dzy = 0, dslope = 0, acx = 0, acy = 0;
+    int steps = 0;  // ticks of motion left; -1 for ever
+    int delay = 0;  // ticks before the picture shows
+    double *field(const std::string &name) {
+        static const std::pair<const char *, double MSpDrawItem::*> fields[] = {
+            {"center_x", &MSpDrawItem::cx},   {"center_y", &MSpDrawItem::cy},   {"alpha", &MSpDrawItem::alpha},
+            {"rot", &MSpDrawItem::rot},       {"zoom_x", &MSpDrawItem::zx},     {"zoom_y", &MSpDrawItem::zy},
+            {"slope", &MSpDrawItem::slope},   {"dcenter_x", &MSpDrawItem::dcx}, {"dcenter_y", &MSpDrawItem::dcy},
+            {"dalpha", &MSpDrawItem::dalpha}, {"drot", &MSpDrawItem::drot},     {"dzoom_x", &MSpDrawItem::dzx},
+            {"dzoom_y", &MSpDrawItem::dzy},   {"dslope", &MSpDrawItem::dslope}, {"acenter_x", &MSpDrawItem::acx},
+            {"acenter_y", &MSpDrawItem::acy}};
+        for (auto &[n, m] : fields)
+            if (name == n) return &(this->*m);
+        return nullptr;
+    }
 };
+
+namespace {
+// Splits on commas, leaving two-byte characters whole.
+std::vector<std::string> splitFields(const std::string &rest) {
+    std::vector<std::string> f;
+    size_t start = 0;
+    for (size_t i = 0; i <= rest.size();) {
+        if (i == rest.size() || rest[i] == ',') {
+            f.push_back(rest.substr(start, i - start));
+            start = ++i;
+            continue;
+        }
+        i += sjisCharLen(rest, i);
+    }
+    return f;
+}
+std::string trim(std::string s) {
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.pop_back();
+    size_t i = 0;
+    while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) i++;
+    return s.substr(i);
+}
+// A field's number, or nullopt when it isn't a finite number within what the fields hold.
+std::optional<double> number(const std::string &field) {
+    std::string v = trim(field);
+    if (v.empty()) return std::nullopt;
+    char *end = nullptr;
+    double d = strtod(v.c_str(), &end);
+    if (end == v.c_str() || !std::isfinite(d) || std::fabs(d) > 1e6) return std::nullopt;
+    return d;
+}
+}  // namespace
 
 void Engine::execDll(const std::string &call) {
     // "plugin.dll/function,arg,arg"
     size_t slash = call.find('/');
-    std::string dll = sjisLower(call.substr(0, slash));
+    std::string dll = normalizePath(call.substr(0, slash));
+    dll = dll.substr(dll.rfind('\\') + 1);  // the DLL's own name, wherever the game keeps it
     std::string rest = slash == std::string::npos ? std::string() : call.substr(slash + 1);
     std::vector<std::string> args;
     size_t start = 0;
@@ -52,14 +103,43 @@ void Engine::layerMessage(int layer, const std::string &msg) {
     size_t slash = msg.find('/');
     std::string verb = sjisLower(msg.substr(0, slash));
     std::string rest = slash == std::string::npos ? std::string() : msg.substr(slash + 1);
+    std::vector<std::string> f = splitFields(rest);
+    auto find = [&](int id) {
+        return std::find_if(mspdraw_.begin(), mspdraw_.end(), [id](auto &i) { return i->id == id; });
+    };
     if (verb == "clear") {
-        if (sjisLower(rest) == "all") {
-            mspdraw_.clear();
-        } else {
-            int id = atoi(rest.c_str());
-            mspdraw_.erase(std::remove_if(mspdraw_.begin(), mspdraw_.end(), [id](auto &i) { return i->id == id; }),
-                           mspdraw_.end());
+        for (const std::string &field : f) {
+            std::string v = sjisLower(trim(field));
+            if (v == "all") {
+                mspdraw_.clear();
+            } else if (auto k = find(atoi(v.c_str())); k != mspdraw_.end()) {
+                mspdraw_.erase(k);
+            }
         }
+        sceneDirty_ = true;
+        return;
+    }
+    if (verb == "set") {
+        if (f.empty()) return;
+        auto k = find(atoi(f[0].c_str()));
+        if (k == mspdraw_.end()) return;
+        MSpDrawItem &item = **k;
+        for (size_t i = 1; i < f.size(); i++) {
+            size_t eq = f[i].find('=');
+            if (eq == std::string::npos) continue;
+            std::string name = sjisLower(trim(f[i].substr(0, eq)));
+            std::optional<double> value = number(f[i].substr(eq + 1));
+            if (!value) {
+                logf("MSpDraw set: %s has no usable value", name.c_str());
+            } else if (name == "time") {
+                item.steps = int(*value);
+            } else if (double *p = item.field(name)) {
+                *p = *value;
+            } else {
+                logf("MSpDraw set: unknown value %s", name.c_str());
+            }
+        }
+        sceneDirty_ = true;
         return;
     }
     if (verb != "draw") {
@@ -67,16 +147,6 @@ void Engine::layerMessage(int layer, const std::string &msg) {
         return;
     }
     // id, then the image tag, which may itself hold commas before its ';', then numbers.
-    std::vector<std::string> f;
-    size_t start = 0;
-    for (size_t i = 0; i <= rest.size();) {
-        if (i == rest.size() || rest[i] == ',') {
-            f.push_back(rest.substr(start, i - start));
-            start = ++i;
-            continue;
-        }
-        i += sjisCharLen(rest, i);
-    }
     if (f.size() < 4) return;
     auto item = std::make_shared<MSpDrawItem>();
     item->id = atoi(f[0].c_str());
@@ -88,22 +158,25 @@ void Engine::layerMessage(int layer, const std::string &msg) {
             tag += "," + f[k];
             if (f[k].find(';') != std::string::npos) break;
         }
-    std::vector<double> n;
-    for (size_t j = k + 1; j < f.size(); j++) n.push_back(atof(f[j].c_str()));
-    n.resize(10, 0);
+    // ":c+;" blends additively and ":c-;" subtractively; the tag is loaded without that sign.
+    if (tag.size() > 2 && tag[0] == ':' && (tag[2] == '+' || tag[2] == '-')) {
+        item->blend = tag[2] == '+' ? Blend::Add : Blend::Sub;
+        tag.erase(2, 1);
+    }
+    double *order[] = {&item->cx,  &item->cy,     &item->alpha, &item->rot, &item->zx,  &item->zy,
+                       &item->slope, nullptr,     &item->dcx,   &item->dcy, &item->dalpha, &item->drot,
+                       &item->dzx, &item->dzy,    &item->dslope, &item->acx, &item->acy, nullptr};
+    for (size_t j = k + 1, n = 0; j < f.size() && n < 18; j++, n++) {
+        std::optional<double> v = number(f[j]);
+        if (!v) continue;  // an empty field keeps the default, as the manual allows
+        if (n == 7) item->steps = int(*v);
+        else if (n == 17) item->delay = std::max(0, int(*v));
+        else *order[n] = *v;
+    }
     if (!loadImage(tag, item->img)) return;
-    item->cx = n[0];
-    item->cy = n[1];
-    item->alpha = int(n[2]);
-    item->rot = int(n[3]);
-    item->sx = n[4] ? n[4] : 1;
-    item->sy = n[5] ? n[5] : 1;
-    item->vx = n[6];
-    item->ticks = int(n[7]);
-    item->vy = n[9];
-    mspdraw_.erase(std::remove_if(mspdraw_.begin(), mspdraw_.end(), [&](auto &i) { return i->id == item->id; }),
-                   mspdraw_.end());
-    mspdraw_.push_back(item);
+    if (auto old = find(item->id); old != mspdraw_.end()) *old = item;
+    else mspdraw_.push_back(item);
+    sceneDirty_ = true;
 }
 
 // Runs each layer plugin's timer at the interval setlayer gave it.
@@ -111,13 +184,25 @@ void Engine::tickLayers() {
     for (auto &[n, layer] : layers_) {
         if (layer.interval <= 0 || now_ < layer.nextTick) continue;
         layer.nextTick = now_ + layer.interval;
-        for (auto &item : mspdraw_)
-            if (item->ticks > 0) {
-                item->cx += item->vx;
-                item->cy += item->vy;
-                item->ticks--;
+        for (auto &item : mspdraw_) {
+            if (item->delay > 0) {
+                item->delay--;
                 sceneDirty_ = true;
+                continue;
             }
+            if (item->steps == 0) continue;
+            if (item->steps > 0) item->steps--;
+            item->dcx += item->acx;
+            item->dcy += item->acy;
+            item->cx += item->dcx;
+            item->cy += item->dcy;
+            item->alpha = std::clamp(item->alpha + item->dalpha, 0.0, 255.0);
+            item->rot += item->drot;
+            item->zx += item->dzx;
+            item->zy += item->dzy;
+            item->slope += item->dslope;
+            sceneDirty_ = true;
+        }
     }
 }
 
@@ -126,12 +211,14 @@ void Engine::drawLayer(int layer, Image &out) {
     if (it == layers_.end() || it->second.plugin != "mspdraw.dll") return;
     for (auto &item : mspdraw_) {
         const LoadedImage &img = item->img;
-        if (!img.image) continue;
+        if (!img.image || item->delay > 0 || item->alpha <= 0) continue;
+        // Anticlockwise on screen, as lsp2's rotation is drawn.
         double rad = item->rot * M_PI / 180.0;
-        double m[4] = {std::cos(rad) * item->sx, std::sin(rad) * item->sy, -std::sin(rad) * item->sx,
-                       std::cos(rad) * item->sy};
-        blitTransformed(out, *img.image, 0, 0, img.cellWidth, img.image->h, item->cx, item->cy, m, item->alpha,
-                        Blend::Normal);
+        double sy = item->zy * std::fabs(std::cos(item->slope * M_PI / 180.0));
+        if (sy < 0.001 || item->zx <= 0) continue;
+        double m[4] = {std::cos(rad) * item->zx, std::sin(rad) * sy, -std::sin(rad) * item->zx, std::cos(rad) * sy};
+        blitTransformed(out, *img.image, 0, 0, img.cellWidth, img.image->h, item->cx, item->cy, m,
+                        int(std::lround(item->alpha)), item->blend);
     }
 }
 
@@ -145,7 +232,8 @@ void cmdSetLayer(E &e, const std::string &) {
     e.readComma();
     int interval = e.readInt();
     e.readComma();
-    std::string plugin = sjisLower(e.readStr());
+    std::string plugin = normalizePath(e.readStr());
+    plugin = plugin.substr(plugin.rfind('\\') + 1);  // the DLL's own name, wherever the game keeps it
     e.layers_[n] = E::Layer{plugin, interval, 0};
     if (plugin != "mspdraw.dll") logf("layer plugin %s is not emulated", plugin.c_str());
 }

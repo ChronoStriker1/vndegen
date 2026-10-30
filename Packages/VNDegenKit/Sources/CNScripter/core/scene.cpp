@@ -245,6 +245,8 @@ bool Engine::readEffectArgs(Effect &e) {
 void Engine::commitScene() {
     shown_ = scene_;
     sceneDirty_ = true;
+    // A commit ends blt's direct drawing; after ofscpy the drawing is the offscreen image, so it lasts one more.
+    if (bltState_ > 0 && --bltState_ == 0) clearBlt();
 }
 
 void Engine::printWithEffect(int effectNo) {
@@ -272,7 +274,16 @@ void Engine::printWithEffect(const Effect &e) {
     effect_.from = frame_;
     commitScene();
     effect_.e = e;
-    effect_.mask = e.mask.empty() ? nullptr : loadFileImage(e.mask);
+    effect_.mask = nullptr;
+    if (e.type == 99) {
+        // The DLL works on the old and new frames; one it doesn't know falls back to a crossfade.
+        Image to;
+        renderScene(shown_, to, true);
+        drawBltLayer(to);
+        if (!startDllEffect(to)) effect_.e.type = 10;
+    } else if (!e.mask.empty()) {
+        effect_.mask = loadFileImage(e.mask);
+    }
     effect_.start = now_;
     effect_.active = true;
     wait_ = WaitKind::Effect;
@@ -363,6 +374,9 @@ void Engine::drawEffect(Image &out, double t) {
         }
         break;
     }
+    case 99:
+        drawDllEffect(out, t);
+        break;
     case 16: case 17: {
         // Mosaic out (16) grows blocks over the old image; mosaic in (17) shrinks them over the new.
         const Image &src = type == 16 ? from : Image(out);
@@ -505,6 +519,7 @@ void Engine::animateSprites() {
 
 void Engine::composeFrame() {
     renderScene(shown_, frame_, true);
+    drawBltLayer(frame_);
     if (effect_.active) {
         double t = effect_.e.duration > 0 ? double(now_ - effect_.start) / effect_.e.duration : 1;
         drawEffect(frame_, std::clamp(t, 0.0, 1.0));
@@ -539,7 +554,7 @@ void cmdBg(E &e, const std::string &) {
         e.scene_.bgColor = parseColor(s);
     } else {
         LoadedImage img;
-        if (e.loadImage(s, img)) e.scene_.bg = img;
+        if (e.loadBackground(s, img)) e.scene_.bg = img;
         e.scene_.bgColor = rgba(0, 0, 0);
     }
     // A new background clears the standing images.
@@ -992,7 +1007,59 @@ void Engine::applySpStr(const std::string &ctrl) {
     }
 }
 
+namespace {
+using E = Engine;
+
+// blt sx..: the manual's "blt screen x, y, w, h, button-image x, y, w, h". Copies that part of the btndef image onto
+// the screen, scaled to the screen rectangle, without going through the scene.
+void cmdBlt(E &e, const std::string &) {
+    int64_t v[8];
+    for (int i = 0; i < 8; i++) {
+        if (i) e.readComma();
+        v[i] = e.readInt();
+    }
+    // blt copies the image as it is (a Windows BitBlt), so the default transparency mode doesn't apply to it; an image
+    // the script tagged itself keeps its tag.
+    const std::string &tag = e.btnImage_.tag;
+    if (tag.empty()) return;
+    std::string opaque = tag[0] == ':' ? tag : ":c;" + tag;
+    if (e.bltSource_.tag != opaque && !e.loadImage(opaque, e.bltSource_)) return;
+    if (!e.bltSource_.image) return;
+    const Image &src = *e.bltSource_.image;
+    int64_t dx = v[0], dy = v[1], dw = v[2], dh = v[3], sx = v[4], sy = v[5], sw = v[6], sh = v[7];
+    if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) return;
+    if (e.bltState_ == 0) {
+        e.bltLayer_ = Image(e.width(), e.height(), 0);
+        e.bltState_ = 1;
+    }
+    Image &dst = e.bltLayer_;
+    // In 64 bits: a script's rectangle may be anywhere, and only the part on screen and in the image is drawn.
+    int64_t y0 = std::max<int64_t>(0, dy), y1 = std::min<int64_t>(dst.h, dy + dh);
+    int64_t x0 = std::max<int64_t>(0, dx), x1 = std::min<int64_t>(dst.w, dx + dw);
+    for (int64_t y = y0; y < y1; y++) {
+        int64_t ty = sy + (y - dy) * sh / dh;
+        if (ty < 0 || ty >= src.h) continue;
+        uint32_t *row = dst.row(int(y));
+        const uint32_t *srow = src.row(int(ty));
+        for (int64_t x = x0; x < x1; x++) {
+            int64_t tx = sx + (x - dx) * sw / dw;
+            if (tx >= 0 && tx < src.w) row[x] = over(row[x], srow[tx]);
+        }
+    }
+    e.composeFrame();
+}
+
+// ofscpy (or ofscopy): blt's drawing becomes the offscreen image, so the next plain print shows it too.
+void cmdOfscpy(E &e, const std::string &) {
+    if (e.bltState_ > 0) e.bltState_ = 2;
+}
+
+}  // namespace
+
 void registerSceneCommands(std::unordered_map<std::string, CommandFn> &t) {
+    t["blt"] = cmdBlt;
+    t["ofscpy"] = cmdOfscpy;
+    t["ofscopy"] = cmdOfscpy;
     t["bg"] = cmdBg;
     t["ld"] = cmdLd;
     t["cl"] = cmdCl;

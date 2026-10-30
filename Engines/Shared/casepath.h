@@ -1,7 +1,7 @@
 // Finds a game's files whatever case the game names them in, as Windows does. iOS disks and case-sensitive Mac volumes
 // tell `Img/Title.PNG` from `img/title.png`; Windows games often mix the two.
 //
-// The RGSS and KiriKiri engines call this from their file layers. Ren'Py and the web engines have their own copies of
+// The RGSS, KiriKiri, and Godot engines call this from their file layers. Ren'Py and the web engines have their own copies of
 // the same rules, in Python and Swift. Every engine plugin passes the case check in scripts/case-check.sh.
 #ifndef VNDEGEN_CASEPATH_H
 #define VNDEGEN_CASEPATH_H

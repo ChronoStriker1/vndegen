@@ -1,0 +1,19 @@
+diff --git a/platform/iphone/platform_config.h b/platform/iphone/platform_config.h
+index a211393..9eab867 100644
+--- a/platform/iphone/platform_config.h
++++ b/platform/iphone/platform_config.h
+@@ -30,8 +30,14 @@
+ 
+ #include <alloca.h>
+ 
++// VNDegen: OpenGL ES through MetalANGLE, OpenGL ES on Metal.
++#ifdef VNDEGEN_ANGLE
++#define GLES2_INCLUDE_H <GLES2/gl2.h>
++#define GLES3_INCLUDE_H <GLES3/gl3.h>
++#else
+ #define GLES2_INCLUDE_H <ES2/gl.h>
+ #define GLES3_INCLUDE_H <ES3/gl.h>
++#endif
+ 
+ #define PTHREAD_RENAME_SELF
+ 

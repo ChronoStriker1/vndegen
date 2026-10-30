@@ -3,11 +3,15 @@
     'use strict';
 
     // WebKit says it can play Ogg Vorbis, but its decodeAudioData rejects every Ogg file, so the engine would fail on
-    // its first sound. Saying no makes MZ decode with its bundled VorbisDecoder and MV pick its .m4a files instead.
-    const canPlayType = HTMLMediaElement.prototype.canPlayType;
-    HTMLMediaElement.prototype.canPlayType = function (type) {
-        return /^audio\/ogg/i.test(String(type)) ? '' : canPlayType.call(this, type);
-    };
+    // its first sound. Saying no makes MZ decode with its bundled VorbisDecoder and MV pick its .m4a files instead. An
+    // MV game that ships no .m4a files gets the shared Ogg decoder (ogg-vorbis.js), which decodes Ogg in decodeAudioData,
+    // so MV keeps asking for .ogg.
+    if (!window.__vndegen.decodesOgg) {
+        const canPlayType = HTMLMediaElement.prototype.canPlayType;
+        HTMLMediaElement.prototype.canPlayType = function (type) {
+            return /^audio\/ogg/i.test(String(type)) ? '' : canPlayType.call(this, type);
+        };
+    }
 
     // NW.js decodes audio itself, so desktop MZ never runs its bundled VorbisDecoder. Here every sound goes through it,
     // and its faults stopped games on the error screen with "RangeError: length cannot be negative". They are handled

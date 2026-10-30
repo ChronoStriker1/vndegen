@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
@@ -22,6 +23,8 @@
 #include "fs.h"
 #include "gfx.h"
 #include "script.h"
+
+struct lua_State;
 
 namespace vnns {
 
@@ -145,7 +148,10 @@ struct SystemUi {
     int page = 0;  // lookback
     std::string input;
     int maxLen = 64;
+    // input's window and field size, in the units its arguments use (4/3 of a pixel); 0 for the PC's default.
+    int dlgW = 0, dlgH = 0, fieldW = 0, fieldH = 0;
     int rowTop = 0, rowH = 0, boxX = 0, boxW = 0;
+    std::vector<std::array<int, 4>> buttons;  // where the dialogs drew each item, x y w h, for the pointer
     // The wait the screen interrupted, restored when it closes.
     WaitKind prevWait = WaitKind::None;
     std::function<void()> prevDone;
@@ -241,15 +247,18 @@ public:
     int jumps_ = 0;               // counts cursor jumps, so a command that jumped isn't checked for leftovers
     bool continueLine_ = false;   // if/notif leave the cursor on the next command of the same line
     void gosub(size_t returnPos, int line, int stmt, std::string_view label);
+    // `return [*label]`: leaves the innermost gosub, defsub or textgosub frame. Returns false with no frame to leave.
+    bool returnFromSub(const std::string &label);
     void errorf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+    int quietErrors_ = 0;  // while above 0, errorf logs nothing
 
     struct Frame {
         enum Kind { Gosub, For, TextGosub } kind = Gosub;
         size_t pos = 0;  // return position, or the loop body's start
         int line = 0, stmt = 0;
         int var = 0, to = 0, step = 1;  // for loops
-        // defsub calls keep their parameter text for getparam.
-        size_t paramPos = 0;
+        // A defsub call returns to the arguments it hasn't read yet, as the PC engine does (and saves): getparam reads
+        // them from pos and moves it on, and return skips any left.
         bool hasParams = false;
         // textgosub calls resume text output afterwards
         bool resumeText = false;
@@ -289,6 +298,10 @@ public:
     std::string transMode_ = "l";
     std::unordered_set<int> windowChips_;
     bool loadImage(const std::string &tag, LoadedImage &out);
+    // A background image. Backgrounds are opaque: the default transparency mode (top-left colour) doesn't apply.
+    bool loadBackground(const std::string &tag, LoadedImage &out) {
+        return loadImage(!tag.empty() && tag[0] == ':' ? tag : ":c;" + tag, out);
+    }
     ImageRef loadFileImage(const std::string &file, bool *hasAlpha = nullptr);
     std::unordered_map<std::string, ImageRef> imageCache_;
     std::vector<std::string> imageCacheOrder_;
@@ -310,9 +323,30 @@ public:
         ImageRef mask;
         int64_t start = 0;
         bool active = false;
+        // Effect 99: the DLL's file name, lowercased, its parameter string, and the rectangle that changes.
+        std::string dll, param;
+        int rx = 0, ry = 0, rw = 0, rh = 0;
+        std::vector<uint8_t> dirs;  // breakup.dll: each cell's direction, 0..7
     } effect_;
     void finishEffect();
     void drawEffect(Image &out, double t);
+    // blt draws the btndef image straight onto the screen, past the scene (a credits roll, say). The drawing is a layer
+    // over the committed scene and under the built-in menus. It lasts until the next commit of the scene; after ofscpy,
+    // which makes it the offscreen image, until the commit after that, so a print or an effect still ends on it. It
+    // isn't saved, and a load or reset drops it.
+    Image bltLayer_;
+    LoadedImage bltSource_;  // the btndef image, loaded without its transparency for blt
+    int bltState_ = 0;  // 0 none, 1 drawn, 2 drawn and ofscpy has run
+    void clearBlt() {
+        bltState_ = 0;
+        bltLayer_ = Image();
+    }
+    void drawBltLayer(Image &out) const {
+        if (bltState_ > 0 && bltLayer_.w == out.w && bltLayer_.h == out.h) blit(out, bltLayer_, 0, 0, 0, 0, out.w, out.h);
+    }
+    // Effect 99, the effect DLLs (dlleffects.cpp). startDllEffect returns false for a DLL that isn't emulated.
+    bool startDllEffect(const Image &to);
+    void drawDllEffect(Image &out, double t);
     int quakeAmp_ = 0, quakeX_ = 0, quakeY_ = 0, quakeKind_ = 0;  // kind: 0 quake, 1 quakex, 2 quakey
     void drawOverlays(Image &out);  // button hover images, the click cursor, system menus
     int64_t quakeEnd_ = 0, quakeDuration_ = 0;
@@ -363,6 +397,7 @@ public:
     bool pretextDone_ = false;     // the line's head (tag, pretextgosub) has been handled
     bool lineHadText_ = false;
     bool noNewlineAtEnd_ = false;  // the line ended in '/', or a page wait right before its end
+    bool halfWidthText_ = false;   // inside a backquoted stretch of a text line: English, wrapped between words
     bool ignoreClickStr_ = false;
     bool clickCursorPage_ = false;
     std::vector<std::string> pendingChars_;  // characters of a variable being shown
@@ -452,6 +487,7 @@ public:
     int selectHover_ = -1;
     bool keyboardSelect_ = false;
     void drawSystemUi(Image &out);
+    void drawDialog(Image &out, SystemUi &ui);
     std::unique_ptr<SystemUi> ui_;
     void openUi(SystemUi ui);
     void closeUi(int choice);
@@ -472,6 +508,10 @@ public:
     // Timing, waits and input
     int64_t now_ = 0;
     int64_t timerBase_ = 0;
+    // NSLua's NSTimer: milliseconds of wall time since the engine started. Monotonic, and it advances while a Lua
+    // function runs, as the PC's tick count does; the engine clock now_ only moves between steps.
+    std::chrono::steady_clock::time_point started_ = std::chrono::steady_clock::now();
+    int64_t wallMs() const;
     WaitKind wait_ = WaitKind::None;
     int64_t waitUntil_ = 0;
     int64_t waitStart_ = 0;
@@ -546,14 +586,18 @@ public:
     bool loadGame(int slot);
     std::string savePath(int slot) const;
     void loadGlobals();
-    void saveGlobals();
+    // gloval.sav's contents: each global variable as an int32 and a NUL-terminated string.
+    Bytes globalsFile() const;
+    Bytes globalsOnDisk_;  // what gloval.sav holds, as far as the engine knows
+    // Writes gloval.sav if a global variable changed since it was last written.
+    void saveGlobalsIfChanged();
     void noteFileUsed(const std::string &tag);
 
     // Audio (audio.cpp holds the mixer; sound commands live in commands_sound.cpp)
     AudioMixer audio_;
     std::string bgmName_;
     bool bgmLoop_ = true;
-    int bgmFadeOut_ = 0, bgmFadeIn_ = 0;
+    int bgmFadeOut_ = 0, bgmFadeIn_ = 0, cdFadeOut_ = 0;
     int volBgm_ = 100, volSe_ = 100, volVoice_ = 100;
     std::string waveName_;
     bool waveLoop_ = false;
@@ -565,6 +609,7 @@ public:
     void playBgm(const std::string &name, bool loop);
     void playSound(int channel, const std::string &name, bool loop);
     bool readSound(const std::string &name, Bytes &out);
+    std::string cdTrackFile(int track) const;
 
     // Movies (video.cpp)
     struct Movie;
@@ -592,6 +637,26 @@ public:
     std::vector<GaijiRule> gaiji_;
     struct MSpDrawItem;
     std::vector<std::shared_ptr<MSpDrawItem>> mspdraw_;
+
+    // NSLua (nslua.cpp): the game's system.lua run by Lua 5.1, as the PC engine's nslua.dll runs it. luasub names
+    // become commands that call NSCOM_name; luacall names are callbacks (NSCALL_name) the engine makes.
+    lua_State *lua_ = nullptr;
+    std::unordered_set<std::string> luaCommands_;
+    std::unordered_set<std::string> luaCallbacks_;
+    bool luaAnimOn_ = false;
+    int luaAnimInterval_ = 15;
+    int64_t luaAnimNext_ = 0;
+    Cursor luaReturn_;  // where NSGosub returns to: after the Lua command's statement, or where a callback was made
+    std::chrono::steady_clock::time_point luaCallStart_;  // when the outermost running Lua call began
+    bool inLua_ = false;
+    void luaStart();
+    void luaStop();
+    bool luaCommand(const std::string &name);
+    // Calls NSCALL_name if the script asked for it with luacall. arg is passed when it isn't negative; *result gets
+    // a boolean return value.
+    bool luaCallback(const std::string &name, int arg = -1, bool *result = nullptr);
+    // Runs one statement given as text, in place: NSExec.
+    void execString(const std::string &statement);
 
     std::string problem_;
     bool ended_ = false;

@@ -7,9 +7,28 @@
 namespace vnns {
 
 bool Engine::readSound(const std::string &name, Bytes &out) {
-    if (fs_.read(name, out)) return true;
-    errorf("sound %s not found", sjisToUtf8(name).c_str());
-    return false;
+    if (!fs_.read(name, out)) {
+        errorf("sound %s not found", sjisToUtf8(name).c_str());
+        return false;
+    }
+    // A sound the game's nbzplgin.dll would unpack (voices stored as .nbz).
+    if (isNbz(out)) {
+        Bytes plain;
+        if (!decodeNbz(out, plain)) return false;
+        out = std::move(plain);
+    }
+    return true;
+}
+
+// play "*n": the PC engine plays track n of the game's CD. The games that use it ship the tracks as files in a CD
+// folder (track01.ogg ...), which is the name their instructions tell the player to use; .mp3 and .wav are accepted too.
+std::string Engine::cdTrackFile(int track) const {
+    char name[32];
+    for (const char *ext : {"ogg", "mp3", "wav"}) {
+        snprintf(name, sizeof name, "cd\\track%02d.%s", track, ext);
+        if (fs_.exists(name)) return name;
+    }
+    return {};
 }
 
 void Engine::playBgm(const std::string &spec, bool loop) {
@@ -26,8 +45,11 @@ void Engine::playBgm(const std::string &spec, bool loop) {
     bgmName_ = spec;
     bgmLoop_ = loop;
     if (!name.empty() && name[0] == '*') {
-        logf("CD audio track %s is not supported", name.c_str());
-        return;
+        name = cdTrackFile(atoi(name.c_str() + 1));
+        if (name.empty()) {
+            logf("CD audio track %s has no file in the CD folder", spec.c_str());
+            return;
+        }
     }
     Bytes data;
     if (!readSound(name, data)) return;
@@ -55,8 +77,10 @@ void cmdBgm(E &e, const std::string &name) {
 }
 
 void cmdBgmStop(E &e, const std::string &name) {
-    e.audio_.stop(AudioMixer::kBgm, e.bgmFadeOut_);
-    e.audio_.stop(AudioMixer::kLoopBgmTail, e.bgmFadeOut_);
+    // cdfadeout's time applies to a CD track; bgmfadeout's to the rest.
+    int fade = !e.bgmName_.empty() && e.bgmName_[0] == '*' ? e.cdFadeOut_ : e.bgmFadeOut_;
+    e.audio_.stop(AudioMixer::kBgm, fade);
+    e.audio_.stop(AudioMixer::kLoopBgmTail, fade);
     e.bgmName_.clear();
     if (name == "stop") {
         e.audio_.stop(AudioMixer::kWave);
@@ -67,6 +91,7 @@ void cmdBgmStop(E &e, const std::string &name) {
 void cmdFade(E &e, const std::string &name) {
     int ms = e.readInt();
     if (name == "bgmfadeout" || name == "mp3fadeout") e.bgmFadeOut_ = ms;
+    else if (name == "cdfadeout") e.cdFadeOut_ = ms;
     else e.bgmFadeIn_ = ms;
 }
 
@@ -161,7 +186,7 @@ void cmdLoopBgmStop(E &e, const std::string &) {
     e.audio_.stop(AudioMixer::kLoopBgmTail, e.bgmFadeOut_);
 }
 
-// v123: wave "wav\123.wav"; dv123: dwave 0,"wav\123.wav"; mv123: voice\123.mp3, which no runtime here decodes.
+// v123: wave "wav\123.wav"; dv123: dwave 0,"wav\123.wav"; mv123: voice\123.mp3 as a voice.
 void cmdVoice(E &e, const std::string &name) {
     size_t d = 0;
     while (d < name.size() && isalpha(uint8_t(name[d]))) d++;
@@ -170,8 +195,10 @@ void cmdVoice(E &e, const std::string &name) {
     else if (head == "v") {
         Bytes data;
         if (e.readSound("wav\\" + number + ".wav", data)) e.audio_.play(AudioMixer::kWave, std::move(data), false, e.volVoice_);
+    } else if (head == "mv") {
+        e.playSound(0, "voice\\" + number + ".mp3", false);
     } else {
-        logf("mv voices are MP3, which isn't supported");
+        e.errorf("unknown command %s", name.c_str());
     }
 }
 
@@ -182,7 +209,7 @@ void cmdWaveDemo(E &e, const std::string &) { e.waveDuringSkip_ = true; }
 void registerSoundCommands(std::unordered_map<std::string, CommandFn> &t) {
     for (const char *n : {"bgm", "bgmonce", "mp3", "mp3loop", "mp3save", "play", "playonce"}) t[n] = cmdBgm;
     for (const char *n : {"bgmstop", "mp3stop", "playstop", "stop"}) t[n] = cmdBgmStop;
-    for (const char *n : {"bgmfadeout", "mp3fadeout", "bgmfadein", "mp3fadein"}) t[n] = cmdFade;
+    for (const char *n : {"bgmfadeout", "mp3fadeout", "bgmfadein", "mp3fadein", "cdfadeout"}) t[n] = cmdFade;
     for (const char *n : {"bgmvol", "mp3vol", "voicevol", "sevol", "defbgmvol", "defmp3vol", "defvoicevol", "defsevol"})
         t[n] = cmdVolume;
     for (const char *n : {"getbgmvol", "getmp3vol", "getvoicevol", "getsevol"}) t[n] = cmdGetVolume;
