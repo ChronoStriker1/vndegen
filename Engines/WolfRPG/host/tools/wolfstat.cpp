@@ -36,9 +36,9 @@ int main(int argc, char **argv) {
             auto ces = parseCommonEvents(readFile(basic / "CommonEvent.dat"));
             for (auto &ce : ces) {
                 if (ce.id != std::atoi(argv[3])) continue;
-                std::printf("common %d \"%s\" run %d op %d var %d value %d args %d/%d\n", ce.id, ce.name.c_str(),
-                            ce.runCondition, ce.conditionOperator, ce.conditionVariable, ce.conditionValue,
-                            ce.numberArgCount, ce.stringArgCount);
+                std::printf("common %d \"%s\" run %d op %d var %d value %d args %d/%d returns %d\n", ce.id,
+                            ce.name.c_str(), ce.runCondition, ce.conditionOperator, ce.conditionVariable,
+                            ce.conditionValue, ce.numberArgCount, ce.stringArgCount, ce.returnVariable);
                 dump(ce.commands);
             }
         } else if (what == "list") {

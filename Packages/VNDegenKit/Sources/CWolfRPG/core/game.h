@@ -129,13 +129,17 @@ struct Thread {
         // A map event's page keeps its map alive, since the event runs on after moving the hero elsewhere.
         std::shared_ptr<const Map> map;
         int mapId = -1;
+        // Remaining passes of this call's counted loops, by the loop command's index. A loop reached other than from
+        // its own end or a "continue" (`repeating`) starts its count afresh, so one left early by a break, a label
+        // jump or the end of the event doesn't carry its count into the next time.
+        std::map<size_t, int> loopCounts;
+        bool repeating = false;
     };
     std::vector<Call> stack;
     int wait = 0;
     bool waitingMessage = false, waitingChoice = false;
     int choiceIndent = 0;
     const struct Actor *waitingRoute = nullptr;
-    std::map<size_t, int> loopCounts;  // remaining passes of counted loops, by the loop command's index
     bool done() const { return stack.empty(); }
 };
 

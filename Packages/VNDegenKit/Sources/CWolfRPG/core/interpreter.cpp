@@ -219,10 +219,11 @@ bool Game::step(Thread &t) {
             return true;
         case 179: {  // loop a number of times
             size_t at = c.pc - 1;
-            auto it = t.loopCounts.find(at);
-            if (it == t.loopCounts.end()) it = t.loopCounts.emplace(at, value(cmd.arg(0), t)).first;
+            auto it = c.loopCounts.find(at);
+            if (it == c.loopCounts.end() || !c.repeating) it = c.loopCounts.insert_or_assign(at, value(cmd.arg(0), t)).first;
+            c.repeating = false;
             if (it->second-- <= 0) {
-                t.loopCounts.erase(it);
+                c.loopCounts.erase(it);
                 const Commands &cmds = *c.commands;
                 while (c.pc < cmds.size() && !(cmds[c.pc].indent == indent && cmds[c.pc].code == 498)) c.pc++;
                 if (c.pc < cmds.size()) c.pc++;
@@ -237,6 +238,7 @@ bool Game::step(Thread &t) {
                 if (cmds[pc].indent == indent && (cmds[pc].code == 170 || cmds[pc].code == 179)) break;
             }
             c.pc = pc;
+            c.repeating = true;
             return true;
         }
         case 171:    // break out of the innermost loop
@@ -252,9 +254,10 @@ bool Game::step(Thread &t) {
             int loopIndent = cmds[pc].indent;
             if (cmd.code == 176) {
                 c.pc = pc;
+                c.repeating = true;
                 return true;
             }
-            t.loopCounts.erase(pc);
+            c.loopCounts.erase(pc);
             c.pc = pc + 1;
             while (c.pc < cmds.size() && !(cmds[c.pc].indent == loopIndent && cmds[c.pc].code == 498)) c.pc++;
             if (c.pc < cmds.size()) c.pc++;
