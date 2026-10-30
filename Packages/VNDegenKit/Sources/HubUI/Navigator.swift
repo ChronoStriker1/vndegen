@@ -79,7 +79,7 @@ final class Navigator {
     }
 
     enum Target: Hashable {
-        case addGame, gridButton, lockButton, settingsButton
+        case addGame, layoutButton, gridButton, lockButton, settingsButton
         /// An archive under Ready to import, by its first volume.
         case importArchive(URL)
         case openFolder, rescan
@@ -151,6 +151,11 @@ final class Navigator {
     private var heroID: GameID?
     /// Set by the grid view from its width.
     var gridColumns = 4
+    var layout = LibraryLayout.setting {
+        didSet { UserDefaults.standard.set(layout.rawValue, forKey: LibraryLayout.storageKey) }
+    }
+    /// Set by the home screen's header list from its width.
+    var headerColumns = 1
     /// Set by the game page when a narrow window puts its other buttons in a row under Play.
     var pageActionsStacked = false
     private(set) var rescanning = false
@@ -192,8 +197,11 @@ final class Navigator {
 
     var shelves: [(shelf: Shelf, games: [Game])] {
         let visible = visibleGames
+        // The header list stacks every game, so Recently played would only repeat the top of All games, which already
+        // lists the last played first.
+        let recent = layout == .headers ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
         let all: [(Shelf, [Game])] = [
-            (.recent, Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))),
+            (.recent, recent),
             (.all, visible.filter { !$0.isLocked }),
             (.hidden, visible.filter(\.isLocked)),
         ]
@@ -215,11 +223,7 @@ final class Navigator {
             switch sheet {
             case .engine, .variant, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case let .artwork(editor):
-                let columns = max(1, editor.columns)
-                let candidates = stride(from: 0, to: editor.candidates.count, by: columns).enumerated().map { index, start in
-                    Row(id: "candidates-\(index)", items: (start..<min(start + columns, editor.candidates.count)).map { .artworkCandidate($0) },
-                        remembersColumn: false)
-                }
+                let candidates = Self.gridRows("candidates", editor.candidates.indices.map { .artworkCandidate($0) }, columns: editor.columns)
                 return [Row(id: "slots", items: ArtworkSlot.allCases.map { .artworkSlot($0) })] + candidates
             case let .metadata(search):
                 return [Row(id: "query", items: [.metadataQuery])]
@@ -238,18 +242,20 @@ final class Navigator {
                     + archives.map { Row(id: "\($0)", items: [$0]) }
                     + [Row(id: "empty-add", items: [.addGame]), Row(id: "empty-folder", items: [.openFolder, .rescan])]
             }
-            var rows = [Row(id: "bar", items: [.addGame, .gridButton, .lockButton, .settingsButton])]
-            if heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
+            var rows = [Row(id: "bar", items: [.addGame, .layoutButton, .gridButton, .lockButton, .settingsButton])]
+            if layout == .featured, heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
             if !archives.isEmpty { rows.append(Row(id: Self.archivesRowID, items: archives)) }
-            rows += shelves.map { shelf in Row(id: shelf.shelf.rawValue, items: shelf.games.map { .tile(shelf.shelf, $0.id) }) }
+            for (shelf, games) in shelves {
+                let tiles = games.map { Target.tile(shelf, $0.id) }
+                if layout == .headers {
+                    rows += Self.gridRows(shelf.rawValue, tiles, columns: headerColumns)
+                } else {
+                    rows.append(Row(id: shelf.rawValue, items: tiles))
+                }
+            }
             return rows
         case .grid:
-            let ids = visibleGames.map(\.id)
-            let columns = max(1, gridColumns)
-            let tiles = stride(from: 0, to: ids.count, by: columns).enumerated().map { index, start in
-                Row(id: "grid-\(index)", items: ids[start..<min(start + columns, ids.count)].map { .gridTile($0) }, remembersColumn: false)
-            }
-            return [Row(id: "grid-back", items: [.back])] + tiles
+            return [Row(id: "grid-back", items: [.back])] + Self.gridRows("grid", visibleGames.map { .gridTile($0.id) }, columns: gridColumns)
         case .game:
             // Orientation only matters on a touch device, and the control method only where it changes something.
             let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
@@ -283,6 +289,14 @@ final class Navigator {
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
+        }
+    }
+
+    /// `items` in rows of `columns`. Moving between them keeps the column, as moving through a grid should.
+    private static func gridRows(_ id: String, _ items: [Target], columns: Int) -> [Row] {
+        let columns = max(1, columns)
+        return stride(from: 0, to: items.count, by: columns).enumerated().map { index, start in
+            Row(id: "\(id)-\(index)", items: Array(items[start..<min(start + columns, items.count)]), remembersColumn: false)
         }
     }
 
@@ -397,6 +411,7 @@ final class Navigator {
         case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
         case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
+        case .layoutButton: layout = layout.next
         case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()

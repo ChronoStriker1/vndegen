@@ -66,6 +66,6 @@ VNDegen should stay free to distribute and may be sold on the App Store later. B
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
 
 ## Out of scope for now
-- Apple TV.
+- Apple TV. When it comes, the library gets a TV layout modeled on Steam Deck's home screen: the focused game's hero art fills the screen with one row of capsules along the top or the bottom edge, and swiping up on the hero art opens a card view of every game. It joins the iPhone and iPad layouts in `LibraryLayout` and is the TV's default.
 - iCloud saves.
 - GameMaker and the other general-purpose and custom engines in `docs/engine-survey.md` that are not listed under Next.

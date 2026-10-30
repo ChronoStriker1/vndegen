@@ -6,21 +6,44 @@ struct LibraryHomeView: View {
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
 
+    /// Room above the first row for the top bar, which floats over the content, in the layouts without a hero.
+    private var barClearance: CGFloat {
+        #if os(macOS)
+        88
+        #else
+        70
+        #endif
+    }
+
     var body: some View {
         let hero = nav.heroGame
+        let layout = nav.layout
         ZStack {
-            HeroBackdrop(game: hero)
+            switch layout {
+            case .featured: HeroBackdrop(game: hero)
+            case .capsules: HeroBackdrop(game: hero, sharp: false)
+            case .headers: Theme.background.ignoresSafeArea()
+            }
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: metrics.isShort ? 18 : 30) {
-                        HeroStage(game: hero)
-                            .frame(height: metrics.stageHeight)
-                            .id("stage")
+                        if layout == .featured {
+                            HeroStage(game: hero)
+                                .frame(height: metrics.stageHeight)
+                                .id("stage")
+                        } else {
+                            Color.clear.frame(height: barClearance).id("stage")
+                        }
                         if !hub.localArchives.isEmpty {
                             ReadyToImportRow(archives: hub.localArchives)
                         }
                         ForEach(nav.shelves, id: \.shelf) { shelf in
-                            ShelfRow(shelf: shelf.shelf, games: shelf.games)
+                            if layout == .headers {
+                                HeaderShelf(shelf: shelf.shelf, games: shelf.games)
+                            } else {
+                                ShelfRow(shelf: shelf.shelf, games: shelf.games,
+                                         tileWidth: layout == .capsules ? metrics.largeTileWidth : metrics.tileWidth)
+                            }
                         }
                     }
                     .padding(.bottom, 48)
@@ -36,7 +59,9 @@ struct LibraryHomeView: View {
                         case .importArchive?: Navigator.archivesRowID
                         default: nil
                         }
-                        if let row {
+                        if layout == .headers, case .tile? = focus {
+                            proxy.scrollTo(focus, anchor: .center)
+                        } else if let row {
                             // Nested scroll views: scroll the page to the row, then the row to the focused item.
                             proxy.scrollTo(row, anchor: .bottom)
                             proxy.scrollTo(focus, anchor: UnitPoint(x: 0.35, y: 0.5))
@@ -46,7 +71,12 @@ struct LibraryHomeView: View {
                     }
                 }
             }
+            // A new layout starts at the top rather than at the old one's scroll offset.
+            .id(layout)
+            .transition(.opacity)
         }
+        .animation(.smooth(duration: 0.3), value: layout)
+        .onChange(of: metrics.headerColumns, initial: true) { _, columns in nav.headerColumns = columns }
         .overlay(alignment: .top) { TopBar() }
     }
 }
@@ -56,6 +86,8 @@ struct LibraryHomeView: View {
 struct HeroBackdrop: View {
     @Environment(\.hubMetrics) private var metrics
     let game: Game?
+    /// Without the sharp hero, only the blurred wash shows, for layouts that put art at the top instead.
+    var sharp = true
 
     var body: some View {
         GeometryReader { geo in
@@ -65,10 +97,12 @@ struct HeroBackdrop: View {
                     ZStack(alignment: .top) {
                         GameArt(game: game, slots: [.hero, .header, .capsule], size: geo.size, blurred: true)
                             .opacity(0.45)
-                        GameArt(game: game, slots: [.hero, .header, .capsule],
-                                size: CGSize(width: geo.size.width, height: metrics.insets.top + metrics.stageHeight * 1.08))
-                            .mask(LinearGradient(stops: [.init(color: .black, location: 0.55), .init(color: .clear, location: 1)],
-                                                 startPoint: .top, endPoint: .bottom))
+                        if sharp {
+                            GameArt(game: game, slots: [.hero, .header, .capsule],
+                                    size: CGSize(width: geo.size.width, height: metrics.insets.top + metrics.stageHeight * 1.08))
+                                .mask(LinearGradient(stops: [.init(color: .black, location: 0.55), .init(color: .clear, location: 1)],
+                                                     startPoint: .top, endPoint: .bottom))
+                        }
                     }
                     .id(game.id)
                     .transition(.opacity)
@@ -112,6 +146,10 @@ struct TopBar: View {
             if !nav.visibleGames.isEmpty {
                 HubButton(target: .addGame, kind: .icon) { Image(systemName: "plus") }
                     .accessibilityLabel("Add game")
+                // Shows the current layout. Pressing it moves to the next.
+                HubButton(target: .layoutButton, kind: .icon) { Image(systemName: nav.layout.systemImage) }
+                    .accessibilityLabel("Library view")
+                    .accessibilityValue(nav.layout.title)
                 HubButton(target: .gridButton, kind: .icon) { Image(systemName: "square.grid.2x2.fill") }
                     .accessibilityLabel("All games")
             }
@@ -231,6 +269,7 @@ private struct ShelfRow: View {
     @Environment(\.hubMetrics) private var metrics
     let shelf: Navigator.Shelf
     let games: [Game]
+    let tileWidth: CGFloat
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -239,7 +278,7 @@ private struct ShelfRow: View {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: metrics.tileSpacing) {
                     ForEach(games) { game in
-                        GameTile(game: game, target: .tile(shelf, game.id))
+                        GameTile(game: game, target: .tile(shelf, game.id), width: tileWidth)
                     }
                 }
                 .padding(.leading, metrics.leading)
@@ -250,6 +289,29 @@ private struct ShelfRow: View {
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
         }
+        .id(shelf.rawValue)
+    }
+}
+
+/// A shelf as header art stacked in columns, for the header list layout.
+private struct HeaderShelf: View {
+    @Environment(\.hubMetrics) private var metrics
+    let shelf: Navigator.Shelf
+    let games: [Game]
+
+    var body: some View {
+        let width = metrics.headerWidth
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: shelf.title, systemImage: shelf == .hidden ? "lock.open.fill" : nil)
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(width), spacing: metrics.tileSpacing), count: metrics.headerColumns),
+                      alignment: .leading, spacing: metrics.tileSpacing) {
+                ForEach(games) { game in
+                    HeaderTile(game: game, target: .tile(shelf, game.id), width: width)
+                }
+            }
+        }
+        .padding(.leading, metrics.leading)
+        .padding(.trailing, metrics.trailing)
         .id(shelf.rawValue)
     }
 }

@@ -60,6 +60,19 @@ struct HubMetrics: Equatable {
     }
     var tileSize: CGSize { CGSize(width: tileWidth, height: tileWidth * 1.5) }
 
+    /// Capsule width in the capsule rows layout. With no hero above them, the shelves have the height for larger art.
+    var largeTileWidth: CGFloat {
+        let byWidth = isCompact ? (size.width - padding * 2 - tileSpacing) / 2.2 : size.width / 5.5
+        return min(300, max(110, min(byWidth, size.height * 0.36)))
+    }
+
+    /// Columns in the header list: one on a phone held upright, two or more as the width allows.
+    var headerColumns: Int { max(1, Int((size.width - padding * 2 + tileSpacing) / (320 + tileSpacing))) }
+    var headerWidth: CGFloat {
+        let columns = CGFloat(headerColumns)
+        return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
+    }
+
     /// Height of the home screen's hero area above the first shelf.
     var stageHeight: CGFloat {
         if isShort { return max(220, size.height * 0.66) }
