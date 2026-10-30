@@ -47,6 +47,7 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 | Flash (ActionScript 1, 2, and 3) | A Flash projector `.exe` with the movie appended, a `.swf` movie, or an HTML page that launches movies, up to four folders down | Mac, iPhone, iPad |
 | NScripter | `nscript.dat`, or `0.txt` or `00.txt` beside an `.nsa`, `.ns2`, or `.sar` archive or NScripter's own files, up to two folders down | Mac, iPhone, iPad |
 | Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` beside `Game.exe`, up to two folders down | Mac, iPhone, iPad |
+| AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` beside `SYSTEM3.EXE`, up to two folders down | Mac, iPhone, iPad |
 
 RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work. WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV games that ship only Ogg audio, as most do, play it through VNDegen's own Ogg decoder, described below.
 
@@ -73,6 +74,8 @@ Flash games run in Ruffle, a Flash Player written in Rust, built for the web and
 NScripter games run on VNDegen's own NScripter runtime, written in C++ for VNDegen from NScripter's documentation and the games' files, MIT licensed like the rest of the app. It draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the engine's archives, including bitmaps and entries its packer compressed, and plays Ogg, WAV, MP3 and NBZ sound, CD tracks from a game's `CD` folder, and MPEG-1 movies. Games that script part of their logic in Lua (NSLua) run on an embedded Lua 5.1. Saves are the PC engine's own files, byte for byte, in the game's save folder, so they move between VNDegen and a PC copy of the game, and Ludusavi backs them up. English translations whose patched engine wraps text between words get the same word wrap. Known limits: of the effect DLLs only the ones a test game uses are drawn, others crossfade, and NSLua's direct drawing functions aren't emulated. `docs/nscripter.md` has the details.
 
 Wolf RPG Editor games run on VNDegen's own Wolf RPG Editor runtime, written in C++ for VNDegen from the games' files, permissively licensed format notes and the original engine's behaviour, MIT licensed like the rest of the app. It draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the games' data, maps and databases, loose or packed in Wolf RPG Editor 2's encrypted `.wolf` archives, runs their event scripts, and plays Ogg, MP3, WAV and MIDI sound, MIDI through a bundled General MIDI SoundFont or one the player chooses in Settings. Text uses a font the game ships, then VNDegen's Windows font pack. Saves are the PC engine's own files in the game's `Save` folder, so Ludusavi backs them up and they move between VNDegen and a PC copy of the game. Known limits: Wolf RPG Editor 3.5's compressed data, newer archive versions, and Pro's encrypted data aren't read yet. `docs/wolfrpg.md` has the details.
+
+AliceSoft's System 3 games run on VNDegen's own System 3 runtime, written in C for VNDegen from AliceSoft's published System 3.5 and 3.9 SDKs, the games' files, and the original engines' observable behaviour, MIT licensed like the rest of the app. It runs both the System 3.5 to 3.9 games (`System39.exe`) and the older Windows 3.1 games (`SYSTEM3.EXE`), drawing on the CPU and showing its frames through Metal inside VNDegen's window. CD music plays from the MP3 files the game's `_inmm.ini` lists, MIDI music through the bundled SoundFont or the player's own, and the English releases of `SYSTEM3.EXE` games that get their text from `replacement.txt` show it. Saves are the PC engines' own files in the game's folder, byte for byte what `System39.exe` and `SYSTEM3.EXE` write, so Ludusavi backs them up and they move between VNDegen and a PC copy of the game. `docs/system3.md` has the details and the known limits.
 
 `docs/engine-survey.md` covers which other engines are common and how each could be supported.
 
@@ -215,6 +218,8 @@ Packages/VNDegenKit/
   Sources/CArtemis/       art3m1s_api.h, the Artemis engine's C interface, and the Ogg Vorbis decoder for its audio
   Sources/EngineGodot/    Godot 3 and 4: detection from the pack, save locations, and the in-process session
   Sources/CGodot/         vngd.h, the Godot engines' C interface
+  Sources/EngineAliceSoft/ AliceSoft System 3 and 4: detection, save locations, input, and the System 3 session
+  Sources/CSystem3/       VNDegen's System 3 runtime in C, with vns3.h, its C interface
   Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
   Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
   Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
@@ -231,6 +236,7 @@ Engines/RGSS/             the RGSS engine's frontend, patches, and build files; 
 Engines/Artemis/          the vendored art3m1s-core engine and its save format tools; UPSTREAM.md lists every change
 Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
 Engines/Godot/            VNDegen's Godot modules, patches, and test host; UPSTREAM.md lists the pinned sources
+Engines/System3/          the System 3 runtime's Linux test host: a headless runner and an SDL player
 Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/
 docs/                     engine survey and screenshots
 scripts/                  build, remote build, simulator, and Ren'Py runtime helpers

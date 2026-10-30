@@ -71,6 +71,12 @@ void s3_msg_text(S3 *s, const char *sjis) {
     S3Win *w = msgwin(s);
     const u8 *p = (const u8 *)sjis;
     while (*p) {
+        // A half-width word that would not fit starts a new line, so translated text breaks between words.
+        if (*p > ' ' && *p < 0x7f && s->zh != 0 && (p == (const u8 *)sjis || p[-1] == ' ')) {
+            int word = 0;
+            for (const u8 *q = p; *q > ' ' && *q < 0x7f; q++) word += s->fontSize / 2;
+            if (s->tx + word > w->x + w->w && s->tx > w->x && word <= w->w) s3_msg_newline(s);
+        }
         u32 cp; bool half;
         p += next_char(s, p, &cp, &half);
         int adv = half ? s->fontSize / 2 : s->fontSize;
