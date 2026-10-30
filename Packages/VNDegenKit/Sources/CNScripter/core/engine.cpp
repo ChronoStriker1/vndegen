@@ -91,6 +91,7 @@ void Engine::resetGame(bool fromDefine) {
     }
     stack_.clear();
     stopMovie();
+    clearBlt();
     scene_ = Scene();
     commitScene();
     clearPage();

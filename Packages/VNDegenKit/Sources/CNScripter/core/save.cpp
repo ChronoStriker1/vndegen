@@ -621,6 +621,7 @@ bool Engine::loadGame(int slot) {
         fileLogOrder_ = std::move(fileLogOrder);
         return false;
     }
+    clearBlt();  // blt's drawing isn't part of a save
     luaCallback("load", slot);
     if (!loadGosub_.empty()) gosub(cur_.pos, cur_.line, cur_.stmt, loadGosub_);
     return true;

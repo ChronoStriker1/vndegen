@@ -330,11 +330,20 @@ public:
     } effect_;
     void finishEffect();
     void drawEffect(Image &out, double t);
-    // blt draws the btndef image straight onto the screen, past the scene (a credits roll, say). The screen keeps that
-    // drawing until the next commit of the scene; after ofscpy, until the one after, so a plain print still shows it.
-    Image bltScreen_;
+    // blt draws the btndef image straight onto the screen, past the scene (a credits roll, say). The drawing is a layer
+    // over the committed scene and under the built-in menus. It lasts until the next commit of the scene; after ofscpy,
+    // which makes it the offscreen image, until the commit after that, so a print or an effect still ends on it. It
+    // isn't saved, and a load or reset drops it.
+    Image bltLayer_;
     LoadedImage bltSource_;  // the btndef image, loaded without its transparency for blt
-    int bltState_ = 0;  // 0 none, 1 the screen shows blt's drawing, 2 the same and ofscpy has run
+    int bltState_ = 0;  // 0 none, 1 drawn, 2 drawn and ofscpy has run
+    void clearBlt() {
+        bltState_ = 0;
+        bltLayer_ = Image();
+    }
+    void drawBltLayer(Image &out) const {
+        if (bltState_ > 0 && bltLayer_.w == out.w && bltLayer_.h == out.h) blit(out, bltLayer_, 0, 0, 0, 0, out.w, out.h);
+    }
     // Effect 99, the effect DLLs (dlleffects.cpp). startDllEffect returns false for a DLL that isn't emulated.
     bool startDllEffect(const Image &to);
     void drawDllEffect(Image &out, double t);

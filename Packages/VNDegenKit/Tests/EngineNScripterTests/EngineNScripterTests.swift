@@ -256,11 +256,11 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(String(cString: vnns_caption(engine)) == "t1")
 }
 
-/// blt copies part of the btndef image straight onto the screen, scaled; after ofscpy a print keeps showing it, and
-/// the next image command replaces it.
+/// blt copies part of the btndef image straight onto the screen, scaled; after ofscpy an effect ends on it, and the
+/// next image command replaces it.
 @Test func bltDrawsStraightToTheScreen() throws {
     let script = ";mode400\n*define\ngame\n*start\nbg #0000FF,1\nbtndef \"red.bmp\"\nblt 10,10,40,20,0,0,4,4\n"
-        + "wait 100\nofscpy\nprint 1\nwait 100\nbg #FFFFFF,1\nclick\nend\n"
+        + "wait 100\nofscpy\nprint 10,100\nwait 100\nbg #FFFFFF,1\nclick\nend\n"
     let (engine, dir) = try runScript(script, files: ["red.bmp": solidBMP(width: 4, height: 4, rgb: (255, 0, 0))])
     defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
     var w: Int32 = 0, h: Int32 = 0
@@ -273,9 +273,9 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(vnns_step(engine, 16))
     #expect(try pixel(45, 25) == [255, 0, 0])  // inside the scaled rectangle, though the image's corner colour is red
     #expect(try pixel(60, 25) == [0, 0, 255])
-    for _ in 0..<8 { #expect(vnns_step(engine, 16)) }  // ofscpy and print: still drawn
+    for _ in 0..<8 { #expect(vnns_step(engine, 16)) }  // ofscpy and a fade: it fades to the same drawing
     #expect(try pixel(45, 25) == [255, 0, 0])
-    for _ in 0..<8 { #expect(vnns_step(engine, 16)) }  // the next bg replaces it
+    for _ in 0..<16 { #expect(vnns_step(engine, 16)) }  // the next bg replaces it
     #expect(try pixel(45, 25) == [255, 255, 255])
 }
 
