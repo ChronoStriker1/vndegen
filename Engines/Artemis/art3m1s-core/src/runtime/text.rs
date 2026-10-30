@@ -302,7 +302,9 @@ impl CoreRuntime {
                 return None;
             };
             match event {
-                Event::ScenarioText { content, inline } => {
+                Event::ScenarioText {
+                    content, inline, ..
+                } => {
                     let content = injected.as_deref().unwrap_or(content);
                     if background_request.is_some() {
                         tracked_span = renderer.push_text_tracked(content, *inline);

@@ -488,7 +488,9 @@ impl CoreRuntime {
             }
             if matches!(
                 event,
-                Event::ScenarioText { .. } | Event::LineBreak { .. } | Event::RubyEnd
+                Event::ScenarioText { printed: false, .. }
+                    | Event::LineBreak { .. }
+                    | Event::RubyEnd
             ) && self
                 .text_renderer
                 .as_mut()
@@ -1265,7 +1267,9 @@ fn event_summary(e: &Event) -> String {
         Event::VoicePlay { file, gain, .. } => format!("VoicePlay file={file} gain={gain:?}"),
         Event::VideoPlay { id, file, .. } => format!("VideoPlay id={id:?} file={file}"),
         Event::Text { content } => format!("Text {content:?}"),
-        Event::ScenarioText { content, inline } => {
+        Event::ScenarioText {
+            content, inline, ..
+        } => {
             format!("ScenarioText inline={inline} {content:?}")
         }
         Event::FontSettings(s) => format!("FontSettings {}", format_map(s)),

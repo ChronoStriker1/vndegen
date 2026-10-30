@@ -816,6 +816,7 @@ impl Interpreter {
                 let result = self.emit_event(Event::ScenarioText {
                     content: text.clone(),
                     inline: false,
+                    printed: false,
                 });
                 match result {
                     CallbackResult::Continue => {
@@ -826,6 +827,7 @@ impl Interpreter {
                         return Ok(ExecutionResult::Wait(Event::ScenarioText {
                             content: text,
                             inline: false,
+                            printed: false,
                         }));
                     }
                     CallbackResult::Abort => {

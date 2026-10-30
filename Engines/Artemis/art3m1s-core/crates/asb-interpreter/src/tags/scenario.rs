@@ -17,6 +17,7 @@ impl TagHandler for PrintHandler {
         Ok(TagResult::Emit(Event::ScenarioText {
             content: value.as_string(),
             inline: false,
+            printed: true,
         }))
     }
 }

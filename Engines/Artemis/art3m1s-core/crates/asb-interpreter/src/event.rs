@@ -122,7 +122,13 @@ pub enum Event {
 
     // ── 剧情文本事件 ──────────────────────────────────────
     /// 剧情文本
-    ScenarioText { content: String, inline: bool },
+    ScenarioText {
+        content: String,
+        inline: bool,
+        /// From a [print] tag rather than a scenario text line. Such text,
+        /// such as a save slot's caption, never starts a new page (VNDegen).
+        printed: bool,
+    },
     /// 换行 [rt]
     LineBreak {
         /// 1 时若最后一行为空行则不换行（防止意外空行）
