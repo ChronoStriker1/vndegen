@@ -165,17 +165,14 @@ fn scaled(font: &Option<FontArc>, scale: PxScale) -> Option<PxScaleFont<&FontArc
     font.as_ref().map(|f| f.as_scaled(scale))
 }
 
+/// A color is a hex number whose low 24 bits are RGB, so a short one such as
+/// `631` is 0x000631, as the PC engine reads it (VNDegen).
 fn parse(s: &str) -> [f32; 3] {
     let h = s.trim().trim_start_matches("0x").trim_start_matches('#');
-    if h.len() >= 6 {
-        [
-            u8::from_str_radix(&h[0..2], 16).unwrap_or(255) as f32 / 255.0,
-            u8::from_str_radix(&h[2..4], 16).unwrap_or(255) as f32 / 255.0,
-            u8::from_str_radix(&h[4..6], 16).unwrap_or(255) as f32 / 255.0,
-        ]
-    } else {
-        [1.0; 3]
-    }
+    let Ok(value) = u32::from_str_radix(h, 16) else {
+        return [1.0; 3];
+    };
+    [16, 8, 0].map(|shift| ((value >> shift) & 0xff) as f32 / 255.0)
 }
 
 /// 单个字形的排版结果：行内 X 坐标与所在行号。
@@ -1089,12 +1086,13 @@ impl TextRenderer for GlyphTextRenderer {
         );
         // The first line whose bottom reaches the window's bottom starts the
         // next page: four lines of 40 in a window of 160 make two pages in
-        // the PC engine. A first line always stays, however tall.
+        // the PC engine. A first line always stays, however tall. Only a
+        // character starts the page, not the line break a game adds after
+        // every line, which leaves nothing below the window yet.
         let fits = |line: usize| (line as f32 + 1.0) * line_height < ly.height;
-        let Some(at) = laid
-            .iter()
-            .position(|glyph| glyph.line > 0 && !fits(glyph.line))
-        else {
+        let Some(at) = laid.iter().zip(&ly.text_buffer).position(|(glyph, info)| {
+            glyph.line > 0 && !fits(glyph.line) && info.character != "\n"
+        }) else {
             return false;
         };
         self.state.layers.get_mut(&id).unwrap().split_page(at);
@@ -1860,6 +1858,35 @@ mod tests {
         assert_eq!(layer.text_buffer.len(), 5);
         assert_eq!((layer.rubies[0].start, layer.rubies[0].end), (1, 3));
         assert!(layer.reveal_pending);
+    }
+
+    #[test]
+    fn colors_are_hex_numbers() {
+        assert_eq!(super::parse("0xffffff"), [1.0; 3]);
+        assert_eq!(super::parse("ff0000"), [1.0, 0.0, 0.0]);
+        assert_eq!(super::parse("631"), [0.0, 6.0 / 255.0, 0x31 as f32 / 255.0]);
+        assert_eq!(super::parse("80ff0000"), [1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn a_line_break_after_the_last_line_that_fits_starts_no_page() {
+        let mut renderer = GlyphTextRenderer::new();
+        renderer.switch_message_layer(Some("adv"), true);
+        {
+            let layer = renderer.font_state_mut().active_layer_mut();
+            layer.width = 100.0;
+            layer.height = 100.0;
+            layer.font.size = Some(20.0);
+            layer.text_buffer = glyphs(&format!("{}\n", "a".repeat(40)));
+        }
+        assert!(!renderer.split_page_overflow());
+        renderer
+            .font_state_mut()
+            .active_layer_mut()
+            .text_buffer
+            .extend(glyphs("b"));
+        assert!(renderer.split_page_overflow(), "the next character does");
+        assert_eq!(renderer.font_state().layers["adv"].text_buffer.len(), 41);
     }
 
     #[test]

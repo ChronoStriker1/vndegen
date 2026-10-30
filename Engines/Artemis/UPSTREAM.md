@@ -59,7 +59,8 @@ VNDegen added `flate2` as a direct dependency for compressed PC saves. It was al
 - Recreate a PC save's scene before onLoad runs.
 - Keep text's spaces and a line's leading full-width space, as the PC engine numbers and prints them.
 - Open a quoted value only at the start of a token, as the PC engine does, so a tag with a quote missing, such as `[var name="t.menu data="0"]`, still closes at its `]` instead of showing as text.
-- Start a new page when scenario text, though not text a `[print]` tag writes, runs below its message window, with lines spaced as the PC engine spaces them: a body 1.2 times the font size, whatever the font.
+- Pass scenario text to a game's tag filter as `[print data=...]`, as the PC engine does, so games whose `print` hook marks the page and queues the click wait break their pages and allow their menu. Read a short color such as `631` as the hex number 0x000631.
+- Start a new page when scenario text, though not text a UI's `[print]` writes, runs a character below its message window, with lines spaced as the PC engine spaces them: a body 1.2 times the font size, whatever the font.
 - Use a host's font only for a face the game ships no font file for, instead of for every face, so games keep their own fonts.
 - Draw ASCII from the bitmap fonts some games ship as `.rft` files (`src/text/rft.rs`), advanced as the PC engine advances them, so English text wraps where it does on the PC. The files store no character map, so other characters use the host's font.
 - Find save files and the loose files beside a game's archives in any case, as VNDegen's `Engines/Shared/casepath.c` does, and use a save folder restored with Windows' cp1252 spelling of its name.

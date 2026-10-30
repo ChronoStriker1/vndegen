@@ -292,6 +292,10 @@ pub struct Interpreter {
     ///
     /// 每次 step 迭代开头消费并复位；只有 Jump 类结果会重新置位。
     arrived_by_jump: bool,
+    /// Whether the script line running now, with the tags its tag filter
+    /// queues, is scenario text, so the text it prints counts as scenario
+    /// text rather than as text a [print] tag writes (VNDegen).
+    in_scenario_text: bool,
     /// 已执行过的 `__lua_block`（键：脚本名 + 指令下标）。
     ///
     /// Artemis 语义：[lua] 块在**文件加载时**执行且每块只执行一次（见
@@ -440,6 +444,7 @@ impl Interpreter {
             last_flush_saw_jump: false,
             queued_call_barriers: Vec::new(),
             arrived_by_jump: false,
+            in_scenario_text: false,
             executed_lua_blocks: std::collections::HashSet::new(),
             macros: MacroRegistry::new(),
             macro_files: HashMap::new(),
@@ -786,6 +791,7 @@ impl Interpreter {
             }
 
             let instruction = script.instructions[self.current_line].clone();
+            self.in_scenario_text = instruction.tag == "__text";
 
             if std::env::var("ASB_TRACE_STEP").is_ok() {
                 eprintln!(
@@ -813,6 +819,17 @@ impl Interpreter {
             // 处理剧情文本
             if instruction.tag == "__text" {
                 let text = instruction.get("text").unwrap_or("").to_string();
+                // As on the PC, a game's tag filter sees scenario text as
+                // [print data=...]. A filter that takes it prints it itself,
+                // through the tags it queues (VNDegen).
+                self.sync_script_state_to_engine();
+                let params = HashMap::from([("data".to_string(), text.clone())]);
+                if self.dispatch_lua_tag_filter_with("print", &params, false)?
+                    == LuaTagFilterDecision::Consume
+                {
+                    self.current_line += 1;
+                    continue;
+                }
                 let result = self.emit_event(Event::ScenarioText {
                     content: text.clone(),
                     inline: false,
@@ -1321,7 +1338,12 @@ impl Interpreter {
         }
     }
 
-    fn emit_event(&mut self, event: Event) -> CallbackResult {
+    fn emit_event(&mut self, mut event: Event) -> CallbackResult {
+        if let Event::ScenarioText { printed, .. } = &mut event
+            && self.in_scenario_text
+        {
+            *printed = false;
+        }
         if matches!(event, Event::ScenarioText { .. }) {
             let mut source = self
                 .current_script
@@ -1909,6 +1931,17 @@ impl Interpreter {
         tag: &str,
         params: &HashMap<String, String>,
     ) -> Result<LuaTagFilterDecision> {
+        self.dispatch_lua_tag_filter_with(tag, params, true)
+    }
+
+    /// `resolve` evaluates each parameter as a script tag's would be; text
+    /// passes as written (VNDegen).
+    fn dispatch_lua_tag_filter_with(
+        &self,
+        tag: &str,
+        params: &HashMap<String, String>,
+        resolve: bool,
+    ) -> Result<LuaTagFilterDecision> {
         // 查找 filter.<tag> 函数，嵌套路径如 tags.msgon 走 Lua 递归解析。
         let func: mlua::Function = {
             let tags: mlua::Table = match self.lua.named_registry_value(TAG_FILTER_REGISTRY_KEY) {
@@ -1941,7 +1974,11 @@ impl Interpreter {
             let variables = self.variables.lock().unwrap();
             let evaluator = ExpressionEvaluator::new(&variables);
             for (k, v) in params {
-                param_table.set(k.as_str(), evaluator.resolve_param_str(v)?)?;
+                if resolve {
+                    param_table.set(k.as_str(), evaluator.resolve_param_str(v)?)?;
+                } else {
+                    param_table.set(k.as_str(), v.as_str())?;
+                }
             }
         }
 
@@ -3880,6 +3917,44 @@ mod tests {
             interpreter.run().unwrap(),
             ExecutionResult::Completed
         ));
+    }
+
+    #[test]
+    fn scenario_text_reaches_the_tag_filter_as_print() {
+        let mut interpreter = filtered_interpreter(
+            r#"
+                local filter = {}
+                function filter.print(e, p)
+                    seen = p.data
+                    e:enqueueTag{"print", data="[" .. p.data .. "]"}
+                    return 1
+                end
+                __engine:setTagFilter(filter)
+            "#,
+            "*main\n$5 a line\n[stop]\n",
+        );
+        let texts = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&texts);
+        interpreter.set_callback(move |event| match event {
+            Event::ScenarioText {
+                content, printed, ..
+            } => {
+                sink.lock().unwrap().push((content.clone(), printed));
+                CallbackResult::Continue
+            }
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+
+        let _ = interpreter.run().unwrap();
+
+        let seen: String = interpreter.lua().globals().get("seen").unwrap();
+        assert_eq!(seen, "$5 a line", "text passes as written");
+        assert_eq!(
+            *texts.lock().unwrap(),
+            [("[$5 a line]".to_string(), false)],
+            "what the filter prints counts as scenario text"
+        );
     }
 
     #[test]
