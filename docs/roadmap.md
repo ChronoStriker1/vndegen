@@ -38,6 +38,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Wolf RPG Editor (0.11.0), on VNDegen's own runtime, written in C++ and MIT licensed, on Mac, iPhone, and iPad. It reads loose data, Wolf RPG Editor 2's `.wolf` archives and its encrypted basic data, and plays Ogg, MP3, WAV, and MIDI. Saves are the PC engine's own files and load in the PC engine and the other way round. All 3 test games reach their title, play, save, and load on the Mac and the iPad simulator, pass the case check, and hold 60 fps in battle, and one also plays on the iPhone simulator. 13 more library games play in the Linux test build. `docs/wolfrpg.md` has the known limits.
 - A shared MIDI player (0.11.0), vnmidi on TinySoundFont, with the FluidR3 Mono SoundFont built in and a Settings option to choose your own. `docs/midi.md` has the details.
 - Game page screenshots and cleaner artwork (0.11.0): the About section shows Steam or IGDB screenshots, the artwork picker hides another source's copy of the same picture, and iPhone portrait art takes less height.
+- Library views (0.11.0): Header list, Capsule rows, and Featured layouts for the library home, switched from the top bar, with a default per device.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

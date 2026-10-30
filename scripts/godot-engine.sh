@@ -34,6 +34,18 @@ if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
 fi
 start=$(date +%s)
 
+# Every checkout shares the cache's work folder, so one build at a time holds this lock. A lock whose build has ended
+# is taken over.
+lock="$cache/lock"
+until mkdir "$lock" 2>/dev/null; do
+  holder=$(cat "$lock/pid" 2>/dev/null || true)
+  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$lock"; continue; fi
+  echo "Waiting for another Godot build${holder:+ (pid $holder)}"
+  sleep 15
+done
+echo $$ > "$lock/pid"
+trap 'rm -rf "$lock"' EXIT
+
 # fetch <repo> <commit> <folder>: a clean checkout of one commit, kept in the cache.
 fetch() {
   [ -f "$3/.vndegen-commit" ] && [ "$(cat "$3/.vndegen-commit")" = "$2" ] && return
@@ -63,7 +75,9 @@ prepare() {
   for patch in "$src/$major"/patches/*.patch; do
     [ -f "$patch" ] && patch -s -p1 -d "$work/fresh/godot" < "$patch"
   done
-  rsync -a --checksum --exclude bin --exclude '*.o' --exclude '*.a' --exclude '.sconsign*' "$work/fresh/godot/" "$work/godot$major/"
+  # --delete removes sources the patched tree doesn't have, such as another version's. Build outputs and the files
+  # SCons generates are excluded, so they stay.
+  rsync -a --checksum --delete --exclude bin --exclude '*.o' --exclude '*.a' --exclude '.sconsign*' --exclude '*.gen.*' "$work/fresh/godot/" "$work/godot$major/"
   rm -rf "$work/fresh"
 }
 
