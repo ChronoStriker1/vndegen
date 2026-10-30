@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "ain.h"
@@ -156,6 +157,7 @@ public:
     // Hooks the HLL modules and the host set.
     std::function<void(const std::string &)> log;
     std::function<void(const std::string &)> trace;  // every call, for debugging
+    std::function<void(const std::string &)> hllTrace;  // every HLL call with its argument words, for debugging
     std::function<void()> peek;             // system.Peek and other points where the host may run a frame
     std::function<uint32_t()> timeMs;       // the game clock
     std::string saveDir;                    // the game's SaveData folder on this machine
@@ -177,7 +179,7 @@ private:
     void callHll(int32_t lib, int32_t fn);
     void callSys(int32_t n);
     std::vector<std::vector<HllImpl>> hll_;
-    std::vector<bool> hllWarned_;
+    std::unordered_set<std::string> hllWarned_;  // unimplemented HLL functions already logged
     int32_t arg(int k) const;
     void structAssign(int32_t dst, int32_t src);
     void freePage(Page &p);

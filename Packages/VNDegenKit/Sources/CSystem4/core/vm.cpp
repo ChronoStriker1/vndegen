@@ -455,22 +455,22 @@ void VM::callHll(int32_t lib, int32_t fn) {
         c.argWord.push_back(w);
         w += isRefPair(a.t.type) ? 2 : (a.t.type == T_VOID ? 0 : 1);
     }
+    if (hllTrace) {
+        std::string t = ain.libraries[lib].name + "." + decl.name;
+        for (int32_t v : c.words) t += " " + std::to_string(v);
+        hllTrace(t);
+    }
     HllImpl impl = hll_[lib][fn];
     if (impl) {
         impl(c);
     } else {
         std::string name = ain.libraries[lib].name + "." + decl.name;
-        if (hllWarned_.size() < 1) hllWarned_.resize(1);
-        static std::unordered_map<std::string, bool> warned;
-        if (!warned[name]) {
-            warned[name] = true;
-            if (log) log("unimplemented HLL " + name);
-        }
+        if (hllWarned_.insert(name).second && log) log("unimplemented HLL " + name);
     }
     // Arguments passed by value as slots belong to the call.
     for (size_t k = 0; k < decl.args.size(); k++) {
         int32_t t = decl.args[k].t.type;
-        if (t == T_STRING || t == T_STRUCT || (isArray(t) && false)) decref(c.words[c.argWord[k]]);
+        if (t == T_STRING || t == T_STRUCT) decref(c.words[c.argWord[k]]);
     }
     int rw = retWords(decl.retType);
     if (rw == 1) {

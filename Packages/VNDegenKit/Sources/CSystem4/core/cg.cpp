@@ -13,6 +13,7 @@
 #endif
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
 #define STBI_ONLY_PNG
 #define STBI_ONLY_JPEG
 #define STBI_NO_STDIO
@@ -234,8 +235,27 @@ bool decodeWebP(const uint8_t *d, size_t n, Image &out) {
 #endif
 }
 
+// The chunks after a WebP's image: "OVER" holds the number of the picture it is drawn over (see Image::overBase).
+int webpOverBase(const uint8_t *d, size_t n) {
+    for (size_t p = 12; p + 8 <= n;) {
+        uint32_t len;
+        std::memcpy(&len, d + p + 4, 4);
+        if (std::memcmp(d + p, "OVER", 4) == 0 && len >= 4 && p + 12 <= n) {
+            int32_t base;
+            std::memcpy(&base, d + p + 8, 4);
+            return base;
+        }
+        p += 8 + size_t(len) + (len & 1);
+    }
+    return -1;
+}
+
 bool decodeImage(const uint8_t *d, size_t n, Image &out) {
-    if (n >= 12 && std::memcmp(d, "RIFF", 4) == 0 && std::memcmp(d + 8, "WEBP", 4) == 0) return decodeWebP(d, n, out);
+    if (n >= 12 && std::memcmp(d, "RIFF", 4) == 0 && std::memcmp(d + 8, "WEBP", 4) == 0) {
+        if (!decodeWebP(d, n, out)) return false;
+        out.overBase = webpOverBase(d, n);
+        return true;
+    }
     if (n >= 4 && std::memcmp(d, "QNT", 3) == 0) return decodeQNT(d, n, out);
     if (n >= 4 && std::memcmp(d, "AJP", 3) == 0) return decodeAJP(d, n, out);
     if (n >= 4 && d[0] == 'P' && d[1] == 'M') return decodePMS(d, n, out);

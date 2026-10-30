@@ -58,7 +58,7 @@ public:
     void yieldFrame();
     void present();                  // composites the sprites into the frame
     void showFrame(std::vector<uint8_t> f);  // publishes a frame drawn elsewhere, such as a transition
-    bool cgLoad(int number, Image &out);
+    bool cgLoad(int number, Image &out);  // a picture drawn over another (Image::overBase) comes out whole
     std::shared_ptr<const Image> cgCached(int number);
     bool cgExists(int number) const;
 
@@ -74,6 +74,7 @@ public:
 
 private:
     void vmMain();
+    bool cgLoad(int number, Image &out, int depth);
     std::thread thread_;
     std::mutex mu_;
     std::condition_variable cv_;

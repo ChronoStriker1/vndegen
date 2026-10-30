@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 
@@ -121,6 +122,7 @@ bool Game::start(std::string &error) {
     vm->timeMs = [this] { return now(); };
     vm->peek = [this] { yieldFrame(); };
     if (std::getenv("S4_TRACE")) vm->trace = [this](const std::string &t) { log("call " + t); };
+    if (std::getenv("S4_HLLTRACE")) vm->hllTrace = [this](const std::string &t) { log("hll " + t); };
     std::error_code ec;
     fs::create_directories(cfg.saveDir, ec);
     frame_.assign(size_t(screenW) * screenH * 4, 0);
@@ -238,11 +240,27 @@ bool Game::takeFrame(std::vector<uint8_t> &out, int &w, int &h) {
 
 bool Game::cgExists(int number) const { return cgArchive && cgArchive->find(number); }
 
-bool Game::cgLoad(int number, Image &out) {
+bool Game::cgLoad(int number, Image &out) { return cgLoad(number, out, 0); }
+
+bool Game::cgLoad(int number, Image &out, int depth) {
     const ArchiveEntry *e = cgArchive ? cgArchive->find(number) : nullptr;
     if (!e) return false;
     std::vector<uint8_t> d;
-    return cgArchive->read(*e, d) && decodeImage(d.data(), d.size(), out);
+    if (!cgArchive->read(*e, d) || !decodeImage(d.data(), d.size(), out)) return false;
+    if (out.overBase < 0) return true;
+    // A picture drawn over another: its magenta pixels show the base, which may itself be drawn over another.
+    Image base;
+    bool haveBase = depth < 16 && cgLoad(out.overBase, base, depth + 1) && base.w == out.w && base.h == out.h;
+    if (!haveBase) log("CG " + std::to_string(number) + ": base " + std::to_string(out.overBase) + " unusable");
+    for (size_t i = 0; i < out.rgba.size(); i += 4) {
+        uint8_t *p = &out.rgba[i];
+        if (p[0] != 255 || p[1] != 0 || p[2] != 255) continue;
+        if (haveBase) std::memcpy(p, &base.rgba[i], 4);
+        else p[3] = 0;
+    }
+    out.hasAlpha = out.hasAlpha || (haveBase && base.hasAlpha) || !haveBase;
+    out.overBase = -1;
+    return true;
 }
 
 std::shared_ptr<const Image> Game::cgCached(int number) {

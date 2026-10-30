@@ -11,6 +11,9 @@ struct Image {
     int x = 0, y = 0;          // QNT's stored offset
     bool hasAlpha = false;
     std::vector<uint8_t> rgba;  // w * h * 4, straight alpha
+    // A WebP with an "OVER" chunk is drawn over another picture of the same size, this number: where it is magenta
+    // (255, 0, 255), the base shows. -1 for a picture that stands alone.
+    int overBase = -1;
 };
 
 // Decodes a picture by its contents. Returns false when the format is unknown or the data is damaged.

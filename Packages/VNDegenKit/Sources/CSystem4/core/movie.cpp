@@ -8,6 +8,7 @@
 // the file and hands pl_mpeg the elementary streams.
 #define PLM_NO_STDIO
 #define PL_MPEG_IMPLEMENTATION
+#include "plm_names.h"
 #include "../third_party/pl_mpeg/pl_mpeg.h"
 
 namespace s4 {
