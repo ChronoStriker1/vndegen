@@ -35,6 +35,10 @@ void host_frame_reset(void);
 void host_input(HostInput *out);
 void host_set_problem(const char *problem);
 
+// For the Linux test host: runs Ruby on the game thread at its next Graphics.update.
+void host_test_eval(const char *code);
+// The Ruby the test host left to run, which the caller frees, or NULL.
+char *host_take_eval(void);
 // For the Linux test host: grants one frame and waits until the game hands it over. False once the game has ended.
 bool host_test_step(int timeoutMs);
 

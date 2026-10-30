@@ -1,5 +1,5 @@
 // Development tool: lists an RGSS archive, or extracts it into a folder. Not part of the app.
-#include "../src/archive.h"
+#include "../../../Packages/VNDegenKit/Sources/CRGSS/core/archive.h"
 
 #include <errno.h>
 #include <stdio.h>

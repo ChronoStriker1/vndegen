@@ -33,6 +33,7 @@ static struct {
     bool mouseLatched[3];
     char problem[2048];
     bool hasProblem;
+    char *pendingEval; // Ruby the Linux test host asks the game thread to run
 } S = {.frameRate = 60};
 
 // The copy the main thread reads, so the game can draw its next frame meanwhile.
@@ -328,6 +329,21 @@ void vnrgss_stop(void) {
 const char *vnrgss_problem(void) { return S.hasProblem ? S.problem : NULL; }
 
 // MARK: Test host
+
+void host_test_eval(const char *code) {
+    pthread_mutex_lock(&lock);
+    free(S.pendingEval);
+    S.pendingEval = strdup(code);
+    pthread_mutex_unlock(&lock);
+}
+
+char *host_take_eval(void) {
+    pthread_mutex_lock(&lock);
+    char *code = S.pendingEval;
+    S.pendingEval = NULL;
+    pthread_mutex_unlock(&lock);
+    return code;
+}
 
 bool host_test_step(int timeoutMs) {
     pthread_mutex_lock(&lock);

@@ -4,7 +4,8 @@
 //           [--audio FILE.raw]
 //
 // A script has one command per line: "N tap KEY" presses a key at frame N and releases it two frames later,
-// "N down KEY" and "N up KEY" hold and release it, "N shot FILE" saves frame N. KEY is a libretro key code or a
+// "N down KEY" and "N up KEY" hold and release it, "N shot FILE" saves frame N, "N eval CODE" runs the rest of the
+// line as Ruby in the game. KEY is a libretro key code or a
 // name: up, down, left, right, enter, esc, space, shift, or a single letter. Lines starting with # are comments.
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,9 +17,9 @@
 
 typedef struct {
     long frame;
-    int kind; // 0 down, 1 up, 2 shot
+    int kind; // 0 down, 1 up, 2 shot, 3 eval
     unsigned key;
-    char file[512];
+    char file[1024];
 } Command;
 
 static Command *commands;
@@ -54,7 +55,13 @@ static void read_script(const char *path) {
         char verb[32], arg[512];
         if (sscanf(line, "%ld %31s %511s", &frame, verb, arg) != 3) continue;
         Command c = {.frame = frame};
-        if (!strcmp(verb, "shot")) {
+        if (!strcmp(verb, "eval")) {
+            c.kind = 3;
+            const char *code = strstr(line, "eval") + 5;
+            snprintf(c.file, sizeof c.file, "%s", code);
+            c.file[strcspn(c.file, "\n")] = 0;
+            add(c);
+        } else if (!strcmp(verb, "shot")) {
             c.kind = 2;
             snprintf(c.file, sizeof c.file, "%s", arg);
             add(c);
@@ -98,7 +105,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "--audio") && v) audioPath = argv[++i];
         else if (!strcmp(a, "--shot") && v) {
             Command c = {.kind = 2};
-            sscanf(argv[++i], "%ld:%511s", &c.frame, c.file);
+            sscanf(argv[++i], "%ld:%1023s", &c.frame, c.file);
             add(c);
         } else {
             fprintf(stderr, "unknown argument %s\n", a);
@@ -121,6 +128,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < commandCount; i++) {
             if (commands[i].frame != frame) continue;
             if (commands[i].kind == 2) save_frame(commands[i].file);
+            else if (commands[i].kind == 3) host_test_eval(commands[i].file);
             else vnrgss_key(commands[i].key, commands[i].kind == 0);
         }
         if (!host_test_step(20000)) break;

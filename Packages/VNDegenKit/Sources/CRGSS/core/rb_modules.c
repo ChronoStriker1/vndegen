@@ -82,6 +82,17 @@ static void present(const Image *frame) {
 }
 
 static void update_frame(void) {
+    char *code = host_take_eval();
+    if (code) {
+        int state = 0;
+        rb_eval_string_protect(code, &state);
+        if (state) {
+            VALUE message = rb_funcall(rb_errinfo(), rb_intern("full_message"), 0);
+            rgss_log("eval failed: %s", StringValueCStr(message));
+            rb_set_errinfo(Qnil);
+        }
+        free(code);
+    }
     ensure_screen();
     if (isFrozen) {
         present(&frozen);

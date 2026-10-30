@@ -463,8 +463,8 @@ static VALUE window_initialize(int argc, VALUE *argv, VALUE self) {
     w->w.viewport = viewport_arg(viewport);
     w->viewport = viewport;
     drawable_attach(&w->w.d, DRAW_WINDOW, w->w.viewport);
-    // VX Ace windows start with an empty contents bitmap, which Window_Base disposes before making its own.
-    if (rgss_version == RGSS3) {
+    // VX and VX Ace windows start with an empty contents bitmap, which Window_Base disposes before making its own.
+    if (rgss_version >= RGSS2) {
         VALUE size[2] = {INT2FIX(1), INT2FIX(1)};
         window_put_contents(self, rb_class_new_instance(2, size, rgss_cBitmap));
     }

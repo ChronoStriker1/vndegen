@@ -22,7 +22,6 @@ static struct {
     int rtpCount;
 } fs;
 
-
 static bool is_file(const char *path) {
     struct stat info;
     return stat(path, &info) == 0 && S_ISREG(info.st_mode);
@@ -79,7 +78,10 @@ static bool find_one(const char *name, char *disk, size_t diskLength, long *entr
         if (i == 1 && !strcmp(fs.saveDir, fs.gameDir)) break;
         if (rgss_resolve_case(folders[i], name, disk, diskLength) && is_file(disk)) return true;
     }
-    if (fs.archive && (*entry = rgss_archive_find(fs.archive, name)) >= 0) return true;
+    if (fs.archive && (*entry = rgss_archive_find(fs.archive, name)) >= 0) {
+        disk[0] = 0;
+        return true;
+    }
     for (int i = 0; i < fs.rtpCount; i++) {
         if (rgss_resolve_case(fs.rtps[i], name, disk, diskLength) && is_file(disk)) return true;
     }

@@ -131,7 +131,8 @@ nonisolated struct RGSSInputRouter {
     private var held: [UInt32: Int] = [:]
     private var pointer = CGPoint(x: 0.5, y: 0.5)
 
-    mutating func translate(_ event: ControllerEvent) -> [RGSSInput] {
+    /// Turns a hub event into engine input. `frame` maps a point normalized over the session view into the frame.
+    mutating func translate(_ event: ControllerEvent, frame: (CGPoint) -> CGPoint = { $0 }) -> [RGSSInput] {
         switch event {
         case let .button(button, pressed):
             return button.retroKey.map { hold($0, pressed) } ?? []
@@ -142,17 +143,22 @@ nonisolated struct RGSSInputRouter {
         case let .gamepad(input, pressed):
             return input.virtualButton?.retroKey.map { hold($0, pressed) } ?? []
         case let .pointer(pointer):
-            self.pointer = pointer.location
-            let button: Int32 = pointer.button == .primary ? 0 : 1
-            switch pointer.phase {
-            case .began: return [.mouseMove(to: pointer.location), .mouseButton(button, down: true)]
-            case .moved: return [.mouseMove(to: pointer.location)]
-            case .ended, .cancelled: return [.mouseMove(to: pointer.location), .mouseButton(button, down: false)]
-            }
+            return self.pointer(pointer, at: frame(pointer.location))
         case let .click(button, pressed):
             return [.mouseMove(to: pointer), .mouseButton(button == .primary ? 0 : 1, down: pressed)]
         case let .scroll(dy):
             return [.wheel(dy / Self.pointsPerNotch)]
+        }
+    }
+
+    /// A pointer event whose location is already normalized over the frame, as the session view reports it.
+    mutating func pointer(_ event: PointerEvent, at location: CGPoint) -> [RGSSInput] {
+        pointer = location
+        let button: Int32 = event.button == .primary ? 0 : 1
+        switch event.phase {
+        case .began: return [.mouseMove(to: location), .mouseButton(button, down: true)]
+        case .moved: return [.mouseMove(to: location)]
+        case .ended, .cancelled: return [.mouseMove(to: location), .mouseButton(button, down: false)]
         }
     }
 
