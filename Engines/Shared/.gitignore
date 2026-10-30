@@ -1,0 +1,2 @@
+# Godot builds its modules' shared C files in place.
+*.o

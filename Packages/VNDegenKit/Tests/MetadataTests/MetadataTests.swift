@@ -1,4 +1,6 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
 import VNCore
 @testable import Metadata
@@ -74,9 +76,10 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(game.title == "Doki Doki Literature Club!")
     #expect(Dictionary(uniqueKeysWithValues: metadata.refs.map { ($0.source, $0.id) })
         == [.vndb: "v21905", .steam: "698780", .steamGridDB: "21043", .igdb: "55935"])
-    #expect(metadata.summary?.hasPrefix("Hi, Monika here!") == true)
-    #expect(metadata.summary?.contains("[url") == false)
-    #expect(metadata.summary?.hasSuffix("[From Itch.io]") == true)
+    #expect(metadata.summary?.hasPrefix("The Literature Club is full of cute girls!") == true, "Steam's text wins over VNDB's")
+    #expect(metadata.genres == ["Casual", "Free To Play", "Indie"])
+    #expect(metadata.screenshots?.count == 3)
+    #expect(metadata.screenshots?.first?.url.host == "shared.akamai.steamstatic.com")
     #expect(metadata.developers == ["Team Salvato"])
     #expect(metadata.publishers.contains("Team Salvato"))
     #expect(metadata.releaseDate == "2017-09-22")
@@ -88,6 +91,104 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(try storedURL(.header, id, library)
         == "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/698780/header.jpg?t=1681943582")
     #expect(try storedURL(.icon, id, library) == "mine")
+}
+
+@Test func vndbDescriptionsBecomePlainText() async throws {
+    let metadata = try await VNDBProvider(http: StubNetwork().http).details("v21905")
+
+    #expect(metadata.summary?.hasPrefix("Hi, Monika here!") == true)
+    #expect(metadata.summary?.contains("[url") == false)
+    #expect(metadata.summary?.hasSuffix("[From Itch.io]") == true)
+}
+
+@Test @MainActor func aboutFallsBackToIGDBWhenSteamDoesNotKnowTheGame() async throws {
+    let network = StubNetwork()
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    let id = GameID("Not on Steam")
+    let library = try await makeLibrary([id.rawValue])
+    let refs = [ExternalRef(source: .igdb, id: StubNetwork.igdbOnlyGameID)]
+    library.update(id) { $0.metadata = GameMetadata(summary: "VNDB text", refs: refs) }
+
+    await service.fillAbout(id, in: library)
+
+    let metadata = try #require(library.game(id)?.metadata)
+    #expect(metadata.summary?.hasPrefix("Fight groovy enemies") == true)
+    #expect(metadata.screenshots?.count == 5)
+    #expect(metadata.screenshots?.first?.url.absoluteString.contains("images.igdb.com/igdb/image/upload/t_1080p/") == true)
+    #expect(metadata.screenshots?.first?.thumbnail.absoluteString.contains("/t_screenshot_med/") == true)
+    #expect(metadata.refs == refs)
+}
+
+@Test @MainActor func fillAboutFollowsTheSteamAppIGDBNames() async throws {
+    let network = StubNetwork()
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    let id = GameID("No Socks RPG")
+    let library = try await makeLibrary([id.rawValue])
+    library.update(id) { $0.metadata = GameMetadata(refs: [ExternalRef(source: .igdb, id: "411478")]) }
+
+    await service.fillAbout(id, in: library)
+
+    let metadata = try #require(library.game(id)?.metadata)
+    #expect(metadata.refs.map(\.source) == [.igdb, .steam])
+    #expect(metadata.refs.last?.id == "4929970")
+    #expect(metadata.screenshots?.count == 3)
+    #expect(metadata.screenshots?.allSatisfy { $0.url.host == "shared.akamai.steamstatic.com" } == true)
+}
+
+@Test @MainActor func fillAboutLeavesAMatchConfirmedWhileItRan() async throws {
+    let id = GameID("No Socks RPG")
+    let library = try await makeLibrary([id.rawValue])
+    library.update(id) { $0.metadata = GameMetadata(summary: "A", refs: [ExternalRef(source: .steam, id: "4929970")]) }
+    let rematch = GameMetadata(summary: "B", refs: [ExternalRef(source: .vndb, id: "v21905")])
+    let network = StubNetwork(beforeAnswer: { request in
+        guard request.url?.host == "store.steampowered.com" else { return }
+        await MainActor.run { library.update(id) { $0.metadata = rematch } }
+    })
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+
+    await service.fillAbout(id, in: library)
+
+    #expect(library.game(id)?.metadata == rematch)
+}
+
+@Test func mergingMetadataLeavesScreenshotsToTheAboutRule() {
+    let saved = GameMetadata(screenshots: [])
+    #expect(GameMetadata().filling(from: saved).screenshots == nil, "an unfinished lookup stays retryable")
+}
+
+@Test @MainActor func fillAboutUpdatesAGameMatchedEarlierOnce() async throws {
+    let network = StubNetwork()
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    let id = GameID("No Socks RPG")
+    let library = try await makeLibrary([id.rawValue])
+    let refs = [ExternalRef(source: .igdb, id: "411478"), ExternalRef(source: .steam, id: "4929970")]
+    library.update(id) { $0.metadata = GameMetadata(summary: "IGDB text", developers: ["Spicyfuse"], refs: refs) }
+
+    await service.fillAbout(id, in: library)
+
+    let metadata = try #require(library.game(id)?.metadata)
+    #expect(metadata.summary?.hasPrefix("Fight groovy enemies") == true)
+    #expect(metadata.genres == ["Adventure", "Casual", "RPG"])
+    #expect(metadata.developers == ["Spicyfuse"])
+    #expect(metadata.screenshots?.count == 3)
+    #expect(metadata.screenshots?.allSatisfy { $0.url.host == "shared.akamai.steamstatic.com" } == true, "Steam's screenshots win")
+
+    library.update(id) { $0.metadata?.summary = "kept"; $0.metadata?.screenshots = [] }
+    await service.fillAbout(id, in: library)
+    #expect(library.game(id)?.metadata?.summary == "kept", "a game with a screenshot list, even an empty one, is left alone")
+}
+
+@Test @MainActor func screenshotsStayUnknownWhileSteamFails() async throws {
+    let network = StubNetwork()
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    let id = GameID("Broken")
+    let library = try await makeLibrary([id.rawValue])
+    let refs = [ExternalRef(source: .steam, id: StubNetwork.failingAppID), ExternalRef(source: .igdb, id: "411478")]
+    library.update(id) { $0.metadata = GameMetadata(refs: refs) }
+
+    await service.fillAbout(id, in: library)
+
+    #expect(library.game(id)?.metadata?.screenshots == nil, "IGDB's screenshots wait until Steam answers")
 }
 
 @Test @MainActor func autoMatchAppliesOnlyAConfidentMatch() async throws {
@@ -123,6 +224,61 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(icons.first?.url.pathExtension == "png", "an .ico icon is offered as its PNG render")
     #expect(network.requests(to: "www.steamgriddb.com").allSatisfy { !$0.url!.path.contains("search") },
             "a known Steam app ID finds the SteamGridDB game without a title search")
+}
+
+/// A PNG of colored bands chosen by `seed`, so one seed at two sizes is the same picture.
+private func picture(_ seed: Int, width: Int, height: Int) -> Data {
+    let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    for band in 0..<8 {
+        let shade = CGFloat((band * 37 + seed * 101) % 256) / 255
+        context.setFillColor(red: shade, green: 1 - shade, blue: CGFloat(seed % 2), alpha: 1)
+        context.fill(CGRect(x: 0, y: band * height / 8, width: width, height: height / 8 + 1))
+    }
+    let data = NSMutableData()
+    let destination = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil)!
+    CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+    CGImageDestinationFinalize(destination)
+    return data as Data
+}
+
+@Test @MainActor func artworkCandidatesHideAnotherSourcesCopy() async throws {
+    let steam = picture(1, width: 300, height: 450), igdbCopy = picture(1, width: 249, height: 374)
+    let other = picture(2, width: 267, height: 400)
+    let network = StubNetwork(images: { url in
+        switch url.host {
+        case "shared.akamai.steamstatic.com": steam
+        case "images.igdb.com": igdbCopy
+        case "cdn2.steamgriddb.com": other
+        default: nil
+        }
+    })
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    var game = Game(id: GameID("No Socks RPG"))
+    game.metadata = GameMetadata(refs: [ExternalRef(source: .steam, id: "4929970"), ExternalRef(source: .igdb, id: "411478"),
+                                        ExternalRef(source: .steamGridDB, id: "5519261")])
+
+    let capsules = await service.artworkCandidates(for: game, slot: .capsule)
+
+    #expect(capsules.map(\.source) == [.steamGridDB, .steam], "IGDB's copy of Steam's capsule is hidden")
+}
+
+@Test @MainActor func artworkCandidatesKeepOneSourcesLookalikes() async throws {
+    let network = StubNetwork(images: { url in
+        switch url.host {
+        case "cdn2.steamgriddb.com": picture(3, width: 267, height: 400)
+        case "shared.akamai.steamstatic.com": picture(3, width: 300, height: 450)
+        default: nil
+        }
+    })
+    let service = MetadataService(credentials: MemoryCredentials([.steamGridDBKey: StubNetwork.steamGridDBKey]), http: network.http)
+    var game = Game(id: GameID("ddlc"), title: "DDLC")
+    game.metadata = GameMetadata(refs: [ExternalRef(source: .steam, id: "698780")])
+
+    let capsules = await service.artworkCandidates(for: game, slot: .capsule)
+
+    #expect(capsules.map(\.source) == [.steamGridDB, .steamGridDB, .steamGridDB],
+            "SteamGridDB's uploads all stay, and Steam's matching capsule is hidden")
 }
 
 @Test @MainActor func igdbFetchesOneTokenAndReusesIt() async throws {

@@ -1,12 +1,15 @@
-// The libretro VFS interface (version 3) on POSIX files. The mkxp-z core does all its file access through it.
+// The libretro VFS interface (version 3) on POSIX files. The mkxp-z core does all its file access through it, so this
+// is where a game's paths are matched to the disk ignoring case, as on Windows.
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "casepath.h"
 #include "libretro.h"
 
 struct retro_vfs_file_handle {
@@ -21,10 +24,19 @@ struct retro_vfs_dir_handle {
     bool hidden;
 };
 
+// The path as it is on disk, whatever case the game names it in, written into `out`. A path that doesn't exist keeps
+// the game's spelling below its deepest existing folder. A path too long for `out` is used as written.
+static const char *on_disk(const char *path, char out[PATH_MAX]) {
+    return casepath_resolve(path, out, PATH_MAX) < 0 ? path : out;
+}
+
 static const char *vfs_get_path(struct retro_vfs_file_handle *h) { return h->path; }
 
-static struct retro_vfs_file_handle *vfs_open(const char *path, unsigned mode, unsigned hints) {
+// A write to a file that exists in another case replaces that file rather than creating a second one beside it.
+static struct retro_vfs_file_handle *vfs_open(const char *game_path, unsigned mode, unsigned hints) {
     (void)hints;
+    char buffer[PATH_MAX];
+    const char *path = on_disk(game_path, buffer);
     int flags;
     if ((mode & RETRO_VFS_FILE_ACCESS_READ_WRITE) == RETRO_VFS_FILE_ACCESS_READ_WRITE) flags = O_RDWR | O_CREAT;
     else if (mode & RETRO_VFS_FILE_ACCESS_WRITE) flags = O_WRONLY | O_CREAT;
@@ -32,6 +44,7 @@ static struct retro_vfs_file_handle *vfs_open(const char *path, unsigned mode, u
     if ((mode & RETRO_VFS_FILE_ACCESS_WRITE) && !(mode & RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING)) flags |= O_TRUNC;
     int fd = open(path, flags | O_CLOEXEC, 0644);
     if (fd < 0) return NULL;
+    if (flags & O_CREAT) casepath_changed(path);
     struct retro_vfs_file_handle *h = malloc(sizeof *h);
     h->fd = fd;
     h->path = strdup(path);
@@ -82,23 +95,45 @@ static int64_t vfs_write(struct retro_vfs_file_handle *h, const void *buf, uint6
 }
 
 static int vfs_flush(struct retro_vfs_file_handle *h) { return fsync(h->fd) == 0 ? 0 : -1; }
-static int vfs_remove(const char *path) { return (unlink(path) == 0 || rmdir(path) == 0) ? 0 : -1; }
-static int vfs_rename(const char *from, const char *to) { return rename(from, to) == 0 ? 0 : -1; }
+static int vfs_remove(const char *game_path) {
+    char buffer[PATH_MAX];
+    const char *path = on_disk(game_path, buffer);
+    if (unlink(path) != 0 && rmdir(path) != 0) return -1;
+    casepath_changed(path);
+    return 0;
+}
 
-static int vfs_stat(const char *path, int32_t *size) {
+// Two paths that differ only in case name the same file, which rename leaves as it is.
+static int vfs_rename(const char *game_from, const char *game_to) {
+    char from_buffer[PATH_MAX], to_buffer[PATH_MAX];
+    const char *from = on_disk(game_from, from_buffer), *to = on_disk(game_to, to_buffer);
+    if (rename(from, to) != 0) return -1;
+    casepath_changed(from);
+    casepath_changed(to);
+    return 0;
+}
+
+static int vfs_stat(const char *game_path, int32_t *size) {
+    char buffer[PATH_MAX];
     struct stat st;
-    if (stat(path, &st) != 0) return 0;
+    if (stat(on_disk(game_path, buffer), &st) != 0) return 0;
     if (size) *size = (int32_t)st.st_size;
     return RETRO_VFS_STAT_IS_VALID | (S_ISDIR(st.st_mode) ? RETRO_VFS_STAT_IS_DIRECTORY : 0) |
            (S_ISCHR(st.st_mode) ? RETRO_VFS_STAT_IS_CHARACTER_SPECIAL : 0);
 }
 
-static int vfs_mkdir(const char *dir) {
-    if (mkdir(dir, 0755) == 0) return 0;
-    return errno == EEXIST ? -2 : -1;
+// A folder that exists in another case exists, so this returns -2 for it.
+static int vfs_mkdir(const char *game_dir) {
+    char buffer[PATH_MAX];
+    const char *dir = on_disk(game_dir, buffer);
+    if (mkdir(dir, 0755) != 0) return errno == EEXIST ? -2 : -1;
+    casepath_changed(dir);
+    return 0;
 }
 
-static struct retro_vfs_dir_handle *vfs_opendir(const char *path, bool hidden) {
+static struct retro_vfs_dir_handle *vfs_opendir(const char *game_path, bool hidden) {
+    char buffer[PATH_MAX];
+    const char *path = on_disk(game_path, buffer);
     DIR *d = opendir(path);
     if (!d) return NULL;
     struct retro_vfs_dir_handle *h = calloc(1, sizeof *h);

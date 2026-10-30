@@ -542,3 +542,86 @@ private func freshLibrary() async throws -> (library: LibraryStore, directory: U
     #expect(service.storedPassword() == nil)
 }
 #endif
+
+/// A PC backup's `File1.rmmzsave` restores over a local `file1.rmmzsave`, as it would on Windows, rather than beside it.
+/// `VNDEGEN_TEST_DIR` puts the game on a case-sensitive volume, which `scripts/build.sh test` mounts.
+@Test func restoreReplacesASaveThatDiffersOnlyInCase() throws {
+    let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? fm.temporaryDirectory
+    let base = scratch.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["File1.rmmzsave": "pc"])
+    _ = try store.backUp(folder: nil, title: "Test Game 01", game: GameID("Test Game 01"), locations: locations, retention: nil,
+                         os: "windows", comment: nil)
+    try fm.removeItem(at: locations[0].directory.appendingPathComponent("File1.rmmzsave"))
+    try write(["file1.rmmzsave": "local"], to: locations[0])
+
+    let preview = try store.preview(folder: "Test Game 01", backup: nil, locations: locations)
+    #expect(preview.replaced == ["file1.rmmzsave"] && preview.added.isEmpty)
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 01")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 01", backup: nil, locations: locations, snapshot: snapshot)
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "pc"])
+}
+
+/// A backup made on a disk that keeps case can hold `File1.rmmzsave` and `file1.rmmzsave`. They are one save on a device
+/// that has one of them, and the one spelled as on disk restores.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"] != nil))
+func aBackupWithTwoSpellingsOfOneSaveRestoresOne() throws {
+    let base = URL(fileURLWithPath: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"]!)
+        .appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["File1.rmmzsave": "upper", "file1.rmmzsave": "lower"])
+    _ = try store.backUp(folder: nil, title: "Test Game 02", game: GameID("Test Game 02"), locations: locations, retention: nil,
+                         os: "linux", comment: nil)
+    try fm.removeItem(at: locations[0].directory.appendingPathComponent("File1.rmmzsave"))
+    try write(["file1.rmmzsave": "local"], to: locations[0])
+
+    #expect(try store.latestHashes(folder: "Test Game 02", locations: locations)?.hashes == ["0:file1.rmmzsave": sha1("lower")])
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 02")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 02", backup: nil, locations: locations, snapshot: snapshot)
+    #expect(try contents(of: locations[0]) == ["file1.rmmzsave": "lower"])
+}
+
+/// Two spellings of one save restore as one file even when the device has neither yet.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"] != nil))
+func twoSpellingsOfANewSaveRestoreAsOneFile() throws {
+    let base = URL(fileURLWithPath: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"]!)
+        .appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["File1.rmmzsave": "upper", "file1.rmmzsave": "lower"])
+    _ = try store.backUp(folder: nil, title: "Test Game 03", game: GameID("Test Game 03"), locations: locations, retention: nil,
+                         os: "linux", comment: nil)
+    try fm.removeItem(at: locations[0].directory)
+
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 03")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 03", backup: nil, locations: locations, snapshot: snapshot)
+    // The backup lists File1 first, as uppercase sorts first, so its spelling and contents win.
+    #expect(try contents(of: locations[0]) == ["File1.rmmzsave": "upper"])
+}
+
+/// Names that differ only in case outside ASCII, as `Σ` and `σ`, are one save too.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"] != nil))
+func spellingsThatDifferInUnicodeCaseRestoreAsOneFile() throws {
+    let base = URL(fileURLWithPath: ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"]!)
+        .appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: base) }
+    let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))
+    try fm.createDirectory(at: store.root, withIntermediateDirectories: true)
+    let locations = try makeGame(in: base, saves: ["fileΣ.rmmzsave": "upper", "fileσ.rmmzsave": "lower"])
+    _ = try store.backUp(folder: nil, title: "Test Game 04", game: GameID("Test Game 04"), locations: locations, retention: nil,
+                         os: "linux", comment: nil)
+    try fm.removeItem(at: locations[0].directory)
+    let snapshot = base.appendingPathComponent("Snapshots/Test Game 04")
+    try fm.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
+    _ = try store.restore(folder: "Test Game 04", backup: nil, locations: locations, snapshot: snapshot)
+    #expect(try contents(of: locations[0]).count == 1)
+}

@@ -177,3 +177,40 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     nav.activate(.settingsPage(.saves))
     #expect(nav.saveSettings === saves)
 }
+
+@MainActor
+@Test func stackedPageActionsTakeTheirOwnRowUnderPlay() async throws {
+    let (nav, _) = try await makeNavigator()
+    nav.setFocus(.pagePlay)
+    press(nav, .right)
+    #expect(nav.focus == .pageArtwork)
+    // A narrow window puts Artwork and the rest under Play, so Down reaches them and Right has nowhere to go.
+    nav.pageActionsStacked = true
+    nav.setFocus(.pagePlay)
+    press(nav, .right)
+    #expect(nav.focus == .pagePlay)
+    press(nav, .down)
+    #expect(nav.focus == .pageArtwork)
+    press(nav, .up)
+    #expect(nav.focus == .pagePlay)
+}
+
+@MainActor
+@Test func eachLibraryLayoutHasItsOwnHomeRowsAndTheViewButtonStepsThroughThem() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.hub.library.update(id) { $0.lastPlayedAt = .now }
+    nav.back()
+    #expect(nav.focus == .tile(.recent, id) || nav.focus == .tile(.all, id))
+    nav.layout = .featured
+    #expect(nav.rows().map(\.id) == ["bar", "hero", "recent", "all"])
+    nav.layout = .capsules
+    #expect(nav.rows().map(\.id) == ["bar", "recent", "all"])
+    // The header list leaves out Recently played, which would repeat the top of All games.
+    nav.layout = .headers
+    #expect(nav.rows().map(\.id) == ["bar", "all-0"])
+    nav.setFocus(.layoutButton)
+    press(nav, .confirm)
+    #expect(nav.layout == .featured)
+    #expect(nav.focus == .layoutButton)
+    #expect(UserDefaults.standard.string(forKey: LibraryLayout.storageKey) == LibraryLayout.featured.rawValue)
+}

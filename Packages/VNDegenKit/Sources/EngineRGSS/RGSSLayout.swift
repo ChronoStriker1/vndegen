@@ -67,7 +67,7 @@ nonisolated struct RGSSLayout: Equatable, Sendable {
         func path(_ name: String) -> String { root.isEmpty ? name : "\(root)/\(name)" }
         // The scan reads three levels, so an unpacked game two folders down needs a direct look for its scripts.
         func exists(_ name: String) -> Bool {
-            probe.contains(path(name)) || FileManager.default.fileExists(atPath: probe.root.appendingPathComponent(path(name)).path)
+            probe.contains(path(name)) || FileManager.default.fileExists(atPath: FileCase.resolve(path(name), in: probe.root).path)
         }
         for version in Version.allCases.reversed() {
             if exists(version.archive) { return (version, path(version.archive)) }

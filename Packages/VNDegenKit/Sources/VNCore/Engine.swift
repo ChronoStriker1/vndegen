@@ -90,6 +90,9 @@ public protocol EnginePlugin: Sendable {
     /// Another way to run a game, such as a different Ren'Py runtime, for the game page's advanced options. Nil when
     /// the engine has none on this device.
     func variants(for game: Game, dataDirectory: URL) -> EngineVariants?
+    /// `variants(for:dataDirectory:)` for engines that find a game's variants in its folder, such as the movies a Flash
+    /// game can start with. The default asks the other.
+    func variants(for game: Game, folder: URL, dataDirectory: URL) -> EngineVariants?
     func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws
     /// True when the engine's games read touches themselves, as Ren'Py's do. VNDegen shows no touch controls over
     /// them, so a touch device's control method changes nothing for them.
@@ -111,6 +114,9 @@ extension EnginePlugin {
     public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? { nil }
     public func backupWarning(for game: Game, dataDirectory: URL) -> String? { nil }
     public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? { nil }
+    public func variants(for game: Game, folder: URL, dataDirectory: URL) -> EngineVariants? {
+        variants(for: game, dataDirectory: dataDirectory)
+    }
     public func selectVariant(_ id: String?, for game: Game, dataDirectory: URL) throws {}
     public var readsTouches: Bool { false }
     public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] { [] }
@@ -185,12 +191,7 @@ extension EngineSession {
     public var drawsOwnMenu: Bool { false }
 
     public func type(_ typed: TypedText) {
-        let keys: [KeyboardKey] = switch typed {
-        case .newline: [KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)]
-        case .deleteBackward: [KeyboardKey(key: "Backspace", code: "Backspace", keyCode: 8)]
-        case let .text(text): text.compactMap(KeyboardKey.init(typing:))
-        }
-        for key in keys {
+        for key in KeyboardKey.keys(typing: typed) {
             send(.key(key, pressed: true))
             send(.key(key, pressed: false))
         }
@@ -198,6 +199,16 @@ extension EngineSession {
 }
 
 extension KeyboardKey {
+    /// The keys the default `EngineSession.type(_:)` presses for `typed`: letters, digits, and spaces, and Return and
+    /// Backspace.
+    public static func keys(typing typed: TypedText) -> [KeyboardKey] {
+        switch typed {
+        case .newline: [KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)]
+        case .deleteBackward: [KeyboardKey(key: "Backspace", code: "Backspace", keyCode: 8)]
+        case let .text(text): text.compactMap(KeyboardKey.init(typing:))
+        }
+    }
+
     /// The key that types `character` on a US keyboard without Shift, for letters, digits, and the space bar.
     init?(typing character: Character) {
         guard let ascii = character.asciiValue else { return nil }

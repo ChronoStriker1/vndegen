@@ -13,12 +13,15 @@ xcodegen generate --quiet
 # Save sync's rclone library, which the package links on every platform.
 scripts/rclone-runtime.sh
 scripts/app-licenses.sh
+scripts/fonts-licenses.sh
+scripts/midi-licenses.sh
+scripts/ruffle-runtime.sh build/ruffle
 # The iOS app links Ren'Py's libraries, which Xcode must find before it builds.
 case "${1:-}" in ios-sim|ipa|release) scripts/renpy-runtime.sh build/renpy ios ;; esac
 
 # The app's Licenses page lists the notices that each bundled runtime writes to build/<runtime>/licenses/. An app build
 # fails when one of these has none, so a missing notice can't reach a release. A new runtime adds its name here.
-licensed=(rclone renpy rgss kirikiri app)
+licensed=(rclone renpy rgss kirikiri ruffle godot artemis app fonts midi)
 require_licenses() {
   local runtime
   for runtime in "${licensed[@]}"; do
@@ -26,12 +29,15 @@ require_licenses() {
   done
 }
 
-# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS
-# and KiriKiri engines build first, so a failure shows its log. The app's own build phases then find them up to date.
+# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS,
+# KiriKiri, Godot, and Artemis engines build first, so a failure shows its log. The app's own build phases then find
+# them up to date.
 xcb() {
   mkdir -p build
   scripts/rgss-engine.sh build/rgss >build/rgss-engine.log 2>&1 || { tail -n 40 build/rgss-engine.log; return 1; }
   scripts/kirikiri-engine.sh build/kirikiri >build/kirikiri-engine.log 2>&1 || { tail -n 40 build/kirikiri-engine.log; return 1; }
+  scripts/godot-engine.sh build/godot >build/godot-engine.log 2>&1 || { tail -n 40 build/godot-engine.log; return 1; }
+  scripts/artemis-engine.sh build/artemis >build/artemis-engine.log 2>&1 || { tail -n 40 build/artemis-engine.log; return 1; }
   xcodebuild -project VNDegen.xcodeproj -scheme VNDegen "$@" 2>&1 | filter 'error:|BUILD (SUCCEEDED|FAILED)|\*\* '
 }
 
@@ -43,8 +49,24 @@ filter() {
 
 case "${1:?destination}" in
   test)
-    cd Packages/VNDegenKit
-    swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed' ;;
+    # The shared font lookup the native engines compile, against the bundled table.
+    mkdir -p build && fonts_run=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-fonts.XXXXXX")
+    cc -std=c11 -Wall -Wextra -Werror -o build/vnfont_test Engines/Shared/vnfont.c Engines/Shared/vnfont_test.c
+    build/vnfont_test Engines/Shared/fonts "$fonts_run" && rm -rf "$fonts_run"
+    # The shared MIDI player the native engines compile, with the bundled SoundFont.
+    cc -std=c11 -O2 -Wall -Wextra -Werror -o build/vnmidi_test Engines/Shared/vnmidi.c Engines/Shared/vnmidi_test.c -lm -lpthread
+    build/vnmidi_test Engines/Shared/soundfonts/FluidR3Mono_GM.sf3 | filter 'FAIL|passed|failures'
+    # Lookups that ignore case are tested on a case-sensitive volume, as iPhones and iPads have, through
+    # VNDEGEN_TEST_DIR. The shared C lookup the RGSS and KiriKiri engines use is tested there first.
+    case_volume=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-case.XXXXXX")
+    scripts/case-volume.sh attach build/case-sensitive.sparseimage "$case_volume"
+    # The image keeps what a run leaves, so each run works in a folder of its own and removes it.
+    case_run=$(mktemp -d "$case_volume/run.XXXXXX")
+    trap 'rm -rf "$case_run"; scripts/case-volume.sh detach "$case_volume"; rmdir "$case_volume"' EXIT
+    mkdir "$case_run/casepath"
+    cc -std=c11 -Wall -Wextra -Werror -o build/casepath_test Engines/Shared/casepath.c Engines/Shared/casepath_test.c
+    build/casepath_test "$case_run/casepath"
+    (cd Packages/VNDegenKit && VNDEGEN_TEST_DIR="$case_run" swift test 2>&1 | filter 'error:|✘|Test run|Executed|failed') ;;
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;
   ios-sim) xcb -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim build ;;
   ipa)

@@ -15,7 +15,17 @@ its own:
   `Engines/RGSS/licenses/` for code whose source folder has none: Ruby and libyaml (built in stage 1, whose sources
   aren't kept), header-only Boost, libretro-common, the Khronos headers, and what the core embeds (the Liberation Sans
   font, SDL's controller database, and the GMGSx soundfont). It fails on a source folder with no license and no text.
+- `scripts/ruffle-runtime.sh` copies `build/ruffle/licenses/` from `Engines/Flash/ruffle/licenses/`, which
+  `scripts/ruffle-web.sh` writes when it builds Ruffle: Ruffle's license, the license files of every Rust crate in its
+  wasm module and every JavaScript package in `ruffle.js`, and the texts in `Engines/Flash/licenses/` for the Noto font
+  and symphonia.
 - `scripts/app-licenses.sh` writes `build/app/licenses/` for third-party code in VNDegen's own sources.
+- `scripts/fonts-licenses.sh` writes `build/fonts/licenses/` from the license files in `Engines/Shared/fonts/licenses/`
+  for the fonts the app bundles: Liberation, DejaVu, and the Ume fonts, whose license page it turns into text. The
+  Chinese and Korean font downloads install Adobe's `LICENSE.txt` beside the fonts.
+- `scripts/midi-licenses.sh` writes `build/midi/licenses/` for vnmidi, the MIDI player in `Engines/Shared`: the license
+  of the FluidR3Mono SoundFont the app bundles from `Engines/Shared/soundfonts/`, and those of TinySoundFont,
+  TinyMidiLoader, and stb_vorbis from `Engines/Shared/third_party/`.
 
 `scripts/build.sh` fails when one of these folders has no notices.
 

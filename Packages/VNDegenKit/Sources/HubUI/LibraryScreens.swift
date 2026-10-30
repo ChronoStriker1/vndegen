@@ -1,10 +1,12 @@
 import SwiftUI
 import ControllerUI
+import FontPack
 import VNCore
 import Metadata
 import GameInput
 import Lock
 import SaveSync
+import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #else
@@ -27,7 +29,8 @@ private struct ScreenHeader: View {
             }
             Spacer()
         }
-        .padding(.horizontal, metrics.padding)
+        .padding(.leading, metrics.topRowPadding(.leading))
+        .padding(.trailing, metrics.topRowPadding(.trailing))
         .padding(.top, 10)
         #if os(macOS)
         .padding(.top, 18)
@@ -66,6 +69,11 @@ struct LibraryGridView: View {
                     if let focus, focus.gameID != nil {
                         withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
                     }
+                }
+                .onChange(of: nav.revealRequest) { _, target in
+                    guard let target else { return }
+                    nav.revealRequest = nil
+                    withAnimation(Theme.focusAnimation) { proxy.scrollTo(target, anchor: .center) }
                 }
             }
         }
@@ -149,6 +157,26 @@ struct SettingsView: View {
                     #endif
 
                     Section {
+                        ForEach(FontPack.packages) { fontRow($0) }
+                    } header: {
+                        Text("Fonts")
+                    } footer: {
+                        Text("Games ask for Windows fonts such as MS Gothic and Arial by name. VNDegen includes free fonts with the same measurements for Western and Japanese text. Chinese and Korean games need these downloads from Adobe's Source Han Sans, under the SIL Open Font License. Games started after a download use it.")
+                    }
+
+                    Section {
+                        soundFontRow
+                        if nav.soundFontName != nil {
+                            Button("Use the built-in SoundFont", systemImage: "arrow.uturn.backward") { nav.select(.soundFontReset) }
+                                .focusRow(.soundFontReset, nav)
+                        }
+                    } header: {
+                        Text("MIDI music")
+                    } footer: {
+                        Text("Wolf RPG Editor games play their MIDI music through a General MIDI SoundFont. Choose an .sf2 or .sf3 file to use instead of the built-in FluidR3 Mono; VNDegen keeps a copy of it. If it can't be read, the built-in font plays. RPG Maker XP, VX and VX Ace games play MIDI with a synthesizer of their own and aren't affected. Games started after a change use it.")
+                    }
+
+                    Section {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                         pageRow("Licenses", systemImage: "doc.text", value: "", page: .licenses)
                     }
@@ -167,6 +195,28 @@ struct SettingsView: View {
         .background { Theme.background.ignoresSafeArea() }
     }
 
+    /// The SoundFont in use, and the row that opens the file picker for another.
+    private var soundFontRow: some View {
+        Button { nav.select(.soundFont) } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label("SoundFont", systemImage: "pianokeys").foregroundStyle(.white)
+                    Spacer()
+                    Text("Choose…").foregroundStyle(Theme.accent)
+                }
+                Text(nav.soundFontError ?? nav.soundFontName ?? "Built-in: FluidR3 Mono")
+                    .font(.footnote).foregroundStyle(Theme.secondaryText).fixedSize(horizontal: false, vertical: true)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .focusRow(.soundFont, nav)
+        .fileImporter(isPresented: Binding(get: { nav.pickingSoundFont }, set: { nav.pickingSoundFont = $0 }),
+                      allowedContentTypes: MIDISoundFont.fileExtensions.compactMap { UTType(filenameExtension: $0) }) {
+            nav.installSoundFont($0)
+        }
+    }
+
     private var savesSummary: String {
         switch hub.saveSync.connection {
         case .notSetUp: hub.saveSync.server == nil ? "Not set up" : "Not tested"
@@ -174,6 +224,34 @@ struct SettingsView: View {
         case .connected: hub.saveSync.server?.remote.host ?? "Connected"
         case .failed: "Can't connect"
         }
+    }
+
+    /// A font package: its state, and what pressing the row does, which is download, cancel, or remove.
+    private func fontRow(_ package: RuntimePackage) -> some View {
+        let target = Navigator.Target.fontPackage(package.id)
+        let phase = nav.runtimes.phases[package.id]
+        let installed = nav.runtimes.installedFonts.contains(package.id)
+        let (state, action): (String, String) = switch phase {
+        case let .running(progress)?: (RuntimeSection.status(progress), "Cancel")
+        case let .failed(message)?: (message, "Download, \(RuntimeSection.size(package.size))")
+        case nil: installed ? ("Installed", "Remove") : ("Not installed", "Download, \(RuntimeSection.size(package.size))")
+        }
+        return Button { nav.select(target) } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label(package.name, systemImage: "textformat").foregroundStyle(.white)
+                    Spacer()
+                    Text(action).foregroundStyle(Theme.accent)
+                }
+                Text(state).font(.footnote).foregroundStyle(Theme.secondaryText).fixedSize(horizontal: false, vertical: true)
+                if case let .running(progress)? = phase {
+                    ProgressView(value: RuntimeSection.fraction(progress, package)).tint(Theme.accent)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .focusRow(target, nav)
     }
 
     /// A row that opens a settings page. It is a focus target, so a controller can reach it.

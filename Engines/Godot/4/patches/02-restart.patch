@@ -1,0 +1,2633 @@
+From 19159ae258b05394fa45fe916ccc47bc05ac88ed Mon Sep 17 00:00:00 2001
+From: x <x>
+Date: Tue, 27 Oct 2026 14:29:02 -0400
+Subject: [PATCH 2/2] LibGodot reinitialization (upstream PRs 123552 123720
+ 123999 124000 124001 124003 124004 124005 124006 124011, ported to 4.7.2) and
+ VNDegen restart fixes
+
+---
+ core/config/project_settings.cpp              |  2 +
+ core/config/project_settings.h                |  6 ++-
+ core/core_bind.cpp                            |  4 ++
+ core/core_bind.h                              | 30 +++++++++++++++
+ core/io/file_access_zip.cpp                   |  3 ++
+ core/io/ip.cpp                                |  3 ++
+ core/io/resource_format_binary.cpp            |  6 +++
+ core/io/resource_format_binary.h              |  1 +
+ core/io/resource_importer.cpp                 |  6 +++
+ core/io/resource_importer.h                   |  1 +
+ core/io/resource_uid.cpp                      |  3 ++
+ core/object/class_db.cpp                      |  7 +++-
+ core/object/class_db.h                        |  5 ++-
+ core/object/object.cpp                        | 18 +++++++--
+ core/object/object.h                          | 26 ++++++++++---
+ core/os/midi_driver.cpp                       |  6 +++
+ core/os/midi_driver.h                         |  2 +-
+ core/register_core_types.cpp                  |  2 +-
+ core/string/string_name.cpp                   | 37 ++++++++++++++-----
+ core/string/string_name.h                     | 18 ++++++++-
+ core/string/translation_server.cpp            |  6 +++
+ core/string/translation_server.h              |  1 +
+ drivers/egl/egl_manager.cpp                   | 12 ++++++
+ drivers/gles3/rasterizer_gles3.cpp            |  3 ++
+ .../animation_blend_space_1d_editor.cpp       |  6 +++
+ .../animation_blend_space_1d_editor.h         |  1 +
+ .../animation_blend_space_2d_editor.cpp       |  6 +++
+ .../animation_blend_space_2d_editor.h         |  1 +
+ .../animation_blend_tree_editor_plugin.cpp    |  6 +++
+ .../animation_blend_tree_editor_plugin.h      |  1 +
+ .../animation_player_editor_plugin.cpp        |  3 ++
+ .../animation_state_machine_editor.cpp        |  6 +++
+ .../animation_state_machine_editor.h          |  1 +
+ .../animation_tree_editor_plugin.cpp          |  6 +++
+ .../animation/animation_tree_editor_plugin.h  |  1 +
+ editor/audio/audio_stream_preview.cpp         |  3 ++
+ .../debug_adapter/debug_adapter_protocol.cpp  |  3 ++
+ editor/debugger/editor_debugger_node.cpp      |  6 +++
+ editor/debugger/editor_debugger_node.h        |  1 +
+ editor/docks/editor_dock_manager.cpp          |  6 +++
+ editor/docks/editor_dock_manager.h            |  1 +
+ editor/editor_interface.cpp                   |  1 +
+ editor/editor_undo_redo_manager.cpp           |  3 ++
+ editor/export/editor_export.cpp               |  6 +++
+ editor/export/editor_export.h                 |  1 +
+ editor/file_system/editor_file_system.cpp     |  3 ++
+ editor/gui/progress_dialog.cpp                |  4 +-
+ editor/import/3d/scene_import_settings.cpp    |  3 ++
+ .../import/audio_stream_import_settings.cpp   |  6 +++
+ editor/import/audio_stream_import_settings.h  |  1 +
+ .../import/dynamic_font_import_settings.cpp   |  6 +++
+ editor/import/dynamic_font_import_settings.h  |  1 +
+ editor/import/fbx_importer_manager.cpp        |  6 +++
+ editor/import/fbx_importer_manager.h          |  1 +
+ editor/inspector/editor_resource_preview.cpp  |  3 ++
+ editor/plugins/editor_plugin.cpp              |  4 --
+ editor/plugins/editor_plugin.h                | 12 +++++-
+ editor/run/editor_run_bar.cpp                 |  6 +++
+ editor/run/editor_run_bar.h                   |  1 +
+ editor/run/run_instances_dialog.cpp           |  6 +++
+ editor/run/run_instances_dialog.h             |  1 +
+ editor/scene/3d/path_3d_editor_plugin.cpp     |  6 +++
+ editor/scene/3d/path_3d_editor_plugin.h       |  1 +
+ editor/scene/canvas_item_editor_plugin.cpp    |  6 +++
+ editor/scene/canvas_item_editor_plugin.h      |  1 +
+ editor/scene/editor_scene_tabs.cpp            |  6 +++
+ editor/scene/editor_scene_tabs.h              |  1 +
+ editor/scene/gui/control_editor_plugin.cpp    |  6 +++
+ editor/scene/gui/control_editor_plugin.h      |  1 +
+ editor/settings/editor_build_profile.cpp      |  6 +++
+ editor/settings/editor_build_profile.h        |  1 +
+ editor/settings/editor_feature_profile.cpp    |  6 +++
+ editor/settings/editor_feature_profile.h      |  1 +
+ editor/settings/project_settings_editor.cpp   |  6 +++
+ editor/settings/project_settings_editor.h     |  1 +
+ editor/shader/shader_file_editor_plugin.cpp   |  6 +++
+ editor/shader/shader_file_editor_plugin.h     |  1 +
+ .../version_control_editor_plugin.cpp         |  3 ++
+ main/main.cpp                                 | 21 +++++++++++
+ main/performance.cpp                          |  6 +++
+ main/performance.h                            |  1 +
+ .../gdscript_language_protocol.cpp            |  7 ++++
+ .../gdscript_language_protocol.h              |  4 +-
+ modules/gdscript/register_types.cpp           |  2 +
+ .../editor/editor_import_blend_runner.cpp     |  6 +++
+ .../gltf/editor/editor_import_blend_runner.h  |  1 +
+ .../godot_physics_server_2d.cpp               |  6 +++
+ .../godot_physics_server_2d.h                 |  2 +-
+ .../godot_physics_server_3d.cpp               |  6 +++
+ .../godot_physics_server_3d.h                 |  2 +-
+ .../2d/nav_mesh_generator_2d.cpp              |  3 ++
+ .../3d/nav_mesh_generator_3d.cpp              |  3 ++
+ .../3d/navigation_mesh_generator.cpp          |  3 ++
+ .../navigation_obstacle_3d_editor_plugin.cpp  |  3 ++
+ ...enxr_fb_display_refresh_rate_extension.cpp |  3 ++
+ platform/android/api/api.cpp                  |  7 ++++
+ platform/android/api/java_class_wrapper.h     |  1 +
+ platform/android/java_class_wrapper.cpp       |  6 +++
+ platform/linuxbsd/libgodot_linuxbsd.cpp       | 13 ++++---
+ platform/macos/libgodot_macos.mm              | 14 ++++---
+ platform/web/api/api.cpp                      |  7 +++-
+ platform/web/audio_driver_web.h               | 10 +++++
+ platform/windows/libgodot_windows.cpp         | 13 ++++---
+ scene/debugger/runtime_node_select.cpp        |  4 ++
+ scene/debugger/scene_debugger.cpp             |  1 +
+ scene/debugger/scene_debugger.h               |  6 +++
+ scene/main/scene_tree.cpp                     |  8 ++++
+ scene/main/scene_tree.h                       |  1 +
+ scene/resources/3d/sky_material.cpp           |  3 ++
+ scene/resources/resource_format_text.cpp      |  6 +++
+ scene/resources/resource_format_text.h        |  1 +
+ servers/audio/audio_driver_dummy.cpp          |  6 +++
+ servers/audio/audio_driver_dummy.h            |  2 +-
+ servers/audio/audio_server.cpp                |  5 +++
+ servers/audio/audio_server.h                  |  1 +
+ servers/debugger/servers_debugger.cpp         |  1 +
+ servers/display/accessibility_server.cpp      |  5 +++
+ servers/display/accessibility_server.h        |  1 +
+ servers/display/display_server.cpp            | 12 ++++++
+ servers/display/display_server.h              |  1 +
+ servers/movie_writer/movie_writer.cpp         |  8 ++++
+ servers/movie_writer/movie_writer.h           |  1 +
+ .../navigation_2d/navigation_server_2d.cpp    |  1 +
+ .../navigation_3d/navigation_server_3d.cpp    |  1 +
+ servers/register_server_types.cpp             |  4 +-
+ .../rendering/renderer_rd/environment/sky.cpp | 30 ++++++++++++---
+ .../render_forward_clustered.cpp              |  4 ++
+ .../scene_shader_forward_clustered.cpp        |  4 ++
+ .../forward_mobile/render_forward_mobile.cpp  |  4 ++
+ .../scene_shader_forward_mobile.cpp           |  4 ++
+ .../renderer_rd/framebuffer_cache_rd.cpp      |  3 ++
+ .../renderer_rd/renderer_compositor_rd.cpp    |  2 +
+ .../renderer_rd/renderer_scene_render_rd.cpp  |  4 ++
+ .../renderer_rd/renderer_scene_render_rd.h    |  1 +
+ .../storage_rd/material_storage.cpp           | 22 +++++++++++
+ .../renderer_rd/storage_rd/material_storage.h |  1 +
+ .../renderer_rd/uniform_set_cache_rd.cpp      |  3 ++
+ servers/rendering/renderer_scene_cull.cpp     |  4 ++
+ .../rendering/rendering_server_default.cpp    | 20 ++++++++++
+ servers/rendering/shader_types.cpp            |  6 +++
+ servers/rendering/shader_types.h              |  1 +
+ 141 files changed, 676 insertions(+), 66 deletions(-)
+
+diff --git a/core/config/project_settings.cpp b/core/config/project_settings.cpp
+index 89a7390..39ccf3a 100644
+--- a/core/config/project_settings.cpp
++++ b/core/config/project_settings.cpp
+@@ -1674,6 +1674,7 @@ ProjectSettings::ProjectSettings() {
+ 	// so that the values can be overridden from project.godot or project.binary.
+ 
+ 	CRASH_COND_MSG(singleton != nullptr, "Instantiating a new ProjectSettings singleton is not supported.");
++	_version = last_version + 1;
+ 	singleton = this;
+ 
+ #ifdef TOOLS_ENABLED
+@@ -1895,6 +1896,7 @@ ProjectSettings::ProjectSettings(const String &p_path) {
+ 
+ ProjectSettings::~ProjectSettings() {
+ 	if (singleton == this) {
++		last_version = _version;
+ 		singleton = nullptr;
+ 	}
+ }
+diff --git a/core/config/project_settings.h b/core/config/project_settings.h
+index e197a8d..2d00b31 100644
+--- a/core/config/project_settings.h
++++ b/core/config/project_settings.h
+@@ -44,8 +44,10 @@ class ProjectSettings : public Object {
+ 
+ 	bool is_changed = false;
+ 
+-	// Starting version from 1 ensures that all callers can reset their tested version to 0,
+-	// and will always detect the initial project settings as a "change".
++	// The first version starts at 1, leaving 0 as the uninitialized cache version.
++	// Subsequent singleton instances continue from the previous version so
++	// GLOBAL_GET_CACHED values are invalidated across reinitialization.
++	static inline uint32_t last_version = 0;
+ 	uint32_t _version = 1;
+ 
+ 	// Track changed settings for get_changed_settings functionality
+diff --git a/core/core_bind.cpp b/core/core_bind.cpp
+index 587af89..b04f400 100644
+--- a/core/core_bind.cpp
++++ b/core/core_bind.cpp
+@@ -2304,6 +2304,10 @@ EngineDebugger::~EngineDebugger() {
+ 		::EngineDebugger::unregister_message_capture(E.key);
+ 	}
+ 	captures.clear();
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void EngineDebugger::_bind_methods() {
+diff --git a/core/core_bind.h b/core/core_bind.h
+index 7a6f17d..4ed77d0 100644
+--- a/core/core_bind.h
++++ b/core/core_bind.h
+@@ -88,6 +88,12 @@ public:
+ 	Vector<String> list_directory(const String &p_directory);
+ 
+ 	ResourceLoader() { singleton = this; }
++
++	~ResourceLoader() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+ 
+ class ResourceSaver : public Object {
+@@ -120,6 +126,12 @@ public:
+ 	ResourceUID::ID get_resource_id_for_path(const String &p_path, bool p_generate = false);
+ 
+ 	ResourceSaver() { singleton = this; }
++
++	~ResourceSaver() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+ 
+ class Logger : public RefCounted {
+@@ -385,6 +397,12 @@ public:
+ 	TypedArray<Point2i> bresenham_line(const Point2i &p_from, const Point2i &p_to);
+ 
+ 	Geometry2D() { singleton = this; }
++
++	~Geometry2D() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+ 
+ class Geometry3D : public Object {
+@@ -416,6 +434,12 @@ public:
+ 	Vector<int32_t> tetrahedralize_delaunay(const Vector<Vector3> &p_points);
+ 
+ 	Geometry3D() { singleton = this; }
++
++	~Geometry3D() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+ 
+ class Marshalls : public Object {
+@@ -640,6 +664,12 @@ public:
+ #endif
+ 
+ 	Engine() { singleton = this; }
++
++	~Engine() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+ 
+ class EngineDebugger : public Object {
+diff --git a/core/io/file_access_zip.cpp b/core/io/file_access_zip.cpp
+index 2bb9db7..51385de 100644
+--- a/core/io/file_access_zip.cpp
++++ b/core/io/file_access_zip.cpp
+@@ -227,6 +227,9 @@ ZipArchive::ZipArchive() {
+ 
+ ZipArchive::~ZipArchive() {
+ 	packages.clear();
++	if (instance == this) {
++		instance = nullptr;
++	}
+ }
+ 
+ Error FileAccessZip::open_internal(const String &p_path, int p_mode_flags) {
+diff --git a/core/io/ip.cpp b/core/io/ip.cpp
+index ec7c72d..4cad641 100644
+--- a/core/io/ip.cpp
++++ b/core/io/ip.cpp
+@@ -346,6 +346,9 @@ IP::IP() {
+ }
+ 
+ IP::~IP() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ 	resolver->thread_abort.set();
+ 	resolver->sem.post();
+ 	resolver->thread.wait_to_finish();
+diff --git a/core/io/resource_format_binary.cpp b/core/io/resource_format_binary.cpp
+index 2b251da..29b45c7 100644
+--- a/core/io/resource_format_binary.cpp
++++ b/core/io/resource_format_binary.cpp
+@@ -2484,3 +2484,9 @@ void ResourceFormatSaverBinary::get_recognized_extensions(const Ref<Resource> &p
+ ResourceFormatSaverBinary::ResourceFormatSaverBinary() {
+ 	singleton = this;
+ }
++
++ResourceFormatSaverBinary::~ResourceFormatSaverBinary() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/core/io/resource_format_binary.h b/core/io/resource_format_binary.h
+index 35e66e7..22c7e68 100644
+--- a/core/io/resource_format_binary.h
++++ b/core/io/resource_format_binary.h
+@@ -190,4 +190,5 @@ public:
+ 	virtual void get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const override;
+ 
+ 	ResourceFormatSaverBinary();
++	~ResourceFormatSaverBinary();
+ };
+diff --git a/core/io/resource_importer.cpp b/core/io/resource_importer.cpp
+index 566fbea..a2f7954 100644
+--- a/core/io/resource_importer.cpp
++++ b/core/io/resource_importer.cpp
+@@ -578,6 +578,12 @@ ResourceFormatImporter::ResourceFormatImporter() {
+ 	singleton = this;
+ }
+ 
++ResourceFormatImporter::~ResourceFormatImporter() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ //////////////
+ 
+ void ResourceImporter::get_build_dependencies(const String &p_path, HashSet<String> *r_dependencies) {
+diff --git a/core/io/resource_importer.h b/core/io/resource_importer.h
+index f32cac6..2daed82 100644
+--- a/core/io/resource_importer.h
++++ b/core/io/resource_importer.h
+@@ -105,6 +105,7 @@ public:
+ 	Error get_resource_import_info(const String &p_path, StringName &r_type, ResourceUID::ID &r_uid, String &r_import_group_file) const;
+ 
+ 	ResourceFormatImporter();
++	~ResourceFormatImporter();
+ };
+ 
+ class ResourceImporter : public RefCounted {
+diff --git a/core/io/resource_uid.cpp b/core/io/resource_uid.cpp
+index 5e9fff6..e4d35b7 100644
+--- a/core/io/resource_uid.cpp
++++ b/core/io/resource_uid.cpp
+@@ -441,4 +441,7 @@ ResourceUID::~ResourceUID() {
+ 	if (crypto != nullptr) {
+ 		memdelete((CryptoCore::RandomGenerator *)crypto);
+ 	}
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/core/object/class_db.cpp b/core/object/class_db.cpp
+index 855ced0..08dfdac 100644
+--- a/core/object/class_db.cpp
++++ b/core/object/class_db.cpp
+@@ -932,7 +932,7 @@ bool ClassDB::is_gdextension(const StringName &p_class) {
+ 	return false;
+ }
+ 
+-void ClassDB::_add_class(GDType &p_class, const GDType *p_inherits) {
++void ClassDB::_add_class(GDType &p_class, const GDType *p_inherits, void (*p_deinit_func)(bool deinit)) {
+ 	Locker::Lock lock(Locker::STATE_WRITE);
+ 
+ 	const StringName &name = p_class.get_name();
+@@ -942,6 +942,7 @@ void ClassDB::_add_class(GDType &p_class, const GDType *p_inherits) {
+ 	classes[name] = ClassInfo();
+ 	ClassInfo &ti = classes[name];
+ 	ti.gdtype = &p_class;
++	ti.deinit_func = p_deinit_func;
+ 	ti.api = current_api;
+ 
+ 	if (p_inherits) {
+@@ -2355,6 +2356,10 @@ void ClassDB::cleanup() {
+ 				memdelete(F.value[i]);
+ 			}
+ 		}
++		// Lets the class register itself again when the engine restarts in the same process.
++		if (ti.deinit_func) {
++			ti.deinit_func(true);
++		}
+ 	}
+ 
+ 	classes.clear();
+diff --git a/core/object/class_db.h b/core/object/class_db.h
+index d038e6b..68576a3 100644
+--- a/core/object/class_db.h
++++ b/core/object/class_db.h
+@@ -154,6 +154,9 @@ public:
+ 		bool is_runtime = false;
+ 		// The bool argument indicates the need to postinitialize.
+ 		Object *(*creation_func)(bool) = nullptr;
++		void (*deinit_func)(bool deinit) = nullptr;
++		ClassInfo() {}
++		~ClassInfo() {}
+ 	};
+ 
+ 	template <typename T>
+@@ -208,7 +211,7 @@ public:
+ 	static APIType current_api;
+ 	static HashMap<APIType, uint32_t> api_hashes_cache;
+ 
+-	static void _add_class(GDType &p_class, const GDType *p_inherits);
++	static void _add_class(GDType &p_class, const GDType *p_inherits, void (*p_deinit_func)(bool deinit) = nullptr);
+ 
+ 	static HashMap<StringName, HashMap<StringName, Variant>> default_values;
+ 	static HashSet<StringName> default_values_cached;
+diff --git a/core/object/object.cpp b/core/object/object.cpp
+index c6f0cf2..c01f5c4 100644
+--- a/core/object/object.cpp
++++ b/core/object/object.cpp
+@@ -1699,8 +1699,13 @@ Variant Object::_get_indexed_bind(const NodePath &p_name) const {
+ 	return get_indexed(p_name.get_as_property_path().get_subnames());
+ }
+ 
+-void Object::initialize_class() {
++void Object::initialize_class(bool p_deinit) {
+ 	static bool initialized = false;
++	if (p_deinit) {
++		initialized = false;
++		get_gdtype_static_mutable(p_deinit);
++		return;
++	}
+ 	if (likely(initialized)) {
+ 		return;
+ 	}
+@@ -1711,7 +1716,7 @@ void Object::initialize_class() {
+ 		// Initialized on another thread while we were waiting.
+ 		return;
+ 	}
+-	_add_class_to_classdb(get_gdtype_static_mutable(), nullptr);
++	_add_class_to_classdb(get_gdtype_static_mutable(), nullptr, Object::initialize_class);
+ 	get_gdtype_static_mutable().initialize();
+ 	_bind_methods();
+ 	_bind_compatibility_methods();
+@@ -1788,8 +1793,8 @@ void Object::_clear_internal_resource_paths(const Variant &p_var) {
+ 	}
+ }
+ 
+-void Object::_add_class_to_classdb(GDType &p_type, const GDType *p_inherits) {
+-	ClassDB::_add_class(p_type, p_inherits);
++void Object::_add_class_to_classdb(GDType &p_type, const GDType *p_inherits, void (*p_deinit_func)(bool deinit)) {
++	ClassDB::_add_class(p_type, p_inherits, p_deinit_func);
+ }
+ 
+ void Object::_get_property_list_from_classdb(const StringName &p_class, List<PropertyInfo> *p_list, bool p_no_inheritance, const Object *p_validator) {
+@@ -2571,6 +2576,11 @@ void ObjectDB::cleanup() {
+ 	if (object_slots) {
+ 		memfree(object_slots);
+ 	}
++	// VNDegen: the engine can start again in the same process. Leaked instances stay leaked, and validators keep
++	// counting up, so their old IDs never match a new instance.
++	object_slots = nullptr;
++	slot_count = 0;
++	slot_max = 0;
+ 
+ 	spin_lock.unlock();
+ }
+diff --git a/core/object/object.h b/core/object/object.h
+index 451680a..f10cfbf 100644
+--- a/core/object/object.h
++++ b/core/object/object.h
+@@ -251,9 +251,13 @@ private: \
+ 	void operator=(const m_class &p_rval) {} \
+ 	friend class ::ClassDB; \
+ \
+-	static GDType &get_gdtype_static_mutable() { \
++	static GDType &get_gdtype_static_mutable(bool p_deinit = false) { \
+ 		static GDType *gdtype = nullptr; \
+ 		static bool initialized = false; \
++		if (p_deinit) { \
++			initialized = false; \
++			return *gdtype; \
++		} \
+ 		if (likely(initialized)) { \
+ 			return *gdtype; \
+ 		} \
+@@ -289,8 +293,13 @@ protected: \
+ 	} \
+ \
+ public: \
+-	static void initialize_class() { \
++	static void initialize_class(bool p_deinit = false) { \
+ 		static bool initialized = false; \
++		if (p_deinit) { \
++			initialized = false; \
++			get_gdtype_static_mutable(p_deinit); \
++			return; \
++		} \
+ 		if (likely(initialized)) { \
+ 			return; \
+ 		} \
+@@ -301,7 +310,7 @@ public: \
+ 			return; \
+ 		} \
+ 		m_inherits::initialize_class(); \
+-		_add_class_to_classdb(get_gdtype_static_mutable(), &super_type::get_gdtype_static()); \
++		_add_class_to_classdb(get_gdtype_static_mutable(), &super_type::get_gdtype_static(), m_class::initialize_class); \
+ 		get_gdtype_static_mutable().initialize(); \
+ 		if (m_class::_get_bind_methods() != m_inherits::_get_bind_methods()) { \
+ 			_bind_methods(); \
+@@ -452,9 +461,13 @@ private:
+ 	mutable const GDType *_gdtype_ptr = nullptr;
+ 	void _reset_gdtype() const;
+ 
+-	static GDType &get_gdtype_static_mutable() {
++	static GDType &get_gdtype_static_mutable(bool p_deinit = false) {
+ 		static GDType *gdtype = nullptr;
+ 		static bool initialized = false;
++		if (p_deinit) {
++			initialized = false;
++			return *gdtype;
++		}
+ 		if (likely(initialized)) {
+ 			return *gdtype;
+ 		}
+@@ -591,7 +604,7 @@ protected:
+ 	friend class ::ClassDB;
+ 	friend class PlaceholderExtensionInstance;
+ 
+-	static void _add_class_to_classdb(GDType &p_class, const GDType *p_inherits);
++	static void _add_class_to_classdb(GDType &p_class, const GDType *p_inherits, void (*p_deinit_func)(bool deinit) = nullptr);
+ 	static void _get_property_list_from_classdb(const StringName &p_class, List<PropertyInfo> *p_list, bool p_no_inheritance, const Object *p_validator);
+ 
+ 	bool _disconnect(const StringName &p_signal, const Callable &p_callable, bool p_force = false);
+@@ -618,7 +631,8 @@ protected:
+ #endif
+ 
+ public: // Should be protected, but bug in clang++.
+-	static void initialize_class();
++	static void initialize_class(bool deinit = false);
++
+ 	_FORCE_INLINE_ static void register_custom_data_to_otdb() {}
+ 
+ public:
+diff --git a/core/os/midi_driver.cpp b/core/os/midi_driver.cpp
+index 6c748b1..9791ad0 100644
+--- a/core/os/midi_driver.cpp
++++ b/core/os/midi_driver.cpp
+@@ -42,6 +42,12 @@ MIDIDriver::MIDIDriver() {
+ 	singleton = this;
+ }
+ 
++MIDIDriver::~MIDIDriver() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ MIDIDriver::MessageCategory MIDIDriver::Parser::category(uint8_t p_midi_fragment) {
+ 	if (p_midi_fragment >= 0xf8) {
+ 		return MessageCategory::RealTime;
+diff --git a/core/os/midi_driver.h b/core/os/midi_driver.h
+index 77ecccc..c3fdf81 100644
+--- a/core/os/midi_driver.h
++++ b/core/os/midi_driver.h
+@@ -103,7 +103,7 @@ public:
+ 	static MIDIDriver *get_singleton();
+ 
+ 	MIDIDriver();
+-	virtual ~MIDIDriver() = default;
++	virtual ~MIDIDriver();
+ 
+ 	virtual Error open() = 0;
+ 	virtual void close() = 0;
+diff --git a/core/register_core_types.cpp b/core/register_core_types.cpp
+index 8069681..e72ed96 100644
+--- a/core/register_core_types.cpp
++++ b/core/register_core_types.cpp
+@@ -367,6 +367,7 @@ void register_early_core_singletons() {
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("OS", CoreBind::OS::get_singleton()));
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("Time", Time::get_singleton()));
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("ClassDB", _classdb));
++	Engine::get_singleton()->add_singleton(Engine::Singleton("GDExtensionManager", GDExtensionManager::get_singleton()));
+ }
+ 
+ void register_core_singletons() {
+@@ -382,7 +383,6 @@ void register_core_singletons() {
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("Input", Input::get_singleton()));
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("InputMap", InputMap::get_singleton()));
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("EngineDebugger", CoreBind::EngineDebugger::get_singleton()));
+-	Engine::get_singleton()->add_singleton(Engine::Singleton("GDExtensionManager", GDExtensionManager::get_singleton()));
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("ResourceUID", ResourceUID::get_singleton()));
+ 	Engine::get_singleton()->add_singleton(Engine::Singleton("WorkerThreadPool", worker_thread_pool));
+ 
+diff --git a/core/string/string_name.cpp b/core/string/string_name.cpp
+index 0892ad0..e0c7782 100644
+--- a/core/string/string_name.cpp
++++ b/core/string/string_name.cpp
+@@ -35,18 +35,29 @@
+ #include "core/string/print_string.h"
+ #include "core/templates/paged_allocator.h"
+ 
+-struct StringName::Table {
+-	constexpr static uint32_t TABLE_BITS = 16;
+-	constexpr static uint32_t TABLE_LEN = 1 << TABLE_BITS;
+-	constexpr static uint32_t TABLE_MASK = TABLE_LEN - 1;
+-
+-	static inline _Data *table[TABLE_LEN];
+-	static inline BinaryMutex mutex;
+-	static inline PagedAllocator<_Data> allocator;
+-};
++StringName::Table::Allocator::~Allocator() {
++#ifdef LIBGODOT_ENABLED
++	configured = false;
++	MutexLock lock(Table::mutex);
++	for (uint32_t i = 0; i < Table::TABLE_LEN; i++) {
++		while (Table::table[i]) {
++			_Data *d = Table::table[i];
++			Table::table[i] = d->next;
++			free(d);
++		}
++	}
++#endif
++}
+ 
+ void StringName::setup() {
++#ifndef LIBGODOT_ENABLED
+ 	ERR_FAIL_COND(configured);
++#else
++	// The table outlives the engine, because static StringNames keep their data across a restart.
++	if (configured) {
++		return;
++	}
++#endif
+ 	for (uint32_t i = 0; i < Table::TABLE_LEN; i++) {
+ 		Table::table[i] = nullptr;
+ 	}
+@@ -80,12 +91,17 @@ void StringName::cleanup() {
+ 			} else if (data[i]->debug_references < 5) {
+ 				rarely_referenced_stringnames += 1;
+ 			}
++			data[i]->debug_references = 0;
+ 		}
+ 
+ 		print_line(vformat("\nOut of %d StringNames, %d StringNames were never referenced during this run (0 times) (%.2f%%).", data_size, unreferenced_stringnames, unreferenced_stringnames / float(data_size) * 100));
+ 		print_line(vformat("Out of %d StringNames, %d StringNames were rarely referenced during this run (1-4 times) (%.2f%%).", data_size, rarely_referenced_stringnames, rarely_referenced_stringnames / float(data_size) * 100));
+ 	}
+ #endif
++
++#ifdef LIBGODOT_ENABLED
++	return;
++#else
+ 	int lost_strings = 0;
+ 	for (uint32_t i = 0; i < Table::TABLE_LEN; i++) {
+ 		while (Table::table[i]) {
+@@ -106,6 +122,7 @@ void StringName::cleanup() {
+ 		print_verbose(vformat("StringName: %d unclaimed string names at exit.", lost_strings));
+ 	}
+ 	configured = false;
++#endif
+ }
+ 
+ void StringName::unref() {
+@@ -114,9 +131,11 @@ void StringName::unref() {
+ 	if (_data && _data->refcount.unref()) {
+ 		MutexLock lock(Table::mutex);
+ 
++#ifndef LIBGODOT_ENABLED
+ 		if (CoreGlobals::leak_reporting_enabled && _data->static_count.get() > 0) {
+ 			ERR_PRINT("BUG: Unreferenced static string to 0: " + _data->name);
+ 		}
++#endif
+ 		if (_data->prev) {
+ 			_data->prev->next = _data->next;
+ 		} else {
+diff --git a/core/string/string_name.h b/core/string/string_name.h
+index 0619af8..51a5a0b 100644
+--- a/core/string/string_name.h
++++ b/core/string/string_name.h
+@@ -30,7 +30,9 @@
+ 
+ #pragma once
+ 
++#include "core/os/mutex.h"
+ #include "core/string/ustring.h"
++#include "core/templates/paged_allocator.h"
+ #include "core/templates/safe_refcount.h"
+ 
+ #define UNIQUE_NODE_PREFIX "%"
+@@ -38,8 +40,6 @@
+ class Main;
+ 
+ class [[nodiscard]] StringName {
+-	struct Table;
+-
+ 	struct _Data {
+ 		SafeRefCount refcount;
+ 		SafeNumeric<uint32_t> static_count;
+@@ -53,6 +53,20 @@ class [[nodiscard]] StringName {
+ 		_Data *next = nullptr;
+ 	};
+ 
++	struct Table {
++		constexpr static uint32_t TABLE_BITS = 16;
++		constexpr static uint32_t TABLE_LEN = 1 << TABLE_BITS;
++		constexpr static uint32_t TABLE_MASK = TABLE_LEN - 1;
++
++		struct Allocator : public PagedAllocator<_Data> {
++			~Allocator();
++		};
++
++		static inline _Data *table[TABLE_LEN];
++		static inline BinaryMutex mutex;
++		static inline Allocator allocator;
++	};
++
+ 	_Data *_data = nullptr;
+ 
+ 	void unref();
+diff --git a/core/string/translation_server.cpp b/core/string/translation_server.cpp
+index 069e53f..775b899 100644
+--- a/core/string/translation_server.cpp
++++ b/core/string/translation_server.cpp
+@@ -785,3 +785,9 @@ TranslationServer::TranslationServer() {
+ 
+ 	init_locale_info();
+ }
++
++TranslationServer::~TranslationServer() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/core/string/translation_server.h b/core/string/translation_server.h
+index aa64c81..e7f5676 100644
+--- a/core/string/translation_server.h
++++ b/core/string/translation_server.h
+@@ -174,4 +174,5 @@ public:
+ #endif // TOOLS_ENABLED
+ 
+ 	TranslationServer();
++	~TranslationServer();
+ };
+diff --git a/drivers/egl/egl_manager.cpp b/drivers/egl/egl_manager.cpp
+index 935fb26..1beea25 100644
+--- a/drivers/egl/egl_manager.cpp
++++ b/drivers/egl/egl_manager.cpp
+@@ -337,6 +337,9 @@ void EGLManager::window_destroy(DisplayServerEnums::WindowID p_window_id) {
+ 	GLDisplay &gldisplay = displays[glwindow.gldisplay_id];
+ 
+ 	if (glwindow.egl_surface != EGL_NO_SURFACE) {
++		if (current_window && current_window->egl_surface) {
++			release_current();
++		}
+ 		eglDestroySurface(gldisplay.egl_display, glwindow.egl_surface);
+ 		glwindow.egl_surface = nullptr;
+ 	}
+@@ -536,9 +539,18 @@ EGLManager::EGLManager() {
+ }
+ 
+ EGLManager::~EGLManager() {
++	for (unsigned int i = 0; i < windows.size(); i++) {
++		window_destroy(i);
++	}
++	windows.reset();
++
+ 	for (unsigned int i = 0; i < displays.size(); i++) {
++		eglDestroyContext(displays[i].egl_display, displays[i].egl_context);
+ 		eglTerminate(displays[i].egl_display);
+ 	}
++	displays.reset();
++
++	current_window = nullptr;
+ }
+ 
+ #endif // EGL_ENABLED
+diff --git a/drivers/gles3/rasterizer_gles3.cpp b/drivers/gles3/rasterizer_gles3.cpp
+index a4208f4..6ad4148 100644
+--- a/drivers/gles3/rasterizer_gles3.cpp
++++ b/drivers/gles3/rasterizer_gles3.cpp
+@@ -392,6 +392,9 @@ RasterizerGLES3::RasterizerGLES3() {
+ }
+ 
+ RasterizerGLES3::~RasterizerGLES3() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void RasterizerGLES3::_blit_render_target_to_screen(DisplayServerEnums::WindowID p_screen, const RenderingServerTypes::BlitToScreen &p_blit, bool p_first) {
+diff --git a/editor/animation/animation_blend_space_1d_editor.cpp b/editor/animation/animation_blend_space_1d_editor.cpp
+index b17226c..6e8a42b 100644
+--- a/editor/animation/animation_blend_space_1d_editor.cpp
++++ b/editor/animation/animation_blend_space_1d_editor.cpp
+@@ -1161,3 +1161,9 @@ AnimationNodeBlendSpace1DEditor::AnimationNodeBlendSpace1DEditor() {
+ 
+ 	set_custom_minimum_size(Size2(0, 150 * EDSCALE));
+ }
++
++AnimationNodeBlendSpace1DEditor::~AnimationNodeBlendSpace1DEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/animation/animation_blend_space_1d_editor.h b/editor/animation/animation_blend_space_1d_editor.h
+index f25ba0b..0ae1b7e 100644
+--- a/editor/animation/animation_blend_space_1d_editor.h
++++ b/editor/animation/animation_blend_space_1d_editor.h
+@@ -160,4 +160,5 @@ public:
+ 	virtual bool can_edit(const Ref<AnimationNode> &p_node) override;
+ 	virtual void edit(const Ref<AnimationNode> &p_node) override;
+ 	AnimationNodeBlendSpace1DEditor();
++	~AnimationNodeBlendSpace1DEditor();
+ };
+diff --git a/editor/animation/animation_blend_space_2d_editor.cpp b/editor/animation/animation_blend_space_2d_editor.cpp
+index 60ee4c0..fafac46 100644
+--- a/editor/animation/animation_blend_space_2d_editor.cpp
++++ b/editor/animation/animation_blend_space_2d_editor.cpp
+@@ -1476,3 +1476,9 @@ AnimationNodeBlendSpace2DEditor::AnimationNodeBlendSpace2DEditor() {
+ 	dragging_selected_attempt = false;
+ 	dragging_blend_position = false;
+ }
++
++AnimationNodeBlendSpace2DEditor::~AnimationNodeBlendSpace2DEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/animation/animation_blend_space_2d_editor.h b/editor/animation/animation_blend_space_2d_editor.h
+index d7a4712..7a440c4 100644
+--- a/editor/animation/animation_blend_space_2d_editor.h
++++ b/editor/animation/animation_blend_space_2d_editor.h
+@@ -174,4 +174,5 @@ public:
+ 	virtual bool can_edit(const Ref<AnimationNode> &p_node) override;
+ 	virtual void edit(const Ref<AnimationNode> &p_node) override;
+ 	AnimationNodeBlendSpace2DEditor();
++	~AnimationNodeBlendSpace2DEditor();
+ };
+diff --git a/editor/animation/animation_blend_tree_editor_plugin.cpp b/editor/animation/animation_blend_tree_editor_plugin.cpp
+index 0617358..2a25991 100644
+--- a/editor/animation/animation_blend_tree_editor_plugin.cpp
++++ b/editor/animation/animation_blend_tree_editor_plugin.cpp
+@@ -1353,6 +1353,12 @@ AnimationNodeBlendTreeEditor::AnimationNodeBlendTreeEditor() {
+ 	EditorInspector::add_inspector_plugin(animation_node_inspector_plugin);
+ }
+ 
++AnimationNodeBlendTreeEditor::~AnimationNodeBlendTreeEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ // EditorPluginAnimationNodeAnimation
+ 
+ void AnimationNodeAnimationEditor::_open_set_custom_timeline_from_marker_dialog() {
+diff --git a/editor/animation/animation_blend_tree_editor_plugin.h b/editor/animation/animation_blend_tree_editor_plugin.h
+index 280e9c7..a42b823 100644
+--- a/editor/animation/animation_blend_tree_editor_plugin.h
++++ b/editor/animation/animation_blend_tree_editor_plugin.h
+@@ -171,6 +171,7 @@ public:
+ 
+ 	void pan_to_node(const StringName &p_node_name, int p_input_index = -1);
+ 	AnimationNodeBlendTreeEditor();
++	~AnimationNodeBlendTreeEditor();
+ };
+ 
+ // EditorPluginAnimationNodeAnimation
+diff --git a/editor/animation/animation_player_editor_plugin.cpp b/editor/animation/animation_player_editor_plugin.cpp
+index 3a562c4..b17128b 100644
+--- a/editor/animation/animation_player_editor_plugin.cpp
++++ b/editor/animation/animation_player_editor_plugin.cpp
+@@ -2345,6 +2345,9 @@ AnimationPlayerEditor::~AnimationPlayerEditor() {
+ 	RS::get_singleton()->free_rid(onion.capture.canvas);
+ 	RS::get_singleton()->free_rid(onion.capture.canvas_item);
+ 	onion.capture = {};
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void AnimationPlayerEditorPlugin::_notification(int p_what) {
+diff --git a/editor/animation/animation_state_machine_editor.cpp b/editor/animation/animation_state_machine_editor.cpp
+index f0ab4c9..de4ab1d 100644
+--- a/editor/animation/animation_state_machine_editor.cpp
++++ b/editor/animation/animation_state_machine_editor.cpp
+@@ -2184,6 +2184,12 @@ AnimationNodeStateMachineEditor::AnimationNodeStateMachineEditor() {
+ 	open_file->connect("file_selected", callable_mp(this, &AnimationNodeStateMachineEditor::_file_opened));
+ }
+ 
++AnimationNodeStateMachineEditor::~AnimationNodeStateMachineEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ void EditorAnimationMultiTransitionEdit::add_transition(const StringName &p_from, const StringName &p_to, Ref<AnimationNodeStateMachineTransition> p_transition) {
+ 	Transition tr;
+ 	tr.from = p_from;
+diff --git a/editor/animation/animation_state_machine_editor.h b/editor/animation/animation_state_machine_editor.h
+index 53dd75c..a73c691 100644
+--- a/editor/animation/animation_state_machine_editor.h
++++ b/editor/animation/animation_state_machine_editor.h
+@@ -305,6 +305,7 @@ public:
+ 	virtual String get_tooltip(const Point2 &p_pos) const override;
+ 
+ 	AnimationNodeStateMachineEditor();
++	~AnimationNodeStateMachineEditor();
+ };
+ 
+ class EditorAnimationMultiTransitionEdit : public RefCounted {
+diff --git a/editor/animation/animation_tree_editor_plugin.cpp b/editor/animation/animation_tree_editor_plugin.cpp
+index c6136a6..9f7ae3c 100644
+--- a/editor/animation/animation_tree_editor_plugin.cpp
++++ b/editor/animation/animation_tree_editor_plugin.cpp
+@@ -591,6 +591,12 @@ AnimationTreeEditor::AnimationTreeEditor() {
+ 	error_scroll->hide();
+ }
+ 
++AnimationTreeEditor::~AnimationTreeEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ void AnimationTreeEditorPlugin::edit(Object *p_object) {
+ 	anim_tree_editor->edit(Object::cast_to<AnimationTree>(p_object));
+ }
+diff --git a/editor/animation/animation_tree_editor_plugin.h b/editor/animation/animation_tree_editor_plugin.h
+index ef63e8c..bf1cc9c 100644
+--- a/editor/animation/animation_tree_editor_plugin.h
++++ b/editor/animation/animation_tree_editor_plugin.h
+@@ -104,6 +104,7 @@ public:
+ 	static AnimationTreeEditor *get_singleton() { return singleton; }
+ 	void edit(AnimationTree *p_tree);
+ 	AnimationTreeEditor();
++	~AnimationTreeEditor();
+ };
+ 
+ class AnimationTreeEditorPlugin : public EditorPlugin {
+diff --git a/editor/audio/audio_stream_preview.cpp b/editor/audio/audio_stream_preview.cpp
+index f72b7d6..7679bb7 100644
+--- a/editor/audio/audio_stream_preview.cpp
++++ b/editor/audio/audio_stream_preview.cpp
+@@ -256,3 +256,6 @@ AudioStreamPreviewGenerator::AudioStreamPreviewGenerator() {
+ 	singleton = this;
+ 	set_process(true);
+ }
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+diff --git a/editor/debugger/debug_adapter/debug_adapter_protocol.cpp b/editor/debugger/debug_adapter/debug_adapter_protocol.cpp
+index 367b956..3de05c3 100644
+--- a/editor/debugger/debug_adapter/debug_adapter_protocol.cpp
++++ b/editor/debugger/debug_adapter/debug_adapter_protocol.cpp
+@@ -1270,4 +1270,7 @@ DebugAdapterProtocol::DebugAdapterProtocol() {
+ 
+ DebugAdapterProtocol::~DebugAdapterProtocol() {
+ 	memdelete(parser);
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/editor/debugger/editor_debugger_node.cpp b/editor/debugger/editor_debugger_node.cpp
+index 5201fe2..fedf45b 100644
+--- a/editor/debugger/editor_debugger_node.cpp
++++ b/editor/debugger/editor_debugger_node.cpp
+@@ -111,6 +111,12 @@ EditorDebuggerNode::EditorDebuggerNode() {
+ 	EditorRunBar::get_singleton()->get_pause_button()->connect(SceneStringName(pressed), callable_mp(this, &EditorDebuggerNode::_paused));
+ }
+ 
++EditorDebuggerNode::~EditorDebuggerNode() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ ScriptEditorDebugger *EditorDebuggerNode::_add_debugger() {
+ 	ScriptEditorDebugger *node = memnew(ScriptEditorDebugger);
+ 
+diff --git a/editor/debugger/editor_debugger_node.h b/editor/debugger/editor_debugger_node.h
+index 2f21a71..90eb439 100644
+--- a/editor/debugger/editor_debugger_node.h
++++ b/editor/debugger/editor_debugger_node.h
+@@ -127,6 +127,7 @@ private:
+ 	friend class DebugAdapterParser;
+ 	static EditorDebuggerNode *singleton;
+ 	EditorDebuggerNode();
++	~EditorDebuggerNode();
+ 
+ protected:
+ 	void _debugger_stopped(int p_id);
+diff --git a/editor/docks/editor_dock_manager.cpp b/editor/docks/editor_dock_manager.cpp
+index 50b991a..115c2e1 100644
+--- a/editor/docks/editor_dock_manager.cpp
++++ b/editor/docks/editor_dock_manager.cpp
+@@ -843,6 +843,12 @@ EditorDockManager::EditorDockManager() {
+ 	EditorNode::get_singleton()->get_gui_base()->connect(SceneStringName(theme_changed), callable_mp(this, &EditorDockManager::update_docks_menu));
+ }
+ 
++EditorDockManager::~EditorDockManager() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ ////////////////////////////////////////////////
+ ////////////////////////////////////////////////
+ 
+diff --git a/editor/docks/editor_dock_manager.h b/editor/docks/editor_dock_manager.h
+index caf7277..91e1147 100644
+--- a/editor/docks/editor_dock_manager.h
++++ b/editor/docks/editor_dock_manager.h
+@@ -157,6 +157,7 @@ public:
+ 	void remove_dock(EditorDock *p_dock);
+ 
+ 	EditorDockManager();
++	~EditorDockManager();
+ };
+ 
+ class DockSlotGrid : public Control {
+diff --git a/editor/editor_interface.cpp b/editor/editor_interface.cpp
+index dcb1c61..de8fc0a 100644
+--- a/editor/editor_interface.cpp
++++ b/editor/editor_interface.cpp
+@@ -959,6 +959,7 @@ void EditorInterface::create() {
+ void EditorInterface::free() {
+ 	ERR_FAIL_NULL(singleton);
+ 	memdelete(singleton);
++	singleton = nullptr;
+ }
+ 
+ EditorInterface::EditorInterface() {
+diff --git a/editor/editor_undo_redo_manager.cpp b/editor/editor_undo_redo_manager.cpp
+index 7ef8d6a..5b41396 100644
+--- a/editor/editor_undo_redo_manager.cpp
++++ b/editor/editor_undo_redo_manager.cpp
+@@ -592,4 +592,7 @@ EditorUndoRedoManager::~EditorUndoRedoManager() {
+ 	for (const KeyValue<int, History> &E : history_map) {
+ 		discard_history(E.key, false);
+ 	}
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/editor/export/editor_export.cpp b/editor/export/editor_export.cpp
+index 1d10838..0db2d4d 100644
+--- a/editor/export/editor_export.cpp
++++ b/editor/export/editor_export.cpp
+@@ -539,3 +539,9 @@ EditorExport::EditorExport() {
+ 	singleton = this;
+ 	set_process(true);
+ }
++
++EditorExport::~EditorExport() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/export/editor_export.h b/editor/export/editor_export.h
+index e20baf4..ab89b14 100644
+--- a/editor/export/editor_export.h
++++ b/editor/export/editor_export.h
+@@ -99,4 +99,5 @@ public:
+ 	void connect_presets_runnable_updated(const Callable &p_target);
+ 
+ 	EditorExport();
++	~EditorExport();
+ };
+diff --git a/editor/file_system/editor_file_system.cpp b/editor/file_system/editor_file_system.cpp
+index 1a9e609..cfc0f81 100644
+--- a/editor/file_system/editor_file_system.cpp
++++ b/editor/file_system/editor_file_system.cpp
+@@ -3830,4 +3830,7 @@ EditorFileSystem::~EditorFileSystem() {
+ 	}
+ 	filesystem = nullptr;
+ 	ResourceSaver::set_get_resource_id_for_path(nullptr);
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/editor/gui/progress_dialog.cpp b/editor/gui/progress_dialog.cpp
+index de13737..7a02825 100644
+--- a/editor/gui/progress_dialog.cpp
++++ b/editor/gui/progress_dialog.cpp
+@@ -311,5 +311,7 @@ ProgressDialog::ProgressDialog() {
+ }
+ 
+ ProgressDialog::~ProgressDialog() {
+-	singleton = nullptr;
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/editor/import/3d/scene_import_settings.cpp b/editor/import/3d/scene_import_settings.cpp
+index 3bad35d..27edcb0 100644
+--- a/editor/import/3d/scene_import_settings.cpp
++++ b/editor/import/3d/scene_import_settings.cpp
+@@ -2002,4 +2002,7 @@ SceneImportSettingsDialog::SceneImportSettingsDialog() {
+ 
+ SceneImportSettingsDialog::~SceneImportSettingsDialog() {
+ 	memdelete(scene_import_settings_data);
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/editor/import/audio_stream_import_settings.cpp b/editor/import/audio_stream_import_settings.cpp
+index 7764be4..4234e1c 100644
+--- a/editor/import/audio_stream_import_settings.cpp
++++ b/editor/import/audio_stream_import_settings.cpp
+@@ -705,3 +705,9 @@ AudioStreamImportSettingsDialog::AudioStreamImportSettingsDialog() {
+ 
+ 	singleton = this;
+ }
++
++AudioStreamImportSettingsDialog::~AudioStreamImportSettingsDialog() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/import/audio_stream_import_settings.h b/editor/import/audio_stream_import_settings.h
+index a345f71..4122319 100644
+--- a/editor/import/audio_stream_import_settings.h
++++ b/editor/import/audio_stream_import_settings.h
+@@ -119,4 +119,5 @@ public:
+ 	static AudioStreamImportSettingsDialog *get_singleton() { return singleton; }
+ 
+ 	AudioStreamImportSettingsDialog();
++	~AudioStreamImportSettingsDialog();
+ };
+diff --git a/editor/import/dynamic_font_import_settings.cpp b/editor/import/dynamic_font_import_settings.cpp
+index daea3f0..4f15663 100644
+--- a/editor/import/dynamic_font_import_settings.cpp
++++ b/editor/import/dynamic_font_import_settings.cpp
+@@ -1320,3 +1320,9 @@ DynamicFontImportSettingsDialog::DynamicFontImportSettingsDialog() {
+ 	set_ok_button_text(TTR("Reimport"));
+ 	set_cancel_button_text(TTR("Close"));
+ }
++
++DynamicFontImportSettingsDialog::~DynamicFontImportSettingsDialog() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/import/dynamic_font_import_settings.h b/editor/import/dynamic_font_import_settings.h
+index 9c36a82..f8a002e 100644
+--- a/editor/import/dynamic_font_import_settings.h
++++ b/editor/import/dynamic_font_import_settings.h
+@@ -169,4 +169,5 @@ public:
+ 	static DynamicFontImportSettingsDialog *get_singleton();
+ 
+ 	DynamicFontImportSettingsDialog();
++	~DynamicFontImportSettingsDialog();
+ };
+diff --git a/editor/import/fbx_importer_manager.cpp b/editor/import/fbx_importer_manager.cpp
+index dcfed30..001c4fe 100644
+--- a/editor/import/fbx_importer_manager.cpp
++++ b/editor/import/fbx_importer_manager.cpp
+@@ -185,3 +185,9 @@ FBXImporterManager::FBXImporterManager() {
+ 
+ 	add_child(browse_dialog);
+ }
++
++FBXImporterManager::~FBXImporterManager() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/import/fbx_importer_manager.h b/editor/import/fbx_importer_manager.h
+index 667e519..1bee199 100644
+--- a/editor/import/fbx_importer_manager.h
++++ b/editor/import/fbx_importer_manager.h
+@@ -62,4 +62,5 @@ public:
+ 	void show_dialog(bool p_exclusive = false);
+ 
+ 	FBXImporterManager();
++	~FBXImporterManager();
+ };
+diff --git a/editor/inspector/editor_resource_preview.cpp b/editor/inspector/editor_resource_preview.cpp
+index 1673636..aac4e5f 100644
+--- a/editor/inspector/editor_resource_preview.cpp
++++ b/editor/inspector/editor_resource_preview.cpp
+@@ -625,4 +625,7 @@ EditorResourcePreview::EditorResourcePreview() {
+ 
+ EditorResourcePreview::~EditorResourcePreview() {
+ 	stop();
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/editor/plugins/editor_plugin.cpp b/editor/plugins/editor_plugin.cpp
+index 95fba96..567830c 100644
+--- a/editor/plugins/editor_plugin.cpp
++++ b/editor/plugins/editor_plugin.cpp
+@@ -754,7 +754,3 @@ void EditorPlugin::_bind_methods() {
+ EditorUndoRedoManager *EditorPlugin::get_undo_redo() {
+ 	return EditorUndoRedoManager::get_singleton();
+ }
+-
+-EditorPluginCreateFunc EditorPlugins::creation_funcs[MAX_CREATE_FUNCS];
+-
+-int EditorPlugins::creation_func_count = 0;
+diff --git a/editor/plugins/editor_plugin.h b/editor/plugins/editor_plugin.h
+index a12ff25..3ad6058 100644
+--- a/editor/plugins/editor_plugin.h
++++ b/editor/plugins/editor_plugin.h
+@@ -284,8 +284,8 @@ class EditorPlugins {
+ 		MAX_CREATE_FUNCS = 128
+ 	};
+ 
+-	static EditorPluginCreateFunc creation_funcs[MAX_CREATE_FUNCS];
+-	static int creation_func_count;
++	static inline EditorPluginCreateFunc creation_funcs[MAX_CREATE_FUNCS];
++	static inline int creation_func_count = 0;
+ 
+ 	template <typename T>
+ 	static EditorPlugin *creator() {
+@@ -308,4 +308,12 @@ public:
+ 		ERR_FAIL_COND(creation_func_count >= MAX_CREATE_FUNCS);
+ 		creation_funcs[creation_func_count++] = p_func;
+ 	}
++
++	static void reset() {
++		for (int i = 0; i < creation_func_count; i++) {
++			creation_funcs[i] = nullptr;
++		}
++
++		creation_func_count = 0;
++	}
+ };
+diff --git a/editor/run/editor_run_bar.cpp b/editor/run/editor_run_bar.cpp
+index 1d61bad..0cec1ad 100644
+--- a/editor/run/editor_run_bar.cpp
++++ b/editor/run/editor_run_bar.cpp
+@@ -725,3 +725,9 @@ EditorRunBar::EditorRunBar() {
+ 	write_movie_button->set_accessibility_name(TTRC("Enable Movie Maker Mode"));
+ 	write_movie_button->set_flat(false);
+ }
++
++EditorRunBar::~EditorRunBar() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/run/editor_run_bar.h b/editor/run/editor_run_bar.h
+index 98df6e1..694dc59 100644
+--- a/editor/run/editor_run_bar.h
++++ b/editor/run/editor_run_bar.h
+@@ -144,4 +144,5 @@ public:
+ 	HBoxContainer *get_buttons_container();
+ 
+ 	EditorRunBar();
++	~EditorRunBar();
+ };
+diff --git a/editor/run/run_instances_dialog.cpp b/editor/run/run_instances_dialog.cpp
+index 41b6217..635b334 100644
+--- a/editor/run/run_instances_dialog.cpp
++++ b/editor/run/run_instances_dialog.cpp
+@@ -406,6 +406,12 @@ RunInstancesDialog::RunInstancesDialog() {
+ 	instance_tree->connect("item_edited", callable_mp(this, &RunInstancesDialog::_start_instance_timer));
+ }
+ 
++RunInstancesDialog::~RunInstancesDialog() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ bool RunInstancesDialog::InstanceData::overrides_run_args() const {
+ 	return item->is_checked(COLUMN_OVERRIDE_ARGS);
+ }
+diff --git a/editor/run/run_instances_dialog.h b/editor/run/run_instances_dialog.h
+index ad2d9da..a33f796 100644
+--- a/editor/run/run_instances_dialog.h
++++ b/editor/run/run_instances_dialog.h
+@@ -102,4 +102,5 @@ public:
+ 
+ 	static RunInstancesDialog *get_singleton() { return singleton; }
+ 	RunInstancesDialog();
++	~RunInstancesDialog();
+ };
+diff --git a/editor/scene/3d/path_3d_editor_plugin.cpp b/editor/scene/3d/path_3d_editor_plugin.cpp
+index 654bf24..1680d98 100644
+--- a/editor/scene/3d/path_3d_editor_plugin.cpp
++++ b/editor/scene/3d/path_3d_editor_plugin.cpp
+@@ -1118,6 +1118,12 @@ Path3DEditorPlugin::Path3DEditorPlugin() {
+ 	Node3DEditor::get_singleton()->add_control_to_menu_panel(topmenu_bar);
+ }
+ 
++Path3DEditorPlugin::~Path3DEditorPlugin() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ Ref<EditorNode3DGizmo> Path3DGizmoPlugin::create_gizmo(Node3D *p_spatial) {
+ 	Ref<Path3DGizmo> ref;
+ 
+diff --git a/editor/scene/3d/path_3d_editor_plugin.h b/editor/scene/3d/path_3d_editor_plugin.h
+index b935735..7d1f0d0 100644
+--- a/editor/scene/3d/path_3d_editor_plugin.h
++++ b/editor/scene/3d/path_3d_editor_plugin.h
+@@ -185,6 +185,7 @@ public:
+ 	void set_handle_clicked(bool clicked) { handle_clicked = clicked; }
+ 
+ 	Path3DEditorPlugin();
++	~Path3DEditorPlugin();
+ 
+ private:
+ 	struct EditData {
+diff --git a/editor/scene/canvas_item_editor_plugin.cpp b/editor/scene/canvas_item_editor_plugin.cpp
+index c939e3a..e0ac1bc 100644
+--- a/editor/scene/canvas_item_editor_plugin.cpp
++++ b/editor/scene/canvas_item_editor_plugin.cpp
+@@ -6136,6 +6136,12 @@ CanvasItemEditor::CanvasItemEditor() {
+ 	callable_mp(this, &CanvasItemEditor::set_state).call_deferred(get_state());
+ }
+ 
++CanvasItemEditor::~CanvasItemEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ CanvasItemEditor *CanvasItemEditor::singleton = nullptr;
+ 
+ void CanvasItemEditorPlugin::edit(Object *p_object) {
+diff --git a/editor/scene/canvas_item_editor_plugin.h b/editor/scene/canvas_item_editor_plugin.h
+index 1982fda..748a05e 100644
+--- a/editor/scene/canvas_item_editor_plugin.h
++++ b/editor/scene/canvas_item_editor_plugin.h
+@@ -631,6 +631,7 @@ public:
+ 	EditorSelection *editor_selection = nullptr;
+ 
+ 	CanvasItemEditor();
++	~CanvasItemEditor();
+ };
+ 
+ class CanvasItemEditorPlugin : public EditorPlugin {
+diff --git a/editor/scene/editor_scene_tabs.cpp b/editor/scene/editor_scene_tabs.cpp
+index 3878784..9c97ef0 100644
+--- a/editor/scene/editor_scene_tabs.cpp
++++ b/editor/scene/editor_scene_tabs.cpp
+@@ -526,3 +526,9 @@ EditorSceneTabs::EditorSceneTabs() {
+ 
+ 	ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &EditorSceneTabs::_project_settings_changed));
+ }
++
++EditorSceneTabs::~EditorSceneTabs() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/scene/editor_scene_tabs.h b/editor/scene/editor_scene_tabs.h
+index 78a3070..b2dc79b 100644
+--- a/editor/scene/editor_scene_tabs.h
++++ b/editor/scene/editor_scene_tabs.h
+@@ -113,4 +113,5 @@ public:
+ 	void update_scene_tabs();
+ 
+ 	EditorSceneTabs();
++	~EditorSceneTabs();
+ };
+diff --git a/editor/scene/gui/control_editor_plugin.cpp b/editor/scene/gui/control_editor_plugin.cpp
+index bc46f7b..b37e10a 100644
+--- a/editor/scene/gui/control_editor_plugin.cpp
++++ b/editor/scene/gui/control_editor_plugin.cpp
+@@ -1258,6 +1258,12 @@ ControlEditorToolbar::ControlEditorToolbar() {
+ 	singleton = this;
+ }
+ 
++ControlEditorToolbar::~ControlEditorToolbar() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ ControlEditorToolbar *ControlEditorToolbar::singleton = nullptr;
+ 
+ // Editor plugin.
+diff --git a/editor/scene/gui/control_editor_plugin.h b/editor/scene/gui/control_editor_plugin.h
+index 675b72f..6547f4c 100644
+--- a/editor/scene/gui/control_editor_plugin.h
++++ b/editor/scene/gui/control_editor_plugin.h
+@@ -250,6 +250,7 @@ public:
+ 	static ControlEditorToolbar *get_singleton() { return singleton; }
+ 
+ 	ControlEditorToolbar();
++	~ControlEditorToolbar();
+ };
+ 
+ class ControlOffsetTransformPreview : public Control {
+diff --git a/editor/settings/editor_build_profile.cpp b/editor/settings/editor_build_profile.cpp
+index 10f549f..c80c9cb 100644
+--- a/editor/settings/editor_build_profile.cpp
++++ b/editor/settings/editor_build_profile.cpp
+@@ -1460,3 +1460,9 @@ EditorBuildProfileManager::EditorBuildProfileManager() {
+ 
+ 	singleton = this;
+ }
++
++EditorBuildProfileManager::~EditorBuildProfileManager() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/settings/editor_build_profile.h b/editor/settings/editor_build_profile.h
+index fb03af9..84aa5a1 100644
+--- a/editor/settings/editor_build_profile.h
++++ b/editor/settings/editor_build_profile.h
+@@ -216,4 +216,5 @@ public:
+ 
+ 	static EditorBuildProfileManager *get_singleton() { return singleton; }
+ 	EditorBuildProfileManager();
++	~EditorBuildProfileManager();
+ };
+diff --git a/editor/settings/editor_feature_profile.cpp b/editor/settings/editor_feature_profile.cpp
+index f7f2aab..b4c5866 100644
+--- a/editor/settings/editor_feature_profile.cpp
++++ b/editor/settings/editor_feature_profile.cpp
+@@ -1092,3 +1092,9 @@ EditorFeatureProfileManager::EditorFeatureProfileManager() {
+ 
+ 	singleton = this;
+ }
++
++EditorFeatureProfileManager::~EditorFeatureProfileManager() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/settings/editor_feature_profile.h b/editor/settings/editor_feature_profile.h
+index cbbe815..d3d63b8 100644
+--- a/editor/settings/editor_feature_profile.h
++++ b/editor/settings/editor_feature_profile.h
+@@ -187,4 +187,5 @@ public:
+ 
+ 	static EditorFeatureProfileManager *get_singleton() { return singleton; }
+ 	EditorFeatureProfileManager();
++	~EditorFeatureProfileManager();
+ };
+diff --git a/editor/settings/project_settings_editor.cpp b/editor/settings/project_settings_editor.cpp
+index 1b19d36..f0eb448 100644
+--- a/editor/settings/project_settings_editor.cpp
++++ b/editor/settings/project_settings_editor.cpp
+@@ -875,3 +875,9 @@ ProjectSettingsEditor::ProjectSettingsEditor(EditorData *p_data) {
+ 
+ 	MovieWriter::set_extensions_hint(); // ensure extensions are properly displayed.
+ }
++
++ProjectSettingsEditor::~ProjectSettingsEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/editor/settings/project_settings_editor.h b/editor/settings/project_settings_editor.h
+index 53a08bf..30e3c3c 100644
+--- a/editor/settings/project_settings_editor.h
++++ b/editor/settings/project_settings_editor.h
+@@ -156,4 +156,5 @@ public:
+ 	void connect_filesystem_dock_signals(FileSystemDock *p_fs_dock);
+ 
+ 	ProjectSettingsEditor(EditorData *p_data);
++	~ProjectSettingsEditor();
+ };
+diff --git a/editor/shader/shader_file_editor_plugin.cpp b/editor/shader/shader_file_editor_plugin.cpp
+index c73a5e4..1dfcd0a 100644
+--- a/editor/shader/shader_file_editor_plugin.cpp
++++ b/editor/shader/shader_file_editor_plugin.cpp
+@@ -304,6 +304,12 @@ ShaderFileEditor::ShaderFileEditor() {
+ 	main_vb->add_child(error_text);
+ }
+ 
++ShaderFileEditor::~ShaderFileEditor() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ void ShaderFileEditorPlugin::edit(Object *p_object) {
+ 	RDShaderFile *s = Object::cast_to<RDShaderFile>(p_object);
+ 	shader_editor->edit(s);
+diff --git a/editor/shader/shader_file_editor_plugin.h b/editor/shader/shader_file_editor_plugin.h
+index 515393d..8141169 100644
+--- a/editor/shader/shader_file_editor_plugin.h
++++ b/editor/shader/shader_file_editor_plugin.h
+@@ -64,6 +64,7 @@ public:
+ 	void edit(const Ref<RDShaderFile> &p_shader);
+ 
+ 	ShaderFileEditor();
++	~ShaderFileEditor();
+ };
+ 
+ class ShaderFileEditorPlugin : public EditorPlugin {
+diff --git a/editor/version_control/version_control_editor_plugin.cpp b/editor/version_control/version_control_editor_plugin.cpp
+index a96a81f..2ef7ba0 100644
+--- a/editor/version_control/version_control_editor_plugin.cpp
++++ b/editor/version_control/version_control_editor_plugin.cpp
+@@ -1609,4 +1609,7 @@ VersionControlEditorPlugin::~VersionControlEditorPlugin() {
+ 	memdelete(version_commit_dock);
+ 	memdelete(version_control_dock);
+ 	memdelete(version_control_actions);
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/main/main.cpp b/main/main.cpp
+index 2fc62fd..4d3dae7 100644
+--- a/main/main.cpp
++++ b/main/main.cpp
+@@ -60,6 +60,9 @@
+ #include "core/variant/variant_parser.h"
+ #include "core/version.h"
+ #include "drivers/register_driver_types.h"
++#ifdef TOOLS_ENABLED
++#include "editor/plugins/editor_plugin.h"
++#endif
+ #include "main/app_icon.gen.h"
+ #include "main/main_timer_sync.h"
+ #include "main/performance.h"
+@@ -172,6 +175,9 @@ static PackedData *packed_data = nullptr;
+ static ZipArchive *zip_packed_data = nullptr;
+ #endif
+ static MessageQueue *message_queue = nullptr;
++#ifdef LIBGODOT_ENABLED
++static String original_cwd;
++#endif
+ 
+ #if defined(STEAMAPI_ENABLED)
+ static SteamTracker *steam_tracker = nullptr;
+@@ -1039,6 +1045,10 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
+ 
+ 	OS::get_singleton()->initialize();
+ 
++#ifdef LIBGODOT_ENABLED
++	original_cwd = OS::get_singleton()->get_cwd();
++#endif
++
+ 	CoreGlobals::print_ready = true;
+ 
+ #if !defined(OVERRIDE_PATH_ENABLED) && !defined(TOOLS_ENABLED)
+@@ -5333,6 +5343,9 @@ void Main::cleanup(bool p_force) {
+ 		memdelete(camera_server);
+ 	}
+ 
++#ifdef LIBGODOT_ENABLED
++	OS::get_singleton()->set_cwd(original_cwd);
++#endif
+ 	OS::get_singleton()->finalize();
+ 
+ 	finalize_display();
+@@ -5403,4 +5416,12 @@ void Main::cleanup(bool p_force) {
+ 	OS::get_singleton()->finalize_core();
+ 
+ 	Thread::release_main_thread();
++
++#ifdef TOOLS_ENABLED
++	EditorPlugins::reset();
++#endif
++	MovieWriter::reset();
++	AudioDriverManager::reset();
++	DisplayServer::reset();
++	SceneTree::reset_idle_callbacks();
+ }
+diff --git a/main/performance.cpp b/main/performance.cpp
+index 93d9e66..81ce6dd 100644
+--- a/main/performance.cpp
++++ b/main/performance.cpp
+@@ -611,6 +611,12 @@ Performance::Performance() {
+ 	singleton = this;
+ }
+ 
++Performance::~Performance() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ Performance::MonitorCall::MonitorCall(Performance::MonitorType p_type, const Callable &p_callable, const Vector<Variant> &p_arguments) {
+ 	_type = p_type;
+ 	_callable = p_callable;
+diff --git a/main/performance.h b/main/performance.h
+index 989ec74..443a7db 100644
+--- a/main/performance.h
++++ b/main/performance.h
+@@ -153,6 +153,7 @@ public:
+ 	static Performance *get_singleton() { return singleton; }
+ 
+ 	Performance();
++	~Performance();
+ 
+ private:
+ 	class MonitorCall {
+diff --git a/modules/gdscript/language_server/gdscript_language_protocol.cpp b/modules/gdscript/language_server/gdscript_language_protocol.cpp
+index 5e945cd..2aa3110 100644
+--- a/modules/gdscript/language_server/gdscript_language_protocol.cpp
++++ b/modules/gdscript/language_server/gdscript_language_protocol.cpp
+@@ -706,6 +706,13 @@ GDScriptLanguageProtocol::GDScriptLanguageProtocol() {
+ 	workspace->root = ProjectSettings::get_singleton()->get_resource_path();
+ }
+ 
++GDScriptLanguageProtocol::~GDScriptLanguageProtocol() {
++	clients.clear();
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ #undef SET_DOCUMENT_METHOD
+ #undef SET_COMPLETION_METHOD
+ #undef SET_WORKSPACE_METHOD
+diff --git a/modules/gdscript/language_server/gdscript_language_protocol.h b/modules/gdscript/language_server/gdscript_language_protocol.h
+index 6ba4fc5..9a5f5b8 100644
+--- a/modules/gdscript/language_server/gdscript_language_protocol.h
++++ b/modules/gdscript/language_server/gdscript_language_protocol.h
+@@ -168,7 +168,5 @@ public:
+ 	ExtendGDScriptParser *get_parse_result(const String &p_path);
+ 
+ 	GDScriptLanguageProtocol();
+-	~GDScriptLanguageProtocol() {
+-		clients.clear();
+-	}
++	~GDScriptLanguageProtocol();
+ };
+diff --git a/modules/gdscript/register_types.cpp b/modules/gdscript/register_types.cpp
+index 4d86e22..09b8efc 100644
+--- a/modules/gdscript/register_types.cpp
++++ b/modules/gdscript/register_types.cpp
+@@ -180,10 +180,12 @@ void uninitialize_gdscript_module(ModuleInitializationLevel p_level) {
+ 
+ 		if (gdscript_cache) {
+ 			memdelete(gdscript_cache);
++			gdscript_cache = nullptr;
+ 		}
+ 
+ 		if (script_language_gd) {
+ 			memdelete(script_language_gd);
++			script_language_gd = nullptr;
+ 		}
+ 
+ 		ResourceLoader::remove_resource_format_loader(resource_loader_gd);
+diff --git a/modules/gltf/editor/editor_import_blend_runner.cpp b/modules/gltf/editor/editor_import_blend_runner.cpp
+index 250a435..02f0e2e 100644
+--- a/modules/gltf/editor/editor_import_blend_runner.cpp
++++ b/modules/gltf/editor/editor_import_blend_runner.cpp
+@@ -400,3 +400,9 @@ EditorImportBlendRunner::EditorImportBlendRunner() {
+ 
+ 	EditorFileSystem::get_singleton()->connect("resources_reimported", callable_mp(this, &EditorImportBlendRunner::_resources_reimported));
+ }
++
++EditorImportBlendRunner::~EditorImportBlendRunner() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/modules/gltf/editor/editor_import_blend_runner.h b/modules/gltf/editor/editor_import_blend_runner.h
+index afc2e68..f481889 100644
+--- a/modules/gltf/editor/editor_import_blend_runner.h
++++ b/modules/gltf/editor/editor_import_blend_runner.h
+@@ -62,4 +62,5 @@ public:
+ 	HTTPClient::Status connect_blender_rpc(const Ref<HTTPClient> &p_client, int p_timeout_usecs);
+ 
+ 	EditorImportBlendRunner();
++	~EditorImportBlendRunner();
+ };
+diff --git a/modules/godot_physics_2d/godot_physics_server_2d.cpp b/modules/godot_physics_2d/godot_physics_server_2d.cpp
+index ba45622..91fc8d5 100644
+--- a/modules/godot_physics_2d/godot_physics_server_2d.cpp
++++ b/modules/godot_physics_2d/godot_physics_server_2d.cpp
+@@ -1396,3 +1396,9 @@ GodotPhysicsServer2D::GodotPhysicsServer2D(bool p_using_threads) {
+ 
+ 	using_threads = p_using_threads;
+ }
++
++GodotPhysicsServer2D::~GodotPhysicsServer2D() {
++	if (godot_singleton == this) {
++		godot_singleton = nullptr;
++	}
++}
+diff --git a/modules/godot_physics_2d/godot_physics_server_2d.h b/modules/godot_physics_2d/godot_physics_server_2d.h
+index c9130c5..030f1b4 100644
+--- a/modules/godot_physics_2d/godot_physics_server_2d.h
++++ b/modules/godot_physics_2d/godot_physics_server_2d.h
+@@ -300,5 +300,5 @@ public:
+ 	int get_process_info(ProcessInfo p_info) override;
+ 
+ 	GodotPhysicsServer2D(bool p_using_threads = false);
+-	~GodotPhysicsServer2D() {}
++	~GodotPhysicsServer2D();
+ };
+diff --git a/modules/godot_physics_3d/godot_physics_server_3d.cpp b/modules/godot_physics_3d/godot_physics_server_3d.cpp
+index 66ca5ca..c705cfa 100644
+--- a/modules/godot_physics_3d/godot_physics_server_3d.cpp
++++ b/modules/godot_physics_3d/godot_physics_server_3d.cpp
+@@ -1814,3 +1814,9 @@ GodotPhysicsServer3D::GodotPhysicsServer3D(bool p_using_threads) {
+ 
+ 	using_threads = p_using_threads;
+ }
++
++GodotPhysicsServer3D::~GodotPhysicsServer3D() {
++	if (godot_singleton == this) {
++		godot_singleton = nullptr;
++	}
++}
+diff --git a/modules/godot_physics_3d/godot_physics_server_3d.h b/modules/godot_physics_3d/godot_physics_server_3d.h
+index 417bfd2..e4279ae 100644
+--- a/modules/godot_physics_3d/godot_physics_server_3d.h
++++ b/modules/godot_physics_3d/godot_physics_server_3d.h
+@@ -386,5 +386,5 @@ public:
+ 	int get_process_info(ProcessInfo p_info) override;
+ 
+ 	GodotPhysicsServer3D(bool p_using_threads = false);
+-	~GodotPhysicsServer3D() {}
++	~GodotPhysicsServer3D();
+ };
+diff --git a/modules/navigation_2d/2d/nav_mesh_generator_2d.cpp b/modules/navigation_2d/2d/nav_mesh_generator_2d.cpp
+index 8f1aebf..f2a4919 100644
+--- a/modules/navigation_2d/2d/nav_mesh_generator_2d.cpp
++++ b/modules/navigation_2d/2d/nav_mesh_generator_2d.cpp
+@@ -71,6 +71,9 @@ NavMeshGenerator2D::NavMeshGenerator2D() {
+ 
+ NavMeshGenerator2D::~NavMeshGenerator2D() {
+ 	cleanup();
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void NavMeshGenerator2D::sync() {
+diff --git a/modules/navigation_3d/3d/nav_mesh_generator_3d.cpp b/modules/navigation_3d/3d/nav_mesh_generator_3d.cpp
+index 200794d..4366ab0 100644
+--- a/modules/navigation_3d/3d/nav_mesh_generator_3d.cpp
++++ b/modules/navigation_3d/3d/nav_mesh_generator_3d.cpp
+@@ -84,6 +84,9 @@ NavMeshGenerator3D::NavMeshGenerator3D() {
+ 
+ NavMeshGenerator3D::~NavMeshGenerator3D() {
+ 	cleanup();
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void NavMeshGenerator3D::sync() {
+diff --git a/modules/navigation_3d/3d/navigation_mesh_generator.cpp b/modules/navigation_3d/3d/navigation_mesh_generator.cpp
+index 21024f4..c630df0 100644
+--- a/modules/navigation_3d/3d/navigation_mesh_generator.cpp
++++ b/modules/navigation_3d/3d/navigation_mesh_generator.cpp
+@@ -46,6 +46,9 @@ NavigationMeshGenerator::NavigationMeshGenerator() {
+ }
+ 
+ NavigationMeshGenerator::~NavigationMeshGenerator() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void NavigationMeshGenerator::bake(const Ref<NavigationMesh> &p_navigation_mesh, Node *p_root_node) {
+diff --git a/modules/navigation_3d/editor/navigation_obstacle_3d_editor_plugin.cpp b/modules/navigation_3d/editor/navigation_obstacle_3d_editor_plugin.cpp
+index 59542c2..5de2c30 100644
+--- a/modules/navigation_3d/editor/navigation_obstacle_3d_editor_plugin.cpp
++++ b/modules/navigation_3d/editor/navigation_obstacle_3d_editor_plugin.cpp
+@@ -902,4 +902,7 @@ NavigationObstacle3DEditorPlugin::~NavigationObstacle3DEditorPlugin() {
+ 		rs->free_rid(point_handle_mesh_rid);
+ 		point_handle_mesh_rid = RID();
+ 	}
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/modules/openxr/extensions/openxr_fb_display_refresh_rate_extension.cpp b/modules/openxr/extensions/openxr_fb_display_refresh_rate_extension.cpp
+index d1d8aa0..a31f91a 100644
+--- a/modules/openxr/extensions/openxr_fb_display_refresh_rate_extension.cpp
++++ b/modules/openxr/extensions/openxr_fb_display_refresh_rate_extension.cpp
+@@ -44,6 +44,9 @@ OpenXRDisplayRefreshRateExtension::OpenXRDisplayRefreshRateExtension() {
+ 
+ OpenXRDisplayRefreshRateExtension::~OpenXRDisplayRefreshRateExtension() {
+ 	display_refresh_rate_ext = false;
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ HashMap<String, bool *> OpenXRDisplayRefreshRateExtension::get_requested_extensions(XrVersion p_version) {
+diff --git a/platform/android/api/api.cpp b/platform/android/api/api.cpp
+index 5a10a47..5f4d19b 100644
+--- a/platform/android/api/api.cpp
++++ b/platform/android/api/api.cpp
+@@ -56,6 +56,7 @@ void register_android_api() {
+ void unregister_android_api() {
+ #if !defined(ANDROID_ENABLED)
+ 	memdelete(java_class_wrapper);
++	java_class_wrapper = nullptr;
+ #endif
+ }
+ 
+@@ -139,4 +140,10 @@ JavaClassWrapper::JavaClassWrapper() {
+ 	singleton = this;
+ }
+ 
++JavaClassWrapper::~JavaClassWrapper() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
++
+ #endif
+diff --git a/platform/android/api/java_class_wrapper.h b/platform/android/api/java_class_wrapper.h
+index 9e5657f..d0f57ca 100644
+--- a/platform/android/api/java_class_wrapper.h
++++ b/platform/android/api/java_class_wrapper.h
+@@ -314,4 +314,5 @@ public:
+ 	Ref<JavaClass> wrap_jclass(jclass p_class, bool p_allow_non_public_methods_access = false);
+ #endif
+ 	JavaClassWrapper();
++	~JavaClassWrapper();
+ };
+diff --git a/platform/android/java_class_wrapper.cpp b/platform/android/java_class_wrapper.cpp
+index f1a9b68..a09f5d2 100644
+--- a/platform/android/java_class_wrapper.cpp
++++ b/platform/android/java_class_wrapper.cpp
+@@ -1906,3 +1906,9 @@ JavaClassWrapper::JavaClassWrapper() {
+ 	Double_doubleValue = env->GetMethodID(bclass, "doubleValue", "()D");
+ 	env->DeleteLocalRef(bclass);
+ }
++
++JavaClassWrapper::~JavaClassWrapper() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/platform/linuxbsd/libgodot_linuxbsd.cpp b/platform/linuxbsd/libgodot_linuxbsd.cpp
+index a5434a6..b048f4b 100644
+--- a/platform/linuxbsd/libgodot_linuxbsd.cpp
++++ b/platform/linuxbsd/libgodot_linuxbsd.cpp
+@@ -34,25 +34,25 @@
+ #include "core/extension/libgodot.h"
+ #include "main/main.h"
+ 
+-static OS_LinuxBSD *os = nullptr;
+-
+ static GodotInstance *instance = nullptr;
+ 
+ GDExtensionObjectPtr libgodot_create_godot_instance(int p_argc, char *p_argv[], GDExtensionInitializationFunction p_init_func) {
+ 	ERR_FAIL_COND_V_MSG(instance != nullptr, nullptr, "Only one Godot Instance may be created.");
+ 
+-	os = new OS_LinuxBSD();
++	new OS_LinuxBSD();
+ 
+ 	Error err = Main::setup(p_argv[0], p_argc - 1, &p_argv[1], false);
+ 	if (err != OK) {
++		delete OS_LinuxBSD::get_singleton();
+ 		return nullptr;
+ 	}
+ 
+ 	instance = memnew(GodotInstance);
+ 	if (!instance->initialize(p_init_func)) {
+ 		memdelete(instance);
+-		// Note: When Godot Engine supports reinitialization, clear the instance pointer here.
+-		//instance = nullptr;
++		instance = nullptr;
++		Main::cleanup(true);
++		delete OS_LinuxBSD::get_singleton();
+ 		return nullptr;
+ 	}
+ 
+@@ -65,6 +65,7 @@ void libgodot_destroy_godot_instance(GDExtensionObjectPtr p_godot_instance) {
+ 		godot_instance->stop();
+ 		memdelete(godot_instance);
+ 		instance = nullptr;
+-		Main::cleanup();
++		Main::cleanup(true);
++		delete OS_LinuxBSD::get_singleton();
+ 	}
+ }
+diff --git a/platform/macos/libgodot_macos.mm b/platform/macos/libgodot_macos.mm
+index 280f337..ba782fb 100644
+--- a/platform/macos/libgodot_macos.mm
++++ b/platform/macos/libgodot_macos.mm
+@@ -34,19 +34,18 @@
+ #include "core/extension/libgodot.h"
+ #include "main/main.h"
+ 
+-static OS_MacOS *os = nullptr;
+-
+ static GodotInstance *instance = nullptr;
+ 
+ GDExtensionObjectPtr libgodot_create_godot_instance(int p_argc, char *p_argv[], GDExtensionInitializationFunction p_init_func) {
+ 	ERR_FAIL_COND_V_MSG(instance != nullptr, nullptr, "Only one Godot Instance may be created.");
+ 
+ 	uint32_t remaining_args = p_argc - 1;
+-	os = new OS_MacOS_NSApp(p_argv[0], remaining_args, remaining_args > 0 ? &p_argv[1] : nullptr);
++	new OS_MacOS_NSApp(p_argv[0], remaining_args, remaining_args > 0 ? &p_argv[1] : nullptr);
+ 
+ 	@autoreleasepool {
+ 		Error err = Main::setup(p_argv[0], remaining_args, remaining_args > 0 ? &p_argv[1] : nullptr, false);
+ 		if (err != OK) {
++			delete OS_MacOS_NSApp::get_singleton();
+ 			return nullptr;
+ 		}
+ 
+@@ -54,6 +53,8 @@ GDExtensionObjectPtr libgodot_create_godot_instance(int p_argc, char *p_argv[],
+ 		if (!instance->initialize(p_init_func)) {
+ 			memdelete(instance);
+ 			instance = nullptr;
++			Main::cleanup(true);
++			delete OS_MacOS_NSApp::get_singleton();
+ 			return nullptr;
+ 		}
+ 
+@@ -66,8 +67,9 @@ void libgodot_destroy_godot_instance(GDExtensionObjectPtr p_godot_instance) {
+ 	if (instance == godot_instance) {
+ 		godot_instance->stop();
+ 		memdelete(godot_instance);
+-		// Note: When Godot Engine supports reinitialization, clear the instance pointer here.
+-		//instance = nullptr;
+-		Main::cleanup();
++		instance = nullptr;
++
++		Main::cleanup(true);
++		delete OS_MacOS_NSApp::get_singleton();
+ 	}
+ }
+diff --git a/platform/web/api/api.cpp b/platform/web/api/api.cpp
+index deb7847..7ddb2f0 100644
+--- a/platform/web/api/api.cpp
++++ b/platform/web/api/api.cpp
+@@ -46,6 +46,7 @@ void register_web_api() {
+ 
+ void unregister_web_api() {
+ 	memdelete(javascript_bridge_singleton);
++	javascript_bridge_singleton = nullptr;
+ }
+ 
+ JavaScriptBridge *JavaScriptBridge::singleton = nullptr;
+@@ -59,7 +60,11 @@ JavaScriptBridge::JavaScriptBridge() {
+ 	singleton = this;
+ }
+ 
+-JavaScriptBridge::~JavaScriptBridge() {}
++JavaScriptBridge::~JavaScriptBridge() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+ 
+ void JavaScriptBridge::_bind_methods() {
+ 	ClassDB::bind_method(D_METHOD("eval", "code", "use_global_execution_context"), &JavaScriptBridge::eval, DEFVAL(false));
+diff --git a/platform/web/audio_driver_web.h b/platform/web/audio_driver_web.h
+index 49e107a..0e98aa8 100644
+--- a/platform/web/audio_driver_web.h
++++ b/platform/web/audio_driver_web.h
+@@ -165,6 +165,11 @@ public:
+ 	static AudioDriverWorklet *get_singleton() { return singleton; }
+ 
+ 	AudioDriverWorklet() { singleton = this; }
++	~AudioDriverWorklet() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+ 
+ #endif // THREADS_ENABLED
+@@ -188,4 +193,9 @@ public:
+ 	static AudioDriverScriptProcessor *get_singleton() { return singleton; }
+ 
+ 	AudioDriverScriptProcessor() { singleton = this; }
++	~AudioDriverScriptProcessor() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
+ };
+diff --git a/platform/windows/libgodot_windows.cpp b/platform/windows/libgodot_windows.cpp
+index 2b75e11..46cd66f 100644
+--- a/platform/windows/libgodot_windows.cpp
++++ b/platform/windows/libgodot_windows.cpp
+@@ -34,17 +34,16 @@
+ #include "core/extension/libgodot.h"
+ #include "main/main.h"
+ 
+-static OS_Windows *os = nullptr;
+-
+ static GodotInstance *instance = nullptr;
+ 
+ GDExtensionObjectPtr libgodot_create_godot_instance(int p_argc, char *p_argv[], GDExtensionInitializationFunction p_init_func) {
+ 	ERR_FAIL_COND_V_MSG(instance != nullptr, nullptr, "Only one Godot Instance may be created at a time.");
+ 
+-	os = new OS_Windows(GetModuleHandle(nullptr));
++	new OS_Windows(GetModuleHandle(nullptr));
+ 
+ 	Error err = Main::setup(p_argv[0], p_argc - 1, &p_argv[1], false);
+ 	if (err != OK) {
++		delete OS_Windows::get_singleton();
+ 		return nullptr;
+ 	}
+ 
+@@ -52,6 +51,8 @@ GDExtensionObjectPtr libgodot_create_godot_instance(int p_argc, char *p_argv[],
+ 	if (!instance->initialize(p_init_func)) {
+ 		memdelete(instance);
+ 		instance = nullptr;
++		Main::cleanup(true);
++		delete OS_Windows::get_singleton();
+ 		return nullptr;
+ 	}
+ 
+@@ -63,8 +64,8 @@ void libgodot_destroy_godot_instance(GDExtensionObjectPtr p_godot_instance) {
+ 	if (instance == godot_instance) {
+ 		godot_instance->stop();
+ 		memdelete(godot_instance);
+-		// Note: When Godot Engine supports reinitialization, clear the instance pointer here.
+-		//instance = nullptr;
+-		Main::cleanup();
++		instance = nullptr;
++		Main::cleanup(true);
++		delete OS_Windows::get_singleton();
+ 	}
+ }
+diff --git a/scene/debugger/runtime_node_select.cpp b/scene/debugger/runtime_node_select.cpp
+index 1d1b49c..8a89958 100644
+--- a/scene/debugger/runtime_node_select.cpp
++++ b/scene/debugger/runtime_node_select.cpp
+@@ -81,6 +81,10 @@ RuntimeNodeSelect::~RuntimeNodeSelect() {
+ 		RS::get_singleton()->free_rid(srect_ci);
+ 		RS::get_singleton()->free_rid(draw_canvas);
+ 	}
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void RuntimeNodeSelect::_setup(const Dictionary &p_settings) {
+diff --git a/scene/debugger/scene_debugger.cpp b/scene/debugger/scene_debugger.cpp
+index 5a2bf4c..47ae118 100644
+--- a/scene/debugger/scene_debugger.cpp
++++ b/scene/debugger/scene_debugger.cpp
+@@ -104,6 +104,7 @@ void SceneDebugger::initialize() {
+ void SceneDebugger::deinitialize() {
+ 	if (singleton) {
+ 		memdelete(singleton);
++		singleton = nullptr;
+ 	}
+ }
+ 
+diff --git a/scene/debugger/scene_debugger.h b/scene/debugger/scene_debugger.h
+index 56a1c60..f0fa2e7 100644
+--- a/scene/debugger/scene_debugger.h
++++ b/scene/debugger/scene_debugger.h
+@@ -171,6 +171,12 @@ private:
+ 	inline static LiveEditor *singleton = nullptr;
+ 
+ public:
++	~LiveEditor() {
++		if (singleton == this) {
++			singleton = nullptr;
++		}
++	}
++
+ 	static LiveEditor *get_singleton();
+ };
+ #endif // DEBUG_ENABLED
+diff --git a/scene/main/scene_tree.cpp b/scene/main/scene_tree.cpp
+index dd92f0f..d5f04f5 100644
+--- a/scene/main/scene_tree.cpp
++++ b/scene/main/scene_tree.cpp
+@@ -2010,6 +2010,14 @@ void SceneTree::add_idle_callback(IdleCallback p_callback) {
+ 	idle_callbacks[idle_callback_count++] = p_callback;
+ }
+ 
++void SceneTree::reset_idle_callbacks() {
++	for (int i = 0; i < idle_callback_count; i++) {
++		idle_callbacks[i] = nullptr;
++	}
++
++	idle_callback_count = 0;
++}
++
+ #ifdef TOOLS_ENABLED
+ void SceneTree::get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const {
+ 	bool add_options = false;
+diff --git a/scene/main/scene_tree.h b/scene/main/scene_tree.h
+index b709829..511e34c 100644
+--- a/scene/main/scene_tree.h
++++ b/scene/main/scene_tree.h
+@@ -452,6 +452,7 @@ public:
+ 	bool is_multiplayer_poll_enabled() const;
+ 
+ 	static void add_idle_callback(IdleCallback p_callback);
++	static void reset_idle_callbacks();
+ 
+ 	void set_disable_node_threading(bool p_disable);
+ 	//default texture settings
+diff --git a/scene/resources/3d/sky_material.cpp b/scene/resources/3d/sky_material.cpp
+index 823167a..4d0ea9b 100644
+--- a/scene/resources/3d/sky_material.cpp
++++ b/scene/resources/3d/sky_material.cpp
+@@ -294,6 +294,7 @@ void ProceduralSkyMaterial::cleanup_shader() {
+ 		if (shader_cache[i].is_valid()) {
+ 			RS::get_singleton()->free_rid(shader_cache[i]);
+ 		}
++		shader_cache[i] = RID();
+ 	}
+ }
+ 
+@@ -484,6 +485,7 @@ void PanoramaSkyMaterial::cleanup_shader() {
+ 		if (shader_cache[i].is_valid()) {
+ 			RS::get_singleton()->free_rid(shader_cache[i]);
+ 		}
++		shader_cache[i] = RID();
+ 	}
+ }
+ 
+@@ -726,6 +728,7 @@ void PhysicalSkyMaterial::cleanup_shader() {
+ 		if (shader_cache[i].is_valid()) {
+ 			RS::get_singleton()->free_rid(shader_cache[i]);
+ 		}
++		shader_cache[i] = RID();
+ 	}
+ }
+ 
+diff --git a/scene/resources/resource_format_text.cpp b/scene/resources/resource_format_text.cpp
+index 53eed0a..9bf6fe3 100644
+--- a/scene/resources/resource_format_text.cpp
++++ b/scene/resources/resource_format_text.cpp
+@@ -2246,3 +2246,9 @@ ResourceFormatSaverText *ResourceFormatSaverText::singleton = nullptr;
+ ResourceFormatSaverText::ResourceFormatSaverText() {
+ 	singleton = this;
+ }
++
++ResourceFormatSaverText::~ResourceFormatSaverText() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/scene/resources/resource_format_text.h b/scene/resources/resource_format_text.h
+index 106229a..a796bf4 100644
+--- a/scene/resources/resource_format_text.h
++++ b/scene/resources/resource_format_text.h
+@@ -218,4 +218,5 @@ public:
+ 	virtual void get_recognized_extensions(const Ref<Resource> &p_resource, List<String> *p_extensions) const override;
+ 
+ 	ResourceFormatSaverText();
++	~ResourceFormatSaverText();
+ };
+diff --git a/servers/audio/audio_driver_dummy.cpp b/servers/audio/audio_driver_dummy.cpp
+index 3d1070a..98d77c3 100644
+--- a/servers/audio/audio_driver_dummy.cpp
++++ b/servers/audio/audio_driver_dummy.cpp
+@@ -148,3 +148,9 @@ void AudioDriverDummy::finish() {
+ AudioDriverDummy::AudioDriverDummy() {
+ 	singleton = this;
+ }
++
++AudioDriverDummy::~AudioDriverDummy() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/servers/audio/audio_driver_dummy.h b/servers/audio/audio_driver_dummy.h
+index fe292c8..e2e80a2 100644
+--- a/servers/audio/audio_driver_dummy.h
++++ b/servers/audio/audio_driver_dummy.h
+@@ -81,5 +81,5 @@ public:
+ 	static AudioDriverDummy *get_dummy_singleton() { return singleton; }
+ 
+ 	AudioDriverDummy();
+-	~AudioDriverDummy() {}
++	~AudioDriverDummy();
+ };
+diff --git a/servers/audio/audio_server.cpp b/servers/audio/audio_server.cpp
+index 98bb2ce..fc8a182 100644
+--- a/servers/audio/audio_server.cpp
++++ b/servers/audio/audio_server.cpp
+@@ -264,6 +264,11 @@ AudioDriver *AudioDriverManager::get_driver(int p_driver) {
+ 	return drivers[p_driver];
+ }
+ 
++void AudioDriverManager::reset() {
++	drivers[0] = &AudioDriverManager::dummy_driver;
++	driver_count = 1;
++}
++
+ //////////////////////////////////////////////
+ //////////////////////////////////////////////
+ //////////////////////////////////////////////
+diff --git a/servers/audio/audio_server.h b/servers/audio/audio_server.h
+index efb0a58..0ee7348 100644
+--- a/servers/audio/audio_server.h
++++ b/servers/audio/audio_server.h
+@@ -173,6 +173,7 @@ public:
+ 	static void initialize(int p_driver);
+ 	static int get_driver_count();
+ 	static AudioDriver *get_driver(int p_driver);
++	static void reset();
+ };
+ 
+ class AudioBusLayout;
+diff --git a/servers/debugger/servers_debugger.cpp b/servers/debugger/servers_debugger.cpp
+index 74d635a..229423a 100644
+--- a/servers/debugger/servers_debugger.cpp
++++ b/servers/debugger/servers_debugger.cpp
+@@ -397,6 +397,7 @@ void ServersDebugger::initialize() {
+ void ServersDebugger::deinitialize() {
+ 	if (singleton) {
+ 		memdelete(singleton);
++		singleton = nullptr;
+ 	}
+ }
+ 
+diff --git a/servers/display/accessibility_server.cpp b/servers/display/accessibility_server.cpp
+index cd8011f..28d51fe 100644
+--- a/servers/display/accessibility_server.cpp
++++ b/servers/display/accessibility_server.cpp
+@@ -230,6 +230,10 @@ AccessibilityServer *AccessibilityServer::create(int p_index, Error &r_error) {
+ 	return server_create_functions[p_index].create_function(r_error);
+ }
+ 
++void AccessibilityServer::reset() {
++	server_create_count = 1;
++}
++
+ void AccessibilityServer::register_create_function(const char *p_name, CreateFunction p_function) {
+ 	ERR_FAIL_COND(server_create_count == MAX_SERVERS);
+ 	// Dummy server is always last
+@@ -253,5 +257,6 @@ AccessibilityServer::AccessibilityServer() {
+ }
+ 
+ AccessibilityServer::~AccessibilityServer() {
++	reset();
+ 	singleton = nullptr;
+ }
+diff --git a/servers/display/accessibility_server.h b/servers/display/accessibility_server.h
+index 2229776..08f4d4f 100644
+--- a/servers/display/accessibility_server.h
++++ b/servers/display/accessibility_server.h
+@@ -158,6 +158,7 @@ public:
+ 	static int get_create_function_count();
+ 	static const char *get_create_function_name(int p_index);
+ 	static AccessibilityServer *create(int p_index, Error &r_error);
++	static void reset();
+ 
+ 	AccessibilityServer();
+ 	virtual ~AccessibilityServer();
+diff --git a/servers/display/display_server.cpp b/servers/display/display_server.cpp
+index 1c7cefb..7f227b2 100644
+--- a/servers/display/display_server.cpp
++++ b/servers/display/display_server.cpp
+@@ -2053,6 +2053,18 @@ DisplayServer *DisplayServer::create(int p_index, const String &p_rendering_driv
+ 	return server_create_functions[p_index].create_function(p_rendering_driver, p_mode, p_vsync_mode, p_flags, p_position, p_resolution, p_screen, p_context, p_parent_window, r_error);
+ }
+ 
++void DisplayServer::reset() {
++	server_create_functions[0] = { "headless", &DisplayServerHeadless::create_func, &DisplayServerHeadless::get_rendering_drivers_func };
++
++	for (int i = 1; i < server_create_count; i++) {
++		server_create_functions[i].name = nullptr;
++		server_create_functions[i].create_function = nullptr;
++		server_create_functions[i].get_rendering_drivers_function = nullptr;
++	}
++
++	server_create_count = 1;
++}
++
+ void DisplayServer::_input_set_mouse_mode(InputClassEnums::MouseMode p_mode) {
+ 	singleton->mouse_set_mode(DisplayServerEnums::MouseMode(p_mode));
+ }
+diff --git a/servers/display/display_server.h b/servers/display/display_server.h
+index 5cc2c17..bfc6ece 100644
+--- a/servers/display/display_server.h
++++ b/servers/display/display_server.h
+@@ -94,6 +94,7 @@ public:
+ 	static const char *get_create_function_name(int p_index);
+ 	static Vector<String> get_create_function_rendering_drivers(int p_index);
+ 	static DisplayServer *create(int p_index, const String &p_rendering_driver, DisplayServerEnums::WindowMode p_mode, DisplayServerEnums::VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, int p_screen, DisplayServerEnums::Context p_context, int64_t p_parent_window, Error &r_error);
++	static void reset();
+ 
+ 	DisplayServer();
+ 	~DisplayServer();
+diff --git a/servers/movie_writer/movie_writer.cpp b/servers/movie_writer/movie_writer.cpp
+index ba5e101..487fb84 100644
+--- a/servers/movie_writer/movie_writer.cpp
++++ b/servers/movie_writer/movie_writer.cpp
+@@ -58,6 +58,14 @@ MovieWriter *MovieWriter::find_writer_for_file(const String &p_file) {
+ 	return nullptr;
+ }
+ 
++void MovieWriter::reset() {
++	for (uint32_t i = 0; i < writer_count; i++) {
++		writers[i] = nullptr;
++	}
++
++	writer_count = 0;
++}
++
+ uint32_t MovieWriter::get_audio_mix_rate() const {
+ 	uint32_t ret = 48000;
+ 	GDVIRTUAL_CALL(_get_audio_mix_rate, ret);
+diff --git a/servers/movie_writer/movie_writer.h b/servers/movie_writer/movie_writer.h
+index 870fc6c..828081c 100644
+--- a/servers/movie_writer/movie_writer.h
++++ b/servers/movie_writer/movie_writer.h
+@@ -85,6 +85,7 @@ public:
+ 
+ 	static void add_writer(MovieWriter *p_writer);
+ 	static MovieWriter *find_writer_for_file(const String &p_file);
++	static void reset();
+ 
+ 	void begin(const Size2i &p_movie_size, uint32_t p_fps, const String &p_base_path);
+ 	void add_frame();
+diff --git a/servers/navigation_2d/navigation_server_2d.cpp b/servers/navigation_2d/navigation_server_2d.cpp
+index e5d252e..db3defb 100644
+--- a/servers/navigation_2d/navigation_server_2d.cpp
++++ b/servers/navigation_2d/navigation_server_2d.cpp
+@@ -678,4 +678,5 @@ void NavigationServer2DManager::initialize_server_manager() {
+ void NavigationServer2DManager::finalize_server_manager() {
+ 	ERR_FAIL_NULL(singleton);
+ 	memdelete(singleton);
++	singleton = nullptr;
+ }
+diff --git a/servers/navigation_3d/navigation_server_3d.cpp b/servers/navigation_3d/navigation_server_3d.cpp
+index 3b4f8cd..8b118ea 100644
+--- a/servers/navigation_3d/navigation_server_3d.cpp
++++ b/servers/navigation_3d/navigation_server_3d.cpp
+@@ -1161,4 +1161,5 @@ void NavigationServer3DManager::initialize_server_manager() {
+ void NavigationServer3DManager::finalize_server_manager() {
+ 	ERR_FAIL_NULL(singleton);
+ 	memdelete(singleton);
++	singleton = nullptr;
+ }
+diff --git a/servers/register_server_types.cpp b/servers/register_server_types.cpp
+index de40333..a6203cc 100644
+--- a/servers/register_server_types.cpp
++++ b/servers/register_server_types.cpp
+@@ -383,8 +383,10 @@ void unregister_server_types() {
+ 
+ 	ServersDebugger::deinitialize();
+ 	memdelete(shader_types);
+-	if constexpr (GD_IS_CLASS_ENABLED(MovieWriterPNGWAV)) {
++	shader_types = nullptr;
++	if (GD_IS_CLASS_ENABLED(MovieWriterPNGWAV)) {
+ 		memdelete(writer_pngwav);
++		writer_pngwav = nullptr;
+ 	}
+ 
+ 	OS::get_singleton()->benchmark_end_measure("Servers", "Unregister Extensions");
+diff --git a/servers/rendering/renderer_rd/environment/sky.cpp b/servers/rendering/renderer_rd/environment/sky.cpp
+index a3c14c2..a0bef44 100644
+--- a/servers/rendering/renderer_rd/environment/sky.cpp
++++ b/servers/rendering/renderer_rd/environment/sky.cpp
+@@ -926,17 +926,35 @@ void SkyRD::set_texture_format(RD::DataFormat p_texture_format) {
+ SkyRD::~SkyRD() {
+ 	// cleanup anything created in init...
+ 	RendererRD::MaterialStorage *material_storage = RendererRD::MaterialStorage::get_singleton();
++	if (material_storage) {
++		material_storage->free_shader_type_resources(RendererRD::MaterialStorage::SHADER_TYPE_SKY);
++	}
+ 
+-	SkyMaterialData *md = static_cast<SkyMaterialData *>(material_storage->material_get_data(sky_shader.default_material, RendererRD::MaterialStorage::SHADER_TYPE_SKY));
+-	sky_shader.shader.version_free(md->shader_data->version);
++	SkyMaterialData *md = nullptr;
++	if (material_storage && material_storage->owns_material(sky_shader.default_material)) {
++		md = static_cast<SkyMaterialData *>(material_storage->material_get_data(sky_shader.default_material, RendererRD::MaterialStorage::SHADER_TYPE_SKY));
++	}
++	if (md != nullptr && md->shader_data != nullptr && md->shader_data->version.is_valid()) {
++		sky_shader.shader.version_free(md->shader_data->version);
++	}
+ 	RD::get_singleton()->free_rid(sky_scene_state.directional_light_buffer);
+ 	RD::get_singleton()->free_rid(sky_scene_state.uniform_buffer);
+ 	memdelete_arr(sky_scene_state.directional_lights);
+ 	memdelete_arr(sky_scene_state.last_frame_directional_lights);
+-	material_storage->shader_free(sky_shader.default_shader);
+-	material_storage->material_free(sky_shader.default_material);
+-	material_storage->shader_free(sky_scene_state.fog_shader);
+-	material_storage->material_free(sky_scene_state.fog_material);
++	if (material_storage) {
++		if (material_storage->owns_shader(sky_shader.default_shader)) {
++			material_storage->shader_free(sky_shader.default_shader);
++		}
++		if (material_storage->owns_material(sky_shader.default_material)) {
++			material_storage->material_free(sky_shader.default_material);
++		}
++		if (material_storage->owns_shader(sky_scene_state.fog_shader)) {
++			material_storage->shader_free(sky_scene_state.fog_shader);
++		}
++		if (material_storage->owns_material(sky_scene_state.fog_material)) {
++			material_storage->material_free(sky_scene_state.fog_material);
++		}
++	}
+ 
+ 	if (RD::get_singleton()->uniform_set_is_valid(sky_scene_state.uniform_set)) {
+ 		RD::get_singleton()->free_rid(sky_scene_state.uniform_set);
+diff --git a/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp b/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp
+index 370d3b6..f9a3993 100644
+--- a/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp
++++ b/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp
+@@ -5310,4 +5310,8 @@ RenderForwardClustered::~RenderForwardClustered() {
+ 		RD::get_singleton()->free_rid(sdfgi_framebuffer_size_cache.begin()->value);
+ 		sdfgi_framebuffer_size_cache.remove(sdfgi_framebuffer_size_cache.begin());
+ 	}
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp b/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp
+index 44a97f3..c106642 100644
+--- a/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp
++++ b/servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp
+@@ -634,6 +634,10 @@ SceneShaderForwardClustered::~SceneShaderForwardClustered() {
+ 	material_storage->material_free(overdraw_material);
+ 	material_storage->material_free(default_material);
+ 	material_storage->material_free(debug_shadow_splits_material);
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+ 
+ void SceneShaderForwardClustered::init(const String p_defines) {
+diff --git a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+index b30e19c..d317b34 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
++++ b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+@@ -3638,4 +3638,8 @@ RenderForwardMobile::~RenderForwardMobile() {
+ 		RD::get_singleton()->free_rid(scene_state.lightmap_capture_buffer);
+ 		memdelete_arr(scene_state.lightmap_captures);
+ 	}
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp b/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp
+index 0d598bf..e80348a 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp
++++ b/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp
+@@ -1001,4 +1001,8 @@ SceneShaderForwardMobile::~SceneShaderForwardMobile() {
+ 	material_storage->material_free(overdraw_material);
+ 	material_storage->material_free(default_material);
+ 	material_storage->material_free(debug_shadow_splits_material);
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/servers/rendering/renderer_rd/framebuffer_cache_rd.cpp b/servers/rendering/renderer_rd/framebuffer_cache_rd.cpp
+index 4e45779..fdb3438 100644
+--- a/servers/rendering/renderer_rd/framebuffer_cache_rd.cpp
++++ b/servers/rendering/renderer_rd/framebuffer_cache_rd.cpp
+@@ -87,4 +87,7 @@ FramebufferCacheRD::~FramebufferCacheRD() {
+ 	if (cache_instances_used > 0) {
+ 		ERR_PRINT("At exit: " + itos(cache_instances_used) + " framebuffer cache instance(s) still in use.");
+ 	}
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/servers/rendering/renderer_rd/renderer_compositor_rd.cpp b/servers/rendering/renderer_rd/renderer_compositor_rd.cpp
+index 06535cf..a359c44 100644
+--- a/servers/rendering/renderer_rd/renderer_compositor_rd.cpp
++++ b/servers/rendering/renderer_rd/renderer_compositor_rd.cpp
+@@ -173,6 +173,8 @@ uint64_t RendererCompositorRD::frame = 1;
+ void RendererCompositorRD::finalize() {
+ 	texture_storage->_tex_blit_shader_free();
+ 	memdelete(scene);
++	scene = nullptr;
++	RendererSceneRenderRD::reset_singleton();
+ 	memdelete(canvas);
+ 	memdelete(fog);
+ 	memdelete(particles_storage);
+diff --git a/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp b/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp
+index fb4d422..43af044 100644
+--- a/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp
++++ b/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp
+@@ -1762,6 +1762,10 @@ void RendererSceneRenderRD::sdfgi_set_debug_probe_select(const Vector3 &p_positi
+ 
+ RendererSceneRenderRD *RendererSceneRenderRD::singleton = nullptr;
+ 
++void RendererSceneRenderRD::reset_singleton() {
++	singleton = nullptr;
++}
++
+ bool RendererSceneRenderRD::is_vrs_supported() const {
+ 	return RD::get_singleton()->has_feature(RD::SUPPORTS_ATTACHMENT_VRS);
+ }
+diff --git a/servers/rendering/renderer_rd/renderer_scene_render_rd.h b/servers/rendering/renderer_rd/renderer_scene_render_rd.h
+index 5c13984..4bdfe25 100644
+--- a/servers/rendering/renderer_rd/renderer_scene_render_rd.h
++++ b/servers/rendering/renderer_rd/renderer_scene_render_rd.h
+@@ -173,6 +173,7 @@ private:
+ 
+ public:
+ 	static RendererSceneRenderRD *get_singleton() { return singleton; }
++	static void reset_singleton();
+ 
+ 	/* LIGHTING */
+ 
+diff --git a/servers/rendering/renderer_rd/storage_rd/material_storage.cpp b/servers/rendering/renderer_rd/storage_rd/material_storage.cpp
+index d4906c9..8274fcd 100644
+--- a/servers/rendering/renderer_rd/storage_rd/material_storage.cpp
++++ b/servers/rendering/renderer_rd/storage_rd/material_storage.cpp
+@@ -2366,6 +2366,28 @@ void MaterialStorage::shader_set_data_request_function(ShaderType p_shader_type,
+ 	shader_data_request_func[p_shader_type] = p_function;
+ }
+ 
++void MaterialStorage::free_shader_type_resources(ShaderType p_shader_type) {
++	ERR_FAIL_INDEX(p_shader_type, SHADER_TYPE_MAX);
++
++	const LocalVector<RID> materials = material_owner.get_owned_list();
++	for (const RID &material_rid : materials) {
++		Material *material = material_owner.get_or_null(material_rid);
++		if (material == nullptr || material->shader_type != p_shader_type) {
++			continue;
++		}
++		material_free(material_rid);
++	}
++
++	const LocalVector<RID> shaders = shader_owner.get_owned_list();
++	for (const RID &shader_rid : shaders) {
++		Shader *shader = shader_owner.get_or_null(shader_rid);
++		if (shader == nullptr || shader->type != p_shader_type) {
++			continue;
++		}
++		shader_free(shader_rid);
++	}
++}
++
+ MaterialStorage::ShaderData *MaterialStorage::shader_get_data(RID p_shader) const {
+ 	Shader *shader = shader_owner.get_or_null(p_shader);
+ 	ERR_FAIL_NULL_V(shader, nullptr);
+diff --git a/servers/rendering/renderer_rd/storage_rd/material_storage.h b/servers/rendering/renderer_rd/storage_rd/material_storage.h
+index 46c7352..7f0e7fe 100644
+--- a/servers/rendering/renderer_rd/storage_rd/material_storage.h
++++ b/servers/rendering/renderer_rd/storage_rd/material_storage.h
+@@ -473,6 +473,7 @@ public:
+ 	virtual RID shader_get_default_texture_parameter(RID p_shader, const StringName &p_name, int p_index) const override;
+ 	virtual Variant shader_get_parameter_default(RID p_shader, const StringName &p_param) const override;
+ 	void shader_set_data_request_function(ShaderType p_shader_type, ShaderDataRequestFunction p_function);
++	void free_shader_type_resources(ShaderType p_shader_type);
+ 	ShaderData *shader_get_data(RID p_shader) const;
+ 
+ 	virtual RenderingServerTypes::ShaderNativeSourceCode shader_get_native_source_code(RID p_shader) const override;
+diff --git a/servers/rendering/renderer_rd/uniform_set_cache_rd.cpp b/servers/rendering/renderer_rd/uniform_set_cache_rd.cpp
+index ff4602a..196837a 100644
+--- a/servers/rendering/renderer_rd/uniform_set_cache_rd.cpp
++++ b/servers/rendering/renderer_rd/uniform_set_cache_rd.cpp
+@@ -82,4 +82,7 @@ UniformSetCacheRD::~UniformSetCacheRD() {
+ 	if (cache_instances_used > 0) {
+ 		ERR_PRINT("At exit: " + itos(cache_instances_used) + " uniform set cache instance(s) still in use.");
+ 	}
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/servers/rendering/renderer_scene_cull.cpp b/servers/rendering/renderer_scene_cull.cpp
+index 26a7879..a68b4ef 100644
+--- a/servers/rendering/renderer_scene_cull.cpp
++++ b/servers/rendering/renderer_scene_cull.cpp
+@@ -4551,4 +4551,8 @@ RendererSceneCull::~RendererSceneCull() {
+ 		memdelete(light_culler);
+ 		light_culler = nullptr;
+ 	}
++
++	if (singleton == this) {
++		singleton = nullptr;
++	}
+ }
+diff --git a/servers/rendering/rendering_server_default.cpp b/servers/rendering/rendering_server_default.cpp
+index 49b80b1..573fb82 100644
+--- a/servers/rendering/rendering_server_default.cpp
++++ b/servers/rendering/rendering_server_default.cpp
+@@ -266,11 +266,31 @@ void RenderingServerDefault::_finish() {
+ 
+ 	RSG::canvas->finalize();
+ 	memdelete(RSG::canvas);
++	RSG::canvas = nullptr;
++
+ 	RSG::rasterizer->finalize();
+ 	memdelete(RSG::viewport);
++	RSG::viewport = nullptr;
++
+ 	memdelete(RSG::rasterizer);
++	RSG::rasterizer = nullptr;
+ 	memdelete(RSG::scene);
++	RSG::scene = nullptr;
++
+ 	memdelete(RSG::camera_attributes);
++	RSG::camera_attributes = nullptr;
++
++	RSG::threaded = false;
++
++	RSG::utilities = nullptr;
++	RSG::light_storage = nullptr;
++	RSG::material_storage = nullptr;
++	RSG::mesh_storage = nullptr;
++	RSG::particles_storage = nullptr;
++	RSG::texture_storage = nullptr;
++	RSG::gi = nullptr;
++	RSG::fog = nullptr;
++	RSG::canvas_render = nullptr;
+ }
+ 
+ void RenderingServerDefault::init() {
+diff --git a/servers/rendering/shader_types.cpp b/servers/rendering/shader_types.cpp
+index b733b6b..102f1b5 100644
+--- a/servers/rendering/shader_types.cpp
++++ b/servers/rendering/shader_types.cpp
+@@ -561,3 +561,9 @@ ShaderTypes::ShaderTypes() {
+ 		shader_types.insert(type);
+ 	}
+ }
++
++ShaderTypes::~ShaderTypes() {
++	if (singleton == this) {
++		singleton = nullptr;
++	}
++}
+diff --git a/servers/rendering/shader_types.h b/servers/rendering/shader_types.h
+index d3fd124..5ec3507 100644
+--- a/servers/rendering/shader_types.h
++++ b/servers/rendering/shader_types.h
+@@ -57,4 +57,5 @@ public:
+ 	const List<String> &get_types_list() const;
+ 
+ 	ShaderTypes();
++	~ShaderTypes();
+ };
+-- 
+2.56.0
+

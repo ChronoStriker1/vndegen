@@ -58,20 +58,59 @@ struct GameTile: View {
         Button { nav.select(target) } label: {
             GameArt(game: game, slots: [.capsule], size: CGSize(width: width, height: width * 1.5))
                 .clipShape(.rect(cornerRadius: 10, style: .continuous))
-                .overlay(alignment: .topLeading) {
-                    if game.isLocked {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 11, weight: .bold))
-                            .padding(7)
-                            .background(.ultraThinMaterial, in: .circle)
-                            .padding(8)
-                    }
-                }
+                .overlay(alignment: .topLeading) { LockBadge(game: game) }
         }
         .buttonStyle(TileButtonStyle(focused: focused))
         .onHover { if $0 { nav.hover(target) } }
         .id(target)
         .accessibilityLabel(nav.hub.displayTitle(game))
+    }
+}
+
+/// A landscape library tile with the game's header art. A game without a header shows its hero with the logo on top,
+/// since a hero has no title of its own.
+struct HeaderTile: View {
+    @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
+    let game: Game
+    let target: Navigator.Target
+    let width: CGFloat
+
+    var body: some View {
+        let header = ArtworkSlot.header.nominalSize
+        let size = CGSize(width: width, height: (width * header.height / header.width).rounded())
+        Button { nav.select(target) } label: {
+            Group {
+                if hub.artworkURL(game, [.header]) != nil {
+                    GameArt(game: game, slots: [.header], size: size)
+                } else {
+                    ZStack {
+                        GameArt(game: game, slots: [.hero], size: size)
+                        GameLogo(game: game, maxSize: CGSize(width: size.width * 0.7, height: size.height * 0.6), alignment: .center)
+                    }
+                }
+            }
+            .clipShape(.rect(cornerRadius: 10, style: .continuous))
+            .overlay(alignment: .topLeading) { LockBadge(game: game) }
+        }
+        .buttonStyle(TileButtonStyle(focused: nav.isFocused(target)))
+        .onHover { if $0 { nav.hover(target) } }
+        .id(target)
+        .accessibilityLabel(hub.displayTitle(game))
+    }
+}
+
+private struct LockBadge: View {
+    let game: Game
+
+    var body: some View {
+        if game.isLocked {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .bold))
+                .padding(7)
+                .background(.ultraThinMaterial, in: .circle)
+                .padding(8)
+        }
     }
 }
 

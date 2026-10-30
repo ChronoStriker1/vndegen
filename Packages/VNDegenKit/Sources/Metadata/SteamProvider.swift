@@ -35,7 +35,8 @@ struct SteamProvider: MetadataProvider {
             releaseDate: data.release_date?.date.flatMap(Self.isoDate),
             genres: (data.genres ?? []).map(\.description),
             rating: data.metacritic.map { Double($0.score) },
-            refs: [Self.ref(id)]
+            refs: [Self.ref(id)],
+            screenshots: (data.screenshots ?? []).map { Screenshot(url: $0.path_full, thumbnail: $0.path_thumbnail) }
         )
     }
 
@@ -99,6 +100,10 @@ private struct AppDetails: Decodable {
         struct Release: Decodable { var date: String? }
         struct Genre: Decodable { var description: String }
         struct Metacritic: Decodable { var score: Int }
+        struct Shot: Decodable {
+            var path_thumbnail: URL
+            var path_full: URL
+        }
         var name: String
         var short_description: String?
         var developers: [String]?
@@ -106,6 +111,7 @@ private struct AppDetails: Decodable {
         var release_date: Release?
         var genres: [Genre]?
         var metacritic: Metacritic?
+        var screenshots: [Shot]?
     }
     var success: Bool
     var data: App?
