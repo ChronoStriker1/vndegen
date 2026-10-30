@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../third_party/stb/stb_image.h"
+#include "images.h"
 
 namespace wolf {
 
@@ -672,8 +672,7 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         fresh.generation = ++generation_;
         if (fresh.kind == PictureKind::File) {
             if (auto bytes = files_.read(fresh.source)) {
-                int n;
-                stbi_info_from_memory(bytes->data(), int(bytes->size()), &fresh.imageW, &fresh.imageH, &n);
+                imageSize(*bytes, fresh.imageW, fresh.imageH);
             }
         }
         fresh.x.set(value(c.arg(7), t), 0);

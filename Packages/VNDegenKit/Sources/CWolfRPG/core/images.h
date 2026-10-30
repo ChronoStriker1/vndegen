@@ -10,6 +10,10 @@
 
 namespace wolf {
 
+// PNG, JPEG and BMP into RGBA, and an image's size without decoding it (stb.cpp).
+bool decodeImage(const std::vector<uint8_t> &bytes, Bitmap &out);
+bool imageSize(const std::vector<uint8_t> &bytes, int &w, int &h);
+
 class ImageCache {
 public:
     ImageCache(const GameFiles &files, std::function<void(const std::string &)> log);

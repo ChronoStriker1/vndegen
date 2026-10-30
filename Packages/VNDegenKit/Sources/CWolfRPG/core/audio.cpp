@@ -16,14 +16,42 @@
 #include <thread>
 #include <vector>
 
+// The decoders are compiled into this file only. dr_mp3 and dr_wav are static, and stb_vorbis's functions take names
+// of their own, so they don't clash with the copies other engines in the app compile.
+#define DRMP3_API static
+#define DRMP3_PRIVATE static
 #define DR_MP3_IMPLEMENTATION
 #include "../third_party/dr_libs/dr_mp3.h"
+#define DRWAV_API static
+#define DRWAV_PRIVATE static
 #define DR_WAV_IMPLEMENTATION
 #include "../third_party/dr_libs/dr_wav.h"
 #define TSF_IMPLEMENTATION
 #include "../third_party/tsf/tsf.h"
 #define TML_IMPLEMENTATION
 #include "../third_party/tsf/tml.h"
+#define STB_VORBIS_NO_STDIO
+#define STB_VORBIS_NO_PUSHDATA_API
+#define stb_vorbis_close wolf_vorbis_close
+#define stb_vorbis_decode_memory wolf_vorbis_decode_memory
+#define stb_vorbis_get_comment wolf_vorbis_get_comment
+#define stb_vorbis_get_error wolf_vorbis_get_error
+#define stb_vorbis_get_file_offset wolf_vorbis_get_file_offset
+#define stb_vorbis_get_frame_float wolf_vorbis_get_frame_float
+#define stb_vorbis_get_frame_short wolf_vorbis_get_frame_short
+#define stb_vorbis_get_frame_short_interleaved wolf_vorbis_get_frame_short_interleaved
+#define stb_vorbis_get_info wolf_vorbis_get_info
+#define stb_vorbis_get_sample_offset wolf_vorbis_get_sample_offset
+#define stb_vorbis_get_samples_float wolf_vorbis_get_samples_float
+#define stb_vorbis_get_samples_float_interleaved wolf_vorbis_get_samples_float_interleaved
+#define stb_vorbis_get_samples_short wolf_vorbis_get_samples_short
+#define stb_vorbis_get_samples_short_interleaved wolf_vorbis_get_samples_short_interleaved
+#define stb_vorbis_open_memory wolf_vorbis_open_memory
+#define stb_vorbis_seek wolf_vorbis_seek
+#define stb_vorbis_seek_frame wolf_vorbis_seek_frame
+#define stb_vorbis_seek_start wolf_vorbis_seek_start
+#define stb_vorbis_stream_length_in_samples wolf_vorbis_stream_length_in_samples
+#define stb_vorbis_stream_length_in_seconds wolf_vorbis_stream_length_in_seconds
 #include "../third_party/stb/stb_vorbis.c"
 
 namespace wolf {
