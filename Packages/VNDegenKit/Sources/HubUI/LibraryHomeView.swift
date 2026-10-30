@@ -53,22 +53,12 @@ struct LibraryHomeView: View {
                 .ignoresSafeArea(edges: .horizontal)
                 .onChange(of: nav.focus) { _, focus in
                     guard nav.focusMovedByController else { return }
-                    withAnimation(Theme.focusAnimation) {
-                        let row: String? = switch focus {
-                        case let .tile(shelf, _)?: shelf.rawValue
-                        case .importArchive?: Navigator.archivesRowID
-                        default: nil
-                        }
-                        if layout == .headers, case .tile? = focus {
-                            proxy.scrollTo(focus, anchor: .center)
-                        } else if let row {
-                            // Nested scroll views: scroll the page to the row, then the row to the focused item.
-                            proxy.scrollTo(row, anchor: .bottom)
-                            proxy.scrollTo(focus, anchor: UnitPoint(x: 0.35, y: 0.5))
-                        } else {
-                            proxy.scrollTo("stage", anchor: .top)
-                        }
-                    }
+                    withAnimation(Theme.focusAnimation) { reveal(focus, layout, proxy) }
+                }
+                // Back from a game page rebuilds this screen at the top, while focus is already on the game's tile.
+                .onAppear {
+                    guard nav.focusMovedByController, let focus = nav.focus else { return }
+                    Task { reveal(focus, layout, proxy) }
                 }
             }
             // A new layout starts at the top rather than at the old one's scroll offset.
@@ -78,6 +68,23 @@ struct LibraryHomeView: View {
         .animation(.smooth(duration: 0.3), value: layout)
         .onChange(of: metrics.headerColumns, initial: true) { _, columns in nav.headerColumns = columns }
         .overlay(alignment: .top) { TopBar() }
+    }
+
+    private func reveal(_ focus: Navigator.Target?, _ layout: LibraryLayout, _ proxy: ScrollViewProxy) {
+        let row: String? = switch focus {
+        case let .tile(shelf, _)?: shelf.rawValue
+        case .importArchive?: Navigator.archivesRowID
+        default: nil
+        }
+        if layout == .headers, case .tile? = focus {
+            proxy.scrollTo(focus, anchor: .center)
+        } else if let row {
+            // Nested scroll views: scroll the page to the row, then the row to the focused item.
+            proxy.scrollTo(row, anchor: .bottom)
+            proxy.scrollTo(focus, anchor: UnitPoint(x: 0.35, y: 0.5))
+        } else {
+            proxy.scrollTo("stage", anchor: .top)
+        }
     }
 }
 
@@ -138,6 +145,8 @@ struct TopBar: View {
             ViewThatFits(in: .horizontal) {
                 Wordmark()
                 Wordmark(showsName: false)
+                // The narrowest windows keep their room for the buttons.
+                Color.clear.frame(width: 0, height: 0)
             }
             .layoutPriority(1)
             // The stack's own spacing keeps the name off the buttons, so it may use all the room up to them.

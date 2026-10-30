@@ -374,8 +374,8 @@ final class Navigator {
     /// Touch users never see a focus ring. Controllers, the keyboard, and the pointer reveal it.
     func isFocused(_ target: Target) -> Bool { focus == target && hub.input.lastInputKind != .touch }
 
-    /// Screens scroll to keep focus in view only when a controller or the keyboard moved it. Scrolling under a hovering
-    /// pointer or a touch user's finger would fight them.
+    /// Screens scroll to keep focus in view only when a controller or the keyboard moved it, or a finished import focused
+    /// the new game. Scrolling under a hovering pointer or a touch user's finger would fight them.
     private(set) var focusMovedByController = false
     /// Set once a controller, the keyboard, or the pointer has moved focus. Until then focus follows the library as it loads.
     @ObservationIgnored private var steered = false
@@ -520,7 +520,11 @@ final class Navigator {
             let id = GameID(folderName)
             guard hub.library.game(id) != nil else { return }
             heroID = id
-            if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) { setFocus(tile) }
+            if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) {
+                // The new game can sort far down the header list, so the library scrolls to it whatever the input.
+                focusMovedByController = true
+                setFocus(tile)
+            }
         }
     }
 
