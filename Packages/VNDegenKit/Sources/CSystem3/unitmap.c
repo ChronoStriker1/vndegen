@@ -140,7 +140,8 @@ void s3_unitmap_command(S3 *s, int k, const u16 *a, const S3LV *lv) {
     case 'S': case 'G': {
         u16 *p = plane(s, a[0], a[1]);
         int x = a[2], y = a[3];
-        if (!p || !inside(m, x, y)) { s3_var_set(s, 0, 0); return; }
+        // Outside the map VG gives 65535 and VS changes nothing, RND included (System39.exe under Wine).
+        if (!p || !inside(m, x, y)) { if (k == 'G') s3_var_set(s, 0, 65535); return; }
         u16 *c = &p[y * m->w + x];
         s3_var_set(s, 0, *c);
         if (k == 'S') { if (a[1] == 1 && *c != a[4]) mark(m, x, y); *c = a[4]; }

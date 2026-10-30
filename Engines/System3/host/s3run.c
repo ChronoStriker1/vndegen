@@ -1,11 +1,13 @@
 // Runs a System 3 game headless for testing: replays scripted input and writes frames as PPM files.
 //   s3run <gameDir> [--ms N] [--save DIR] [--log FILE] [--final FILE.ppm] [--time UNIX]
-//         [--auto MS] [--prefer TEXT]... [--avoid TEXT]... [events...]
+//         [--auto MS] [--prefer TEXT]... [--avoid TEXT]... [--repl FIFO] [events...]
 // Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:shot:FILE.ppm, T:pick:TEXT
 // T:pick:TEXT waits from T until a menu offers an item containing TEXT, then chooses it; picks go in order, and the
 // autopilot answers the menus in between.
 // From --auto MS on, the autopilot presses Return at message waits, and once a second at other waits, and answers menus: a pending pick first, then the
 // first --prefer text an item contains, then a seeded random item, never one containing an --avoid text.
+// With --repl, after --ms it reads commands from FIFO, one per line, and prints "ok" after each:
+//   run MS | click X Y | rclick X Y | key VK | shot FILE | where | trace 0/1 | var FROM [TO] | quit
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 // It prints the game's problem, if one stopped it, and exits 1 then.
 #include "vns3.h"
@@ -85,7 +87,7 @@ int main(int argc, char **argv) {
     vnfont_init(S3_FONTS_DIR "/fonts.tsv", dirs, 1);
     VNS3Config cfg = { .gameDir = argv[1], .audioRate = 44100, .soundFontPath = S3_SOUNDFONT, .startTime = 1767225600 };
     int total = 10000, autoFrom = -1;
-    const char *final = NULL;
+    const char *final = NULL, *repl = NULL;
     static Ev ev[1024];
     int n = 0;
     for (int i = 2; i < argc; i++) {
@@ -95,6 +97,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--final") && i + 1 < argc) final = argv[++i];
         else if (!strcmp(argv[i], "--time") && i + 1 < argc) cfg.startTime = atoll(argv[++i]);
         else if (!strcmp(argv[i], "--auto") && i + 1 < argc) autoFrom = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--repl") && i + 1 < argc) repl = argv[++i];
         else if (!strcmp(argv[i], "--prefer") && i + 1 < argc && preferCount < 32) prefer[preferCount++] = argv[++i];
         else if (!strcmp(argv[i], "--avoid") && i + 1 < argc && avoidCount < 32) avoid[avoidCount++] = argv[++i];
         else if (n < 1024) {
@@ -153,6 +156,38 @@ int main(int argc, char **argv) {
         }
         if (!vns3_frame(g, 16)) { ok = !vns3_problem(g); break; }
         vns3_audio(g, audio, 705); // keep the mixer moving as a device would
+    }
+    while (ok && repl) {
+        FILE *in = fopen(repl, "r");
+        if (!in) break;
+        char line[600];
+        bool quit = false;
+        while (ok && !quit && fgets(line, sizeof line, in)) {
+            char cmd[16] = "", arg[512] = "";
+            int x = 0, y = 0;
+            sscanf(line, "%15s %511[^\n]", cmd, arg);
+            sscanf(arg, "%d %d", &x, &y);
+            int ms = 0;
+            if (!strcmp(cmd, "quit")) quit = true;
+            else if (!strcmp(cmd, "shot")) shot(g, arg);
+            else if (!strcmp(cmd, "where")) printf("page %d pc %x wait %d menus %d\n", s->page, s->pc, s->wait, s->menuCount);
+            else if (!strcmp(cmd, "trace")) s->trace = x != 0;
+            else if (!strcmp(cmd, "var")) { for (int v = x; v <= (y > x ? y : x); v++) printf("v%d=%u ", v, s3_var_get(s, (u16)v)); printf("\n"); }
+            else if (!strcmp(cmd, "run")) ms = x;
+            else if (!strcmp(cmd, "key")) { vns3_key(g, x, true); ok = vns3_frame(g, 16) || !vns3_problem(g); for (int k = 0; k < 5; k++) vns3_frame(g, 16); vns3_key(g, x, false); }
+            else if (!strcmp(cmd, "click") || !strcmp(cmd, "rclick")) {
+                int b = cmd[0] == 'r' ? VNS3_MOUSE_RIGHT : VNS3_MOUSE_LEFT;
+                vns3_mouse_move(g, x, y);
+                vns3_mouse_button(g, b, true);
+                for (int k = 0; k < 6; k++) vns3_frame(g, 16);
+                vns3_mouse_button(g, b, false);
+            }
+            for (int t = 0; t < ms && ok; t += 16) { if (!vns3_frame(g, 16)) ok = !vns3_problem(g) && false; vns3_audio(g, audio, 705); }
+            printf("ok %s\n", cmd);
+            fflush(stdout);
+        }
+        fclose(in);
+        if (quit) break;
     }
     if (final) shot(g, final);
     if (vns3_problem(g)) printf("problem: %s\n", vns3_problem(g));
