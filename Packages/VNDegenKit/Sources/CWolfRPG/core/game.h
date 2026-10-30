@@ -240,6 +240,10 @@ private:
     std::string readStr(int32_t id, const Thread &t) const;
     void writeStr(int32_t id, const std::string &s, const Thread &t);
     int32_t *selfSlot(int32_t id, const Thread &t);
+    // The database cell a 1 X TT DDDD FF address names, or null when the database has no such cell or it holds the
+    // other kind of value.
+    int32_t *dbNumberCell(int32_t id);
+    std::string *dbStringCell(int32_t id);
     int32_t dbNumber(const Database &db, int type, int row, int field) const;
     std::string dbString(const Database &db, int type, int row, int field) const;
 

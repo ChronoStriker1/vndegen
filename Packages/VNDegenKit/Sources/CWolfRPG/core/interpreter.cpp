@@ -10,6 +10,16 @@
 
 namespace wolf {
 
+namespace {
+
+// 600050 to 600150 name a common event relative to the running one, 600100 being itself (WodiLib's CommonEventId).
+int resolveRelativeCommon(int id, const Thread &t) {
+    if (id < 600050 || id > 600150 || t.stack.empty() || t.stack.back().commonEvent < 0) return id;
+    return 500000 + t.stack.back().commonEvent + id - 600100;
+}
+
+}  // namespace
+
 void Game::run(Thread &t) {
     if (t.wait > 0) {
         t.wait--;
@@ -270,7 +280,7 @@ bool Game::step(Thread &t) {
         }
 
         case 210: {  // call a common event, or a page of a map event
-            int id = value(cmd.arg(0), t);
+            int id = resolveRelativeCommon(value(cmd.arg(0), t), t);
             if (id >= 500000 && id < 600000) {
                 callCommon(t, id - 500000, cmd, 1);
             } else {
@@ -286,7 +296,7 @@ bool Game::step(Thread &t) {
             return true;
         }
         case 211: {  // run a common event after this event ends
-            int id = value(cmd.arg(0), t);
+            int id = resolveRelativeCommon(value(cmd.arg(0), t), t);
             if (id >= 500000) id -= 500000;
             if (const CommonEvent *ce = commonById(id)) {
                 Thread r;
@@ -473,13 +483,18 @@ void Game::callCommon(Thread &t, int id, const Command &cmd, int argBase) {
     int strings = (flags >> 4) & 0x0F;
     int refFlags = (flags >> 8) & 0xFF;
     bool wantsReturn = ((flags >> 24) & 0xFF) == 1;
-    std::array<int32_t, 100> &self = cself_[id];
-    for (int i = 0; i < numbers && i < 5; i++) self[i] = value(cmd.arg(argBase + 1 + i), t);
+    // Arguments are read in the caller's context before any reaches the callee, so a text code such as \cself[0] in a
+    // string argument means the caller's variable, even when an event calls itself.
+    numbers = std::min(numbers, 5);
+    strings = std::min(strings, 5);
+    std::array<int32_t, 5> nums{};
+    std::array<std::string, 5> strs;
+    for (int i = 0; i < numbers; i++) nums[i] = value(cmd.arg(argBase + 1 + i), t);
     int next = argBase + 1 + numbers;
-    for (int i = 0; i < strings && i < 5; i++) {
-        if (refFlags & (1 << i)) cselfStr_[id][5 + i] = readStr(cmd.arg(next++), t);
-        else cselfStr_[id][5 + i] = cmd.str(1 + i);
-    }
+    for (int i = 0; i < strings; i++)
+        strs[i] = (refFlags & (1 << i)) ? readStr(cmd.arg(next++), t) : expandText(cmd.str(1 + i), &t);
+    for (int i = 0; i < numbers; i++) cself_[id][i] = nums[i];
+    for (int i = 0; i < strings; i++) cselfStr_[id][5 + i] = std::move(strs[i]);
     int32_t returnTo = wantsReturn ? cmd.arg(next) : 0;
     t.stack.push_back({&ce->commands, 0, id, -1, returnTo});
 }
@@ -506,6 +521,9 @@ void Game::setVariable(Thread &t, const Command &c) {
         case 0x60: rhs = std::uniform_int_distribution<int>(std::min(a, b), std::max(a, b))(rng_); break;
         case 0xF0: rhs = int32_t(std::lround(std::atan2(double(a), double(b)) * 1800 / M_PI)); break;
     }
+    // The multi-target flag (byte 2 bit 0) applies the result to the target and the next arg(4) variables.
+    int32_t count = (flags >> 16) & 0x01 ? std::max(0, c.arg(4)) : 0;
+    for (int32_t k = 0; k <= count; k++, target++) {
     // Right side 2 of exactly zero with addition is how the editor writes "assign the first value".
     int32_t cur = assign == 0 ? 0 : readVar(target, t);
     int32_t out = cur;
@@ -524,6 +542,7 @@ void Game::setVariable(Thread &t, const Command &c) {
         case 0x0B: out = int32_t(std::lround(std::cos(rhs * M_PI / 1800) * 1000)); break;
     }
     writeVar(target, out, t);
+    }
 }
 
 // A message starting with "@n" shows face graphic n beside it; the code's line is not text.

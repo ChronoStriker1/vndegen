@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <type_traits>
 
 namespace fs = std::filesystem;
 
@@ -37,6 +38,18 @@ bool Game::load(std::string *error) {
     normal_.assign(std::max<size_t>(rows(SysNormalVarNames), 100), 0);
     for (int i = 0; i < 9; i++) spare_[i].assign(std::max<size_t>(rows(SysSpare1 + i), 100), 0);
     system_.assign(std::max<size_t>(rows(SysSystemVarNames), 200), 0);
+    // System variables the standard systems read to lay out their windows: 84 the old screen size code, 115 the
+    // engine version times 100 (2.24 for Shift-JIS games and 3.28 for UTF-8 ones, as no Game.dat field is known to
+    // hold it), 116 and 117 the screen size, 118 the tile size, and 119 the scale of a 320 by 240 game.
+    {
+        int w = gameDat_.screenWidth, h = gameDat_.screenHeight;
+        system_[84] = w == 320 && h == 240 ? 0 : w == 640 && h == 480 ? 1 : w == 800 && h == 600 ? 2 : -1;
+        system_[115] = gameDat_.encoding == Encoding::UTF8 ? 328 : 224;
+        system_[116] = w;
+        system_[117] = h;
+        system_[118] = gameDat_.tileSize();
+        system_[119] = w == 320 && h == 240 ? 2 : 1;
+    }
     strings_.assign(std::max<size_t>(rows(SysStringVarNames), 100), "");
     systemStrings_.assign(std::max<size_t>(rows(SysSystemStrings), 100), "");
     int maxCommon = 0;
@@ -125,6 +138,29 @@ int32_t *Game::selfSlot(int32_t id, const Thread &t) {
     return nullptr;
 }
 
+// 1 X TT DDDD FF: X picks the database (0 user, 1 changeable, 3 system), then type, row and field.
+namespace {
+template <class Cell>
+Cell *dbCell(std::array<Database *, 3> dbs, int32_t id, bool wantString) {
+    Database &db = *(id >= 1300000000 ? dbs[2] : id >= 1100000000 ? dbs[1] : dbs[0]);
+    int type = (id / 1000000) % 100, row = (id / 100) % 10000, field = id % 100;
+    if (type >= int(db.types.size())) return nullptr;
+    DatabaseType &dt = db.types[type];
+    if (row >= int(dt.rows.size()) || field >= int(dt.fieldKinds.size()) || dt.isString(field) != wantString)
+        return nullptr;
+    auto &cells = [&]() -> auto & {
+        if constexpr (std::is_same_v<Cell, std::string>) return dt.rows[row].strings;
+        else return dt.rows[row].numbers;
+    }();
+    size_t slot = dt.slot(field);
+    return slot < cells.size() ? &cells[slot] : nullptr;
+}
+}  // namespace
+
+int32_t *Game::dbNumberCell(int32_t id) { return dbCell<int32_t>({&udb_, &cdb_, &sdb_}, id, false); }
+
+std::string *Game::dbStringCell(int32_t id) { return dbCell<std::string>({&udb_, &cdb_, &sdb_}, id, true); }
+
 bool Game::isStringVar(int32_t id) const {
     if (id >= 3000000 && id < 4000000) return true;
     if (id >= 9900000 && id < 10000000) return true;
@@ -132,6 +168,11 @@ bool Game::isStringVar(int32_t id) const {
     if (id >= 15000000 && id < 16000000) {
         int s = (id - 15000000) % 100;
         return s >= 5 && s < 10;
+    }
+    if (id >= 1000000000) {
+        const Database &db = id >= 1300000000 ? sdb_ : id >= 1100000000 ? cdb_ : udb_;
+        int type = (id / 1000000) % 100;
+        return type < int(db.types.size()) && db.types[type].isString(id % 100);
     }
     return false;
 }
@@ -189,6 +230,10 @@ void Game::writeVar(int32_t id, int32_t v, const Thread &t) {
         *s = v;
         return;
     }
+    if (id >= 1000000000) {
+        if (int32_t *cell = dbNumberCell(id)) *cell = v;
+        return;
+    }
     log(format("write to unsupported variable %d", id));
 }
 
@@ -231,6 +276,10 @@ void Game::writeStr(int32_t id, const std::string &s, const Thread &t) {
     if (id >= 15000000 && id < 16000000) {
         int ce = (id - 15000000) / 100;
         if (ce < int(cselfStr_.size())) cselfStr_[ce][(id - 15000000) % 100] = s;
+        return;
+    }
+    if (id >= 1000000000) {
+        if (std::string *cell = dbStringCell(id)) *cell = s;
         return;
     }
     log(format("write to unsupported string variable %d", id));
@@ -477,16 +526,18 @@ void Game::update(const Input &input) {
         }
     }
 
-    // Parallel common events run every frame while their condition holds.
+    // Parallel common events run every frame while their condition holds, beside any other event, and stop where they
+    // are once it doesn't (the manual's common event settings). Run condition 3, parallel always, ignores its condition.
     if (parallel_.size() != commons_.size()) parallel_.resize(commons_.size());
     for (size_t i = 0; i < commons_.size(); i++) {
         auto &ce = commons_[i];
         if (ce.runCondition < 2 || ce.commands.size() <= 1) continue;
-        if (ce.runCondition == 2 && !threads_.empty()) continue;
         Thread &t = parallel_[i];
+        if (ce.runCondition != 3 && !commonConditionMet(ce)) {
+            t = Thread{};
+            continue;
+        }
         if (t.done()) {
-            // Run condition 3, parallel always, runs whatever its condition says.
-            if (ce.runCondition != 3 && !commonConditionMet(ce)) continue;
             t = Thread{};
             t.stack.push_back({&ce.commands, 0, ce.id, -1});
         }

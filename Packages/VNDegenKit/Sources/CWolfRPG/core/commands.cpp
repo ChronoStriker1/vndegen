@@ -112,7 +112,8 @@ void Game::databaseCommand(Thread &t, const Command &c) {
     if (dt->isString(field)) {
         if (slot >= r.strings.size()) return;
         if (read) {
-            writeStr(target, r.strings[slot], t);
+            // Operator 0x10 appends the field to the string variable.
+            writeStr(target, op == 0x10 ? readStr(target, t) + r.strings[slot] : r.strings[slot], t);
         } else {
             // Low code 2 assigns, with 0x10 appending; the text is given or comes from a string variable.
             std::string rhs = (flags & 0x0F) == 0x02 ? expandText(c.str(0), &t) : readStr(target, t);
@@ -361,6 +362,8 @@ bool Game::keyInput(Thread &t, const Command &c) {
         t.stack.back().pc--;
         return false;
     }
+    // A press a waiting input accepts is used up, so the next wait in the same frame waits for a press of its own.
+    if (wait) input_.pressed &= ~keys;
     writeVar(target, v, t);
     return true;
 }
@@ -420,14 +423,14 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.g.set(a2, frames / 2);
                     p.b.set(a3, frames / 2);
                     break;
-                case 0x10:  // colour correction
-                    p.r.set(a1, frames);
-                    p.g.set(a2, frames);
-                    p.b.set(a3, frames);
+                case 0x10:  // colour correction, as offsets from the normal 100
+                    p.r.set(100 + a1, frames);
+                    p.g.set(100 + a2, frames);
+                    p.b.set(100 + a3, frames);
                     break;
-                case 0x20:  // shift the drawing position
-                    p.x.set(p.x.value() + a1, frames);
-                    p.y.set(p.y.value() + a2, frames);
+                case 0x20:  // shift where the picture draws, apart from its position, which moves leave alone
+                    p.shiftX = a1;
+                    p.shiftY = a2;
                     break;
                 case 0x30:  // shake
                     p.shakePower = a1;
@@ -438,7 +441,10 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.zoomX.set(a1, frames);
                     p.zoomY.set(a2 ? a2 : a1, frames);
                     break;
-                case 0x50:  // switch visibility on and off
+                case 0x50:  // pulse the colour by the offsets, the frames field giving the interval
+                    p.pulse = {a1, a2, a3};
+                    p.pulseInterval = (a1 || a2 || a3) ? std::max(0, frames) : 0;
+                    break;
                 case 0x60:
                     p.flickerFrames = frames;
                     p.flickerInterval = std::max(1, a1);
