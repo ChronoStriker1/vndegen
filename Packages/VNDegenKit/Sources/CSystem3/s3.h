@@ -170,6 +170,7 @@ struct S3 {
     int msgBgAlpha, menuBgAlpha, menuDefault;
     int palBank;
     S3Win msgWin[128], selWin[128];  // the PC save keeps 128 of each
+    u8 *msgUnder[101];      // what B4 covered with a message window whose B3 asked to keep it, for B4 ... ,1
     int curMsg, curSel;
     int msgFrameOn, selFrameOn;
     int tx, ty;                // next text position
@@ -226,6 +227,8 @@ struct S3 {
 
     // fonts and audio (opaque here)
     struct S3Font *font;
+    struct S3Gaiji *gaiji;     // GAIJI.DAT's characters, for System 3.0 games that ship one
+    int gaijiCount;
     struct S3UnitMap *unitMap;
     struct S3Sprites *sprites;
     struct S3Audio *audio;
@@ -261,6 +264,10 @@ bool s3_font_open(S3 *s, const char *path, int index);
 void s3_font_close(S3 *s);
 // Draws one character at (x, y) with the cell height size; returns the advance.
 int s3_draw_char(S3 *s, u32 cp, bool half, int x, int y, int size, int color);
+// Code points from S3_GAIJI on stand for GAIJI.DAT's characters, by their index there.
+#define S3_GAIJI 0xf0000u
+void s3_gaiji_load(S3 *s);
+int s3_gaiji_find(S3 *s, const u8 *sjis);
 
 // msg.c
 void s3_msg_text(S3 *s, const char *sjis);

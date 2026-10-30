@@ -69,8 +69,56 @@ static Glyph *glyph(S3Font *f, u32 cp, int size, bool half) {
     return g;
 }
 
+// GAIJI.DAT, read from the files of the System 3.0 games: u16 count, u16 cell size (16), 30 zero bytes, then per
+// character a u16 JIS code and 16 rows of u16 pixels, leftmost pixel in the top bit. The codes are in JIS rows 0x76
+// and 0x77, which Shift-JIS writes as EB 9F to EC 9E: the games' save dates, AM, PM and such.
+typedef struct S3Gaiji { u8 lead, trail; u16 rows[16]; } S3Gaiji;
+
+void s3_gaiji_load(S3 *s) {
+    char *path = s3_find_file(s->gameDir, "GAIJI.DAT");
+    size_t n;
+    u8 *d = path ? s3_read_file(path, &n) : NULL;
+    free(path);
+    if (!d) return;
+    int count = n >= 34 && s3_le16(d + 2) == 16 ? s3_le16(d) : 0;
+    if (count > (int)((n - 34) / 34)) count = (int)((n - 34) / 34);
+    s->gaiji = s3_alloc(sizeof(S3Gaiji) * (size_t)(count + 1));
+    for (int i = 0; i < count; i++) {
+        const u8 *e = d + 34 + (size_t)i * 34;
+        int row = e[1], col = e[0];
+        S3Gaiji *g = &s->gaiji[s->gaijiCount++];
+        g->lead = (u8)((row + 1) / 2 + (row <= 0x5e ? 0x70 : 0xb0));
+        g->trail = (u8)(row & 1 ? col + (col < 0x60 ? 0x1f : 0x20) : col + 0x7e);
+        for (int y = 0; y < 16; y++) g->rows[y] = s3_le16(e + 2 + y * 2);
+    }
+    free(d);
+}
+
+int s3_gaiji_find(S3 *s, const u8 *sjis) {
+    for (int i = 0; i < s->gaijiCount; i++) if (s->gaiji[i].lead == sjis[0] && s->gaiji[i].trail == sjis[1]) return i;
+    return -1;
+}
+
+// A GAIJI.DAT character, scaled from its 16 by 16 cell to the font size.
+static void draw_gaiji(S3 *s, const S3Gaiji *g, int x, int y, int size, int color) {
+    u32 rgb = s3_rgb(s, color);
+    for (int j = 0; j < size; j++)
+        for (int i = 0; i < size; i++) {
+            if (!(g->rows[j * 16 / size] & (0x8000 >> (i * 16 / size)))) continue;
+            int dx = x + i, dy = y + j;
+            if (dx < 0 || dy < 0 || dx >= s->dib.w || dy >= s->dib.h) continue;
+            size_t di = (size_t)dy * s->dib.w + dx;
+            if (s->dib.depth == 8) s->dib.p8[di] = (u8)color; else s->dib.p32[di] = rgb;
+        }
+    s3_mark_dirty(s);
+}
+
 int s3_draw_char(S3 *s, u32 cp, bool half, int x, int y, int size, int color) {
     int adv = half ? size / 2 : size;
+    if (cp >= S3_GAIJI) {
+        if (cp - S3_GAIJI < (u32)s->gaijiCount) draw_gaiji(s, &s->gaiji[cp - S3_GAIJI], x, y, size, color);
+        return adv;
+    }
     if (!s->font || cp == ' ' || cp == 0x3000) return adv;
     Glyph *g = glyph(s->font, cp, size, half);
     if (!g->bits) return adv;

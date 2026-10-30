@@ -43,6 +43,8 @@ static void menu_append(S3 *s, const char *sjis) {
 // Converts one character for display under the current ZH mode. Returns the code point and
 // whether it takes a half-width cell.
 static int next_char(S3 *s, const u8 *p, u32 *cp, bool *half) {
+    int g = s->gaijiCount && p[0] >= 0xeb && p[1] ? s3_gaiji_find(s, p) : -1;
+    if (g >= 0) { *cp = S3_GAIJI + (u32)g; *half = false; return 2; }
     int n = s3_sjis_decode(p, cp);
     *half = n == 1;
     if (s->zh == 0 && n == 1) {
@@ -92,12 +94,30 @@ void s3_msg_text(S3 *s, const char *sjis) {
     }
 }
 
+// Copies a window's rectangle of the DIB out to *buf (allocating it) or back in.
+static void window_area(S3 *s, const S3Win *win, u8 **buf, bool out) {
+    int x = win->x, y = win->y, w = win->w, h = win->h;
+    if (!s3_clip(s, &x, &y, &w, &h)) return;
+    size_t px = s->dib.depth == 8 ? 1 : 4, row = (size_t)w * px;
+    if (out && !*buf) *buf = s3_alloc(row * (size_t)h);
+    if (!*buf) return;
+    for (int j = 0; j < h; j++) {
+        u8 *dib = (s->dib.depth == 8 ? s->dib.p8 : (u8 *)s->dib.p32) + ((size_t)(y + j) * s->dib.w + x) * px;
+        if (out) memcpy(*buf + (size_t)j * row, dib, row); else memcpy(dib, *buf + (size_t)j * row, row);
+    }
+    if (!out) { free(*buf); *buf = NULL; s3_mark_dirty(s); }
+}
+
+// B4 num, frame, -, -, noClear, restore. restore 0 keeps what the window covers when its B3 asked to, then makes it the
+// message window and clears it unless noClear; restore 1 puts back what the window covered and leaves the current
+// window as it is, as the System 3.0 games' save screens rely on.
 void s3_msg_select_window(S3 *s, int n, int frame, int noClear, int restore) {
     if (n < 1 || n > 100) return;
+    if (restore) { if (s->msgUnder[n]) window_area(s, &s->msgWin[n], &s->msgUnder[n], false); return; }
+    if (s->msgWin[n].save) { free(s->msgUnder[n]); s->msgUnder[n] = NULL; window_area(s, &s->msgWin[n], &s->msgUnder[n], true); }
     s->curMsg = n;
     s->msgFrameOn = frame;
     S3Win *w = msgwin(s);
-    (void)restore;
     if (!noClear) s3_msg_clear(s);
     s->tx = w->x;
     s->ty = w->y;
@@ -245,7 +265,7 @@ void s3_menu_close(S3 *s, int choice) {
 
 char *s3_display_utf8(S3 *s, const char *sjis) {
     size_t n = strlen(sjis);
-    char *out = s3_alloc(n * 3 + 1), *o = out;
+    char *out = s3_alloc(n * 4 + 1), *o = out;
     const u8 *p = (const u8 *)sjis;
     while (*p) {
         u32 cp;
@@ -253,7 +273,8 @@ char *s3_display_utf8(S3 *s, const char *sjis) {
         p += next_char(s, p, &cp, &half);
         if (cp < 0x80) *o++ = (char)cp;
         else if (cp < 0x800) { *o++ = (char)(0xc0 | cp >> 6); *o++ = (char)(0x80 | (cp & 0x3f)); }
-        else { *o++ = (char)(0xe0 | cp >> 12); *o++ = (char)(0x80 | ((cp >> 6) & 0x3f)); *o++ = (char)(0x80 | (cp & 0x3f)); }
+        else if (cp < 0x10000) { *o++ = (char)(0xe0 | cp >> 12); *o++ = (char)(0x80 | ((cp >> 6) & 0x3f)); *o++ = (char)(0x80 | (cp & 0x3f)); }
+        else { *o++ = (char)(0xf0 | cp >> 18); *o++ = (char)(0x80 | ((cp >> 12) & 0x3f)); *o++ = (char)(0x80 | ((cp >> 6) & 0x3f)); *o++ = (char)(0x80 | (cp & 0x3f)); }
     }
     *o = 0;
     return out;

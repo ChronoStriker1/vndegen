@@ -226,6 +226,7 @@ bool s3_open30(S3 *s) {
     static const char *const cgs[] = { "ACG.DAT", "BCG.DAT", "CCG.DAT", "DCG.DAT" };
     if (!s3_dat_open(&s->adisk, s->gameDir, scenario, 1)) return false;
     s3_dat_open(&s->cg30, s->gameDir, cgs, 4);
+    s3_gaiji_load(s);
     s->s30 = s3_alloc(sizeof(S3State30));
     S3State30 *t = s->s30;
     // The defaults a fresh SYSTEM3.EXE saves.
@@ -260,6 +261,9 @@ void s3_close30(S3 *s) {
     s->s30 = NULL;
     s3_dat_close(&s->adisk);
     s3_dat_close(&s->cg30);
+    free(s->gaiji);
+    s->gaiji = NULL;
+    s->gaijiCount = 0;
 }
 
 // ---- commands ----
@@ -389,7 +393,7 @@ static void command30(S3 *s) {
             s->curSel = k;
             s->selFrameOn = v[1];
         } else if (sub == 4) {
-            if (v[4] == 0) { s3_msg_select_window(s, k, v[3], 0, 0); }
+            s3_msg_select_window(s, k, v[1], v[4], v[5]);
         }
         return;
     }

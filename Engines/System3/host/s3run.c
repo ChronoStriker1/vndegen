@@ -38,11 +38,23 @@ static bool contains_any(const char *text, const char **list, int count) {
     return false;
 }
 
+// Full-width ASCII and ideographic spaces as plain ASCII, in place, so menu text matches as typed.
+static void narrow(char *u) {
+    unsigned char *r = (unsigned char *)u, *w = r;
+    while (*r) {
+        if (r[0] == 0xef && r[1] == 0xbc && r[2] >= 0x81 && r[2] <= 0xbf) { *w++ = (unsigned char)(r[2] - 0x60); r += 3; }
+        else if (r[0] == 0xef && r[1] == 0xbd && r[2] >= 0x80 && r[2] <= 0x9e) { *w++ = (unsigned char)(r[2] - 0x20); r += 3; }
+        else if (r[0] == 0xe3 && r[1] == 0x80 && r[2] == 0x80) { *w++ = ' '; r += 3; }
+        else *w++ = *r++;
+    }
+    *w = 0;
+}
+
 // Chooses an item of the open menu: the pick if one matches, else the autopilot's choice. Returns -1 for none.
 static int choose(S3 *s, const char *pick, bool autopilot, int *turn) {
     char *items[S3_MAX_MENU];
     int count = s->menuCount, choice = -1;
-    for (int i = 0; i < count; i++) items[i] = s3_display_utf8(s, s->menu[i].text);
+    for (int i = 0; i < count; i++) { items[i] = s3_display_utf8(s, s->menu[i].text); narrow(items[i]); }
     if (pick) for (int i = 0; i < count && choice < 0; i++) if (strstr(items[i], pick)) choice = i;
     if (choice < 0 && autopilot && !pick) {
         for (int p = 0; p < preferCount && choice < 0; p++)
@@ -57,6 +69,7 @@ static int choose(S3 *s, const char *pick, bool autopilot, int *turn) {
         printf("%llu ms: menu", (unsigned long long)s->clockMs);
         for (int i = 0; i < count; i++) printf(" %s[%s]", i == choice ? "*" : "", items[i]);
         printf("\n");
+        for (int i = 0; i < count; i++) if (strstr(items[i], "\xef\xbf\xbd")) { printf("  raw %d zh %d:", i, s->menu[i].zh); for (const unsigned char *q = (const unsigned char *)s->menu[i].text; *q; q++) printf(" %02x", *q); printf("\n"); }
     }
     for (int i = 0; i < count; i++) free(items[i]);
     return choice;

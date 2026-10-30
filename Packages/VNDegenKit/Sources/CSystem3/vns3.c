@@ -146,6 +146,7 @@ void vns3_close(VNS3 *s3) {
     free(s->dib.p32);
     free(s->screen);
     free(s->menuSave);
+    for (int i = 0; i < 101; i++) free(s->msgUnder[i]);
     if (s->log) fclose(s->log);
     free(s->gameDir);
     free(s->saveDir);
