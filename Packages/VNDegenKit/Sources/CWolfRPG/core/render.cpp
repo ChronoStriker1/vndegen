@@ -282,7 +282,17 @@ void Renderer::draw(Bitmap &frame) {
     }
     Canvas canvas(frame);
     canvas.clear(0, 0, 0);
-    map_.draw(canvas);
+    if (auto [rate, cx, cy] = game_.mapZoom(); std::abs(rate - 100) > 0.01) {
+        // A zoomed map is drawn at its normal size first, then scaled around the zoom's centre.
+        if (mapLayer_.w != w || mapLayer_.h != h) mapLayer_ = Bitmap(w, h);
+        Canvas layer(mapLayer_);
+        layer.clear(0, 0, 0);
+        map_.draw(layer);
+        float s = float(rate / 100);
+        canvas.draw(mapLayer_, {0, 0, w, h}, {float(cx - cx * s), float(cy - cy * s), w * s, h * s});
+    } else {
+        map_.draw(canvas);
+    }
     std::erase_if(pictureImages_, [&](auto &kv) { return !game_.pictures().count(kv.first); });
     for (auto &[n, p] : game_.pictures()) drawPicture(canvas, n, p);
     auto tint = game_.screenColor();

@@ -220,6 +220,9 @@ public:
     std::array<uint8_t, 3> textColor(int i) const;
     uint64_t frameCount() const { return frame_; }
     const ShakeState &shake() const { return shake_; }
+    // The effect command's map zoom: the rate in percent and the screen point it zooms around. The map, its
+    // characters, the background and fog zoom; pictures don't.
+    std::array<double, 3> mapZoom() const { return {mapZoom_.value(), mapZoomX_.value(), mapZoomY_.value()}; }
     const TransitionState &transition() const { return transition_; }
     double scrollX() const { return scrollX_; }
     double scrollY() const { return scrollY_; }
@@ -382,6 +385,7 @@ private:
     uint32_t autoKeys_ = 0;
     int keyControl_ = 0;
     ShakeState shake_;
+    Tween mapZoom_{100, 100}, mapZoomX_, mapZoomY_;
     TransitionState transition_;
     int transitionFrames_ = 0;
     double scrollX_ = 0, scrollY_ = 0;

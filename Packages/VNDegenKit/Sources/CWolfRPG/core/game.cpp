@@ -589,6 +589,7 @@ void Game::update(const Input &input) {
     tintR_.step();
     tintG_.step();
     tintB_.step();
+    for (Tween *z : {&mapZoom_, &mapZoomX_, &mapZoomY_}) z->step();
     updateCamera();
 }
 

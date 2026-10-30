@@ -41,6 +41,7 @@ private:
         Bitmap bitmap;
     };
     std::map<int, CachedImage> pictureImages_;
+    Bitmap mapLayer_;  // the map before a map zoom scales it
     Bitmap frozen_;  // the screen as it was when a transition was prepared
     uint64_t frozenGeneration_ = 0;
 };

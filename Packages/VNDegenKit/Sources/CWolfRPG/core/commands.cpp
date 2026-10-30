@@ -468,6 +468,14 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     break;
             }
         }
+    } else if (targetKind == 2) {  // the map: zoom around a point; 100% returns to normal
+        if (type == 0x00) {
+            mapZoomX_.set(a1, frames);
+            mapZoomY_.set(a2, frames);
+            mapZoom_.set(a3 > 0 ? a3 : 100, frames);
+        } else {
+            unsupported(c);
+        }
     } else if (targetKind == 1) {  // a character
         Actor *a = actorFor(value(c.arg(2), t), t);
         if (!a) return;
