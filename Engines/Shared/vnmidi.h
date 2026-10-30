@@ -22,6 +22,10 @@ typedef struct vnmidi_player vnmidi_player;
 // Loads a SoundFont and decodes all of its samples, which takes a moment for an .sf3 file. Returns NULL on failure and
 // writes a one-line reason to `error` when it isn't NULL.
 vnmidi_font *vnmidi_font_load(const char *path, char *error, size_t error_size);
+// Loads `path`, or `fallback` when that fails, as when a SoundFont the player chose can't be read. `error` is left
+// empty when `path` loads; after a fallback it says why `path` failed, for the log. Returns NULL with both reasons when
+// neither loads. `fallback` may be NULL.
+vnmidi_font *vnmidi_font_load_fallback(const char *path, const char *fallback, char *error, size_t error_size);
 // Releases the font. Players opened from it keep its samples until they close, so this may come before their close.
 void vnmidi_font_free(vnmidi_font *font);
 

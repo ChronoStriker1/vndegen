@@ -241,6 +241,17 @@ static void builtin(const char *font_path) {
     if (!font) return;
     printf("font loaded in %.2f s CPU\n", cpu_seconds() - t0);
 
+    // A font that can't be read falls back to the second path and says why; one that reads leaves the error empty.
+    vnmidi_font *fallback = vnmidi_font_load_fallback(__FILE__, font_path, error, sizeof error);
+    CHECK(fallback && strstr(error, "isn't a SoundFont") && strstr(error, "instead"), "fallback: '%s'", error);
+    printf("fallback: %s\n", error);
+    vnmidi_font_free(fallback);
+    CHECK(!vnmidi_font_load_fallback("/nonexistent/x.sf2", "/nonexistent/y.sf2", error, sizeof error) &&
+              strstr(error, "x.sf2") && strstr(error, "y.sf2"),
+          "both missing: '%s'", error);
+    CHECK(!vnmidi_font_load_fallback("/nonexistent/x.sf2", NULL, error, sizeof error) && error[0],
+          "no fallback: '%s'", error);
+
     for (int format = 0; format <= 1; format++) {
         bytes song = make_song(format);
         vnmidi_player *p = vnmidi_player_open(font, song.d, song.n, RATE, error, sizeof error);

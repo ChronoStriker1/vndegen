@@ -20,6 +20,7 @@ typedef struct VNWolfLaunch {
     const char *gameRoot;       // folder holding Game.exe and Data or Data.wolf
     const char *logPath;        // file the runtime's log is appended to; NULL logs to stderr
     const char *soundFontPath;  // General MIDI SoundFont for MIDI music; NULL plays MIDI silently
+    const char *fallbackSoundFontPath;  // loaded when soundFontPath can't be; may be NULL
 } VNWolfLaunch;
 
 // Starts a game. Returns NULL when it can't, with the reason in vnwolf_start_error().

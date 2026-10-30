@@ -110,6 +110,22 @@ vnmidi_font *vnmidi_font_load(const char *path, char *error, size_t error_size) 
     return font;
 }
 
+vnmidi_font *vnmidi_font_load_fallback(const char *path, const char *fallback, char *error, size_t error_size) {
+    set_error(error, error_size, "%s", "");
+    char first[256] = "";
+    vnmidi_font *font = vnmidi_font_load(path, first, sizeof first);
+    if (font) return font;
+    if (!fallback || !*fallback) {
+        set_error(error, error_size, "%s", first);
+        return NULL;
+    }
+    char second[256] = "";
+    font = vnmidi_font_load(fallback, second, sizeof second);
+    if (font) set_error(error, error_size, "%s; using %s instead", first, fallback);
+    else set_error(error, error_size, "%s; %s", first, second);
+    return font;
+}
+
 void vnmidi_font_free(vnmidi_font *font) {
     if (!font) return;
     pthread_mutex_lock(&share_lock);

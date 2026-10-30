@@ -6,6 +6,7 @@ import Metadata
 import GameInput
 import Lock
 import SaveSync
+import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #else
@@ -159,6 +160,18 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        soundFontRow
+                        if nav.soundFontName != nil {
+                            Button("Use the built-in SoundFont", systemImage: "arrow.uturn.backward") { nav.select(.soundFontReset) }
+                                .focusRow(.soundFontReset, nav)
+                        }
+                    } header: {
+                        Text("MIDI music")
+                    } footer: {
+                        Text("Wolf RPG Editor games play their MIDI music through a General MIDI SoundFont. Choose an .sf2 or .sf3 file to use instead of the built-in FluidR3 Mono; VNDegen keeps a copy of it. If it can't be read, the built-in font plays. RPG Maker XP, VX and VX Ace games play MIDI with a synthesizer of their own and aren't affected. Games started after a change use it.")
+                    }
+
+                    Section {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                         pageRow("Licenses", systemImage: "doc.text", value: "", page: .licenses)
                     }
@@ -175,6 +188,28 @@ struct SettingsView: View {
         }
         .balancedHorizontalSafeArea(metrics)
         .background { Theme.background.ignoresSafeArea() }
+    }
+
+    /// The SoundFont in use, and the row that opens the file picker for another.
+    private var soundFontRow: some View {
+        Button { nav.select(.soundFont) } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label("SoundFont", systemImage: "pianokeys").foregroundStyle(.white)
+                    Spacer()
+                    Text("Choose…").foregroundStyle(Theme.accent)
+                }
+                Text(nav.soundFontError ?? nav.soundFontName ?? "Built-in: FluidR3 Mono")
+                    .font(.footnote).foregroundStyle(Theme.secondaryText).fixedSize(horizontal: false, vertical: true)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .focusRow(.soundFont, nav)
+        .fileImporter(isPresented: Binding(get: { nav.pickingSoundFont }, set: { nav.pickingSoundFont = $0 }),
+                      allowedContentTypes: MIDISoundFont.fileExtensions.compactMap { UTType(filenameExtension: $0) }) {
+            nav.installSoundFont($0)
+        }
     }
 
     private var savesSummary: String {

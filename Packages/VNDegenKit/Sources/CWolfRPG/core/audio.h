@@ -42,9 +42,10 @@ public:
     Audio(const Audio &) = delete;
     Audio &operator=(const Audio &) = delete;
 
-    // The General MIDI SoundFont (.sf2) for MIDI files. Without one, MIDI files play silently. Defaults to the
+    // The General MIDI SoundFont (.sf2 or .sf3) for MIDI files, and one to load instead when it can't be read, such as
+    // the bundled font behind one the player chose. Without one, MIDI files play silently. Defaults to the
     // WOLF_SOUNDFONT environment variable. The font loads on the first MIDI file.
-    void setSoundFontPath(std::string path);
+    void setSoundFontPath(std::string path, std::string fallback = {});
     // Game frames per second, which fade and delay times count in. Wolf games run at 60 or 30.
     void setFrameRate(int fps);
 

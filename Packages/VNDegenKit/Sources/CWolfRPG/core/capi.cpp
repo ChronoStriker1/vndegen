@@ -76,7 +76,9 @@ VNWolfEngine *vnwolf_start(const VNWolfLaunch *launch) {
         if (e->log) std::fclose(e->log);
         return nullptr;
     }
-    if (launch->soundFontPath && e->game->audio()) e->game->audio()->setSoundFontPath(launch->soundFontPath);
+    if (launch->soundFontPath && e->game->audio())
+        e->game->audio()->setSoundFontPath(launch->soundFontPath,
+                                           launch->fallbackSoundFontPath ? launch->fallbackSoundFontPath : "");
     e->renderer = std::make_unique<Renderer>(*e->game);
     e->caption = e->game->gameDat().title;
     e->renderer->draw(e->frame);

@@ -190,7 +190,7 @@ struct WavDecoder : Decoder {
 
 struct SoundFont {
     std::mutex mutex;
-    std::string path;
+    std::string path, fallback;
     vnmidi_font *font = nullptr;
     bool tried = false;
 
@@ -227,8 +227,11 @@ std::unique_ptr<Decoder> openMidi(std::vector<uint8_t> bytes, SoundFont &sf, int
             sf.tried = true;
             char error[256] = "";
             if (sf.path.empty()) log("audio: no SoundFont set, MIDI files play silently");
-            else if (!(sf.font = vnmidi_font_load(sf.path.c_str(), error, sizeof error)))
-                log("audio: can't load SoundFont " + sf.path + ": " + error);
+            else {
+                sf.font = vnmidi_font_load_fallback(sf.path.c_str(), sf.fallback.c_str(), error, sizeof error);
+                if (!sf.font) log("audio: can't load SoundFont: " + std::string(error));
+                else if (*error) log("audio: " + std::string(error));
+            }
         }
         font = sf.font;
     }
@@ -560,10 +563,11 @@ Audio::~Audio() {
 
 int Audio::sampleRate() const { return impl_->rate; }
 
-void Audio::setSoundFontPath(std::string path) {
+void Audio::setSoundFontPath(std::string path, std::string fallback) {
     std::lock_guard lock(impl_->font.mutex);
-    if (path == impl_->font.path) return;
+    if (path == impl_->font.path && fallback == impl_->font.fallback) return;
     impl_->font.path = std::move(path);
+    impl_->font.fallback = std::move(fallback);
     impl_->font.tried = false;
     if (impl_->font.font) vnmidi_font_free(impl_->font.font);
     impl_->font.font = nullptr;

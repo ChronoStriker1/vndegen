@@ -49,14 +49,18 @@ final class WolfRPGSession: EngineSession {
         let logURL = launch.dataDirectory.appendingPathComponent("logs/wolfrpg.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
-        // MIDI music plays with the SoundFont the app bundles (docs/midi.md).
+        // MIDI music plays with the player's SoundFont from Settings, or the one the app bundles (docs/midi.md).
         let soundFont = MIDISoundFont.url?.path ?? ""
+        let fallback = MIDISoundFont.fallbackURL?.path ?? ""
         let started: OpaquePointer? = root.path.withCString { rootPath in
             logURL.path.withCString { logPath in
                 soundFont.withCString { fontPath in
-                    var settings = VNWolfLaunch(gameRoot: rootPath, logPath: logPath,
-                                                soundFontPath: soundFont.isEmpty ? nil : fontPath)
-                    return vnwolf_start(&settings)
+                    fallback.withCString { fallbackPath in
+                        var settings = VNWolfLaunch(gameRoot: rootPath, logPath: logPath,
+                                                    soundFontPath: soundFont.isEmpty ? nil : fontPath,
+                                                    fallbackSoundFontPath: fallback.isEmpty ? nil : fallbackPath)
+                        return vnwolf_start(&settings)
+                    }
                 }
             }
         }

@@ -39,12 +39,29 @@ The decoded font takes memory: TinySoundFont keeps every sample as a 32-bit floa
 samples take 267 MB once loaded. Loading takes 0.66 s of CPU on the Linux build machine and 1.1 s on the Mac mini.
 An engine should load the font when a game first plays MIDI, off its audio thread, and keep it for the session.
 
+FluidR3Mono stays the bundled default (the user's decision, 2026-10-30). If its memory, load time or sound causes
+problems, a smaller font is the next step. VNDegen doesn't store samples in 16 bits to save memory.
+
+## The player's SoundFont
+
+Settings › MIDI music lets the player choose an .sf2 or .sf3 file to use instead of the bundled font. VNDegen copies
+it into `Application Support/VNDegen/SoundFont/`, so it doesn't need access to the original later, and Settings shows
+its name with a button that goes back to the bundled font. The choice is app-wide and applies to games started after
+it.
+
+It covers the engines that play MIDI through vnmidi: Wolf RPG Editor. The RPG Maker XP, VX and VX Ace engine
+(mkxp-z) plays MIDI with its own synthesizer and embedded font and doesn't use it.
+
+An engine loads the player's font with `vnmidi_font_load_fallback`, which loads the bundled font instead when the
+player's can't be read and says why, which the engine logs.
+
 ## The C interface
 
 `Engines/Shared/vnmidi.h`. Engines compile `vnmidi.c`, or depend on the `CVNMidi` package target, which links to it.
 
 ```c
 vnmidi_font *vnmidi_font_load(const char *path, char *error, size_t error_size);
+vnmidi_font *vnmidi_font_load_fallback(const char *path, const char *fallback, char *error, size_t error_size);
 void vnmidi_font_free(vnmidi_font *font);
 
 vnmidi_player *vnmidi_player_open(vnmidi_font *font, const void *data, size_t size, int sample_rate,
@@ -88,12 +105,15 @@ typical game music in Ogg or MP3, and loud passages clip. Engines scale it furth
 
 ## The Swift side
 
-`MIDISoundFont.url`, in the `FontPack` module, is the bundled SoundFont's location in the app, which an engine passes to
-`vnmidi_font_load`. `project.yml` copies `Engines/Shared/soundfonts` into the app.
+`MIDISoundFont`, in the `FontPack` module: `url` is the font an engine loads, the player's when there is one, else the
+bundled one, and `fallbackURL` the bundled font when the player's is in use, which an engine passes to
+`vnmidi_font_load_fallback`. `install` and `reset` keep the player's copy. `project.yml` copies
+`Engines/Shared/soundfonts` into the app.
 
 ## Tests
 
-`vnmidi_test.c` checks the player on generated songs: length, CC#111 marker, the loop seam and where it lands, stop,
+`vnmidi_test.c` checks the fallback load (a file that isn't a SoundFont falls back to the bundled one, and a missing
+fallback reports both reasons) and the player on generated songs: length, CC#111 marker, the loop seam and where it lands, stop,
 seek, volume, tempo, transposition, a player without a font, every truncation of the file, a font shared by players
 on four threads, and a tempo track whose first event is a meta event. `scripts/build.sh test` runs it with the bundled
 font. Given MIDI files and a folder, it renders each to a WAV file and the 3 s on each side of its loop seam to

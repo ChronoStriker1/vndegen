@@ -105,6 +105,8 @@ final class Navigator {
         case licenseAccept, licenseDecline
         /// A font package in Settings, by package ID. It downloads, cancels, or removes the package.
         case fontPackage(String)
+        /// The MIDI SoundFont rows in Settings: choose a file, and go back to the bundled font.
+        case soundFont, soundFontReset
     }
 
     enum RuntimeAction: Hashable {
@@ -154,6 +156,11 @@ final class Navigator {
     /// Set by the game page when a narrow window puts its other buttons in a row under Play.
     var pageActionsStacked = false
     private(set) var rescanning = false
+    /// Settings' SoundFont file picker is open.
+    var pickingSoundFont = false
+    /// The file name of the player's MIDI SoundFont, nil for the bundled one, and why the last choice failed.
+    private(set) var soundFontName = MIDISoundFont.userFont()?.lastPathComponent
+    private(set) var soundFontError: String?
     @ObservationIgnored private var columnMemory: [String: Int] = [:]
     @ObservationIgnored private var lastBackgrounded: Date?
     /// The unlock view shown in the sheet, kept so controller events reach the same instance.
@@ -280,6 +287,8 @@ final class Navigator {
             items.append(.playOrientation)
             #endif
             items += FontPack.packages.map { .fontPackage($0.id) }
+            items.append(.soundFont)
+            if soundFontName != nil { items.append(.soundFontReset) }
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return items.map { Row(id: "settings-\($0)", items: [$0]) }
@@ -464,6 +473,16 @@ final class Navigator {
             } else {
                 runtimes.install(package, for: nil)
             }
+        case .soundFont: pickingSoundFont = true
+        case .soundFontReset:
+            do {
+                try MIDISoundFont.reset()
+                soundFontName = nil
+                soundFontError = nil
+                setFocus(.soundFont)
+            } catch {
+                soundFontError = error.localizedDescription
+            }
         case .licenseAccept, .licenseDecline:
             guard case let .license(request) = sheet else { return }
             request.respond(target == .licenseAccept)
@@ -506,6 +525,18 @@ final class Navigator {
             guard hub.library.game(id) != nil else { return }
             heroID = id
             if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) { setFocus(tile) }
+        }
+    }
+
+    /// Copies the SoundFont the player chose into the app, for engines started after this.
+    func installSoundFont(_ result: Result<URL, Error>) {
+        do {
+            soundFontName = try MIDISoundFont.install(result.get()).lastPathComponent
+            soundFontError = nil
+        } catch let error as CocoaError where error.code == .userCancelled {
+            return
+        } catch {
+            soundFontError = error.localizedDescription
         }
     }
 
