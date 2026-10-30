@@ -1,6 +1,6 @@
 #include "files.h"
 
-#include "casepath.h"
+#include "wolf_casepath.h"
 
 #include <cstring>
 #include <fstream>
