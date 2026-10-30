@@ -400,7 +400,11 @@ int Game::activePage(const MapEventState &e, const Thread &ctx) {
         for (int i = 0; i < 4 && ok; i++) {
             int op = pg.condOps[i] >> 4, enabled = pg.condOps[i] & 0x0F;
             if (!enabled) continue;
-            ok = compare(readVar(pg.condVars[i], ctx), pg.condValues[i], op);
+            // A page condition on 1000000 to 1000009 is the event's own self variable, as 1100000 to 1100009 is:
+            // Test Game 52's opening sets its self variable 0 and its next page waits on 1000000.
+            int32_t var = pg.condVars[i];
+            if (var >= 1000000 && var < 1000010) var += 100000;
+            ok = compare(readVar(var, ctx), pg.condValues[i], op);
         }
         if (ok) return p;
     }
