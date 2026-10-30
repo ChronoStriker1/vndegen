@@ -353,10 +353,15 @@ impl CoreRuntime {
     }
 
     /// Starts the next page of text that ran below its window, then applies
-    /// the events held behind it (VNDegen).
+    /// the events held behind it. A page that runs below the window too
+    /// waits for another click first, with the events still held (VNDegen).
     fn continue_page_overflow(&mut self, profile: &mut crate::profiler::FrameProfile) {
-        if let Some(renderer) = self.text_renderer.as_mut() {
+        let overflows_again = self.text_renderer.as_mut().is_some_and(|renderer| {
             renderer.continue_page_overflow();
+            renderer.split_page_overflow()
+        });
+        if overflows_again {
+            return;
         }
         let held = self.page_overflow_held.take().unwrap_or_default();
         self.dispatch_events(&held, profile);
