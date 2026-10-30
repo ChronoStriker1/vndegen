@@ -13,8 +13,12 @@ final class StubNetwork: Sendable {
     private let log = Mutex<[URLRequest]>([])
     /// Runs before each answer, so a test can change app state while a request is in flight.
     private let beforeAnswer: @Sendable (URLRequest) async -> Void
+    /// Real image bytes for the image URLs a test cares about. Other image URLs answer with their own URL string.
+    private let images: @Sendable (URL) -> Data?
 
-    init(beforeAnswer: @escaping @Sendable (URLRequest) async -> Void = { _ in }) {
+    init(images: @escaping @Sendable (URL) -> Data? = { _ in nil },
+         beforeAnswer: @escaping @Sendable (URLRequest) async -> Void = { _ in }) {
+        self.images = images
         self.beforeAnswer = beforeAnswer
     }
 
@@ -22,7 +26,7 @@ final class StubNetwork: Sendable {
         HTTP { [self] request in
             log.withLock { $0.append(request) }
             await beforeAnswer(request)
-            let (status, mime, body) = Self.route(request)
+            let (status, mime, body) = images(request.url!).map { (200, "image/png", $0) } ?? Self.route(request)
             let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
                                            headerFields: mime.map { ["Content-Type": $0] } ?? [:])!
             return (body, response)

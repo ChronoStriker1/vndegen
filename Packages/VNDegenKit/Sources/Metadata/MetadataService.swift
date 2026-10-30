@@ -141,9 +141,10 @@ public final class MetadataService {
         }
     }
 
+    /// Every image for `slot` from sources that know the game, best source first, each picture once.
     public func artworkCandidates(for game: Game, slot: ArtworkSlot) async -> [ArtworkCandidate] {
         let refs = await resolveRefs(title: game.metadata?.title ?? game.title, known: game.metadata?.refs ?? [])
-        return await candidates(slot, refs: refs)
+        return await distinct(candidates(slot, refs: refs))
     }
 
     /// Downloads the candidate and stores it in the slot.
@@ -266,6 +267,28 @@ public final class MetadataService {
             return ranked
         }
         return results.sorted { $0.0 < $1.0 }.flatMap(\.1)
+    }
+
+    /// Drops each candidate that shows the same picture as an earlier one from another source, as when IGDB hosts
+    /// Steam's capsule. One source's near-identical images are separate uploads, so they all stay. A candidate whose
+    /// thumbnail cannot be fetched or decoded stays too.
+    private func distinct(_ candidates: [ArtworkCandidate]) async -> [ArtworkCandidate] {
+        let http = http
+        let fingerprints = await withTaskGroup(of: (Int, ImageFingerprint?).self) { group in
+            for (index, candidate) in candidates.enumerated() {
+                group.addTask { (index, (try? await http.image(candidate.thumbnail ?? candidate.url)).flatMap { ImageFingerprint($0.data) }) }
+            }
+            var byIndex = [ImageFingerprint?](repeating: nil, count: candidates.count)
+            for await (index, fingerprint) in group { byIndex[index] = fingerprint }
+            return byIndex
+        }
+        var kept: [(source: MetadataSource, fingerprint: ImageFingerprint)] = []
+        return zip(candidates, fingerprints).compactMap { candidate, fingerprint in
+            guard let fingerprint else { return candidate }
+            guard !kept.contains(where: { $0.source != candidate.source && $0.fingerprint.matches(fingerprint) }) else { return nil }
+            kept.append((candidate.source, fingerprint))
+            return candidate
+        }
     }
 
     private func fillEmptyArtwork(_ id: GameID, refs: [ExternalRef], in library: LibraryStore) async {

@@ -50,8 +50,9 @@ struct IGDBProvider: MetadataProvider {
     func artwork(_ id: String, slot: ArtworkSlot) async throws -> [ArtworkCandidate] {
         let game = try await game(id)
         let images: [(String, String, String)] = switch slot {
-        case .capsule: game.cover.map { [($0.image_id, "t_cover_big_2x", "t_cover_small")] } ?? []
-        case .hero: (game.artworks ?? []).map { ($0.image_id, "t_1080p", "t_screenshot_med") }
+        case .capsule: game.cover.map { [($0.image_id, "t_cover_big_2x", "t_cover_big")] } ?? []
+        // t_720p keeps the artwork's shape, where t_screenshot_med crops it to 16:9.
+        case .hero: (game.artworks ?? []).map { ($0.image_id, "t_1080p", "t_720p") }
         case .logo, .header, .icon: []
         }
         return images.map { imageID, size, thumbnail in
