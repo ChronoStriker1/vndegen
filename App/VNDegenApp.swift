@@ -9,6 +9,7 @@ import EngineRGSS
 import EngineArtemis
 import EngineGodot
 import EngineNScripter
+import EngineWolfRPG
 import FontPack
 import RuntimePackages
 import Metadata
@@ -29,6 +30,7 @@ let engines: [any EnginePlugin] = {
         GodotPlugin(),
         FlashPlugin(),
         NScripterPlugin(),
+        WolfRPGPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)
@@ -38,6 +40,8 @@ let engines: [any EnginePlugin] = {
     // The Windows font substitutes every engine reads: the bundled fonts, and the Chinese and Korean ones the player
     // downloaded. Settings configures it again after a download.
     FontPack.configure { runtimes.installedFolder(for: $0) }
+    // The MIDI SoundFont the player chose in Settings, kept with the library's other support files.
+    MIDISoundFont.configure(support: libraryPaths.support)
     #if DEBUG
     // Registered first, so it wins the MZ engine ID over the real runtime.
     if UserDefaults.standard.bool(forKey: "fakeSession") { engines.insert(FakeSessionPlugin(), at: 0) }

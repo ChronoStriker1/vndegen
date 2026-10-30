@@ -71,3 +71,44 @@ struct FontPackTests {
         #expect(FontPack.referencedNames(in: "") == [])
     }
 }
+
+/// The player's SoundFont from Settings, in a folder of the test's own. vnmidi_test.c covers loading the bundled font
+/// when the player's can't be read.
+struct MIDISoundFontTests {
+    @Test func installReplacesTheEarlierFontAndResetRemovesIt() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-soundfont-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = root.appending(path: "Support/SoundFont")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let first = root.appending(path: "First.sf2"), second = root.appending(path: "Second.SF3")
+        try Data("one".utf8).write(to: first)
+        try Data("two".utf8).write(to: second)
+
+        #expect(MIDISoundFont.userFont(in: directory) == nil)
+        try MIDISoundFont.install(first, in: directory)
+        #expect(MIDISoundFont.userFont(in: directory)?.lastPathComponent == "First.sf2")
+        let copy = try MIDISoundFont.install(second, in: directory)
+        #expect(MIDISoundFont.userFont(in: directory)?.lastPathComponent == "Second.SF3")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["Second.SF3"])
+        #expect(try Data(contentsOf: copy) == Data("two".utf8))
+        // The original stays where it was.
+        #expect(FileManager.default.fileExists(atPath: second.path))
+
+        try MIDISoundFont.reset(in: directory)
+        #expect(MIDISoundFont.userFont(in: directory) == nil)
+        try MIDISoundFont.reset(in: directory)
+    }
+
+    @Test func refusesFilesThatArentSoundFonts() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-soundfont-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let font = root.appending(path: "Font.sf2"), other = root.appending(path: "notes.txt")
+        try Data().write(to: font)
+        try Data().write(to: other)
+        let directory = root.appending(path: "SoundFont")
+        try MIDISoundFont.install(font, in: directory)
+        #expect(throws: CocoaError.self) { try MIDISoundFont.install(other, in: directory) }
+        #expect(MIDISoundFont.userFont(in: directory)?.lastPathComponent == "Font.sf2")
+    }
+}
