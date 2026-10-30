@@ -1,23 +1,21 @@
---- a/core/os/dir_access.cpp	2026-10-30 04:45:43.834729925 -0400
-+++ b/core/os/dir_access.cpp	2026-10-30 04:45:43.841521101 -0400
-@@ -35,6 +35,10 @@
+--- a/core/os/dir_access.cpp	2026-10-30 04:51:01.099574211 -0400
++++ b/core/os/dir_access.cpp	2026-10-30 04:51:01.106247014 -0400
+@@ -35,6 +35,8 @@
  #include "core/os/os.h"
  #include "core/project_settings.h"
  
-+#include <limits.h>
 +#include <sys/stat.h>
-+#include <unistd.h>
 +
  String DirAccess::_get_root_path() const {
  	switch (_access_type) {
  		case ACCESS_RESOURCES:
-@@ -280,6 +284,14 @@
+@@ -280,6 +282,14 @@
  	return full;
  }
  
 +// VNDegen: VNDegen finds files whatever case a game names them in, so two spellings can open one file on disk, and
-+// copying it onto itself would empty it. The destination is the file on disk the copy would write, even where the pack
-+// has a file of that name, and a file read from the pack reports no disk path, so it never matches.
++// copying it onto itself would empty it. The destination is opened as the write below opens it, on disk, even where the
++// pack has a file of that name, and a file read from the pack reports no disk path, so it never matches.
 +static bool _vndegen_same_file(const String &p_a, const String &p_b) {
 +	struct stat a, b;
 +	return !p_a.empty() && !p_b.empty() && stat(p_a.utf8().get_data(), &a) == 0 && stat(p_b.utf8().get_data(), &b) == 0 && a.st_dev == b.st_dev && a.st_ino == b.st_ino;
@@ -26,28 +24,17 @@
  Error DirAccess::copy(String p_from, String p_to, int p_chmod_flags) {
  	//printf("copy %s -> %s\n",p_from.ascii().get_data(),p_to.ascii().get_data());
  	Error err;
-@@ -290,6 +302,26 @@
+@@ -290,6 +300,15 @@
  		return err;
  	}
  
-+	String target = ProjectSettings::get_singleton()->globalize_path(p_to);
-+	if (target.is_rel_path()) {
-+		// A relative path counts from the working directory, as the write's does, not from the pack.
-+		char cwd[PATH_MAX];
-+		if (getcwd(cwd, sizeof(cwd))) {
-+			target = String::utf8(cwd).plus_file(target);
-+		}
-+	}
-+	if (FileAccess::exists(target)) {
-+		FileAccess *existing = FileAccess::open(target, FileAccess::READ);
-+		const bool same = existing && _vndegen_same_file(fsrc->get_path_absolute(), existing->get_path_absolute());
-+		if (existing) {
-+			memdelete(existing);
-+		}
-+		if (same) {
-+			memdelete(fsrc);
-+			return OK;
-+		}
++	FileAccess *existing = FileAccess::create(FileAccess::ACCESS_FILESYSTEM);
++	const bool same = existing->reopen(ProjectSettings::get_singleton()->globalize_path(p_to), FileAccess::READ) == OK &&
++			_vndegen_same_file(fsrc->get_path_absolute(), existing->get_path_absolute());
++	memdelete(existing);
++	if (same) {
++		memdelete(fsrc);
++		return OK;
 +	}
 +
  	FileAccess *fdst = FileAccess::open(p_to, FileAccess::WRITE, &err);
