@@ -28,13 +28,13 @@ namespace {
 
 std::string gStartError;
 
-// Wolf's keys: Z, Return and Space confirm, X and Escape cancel, Shift is sub, and the arrows and the number pad's
+// Wolf's keys: Z, Return and Space confirm, X and Escape cancel, C and Shift are sub, and the arrows and the number pad's
 // 2, 4, 6 and 8 move.
 uint32_t wolfKey(int key) {
     switch (key) {
         case 'Z': case VNWOLF_KEY_RETURN: case VNWOLF_KEY_SPACE: return KeyConfirm;
         case 'X': case VNWOLF_KEY_ESCAPE: return KeyCancel;
-        case VNWOLF_KEY_SHIFT: return KeySub;
+        case 'C': case VNWOLF_KEY_SHIFT: return KeySub;
         case VNWOLF_KEY_UP: case '8': return KeyUp;
         case VNWOLF_KEY_DOWN: case '2': return KeyDown;
         case VNWOLF_KEY_LEFT: case '4': return KeyLeft;

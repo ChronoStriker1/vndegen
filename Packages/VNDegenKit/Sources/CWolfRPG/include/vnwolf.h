@@ -39,7 +39,7 @@ const char *vnwolf_caption(VNWolfEngine *e);
 // Mixes frames stereo frames of 44.1 kHz float audio into out (interleaved). Safe on the audio thread.
 void vnwolf_audio_render(VNWolfEngine *e, float *out, int frames);
 
-// Keyboard input, in the key codes below. Wolf's confirm is Z, Return or Space, cancel X or Escape, and sub Shift.
+// Keyboard input, in the key codes below. Wolf's confirm is Z, Return or Space, cancel X or Escape, and sub C or Shift.
 void vnwolf_key(VNWolfEngine *e, int key, bool down);
 
 // Key codes: printable keys are their uppercase ASCII codes ('A'..'Z', '0'..'9'), others these. The same values
