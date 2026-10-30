@@ -1371,6 +1371,72 @@ mod tests {
     }
 
     #[test]
+    fn a_menu_a_handler_opens_does_not_take_the_story_lines_text() {
+        use asb_interpreter::CallbackResult;
+        use std::sync::{Arc, Mutex};
+        let mut interpreter = Interpreter::new(InterpreterConfig::default());
+        interpreter
+            .lua()
+            .load(
+                r#"
+                local f = {}
+                function f.print(e, p)
+                    e:enqueueTag{"print", data=p.data}
+                    e:enqueueTag{"@"}
+                    return 1
+                end
+                __engine:setTagFilter(f)
+                "#,
+            )
+            .exec()
+            .unwrap();
+        interpreter
+            .load_script("story", "*main\nstory text\n[stop]")
+            .unwrap();
+        interpreter
+            .load_script("menu", "*open\n[print data=\"menu text\"]\n[stop]")
+            .unwrap();
+        let texts = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&texts);
+        interpreter.set_callback(move |event| {
+            if let Event::ScenarioText {
+                content, printed, ..
+            } = &event
+            {
+                sink.lock().unwrap().push((content.clone(), *printed));
+            }
+            if matches!(event, Event::Wait { .. }) {
+                CallbackResult::Pause
+            } else {
+                CallbackResult::Continue
+            }
+        });
+        interpreter.start("story", "main").unwrap();
+        interpreter.run().unwrap();
+
+        // As a right click whose handler calls a menu script.
+        assert!(enqueue_handler_tags(
+            &interpreter,
+            None,
+            Some("menu"),
+            Some("open"),
+            true,
+            &HashMap::new(),
+            &[],
+        ));
+        interpreter.drain_queued_tags_only().unwrap();
+        interpreter.run().unwrap();
+
+        assert_eq!(
+            *texts.lock().unwrap(),
+            [
+                ("story text".to_string(), false),
+                ("menu text".to_string(), true)
+            ]
+        );
+    }
+
+    #[test]
     fn dispatch_outcomes_gate_default_role_fallback() {
         let interpreter = Interpreter::new(InterpreterConfig::default());
         interpreter
@@ -1540,6 +1606,9 @@ pub(super) fn enqueue_handler_tags(
     params: &HashMap<String, String>,
     runtime_params: &[(&str, &str)],
 ) -> bool {
+    // A handler runs on input; text it prints belongs to it, not to the
+    // scenario line shown before (VNDegen).
+    interpreter.end_scenario_text_line();
     // A target is optional only when *both* fields carry the sentinel.  Keep
     // a non-sentinel counterpart intact: `[call file="0" label="foo"]` is a
     // legitimate same-script call, while `[call file="foo" label="0"]`

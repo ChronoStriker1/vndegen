@@ -301,11 +301,16 @@ pub struct Interpreter {
     /// scenario text, rather than as text a [print] tag writes, and has this
     /// line as its source. The last field is the call depth it ran at
     /// (VNDegen).
-    scenario_text_line: Option<(String, usize, usize)>,
+    /// Behind a lock so an input handler, which holds the interpreter
+    /// shared, can end it.
+    scenario_text_line: Mutex<Option<(String, usize, usize)>>,
     /// Instructions run since the host last took them, other than scenario
     /// text and [/if], by script and index. The PC engine marks every
     /// instruction it runs as read, and its read-skip checks them (VNDegen).
     executed: Vec<(String, usize)>,
+    /// Macro invocations whose macro may still run, with the call depth they
+    /// ran at, to mark read once the macro's frame is gone (VNDegen).
+    running_macros: Vec<(String, usize, usize)>,
     /// 已执行过的 `__lua_block`（键：脚本名 + 指令下标）。
     ///
     /// Artemis 语义：[lua] 块在**文件加载时**执行且每块只执行一次（见
@@ -454,8 +459,9 @@ impl Interpreter {
             last_flush_saw_jump: false,
             queued_call_barriers: Vec::new(),
             arrived_by_jump: false,
-            scenario_text_line: None,
+            scenario_text_line: Mutex::new(None),
             executed: Vec::new(),
+            running_macros: Vec::new(),
             executed_lua_blocks: std::collections::HashSet::new(),
             macros: MacroRegistry::new(),
             macro_files: HashMap::new(),
@@ -802,21 +808,33 @@ impl Interpreter {
             }
 
             let instruction = script.instructions[self.current_line].clone();
+            // A macro's text takes its invocation as its source, so the
+            // invocation is marked read once the macro has left the stack,
+            // after that text has shown, not here.
             if instruction.tag != "__text"
                 && instruction.tag != "/if"
                 && !script_name.starts_with("__macro__")
             {
-                self.executed.push((script_name.clone(), self.current_line));
+                if self.macros.contains(&instruction.tag) {
+                    self.running_macros.push((
+                        script_name.clone(),
+                        self.current_line,
+                        self.call_stack.len(),
+                    ));
+                } else {
+                    self.executed.push((script_name.clone(), self.current_line));
+                }
             }
-            if instruction.tag == "__text" {
-                self.scenario_text_line =
-                    Some((script_name.clone(), self.current_line, self.call_stack.len()));
-            } else if self
-                .scenario_text_line
-                .as_ref()
-                .is_some_and(|(_, _, depth)| self.call_stack.len() <= *depth)
             {
-                self.scenario_text_line = None;
+                let mut line = self.scenario_text_line.lock().unwrap();
+                if instruction.tag == "__text" {
+                    *line = Some((script_name.clone(), self.current_line, self.call_stack.len()));
+                } else if line
+                    .as_ref()
+                    .is_some_and(|(_, _, depth)| self.call_stack.len() <= *depth)
+                {
+                    *line = None;
+                }
             }
 
             if std::env::var("ASB_TRACE_STEP").is_ok() {
@@ -1407,13 +1425,14 @@ impl Interpreter {
     }
 
     fn emit_event(&mut self, mut event: Event) -> CallbackResult {
+        let scenario_line = self.scenario_text_line.lock().unwrap().clone();
         if let Event::ScenarioText { printed, .. } = &mut event
-            && self.scenario_text_line.is_some()
+            && scenario_line.is_some()
         {
             *printed = false;
         }
         if matches!(event, Event::ScenarioText { .. }) {
-            let mut source = self.scenario_text_line.clone().map(|(file, line, _)| (file, line)).or_else(|| {
+            let mut source = scenario_line.map(|(file, line, _)| (file, line)).or_else(|| {
                 self.current_script
                     .clone()
                     .map(|file| (file, self.current_line))
@@ -2264,14 +2283,23 @@ impl Interpreter {
 
     /// Ends the current scenario line's hold on the text that follows: an
     /// input handler's text, such as a menu's, is not that line's (VNDegen).
-    pub fn end_scenario_text_line(&mut self) {
-        self.scenario_text_line = None;
+    pub fn end_scenario_text_line(&self) {
+        *self.scenario_text_line.lock().unwrap() = None;
     }
 
     /// The instructions run since the last call, other than scenario text,
     /// as PC engine indexes by script (VNDegen).
     pub fn take_executed_pc_lines(&mut self) -> Vec<(String, usize)> {
-        let executed = std::mem::take(&mut self.executed);
+        let stack = &self.call_stack;
+        let (done, running): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.running_macros).into_iter().partition(|(script, line, depth)| {
+                stack.get(*depth).is_none_or(|frame| {
+                    frame.script != *script || frame.return_line != line + 1
+                })
+            });
+        self.running_macros = running;
+        let mut executed = std::mem::take(&mut self.executed);
+        executed.extend(done.into_iter().map(|(script, line, _)| (script, line)));
         let mut pc_indexes: HashMap<String, Vec<usize>> = HashMap::new();
         executed
             .into_iter()
@@ -3080,6 +3108,71 @@ mod tests {
         let lines: Vec<_> = it.take_executed_pc_lines().into_iter().map(|(_, line)| line).collect();
         assert_eq!(lines, [0, 1, 3, 4]);
         assert!(it.take_executed_pc_lines().is_empty());
+    }
+
+    #[test]
+    fn get_script_stack_follows_a_call_and_return_e_tag_makes() {
+        // A helper calls a script and returns from it, then reads the stack.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(
+                r#"
+                function leave(e, p)
+                    e:tag{"call", file="dummy"}
+                    e:tag{"return"}
+                    local ss = e:getScriptStack()
+                    for i = #ss, 1, -1 do
+                        if ss[i].file == "ui" then e:tag{"return"} else break end
+                    end
+                end
+                "#,
+            )
+            .exec()
+            .unwrap();
+        it.load_script("story", "*main\n[call file=ui]\n[var name=t.after data=1]\n[stop]")
+            .unwrap();
+        it.load_script("ui", "[calllua function=leave]\n[stop]").unwrap();
+        it.load_script("dummy", "[stop]").unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+
+        let _ = it.run().unwrap();
+
+        assert_eq!(it.current_script(), Some("story"));
+        assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)));
+    }
+
+    #[test]
+    fn a_macro_invocation_is_not_read_before_its_text_shows() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.set_script_loader(Box::new(|_| {
+            Ok("*say\n[wait time=100]\nfirst unread page\n[stop]\n[return]".into())
+        }));
+        it.load_macro_file("macro.iet").unwrap();
+        it.load_script("story", "*main\n[say]\n[stop]").unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+
+        let _ = it.run().unwrap();
+
+        assert!(
+            it.take_executed_pc_lines().is_empty(),
+            "[say] is marked read when its text shows"
+        );
+        it.advance_line();
+        let _ = it.run().unwrap();
+        it.advance_line();
+        let _ = it.run().unwrap();
+        assert!(
+            it.take_executed_pc_lines().contains(&("story".to_string(), 0)),
+            "and once the macro returns"
+        );
     }
 
     #[test]
