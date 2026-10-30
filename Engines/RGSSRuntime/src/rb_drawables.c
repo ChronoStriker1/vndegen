@@ -9,7 +9,8 @@ static VALUE cTilemapBitmaps;
 
 static int clamp_opacity(VALUE v) { return clamp255(NUM2INT(v)); }
 
-// The objects a drawable refers to. Each struct keeps the Ruby objects alive and points at their C data.
+// RGSS3 lets scripts read and set a disposed object's properties, which games do while tearing scenes down, so the
+// accessors don't check for disposal. The objects a drawable refers to. Each struct keeps the Ruby objects alive and points at their C data.
 typedef struct {
     Viewport v;
     VALUE rect, color, tone;
@@ -36,6 +37,7 @@ typedef struct {
 } RbTilemap;
 
 static Viewport *viewport_arg(VALUE v);
+static VALUE window_put_contents(VALUE self, VALUE b);
 
 // MARK: Viewport
 
@@ -75,7 +77,6 @@ static VALUE viewport_alloc(VALUE klass) {
 
 static RbViewport *get_viewport(VALUE self) {
     RbViewport *v = rb_check_typeddata(self, &viewport_type);
-    if (v->v.disposed) rgss_raise_disposed("viewport");
     return v;
 }
 
@@ -188,7 +189,6 @@ static VALUE sprite_alloc(VALUE klass) {
 
 static RbSprite *get_sprite(VALUE self) {
     RbSprite *s = rb_check_typeddata(self, &sprite_type);
-    if (s->s.disposed) rgss_raise_disposed("sprite");
     return s;
 }
 
@@ -351,7 +351,6 @@ static VALUE plane_alloc(VALUE klass) {
 
 static RbPlane *get_plane(VALUE self) {
     RbPlane *s = rb_check_typeddata(self, &plane_type);
-    if (s->p.disposed) rgss_raise_disposed("plane");
     return s;
 }
 
@@ -443,7 +442,6 @@ static VALUE window_alloc(VALUE klass) {
 
 static RbWindow *get_window(VALUE self) {
     RbWindow *w = rb_check_typeddata(self, &window_type);
-    if (w->w.disposed) rgss_raise_disposed("window");
     return w;
 }
 
@@ -465,6 +463,11 @@ static VALUE window_initialize(int argc, VALUE *argv, VALUE self) {
     w->w.viewport = viewport_arg(viewport);
     w->viewport = viewport;
     drawable_attach(&w->w.d, DRAW_WINDOW, w->w.viewport);
+    // VX Ace windows start with an empty contents bitmap, which Window_Base disposes before making its own.
+    if (rgss_version == RGSS3) {
+        VALUE size[2] = {INT2FIX(1), INT2FIX(1)};
+        window_put_contents(self, rb_class_new_instance(2, size, rgss_cBitmap));
+    }
     return self;
 }
 
@@ -587,7 +590,6 @@ static VALUE tilemap_alloc(VALUE klass) {
 
 static RbTilemap *get_tilemap(VALUE self) {
     RbTilemap *t = rb_check_typeddata(self, &tilemap_type);
-    if (t->t.disposed) rgss_raise_disposed("tilemap");
     return t;
 }
 

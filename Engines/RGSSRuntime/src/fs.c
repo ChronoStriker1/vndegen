@@ -1,9 +1,10 @@
 // The game's files. Windows ignores case, so a game asking for "Graphics/System/Window.PNG" gets
-// "graphics/system/window.png" on a case-sensitive volume. Every lookup goes through rgss_resolve_case.
+// "graphics/system/window.png" on a case-sensitive volume. Every lookup goes through rgss_resolve_case, which uses
+// VNDegen's shared casepath_resolve.
 #include "archive.h"
+#include "casepath.h"
 #include "rgss.h"
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,68 +22,19 @@ static struct {
     int rtpCount;
 } fs;
 
-static bool exists(const char *path) {
-    struct stat info;
-    return stat(path, &info) == 0;
-}
 
 static bool is_file(const char *path) {
     struct stat info;
     return stat(path, &info) == 0 && S_ISREG(info.st_mode);
 }
 
-static int ascii_casecmp(const char *a, const char *b) {
-    for (;; a++, b++) {
-        int ca = (unsigned char)*a, cb = (unsigned char)*b;
-        if (ca >= 'A' && ca <= 'Z') ca += 32;
-        if (cb >= 'A' && cb <= 'Z') cb += 32;
-        if (ca != cb || !ca) return ca - cb;
-    }
-}
-
 bool rgss_resolve_case(const char *base, const char *relative, char *out, size_t length) {
     char path[2048];
     snprintf(path, sizeof path, "%s/%s", base, relative);
     for (char *p = path; *p; p++) if (*p == '\\') *p = '/';
-    if (exists(path)) {
-        snprintf(out, length, "%s", path);
-        return true;
-    }
-    // Walk the relative part one component at a time, matching each against its folder's listing.
-    char built[2048];
-    snprintf(built, sizeof built, "%s", base);
-    char rest[2048];
-    snprintf(rest, sizeof rest, "%s", relative);
-    for (char *p = rest; *p; p++) if (*p == '\\') *p = '/';
-    char *save = NULL;
-    for (char *part = strtok_r(rest, "/", &save); part; part = strtok_r(NULL, "/", &save)) {
-        if (!strcmp(part, ".")) continue;
-        size_t used = strlen(built);
-        snprintf(built + used, sizeof built - used, "/%s", part);
-        if (exists(built)) continue;
-        built[used] = 0;
-        DIR *dir = opendir(built);
-        if (!dir) {
-            snprintf(out, length, "%s/%s", base, relative);
-            return false;
-        }
-        bool found = false;
-        for (struct dirent *entry; (entry = readdir(dir));) {
-            if (ascii_casecmp(entry->d_name, part) == 0) {
-                snprintf(built + used, sizeof built - used, "/%s", entry->d_name);
-                found = true;
-                break;
-            }
-        }
-        closedir(dir);
-        if (!found) {
-            snprintf(out, length, "%s/%s", base, relative);
-            for (char *p = out; *p; p++) if (*p == '\\') *p = '/';
-            return false;
-        }
-    }
-    snprintf(out, length, "%s", built);
-    return true;
+    int found = casepath_resolve(path, out, length);
+    if (found < 0) snprintf(out, length, "%s", path);
+    return found == 1;
 }
 
 void rgss_fs_open(const char *saveDir, const char *gameDir, const char *archive, const char *const *rtps, int rtpCount) {
@@ -200,4 +152,12 @@ void rgss_fs_write_path(const char *path, char *out, size_t length) {
     char existing[2048];
     if (rgss_resolve_case(resolved, slash + 1, existing, sizeof existing)) snprintf(out, length, "%s", existing);
     else snprintf(out, length, "%s", file);
+}
+
+const char *rgss_fs_save_dir(void) { return fs.saveDir; }
+const char *rgss_fs_game_dir(void) { return fs.gameDir; }
+
+bool rgss_fs_in_save_dir(const char *path) {
+    size_t n = strlen(fs.saveDir);
+    return strncmp(path, fs.saveDir, n) == 0 && path[n] == '/';
 }

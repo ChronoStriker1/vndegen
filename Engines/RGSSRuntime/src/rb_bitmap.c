@@ -1,6 +1,8 @@
 // Font and Bitmap.
 #include "binding.h"
 
+#include <ruby/encoding.h>
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,6 +1,8 @@
 // Text through stb_truetype, the same on every platform. Fonts come from the folders registered for the game (its
-// Fonts/ folder and the RTP's), then from VNDegen's shared fonts, found by family name the way Windows finds them.
+// Fonts/ folder and the RTP's), found by family name the way Windows finds them, then from VNDegen's font pack
+// (Engines/Shared/vnfont.h), which maps Windows font names to bundled open fonts.
 #include "rgss.h"
+#include "vnfont.h"
 
 #include <dirent.h>
 #include <math.h>
@@ -10,7 +12,10 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "../third_party/stb_truetype.h"
+#pragma GCC diagnostic pop
 
 typedef struct {
     char *path;
@@ -26,8 +31,7 @@ typedef struct {
 
 static Face *faces;
 static int faceCount, faceCapacity;
-// Faces from folders registered for the current game, which go away with it. Shared faces stay.
-static int sharedFaceCount = -1;
+// Faces from the folders registered for the current game, which go away with it.
 
 // MARK: Names
 
@@ -177,44 +181,48 @@ static void free_face(Face *face) {
     free(face->names);
 }
 
-// The fonts that go with every game: VNDegen's shared fonts, and on the Linux test host the system's.
-static void add_shared_fonts(void) {
-    const char *shared = getenv("VNRGSS_FONT_DIR");
-    if (shared) text_add_font_folder(shared);
-#ifdef __linux__
-    const char *system[] = {"/usr/share/fonts/TTF", "/usr/share/fonts/OTF", "/usr/share/fonts/noto-cjk",
-                            "/usr/share/fonts/noto", "/usr/share/fonts/liberation", "/usr/share/fonts/vlgothic",
-                            "/usr/share/fonts/adobe-source-han-sans", NULL};
-    for (int i = 0; system[i]; i++) text_add_font_folder(system[i]);
-#endif
-}
-
 void text_reset(void) {
-    if (sharedFaceCount < 0) {
-        add_shared_fonts();
-        sharedFaceCount = faceCount;
-        return;
+    for (int i = 0; i < faceCount; i++) free_face(&faces[i]);
+    faceCount = 0;
+#ifdef RGSS_FONTS_DIR
+    // The app reads the font pack's table at launch; the Linux test host reads it here.
+    static bool packRead;
+    if (!packRead) {
+        const char *dirs[] = {RGSS_FONTS_DIR};
+        vnfont_init(RGSS_FONTS_DIR "/fonts.tsv", dirs, 1);
+        packRead = true;
     }
-    for (int i = sharedFaceCount; i < faceCount; i++) free_face(&faces[i]);
-    faceCount = sharedFaceCount;
+#endif
 }
 
 // MARK: Lookup
 
-// Windows font names the shared fonts stand in for, until VNDegen's shared substitution table takes over.
-static const char *const substitutes[][2] = {
-    {"ms gothic", "ume gothic"}, {"ms pgothic", "ume pgothic"}, {"ms ui gothic", "ume ui gothic"},
-    {"ｍｓ ゴシック", "ume gothic"}, {"ｍｓ ｐゴシック", "ume pgothic"}, {"ms mincho", "ume mincho"},
-    {"ms pmincho", "ume pmincho"}, {"ｍｓ 明朝", "ume mincho"}, {"ｍｓ ｐ明朝", "ume pmincho"},
-    {"arial", "liberation sans"}, {"times new roman", "liberation serif"}, {"courier new", "liberation mono"},
-    {"verdana", "dejavu sans"}, {"tahoma", "dejavu sans"}, {"meiryo", "noto sans cjk jp"},
-    {"メイリオ", "noto sans cjk jp"}, {"ms gothic", "noto sans cjk jp"}, {"ms pgothic", "noto sans cjk jp"},
-    {"ｍｓ ゴシック", "noto sans cjk jp"}, {"ｍｓ ｐゴシック", "noto sans cjk jp"},
-};
+// Faces from VNDegen's font pack, which stand in for Windows fonts. They stay loaded from game to game.
+static Face *packFaces;
+static int packCount, packCapacity;
 
-// The fallback for text no face the game named can draw.
-static const char *const fallbacks[] = {"vl gothic", "ume pgothic", "noto sans cjk jp", "source han sans jp",
-                                        "liberation sans", "dejavu sans", NULL};
+static Face *pack_face(const vnfont_match *m) {
+    for (int i = 0; i < packCount; i++) {
+        if (packFaces[i].index == m->face && !strcmp(packFaces[i].path, m->path)) return &packFaces[i];
+    }
+    if (packCount == packCapacity) {
+        packCapacity = packCapacity ? packCapacity * 2 : 8;
+        Face *grown = realloc(packFaces, sizeof(Face) * (size_t)packCapacity);
+        if (!grown) return NULL;
+        packFaces = grown;
+    }
+    Face *face = &packFaces[packCount++];
+    memset(face, 0, sizeof *face);
+    face->path = strdup(m->path);
+    face->index = m->face;
+    // A match without the asked-for style is drawn bolder or slanted, as Windows does for such a font.
+    face->bold = m->bold || !m->embolden;
+    face->italic = m->italic || !m->slant;
+    return face;
+}
+
+// The fallbacks for text no face the game named can draw: the substitutes for Windows' Japanese UI fonts.
+static const char *const fallbacks[] = {"MS PGothic", "MS Gothic", "Arial", NULL};
 
 static Face *face_named(const char *name, bool bold, bool italic) {
     char folded[256];
@@ -227,7 +235,7 @@ static Face *face_named(const char *name, bool bold, bool italic) {
         if (face->broken) continue;
         for (int j = 0; j < face->nameCount; j++) {
             if (strcmp(face->names[j], folded)) continue;
-            int score = (face->bold == bold) + (face->italic == italic) + (i >= sharedFaceCount ? 4 : 0);
+            int score = (face->bold == bold) + (face->italic == italic);
             if (score > bestScore) {
                 best = face;
                 bestScore = score;
@@ -238,15 +246,13 @@ static Face *face_named(const char *name, bool bold, bool italic) {
     return best;
 }
 
+// A font by the name the game gives: the game's own Fonts/ folder and the RTP's first, then the font pack's
+// substitute for a Windows font.
 static Face *lookup(const char *name, bool bold, bool italic) {
     Face *face = face_named(name, bold, italic);
     if (face) return face;
-    char folded[256];
-    snprintf(folded, sizeof folded, "%s", name);
-    fold_name(folded);
-    for (size_t i = 0; i < sizeof substitutes / sizeof substitutes[0]; i++) {
-        if (!strcmp(substitutes[i][0], folded) && (face = face_named(substitutes[i][1], bold, italic))) return face;
-    }
+    vnfont_match m;
+    if (vnfont_resolve(name, bold, italic, &m)) return pack_face(&m);
     return NULL;
 }
 
@@ -278,6 +284,7 @@ static Face *primary_face(const FontRequest *font) {
         if (face && load_face(face)) return face;
     }
     for (int i = 0; i < faceCount; i++) if (load_face(&faces[i])) return &faces[i];
+    for (int i = 0; i < packCount; i++) if (load_face(&packFaces[i])) return &packFaces[i];
     return NULL;
 }
 

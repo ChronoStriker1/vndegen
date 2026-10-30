@@ -27,6 +27,9 @@ bool rgss_fs_read(const char *path, const char *const *extensions, uint8_t **dat
 bool rgss_fs_disk_path(const char *path, char *out, size_t length);
 // A path under the save folder for writing a game path, creating no folders.
 void rgss_fs_write_path(const char *path, char *out, size_t length);
+const char *rgss_fs_save_dir(void);
+const char *rgss_fs_game_dir(void);
+bool rgss_fs_in_save_dir(const char *path);
 // Whether a game path exists in any source.
 bool rgss_fs_exists(const char *path, const char *const *extensions);
 // Finds `relative` under `base` whatever the case of each component. Fills `out` and returns true when it exists.

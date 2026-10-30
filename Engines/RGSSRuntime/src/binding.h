@@ -67,13 +67,9 @@ void rgss_raise_disposed(const char *what) __attribute__((noreturn));
 extern int rgss_frame_rate;
 extern long rgss_frame_count;
 
-// MARK: The game thread's link to the host (host.c)
-
-// Hands a finished frame to the host and waits until the host lets the game run another. Raises the stop exception
-// when the host stops the game.
-void host_present(const Image *frame);
-// Waits for the next frame without a new picture, for Graphics.wait and the like.
-void host_snapshot_input(void);
-bool host_stop_requested(void);
+// The tag Graphics.update throws when the host stops the game; game.c catches it around the scripts.
+VALUE rgss_stop_tag(void);
+// Clears Graphics and Input state between games.
+void rgss_modules_reset(void);
 
 #endif
