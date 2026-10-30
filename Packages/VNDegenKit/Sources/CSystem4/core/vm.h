@@ -93,6 +93,9 @@ struct HllState {
 
 constexpr size_t kUnknownBase = SIZE_MAX;
 
+bool isArray(int32_t type);
+int32_t arrayElem(int32_t arrayType);  // the base type of an array type's elements
+
 struct Frame {
     int32_t function;
     int32_t localPage;

@@ -4,11 +4,14 @@
 // docs/system4-cleanroom.md lists what each call was taken to mean. Also the DrawGraph calls on sprite pictures.
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 
 #include "font.h"
 #include "game.h"
+#include "serial.h"
 #include "sjis.h"
 
 namespace s4 {
@@ -21,9 +24,9 @@ int g_nextInternal = 1000000;
 
 struct CharProps {
     int type = 0, size = 24;
-    int r = 255, g = 255, b = 255;
+    int r = 255, g = 255, b = 255, a = 255;
     float bold = 0, edge = 0;
-    int er = 0, eg = 0, eb = 0;
+    int er = 0, eg = 0, eb = 0, ea = 255;
 };
 
 TextStyle styleOf(const CharProps &p) {
@@ -49,10 +52,12 @@ struct Multi {
     int transNum = 0, transTime = 0;
     bool linked = false;
     int parentFrame = -1;
-    int origin = 0;
+    int origin = 1;  // reading order: 1 top left, 5 centre, 9 bottom right
     std::string text;
     int charSpace = 0;
-    CharProps props;
+    CharProps props = {.size = 16};
+    // Fields the PC keeps whose meaning is unknown, carried through saves with the PC's values.
+    int unknown8 = 1, unknown18 = 0, unknown22 = 190, unknown23 = 0;
     int sprite = 0;
     bool moving = false;
     Move move{};
@@ -63,14 +68,20 @@ struct Multi {
 std::map<std::pair<int, int>, Multi> g_multi;
 bool g_messageFrameShown = true;
 
-Multi &multi(int type, int num) { return g_multi[{type, num}]; }
+std::vector<std::pair<int, int>> g_multiOrder;  // creation order, which the PC's encoding keeps
 
-// The point a position names, by origin mode: the numeric keypad's layout (7 top left, 5 centre, 3 bottom right),
-// and 0 also top left.
+Multi &multi(int type, int num) {
+    auto [it, made] = g_multi.try_emplace({type, num});
+    if (made) g_multiOrder.push_back({type, num});
+    return it->second;
+}
+
+// The point a position names, by origin mode, in reading order: 1 top left (the PC's default, which every picture
+// uses), 5 centre, 9 bottom right. Other values are top left.
 void anchor(int mode, int w, int h, int &dx, int &dy) {
     dx = dy = 0;
     if (mode < 1 || mode > 9) return;
-    int col = (mode - 1) % 3, row = 2 - (mode - 1) / 3;
+    int col = (mode - 1) % 3, row = (mode - 1) / 3;
     dx = -w * col / 2;
     dy = -h * row / 2;
 }
@@ -210,61 +221,146 @@ S4_HLL(StoatSpriteEngine, MultiSprite_EndAllMove) {
     }
 }
 
-// Encode and Decode keep the whole MultiSprite state in an int array the game stores in its saves.
-void putString(std::vector<int32_t> &out, const std::string &s) {
-    out.push_back(int32_t(s.size()));
-    for (unsigned char ch : s) out.push_back(ch);
-}
-std::string getString(const std::vector<int32_t> &in, size_t &i) {
-    std::string s;
-    if (i >= in.size()) return s;
-    size_t n = size_t(std::max(0, in[i++]));
-    for (size_t k = 0; k < n && i < in.size(); k++) s += char(in[i++]);
-    return s;
-}
-S4_HLL(StoatSpriteEngine, MultiSprite_Encode) {
-    std::vector<int32_t> out{1, int32_t(g_multi.size()), g_messageFrameShown};
-    for (auto &[k, m] : g_multi) {
-        for (int32_t v : {k.first, k.second, m.cg, m.x, m.y, m.defX, m.defY, m.z, m.alpha, m.transNum, m.transTime,
-                          int32_t(m.linked), m.parentFrame, m.origin, m.charSpace, m.props.type, m.props.size,
-                          m.props.r, m.props.g, m.props.b, m.props.er, m.props.eg, m.props.eb})
-            out.push_back(v);
-        int32_t fb, fe;
-        std::memcpy(&fb, &m.props.bold, 4);
-        std::memcpy(&fe, &m.props.edge, 4);
-        out.push_back(fb);
-        out.push_back(fe);
-        putString(out, m.text);
+// Encode and Decode keep the whole MultiSprite state in an int array the game stores in its saves, in the PC's
+// layout: a byte stream copied into the ints four bytes at a time, padded with zeros. Taken from the routine in Test
+// Game 19's StoatSpriteEngine.dll that writes it, and checked against a save the PC wrote:
+//   "MST\0", u32 version 0
+//   u32 7, then for each kind 0 to 6: u32 n, n sprite numbers, u32 n, n record indices (creation order)
+//   u32 records, then each: u32 0 for none, or u32 1 and the sprite: kind, CG, x, y, z, alpha, default x and y,
+//     u32 (1), origin mode, text and NUL, font type, font size, colour RGBA as 4 bytes, edge colour RGBA, bold and
+//     edge weights as floats, character space, u32 (0), u32 linked to the message frame, parent frame, transition
+//     number and time, u32 (190), u32 (0). The parenthesised fields are unknown; their values are carried through.
+// Moves in progress aren't kept.
+constexpr int kMultiKinds = 7;
+struct Bytes {
+    std::vector<uint8_t> b;
+    void u32(int32_t v) { for (int k = 0; k < 4; k++) b.push_back(uint8_t(uint32_t(v) >> (8 * k))); }
+    void u8(int v) { b.push_back(uint8_t(v)); }
+    void f32(float f) { int32_t v; std::memcpy(&v, &f, 4); u32(v); }
+    void str(const std::string &s) { b.insert(b.end(), s.begin(), s.end()); b.push_back(0); }
+};
+struct ByteReader {
+    std::vector<uint8_t> b;
+    size_t i = 0;
+    bool bad = false;
+    int32_t u32() {
+        if (i + 4 > b.size()) { bad = true; i = b.size(); return 0; }
+        int32_t v = int32_t(uint32_t(b[i]) | uint32_t(b[i + 1]) << 8 | uint32_t(b[i + 2]) << 16 | uint32_t(b[i + 3]) << 24);
+        i += 4;
+        return v;
     }
+    int u8() {
+        if (i >= b.size()) { bad = true; return 0; }
+        return b[i++];
+    }
+    float f32() { int32_t v = u32(); float f; std::memcpy(&f, &v, 4); return f; }
+    std::string str() {
+        size_t j = i;
+        while (j < b.size() && b[j]) j++;
+        if (j >= b.size()) { bad = true; i = b.size(); return {}; }
+        std::string s(reinterpret_cast<const char *>(b.data() + i), j - i);
+        i = j + 1;
+        return s;
+    }
+};
+
+S4_HLL(StoatSpriteEngine, MultiSprite_Encode) {
+    if (std::getenv("S4_MSDUMP"))
+        for (auto &[k, m] : g_multi)
+            G().log("ms " + std::to_string(k.first) + " " + std::to_string(k.second) + " cg " + std::to_string(m.cg) +
+                    " pos " + std::to_string(m.x) + " " + std::to_string(m.y) + " z " + std::to_string(m.z) + " origin " +
+                    std::to_string(m.origin) + " linked " + std::to_string(m.linked) + " text " + std::to_string(m.text.size()));
+    Bytes o;
+    o.str("MST");
+    o.u32(0);
+    o.u32(kMultiKinds);
+    for (int kind = 0; kind < kMultiKinds; kind++) {
+        std::vector<int32_t> nums, recs;
+        for (size_t r = 0; r < g_multiOrder.size(); r++)
+            if (g_multiOrder[r].first == kind) { nums.push_back(g_multiOrder[r].second); recs.push_back(int32_t(r)); }
+        o.u32(int32_t(nums.size()));
+        for (int32_t n : nums) o.u32(n);
+        o.u32(int32_t(recs.size()));
+        for (int32_t r : recs) o.u32(r);
+    }
+    o.u32(int32_t(g_multiOrder.size()));
+    for (auto &k : g_multiOrder) {
+        const Multi &m = g_multi[k];
+        const CharProps &p = m.props;
+        o.u32(1);
+        for (int32_t v : {k.first, m.cg, m.x, m.y, m.z, m.alpha, m.defX, m.defY, m.unknown8, m.origin}) o.u32(v);
+        o.str(m.text);
+        o.u32(p.type);
+        o.u32(p.size);
+        for (int v : {p.r, p.g, p.b, p.a, p.er, p.eg, p.eb, p.ea}) o.u8(v);
+        o.f32(p.bold);
+        o.f32(p.edge);
+        for (int32_t v : {m.charSpace, m.unknown18, int32_t(m.linked), m.parentFrame, m.transNum, m.transTime, m.unknown22,
+                          m.unknown23})
+            o.u32(v);
+    }
+    while (o.b.size() % 4) o.b.push_back(0);
     Page *a = c.page(0);
-    if (a) a->v = std::move(out);
+    if (a) {
+        a->v.resize(o.b.size() / 4);
+        std::memcpy(a->v.data(), o.b.data(), o.b.size());
+    }
     c.retBool(a != nullptr);
 }
 S4_HLL(StoatSpriteEngine, MultiSprite_Decode) {
     Page *a = c.page(0);
-    if (!a || a->v.size() < 3 || a->v[0] != 1) { c.retBool(false); return; }
-    const auto &in = a->v;
+    if (!a) { c.retBool(false); return; }
+    ByteReader in;
+    in.b.resize(a->v.size() * 4);
+    std::memcpy(in.b.data(), a->v.data(), in.b.size());
+    if (in.str() != "MST" || in.u32() != 0) { c.retBool(false); return; }
+    // Which sprite each record is.
+    std::map<int32_t, std::pair<int, int>> owner;
+    int kinds = in.u32();
+    for (int kind = 0; kind < kinds && !in.bad; kind++) {
+        std::vector<int32_t> nums(size_t(std::max(0, in.u32())));
+        for (auto &n : nums) n = in.u32();
+        int32_t nrec = in.u32();
+        for (int32_t k = 0; k < nrec && !in.bad; k++) {
+            int32_t r = in.u32();
+            if (size_t(k) < nums.size()) owner[r] = {kind, nums[size_t(k)]};
+        }
+    }
+    std::map<std::pair<int, int>, Multi> multis;
+    std::vector<std::pair<int, int>> order;
+    int32_t nrec = in.u32();
+    for (int32_t r = 0; r < nrec && !in.bad; r++) {
+        if (in.u32() == 0) continue;
+        Multi m;
+        CharProps &p = m.props;
+        int kind = in.u32();
+        int32_t *ints[] = {&m.cg, &m.x, &m.y, &m.z, &m.alpha, &m.defX, &m.defY, &m.unknown8, &m.origin};
+        for (int32_t *v : ints) *v = in.u32();
+        m.text = in.str();
+        p.type = in.u32();
+        p.size = in.u32();
+        int *bytes[] = {&p.r, &p.g, &p.b, &p.a, &p.er, &p.eg, &p.eb, &p.ea};
+        for (int *v : bytes) *v = in.u8();
+        p.bold = in.f32();
+        p.edge = in.f32();
+        m.charSpace = in.u32();
+        m.unknown18 = in.u32();
+        m.linked = in.u32() != 0;
+        m.parentFrame = in.u32();
+        m.transNum = in.u32();
+        m.transTime = in.u32();
+        m.unknown22 = in.u32();
+        m.unknown23 = in.u32();
+        auto it = owner.find(r);
+        if (it == owner.end() || it->second.first != kind) continue;
+        multis[it->second] = std::move(m);
+        order.push_back(it->second);
+    }
+    if (in.bad) { c.retBool(false); return; }
     for (auto &[k, m] : g_multi)
         if (m.sprite) G().sprites.remove(m.sprite);
-    g_multi.clear();
-    size_t i = 1;
-    int n = in[i++];
-    g_messageFrameShown = in[i++];
-    for (int k = 0; k < n && i + 25 <= in.size(); k++) {
-        int type = in[i++], num = in[i++];
-        Multi &m = multi(type, num);
-        int32_t *f[] = {&m.cg, &m.x, &m.y, &m.defX, &m.defY, &m.z, &m.alpha, &m.transNum, &m.transTime};
-        for (int32_t *p : f) *p = in[i++];
-        m.linked = in[i++];
-        m.parentFrame = in[i++];
-        m.origin = in[i++];
-        m.charSpace = in[i++];
-        int32_t *pp[] = {&m.props.type, &m.props.size, &m.props.r, &m.props.g, &m.props.b, &m.props.er, &m.props.eg, &m.props.eb};
-        for (int32_t *p : pp) *p = in[i++];
-        std::memcpy(&m.props.bold, &in[i++], 4);
-        std::memcpy(&m.props.edge, &in[i++], 4);
-        m.text = getString(in, i);
-    }
+    g_multi = std::move(multis);
+    g_multiOrder = std::move(order);
     c.retBool(true);
 }
 
@@ -284,10 +380,10 @@ CharProps propsFrom(Page *p) {
     if (!p || p->v.size() < 6) return cp;
     cp.type = p->v[0];
     cp.size = p->v[1];
-    if (Page *col = G().vm->page(p->v[2]); col && col->v.size() >= 3) { cp.r = col->v[0]; cp.g = col->v[1]; cp.b = col->v[2]; }
+    if (Page *col = G().vm->page(p->v[2]); col && col->v.size() >= 4) { cp.r = col->v[0]; cp.g = col->v[1]; cp.b = col->v[2]; cp.a = col->v[3]; }
     std::memcpy(&cp.bold, &p->v[3], 4);
     std::memcpy(&cp.edge, &p->v[4], 4);
-    if (Page *col = G().vm->page(p->v[5]); col && col->v.size() >= 3) { cp.er = col->v[0]; cp.eg = col->v[1]; cp.eb = col->v[2]; }
+    if (Page *col = G().vm->page(p->v[5]); col && col->v.size() >= 4) { cp.er = col->v[0]; cp.eg = col->v[1]; cp.eb = col->v[2]; cp.ea = col->v[3]; }
     return cp;
 }
 
@@ -321,17 +417,30 @@ void drawChar(CharSpr &cs) {
     s.x = x; s.y = y; s.z = z; s.show = show;
     s.blendRate = cs.alpha;
 }
+// The saved form, as the PC writes it: "CSM", version 0, the number of handles ever made, then for each handle 0
+// when it is free, or 1, the character, the CASCharSpriteProperty struct's fields (type, size, colour RGBA, bold and
+// edge weights as float bits, edge colour RGBA), x, y, z, alpha rate, shown, and the engine's sprite number. The PC
+// numbered those sprites 2000 plus the handle.
+constexpr int kCharSpriteBase = 2000;
 S4_HLL(StoatSpriteEngine, CharSpriteManager_Save) {
-    std::vector<int32_t> out{1, int32_t(g_chars.size()), g_nextCharHandle};
-    for (auto &[h, cs] : g_chars) {
+    std::vector<int32_t> out;
+    serial::putTag(out, "CSM");
+    out.push_back(0);
+    out.push_back(g_nextCharHandle);
+    for (int h = 0; h < g_nextCharHandle; h++) {
+        auto it = g_chars.find(h);
+        if (it == g_chars.end()) { out.push_back(0); continue; }
+        const CharSpr &cs = it->second;
+        const CharProps &p = cs.props;
         Sprite *s = G().sprites.find(cs.sprite);
         int32_t fb, fe;
-        std::memcpy(&fb, &cs.props.bold, 4);
-        std::memcpy(&fe, &cs.props.edge, 4);
-        for (int32_t v : {h, cs.alpha, s ? s->x : 0, s ? s->y : 0, s ? s->z : 0, s ? int32_t(s->show) : 0, cs.props.type,
-                          cs.props.size, cs.props.r, cs.props.g, cs.props.b, fb, fe, cs.props.er, cs.props.eg, cs.props.eb})
+        std::memcpy(&fb, &p.bold, 4);
+        std::memcpy(&fe, &p.edge, 4);
+        out.push_back(1);
+        serial::putString(out, cs.ch);
+        for (int32_t v : {p.type, p.size, p.r, p.g, p.b, p.a, fb, fe, p.er, p.eg, p.eb, p.ea, s ? s->x : 0, s ? s->y : 0,
+                          s ? s->z : 0, cs.alpha, s ? int32_t(s->show) : 0, kCharSpriteBase + h})
             out.push_back(v);
-        putString(out, cs.ch);
     }
     if (Page *a = c.page(0)) a->v = std::move(out);
     c.retBool(true);
@@ -340,29 +449,38 @@ S4_HLL(StoatSpriteEngine, CharSpriteManager_Load) {
     Page *a = c.page(0);
     for (auto &[h, cs] : g_chars) G().sprites.remove(cs.sprite);
     g_chars.clear();
-    if (!a || a->v.size() < 3 || a->v[0] != 1) { c.retBool(false); return; }
+    size_t i = 0;
+    if (!a || !serial::getTag(a->v, i, "CSM") || i + 2 > a->v.size() || a->v[i] != 0 || a->v[i + 1] < 0) {
+        c.retBool(false);
+        return;
+    }
     const auto &in = a->v;
-    size_t i = 1;
-    int n = in[i++];
-    g_nextCharHandle = in[i++];
-    for (int k = 0; k < n && i + 16 <= in.size(); k++) {
-        int h = in[i++];
+    int n = in[i + 1];
+    i += 2;
+    for (int h = 0; h < n; h++) {
+        if (i >= in.size()) break;
+        if (in[i++] == 0) continue;
+        std::string ch;
+        if (!serial::getString(in, i, ch) || i + 18 > in.size()) break;
         CharSpr &cs = g_chars[h];
+        cs.ch = ch;
         cs.sprite = g_nextInternal++;
+        CharProps &p = cs.props;
+        p.type = in[i++]; p.size = in[i++];
+        p.r = in[i++]; p.g = in[i++]; p.b = in[i++]; p.a = in[i++];
+        std::memcpy(&p.bold, &in[i++], 4);
+        std::memcpy(&p.edge, &in[i++], 4);
+        p.er = in[i++]; p.eg = in[i++]; p.eb = in[i++]; p.ea = in[i++];
+        int x = in[i++], y = in[i++], z = in[i++];
         cs.alpha = in[i++];
-        int x = in[i++], y = in[i++], z = in[i++], show = in[i++];
-        cs.props.type = in[i++];
-        cs.props.size = in[i++];
-        cs.props.r = in[i++]; cs.props.g = in[i++]; cs.props.b = in[i++];
-        std::memcpy(&cs.props.bold, &in[i++], 4);
-        std::memcpy(&cs.props.edge, &in[i++], 4);
-        cs.props.er = in[i++]; cs.props.eg = in[i++]; cs.props.eb = in[i++];
-        cs.ch = getString(in, i);
+        bool show = in[i++] != 0;
+        i++;  // the PC's sprite number; this engine numbers its own
         Sprite &s = G().sprites.get(cs.sprite);
         s.x = x; s.y = y; s.z = z;
         drawChar(cs);
         s.show = show;
     }
+    g_nextCharHandle = std::max(n, 1);
     c.retBool(true);
 }
 S4_HLL(StoatSpriteEngine, CharSprite_Release) {
@@ -434,30 +552,41 @@ S4_HLL(StoatSpriteEngine, ADVLogList_GetADVLogVoice) {
     int n = c.i(0);
     c.retInt(n >= 0 && size_t(n) < g_log.size() ? g_log[n].voice : 0);
 }
+// The saved form, as the PC writes it: "ADL", version 0, the number of pages, each page's line count, lines and
+// voice, then whether the log is enabled.
 S4_HLL(StoatSpriteEngine, ADVLogList_Save) {
-    std::vector<int32_t> out{1, int32_t(g_log.size())};
+    std::vector<int32_t> out;
+    serial::putTag(out, "ADL");
+    out.push_back(0);
+    out.push_back(int32_t(g_log.size()));
     for (auto &p : g_log) {
-        out.push_back(p.voice);
         out.push_back(int32_t(p.lines.size()));
-        for (auto &l : p.lines) putString(out, l);
+        for (auto &l : p.lines) serial::putString(out, l);
+        out.push_back(p.voice);
     }
+    out.push_back(g_logEnabled);
     if (Page *a = c.page(0)) a->v = std::move(out);
     c.retBool(true);
 }
 S4_HLL(StoatSpriteEngine, ADVLogList_Load) {
     Page *a = c.page(0);
     g_log.clear();
-    if (!a || a->v.size() < 2 || a->v[0] != 1) { c.retBool(false); return; }
-    size_t i = 1;
-    int n = a->v[i++];
-    for (int k = 0; k < n && i + 2 <= a->v.size(); k++) {
+    size_t i = 0;
+    if (!a || !serial::getTag(a->v, i, "ADL") || i + 2 > a->v.size() || a->v[i] != 0) { c.retBool(false); return; }
+    const auto &in = a->v;
+    int n = in[i + 1];
+    i += 2;
+    for (int k = 0; k < n; k++) {
+        if (i >= in.size() || in[i] < 0) { g_log.clear(); c.retBool(false); return; }
         LogPage p;
-        p.voice = a->v[i++];
-        int lines = a->v[i++];
-        p.lines.clear();
-        for (int l = 0; l < lines; l++) p.lines.push_back(getString(a->v, i));
+        p.lines.assign(size_t(in[i++]), "");
+        for (auto &l : p.lines)
+            if (!serial::getString(in, i, l)) { g_log.clear(); c.retBool(false); return; }
+        if (i >= in.size()) { g_log.clear(); c.retBool(false); return; }
+        p.voice = in[i++];
         g_log.push_back(std::move(p));
     }
+    if (i < in.size()) g_logEnabled = in[i] != 0;
     c.retBool(true);
 }
 
@@ -531,46 +660,73 @@ S4_HLL(MsgLogViewer, ConvertFromMsgLogManager) {
 }
 
 // ---- ADVSceneKeeper: copies of a scene struct the game hands over, for the scene replay list ----
+// Each scene is kept in the PC's encoding (serial.h). The saved form is "ADS", version 0, the number of scenes and
+// the scenes one after another, with nothing marking where one ends: a loaded list is split when the game first
+// hands over a struct, whose type gives each scene's length.
 
-std::vector<std::vector<int32_t>> g_scenes;  // the struct's int members
+struct SceneKeeper {
+    std::vector<std::vector<int32_t>> scenes;
+    std::vector<int32_t> pending;  // loaded and not yet split
+    int pendingCount = 0;
+
+    int count() const { return int(scenes.size()) + pendingCount; }
+    bool split(int32_t structType) {
+        if (!pendingCount) return true;
+        size_t i = 0;
+        for (int k = 0; k < pendingCount; k++) {
+            size_t start = i;
+            if (!serial::skipStruct(*G().vm, pending, i, structType)) {
+                G().log("ADVSceneKeeper: the saved scenes don't fit their struct");
+                pending.clear();
+                pendingCount = 0;
+                return false;
+            }
+            scenes.emplace_back(pending.begin() + ptrdiff_t(start), pending.begin() + ptrdiff_t(i));
+        }
+        pending.clear();
+        pendingCount = 0;
+        return true;
+    }
+};
+SceneKeeper g_scenes;
+
 S4_HLL(StoatSpriteEngine, ADVSceneKeeper_AddADVScene) {
     Page *p = c.page(0);
-    if (p) g_scenes.push_back(p->v);
-    c.retBool(p != nullptr);
+    if (!p || !g_scenes.split(p->index)) { c.retBool(false); return; }
+    std::vector<int32_t> out;
+    serial::putStruct(*G().vm, out, c.i(0));
+    g_scenes.scenes.push_back(std::move(out));
+    c.retBool(true);
 }
-S4_HLL(StoatSpriteEngine, ADVSceneKeeper_GetNumofADVScene) { c.retInt(int32_t(g_scenes.size())); }
+S4_HLL(StoatSpriteEngine, ADVSceneKeeper_GetNumofADVScene) { c.retInt(g_scenes.count()); }
 S4_HLL(StoatSpriteEngine, ADVSceneKeeper_GetADVScene) {
     int n = c.i(0);
     Page *p = c.page(1);
-    if (!p || n < 0 || size_t(n) >= g_scenes.size()) { c.retBool(false); return; }
-    for (size_t k = 0; k < p->v.size() && k < g_scenes[n].size(); k++) {
-        VarType t = G().vm->varType(*p, k);
-        if (t.type == T_INT || t.type == T_BOOL || t.type == T_FLOAT) p->v[k] = g_scenes[n][k];
-    }
-    c.retBool(true);
+    if (!p || !g_scenes.split(p->index) || n < 0 || size_t(n) >= g_scenes.scenes.size()) { c.retBool(false); return; }
+    size_t i = 0;
+    c.retBool(serial::getStruct(*G().vm, g_scenes.scenes[size_t(n)], i, c.i(1)));
 }
-S4_HLL(StoatSpriteEngine, ADVSceneKeeper_Clear) { g_scenes.clear(); }
+S4_HLL(StoatSpriteEngine, ADVSceneKeeper_Clear) { g_scenes = {}; }
 S4_HLL(StoatSpriteEngine, ADVSceneKeeper_Save) {
-    std::vector<int32_t> out{1, int32_t(g_scenes.size())};
-    for (auto &s : g_scenes) {
-        out.push_back(int32_t(s.size()));
-        out.insert(out.end(), s.begin(), s.end());
-    }
+    std::vector<int32_t> out;
+    serial::putTag(out, "ADS");
+    out.push_back(0);
+    out.push_back(g_scenes.count());
+    for (auto &sc : g_scenes.scenes) out.insert(out.end(), sc.begin(), sc.end());
+    out.insert(out.end(), g_scenes.pending.begin(), g_scenes.pending.end());
     if (Page *a = c.page(0)) a->v = std::move(out);
     c.retBool(true);
 }
 S4_HLL(StoatSpriteEngine, ADVSceneKeeper_Load) {
     Page *a = c.page(0);
-    g_scenes.clear();
-    if (!a || a->v.size() < 2 || a->v[0] != 1) { c.retBool(false); return; }
-    size_t i = 1;
-    int n = a->v[i++];
-    for (int k = 0; k < n && i < a->v.size(); k++) {
-        size_t len = size_t(std::max(0, a->v[i++]));
-        len = std::min(len, a->v.size() - i);
-        g_scenes.emplace_back(a->v.begin() + i, a->v.begin() + i + len);
-        i += len;
+    g_scenes = {};
+    size_t i = 0;
+    if (!a || !serial::getTag(a->v, i, "ADS") || i + 2 > a->v.size() || a->v[i] != 0 || a->v[i + 1] < 0) {
+        c.retBool(false);
+        return;
     }
+    g_scenes.pendingCount = a->v[i + 1];
+    g_scenes.pending.assign(a->v.begin() + ptrdiff_t(i + 2), a->v.end());
     c.retBool(true);
 }
 
@@ -690,12 +846,13 @@ int g_drawFontSpace = 0;
 S4_HLL_RESET {
     g_nextInternal = 1000000;
     g_multi.clear();
+    g_multiOrder.clear();
     g_messageFrameShown = true;
     g_chars.clear();
     g_nextCharHandle = 1;
     g_log.clear();
     g_logEnabled = true;
-    g_scenes.clear();
+    g_scenes = {};
     g_drawFont = {};
     g_drawFontSpace = 0;
     g_msgLog.clear();

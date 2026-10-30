@@ -66,6 +66,7 @@ S4_HLL(StoatSpriteEngine, SP_SetCG) {
     Sprite &s = G().sprites.get(c.i(0));
     s.used = true;
     s.cg = img;
+    s.cgNumber = c.i(1);
     s.hasOwn = false;
     s.own = {};
     c.retInt(1);
@@ -98,11 +99,13 @@ S4_HLL(StoatSpriteEngine, SP_Delete) { G().sprites.remove(c.i(0)); c.retInt(1); 
 S4_HLL(StoatSpriteEngine, SP_DeleteAll) { G().sprites.clear(); c.retBool(true); }
 S4_HLL(StoatSpriteEngine, SP_IsUsing) { c.retBool(G().sprites.find(c.i(0)) != nullptr); }
 
+// A sprite number is a slot: its position, Z, show flag and the rest stay set before it has a picture, and the
+// game relies on that (Test Game 19 sets a number sprite's Z, then makes it with SP_Create).
 #define SPRITE_SET(fn, body)                         \
     S4_HLL(StoatSpriteEngine, fn) {                  \
-        Sprite *s = G().sprites.find(c.i(0));        \
-        if (s) { body; }                             \
-        c.retInt(s ? 1 : 0);                         \
+        Sprite *s = &G().sprites.get(c.i(0));        \
+        body;                                        \
+        c.retInt(1);                                 \
     }
 #define SPRITE_GET(fn, expr, dflt)                   \
     S4_HLL(StoatSpriteEngine, fn) {                  \

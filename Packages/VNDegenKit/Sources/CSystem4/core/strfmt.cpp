@@ -118,6 +118,21 @@ std::string formatOne(const std::string &fmt, int32_t type, int32_t value, const
             out = buf;
             break;
         }
+        case 'D': {
+            // Two-byte (full-width) characters, as the SDK manual gives: "%D" % 5 is "５". Padding becomes a
+            // full-width space.
+            long long v = type == 3 ? (long long)f : value;
+            std::snprintf(buf, sizeof buf, (spec + "lld").c_str(), v);
+            for (const char *q = buf; *q; q++) {
+                char ch = *q;
+                if (ch >= '0' && ch <= '9') { out += char(0x82); out += char(0x4F + (ch - '0')); }
+                else if (ch == '-') { out += char(0x81); out += char(0x7C); }
+                else if (ch == '+') { out += char(0x81); out += char(0x7B); }
+                else if (ch == ' ') { out += char(0x81); out += char(0x40); }
+                else out += ch;
+            }
+            break;
+        }
         case 'f': case 'g': case 'e':
             std::snprintf(buf, sizeof buf, (spec + conv).c_str(), double(type == 3 ? f : float(value)));
             out = buf;

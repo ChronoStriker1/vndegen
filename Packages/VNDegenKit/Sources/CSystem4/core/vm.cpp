@@ -22,14 +22,16 @@ int retWords(int32_t t) { return t == T_VOID ? 0 : isRefPair(t) ? 2 : 1; }
 bool isString(int32_t t) { return t == T_STRING; }
 bool isDelegate(int32_t t) { return t == 63; }
 bool isStructValue(int32_t t) { return t == T_STRUCT; }
-bool isArray(int32_t t) {
-    return t == T_ARRAY_INT || t == T_ARRAY_FLOAT || t == T_ARRAY_STRING || t == T_ARRAY_STRUCT ||
-           t == T_ARRAY_FUNCTYPE || t == T_ARRAY_BOOL || t == 58 || t == 67;
-}
 // Reference types that hold a slot and keep it alive.
 bool isRefSlot(int32_t t) {
     return t == T_REF_STRING || t == T_REF_STRUCT || (t >= T_REF_ARRAY_INT && t <= T_REF_ARRAY_STRUCT) ||
            t == T_REF_ARRAY_FUNCTYPE || t == T_REF_ARRAY_BOOL;
+}
+}  // namespace
+
+bool isArray(int32_t t) {
+    return t == T_ARRAY_INT || t == T_ARRAY_FLOAT || t == T_ARRAY_STRING || t == T_ARRAY_STRUCT ||
+           t == T_ARRAY_FUNCTYPE || t == T_ARRAY_BOOL || t == 58 || t == 67;
 }
 // The base type of an array's elements.
 int32_t arrayElem(int32_t t) {
@@ -46,7 +48,6 @@ int32_t arrayElem(int32_t t) {
     }
 }
 
-}  // namespace
 
 std::vector<void (*)()> &HllState::resets() {
     static std::vector<void (*)()> r;

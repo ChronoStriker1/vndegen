@@ -43,6 +43,7 @@ int textWidth(const std::string &sjisText, const TextStyle &st, int charSpace);
 struct Sprite {
     bool used = false;
     std::shared_ptr<const Image> cg;   // a CG set with SP_SetCG, shared with the cache until drawn on
+    int cgNumber = 0;                  // that CG's number, for debugging
     Surface own;                       // a sprite made with SP_Create, or a CG copied before drawing on it
     bool hasOwn = false;
     int x = 0, y = 0, z = 0;

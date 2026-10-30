@@ -24,8 +24,11 @@ port. This file lists where each part of the runtime came from, and what was unc
     test programs and test bitmaps in, files out.
 - **The games' own executables and DLLs under Wine as black boxes**: Test Game 46's VM DLL (`Sys43VM.dll`) loaded by
   the SDK's runtime, to see the save layout of a later VM.
-- **Minimal disassembly** of the SDK's `Sys42VM.dll`, only where a file format couldn't be settled otherwise: the
-  routine that writes a save file's "GD" header and the XOR routine it calls (see Saves).
+- **Minimal disassembly**, only where a file format couldn't be settled otherwise: in the SDK's `Sys42VM.dll`, the
+  routine that writes a save file's "GD" header and the XOR routine it calls (see Saves); in Test Game 19's
+  `StoatSpriteEngine.dll`, the routine that writes MultiSprite_Encode's data, for the order and width of its fields.
+- **The PC games under Wine** in a headless gamescope session, to make real saves and load VNDegen's: Test Game 19
+  saved on the PC and loaded in VNDegen, and the other way round.
 - **Permissive code**: stb_image and stb_vorbis (public domain or MIT), pl_mpeg (MIT), zlib, and FreeType and libwebp
   on the Linux test host only. The text and font code is adapted from VNDegen's own Wolf RPG Editor runtime.
 - **Reference outputs**: the ffmpeg and mpg123 command-line programs decoded the games' movies so the movie
@@ -131,6 +134,25 @@ calls were read from how the games call them.
   saved by the SDK runtime (version 7) and by Test Game 46's VM DLL (version 8). Version 8 adds the `this` page to each
   local page record. Code addresses are stored as the function's name, the call's offset in it and the function's
   CRC, so a load still finds them if the code moved.
+- A save Test Game 19 wrote on the PC settled the rest. Its VM, a 2009 `Sys42VM.dll`, writes the GD container without
+  the XOR and the resume save as version 7; VNDegen picks that format from the ini's `MainVM`. Struct records name
+  the struct's constructor and destructor functions. A string record's length is the PC's buffer, which can run past
+  the text's NUL. Saved reference counts leave out the reference each method frame holds on its `this`.
+- Save slot details go through VSFile, whose files start "VSF", four zero bytes, then each value as a type byte (1 an
+  int, 3 a NUL-terminated string) and its data, as Test Game 19's PC save shows.
+
+### Data the sprite engine hands the game to save (`serial.cpp`, `hll_adv.cpp`)
+
+Test Game 19 keeps the backlog, the back scenes, the character sprites and the MultiSprite state in int arrays inside
+its saves. Their layouts were read from the arrays in the PC save:
+- Values (`serial.cpp`): an int or bool is itself, a string its bytes one per element and a NUL, a struct its members
+  in order, an array its length and elements. The backlog ("ADL"), the back scenes ("ADS") and the character sprites
+  ("CSM") are built from these, each after a tag and a version 0.
+- MultiSprite ("MST") is a byte stream copied into the ints four bytes at a time. The kind and order of its fields
+  came from the routine that writes it (see Sources); the values were checked against the PC save.
+
+A save the PC wrote loads in VNDegen, and VNDegen saves it back with the back scenes and MultiSprite data
+byte-identical. A save VNDegen wrote from its own play loads on the PC, which then plays on.
 
 ### Sprite engine and the rest of the HLL libraries (`hll_*.cpp`, `gfx.cpp`, `audio.cpp`, `font.cpp`)
 
@@ -139,11 +161,10 @@ calls were read from how the games call them.
   overlap; its own calls (MultiSprite, CharSprite, ADVLogList, ADVSceneKeeper, transitions) were read from how the
   games call them: their names, argument names, and the game functions that wrap them.
 - Encodings these libraries hand the game to store in its saves (MultiSprite_Encode, CharSpriteManager_Save,
-  ADVLogList_Save, ADVSceneKeeper_Save) are VNDegen's own for now. See Known gaps.
+  ADVLogList_Save, ADVSceneKeeper_Save) follow the PC's; see the section above.
 
 ## Known gaps and open questions
 
-- The encodings above should match the PC's, because the game stores them in its saves. VNDegen can't yet run the PC
-  game's sprite library to learn them.
-- Resume saves are verified against the SDK runtime and Test Game 46's VM, not yet against Test Games 19 and 56 on
-  the PC.
+- Four MultiSprite fields keep the PC's values without a known meaning. Moves in progress aren't saved, as on the PC.
+- Resume saves are verified on the PC for Test Game 19, and against the SDK runtime and Test Game 46's VM; Test
+  Game 56 isn't checked on the PC yet.

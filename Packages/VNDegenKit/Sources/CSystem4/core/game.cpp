@@ -220,7 +220,7 @@ void Game::present() {
     if (dumpSprites_.exchange(false)) {
         for (auto &[n, sp] : sprites.all())
             if (sp.used)
-                log("sprite " + std::to_string(n) + " at " + std::to_string(sp.x) + "," + std::to_string(sp.y) + " size " +
+                log("sprite " + std::to_string(n) + " cg " + std::to_string(sp.cgNumber) + " at " + std::to_string(sp.x) + "," + std::to_string(sp.y) + " size " +
                     std::to_string(sp.width()) + "x" + std::to_string(sp.height()) + " z " + std::to_string(sp.z) +
                     (sp.show ? " shown" : " hidden") + " blend " + std::to_string(sp.blendRate));
     }
