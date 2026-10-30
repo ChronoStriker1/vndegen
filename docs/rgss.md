@@ -31,12 +31,28 @@ Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's stri
 
 ## Test games
 
+Checked on the Linux host, the Mac app and an iPad simulator, with every game file name's case swapped on a
+case-sensitive volume as well, and Test Games 33 and 55 on an iPhone simulator.
+
 | Game | Version | Packed | Checked |
 | --- | --- | --- | --- |
-| Test Game 14 | VX Ace | `Game.rgss3a`, VX Ace RTP | title, new game, events with pictures and choices, save, load in the PC engine |
-| Test Game 33 | VX | `Game.rgss2a`, VX RTP | title, PC saves load, map, save, load in the PC engine |
-| Test Game 37 | XP | `Game.rgssad`, XP RTP | title, new game, events with pictures and messages, autotiles match the PC engine |
-| Test Game 55 | VX Ace | unpacked, no RTP | first map, HUD, windows; resizes the screen to 1024x768 |
+| Test Game 14 | VX Ace | `Game.rgss3a`, VX Ace RTP | title, new game, events with pictures, choices and a minigame, save, load; the PC engine loads the save |
+| Test Game 33 | VX | `Game.rgss2a`, VX RTP | title, the PC saves in its folder load, map, save; the PC engine loads the save |
+| Test Game 37 | XP | `Game.rgssad`, XP RTP | title, new game, events with pictures and messages, save, load; autotiles match the PC engine; runs at the 120 frames a second its scripts set |
+| Test Game 55 | VX Ace | unpacked, no RTP | map at 1024x768, HUD, its own menus, save and load from the menu in the app |
+
+Frame rates, from `-frameMonitor YES` (DEBUG builds log `RGSSFRAMES` every 10 seconds) while walking or playing, with
+another thread's iPhone simulator running on the same Mac mini:
+
+| Game | Target | iPad simulator, average and slowest 1% | Mac app |
+| --- | --- | --- | --- |
+| Test Game 33, map | 60 | 59.6 to 60.0, 33 to 60 | 60.0, 60.0 |
+| Test Game 55, map at 1024x768 | 60 | 59.4 to 59.8, 30 to 43 | 60.0, 59.9 to 60.0 |
+| Test Game 14, minigame | 60 | 59.6 to 59.8, 33 to 43 | 59.7 to 59.8, 43 to 50 |
+| Test Game 37, intro | 120 (shown at 60) | 60.0, 60.0 | 60.0, 60.0 |
+
+The runtime's log gives each frame's cost every 600 frames ("timing:"): on the iPad simulator a VX map takes about
+0.7 ms in the game's scripts and 1.9 ms to compose. Simulator timing isn't iPad timing.
 
 ## Win32API
 
