@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -72,6 +73,8 @@ static float gain_for(int volume) {
     return v * v;
 }
 
+static void ensure_font(void);
+
 // MARK: Streams
 
 static bool has_prefix(const uint8_t *d, size_t n, const char *magic) {
@@ -129,6 +132,7 @@ static Stream *stream_open(uint8_t *data, size_t size, const char *name) {
         s->rate = (int)s->wav.sampleRate;
         s->frames = (int64_t)s->wav.totalPCMFrameCount;
     } else if (has_prefix(data, size, "MThd")) {
+        ensure_font();
         char error[256] = "";
         s->midi = vnmidi_player_open(soundFont, data, size, AUDIO_RATE, error, sizeof error);
         if (!s->midi) {
@@ -307,13 +311,30 @@ static bool voice_mix(Voice *v, float *out, int frames) {
 
 // MARK: The host's side
 
-void audio_start(const char *path, const char *fallback) {
-    audio_stop();
-    if (!soundFont && (path || fallback)) {
+// The SoundFont the host asked for, loaded when the game first plays MIDI, on the game thread, since decoding it takes
+// a moment. The player may have chosen another in Settings since the last game.
+static char wantedFont[2048], wantedFallback[2048], loadedFonts[4100];
+
+static void ensure_font(void) {
+    char wanted[sizeof loadedFonts];
+    snprintf(wanted, sizeof wanted, "%s|%s", wantedFont, wantedFallback);
+    if (!strcmp(wanted, loadedFonts)) return;
+    vnmidi_font_free(soundFont);
+    soundFont = NULL;
+    if (wantedFont[0] || wantedFallback[0]) {
+        const char *path = wantedFont[0] ? wantedFont : wantedFallback;
+        const char *fallback = wantedFont[0] && wantedFallback[0] ? wantedFallback : NULL;
         char error[512] = "";
-        soundFont = vnmidi_font_load_fallback(path ? path : fallback, path ? fallback : NULL, error, sizeof error);
+        soundFont = vnmidi_font_load_fallback(path, fallback, error, sizeof error);
         if (error[0]) rgss_log("audio: SoundFont: %s", error);
     }
+    snprintf(loadedFonts, sizeof loadedFonts, "%s", wanted);
+}
+
+void audio_start(const char *path, const char *fallback) {
+    audio_stop();
+    snprintf(wantedFont, sizeof wantedFont, "%s", path ? path : "");
+    snprintf(wantedFallback, sizeof wantedFallback, "%s", fallback ? fallback : "");
     pthread_mutex_lock(&lock);
     paused = false;
     pthread_mutex_unlock(&lock);

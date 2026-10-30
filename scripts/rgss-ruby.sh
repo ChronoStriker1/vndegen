@@ -138,15 +138,9 @@ case "$platform" in
     sdk() { xcrun --sdk "$1" --show-sdk-path; }
     clang=$(xcrun -f clang)
     tools=(AR="$(xcrun -f ar)" RANLIB="$(xcrun -f ranlib)" NM="$(xcrun -f nm)" STRIP="$(xcrun -f strip)")
-    # iOS has no fork or exec for an app; Ruby's process functions then raise NotImplementedError, which RGSS games
-    # don't call.
-    # dir.c includes <sys/vnode.h> on Apple systems for the file and file system types getattrlist reports, and the
-    # iOS SDK has no such header. The macOS SDK's has the same two enums, which the stand-in takes from it.
-    mkdir -p "$work/ios-shim/sys"
-    sed -n '/^enum vtype/,/};/p; /^enum vtagtype/,/};/p' "$(sdk macosx)/usr/include/sys/vnode.h" >"$work/ios-shim/sys/vnode.h"
-    ios_cache=(ac_cv_func_fork=no ac_cv_func_vfork=no ac_cv_func_fork_works=no ac_cv_func_vfork_works=no
-               ac_cv_func_execv=no ac_cv_func_execve=no ac_cv_func_posix_spawn=no ac_cv_func_system=no
-               ac_cv_func_daemon=no ac_cv_func_getentropy=no ac_cv_func_setpgrp=no ac_cv_func_setsid=no)
+    # iOS declares fork and exec, which its sandbox refuses at run time; Ruby's process functions then raise, and RGSS
+    # games don't call them. system() and daemon() aren't available to iOS apps, and getentropy has no header there.
+    ios_cache=(ac_cv_func_system=no ac_cv_func_daemon=no ac_cv_func_getentropy=no)
     slice mac-arm64 "${base[@]}" --host=aarch64-apple-darwin "${tools[@]}" \
       CC="$clang -target arm64-apple-macos15.0 -isysroot $(sdk macosx)" CFLAGS="-O2"
     slice mac-x86_64 "${base[@]}" --host=x86_64-apple-darwin "${tools[@]}" \
