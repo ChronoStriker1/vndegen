@@ -611,6 +611,7 @@ void rgss_define_modules(void) {
 
 // Resets the module state a game left behind, before the next game starts.
 void rgss_modules_reset(void) {
+    memset(&timing, 0, sizeof timing);
     image_free(&frozen);
     isFrozen = false;
     brightness = 255;

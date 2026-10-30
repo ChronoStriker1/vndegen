@@ -313,16 +313,38 @@ typedef struct {
     int layer;
 } Item;
 
-// Equal z: in VX and VX Ace a sprite lower on the screen (larger y) is in front, then the one made later.
 static int compare_items(const void *a, const void *b) {
     const Item *x = a, *y = b;
     if (x->z != y->z) return x->z < y->z ? -1 : 1;
-    if (rgss_version >= RGSS2 && x->d->kind == DRAW_SPRITE && y->d->kind == DRAW_SPRITE) {
-        int xy = ((const Sprite *)x->d)->y, yy = ((const Sprite *)y->d)->y;
-        if (xy != yy) return xy < yy ? -1 : 1;
-    }
     if (x->d->serial != y->d->serial) return x->d->serial < y->d->serial ? -1 : 1;
     return x->layer - y->layer;
+}
+
+static int sprite_y(const Item *item) { return ((const Sprite *)item->d)->y; }
+
+static int compare_sprites_by_y(const void *a, const void *b) {
+    const Item *x = a, *y = b;
+    if (sprite_y(x) != sprite_y(y)) return sprite_y(x) < sprite_y(y) ? -1 : 1;
+    return x->d->serial < y->d->serial ? -1 : x->d->serial > y->d->serial;
+}
+
+// In VX and VX Ace a sprite lower on the screen (larger y) is in front of another sprite at the same z, then the one
+// made later. Other objects at that z keep their places among them, in the order they were made, so the order stays
+// consistent whatever mix of objects shares a z.
+static void order_sprites_by_y(Item *items, size_t count) {
+    for (size_t start = 0; start < count;) {
+        size_t end = start;
+        while (end < count && items[end].z == items[start].z) end++;
+        Item sprites[end - start];
+        size_t n = 0;
+        for (size_t i = start; i < end; i++) if (items[i].d->kind == DRAW_SPRITE) sprites[n++] = items[i];
+        if (n > 1) {
+            qsort(sprites, n, sizeof(Item), compare_sprites_by_y);
+            size_t k = 0;
+            for (size_t i = start; i < end; i++) if (items[i].d->kind == DRAW_SPRITE) items[i] = sprites[k++];
+        }
+        start = end;
+    }
 }
 
 static IRect intersect(IRect a, IRect b) {
@@ -364,6 +386,7 @@ static void render_container(Container *c, Image *target, IRect clip, int offX, 
         }
     }
     qsort(items, count, sizeof(Item), compare_items);
+    if (rgss_version >= RGSS2) order_sprites_by_y(items, count);
     for (size_t i = 0; i < count; i++) {
         Drawable *d = items[i].d;
         switch (d->kind) {
