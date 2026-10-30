@@ -62,9 +62,12 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `4/vndegen/`: the Godot 4 module, built in with `custom_modules`.
   - The functions in `Packages/VNDegenKit/Sources/CGodot/include/vngd.h` (`vngd.cpp`).
   - `DisplayServerVNDegen`, which draws into the CAMetalLayer VNDegen hands it and takes all input through `vngd.h` (`display_server_vndegen.mm`).
-  - The OS for each platform (`vngd_apple.mm`, and `vngd_linuxbsd.cpp` for testing on Linux). It gives games their `.exe` as the executable path and keeps `user://` where Windows does, under VNDegen's stand-in for `%APPDATA%`.
+  - The OS for each platform (`vngd_apple.mm`, and `vngd_linuxbsd.cpp` for testing on Linux). It gives games their `.exe` as the executable path and its folder as the place for `res://` paths the pack doesn't hold, and keeps `user://` where Windows does, under VNDegen's stand-in for `%APPDATA%`.
+  - The key of an encrypted pack, which `vngd_start` copies into Godot's `script_encryption_key` for the game it starts.
   - File and folder access that finds files outside the pack whatever case the game names them in, through `Engines/Shared/casepath.c` (`vngd_files.h`, also in the Godot 3 module).
+  - The class names of the Epic Online Services extension, without the services, for the games that ship it (`vngd_eos.h`).
 - `3/vndegen/`: the Godot 3 module, with the same functions. Its OS draws with MetalANGLE on iPhone and iPad and with Apple's OpenGL on Mac, into two IOSurfaces a layer shows (`vngd_apple.mm`), and `vngd_x11.cpp` runs it on Linux for testing.
 - `vngd_frames.h`: the frame timing both modules log for `VNGD_FRAME_LOG`.
-- `test-host/vngd_test.c`: runs games through `vngd.h` on Linux, one after another in one process, to test that each engine starts again.
+- `vngd_steam.h`: GodotSteam's `Steam` class and singleton, answering as Steam does offline, which both modules register for games that use GodotSteam.
+- `test-host/vngd_test.c`: runs games through `vngd.h` on Linux, one after another in one process, to test that each engine starts again. `VNGD_TEST_STEAM=1`, `VNGD_TEST_EOS=1`, and `VNGD_TEST_KEY=<hex>` set the launch's stand-ins and key.
 - `Info.plist`: the frameworks' Info.plist.

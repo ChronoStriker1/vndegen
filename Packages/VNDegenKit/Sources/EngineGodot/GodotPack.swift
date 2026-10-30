@@ -1,4 +1,7 @@
+import CommonCrypto
+import CryptoKit
 import Foundation
+import Synchronization
 
 /// A Godot resource pack's header and file list. The pack is a `.pck` file, or sits inside the game's Windows `.exe`:
 /// in its "pck" section for Godot 4, or appended to it with its size and magic at the very end.
@@ -13,6 +16,8 @@ nonisolated struct GodotPack: Equatable, Sendable {
     var encryptedDirectory: Bool
     /// How many files the game encrypted that way.
     var encryptedFiles = 0
+    /// The key the game encrypted its pack with, found in its `.exe`. The file list and settings were read through it.
+    var encryptionKey: Data?
     /// Paths inside the pack, without `res://`. Empty when the list is encrypted.
     var files: [String]
     /// The project settings VNDegen reads, from the pack's `project.binary`: strings and booleans, by key.
@@ -73,13 +78,17 @@ nonisolated struct GodotPack: Equatable, Sendable {
         files.filter { $0.hasSuffix(".gdextension") || $0.hasSuffix(".gdnlib") }
     }
 
-    /// Reads the pack in `url`, which is a `.pck` or an `.exe`. Nil when the file holds no pack.
-    init?(contentsOf url: URL) {
+    /// Reads the pack in `url`, which is a `.pck` or an `.exe`. Nil when the file holds no pack. An encrypted pack is
+    /// read with the key found in `executable`, the game's `.exe`.
+    init?(contentsOf url: URL, executable: URL? = nil) {
         guard let file = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? file.close() }
-        guard let offset = Self.findPack(file), let pack = Self.read(file, at: offset) else { return nil }
+        guard let offset = Self.findPack(file), let pack = Self.read(file, at: offset, executable: executable) else { return nil }
         self = pack
     }
+
+    /// Whether the game encrypted any of its pack.
+    var encrypted: Bool { encryptedDirectory || encryptedFiles > 0 }
 
     init(major: Int, minor: Int, patch: Int, format: Int, offset: UInt64, encryptedDirectory: Bool, files: [String]) {
         self.major = major
@@ -117,7 +126,7 @@ nonisolated struct GodotPack: Equatable, Sendable {
 
     /// Offsets in a pack come from the file, so they add with wrapping: a bad one points past the end, where every read
     /// fails, rather than trapping.
-    private static func read(_ file: FileHandle, at offset: UInt64) -> GodotPack? {
+    private static func read(_ file: FileHandle, at offset: UInt64, executable: URL?) -> GodotPack? {
         // Magic, format, version, then from format 2 on flags and file base, and from format 3 on the directory offset.
         guard let header = file.read(at: offset, count: 40) else { return nil }
         let format = Int(header.uint32(at: 4)), major = Int(header.uint32(at: 8)), minor = Int(header.uint32(at: 12))
@@ -139,30 +148,53 @@ nonisolated struct GodotPack: Equatable, Sendable {
         }
         var pack = GodotPack(major: major, minor: minor, patch: patch, format: format, offset: offset,
                              encryptedDirectory: flags & 1 != 0, files: [])
-        guard !pack.encryptedDirectory, let count = file.readUInt32(at: cursor) else { return pack }
+        guard let count = file.readUInt32(at: cursor) else { return pack }
         cursor &+= 4
+        // The entries follow the count, which Godot leaves unencrypted when it encrypts the file list.
+        let entries: (UInt64, Int) -> Data?
+        if pack.encryptedDirectory {
+            guard let executable, let key = encryptionKey(file, sample: cursor, plaintext: .fileList, executable: executable),
+                  let list = decrypt(file, at: cursor, key: key) else { return pack }
+            pack.encryptionKey = key
+            entries = { offset, count in
+                offset <= UInt64(list.count) && count <= list.count - Int(offset) ? list.subdata(in: Int(offset)..<(Int(offset) + count)) : nil
+            }
+            cursor = 0
+        } else {
+            entries = { file.read(at: $0, count: $1) }
+        }
+        let u32 = { entries($0, 4).map { $0.uint32(at: 0) } }
+        let u64 = { entries($0, 8).map { $0.uint64(at: 0) } }
         // Each entry: path length, path, offset, size, MD5, and from format 2 on, flags.
         let entryTail: UInt64 = 8 + 8 + 16 + (format >= 2 ? 4 : 0)
         var files: [String] = []
         files.reserveCapacity(Int(min(count, 200_000)))
-        var project: (offset: UInt64, size: UInt64)?
+        var encryptedFiles: [(name: String, offset: UInt64, size: UInt64)] = []
+        var project: (offset: UInt64, size: UInt64, encrypted: Bool)?
         for _ in 0..<min(count, 200_000) {
-            guard let length = file.readUInt32(at: cursor), length < 4096,
-                  let path = file.read(at: cursor &+ 4, count: Int(length)) else { break }
+            guard let length = u32(cursor), length < 4096, let path = entries(cursor &+ 4, Int(length)) else { break }
             let entry = cursor &+ 4 &+ UInt64(length)
             cursor = entry &+ entryTail
-            // Bit 0 of an entry's flags marks an encrypted file.
-            if format >= 2, let flags = file.readUInt32(at: cursor &- 4), flags & 1 != 0 { pack.encryptedFiles += 1 }
             var name = String(decoding: path.prefix { $0 != 0 }, as: UTF8.self)
             if name.hasPrefix("res://") { name.removeFirst(6) }
-            if name == "project.binary", let start = file.readUInt64(at: entry), let size = file.readUInt64(at: entry &+ 8) {
-                project = (fileBase &+ start, size)
+            guard let start = u64(entry), let size = u64(entry &+ 8) else { break }
+            // Bit 0 of an entry's flags marks an encrypted file.
+            let encrypted = format >= 2 && (u32(cursor &- 4) ?? 0) & 1 != 0
+            if encrypted {
+                pack.encryptedFiles += 1
+                encryptedFiles.append((name, fileBase &+ start, size))
             }
+            if name == "project.binary" { project = (fileBase &+ start, size, encrypted) }
             files.append(name)
         }
         pack.files = files
-        if let project, project.size < 1 << 22, let data = file.read(at: project.offset, count: Int(project.size)) {
-            pack.settings = settings(data)
+        if pack.encryptionKey == nil, let executable {
+            pack.encryptionKey = encryptionKey(file, among: encryptedFiles, executable: executable)
+        }
+        if let project, project.size < 1 << 22 {
+            let data = project.encrypted ? pack.encryptionKey.flatMap { decrypt(file, at: project.offset, key: $0) }
+                : file.read(at: project.offset, count: Int(project.size))
+            pack.settings = data.map(settings) ?? [:]
         }
         return pack
     }
@@ -198,6 +230,150 @@ nonisolated struct GodotPack: Equatable, Sendable {
             cursor += valueLength
         }
         return result
+    }
+}
+
+/// Finding the key of an encrypted pack. Godot builds the key into the game's own engine as a 32-byte array, which an
+/// export keeps in the `.exe`'s `.data` section. Each 32 bytes there, at every fourth byte, is tried on one encrypted
+/// part of the pack, and the key is the one that reproduces the MD5 Godot stored with that part.
+nonisolated extension GodotPack {
+    /// How a correct key's first block of a part reads. Each candidate decrypts only that block first, so the search
+    /// costs one AES block per candidate and decrypts the whole part only for the few that pass.
+    enum Plaintext: Equatable {
+        /// A file that starts with one of these.
+        case magic([Data])
+        /// A text file in ASCII.
+        case text
+        /// The file list after its count: the first path's length, then the path.
+        case fileList
+        /// A file whose start can't be told, which every candidate decrypts in full.
+        case unknown
+
+        init(path: String) {
+            let name = path.lowercased()
+            switch name.split(separator: ".").last ?? "" {
+            case _ where name.hasSuffix("project.binary"): self = .magic([Data("ECFG".utf8)])
+            case "gdc": self = .magic([Data("GDSC".utf8)])
+            case "res", "scn": self = .magic([Data("RSRC".utf8), Data("RSCC".utf8)])
+            case "ctex", "stex": self = .magic([Data("GST2".utf8), Data("GDST".utf8)])
+            case "gd", "tscn", "tres", "remap", "import", "cfg", "json", "txt", "gdshader", "csv": self = .text
+            default: self = .unknown
+            }
+        }
+
+        func matches(_ block: Data) -> Bool {
+            let printable = { (bytes: Data) in bytes.allSatisfy { (0x20..<0x7F).contains($0) || [0x09, 0x0A, 0x0D].contains($0) } }
+            switch self {
+            case let .magic(starts): return starts.contains { block.starts(with: $0) }
+            case .text: return printable(block)
+            case .fileList:
+                // Godot pads each path with zeros to a multiple of four bytes.
+                let length = Int(block.uint32(at: 0))
+                return (1..<4096).contains(length) && printable(block.dropFirst(4).prefix(length).filter { $0 != 0 })
+            case .unknown: return true
+            }
+        }
+    }
+
+    /// The key for one of the encrypted files. The smallest file of each kind is tried, the surest kind first: a file
+    /// with a magic number, then a text file, which may not be ASCII after all, then a file of another kind. Every
+    /// candidate decrypts all of that last kind, so only one of 512 bytes or less is tried.
+    fileprivate static func encryptionKey(_ file: FileHandle, among files: [(name: String, offset: UInt64, size: UInt64)],
+                                          executable: URL) -> Data? {
+        let rank = { (plaintext: Plaintext) in
+            switch plaintext {
+            case .magic: 0
+            case .text: 1
+            case .fileList, .unknown: 2
+            }
+        }
+        var tried: Set<Int> = []
+        let samples = files.filter { $0.size > 0 }.map { (file: $0, plaintext: Plaintext(path: $0.name)) }
+        for (sample, plaintext) in samples.sorted(by: { (rank($0.plaintext), $0.file.size) < (rank($1.plaintext), $1.file.size) }) {
+            let kind = rank(plaintext)
+            guard !tried.contains(kind), plaintext != .unknown || sample.size <= 512 else { continue }
+            tried.insert(kind)
+            if let key = encryptionKey(file, sample: sample.offset, plaintext: plaintext, executable: executable) { return key }
+        }
+        return nil
+    }
+
+    /// Keys already searched for, by executable and part, since the game's page and its launch both read the pack.
+    private static let keys = Mutex<[String: Data?]>([:])
+
+    /// The key in `executable` that decrypts the encrypted part at `sample`, or nil.
+    static func encryptionKey(_ file: FileHandle, sample: UInt64, plaintext: Plaintext, executable: URL) -> Data? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: executable.path)
+        let id = "\(executable.path)|\(attributes?[.size] ?? "")|\(attributes?[.modificationDate] ?? "")|\(sample)"
+        if let known = keys.withLock({ $0[id] }) { return known }
+        let key = searchKey(file, sample: sample, plaintext: plaintext, executable: executable)
+        keys.withLock { $0[id] = key }
+        return key
+    }
+
+    private static func searchKey(_ file: FileHandle, sample: UInt64, plaintext: Plaintext, executable: URL) -> Data? {
+        guard let part = EncryptedPart(file, at: sample), let data = WindowsExecutable(executable)?.contents(of: ".data"),
+              data.count >= 32 else { return nil }
+        let first = part.cipher.prefix(16)
+        for offset in stride(from: data.startIndex, through: data.endIndex - 32, by: 4) {
+            let key = Data(data[offset..<(offset + 32)])
+            // CFB's first block is the IV encrypted with the key, XORed with the data.
+            // A part shorter than a block is padded, so only its own bytes count.
+            if plaintext != .unknown {
+                guard let stream = aes(key, part.iv, part.iv, CCOperation(kCCEncrypt), CCMode(kCCModeECB)),
+                      plaintext.matches(Data(zip(stream, first).map { $0 ^ $1 }.prefix(part.length))) else { continue }
+            }
+            if part.decrypt(key) != nil { return key }
+        }
+        return nil
+    }
+
+    /// The encrypted part at `offset` decrypted with `key`, or nil when its MD5 doesn't match.
+    fileprivate static func decrypt(_ file: FileHandle, at offset: UInt64, key: Data) -> Data? {
+        EncryptedPart(file, at: offset)?.decrypt(key)
+    }
+
+    /// An encrypted file or file list as Godot writes it in a pack: its MD5, its length, and its IV, then the data in
+    /// AES-256 CFB, in whole blocks.
+    private struct EncryptedPart {
+        var md5: Data, length: Int, iv: Data, cipher: Data
+
+        init?(_ file: FileHandle, at offset: UInt64) {
+            guard let header = file.read(at: offset, count: 40) else { return nil }
+            let length = header.uint64(at: 16)
+            guard length > 0, length < 1 << 26, let cipher = file.read(at: offset &+ 40, count: Int((length + 15) / 16 * 16)) else { return nil }
+            self.md5 = Data(header.prefix(16))
+            self.length = Int(length)
+            self.iv = Data(header.suffix(16))
+            self.cipher = cipher
+        }
+
+        func decrypt(_ key: Data) -> Data? {
+            guard let plain = GodotPack.aes(key, iv, cipher, CCOperation(kCCDecrypt), CCMode(kCCModeCFB))?.prefix(length),
+                  Data(Insecure.MD5.hash(data: plain)) == md5 else { return nil }
+            return Data(plain)
+        }
+    }
+
+    /// AES-256 over whole blocks, in Godot's CFB mode, or in ECB mode, which ignores `iv`.
+    fileprivate static func aes(_ key: Data, _ iv: Data, _ input: Data, _ operation: CCOperation, _ mode: CCMode) -> Data? {
+        var cryptor: CCCryptorRef?
+        let created = key.withUnsafeBytes { key in
+            iv.withUnsafeBytes { iv in
+                CCCryptorCreateWithMode(operation, mode, CCAlgorithm(kCCAlgorithmAES), CCPadding(ccNoPadding), iv.baseAddress,
+                                        key.baseAddress, key.count, nil, 0, 0, CCModeOptions(0), &cryptor)
+            }
+        }
+        guard created == kCCSuccess, let cryptor else { return nil }
+        defer { CCCryptorRelease(cryptor) }
+        var output = Data(count: input.count)
+        var moved = 0
+        let status = output.withUnsafeMutableBytes { output in
+            input.withUnsafeBytes { input in
+                CCCryptorUpdate(cryptor, input.baseAddress, input.count, output.baseAddress, output.count, &moved)
+            }
+        }
+        return status == kCCSuccess && moved == input.count ? output : nil
     }
 }
 

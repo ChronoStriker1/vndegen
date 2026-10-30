@@ -36,7 +36,17 @@ VNDegen sends all input itself, through `vngd.h`. Godot reads no controller of i
 
 Godot keeps a game's saves in `user://`. On Windows that is `%APPDATA%\Godot\app_userdata\<project name>`, or `%APPDATA%\<folder>` for a project that names its own folder. VNDegen keeps the same layout under `AppData/Roaming` in the game's data folder, taking the project name and folder from the pack's `project.binary`, and reports it to Ludusavi. Backups from Windows, a Steam Deck's Proton, and Godot's Linux and Mac builds map into it.
 
-The game sees its `.exe` in its own folder as its executable path, so games that save beside the `.exe` save in their own folder, as on PC.
+The game sees its `.exe` in its own folder as its executable path, and `res://` paths that the pack doesn't hold lead to that folder, as on Windows, where a game starts in its own folder. Games that save beside the `.exe`, by either path, save in their own folder, as on PC.
+
+## Steam and Epic Online Services
+
+Some games call Steam through GodotSteam, either built into their own copy of Godot or as a GDExtension. VNDegen can't run either one, so its Godot provides GodotSteam's `Steam` class and singleton in their place (`Engines/Godot/vngd_steam.h`). It answers as Steam does offline, with the player signed in and owning the game. Achievements and stats last until the game quits, and leaderboard requests fail. VNDegen provides it when the game's `.exe` imports Steam's library or its pack has `godotsteam.gdextension`. It has the members the library's Steam games call: starting and stopping Steam, the player and the app, achievements, stats, and leaderboards. A game that calls a member it lacks fails to compile that script, and its log names the member.
+
+Some Godot 4 games also ship the Epic Online Services extension (`eosg.gdextension`) and use it only in their Epic Games Store build. Their scripts name its classes everywhere, so VNDegen's Godot 4 provides those names without the services behind them (`Engines/Godot/4/vndegen/vngd_eos.h`). Every call to its `IEOS` singleton returns nothing, and its signals never fire. An Epic Games Store build that signs in through Epic doesn't run.
+
+## Encrypted packs
+
+A Godot 4 export can encrypt its pack with a key built into the game's own copy of Godot. Godot keeps the key in a 32-byte array in the `.exe`'s `.data` section. VNDegen tries each 32 bytes there, at every fourth byte, against the smallest encrypted file in the pack, or the file list when that is encrypted. The key is the one that reproduces the MD5 Godot stored with that file. VNDegen's Godot then decrypts the pack with it as the game's own Godot would. Godot 3 packs can't be encrypted.
 
 ## File names
 
@@ -52,9 +62,8 @@ On iPhone and iPad every game runs inside VNDegen's process, so Godot has to sta
 
 The game page says why:
 
-- Games whose files are encrypted with a key built into their own copy of Godot.
-- Games that need GDExtension or GDNative libraries, which are Windows code.
-- Games whose own copy of Godot has Steam built in, read from the `.exe`'s imports. Such games call Steam from their scripts, and some quit unless Steam says the player owns them.
+- Games whose files are encrypted with a key VNDegen doesn't find in their `.exe`.
+- Games that need GDExtension or GDNative libraries other than GodotSteam's and Epic Online Services', since those are Windows code.
 - Godot C# games, which need .NET.
 
 ## Testing

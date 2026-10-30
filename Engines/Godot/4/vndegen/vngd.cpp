@@ -6,6 +6,7 @@
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
 #include "core/input/input.h"
+#include "core/object/script_language.h"
 #include "core/os/os.h"
 #include "main/main.h"
 #include "scene/main/scene_tree.h"
@@ -19,6 +20,8 @@
 #include <vngd.h>
 
 #include "../../vngd_frames.h"
+#include "../../vngd_steam.h"
+#include "vngd_eos.h"
 
 #include <cstring>
 #include <string>
@@ -127,6 +130,13 @@ int vngd_start(const VNGDLaunch *p_launch) {
 		argv.push_back(arg.data());
 	}
 	argv.push_back(nullptr);
+
+	vngd::steam_wanted = p_launch->steam;
+	vngd::eos::wanted = p_launch->epicOnlineServices;
+	// Godot decrypts a pack with the key its build was given, which this engine's build leaves empty.
+	if (p_launch->encryptionKey) {
+		memcpy(script_encryption_key, p_launch->encryptionKey, sizeof(script_encryption_key));
+	}
 
 	// The two phases run apart, since a failed first phase undoes itself and a failed second doesn't.
 	if (Main::setup(p_launch->executable, (int)args.size(), argv.data(), false) != OK) {
@@ -365,6 +375,7 @@ void vngd_stop(void) {
 		SceneTree::reset_idle_callbacks();
 	}
 	vngd_platform_destroy_os(state.os);
+	memset(script_encryption_key, 0, sizeof(script_encryption_key));
 	std::string problem = state.problem;
 	state = State();
 	state.problem = problem;

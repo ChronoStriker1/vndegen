@@ -2,6 +2,7 @@
 // after vngd_stop.
 //   vngd_test <libgodot.so> <data dir> <frames> <pack> <exe> [<pack> <exe> ...]
 // Built with -DVNGD_STATIC and linked with the engine, the first argument is ignored.
+// VNGD_TEST_STEAM=1 and VNGD_TEST_EOS=1 ask for those stand-ins, and VNGD_TEST_KEY gives an encrypted pack's key in hex.
 #include <vngd.h>
 
 #include <dlfcn.h>
@@ -23,8 +24,13 @@ int main(int argc, char **argv) {
 #endif
     LOAD(vngd_start) LOAD(vngd_iterate) LOAD(vngd_stop) LOAD(vngd_problem) LOAD(vngd_key) LOAD(vngd_request_quit)
     int frames = atoi(argv[3]);
+    uint8_t key[32];
+    const char *hex = getenv("VNGD_TEST_KEY");
+    for (int i = 0; hex && i < 32; i++) sscanf(hex + 2 * i, "%2hhx", &key[i]);
+    const char *steam = getenv("VNGD_TEST_STEAM"), *eos = getenv("VNGD_TEST_EOS");
     for (int i = 4; i + 1 < argc; i += 2) {
-        VNGDLaunch launch = { .pack = argv[i], .executable = argv[i + 1], .dataDir = argv[2], .renderingMethod = "gl_compatibility" };
+        VNGDLaunch launch = { .pack = argv[i], .executable = argv[i + 1], .dataDir = argv[2], .renderingMethod = "gl_compatibility",
+                              .steam = steam && *steam == '1', .epicOnlineServices = eos && *eos == '1', .encryptionKey = hex ? key : NULL };
         fprintf(stderr, "=== start %s\n", argv[i]);
         if (p_vngd_start(&launch) != 0) {
             fprintf(stderr, "=== start failed: %s\n", p_vngd_problem() ? p_vngd_problem() : "?");

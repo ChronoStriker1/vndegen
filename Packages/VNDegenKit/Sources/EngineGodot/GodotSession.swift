@@ -30,6 +30,7 @@ final class GodotSession: EngineSession {
     private let engine: GodotEngine
     private let launch: GameLaunch
     private let paths: GodotPaths
+    private let requirements: GodotRequirements
     private var state = State.waiting
     private var paused = false
     private var router = GodotInputRouter()
@@ -44,10 +45,11 @@ final class GodotSession: EngineSession {
     /// The Godot majors whose engine failed to start a game in a way it can't recover from in this process.
     private(set) static var unusable: Set<Int> = []
 
-    init(_ launch: GameLaunch, paths: GodotPaths, engine: GodotEngine) throws {
+    init(_ launch: GameLaunch, paths: GodotPaths, requirements: GodotRequirements, engine: GodotEngine) throws {
         self.launch = launch
         self.engine = engine
         self.paths = paths
+        self.requirements = requirements
         try paths.prepare()
         host = GodotHostView()
         view = host
@@ -91,13 +93,17 @@ final class GodotSession: EngineSession {
             fontFolders.deallocate()
             folderPaths.forEach { free($0) }
         }
-        var settings = VNGDLaunch(pack: strings[0], executable: strings[1], dataDir: strings[2], logPath: strings[3],
-                                  renderingMethod: rendering, layer: Unmanaged.passUnretained(host.metalLayer).toOpaque(),
-                                  width: Float(size.width), height: Float(size.height), scale: Float(host.scale),
-                                  keyboard: nil, context: nil, fontTable: fontTable, fontFolders: fontFolders,
-                                  fontFolderCount: Int32(folderPaths.count))
         Self.engineInUse = true
-        let result = engine.start(&settings)
+        let result = (requirements.encryptionKey ?? Data()).withUnsafeBytes { key in
+            var settings = VNGDLaunch(pack: strings[0], executable: strings[1], dataDir: strings[2], logPath: strings[3],
+                                      renderingMethod: rendering, layer: Unmanaged.passUnretained(host.metalLayer).toOpaque(),
+                                      width: Float(size.width), height: Float(size.height), scale: Float(host.scale),
+                                      keyboard: nil, context: nil, fontTable: fontTable, fontFolders: fontFolders,
+                                      fontFolderCount: Int32(folderPaths.count), steam: requirements.steam,
+                                      epicOnlineServices: requirements.epicOnlineServices,
+                                      encryptionKey: requirements.encryptionKey == nil ? nil : key.bindMemory(to: UInt8.self).baseAddress)
+            return engine.start(&settings)
+        }
         guard result == 0 else {
             if result == 2 { Self.unusable.insert(paths.major) }
             godotLog.error("\(self.launch.game.id.rawValue, privacy: .public) did not start: \(self.engine.lastProblem ?? "", privacy: .public)")
