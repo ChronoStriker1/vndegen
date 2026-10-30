@@ -8,6 +8,8 @@ final class StubNetwork: Sendable {
     static let steamGridDBKey = "test-key"
     /// A Steam app whose store page answers with a server error.
     static let failingAppID = "500"
+    /// An IGDB game that names no Steam app: No Socks RPG's entry without its external games.
+    static let igdbOnlyGameID = "1"
     private let log = Mutex<[URLRequest]>([])
 
     var http: HTTP {
@@ -70,6 +72,11 @@ final class StubNetwork: Sendable {
         case "api.igdb.com":
             guard request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture-token" else { return (401, nil, Data()) }
             if body.hasPrefix("search") { return json(body.contains("No Socks") ? "igdb-search-nosocks" : "igdb-search-ddlc") }
+            if body.contains("id = \(igdbOnlyGameID);") {
+                var games = try! JSONSerialization.jsonObject(with: fixture("igdb-game-411478")) as! [[String: Any]]
+                games[0]["external_games"] = nil
+                return (200, "application/json", try! JSONSerialization.data(withJSONObject: games))
+            }
             if body.contains("id = 55935") { return json("igdb-game-55935") }
             if body.contains("id = 411478") { return json("igdb-game-411478") }
             return (200, "application/json", Data("[]".utf8))

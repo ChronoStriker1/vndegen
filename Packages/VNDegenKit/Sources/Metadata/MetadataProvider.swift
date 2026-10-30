@@ -50,6 +50,7 @@ extension MetadataSource {
 
 extension GameMetadata {
     /// Keeps every value already present and takes the rest from `other`. Refs from sources not yet present are added.
+    /// Screenshots are left alone, because `MetadataService` picks them by source and nil means "look again".
     func filling(from other: GameMetadata?) -> GameMetadata {
         guard let other else { return self }
         var merged = self
@@ -60,7 +61,6 @@ extension GameMetadata {
         merged.releaseDate = releaseDate ?? other.releaseDate
         merged.genres = genres.isEmpty ? other.genres : genres
         merged.rating = rating ?? other.rating
-        merged.screenshots = screenshots ?? other.screenshots
         let known = Set(refs.map(\.source))
         merged.refs = refs + other.refs.filter { !known.contains($0.source) }
         return merged

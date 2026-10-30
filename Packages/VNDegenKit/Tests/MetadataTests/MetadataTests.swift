@@ -104,7 +104,8 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
     let id = GameID("Not on Steam")
     let library = try await makeLibrary([id.rawValue])
-    library.update(id) { $0.metadata = GameMetadata(summary: "VNDB text", refs: [ExternalRef(source: .igdb, id: "411478")]) }
+    let refs = [ExternalRef(source: .igdb, id: StubNetwork.igdbOnlyGameID)]
+    library.update(id) { $0.metadata = GameMetadata(summary: "VNDB text", refs: refs) }
 
     await service.fillAbout(id, in: library)
 
@@ -113,6 +114,28 @@ private func storedURL(_ slot: ArtworkSlot, _ id: GameID, _ library: LibraryStor
     #expect(metadata.screenshots?.count == 5)
     #expect(metadata.screenshots?.first?.url.absoluteString.contains("images.igdb.com/igdb/image/upload/t_1080p/") == true)
     #expect(metadata.screenshots?.first?.thumbnail.absoluteString.contains("/t_screenshot_med/") == true)
+    #expect(metadata.refs == refs)
+}
+
+@Test @MainActor func fillAboutFollowsTheSteamAppIGDBNames() async throws {
+    let network = StubNetwork()
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    let id = GameID("No Socks RPG")
+    let library = try await makeLibrary([id.rawValue])
+    library.update(id) { $0.metadata = GameMetadata(refs: [ExternalRef(source: .igdb, id: "411478")]) }
+
+    await service.fillAbout(id, in: library)
+
+    let metadata = try #require(library.game(id)?.metadata)
+    #expect(metadata.refs.map(\.source) == [.igdb, .steam])
+    #expect(metadata.refs.last?.id == "4929970")
+    #expect(metadata.screenshots?.count == 3)
+    #expect(metadata.screenshots?.allSatisfy { $0.url.host == "shared.akamai.steamstatic.com" } == true)
+}
+
+@Test func mergingMetadataLeavesScreenshotsToTheAboutRule() {
+    let saved = GameMetadata(screenshots: [])
+    #expect(GameMetadata().filling(from: saved).screenshots == nil, "an unfinished lookup stays retryable")
 }
 
 @Test @MainActor func fillAboutUpdatesAGameMatchedEarlierOnce() async throws {

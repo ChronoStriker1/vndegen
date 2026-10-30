@@ -127,11 +127,17 @@ public final class MetadataService {
     /// Does nothing once the game has a screenshot list, even an empty one.
     public func fillAbout(_ id: GameID, in library: LibraryStore) async {
         guard let metadata = library.game(id)?.metadata, metadata.screenshots == nil else { return }
-        let refs = metadata.refs.filter { Self.aboutPriority.contains($0.source) && provider(for: $0.source) != nil }
-        let details = await details(refs)
+        let refs = aboutRefs(metadata.refs)
+        var details = await details(refs)
+        // An IGDB entry can name the game's Steam app, which outranks it.
+        var known = Set(refs.map(\.source))
+        let found = aboutRefs(details.values.flatMap(\.refs)).filter { known.insert($0.source).inserted }
+        details.merge(await self.details(found)) { first, _ in first }
         library.update(id) { game in
-            guard let current = game.metadata, current.screenshots == nil else { return }
-            game.metadata = Self.preferringAbout(current, details: details, asked: Set(refs.map(\.source)))
+            // A match the user confirmed while this ran wins.
+            guard var current = game.metadata, current.refs == metadata.refs, current.screenshots == nil else { return }
+            current.refs += found
+            game.metadata = Self.preferringAbout(current, details: details, asked: known)
         }
     }
 
@@ -180,6 +186,11 @@ public final class MetadataService {
 
     private func provider(for source: MetadataSource) -> (any MetadataProvider)? {
         providers.first { $0.source == source }
+    }
+
+    /// The refs whose sources can fill the About section and are set up.
+    private func aboutRefs(_ refs: [ExternalRef]) -> [ExternalRef] {
+        refs.filter { Self.aboutPriority.contains($0.source) && provider(for: $0.source) != nil }
     }
 
     /// Details from each ref's source, keyed by source. Sources that are not set up or fail are left out.
