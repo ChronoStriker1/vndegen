@@ -343,7 +343,7 @@ fn tag_left_open(line: &str) -> bool {
     for ch in line.chars() {
         match ch {
             '/' if !in_tag && previous == '/' => return false,
-            '"' if in_tag => in_quote = !in_quote,
+            '"' if in_tag && (in_quote || opens_quote(previous)) => in_quote = !in_quote,
             '[' if !in_tag => in_tag = true,
             ']' if in_tag && !in_quote => in_tag = false,
             _ => {}
@@ -353,15 +353,25 @@ fn tag_left_open(line: &str) -> bool {
     in_tag
 }
 
+/// Whether a `"` after `previous` inside a tag opens a quoted value: only at
+/// the start of a token, as the PC engine reads it, so a stray quote such as
+/// the second one in `[var name="t.a data="0"]` is an ordinary character and
+/// the `]` after it still closes the tag (VNDegen).
+fn opens_quote(previous: char) -> bool {
+    previous == '=' || previous == '[' || previous.is_whitespace()
+}
+
 pub(crate) fn split_line_segments(line: &str) -> Vec<LineSegment> {
     let mut segments = Vec::new();
     let mut current = String::new();
     let mut in_tag = false;
     let mut in_quote = false; // 仅在标签内部有效
+    let mut previous = '\0';
 
     for ch in line.chars() {
+        let before = std::mem::replace(&mut previous, ch);
         match ch {
-            '"' if in_tag => {
+            '"' if in_tag && (in_quote || opens_quote(before)) => {
                 in_quote = !in_quote;
                 current.push(ch);
             }
@@ -688,6 +698,20 @@ mod tests {
         assert_eq!(script.instructions[0].get("face"), Some("a b.ttf"));
         assert_eq!(script.instructions[0].get("size"), Some("36"));
         assert_eq!(script.instructions[1].line, 5);
+    }
+
+    #[test]
+    fn a_stray_quote_inside_a_value_does_not_hold_the_tag_open() {
+        // A game's [var name="t.menu data="0"] has a quote missing; the PC
+        // engine still reads it as one tag.
+        let script = Script::parse(
+            "test",
+            "*top\nchaos.[var name=\"t.menu data=\"0\"]\n[var name=\"t.menu data=\"0\"]\n[stop]",
+        )
+        .unwrap();
+        let tags: Vec<_> = script.instructions.iter().map(|i| i.tag.as_str()).collect();
+        assert_eq!(tags, ["__text", "var", "var", "stop"]);
+        assert_eq!(script.instructions[1].get("name"), Some("t.menu data="));
     }
 
     #[test]

@@ -58,6 +58,7 @@ VNDegen added `flate2` as a direct dependency for compressed PC saves. It was al
 - Input handlers: keep the call a handler makes as its event frame, return a game's yes/no dialog's buttons to the dialog's wait, keep a click wait when a handler's own wait follows it, and wait for a transition or video a handler queues instead of for a click.
 - Recreate a PC save's scene before onLoad runs.
 - Keep text's spaces and a line's leading full-width space, as the PC engine numbers and prints them.
+- Open a quoted value only at the start of a token, as the PC engine does, so a tag with a quote missing, such as `[var name="t.menu data="0"]`, still closes at its `]` instead of showing as text.
 - Start a new page when scenario text, though not text a `[print]` tag writes, runs below its message window, with lines spaced as the PC engine spaces them: a body 1.2 times the font size, whatever the font.
 - Use a host's font only for a face the game ships no font file for, instead of for every face, so games keep their own fonts.
 - Draw ASCII from the bitmap fonts some games ship as `.rft` files (`src/text/rft.rs`), advanced as the PC engine advances them, so English text wraps where it does on the PC. The files store no character map, so other characters use the host's font.
