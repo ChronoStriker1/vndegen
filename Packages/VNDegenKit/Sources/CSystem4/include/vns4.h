@@ -53,6 +53,11 @@ void vns4_set_paused(VNS4Engine *e, bool paused);
 // Stops the game and frees the engine.
 void vns4_stop(VNS4Engine *e);
 
+// Debugging: logs every sprite when the next frame is drawn.
+void vns4_debug_dump_sprites(VNS4Engine *e);
+// Debugging: calls the game function with this name (UTF-8) when the game next shows a frame.
+void vns4_debug_call(VNS4Engine *e, const char *utf8Name);
+
 // A sentence for the player about the most recent problem, such as a part of the game VNDegen can't run yet, or NULL.
 const char *vns4_problem(VNS4Engine *e);
 

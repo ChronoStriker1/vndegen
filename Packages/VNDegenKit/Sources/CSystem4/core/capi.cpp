@@ -53,6 +53,9 @@ void vns4_wheel(VNS4Engine *e, int n) { if (e) e->game->wheel(n); }
 void vns4_set_paused(VNS4Engine *e, bool p) { if (e) e->game->setPaused(p); }
 void vns4_stop(VNS4Engine *e) { delete e; }
 
+void vns4_debug_dump_sprites(VNS4Engine *e) { if (e) e->game->dumpSpritesOnNextFrame(); }
+void vns4_debug_call(VNS4Engine *e, const char *utf8Name) { if (e) e->game->debugCall(s4::sjis::fromUtf8(utf8Name)); }
+
 const char *vns4_problem(VNS4Engine *e) {
     if (!e || e->game->lastProblem.empty()) return nullptr;
     e->problem = e->game->lastProblem;

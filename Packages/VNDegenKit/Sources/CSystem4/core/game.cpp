@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
@@ -105,10 +106,13 @@ bool Game::start(std::string &error) {
 
     vm = std::make_unique<VM>(std::move(ain));
     vm->saveDir = cfg.saveDir;
+    vm->rootDir = cfg.root;
+    if (ini.count("SaveFolder")) vm->saveFolderName = ini["SaveFolder"];
     vm->gameName = ini.count("GameName") ? ini["GameName"] : stem;
     vm->log = [this](const std::string &s) { log(s); };
     vm->timeMs = [this] { return now(); };
     vm->peek = [this] { yieldFrame(); };
+    if (std::getenv("S4_TRACE")) vm->trace = [this](const std::string &t) { log("call " + t); };
     std::error_code ec;
     fs::create_directories(cfg.saveDir, ec);
     frame_.assign(size_t(screenW) * screenH * 4, 0);
@@ -124,7 +128,18 @@ void Game::vmMain() {
     }
     try {
         vm->start();
-        vm->call(vm->ain.mainFunction, {});
+        try {
+            vm->call(vm->ain.mainFunction, {});
+        } catch (const ResumeJump &) {
+            // A resume load replaced the VM's state; keep running it, through any later loads.
+            for (;;) {
+                try {
+                    vm->run(0);
+                    break;
+                } catch (const ResumeJump &) {
+                }
+            }
+        }
         log("main returned");
     } catch (const VMExit &e) {
         log("game ended: " + e.reason);
@@ -140,6 +155,17 @@ void Game::vmMain() {
 }
 
 void Game::yieldFrame() {
+    // Debugging: a function the host asked for runs here, where the game shows a frame.
+    std::string call;
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        call.swap(debugCall_);
+    }
+    if (!call.empty()) {
+        int fn = vm->ain.findFunction(call);
+        log("debug call " + std::to_string(fn));
+        if (fn > 0) vm->call(fn, {});
+    }
     std::unique_lock<std::mutex> lock(mu_);
     vmTurn_ = false;
     cv_.notify_all();
@@ -175,6 +201,13 @@ void Game::mouseMove(int x, int y) { mouseX_ = x; mouseY_ = y; }
 void Game::wheel(int delta) { wheel_ += delta; }
 
 void Game::present() {
+    if (dumpSprites_.exchange(false)) {
+        for (auto &[n, sp] : sprites.all())
+            if (sp.used)
+                log("sprite " + std::to_string(n) + " at " + std::to_string(sp.x) + "," + std::to_string(sp.y) + " size " +
+                    std::to_string(sp.width()) + "x" + std::to_string(sp.height()) + " z " + std::to_string(sp.z) +
+                    (sp.show ? " shown" : " hidden") + " blend " + std::to_string(sp.blendRate));
+    }
     std::vector<uint8_t> f(size_t(screenW) * screenH * 4);
     sprites.compose(f, screenW, screenH, 0, 0);
     std::lock_guard<std::mutex> lock(frameMu_);

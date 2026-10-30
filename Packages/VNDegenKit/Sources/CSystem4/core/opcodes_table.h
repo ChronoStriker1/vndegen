@@ -197,7 +197,7 @@
     {"SH_MEM_REF2", 2},  // 195
     {"PAGE_REF2", 2},  // 196
     {"SH_MEM_REF3", 3},  // 197
-    {"SH_GLOBAL_MEM_CALLMETHOD", 3},  // 198
+    {"SH_MEM_MEM_CALLMETHOD", 3},  // 198
     {"SH_IF_MEM_Z", 2},  // 199
     {"SH_IF_MEM_A_NOT_EMPTY", 2},  // 200
     {"SH_IF_LOC_GT_IMM", 3},  // 201

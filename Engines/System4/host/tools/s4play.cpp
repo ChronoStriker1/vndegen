@@ -54,6 +54,8 @@ int main(int argc, char **argv) {
             else if (cmd == "click") { int x, y; ss >> x >> y; vns4_mouse_move(e, x, y); vns4_key(e, 1, true); }
             else if (cmd == "release") { vns4_key(e, 1, false); }
             else if (cmd == "wheel") { int n; ss >> n; vns4_wheel(e, n); }
+            else if (cmd == "sprites") vns4_debug_dump_sprites(e);
+            else if (cmd == "call") { std::string fn; ss >> fn; vns4_debug_call(e, fn.c_str()); }
             else if (cmd == "shot") { std::string file; ss >> file; shot(e, file); }
         }
         if (!vns4_step(e, 16)) { std::printf("game ended at frame %ld\n", f); break; }

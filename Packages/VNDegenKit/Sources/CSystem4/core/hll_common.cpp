@@ -198,11 +198,11 @@ S4_HLL(PassRegister, ExistText) { c.retBool(g_pass[c.i(0)].texts.count(c.s(1)) >
 // ---- VSFile: a binary file the game writes and reads value by value, in the save folder ----
 std::fstream g_vs;
 S4_HLL(VSFile, OpenForWrite) {
-    g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), true), std::ios::out | std::ios::binary | std::ios::trunc);
+    g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), false), std::ios::out | std::ios::binary | std::ios::trunc);
     c.retBool(g_vs.is_open());
 }
 S4_HLL(VSFile, OpenForRead) {
-    g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), true), std::ios::in | std::ios::binary);
+    g_vs = std::fstream(save::hostPath(*G().vm, c.s(0), false), std::ios::in | std::ios::binary);
     c.retBool(g_vs.is_open());
 }
 S4_HLL(VSFile, Close) { g_vs.close(); c.retBool(true); }
@@ -221,10 +221,7 @@ S4_HLL(VSFile, ReadString) {
 }
 
 // ---- FileOperation: paths relative to the game folder ----
-std::string gamePath(const std::string &name) {
-    std::string p = save::hostPath(*G().vm, name, false);
-    return !p.empty() && p[0] == '/' ? p : G().cfg.root + "/" + p;
-}
+std::string gamePath(const std::string &name) { return save::hostPath(*G().vm, name, false); }
 S4_HLL(FileOperation, ExistFile) { std::error_code ec; c.retBool(fs::is_regular_file(gamePath(c.s(0)), ec)); }
 S4_HLL(FileOperation, DeleteFile) { std::error_code ec; c.retBool(fs::remove(gamePath(c.s(0)), ec)); }
 S4_HLL(FileOperation, CopyFile) {

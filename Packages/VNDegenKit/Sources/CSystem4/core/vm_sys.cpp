@@ -39,17 +39,23 @@ void VM::callSys(int32_t n) {
         push(s);
         break;
     }
-    case 8: {  // ResumeSave(key, file, ref int result) -> int
+    case 8: {  // ResumeSave(key, file, ref int result) -> int: 1 after saving, 0 when execution resumes from a load
         int32_t ri = pop(), rp = pop();
         std::string file = popStr(), key = popStr();
-        if (log) log("ResumeSave is not supported: " + sjis::toUtf8(file));
-        if (Page *p = page(rp); p && ri >= 0 && size_t(ri) < p->v.size()) p->v[ri] = 0;
+        std::vector<uint8_t> snap = resumeSnapshot(key, ip);
+        bool ok = save::writeGD(save::hostPath(*this, file, true), snap);
+        if (log) log(std::string(ok ? "resume saved: " : "resume save failed: ") + sjis::toUtf8(file));
+        if (Page *p = page(rp); p && ri >= 0 && size_t(ri) < p->v.size()) p->v[ri] = ok;
         push(1);
         break;
     }
-    case 9: {  // ResumeLoad(key, file)
-        popStr(); std::string file = popStr();
-        if (log) log("ResumeLoad is not supported: " + sjis::toUtf8(file));
+    case 9: {  // ResumeLoad(key, file): on success execution continues where the save was made
+        std::string file = popStr(), key = popStr();
+        std::vector<uint8_t> d;
+        std::string err;
+        if (!save::readGD(save::hostPath(*this, file, true), d)) err = "can't read the save";
+        else if (resumeRestore(d, key, err)) throw ResumeJump{};
+        if (log) log("resume load failed: " + sjis::toUtf8(file) + ": " + err);
         break;
     }
     case 10: case 16: {  // ExistFile(name), ExistSaveFile(name) -> int
@@ -58,7 +64,7 @@ void VM::callSys(int32_t n) {
         break;
     }
     case 11: popStr(); break;  // OpenWeb
-    case 12: push(newString(saveDir)); break;  // GetSaveFolderName
+    case 12: push(newString(saveFolderName)); break;  // GetSaveFolderName: relative, resolved by save::hostPath
     case 13: push(int32_t(timeMs ? timeMs() : 0)); break;  // GetTime
     case 14: push(newString(gameName)); break;  // GetGameName
     case 17: push(0); break;  // IsDebugMode

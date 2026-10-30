@@ -68,6 +68,8 @@ public:
     int mouseY() const { return mouseY_.load(); }
     int takeWheel() { return wheel_.exchange(0); }
     std::string lastProblem;
+    void dumpSpritesOnNextFrame() { dumpSprites_ = true; }  // debugging: logs every sprite
+    void debugCall(const std::string &sjisName) { std::lock_guard<std::mutex> l(mu_); debugCall_ = sjisName; }
     std::atomic<bool> ended{false};
 
 private:
@@ -85,6 +87,8 @@ private:
     std::mutex frameMu_;
     std::vector<uint8_t> frame_;
     FILE *logFile_ = nullptr;
+    std::atomic<bool> dumpSprites_{false};
+    std::string debugCall_;
     std::mutex cgMu_;
     std::map<int, std::weak_ptr<const Image>> cgCache_;
     std::vector<std::shared_ptr<const Image>> cgRecent_;  // keeps recently used pictures alive

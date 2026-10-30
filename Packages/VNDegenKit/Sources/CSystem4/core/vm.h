@@ -4,6 +4,7 @@
 // so the heap model follows what the code expects. docs/system4-cleanroom.md says where each rule came from.
 #pragma once
 #include <cstdint>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -74,6 +75,8 @@ struct HllRegistry {
     static s4::HllRegistry::Add reg_##lib##_##fn(#lib "." #fn, hll_##lib##_##fn); \
     static void hll_##lib##_##fn([[maybe_unused]] s4::HllCall &c)
 
+constexpr size_t kUnknownBase = SIZE_MAX;
+
 struct Frame {
     int32_t function;
     int32_t localPage;
@@ -81,7 +84,12 @@ struct Frame {
     uint32_t returnAddress;
     size_t stackBase;     // stack size when the call started, minus its arguments
     bool native = false;  // a call from native code: returning ends VM::call
+    uint32_t callSite = 0;  // address of the call instruction in the caller
+    bool method = false;
 };
+
+// Thrown when system.ResumeLoad has replaced the VM's state: the runner continues with VM::run(0).
+struct ResumeJump {};
 
 // Thrown to stop the VM: system.Exit, a fatal error, or the host stopping the game.
 struct VMExit { int code; std::string reason; };
@@ -132,14 +140,21 @@ public:
     std::function<void(const std::string &)> trace;  // every call, for debugging
     std::function<void()> peek;             // system.Peek and other points where the host may run a frame
     std::function<uint32_t()> timeMs;       // the game clock
-    std::string saveDir;                    // the game's SaveData folder
+    std::string saveDir;                    // the game's SaveData folder on this machine
+    std::string saveFolderName = "SaveData";  // its name as the game sees it (the ini's SaveFolder)
+    std::string rootDir;                    // the game's folder
     std::string gameName;
 
     std::string functionName(int32_t f) const;
+
+    // system.ResumeSave and ResumeLoad: the whole VM state in the PC engine's "RSM" layout (resume.cpp).
+    std::vector<uint8_t> resumeSnapshot(const std::string &key, uint32_t resumeIp);
+    bool resumeRestore(const std::vector<uint8_t> &data, const std::string &key, std::string &error);
     [[noreturn]] void fatal(const std::string &msg);
 
 private:
     void enter(int32_t function, int32_t thisPage, bool native);
+    uint32_t curInsn_ = 0;
     void leave();
     void callHll(int32_t lib, int32_t fn);
     void callSys(int32_t n);

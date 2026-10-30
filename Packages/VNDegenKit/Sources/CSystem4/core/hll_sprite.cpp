@@ -58,7 +58,11 @@ S4_HLL(StoatSpriteEngine, SP_Count) {
 }
 S4_HLL(StoatSpriteEngine, SP_SetCG) {
     auto img = G().cgCached(c.i(1));
-    if (!img) { c.retInt(0); return; }
+    if (!img) {
+        G().log("SP_SetCG: no CG " + std::to_string(c.i(1)));
+        c.retInt(0);
+        return;
+    }
     Sprite &s = G().sprites.get(c.i(0));
     s.used = true;
     s.cg = img;

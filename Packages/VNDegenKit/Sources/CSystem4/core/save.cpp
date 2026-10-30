@@ -79,21 +79,18 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain) {
     return !ec;
 }
 
-std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
-    std::string p = sjis::toUtf8(name);
-    for (char &c : p) if (c == '\\') c = '/';
-    std::string base = inSaveFolder ? vm.saveDir : std::string();
-    if (base.empty()) return p;
-    // Match each part of the path case-insensitively, as Windows does, so a save the PC wrote as FOO.ASD loads
-    // when the game asks for foo.asd.
+namespace {
+// The path with each part matched case-insensitively, as on Windows, so a save the PC wrote as FOO.ASD loads when
+// the game asks for foo.asd.
+std::string caseless(const fs::path &base, const std::string &rel) {
     fs::path cur(base);
-    fs::path rel(p);
-    for (auto it = rel.begin(); it != rel.end(); ++it) {
-        std::string part = it->string();
-        fs::path exact = cur / part;
+    for (auto &part : fs::path(rel)) {
+        std::string ps = part.string();
+        if (ps.empty() || ps == ".") continue;
+        fs::path exact = cur / ps;
         std::error_code ec;
         if (!fs::exists(exact, ec)) {
-            std::string low = part;
+            std::string low = ps;
             for (char &ch : low) ch = char(std::tolower(static_cast<unsigned char>(ch)));
             for (auto &e : fs::directory_iterator(cur, ec)) {
                 std::string n = e.path().filename().string();
@@ -104,6 +101,21 @@ std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
         cur = exact;
     }
     return cur.string();
+}
+}  // namespace
+
+std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
+    std::string p = sjis::toUtf8(name);
+    for (char &c : p) if (c == '\\') c = '/';
+    if (!p.empty() && p[0] == '/') return p;
+    // A path that starts with the save folder's name, as system.GetSaveFolderName returns it, is in the save folder.
+    std::string first = p.substr(0, p.find('/'));
+    std::string lowFirst = first, lowSave = vm.saveFolderName;
+    for (char &ch : lowFirst) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+    for (char &ch : lowSave) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+    if (!lowSave.empty() && lowFirst == lowSave && first.size() < p.size()) return caseless(vm.saveDir, p.substr(first.size() + 1));
+    if (inSaveFolder) return caseless(vm.saveDir, p);
+    return caseless(vm.rootDir, p);
 }
 
 // ---- global and group saves ----
@@ -219,7 +231,8 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
     if (!group.empty()) {
         for (size_t i = 0; i < vm.ain.objGroups.size(); i++)
             if (vm.ain.objGroups[i] == group) groupIndex = int(i);
-        if (groupIndex < 0) { if (count) *count = 0; return 0; }
+        // A group the program doesn't declare saves no globals; the file is still written.
+        if (groupIndex < 0) groupIndex = int(vm.ain.objGroups.size());
     }
     Writer w{vm};
     w.records.emplace_back();  // record 0, filled in below

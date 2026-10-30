@@ -83,9 +83,6 @@ void HllCall::retString(const std::string &s) { retInt(vm.newString(s)); }
 
 VM::VM(Ain a) : ain(std::move(a)) {
     heap.reserve(4096);
-    // Slot 0 is never handed out, so a zero in a slot variable reads as "none".
-    heap.emplace_back();
-    heap[0].inUse = false;
     auto &table = HllRegistry::table();
     for (auto &lib : ain.libraries) {
         std::vector<HllImpl> fns;
@@ -345,7 +342,7 @@ void VM::enter(int32_t function, int32_t thisPage, bool native) {
     }
     if (thisPage >= 0) incref(thisPage);
     if (trace) trace(std::string(frames.size(), ' ') + functionName(function) + (thisPage >= 0 ? " this=" + std::to_string(thisPage) : ""));
-    frames.push_back(Frame{function, lp, thisPage, ip, stack.size(), native});
+    frames.push_back(Frame{function, lp, thisPage, ip, stack.size(), native, native ? 0 : curInsn_, thisPage >= 0});
     ip = f.address;
 }
 
@@ -353,10 +350,12 @@ void VM::leave() {
     Frame fr = frames.back();
     const Function &f = ain.functions[fr.function];
     int n = retWords(f.ret.type);
-    if (stack.size() < fr.stackBase + n) fatal("stack underflow returning from " + functionName(fr.function));
+    if (stack.size() < size_t(n) || (fr.stackBase != kUnknownBase && stack.size() < fr.stackBase + n)) fatal("stack underflow returning from " + functionName(fr.function));
     std::vector<int32_t> ret(stack.end() - n, stack.end());
-    // Values left above the frame's base are temporaries; drop them.
-    stack.resize(fr.stackBase);
+    stack.resize(stack.size() - n);
+    // Values left above the frame's base are temporaries; drop them. Frames restored from a resume save don't
+    // know their base.
+    if (fr.stackBase != kUnknownBase && stack.size() > fr.stackBase) stack.resize(fr.stackBase);
     frames.pop_back();
     decref(fr.localPage);
     if (fr.structPage >= 0) decref(fr.structPage);
@@ -460,6 +459,7 @@ void VM::run(size_t untilFrames) {
         const OpInfo *oi = opInfo(op);
         if (!oi) fatal("unknown opcode " + std::to_string(op));
         uint32_t next = ip + 2 + 4 * oi->args;
+        curInsn_ = ip;
         int32_t args[3] = {0, 0, 0};
         std::memcpy(args, code.data() + ip + 2, 4 * oi->args);
         auto A = [&](int k) { return args[k]; };
@@ -945,7 +945,7 @@ void VM::run(size_t untilFrames) {
         case OP_SH_MEM_REF3: push(var(var(thisv(A(0)), A(1)), A(2))); break;
         case OP_SH_MEM_CALLMETHOD: callMethodOn(thisv(A(0)), A(1)); break;
         case OP_THIS_CALLMETHOD: callMethodOn(fr.structPage, A(0)); break;
-        case OP_SH_GLOBAL_MEM_CALLMETHOD: callMethodOn(var(globv(A(0)), A(1)), A(2)); break;
+        case OP_SH_MEM_MEM_CALLMETHOD: callMethodOn(var(thisv(A(0)), A(1)), A(2)); break;
         case OP_SH_GLOBAL_ASSIGN_IMM: globv(A(0)) = A(1); break;
         case OP_SH_LOCREF_CHECK: break;
         case OP_SH_MEM_A_PUSHBACK_LOCAL: arrayAt(fr.structPage, A(0))->v.push_back(copyPage(localv(A(1)))); break;

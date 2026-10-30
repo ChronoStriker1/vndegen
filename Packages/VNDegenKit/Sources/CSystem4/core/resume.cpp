@@ -1,0 +1,350 @@
+// system.ResumeSave and ResumeLoad: the VM's whole state in the PC engine's "RSM" layout, so a game saved on the
+// PC loads here and the other way round. Worked out from saves the SDK runtime and Test Game 46's VM wrote for test
+// programs; docs/system4-cleanroom.md has the details. The layout (version 8):
+//
+//   "RSM\0", u32 version, key
+//   u32 0
+//   resume point: u32 next address, function name, u32 offset of the call from the function's start, u32 CRC
+//   u32 0
+//   u32 n, n stack words
+//   u32 n, the local page of each frame, outermost first; the first is a root with -1
+//   u32 n, each frame's kind: 4 the root, 0 entered from native code, 1 a function call, 2 a method call
+//   u32 n, the `this` page of each method frame
+//   u32 n, each frame's return point: -1 for an entry frame, else an address record as above
+//   u32 0, u32 0, u32 0
+//   u32 n, then each heap slot: -1 when free, else a record by kind:
+//     0 globals    u32 0, u32 refs, i32 -1, u32 n, n types, u32 bytes, values
+//     1 locals     u32 1, u32 refs, function name, u32 n, n types, i32 `this` (version 8), u32 bytes, values
+//     2 string     u32 2, u32 refs, u32 0, u32 length with its NUL, the bytes and NUL
+//     3 array      u32 3, u32 refs, u32 0, u32 array type, struct name, u32 rank, u32 1, u32 bytes, values
+//     4 struct     u32 4, u32 refs, u32 0, two NULs, struct name, u32 n, n types, u32 bytes, values
+//   u32 n, every function name, by index
+#include <cstring>
+
+#include "opcodes.h"
+#include "vm.h"
+
+namespace s4 {
+namespace {
+
+constexpr uint32_t kVersion = 8;
+
+struct Out {
+    std::vector<uint8_t> b;
+    void u32(uint32_t v) { b.insert(b.end(), reinterpret_cast<uint8_t *>(&v), reinterpret_cast<uint8_t *>(&v) + 4); }
+    void str(const std::string &s) { b.insert(b.end(), s.begin(), s.end()); b.push_back(0); }
+};
+
+struct In {
+    const std::vector<uint8_t> &b;
+    size_t i = 0;
+    bool bad = false;
+    uint32_t u32() {
+        if (i + 4 > b.size()) { bad = true; i = b.size(); return 0; }
+        uint32_t v;
+        std::memcpy(&v, b.data() + i, 4);
+        i += 4;
+        return v;
+    }
+    int32_t i32() { return int32_t(u32()); }
+    std::string str() {
+        size_t j = i;
+        while (j < b.size() && b[j]) j++;
+        if (j >= b.size()) { bad = true; i = b.size(); return {}; }
+        std::string s(reinterpret_cast<const char *>(b.data() + i), j - i);
+        i = j + 1;
+        return s;
+    }
+};
+
+int32_t arrayTypeOf(int32_t elemType) {
+    switch (elemType) {
+    case T_INT: return T_ARRAY_INT;
+    case T_FLOAT: return T_ARRAY_FLOAT;
+    case T_STRING: return T_ARRAY_STRING;
+    case T_STRUCT: return T_ARRAY_STRUCT;
+    case T_BOOL: return T_ARRAY_BOOL;
+    case T_FUNCTYPE: return T_ARRAY_FUNCTYPE;
+    case 55: return 58;
+    case 63: return 67;
+    default: return T_ARRAY_INT;
+    }
+}
+int32_t elemTypeOf(int32_t arrayType) {
+    switch (arrayType) {
+    case T_ARRAY_FLOAT: return T_FLOAT;
+    case T_ARRAY_STRING: return T_STRING;
+    case T_ARRAY_STRUCT: return T_STRUCT;
+    case T_ARRAY_BOOL: return T_BOOL;
+    case T_ARRAY_FUNCTYPE: return T_FUNCTYPE;
+    case 58: return 55;
+    case 67: return 63;
+    default: return T_INT;
+    }
+}
+
+// The length of the call instruction at an address, so a return point can be rebuilt from its call's offset.
+uint32_t insnLength(const std::vector<uint8_t> &code, uint32_t at) {
+    if (at + 2 > code.size()) return 6;
+    const OpInfo *oi = opInfo(code[at] | code[at + 1] << 8);
+    return oi ? 2 + 4 * oi->args : 6;
+}
+
+}  // namespace
+
+std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeIp) {
+    Out o;
+    o.b.insert(o.b.end(), {'R', 'S', 'M', 0});
+    o.u32(kVersion);
+    o.str(key);
+    o.u32(0);
+    auto point = [&](uint32_t next, uint32_t callSite, int32_t fn) {
+        const Function &f = ain.functions[fn];
+        o.u32(next);
+        o.str(f.name);
+        o.u32(callSite - (f.address - 6));
+        o.u32(f.crc);
+    };
+    point(resumeIp, curInsn_, frames.back().function);
+    o.u32(0);
+    o.u32(uint32_t(stack.size()));
+    for (int32_t v : stack) o.u32(uint32_t(v));
+    o.u32(uint32_t(frames.size() + 1));
+    o.u32(uint32_t(-1));
+    for (auto &f : frames) o.u32(uint32_t(f.localPage));
+    o.u32(uint32_t(frames.size() + 1));
+    o.u32(4);
+    for (auto &f : frames) o.u32(f.native ? 0 : f.method ? 2 : 1);
+    uint32_t methods = 0;
+    for (auto &f : frames) methods += f.method && !f.native;
+    o.u32(methods);
+    for (auto &f : frames)
+        if (f.method && !f.native) o.u32(uint32_t(f.structPage));
+    o.u32(uint32_t(frames.size()));
+    for (size_t k = 0; k < frames.size(); k++) {
+        if (frames[k].native || k == 0) { o.u32(uint32_t(-1)); continue; }
+        point(frames[k].returnAddress, frames[k].callSite, frames[k - 1].function);
+    }
+    o.u32(0);
+    o.u32(0);
+    o.u32(0);
+    o.u32(uint32_t(heap.size()));
+    for (size_t s = 0; s < heap.size(); s++) {
+        const Slot &sl = heap[s];
+        if (!sl.inUse) { o.u32(uint32_t(-1)); continue; }
+        if (sl.str) {
+            o.u32(2);
+            o.u32(uint32_t(sl.refs));
+            o.u32(0);
+            o.u32(uint32_t(sl.str->size() + 1));
+            o.str(*sl.str);
+            continue;
+        }
+        const Page &p = *sl.page;
+        auto types = [&] {
+            o.u32(uint32_t(p.v.size()));
+            for (size_t i = 0; i < p.v.size(); i++) o.u32(uint32_t(varType(p, i).type));
+        };
+        auto values = [&] {
+            o.u32(uint32_t(p.v.size() * 4));
+            for (int32_t v : p.v) o.u32(uint32_t(v));
+        };
+        switch (p.kind) {
+        case PageKind::Global:
+            o.u32(0);
+            o.u32(uint32_t(sl.refs));
+            o.u32(uint32_t(-1));
+            types();
+            values();
+            break;
+        case PageKind::Local: {
+            o.u32(1);
+            o.u32(uint32_t(sl.refs));
+            o.str(ain.functions[p.index].name);
+            types();
+            int32_t self = -1;
+            for (auto &f : frames)
+                if (f.localPage == int32_t(s)) self = f.structPage;
+            o.u32(uint32_t(self));
+            values();
+            break;
+        }
+        case PageKind::Array: {
+            o.u32(3);
+            o.u32(uint32_t(sl.refs));
+            o.u32(0);
+            o.u32(uint32_t(arrayTypeOf(p.elemType)));
+            o.str(p.elemType == T_STRUCT && p.elemStruct >= 0 ? ain.structs[p.elemStruct].name : "");
+            o.u32(uint32_t(std::max(1, p.rank)));
+            o.u32(1);
+            values();
+            break;
+        }
+        case PageKind::Struct:
+            o.u32(4);
+            o.u32(uint32_t(sl.refs));
+            o.u32(0);
+            o.b.push_back(0);
+            o.b.push_back(0);
+            o.str(ain.structs[p.index].name);
+            types();
+            values();
+            break;
+        }
+    }
+    o.u32(uint32_t(ain.functions.size()));
+    for (auto &f : ain.functions) o.str(f.name);
+    return o.b;
+}
+
+bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key, std::string &error) {
+    In in{data};
+    if (data.size() < 8 || std::memcmp(data.data(), "RSM", 4) != 0) { error = "not a resume save"; return false; }
+    in.i = 4;
+    uint32_t version = in.u32();
+    if (version < 7 || version > 8) { error = "resume save version " + std::to_string(version) + " is not supported"; return false; }
+    if (in.str() != key) { error = "the save belongs to another game"; return false; }
+    in.u32();
+    // An address record: the function by name, then the call's offset in it.
+    auto readPoint = [&](uint32_t &callSite, int32_t &fn) {
+        in.u32();
+        std::string name = in.str();
+        uint32_t off = in.u32();
+        in.u32();
+        fn = ain.findFunction(name);
+        if (fn < 0) { error = "the save names a function this game lacks"; return false; }
+        callSite = ain.functions[fn].address - 6 + off;
+        return true;
+    };
+    uint32_t curCall;
+    int32_t curFn;
+    if (!readPoint(curCall, curFn)) return false;
+    in.u32();
+    std::vector<int32_t> newStack(in.u32());
+    for (auto &v : newStack) v = in.i32();
+    uint32_t nf = in.u32();
+    std::vector<int32_t> locals(nf);
+    for (auto &v : locals) v = in.i32();
+    std::vector<int32_t> kinds(in.u32());
+    for (auto &v : kinds) v = in.i32();
+    std::vector<int32_t> selves(in.u32());
+    for (auto &v : selves) v = in.i32();
+    uint32_t nret = in.u32();
+    std::vector<std::pair<uint32_t, int32_t>> rets;
+    for (uint32_t k = 0; k < nret; k++) {
+        size_t at = in.i;
+        if (in.i32() == -1) { rets.push_back({0, -1}); continue; }
+        in.i = at;
+        uint32_t cs;
+        int32_t fn;
+        if (!readPoint(cs, fn)) return false;
+        rets.push_back({cs, fn});
+    }
+    in.u32();
+    in.u32();
+    in.u32();
+    if (in.bad || nf < 2 || kinds.size() != nf || nret + 1 != nf) { error = "the resume save is damaged"; return false; }
+
+    // The new heap, slot for slot as saved.
+    std::vector<Slot> newHeap(in.u32());
+    for (size_t s = 0; s < newHeap.size() && !in.bad; s++) {
+        int32_t kind = in.i32();
+        if (kind == -1) continue;
+        Slot &sl = newHeap[s];
+        sl.inUse = true;
+        sl.refs = in.i32();
+        auto page = std::make_unique<Page>();
+        auto readTypes = [&]() {
+            uint32_t n = in.u32();
+            for (uint32_t i = 0; i < n; i++) in.u32();
+            return n;
+        };
+        auto readValues = [&](Page &p) {
+            uint32_t bytes = in.u32();
+            p.v.resize(bytes / 4);
+            for (auto &v : p.v) v = in.i32();
+        };
+        switch (kind) {
+        case 0:
+            in.u32();
+            readTypes();
+            page->kind = PageKind::Global;
+            readValues(*page);
+            break;
+        case 1: {
+            page->kind = PageKind::Local;
+            page->index = ain.findFunction(in.str());
+            readTypes();
+            if (version >= 8) in.u32();
+            readValues(*page);
+            break;
+        }
+        case 2: {
+            in.u32();
+            uint32_t len = in.u32();
+            std::string str = in.str();
+            (void)len;
+            sl.str = std::make_unique<std::string>(std::move(str));
+            continue;
+        }
+        case 3: {
+            page->kind = PageKind::Array;
+            in.u32();
+            page->elemType = elemTypeOf(in.i32());
+            std::string sname = in.str();
+            page->elemStruct = sname.empty() ? -1 : ain.findStruct(sname);
+            page->rank = in.i32();
+            in.u32();
+            readValues(*page);
+            break;
+        }
+        case 4: {
+            page->kind = PageKind::Struct;
+            in.u32();
+            in.i += 2;
+            page->index = ain.findStruct(in.str());
+            readTypes();
+            readValues(*page);
+            break;
+        }
+        default:
+            error = "the resume save has an unknown kind of data";
+            return false;
+        }
+        sl.page = std::move(page);
+    }
+    if (in.bad) { error = "the resume save is damaged"; return false; }
+
+    // Everything checked: replace the state.
+    heap = std::move(newHeap);
+    freeSlots.clear();
+    for (size_t s = heap.size(); s-- > 0;)
+        if (!heap[s].inUse) freeSlots.push_back(int32_t(s));
+    globalPage = -1;
+    for (size_t s = 0; s < heap.size(); s++)
+        if (heap[s].page && heap[s].page->kind == PageKind::Global) { globalPage = int32_t(s); break; }
+    stack = std::move(newStack);
+    frames.clear();
+    size_t self = 0;
+    for (uint32_t k = 1; k < nf; k++) {
+        Frame f;
+        f.localPage = locals[k];
+        Page *lp = page(f.localPage);
+        f.function = lp ? lp->index : -1;
+        f.native = kinds[k] == 0;
+        f.method = kinds[k] == 2;
+        f.structPage = f.method && self < selves.size() ? selves[self++] : -1;
+        f.callSite = rets[k - 1].first;
+        f.returnAddress = f.native ? 0 : f.callSite + insnLength(ain.code, f.callSite);
+        f.stackBase = kUnknownBase;
+        frames.push_back(f);
+    }
+    // The first frame is the entry; when it returns, the game ends.
+    if (!frames.empty()) frames.front().native = true;
+    ip = curCall + insnLength(ain.code, curCall);
+    curInsn_ = curCall;
+    push(0);  // ResumeSave returns 0 after a load
+    return true;
+}
+
+}  // namespace s4
