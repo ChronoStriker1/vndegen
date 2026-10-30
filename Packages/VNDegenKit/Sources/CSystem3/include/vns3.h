@@ -26,6 +26,7 @@ typedef struct VNS3Config {
     int audioRate;         // output sample rate for vns3_audio, such as 44100
     const char *soundFontPath;         // General MIDI SoundFont for MIDI music; NULL plays MIDI silently
     const char *fallbackSoundFontPath; // used when soundFontPath can't be read; may be NULL
+    long long startTime;   // the game clock's start in Unix seconds; 0 starts it now. Tests pin it, since games read it.
 } VNS3Config;
 
 // Opens a game. Returns NULL and fills err (if given) when the folder holds no game it can run.

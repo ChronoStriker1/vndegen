@@ -203,6 +203,7 @@ struct S3 {
     // input
     int mouseX, mouseY;
     bool mouseL, mouseR, keyDown[256];
+    u32 clickLatch;         // buttons pressed since IM last read them (16 left, 32 right), so a quick tap still counts
     u32 pressedMask;           // keys pressed since the last poll, IK bit layout
     int wheel;
     u32 cursorMoveTime;

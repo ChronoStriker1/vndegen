@@ -8,7 +8,7 @@ extension AliceSoftPlugin {
     }
 
     /// The file name when `path` is a System 3 save: `RanceSA.ASD` to `RanceSZ.ASD` (System 3.9), `ASLEEP_A.DAT` and
-    /// `ASLEEP.DAT` (System 3.0), and the `floor_N.map` files a dungeon game rewrites with QE as it is played.
+    /// `ASLEEP.DAT` (System 3.0), and the `<prefix>FS.ALD` file of game-wide flags Toushin Toshi II writes with QE.
     nonisolated static func system3SaveName(_ path: String) -> String? {
         guard let name = path.split(separator: "/").last.map(String.init) else { return nil }
         let lower = name.lowercased()
@@ -19,7 +19,7 @@ extension AliceSoftPlugin {
         }
         if lower == "asleep.dat" { return name }
         if lower.hasPrefix("asleep_"), lower.hasSuffix(".dat"), lower.count == 12 { return name }
-        if lower.hasPrefix("floor_"), lower.hasSuffix(".map") { return name }
+        if lower.hasSuffix("fs.ald") { return name }
         return nil
     }
 }

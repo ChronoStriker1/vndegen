@@ -1,5 +1,6 @@
 // Runs a System 3 game headless for testing: replays scripted input and writes frames as PPM files.
-//   s3run <gameDir> [--ms N] [--save DIR] [--log FILE] [--final FILE.ppm] [events...]
+//   s3run <gameDir> [--ms N] [--save DIR] [--log FILE] [--final FILE.ppm] [--time UNIX] [events...]
+// The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 // Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:shot:FILE.ppm
 // It prints the game's problem, if one stopped it, and exits 1 then.
 #include "vns3.h"
@@ -28,7 +29,7 @@ int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: s3run gameDir [--ms N] [--save DIR] [--log FILE] [events]\n"); return 2; }
     const char *dirs[] = { S3_FONTS_DIR };
     vnfont_init(S3_FONTS_DIR "/fonts.tsv", dirs, 1);
-    VNS3Config cfg = { .gameDir = argv[1], .audioRate = 44100, .soundFontPath = S3_SOUNDFONT };
+    VNS3Config cfg = { .gameDir = argv[1], .audioRate = 44100, .soundFontPath = S3_SOUNDFONT, .startTime = 1767225600 };
     int total = 10000;
     const char *final = NULL;
     Ev ev[256];
@@ -38,6 +39,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--save") && i + 1 < argc) cfg.saveDir = argv[++i];
         else if (!strcmp(argv[i], "--log") && i + 1 < argc) cfg.logPath = argv[++i];
         else if (!strcmp(argv[i], "--final") && i + 1 < argc) final = argv[++i];
+        else if (!strcmp(argv[i], "--time") && i + 1 < argc) cfg.startTime = atoll(argv[++i]);
         else if (n < 256) {
             Ev *e = &ev[n];
             memset(e, 0, sizeof *e);
@@ -53,18 +55,24 @@ int main(int argc, char **argv) {
     if (!g) { fprintf(stderr, "open failed: %s\n", err); return 1; }
     float audio[1470 * 2];
     int ok = 1;
+    // Keys and buttons stay down for 96 ms, as a person's press does, so games that poll the state see them.
+    int releaseAt = -1, heldKey = 0, heldButton = -1;
     for (int t = 0; t < total; t += 16) {
+        if (releaseAt >= 0 && t >= releaseAt) {
+            if (heldKey) vns3_key(g, heldKey, false);
+            if (heldButton >= 0) vns3_mouse_button(g, heldButton, false);
+            releaseAt = -1; heldKey = 0; heldButton = -1;
+        }
         for (int i = 0; i < n; i++) {
             Ev *e = &ev[i];
             if (e->t < t || e->t >= t + 16) continue;
-            if (!strcmp(e->kind, "key")) { vns3_key(g, e->a, true); vns3_frame(g, 0); vns3_key(g, e->a, false); }
+            if (!strcmp(e->kind, "key")) { vns3_key(g, e->a, true); heldKey = e->a; releaseAt = t + 96; }
             else if (!strcmp(e->kind, "move")) vns3_mouse_move(g, e->a, e->b);
             else if (!strcmp(e->kind, "click") || !strcmp(e->kind, "rclick")) {
-                int b = e->kind[0] == 'r' ? VNS3_MOUSE_RIGHT : VNS3_MOUSE_LEFT;
+                heldButton = e->kind[0] == 'r' ? VNS3_MOUSE_RIGHT : VNS3_MOUSE_LEFT;
                 vns3_mouse_move(g, e->a, e->b);
-                vns3_mouse_button(g, b, true);
-                vns3_frame(g, 0);
-                vns3_mouse_button(g, b, false);
+                vns3_mouse_button(g, heldButton, true);
+                releaseAt = t + 96;
             } else if (!strcmp(e->kind, "shot")) shot(g, e->file);
         }
         if (!vns3_frame(g, 16)) { ok = !vns3_problem(g); break; }

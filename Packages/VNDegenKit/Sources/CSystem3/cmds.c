@@ -2,6 +2,7 @@
 // e = expression, b = raw byte, s = NUL-terminated string, f = function reference, m = u32.
 // Behaviour follows AliceSoft's System 3.9 SDK manual, checked against the original engine.
 #include "vm.h"
+#include <strings.h>
 #include <time.h>
 
 typedef struct Arg { u16 v; S3LV lv; bool isVar; const char *s; u32 u; u16 fpage; } Arg;
@@ -483,7 +484,25 @@ static void cmd_E(S3 *s) {
 static void var_file(S3 *s, bool write, int type, const char *name, size_t nameLen, const Arg *start, int count) {
     char file[256];
     snprintf(file, sizeof file, "%.*s", (int)nameLen, name);
+    bool ascii = true;
+    for (const char *c = file; *c; c++) if ((u8)*c >= 0x80) ascii = false;
+    size_t len = strlen(file);
+    if (!ascii && len >= 6 && !strcasecmp(file + len - 4, ".ALD") && s->prefix[0]) {
+        // A Japanese name ending in <two letters>.ALD names a file beside the game's archives. English releases rename
+        // those archives (TG108's 闘神ⅡSA.ALD is tt2SA.ALD, and its PC copy keeps this data as tt2FS.ALD), so use the
+        // archives' prefix.
+        char tail[8];
+        snprintf(tail, sizeof tail, "%s", file + len - 6);
+        snprintf(file, sizeof file, "%s%s", s->prefix, tail);
+    } else if (!ascii) {
+        // File systems want UTF-8 names.
+        char *utf8 = s3_sjis_to_utf8(file);
+        snprintf(file, sizeof file, "%s", utf8);
+        free(utf8);
+    }
+    // Files the game writes live in the save folder; ones it only reads, such as shipped maps, may be in the game's.
     char *path = s3_find_file(s->saveDir, file);
+    if (!path && !write) path = s3_find_file(s->gameDir, file);
     if (!path) path = s3_path(s->saveDir, file);
     if (write) {
         FILE *f = fopen(path, "wb");
@@ -569,7 +588,7 @@ static void cmd_I(S3 *s) {
         return;
     }
     case 'M': args(s, "ee", a); put(s, &a[0], 0, (u16)(s->mouseX + s->viewX)); put(s, &a[1], 0, (u16)(s->mouseY + s->viewY));
-        rnd(s, (u16)((s->mouseL ? 16 : 0) | (s->mouseR ? 32 : 0))); s->polls++; return;
+        rnd(s, (u16)((s->mouseL ? 16 : 0) | (s->mouseR ? 32 : 0) | s->clickLatch)); s->clickLatch = 0; s->polls++; return;
     case 'X': args(s, "e", a); put(s, &a[0], 0, 0); return;
     case 'Y': args(s, "e", a); return;
     case 'Z': args(s, "ee", a); s->mouseX = a[0].v - s->viewX; s->mouseY = a[1].v - s->viewY; return;
@@ -661,11 +680,12 @@ static void cmd_N(S3 *s) {
         return;
     }
     case 'B': {
+        // NB dest, src, count. Copies through a buffer, so overlapping ranges copy as if separate.
         args(s, "eee", a);
         u16 tmp[4096];
         int n = a[2].v < 4096 ? a[2].v : 4096;
-        for (int i = 0; i < n; i++) tmp[i] = s3_lv_get(s, &a[0].lv, i);
-        for (int i = 0; i < n; i++) put(s, &a[1], i, tmp[i]);
+        for (int i = 0; i < n; i++) tmp[i] = s3_lv_get(s, &a[1].lv, i);
+        for (int i = 0; i < n; i++) put(s, &a[0], i, tmp[i]);
         return;
     }
     case 'C': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, 0); return;

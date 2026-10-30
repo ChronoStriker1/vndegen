@@ -79,7 +79,7 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
     s->cfg.saveDir = s->saveDir;
     if (config->logPath) s->log = fopen(config->logPath, "a");
     s->trace = getenv("S3_TRACE") != NULL;
-    s->startTime = (long long)time(NULL);
+    s->startTime = config->startTime ? config->startTime : (long long)time(NULL);
     s->vars = s3_alloc(65536 * sizeof(u16));
     s->bind = s3_alloc(16384 * sizeof(S3Bind));
     defaults(s);
@@ -189,8 +189,8 @@ void vns3_mouse_move(VNS3 *s3, int x, int y) {
 
 void vns3_mouse_button(VNS3 *s3, int button, bool down) {
     S3 *s = (S3 *)s3;
-    if (button == VNS3_MOUSE_LEFT) { s->mouseL = down; if (down) s->pressedMask |= 16 | 0x10000; }
-    if (button == VNS3_MOUSE_RIGHT) { s->mouseR = down; if (down) s->pressedMask |= 32 | 0x20000; }
+    if (button == VNS3_MOUSE_LEFT) { s->mouseL = down; if (down) { s->pressedMask |= 16 | 0x10000; s->clickLatch |= 16; } }
+    if (button == VNS3_MOUSE_RIGHT) { s->mouseR = down; if (down) { s->pressedMask |= 32 | 0x20000; s->clickLatch |= 32; } }
 }
 
 // The IK bit for a Windows virtual key, 0 for keys IK doesn't report.

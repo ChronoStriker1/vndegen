@@ -62,7 +62,9 @@ import VNCore
         #expect(AliceSoftPlugin.system3SaveName("D:/Rance 4.1 32bit/ADISK.DAT") == nil)
     }
 
-    @Test func dungeonMaps() {
-        #expect(AliceSoftPlugin.system3SaveName("C:/Panyon/FLOOR_12.MAP") == "FLOOR_12.MAP")
+    @Test func flagFiles() {
+        #expect(AliceSoftPlugin.system3SaveName("C:/Games/tt2/tt2FS.ALD") == "tt2FS.ALD")
+        // Panyon ships its floor maps; only its map editor rewrites them.
+        #expect(AliceSoftPlugin.system3SaveName("C:/Panyon/FLOOR_12.MAP") == nil)
     }
 }
