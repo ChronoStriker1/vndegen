@@ -400,6 +400,13 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 void Game::update(const Input &input) {
     input_ = input;
     frame_++;
+    // A load requested last frame takes effect before anything runs (savestate.cpp).
+    if (pendingLoad_) applyPendingLoad();
+    // System variables 28 and 29 count frames and seconds of play; saves keep them and clocks in games read them.
+    if (system_.size() > 29) {
+        system_[28]++;
+        if (system_[28] % gameDat_.fps() == 0) system_[29]++;
+    }
 
     // Choices take the keys while they are open.
     if (choice_.active && !choice_.visible.empty()) {

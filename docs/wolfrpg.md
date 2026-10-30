@@ -57,11 +57,16 @@ works as on Windows: Z, Return or Space confirm, X or Escape cancel, Shift is su
 
 ## Saves
 
-Saves are the PC engine's own files in the `Save` folder beside `Game.exe`, so they move between VNDegen and a PC copy of
-the game, and Ludusavi backs them up. `docs/wolfrpg-save-format.md` describes the format.
+Saves are the PC engine's own files in the `Save` folder beside `Game.exe` (`SaveDataNN.sav`, and `System.sav` for
+games that keep values across saves), so they move between VNDegen and a PC copy of the game, and Ludusavi backs them
+up. Saves the PC engine wrote load in the runtime, and saves the runtime wrote load in the PC engine, checked under
+Wine for a Wolf RPG Editor 2 and a Wolf RPG Editor 3 test game. Fields the runtime doesn't use are carried over from the
+last save read or written. `docs/wolfrpg-save-format.md` describes the format and how each field was established.
 
 ## Known limits
 
+- A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
+  playing. The PC engine shows no saved pictures after a load either; the map's own music starts.
 - Wolf RPG Editor 3.5 games, whose data files are compressed, and DxLib archive versions 7 and 8 (Wolf RPG Editor 2.225
   and later, and 3.x) aren't read yet. None of the test games uses them.
 - Wolf RPG Editor Pro's encrypted data isn't read.
