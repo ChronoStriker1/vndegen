@@ -100,7 +100,8 @@ final class ArtemisSession: EngineSession {
         // Surface kind 4 is a CAMetalLayer the core presents to.
         let surface = core.api.runtime_set_external_surface!(runtime, 4, Unmanaged.passUnretained(layer).toOpaque(),
                                                             UInt32(stage.width), UInt32(stage.height))
-        guard surface == 0 else { return fail("the game's view could not be set up") }
+        // 1 means the core took the layer.
+        guard surface == 1 else { return fail("the game's view could not be set up") }
         drainEvents()
         artemisLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
         if paused { audio.setPaused(true) }
