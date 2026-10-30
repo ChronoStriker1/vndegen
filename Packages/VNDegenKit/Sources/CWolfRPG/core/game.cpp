@@ -54,6 +54,9 @@ bool Game::load(std::string *error) {
         if (error) *error = format("cannot load start map %d", startMap);
         return false;
     }
+    audio_ = std::make_unique<Audio>(files_, 44100, true, log);
+    audio_->setFrameRate(gameDat_.fps());
+    playMapMusic();
     tintR_.set(100, 0);
     tintG_.set(100, 0);
     tintB_.set(100, 0);
@@ -319,6 +322,7 @@ bool Game::loadMap(int id) {
     }
     mapParallel_.clear();
     refreshPages();
+    playMapMusic();
     return true;
 }
 

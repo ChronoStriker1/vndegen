@@ -470,13 +470,85 @@ void Game::effectCommand(Thread &t, const Command &c) {
     }
 }
 
-void Game::soundCommand(Thread &t, const Command &c) {
-    (void)t;
-    unsupported(c);
+// A sound from the system database's lists: type 1 BGM, 2 BGS and 3 SE, each row a file, volume, frequency and
+// loop start (for SE, a release mode).
+void Game::playListed(SoundKind kind, int id, int fadeFrames, int startMs) {
+    if (!audio_) return;
+    int type = kind == SoundKind::BGM ? 1 : kind == SoundKind::BGS ? 2 : 3;
+    std::string file = dbString(sdb_, type, id, 0);
+    if (file.empty()) return;
+    int volume = dbNumber(sdb_, type, id, 1), frequency = dbNumber(sdb_, type, id, 2);
+    if (kind == SoundKind::SE) {
+        audio_->playSE(file, volume ? volume : 100, frequency ? frequency : 100);
+        return;
+    }
+    MusicParams p;
+    p.volume = volume ? volume : 100;
+    p.frequency = frequency ? frequency : 100;
+    p.loopStartMs = dbNumber(sdb_, type, id, 3);
+    p.fadeFrames = fadeFrames;
+    p.startMs = startMs;
+    audio_->playMusic(kind, file, p);
 }
 
-void Game::playSoundEffect(int id) {
-    (void)id;  // sound arrives with the audio module
+// The map's music from the system database's map list: a list number, -1 for silence, -2 to keep what plays, and -3
+// for a file named in the row.
+void Game::playMapMusic() {
+    if (!audio_ || mapId_ < 0) return;
+    for (SoundKind kind : {SoundKind::BGM, SoundKind::BGS}) {
+        bool bgm = kind == SoundKind::BGM;
+        int id = dbNumber(sdb_, SysMaps, mapId_, bgm ? 1 : 2);
+        if (id == -2) continue;
+        if (id == -1) audio_->stopMusic(kind);
+        else if (id == -3) {
+            std::string file = dbString(sdb_, SysMaps, mapId_, bgm ? 5 : 6);
+            if (file.empty()) audio_->stopMusic(kind);
+            else audio_->playMusic(kind, file, MusicParams{});
+        } else {
+            playListed(kind, id, 0);
+        }
+    }
+}
+
+void Game::playSoundEffect(int id) { playListed(SoundKind::SE, id, 0); }
+
+// The sound command. Its first word holds the kind (BGM 0x00, BGS 0x10, SE 0x20) and what to do in its low byte, the
+// list number in the next two bytes (0xFFFF stops), and in the top byte whether the sound is a list number, a list
+// number in a variable, or a file named in the command.
+void Game::soundCommand(Thread &t, const Command &c) {
+    if (!audio_) return;
+    uint32_t w = uint32_t(c.arg(0));
+    int kindCode = w & 0xF0, exec = w & 0x0F;
+    if (exec != 0) return;  // preloading and releasing sounds need nothing here
+    SoundKind kind = kindCode == 0x10 ? SoundKind::BGS : kindCode == 0x20 ? SoundKind::SE : SoundKind::BGM;
+    int id = int((w >> 8) & 0xFFFF);
+    int spec = (w >> 24) & 0xFF;
+    // Fade times are in tenths of a second.
+    int fade = value(c.arg(1), t) * gameDat_.fps() / 10;
+    if (spec == 0xFF || (spec != 2 && id == 0xFFFF)) {
+        if (kind == SoundKind::SE) audio_->stopAllSE();
+        else audio_->stopMusic(kind, fade);
+        return;
+    }
+    if (spec == 1) id = value(c.arg(2), t);
+    int startMs = value(c.arg(3), t);
+    if (spec == 2) {
+        std::string file = c.str(0);
+        int volume = c.args.size() > 4 ? value(c.arg(4), t) : 100, frequency = c.args.size() > 5 ? value(c.arg(5), t) : 100;
+        if (kind == SoundKind::SE) {
+            audio_->playSE(file, volume, frequency);
+        } else {
+            MusicParams p;
+            p.volume = volume;
+            p.frequency = frequency;
+            p.loopStartMs = c.args.size() > 6 ? value(c.arg(6), t) : 0;
+            p.fadeFrames = fade;
+            p.startMs = startMs;
+            audio_->playMusic(kind, file, p);
+        }
+        return;
+    }
+    playListed(kind, id, fade, startMs);
 }
 
 void Game::chipCommand(Thread &t, const Command &c) {
@@ -494,11 +566,6 @@ void Game::chipCommand(Thread &t, const Command &c) {
         map_->tileset = value(c.arg(0), t);
         return;
     }
-    unsupported(c);
-}
-
-void Game::saveCommand(Thread &t, const Command &c) {
-    if (c.code == 221) writeVar(c.arg(0), 0, t);
     unsupported(c);
 }
 

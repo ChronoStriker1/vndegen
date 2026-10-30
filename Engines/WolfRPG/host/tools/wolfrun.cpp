@@ -54,6 +54,9 @@ int main(int argc, char **argv) {
     }
     std::printf("after %d frames: map %d, %zu pictures, message %s\n", frames, game.mapId(), game.pictures().size(),
                 game.message().active ? game.message().text.c_str() : "(none)");
+    if (Audio *a = game.audio())
+        std::printf("bgm %s at %d ms, bgs %s\n", a->musicPath(SoundKind::BGM).c_str(),
+                    a->musicPositionMs(SoundKind::BGM), a->musicPath(SoundKind::BGS).c_str());
     for (auto [code, n] : game.unsupported()) std::printf("unsupported command %d x%d\n", code, n);
     return 0;
 }

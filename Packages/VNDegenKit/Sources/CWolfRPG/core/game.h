@@ -2,6 +2,7 @@
 // tested without a display.
 #pragma once
 
+#include "audio.h"
 #include "data.h"
 #include "files.h"
 
@@ -211,6 +212,8 @@ public:
     double scrollX() const { return scrollX_; }
     double scrollY() const { return scrollY_; }
     bool quitRequested() const { return quitRequested_; }
+    // The game's sound. The host pulls its mix from the audio thread with Audio::render.
+    Audio *audio() const { return audio_.get(); }
 
     // Commands the interpreter has met but does not run yet, with how often. For the logs.
     const std::map<int, int> &unsupported() const { return unsupported_; }
@@ -257,7 +260,11 @@ private:
     void soundCommand(Thread &t, const Command &c);
     void playSoundEffect(int id);  // a sound from the system database's SE list
     void chipCommand(Thread &t, const Command &c);
+    // Saves (savestate.cpp): the save and load commands, and reading and writing Save/SaveDataNN.sav as the PC
+    // engine does.
     void saveCommand(Thread &t, const Command &c);
+    // --- savestate.cpp: declarations for saving and loading go here ---
+    // --- end of savestate.cpp declarations ---
     Database *databaseKind(int kind);
     uint32_t keysNow() const;
 
@@ -321,6 +328,9 @@ private:
     uint64_t frame_ = 0, generation_ = 0;
     std::mt19937 rng_{12345};
     std::map<int, int> unsupported_;
+    std::unique_ptr<Audio> audio_;
+    void playListed(SoundKind kind, int id, int fadeFrames, int startMs = 0);
+    void playMapMusic();
 
     bool moveDuringEvents_ = false, haltNonPicture_ = false, scrollLocked_ = false;
     bool pendingTitle_ = false, quitRequested_ = false;
