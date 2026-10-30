@@ -296,11 +296,16 @@ pub struct Interpreter {
     /// 每次 step 迭代开头消费并复位；只有 Jump 类结果会重新置位。
     arrived_by_jump: bool,
     /// The scenario text line running now, with the tags its tag filter
-    /// queues and the helpers they call, until the script waits: the text it prints counts as
+    /// queues and the helpers they call, until the script goes on or an
+    /// input handler runs: the text it prints counts as
     /// scenario text, rather than as text a [print] tag writes, and has this
     /// line as its source. The last field is the call depth it ran at
     /// (VNDegen).
     scenario_text_line: Option<(String, usize, usize)>,
+    /// Instructions run since the host last took them, other than scenario
+    /// text and [/if], by script and index. The PC engine marks every
+    /// instruction it runs as read, and its read-skip checks them (VNDegen).
+    executed: Vec<(String, usize)>,
     /// 已执行过的 `__lua_block`（键：脚本名 + 指令下标）。
     ///
     /// Artemis 语义：[lua] 块在**文件加载时**执行且每块只执行一次（见
@@ -450,6 +455,7 @@ impl Interpreter {
             queued_call_barriers: Vec::new(),
             arrived_by_jump: false,
             scenario_text_line: None,
+            executed: Vec::new(),
             executed_lua_blocks: std::collections::HashSet::new(),
             macros: MacroRegistry::new(),
             macro_files: HashMap::new(),
@@ -796,6 +802,12 @@ impl Interpreter {
             }
 
             let instruction = script.instructions[self.current_line].clone();
+            if instruction.tag != "__text"
+                && instruction.tag != "/if"
+                && !script_name.starts_with("__macro__")
+            {
+                self.executed.push((script_name.clone(), self.current_line));
+            }
             if instruction.tag == "__text" {
                 self.scenario_text_line =
                     Some((script_name.clone(), self.current_line, self.call_stack.len()));
@@ -2056,9 +2068,6 @@ impl Interpreter {
 
     /// 持续执行直到完成或等待
     pub fn run(&mut self) -> Result<ExecutionResult> {
-        // A scenario line's text is what it prints before the script waits;
-        // a menu opened from that wait prints text of its own (VNDegen).
-        self.scenario_text_line = None;
         self.step()
     }
 
@@ -2253,6 +2262,41 @@ impl Interpreter {
             .map_or(index, |loaded| loaded.pc_index(index))
     }
 
+    /// Ends the current scenario line's hold on the text that follows: an
+    /// input handler's text, such as a menu's, is not that line's (VNDegen).
+    pub fn end_scenario_text_line(&mut self) {
+        self.scenario_text_line = None;
+    }
+
+    /// The instructions run since the last call, other than scenario text,
+    /// as PC engine indexes by script (VNDegen).
+    pub fn take_executed_pc_lines(&mut self) -> Vec<(String, usize)> {
+        let executed = std::mem::take(&mut self.executed);
+        let mut pc_indexes: HashMap<String, Vec<usize>> = HashMap::new();
+        executed
+            .into_iter()
+            .filter_map(|(script, index)| {
+                let loaded = self.scripts.get(&script)?;
+                let indexes = pc_indexes.entry(script.clone()).or_insert_with(|| {
+                    let mut ifs = 0;
+                    loaded
+                        .instructions
+                        .iter()
+                        .enumerate()
+                        .map(|(index, instruction)| {
+                            let pc = index - ifs;
+                            if instruction.tag == "/if" {
+                                ifs += 1;
+                            }
+                            pc
+                        })
+                        .collect()
+                });
+                Some((script, *indexes.get(index)?))
+            })
+            .collect()
+    }
+
     /// The instruction of a script that a PC Artemis engine index points at,
     /// loading the script first (VNDegen).
     pub fn index_from_pc(&mut self, script: &str, pc_index: usize) -> Result<usize> {
@@ -2292,7 +2336,6 @@ impl Interpreter {
 
     /// 只抽干 Lua/事件排入的标签队列，不在队列清空后继续执行主脚本。
     pub fn drain_queued_tags_only(&mut self) -> Result<QueuedTagDrain> {
-        self.scenario_text_line = None;
         let origin = (
             self.current_script.clone(),
             self.current_line,
@@ -3015,6 +3058,28 @@ mod tests {
         let _ = it.run().unwrap();
 
         assert_eq!(it.get_variable("t.after"), Some(Value::Int(1)), "the menu's stop left with it");
+    }
+
+    #[test]
+    fn instructions_run_are_kept_as_pc_indexes() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.load_script(
+            "story",
+            "*main\n[if estimate=\"1\"]\n[var name=\"t.a\" data=\"1\"]\n[/if]\ntext\n[var name=\"t.b\" data=\"1\"]\n[stop]\n",
+        )
+        .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.start("story", "main").unwrap();
+        let _ = it.run().unwrap();
+
+        // [if] 0, [var] 1, [/if] 2 (no PC index), text 3, [var] 4, [stop] 5:
+        // PC indexes 0, 1, (text 2), 3, 4.
+        let lines: Vec<_> = it.take_executed_pc_lines().into_iter().map(|(_, line)| line).collect();
+        assert_eq!(lines, [0, 1, 3, 4]);
+        assert!(it.take_executed_pc_lines().is_empty());
     }
 
     #[test]
@@ -4217,6 +4282,40 @@ mod tests {
                 ("second".to_string(), false, Some(("test".to_string(), 1))),
             ]
         );
+    }
+
+    #[test]
+    fn scenario_text_keeps_its_line_across_a_wait_its_filter_queues() {
+        // As a game's print hook: a transition wait, then the print.
+        let mut interpreter = filtered_interpreter(
+            r#"
+                local filter = {}
+                function filter.print(e, p)
+                    e:enqueueTag{"wait", time="100"}
+                    e:enqueueTag{"print", data=p.data}
+                    return 1
+                end
+                __engine:setTagFilter(filter)
+            "#,
+            "*main\nfirst\n[var name=\"t.a\" data=\"1\"]\n[stop]\n",
+        );
+        let sources = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&sources);
+        let ctx = Arc::clone(interpreter.engine_context());
+        interpreter.set_callback(move |event| match event {
+            Event::ScenarioText { .. } => {
+                sink.lock().unwrap().push(ctx.lock().unwrap().scenario_text_source.clone());
+                CallbackResult::Continue
+            }
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+
+        let _ = interpreter.run().unwrap();
+        interpreter.advance_line();
+        let _ = interpreter.run().unwrap();
+
+        assert_eq!(*sources.lock().unwrap(), [Some(("test".to_string(), 0))]);
     }
 
     #[test]

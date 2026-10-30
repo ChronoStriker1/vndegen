@@ -379,6 +379,9 @@ impl CoreRuntime {
     }
 
     pub(super) fn begin_inline_event_frame(&mut self) {
+        // A handler runs on input; text it prints belongs to it, not to the
+        // scenario line shown before (VNDegen).
+        self.interpreter.end_scenario_text_line();
         self.refresh_inline_event_frame();
         let Some(script) = self.interpreter.current_script().map(str::to_string) else {
             return;
