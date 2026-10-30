@@ -191,12 +191,7 @@ extension EngineSession {
     public var drawsOwnMenu: Bool { false }
 
     public func type(_ typed: TypedText) {
-        let keys: [KeyboardKey] = switch typed {
-        case .newline: [KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)]
-        case .deleteBackward: [KeyboardKey(key: "Backspace", code: "Backspace", keyCode: 8)]
-        case let .text(text): text.compactMap(KeyboardKey.init(typing:))
-        }
-        for key in keys {
+        for key in KeyboardKey.keys(typing: typed) {
             send(.key(key, pressed: true))
             send(.key(key, pressed: false))
         }
@@ -204,6 +199,16 @@ extension EngineSession {
 }
 
 extension KeyboardKey {
+    /// The keys the default `EngineSession.type(_:)` presses for `typed`: letters, digits, and spaces, and Return and
+    /// Backspace.
+    public static func keys(typing typed: TypedText) -> [KeyboardKey] {
+        switch typed {
+        case .newline: [KeyboardKey(key: "Enter", code: "Enter", keyCode: 13)]
+        case .deleteBackward: [KeyboardKey(key: "Backspace", code: "Backspace", keyCode: 8)]
+        case let .text(text): text.compactMap(KeyboardKey.init(typing:))
+        }
+    }
+
     /// The key that types `character` on a US keyboard without Shift, for letters, digits, and the space bar.
     init?(typing character: Character) {
         guard let ascii = character.asciiValue else { return nil }

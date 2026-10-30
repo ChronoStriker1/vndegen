@@ -37,6 +37,8 @@ final class ArtemisSession: EngineSession {
     private var stopped = false
     /// The last pointer position, in stage pixels, where a click lands.
     private var pointer = CGPoint.zero
+    /// The game's dialog while one is open.
+    private var prompt: Prompt?
 
     /// Whether a session's runtime is alive. The core keeps some state per process, so one game runs at a time.
     private(set) static var engineInUse = false
@@ -212,7 +214,9 @@ final class ArtemisSession: EngineSession {
         let cancels = body["hasCancel"] as? Bool ?? false, asksText = body["textfield"] as? Bool ?? false
         let initial = body["initialText"] as? String ?? ""
         let answer: @MainActor (Bool, String?) -> Void = { [weak self] accepted, text in
-            guard let self, let runtime else { return }
+            guard let self else { return }
+            prompt = nil
+            guard let runtime else { return }
             _ = core.api.runtime_submit_dialog!(runtime, accepted ? 1 : 0, text)
         }
         #if canImport(UIKit)
@@ -220,6 +224,13 @@ final class ArtemisSession: EngineSession {
         if asksText { alert.addTextField { $0.text = initial } }
         alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in answer(true, alert?.textFields?.first?.text) })
         if cancels { alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in answer(false, nil) }) }
+        let field = alert.textFields?.first
+        prompt = Prompt(cancels: cancels, field: field.map { field in (get: { field.text ?? "" }, set: { field.text = $0 }) }) {
+            [weak alert] accepted in
+            let text = alert?.textFields?.first?.text
+            alert?.dismiss(animated: true)
+            answer(accepted, accepted ? text : nil)
+        }
         var presenter = host.window?.rootViewController
         while let shown = presenter?.presentedViewController { presenter = shown }
         presenter?.present(alert, animated: true)
@@ -233,10 +244,23 @@ final class ArtemisSession: EngineSession {
         alert.addButton(withTitle: "OK")
         if cancels { alert.addButton(withTitle: "Cancel") }
         guard let window = host.window else { return answer(alert.runModal() == .alertFirstButtonReturn, field?.stringValue) }
+        prompt = Prompt(cancels: cancels, field: field.map { field in (get: { field.stringValue }, set: { field.stringValue = $0 }) }) {
+            [weak window, weak alert] accepted in
+            guard let window, let sheet = alert?.window else { return }
+            window.endSheet(sheet, returnCode: accepted ? .alertFirstButtonReturn : .alertSecondButtonReturn)
+        }
         alert.beginSheetModal(for: window) { response in
             MainActor.assumeIsolated { answer(response == .alertFirstButtonReturn, field?.stringValue) }
         }
         #endif
+    }
+
+    /// A dialog the game shows, which a controller answers too: Confirm, Return, or Space presses OK, Cancel or Escape
+    /// presses Cancel when the dialog has it, and VNDegen's on-screen keyboard types into its text field.
+    private struct Prompt {
+        let cancels: Bool
+        let field: (get: () -> String, set: (String) -> Void)?
+        let close: (_ accepted: Bool) -> Void
     }
 
     private func open(_ url: URL) {
@@ -279,7 +303,33 @@ final class ArtemisSession: EngineSession {
 
     func send(_ event: ControllerEvent) {
         guard runtime != nil, !paused else { return }
+        if let prompt {
+            // In the "Keyboard and mouse" layout A and B arrive as Space and E, so the keys answer too.
+            switch event {
+            case .button(.confirm, pressed: true): prompt.close(true)
+            case let .key(key, pressed: true) where key.keyCode == 13 || key.keyCode == 32: prompt.close(true)
+            case .button(.cancel, pressed: true) where prompt.cancels: prompt.close(false)
+            case let .key(key, pressed: true) where key.keyCode == 27 && prompt.cancels: prompt.close(false)
+            default: break
+            }
+            return
+        }
         router.translate(event).forEach(deliver)
+    }
+
+    func type(_ typed: TypedText) {
+        guard let prompt, let field = prompt.field else {
+            for key in KeyboardKey.keys(typing: typed) {
+                send(.key(key, pressed: true))
+                send(.key(key, pressed: false))
+            }
+            return
+        }
+        switch typed {
+        case let .text(text): field.set(field.get() + text)
+        case .deleteBackward: field.set(String(field.get().dropLast()))
+        case .newline: prompt.close(true)
+        }
     }
 
     func setPaused(_ paused: Bool) {
