@@ -42,13 +42,14 @@ public:
         return s;
     }
 
-    // A length-prefixed string. The length counts the terminating NUL, which is dropped. The bytes stay in the game's
-    // encoding, which the caller converts.
+    // A length-prefixed string. The length counts the terminating NUL. Wolf reads strings as C strings, so the text
+    // ends at the first NUL; editors sometimes leave old bytes after it. The bytes stay in the game's encoding, which
+    // the caller converts.
     std::string rawString() {
         uint32_t len = u32();
         auto b = bytes(len);
-        size_t n = len;
-        while (n > 0 && b[n - 1] == 0) n--;
+        size_t n = 0;
+        while (n < len && b[n] != 0) n++;
         return std::string(reinterpret_cast<const char *>(b.data()), n);
     }
 
