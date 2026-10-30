@@ -51,7 +51,7 @@ u16 s3_u16(S3 *s) {
 }
 
 // Reads a variable reference whose first byte c was already read.
-static void var_ref(S3 *s, int c, S3LV *lv) {
+void s3_var_ref(S3 *s, int c, S3LV *lv) {
     memset(lv, 0, sizeof *lv);
     if (c >= 0x80 && c <= 0xbf) { lv->var = (u16)(c - 0x80); return; }
     if (c == 0xc0) {
@@ -79,7 +79,8 @@ u16 s3_expr(S3 *s) {
         if (c == 0x7f) break;
         if (sp >= 64) { s->vmError = true; return 0; }
         if (c < 0x40) { st[sp++] = c << 8 | s3_byte(s); continue; }
-        if (c < 0x74) { st[sp++] = c - 0x40; continue; }
+        // System 3.0 has no bitwise operators, so 0x74 to 0x76 are the constants 52 to 54 there.
+        if (c < 0x74 || (s->sys30 && c < 0x77)) { st[sp++] = c - 0x40; continue; }
         int op = c;
         if (c == 0xc0) {
             int n = s->pc < s->codeSize ? s->code[s->pc] : 0;
@@ -87,7 +88,7 @@ u16 s3_expr(S3 *s) {
         }
         if (op >= 0x80 && op < 0x100) {
             S3LV lv;
-            var_ref(s, c, &lv);
+            s3_var_ref(s, c, &lv);
             st[sp++] = s3_lv_get(s, &lv, 0);
             continue;
         }
@@ -126,7 +127,7 @@ void s3_lvarg(S3 *s, S3LV *lv) {
         lv->var = 0;
         return;
     }
-    var_ref(s, c, lv);
+    s3_var_ref(s, c, lv);
     if (s3_byte(s) != 0x7f) s->vmError = true;
 }
 
@@ -142,6 +143,18 @@ const char *s3_strarg(S3 *s) {
 
 bool s3_goto_page(S3 *s, int page, u32 addr) {
     S3Blob b;
+    if (s->sys30) {
+        // System 3.0 pages start with a 16-bit field; their labels are offsets in the page.
+        if (!s3_dat_get(&s->adisk, (u32)page + 1, &b) || b.size < 2) {
+            s3_fail(s, "The game asked for scenario page %d, which ADISK.DAT does not have.", page);
+            return false;
+        }
+        s->page = (u16)page;
+        s->code = b.data;
+        s->codeSize = (u32)b.size;
+        s->pc = addr ? addr : 2;
+        return true;
+    }
     if (!s3_archive_get(&s->sa, (u32)page + 1, &b, NULL) || b.size < 0x20) {
         s3_fail(s, "The game asked for scenario page %d, which its archive does not have.", page);
         return false;
@@ -220,11 +233,11 @@ static void exec_one(S3 *s) {
     S3LV lv;
     switch (c) {
     case 0x21: // ! var: expr
-        var_ref(s, s3_byte(s), &lv);
+        s3_var_ref(s, s3_byte(s), &lv);
         s3_lv_set(s, &lv, 0, s3_expr(s));
         return;
     case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: {
-        var_ref(s, s3_byte(s), &lv);
+        s3_var_ref(s, s3_byte(s), &lv);
         long a = s3_lv_get(s, &lv, 0), b = s3_expr(s), r = 0;
         switch (c) {
         case 0x10: r = a + b; break;
@@ -336,7 +349,7 @@ void s3_vm_run(S3 *s, int budget) {
     s->polls = 0;
     while (budget-- > 0 && !s->quit && s->wait == S3_WAIT_NONE) {
         if (s->pc >= s->codeSize) { s3_fail(s, "Scenario page %d ran past its end.", s->page); return; }
-        exec_one(s);
+        if (s->sys30) s3_exec30(s); else exec_one(s);
         if (s->vmError) {
             char hex[64] = "";
             for (u32 i = 0; i < 12 && s->cmdStart + i < s->codeSize; i++)

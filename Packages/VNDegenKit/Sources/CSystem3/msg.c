@@ -33,6 +33,7 @@ void s3_msg_clear(S3 *s) {
 // Appends text to the menu item being built.
 static void menu_append(S3 *s, const char *sjis) {
     S3MenuItem *m = &s->menu[s->menuBuild];
+    m->zh = s->zh;
     size_t have = strlen(m->text), add = strlen(sjis);
     if (have + add >= sizeof m->text) add = sizeof m->text - 1 - have;
     memcpy(m->text + have, sjis, add);
@@ -108,13 +109,18 @@ static int text_width(S3 *s, const char *sjis, int size) {
 static void menu_rect(S3 *s, int *x, int *y, int *w, int *h) {
     S3Win *win = &s->selWin[s->curSel > 0 && s->curSel <= 100 ? s->curSel : 1];
     *x = win->x; *y = win->y; *w = win->w; *h = win->h;
-    int need = 0;
+    int need = 0, zh = s->zh;
     for (int i = 0; i < s->menuCount; i++) {
+        s->zh = s->menu[i].zh;
         int tw = text_width(s, s->menu[i].text, s->menuFontSize);
         if (tw > need) need = tw;
     }
+    s->zh = zh;
     if (*w < need + 16) *w = need + 16;
     *h = s->menuCount * menu_row_height(s) + 8;
+    // A box that grew past the right of the screen, as translated text can make it, moves left.
+    int right = s->viewX + (s->viewW > 0 ? s->viewW : s->dib.w);
+    if (*x + *w > right) *x = right - *w > 0 ? right - *w : 0;
 }
 
 static void menu_draw(S3 *s) {
@@ -130,13 +136,15 @@ static void menu_draw(S3 *s) {
         bool sel = i == s->menuCursorPos;
         int color = sel && s->menuCursor == 2 ? s->menuBg : s->menuColor;
         if (sel && s->menuCursor == 2) s3_fill(s, x + 4, ry, w - 8, menu_row_height(s) - 2, s->menuColor);
-        int tx = x + 8;
+        int tx = x + 8, zh = s->zh;
+        s->zh = s->menu[i].zh;
         const u8 *p = (const u8 *)s->menu[i].text;
         while (*p) {
             u32 cp; bool half;
             p += next_char(s, p, &cp, &half);
             tx += s3_draw_char(s, cp, half, tx, ry + 1, s->menuFontSize, color);
         }
+        s->zh = zh;
         if (sel && s->menuCursor != 2) {
             int t = s->menuCursor == 1 ? 1 : 2;
             int rw = w - 8, rh = menu_row_height(s) - 1;
@@ -221,4 +229,20 @@ bool s3_menu_update(S3 *s) {
 void s3_menu_close(S3 *s, int choice) {
     (void)choice;
     menu_restore(s);
+}
+
+char *s3_display_utf8(S3 *s, const char *sjis) {
+    size_t n = strlen(sjis);
+    char *out = s3_alloc(n * 3 + 1), *o = out;
+    const u8 *p = (const u8 *)sjis;
+    while (*p) {
+        u32 cp;
+        bool half;
+        p += next_char(s, p, &cp, &half);
+        if (cp < 0x80) *o++ = (char)cp;
+        else if (cp < 0x800) { *o++ = (char)(0xc0 | cp >> 6); *o++ = (char)(0x80 | (cp & 0x3f)); }
+        else { *o++ = (char)(0xe0 | cp >> 12); *o++ = (char)(0x80 | ((cp >> 6) & 0x3f)); *o++ = (char)(0x80 | (cp & 0x3f)); }
+    }
+    *o = 0;
+    return out;
 }

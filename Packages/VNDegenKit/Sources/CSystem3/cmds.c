@@ -213,9 +213,10 @@ void s3_service_wait(S3 *s) {
 
 // ---- CG loading ----
 
-static void load_cg(S3 *s, int n, int key) {
+void s3_load_cg(S3 *s, int n, int key, int yOffset) {
     S3Blob b;
-    if (!s3_archive_get(&s->ga, (u32)n, &b, NULL)) { s3_log(s, "CG %d missing", n); s->cgPos = false; return; }
+    bool found = s->sys30 ? s3_dat_get(&s->cg30, (u32)n, &b) : s3_archive_get(&s->ga, (u32)n, &b, NULL);
+    if (!found) { s3_log(s, "CG %d missing", n); s->cgPos = false; return; }
     S3Image img;
     if (!s3_cg_decode(b.data, b.size, &img)) { s3_log(s, "CG %d undecodable", n); s->cgPos = false; return; }
     // A 16-colour VSP whose header names bank 0 goes to the bank ZC 0 chose (1 at start), so it leaves the colours
@@ -227,12 +228,15 @@ static void load_cg(S3 *s, int n, int key) {
         img.palMask = (u16)(1u << s->palBank);
         if (key >= 0 && key < 16) key += shift;
     }
+    // A 16-colour VSP's transparent colour counts within its own bank.
+    if (img.vsp && img.palBank > 0 && key >= 0 && key < 16) key += (img.palBank & 15) * 16;
     int x = img.x, y = img.y;
     if (s->cgPos) {
-        if (s->cgPosMode == 0 || s->cgPosMode == 2) { x = s->cgX; y = s->cgY; }
+        if (s->cgPosMode == 0 || s->cgPosMode == 2 || s->cgPosMode == 30) { x = s->cgX; y = s->cgY; }
         else { x += s->cgX; y += s->cgY; }
         s->cgPos = false;
     }
+    y += yOffset;
     if (s->trace) s3_log(s, "CG %d at %d,%d %dx%d bpp %d mask %04x pc %d", n, x, y, img.w, img.h, img.bpp, img.palMask, s->pcMode);
     if (img.hasPal && (s->pcMode & 4) && n != s->noPalCg) {
         for (int bank = 0; bank < 16; bank++) {
@@ -1021,8 +1025,8 @@ void s3_command(S3 *s) {
     case 'F': cmd_F(s, s3_byte(s)); return;
     case 'G': {
         int k = s3_byte(s);
-        if (k == 0) { args(s, "e", a); load_cg(s, a[0].v, -1); }
-        else if (k == 1) { args(s, "ee", a); load_cg(s, a[0].v, a[1].v); }
+        if (k == 0) { args(s, "e", a); s3_load_cg(s, a[0].v, -1, 0); }
+        else if (k == 1) { args(s, "ee", a); s3_load_cg(s, a[0].v, a[1].v, 0); }
         else if (k == 'S') {
             args(s, "ee", a);
             S3Blob b; S3Image img;
@@ -1032,7 +1036,7 @@ void s3_command(S3 *s) {
                 put(s, &a[1], 0, (u16)x); put(s, &a[1], 1, (u16)y); put(s, &a[1], 2, (u16)img.w); put(s, &a[1], 3, (u16)img.h);
                 s3_image_free(&img);
             }
-        } else if (k == 'X') { args(s, "ee", a); load_cg(s, a[0].v, -1); }
+        } else if (k == 'X') { args(s, "ee", a); s3_load_cg(s, a[0].v, -1, 0); }
         else s->vmError = true;
         return;
     }

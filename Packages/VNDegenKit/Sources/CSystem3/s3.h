@@ -50,6 +50,19 @@ void s3_archive_close(S3Archive *a);
 // Entry for link number n (1-based). name receives the stored file name if given.
 bool s3_archive_get(const S3Archive *a, u32 n, S3Blob *out, const char **name);
 
+// System 3.0 DAT archives
+typedef struct S3Dat {
+    u8 *vol[4];
+    size_t volSize[4];
+    const u8 *map;             // file 1 of the first volume: (volume, index) per link number
+    u8 *mapData;
+    u32 count;
+} S3Dat;
+bool s3_dat_open(S3Dat *a, const char *dir, const char *const *names, int count);
+bool s3_dat_file(const S3Dat *a, int vol, u32 file, S3Blob *out);
+bool s3_dat_get(const S3Dat *a, u32 n, S3Blob *out);
+void s3_dat_close(S3Dat *a);
+
 // ---- ain.c: System39.ain ----
 typedef struct S3Ain {
     u8 *data;
@@ -108,7 +121,7 @@ typedef struct S3Bind { u8 page; u16 base; u16 pointer; bool on; } S3Bind;
 
 typedef struct S3Win { int x, y, w, h, save; } S3Win;
 
-typedef struct S3MenuItem { u16 page; u32 addr; char text[256]; } S3MenuItem;
+typedef struct S3MenuItem { u16 page; u32 addr; char text[256]; int zh; } S3MenuItem; // zh: the ZH mode its text came in
 
 #define S3_MAX_STRINGS 5001
 #define S3_MAX_FRAMES 4096
@@ -127,6 +140,9 @@ struct S3 {
     S3Archive sa, ga, wa, ma, da;
     S3Ain ain;
     bool hasAin;
+    bool sys30;                // a SYSTEM3.EXE game (vm30.c)
+    S3Dat adisk, cg30;
+    struct S3State30 *s30;
 
     // VM state
     u16 *vars;                 // page 0, 65536 entries
@@ -244,6 +260,8 @@ int s3_draw_char(S3 *s, u32 cp, bool half, int x, int y, int size, int color);
 void s3_msg_text(S3 *s, const char *sjis);
 void s3_msg_newline(S3 *s);
 void s3_msg_clear(S3 *s);
+// CP932 text as the window shows it (hiragana for half-width kana, full-width ASCII under ZH 0), in UTF-8.
+char *s3_display_utf8(S3 *s, const char *sjis);
 void s3_msg_select_window(S3 *s, int n, int frame, int noClear, int restore);
 void s3_menu_open(S3 *s);
 bool s3_menu_update(S3 *s);   // true when a choice was made or cancelled

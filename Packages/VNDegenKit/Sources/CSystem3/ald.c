@@ -72,3 +72,53 @@ bool s3_archive_get(const S3Archive *a, u32 n, S3Blob *out, const char **name) {
     if (disk < 1 || disk > 26) return false;
     return entry(a, disk - 1, a->mapIndex[n], out, name);
 }
+
+// System 3.0 DAT archives (ADISK.DAT, ACG.dat, BCG.dat, ...), read from the files: 256-byte sectors, a table of
+// u16 sector numbers where file i spans sectors table[i-1]-1 to table[i]-1, and file 1 a link map of (volume, file)
+// byte pairs, one per link number. A link's file index counts the map as file 1, so index i is file i + 1.
+bool s3_dat_open(S3Dat *a, const char *dir, const char *const *names, int count) {
+    memset(a, 0, sizeof *a);
+    for (int v = 0; v < count && v < 4; v++) {
+        char *path = s3_find_file(dir, names[v]);
+        if (!path) continue;
+        a->vol[v] = s3_read_file(path, &a->volSize[v]);
+        free(path);
+    }
+    if (!a->vol[0]) return false;
+    S3Blob map;
+    a->mapData = NULL;
+    if (!s3_dat_file(a, 0, 1, &map)) return false;
+    a->map = map.data;
+    a->count = (u32)(map.size / 2);
+    while (a->count && a->map[(a->count - 1) * 2] == 0) a->count--;
+    return a->count > 0;
+}
+
+bool s3_dat_file(const S3Dat *a, int vol, u32 file, S3Blob *out) {
+    if (vol < 0 || vol >= 4 || !a->vol[vol] || file == 0) return false;
+    const u8 *d = a->vol[vol];
+    size_t n = a->volSize[vol];
+    if (n < 2) return false;
+    size_t tableEnd = ((size_t)s3_le16(d) - 1) * 256;
+    if ((size_t)file * 2 + 2 > tableEnd || tableEnd > n) return false;
+    u32 s0 = s3_le16(d + (file - 1) * 2), s1 = s3_le16(d + file * 2);
+    if (s0 == 0 || s1 <= s0) return false;
+    size_t from = ((size_t)s0 - 1) * 256, to = ((size_t)s1 - 1) * 256;
+    if (to > n) to = n;
+    if (from >= to) return false;
+    out->data = d + from;
+    out->size = to - from;
+    return true;
+}
+
+bool s3_dat_get(const S3Dat *a, u32 n, S3Blob *out) {
+    if (n == 0 || n > a->count) return false;
+    int vol = a->map[(n - 1) * 2], index = a->map[(n - 1) * 2 + 1];
+    if (vol < 1 || index < 1) return false;
+    return s3_dat_file(a, vol - 1, (u32)index + 1, out);
+}
+
+void s3_dat_close(S3Dat *a) {
+    for (int v = 0; v < 4; v++) free(a->vol[v]);
+    memset(a, 0, sizeof *a);
+}

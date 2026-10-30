@@ -85,16 +85,21 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
     defaults(s);
 
     char *ain = s3_find_file(s->gameDir, "System39.ain");
-    if (!ain) { set_err(err, errSize, "This folder has no System39.ain. System 3.0 games are not supported yet."); vns3_close((VNS3 *)s); return NULL; }
-    s->hasAin = s3_ain_open(&s->ain, ain);
-    free(ain);
-    if (!find_prefix(s) || !s3_archive_open(&s->sa, s->gameDir, s->prefix, 'S')) {
+    if (!ain) {
+        // A SYSTEM3.EXE game: scenario in ADISK.DAT, CGs in ACG.DAT and the volumes after it.
+        s->sys30 = true;
+        if (!s3_open30(s)) { set_err(err, errSize, "This folder has neither System39.ain nor ADISK.DAT."); vns3_close((VNS3 *)s); return NULL; }
+    } else {
+        s->hasAin = s3_ain_open(&s->ain, ain);
+        free(ain);
+    }
+    if (!s->sys30 && (!find_prefix(s) || !s3_archive_open(&s->sa, s->gameDir, s->prefix, 'S'))) {
         set_err(err, errSize, "The game's scenario archive (*SA.ALD) is missing or unreadable.");
         vns3_close((VNS3 *)s);
         return NULL;
     }
-    s3_archive_open(&s->ga, s->gameDir, s->prefix, 'G');
-    s3_archive_open(&s->wa, s->gameDir, s->prefix, 'W');
+    if (!s->sys30) s3_archive_open(&s->ga, s->gameDir, s->prefix, 'G');
+    if (!s->sys30) s3_archive_open(&s->wa, s->gameDir, s->prefix, 'W');
     s3_archive_open(&s->ma, s->gameDir, s->prefix, 'M');
     s3_archive_open(&s->da, s->gameDir, s->prefix, 'D');
     s3_log(s, "opened %s: prefix %s, %u pages, %u messages", s->gameDir, s->prefix, s->sa.count, s->ain.msgCount);
@@ -105,9 +110,10 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
     if (!fontPath && vnfont_resolve("MS Gothic", 0, 0, &match)) { fontPath = match.path; fontIndex = match.face; }
     if (!s3_font_open(s, fontPath, fontIndex)) s3_log(s, "no font: text will not show");
 
-    s3_gfx_init(s, 640, 480, 8);
+    // System 3.0 games draw on a 640x400 screen and keep a second, hidden one below it (Y30, Y31).
+    s3_gfx_init(s, 640, s->sys30 ? 960 : 480, 8);
     s->viewW = 640;
-    s->viewH = 480;
+    s->viewH = s->sys30 ? 400 : 480;
     s3_audio_init(s);
     if (!s3_vm_start(s)) { set_err(err, errSize, s->problem); vns3_close((VNS3 *)s); return NULL; }
     return (VNS3 *)s;
@@ -116,9 +122,14 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
 void vns3_close(VNS3 *s3) {
     S3 *s = (S3 *)s3;
     if (!s) return;
+    if (s->trace && s->dib.p8) {
+        int i = s->dib.p8[(size_t)20 * s->dib.w + 20];
+        s3_log(s, "pixel 20,20: index %d pal %d,%d,%d shown %d,%d,%d", i, s->pal[i][0], s->pal[i][1], s->pal[i][2], s->shownPal[i][0], s->shownPal[i][1], s->shownPal[i][2]);
+    }
     s3_audio_free(s);
     s3_font_close(s);
     s3_unitmap_free(s);
+    s3_close30(s);
     s3_sprite_free(s);
     s3_archive_close(&s->sa);
     s3_archive_close(&s->ga);
