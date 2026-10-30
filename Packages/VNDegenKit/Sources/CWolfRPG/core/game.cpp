@@ -247,50 +247,56 @@ std::string Game::expandText(const std::string &text, const Thread *t) const {
             size_t n = std::strlen(name);
             return text.compare(i + 1, n, name) == 0 && i + 1 + n < text.size() && text[i + 1 + n] == '[';
         };
-        auto number = [&](size_t open, size_t *close) {
-            *close = text.find(']', open);
-            if (*close == std::string::npos) return -1;
-            return std::atoi(text.c_str() + open + 1);
-        };
+        // The text between the bracket at `open` and its partner, with codes inside expanded first, as in
+        // \udb[0:\cself[0]:0]. Sets close to the partner bracket, or npos when there is none.
         size_t close = 0;
+        auto argument = [&](size_t open) {
+            int depth = 0;
+            for (close = open; close < text.size(); close++) {
+                if (text[close] == '[') depth++;
+                else if (text[close] == ']' && --depth == 0) return expandText(text.substr(open + 1, close - open - 1), t);
+            }
+            close = std::string::npos;
+            return std::string();
+        };
+        auto number = [&](size_t open) { return std::atoi(argument(open).c_str()); };
         if (code("cdb") || code("udb") || code("sdb")) {
             // \cdb[type:row:field], and the same for the user and system databases: the cell's text or number.
-            size_t open = i + 4;
-            close = text.find(']', open);
+            std::string arg = argument(i + 4);
             if (close == std::string::npos) break;
             int type = 0, row = 0, field = 0;
-            std::sscanf(text.c_str() + open + 1, "%d:%d:%d", &type, &row, &field);
+            std::sscanf(arg.c_str(), "%d:%d:%d", &type, &row, &field);
             const Database &db = text[i + 1] == 'c' ? cdb_ : text[i + 1] == 'u' ? udb_ : sdb_;
             bool isString = type >= 0 && type < int(db.types.size()) && db.types[type].isString(field);
             out += isString ? dbString(db, type, row, field) : std::to_string(dbNumber(db, type, row, field));
             i = close;
         } else if (code("self")) {
-            int n = number(i + 5, &close);
+            int n = number(i + 5);
             Thread copy = t ? *t : Thread{};
             if (t && !copy.stack.empty())
                 out += std::to_string(const_cast<Game *>(this)->readVar(1100000 + n, copy));
             i = close;
         } else if (code("cself")) {
-            int n = number(i + 6, &close);
-            if (t && !t->stack.empty() && t->stack.back().commonEvent >= 0) {
+            int n = number(i + 6);
+            if (t && !t->stack.empty() && t->stack.back().commonEvent >= 0 && n >= 0 && n < 100) {
                 int ce = t->stack.back().commonEvent;
                 out += (n >= 5 && n < 10) ? cselfStr_[ce][n] : std::to_string(cself_[ce][n]);
             }
             i = close;
         } else if (code("v")) {
-            int n = number(i + 2, &close);
+            int n = number(i + 2);
             if (n >= 0 && n < int(normal_.size())) out += std::to_string(normal_[n]);
             i = close;
         } else if (code("s")) {
-            int n = number(i + 2, &close);
+            int n = number(i + 2);
             if (n >= 0 && n < int(strings_.size())) out += strings_[n];
             i = close;
         } else if (code("sys")) {
-            int n = number(i + 4, &close);
+            int n = number(i + 4);
             if (n >= 0 && n < int(system_.size())) out += std::to_string(system_[n]);
             i = close;
         } else if (code("sysS")) {
-            int n = number(i + 5, &close);
+            int n = number(i + 5);
             if (n >= 0 && n < int(systemStrings_.size())) out += systemStrings_[n];
             i = close;
         } else {
