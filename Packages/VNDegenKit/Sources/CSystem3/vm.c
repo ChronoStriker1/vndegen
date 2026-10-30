@@ -215,6 +215,7 @@ void s3_message(S3 *s, u32 index) {
 
 static void exec_one(S3 *s) {
     s->cmdStart = s->pc;
+    if (s->trace) s3_log(s, "%d:%05x %02x %02x %02x", s->page, s->pc, s->code[s->pc], s->pc + 1 < s->codeSize ? s->code[s->pc + 1] : 0, s->pc + 2 < s->codeSize ? s->code[s->pc + 2] : 0);
     int c = s3_byte(s);
     S3LV lv;
     switch (c) {

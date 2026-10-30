@@ -128,6 +128,7 @@ static void wait_ms(S3 *s, u32 ms, bool keyCancels) {
     s->wait = S3_WAIT_TIME;
     s->waitUntil = s->clockMs + ms;
     s->waitArg[0] = keyCancels;
+    s->waitArg[1] = 0;
     s->pressedMask = 0;
 }
 
@@ -171,8 +172,13 @@ void s3_service_wait(S3 *s) {
         }
         break;
     case S3_WAIT_TIME:
-        if (s->waitArg[0] && s->pressedMask) { rnd(s, (u16)s->pressedMask); s->wait = S3_WAIT_NONE; }
-        else if (s->clockMs >= s->waitUntil) s->wait = S3_WAIT_NONE;
+        // Keys pressed during the wait reach RND whether or not they may end it (Y3, ZT20, ZT21).
+        s->waitArg[1] |= (int)(s->pressedMask & 0xff);
+        s->pressedMask = 0;
+        if ((s->waitArg[0] && s->waitArg[1]) || s->clockMs >= s->waitUntil) {
+            rnd(s, (u16)s->waitArg[1]);
+            s->wait = S3_WAIT_NONE;
+        }
         break;
     case S3_WAIT_FADE: {
         int elapsed = (int)(s->clockMs - (u64)(u32)s->waitArg[2]);
@@ -212,12 +218,22 @@ static void load_cg(S3 *s, int n, int key) {
     if (!s3_archive_get(&s->ga, (u32)n, &b, NULL)) { s3_log(s, "CG %d missing", n); s->cgPos = false; return; }
     S3Image img;
     if (!s3_cg_decode(b.data, b.size, &img)) { s3_log(s, "CG %d undecodable", n); s->cgPos = false; return; }
+    // A 16-colour VSP whose header names bank 0 goes to the bank ZC 0 chose (1 at start), so it leaves the colours
+    // the game set in bank 0 alone.
+    if (img.vsp && img.palBank == 0 && s->palBank > 0 && s->palBank < 16) {
+        int shift = s->palBank * 16;
+        for (int i = 0; i < img.w * img.h; i++) img.pixels8[i] = (u8)(img.pixels8[i] + shift);
+        memcpy(img.pal[shift], img.pal[0], 48);
+        img.palMask = (u16)(1u << s->palBank);
+        if (key >= 0 && key < 16) key += shift;
+    }
     int x = img.x, y = img.y;
     if (s->cgPos) {
         if (s->cgPosMode == 0 || s->cgPosMode == 2) { x = s->cgX; y = s->cgY; }
         else { x += s->cgX; y += s->cgY; }
         s->cgPos = false;
     }
+    if (s->trace) s3_log(s, "CG %d at %d,%d %dx%d bpp %d mask %04x pc %d", n, x, y, img.w, img.h, img.bpp, img.palMask, s->pcMode);
     if (img.hasPal && (s->pcMode & 4) && n != s->noPalCg) {
         for (int bank = 0; bank < 16; bank++) {
             if (!(img.palMask & (1u << bank))) continue;
@@ -859,21 +875,27 @@ static void cmd_Z(S3 *s) {
 static void cmd_V(S3 *s) {
     int k = s3_byte(s);
     Arg a[10];
+    u16 v[10] = {0};
+    const char *sig;
     switch (k) {
     case 'A': { s3_byte(s); args(s, "eee", a); unimpl(s, "VA"); return; } // VA n: three arguments for every n
-    case 'B': case 'C': args(s, "eeeeeee", a); break;
-    case 'E': case 'H': case 'P': args(s, "eeeeee", a); break;
-    case 'F': break;
-    case 'G': case 'J': case 'X': args(s, "eeee", a); break;
-    case 'I': s3_byte(s); args(s, "eeee", a); break;
-    case 'R': case 'W': args(s, "eee", a); break;
-    case 'S': args(s, "eeeee", a); break;
-    case 'T': args(s, "eeeeeeeeee", a); break;
-    case 'V': args(s, "ee", a); break;
-    case 'Z': args(s, "bee", a); break;
+    case 'B': case 'C': sig = "eeeeeee"; break;
+    case 'E': case 'H': case 'P': sig = "eeeeee"; break;
+    case 'F': sig = ""; break;
+    case 'G': case 'J': sig = "eeee"; break;
+    case 'I': v[4] = s3_byte(s) == 'P'; sig = "eeee"; break; // VIC or VIP
+    case 'R': case 'W': sig = "eee"; break;
+    case 'S': sig = "eeeee"; break;
+    case 'T': sig = "eeeeeeeeee"; break;
+    case 'V': sig = "ee"; break;
+    case 'X': sig = "eeee"; break;
+    case 'Z': sig = "bee"; break;
     default: s->vmError = true; return;
     }
-    unimpl(s, "unit map");
+    args(s, sig, a);
+    for (size_t i = 0; sig[i]; i++) if (k != 'I' || i < 4) v[i] = a[i].v;
+    if (k == 'J') { unimpl(s, "VJ"); return; }
+    s3_unitmap_command(s, k, v, (k == 'R' || k == 'W') && a[2].isVar ? &a[2].lv : NULL);
 }
 
 static void cmd_Y(S3 *s) {

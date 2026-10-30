@@ -25,6 +25,10 @@ void s3_return(S3 *s, bool page);
 void s3_push_var(S3 *s, u16 var);
 void s3_message(S3 *s, u32 index);
 
+// unitmap.c: the V commands, with their arguments' values and, for VR and VW, the variable argument
+void s3_unitmap_command(S3 *s, int k, const u16 *args, const S3LV *lv);
+void s3_unitmap_free(S3 *s);
+
 // cmds.c
 void s3_command(S3 *s);
 void s3_cmd_wait_key(S3 *s);

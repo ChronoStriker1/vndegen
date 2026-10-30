@@ -150,6 +150,7 @@ static bool decode_vsp(const u8 *d, size_t size, S3Image *img) {
     img->w = cols * 8;
     img->h = h;
     img->palBank = d[9];
+    img->vsp = true;
     img->hasPal = true;
     img->palMask = (u16)(1u << (img->palBank & 15));
     for (int i = 0; i < 16; i++) {

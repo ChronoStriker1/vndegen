@@ -77,6 +77,7 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
     s->cfg.gameDir = s->gameDir;
     s->cfg.saveDir = s->saveDir;
     if (config->logPath) s->log = fopen(config->logPath, "a");
+    s->trace = getenv("S3_TRACE") != NULL;
     s->vars = s3_alloc(65536 * sizeof(u16));
     s->bind = s3_alloc(16384 * sizeof(S3Bind));
     defaults(s);
@@ -115,6 +116,7 @@ void vns3_close(VNS3 *s3) {
     if (!s) return;
     s3_audio_free(s);
     s3_font_close(s);
+    s3_unitmap_free(s);
     s3_archive_close(&s->sa);
     s3_archive_close(&s->ga);
     s3_archive_close(&s->wa);

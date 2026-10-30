@@ -72,6 +72,7 @@ typedef struct S3Image {
     u8 pal[256][3];           // palette (RGB) for indexed images
     u16 palMask;              // PMS: bit n set loads palette entries 16n..16n+15
     int palBank;              // VSP: the 16-entry bank the palette belongs to
+    bool vsp;
     bool hasPal;
     int transparent;          // colour key from the file, or -1
 } S3Image;
@@ -136,6 +137,7 @@ struct S3 {
     u32 codeSize;
     u32 pc, cmdStart;
     bool vmError, forFirst;
+    bool trace;                // S3_TRACE set: log every command (Linux test host)
     S3Frame stack[S3_MAX_FRAMES];
     int sp;
     u16 retValue;
@@ -201,6 +203,7 @@ struct S3 {
 
     // fonts and audio (opaque here)
     struct S3Font *font;
+    struct S3UnitMap *unitMap;
     struct S3Audio *audio;
     u32 rand;
     int cdLoops, cdTrack, midiLoops, midiPlaying;
