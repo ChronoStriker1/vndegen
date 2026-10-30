@@ -47,6 +47,15 @@ struct HubMetrics: Equatable {
     /// How far below the safe area's top a view in a top corner starts, to sit below an iPad window's controls.
     var cornerClearance: CGFloat { max(0, windowControls.top - insets.top) }
 
+    var topBarSpacing: CGFloat { isCompact ? 8 : 12 }
+
+    /// Whether the home screen's top bar fits its `buttons` beside an iPad window's controls, with the wordmark hidden.
+    /// When it doesn't, the bar moves below the controls and takes the full width.
+    func topBarFitsBesideControls(buttons: Int) -> Bool {
+        let content = CGFloat(buttons) * 44 + CGFloat(buttons + 1) * topBarSpacing
+        return content + topRowPadding(.leading) + topRowPadding(.trailing) <= size.width
+    }
+
     var isCompact: Bool { size.width < 600 }
     /// Landscape phones and short windows, where the hero has to share very little height with the shelves.
     var isShort: Bool { size.height < 520 }

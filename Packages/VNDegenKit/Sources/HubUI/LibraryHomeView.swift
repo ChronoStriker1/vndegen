@@ -11,7 +11,7 @@ struct LibraryHomeView: View {
         #if os(macOS)
         88
         #else
-        70
+        70 + (metrics.topBarFitsBesideControls(buttons: TopBar.libraryButtons) ? 0 : metrics.cornerClearance)
         #endif
     }
 
@@ -55,10 +55,17 @@ struct LibraryHomeView: View {
                     guard nav.focusMovedByController else { return }
                     withAnimation(Theme.focusAnimation) { reveal(focus, layout, proxy) }
                 }
+                .onChange(of: nav.revealRequest) { _, target in
+                    guard let target else { return }
+                    nav.revealRequest = nil
+                    withAnimation(Theme.focusAnimation) { reveal(target, layout, proxy) }
+                }
                 // Back from a game page rebuilds this screen at the top, while focus is already on the game's tile.
                 .onAppear {
-                    guard nav.focusMovedByController, let focus = nav.focus else { return }
-                    Task { reveal(focus, layout, proxy) }
+                    let target = nav.revealRequest ?? (nav.focusMovedByController ? nav.focus : nil)
+                    guard let target else { return }
+                    nav.revealRequest = nil
+                    Task { reveal(target, layout, proxy) }
                 }
             }
             // A new layout starts at the top rather than at the old one's scroll offset.
@@ -139,13 +146,16 @@ struct TopBar: View {
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
 
+    /// Icon buttons in the bar over a library with games. The empty library shows only Lock and Settings.
+    static let libraryButtons = 5
+
     var body: some View {
-        HStack(spacing: metrics.isCompact ? 8 : 12) {
+        let besideControls = metrics.topBarFitsBesideControls(buttons: nav.visibleGames.isEmpty ? 2 : Self.libraryButtons)
+        HStack(spacing: metrics.topBarSpacing) {
             // A narrow iPad window has no room for the name beside the buttons, and less still beside its window controls.
             ViewThatFits(in: .horizontal) {
                 Wordmark()
                 Wordmark(showsName: false)
-                // The narrowest windows keep their room for the buttons.
                 Color.clear.frame(width: 0, height: 0)
             }
             .layoutPriority(1)
@@ -169,9 +179,9 @@ struct TopBar: View {
             HubButton(target: .settingsButton, kind: .icon) { Image(systemName: "gearshape.fill") }
                 .accessibilityLabel("Settings")
         }
-        .padding(.leading, metrics.topRowPadding(.leading))
-        .padding(.trailing, metrics.topRowPadding(.trailing))
-        .padding(.top, 10)
+        .padding(.leading, besideControls ? metrics.topRowPadding(.leading) : metrics.padding)
+        .padding(.trailing, besideControls ? metrics.topRowPadding(.trailing) : metrics.padding)
+        .padding(.top, 10 + (besideControls ? 0 : metrics.cornerClearance))
         #if os(macOS)
         .padding(.top, 18)
         #endif
