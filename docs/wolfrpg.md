@@ -1,0 +1,71 @@
+# Wolf RPG Editor
+
+VNDegen runs Wolf RPG Editor games on its own Wolf RPG Editor runtime, written for VNDegen in C++20 and MIT licensed
+like the rest of the app. No open-source Wolf RPG Editor runtime exists; the original is a closed Windows program built
+on DxLib. How the runtime was written, and from which sources, is in `docs/wolfrpg-cleanroom.md`.
+
+## Layout
+
+| Part | Where | What it does |
+|---|---|---|
+| Runtime | `Packages/VNDegenKit/Sources/CWolfRPG/core/` | Game data and archives, the event interpreter, characters and movement, drawing on the CPU, text, sound, saves |
+| C interface | `Packages/VNDegenKit/Sources/CWolfRPG/include/vnwolf.h` | What the app calls: start, step, frame, audio, keys, pause, stop |
+| Plugin | `Packages/VNDegenKit/Sources/EngineWolfRPG/` | Detection, the session, input mapping, save locations |
+| Presenter | `Packages/VNDegenKit/Sources/FrameHost/` | Shows the runtime's frame through Metal and plays its sound through AVAudioEngine, shared with the other software-composited runtimes |
+| Linux test host | `Engines/WolfRPG/host/` | Builds the same sources on Linux with tools that run games headless |
+
+The runtime draws each frame on the CPU at the game's resolution (320 x 240 to 960 x 720 in the test games). The
+session steps it once per display refresh on the main thread, and the runtime advances the game at its own frame rate
+from Game.dat (60, or 30). Sound is mixed at 44.1 kHz and pulled by AVAudioEngine on its audio thread; a decoder thread
+of the runtime's own keeps music decoded ahead. Everything runs in the app's process, with no JIT.
+
+## Detection
+
+A game is Wolf RPG Editor when a folder at the top of the game folder, or up to two folders down, holds `Data.wolf`,
+`Data/BasicData`, or `Data/BasicData.wolf`, beside `Game.exe` (or `GamePro.exe`) for certainty. A game deeper than the
+folder listing reaches is found by `Game.exe` beside `Data` and `GuruguruSMF4.dll`, the MIDI player every Wolf RPG
+Editor 2 game ships.
+
+## What the runtime reads
+
+- Game data: `Game.dat`, `CommonEvent.dat`, the user, changeable and system databases with their `.project` files,
+  `TileSetData.dat`, and the maps (`.mps`). Text is Shift-JIS in Wolf RPG Editor 2 and UTF-8 in Wolf RPG Editor 3
+  games that say so. Translated games often hold bytes that aren't valid Shift-JIS; they become U+FFFD.
+- Archives: `Data.wolf`, or one `.wolf` archive per top-level data folder, as DxLib archives of versions 1 to 6 with
+  the encryption keys of Wolf RPG Editor 2. Loose files win over archives.
+- Images: PNG, JPEG and BMP (stb_image). Sound: Ogg Vorbis (stb_vorbis), MP3 (dr_mp3), WAV (dr_wav), and MIDI through
+  VNDegen's shared MIDI player.
+- File names match without regard to case, through `Engines/Shared/casepath.c`.
+
+## The interpreter
+
+Wolf RPG Editor games are event scripts: map events and common events, numbered commands with integer and string
+arguments. The runtime runs the commands the library's games use: variables and strings, conditions, loops and labels,
+calling common events with arguments and return values, the database command, the extended variable read (characters,
+map positions, pictures, the current map), key input, messages and choices, pictures with their effects, screen colour,
+shake and transitions, sound, map changes, move routes, party graphics, map tile changes, and saving and loading.
+Battles and menus are common events in each game's own data, so they need nothing of their own.
+
+Text uses a font file the game ships whose family name matches the one Game.dat names, then VNDegen's Windows font pack
+(`docs/fonts.md`), then Hiragino on Apple systems.
+
+## Controls
+
+Wolf RPG Editor reads gamepads, so the default layout is the gamepad: A confirms (Z), B and Menu cancel (X, which
+opens the menu in most games), the Dash button is the sub key (Shift), and the D-pad and left stick move. A keyboard
+works as on Windows: Z, Return or Space confirm, X or Escape cancel, Shift is sub, and the arrows or the number pad move.
+
+## Saves
+
+Saves are the PC engine's own files in the `Save` folder beside `Game.exe`, so they move between VNDegen and a PC copy of
+the game, and Ludusavi backs them up. `docs/wolfrpg-save-format.md` describes the format.
+
+## Known limits
+
+- Wolf RPG Editor 3.5 games, whose data files are compressed, and DxLib archive versions 7 and 8 (Wolf RPG Editor 2.225
+  and later, and 3.x) aren't read yet. None of the test games uses them.
+- Wolf RPG Editor Pro's encrypted data isn't read.
+- Mouse input, CSV import (command 251), file downloads (260), and typing a name on the keyboard (a string command mode)
+  aren't supported; the test games don't use them.
+- Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
+  variables other than the choice window's top may place them differently.
