@@ -51,10 +51,12 @@ static void defaults(S3 *s) {
     s->flip = true;
     s->menuBuild = -1;
     s->curMsg = s->curSel = 1;
-    s->msgWin[1] = (S3Win){ 100, 300, 400, 90, 0 };
-    s->selWin[1] = (S3Win){ 450, 100, 150, 100, 1 };
+    for (int i = 0; i < 128; i++) {
+        s->msgWin[i] = (S3Win){ 100, 300, 400, 90, 0 };
+        s->selWin[i] = (S3Win){ 450, 100, 150, 100, 1 };
+    }
     s->strLen = 512;
-    s->strCount = S3_MAX_STRINGS - 1;
+    s->strCount = S3_MAX_STRINGS - 2; // strings 0 to 4999: the save counts 5000
     s->y3Cancel = true;
     s->rand = 0x12345678u;
     s->tx = s->msgWin[1].x;

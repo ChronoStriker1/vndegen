@@ -151,7 +151,7 @@ struct S3 {
     int msgColor, menuColor, menuFrame, menuBg, msgFrame, msgBg, hitColor, menuCursor, menuSelColor;
     int msgBgAlpha, menuBgAlpha, menuDefault;
     int palBank;
-    S3Win msgWin[101], selWin[101];
+    S3Win msgWin[128], selWin[128];  // the PC save keeps 128 of each
     int curMsg, curSel;
     int msgFrameOn, selFrameOn;
     int tx, ty;                // next text position
@@ -251,8 +251,7 @@ bool s3_save_copy(S3 *s, int to, int from);
 struct S3LV;
 bool s3_save_write_part(S3 *s, int slot, const struct S3LV *from, int count);
 bool s3_save_load_part(S3 *s, int slot, const struct S3LV *to, int count);
-struct Arg;
-bool s3_save_time(S3 *s, int slot, struct Arg *out);
+bool s3_save_time(S3 *s, int slot, u16 out[7]);
 
 // snd.c
 void s3_audio_init(S3 *s);

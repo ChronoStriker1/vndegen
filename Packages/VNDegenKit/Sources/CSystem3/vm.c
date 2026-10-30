@@ -148,7 +148,7 @@ bool s3_goto_page(S3 *s, int page, u32 addr) {
     }
     s->page = (u16)page;
     s->code = b.data;
-    s->codeSize = b.size;
+    s->codeSize = (u32)b.size;
     u32 hs = s3_le32(b.data + 4);
     s->pc = addr ? addr : hs;
     return true;

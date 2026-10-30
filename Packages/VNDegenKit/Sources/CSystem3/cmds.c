@@ -530,9 +530,16 @@ static void cmd_L(S3 *s) {
     int k = s3_byte(s);
     Arg a[4];
     switch (k) {
-    case 'D': args(s, "e", a); rnd(s, (u16)(s3_save_load(s, a[0].v) ? 0 : 255)); return;
+    case 'D': args(s, "e", a); if (!s3_save_load(s, a[0].v)) rnd(s, 255); return; // success resumes after the QD
     case 'P': args(s, "eee", a); rnd(s, (u16)(s3_save_load_part(s, a[0].v, &a[1].lv, a[2].v) ? 0 : 255)); return;
-    case 'T': args(s, "ee", a); rnd(s, (u16)(s3_save_time(s, a[0].v, a) ? 0 : 255)); return;
+    case 'T': {
+        args(s, "ee", a);
+        u16 t[7];
+        bool ok = s3_save_time(s, a[0].v, t);
+        if (ok) for (int i = 0; i < 7; i++) put(s, &a[1], i, t[i]);
+        rnd(s, ok ? 0 : 255);
+        return;
+    }
     case 'L': args(s, "beee", a); unimpl(s, "LL"); return;
     case 'E': args(s, "b:ee", a); rnd(s, 255); unimpl(s, "LE"); return; // old form: the file name ends with ':'
     case 'H': { int k2 = s3_byte(s); (void)k2; args(s, "be", a); rnd(s, 0); return; }
@@ -566,7 +573,7 @@ static void cmd_M(S3 *s) {
     case 'T': args(s, ":", a); { size_t n = 0; while (a[0].s[n] && a[0].s[n] != ':') n += s3_sjis_lead((u8)a[0].s[n]) ? 2 : 1;
         snprintf(buf, sizeof buf, "%.*s", (int)n, a[0].s); char *u = s3_sjis_to_utf8(buf); snprintf(s->title, sizeof s->title, "%s", u); free(u); } return;
     case 'V': args(s, "e", a); return;
-    case 'Z': args(s, "beee", a); if (a[0].v == 0) { s->strCount = a[1].v; s->strLen = a[2].v > 0 ? a[2].v * 2 : s->strLen; } return;
+    case 'Z': args(s, "beee", a); if (a[0].v == 0 && a[2].v > 0 && a[2].v < S3_MAX_STRINGS) s->strCount = a[2].v; return; // MZ0,reserved,count,reserved
     default: s->vmError = true;
     }
 }

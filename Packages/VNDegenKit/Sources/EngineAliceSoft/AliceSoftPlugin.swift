@@ -27,7 +27,8 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         guard let layout = AliceSoftLayout(FolderProbe(scanning: launch.folder)) else { throw AliceSoftError.notAliceSoft }
         switch layout.system {
-        case .system30, .system39: throw AliceSoftError.notAvailable
+        case .system39: return System3Session(launch, root: layout.url(in: launch.folder))
+        case .system30: throw AliceSoftError.notAvailable
         case .system4: throw AliceSoftError.notAvailable
         }
     }
