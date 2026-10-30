@@ -40,6 +40,9 @@ let package = Package(
         // compile too.
         .target(name: "CVNFont"),
         .target(name: "FontPack", dependencies: ["CVNFont", "VNCore"]),
+        // General MIDI music for the native engines. CVNMidi's files are links to Engines/Shared/vnmidi.[ch] and the
+        // libraries vnmidi.c compiles into itself. FontPack's MIDISoundFont finds the SoundFont the app bundles.
+        .target(name: "CVNMidi", exclude: ["third_party"]),
         .target(name: "WebRuntime", dependencies: ["VNCore", "FontPack"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),

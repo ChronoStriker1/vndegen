@@ -246,6 +246,8 @@ Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector
 
 An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [docs/fonts.md](docs/fonts.md).
 
+An engine that plays MIDI music uses vnmidi from `Engines/Shared/vnmidi.h`. It compiles `vnmidi.c`, or depends on the `CVNMidi` package target, and loads the General MIDI SoundFont the app bundles from `MIDISoundFont.url`. See [docs/midi.md](docs/midi.md).
+
 Windows ignores case in file and folder names, so Windows games often ask for `Img/Title.PNG` when the disk has `img/title.png`. iPhone and iPad disks, and case-sensitive Mac volumes, do not ignore case. Every engine plugin must find a game's files, folders, and archive members whatever case the game uses, for reads, writes, existence checks, and folder listings. A write to a name that exists in another case must replace that file rather than create a second one. Use the lookup of the engine's family rather than a new one:
 
 - Swift code, including the web engines' `GameFolder`, uses `FileCase` in `VNCore/FileCase.swift`.

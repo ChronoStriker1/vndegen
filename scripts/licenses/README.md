@@ -23,6 +23,9 @@ its own:
 - `scripts/fonts-licenses.sh` writes `build/fonts/licenses/` from the license files in `Engines/Shared/fonts/licenses/`
   for the fonts the app bundles: Liberation, DejaVu, and the Ume fonts, whose license page it turns into text. The
   Chinese and Korean font downloads install Adobe's `LICENSE.txt` beside the fonts.
+- `scripts/midi-licenses.sh` writes `build/midi/licenses/` for vnmidi, the MIDI player in `Engines/Shared`: the license
+  of the FluidR3Mono SoundFont the app bundles from `Engines/Shared/soundfonts/`, and those of TinySoundFont,
+  TinyMidiLoader, and stb_vorbis from `Engines/Shared/third_party/`.
 
 `scripts/build.sh` fails when one of these folders has no notices.
 

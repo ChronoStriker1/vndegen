@@ -49,6 +49,10 @@ targets:
       - path: Engines/Shared/fonts
         type: folder
         buildPhase: resources
+      # The General MIDI SoundFont, which engines that play MIDI music read from Contents/Resources/soundfonts.
+      - path: Engines/Shared/soundfonts
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: VNDegenKit
         products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineWolfRPG, EngineGodot, EngineArtemis, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
