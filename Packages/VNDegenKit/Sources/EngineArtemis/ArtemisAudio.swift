@@ -141,7 +141,7 @@ final class ArtemisAudio {
                 }
             }
         }
-        startEngine()
+        startEngine(playing: true)
         channel.player.play()
         return channel
     }
@@ -159,8 +159,10 @@ final class ArtemisAudio {
         onFinished?(id)
     }
 
-    private func startEngine() {
-        guard !paused, !engine.isRunning else { return }
+    /// Starts the engine when a sound plays, or on resume when one is loaded. AVAudioEngine raises an exception when
+    /// started with no node connected, as on iOS when a game is resumed before its first sound.
+    private func startEngine(playing: Bool? = nil) {
+        guard !paused, !engine.isRunning, playing ?? (music != nil || !sounds.isEmpty) else { return }
         try? engine.start()
     }
 
