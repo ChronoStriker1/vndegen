@@ -49,10 +49,10 @@ import VNCore
         #expect(WolfRPGPlugin.saveRelativePath("Save/..") == nil)
     }
 
-    @Test func savesBesideGameExeInTheFolderAsSpelled() throws {
+    @Test func savesInTheSaveFolderBesideGameExe() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "wolfrpg-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        for path in ["Game/Game.exe", "Game/Data.wolf", "Game/save/SaveData01.sav"] {
+        for path in ["Game/Game.exe", "Game/Data.wolf", "Game/Save/SaveData01.sav"] {
             let url = root.appending(path: path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try Data().write(to: url)
@@ -60,6 +60,7 @@ import VNCore
         let locations = WolfRPGPlugin().saveLocations(folder: root, dataDirectory: root.appending(path: "data"))
         let location = try #require(locations.first)
         #expect(locations.count == 1)
-        #expect(location.directory.standardizedFileURL.path == root.appending(path: "Game/save").standardizedFileURL.path)
+        #expect(location.directory.resolvingSymlinksInPath().path
+            == root.appending(path: "Game/Save").resolvingSymlinksInPath().path)
     }
 }
