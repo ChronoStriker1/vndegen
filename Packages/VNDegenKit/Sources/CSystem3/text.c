@@ -5,7 +5,10 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "third_party/stb_truetype.h"
+#pragma GCC diagnostic pop
 
 #define CACHE_SIZE 1024
 

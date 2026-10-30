@@ -142,7 +142,7 @@ const char *s3_strarg(S3 *s) {
 
 bool s3_goto_page(S3 *s, int page, u32 addr) {
     S3Blob b;
-    if (!s3_archive_get(&s->sa, (u32)page + 1, &b) || b.size < 0x20) {
+    if (!s3_archive_get(&s->sa, (u32)page + 1, &b, NULL) || b.size < 0x20) {
         s3_fail(s, "The game asked for scenario page %d, which its archive does not have.", page);
         return false;
     }

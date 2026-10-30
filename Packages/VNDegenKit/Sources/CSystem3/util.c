@@ -1,8 +1,6 @@
 // Files, case-insensitive lookup, Shift-JIS, and logging.
 #include "s3.h"
-#include <ctype.h>
-#include <dirent.h>
-#include <sys/stat.h>
+#include "s3_casepath.h"
 
 extern const uint16_t s3_sjis_table[];
 
@@ -45,39 +43,15 @@ char *s3_path(const char *dir, const char *name) {
     return p;
 }
 
-static bool same_nocase(const char *a, const char *b) {
-    for (; *a && *b; a++, b++)
-        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return false;
-    return *a == *b;
-}
-
-// Games ask for names in any case, and may use backslashes. Each path component is matched
-// without regard to ASCII case, as on Windows.
+// Games ask for names in any case, and may use backslashes. The shared lookup matches each path component without
+// regard to ASCII case, as Windows does.
 char *s3_find_file(const char *dir, const char *name) {
-    char *cur = s3_strdup(dir);
-    char *rest = s3_strdup(name);
-    for (char *c = rest; *c; c++) if (*c == '\\') *c = '/';
-    char *save = NULL;
-    for (char *part = strtok_r(rest, "/", &save); part; part = strtok_r(NULL, "/", &save)) {
-        char *exact = s3_path(cur, part);
-        struct stat st;
-        if (stat(exact, &st) == 0) { free(cur); cur = exact; continue; }
-        free(exact);
-        DIR *d = opendir(cur);
-        char *found = NULL;
-        if (d) {
-            struct dirent *e;
-            while ((e = readdir(d))) {
-                if (same_nocase(e->d_name, part)) { found = s3_path(cur, e->d_name); break; }
-            }
-            closedir(d);
-        }
-        free(cur);
-        if (!found) { free(rest); return NULL; }
-        cur = found;
-    }
-    free(rest);
-    return cur;
+    char *joined = s3_path(dir, name);
+    for (char *c = joined; *c; c++) if (*c == '\\') *c = '/';
+    char out[4096];
+    int found = s3_casepath_resolve(joined, out, sizeof out);
+    free(joined);
+    return found == 1 ? s3_strdup(out) : NULL;
 }
 
 bool s3_sjis_lead(u8 c) { return (c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfc); }

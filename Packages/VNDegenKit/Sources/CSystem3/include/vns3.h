@@ -20,10 +20,12 @@ typedef struct VNS3 VNS3;
 typedef struct VNS3Config {
     const char *gameDir;   // the folder holding System39.ain and the ALD files, or SYSTEM3.EXE and ADISK.DAT
     const char *saveDir;   // where save files are read and written; the game folder on PC
-    const char *fontPath;  // gothic font (TTF, OTF or TTC) for all text
-    int fontIndex;         // face index inside a TTC
+    const char *fontPath;  // font file for all text; NULL asks the shared font pack (vnfont) for MS Gothic
+    int fontIndex;         // face index inside a font collection, with fontPath
     const char *logPath;   // log file, appended to; NULL logs nothing
-    int audioRate;         // output sample rate for vns3_audio, such as 48000
+    int audioRate;         // output sample rate for vns3_audio, such as 44100
+    const char *soundFontPath;         // General MIDI SoundFont for MIDI music; NULL plays MIDI silently
+    const char *fallbackSoundFontPath; // used when soundFontPath can't be read; may be NULL
 } VNS3Config;
 
 // Opens a game. Returns NULL and fills err (if given) when the folder holds no game it can run.
@@ -46,8 +48,11 @@ void vns3_mouse_button(VNS3 *s3, int button, bool down);
 void vns3_key(VNS3 *s3, int virtualKey, bool down);
 void vns3_wheel(VNS3 *s3, int notches);
 
-// Fills frames of interleaved stereo 16-bit audio at the configured rate.
-void vns3_audio(VNS3 *s3, int16_t *out, int frames);
+// Fills frames of interleaved stereo float audio at the configured rate. Safe to call on the audio thread.
+void vns3_audio(VNS3 *s3, float *out, int frames);
+
+// Stops the game clock and its sound while paused.
+void vns3_set_paused(VNS3 *s3, bool paused);
 
 // Asks the game to end; the next vns3_frame returns false.
 void vns3_request_quit(VNS3 *s3);
@@ -58,16 +63,6 @@ const char *vns3_title(VNS3 *s3);
 // A sentence describing the last problem that stopped the game, or NULL.
 const char *vns3_problem(VNS3 *s3);
 
-// MIDI music goes through the host so every engine shares one player. The runtime calls these
-// with Standard MIDI File bytes; a host that sets nothing leaves MIDI music silent.
-typedef struct VNS3MidiHooks {
-    void *context;
-    void (*play)(void *context, const uint8_t *smf, size_t size, int loops); // loops 0 = forever
-    void (*stop)(void *context);
-    // Milliseconds played, or -1 when nothing plays.
-    int (*position)(void *context);
-} VNS3MidiHooks;
-void vns3_set_midi(VNS3 *s3, const VNS3MidiHooks *hooks);
 
 #ifdef __cplusplus
 }

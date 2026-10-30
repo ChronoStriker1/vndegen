@@ -2,6 +2,9 @@
 #ifndef S3_H
 #define S3_H
 
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
 #include "vns3.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -116,7 +119,7 @@ struct S3 {
     char problem[512];
     char title[256];
     FILE *log;
-    bool quit;
+    bool quit, paused;
 
     // game data
     char prefix[64];           // ALD name prefix, such as "Rance"
@@ -199,7 +202,6 @@ struct S3 {
     // fonts and audio (opaque here)
     struct S3Font *font;
     struct S3Audio *audio;
-    VNS3MidiHooks midi;
     u32 rand;
     int cdLoops, cdTrack, midiLoops, midiPlaying;
     bool y3Cancel;
@@ -263,5 +265,6 @@ void s3_music_stop(S3 *s);
 int s3_music_position(S3 *s);
 void s3_midi_play(S3 *s, int n, int loops);
 void s3_midi_stop(S3 *s);
+void s3_audio_pause(S3 *s, bool paused);
 
 #endif

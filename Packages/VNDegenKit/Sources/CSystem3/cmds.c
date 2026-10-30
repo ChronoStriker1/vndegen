@@ -132,6 +132,7 @@ static void wait_ms(S3 *s, u32 ms, bool keyCancels) {
 }
 
 static void start_fade(S3 *s, bool in, bool white, int frames16, bool keyCancels) {
+    memcpy(s->shownPal, s->pal, sizeof s->pal); // a fade shows the palette being drawn with
     s->fadeWhite = white;
     s->wait = S3_WAIT_FADE;
     s->waitArg[0] = in;
@@ -221,9 +222,10 @@ static void load_cg(S3 *s, int n, int key) {
         for (int bank = 0; bank < 16; bank++) {
             if (!(img.palMask & (1u << bank))) continue;
             memcpy(s->pal[bank * 16], img.pal[bank * 16], 48);
-            if (s->pcMode & 2) memcpy(s->shownPal[bank * 16], img.pal[bank * 16], 48);
         }
     }
+    // Palette expansion copies the whole palette to the screen, including entries PS set.
+    if (s->pcMode & 2) memcpy(s->shownPal, s->pal, sizeof s->pal);
     if (s->pcMode & 1) s3_draw_image(s, &img, x, y, key);
     s3_mark_dirty(s);
     s->lastCg = n;
@@ -532,6 +534,7 @@ static void cmd_L(S3 *s) {
     case 'P': args(s, "eee", a); rnd(s, (u16)(s3_save_load_part(s, a[0].v, &a[1].lv, a[2].v) ? 0 : 255)); return;
     case 'T': args(s, "ee", a); rnd(s, (u16)(s3_save_time(s, a[0].v, a) ? 0 : 255)); return;
     case 'L': args(s, "beee", a); unimpl(s, "LL"); return;
+    case 'E': args(s, "b:ee", a); rnd(s, 255); unimpl(s, "LE"); return; // old form: the file name ends with ':'
     case 'H': { int k2 = s3_byte(s); (void)k2; args(s, "be", a); rnd(s, 0); return; }
     case 'X': { int k2 = s3_byte(s); (void)k2; args(s, "eee", a); unimpl(s, "LX"); return; }
     default: s->vmError = true;
@@ -673,12 +676,12 @@ static void cmd_P(S3 *s) {
 
 static void cmd_Q(S3 *s) {
     int k = s3_byte(s);
-    Arg a[3];
+    Arg a[4];
     switch (k) {
     case 'C': args(s, "ee", a); rnd(s, (u16)(s3_save_copy(s, a[0].v, a[1].v) ? 1 : 255)); return;
     case 'D': args(s, "e", a); rnd(s, (u16)(s3_save_write(s, a[0].v) ? 1 : 255)); return;
     case 'P': args(s, "eee", a); rnd(s, (u16)(s3_save_write_part(s, a[0].v, &a[1].lv, a[2].v) ? 1 : 255)); return;
-    case 'E': { s3_byte(s); Arg b[3]; args(s, "see", b); unimpl(s, "QE"); return; }
+    case 'E': args(s, "b:ee", a); rnd(s, 255); unimpl(s, "QE"); return; // old form: the file name ends with ':'
     default: s->vmError = true;
     }
 }
@@ -695,7 +698,8 @@ static void cmd_S(S3 *s) {
         return;
     case 'R': { int sub = s3_byte(s); args(s, "e", a);
         put(s, &a[0], 0, (u16)(sub == 0 ? (s3_music_position(s) >= 0 ? s->cdTrack : 0) : s->midiPlaying));
-        for (int i = 1; i < 4; i++) put(s, &a[0], i, 0); return; }
+        for (int i = 1; i < 4; i++) put(s, &a[0], i, 0);
+        return; }
     case 'I': { s3_byte(s); args(s, "e", a); put(s, &a[0], 0, 1); return; }
     case 'P': args(s, "ee", a); { S3Blob b; if (s3_archive_get(&s->wa, a[0].v, &b, NULL)) s3_wav_play(s, 0, b.data, b.size, a[1].v); } return;
     case 'Q': args(s, "eee", a); { S3Blob b; if (s3_archive_get(&s->wa, a[0].v, &b, NULL)) s3_wav_play(s, 0, b.data, b.size, a[2].v); } return;
@@ -849,7 +853,7 @@ static void cmd_V(S3 *s) {
     int k = s3_byte(s);
     Arg a[10];
     switch (k) {
-    case 'A': { int sub = s3_byte(s); args(s, sub == 3 || sub == 4 ? "eee" : "ee", a); unimpl(s, "VA"); return; }
+    case 'A': { s3_byte(s); args(s, "eee", a); unimpl(s, "VA"); return; } // VA n: three arguments for every n
     case 'B': case 'C': args(s, "eeeeeee", a); break;
     case 'E': case 'H': case 'P': args(s, "eeeeee", a); break;
     case 'F': break;
@@ -900,9 +904,9 @@ static void cmd_slash(S3 *s) {
         if (d && s3_cg_decode(d, n, &img)) { s3_draw_image(s, &img, a[0].v, a[1].v, -1); s3_image_free(&img); }
         free(d); free(p);
     } return;
-    case 0x24: args(s, "bsee", a); unimpl(s, "LE"); return;
+    case 0x24: args(s, "bsee", a); rnd(s, 255); unimpl(s, "LE"); return;
     case 0x26: args(s, "ees", a); unimpl(s, "MI"); return;
-    case 0x2a: args(s, "bsee", a); unimpl(s, "QE"); return;
+    case 0x2a: args(s, "bsee", a); rnd(s, 255); unimpl(s, "QE"); return;
     case 0x47: return;  // emitted before ]; no visible effect found
     case 0x00: case 0x01: case 0x04: // TOC TOS TOP
         if (s->textSp > 0) { s->textSp--; int *t = s->textStack[s->textSp];
