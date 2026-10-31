@@ -24,8 +24,7 @@ final class System4Session: EngineSession {
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
     private var lastTimestamp: CFTimeInterval?
-    private var deferred: [[System4Input]] = []  // input batches for the coming frames, oldest first; [] is a frame
-    private var holdUntil: CFTimeInterval = 0     // a deferred press stays down until then before the next batch
+    private var pacer = System4InputPacer()
     private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
@@ -162,17 +161,11 @@ final class System4Session: EngineSession {
         msCarry = elapsed - Double(ms)
         lastTimestamp = now
         guard !paused else { return }
+        apply(pacer.nextFrame(now: CACurrentMediaTime()))
         // The runtime caps the step at 100 ms and logs the time it drops.
         if !vns4_step(engine, Int32(min(max(ms, 0), 60_000))) {
             finish(byGame: true)
             return
-        }
-        if !deferred.isEmpty, CACurrentMediaTime() >= holdUntil {
-            let batch = deferred.removeFirst()
-            apply(batch)
-            if batch.contains(where: { if case .key(_, true) = $0 { true } else { false } }) {
-                holdUntil = CACurrentMediaTime() + 0.1
-            }
         }
         var w: Int32 = 0, h: Int32 = 0
         if let pixels = vns4_frame(engine, &w, &h), w > 0, h > 0 {
@@ -184,27 +177,10 @@ final class System4Session: EngineSession {
         #endif
     }
 
-    /// Hands inputs to the runtime. The games only take a click on a button the pointer has rested on, and see a press
-    /// only if it is still down at their next poll, so a touch that moves the pointer, presses and lets go at once would
-    /// hit nothing: a press that comes with its pointer move waits three frames (Rance 02's title took none at one), and
-    /// what follows a press is held back until it has been down for 100 ms (Sengoku Rance missed a 17 ms tap).
+    /// Hands inputs to the runtime as System4InputPacer allows; the rest follow on later frames.
     private func deliver(_ inputs: [System4Input]) {
         guard !inputs.isEmpty else { return }
-        if !deferred.isEmpty || CACurrentMediaTime() < holdUntil {
-            deferred.append(inputs)
-            return
-        }
-        if let move = inputs.firstIndex(where: { if case .mouseMove = $0 { true } else { false } }),
-           inputs[(move + 1)...].contains(where: { if case .key = $0 { true } else { false } }) {
-            apply(Array(inputs[...move]))
-            deferred.append(contentsOf: [[], []])
-            deferred.append(Array(inputs[(move + 1)...]))
-            return
-        }
-        apply(inputs)
-        if inputs.contains(where: { if case .key(_, true) = $0 { true } else { false } }) {
-            holdUntil = CACurrentMediaTime() + 0.1
-        }
+        apply(pacer.add(inputs, now: CACurrentMediaTime()))
     }
 
     private func apply(_ inputs: [System4Input]) {
@@ -248,7 +224,11 @@ final class System4Session: EngineSession {
     func setPaused(_ paused: Bool) {
         self.paused = paused
         guard let engine else { return }
-        if paused { deliver(router.releaseAll()) }
+        if paused {
+            // Input still waiting is dropped and every held key and button lets go now, not after the queue.
+            pacer.clear()
+            apply(router.releaseAll())
+        }
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
@@ -303,6 +283,75 @@ nonisolated enum System4Input: Equatable, Sendable {
 
 /// Turns VNDegen's controller events and the session view's own keyboard into keys the game reads. Several buttons
 /// can hold the same key, so a key goes down with the first press and up with the last release.
+/// Paces input for the games, which read the keyboard and mouse once per game frame and only take a click on a button
+/// the pointer has rested on. A touch moves the pointer, presses and lets go within a few milliseconds, which they
+/// would miss. Inputs apply in the order they came, with these waits:
+/// - a mouse button press waits until the pointer has stayed put for three frames (Rance 02's title took none at one);
+/// - after a key or button changes, the next change waits 100 ms after a press and 50 ms after a release, so the game
+///   sees each state (Sengoku Rance missed a 17 ms tap).
+/// Pointer moves never wait except behind such a change, and consecutive ones collapse to the last, so a fast drag can't
+/// build a backlog in front of its release.
+nonisolated struct System4InputPacer {
+    static let hoverFrames = 3
+    static let pressHold = 0.1
+    static let releaseHold = 0.05
+
+    private var queue: [System4Input] = []
+    private var frame = 0
+    private var movedAt = -hoverFrames  // the frame the pointer last moved to a new place
+    private var position: CGPoint?
+    private var keyGate = 0.0  // no key or button change applies before this time
+
+    /// Takes newly arrived inputs; returns those the runtime may have now.
+    mutating func add(_ inputs: [System4Input], now: Double) -> [System4Input] {
+        queue += inputs
+        return drain(now)
+    }
+
+    /// Called once per display frame, before the game steps; returns the inputs now due.
+    mutating func nextFrame(now: Double) -> [System4Input] {
+        frame += 1
+        return drain(now)
+    }
+
+    /// Drops everything waiting, as when the game pauses and lets go of every key.
+    mutating func clear() {
+        queue = []
+        keyGate = 0
+    }
+
+    private mutating func drain(_ now: Double) -> [System4Input] {
+        var out: [System4Input] = []
+        var move: CGPoint?
+        func flushMove() {
+            if let m = move { out.append(.mouseMove(m)) }
+            move = nil
+        }
+        loop: while let next = queue.first {
+            switch next {
+            case let .mouseMove(p):
+                if p != position {
+                    position = p
+                    movedAt = frame
+                }
+                move = p
+            case .wheel:
+                flushMove()
+                out.append(next)
+            case let .key(vk, down):
+                if now < keyGate { break loop }
+                if down, vk == 1 || vk == 2, frame - movedAt < Self.hoverFrames { break loop }
+                flushMove()
+                out.append(next)
+                keyGate = now + (down ? Self.pressHold : Self.releaseHold)
+            }
+            queue.removeFirst()
+        }
+        flushMove()
+        return out
+    }
+}
+
 nonisolated struct System4InputRouter {
     static let pointsPerNotch = 40.0
     private var held: [Int32: Int] = [:]

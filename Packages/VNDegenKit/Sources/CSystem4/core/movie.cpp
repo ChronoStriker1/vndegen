@@ -268,7 +268,8 @@ bool Movie::advanceTo(double seconds) {
         if (heard >= 0.5) minLead_ = std::min(minLead_, heard - seconds);
         double target = seconds;
         if (audioEnded_ && ringCount_ == 0) target = std::max(target, heard);
-        else if (std::isfinite(minLead_)) target = std::max(target, heard - minLead_ - kAudioSlack);
+        // A negative lead (sound that started late) isn't latency: never put the picture past the sound played.
+        else if (std::isfinite(minLead_)) target = std::max(target, heard - std::max(0.0, minLead_) - kAudioSlack);
         now_ = std::max(now_, target);
     }
 
