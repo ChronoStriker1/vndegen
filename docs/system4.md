@@ -39,7 +39,9 @@ through the shared FrameHost module and maps the controls.
   - the slot details VSFile writes, and the read-message file.
   The data the sprite engine hands the game to keep (backlog, back scenes, character sprites, MultiSprite) uses the
   PC library's encodings. Each was checked against saves the PC games wrote under Wine.
-- **Input.** The runtime takes Windows virtual-key codes and mouse positions. Confirm is Enter, cancel and the menu
+- **Input.** The runtime takes Windows virtual-key codes and mouse positions. The games only take a click on a
+  button the pointer has rested on, and poll the mouse once a frame, so a touch's press waits three frames after its
+  pointer move and stays down at least 100 ms. Confirm is Enter, cancel and the menu
   are the right mouse button, the arrows move, page up and down turn the wheel, dash is Ctrl, and the touch mouse
   and touch gamepad send the same. The default layout is keyboard and mouse.
 
@@ -79,8 +81,10 @@ Mac app on a Mac mini (muted with `S4_MUTE`, `-frameMonitor YES`, nothing else h
 | Sengoku Rance opening movie (170 s) | 29.97 fps movie, 60 Hz display | 5094 frames, 29.85 a second; longest gap 67 ms; display 59.9 fps average over 21 windows, median 1% low 49 |
 | Sengoku Rance battle (250 s) | 60 fps | 60.0 average (59.8 to 60.0 per window), median 1% low 60, lowest 41, slowest step 36 ms |
 
-The movies' sound never ran dry in these runs. On an iPad simulator the Rance 02 opening (227 s) also played with no
-underrun and no step over 100 ms.
+The movies' sound never ran dry in these runs. On an iPad simulator (Mac mini, load average about 10) the Rance 02
+opening showed 6806 of 6810 frames, 29.98 a second, its sound never ran dry, and the display averaged 59.9 fps with a
+median 1% low of 60. Sengoku Rance's battle on the iPad simulator averaged 59.2 fps over 200 s while other builds
+pushed the Mac mini's load average to about 80, with a median 1% low of 37.
 
 ## Known limits
 
