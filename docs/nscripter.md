@@ -168,12 +168,23 @@ window's and text field's size, in the 4/3-pixel units the PC engine's dialog us
 when the message is plain ASCII, as a translated game's is, and in Japanese otherwise. The default save and load
 menus and the right-click menu keep the runtime's own layout.
 
+## Game commands
+
+A game's Windows menu bar, which it builds with `resetmenu` and `insertmenu` and the runtime never draws, appears in
+VNDegen's Game commands, through `vnns_menu` and `vnns_menu_click`. The functions VNDegen runs are listed: `SKIP`, the
+read-text skip setting (`KIDOKUOFF`, `KIDOKUON`), and the three text speeds (`TEXTSLOW`, `TEXTMIDDLE`, `TEXTFAST`, from
+`defaultspeed`), with check marks on the current choices. Volume (`DWAVEVOLUME`) and screen mode (`FULL`, `WINDOW`)
+are left out. Lilipalace (Test Game 26) has its message skip and text speed only there. `deletemenu` leaves a game with
+no menu bar, as on the PC.
+
 ## Known limits
 
 - Effects 1 to 18 are drawn as NScripter's manual describes them. Of the effect DLLs, only `breakup.dll`,
   `lngtwave.dll/vwi` and `trvswave.dll/h` are drawn; others crossfade.
 - CD audio plays only from files in the game's `CD` folder; a disc isn't read.
 - MIDI music (`play "song.mid"`) isn't played; no test game has any.
+- The text speed chosen from a game's menu bar lasts until the game quits. The PC engine keeps it in its environment
+  file, which the runtime doesn't write.
 - `.nsa` compression type 4 isn't read; no test game uses it.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
