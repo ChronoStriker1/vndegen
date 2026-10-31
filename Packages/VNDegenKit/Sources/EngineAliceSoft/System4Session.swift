@@ -173,9 +173,9 @@ final class System4Session: EngineSession {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     #if os(macOS)
-                    if let window = note.object as? NSWindow, window !== frameView.window { return }
+                    if let window = note.object as? NSWindow, window !== self.frameView.window { return }
                     #endif
-                    releaseHeldInput()
+                    self.releaseHeldInput()
                 }
             }
         }
