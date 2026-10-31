@@ -115,6 +115,8 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
     /// button. Buttons missing here keep that layout. Nil follows the engine's default layout instead, so an empty
     /// mapping is the plain Xbox layout in an engine whose default is another.
     public var buttonMapping: [ControlInput: ControlAction]?
+    /// The cheats that stay on for this game. Nil while the player has never changed one.
+    public var cheats: CheatSettings?
 
     public var engine: EngineID? { engineOverride ?? detected?.engine }
 

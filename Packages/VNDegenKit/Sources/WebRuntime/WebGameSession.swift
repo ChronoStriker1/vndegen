@@ -44,6 +44,9 @@ public struct WebGameConfiguration {
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
     public var scriptArgument: String
     public var log: Logger
+    /// The game's cheats, made the first time VNDegen's menu asks for them, around the session's page. Nil for engines
+    /// that offer none.
+    public var cheats: (@MainActor (any GamePage) -> any CheatSession)?
 
     /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects. A
     /// `storageDirectory` keeps localStorage in `WebStorage` files there, and `storage` replaces it with another store.
@@ -73,6 +76,13 @@ public struct WebGameConfiguration {
     }
 }
 
+/// A running game's page, for engine code that reads and changes the game's state.
+@MainActor
+public protocol GamePage: AnyObject {
+    /// Runs `body` as the body of an async function whose parameters are `arguments`' keys, and returns what it returns.
+    func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any?
+}
+
 /// Runs an HTML5 game in a WKWebView that looks enough like NW.js that the game reads and writes its own folder through
 /// Node's `fs`, the way its desktop build does.
 final class WebGameSession: NSObject, EngineSession {
@@ -88,6 +98,9 @@ final class WebGameSession: NSObject, EngineSession {
     private let scriptArgument: String
     private let log: Logger
     private let onExit: @MainActor () -> Void
+    private let makeCheats: (@MainActor (any GamePage) -> any CheatSession)?
+    /// Made once, the first time the menu asks, so the cheats keep what they track for the whole session.
+    lazy var cheats: (any CheatSession)? = makeCheats?(self)
     private var ended = false
     private var paused = false
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
@@ -104,6 +117,7 @@ final class WebGameSession: NSObject, EngineSession {
         scriptArgument = game.scriptArgument
         log = game.log
         onExit = launch.onExit
+        makeCheats = game.cheats
         let shim = try Self.shimSource(for: game)
         let fonts = try Self.fontScript(preload: game.preloadFonts)
         let ogg = game.decodesOgg ? [try Self.oggScript()] : []
@@ -409,6 +423,15 @@ final class WebGameSession: NSObject, EngineSession {
         default:
             return bridge.handle(request).json
         }
+    }
+}
+
+// MARK: - GamePage
+
+extension WebGameSession: GamePage {
+    func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any? {
+        guard !ended else { throw CancellationError() }
+        return try await webView.callAsyncJavaScript(body, arguments: arguments, contentWorld: .page)
     }
 }
 
