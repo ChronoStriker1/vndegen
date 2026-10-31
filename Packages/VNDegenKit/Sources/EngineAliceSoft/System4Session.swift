@@ -26,6 +26,7 @@ final class System4Session: EngineSession {
     private var lastTimestamp: CFTimeInterval?
     private var pacer = System4InputPacer()
     private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
+    private var focusObservers: [NSObjectProtocol] = []
     private var scrollCarry = 0.0  // fractions of a wheel notch the view reported and the game hasn't had
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
@@ -156,6 +157,34 @@ final class System4Session: EngineSession {
         #endif
         link.add(to: .main, forMode: .common)
         displayLink = link
+        observeFocus()
+    }
+
+    /// Keys let go while another app or window has the keyboard never reach this view, so when the app or its window
+    /// loses focus, waiting input is dropped and every key and button the game holds lets go, as on pause.
+    private func observeFocus() {
+        #if canImport(UIKit)
+        let names = [UIApplication.willResignActiveNotification]
+        #else
+        let names = [NSApplication.willResignActiveNotification, NSWindow.didResignKeyNotification]
+        #endif
+        focusObservers = names.map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    #if os(macOS)
+                    if let window = note.object as? NSWindow, window !== frameView.window { return }
+                    #endif
+                    releaseHeldInput()
+                }
+            }
+        }
+    }
+
+    private func releaseHeldInput() {
+        guard let engine else { return }
+        _ = router.releaseAll()
+        apply(pacer.clear(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))))
     }
 
     fileprivate func step(_ link: CADisplayLink) {
@@ -203,6 +232,8 @@ final class System4Session: EngineSession {
     }
 
     private func finish(byGame: Bool) {
+        focusObservers.forEach(NotificationCenter.default.removeObserver)
+        focusObservers = []
         displayLink?.invalidate()
         displayLink = nil
         audio?.stop()
@@ -251,11 +282,8 @@ final class System4Session: EngineSession {
         let wasPaused = self.paused
         self.paused = paused
         guard let engine else { return }
-        if paused {
-            // Input still waiting is dropped, and every key and button the game holds lets go now.
-            _ = router.releaseAll()
-            apply(pacer.clear(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))))
-        }
+        // Input still waiting is dropped, and every key and button the game holds lets go now.
+        if paused { releaseHeldInput() }
         if !paused, wasPaused { pacer.resumed(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))) }
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
