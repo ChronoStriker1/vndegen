@@ -35,7 +35,13 @@ public final class ArchiveImporter {
         public var keptArchives: [String] = []
     }
 
+    /// VNDegen's own games folder, where the archives under Ready to import sit.
     public let gamesRoot: URL
+    /// The library folder the game is unpacked into. It starts as `gamesRoot`. Extraction stages inside it, so the
+    /// finished folder moves into place without a copy. Only `gamesRoot`'s staging folder is cleaned of what a crash
+    /// left: another library folder can be shared, such as on a server, and another device's import may be staging
+    /// there.
+    public var destination: URL
     public private(set) var step: Step = .choosing {
         didSet { keepAwake(step == .extracting) }
     }
@@ -67,20 +73,26 @@ public final class ArchiveImporter {
     private var awakeActivity: NSObjectProtocol?
     #endif
 
-    /// Staging folders of imports running in this process. Any other folder in `.importing` is left from a crash.
+    /// Staging folders of imports running in this process. Any other folder in `gamesRoot`'s `.importing`, which only
+    /// this device uses, is left from a crash.
     private static var liveStagings: Set<URL> = []
 
     public init(gamesRoot: URL) {
         self.gamesRoot = gamesRoot
+        destination = gamesRoot
+        Self.removeLeftovers(in: stagingParent)
+    }
+
+    private var stagingParent: URL { destination.appendingPathComponent(".importing", isDirectory: true) }
+
+    private static func removeLeftovers(in stagingParent: URL) {
         let leftovers = (try? FileManager.default.contentsOfDirectory(at: stagingParent, includingPropertiesForKeys: nil)) ?? []
-        for url in leftovers where !Self.liveStagings.contains(url.standardizedFileURL) {
+        for url in leftovers where !liveStagings.contains(url.standardizedFileURL) {
             try? FileManager.default.removeItem(at: url)
         }
     }
 
-    private var stagingParent: URL { gamesRoot.appendingPathComponent(".importing", isDirectory: true) }
-
-    public var folderNameProblem: String? { GameFolderName.problem(with: folderName, in: gamesRoot) }
+    public var folderNameProblem: String? { GameFolderName.problem(with: folderName, in: destination) }
 
     /// Deletes the copies the system made for VNDegen among `urls`, for files from a drop or Open in VNDegen that
     /// nothing imports.
@@ -221,10 +233,18 @@ public final class ArchiveImporter {
         stagings.append(staging)
         Self.liveStagings.insert(staging)
         let password = password
+        let destination = destination, gamesRoot = gamesRoot
         task = Task {
             do {
+                // VNDegen's own folder is made when missing. Another library folder that went away, such as a drive
+                // unplugged since it was chosen, isn't made again on the disk under it.
+                var isFolder: ObjCBool = false
+                if destination != gamesRoot,
+                   !(FileManager.default.fileExists(atPath: destination.path, isDirectory: &isFolder) && isFolder.boolValue) {
+                    throw ImportFailure(message: "The library folder \(destination.lastPathComponent) isn't there anymore. Choose another one.")
+                }
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-                try ArchiveExtractor.checkSpace(for: contents, on: gamesRoot)
+                try ArchiveExtractor.checkSpace(for: contents, on: destination)
                 let extracted = try await selection.read {
                     try await Self.extract(source, password: password, into: staging, total: contents) { progress in
                         Task { @MainActor in
@@ -267,8 +287,8 @@ public final class ArchiveImporter {
         let name = folderName.trimmingCharacters(in: .whitespaces)
         do {
             // Checked again because another import or the Files app may have taken the name meanwhile.
-            if let problem = GameFolderName.problem(with: name, in: gamesRoot) { throw ImportFailure(message: problem) }
-            try FileManager.default.moveItem(at: root, to: gamesRoot.appendingPathComponent(name, isDirectory: true))
+            if let problem = GameFolderName.problem(with: name, in: destination) { throw ImportFailure(message: problem) }
+            try FileManager.default.moveItem(at: root, to: destination.appendingPathComponent(name, isDirectory: true))
         } catch {
             discardStagings()
             fail(error, returningTo: .reviewing)

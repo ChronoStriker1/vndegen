@@ -214,3 +214,61 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.focus == .layoutButton)
     #expect(UserDefaults.standard.string(forKey: LibraryLayout.storageKey) == LibraryLayout.featured.rawValue)
 }
+
+@MainActor
+@Test func xOpensTheFocusedTilesMenuWithTheGamePagesActions() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.back()
+    nav.layout = .capsules
+    nav.setFocus(.tile(.all, id))
+    press(nav, .dash)
+    guard case .gameMenu(id)? = nav.sheet else { Issue.record("no game menu"); return }
+    let actions: [Navigator.GameAction] = [.play, .openPage, .artwork, .metadata, .hide, .showFolder, .remove]
+    #expect(nav.rows().flatMap(\.items) == actions.map { .gameAction($0) })
+    #expect(nav.focus == .gameAction(.play))
+    press(nav, .down, .confirm)
+    #expect(nav.sheet == nil && nav.route == .game(id))
+    nav.back()
+    #expect(nav.focus == .tile(.all, id))
+    press(nav, .dash, .down, .down, .confirm)
+    guard case .artwork? = nav.sheet else { Issue.record("no artwork editor"); return }
+    press(nav, .cancel)
+    #expect(nav.sheet == nil && nav.focus == .tile(.all, id))
+    // X does nothing where no game has focus.
+    nav.setFocus(.settingsButton)
+    press(nav, .dash)
+    #expect(nav.sheet == nil)
+}
+
+@MainActor
+@Test func removingAGameAsksFirstWithCancelFocused() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.perform(.remove, on: id)
+    guard case .confirm? = nav.sheet else { Issue.record("no confirmation"); return }
+    #expect(nav.focus == .confirmCancel)
+    #expect(nav.rows().flatMap(\.items) == [.confirmAction, .confirmCancel])
+    press(nav, .confirm)
+    #expect(nav.sheet == nil)
+    #expect(FileManager.default.fileExists(atPath: nav.hub.library.folder(for: id).path))
+    #expect(nav.hub.library.games.map(\.id) == [id])
+}
+
+@MainActor
+@Test func settingsListsEachAddedFolderWithItsButtons() async throws {
+    let (nav, _) = try await makeNavigator()
+    let added = nav.hub.library.paths.gamesRoot.deletingLastPathComponent().appendingPathComponent("Added", isDirectory: true)
+    try FileManager.default.createDirectory(at: added, withIntermediateDirectories: true)
+    try await nav.hub.addLibraryFolder(added)
+    let folder = try #require(nav.hub.library.folders.first)
+    nav.back()
+    nav.push(.settings)
+    let items = nav.rows().map(\.items)
+    #expect(items.prefix(4) == [[.back], [.openFolder], [.showLibraryFolder(folder.id), .removeLibraryFolder(folder.id)], [.addLibraryFolder]])
+    nav.activate(.removeLibraryFolder(folder.id))
+    guard case let .confirm(confirmation)? = nav.sheet else { Issue.record("no confirmation"); return }
+    // What Remove folder runs, awaited here rather than in the task the button starts.
+    nav.sheet = nil
+    await confirmation.perform()
+    #expect(nav.hub.library.folders.isEmpty)
+    #expect(FileManager.default.fileExists(atPath: added.path))
+}

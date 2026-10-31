@@ -17,7 +17,7 @@ struct HubButton<Label: View>: View {
 }
 
 struct HubButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, icon }
+    enum Kind { case primary, secondary, icon, destructive }
     let kind: Kind
     let focused: Bool
 
@@ -25,17 +25,18 @@ struct HubButtonStyle: ButtonStyle {
         let shape = kind == .icon ? AnyShape(Circle()) : AnyShape(Capsule())
         configuration.label
             .font(.system(size: kind == .primary ? 17 : 15, weight: .bold))
-            .foregroundStyle(kind == .primary ? .white : (focused ? .black : .white))
+            .foregroundStyle(kind == .primary || kind == .destructive ? .white : (focused ? .black : .white))
             .padding(.horizontal, kind == .icon ? 0 : (kind == .primary ? 28 : 18))
             .frame(minWidth: kind == .icon ? 44 : nil, minHeight: kind == .primary ? 52 : 44)
             .background {
                 switch kind {
                 case .primary: shape.fill(Theme.accent.gradient)
+                case .destructive: shape.fill(Color.red.opacity(focused ? 1 : 0.8))
                 case .secondary, .icon:
                     if focused { shape.fill(.white) } else { shape.fill(.ultraThinMaterial).overlay(shape.fill(.white.opacity(0.06))) }
                 }
             }
-            .overlay { shape.stroke(focused ? .white : Theme.stroke, lineWidth: focused ? (kind == .primary ? 3 : 0) : 1) }
+            .overlay { shape.stroke(focused ? .white : Theme.stroke, lineWidth: focused ? (kind == .primary || kind == .destructive ? 3 : 0) : 1) }
             .contentShape(shape)
             .scaleEffect(configuration.isPressed ? 0.95 : (focused ? 1.06 : 1))
             .shadow(color: focused ? Theme.accent.opacity(kind == .primary ? 0.7 : 0.35) : .clear, radius: 16)
@@ -59,8 +60,10 @@ struct GameTile: View {
             GameArt(game: game, slots: [.capsule], size: CGSize(width: width, height: width * 1.5))
                 .clipShape(.rect(cornerRadius: 10, style: .continuous))
                 .overlay(alignment: .topLeading) { LockBadge(game: game) }
+                .unavailable(nav.hub.library.unavailableReason(game.id) != nil)
         }
         .buttonStyle(TileButtonStyle(focused: focused))
+        .gameMenu(game.id)
         .onHover { if $0 { nav.hover(target) } }
         .id(target)
         .accessibilityLabel(nav.hub.displayTitle(game))
@@ -92,11 +95,54 @@ struct HeaderTile: View {
             }
             .clipShape(.rect(cornerRadius: 10, style: .continuous))
             .overlay(alignment: .topLeading) { LockBadge(game: game) }
+            .unavailable(hub.library.unavailableReason(game.id) != nil)
         }
         .buttonStyle(TileButtonStyle(focused: nav.isFocused(target)))
+        .gameMenu(game.id)
         .onHover { if $0 { nav.hover(target) } }
         .id(target)
         .accessibilityLabel(hub.displayTitle(game))
+    }
+}
+
+/// A library tile's menu for a long press or a right click. A controller's X opens the same actions in a sheet.
+private struct GameMenu: ViewModifier {
+    @Environment(Navigator.self) private var nav
+    let id: GameID
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            ForEach(nav.gameActions(id), id: \.action) { item in
+                Button(role: item.action == .remove ? .destructive : nil) {
+                    nav.perform(item.action, on: id)
+                } label: {
+                    Label(item.title, systemImage: item.systemImage)
+                }
+                if item.action == .metadata || item.action == .showFolder { Divider() }
+            }
+        }
+    }
+}
+
+extension View {
+    func gameMenu(_ id: GameID) -> some View { modifier(GameMenu(id: id)) }
+
+    /// Dims a tile whose game is in a library folder that can't be reached, and marks it with a drive icon.
+    @ViewBuilder
+    func unavailable(_ unavailable: Bool) -> some View {
+        if unavailable {
+            opacity(0.45)
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: "externaldrive.badge.xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(7)
+                        .background(.ultraThinMaterial, in: .circle)
+                        .padding(8)
+                }
+                .accessibilityValue("Unavailable")
+        } else {
+            self
+        }
     }
 }
 

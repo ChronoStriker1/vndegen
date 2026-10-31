@@ -49,7 +49,7 @@ final class RuntimeInstalls {
             missing[id] = nil
             return
         }
-        let folder = library.paths.folder(for: id), store = store
+        let folder = library.folder(for: id), store = store
         missing[id] = await Task.detached {
             plugin.runtimePackages(for: game, folder: folder).filter { store.installedFolder(for: $0) == nil }
         }.value

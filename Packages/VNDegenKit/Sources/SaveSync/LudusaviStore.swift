@@ -606,6 +606,8 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case noStoreFolder(String)
     case engineUnsupported
     case outsideSaveFolder(String)
+    /// The game's library folder can't be reached, for the reason given.
+    case gameFolderUnavailable(String)
 
     public var errorDescription: String? {
         switch self {
@@ -631,6 +633,7 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case .loginRefused: "The share refused the username or password. Check them in Settings."
         case let .noStoreFolder(path): "The share has no folder \(path). Enter the share, then the folder Ludusavi backs up to, such as games/Ludusavi."
         case .engineUnsupported: "Save sync does not support this game's engine yet."
+        case let .gameFolderUnavailable(reason): "The game's folder can't be reached. \(reason)"
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
         }
     }
