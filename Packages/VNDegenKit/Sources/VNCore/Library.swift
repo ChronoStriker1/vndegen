@@ -273,7 +273,7 @@ public final class LibraryStore {
             }
         }
 
-        let placed = Self.place(listings, in: &records)
+        let placed = Self.place(listings, in: &records, reserved: Set(removed.map(\.id)))
         let engines = engines
         // Each added folder's games are probed on their own, within `probeTimeout`, so a share that lists its games
         // and then stalls on their files holds up nothing else. The built-in folder is the app's own.
@@ -311,8 +311,10 @@ public final class LibraryStore {
     /// ID is its name when no present folder holds that record, which is how a game moved between library folders keeps
     /// its artwork and play time. Otherwise, when another library folder has a game of the same name, its ID adds its
     /// library folder's name. IDs are compared without case, because they name folders for artwork and saves, and a
-    /// Mac volume usually treats "Game" and "game" as one. Earlier listings win, and the built-in folder comes first.
-    static func place(_ listings: [Listing], in records: inout [GameID: Game]) -> [Placed] {
+    /// Mac volume usually treats "Game" and "game" as one. The records of a `reserved` folder, one the player removed,
+    /// are never taken over, so adding that folder back finds them. Earlier listings win, and the built-in folder
+    /// comes first.
+    static func place(_ listings: [Listing], in records: inout [GameID: Game], reserved: Set<LibraryFolderID> = []) -> [Placed] {
         struct Key: Hashable { let folder: LibraryFolderID?; let name: String }
         var held: [Key: GameID] = [:]
         for game in records.values { held[Key(folder: game.libraryFolder, name: game.folderName ?? game.id.rawValue)] = game.id }
@@ -341,6 +343,7 @@ public final class LibraryStore {
                 guard !claimed.contains(where: { $0.rawValue.lowercased() == id.rawValue.lowercased() }) else { return false }
                 guard folded[id.rawValue.lowercased(), default: []].subtracting([id]).isEmpty else { return false }
                 guard let record = records[id] else { return true }
+                if let folder = record.libraryFolder, reserved.contains(folder) { return false }
                 return (record.folderName ?? record.id.rawValue) == name
             }
             var id = GameID(name)

@@ -78,7 +78,8 @@ final class Navigator {
             case let .metadata(search): search.gameID
             case let .saves(model): model.game
             case let .launchSaves(model): model.game
-            case .unlock, .settingsPage, .importGame, .license, .confirm: nil
+            case let .confirm(confirmation): confirmation.gameID
+            case .unlock, .settingsPage, .importGame, .license: nil
             }
         }
     }
@@ -681,8 +682,9 @@ final class Navigator {
         let action = "Delete folder"
         #endif
         sheet = .confirm(Confirmation(title: "Remove \(hub.displayTitle(game)) from the library?", message: message,
-                                      action: action, destructive: true) { [weak self] in
-            guard let self else { return }
+                                      action: action, destructive: true, gameID: id) { [weak self] in
+            // The library may have locked since the question was asked.
+            guard let self, let game = hub.library.game(id), isVisible(game) else { return }
             do {
                 try await hub.library.deleteFolder(of: id)
             } catch {

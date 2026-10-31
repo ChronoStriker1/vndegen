@@ -547,13 +547,17 @@ final class Confirmation {
     let action: String
     /// Draws that button in red, for a change that removes or deletes something.
     let destructive: Bool
+    /// The game it's about, so the sheet closes when that game is hidden or leaves the library.
+    let gameID: GameID?
     let perform: @MainActor () async -> Void
 
-    init(title: String, message: String, action: String, destructive: Bool, perform: @escaping @MainActor () async -> Void) {
+    init(title: String, message: String, action: String, destructive: Bool, gameID: GameID? = nil,
+         perform: @escaping @MainActor () async -> Void) {
         self.title = title
         self.message = message
         self.action = action
         self.destructive = destructive
+        self.gameID = gameID
         self.perform = perform
     }
 }

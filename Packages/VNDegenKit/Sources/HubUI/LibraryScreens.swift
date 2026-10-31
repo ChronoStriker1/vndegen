@@ -421,7 +421,12 @@ enum FileBrowser {
     static func open(_ url: URL, create: Bool = false) {
         if create { try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
         // The Files app opens a folder in an app's container through the shareddocuments scheme.
-        if let files = URL(string: "shareddocuments://\(url.path)") { UIApplication.shared.open(files) }
+        // Built from components, so a # or ? in a folder name stays part of the path.
+        var files = URLComponents()
+        files.scheme = "shareddocuments"
+        files.host = ""
+        files.path = url.path
+        if let files = files.url { UIApplication.shared.open(files) }
     }
     #endif
 }

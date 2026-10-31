@@ -233,8 +233,16 @@ public final class ArchiveImporter {
         stagings.append(staging)
         Self.liveStagings.insert(staging)
         let password = password
+        let destination = destination, gamesRoot = gamesRoot
         task = Task {
             do {
+                // VNDegen's own folder is made when missing. Another library folder that went away, such as a drive
+                // unplugged since it was chosen, isn't made again on the disk under it.
+                var isFolder: ObjCBool = false
+                if destination != gamesRoot,
+                   !(FileManager.default.fileExists(atPath: destination.path, isDirectory: &isFolder) && isFolder.boolValue) {
+                    throw ImportFailure(message: "The library folder \(destination.lastPathComponent) isn't there anymore. Choose another one.")
+                }
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
                 try ArchiveExtractor.checkSpace(for: contents, on: destination)
                 let extracted = try await selection.read {

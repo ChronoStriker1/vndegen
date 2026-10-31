@@ -287,3 +287,26 @@ private func setReachable(_ folder: URL, _ reachable: Bool) throws {
     await reopened.refresh()
     #expect(ids(reopened) == ["Game (External)"])
 }
+
+@Test @MainActor func anotherFolderNeverTakesARemovedFoldersRecords() async throws {
+    let scratch = Scratch()
+    let first = scratch.folder("A").appendingPathComponent("External", isDirectory: true)
+    let second = scratch.folder("B").appendingPathComponent("External", isDirectory: true)
+    try scratch.addGame("Game", in: scratch.paths.gamesRoot)
+    try scratch.addGame("Game", in: first)
+    try scratch.addGame("Game", in: second)
+    let library = scratch.library()
+    try await library.addFolder(first)
+    let original = GameID("Game (External)")
+    library.update(original) { $0.playTime = 300 }
+
+    await library.removeFolder(library.folders[0].id)
+    try await library.addFolder(second)
+    #expect(ids(library) == ["Game", "Game (External) 2"])
+    #expect(library.game(GameID("Game (External) 2"))?.playTime == 0)
+
+    try await library.addFolder(first)
+    #expect(ids(library) == ["Game", "Game (External)", "Game (External) 2"])
+    #expect(library.game(original)?.playTime == 300)
+    #expect(library.folder(for: original).standardizedFileURL == first.appendingPathComponent("Game").standardizedFileURL)
+}
