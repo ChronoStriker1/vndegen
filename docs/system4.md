@@ -106,6 +106,10 @@ pushed the Mac mini's load average to about 80, with a median 1% low of 37.
 - Four MultiSprite fields keep the PC's values without a known meaning, and moves in progress aren't saved, as on the
   PC.
 - The read-message file's bit order within a byte is assumed; the PC file seen had no bit set.
+- The PC engine's window menu bar isn't drawn, and VNDegen's Game commands don't list it. Sengoku Rance (Test Game
+  46) has a "Message Skip" item there, but the game turns that item off itself (`msgSkipSetEnable`, which calls
+  `MsgSkip.SetEnable`), and its dialogue window has its own Skip button, which skips without the menu's mode. Rance
+  02's and Rance IX's menu bars hold only Screenshot, Restart, Exit and About.
 - Movies are MPEG-1 video with MP2 sound, which is what the test games ship. A damaged `.alm` could still crash
   pl_mpeg's decoder, whose upstream has open issues with corrupt input.
 - A controller button held while the app loses focus and then let go after a keyboard press of the same key can
