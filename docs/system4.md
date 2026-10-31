@@ -68,6 +68,20 @@ logs `S4FRAMES` every 10 seconds: display refreshes per second on average and ov
 step.
 - `S4_FONTS`: the font pack folder on Linux.
 
+## Frame rate
+
+The runtime steps once per display refresh and draws on the CPU. Each test game's heaviest scenes, measured in the
+Mac app on a Mac mini (muted with `S4_MUTE`, `-frameMonitor YES`, nothing else heavy running):
+
+| Scene | Target | Result |
+|---|---|---|
+| Rance 02 opening movie (227 s) | 30 fps movie, 60 Hz display | 6787 of 6810 frames shown, 29.89 a second; longest gap 67 ms; display 59.8 fps average over 25 ten-second windows, median 1% low 42 |
+| Sengoku Rance opening movie (170 s) | 29.97 fps movie, 60 Hz display | 5094 frames, 29.85 a second; longest gap 67 ms; display 59.9 fps average over 21 windows, median 1% low 49 |
+| Sengoku Rance battle (250 s) | 60 fps | 60.0 average (59.8 to 60.0 per window), median 1% low 60, lowest 41, slowest step 36 ms |
+
+The movies' sound never ran dry in these runs. On an iPad simulator the Rance 02 opening (227 s) also played with no
+underrun and no step over 100 ms.
+
 ## Known limits
 
 - System 4 games built on PartsEngine and the libraries that came with it (ChipmunkSpriteEngine, KiwiSoundEngine,
