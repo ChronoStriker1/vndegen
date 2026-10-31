@@ -137,6 +137,11 @@ S4_HLL(SystemService, SetMixerMute) {
 }
 S4_HLL(SystemService, GetGameVersion) { c.retInt(G().vm->ain.gameVersion); }
 S4_HLL(SystemService, GetGameName) { c.refS(0) = G().vm->gameName; }
+// Test Game 56's main loops until this fills its string so that characters 0 and 16 are '=', character 8 is '/',
+// and the two-digit numbers at 6 and 14 match. Its meaning is unknown; this is the plainest string of that shape.
+S4_HLL(SystemService, Rance96161988) { c.refS(0) = "=0000000/0000000="; }
+S4_HLL(SystemService, GetViewWidth) { c.retInt(G().screenW); }
+S4_HLL(SystemService, GetViewHeight) { c.retInt(G().screenH); }
 S4_HLL(SystemService, IsFullScreen) { c.retBool(true); }
 S4_HLL(SystemService, ChangeNormalScreen) { c.retBool(true); }
 S4_HLL(SystemService, ChangeFullScreen) { c.retBool(true); }

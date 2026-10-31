@@ -190,7 +190,8 @@ private:
     void callHll(int32_t lib, int32_t fn);
     void callSys(int32_t n);
     std::vector<std::vector<HllImpl>> hll_;
-    std::unordered_set<std::string> hllWarned_;  // unimplemented HLL functions already logged
+    std::unordered_set<std::string> hllWarned_;
+    int32_t dgLastReturn_ = 0;  // the return of the last method a delegate call ran  // unimplemented HLL functions already logged
     int32_t arg(int k) const;
     void structAssign(int32_t dst, int32_t src);
     void freePage(Page &p);

@@ -409,6 +409,8 @@ void VM::leave() {
     if (fr.structPage >= 0) decref(fr.structPage);
     if (!fr.discardReturn)
         for (int32_t v : ret) stack.push_back(v);
+    else if (ret.size() == 1)
+        dgLastReturn_ = ret[0];
     ip = fr.returnAddress;
 }
 
@@ -1097,7 +1099,12 @@ void VM::run(size_t untilFrames) {
             int32_t dsl = stack[top - 2 - nargs];
             Delegate *d = delegate(dsl);
             if (!d || idx >= int32_t(d->size())) {
+                // The loop's value is the last method's return; with none called, the type's empty value.
                 stack.resize(top - 2 - nargs);
+                if (ft.ret.type != T_VOID) {
+                    if (idx > 0) push(dgLastReturn_);
+                    else push(ft.ret.type == T_STRING ? newString() : ft.ret.type == T_STRUCT ? -1 : 0);
+                }
                 jump(A(1));
                 break;
             }
