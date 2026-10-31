@@ -15,6 +15,7 @@
 #include "tjsHashSearch.h"
 
 #include "TVPArchive.h"
+#include <vector>
 
 //---------------------------------------------------------------------------
 // archive delimiter
@@ -168,6 +169,9 @@ void TVPRemoveAutoPath(const ttstr& name);
 
 void TVPClearAllAutoPath();
 // remove all given path from auto search path
+
+std::vector<ttstr> TVPListAutoPathStorages();
+// full storage names of the files directly in each auto search path, archives included
 //---------------------------------------------------------------------------
 
 ttstr TVPGetPlacedPath(const ttstr& name);

@@ -194,6 +194,8 @@
             fs.writeFileSync(p, existing + String(data), options);
         },
         mkdirSync(p, options) { call('mkdir', { path: absolute(p), recursive: !!(options && options.recursive) }); },
+        // Empty directories only. MV's community core makes and removes www/testDirectory to pick its save folder.
+        rmdirSync(p) { call('rmdir', { path: absolute(p) }); },
         readdirSync(p) { return call('readdir', { path: absolute(p) }); },
         renameSync(from, to) { call('rename', { from: absolute(from), to: absolute(to) }); },
         unlinkSync(p) { call('unlink', { path: absolute(p) }); },
@@ -204,7 +206,7 @@
         promises: {},
     };
 
-    for (const name of ['stat', 'lstat', 'readFile', 'writeFile', 'appendFile', 'mkdir', 'readdir', 'rename', 'unlink', 'rm', 'copyFile', 'access']) {
+    for (const name of ['stat', 'lstat', 'readFile', 'writeFile', 'appendFile', 'mkdir', 'rmdir', 'readdir', 'rename', 'unlink', 'rm', 'copyFile', 'access']) {
         const sync = fs[name + 'Sync'];
         fs[name] = (...args) => {
             const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;

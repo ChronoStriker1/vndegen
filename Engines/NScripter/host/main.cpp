@@ -11,6 +11,8 @@
 //   text UTF8...        type text
 //   shot PATH           write the current frame as a PNG
 //   load N              load save slot N
+//   menu                print the window menu bar the game built, as vnns_menu's JSON
+//   menuclick ID        pick the menu bar item ID
 //   where               print the script line and what the game waits for
 //   caption             print the game's window title (a script's caption command), for lab scripts
 //   audio               print the peak level of the sound mixed during the last step command, 0 to 1
@@ -203,6 +205,13 @@ int main(int argc, char **argv) {
             drawn = 0;
         } else if (cmd == "caption") {
             std::cout << "caption " << vnns_caption(e) << std::endl;
+        } else if (cmd == "menu") {
+            const char *menu = vnns_menu(e);
+            std::cout << "menu " << (menu ? menu : "none") << std::endl;
+        } else if (cmd == "menuclick") {
+            std::string id;
+            in >> id;
+            if (!vnns_menu_click(e, id.c_str())) std::cout << "menuclick failed" << std::endl;
         } else if (cmd == "where") {
             std::cout << vnns_debug_status(e) << std::endl;
         } else if (cmd == "quit") {

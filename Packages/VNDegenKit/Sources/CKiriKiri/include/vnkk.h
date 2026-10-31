@@ -78,6 +78,26 @@ VNKK_API void vnkk_stop(void);
 // quits and clears when the next game starts.
 VNKK_API const char *vnkk_problem(void);
 
+// The game's window menu bar, which the engine never draws. A game that asks whether it is visible is told one of
+// these. Automatic tells it hidden when one of its scripts tests for a hidden menu bar, since such a game puts its
+// menu commands on screen then, and otherwise what the game set, so the game builds its menu for vnkk_menu to list.
+enum { VNKK_MENU_BAR_AUTOMATIC = 0, VNKK_MENU_BAR_HIDDEN = 1, VNKK_MENU_BAR_SHOWN = 2 };
+// Call before vnkk_start. The choice holds for later games until the next call.
+VNKK_API void vnkk_set_menu_bar(int mode);
+// -1 until the game first asked, then 1 when it was told the menu bar shows and 0 when it was told it is hidden.
+VNKK_API int vnkk_menu_bar_shown(void);
+
+// The main window's menu bar as JSON, or NULL when the game has none: an array of items, each
+// {"id": "0.3", "title": "Save(&S)", "checked": false, "radio": false, "enabled": true, "items": [...]},
+// with the game's captions as it set them, "-" for a separator. Hidden items are left out, and so are the ones
+// VNDegen's own menu covers or that can't work here: Exit, Windowed, Full Screen, Help and its items, the font
+// dialog, and the debug menu. "enabled" is false when the item or a menu above it is disabled. The text stays valid
+// until the next call.
+VNKK_API const char *vnkk_menu(void);
+// Clicks the item with the given id, as the player choosing it in the menu bar would. The game handles the click in
+// its next frame. Returns false when no item has the id.
+VNKK_API bool vnkk_menu_click(const char *id);
+
 // The UIView SDL renders into, for the host to place in its own view hierarchy. NULL on macOS,
 // where the engine places its view in VNKKLaunch.hostView itself.
 VNKK_API void *vnkk_view(void);

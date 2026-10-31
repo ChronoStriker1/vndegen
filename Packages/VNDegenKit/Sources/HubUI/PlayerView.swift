@@ -1,3 +1,4 @@
+import ControllerUI
 import SwiftUI
 import VNCore
 import GameInput
@@ -10,6 +11,8 @@ struct PlayerView: View {
     @Environment(Navigator.self) private var nav
     @State private var menu = PlayerMenu()
     @State private var mappingEditor: ButtonMappingEditor?
+    /// Asks the game for its Game commands while VNDegen's menu is open.
+    @State private var menuLoad: Task<Void, Never>?
     @AppStorage(ControlMethod.storageKey) private var defaultMethod = ControlMethod.automatic
     /// Whether the menu or the unlock screen has input rather than the game. Nil until the view first takes input.
     @State private var navigating: Bool?
@@ -58,7 +61,8 @@ struct PlayerView: View {
             #endif
             if menu.isOpen {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
-                               onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping)
+                               onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping,
+                               onGameMenu: menu.openGameMenu, onGameItem: choose, onCheats: openCheats)
                     .transition(.opacity)
             } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
@@ -106,6 +110,10 @@ struct PlayerView: View {
             #if os(iOS)
             OrientationLock.apply(orientation)
             #endif
+        }
+        // Typing on the Cheats page's keyboard reaches its text field rather than the menu, as in the hub's sheets.
+        .onChange(of: menu.page == .cheats && menu.cheats?.keyboard != nil) { _, typing in
+            if menu.isOpen { hub.input.translatesKeyboard = !typing }
         }
         .onChange(of: isCovered, initial: true) { _, covered in
             applyInputMode()
@@ -178,7 +186,12 @@ struct PlayerView: View {
             if !mappingEditor.handle(button), button == .cancel || button == .hub { self.mappingEditor = nil }
             return
         }
-        let items = PlayerMenu.items(for: method)
+        switch menu.page {
+        case .main: break
+        case .game: return navigateGameMenu(button)
+        case .cheats: return navigateCheats(button)
+        }
+        let items = menu.items(for: method)
         let index = items.firstIndex(of: menu.focus) ?? 0
         switch button {
         case .up: menu.focus = items[max(0, index - 1)]
@@ -187,11 +200,13 @@ struct PlayerView: View {
             switch menu.focus {
             case .method: setMethod(method.stepped(by: button == .left ? -1 : 1))
             case .mouseStyle: setMethod(method.switchingMouseStyle)
-            case .resume, .quit, .controllerMouse, .mapping: break
+            case .resume, .gameMenu, .cheats, .quit, .controllerMouse, .mapping: break
             }
         case .confirm:
             switch menu.focus {
             case .resume: resume()
+            case .gameMenu: menu.openGameMenu()
+            case .cheats: openCheats()
             case .quit: hub.endSession()
             case .method: setMethod(method.stepped(by: 1))
             case .controllerMouse: setMethod(method.togglingMouse)
@@ -201,6 +216,55 @@ struct PlayerView: View {
         case .cancel, .hub, .menu: resume()
         default: break
         }
+    }
+
+    /// Up and down move through the current level of Game commands, and confirm opens a submenu or runs a command. Cancel goes
+    /// back a level, and from the top back to VNDegen's menu.
+    private func navigateGameMenu(_ button: VirtualButton) {
+        switch button {
+        case .up: menu.moveGameFocus(by: -1)
+        case .down: menu.moveGameFocus(by: 1)
+        case .confirm: if let item = menu.focusedGameItem { choose(item) }
+        case .right: if let item = menu.focusedGameItem, case .submenu = item.kind { choose(item) }
+        case .cancel, .left: menu.gameBack()
+        case .hub, .menu: resume()
+        default: break
+        }
+    }
+
+    /// A command closes VNDegen's menu and the game runs it as it resumes, as a PC game runs a menu bar command once its
+    /// menu closes. The command can open the game's own screens and dialogs, which need the game running.
+    private func choose(_ item: GameMenuItem) {
+        guard item.isEnabled else { return }
+        switch item.kind {
+        case .submenu: menu.openSubmenu(item)
+        case .command:
+            session.chooseGameMenuItem(item.id)
+            resume()
+        case .separator: break
+        }
+    }
+
+    /// The page keeps its tab and search while the game runs, and reads the game again each time it opens.
+    private func openCheats() {
+        guard let cheats = session.cheats, let game else { return }
+        if menu.cheats == nil {
+            let id = game.id
+            menu.cheats = CheatsPage(cheats: cheats, settings: game.cheats ?? CheatSettings()) { [hub] settings in
+                hub.library.update(id) { $0.cheats = settings }
+            }
+        }
+        // Opened with a controller or the keyboard, the page shows its focus ring at once, as the menu does, so the
+        // first press moves it.
+        if hub.input.lastInputKind != .touch { menu.cheats?.focus.showsFocus = true }
+        menu.page = .cheats
+    }
+
+    /// The home button resumes the game, and so does Menu unless the keyboard, where it finishes typing, is open.
+    private func navigateCheats(_ button: VirtualButton) {
+        guard let cheats = menu.cheats else { return menu.closeCheats() }
+        if button == .hub || (button == .menu && cheats.keyboard == nil) { return resume() }
+        if !cheats.handle(button) { menu.closeCheats() }
     }
 
     private func menuButton() {
@@ -215,13 +279,24 @@ struct PlayerView: View {
     /// Takes input from the game before pausing it, so the game handles the releases of the buttons it holds.
     private func openMenu() {
         menu.focus = .resume
+        menu.page = .main
         menu.isOpen = true
+        menu.offersCheats = session.cheats != nil
         applyInputMode()
         session.setPaused(true)
+        menu.gameItems = []
+        menuLoad?.cancel()
+        menuLoad = Task {
+            let items = await session.gameMenu()
+            guard !Task.isCancelled, menu.isOpen else { return }
+            menu.gameItems = items
+        }
     }
 
     private func resume() {
         mappingEditor = nil
+        menuLoad?.cancel()
+        menu.page = .main
         menu.isOpen = false
         applyInputMode()
         session.setPaused(false)
@@ -232,7 +307,7 @@ struct PlayerView: View {
     private func setMethod(_ method: ControlMethod) {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.controlMethod = method }
-        if !PlayerMenu.items(for: method).contains(menu.focus) { menu.focus = .method }
+        if !menu.items(for: method).contains(menu.focus) { menu.focus = .method }
     }
 
     private func openMapping() {
@@ -258,19 +333,76 @@ struct PlayerView: View {
 @MainActor
 @Observable
 final class PlayerMenu {
-    enum Item { case resume, quit, method, controllerMouse, mouseStyle, mapping }
+    enum Item { case resume, gameMenu, cheats, quit, method, controllerMouse, mouseStyle, mapping }
+    /// What the menu's card shows: its main buttons, or a page that one of them opened.
+    enum Page { case main, game, cheats }
 
-    /// Top to bottom. The control method only matters on a touch device.
-    static func items(for method: ControlMethod) -> [Item] {
-        guard Platform.current == .iOS else { return [.resume, .quit, .mapping] }
-        var items: [Item] = [.resume, .quit, .method]
+    /// Top to bottom. Game commands show when the game has any. The control method only matters on a touch device.
+    func items(for method: ControlMethod) -> [Item] {
+        let session: [Item] = [.resume] + (gameItems.isEmpty ? [] : [.gameMenu]) + (offersCheats ? [.cheats] : []) + [.quit]
+        guard Platform.current == .iOS else { return session + [.mapping] }
+        var items = session + [.method]
         if method.kind == .controller { items.append(.controllerMouse) }
         if method.mouse != nil { items.append(.mouseStyle) }
         return items + [.mapping]
     }
 
     var isOpen = false
+    var page = Page.main
     var focus = Item.resume
+    /// The game's own menu, read from the game each time this menu opens.
+    var gameItems: [GameMenuItem] = []
+    /// The submenus open in Game commands, outermost first, and empty at its top.
+    var gamePath: [GameMenuItem] = []
+    var gameFocus: GameMenuItem.ID?
+    /// Whether the game offers cheats.
+    var offersCheats = false
+    /// The Cheats page, made the first time it opens.
+    var cheats: CheatsPage?
+
+    func closeCheats() {
+        page = .main
+        focus = .cheats
+    }
+
+    /// What Game commands show now.
+    var gameLevel: [GameMenuItem] { gamePath.last?.items ?? gameItems }
+
+    var focusedGameItem: GameMenuItem? { gameLevel.first { $0.id == gameFocus } }
+
+    func openGameMenu() {
+        page = .game
+        gamePath = []
+        gameFocus = Self.firstChoice(gameItems)
+    }
+
+    func openSubmenu(_ item: GameMenuItem) {
+        gamePath.append(item)
+        gameFocus = Self.firstChoice(item.items)
+    }
+
+    /// Up a level, with focus on the submenu just left. From the top, back to VNDegen's menu.
+    func gameBack() {
+        if let left = gamePath.popLast() {
+            gameFocus = left.id
+        } else {
+            page = .main
+            focus = .gameMenu
+        }
+    }
+
+    /// Separators take no focus. Disabled items do, so a controller shows them as a mouse would, and choosing them
+    /// does nothing.
+    func moveGameFocus(by step: Int) {
+        let choices = gameLevel.filter { $0.kind != .separator }
+        guard !choices.isEmpty else { return }
+        let index = choices.firstIndex { $0.id == gameFocus } ?? (step > 0 ? -1 : choices.count)
+        gameFocus = choices[min(choices.count - 1, max(0, index + step))].id
+    }
+
+    private static func firstChoice(_ items: [GameMenuItem]) -> GameMenuItem.ID? {
+        items.first { $0.kind != .separator }?.id
+    }
 }
 
 private struct PlayerMenuView: View {
@@ -283,26 +415,50 @@ private struct PlayerMenuView: View {
     let onQuit: () -> Void
     let onMethod: (ControlMethod) -> Void
     let onMapping: () -> Void
+    let onGameMenu: () -> Void
+    let onGameItem: (GameMenuItem) -> Void
+    let onCheats: () -> Void
 
     var body: some View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            // Side by side when a landscape phone or a short window has no room for one column, and is wide enough for
-            // two: the columns' 220 pt buttons, spacing and padding need about 620 pt. Not ViewThatFits: after a tap on
-            // Quit inside its second choice, SwiftUI kept the player in place, so the next game reused this view and
-            // never started.
-            let sideBySide = metrics.isShort && metrics.size.width >= 640
-            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
-            layout {
-                session
-                controls
+            switch menu.page {
+            case .main: card
+            case .game:
+                GameMenuView(menu: menu, showsFocus: showsFocus, onChoose: onGameItem)
+                    .padding(isNarrow ? 20 : 28)
+                    .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+                    .padding(12)
+            case .cheats:
+                if let cheats = menu.cheats {
+                    CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
+                        .padding(isNarrow || metrics.isShort ? 16 : 28)
+                        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+                        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+                        .padding(12)
+                }
             }
-            .padding(isNarrow ? 20 : 28)
-            .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
-            .padding(12)
         }
+        .onScreenKeyboard(menu.page == .cheats ? menu.cheats?.keyboard : nil)
+    }
+
+    private var card: some View {
+        // Side by side when a landscape phone or a short window has no room for one column, and is wide enough for
+        // two: the columns' 220 pt buttons, spacing and padding need about 620 pt. Not ViewThatFits: after a tap on
+        // Quit inside its second choice, SwiftUI kept the player in place, so the next game reused this view and
+        // never started.
+        let sideBySide = metrics.isShort && metrics.size.width >= 640
+        let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
+        return layout {
+            session
+            controls
+        }
+        .padding(isNarrow ? 20 : 28)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+        .padding(12)
     }
 
     private var session: some View {
@@ -315,6 +471,16 @@ private struct PlayerMenuView: View {
             Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
                 .onHover { if $0 { menu.focus = .resume } }
+            if !menu.gameItems.isEmpty {
+                Button(action: onGameMenu) { Label("Game commands", systemImage: "list.bullet").frame(minWidth: buttonWidth) }
+                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.gameMenu)))
+                    .onHover { if $0 { menu.focus = .gameMenu } }
+            }
+            if menu.offersCheats {
+                Button(action: onCheats) { Label("Cheats", systemImage: "wand.and.stars").frame(minWidth: buttonWidth) }
+                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.cheats)))
+                    .onHover { if $0 { menu.focus = .cheats } }
+            }
             Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
                 .onHover { if $0 { menu.focus = .quit } }
@@ -324,7 +490,7 @@ private struct PlayerMenuView: View {
     private var controls: some View {
         VStack(spacing: 12) {
             SectionLabel(text: "Controls", systemImage: "gamecontroller")
-            let items = PlayerMenu.items(for: method)
+            let items = menu.items(for: method)
             if items.contains(.method) { methods }
             if items.contains(.controllerMouse) { controllerMouse }
             if items.contains(.mouseStyle), let style = method.mouse { mouseStyles(style) }
@@ -403,7 +569,7 @@ private struct PlayerMenuView: View {
     private func isFocused(_ item: PlayerMenu.Item) -> Bool { showsFocus && menu.focus == item }
 }
 
-private struct SegmentLabel: View {
+struct SegmentLabel: View {
     let title: String
     let selected: Bool
 

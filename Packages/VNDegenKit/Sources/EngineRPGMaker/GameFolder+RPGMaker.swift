@@ -13,8 +13,25 @@ extension GameFolder {
         self = !hasCore(Self.virtualRoot) && hasCore("\(Self.virtualRoot)/www") ? GameFolder(root: root, webRoot: "www") : top
     }
 
-    /// Where NW.js builds save: `save/` beside index.html.
-    nonisolated var saveDirectory: URL? { resolve(virtualPath: "\(virtualWebRoot)/save") }
+    /// Where NW.js builds save: `save/` beside index.html. Early MV cores (1.2.0 in the library) build the folder from
+    /// the page's address instead, index.html's folder less a last `/www` plus `save/`, which is the game's top-level
+    /// `save/` on the PC. rpgmaker.js has them apply that rule to index.html's path here.
+    nonisolated var saveDirectory: URL? {
+        guard usesPageAddressForSaves else { return resolve(virtualPath: "\(virtualWebRoot)/save") }
+        return resolve(virtualPath: mainModule.replacingOccurrences(of: #"(/www|)/[^/]*$"#, with: "/save", options: .regularExpression))
+    }
+
+    /// The MV core's managers script, where StorageManager decides the save folder. Empty for MZ.
+    nonisolated var managersScript: String {
+        read(servedPath: "/js/rpg_managers.js", limit: 4 << 20).map { String(decoding: $0, as: UTF8.self) } ?? ""
+    }
+
+    /// True for an MV core whose StorageManager.localFileDirectoryPath reads `window.location.pathname`.
+    private nonisolated var usesPageAddressForSaves: Bool {
+        let script = managersScript
+        guard let start = script.range(of: "StorageManager.localFileDirectoryPath = function") else { return false }
+        return script[start.upperBound...].prefix(300).contains("location.pathname")
+    }
 
     /// True when the audio folder holds Ogg files, plain or encrypted (.rpgmvo), and no .m4a (.rpgmvm). MV asks for
     /// .m4a in a browser that cannot play Ogg, and its deployment usually ships both, but many games ship only Ogg. MV
@@ -32,6 +49,16 @@ extension GameFolder {
             }
         }
         return hasOgg
+    }
+
+    /// The names of the plugins `js/plugins.js` turns on.
+    nonisolated var enabledPlugins: Set<String> {
+        guard let data = read(servedPath: "/js/plugins.js", limit: 8 << 20) else { return [] }
+        let text = String(decoding: data, as: UTF8.self)
+        guard let start = text.firstIndex(of: "["), let end = text.lastIndex(of: "]"), start < end,
+              let list = try? JSONSerialization.jsonObject(with: Data(text[start...end].utf8)) as? [[String: Any]]
+        else { return [] }
+        return Set(list.compactMap { $0["status"] as? Bool == true ? $0["name"] as? String : nil })
     }
 
     /// The Windows font names the game asks for in its plugins, plugin settings, and database, whose substitutes the

@@ -13,3 +13,7 @@ _vnkk_view
 _vnkk_click
 _vnkk_text
 _vnkk_set_fonts
+_vnkk_set_menu_bar
+_vnkk_menu_bar_shown
+_vnkk_menu
+_vnkk_menu_click

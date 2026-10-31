@@ -201,6 +201,10 @@ public:
     int height() const { return height_; }
     std::string caption() const { return caption_; }
     std::string debugStatus() const;
+    // The window menu bar the game builds with insertmenu, which the runtime never draws, as vnns_menu describes it.
+    std::string windowMenuJson() const;
+    // Runs the menu bar item at index as the PC engine does when the player picks it. False when no item there runs.
+    bool chooseWindowMenuItem(size_t index);
     const Script &script() const { return script_; }
 
     // ---- everything below is the interpreter's own state and helpers, shared by the command files ----
@@ -544,6 +548,14 @@ public:
     bool trapPending_ = false;
     bool rmode_ = true;
     std::vector<std::pair<std::string, std::string>> rmenu_;
+    // insertmenu's items in order. An item whose function is "sub" opens a submenu, which holds the items one level
+    // down that follow it.
+    struct WindowMenuItem {
+        std::string text, fn;
+        int level = 0;
+    };
+    std::vector<WindowMenuItem> windowMenu_;
+    std::string windowMenuItemsJson(size_t &next, int level) const;
     bool lookbackOnRight_ = false;
     int lastRet_ = 0;
 

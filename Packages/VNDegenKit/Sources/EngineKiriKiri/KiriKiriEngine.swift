@@ -19,6 +19,10 @@ struct KiriKiriEngine {
     let saveSystemData: @convention(c) () -> Void
     let stop: @convention(c) () -> Void
     let view: @convention(c) () -> UnsafeMutableRawPointer?
+    let setMenuBar: @convention(c) (Int32) -> Void
+    let menuBarShown: @convention(c) () -> Int32
+    let menu: @convention(c) () -> UnsafePointer<CChar>?
+    let menuClick: @convention(c) (UnsafePointer<CChar>?) -> Bool
 
     /// Nil when this build of VNDegen has no engine.
     static func load() -> KiriKiriEngine? {
@@ -41,11 +45,16 @@ struct KiriKiriEngine {
               let requestQuit: @convention(c) () -> Void = function("vnkk_request_quit"),
               let saveSystemData: @convention(c) () -> Void = function("vnkk_save_system_data"),
               let stop: @convention(c) () -> Void = function("vnkk_stop"),
-              let view: @convention(c) () -> UnsafeMutableRawPointer? = function("vnkk_view")
+              let view: @convention(c) () -> UnsafeMutableRawPointer? = function("vnkk_view"),
+              let setMenuBar: @convention(c) (Int32) -> Void = function("vnkk_set_menu_bar"),
+              let menuBarShown: @convention(c) () -> Int32 = function("vnkk_menu_bar_shown"),
+              let menu: @convention(c) () -> UnsafePointer<CChar>? = function("vnkk_menu"),
+              let menuClick: @convention(c) (UnsafePointer<CChar>?) -> Bool = function("vnkk_menu_click")
         else { return nil }
         return KiriKiriEngine(setFonts: setFonts, start: start, iterate: iterate, key: key, mouseButton: mouseButton, mouseMove: mouseMove,
                               click: click, wheel: wheel, text: text, setPaused: setPaused, requestQuit: requestQuit,
-                              saveSystemData: saveSystemData, stop: stop, view: view)
+                              saveSystemData: saveSystemData, stop: stop, view: view, setMenuBar: setMenuBar,
+                              menuBarShown: menuBarShown, menu: menu, menuClick: menuClick)
     }
 
     /// Hands the engine the Windows font substitutes FontPack has configured, for the next game it starts.
