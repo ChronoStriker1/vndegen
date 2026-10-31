@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: proposal, not started. This page describes the feature so it can be planned. Nothing here is built yet.
+Status: approved, in progress on `feature/cheats-request`.
 
 ## Why
 
@@ -37,11 +37,11 @@ Every change goes through the engine, so a save made afterwards is an ordinary s
 
 Visual novel engines (TyranoScript, Ren'Py, KiriKiri, NScripter, Artemis) don't get cheats. Their equivalents, skip and auto, already exist in the games or in the planned Game menu.
 
-## Open questions for the maintainer
+## Decisions (maintainer, 2026-10-31)
 
-1. Should the variable editor be available, or only the quick cheats? The editor is powerful, and a wrong value can break a game's story flags. A save made before editing would be the undo.
-2. Should game speed sit with the cheats, or in the Game menu for every engine that can do it?
-3. Per-game tables for AliceSoft games, which say which variable holds gold and the like: worth building, or the variable list only?
+1. The variable and switch editor is included. A save made before editing is the undo, and the editor says so.
+2. Game speed sits with the cheats, in every engine that can do it.
+3. AliceSoft System 3 and 4 get per-game tables that say which variable holds gold, HP and the like, for the library games that have them. The variable list works for every game.
 
 ## Suggested order
 
