@@ -38,6 +38,15 @@ bool fieldNamed(const Database &db, int type, size_t field, const char *name) {
            db.types[type].fieldNames[field] == name;
 }
 
+bool numberField(const Database &db, int type, size_t field) {
+    return type < int(db.types.size()) && field < db.types[type].fieldKinds.size() && !db.types[type].isString(field);
+}
+
+size_t rowCount(const Database &db, int type) { return type < int(db.types.size()) ? db.types[type].rows.size() : 0; }
+
+// dbNumberCell's ids give a row four digits.
+constexpr int kMaxRows = 10000;
+
 // A cell of the changeable database, as the variable number Wolf's commands use for it.
 int32_t cdbId(int type, int row, int field) { return 1100000000 + type * kMillion + row * 100 + field; }
 
@@ -63,9 +72,16 @@ std::string json(const std::string &text) {
 bool Game::hasStandardParty() const {
     if (!fieldNamed(cdb_, PartyInfo, Gold, "所持金") || !fieldNamed(cdb_, HeroStatus, HP, "HP") ||
         !fieldNamed(cdb_, HeroStatus, MaxHP, "最大HP") || !fieldNamed(cdb_, HeroStatus, SP, "SP") ||
-        !fieldNamed(cdb_, HeroStatus, MaxSP, "最大SP"))
+        !fieldNamed(cdb_, HeroStatus, MaxSP, "最大SP") || rowCount(cdb_, PartyInfo) < 1)
         return false;
-    return int(cdb_.types.size()) > OwnedItems + 2 && int(udb_.types.size()) > ItemDatabase + 2;
+    // The rest of the layout the cheats use: numbers where they read and write numbers.
+    for (int field = Gold; field < FirstMember + MemberCount; field++)
+        if (!numberField(cdb_, PartyInfo, field)) return false;
+    for (int field : {HP, MaxHP, SP, MaxSP})
+        if (!numberField(cdb_, HeroStatus, field)) return false;
+    for (int kind = 0; kind < 3; kind++)
+        if (!numberField(cdb_, OwnedItems + kind, 0) || int(udb_.types.size()) <= ItemDatabase + kind) return false;
+    return true;
 }
 
 std::string Game::cheatState() const {
@@ -78,7 +94,7 @@ std::string Game::cheatState() const {
         bool first = true;
         for (int i = 0; i < MemberCount; i++) {
             int hero = dbNumber(cdb_, PartyInfo, 0, FirstMember + i);
-            if (hero < 0 || hero >= int(cdb_.types[HeroStatus].rows.size())) continue;
+            if (hero < 0 || hero >= int(rowCount(cdb_, HeroStatus))) continue;
             if (!first) out += ',';
             first = false;
             out += '[' + json(dbString(cdb_, HeroStatus, hero, 0));
@@ -120,14 +136,17 @@ bool Game::cheatAddGold(int amount) {
     int32_t *gold = dbNumberCell(cdbId(PartyInfo, 0, Gold));
     if (!gold) return false;
     *gold = int32_t(std::clamp<int64_t>(int64_t(*gold) + amount, 0, kMaxGold));
+    refreshPages();
     return true;
 }
 
 bool Game::cheatAddItem(int kind, int id, int count) {
     if (mapId_ < 0 || !hasStandardParty() || kind < 0 || kind > 2) return false;
+    if (id < 0 || id >= int(std::min<size_t>(rowCount(cdb_, OwnedItems + kind), kMaxRows))) return false;
     int32_t *owned = dbNumberCell(cdbId(OwnedItems + kind, id, 0));
     if (!owned) return false;
     *owned = int32_t(std::clamp<int64_t>(int64_t(*owned) + count, 0, std::max(kMaxOwned, *owned)));
+    refreshPages();
     return true;
 }
 
@@ -135,19 +154,26 @@ bool Game::cheatRestoreParty() {
     if (mapId_ < 0 || !hasStandardParty()) return false;
     for (int i = 0; i < MemberCount; i++) {
         int hero = dbNumber(cdb_, PartyInfo, 0, FirstMember + i);
-        if (hero < 0) continue;
+        if (hero < 0 || hero >= int(std::min<size_t>(rowCount(cdb_, HeroStatus), kMaxRows))) continue;
         for (auto [value, limit] : {std::pair{HP, MaxHP}, std::pair{SP, MaxSP}}) {
             int32_t *cell = dbNumberCell(cdbId(HeroStatus, hero, value));
             if (cell) *cell = std::max(*cell, dbNumber(cdb_, HeroStatus, hero, limit));
         }
     }
+    refreshPages();
     return true;
 }
 
 bool Game::cheatSetVariable(int id, int value) {
     if (mapId_ < 0 || id < 0 || id >= int(normal_.size())) return false;
     normal_[id] = value;
+    // Map event pages show by conditions on variables, which the game checks again when they change.
+    refreshPages();
     return true;
+}
+
+void Game::setSpeed(int speed) {
+    if (audio_) audio_->setFrameRate(gameDat_.fps() * std::max(1, speed));
 }
 
 }  // namespace wolf

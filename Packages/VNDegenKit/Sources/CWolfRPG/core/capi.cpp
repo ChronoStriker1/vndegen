@@ -168,7 +168,9 @@ const char *vnwolf_problem(VNWolfEngine *e) { return e && !e->problem.empty() ? 
 
 
 void vnwolf_set_speed(VNWolfEngine *e, int speed) {
-    if (e) e->speed = std::clamp(speed, 1, 8);
+    if (!e) return;
+    e->speed = std::clamp(speed, 1, 8);
+    e->game->setSpeed(e->speed);
 }
 
 bool vnwolf_cheat_has_party(VNWolfEngine *e) { return e && e->game->hasStandardParty(); }

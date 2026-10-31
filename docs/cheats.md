@@ -145,8 +145,10 @@ How it works, in `Packages/VNDegenKit/Sources/CWolfRPG/core/cheats.cpp` and `vnw
 
 - The runtime is VNDegen's own, so the cheats are calls on its `Game`: they read and write the same variables and database cells the game's events do, which the save writes as it always does.
 - Walk through walls lets the hero pass where `canMove` would stop it, within the map.
-- Game speed is `vnwolf_set_speed`: each step advances that many times as many of the game's frames, and draws the last.
+- Game speed is `vnwolf_set_speed`: each step advances that many times as many of the game's frames, and draws the last. Sound fades a command starts take that much less time too, so they end with the waits they go with.
+- After each change the runtime checks map event pages again, as it does when an event changes a variable, so a page whose condition the change meets shows.
 - Gold is held between 0 and 999,999,999, and an item's count at 99 or what the game already allows above it.
+- A game counts as using the standard systems only when every field these cheats read and write is where they expect it, as a number.
 
 Checked: on CachyOS through the runtime with Test Games 02, 52 and 53; on the Mac app by controller with Test Game 52; on an iPad simulator by touch with Test Games 02 and 53; and on an iPhone simulator with Test Game 53, where the search found its money variable. Test Game 52's save made after cheating loads in the Windows engine (Wolf RPG Editor 3.282) under Wine with 1,010 yen, 10 Sedatives and full HP.
 

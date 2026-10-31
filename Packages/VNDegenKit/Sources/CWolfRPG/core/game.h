@@ -256,6 +256,8 @@ public:
     bool cheatRestoreParty();
     bool cheatSetVariable(int id, int value);
     void setWalkThroughWalls(bool on) { walkThroughWalls_ = on; }
+    // The host runs `speed` of the game's frames for each one of real time, so fades started now take that much less.
+    void setSpeed(int speed);
 
 private:
     bool walkThroughWalls_ = false;
