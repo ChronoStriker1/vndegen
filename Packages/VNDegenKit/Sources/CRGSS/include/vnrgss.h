@@ -59,7 +59,8 @@ void vnrgss_set_paused(bool paused);
 void vnrgss_set_speed(int speed);
 
 // Queues Ruby to run on the game thread while the game waits for its next frame, between two frames, whether or not
-// it is paused. Returns a request number for vnrgss_ruby_result, or 0 when no game is running.
+// it is paused, once the game's scripts have loaded. Returns a request number for vnrgss_ruby_result, or 0 when no
+// game is running.
 long vnrgss_run_ruby(const char *ruby);
 
 // What a request's Ruby gave, as its last value's to_s, or with `failed` set, why it failed: its exception's message, or

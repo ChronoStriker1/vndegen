@@ -35,6 +35,7 @@ static struct {
     bool hasProblem;
     char *pendingEval; // Ruby the Linux test host asks the game thread to run
     int speed;         // frames the game draws for each one its frame rate gives
+    bool scriptsLoaded; // whether Ruby the host queued may run
 } S = {.frameRate = 60, .speed = 1};
 
 // Ruby the host asked to run, in order, and what it gave once it has run.
@@ -156,9 +157,15 @@ static void run_requests_locked(void) {
     }
 }
 
+void host_scripts_loaded(void) {
+    pthread_mutex_lock(&lock);
+    S.scriptsLoaded = true;
+    pthread_mutex_unlock(&lock);
+}
+
 bool host_wait_frame_locked(void) {
     for (;;) {
-        if (!S.stopRequested) run_requests_locked();
+        if (S.scriptsLoaded && !S.stopRequested) run_requests_locked();
         if (S.granted > 0 || S.stopRequested) break;
         pthread_cond_wait(&cond, &lock);
     }
@@ -253,6 +260,7 @@ int vnrgss_start(const VNRGSSLaunch *l) {
     S.carry = 0;
     S.frameRate = 60;
     S.speed = 1;
+    S.scriptsLoaded = false;
     // Results the last game's host never read.
     while (requests) {
         RubyRequest *r = requests;

@@ -1,7 +1,7 @@
 # VNDegen's cheats for RPG Maker XP, VX and VX Ace, on the game's own objects, so a save made afterwards is an ordinary
-# save. VNDegen runs this file once the game's scripts have loaded, while the game waits for its first frame, and then
-# calls the module the same way. The settings that stay on are modules prepended to the game's classes, which Marshal
-# doesn't write into saves.
+# save. VNDegen runs this file once the game's scripts have loaded, at the first frame after its Main section starts,
+# and then calls the module the same way. The settings that stay on are modules prepended to the game's classes, which
+# Marshal doesn't write into saves.
 module VNDegenCheats
   @settings = {}
   @installed = false
@@ -14,12 +14,13 @@ module VNDegenCheats
       @settings[name]
     end
 
+    # True once the wraps are in place.
     def apply(settings)
       fill = settings['keepsPartyHealthy'] && !@settings['keepsPartyHealthy']
       @settings = settings
       install
       fill_party if fill && in_game?
-      true
+      @installed
     end
 
     def install
@@ -238,4 +239,3 @@ module VNDegenCheats
 end
 
 VNDegenCheats.install
-true

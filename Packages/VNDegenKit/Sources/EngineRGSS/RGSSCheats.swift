@@ -11,7 +11,7 @@ final class RGSSCheats: CheatSession {
     let variableRange = -99_999_999...99_999_999
 
     /// Loads the cheats into a game that just started, with the settings it starts with. They run once its scripts have
-    /// loaded, at its first frame, which can take a while.
+    /// loaded, which can take a while.
     static func start(with settings: CheatSettings) {
         vnrgss_set_speed(Int32(settings.speed))
         guard let url = Bundle.module.url(forResource: "rgss-cheats", withExtension: "rb"),
@@ -22,7 +22,9 @@ final class RGSSCheats: CheatSession {
         let request = vnrgss_run_ruby(source + "\nVNDegenCheats.apply(\(ruby(settings)))")
         Task {
             do {
-                _ = try await result(of: request, within: .seconds(120))
+                if try await result(of: request) != "true" {
+                    rgssLog.error("cheats did not load: the game's scripts have no Game_Actor, Game_Player or Scene_Map")
+                }
             } catch {
                 rgssLog.error("cheats did not load: \(error.localizedDescription, privacy: .public)")
             }
@@ -38,7 +40,7 @@ final class RGSSCheats: CheatSession {
         let request = vnrgss_run_ruby(source)
         Task {
             do {
-                let result = try await result(of: request, within: .seconds(120))
+                let result = try await result(of: request)
                 rgssLog.notice("rgss-ruby: \(result, privacy: .public)")
             } catch {
                 rgssLog.error("rgss-ruby failed: \(error.localizedDescription, privacy: .public)")
@@ -67,13 +69,14 @@ final class RGSSCheats: CheatSession {
     }
 
     private static func run(_ ruby: String) async throws -> String {
-        try await result(of: vnrgss_run_ruby(ruby), within: .seconds(10))
+        try await result(of: vnrgss_run_ruby(ruby))
     }
 
-    /// Waits for the game thread to run a request. A game in a long load or transition gets to it at its next frame.
-    private static func result(of request: Int, within limit: Duration) async throws -> String {
+    /// Waits for the game thread to run a request, which a game in a long load gets to at its next frame. A request
+    /// can't be withdrawn once queued, so this waits for its result even when cancelled, rather than report a change
+    /// that may still happen. The game ending finishes every request.
+    private static func result(of request: Int) async throws -> String {
         guard request != 0 else { throw RGSSCheatError.notRunning }
-        let deadline = ContinuousClock.now + limit
         while true {
             var failed = false
             if let text = vnrgss_ruby_result(request, &failed) {
@@ -82,8 +85,7 @@ final class RGSSCheats: CheatSession {
                 if failed { throw RGSSCheatError.ruby(result) }
                 return result
             }
-            guard ContinuousClock.now < deadline else { throw RGSSCheatError.noAnswer }
-            try await Task.sleep(for: .milliseconds(10))
+            try? await Task.sleep(for: .milliseconds(10))
         }
     }
 
@@ -119,13 +121,12 @@ final class RGSSCheats: CheatSession {
 }
 
 nonisolated enum RGSSCheatError: LocalizedError {
-    case notRunning, noAnswer, notInGame
+    case notRunning, notInGame
     case ruby(String)
 
     var errorDescription: String? {
         switch self {
         case .notRunning: "The game isn't running."
-        case .noAnswer: "The game didn't answer."
         case .notInGame: "Start or load a game first."
         case let .ruby(message): message
         }

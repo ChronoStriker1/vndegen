@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <time.h>
 
 #include "host.h"
 #include "vnrgss.h"
@@ -95,8 +94,11 @@ static void save_frame(const char *path) {
 
 static int run(int argc, char **argv);
 
-// Runs Ruby while the game waits for its next frame, as the app does, and prints the result.
-static void run_ruby(long frame, const char *code, bool fromFile) {
+// Ruby queued through vnrgss_run_ruby, as the app's cheats queue it, and printed once the game has run it.
+static struct { long frame, request; } pendingRuby[64];
+static int pendingRubyCount;
+
+static void queue_ruby(long frame, const char *code, bool fromFile) {
     char *source = NULL;
     if (fromFile) {
         FILE *file = fopen(code, "rb");
@@ -113,18 +115,23 @@ static void run_ruby(long frame, const char *code, bool fromFile) {
     }
     long request = vnrgss_run_ruby(source ? source : code);
     free(source);
-    for (int tries = 0; request && tries < 500; tries++) {
+    if (!request) printf("ruby %ld: no game\n", frame);
+    else if (pendingRubyCount < 64) pendingRuby[pendingRubyCount++] = (typeof(pendingRuby[0])){frame, request};
+}
+
+// Prints the queued Ruby that has run since the last call.
+static void print_ruby_results(void) {
+    for (int i = 0; i < pendingRubyCount;) {
         bool failed = false;
-        char *result = vnrgss_ruby_result(request, &failed);
-        if (result) {
-            printf("ruby %ld%s: %s\n", frame, failed ? " failed" : "", result);
-            free(result);
-            return;
+        char *result = vnrgss_ruby_result(pendingRuby[i].request, &failed);
+        if (!result) {
+            i++;
+            continue;
         }
-        struct timespec pause = {0, 10000000};
-        nanosleep(&pause, NULL);
+        printf("ruby %ld%s: %s\n", pendingRuby[i].frame, failed ? " failed" : "", result);
+        free(result);
+        pendingRuby[i] = pendingRuby[--pendingRubyCount];
     }
-    printf("ruby %ld: no answer\n", frame);
 }
 
 int main(int argc, char **argv) {
@@ -184,10 +191,11 @@ static int run(int argc, char **argv) {
             if (commands[i].frame != frame) continue;
             if (commands[i].kind == 2) save_frame(commands[i].file);
             else if (commands[i].kind == 3) host_test_eval(commands[i].file);
-            else if (commands[i].kind == 4 || commands[i].kind == 5) run_ruby(frame, commands[i].file, commands[i].kind == 5);
+            else if (commands[i].kind == 4 || commands[i].kind == 5) queue_ruby(frame, commands[i].file, commands[i].kind == 5);
             else vnrgss_key(commands[i].key, commands[i].kind == 0);
         }
         if (!host_test_step(20000)) break;
+        print_ruby_results();
         // A 60 Hz frame's worth of sound, which also keeps the mixer's decoders exercised.
         float pcm[735 * 2];
         vnrgss_audio_render(pcm, 735);
@@ -197,6 +205,7 @@ static int run(int argc, char **argv) {
         if (commands[i].kind == 2 && commands[i].frame >= frame) save_frame(commands[i].file);
     }
     if (audio) fclose(audio);
+    print_ruby_results();
     const char *problem = vnrgss_problem();
     printf("frames %ld%s%s\n", frame, problem ? ", problem: " : "", problem ? problem : "");
     vnrgss_stop();
