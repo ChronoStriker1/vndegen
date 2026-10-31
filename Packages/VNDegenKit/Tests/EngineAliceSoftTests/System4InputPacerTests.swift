@@ -132,6 +132,44 @@ private struct Harness {
         #expect(h.at(enterUp).count == 1)
     }
 
+    @Test func aHoverWaitDoesntHoldAReleaseBehindABusyGame() {
+        var h = Harness()
+        h.add([enter])
+        h.steps(10)
+        // The game loops without finishing frames; the player clicks somewhere new, then lets go of Return.
+        h.add([.mouseMove(b), press, enterUp])
+        for _ in 0..<12 { h.step(0.1, finishes: false) }
+        #expect(h.at(enterUp).count == 1)
+    }
+
+    @Test func aLongPauseStillNeedsTheGameToReadItsReleases() {
+        var h = Harness()
+        h.add([enter])
+        h.steps(20)
+        _ = h.pacer.clear(now: h.now, done: h.done)  // pause: Return up
+        h.now += 5                                     // paused five seconds
+        h.pacer.resumed(now: h.now, done: h.done)
+        let resumedAt = h.done
+        h.add([enter])                                 // a fresh press before the first resumed step
+        #expect(h.at(enter).count == 1)
+        h.steps(4)
+        #expect(h.at(enter).count == 2)
+        #expect(h.at(enter)[1].done >= resumedAt + 2)
+    }
+
+    @Test func pauseDropsAQueuedRelease() {
+        var h = Harness()
+        h.add([.mouseMove(a)])
+        h.steps(4)
+        h.add([press])
+        h.add([release])  // waits behind the press's hold
+        #expect(h.at(release).isEmpty)
+        #expect(h.pacer.clear(now: h.now, done: h.done) == [release])
+        h.pacer.resumed(now: h.now, done: h.done)
+        h.steps(10)
+        #expect(h.at(release).isEmpty)  // dropped, not replayed after pause let go
+    }
+
     @Test func pauseReleasesWhatTheGameHoldsAndTheyAreReadBeforeAnythingElse() {
         var h = Harness()
         h.add([.mouseMove(a)])

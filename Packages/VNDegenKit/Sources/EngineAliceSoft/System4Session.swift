@@ -232,6 +232,7 @@ final class System4Session: EngineSession {
             _ = router.releaseAll()
             apply(pacer.clear(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))))
         }
+        if !paused { pacer.resumed(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))) }
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
@@ -292,7 +293,7 @@ nonisolated enum System4Input: Equatable, Sendable {
 /// (vns4_frames_done). Input set while the count is D is surely read by the time it reaches D + 2, since frame D + 1
 /// may have read the input before it changed.
 /// - a mouse button press waits until the game has finished three frames with the pointer where the press is (Rance
-///   02's title took none at one);
+///   02's title took none at one), or half a second has passed since the pointer moved;
 /// - after a key or button changes, nothing more applies until the game has read it, so it sees every state and a
 ///   press its own position; a game that stops finishing frames (a load, or a loop waiting for a key to come up)
 ///   holds this back at most half a second, so no release waits on it for long;
@@ -306,6 +307,7 @@ nonisolated struct System4InputPacer {
 
     private var queue: [System4Input] = []
     private var movedAt = Int.min / 2   // frames done when the pointer moved to where it is
+    private var movedTime = -Double.infinity  // and when
     private var position: CGPoint?
     private var keyGate = 0.0           // no key or button change applies before this time
     private var changedAt = Int.min / 2 // frames done when the last key or button changed
@@ -337,6 +339,14 @@ nonisolated struct System4InputPacer {
         return down.sorted().map { .key($0, down: false) }
     }
 
+    /// Called on resume: the game couldn't read anything while paused, so what pause let go of must still be read
+    /// before anything else applies, however long the pause was.
+    mutating func resumed(now: Double, done: Int) {
+        changedAt = done
+        changedTime = now
+        keyGate = max(keyGate, now + Self.releaseHold)
+    }
+
     private mutating func drain(_ now: Double, done: Int) -> [System4Input] {
         var out: [System4Input] = []
         var move: CGPoint?
@@ -350,6 +360,7 @@ nonisolated struct System4InputPacer {
                 if p != position {
                     position = p
                     movedAt = done
+                    movedTime = now
                 }
                 move = p
             case .wheel:
@@ -357,7 +368,8 @@ nonisolated struct System4InputPacer {
                 out.append(next)
             case let .key(vk, isDown):
                 if now < keyGate { break loop }
-                if isDown, vk == 1 || vk == 2, done < movedAt + 1 + Self.hoverFrames { break loop }
+                if isDown, vk == 1 || vk == 2, done < movedAt + 1 + Self.hoverFrames,
+                   now < movedTime + Self.readWaitLimit { break loop }
                 flushMove()
                 out.append(next)
                 if isDown { down.insert(vk) } else { down.remove(vk) }
