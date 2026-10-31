@@ -539,6 +539,62 @@
         });
     }, true);
 
+    // iOS can end WebKit's GPU process, such as when it needs the memory, and the page loses its WebGL context. WebKit
+    // restores it at once and PIXI uploads its textures again, but two parts of MZ kept what lived in the lost context.
+    // Tile layers copy their tilesets into the tilemap renderer's own textures only when the tileset changes, so the
+    // map went black. Effekseer, which draws battle animations, went on drawing with its lost buffers and programs, and
+    // its failing calls broke PIXI's next buffer uploads, so sprites drew in the wrong places and order, more of them
+    // with each battle, until the map showed none. After a restore, each tile layer copies its tilesets again, and
+    // Effekseer gets a new context whose effects load again. Animations that were playing end, as their effect is gone.
+    let contextGeneration = 0;
+    window.addEventListener('webglcontextrestored', (event) => {
+        const graphics = window.Graphics;
+        if (!graphics || !graphics._app || event.target !== graphics._app.view) return;
+        contextGeneration++;
+        console.warn('WebGL context restored, restoring the tilemap and Effekseer');
+        if (!graphics._effekseer || typeof graphics._createEffekseerContext !== 'function') return;
+        // Frees the lost context's memory. Deleting its GL objects, which went with the context, only sets error flags,
+        // which are cleared so nothing reads them as a later call's.
+        const gl = graphics._app.renderer.gl;
+        try {
+            if (window.effekseer && effekseer.releaseContext) effekseer.releaseContext(graphics._effekseer);
+        } catch (e) { /* already gone */ }
+        for (let i = 0; i < 16 && gl.getError() !== gl.NO_ERROR; i++);
+        graphics._createEffekseerContext();
+        if (window.EffectManager) EffectManager._cache = {};
+    }, true);
+    document.addEventListener('load', () => {
+        const layer = window.Tilemap && Tilemap.Layer && Tilemap.Layer.prototype;
+        if (layer) {
+            wrap(layer, 'render', (render) => function () {
+                if (this.vndegenContext !== contextGeneration) {
+                    if (this.vndegenContext !== undefined) this._needsTexturesUpdate = true;
+                    this.vndegenContext = contextGeneration;
+                }
+                return render.apply(this, arguments);
+            });
+        }
+        // MV's animations are sprites, which PIXI restores.
+        const animation = window.Graphics && Graphics._createEffekseerContext && typeof Sprite_Animation === 'function'
+            && Sprite_Animation.prototype;
+        if (animation) {
+            wrap(animation, 'setup', (setup) => function () {
+                this.vndegenContext = contextGeneration;
+                return setup.apply(this, arguments);
+            });
+            wrap(animation, 'update', (update) => function () {
+                if (this.vndegenContext !== contextGeneration) {
+                    this.vndegenContext = contextGeneration;
+                    this._handle = null;
+                    if (!this._started && this._animation && window.EffectManager) {
+                        this._effect = EffectManager.load(this._animation.effectName);
+                    }
+                }
+                return update.apply(this, arguments);
+            });
+        }
+    }, true);
+
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
         sessionPaused = paused;
