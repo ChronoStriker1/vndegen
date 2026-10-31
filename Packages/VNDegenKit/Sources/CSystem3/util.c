@@ -90,14 +90,17 @@ char *s3_sjis_to_utf8(const char *s) {
 
 bool s3_write_file(const char *path, const void *data, size_t size) {
     // The temporary gets a fresh name, created exclusively, so nothing already at that path (a symlink included) is
-    // written through; the rename then replaces the destination's directory entry.
+    // written through; the rename then replaces the destination's directory entry. mkstemp makes it private (0600); a
+    // file being replaced keeps its own permissions.
+    struct stat old;
+    bool had = stat(path, &old) == 0;
     size_t n = strlen(path) + 16;
     char *tmp = s3_alloc(n);
     snprintf(tmp, n, "%s.XXXXXX", path);
     int fd = mkstemp(tmp);
     bool ok = fd >= 0;
     if (ok) {
-        fchmod(fd, 0644);
+        if (had) fchmod(fd, old.st_mode & 0777);
         FILE *f = fdopen(fd, "wb");
         if (!f) { close(fd); ok = false; }
         else {

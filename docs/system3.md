@@ -53,6 +53,10 @@ samples averaged 60.0 with one hitch. A DEBUG build launched with `-frameMonitor
 - CE transitions show their result after the transition's time, and CD sprite copies show theirs at once, rather than
   animating each step.
 - Text appears all at once rather than at the game's message speed.
+- LE and QE files stay inside the save and game folders: absolute paths, drives and `..` are refused, and the resolved
+  path, symlinks followed, is checked before each read or write. The check and the open are separate steps, so a
+  process that swaps a folder for a symlink between them could still redirect the access. Such a process already runs
+  as the player and can write the saves itself.
 - System 3.0's own music format (`AMUS.DAT`) isn't played; the test games use CD tracks instead.
 - Mamatoto: in the scripted tutorial's defensive battle, the Squad Formation screen offers 2 of the 5 commanders a new
   game adds, so the demo's scripted clicks miss and it stops at the game's own end-of-script loop before the first save

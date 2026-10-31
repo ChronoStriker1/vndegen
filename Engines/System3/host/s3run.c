@@ -122,6 +122,7 @@ int main(int argc, char **argv) {
     // --wav FILE: every sample vns3_audio returns, as 16-bit stereo at 44100 Hz (header sizes patched at the end).
     FILE *wav = wavPath ? fopen(wavPath, "wb") : NULL;
     long wavFrames = 0;
+    if (wavPath && !wav) { perror(wavPath); return 1; }
     if (wav) { static const unsigned char h[44] = { 'R','I','F','F',0,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0,1,0,2,0,0x44,0xac,0,0,0x10,0xb1,2,0,4,0,16,0,'d','a','t','a',0,0,0,0 }; fwrite(h, 1, 44, wav); }
     int ok = 1, turn = 0, nextPick = 0, nextAuto = autoFrom;
     // Keys and buttons stay down for 96 ms, as a person's press does, so games that poll the state see them.
@@ -171,9 +172,9 @@ int main(int argc, char **argv) {
     }
     if (wav) {
         unsigned int data = (unsigned int)(wavFrames * 4), riff = data + 36;
-        fseek(wav, 4, SEEK_SET); fwrite(&riff, 4, 1, wav);
-        fseek(wav, 40, SEEK_SET); fwrite(&data, 4, 1, wav);
-        fclose(wav);
+        bool wrote = !ferror(wav) && fseek(wav, 4, SEEK_SET) == 0 && fwrite(&riff, 4, 1, wav) == 1
+                     && fseek(wav, 40, SEEK_SET) == 0 && fwrite(&data, 4, 1, wav) == 1;
+        if (fclose(wav) != 0 || !wrote) { fprintf(stderr, "could not finish %s\n", wavPath); ok = 0; }
     }
     while (ok && repl) {
         FILE *in = fopen(repl, "r");

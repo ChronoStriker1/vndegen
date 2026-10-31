@@ -169,17 +169,26 @@ static bool save_valid(S3 *s, const Save *sv) {
     }
     u32 stackSize = s3_le32(d + sv->stack);
     if ((u64)stackSize + sv->stack + 16 > sv->n) return false;
+    // Read from the top of the stack down. Label returns belong to the page running above them: the resume page at
+    // the top, then each page frame's own page below it. A page frame's 16-bit field stores page + 1, so 0 is 65536.
+    u32 page = s3_le32(d + 0x50);
+    if (!page_ok(s, page, s3_le32(d + 0x54))) return false;
     const u8 *start = d + sv->stack + 16, *q = start + stackSize;
     int frames = 0;
     while (q > start) {
         if (++frames > S3_MAX_FRAMES) return false;
         u8 tag = q[-1];
-        if (tag == 0xee && q - start >= 5) q -= 5;
-        else if (tag == 0xff && q - start >= 7) { q -= 7; if (!page_ok(s, s3_le16(q), s3_le32(q + 2))) return false; }
-        else if (tag == 0xdd && q - start >= 7) q -= 7;
+        if (tag == 0xee && q - start >= 5) { q -= 5; if (!page_ok(s, page, s3_le32(q))) return false; }
+        else if (tag == 0xff && q - start >= 7) {
+            q -= 7;
+            u32 stored = s3_le16(q);
+            page = stored ? stored : 65536;
+            if (!page_ok(s, page, s3_le32(q + 2))) return false;
+        }
+        else if (tag == 0xdd && q - start >= 7) { q -= 7; if (s3_le32(q) > 0xffff) return false; }
         else return false;
     }
-    return page_ok(s, s3_le32(d + 0x50), s3_le32(d + 0x54));
+    return true;
 }
 
 bool s3_save_load(S3 *s, int slot) {
