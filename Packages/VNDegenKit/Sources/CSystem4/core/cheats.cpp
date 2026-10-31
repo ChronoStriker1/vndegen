@@ -5,6 +5,7 @@
 #include "game.h"
 #include "sjis.h"
 #include "vm.h"
+#include "vns4.h"
 
 #include <algorithm>
 #include <cctype>
@@ -55,7 +56,8 @@ std::string lower(std::string s) {
 
 }  // namespace
 
-bool Game::cheatReady() const { return vm && vm->globalPage >= 0 && !vmTurn_ && !ended; }
+// The VM thread's turn is checked first: until it hands back control, its state, globalPage included, is its own.
+bool Game::cheatReady() const { return !vmTurn_ && !ended && vm && vm->globalPage >= 0; }
 
 int Game::goldGlobal() const {
     for (const auto &g : kGold) {
@@ -95,13 +97,15 @@ std::string Game::cheatState() {
     return out + "]}";
 }
 
-bool Game::cheatSetGlobal(int index, int32_t value) {
+int Game::cheatSetGlobal(int index, int32_t value) {
     std::lock_guard<std::mutex> lock(mu_);
-    if (!cheatReady() || index < 0 || size_t(index) >= vm->ain.globals.size()) return false;
-    const int32_t type = vm->ain.globals[size_t(index)].t.type;
-    if (!wholeNumber(type)) return false;
-    vm->page(vm->globalPage)->v[size_t(index)] = type == T_BOOL ? int32_t(value != 0) : value;
-    return true;
+    if (!cheatReady()) return VNS4_CHEAT_BUSY;
+    if (index < 0 || size_t(index) >= vm->ain.globals.size() || !wholeNumber(vm->ain.globals[size_t(index)].t.type))
+        return VNS4_CHEAT_NOT_NUMBER;
+    // A bool takes 0 or 1 as it is, so the page shows what the game holds.
+    if (vm->ain.globals[size_t(index)].t.type == T_BOOL && value != 0 && value != 1) return VNS4_CHEAT_BOOL;
+    vm->page(vm->globalPage)->v[size_t(index)] = value;
+    return VNS4_CHEAT_OK;
 }
 
 bool Game::cheatAddGold(int amount) {

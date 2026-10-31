@@ -68,9 +68,14 @@ void vns4_set_speed(VNS4Engine *e, int speed);
 // numbers and floats and strings as {"o": text}. "gold" is there for the library games whose globals say which holds
 // the party's money. NULL while the game is running. Valid until the next call.
 const char *vns4_cheat_state(VNS4Engine *e);
-// Sets a whole-number global (int, bool, or the v6 games' 32-bit counts). False for another type, an index the game
-// doesn't have, or while the game is running.
-bool vns4_cheat_set_global(VNS4Engine *e, int index, int32_t value);
+// Sets a whole-number global: an int, a bool (0 or 1), or one of the v6 games' 32-bit counts.
+enum {
+    VNS4_CHEAT_OK = 0,
+    VNS4_CHEAT_BUSY = 1,        // the game is running, as in a long load; try again
+    VNS4_CHEAT_NOT_NUMBER = 2,  // no such global, or not a whole number
+    VNS4_CHEAT_BOOL = 3,        // a bool, which takes only 0 or 1
+};
+int vns4_cheat_set_global(VNS4Engine *e, int index, int32_t value);
 // Whether the game is one whose globals say which holds the party's money.
 bool vns4_cheat_has_gold(VNS4Engine *e);
 // Adds to the party's money, held between 0 and 9,999,999 or the game's amount if higher. False for a game without

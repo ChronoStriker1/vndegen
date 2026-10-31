@@ -50,9 +50,9 @@ public:
     // The last presented frame, RGBA. Copies it out under the lock.
     bool takeFrame(std::vector<uint8_t> &out, int &w, int &h);
     // Cheats (cheats.cpp), on the game's globals while the VM waits for the next step. The state is CheatState's JSON,
-    // empty while the VM is running. The setters return false when the game has no such global or the VM is running.
+    // empty while the VM is running. cheatAddGold returns false when the game has no money global or the VM is running.
     std::string cheatState();
-    bool cheatSetGlobal(int index, int32_t value);
+    int cheatSetGlobal(int index, int32_t value);  // a VNS4_CHEAT_ result
     bool cheatAddGold(int amount);
     bool hasGold() const { return vm && goldGlobal() >= 0; }  // the code file never changes while the game runs
     // The game's clock runs this many times as fast.
@@ -69,6 +69,8 @@ public:
     void log(const std::string &s);
     void problem(const std::string &s);
     uint32_t now() const { return clockMs_.load(); }
+    // Time stepped without the Cheats page's game speed: a movie keeps to its sound, which plays at normal speed.
+    uint32_t movieNow() const { return movieClockMs_.load(); }
     // Called where the game shows a frame or polls: hands control to the host until its next step.
     void yieldFrame();
     void present();                  // composites the sprites into the frame
@@ -118,6 +120,7 @@ private:
     bool cheatReady() const;          // with mu_ held
     int goldGlobal() const;           // the global the party's money is in, or -1
     std::atomic<uint32_t> clockMs_{0};
+    std::atomic<uint32_t> movieClockMs_{0};
     uint32_t budgetMs_ = 0;          // game time the current step may still use
     int hitches_ = 0, lostMs_ = 0;   // steps the clock capped and the time they dropped, since the last timing log
     uint32_t timingLoggedAt_ = 0;

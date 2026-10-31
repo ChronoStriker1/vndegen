@@ -233,6 +233,7 @@ bool Game::step(int ms) {
         ms = 100;
     }
     clockMs_ += uint32_t(ms) * uint32_t(speed_.load());
+    movieClockMs_ += uint32_t(ms);
     if (clockMs_ - timingLoggedAt_ >= 10000) {
         timingLoggedAt_ = clockMs_;
         Audio::Timing t = audio.takeTiming();

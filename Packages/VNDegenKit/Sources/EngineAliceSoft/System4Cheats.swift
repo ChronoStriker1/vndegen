@@ -30,13 +30,19 @@ final class System4Cheats: CheatSession {
 
     func perform(_ action: CheatAction) async throws {
         guard let engine = engine() else { throw System4CheatError.notRunning }
-        let done = switch action {
-        case let .addGold(amount): vns4_cheat_add_gold(engine, Int32(clamping: amount))
-        case let .setVariable(id, .integer(value)): vns4_cheat_set_global(engine, Int32(clamping: id), Int32(clamping: value))
+        switch action {
+        case let .addGold(amount):
+            guard vns4_cheat_add_gold(engine, Int32(clamping: amount)) else { throw System4CheatError.busy }
+        case let .setVariable(id, .integer(value)):
+            switch Int(vns4_cheat_set_global(engine, Int32(clamping: id), Int32(clamping: value))) {
+            case VNS4_CHEAT_OK: break
+            case VNS4_CHEAT_BOOL: throw System4CheatError.yesOrNo(id)
+            case VNS4_CHEAT_NOT_NUMBER: throw System4CheatError.notANumber(id)
+            default: throw System4CheatError.busy
+            }
         // The page offers nothing else for System 4.
-        case .setVariable, .setSwitch, .addItem, .restoreParty: true
+        case .setVariable, .setSwitch, .addItem, .restoreParty: break
         }
-        guard done else { throw System4CheatError.busy }
     }
 
     func apply(_ settings: CheatSettings) {
@@ -46,12 +52,14 @@ final class System4Cheats: CheatSession {
 }
 
 nonisolated enum System4CheatError: LocalizedError {
-    case notRunning, busy
+    case notRunning, busy, yesOrNo(Int), notANumber(Int)
 
     var errorDescription: String? {
         switch self {
         case .notRunning: "The game isn't running."
         case .busy: "The game is busy. Try again in a moment."
+        case let .yesOrNo(id): "Global \(id) is a yes-or-no value: 0 or 1."
+        case let .notANumber(id): "Global \(id) isn't a whole number."
         }
     }
 }

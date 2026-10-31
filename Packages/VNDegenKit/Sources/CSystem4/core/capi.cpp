@@ -119,7 +119,7 @@ const char *vns4_cheat_state(VNS4Engine *e) {
     return e->cheatState.empty() ? nullptr : e->cheatState.c_str();
 }
 
-bool vns4_cheat_set_global(VNS4Engine *e, int index, int32_t value) { return e && e->game->cheatSetGlobal(index, value); }
+int vns4_cheat_set_global(VNS4Engine *e, int index, int32_t value) { return e ? e->game->cheatSetGlobal(index, value) : VNS4_CHEAT_BUSY; }
 bool vns4_cheat_add_gold(VNS4Engine *e, int amount) { return e && e->game->cheatAddGold(amount); }
 bool vns4_cheat_has_gold(VNS4Engine *e) { return e && e->game->hasGold(); }
 

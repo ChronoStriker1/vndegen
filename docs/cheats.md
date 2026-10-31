@@ -221,14 +221,16 @@ Set to 4x on the page while the movie ran, it measured 3.999 and 59.1.
 Both runtimes are VNDegen's own, so their Cheats pages are calls on the runtime's variables, which the games' saves keep as always.
 
 - **System 3** (`vns3.h`): the Variables tab lists the game's variables, 0 to 65,535 each, with the names `System39.ain` gives them, and game speed. Nine of the ten library games name them `VAR0000` and on, and Kichikuou Rance's fan translation names 24, none of them gold or HP. A `SYSTEM3.EXE` game (Rance 4.1 and 4.2) names none, and the tab lists the 512 variables its saves keep.
-- **System 4** (`vns4.h`): the Variables tab lists the game's globals by name: whole numbers to edit, and decimals and text to read. Gold is on the Quick tab for the library games whose globals say which one holds the party's money: `GOLD` in Rance 02, `◆金` in Sengoku Rance and `g_nPartyMoney` in Evenicle. Rance IX, which the runtime doesn't run yet, keeps its money in a structure, so it would get the variables and speed only. The VM runs on a thread of its own, so the cheats work while it waits for the host's next step, which is whenever the game isn't in the middle of a long load.
+- **System 4** (`vns4.h`): the Variables tab lists the game's globals by name: whole numbers to edit, a bool taking 0 or 1, and decimals and text to read. Gold is on the Quick tab for the library games whose globals say which one holds the party's money: `GOLD` in Rance 02, `◆金` in Sengoku Rance and `g_nPartyMoney` in Evenicle. Rance IX, which the runtime doesn't run yet, keeps its money in a structure, so it would get the variables and speed only. The VM runs on a thread of its own, so the cheats work while it waits for the host's next step, which is whenever the game isn't in the middle of a long load.
 - **Find by value**, on every engine's Variables tab: type the number the game shows, such as your gold, and the list keeps the variables that hold it. Change the number in the game, by buying something, then find the new number: the list keeps those of them that hold it, usually one. Show all clears it. The page keeps what it found while the game runs.
-- **Game speed** runs the runtime's clock that many times as fast, so its waits, fades, animations and timers pass sooner. Music plays at normal speed.
+- **Game speed** runs the runtime's clock that many times as fast, so its waits, fades, animations and timers pass sooner. Music plays at normal speed, and a System 4 movie keeps to its sound on a clock of its own, so it plays at normal speed too.
 
 Checked on CachyOS through the runtimes:
 
 - System 3, Kichikuou Rance (`System39.ain`) and Rance 4.1 (`SYSTEM3.EXE`): 806 and 512 variables listed, a variable set to 4,242 and one held to 65,535, and the clock running 3,840 ms for 960 ms of frames at 4x. Kichikuou Rance's save written after the change, in its own `KICHIKUSA.ASD`, loaded with the new value.
-- System 4, Rance 02 and Sengoku Rance: 218 and 107 globals listed, gold found and raised by 1,000, a bool held to 0 or 1, and a global of another type refused.
+- System 4, Rance 02 and Sengoku Rance: 218 and 107 globals listed, gold found and raised by 1,000, a bool refusing 4,242, and a global of another type refused.
+
+Checked in the app on an iPad simulator (the page and the runtime calls are the same on every device): in Kichikuou Rance, finding 24 kept the two variables holding it, and after one changed to 30, finding 30 kept that one. In Rance 02, the Quick tab showed Gold 0, +10,000 made it 10,000, and the Variables tab's search found `GOLD` at 10,000.
 
 ### Known limits
 
