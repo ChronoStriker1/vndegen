@@ -26,6 +26,7 @@ final class System4Session: EngineSession {
     private var lastTimestamp: CFTimeInterval?
     private var pacer = System4InputPacer()
     private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
+    private var scrollCarry = 0.0  // fractions of a wheel notch the view reported and the game hasn't had
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
     private var paused = false
@@ -96,7 +97,10 @@ final class System4Session: EngineSession {
         }
         frameView.onScroll = { [weak self] notches in
             guard let self, !paused else { return }
-            let whole = Int(notches.rounded())
+            // A trackpad reports fractions of a notch; they add up rather than round away.
+            scrollCarry += notches
+            let whole = Int(scrollCarry.rounded(.towardZero))
+            scrollCarry -= Double(whole)
             if whole != 0 { deliver([.wheel(whole)]) }
         }
         frameView.onKey = { [weak self] usage, pressed, characters in
@@ -229,14 +233,17 @@ final class System4Session: EngineSession {
     /// entry, all in order through the pacer like a hardware keyboard's.
     func type(_ typed: TypedText) {
         guard !paused else { return }
-        func tap(_ vk: Int32) -> [System4Input] { [.key(vk, down: true), .key(vk, down: false)] }
+        // Taps go through the router, so a key another source holds stays down.
         switch typed {
         case let .text(text):
-            deliver(text.flatMap { c -> [System4Input] in
-                KeyboardKey.keys(typing: .text(String(c))).flatMap { tap(Int32($0.keyCode)) } + [.text(String(c))]
-            })
-        case .newline: deliver(tap(13))
-        case .deleteBackward: deliver(tap(8))
+            var inputs: [System4Input] = []
+            for c in text {
+                for key in KeyboardKey.keys(typing: .text(String(c))) { inputs += router.tap(Int32(key.keyCode)) }
+                inputs.append(.text(String(c)))
+            }
+            deliver(inputs)
+        case .newline: deliver(router.tap(13))
+        case .deleteBackward: deliver(router.tap(8))
         }
     }
 
@@ -254,6 +261,7 @@ final class System4Session: EngineSession {
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
         msCarry = 0
+        scrollCarry = 0
         #if DEBUG
         pacing?.reset()
         #endif
@@ -490,6 +498,11 @@ nonisolated struct System4InputRouter {
             guard hostKeysDown.remove(hidUsage) != nil else { return [] }
         }
         return press(vk, pressed)
+    }
+
+    /// A key pressed and let go at once, as the on-screen keyboard types. A key another source holds sends nothing.
+    mutating func tap(_ vk: Int32) -> [System4Input] {
+        press(vk, true) + press(vk, false)
     }
 
     mutating func releaseAll() -> [System4Input] {

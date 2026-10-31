@@ -36,4 +36,12 @@ import VNCore
         #expect(router.pointerReleased(2) == [])
         #expect(router.pointer(event(.ended, .secondary), at: at) == [.mouseMove(at)])
     }
+
+    @Test func aTapOfAKeyHeldElsewhereSendsNothing() {
+        var router = System4InputRouter()
+        #expect(router.tap(13) == [.key(13, down: true), .key(13, down: false)])
+        _ = router.translate(.button(.confirm, pressed: true)) { $0 }  // Confirm holds Return
+        #expect(router.tap(13).isEmpty)                                // still held
+        #expect(router.translate(.button(.confirm, pressed: false)) { $0 } == [.key(13, down: false)])
+    }
 }
