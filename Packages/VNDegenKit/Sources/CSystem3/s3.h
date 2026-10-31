@@ -206,6 +206,7 @@ struct S3 {
     // input
     int mouseX, mouseY;
     bool mouseL, mouseR, keyDown[256];
+    double w64[256];        // the ND commands' double-precision work area
     int exprDepth;          // nesting of index expressions being read
     u32 clickLatch;         // buttons pressed since IM last read them (16 left, 32 right), so a quick tap still counts
     // A tap moves the pointer and presses in one go. Games take their hover from the position they last polled, so a

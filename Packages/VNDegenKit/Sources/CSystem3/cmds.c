@@ -329,7 +329,11 @@ static void cmd_C(S3 *s) {
         s3_fill(s, a[0].v, a[1].v, 1, a[3].v, a[4].v); s3_fill(s, a[0].v + a[2].v - 1, a[1].v, 1, a[3].v, a[4].v);
         return;
     case 'C': args(s, "eeeeee", a); s3_copy(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v); return;
-    case 'D': args(s, "eeeeeeeeee", a); unimpl(s, "CD"); return;
+    case 'D': // CD sx, sy, w, h, dx, dy, effect, wait, keyFlag, key: a keyed copy shown at once, without the effect
+        args(s, "eeeeeeeeee", a);
+        s3_copy_key(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v, a[9].v);
+        if (a[8].v) rnd(s, 0);
+        return;
     case 'E': args(s, "eeeeeeeee", a); effect_copy(s, a); return;
     case 'F': args(s, "eeeee", a); s3_fill(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v); return;
     case 'K': {
@@ -718,7 +722,11 @@ static void cmd_N(S3 *s) {
         return;
     }
     case 'C': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, 0); return;
-    case 'I': args(s, "eeee", a); unimpl(s, "NI"); return;
+    case 'I': // NI var, default, min, max: a number input box. There is no keypad, so it takes the default, as OK would.
+        args(s, "eeee", a);
+        put(s, &a[0], 0, a[1].v < a[2].v ? a[2].v : a[1].v > a[3].v ? a[3].v : a[1].v);
+        rnd(s, 0);
+        return;
     case 'P': {
         args(s, "eeee", a);
         bool same = true;
@@ -739,12 +747,37 @@ static void cmd_N(S3 *s) {
         return;
     }
     case 'D': {
-        // Double-precision (32-bit) numbers kept in variable pairs, numbered by the first arg.
+        // ND: doubles in a work area of their own, w64 0 to 255 (SDK manual). C copies a number in; D copies one out to
+        // a variable, truncated and taken modulo 65536 as System39.exe does; + - * / combine two into the first; A and
+        // M convert from and to a string; H prints.
         int op = s3_byte(s);
         Arg b[3];
         if (op == '+' || op == '-' || op == '*' || op == '/') args(s, "eee", b); else args(s, "ee", b);
-        unimpl(s, "ND");
-        return;
+        double *w = s->w64;
+        switch (op) {
+        case 'C': w[b[0].v & 255] = b[1].v; return;
+        case 'D': { double v = w[b[1].v & 255]; put(s, &b[0], 0, (u16)(long long)v); return; } // truncated, then wraps
+        case '+': w[b[0].v & 255] = w[b[1].v & 255] + w[b[2].v & 255]; return;
+        case '-': w[b[0].v & 255] = w[b[1].v & 255] - w[b[2].v & 255]; return;
+        case '*': w[b[0].v & 255] = w[b[1].v & 255] * w[b[2].v & 255]; return;
+        case '/': { double y = w[b[2].v & 255]; w[b[0].v & 255] = y != 0 ? w[b[1].v & 255] / y : 0; return; }
+        case 'A': { const char *x = str_slot(s, b[0].v); w[b[1].v & 255] = x ? atof(x) : 0; return; }
+        case 'M': { char t[64]; snprintf(t, sizeof t, "%.0f", w[b[1].v & 255]); str_set(s, b[0].v, t); return; }
+        case 'H': {
+            double v = w[b[0].v & 255];
+            char t[64], out[160];
+            snprintf(t, sizeof t, "%.0f", v < 0 ? 0 : v);
+            size_t n = strlen(t);
+            const char *digits = b[1].v > 0 && (size_t)b[1].v < n ? t + n - b[1].v : t;
+            size_t o = 0;
+            for (int pad = b[1].v - (int)n; pad > 0 && o + 2 < sizeof out; pad--) { out[o++] = (char)0x81; out[o++] = (char)0x40; }
+            for (const char *q = digits; *q && o + 2 < sizeof out; q++) { out[o++] = (char)0x82; out[o++] = (char)(0x4f + (*q - '0')); }
+            out[o] = 0;
+            s3_msg_text(s, out);
+            return;
+        }
+        default: s->vmError = true; return;
+        }
     }
     default: s->vmError = true;
     }
