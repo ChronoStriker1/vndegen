@@ -177,7 +177,6 @@ final class Navigator {
                 let current = pageScreenshots, url = viewer.screenshots[viewer.index].url
                 focusBeforeSheet = current.firstIndex { $0.url == url }.map { .pageScreenshot($0) }
                     ?? (current.isEmpty ? .pagePlay : .pageScreenshot(0))
-                keepScreenshotFocusShown(focusBeforeSheet)
             }
             // Focus moves into a sheet and returns to whatever opened it, however the sheet closes. A sheet that replaces
             // another, such as a license over the artwork editor, starts on its own default.
@@ -185,7 +184,8 @@ final class Navigator {
                 focusBeforeSheet = focus
                 setFocus(defaultFocus)
             } else if sheet == nil, oldValue != nil {
-                setFocus(focusBeforeSheet)
+                // The window can resize under a sheet, which changes the screenshot grid it returns to.
+                setFocus(shownScreenshotTarget(focusBeforeSheet))
                 focusBeforeSheet = nil
             } else if let sheet, let oldValue, sheet.id != oldValue.id {
                 setFocus(defaultFocus)
@@ -218,7 +218,7 @@ final class Navigator {
     var pageActionsStacked = false
     /// Set by the game page's screenshot grid from its width.
     var screenshotColumns = 2 {
-        didSet { if screenshotColumns != oldValue { keepScreenshotFocusShown() } }
+        didSet { if screenshotColumns != oldValue, sheet == nil { setFocus(shownScreenshotTarget(focus)) } }
     }
     /// Whether the game page's screenshot grid shows every screenshot rather than its first rows. Each page starts collapsed.
     var showsAllScreenshots = false
@@ -395,17 +395,21 @@ final class Navigator {
     /// Whether the grid has more screenshots than it shows collapsed, so it offers Show all and Show fewer.
     static func collapsesScreenshots(_ total: Int, columns: Int) -> Bool { total > columns * 3 }
 
-    /// Keeps a focused screenshot in the grid when the grid shows fewer, such as after the window narrows, by showing all
-    /// of them. A Show all button that went away because the grid no longer collapses hands focus to the last screenshot.
-    private func keepScreenshotFocusShown(_ target: Target? = nil) {
-        guard let target = target ?? focus else { return }
+    /// Where focus on `target` belongs after the screenshot grid changed under it, such as when the window narrowed or
+    /// widened. A screenshot the grid no longer shows makes it show all of them, and a Show all button that went away,
+    /// because the grid no longer collapses, hands focus to the last screenshot.
+    private func shownScreenshotTarget(_ target: Target?) -> Target? {
         let total = pageScreenshots.count
         switch target {
-        case let .pageScreenshot(index) where index >= Self.shownScreenshots(total, columns: screenshotColumns, showsAll: showsAllScreenshots):
+        case let .pageScreenshot(index)? where index >= total:
+            return total > 0 ? .pageScreenshot(total - 1) : .pagePlay
+        case let .pageScreenshot(index)? where index >= Self.shownScreenshots(total, columns: screenshotColumns, showsAll: showsAllScreenshots):
             showsAllScreenshots = true
-        case .pageScreenshotsMore where !Self.collapsesScreenshots(total, columns: screenshotColumns):
-            setFocus(total > 0 ? .pageScreenshot(total - 1) : defaultFocus)
-        default: break
+            return target
+        case .pageScreenshotsMore? where !Self.collapsesScreenshots(total, columns: screenshotColumns):
+            return total > 0 ? .pageScreenshot(total - 1) : .pagePlay
+        default:
+            return target
         }
     }
 
@@ -1044,6 +1048,8 @@ final class Navigator {
             guard let self else { return }
             let offer = await hub.saveSync.launchOffer(id)
             checkingSaves = nil
+            // The screenshot viewer can open while the saves are checked, and it mustn't stay over the game.
+            if case .screenshots? = sheet { sheet = nil }
             guard let offer else { return hub.launch(id) }
             sheet = .launchSaves(LaunchSavesModel(service: hub.saveSync, game: id, offer: offer) { [weak self] start in
                 self?.sheet = nil

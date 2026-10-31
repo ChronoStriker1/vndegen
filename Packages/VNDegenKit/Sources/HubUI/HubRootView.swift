@@ -26,7 +26,7 @@ public struct HubRootView: View {
                 // The screenshot viewer covers the library from here rather than from the library's own overlay, since the
                 // game page lays the library out wider than the safe area.
                 ZStack {
-                    if case let .screenshots(viewer)? = nav.sheet {
+                    if case .library = hub.screen, case let .screenshots(viewer)? = nav.sheet {
                         ScreenshotViewerView(viewer: viewer).transition(.opacity)
                     }
                 }

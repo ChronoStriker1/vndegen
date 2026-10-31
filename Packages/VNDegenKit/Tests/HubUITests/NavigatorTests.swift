@@ -330,6 +330,23 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.focus == .pageScreenshot(0))
     nav.hub.library.update(id) { $0.metadata?.screenshots = shots }
 
+    // The window can resize under another sheet. Closing it brings focus back to a screenshot the grid shows, and a Show
+    // all button that went away hands focus to the last screenshot.
+    nav.showsAllScreenshots = false
+    nav.screenshotColumns = 4
+    nav.setFocus(.pageScreenshot(8))
+    nav.activate(.pageEngine)
+    nav.screenshotColumns = 3
+    press(nav, .cancel)
+    #expect(nav.showsAllScreenshots)
+    #expect(nav.focus == .pageScreenshot(8))
+    nav.showsAllScreenshots = false
+    nav.setFocus(.pageScreenshotsMore)
+    nav.activate(.pageEngine)
+    nav.screenshotColumns = 4
+    press(nav, .cancel)
+    #expect(nav.focus == .pageScreenshot(9))
+
     // A shorter list shows every screenshot without the button.
     nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots.prefix(9)) }
     nav.push(.game(id))
