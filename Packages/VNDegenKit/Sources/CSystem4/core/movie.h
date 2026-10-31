@@ -5,6 +5,7 @@
 // Threads: open, advanceTo, frame, ended and close belong to one thread. readAudio may run on another (the host's
 // audio thread). Stop the audio thread before destroying the Movie.
 #pragma once
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <mutex>
@@ -35,8 +36,9 @@ public:
     int sourceAudioRate() const { return srcRate_; }  // the MP2 stream's rate; 0 without audio
 
     // Decodes video up to the playback time and keeps half a second of sound decoded ahead of what has played.
-    // The playback time is seconds (the game clock since the start), or the sound played so far less 50 ms when that
-    // is later, so a game clock that falls behind real time neither starves the sound nor lets the picture lag it. Returns true
+    // The playback time is seconds (the game clock since the start), moved ahead when the sound shows the clock has
+    // dropped more than 50 ms (see advanceTo), so a clock that falls behind real time neither starves the sound nor
+    // lets the picture lag it. Returns true
     // when frame() changed. Time only moves forward; a large jump decodes every frame in between.
     bool advanceTo(double seconds);
     // RGBA8, width*height*4, alpha 255. Black until the first frame.
@@ -100,6 +102,7 @@ private:
     size_t ringHead_ = 0, ringCount_ = 0;  // in frames
     bool audioEnded_ = false;  // the decoder has pushed its last samples
     int64_t audioRead_ = 0;    // frames the host has played
+    double minLead_ = INFINITY;  // the sound read's smallest lead over the game clock: the host's output latency
     int64_t leadSilence_ = 0;  // silence still to play before the sound, when it starts after the picture
     Dry dry_;
 };

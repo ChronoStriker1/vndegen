@@ -259,12 +259,17 @@ bool Movie::advanceTo(double seconds) {
         return ringCount_ + size_t(leadSilence_);
     };
     {
-        // The game clock drives the picture, stepping evenly with the display. The sound played moves in audio
-        // buffers, so it only takes over when it is well ahead, as after a hitch that the game clock dropped. Once the
-        // sound has played out, the picture catches up to it fully, or its last frames would wait for the game clock.
+        // The game clock drives the picture, stepping evenly with the display. The sound read leads what is heard by
+        // the host's output latency (large on a simulator), so its smallest lead over the game clock is taken as that
+        // latency; lead beyond it is time the game clock dropped in hitches, and past the slack the picture catches up.
+        // Once the sound has played out, the picture catches up fully, or its last frames would wait for the clock.
         std::lock_guard<std::mutex> lock(mu_);
-        double slack = audioEnded_ && ringCount_ == 0 ? 0 : kAudioSlack;
-        now_ = std::max({now_, seconds, double(audioRead_) / kAudioRate - slack});
+        double heard = double(audioRead_) / kAudioRate;
+        if (heard >= 0.5) minLead_ = std::min(minLead_, heard - seconds);
+        double target = seconds;
+        if (audioEnded_ && ringCount_ == 0) target = std::max(target, heard);
+        else if (std::isfinite(minLead_)) target = std::max(target, heard - minLead_ - kAudioSlack);
+        now_ = std::max(now_, target);
     }
 
     // plm_video_get_time is the presentation time of the next frame to decode. Only the newest frame is converted.
@@ -408,6 +413,7 @@ void Movie::close() {
     ringHead_ = ringCount_ = 0;
     audioEnded_ = false;
     audioRead_ = 0;
+    minLead_ = INFINITY;
     leadSilence_ = 0;
     audioStart_ = 0;
     dry_ = {};
