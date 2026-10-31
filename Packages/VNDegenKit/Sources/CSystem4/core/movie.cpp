@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 
 // pl_mpeg's implementation, compiled once for the runtime. Its stdio loaders are unused: the demuxer below reads
@@ -232,17 +231,23 @@ bool Movie::open(const std::string &path) {
         audio_ = nullptr;
         audioBuf_ = nullptr;
     }
-    if (audio_ && firstAudioPts_ >= 0) audioSkew_ = std::llround((firstVideoPts_ - firstAudioPts_) * kAudioRate);
-    if (std::llabs(audioSkew_) > 10 * kAudioRate) audioSkew_ = 0;  // streams 10 s apart are damaged timestamps
+    if (audio_ && firstAudioPts_ >= 0) {
+        audioStart_ = firstAudioPts_ - firstVideoPts_;
+        audioSkew_ = std::llround(-audioStart_ * kAudioRate);
+    }
+    // Sound that starts after the picture is preceded by silence, counted rather than stored.
+    int64_t leadSilence = std::max<int64_t>(0, -audioSkew_);
+    audioSkew_ = std::max<int64_t>(0, audioSkew_);
 
     frame_.assign(size_t(width_) * height_ * 4, 0);
     for (size_t i = 3; i < frame_.size(); i += 4) frame_[i] = 255;
     rsIn_.assign(2, 0.0f);  // one frame of history before the first sample
     rsPos_ = 1;
     std::lock_guard<std::mutex> lock(mu_);
-    // A second of sound, plus room for the silence before sound that starts after the picture.
-    ring_.assign((size_t(kAudioRate) + size_t(std::max<int64_t>(0, -audioSkew_))) * 2, 0.0f);
+    ring_.assign(size_t(kAudioRate) * 2, 0.0f);  // one second
     ringHead_ = ringCount_ = 0;
+    leadSilence_ = leadSilence;
+    audioPushed_ = leadSilence;
     return true;
 }
 
@@ -250,7 +255,7 @@ bool Movie::advanceTo(double seconds) {
     if (!video_) return false;
     auto buffered = [this] {
         std::lock_guard<std::mutex> lock(mu_);
-        return ringCount_;
+        return ringCount_ + size_t(leadSilence_);
     };
     {
         std::lock_guard<std::mutex> lock(mu_);
@@ -267,9 +272,10 @@ bool Movie::advanceTo(double seconds) {
         }
         shown = f;
     }
-    // Sound runs ahead of the game clock (as without a host pulling it) and of what has played.
+    // Sound runs ahead of the game clock (as without a host pulling it) and of what has played. The decoder's clock
+    // starts at the sound's own start, audioStart_ into the movie.
     while (audio_ && !audioDone_ &&
-           (plm_audio_get_time(audio_) < now_ + kAudioLead || buffered() < size_t(kAudioLead * kAudioRate))) {
+           (plm_audio_get_time(audio_) + audioStart_ < now_ + kAudioLead || buffered() < size_t(kAudioLead * kAudioRate))) {
         plm_samples_t *s = plm_audio_decode(audio_);
         if (!s) {
             audioDone_ = eof_;
@@ -311,12 +317,6 @@ void Movie::pushAudio(const float *in, int frames) {
         audioSkew_ -= int64_t(d);
     }
     std::lock_guard<std::mutex> lock(mu_);
-    if (audioSkew_ < 0) {  // audio starts after the video: pad with silence
-        std::vector<float> silence(size_t(-audioSkew_) * 2, 0.0f);
-        writeRing(silence.data(), size_t(-audioSkew_));
-        audioPushed_ -= audioSkew_;
-        audioSkew_ = 0;
-    }
     writeRing(src, n);
     audioPushed_ += int64_t(n);
 }
@@ -342,6 +342,13 @@ void Movie::writeRing(const float *in, size_t frames) {
 
 int Movie::readAudio(float *out, int frames) {
     std::lock_guard<std::mutex> lock(mu_);
+    // The silence before sound that starts after the picture comes first.
+    int quiet = int(std::min<int64_t>(leadSilence_, std::max(frames, 0)));
+    std::memset(out, 0, size_t(quiet) * 2 * sizeof(float));
+    leadSilence_ -= quiet;
+    audioRead_ += quiet;
+    out += size_t(quiet) * 2;
+    frames -= quiet;
     size_t cap = ring_.size() / 2;
     size_t n = std::min(size_t(std::max(frames, 0)), ringCount_);
     size_t first = std::min(n, cap - ringHead_);
@@ -354,7 +361,7 @@ int Movie::readAudio(float *out, int frames) {
         dry_.reads++;
         dry_.frames += frames - int64_t(n);
     }
-    return int(n);
+    return quiet + int(n);
 }
 
 Movie::Dry Movie::dry() {
@@ -396,6 +403,8 @@ void Movie::close() {
     ringHead_ = ringCount_ = 0;
     audioEnded_ = false;
     audioRead_ = 0;
+    leadSilence_ = 0;
+    audioStart_ = 0;
     dry_ = {};
 }
 

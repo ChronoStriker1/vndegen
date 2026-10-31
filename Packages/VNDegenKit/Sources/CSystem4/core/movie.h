@@ -91,7 +91,8 @@ private:
     // Resampler state: pending source frames (stereo) with one frame of history, and the read position in them.
     std::vector<float> rsIn_, rsOut_;
     double rsPos_ = 1;
-    int64_t audioSkew_ = 0;  // output frames to drop (>0) or silence to insert (<0) to line audio up with video
+    int64_t audioSkew_ = 0;  // output frames of the sound's lead-in to drop, when it starts before the picture
+    double audioStart_ = 0;  // seconds into the movie the sound starts; negative when it starts first
     int64_t audioPushed_ = 0;  // output frames produced so far, in movie time
 
     std::mutex mu_;  // guards the ring and the counts below it
@@ -99,6 +100,7 @@ private:
     size_t ringHead_ = 0, ringCount_ = 0;  // in frames
     bool audioEnded_ = false;  // the decoder has pushed its last samples
     int64_t audioRead_ = 0;    // frames the host has played
+    int64_t leadSilence_ = 0;  // silence still to play before the sound, when it starts after the picture
     Dry dry_;
 };
 

@@ -259,12 +259,12 @@ S4_HLL(VSFile, ReadFloat) {
     c.retBool(ok);
 }
 S4_HLL(VSFile, ReadString) {
-    // The string must end in its NUL within 64 KB; otherwise the file is damaged and the variable keeps its value.
-    constexpr size_t kMax = 65536;
+    // The string must end in its NUL before the file does; otherwise the file is damaged and the variable keeps its
+    // value.
     std::string s;
     bool ok = vsExpect(kVsString);
     for (int ch; ok && (ch = g_vs.get()) != 0;) {
-        if (ch == std::char_traits<char>::eof() || s.size() == kMax) ok = false;
+        if (ch == std::char_traits<char>::eof()) ok = false;
         else s += char(ch);
     }
     if (ok) c.refS(0) = s;

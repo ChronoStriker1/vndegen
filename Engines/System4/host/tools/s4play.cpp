@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     // frame would be: the step and the sound pulled after it cover 200 ms.
     std::vector<float> audio(2 * 8820);
     long hitch = std::getenv("S4_HITCH") ? std::atol(std::getenv("S4_HITCH")) : 0;
-    long sampleClock = 0;  // sound frames pulled so far
+    long gameMs = 0, sampleClock = 0;  // time stepped and sound frames pulled so far
     bool audioLog = std::getenv("S4_AUDIOLOG") != nullptr;
     std::FILE *wav = std::getenv("S4_WAV") ? std::fopen(std::getenv("S4_WAV"), "wb") : nullptr;
     if (wav) std::fseek(wav, 44, SEEK_SET);
@@ -72,7 +72,8 @@ int main(int argc, char **argv) {
         }
         int ms = hitch > 0 && f % hitch == hitch - 1 ? 200 : 16;
         if (!vns4_step(e, ms)) { std::printf("game ended at frame %ld\n", f); break; }
-        int n = int(sampleClock + ms * 441 / 10 - sampleClock);
+        gameMs += ms;
+        int n = int(gameMs * 441 / 10 - sampleClock);  // whole frames due by now, so no fraction is lost
         sampleClock += n;
         vns4_audio_render(e, audio.data(), n);
         if (wav) {

@@ -68,6 +68,7 @@ bool readGD(const std::string &path, std::vector<uint8_t> &plain) {
 }
 
 bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xorData) {
+    if (path.empty()) return false;  // hostPath refused it: nothing, not even the temporary file, is written
     uLongf cap = compressBound(uLong(plain.size()));
     std::vector<uint8_t> d(8 + cap);
     if (compress2(d.data() + 8, &cap, plain.data(), uLong(plain.size()), 9) != Z_OK) return false;
@@ -313,8 +314,8 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
 
 namespace {
 
-constexpr int32_t kMaxRank = 16;  // far above any game's arrays
-constexpr int kMaxDepth = 64;     // structs and arrays nested in a save
+constexpr int32_t kMaxRank = 16;           // far above any game's arrays
+constexpr size_t kMaxArrayPages = 1 << 20;  // arrays one load may make; empty dimensions cost no bytes in the file
 
 struct Reader {
     const std::vector<uint8_t> &d;
@@ -403,26 +404,93 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
     return !r.bad;
 }
 
+// Walks what Applier would fill without touching the VM: a record or array that refers back to one being filled,
+// or more arrays than kMaxArrayPages, fails the load before any global changes.
+struct Checker {
+    VM &vm;
+    Loaded &L;
+    std::vector<char> recordOpen = std::vector<char>(L.records.size()), arrayOpen = std::vector<char>(L.arrayAt.size());
+    size_t pages = 0;
+    bool failed = false;
+
+    void value(const VarType &t, int32_t v) {
+        if (failed) return;
+        if (t.type == T_STRUCT) record(t.structType, v);
+        else if (isArray(t.type)) array(arrayElem(t.type) == T_STRUCT ? t.structType : -1, v);
+    }
+    void record(int32_t structType, int32_t index) {
+        if (index < 0 || size_t(index) >= L.records.size() || structType < 0 || size_t(structType) >= vm.ain.structs.size()) return;
+        if (recordOpen[size_t(index)]) { failed = true; return; }
+        recordOpen[size_t(index)] = 1;
+        const Struct &st = vm.ain.structs[size_t(structType)];
+        for (int32_t vi : L.records[size_t(index)].idx) {
+            if (vi < 0 || size_t(vi) >= L.structVals.size()) continue;
+            for (const Variable &m : st.members)
+                if (m.name == L.structVals[size_t(vi)].name) {
+                    value(m.t, L.structVals[size_t(vi)].value);
+                    break;
+                }
+        }
+        recordOpen[size_t(index)] = 0;
+    }
+    // elemStruct is the element struct type, or -1 when the elements aren't structs.
+    void array(int32_t elemStruct, int32_t index) {
+        if (index < 0 || size_t(index) >= L.arrayAt.size()) return;
+        if (arrayOpen[size_t(index)]) { failed = true; return; }
+        arrayOpen[size_t(index)] = 1;
+        Reader r{*L.data};
+        size_t p = L.arrayAt[size_t(index)];
+        int32_t rank = int32_t(r.u32(p));
+        if (rank > kMaxRank) { failed = true; return; }
+        if (rank > 0) {
+            std::vector<uint32_t> dims(static_cast<size_t>(rank), 0);
+            for (auto &d : dims) d = r.u32(p);
+            r.u32(p);
+            // Applier makes one array per node: the outer dimensions' running products.
+            uint64_t level = 1;
+            for (int k = rank - 1; k >= 1 && !failed; k--) {
+                level *= dims[size_t(k)];
+                pages += size_t(std::min<uint64_t>(level, kMaxArrayPages + 1));
+                if (level > kMaxArrayPages || pages > kMaxArrayPages) failed = true;
+            }
+            // The innermost rows, in order, with their struct elements.
+            for (uint64_t row = 0; row < level && !failed && !r.bad; row++) {
+                if (++pages > kMaxArrayPages) { failed = true; break; }
+                uint32_t n = r.u32(p);
+                for (uint32_t k = 0; k < n && !r.bad && !failed; k++) {
+                    int32_t val = int32_t(r.u32(p));
+                    r.u32(p);
+                    if (elemStruct >= 0) record(elemStruct, val);
+                }
+            }
+        }
+        arrayOpen[size_t(index)] = 0;
+    }
+};
+
 // Puts a saved value into a variable of the program's type, matching struct members by name.
 struct Applier {
     VM &vm;
     Loaded &L;
-    int depth = 0;  // a damaged save's records can refer to each other in a loop
+    // A damaged save's records or arrays can refer back to one being filled, or ask for absurd numbers of arrays.
+    // Either fails the load; nothing is skipped silently.
+    std::vector<char> recordOpen = std::vector<char>(L.records.size()), arrayOpen = std::vector<char>(L.arrayAt.size());
+    size_t pages = 0;
+    bool failed = false;
 
     void store(int32_t &dst, const VarType &t, int32_t savedType, int32_t value) {
-        if (depth >= kMaxDepth) return;
-        depth++;
-        storeValue(dst, t, savedType, value);
-        depth--;
-    }
-
-    void storeValue(int32_t &dst, const VarType &t, int32_t savedType, int32_t value) {
+        if (failed) return;
         if (t.type == T_STRING) {
             if (!vm.valid(dst)) dst = vm.newString();
             vm.str(dst) = value >= 0 && size_t(value) < L.strings.size() ? L.strings[value] : std::string();
         } else if (t.type == T_STRUCT) {
             if (!vm.valid(dst)) dst = vm.newStruct(t.structType);
-            if (value >= 0 && size_t(value) < L.records.size()) fillStruct(dst, L.records[value]);
+            if (value >= 0 && size_t(value) < L.records.size()) {
+                if (recordOpen[size_t(value)]) { failed = true; return; }
+                recordOpen[size_t(value)] = 1;
+                fillStruct(dst, L.records[value]);
+                recordOpen[size_t(value)] = 0;
+            }
         } else if ((t.type >= T_ARRAY_INT && t.type <= T_ARRAY_STRUCT) || t.type == T_ARRAY_BOOL || t.type == T_ARRAY_FUNCTYPE ||
                    t.type == 58 || t.type == 67) {
             fillArray(dst, t, value);
@@ -453,6 +521,13 @@ struct Applier {
 
     void fillArray(int32_t &dst, const VarType &t, int32_t index) {
         if (index < 0 || size_t(index) >= L.arrayAt.size()) return;
+        if (arrayOpen[size_t(index)]) { failed = true; return; }
+        arrayOpen[size_t(index)] = 1;
+        fillArrayAt(dst, t, index);
+        arrayOpen[size_t(index)] = 0;
+    }
+
+    void fillArrayAt(int32_t &dst, const VarType &t, int32_t index) {
         Reader r{*L.data};
         size_t p = L.arrayAt[index];
         int32_t rank = int32_t(r.u32(p));
@@ -478,15 +553,19 @@ struct Applier {
     int32_t node(Reader &r, size_t &p, int32_t elemType, int32_t elemStruct, int rank, const std::vector<uint32_t> &dims) {
         int32_t none[1] = {0};
         int32_t s = vm.newArray(elemType, elemStruct, rank, none, 1);
+        if (++pages > kMaxArrayPages) {
+            failed = true;
+            return s;
+        }
         if (rank > 1) {
-            for (uint32_t k = 0; k < dims[size_t(rank - 1)] && !r.bad; k++) {
+            for (uint32_t k = 0; k < dims[size_t(rank - 1)] && !r.bad && !failed; k++) {
                 int32_t v = node(r, p, elemType, elemStruct, rank - 1, dims);
                 vm.page(s)->v.push_back(v);
             }
             return s;
         }
         uint32_t n = r.u32(p);
-        for (uint32_t k = 0; k < n && !r.bad; k++) {
+        for (uint32_t k = 0; k < n && !r.bad && !failed; k++) {
             int32_t val = int32_t(r.u32(p)), typ = int32_t(r.u32(p));
             int32_t v = elemType == T_STRING ? vm.newString() : elemType == T_STRUCT ? vm.newStruct(elemStruct) : 0;
             store(v, VarType{elemType, elemStruct, 0}, typ, val);
@@ -506,6 +585,16 @@ int32_t globalLoad(VM &vm, const std::string &key, const std::string &file, cons
     std::string fileKey, fileGroup;
     if (!parse(d, L, fileKey, fileGroup) || fileKey != key) return 0;
     if (!group.empty() && fileGroup != group) return 0;
+    // The whole save is checked first, so a damaged one fails without changing anything; then it fills the
+    // globals in place, as the PC does, so references to them stay valid and no destructor runs.
+    Checker check{vm, L};
+    for (auto &gv : L.globals)
+        for (size_t i = 0; i < vm.ain.globals.size(); i++)
+            if (vm.ain.globals[i].name == gv.name) {
+                check.value(vm.ain.globals[i].t, gv.value);
+                break;
+            }
+    if (check.failed) return 0;
     Applier a{vm, L};
     int n = 0;
     for (auto &gv : L.globals) {
@@ -519,7 +608,7 @@ int32_t globalLoad(VM &vm, const std::string &key, const std::string &file, cons
         }
     }
     if (count) *count = n;
-    return 1;
+    return a.failed ? 0 : 1;
 }
 
 int32_t exists(VM &vm, const std::string &name, bool inSaveFolder) {

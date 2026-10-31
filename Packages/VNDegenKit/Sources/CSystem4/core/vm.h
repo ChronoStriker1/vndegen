@@ -58,6 +58,11 @@ struct HllCall {
         size_t w = size_t(argWord[size_t(k)]) + size_t(offset);
         return w < words.size() ? words[w] : 0;
     }
+    // Whether the call passed argument k's words. A missing slot argument reads as -1, never slot 0.
+    bool passed(int k, int nWords = 1) const {
+        return k >= 0 && size_t(k) < argWord.size() && size_t(argWord[size_t(k)]) + size_t(nWords) <= words.size();
+    }
+    int32_t slotWord(int k) const { return passed(k) ? word(k) : -1; }
     int32_t i(int k) const { return word(k); }
     float f(int k) const;
     bool b(int k) const { return i(k) != 0; }
@@ -67,7 +72,7 @@ struct HllCall {
     float &refF(int k) const;
     std::string &refS(int k) const;   // ref string
     Page *page(int k) const;          // struct, ref struct, arrays and ref arrays: the page, or nullptr
-    int32_t slot(int k) const { return i(k); }
+    int32_t slot(int k) const { return slotWord(k); }
 
     void retInt(int32_t v) { ret = v; retSet = true; }
     void retBool(bool v) { retInt(v ? 1 : 0); }

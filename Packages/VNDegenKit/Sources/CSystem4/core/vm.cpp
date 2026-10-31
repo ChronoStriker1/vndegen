@@ -64,25 +64,26 @@ std::unordered_map<std::string, HllImpl> &HllRegistry::table() {
 float HllCall::f(int k) const { return bitsToFloat(i(k)); }
 const std::string &HllCall::s(int k) const {
     static const std::string empty;
-    int32_t sl = i(k);
+    int32_t sl = slotWord(k);
     return vm.valid(sl) && vm.heap[sl].str ? *vm.heap[sl].str : empty;
 }
 int32_t &HllCall::ref(int k) const {
     static int32_t dummy;
+    // An argument the game's declaration doesn't pass gets the dummy, not page 0 (the globals).
     int32_t pg = word(k), idx = word(k, 1);
-    Page *p = vm.page(pg);
+    Page *p = passed(k, 2) ? vm.page(pg) : nullptr;
     if (!p || idx < 0 || size_t(idx) >= p->v.size()) { dummy = 0; return dummy; }
     return p->v[idx];
 }
 float &HllCall::refF(int k) const { return *reinterpret_cast<float *>(&ref(k)); }
 std::string &HllCall::refS(int k) const {
     static std::string dummy;
-    int32_t sl = i(k);
+    int32_t sl = slotWord(k);
     if (vm.valid(sl) && vm.heap[sl].str) return *vm.heap[sl].str;
     dummy.clear();
     return dummy;
 }
-Page *HllCall::page(int k) const { return vm.page(i(k)); }
+Page *HllCall::page(int k) const { return vm.page(slotWord(k)); }
 void HllCall::retFloat(float v) { retInt(floatToBits(v)); }
 void HllCall::retString(const std::string &s) { retInt(vm.newString(s)); }
 
@@ -811,18 +812,17 @@ void VM::run(size_t untilFrames) {
         }
         case OP_A_COPY: {
             int32_t n = pop(), srcStart = pop(), src = pop(), dstStart = pop(), i = pop(), pg = pop();
-            Page *d = arrayAt(pg, i);
-            Page *s = page(src);
             int32_t done = 0;
-            if (d && s && n > 0 && dstStart >= 0 && srcStart >= 0 && size_t(dstStart) < d->v.size() &&
-                size_t(srcStart) < s->v.size()) {
-                int32_t count = int32_t(std::min({size_t(n), d->v.size() - size_t(dstStart), s->v.size() - size_t(srcStart)}));
-                for (; done < count; done++) {
-                    int32_t v = s->v[size_t(srcStart) + size_t(done)];
-                    int32_t &dv = d->v[size_t(dstStart) + size_t(done)];
-                    if (d->elemType == T_STRING) str(dv) = str(v);
-                    else if (d->elemType == T_STRUCT) structAssign(dv, v);
-                    else dv = v;
+            if (n > 0 && dstStart >= 0 && srcStart >= 0) {
+                // The arrays are looked up each time: a struct's destructor, run by the assignment, can change them.
+                for (; done < n; done++) {
+                    Page *d = arrayAt(pg, i), *s = page(src);
+                    size_t di = size_t(dstStart) + size_t(done), si = size_t(srcStart) + size_t(done);
+                    if (!d || !s || di >= d->v.size() || si >= s->v.size()) break;
+                    int32_t v = s->v[si];
+                    if (d->elemType == T_STRING) str(d->v[di]) = str(v);
+                    else if (d->elemType == T_STRUCT) structAssign(d->v[di], v);
+                    else d->v[di] = v;
                 }
             }
             push(done);
@@ -838,14 +838,14 @@ void VM::run(size_t untilFrames) {
             for (int64_t k = std::max<int64_t>(start, 0); k < end && size_t(k) < a->v.size(); k++) {
                 int32_t e = a->v[size_t(k)];
                 if (a->elemType == T_STRING) str(e) = str(v);
-                else if (a->elemType == T_STRUCT) {
+                else if (a->elemType == T_STRUCT && a->rank <= 1) {
                     // Each element gets its own copy; the value popped is a temporary this instruction owns.
                     if (page(e)) structAssign(e, v);
                     else if (int32_t c = copyPage(v); size_t(k) < a->v.size()) a->v[size_t(k)] = c;
                     else decref(c);
                 } else a->v[size_t(k)] = v;
             }
-            if (a->elemType == T_STRING || a->elemType == T_STRUCT) decref(v);
+            if (a->elemType == T_STRING || (a->elemType == T_STRUCT && a->rank <= 1)) decref(v);
             push(done);
             break;
         }
@@ -1107,8 +1107,8 @@ void VM::run(size_t untilFrames) {
         }
         // A delegate call: CALLBEGIN finds the delegate below the arguments and pushes an index; each DG_CALL calls
         // the next method with copies of the arguments, or when none are left drops them and jumps past the loop.
-        // Strings and structs passed by value belong to the callee, so each method gets its own copy and the loop
-        // releases the originals at the end.
+        // Strings, structs and delegates passed by value belong to the callee, so each method gets its own copy and
+        // the loop releases the originals at the end.
         case OP_DG_CALLBEGIN: push(0); break;
         case OP_DG_CALL: {
             const FuncType &ft = ain.delegates.at(A(0));
@@ -1121,17 +1121,18 @@ void VM::run(size_t untilFrames) {
             Delegate *d = delegate(dsl);
             auto byValue = [&](int k) {
                 int32_t t = size_t(k) < ft.vars.size() ? ft.vars[size_t(k)].t.type : T_INT;
-                return t == T_STRING || t == T_STRUCT;
+                return t == T_STRING || t == T_STRUCT || isDelegate(t);
             };
             if (!d || idx >= int32_t(d->size())) {
-                // The loop's value is the last method's return; with none called, the type's empty value.
+                // The loop's value is the last method's return; with none called, the type's empty value. It is
+                // taken before the arguments are released, since their destructors can call delegates too.
+                int32_t result = idx > 0 ? dgLastReturn_ : ft.ret.type == T_STRING ? newString() : ft.ret.type == T_STRUCT ? -1 : 0;
+                std::vector<int32_t> owned;
                 for (int k = 0; k < nargs; k++)
-                    if (byValue(k)) decref(stack[top - 1 - nargs + k]);
+                    if (byValue(k)) owned.push_back(stack[top - 1 - nargs + k]);
                 stack.resize(top - 2 - nargs);
-                if (ft.ret.type != T_VOID) {
-                    if (idx > 0) push(dgLastReturn_);
-                    else push(ft.ret.type == T_STRING ? newString() : ft.ret.type == T_STRUCT ? -1 : 0);
-                }
+                for (int32_t v : owned) decref(v);
+                if (ft.ret.type != T_VOID) push(result);
                 jump(A(1));
                 break;
             }
@@ -1139,9 +1140,11 @@ void VM::run(size_t untilFrames) {
             stack[top - 1] = idx + 1;
             for (int k = 0; k < nargs; k++) {
                 int32_t v = stack[top - 1 - nargs + k];
-                if (!byValue(k)) push(v);
-                else if (ft.vars[size_t(k)].t.type == T_STRING) push(newString(str(v)));
-                else push(copyPage(v));
+                int32_t t = byValue(k) ? ft.vars[size_t(k)].t.type : T_INT;
+                if (t == T_STRING) push(newString(str(v)));
+                else if (t == T_STRUCT) push(copyPage(v));
+                else if (isDelegate(t)) push(newDelegate(delegate(v) ? *delegate(v) : Delegate{}));
+                else push(v);
             }
             ip = next;
             enter(fn, obj >= 0 ? obj : -1, false);
