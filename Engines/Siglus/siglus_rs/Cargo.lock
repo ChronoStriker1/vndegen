@@ -945,19 +945,6 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
-dependencies = [
- "humantime",
- "is-terminal",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2daee4ea451f429a58296525ddf28b45a3b64f1acf6587e2067437bb11e218d"
@@ -1109,27 +1096,6 @@ version = "0.1.0"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "game_launcher"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "avg32",
- "encoding_rs",
- "engine-detect",
- "game_fs",
- "image",
- "js-sys",
- "log",
- "pollster",
- "reallive",
- "siglus_scene_vm",
- "uk2",
- "wasm-bindgen",
- "wgpu 0.20.1",
- "winit 0.31.0-beta.3",
 ]
 
 [[package]]
@@ -1359,12 +1325,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62adaabb884c94955b19907d60019f4e145d091c75345379e70d1ee696f7854f"
 
 [[package]]
-name = "humantime"
-version = "2.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15cdd26707701c53297e2fa6afb323d55fbc1d0810c3aec078ae3ef0424c3c15"
-
-[[package]]
 name = "iana-time-zone"
 version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1527,17 +1487,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "is-terminal"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
-dependencies = [
- "hermit-abi",
- "libc",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1667,7 +1616,7 @@ dependencies = [
  "glam",
  "mint",
  "paste",
- "ringbuf 0.3.3",
+ "ringbuf",
  "send_wrapper",
  "symphonia",
  "triple_buffer",
@@ -1795,12 +1744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "md5"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
-
-[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1874,7 +1817,7 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "crossbeam-channel",
- "env_logger 0.11.9",
+ "env_logger",
  "log",
  "oxideav-ac3",
  "oxideav-core",
@@ -2646,17 +2589,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ringbuf"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe47b720588c8702e34b5979cb3271a8b1842c7cb6f57408efa70c779363488c"
-dependencies = [
- "crossbeam-utils",
- "portable-atomic",
- "portable-atomic-util",
-]
-
-[[package]]
 name = "rodio"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2845,24 +2777,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "shion-render"
-version = "0.1.0"
-dependencies = [
- "shion-xfile",
-]
-
-[[package]]
 name = "shion-xfile"
 version = "0.1.0"
 dependencies = [
  "flate2",
-]
-
-[[package]]
-name = "shion-xscene"
-version = "0.1.0"
-dependencies = [
- "shion-xfile",
 ]
 
 [[package]]
@@ -2885,45 +2803,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "siglus_cfx_decompiler"
-version = "0.1.0"
-
-[[package]]
-name = "siglus_compiler_common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
-]
-
-[[package]]
-name = "siglus_g00_extract"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "image",
- "siglus_scene_vm",
-]
-
-[[package]]
-name = "siglus_gameexe_compiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "encoding_rs",
- "siglus_compiler_common",
-]
-
-[[package]]
-name = "siglus_gameexe_ini"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "siglus_assets",
-]
-
-[[package]]
 name = "siglus_key_recovery"
 version = "0.1.0"
 dependencies = [
@@ -2941,19 +2820,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "siglus_scene_linker"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "encoding_rs",
- "md5",
- "serde",
- "serde_json",
- "siglus_compiler_common",
-]
-
-[[package]]
 name = "siglus_scene_vm"
 version = "1.0.0"
 dependencies = [
@@ -2968,7 +2834,7 @@ dependencies = [
  "egui-wgpu",
  "eluna_rs",
  "encoding_rs",
- "env_logger 0.11.9",
+ "env_logger",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
  "image",
@@ -2995,39 +2861,6 @@ dependencies = [
  "wgpu 0.20.1",
  "winit 0.31.0-beta.3",
  "wmv-decoder",
-]
-
-[[package]]
-name = "siglus_script_compiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "encoding_rs",
- "siglus_compiler_common",
-]
-
-[[package]]
-name = "siglus_ss_decompiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "siglus_assets",
-]
-
-[[package]]
-name = "siglus_x_viewer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "clap",
- "env_logger 0.11.9",
- "log",
- "pollster",
- "shion-render",
- "wgpu 0.20.1",
- "winit 0.31.0-beta.3",
 ]
 
 [[package]]
@@ -3526,24 +3359,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb30dbbd9036155e74adad6812e9898d03ec374946234fbcebd5dfc7b9187b90"
 dependencies = [
  "rustc-hash 2.1.1",
-]
-
-[[package]]
-name = "uk2"
-version = "0.1.0"
-dependencies = [
- "ab_glyph",
- "anyhow",
- "bytemuck",
- "chrono",
- "encoding_rs",
- "game_fs",
- "image",
- "kira",
- "log",
- "pollster",
- "wgpu 0.20.1",
- "winit 0.31.0-beta.3",
 ]
 
 [[package]]
@@ -4816,22 +4631,6 @@ checksum = "d7249219f66ced02969388cf2bb044a09756a083d0fab1e566056b04d9fbcaa5"
 [[package]]
 name = "wmv-decoder"
 version = "0.2.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "byteorder",
- "cpal",
- "crossbeam-channel",
- "env_logger 0.10.2",
- "kira",
- "log",
- "png 0.17.16",
- "pollster",
- "ringbuf 0.4.8",
- "thiserror 1.0.69",
- "wgpu 0.19.4",
- "winit 0.29.15",
-]
 
 [[package]]
 name = "writeable"

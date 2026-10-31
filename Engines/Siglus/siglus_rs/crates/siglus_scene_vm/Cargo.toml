@@ -28,7 +28,8 @@ encoding_rs = "0.8"
 eluna = { package = "eluna_rs", version = "0.1.0", path = "../../vendor/eluna_rs" }
 siglus_omv_decoder = { path = "../siglus_omv_decoder" }
 na_mpeg2_decoder = { path = "../na_mpeg2_decoder" }
-wmv_decoder = { package = "wmv-decoder", path = "../na_wmv_player" }
+# VNDegen: a stub in place of the LGPL decoder, so .wmv movies do not play.
+wmv_decoder = { package = "wmv-decoder", path = "../../../wmv_stub" }
 siglus_key_recovery = { path = "../siglus_key_recovery" }
 
 siglus_assets = { path = "../siglus_assets" }
