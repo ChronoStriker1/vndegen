@@ -254,6 +254,9 @@ struct PlayerView: View {
                 hub.library.update(id) { $0.cheats = settings }
             }
         }
+        // Opened with a controller or the keyboard, the page shows its focus ring at once, as the menu does, so the
+        // first press moves it.
+        if hub.input.lastInputKind != .touch { menu.cheats?.focus.showsFocus = true }
         menu.page = .cheats
     }
 
