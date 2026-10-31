@@ -568,21 +568,25 @@ struct ConfirmationSheet: View {
     var body: some View {
         SheetScaffold(title: confirmation.title, escapeCloses: true) {
             VStack(alignment: .leading, spacing: 22) {
-                Text(confirmation.message)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.86))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
+                // Scrolls, so a long path never pushes the buttons off a small screen.
+                ScrollView {
+                    Text(confirmation.message)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.86))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollBounceBehavior(.basedOnSize)
                 HStack(spacing: 12) {
                     HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
                     HubButton(target: .confirmCancel) { Text("Cancel") }
                 }
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 22)
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif

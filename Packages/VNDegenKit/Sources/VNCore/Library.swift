@@ -151,8 +151,11 @@ public final class LibraryStore {
             if opened { FolderAccess.stop(url) }
             throw error
         }
-        // A folder removed before comes back as itself, so its games find their records by name in it.
-        let earlier = removed.firstIndex { Self.realPath($0.url) == candidate }
+        // A folder removed before comes back as itself, so its games find their records by name in it, even when it was
+        // moved or renamed meanwhile, which its bookmark follows.
+        let earlier = removed.firstIndex { folder in
+            Self.realPath(folder.url) == candidate || (try? FolderAccess.resolve(folder.bookmark)).map { Self.realPath($0.url) } == candidate
+        }
         var folder = LibraryFolder(url: url, bookmark: bookmark)
         if let earlier {
             folder = LibraryFolder(id: removed[earlier].id, url: url, bookmark: bookmark, lastSeen: removed[earlier].lastSeen)
@@ -348,12 +351,18 @@ public final class LibraryStore {
             }
             var id = GameID(name)
             if !free(id) {
-                let base = "\(name) (\(listing.label))"
-                id = GameID(base)
-                var number = 2
-                while !free(id) {
-                    id = GameID("\(base) \(number)")
-                    number += 1
+                // A game whose ID names another library folder, moved to this one, keeps that ID and its record.
+                let moved = records.keys.filter { records[$0]?.folderName == name && free($0) }.min { $0.rawValue < $1.rawValue }
+                if let moved {
+                    id = moved
+                } else {
+                    let base = "\(name) (\(listing.label))"
+                    id = GameID(base)
+                    var number = 2
+                    while !free(id) {
+                        id = GameID("\(base) \(number)")
+                        number += 1
+                    }
                 }
             }
             var game = records[id] ?? Game(id: id, title: name)

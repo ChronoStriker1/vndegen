@@ -310,3 +310,42 @@ private func setReachable(_ folder: URL, _ reachable: Bool) throws {
     #expect(library.game(original)?.playTime == 300)
     #expect(library.folder(for: original).standardizedFileURL == first.appendingPathComponent("Game").standardizedFileURL)
 }
+
+@Test @MainActor func aGameWithAQualifiedIDKeepsItWhenMovedToAnotherFolder() async throws {
+    let scratch = Scratch()
+    let fm = FileManager.default
+    let external = scratch.folder("External"), other = scratch.folder("Other")
+    try scratch.addGame("Game", in: scratch.paths.gamesRoot)
+    try scratch.addGame("Game", in: external)
+    try fm.createDirectory(at: other, withIntermediateDirectories: true)
+    let library = scratch.library()
+    try await library.addFolder(external)
+    try await library.addFolder(other)
+    let twin = GameID("Game (External)")
+    library.update(twin) { $0.playTime = 12 }
+
+    try fm.moveItem(at: external.appendingPathComponent("Game"), to: other.appendingPathComponent("Game"))
+    await library.refresh()
+    #expect(ids(library) == ["Game", "Game (External)"])
+    #expect(library.game(twin)?.playTime == 12)
+    #expect(library.game(twin)?.libraryFolder == library.folders[1].id)
+}
+
+#if canImport(Darwin)
+@Test @MainActor func aRemovedFolderRenamedMeanwhileComesBackAsItself() async throws {
+    let scratch = Scratch()
+    let external = scratch.folder("External")
+    try scratch.addGame("Game", in: scratch.paths.gamesRoot)
+    try scratch.addGame("Game", in: external)
+    let library = scratch.library()
+    try await library.addFolder(external)
+    library.update(GameID("Game (External)")) { $0.playTime = 34 }
+    await library.removeFolder(library.folders[0].id)
+
+    let renamed = scratch.folder("Renamed")
+    try FileManager.default.moveItem(at: external, to: renamed)
+    try await library.addFolder(renamed)
+    #expect(ids(library) == ["Game", "Game (External)"])
+    #expect(library.game(GameID("Game (External)"))?.playTime == 34)
+}
+#endif
