@@ -345,6 +345,38 @@ S4_HLL(IbisInputEngine, Joystick_ClearCaptureFlag) {}
 S4_HLL(IbisInputEngine, Joystick_GetNumofDevice) { c.retInt(0); }
 S4_HLL(IbisInputEngine, Joystick_IsKeyDown) { c.retBool(false); }
 S4_HLL(IbisInputEngine, Joystick_GetAxis) { c.retFloat(0); }
+S4_HLL(IbisInputEngine, Key_IsDown) { c.retBool(G().keyDown(c.i(0))); }
+int g_ibisWheelForward = 0, g_ibisWheelBack = 0;
+S4_HLL(IbisInputEngine, MouseWheel_ClearCount) { G().takeWheel(); g_ibisWheelForward = g_ibisWheelBack = 0; }
+S4_HLL(IbisInputEngine, MouseWheel_GetCount) {
+    int d = G().takeWheel();
+    if (d > 0) g_ibisWheelForward += d; else g_ibisWheelBack -= d;
+    c.ref(0) = g_ibisWheelForward;
+    c.ref(1) = g_ibisWheelBack;
+}
+
+// ---- SystemService additions in later games (Test Game 56) ----
+S4_HLL(SystemService, GetTime) {
+    std::time_t t = std::time(nullptr);
+    std::tm lt{};
+#if defined(_WIN32)
+    localtime_s(&lt, &t);
+#else
+    localtime_r(&t, &lt);
+#endif
+    c.ref(0) = lt.tm_hour;
+    c.ref(1) = lt.tm_min;
+    c.ref(2) = lt.tm_sec;
+}
+S4_HLL(SystemService, UpdateView) { c.retBool(true); }
+// A system message is a request from the window, such as closing it; VNDegen's host stops the game itself.
+S4_HLL(SystemService, IsExistSystemMessage) { c.retBool(false); }
+
+// ---- Libraries for outside services and tools: Discord presence and the log viewer. VNDegen has neither. ----
+S4_HLL(Discord, Update) {}
+S4_HLL(Discord, UpdateActivity) {}
+S4_HLL(CrayfishLogViewer, SetWindowTitleName) {}
+S4_HLL(CrayfishLogViewer, SetSaveFolderName) {}
 
 // ---- DrawPluginManager: the games load drawing plugins by name; VNDegen's drawing is built in. ----
 S4_HLL(DrawPluginManager, Load) { c.retInt(1); }
@@ -358,6 +390,7 @@ S4_HLL_RESET {
     g_windowSettings.clear();
     g_cursorConfig.clear();
     g_inputResult.clear();
+    g_ibisWheelForward = g_ibisWheelBack = 0;
     g_pass.clear();
     g_vs.close();
     g_confirm.close();

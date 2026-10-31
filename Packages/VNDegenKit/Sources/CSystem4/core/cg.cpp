@@ -145,9 +145,12 @@ bool decodeQNT(const uint8_t *d, size_t n, Image &out) {
     }
     out.hasAlpha = asize != 0;
     if (asize) {
-        std::vector<uint8_t> a;
-        if (!inflateTo(d + hdr + psize, asize, a, plane)) return false;
-        // The alpha plane is stored row by row with the same prediction.
+        // The alpha plane is stored row by row with the same prediction. Its width is rounded up to even; version 2
+        // files (Test Game 56) leave an odd height as is, so the missing last row reads as zeros.
+        std::vector<uint8_t> a(plane, 0);
+        uLongf len = plane;
+        if (uncompress(a.data(), &len, d + hdr + psize, asize) != Z_OK || (len != plane && len != size_t(W) * h))
+            return false;
         std::vector<uint8_t> blocked(plane);
         size_t k = 0;
         for (int yy = 0; yy < H; yy += 2)
