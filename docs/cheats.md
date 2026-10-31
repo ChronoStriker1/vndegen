@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, and XP, VX and VX Ace, are built, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, see below.
 
 ## Why
 
@@ -133,3 +133,26 @@ Test Game 55, on the MacBook (120 Hz display) at a load average of 550 to 610, 4
 |---|---|---|---|
 | 1x | 60.0 | 45 to 51 | 60.0 |
 | 4x | 114 to 119 | 29 to 70 | 240 |
+
+## Built: Wolf RPG Editor
+
+Wolf RPG Editor has no gold, items, party or switches of its own. Games keep their state in normal variables and in their databases, laid out as each game likes. So what the Cheats page offers depends on the game:
+
+- **Every game**: the Variables tab, with the game's normal variables and the names its system database gives them (type 14), walk through walls, and game speed.
+- **Games built on the editor's standard systems**, recognized by the changeable database's field names: gold (type 6, field 0, 所持金), items, weapons and armor by name (counts in types 7 to 9, names in the user database's types 2 to 4), and restoring the party's HP and SP (type 0, fields 6 to 9) for the members type 6 lists. Test Games 02 and 52 are such games. Test Game 53 keeps its own layout, and its money is normal variable 17, which the Variables tab edits.
+
+How it works, in `Packages/VNDegenKit/Sources/CWolfRPG/core/cheats.cpp` and `vnwolf.h`:
+
+- The runtime is VNDegen's own, so the cheats are calls on its `Game`: they read and write the same variables and database cells the game's events do, which the save writes as it always does.
+- Walk through walls lets the hero pass where `canMove` would stop it, within the map.
+- Game speed is `vnwolf_set_speed`: each step advances that many times as many of the game's frames, and draws the last.
+- Gold is held between 0 and 999,999,999, and an item's count at 99 or what the game already allows above it.
+
+Checked: on CachyOS through the runtime with Test Games 02, 52 and 53. Test Game 52's save made after cheating loads in the Windows engine (Wolf RPG Editor 3.282) under Wine with 1,010 yen, 10 Sedatives and full HP.
+
+### Known limits
+
+- Keeping HP and SP full, no random encounters, and the experience rate aren't offered: the standard systems run battles, encounters and experience in their own common events, and change HP in a battle copy of the party (the changeable database's type 10) that a cheat on type 0 wouldn't reach.
+- Restore fills HP and SP to the hero's base maximum (fields 7 and 9). Equipment that raises the maximum raises it further only in the standard system's own calculation, so the restored value can be below what the status screen shows as the maximum.
+- Spare variables, string variables and the databases themselves aren't listed.
+- A standard system translated so far that its database field names changed isn't recognized, and gets the variables only.

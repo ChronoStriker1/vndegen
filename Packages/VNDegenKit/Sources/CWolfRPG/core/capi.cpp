@@ -18,7 +18,9 @@ struct VNWolfEngine {
     Bitmap frame;
     FILE *log = nullptr;
     double elapsedMs = 0;
+    int speed = 1;
     bool paused = false, advanced = true;
+    std::string cheatState;
     std::map<int, int> keysDown;  // key code to the number of times it is held
     uint32_t pressed = 0;         // Wolf keys pressed since the last frame, so a quick tap still counts
     std::string caption, status, problem;
@@ -89,10 +91,10 @@ const char *vnwolf_start_error(void) { return gStartError.empty() ? nullptr : gS
 bool vnwolf_step(VNWolfEngine *e, int ms) {
     if (!e || e->paused) return !e || !e->game->quitRequested();
     double frameMs = 1000.0 / e->game->gameDat().fps();
-    e->elapsedMs += ms;
-    // At most four frames per step, so a stall doesn't make the game race to catch up.
-    int frames = 0;
-    while (e->elapsedMs >= frameMs && frames < 4) {
+    e->elapsedMs += double(ms) * e->speed;
+    // At most four of the game's own frames per step, so a stall doesn't make the game race to catch up.
+    int frames = 0, most = 4 * e->speed;
+    while (e->elapsedMs >= frameMs && frames < most) {
         Input in;
         in.held = heldKeys(e) | e->pressed;
         in.pressed = e->pressed;
@@ -102,7 +104,7 @@ bool vnwolf_step(VNWolfEngine *e, int ms) {
         frames++;
         if (e->game->quitRequested()) return false;
     }
-    if (e->elapsedMs > frameMs * 4) e->elapsedMs = 0;
+    if (e->elapsedMs > frameMs * most) e->elapsedMs = 0;
     if (frames) {
         e->renderer->draw(e->frame);
         e->advanced = true;
@@ -163,5 +165,32 @@ const char *vnwolf_debug_status(VNWolfEngine *e) {
 }
 
 const char *vnwolf_problem(VNWolfEngine *e) { return e && !e->problem.empty() ? e->problem.c_str() : nullptr; }
+
+
+void vnwolf_set_speed(VNWolfEngine *e, int speed) {
+    if (e) e->speed = std::clamp(speed, 1, 8);
+}
+
+bool vnwolf_cheat_has_party(VNWolfEngine *e) { return e && e->game->hasStandardParty(); }
+
+const char *vnwolf_cheat_state(VNWolfEngine *e) {
+    if (!e) return nullptr;
+    e->cheatState = e->game->cheatState();
+    return e->cheatState.c_str();
+}
+
+bool vnwolf_cheat_add_gold(VNWolfEngine *e, int amount) { return e && e->game->cheatAddGold(amount); }
+
+bool vnwolf_cheat_add_item(VNWolfEngine *e, int kind, int id, int count) {
+    return e && e->game->cheatAddItem(kind, id, count);
+}
+
+bool vnwolf_cheat_restore_party(VNWolfEngine *e) { return e && e->game->cheatRestoreParty(); }
+
+bool vnwolf_cheat_set_variable(VNWolfEngine *e, int id, int value) { return e && e->game->cheatSetVariable(id, value); }
+
+void vnwolf_cheat_walk_through_walls(VNWolfEngine *e, bool on) {
+    if (e) e->game->setWalkThroughWalls(on);
+}
 
 }  // extern "C"
