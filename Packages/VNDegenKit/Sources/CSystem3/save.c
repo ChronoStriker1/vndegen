@@ -140,7 +140,15 @@ static bool read_save(S3 *s, int slot, Save *sv) {
     return true;
 }
 
-// Checks every section a save refers to and its resume point, so a bad save is refused before anything changes.
+// Whether 1-based stored page `page` is a scenario page s3_goto_page accepts, and `pc` lies inside it.
+static bool page_ok(S3 *s, u32 page, u32 pc) {
+    S3Blob b;
+    return page >= 1 && page <= 65536 && s3_archive_get(&s->sa, page, &b, NULL) && b.size >= 0x20 && pc < b.size;
+}
+
+// Checks every section a save refers to and its resume point, so a bad save is refused before anything changes:
+// the array pages, the strings (the declared count, each ended by a NUL inside its section), the whole call stack
+// decoding cleanly from its end, and the resume page and address.
 static bool save_valid(S3 *s, const Save *sv) {
     const u8 *d = sv->d;
     for (int page = 1; page < 256; page++) {
@@ -150,10 +158,28 @@ static bool save_valid(S3 *s, const Save *sv) {
         u32 size = s3_le32(d + a);
         if (s3_le32(d + a + 4) != (u32)page || size % 2 || (u64)a + 16 + size > sv->n) return false;
     }
-    if ((u64)s3_le32(d + sv->stack) + sv->stack + 16 > sv->n) return false;
-    u32 page = s3_le32(d + 0x50), pc = s3_le32(d + 0x54);
-    S3Blob b;
-    return page >= 1 && page <= 0xffff && s3_archive_get(&s->sa, page, &b, NULL) && pc < b.size;
+    u64 strEnd = (u64)sv->strings + 16 + s3_le32(d + sv->strings);
+    u32 count = s3_le32(d + sv->strings + 4);
+    if (strEnd > sv->n || count == 0 || count > S3_MAX_STRINGS) return false;
+    size_t p = sv->strings + 16;
+    for (u32 i = 0; i < count; i++) {
+        const u8 *e = p < strEnd ? memchr(d + p, 0, (size_t)(strEnd - p)) : NULL;
+        if (!e) return false;
+        p = (size_t)(e - d) + 1;
+    }
+    u32 stackSize = s3_le32(d + sv->stack);
+    if ((u64)stackSize + sv->stack + 16 > sv->n) return false;
+    const u8 *start = d + sv->stack + 16, *q = start + stackSize;
+    int frames = 0;
+    while (q > start) {
+        if (++frames > S3_MAX_FRAMES) return false;
+        u8 tag = q[-1];
+        if (tag == 0xee && q - start >= 5) q -= 5;
+        else if (tag == 0xff && q - start >= 7) { q -= 7; if (!page_ok(s, s3_le16(q), s3_le32(q + 2))) return false; }
+        else if (tag == 0xdd && q - start >= 7) q -= 7;
+        else return false;
+    }
+    return page_ok(s, s3_le32(d + 0x50), s3_le32(d + 0x54));
 }
 
 bool s3_save_load(S3 *s, int slot) {

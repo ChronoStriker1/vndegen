@@ -1,6 +1,9 @@
 // Files, case-insensitive lookup, Shift-JIS, and logging.
 #include "s3.h"
 #include "s3_casepath.h"
+#include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
 
 extern const uint16_t s3_sjis_table[];
 
@@ -86,16 +89,41 @@ char *s3_sjis_to_utf8(const char *s) {
 }
 
 bool s3_write_file(const char *path, const void *data, size_t size) {
-    size_t n = strlen(path) + 8;
+    // The temporary gets a fresh name, created exclusively, so nothing already at that path (a symlink included) is
+    // written through; the rename then replaces the destination's directory entry.
+    size_t n = strlen(path) + 16;
     char *tmp = s3_alloc(n);
-    snprintf(tmp, n, "%s.tmp", path);
-    FILE *f = fopen(tmp, "wb");
-    bool ok = f && fwrite(data, 1, size, f) == size;
-    if (f && fclose(f) != 0) ok = false;
-    if (ok) ok = rename(tmp, path) == 0;
-    if (!ok) remove(tmp);
+    snprintf(tmp, n, "%s.XXXXXX", path);
+    int fd = mkstemp(tmp);
+    bool ok = fd >= 0;
+    if (ok) {
+        fchmod(fd, 0644);
+        FILE *f = fdopen(fd, "wb");
+        if (!f) { close(fd); ok = false; }
+        else {
+            ok = fwrite(data, 1, size, f) == size;
+            if (fclose(f) != 0) ok = false;
+        }
+        if (ok) ok = rename(tmp, path) == 0;
+        if (!ok) remove(tmp);
+    }
     free(tmp);
     return ok;
+}
+
+bool s3_path_inside(const char *path, const char *root) {
+    char rootReal[PATH_MAX], real[PATH_MAX];
+    if (!realpath(root, rootReal)) return false;
+    if (!realpath(path, real)) {
+        // A file not made yet: its folder must exist inside the root.
+        char *dir = s3_strdup(path), *slash = strrchr(dir, '/');
+        if (slash) *slash = 0;
+        bool ok = slash && realpath(dir, real);
+        free(dir);
+        if (!ok) return false;
+    }
+    size_t r = strlen(rootReal);
+    return !strncmp(real, rootReal, r) && (real[r] == '/' || real[r] == 0);
 }
 
 u16 s3_le16(const u8 *p) { return (u16)(p[0] | p[1] << 8); }

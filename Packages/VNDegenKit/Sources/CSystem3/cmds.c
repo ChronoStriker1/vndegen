@@ -511,17 +511,33 @@ static void var_file(S3 *s, bool write, int type, const char *name, size_t nameL
         snprintf(file, sizeof file, "%s", utf8);
         free(utf8);
     }
-    // A plain file name only: nothing that leaves the save or game folder. Checked after the UTF-8 conversion, since a
-    // Shift-JIS trail byte can be 0x5C.
-    if (!file[0] || strchr(file, '/') || strchr(file, '\\') || strchr(file, ':') || !strcmp(file, ".") || !strcmp(file, "..")) {
+    // A relative path, with Windows separators allowed, that stays inside the save or game folder: no drive, no leading
+    // separator, no "..". Checked after the UTF-8 conversion, since a Shift-JIS trail byte can be 0x5C. Symlinks are
+    // followed for the containment check below.
+    for (char *c = file; *c; c++) if (*c == '\\') *c = '/';
+    bool bad = !file[0] || file[0] == '/' || strchr(file, ':');
+    for (const char *c = file; !bad && *c;) {
+        const char *e = strchr(c, '/');
+        size_t len = e ? (size_t)(e - c) : strlen(c);
+        if (len == 2 && c[0] == '.' && c[1] == '.') bad = true;
+        c = e ? e + 1 : c + len;
+    }
+    if (bad) {
         s3_log(s, "LE/QE refused file name %s", file);
         rnd(s, 255);
         return;
     }
     // Files the game writes live in the save folder; ones it only reads, such as shipped maps, may be in the game's.
     char *path = s3_find_file(s->saveDir, file);
-    if (!path && !write) path = s3_find_file(s->gameDir, file);
+    const char *root = s->saveDir;
+    if (!path && !write && (path = s3_find_file(s->gameDir, file))) root = s->gameDir;
     if (!path) path = s3_path(s->saveDir, file);
+    if (!s3_path_inside(path, root)) {
+        s3_log(s, "LE/QE refused %s: it resolves outside the game's folders", file);
+        free(path);
+        rnd(s, 255);
+        return;
+    }
     if (write) {
         size_t n = 0, cap = 64;
         u8 *out = s3_alloc(cap);

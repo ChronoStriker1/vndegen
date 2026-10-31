@@ -23,6 +23,8 @@ char *s3_strdup(const char *s);
 u8 *s3_read_file(const char *path, size_t *size);
 // Writes a whole file through a temporary beside it, so a failed write leaves the old file as it was.
 bool s3_write_file(const char *path, const void *data, size_t size);
+// Whether path, or the folder it would be made in, resolves (symlinks followed) to root or something inside it.
+bool s3_path_inside(const char *path, const char *root);
 // Finds dir/name whatever the case of name, as Windows does. Returns a malloc'd path or NULL.
 char *s3_find_file(const char *dir, const char *name);
 char *s3_path(const char *dir, const char *name); // joins without checking
