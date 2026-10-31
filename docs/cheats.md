@@ -55,7 +55,7 @@ Each engine's work is checked like an engine change: the Mac app and an iPad sim
 
 ## Built: RPG Maker MV and MZ
 
-The Cheats entry sits in the VNDegen menu, between Resume (or Game menu) and Quit to library, for every MV and MZ game. Its page has four tabs:
+The Cheats entry sits in the VNDegen menu, between Resume (or Game commands) and Quit to library, for every MV and MZ game. Its page has four tabs:
 
 - **Quick**: add 1,000, 10,000 or 100,000 gold (the game's own maximum still applies), restore the party's HP and MP, and the settings that stay on: keep HP and MP full, no random encounters, walk through walls, game speed 1x, 2x or 4x, and experience 1x, 2x, 5x or 10x.
 - **Items**: the game's items, weapons and armor by name, with how many the party has, and +1 or +10.

@@ -13,7 +13,7 @@ struct GameMenuView: View {
             Button(action: menu.gameBack) {
                 HStack(spacing: 8) {
                     Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold))
-                    Text(menu.gamePath.last?.title ?? "Game menu")
+                    Text(menu.gamePath.last?.title ?? "Game commands")
                         .font(.display(17, weight: .heavy))
                         .lineLimit(1)
                 }
@@ -52,8 +52,10 @@ struct GameMenuView: View {
         let focused = showsFocus && menu.gameFocus == item.id
         return Button { onChoose(item) } label: {
             HStack(spacing: 10) {
-                mark(item)
-                    .frame(width: 18)
+                // A column for check marks on every row, as in a Windows menu, so the titles line up.
+                Color.clear
+                    .frame(width: 18, height: 18)
+                    .overlay { mark(item) }
                 Text(item.title)
                     .font(.system(size: 15, weight: .semibold))
                     .lineLimit(2)

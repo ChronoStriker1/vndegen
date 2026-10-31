@@ -1,4 +1,4 @@
-/// One entry of a game's own menu, as VNDegen's Game menu lists it: a command, a submenu, or a separator line.
+/// One entry of a game's own menu, as VNDegen's Game commands list it: a command, a submenu, or a separator line.
 public struct GameMenuItem: Identifiable, Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         case command

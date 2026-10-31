@@ -83,7 +83,7 @@ void vnns_save_system_data(VNNSEngine *e);
 // Frees the engine.
 void vnns_stop(VNNSEngine *e);
 
-// The window menu bar the game builds with insertmenu, which the runtime never draws, as JSON for VNDegen's Game menu,
+// The window menu bar the game builds with insertmenu, which the runtime never draws, as JSON for VNDegen's Game commands,
 // or NULL when the game has none: an array of items, each {"id": "3", "title": "Skip", "checked": false,
 // "radio": false, "enabled": true, "items": [...]}, titles in UTF-8. Only the functions VNDegen runs are listed: Skip,
 // skipping all or only read text (KIDOKUOFF, KIDOKUON), and the three text speeds, with check marks on the current

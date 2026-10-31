@@ -37,7 +37,7 @@ private func temporaryGame() throws -> URL {
     #expect(GameFolder(root: root, webRoot: "www").saveDirectory?.path == root.appendingPathComponent("www/save").path)
 }
 
-/// MessageSkip's auto and skip reach the Game menu only when the game turns the plugin on.
+/// MessageSkip's auto and skip reach Game commands only when the game turns the plugin on.
 @Test func offersMessageSkipsCommandsWhenThePluginIsOn() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }

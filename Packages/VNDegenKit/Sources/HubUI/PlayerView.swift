@@ -11,7 +11,7 @@ struct PlayerView: View {
     @Environment(Navigator.self) private var nav
     @State private var menu = PlayerMenu()
     @State private var mappingEditor: ButtonMappingEditor?
-    /// Asks the game for its Game menu while VNDegen's menu is open.
+    /// Asks the game for its Game commands while VNDegen's menu is open.
     @State private var menuLoad: Task<Void, Never>?
     @AppStorage(ControlMethod.storageKey) private var defaultMethod = ControlMethod.automatic
     /// Whether the menu or the unlock screen has input rather than the game. Nil until the view first takes input.
@@ -218,7 +218,7 @@ struct PlayerView: View {
         }
     }
 
-    /// Up and down move through the Game menu's current level, and confirm opens a submenu or runs a command. Cancel goes
+    /// Up and down move through the current level of Game commands, and confirm opens a submenu or runs a command. Cancel goes
     /// back a level, and from the top back to VNDegen's menu.
     private func navigateGameMenu(_ button: VirtualButton) {
         switch button {
@@ -334,7 +334,7 @@ final class PlayerMenu {
     /// What the menu's card shows: its main buttons, or a page that one of them opened.
     enum Page { case main, game, cheats }
 
-    /// Top to bottom. The Game menu shows when the game has one. The control method only matters on a touch device.
+    /// Top to bottom. Game commands show when the game has any. The control method only matters on a touch device.
     func items(for method: ControlMethod) -> [Item] {
         let session: [Item] = [.resume] + (gameItems.isEmpty ? [] : [.gameMenu]) + (offersCheats ? [.cheats] : []) + [.quit]
         guard Platform.current == .iOS else { return session + [.mapping] }
@@ -349,7 +349,7 @@ final class PlayerMenu {
     var focus = Item.resume
     /// The game's own menu, read from the game each time this menu opens.
     var gameItems: [GameMenuItem] = []
-    /// The submenus open in the Game menu, outermost first, and empty at its top.
+    /// The submenus open in Game commands, outermost first, and empty at its top.
     var gamePath: [GameMenuItem] = []
     var gameFocus: GameMenuItem.ID?
     /// Whether the game offers cheats.
@@ -362,7 +362,7 @@ final class PlayerMenu {
         focus = .cheats
     }
 
-    /// What the Game menu shows now.
+    /// What Game commands show now.
     var gameLevel: [GameMenuItem] { gamePath.last?.items ?? gameItems }
 
     var focusedGameItem: GameMenuItem? { gameLevel.first { $0.id == gameFocus } }
@@ -469,7 +469,7 @@ private struct PlayerMenuView: View {
                 .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
                 .onHover { if $0 { menu.focus = .resume } }
             if !menu.gameItems.isEmpty {
-                Button(action: onGameMenu) { Label("Game menu", systemImage: "list.bullet").frame(minWidth: buttonWidth) }
+                Button(action: onGameMenu) { Label("Game commands", systemImage: "list.bullet").frame(minWidth: buttonWidth) }
                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.gameMenu)))
                     .onHover { if $0 { menu.focus = .gameMenu } }
             }
