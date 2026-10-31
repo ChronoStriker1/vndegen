@@ -40,7 +40,7 @@ struct GamePageView: View {
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController else { return }
                 withAnimation(Theme.focusAnimation) {
-                    if let focus, [.pageEngine, .pageVariant, .pageOrientation, .pageControls, .pageMapping].contains(focus) {
+                    if let focus, Self.scrollsToCenter(focus) {
                         proxy.scrollTo(focus, anchor: .center)
                     } else {
                         proxy.scrollTo("banner", anchor: .top)
@@ -168,7 +168,8 @@ struct GamePageView: View {
                 FlowTags(tags: genres)
             }
             if let screenshots = metadata?.screenshots, !screenshots.isEmpty {
-                ScreenshotRow(screenshots: screenshots)
+                ScreenshotGrid(screenshots: screenshots)
+                    .padding(.top, 6)
             }
         }
     }
@@ -198,6 +199,15 @@ struct GamePageView: View {
         .padding(18)
         .background(Theme.surface, in: .rect(cornerRadius: 16, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.stroke) }
+    }
+
+    /// Targets far enough down the page that a controller moving to one scrolls it to the middle. The rest scroll the
+    /// banner back into view.
+    static func scrollsToCenter(_ target: Navigator.Target) -> Bool {
+        switch target {
+        case .pageEngine, .pageVariant, .pageOrientation, .pageControls, .pageMapping, .pageScreenshot, .pageScreenshotsMore: true
+        default: false
+        }
     }
 
     /// Metadata dates may be partial ("2024" or "2024-03").
@@ -390,30 +400,6 @@ private struct EngineSection: View {
         case .likely: "likely"
         case .certain: "certain"
         }
-    }
-}
-
-/// The game's screenshots in a row that scrolls sideways.
-private struct ScreenshotRow: View {
-    let screenshots: [Screenshot]
-
-    var body: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 10) {
-                ForEach(screenshots, id: \.url) { screenshot in
-                    AsyncImage(url: screenshot.thumbnail) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Theme.surface
-                    }
-                    .frame(width: 256, height: 144)
-                    .clipShape(.rect(cornerRadius: 8, style: .continuous))
-                    .overlay { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.stroke) }
-                }
-            }
-        }
-        .scrollIndicators(.hidden)
-        .accessibilityLabel("Screenshots")
     }
 }
 

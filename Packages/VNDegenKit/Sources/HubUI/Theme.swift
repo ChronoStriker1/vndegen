@@ -82,6 +82,13 @@ struct HubMetrics: Equatable {
         return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
     }
 
+    /// Columns in a game page's screenshot grid `width` wide: two on a phone held upright, and more as the width allows,
+    /// so the tiles grow with the window between steps.
+    func screenshotColumns(in width: CGFloat) -> Int {
+        let minimum: CGFloat = isCompact ? 150 : 230
+        return max(2, Int((width + tileSpacing) / (minimum + tileSpacing)))
+    }
+
     /// Height of the home screen's hero area above the first shelf.
     var stageHeight: CGFloat {
         if isShort { return max(220, size.height * 0.66) }
