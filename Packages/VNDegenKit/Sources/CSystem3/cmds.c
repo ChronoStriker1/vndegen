@@ -553,6 +553,7 @@ static void table_read(S3 *s, int sub, Arg *a) {
     case 2: case 3: case 4: case 5: {
         u32 p = s->dataPtr + (u32)a[1].v * 2;
         u16 v = p + 2 <= n ? s3_le16(d + p) : 0;
+        if (s->trace) s3_log(s, "TBL F%d page %d at %x skip %d -> %u", sub, s->dataPage, p, a[1].v, v);
         put(s, &a[0], 0, v);
         if (sub == 2 || sub == 4) s->dataPtr = p + 2;
         return;
