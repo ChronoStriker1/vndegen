@@ -391,7 +391,7 @@ static void cmd_C(S3 *s) {
         s3_mark_dirty(s);
         return;
     }
-    case 'P': args(s, "eee", a); unimpl(s, "CP"); return;
+    case 'P': args(s, "eee", a); s3_paint(s, a[0].v, a[1].v, a[2].v); return;
     case 'S': args(s, "eeeeeee", a); s3_copy_key(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v, a[6].v); return;
     case 'T': args(s, "eee", a); unimpl(s, "CT"); return;
     case 'U': case 'V': args(s, "eeeeee", a); unimpl(s, "CU/CV"); return;

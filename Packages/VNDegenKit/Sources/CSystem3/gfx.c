@@ -30,6 +30,43 @@ bool s3_clip(S3 *s, int *x, int *y, int *w, int *h) {
     return *w > 0 && *h > 0;
 }
 
+// CP: fills the 4-connected area of the start pixel's colour with `color`, scanning runs of a row at a time.
+void s3_paint(S3 *s, int x, int y, int color) {
+    int W = s->dib.w, H = s->dib.h;
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    bool p8 = s->dib.depth == 8;
+    u32 from = p8 ? s->dib.p8[(size_t)y * W + x] : s->dib.p32[(size_t)y * W + x];
+    u32 to = p8 ? (u32)(color & 255) : s3_rgb(s, color);
+    if (from == to) return;
+    #define PX(i) (p8 ? (u32)s->dib.p8[i] : s->dib.p32[i])
+    size_t cap = 1024, n = 0;
+    int *stack = s3_alloc(sizeof(int) * 2 * cap);
+    stack[n * 2] = x; stack[n * 2 + 1] = y; n++;
+    while (n) {
+        n--;
+        int sx = stack[n * 2], sy = stack[n * 2 + 1];
+        size_t row = (size_t)sy * W;
+        if (PX(row + sx) != from) continue;
+        int l = sx, r = sx;
+        while (l > 0 && PX(row + l - 1) == from) l--;
+        while (r < W - 1 && PX(row + r + 1) == from) r++;
+        for (int i = l; i <= r; i++) { if (p8) s->dib.p8[row + i] = (u8)to; else s->dib.p32[row + i] = to; }
+        for (int dy = -1; dy <= 1; dy += 2) {
+            int ny = sy + dy;
+            if (ny < 0 || ny >= H) continue;
+            size_t nrow = (size_t)ny * W;
+            for (int i = l; i <= r; i++) {
+                if (PX(nrow + i) != from || (i > l && PX(nrow + i - 1) == from)) continue; // one seed per run
+                if (n == cap) { cap *= 2; stack = realloc(stack, sizeof(int) * 2 * cap); if (!stack) abort(); }
+                stack[n * 2] = i; stack[n * 2 + 1] = ny; n++;
+            }
+        }
+    }
+    #undef PX
+    free(stack);
+    s3_mark_dirty(s);
+}
+
 void s3_fill(S3 *s, int x, int y, int w, int h, int color) {
     if (!s3_clip(s, &x, &y, &w, &h)) return;
     if (s->dib.depth == 8) {

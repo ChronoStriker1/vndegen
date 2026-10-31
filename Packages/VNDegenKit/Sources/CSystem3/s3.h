@@ -256,6 +256,7 @@ void s3_gfx_init(S3 *s, int w, int h, int depth);
 void s3_gfx_present(S3 *s);
 u32 s3_rgb(S3 *s, int color);                   // palette index or 24-bit value to 0xRRGGBB
 void s3_fill(S3 *s, int x, int y, int w, int h, int color);
+void s3_paint(S3 *s, int x, int y, int color);
 void s3_copy(S3 *s, int sx, int sy, int w, int h, int dx, int dy);
 void s3_copy_key(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key);
 void s3_draw_image(S3 *s, const S3Image *img, int x, int y, int key);
