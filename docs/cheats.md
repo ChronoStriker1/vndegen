@@ -76,4 +76,21 @@ Checked against Rookie Knight Rathi (MV 1.6.1), Mama's Secret Parent Teacher Con
 - Walk through walls uses the player's through flag, as an event's Through option does. Followers still follow, and vehicles are unchanged.
 - A plugin that replaces one of the wrapped methods after the boot scene starts, rather than when it loads, replaces the cheat with it. No library game was found doing so.
 - Variables and switches past the length of the game's System lists aren't listed, since MV's and MZ's `setValue` ignores them.
-- At 4x a heavy scene runs four engine updates per displayed frame, so a game that is already slow on a device draws fewer frames, though its timing stays right.
+- At 4x every displayed frame runs four engine updates, and MZ runs more after a slow frame to catch up, so a game whose updates are expensive draws fewer frames. No Socks RPG, with 87 VisuStella plugins, drew about 24 frames a second at 4x on the Mac mini and 26 on an iPad simulator, while its game ran at about 3.2x. Rookie Knight Rathi held 60.
+
+### Frame rate
+
+Measured on the map with the DEBUG input script's `fps` step and a count of `Scene_Map.update` calls, 30 s each on the Mac and 20 s each on the iPad Pro 13-inch simulator. The Mac mini's load average and other work are in the evidence's `.env` files. RPG Maker MV and MZ target 60.
+
+| Game | Device | Speed | Drawn fps | 1% low | Map updates per second |
+|---|---|---|---|---|---|
+| Rookie Knight Rathi (MV) | Mac | 1x | 60.0 | 52.6 | 60.0 |
+| Rookie Knight Rathi (MV) | Mac | 4x | 60.0 | 52.6 | 240.2 |
+| No Socks RPG (MZ) | Mac | 1x | 56.1 | 26.3 | 56.6 |
+| No Socks RPG (MZ) | Mac | 4x | 23.9 | 14.1 | 190.8 |
+| Rookie Knight Rathi (MV) | iPad simulator | 1x | 56.2 | 24.4 | 59.2 |
+| Rookie Knight Rathi (MV) | iPad simulator | 4x | 59.6 | 35.7 | 240.0 |
+| No Socks RPG (MZ) | iPad simulator | 1x | 51.5 | 29.4 | 52.4 |
+| No Socks RPG (MZ) | iPad simulator | 4x | 25.7 | 17.9 | 206.4 |
+
+Simulator timing isn't iPad timing, and the Mac mini ran other threads' builds and simulators during several of these runs.
