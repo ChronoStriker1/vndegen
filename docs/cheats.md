@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, and game speed for Godot, see below.
 
 ## Why
 
@@ -165,3 +165,19 @@ Test Game 52 on the MacBook (120 Hz display, load average about 30), 30 s at eac
 - Restore fills HP and SP to the hero's base maximum (fields 7 and 9). Equipment that raises the maximum raises it further only in the standard system's own calculation, so the restored value can be below what the status screen shows as the maximum.
 - Spare variables, string variables and the databases themselves aren't listed.
 - A standard system translated so far that its database field names changed isn't recognized, and gets the variables only.
+
+## Built: game speed for Godot
+
+Godot games keep their gold, items and party in their own scripts, each in its own way, so their Cheats page has game speed only: 1x, 2x or 4x, on the Quick tab, working from the title screen on.
+
+It is Godot's own speed control, the one the Godot editor's Game view has (`Engine::set_user_time_scale`), through `vngd_set_speed` in `vngd.h`:
+
+- It multiplies whatever time scale the game sets itself, so a game's slow motion still works, and the game reads back its own value.
+- It runs more physics steps per frame, each as long as before, so collisions and physics behave as at 1x. The most physics steps a frame may run rises with the speed, so a frame running behind still catches up.
+- Each frame's `_process` time, and so timers, tweens and animations, advance that many times as far.
+- Godot 4.7 has the control. Godot 3.6 doesn't, and `Engines/Godot/3/patches/06-user-time-scale.patch` adds the same thing to its `Engine` and main loop.
+
+### Known limits
+
+- A game that counts frames rather than time in `_process`, or that times itself with `Time.get_ticks_msec()` (`OS.get_ticks_msec()` in Godot 3), runs those parts at normal speed.
+- Music and sounds play at their normal speed.

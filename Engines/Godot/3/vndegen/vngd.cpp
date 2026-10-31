@@ -306,6 +306,12 @@ void vngd_set_paused(bool p_paused) {
 	vngd_platform_set_audio_paused(p_paused);
 }
 
+void vngd_set_speed(int p_speed) {
+	if (state.started) {
+		Engine::get_singleton()->set_user_time_scale(CLAMP(p_speed, 1, 8));
+	}
+}
+
 void vngd_request_quit(void) {
 	// What the window's close button does: games see NOTIFICATION_WM_QUIT_REQUEST, and the tree quits unless the game
 	// turned auto_accept_quit off.

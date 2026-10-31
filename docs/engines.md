@@ -77,7 +77,7 @@ Godot games run on Godot itself, which VNDegen builds into the app twice: Godot 
 
 Saves go where the PC version keeps them: `user://` is under the Windows AppData folder's stand-in in the game's data folder, so Ludusavi backups from Windows, a Steam Deck, or Godot's Linux and Mac builds restore there, and games that save beside their `.exe` save in their own folder. Games built with Steam through GodotSteam run as Steam does offline, with the player signed in, and games that also ship Epic Online Services for their Epic Games Store build run without it. Packs encrypted with a key built into the game's own copy of Godot run too: VNDegen finds the key in the game's `.exe`.
 
-Games that can't run say why on their page: games that need other GDExtension or GDNative libraries, which are Windows code, and encrypted games whose key VNDegen doesn't find. Godot C# games aren't supported. [godot.md](godot.md) has the details and the known limits.
+Games that can't run say why on their page: games that need other GDExtension or GDNative libraries, which are Windows code, and encrypted games whose key VNDegen doesn't find. Godot C# games aren't supported. [godot.md](godot.md) has the details and the known limits. The Cheats page in the VNDegen menu runs Godot games at 2x or 4x speed.
 
 ## Flash
 
