@@ -59,3 +59,17 @@ About 9,000 lines of C and 500 of Swift. NPA and file layer 1 day. Parser, compi
 ## Known limits
 
 Filled in as the work lands.
+
+## Where the work stopped (2026-10-31)
+
+Done on `ws/n2system`, Linux only:
+- The C runtime in `Packages/VNDegenKit/Sources/CN2System` (about 4,500 lines): `.npa` reader, file layer with casepath, NSS lexer, parser and bytecode compiler, VM with threads, object tree with aliases and wildcard queries, about 80 built-ins, animations, CPU compositor with blend modes, zoom, rotation and masked transitions, text with markup, typewriter, key waits and icons, Ogg sound mixer, backlog, `NPSF` containers, `NPSG` and `NPSL` variable files, `NPSI` thumbnails.
+- All 82 of Saya's scripts compile (checked with a parse test against `nss.npa`).
+- The Linux host in `Engines/N2System/host` (`n2run` headless runner with PNG output, `n2play` SDL player) builds with no warnings.
+
+Not done yet, in order:
+1. Run Saya in `n2run` and fix what the first runs show, up to the title, play, menus, save and load.
+2. Slot state (`slot.c` is a stub): threads, objects and backlog, as the design above says.
+3. The `script.npf`, `frames.npf`, `bklg.npf` and `common/cqst.npf` formats, for PC-compatible slot saves.
+4. The Swift `EngineN2System` plugin, package target, registration and `PluginInfo` entry.
+5. Apple builds, Mac app, iPad and iPhone simulators, case check, Codex review.

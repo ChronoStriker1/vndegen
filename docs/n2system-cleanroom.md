@@ -20,4 +20,4 @@ VNDegen's N2System runtime is written from the game files, permissively licensed
 
 ## Open questions and how they were settled
 
-Filled in as the work lands.
+Filled in as the work lands. So far: `&.` shows as `.` and `&8` as `&8` (Wine screenshot); objects are scoped per script context, since the menu script ends with `Delete("*")` and the scene survives.
