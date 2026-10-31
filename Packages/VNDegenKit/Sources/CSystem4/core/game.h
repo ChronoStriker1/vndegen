@@ -59,6 +59,8 @@ public:
     std::unique_ptr<AldArchive> cgArchive, waveArchive, bgmArchive;
     // Later games (Test Game 56) keep pictures by name in <stem>CG.afa, and load more archives through AFAFactory.
     std::unique_ptr<AfaArchive> cgAfa;
+    // Their music and sounds are numbered entries ("00001.ogg") of <stem>BA.afa and <stem>WA.afa.
+    std::unique_ptr<AfaArchive> bgmAfa, waveAfa;
     std::vector<std::unique_ptr<AfaArchive>> extraAfa;
     // A picture by its CP932 name, without extension: the CG archive's "<name>.qnt" and the like.
     const ArchiveEntry *cgFind(const std::string &name, AfaArchive **from = nullptr) const;

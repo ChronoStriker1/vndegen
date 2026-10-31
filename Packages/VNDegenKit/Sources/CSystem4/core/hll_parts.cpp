@@ -6,9 +6,12 @@
 // the game makes; docs/system4-cleanroom.md has the details.
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <deque>
 #include <map>
 #include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "game.h"
@@ -23,8 +26,10 @@ Game &G() { return game(); }
 constexpr int kSpriteBase = 1000000;  // parts' sprite numbers, above any the earlier sprite engines use
 
 struct Step {  // a construction step
-    enum Kind { Create, CreatePixelOnly, Fill, FillAlpha } kind;
+    enum Kind { Create, CreatePixelOnly, Fill, FillAlpha, FillBlend, CopyCG, DrawCG } kind;
     int x = 0, y = 0, w = 0, h = 0, r = 0, g = 0, b = 0, a = 255;
+    std::string cg;
+    int sx = 0, sy = 0, sw = 0, sh = 0;
 };
 
 struct State {
@@ -37,6 +42,7 @@ struct State {
     std::vector<Step> steps;
     Surface built;
     bool hasBuilt = false;
+    bool empty() const { return !cg && !hasBuilt && !hasText; }
 };
 
 struct Motion {
@@ -48,7 +54,10 @@ struct Motion {
 
 struct Part {
     State states[3];
-    int state = 1;
+    int state = 1;  // the input state, which is also the state shown: 1 normal, 2 under the pointer, 3 pressed
+    int layer = 0;
+    bool clickable = false;
+    bool lockInput = false;
     float x = 0, y = 0;
     int z = 0;
     bool show = true;
@@ -61,11 +70,45 @@ struct Part {
     bool dirty = true;  // the picture needs drawing again
 };
 
+// What the player did to a part, queued for the game's message loop. Types as the game's dispatcher numbers them.
+struct Message {
+    enum Type { MouseEnter = 1, MouseMove = 2, MouseLeave = 3, MouseClick = 5 };
+    int type, number, delegate;
+    std::vector<int> vars;  // all ints: the pointer's x and y, then the key for a click
+};
+
+// Activities: named groups of parts the game's UI code keeps here, with the keys and parts that close them.
+struct Activity {
+    std::vector<std::pair<std::string, int>> parts;  // name and number
+    std::set<std::string> closeParts;
+    std::set<int> endKeys;
+    std::map<std::tuple<std::string, int, std::string>, std::string> funcs;  // (parts name, type, key) to function
+};
+
+// Intent data: a type and destinations under two names, which the game's UI code sets and reads back.
+struct Intent {
+    int type = 0;
+    std::vector<std::string> destinations;
+};
+
 std::map<int, Part> g_parts;
 std::vector<Motion> g_motions;
 int g_motionTime = 0;
 bool g_motionOn = false;
 TextStyle g_textDefault;  // ChipmunkSpriteEngine's SP_SetTextSprite* defaults for new text
+std::deque<Message> g_messages;
+int g_hover = 0, g_pressed = 0;  // parts under the pointer and pressed; 0 for none
+bool g_buttonWas = false;
+int g_activeLayer = 0;
+constexpr int kOverlayLayer = 1;  // the system overlay layer, drawn over the game's
+std::map<std::string, Activity> g_activities;
+std::map<std::pair<std::string, std::string>, Intent> g_intents;
+std::map<int, std::map<int, int>> g_links;  // PartsFunc's per-part values (scroll links and the like), by ID
+std::set<std::string> g_loggedOnce;
+
+void logOnce(const std::string &what) {
+    if (g_loggedOnce.insert(what).second) G().log("PartsEngine: " + what);
+}
 
 S4_HLL_RESET {
     for (auto &[n, p] : g_parts) G().sprites.remove(kSpriteBase + n);
@@ -74,6 +117,14 @@ S4_HLL_RESET {
     g_motionTime = 0;
     g_motionOn = false;
     g_textDefault = TextStyle{};
+    g_messages.clear();
+    g_hover = g_pressed = 0;
+    g_buttonWas = false;
+    g_activeLayer = 0;
+    g_activities.clear();
+    g_links.clear();
+    g_intents.clear();
+    g_loggedOnce.clear();
 }
 
 Part *find(int n) {
@@ -83,8 +134,10 @@ Part *find(int n) {
 
 Part &get(int n) {
     auto [it, added] = g_parts.try_emplace(n);
-    if (added)
+    if (added) {
         for (auto &s : it->second.states) s.font = g_textDefault;
+        it->second.layer = g_activeLayer;
+    }
     return it->second;
 }
 
@@ -126,7 +179,7 @@ void placement(int n, float &x, float &y, int &z, int &alpha, bool &show, int de
     if (!p || depth > 32) return;
     x += p->x;
     y += p->y;
-    z += p->z;
+    z += p->z + (depth == 0 ? p->layer * 1000000 : 0);
     alpha = alpha * p->alpha / 255;
     show = show && p->show;
     if (p->parent > 0 && p->parent != n) placement(p->parent, x, y, z, alpha, show, depth + 1);
@@ -138,7 +191,9 @@ void syncAll() {
         Sprite &sp = G().sprites.get(kSpriteBase + n);
         sp.used = true;
         if (p.dirty) {
-            drawState(p.states[std::clamp(p.state, 1, 3) - 1], sp);
+            // A state with nothing in it shows the normal one.
+            const State &st = p.states[std::clamp(p.state, 1, 3) - 1];
+            drawState(st.empty() ? p.states[0] : st, sp);
             p.dirty = false;
         }
         float x = 0, y = 0;
@@ -169,6 +224,52 @@ void applyMotions(int t) {
             p->y = m.from[1] + (m.to[1] - m.from[1]) * k;
         }
     }
+}
+
+// The part under the pointer that takes clicks: the frontmost shown clickable part whose rectangle holds it.
+int hitTest(int mx, int my) {
+    int best = 0, bestZ = 0;
+    for (auto &[n, p] : g_parts) {
+        if (!p.clickable || p.lockInput) continue;
+        Sprite *sp = G().sprites.find(kSpriteBase + n);
+        if (!sp || !sp->show || sp->blendRate == 0) continue;
+        if (mx < sp->x || my < sp->y || mx >= sp->x + sp->width() || my >= sp->y + sp->height()) continue;
+        if (!best || sp->z >= bestZ) { best = n; bestZ = sp->z; }
+    }
+    return best;
+}
+
+void post(int type, int number, std::vector<int> vars) {
+    Part *p = find(number);
+    g_messages.push_back({type, number, p ? p->delegate : -1, std::move(vars)});
+}
+
+void setInputState(int number, int state) {
+    Part *p = find(number);
+    if (p && p->state != state) { p->state = state; p->dirty = true; }
+}
+
+// Turns the pointer into states and messages: entering and leaving a part, pressing it, and a click when the button
+// comes up over the part it went down on.
+void updateInput() {
+    int mx = G().mouseX(), my = G().mouseY();
+    bool down = G().keyDown(1);
+    int hit = hitTest(mx, my);
+    if (hit != g_hover) {
+        if (g_hover && find(g_hover)) {
+            post(Message::MouseLeave, g_hover, {mx, my});
+            setInputState(g_hover, 1);
+        }
+        if (hit) post(Message::MouseEnter, hit, {mx, my});
+        g_hover = hit;
+    }
+    if (down && !g_buttonWas) g_pressed = hit;
+    if (!down && g_buttonWas) {
+        if (g_pressed && g_pressed == hit) post(Message::MouseClick, hit, {mx, my, 1});
+        g_pressed = 0;
+    }
+    g_buttonWas = down;
+    if (g_hover) setInputState(g_hover, g_pressed == g_hover ? 3 : 2);
 }
 
 int motionEnd() {
@@ -216,9 +317,34 @@ S4_HLL(PartsEngine, Parts_SetParentPartsNumber) { get(c.i(0)).parent = c.i(1); }
 S4_HLL(PartsEngine, Parts_GetParentPartsNumber) { Part *p = find(c.i(0)); c.retInt(p ? p->parent : 0); }
 S4_HLL(PartsEngine, SetDelegateIndex) { get(c.i(0)).delegate = c.i(1); }
 S4_HLL(PartsEngine, GetDelegateIndex) { Part *p = find(c.i(0)); c.retInt(p ? p->delegate : -1); }
-S4_HLL(PartsEngine, Parts_SetPartsState) {
-    Part &p = get(c.i(0));
-    if (p.state != c.i(1)) { p.state = c.i(1); p.dirty = true; }
+S4_HLL(PartsEngine, Parts_SetInputState) { get(c.i(0)); setInputState(c.i(0), std::clamp(c.i(1), 1, 3)); }
+S4_HLL(PartsEngine, Parts_GetInputState) { Part *p = find(c.i(0)); c.retInt(p ? p->state : 1); }
+S4_HLL(PartsEngine, Parts_SetClickable) { get(c.i(0)).clickable = c.b(1); }
+S4_HLL(PartsEngine, Parts_GetPartsClickable) { Part *p = find(c.i(0)); c.retBool(p && p->clickable); }
+S4_HLL(PartsEngine, SetComponentDrawFilter) {}
+S4_HLL(PartsEngine, GetComponentDrawFilter) { c.retInt(0); }
+S4_HLL(PartsEngine, SetComponentSpeedupRateByMessageSkip) {}
+S4_HLL(PartsEngine, GetComponentSpeedupRateByMessageSkip) { c.retInt(0); }
+// A state's size and top left corner, before the part's position.
+S4_HLL(PartsEngine, Parts_GetPartsWidth) {
+    State *s = stateOf(c, 0, 1);
+    c.retInt(!s ? 0 : s->hasBuilt ? s->built.w : s->cg ? s->cg->w : 0);
+}
+S4_HLL(PartsEngine, Parts_GetPartsHeight) {
+    State *s = stateOf(c, 0, 1);
+    c.retInt(!s ? 0 : s->hasBuilt ? s->built.h : s->cg ? s->cg->h : 0);
+}
+S4_HLL(PartsEngine, Parts_GetPartsUpperLeftPosX) {
+    Part *p = find(c.i(0));
+    Sprite *sp = G().sprites.find(kSpriteBase + c.i(0));
+    int m = p ? std::clamp(p->originMode, 1, 9) - 1 : 0;
+    c.retFloat(p ? p->x - float(sp ? sp->width() : 0) * float(m % 3) / 2.0f : 0);
+}
+S4_HLL(PartsEngine, Parts_GetPartsUpperLeftPosY) {
+    Part *p = find(c.i(0));
+    Sprite *sp = G().sprites.find(kSpriteBase + c.i(0));
+    int m = p ? std::clamp(p->originMode, 1, 9) - 1 : 0;
+    c.retFloat(p ? p->y - float(sp ? sp->height() : 0) * float(m / 3) / 2.0f : 0);
 }
 S4_HLL(PartsEngine, GetComponentWidth) {
     Sprite *sp = G().sprites.find(kSpriteBase + c.i(0));
@@ -321,6 +447,24 @@ S4_HLL(PartsEngine, Parts_AddFillWithAlphaToPartsConstructionProcess) {
     if (s) s->steps.push_back({Step::FillAlpha, c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), c.i(8)});
     c.retBool(s != nullptr);
 }
+S4_HLL(PartsEngine, Parts_AddFillAlphaColorToPartsConstructionProcess) {
+    State *s = stateOf(c, 0, 9);
+    if (s) s->steps.push_back({Step::FillBlend, c.i(1), c.i(2), c.i(3), c.i(4), c.i(5), c.i(6), c.i(7), c.i(8)});
+    c.retBool(s != nullptr);
+}
+// A cut of a CG, scaled from its source rectangle into the destination one: copied over the pixels, or blended.
+static void addCut(HllCall &c, Step::Kind kind) {
+    State *s = stateOf(c, 0, 11);
+    if (s) {
+        Step st{kind, c.i(2), c.i(3), c.i(4), c.i(5)};
+        st.cg = c.s(1);
+        st.sx = c.i(6); st.sy = c.i(7); st.sw = c.i(8); st.sh = c.i(9);
+        s->steps.push_back(std::move(st));
+    }
+    c.retBool(s != nullptr);
+}
+S4_HLL(PartsEngine, Parts_AddCopyCutCGToPartsConstructionProcess) { addCut(c, Step::CopyCG); }
+S4_HLL(PartsEngine, Parts_AddDrawCutCGToPartsConstructionProcess) { addCut(c, Step::DrawCG); }
 S4_HLL(PartsEngine, Parts_BuildPartsConstructionProcess) {
     State *s = stateOf(c, 0, 1);
     if (!s) { c.retBool(false); return; }
@@ -331,6 +475,43 @@ S4_HLL(PartsEngine, Parts_BuildPartsConstructionProcess) {
         case Step::CreatePixelOnly: out.create(std::max(0, st.w), std::max(0, st.h), false); break;
         case Step::Fill: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, out.hasAlpha ? 255 : -1); break;
         case Step::FillAlpha: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, st.a); break;
+        case Step::FillBlend: {
+            Surface f;
+            f.create(std::max(0, st.w), std::max(0, st.h), true);
+            f.fill(0, 0, f.w, f.h, st.r, st.g, st.b, std::clamp(st.a, 0, 255));
+            if (out.w > 0) blit(out.px.data(), out.w, out.h, st.x, st.y, f.px.data(), f.w, f.h, true, 255, 0);
+            break;
+        }
+        case Step::CopyCG:
+        case Step::DrawCG: {
+            auto img = G().cgCachedNamed(st.cg);
+            if (!img || out.w <= 0 || st.w <= 0 || st.h <= 0 || st.sw <= 0 || st.sh <= 0) {
+                logOnce("construction step: no CG " + sjis::toUtf8(st.cg));
+                break;
+            }
+            Surface cut;
+            cut.create(st.w, st.h, true);
+            for (int y = 0; y < st.h; y++)
+                for (int x = 0; x < st.w; x++) {
+                    int sx = st.sx + x * st.sw / st.w, sy = st.sy + y * st.sh / st.h;
+                    if (sx < 0 || sy < 0 || sx >= img->w || sy >= img->h) continue;
+                    std::memcpy(cut.px.data() + (size_t(y) * st.w + x) * 4, img->rgba.data() + (size_t(sy) * img->w + sx) * 4, 4);
+                }
+            if (st.kind == Step::DrawCG) {
+                blit(out.px.data(), out.w, out.h, st.x, st.y, cut.px.data(), cut.w, cut.h, true, 255, 0);
+                break;
+            }
+            for (int y = 0; y < st.h; y++) {
+                int dy = st.y + y;
+                if (dy < 0 || dy >= out.h) continue;
+                for (int x = 0; x < st.w; x++) {
+                    int dx = st.x + x;
+                    if (dx >= 0 && dx < out.w)
+                        std::memcpy(out.px.data() + (size_t(dy) * out.w + dx) * 4, cut.px.data() + (size_t(y) * st.w + x) * 4, 4);
+                }
+            }
+            break;
+        }
         }
     }
     s->built = std::move(out);
@@ -366,12 +547,230 @@ S4_HLL(PartsEngine, EndMotion) {
 }
 
 // ---- each frame ----
-S4_HLL(PartsEngine, UpdateComponent) { syncAll(); }
-// Messages are what the player did to parts (clicks and the like); none are made yet.
-S4_HLL(PartsEngine, GetMessageType) { c.retInt(0); }
-S4_HLL(PartsEngine, ReleaseMessage) {}
+S4_HLL(PartsEngine, UpdateComponent) {
+    syncAll();
+    updateInput();
+}
+// ---- messages: the game reads the front one, then pops it, and releases the rest at the end of its loop ----
+S4_HLL(PartsEngine, GetMessageType) { c.retInt(g_messages.empty() ? 0 : g_messages.front().type); }
+S4_HLL(PartsEngine, PopMessage) { if (!g_messages.empty()) g_messages.pop_front(); }
+S4_HLL(PartsEngine, ReleaseMessage) { g_messages.clear(); }
+S4_HLL(PartsEngine, GetMessagePartsNumber) { c.retInt(g_messages.empty() ? 0 : g_messages.front().number); }
+S4_HLL(PartsEngine, GetMessageDelegateIndex) { c.retInt(g_messages.empty() ? -1 : g_messages.front().delegate); }
+S4_HLL(PartsEngine, GetMessageVariableCount) { c.retInt(g_messages.empty() ? 0 : int(g_messages.front().vars.size())); }
+S4_HLL(PartsEngine, GetMessageVariableType) { c.retInt(1); }  // every variable made here is an int
+static int messageVar(int k) {
+    if (g_messages.empty() || k < 0 || size_t(k) >= g_messages.front().vars.size()) return 0;
+    return g_messages.front().vars[size_t(k)];
+}
+S4_HLL(PartsEngine, GetMessageVariableInt) { c.retInt(messageVar(c.i(0))); }
+S4_HLL(PartsEngine, GetMessageVariableFloat) { c.retFloat(float(messageVar(c.i(0)))); }
+S4_HLL(PartsEngine, GetMessageVariableBool) { c.retBool(messageVar(c.i(0)) != 0); }
+S4_HLL(PartsEngine, GetMessageVariableString) { c.refS(1).clear(); }
+S4_HLL(PartsEngine, GetClickNumber) { c.retInt(0); }
+S4_HLL(PartsEngine, SetFocus) {}
+S4_HLL(PartsEngine, IsFocus) { c.retBool(false); }
+S4_HLL(PartsEngine, SetClickMissSoundNumber) {}
+S4_HLL(PartsEngine, GetClickMissSoundNumber) { c.retInt(-1); }
+S4_HLL(PartsEngine, SetButtonClickSoundNumber) {}
+S4_HLL(PartsEngine, GetButtonClickSoundNumber) { c.retInt(-1); }
+
+// ---- Flat animations (Flash-like, from the Flat archives). Not played yet: each reports itself finished. ----
+S4_HLL(PartsEngine, Parts_SetPartsFlat) { logOnce("Flat animations are not played (" + sjis::toUtf8(c.s(1)) + ")"); c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetPartsFlatAndStop) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_IsPartsFlatEnd) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_StopPartsFlat) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_StartPartsFlat) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_GetPartsFlatCurrentFrameNumber) { c.retInt(0); }
+S4_HLL(PartsEngine, Parts_GetPartsFlatEndFrame) { c.retInt(0); }
+S4_HLL(PartsEngine, Parts_StepPartsFlatFinalFrame) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_BackPartsFlatBeginFrame) { c.retBool(true); }
+
+// ---- numerals: a number drawn in digits. Not drawn yet. ----
+S4_HLL(PartsEngine, Parts_SetNumeralNumber) { logOnce("numerals are not drawn"); c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetNumeralCG) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetNumeralFont) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetNumeralShowComma) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetNumeralSpace) { c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetNumeralLength) { c.retBool(true); }
 S4_HLL(PartsEngine, BeginInput) {}
 S4_HLL(PartsEngine, EndInput) {}
+
+// ---- PartsFunc: many small calls behind one, by number. The inputs fill the int, float and string arrays in
+// order, a reference argument is read back from its slot, and the result takes the last slot of its type's array,
+// which the game fills with a placeholder first. The numbers come from the game's wrapper functions. ----
+namespace {
+
+struct FuncArgs {
+    HllCall &c;
+    Page *ints, *floats, *strs;
+    int i(size_t k) const { return ints && k < ints->v.size() ? ints->v[k] : 0; }
+    std::string s(size_t k) const {
+        return strs && k < strs->v.size() && c.vm.valid(strs->v[k]) ? c.vm.str(strs->v[k]) : std::string();
+    }
+    void setI(size_t k, int v) { if (ints && k < ints->v.size()) ints->v[k] = v; }
+    void setS(size_t k, const std::string &v) {
+        if (!strs || k >= strs->v.size()) return;
+        if (c.vm.valid(strs->v[k])) c.vm.str(strs->v[k]) = v;
+        else strs->v[k] = c.vm.newString(v);
+    }
+    void retInt(int v) { if (ints && !ints->v.empty()) ints->v.back() = v; }
+    void retBool(bool v) { retInt(v ? 1 : 0); }
+    void retFloat(float f) {
+        if (!floats || floats->v.empty()) return;
+        int32_t b;
+        std::memcpy(&b, &f, 4);
+        floats->v.back() = b;
+    }
+    void retString(const std::string &v) { if (strs && !strs->v.empty()) setS(strs->v.size() - 1, v); }
+};
+
+Activity *activity(const std::string &name) {
+    auto it = g_activities.find(name);
+    return it == g_activities.end() ? nullptr : &it->second;
+}
+
+void absolute(int n, float &x, float &y, int &z) {
+    int alpha = 255;
+    bool show = true;
+    placement(n, x, y, z, alpha, show);
+}
+
+void partsFunc(int id, FuncArgs a) {
+    switch (id) {
+    case 0: g_activeLayer = a.i(0); break;  // SetActiveLayer
+    case 1: a.retInt(g_activeLayer); break;
+    case 2: a.retInt(kOverlayLayer); break;
+    case 3: break;  // PlayMotion: the motions run from UpdateMotionTime
+    case 4: g_links[id][a.i(0)] = a.i(1); break;  // SetWantSave
+    case 5: a.retBool(g_links[4][a.i(0)] != 0); break;
+    case 7: a.retBool(activity(a.s(0)) != nullptr); break;
+    case 8: a.retBool(g_activities.try_emplace(a.s(0)).second); break;
+    case 9: {  // AddActivityParts(activity, name, number)
+        Activity *ac = activity(a.s(0));
+        if (ac) ac->parts.emplace_back(a.s(1), a.i(0));
+        a.retBool(ac != nullptr);
+        break;
+    }
+    case 10: {
+        Activity *ac = activity(a.s(0));
+        std::string name = a.s(1);
+        if (ac) std::erase_if(ac->parts, [&](const auto &p) { return p.first == name; });
+        a.retBool(ac != nullptr);
+        break;
+    }
+    case 11: { Activity *ac = activity(a.s(0)); if (ac) ac->parts.clear(); a.retBool(ac != nullptr); break; }
+    case 12: { Activity *ac = activity(a.s(0)); a.retInt(ac ? int(ac->parts.size()) : 0); break; }
+    case 13: {  // GetActivityParts(index, activity, &name, &number)
+        Activity *ac = activity(a.s(0));
+        int k = a.i(0);
+        bool ok = ac && k >= 0 && size_t(k) < ac->parts.size();
+        if (ok) { a.setS(1, ac->parts[size_t(k)].first); a.setI(1, ac->parts[size_t(k)].second); }
+        a.retBool(ok);
+        break;
+    }
+    case 14: case 16: {  // by name: whether it is there, and its number
+        Activity *ac = activity(a.s(0));
+        std::string name = a.s(1);
+        int number = -1;
+        if (ac)
+            for (const auto &p : ac->parts)
+                if (p.first == name) { number = p.second; break; }
+        if (id == 14) a.retBool(number != -1); else a.retInt(number);
+        break;
+    }
+    case 15: case 17: {  // by number: whether it is there, and its name
+        Activity *ac = activity(a.s(0));
+        const std::string *name = nullptr;
+        if (ac)
+            for (const auto &p : ac->parts)
+                if (p.second == a.i(0)) { name = &p.first; break; }
+        if (id == 15) a.retBool(name != nullptr); else a.retString(name ? *name : std::string());
+        break;
+    }
+    case 18: case 19: logOnce("activity files are not read or written"); a.retBool(false); break;
+    case 20: a.retBool(false); break;
+    case 21: g_intents[{a.s(0), a.s(1)}].type = a.i(0); break;  // SetIntentData(a, b, data, type)
+    case 22: g_intents[{a.s(0), a.s(1)}].destinations.push_back(a.s(2)); break;
+    case 23: a.retBool(g_intents.count({a.s(0), a.s(1)}) != 0); break;
+    case 24: { auto it = g_intents.find({a.s(0), a.s(1)}); a.retInt(it == g_intents.end() ? 0 : int(it->second.destinations.size())); break; }
+    case 26: { auto it = g_intents.find({a.s(0), a.s(1)}); a.retInt(it == g_intents.end() ? 0 : it->second.type); break; }
+    case 27: { Activity *ac = activity(a.s(0)); if (ac) ac->funcs[{a.s(1), a.i(0), a.s(2)}] = a.s(3); break; }
+    case 28: {
+        Activity *ac = activity(a.s(0));
+        std::string f;
+        if (ac)
+            if (auto it = ac->funcs.find({a.s(1), a.i(0), a.s(2)}); it != ac->funcs.end()) f = it->second;
+        a.retString(f);
+        break;
+    }
+    case 29: case 30: {  // the functions of one parts name and type: their count, and one by index
+        Activity *ac = activity(a.s(0));
+        std::vector<std::pair<std::string, std::string>> list;
+        if (ac)
+            for (const auto &[k, f] : ac->funcs)
+                if (std::get<0>(k) == a.s(1) && std::get<1>(k) == a.i(id == 29 ? 0 : 1)) list.emplace_back(std::get<2>(k), f);
+        if (id == 29) { a.retInt(int(list.size())); break; }
+        if (size_t k = size_t(a.i(0)); k < list.size()) { a.setS(2, list[k].first); a.setS(3, list[k].second); }
+        break;
+    }
+    case 31: { Activity *ac = activity(a.s(0)); if (ac) ac->closeParts.insert(a.s(1)); break; }
+    case 32: { Activity *ac = activity(a.s(0)); if (ac) ac->closeParts.erase(a.s(1)); break; }
+    case 33: { Activity *ac = activity(a.s(0)); if (ac) ac->closeParts.clear(); break; }
+    case 34: { Activity *ac = activity(a.s(0)); a.retBool(ac && ac->closeParts.count(a.s(1))); break; }
+    case 35: { Activity *ac = activity(a.s(0)); if (ac) ac->endKeys.insert(a.i(0)); break; }
+    case 36: { Activity *ac = activity(a.s(0)); if (ac) ac->endKeys.erase(a.i(0)); break; }
+    case 37: { Activity *ac = activity(a.s(0)); a.retBool(ac && ac->endKeys.count(a.i(0))); break; }
+    case 40: case 41: case 42: {
+        float x = 0, y = 0;
+        int z = 0;
+        absolute(a.i(0), x, y, z);
+        if (id == 42) a.retInt(z); else a.retFloat(id == 40 ? x : y);
+        break;
+    }
+    case 43: {  // the frontmost depth among the part and the parts inside it
+        int best = 0;
+        for (auto &[n, p] : g_parts) {
+            int m = n;
+            for (int d = 0; d < 32 && m > 0 && m != a.i(0); d++) m = find(m) ? find(m)->parent : 0;
+            if (m != a.i(0)) continue;
+            float x = 0, y = 0;
+            int z = 0;
+            absolute(n, x, y, z);
+            best = std::max(best, z);
+        }
+        a.retInt(best);
+        break;
+    }
+    case 45: get(a.i(0)).lockInput = a.i(1) != 0; break;
+    case 46: { Part *p = find(a.i(0)); a.retBool(p && p->lockInput); break; }
+    case 47: case 48: case 51: case 53: g_links[id][a.i(0)] = a.i(1); break;
+    case 49: case 50: case 52: case 54: {  // the getters of 47, 48, 51 and 53
+        auto &m = g_links[id == 49 ? 47 : id == 50 ? 48 : id == 52 ? 51 : 53];
+        auto it = m.find(a.i(0));
+        a.retInt(it == m.end() ? 0 : it->second);
+        break;
+    }
+    case 162: {  // a drawing plugin's surface on a part (number, width, height, three plugin values, state)
+        int st = a.i(6);
+        if (st < 1 || st > 3 || a.i(1) <= 0 || a.i(2) <= 0) { a.retBool(false); break; }
+        Part &p = get(a.i(0));
+        State &s = p.states[st - 1];
+        s.built.create(a.i(1), a.i(2), false);
+        s.hasBuilt = true;
+        p.dirty = true;
+        a.retBool(true);
+        break;
+    }
+    // That surface's handle for the plugin: DrawMovie3.Draw takes the part's sprite number.
+    case 163: syncAll(); a.retInt(find(a.i(0)) ? kSpriteBase + a.i(0) : -1); break;
+    default: logOnce("PartsFunc " + std::to_string(id) + " is not known"); break;
+    }
+}
+
+}  // namespace
+
+S4_HLL(PartsEngine, PartsFunc) { partsFunc(c.i(0), {c, c.page(1), c.page(2), c.page(3)}); }
 
 // ---- ChipmunkSpriteEngine: the frame, transitions and settings ----
 S4_HLL(ChipmunkSpriteEngine, Update) {

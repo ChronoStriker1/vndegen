@@ -140,6 +140,8 @@ bool Game::start(std::string &error) {
     }
     cgArchive = openAld("G");
     if (std::string afa = findCaseless(cfg.root, stem + "CG.afa"); !afa.empty()) cgAfa = AfaArchive::open(afa);
+    if (std::string afa = findCaseless(cfg.root, stem + "BA.afa"); !afa.empty()) bgmAfa = AfaArchive::open(afa);
+    if (std::string afa = findCaseless(cfg.root, stem + "WA.afa"); !afa.empty()) waveAfa = AfaArchive::open(afa);
     waveArchive = openAld("W");
     bgmArchive = openAld("B");
 

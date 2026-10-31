@@ -346,6 +346,16 @@ S4_HLL(IbisInputEngine, Joystick_GetNumofDevice) { c.retInt(0); }
 S4_HLL(IbisInputEngine, Joystick_IsKeyDown) { c.retBool(false); }
 S4_HLL(IbisInputEngine, Joystick_GetAxis) { c.retFloat(0); }
 S4_HLL(IbisInputEngine, Key_IsDown) { c.retBool(G().keyDown(c.i(0))); }
+bool g_hideCursor = false;  // the game's wish; VNDegen's host shows its own pointer
+S4_HLL(IbisInputEngine, Mouse_HideCursorByGame) { g_hideCursor = c.b(0); c.retBool(true); }
+S4_HLL(IbisInputEngine, Mouse_IsHideCursorByGame) { c.retBool(g_hideCursor); }
+S4_HLL(IbisInputEngine, Mouse_GetPos) {
+    c.ref(0) = G().mouseX();
+    c.ref(1) = G().mouseY();
+    c.retBool(true);
+}
+S4_HLL(IbisInputEngine, Mouse_MovePosImmediately) { G().mouseMove(c.i(0), c.i(1)); c.retBool(true); }
+S4_HLL(IbisInputEngine, Mouse_HideByStepMessage) {}
 int g_ibisWheelForward = 0, g_ibisWheelBack = 0;
 S4_HLL(IbisInputEngine, MouseWheel_ClearCount) { G().takeWheel(); g_ibisWheelForward = g_ibisWheelBack = 0; }
 S4_HLL(IbisInputEngine, MouseWheel_GetCount) {
@@ -391,6 +401,7 @@ S4_HLL_RESET {
     g_cursorConfig.clear();
     g_inputResult.clear();
     g_ibisWheelForward = g_ibisWheelBack = 0;
+    g_hideCursor = false;
     g_pass.clear();
     g_vs.close();
     g_confirm.close();
