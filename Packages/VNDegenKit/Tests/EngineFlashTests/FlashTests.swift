@@ -223,6 +223,15 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     #expect(!script.contains("__VNDEGEN_FLASH_FONTS__"))
 }
 
+@Test func pageScriptStartsWithTheGameSpeed() throws {
+    let host = try #require(FlashPlugin.hostDirectory)
+    let source = try String(contentsOf: host.appendingPathComponent("flash-page.js"), encoding: .utf8)
+    let template = try FlashFonts.pageScript(source)
+    let script = FlashCheats.script(template, speed: 4)
+    #expect(!script.contains("__VNDEGEN_FLASH_SPEED__"))
+    #expect(script.contains("const speed = { value: 4,"))
+}
+
 @Test func launcherPagesAreClassifiedByTheMoviesTheyReach() throws {
     let root = try game([
         // A menu that links only to episode pages, which embed the movies.

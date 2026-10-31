@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, and game speed for Godot, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, and game speed for Godot and Flash, see below.
 
 ## Why
 
@@ -180,4 +180,17 @@ It is Godot's own speed control, the one the Godot editor's Game view has (`Engi
 ### Known limits
 
 - A game that counts frames rather than time in `_process`, or that times itself with `Time.get_ticks_msec()` (`OS.get_ticks_msec()` in Godot 3), runs those parts at normal speed.
+- Music and sounds play at their normal speed.
+
+## Built: game speed for Flash
+
+Ruffle has no way to reach a movie's variables from outside, so Flash games' Cheats page has game speed only: 1x, 2x or 4x, on the Quick tab.
+
+Ruffle has no speed setting either. Its web build advances a movie by the time between the animation frames it asks the page for: it runs as many of the movie's frames as fit in that time, and moves the movie's ActionScript timers on by it. `flash-page.js` wraps `requestAnimationFrame` before Ruffle loads, so each animation frame tells Ruffle that the time since the last one, times the speed, has passed. Every callback in one animation frame gets the same time, and the time never goes back when the speed changes. A page the game opens next, such as a movie a launcher page opens, starts at the same speed.
+
+### Known limits
+
+- `getTimer()` reads the real clock, so a game that moves by the time `getTimer()` says has passed runs those parts at normal speed.
+- A timeline's streamed sound, mostly in animated scenes, holds its movie clip to the sound, which plays at normal speed. Such a scene runs at normal speed.
+- Ruffle runs at most 5 of a movie's frames per animation frame, and fewer when the movie's frames take long to run. A 60 fps movie at 4x on a 60 Hz display needs 4, and a 120 Hz display halves that.
 - Music and sounds play at their normal speed.
