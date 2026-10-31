@@ -25,6 +25,7 @@ final class System4Session: EngineSession {
     private var displayLink: CADisplayLink?
     private var lastTimestamp: CFTimeInterval?
     private var deferred: [[System4Input]] = []  // input batches for the coming frames, oldest first; [] is a frame
+    private var holdUntil: CFTimeInterval = 0     // a deferred press stays down until then before the next batch
     private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
@@ -166,7 +167,13 @@ final class System4Session: EngineSession {
             finish(byGame: true)
             return
         }
-        if !deferred.isEmpty { apply(deferred.removeFirst()) }
+        if !deferred.isEmpty, CACurrentMediaTime() >= holdUntil {
+            let batch = deferred.removeFirst()
+            apply(batch)
+            if batch.contains(where: { if case .key(_, true) = $0 { true } else { false } }) {
+                holdUntil = CACurrentMediaTime() + 0.1
+            }
+        }
         var w: Int32 = 0, h: Int32 = 0
         if let pixels = vns4_frame(engine, &w, &h), w > 0, h > 0 {
             frameSize = CGSize(width: Int(w), height: Int(h))
@@ -177,13 +184,13 @@ final class System4Session: EngineSession {
         #endif
     }
 
-    /// Hands inputs to the runtime. The games only take a click on a button the pointer has rested on for a few frames,
-    /// so a touch that moves the pointer and presses at once would hit nothing: a press that comes with its pointer move
-    /// waits three frames (Rance 02's title took none at one), and whatever arrives meanwhile follows in order, a frame
-    /// apart.
+    /// Hands inputs to the runtime. The games only take a click on a button the pointer has rested on, and see a press
+    /// only if it is still down at their next poll, so a touch that moves the pointer, presses and lets go at once would
+    /// hit nothing: a press that comes with its pointer move waits three frames (Rance 02's title took none at one), and
+    /// what follows a press is held back until it has been down for 100 ms (Sengoku Rance missed a 17 ms tap).
     private func deliver(_ inputs: [System4Input]) {
         guard !inputs.isEmpty else { return }
-        if !deferred.isEmpty {
+        if !deferred.isEmpty || CACurrentMediaTime() < holdUntil {
             deferred.append(inputs)
             return
         }
@@ -195,6 +202,9 @@ final class System4Session: EngineSession {
             return
         }
         apply(inputs)
+        if inputs.contains(where: { if case .key(_, true) = $0 { true } else { false } }) {
+            holdUntil = CACurrentMediaTime() + 0.1
+        }
     }
 
     private func apply(_ inputs: [System4Input]) {
