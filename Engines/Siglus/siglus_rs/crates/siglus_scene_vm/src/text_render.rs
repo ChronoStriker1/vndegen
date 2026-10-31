@@ -14,8 +14,23 @@ use std::sync::{Mutex, OnceLock};
 
 static MISSING_CONFIGURED_FONTS_LOGGED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
-// Share one embedded font allocation between game text and desktop dialogs.
-pub(crate) static DEFAULT_FONT_BYTES: &[u8] = include_bytes!("../assets/fonts/default.ttf");
+// VNDegen: upstream compiles Microsoft's MS PGothic in here. VNDegen can't ship that font, so the host passes a
+// substitute once, before the first game starts, through `set_default_font`.
+static DEFAULT_FONT: OnceLock<(&'static [u8], String)> = OnceLock::new();
+
+/// Sets the font used in place of MS PGothic and of faces no game or system font provides. Only the first call takes
+/// effect. Returns whether `bytes` became the default font.
+pub fn set_default_font(bytes: Vec<u8>, source: String) -> bool {
+    if FontRef::try_from_slice(&bytes).is_err() {
+        return false;
+    }
+    DEFAULT_FONT.set((Vec::leak(bytes), source)).is_ok()
+}
+
+/// The default font's bytes, empty until the host sets one. Desktop dialogs share it with game text.
+pub(crate) fn default_font_bytes() -> &'static [u8] {
+    DEFAULT_FONT.get().map(|(bytes, _)| *bytes).unwrap_or(&[])
+}
 
 fn log_missing_configured_font_once(requested_name: &str, fallback: Option<&Path>) {
     let key = normalize_font_name_for_match(requested_name.trim_start_matches('@'));
@@ -46,8 +61,14 @@ fn log_missing_configured_font_once(requested_name: &str, fallback: Option<&Path
 }
 
 mod embedded_font {
-    pub const EMBEDDED_DEFAULT_FONT: Option<&'static [u8]> = Some(super::DEFAULT_FONT_BYTES);
-    pub const EMBEDDED_DEFAULT_FONT_SOURCE: Option<&'static str> = Some("assets/fonts/default.ttf");
+    pub fn embedded_default_font() -> Option<&'static [u8]> {
+        super::DEFAULT_FONT.get().map(|(bytes, _)| *bytes)
+    }
+
+    pub fn embedded_default_font_source() -> Option<&'static str> {
+        super::DEFAULT_FONT.get().map(|(_, source)| source.as_str())
+    }
+
     pub const EMBEDDED_DEFAULT_FONT_ALIASES: &[&str] = &[
         "ＭＳ Ｐゴシック",
         "MS PGothic",
@@ -382,7 +403,7 @@ impl FontCache {
         if self.font.is_some() {
             return true;
         }
-        let Some(bytes) = embedded_font::EMBEDDED_DEFAULT_FONT else {
+        let Some(bytes) = embedded_font::embedded_default_font() else {
             return false;
         };
         // Parsed in place: the font lives in the executable, so it costs no
@@ -391,7 +412,7 @@ impl FontCache {
             Ok(font) => {
                 self.font = Some(FontArc::from(font));
                 let source =
-                    embedded_font::EMBEDDED_DEFAULT_FONT_SOURCE.unwrap_or("embedded:default-font");
+                    embedded_font::embedded_default_font_source().unwrap_or("embedded:default-font");
                 self.loaded_from = Some(PathBuf::from(source));
                 self.loaded_face_index = 0;
                 true
@@ -2171,7 +2192,7 @@ fn render_text_ab_glyph_rgba(
 }
 
 pub fn embedded_default_font_available() -> bool {
-    embedded_font::EMBEDDED_DEFAULT_FONT.is_some()
+    embedded_font::embedded_default_font().is_some()
 }
 
 pub fn embedded_default_font_names() -> &'static [&'static str] {
