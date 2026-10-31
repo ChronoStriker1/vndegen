@@ -358,6 +358,41 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
                 return false;
         }
         if (!global || curCall >= ain.code.size()) return false;
+        // Every slot a page holds must be NULL (-1) or a live slot of the kind its type needs; the VM trusts this.
+        enum Want { String, StructPage, ArrayPage, AnyPage };
+        auto holds = [&](int32_t v, Want want) {
+            if (v == -1) return true;
+            if (v < 0 || size_t(v) >= newHeap.size() || !newHeap[size_t(v)].inUse) return false;
+            const Slot &sl = newHeap[size_t(v)];
+            switch (want) {
+            case String: return bool(sl.str);
+            case StructPage: return sl.page && sl.page->kind == PageKind::Struct;
+            case ArrayPage: return sl.page && sl.page->kind == PageKind::Array;
+            case AnyPage: return bool(sl.page);
+            }
+            return false;
+        };
+        for (const Slot &sl : newHeap) {
+            if (!sl.page) continue;
+            const Page &p = *sl.page;
+            for (size_t i = 0; i < p.v.size(); i++) {
+                int32_t t = varType(p, i).type, v = p.v[i];
+                bool ok = true;
+                if (t == T_STRING || t == T_REF_STRING) ok = holds(v, String);
+                else if (t == T_STRUCT || t == T_REF_STRUCT) ok = holds(v, StructPage);
+                else if (isArray(t) || (t >= T_REF_ARRAY_INT && t <= T_REF_ARRAY_STRUCT) || t == T_REF_ARRAY_FUNCTYPE ||
+                         t == T_REF_ARRAY_BOOL)
+                    ok = holds(v, ArrayPage);
+                else if (t == T_REF_INT || t == T_REF_FLOAT || t == T_REF_BOOL || t == 59) {
+                    // A (page, index) pair: the index must lie in the page.
+                    if (i + 1 >= p.v.size()) return false;
+                    int32_t idx = p.v[++i];
+                    ok = holds(v, AnyPage) &&
+                         (v == -1 || (idx >= 0 && size_t(idx) < newHeap[size_t(v)].page->v.size()));
+                }
+                if (!ok) return false;
+            }
+        }
         size_t methods = 0;
         for (uint32_t k = 1; k < nf; k++) {
             if (!pageAt(locals[k], PageKind::Local)) return false;
