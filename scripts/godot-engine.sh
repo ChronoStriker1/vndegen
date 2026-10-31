@@ -7,9 +7,9 @@
 # Each framework holds iOS device and simulator and macOS slices, all arm64, of Godot built as static libraries with
 # VNDegen's module (Engines/Godot/<major>/vndegen), and exports only the functions in vngd.h. Godot comes from the pinned
 # commits below, with Engines/Godot/<major>/patches applied. SCons comes from PyPI into a venv. Sources, SCons, and the
-# build folders are cached in ~/Library/Caches/VNDegen/godot, so a change rebuilds only what it touches. A build whose
-# inputs have not changed since the last one is skipped. VNDEGEN_GODOT_SLICES picks slices, such as "ios-sim mac", and
-# VNDEGEN_GODOT_MAJORS picks engines, such as "4", for a quicker build while testing.
+# build folders are cached in ~/Library/Caches/VNDegen/godot, with one work folder per build folder, so a change rebuilds
+# only what it touches. A build whose inputs have not changed since the last one is skipped. VNDEGEN_GODOT_SLICES picks
+# slices, such as "ios-sim mac", and VNDEGEN_GODOT_MAJORS picks engines, such as "4", for a quicker build while testing.
 set -euo pipefail
 dest=${1:?destination folder, such as build/godot}
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -34,13 +34,16 @@ if [ "$(cat "$dest/.vndegen-engine" 2>/dev/null)" = "$stamp" ]; then
 fi
 start=$(date +%s)
 
-# Every checkout shares the cache's work folder, so one build at a time holds this lock. A lock whose build has ended
-# is taken over.
-lock="$cache/lock"
+# Each build folder gets its own work folder in the cache, so builds of different branches never rebuild each other's
+# objects or wait on each other. The Godot sources and SCons stay shared. One build per work folder holds this lock; a
+# lock whose build has ended is taken over.
+work="$cache/work/$(basename "$root")"
+mkdir -p "$cache/work"
+lock="$work.lock"
 until mkdir "$lock" 2>/dev/null; do
   holder=$(cat "$lock/pid" 2>/dev/null || true)
   if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$lock"; continue; fi
-  echo "Waiting for another Godot build${holder:+ (pid $holder)}"
+  echo "Waiting for another Godot build in this folder${holder:+ (pid $holder)}"
   sleep 15
 done
 echo $$ > "$lock/pid"
@@ -63,7 +66,6 @@ if [ ! -x "$cache/venv/bin/scons" ] || [ "$("$cache/venv/bin/scons" --version | 
   "$cache/venv/bin/pip" install --quiet "scons==$scons_version"
 fi
 scons="$cache/venv/bin/scons"
-work="$cache/work"
 
 # prepare <major> <commit>: the patched sources in $work/godot<major>. They are made fresh, then copied over the
 # sources the builds use by content, so unchanged files keep their times and SCons rebuilds only what changed.
