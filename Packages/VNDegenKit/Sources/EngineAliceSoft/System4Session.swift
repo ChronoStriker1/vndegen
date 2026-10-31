@@ -24,7 +24,7 @@ final class System4Session: EngineSession {
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
     private var lastTimestamp: CFTimeInterval?
-    private var deferred: [[System4Input]] = []  // input batches waiting for the next frame, oldest first
+    private var deferred: [[System4Input]] = []  // input batches for the coming frames, oldest first; [] is a frame
     private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
@@ -177,9 +177,10 @@ final class System4Session: EngineSession {
         #endif
     }
 
-    /// Hands inputs to the runtime. The games pick what is under the pointer from the frame before a press, so a touch
-    /// that moves the pointer and presses at once would hit nothing: a press that comes with its pointer move waits a
-    /// frame, and whatever arrives while something waits follows in order, a frame apart.
+    /// Hands inputs to the runtime. The games only take a click on a button the pointer has rested on for a few frames,
+    /// so a touch that moves the pointer and presses at once would hit nothing: a press that comes with its pointer move
+    /// waits three frames (Rance 02's title took none at one), and whatever arrives meanwhile follows in order, a frame
+    /// apart.
     private func deliver(_ inputs: [System4Input]) {
         guard !inputs.isEmpty else { return }
         if !deferred.isEmpty {
@@ -189,6 +190,7 @@ final class System4Session: EngineSession {
         if let move = inputs.firstIndex(where: { if case .mouseMove = $0 { true } else { false } }),
            inputs[(move + 1)...].contains(where: { if case .key = $0 { true } else { false } }) {
             apply(Array(inputs[...move]))
+            deferred.append(contentsOf: [[], []])
             deferred.append(Array(inputs[(move + 1)...]))
             return
         }
