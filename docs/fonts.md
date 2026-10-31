@@ -9,7 +9,10 @@ engine reads it.
 
 The app bundles the Latin and Japanese fonts in `Engines/Shared/fonts/`, unmodified and under their upstream names.
 They take 27.2 MB in the app and about 13 MB in the zipped IPA. The Chinese and Korean fonts are large, so Settings,
-Fonts offers them as downloads.
+Fonts offers them as downloads of Source Han Sans from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean.
+Games started after a download use it. A device font with the name a game asks for, such as Arial on Apple systems,
+comes before the substitute. The RPG Maker MV and MZ and TyranoScript engines read the table through the `FontPack`
+module, and KiriKiri, RGSS, and the other native engines through `Engines/Shared/vnfont.h`.
 
 | Windows names | Substitute | File | Source | License |
 |---|---|---|---|---|

@@ -2,116 +2,114 @@
 
 # VNDegen
 
-VNDegen runs visual novel and RPG Maker games natively on Mac, iPhone, and iPad. Copy a game's folder into the library and VNDegen detects its engine and lists it in a game hub modeled on Steam's Big Picture mode. Each game shows its artwork, and Play starts it.
+VNDegen runs PC visual novels and RPG Maker games natively on Mac, iPhone, and iPad. Copy a game's folder into the library, and VNDegen detects its engine and lists it in a game hub modeled on Steam's Big Picture mode, with artwork from Steam and other sources. Play starts it.
 
-The PC games run unmodified. VNDegen does not convert or repack them, and their saves stay compatible with the PC versions.
+The games run unmodified. VNDegen does not convert or repack them, and their saves stay compatible with the PC versions.
 
 <p align="center">
-  <img src="docs/screenshots/hub-ipad.jpg" width="820" alt="Library home on iPad, with the focused game's hero art, logo, and Play button above a shelf of recently played games">
+  <img src="docs/screenshots/hub-ipad.jpg" width="820" alt="The library on iPad in Capsule rows, the iPad default: a Recently played shelf with Barely Working, Nitz's Debt, Warding Witches, and Kichikuou Rance above the All games shelf">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/hub-iphone.jpg" width="260" alt="Library home on iPhone">
-  <img src="docs/screenshots/game-page-mac.jpg" width="560" alt="Game page on Mac, with the hero banner, Play, Artwork, Find metadata, and Hide buttons, and a details card">
+  <img src="docs/screenshots/hub-iphone.jpg" width="260" alt="The library on iPhone in portrait, in Header list, the iPhone default: wide header art for Warding Witches, Kichikuou Rance, Nitz's Debt, and Barely Working">
+  <img src="docs/screenshots/hub-mac.jpg" width="560" alt="The library on Mac in Featured, the Mac default: Warding Witches' hero art, a Godot badge, its description, and Play and Details buttons above the Recently played shelf">
 </p>
 
 ## Features
 
-- **Engine detection.** Each engine is a plugin that recognizes its own files, such as `js/rmmz_core.js` for RPG Maker MZ. The game page shows the detected engine and the file that identified it. Games with no detected engine can be assigned one by hand.
-- **Artwork and metadata.** VNDegen fetches capsule, hero, logo, header, and icon art plus descriptions, developers, release dates, genres, and screenshots from the Steam store, SteamGridDB, IGDB, and VNDB. Every artwork slot can be replaced with another source's image or one imported from Photos or Files.
-- **Library views.** The view button in the top bar switches the library between three layouts. Header list stacks each game's wide header art, in as many columns as the screen allows. Capsule rows shows shelves of large portrait capsules. Featured puts the focused game's hero art, logo, and Play button above the shelves. iPhone starts on Header list, iPad on Capsule rows, and Mac on Featured, and each device remembers its choice.
-- **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls.
-- **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. A controller alone reaches every screen, including Settings, the button mapping editor, adding a game, and the lock screen, and its text fields open an on-screen keyboard the controller types on. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Every button reaches games as an Xbox controller button by default, except in KiriKiri, TyranoScript, and Flash games, which start with Steam's Keyboard and Mouse layout. Each game also has its own button mapping: any overlay or controller button can send another Xbox button, a keyboard key, a mouse click, the mouse wheel, mouse movement, or the on-screen keyboard.
-- **More than one games folder.** Settings, Library folders, adds other folders of games beside VNDegen's own, such as a folder on an external drive, a server connected in Files, or another folder on the Mac. A folder that can't be reached, such as an unplugged drive, keeps its games in the library, shown as unavailable with the reason, until it's back.
-- **Game menu.** A long press on a game in any library layout, a right click on a Mac, or X on a controller opens a menu with Play, Open game page, Change artwork, Find metadata, Hide or Unhide, Show in Finder or Open in Files, and Remove from library.
-- **Plugins.** Settings, Engines, Plugins lists every engine plugin built into the app, the engine versions it covers, what runs its games and under which license, how many of your games use it, and whether it runs on this device. Godot doesn't run on an Intel Mac, for example. Plugins are compiled into the app, so they can't be added or removed.
-- **Game commands.** Commands a game keeps where VNDegen draws nothing, such as a KiriKiri game's window menu bar, appear under Game commands in the VNDegen menu, with the game's own captions, submenus, check marks, and disabled items. Choosing one closes the VNDegen menu and the game runs it, as on the PC. Items VNDegen's own menu covers, such as Exit and Full Screen, are left out, and games without such commands don't show the entry.
-- **Cheats.** RPG Maker MV, MZ, XP, VX, and VX Ace games have a Cheats page in the VNDegen menu: add gold, items, weapons, and armor by name from the game's own database, restore the party's HP and MP, keep them full, turn random encounters off, walk through walls, multiply experience, and run the game at 2x or 4x speed. A Variables and a Switches tab list the game's numbered variables and switches with the names its database gives them, and edit them in place. Every change goes through the game's own objects, so a save made afterwards is an ordinary save that loads on the PC. Cheats are off until you turn one on. The settings that stay on, such as game speed, are kept per game and shown on its game page.
-- **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
-- **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen. In a window, tiled or not, a game follows the window's shape. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
-- **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
-- **Windows fonts.** Games that ask for MS Gothic, MS Mincho, Arial, Tahoma, and other Windows fonts by name get free fonts with the same metrics, as under Proton, so their text wraps and fits as designed. Chinese and Korean fonts are a download in Settings.
-- **Hardware rendering.** Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad. Godot 4 renders on Metal.
+- **PC games on their own engines**, including RPG Maker, Ren'Py, KiriKiri, Godot, and Flash. See [Supported engines](#supported-engines).
+- **Engine detection.** VNDegen recognizes each game by its files and shows which file identified it. You can assign an engine by hand. [Engines](docs/engines.md)
+- **Artwork and metadata** from Steam, SteamGridDB, IGDB, and VNDB, and any art slot can be replaced. [Library](docs/library.md#artwork-and-metadata)
+- **Three library layouts**, Header list, Capsule rows, and Featured, that fit iPhone portrait and landscape, iPhone Duo, iPad full screen or in a window, and Mac windows of any size. [Layouts](#layouts-on-each-device)
+- **Touch, mouse and keyboard, and controllers** drive the hub and the games, with a per-game button mapping. [Controls](docs/controls.md)
+- **More than one games folder**, such as an external drive or a server, and archives unpack straight into the library. [Library](docs/library.md#adding-games)
+- **Game menu.** A long press, a right click, or X on a controller opens Play, Change artwork, Hide, Remove, and more. [Library](docs/library.md#the-game-menu)
+- **Game commands.** Menus a game keeps in its window's menu bar, such as KiriKiri's, appear in the VNDegen menu. [Controls](docs/controls.md#game-commands)
+- **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace: gold, items, encounters, game speed, variables, and switches. [Controls](docs/controls.md#cheats)
+- **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
+- **Ludusavi saves.** Back up and restore through your Ludusavi SMB share, so saves move between VNDegen and your PCs. [Ludusavi](docs/ludusavi.md)
+- **Windows fonts.** Games that ask for MS Gothic, Arial, and other Windows fonts get free fonts with the same metrics. [Fonts](docs/fonts.md)
+- **Hardware rendering** through Metal, directly or through WebGL, OpenGL, or ANGLE. [Engines](docs/engines.md)
+
+## Layouts on each device
+
+The view button in the top bar switches between Header list, Capsule rows, and Featured, and each device keeps its own choice.
 
 <p align="center">
-  <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
+  <img src="docs/screenshots/hub-iphone-landscape.jpg" width="820" alt="iPhone in landscape in Featured: Nitz's Debt's hero art, a Godot badge, and Play and Details buttons above the Recently played shelf">
 </p>
 
-## Engines
+<p align="center">
+  <img src="docs/screenshots/hub-ipad-featured.jpg" width="820" alt="iPad in Featured: Kaeru nyo Panyon, an AliceSoft System 3 game, with its hero art, description, and Play and Details buttons above the Recently played shelf">
+</p>
 
-| Engine | Detected by | Platforms |
-|---|---|---|
-| RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad |
-| RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
-| TyranoScript and TyranoBuilder | `tyrano/` with `data/scenario/`, including NW.js and Electron builds (also inside `app.asar`) | Mac, iPhone, iPad |
-| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
-| RPG Maker XP, VX, and VX Ace | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac, iPhone, iPad |
-| KiriKiri 2 and KiriKiri Z | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |
-| Artemis | a `.pfs` archive, such as `root.pfs`, whose first bytes are `pf2`, `pf6`, or `pf8`, or a `system.ini` that names the script to boot, up to two folders down | Mac, iPhone, iPad |
-| Godot 3 and Godot 4 | a `.pck` file beside the game's `.exe`, or a pack inside the `.exe`, up to two folders down | Mac with Apple silicon, iPhone, iPad |
-| Flash (ActionScript 1, 2, and 3) | A Flash projector `.exe` with the movie appended, a `.swf` movie, or an HTML page that launches movies, up to four folders down | Mac, iPhone, iPad |
-| NScripter | `nscript.dat`, or `0.txt` or `00.txt` beside an `.nsa`, `.ns2`, or `.sar` archive or NScripter's own files, up to two folders down | Mac, iPhone, iPad |
-| Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` beside `Game.exe`, up to two folders down | Mac, iPhone, iPad |
-| AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` beside `SYSTEM3.EXE`, up to two folders down | Mac, iPhone, iPad |
+<p align="center">
+  <img src="docs/screenshots/hub-duo-outer.jpg" width="300" alt="iPhone Duo folded, on the outer display, in Header list: one column of header art beside the camera inset">
+  <img src="docs/screenshots/hub-duo-inner.jpg" width="520" alt="iPhone Duo unfolded, on the inner display, in Header list: two columns of header art">
+</p>
 
-RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves are written as `save/*.rmmzsave` exactly like the PC version, and encrypted images and audio, Effekseer effects, and WebM movies all work. WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV games that ship only Ogg audio, as most do, play it through VNDegen's own Ogg decoder, described below.
+<p align="center">
+  <img src="docs/screenshots/hub-mac-headers.jpg" width="820" alt="A wide Mac window in Header list: sixteen games' header art in five columns, including Warding Witches, five Rance games, Lilipalace, and No Socks RPG">
+</p>
 
-TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. iOS cannot play Ogg, so VNDegen decodes Ogg Vorbis inside the game's page with libvorbis compiled to WebAssembly, the first time each track plays.
+## Supported engines
 
-Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py runtimes, 8.5.3 for Ren'Py 8 games and 7.8.7 for Ren'Py 7 and older games, and picks one from the game's `renpy/vc_version.py` or `renpy/__init__.py`, then its `lib/` folder names, then the engine's compiled files. Each game runs in its own process and window, which takes the hub window's place, and the hub comes back when the game quits. Saves and logs go to the game's data folder, and the game folder is never written to. A game copied from a PC with saves in `game/saves/` gets those copied in on its first launch.
+| Engine | VNDegen detects | Platforms | Details |
+|---|---|---|---|
+| RPG Maker MZ | `js/rmmz_core.js` | Mac, iPhone, iPad | [engines.md](docs/engines.md#rpg-maker-mv-and-mz) |
+| RPG Maker MV | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad | [engines.md](docs/engines.md#rpg-maker-mv-and-mz) |
+| TyranoScript and TyranoBuilder | `tyrano/plugins/kag/kag.js`, also in NW.js and Electron builds | Mac, iPhone, iPad | [engines.md](docs/engines.md#tyranoscript) |
+| Ren'Py 6.99 to 8 | `renpy/` beside a `game/` folder of scripts | Mac, iPhone, iPad | [engines.md](docs/engines.md#renpy) |
+| RPG Maker XP, VX, and VX Ace | `Game.ini` beside a `Game.rgss*` archive or `Data/Scripts.*` | Mac, iPhone, iPad | [rgss.md](docs/rgss.md) |
+| KiriKiri 2 and KiriKiri Z | `data.xp3`, `data/startup.tjs`, or an archive in the `.exe` | Mac, iPhone, iPad | [engines.md](docs/engines.md#kirikiri) |
+| Artemis | a `.pfs` archive or a `system.ini` | Mac, iPhone, iPad | [artemis.md](docs/artemis.md) |
+| Godot 3 and Godot 4 | a `.pck` file, or a pack inside the game's `.exe` | Mac with Apple silicon, iPhone, iPad | [godot.md](docs/godot.md) |
+| Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPad | [flash.md](docs/flash.md) |
+| NScripter | `nscript.dat`, or `0.txt` or `00.txt` beside NScripter archives | Mac, iPhone, iPad | [nscripter.md](docs/nscripter.md) |
+| Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
+| AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |
 
-On iPhone and iPad, Ren'Py 8.5.3 is built into the app and every Ren'Py game runs on it, inside VNDegen's window. Ren'Py 7 and 6.99 games run on it too, with fixes VNDegen applies in memory, such as dividing integers the Python 2 way in the game's own code. 15 of the 16 Ren'Py 7 games in the maintainer's library reached their main menu this way, and VNDegen ships that list. The page of a Ren'Py 7 game says whether it is known to work and, once it has run, whether it reached its main menu on this device. On Mac the game page's Ren'Py runtime option runs a game on the other runtime.
+[docs/engines.md](docs/engines.md) has the exact detection rules and how each engine runs, saves, and what it can't do yet. Some RPG Maker XP, VX, and VX Ace games need the RTP, which VNDegen downloads from the RPG Maker website when you ask. [docs/engine-survey.md](docs/engine-survey.md) covers other engines and how each could be supported.
 
-Ren'Py can't load saves made by a newer Ren'Py. VNDegen runs each game on the newest Ren'Py of its line, so saves made here may not load in the game's PC version, and the game's Saves page warns before a Ludusavi backup when that applies. VNDegen on other devices loads them. The exception is a Mac, which runs Ren'Py 7 games on Ren'Py 7.8.7, so it loads a Ren'Py 7 game's saves from an iPhone or iPad only once that game's Ren'Py runtime option is set to Ren'Py 8.5.3. A Ren'Py 7 game's persistent data, such as unlocked gallery images, is written so its PC version loads it.
+## Installing
 
-RPG Maker XP, VX, and VX Ace games run on VNDegen's own RGSS runtime, which runs the game's Ruby scripts on MRI Ruby, an interpreter with no JIT, and draws each frame on the CPU for the app to show through Metal. The VNDegen menu and touch controls work as for the other engines. Packed games (`Game.rgss3a` and its older forms) and unpacked ones both work, as do MIDI music, through the General MIDI SoundFont in Settings, and the Windows API calls the test games make, which the runtime emulates. Saves go to the game's data folder in the PC format, so saves copied in with a PC game still load and VNDegen's saves load on PC, and the game folder is never written to. Games that need a Windows DLL VNDegen doesn't emulate lose that DLL's feature, and a game whose scripts need something the runtime lacks stops with an error, which the game page then shows. [docs/rgss.md](docs/rgss.md) has the details and known limits.
+- **Releases.** The [Releases](https://github.com/ChronoStriker1/vndegen/releases) page has an IPA for iPhone and iPad and a zipped app for Mac, with install steps in each release's notes.
+- **AltStore or SideStore.** Add this source to install VNDegen and get updates:
 
-Many RPG Maker games use the RTP, a set of stock graphics, sounds, and fonts that the PC player installs once instead of every game shipping it. Its license doesn't let VNDegen include it. When a game needs an RTP that isn't installed, its page offers Download and install, which fetches the official installer from the RPG Maker website (rpgmakerweb.com), checks it against the SHA-256 VNDegen expects, shows the RTP's license to accept, and unpacks it inside the app on Mac, iPhone, and iPad. The RTP is then shared by every game that needs it. Import from folder takes an RTP folder copied from a PC instead, such as `C:\Program Files (x86)\Common Files\Enterbrain\RGSS3\RPGVXAce`. The XP RTP is 23 MB to download, VX's 37 MB, and VX Ace's 195 MB. Nothing downloads until you tap the button.
+  ```
+  https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json
+  ```
 
-KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDegen builds into the app. The game draws inside VNDegen's window, composited on the CPU and shown through Metal, so the VNDegen menu and touch controls work as for the other engines. Saves stay in the game's `savedata/` folder as on PC. A game that saves to the Windows AppData or Documents folder saves to its data folder instead, and Ludusavi backups from Windows or a Steam Deck restore there. Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives work without any per-game setting: VNDegen recognizes the common ciphers by the checksums inside the archive, and tells you when a game uses one it doesn't know. Common Windows plugins are built in, including `extrans`, `layerExDraw`, `layerExSave`, and Steam builds' `krkrsteam`. Known limits: sound effects and music stored as MP3 don't play, AlphaMovie (`.amv`) animations don't show, and a KiriKiri game that is still starting with a question on screen when the Mac logs out or shuts down doesn't save its settings from that moment.
+- **Sideloadly.** Sideloadly or AltStore signs and installs the IPA with a free Apple ID. Apps signed that way expire after 7 days and need to be installed again.
 
-Artemis games run on art3m1s-core, an open-source Rust reimplementation of the Artemis engine, built into the app with Lua 5.1 and no JIT. The game draws inside VNDegen's window through the core's Metal renderer, so the VNDegen menu and touch controls work as for the other engines. Saves are the PC engine's own files, in both of the versions it writes, so a save made in VNDegen loads in the PC version at the same page and the other way round. They go to the game's data folder, under the folder name the PC version uses in AppData or beside the game, so Ludusavi backups from Windows restore there. Pages break where the PC version breaks them. Known limits: movies and HLSL shader effects don't play, and in games that ship bitmap fonts (`.rft`) only ASCII comes from those fonts, with MS Gothic for the rest. [docs/artemis.md](docs/artemis.md) has the details.
-
-Godot games run on Godot itself, which VNDegen builds into the app twice: Godot 4.7 runs every Godot 4 game, and Godot 3.6 every Godot 3 game. A game's pack loads unchanged, from its `.pck` or from inside its `.exe`, and games exported with older Godot versions run too, such as Godot 4.2 to 4.5 and Godot 3.3 and 3.5. The game draws inside VNDegen's window: Godot 4 through Metal on Mac, iPhone, and iPad, and Godot 3 through Apple's OpenGL on Mac and through ANGLE's Metal backend on iPhone and iPad. Controllers reach games as an Xbox controller, and touches and the mouse as Godot's mouse. Saves go where the PC version keeps them: `user://` is under the Windows AppData folder's stand-in in the game's data folder, so Ludusavi backups from Windows, a Steam Deck, or Godot's Linux and Mac builds restore there, and games that save beside their `.exe` save in their own folder. Games built with Steam through GodotSteam run as Steam does offline, with the player signed in, and games that also ship Epic Online Services for their Epic Games Store build run without it. Packs encrypted with a key built into the game's own copy of Godot run too: VNDegen finds the key in the game's `.exe`. Games that can't run say why on their page: games that need other GDExtension or GDNative libraries, which are Windows code, and encrypted games whose key VNDegen doesn't find. Godot C# games aren't supported. `docs/godot.md` has the details and the known limits.
-
-Flash games run in Ruffle, a Flash Player written in Rust, built for the web and run on the same WebKit host with WebGL. VNDegen plays a game's Windows projector (`Game.exe` with the movie appended) without unpacking it, a `.swf` movie, or a collection's own HTML menu page. Movies a game loads, and its saves, are named as they are beside the PC executable. Saves are the `.sol` files Flash Player writes, kept in the game's data folder by the movie that made them, so saves from Flash Player or Ruffle on a PC restore through Ludusavi and load. ActionScript 3 support in Ruffle is less complete than for ActionScript 1 and 2, so some AS3 games may stop or misbehave. `docs/flash.md` has the details.
-
-NScripter games run on VNDegen's own NScripter runtime, written in C++ for VNDegen from NScripter's documentation and the games' files, MIT licensed like the rest of the app. It draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the engine's archives, including bitmaps and entries its packer compressed, and plays Ogg, WAV, MP3 and NBZ sound, CD tracks from a game's `CD` folder, and MPEG-1 movies. Games that script part of their logic in Lua (NSLua) run on an embedded Lua 5.1. Saves are the PC engine's own files, byte for byte, in the game's save folder, so they move between VNDegen and a PC copy of the game, and Ludusavi backs them up. English translations whose patched engine wraps text between words get the same word wrap. Known limits: of the effect DLLs only the ones a test game uses are drawn, others crossfade, and NSLua's direct drawing functions aren't emulated. `docs/nscripter.md` has the details.
-
-Wolf RPG Editor games run on VNDegen's own Wolf RPG Editor runtime, written in C++ for VNDegen from the games' files, permissively licensed format notes and the original engine's behaviour, MIT licensed like the rest of the app. It draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the games' data, maps and databases, loose or packed in Wolf RPG Editor 2's encrypted `.wolf` archives, runs their event scripts, and plays Ogg, MP3, WAV and MIDI sound, MIDI through a bundled General MIDI SoundFont or one the player chooses in Settings. Text uses a font the game ships, then VNDegen's Windows font pack. Saves are the PC engine's own files in the game's `Save` folder, so Ludusavi backs them up and they move between VNDegen and a PC copy of the game. Known limits: Wolf RPG Editor 3.5's compressed data, newer archive versions, and Pro's encrypted data aren't read yet. `docs/wolfrpg.md` has the details.
-
-AliceSoft's System 3 games run on VNDegen's own System 3 runtime, written in C for VNDegen from AliceSoft's published System 3.5 and 3.9 SDKs, the games' files, and the original engines' observable behaviour, MIT licensed like the rest of the app. It runs both the System 3.5 to 3.9 games (`System39.exe`) and the older Windows 3.1 games (`SYSTEM3.EXE`), drawing on the CPU and showing its frames through Metal inside VNDegen's window. CD music plays from the MP3 files the game's `_inmm.ini` lists, MIDI music through the bundled SoundFont or the player's own, and the English releases of `SYSTEM3.EXE` games that get their text from `replacement.txt` show it. Saves are the PC engines' own files in the game's folder, byte for byte what `System39.exe` and `SYSTEM3.EXE` write, so they move between VNDegen and a PC copy of the game. Ludusavi's manifest doesn't list the test games yet, so Ludusavi doesn't back them up on its own. `docs/system3.md` has the details and the known limits.
-
-`docs/engine-survey.md` covers which other engines are common and how each could be supported.
+To build VNDegen yourself, see [docs/development.md](docs/development.md).
 
 ## Adding games
 
-Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each. The one exception is a game whose folder name a game in another library folder already has, described below.
+Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game on several devices keeps its artwork and settings on each.
 
-- **iPhone and iPad:** open the Files app, then On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
-- **Mac:** copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.
-- **From an archive:** Add game in the library unpacks a zip, RAR, or 7z into the library. You can also drag an archive from Files or Finder onto VNDegen, or open it in VNDegen from the Files Share menu or with Open With on a Mac.
-- **Archive copied into VNDegen's folder:** copy a zip, RAR, or 7z into On My iPhone (or iPad), VNDegen, or its Games folder. On a Mac, copy it into `~/Games/VNDegen`. The library lists it under Ready to import, and its Import button opens the import with the archive chosen. "Delete archive after import" starts on for these archives. Use this when choosing an archive, dropping it, or opening it in VNDegen does nothing, which happens on some sideloaded installs.
+- **iPhone and iPad.** In the Files app, open On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
+- **Mac.** Copy the game folders into `~/Games/VNDegen`, which sits outside `~/Documents` so iCloud Drive does not upload your games.
+- **Archives.** Add game in the library unpacks a zip, RAR, or 7z. You can also drop an archive on VNDegen or open it in VNDegen from Files or Finder.
+- **Other folders.** Settings, Library folders adds a folder of games from an external drive, a server, or elsewhere on the Mac.
 
-- **Another folder:** Settings, Library folders, Add folder adds a folder of game folders from anywhere the system's folder picker reaches: an external drive, a server connected in Files or Finder, or another folder on the Mac. Each game in it is a subfolder, as in VNDegen's own folder. Add game asks which library folder to unpack an archive into when there is more than one. On iPhone and iPad, VNDegen keeps a bookmark with permission to read and write the folder, since games write their saves into their own folders, and keeps that permission from launch until you remove the folder. On a Mac the bookmark finds the folder again after it is moved or renamed. A folder that can't be reached keeps its games in the library, shown as unavailable with the reason, and they come back on the next rescan once the drive or server is back. Remove takes a folder's games out of the library and leaves its files alone. Two folders can each hold a game of the same name, even when the names differ only in case. The second one's library ID adds its folder's name, so each keeps its own artwork, saves, and settings, and that game's identity is local to the device. A removed folder that is added back gets its games' records back. Known limit: on a Mac, if an added folder is moved and another folder is made at its old path, VNDegen finds the new one there, because macOS resolves a bookmark by path first. Remove that folder and add the right one.
+VNDegen rescans on launch, on pull to refresh, and when you return to the app. [docs/library.md](docs/library.md) covers archives VNDegen can't open directly, other folders, removing games, and more.
 
-Remove from library, in a game's menu or on its page, deletes the game's folder after asking: on a Mac it goes to the Trash, and on iPhone and iPad it is deleted for good. Saves the game writes inside its own folder go with it. The saves VNDegen keeps in its own data folder for the game stay, and so do its artwork, play time, and settings, so copying the folder back restores it.
+<p align="center">
+  <img src="docs/screenshots/game-page-mac.jpg" width="560" alt="Warding Witches' game page on Mac: hero banner, Play, Artwork, Find metadata, Saves, and Hide buttons, a Godot badge, the Steam description and screenshots, and a details card with developer, publisher, release date, and the detected Godot 4.5.1 engine">
+  <img src="docs/screenshots/game-menu.jpg" width="260" alt="The menu a long press opens on a library game on iPhone: Play, Open game page, Change artwork, Find metadata, Hide, Open in Files, and Remove from library">
+</p>
 
-VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app.
+<p align="center">
+  <img src="docs/screenshots/vndegen-menu.jpg" width="400" alt="The VNDegen menu over Lilipalace, an NScripter game, on iPad: Resume, Game commands, Quit to library, the control methods, and Button mapping">
+  <img src="docs/screenshots/game-commands.jpg" width="400" alt="Game commands for Lilipalace on iPad: the game's own Skip, Skip Setting, and Text Speed menu items">
+</p>
 
 ## Controls
 
-In a game, the controller is an Xbox controller, except in engines with no gamepad support. Every button, from the touch gamepad or a real controller, reaches the game as the same Xbox button, and the game reads it with its own gamepad support. RPG Maker MV and MZ map a gamepad themselves, so A confirms, B cancels, X dashes, Y opens the menu, LB and RB turn pages, and the D-pad and left stick move. Like a real Xbox controller there, the Menu, View, and trigger buttons do nothing unless the game uses them.
+In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad, such as KiriKiri, TyranoScript, Flash, and Artemis, start with Steam's Keyboard and Mouse layout instead. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
 
-KiriKiri, TyranoScript, Flash, and Artemis read no gamepad, so their games start with "Keyboard and mouse", the layout of Steam's Keyboard and Mouse controller template. LB turns the mouse wheel down and RB turns it up, LT right clicks, RT left clicks, View is Tab, and Menu is Escape. The left stick is W, A, S, and D, and pressing it in is Shift. The right stick moves the pointer, faster the further it is pushed, and pressing it in left clicks. The D-pad is 1, 2, 3, and 4, and A, B, X, and Y are Space, E, R, and F. The controller's Share button is not used. The touch gamepad gets the same buttons and has no sticks, so pointing on a touch device uses the Mouse control method.
-
-"Mouse" is another layout the mapping editor offers. Both sticks move the pointer, A and RT left click, X and LT right click, LB turns the wheel down and RB turns it up, B and Menu press Escape, and Y shows the on-screen keyboard. The D-pad, View, and pressing the sticks in keep their Xbox buttons. On a Mac the controller moves the Mac's own pointer, and on iPhone and iPad a pointer arrow shows where it is. On iPhone and iPad the on-screen keyboard types into the game, with Return and Backspace, until the button or the keyboard's own key hides it. A Mac has its hardware keyboard, which already types into the game, so Show keyboard does nothing there.
-
-With the Xbox gamepad layout instead, a TyranoScript game reads the gamepad when it turns that on in its Config.tjs (`useGamepad`), and each button its KeyConfig.js binds does what the game says. VNDegen turns every other button into the engine's own action: A reads on or presses the focused button, B cancels, X skips while held, Y and Menu open the game's menu, LB opens the backlog, RB turns auto mode on and off, and the D-pad and left stick move the focus. A Ren'Py game reads the controller itself in Ren'Py's own layout. On iPhone and iPad a Ren'Py game takes touches directly, with no touch controls over it, so its game page offers no control method.
-
-The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3, R3, and the sticks come from a real controller.
-
-| Action in the library and the VNDegen menu | Controller | Keyboard in the library |
+| In the library and the VNDegen menu | Controller | Keyboard |
 |---|---|---|
 | Move | D-pad or left stick | Arrows or WASD |
 | Confirm | A | Return or Space |
@@ -119,167 +117,28 @@ The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3,
 | Menu | Y or Menu | Tab |
 | Open the focused game's menu | X | |
 | Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
-| Open the VNDegen menu in a game (resume or quit to library) | Home, and View while the menu is open | Backtick (`` ` ``) |
+| Open the VNDegen menu in a game | Home, and View while the menu is open | Backtick (`` ` ``) |
 
-A text field opens VNDegen's on-screen keyboard when you press A on it. A types the focused key, X deletes, LB toggles shift, RB switches to symbols, Y finishes, and B closes the keyboard without changes. In the button mapping editor, LB and RB jump between groups of buttons, and Reset returns the game to its engine's default layout. Remapping A or B never changes how the editor or the VNDegen menu respond. Adding a game by controller lists the archives in VNDegen's own folder (On My iPhone or On My iPad, VNDegen, on iOS). The Files and Photos pickers need touch or a mouse, and say so on screen.
+A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. [docs/controls.md](docs/controls.md) has every layout, the mapping editor, and each engine's keys.
 
-While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker, MV and MZ as well as XP, VX, and VX Ace, those are the arrows, Z or Return, X or Escape, Shift, and Q and W. In a KiriKiri game on the Xbox gamepad layout, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls. A KiriKiri game's text fields get what the keyboard types, as on Windows. In an Artemis game, Return reads on, a right click opens the game's menu, Control skips, and the mouse wheel opens the message history.
-
-Each game has its own button mapping. The VNDegen menu's Controls section and the game page's Controls section switch the control method and open the button mapping editor, which lists every Xbox button. Each button can send another Xbox button, a keyboard key, a left or right click, the scroll wheel up or down, mouse movement up, down, left, or right, Show keyboard, or nothing. A button or D-pad direction moves the pointer at a steady speed while held. Each stick also has a row that turns the whole stick into mouse movement, or back into a stick, in one step. Without a mapping, sticks are the controller's sticks. At the top of the editor, "Keyboard and mouse" applies the layout KiriKiri, TyranoScript, Flash, and Artemis games start with, "Mouse" the pointer layout above, and "RPG Maker controls" maps the buttons to the keys RPG Maker reads: A to Return, B to Escape, X to Shift, Y and Menu to X, LB to Q, RB to W, and the D-pad and left stick to the arrows. Return confirms in every RPG Maker, where XP uses Z for another button, and Escape and X both cancel and open the menu. "Xbox gamepad" clears every remap, so every button sends its own Xbox button. Ren'Py applies the mapping too, except mouse movement, the wheel, and Show keyboard, since Ren'Py reads the controller itself. A remapped touch button shows what it sends, for example "Esc".
-
-The VNDegen menu's Game commands list one level of the game's menu at a time. Up and down move, A opens a submenu or runs a command, B goes back a level, and from the top back to the VNDegen menu. Touch and a mouse choose an item directly, and the arrow at the top goes back. A KiriKiri game whose scripts check whether the window's menu bar is hidden, and then put their commands on screen, is told it is hidden, so those buttons show. Any other KiriKiri game is told it shows, so the game builds its menu for Game commands. The game page's Window menu option overrides that per game.
-
-The VNDegen menu's Cheats page has tabs for quick cheats, items, variables, and switches, which LB and RB switch between. Up and down move, A runs a cheat or turns a setting on and off, and left and right step game speed and the experience rate, and add or take 1 from the focused variable. A on a variable opens the on-screen keyboard on its value, and Y sets it. The search field matches names, or a number with or without `#`. Gold, items, the party, variables, and switches wait until a game is started or loaded, since starting or loading one replaces them. To undo a change, load a save made before it.
-
-A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. Remaps saved by earlier versions, which sent actions such as Confirm, convert on first launch to what those actions sent in the game's engine, so remapped games play the same: the Return key in RPG Maker, the matching Xbox button in Ren'Py, and the same TyranoScript action in TyranoScript.
+<p align="center">
+  <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
+</p>
 
 <p align="center">
   <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a cross D-pad, Xbox A B X Y buttons, LB RB LT RT shoulder buttons, a home button, and View and Menu buttons over No Socks RPG gameplay, with the player on the beach map">
   <img src="docs/screenshots/unlock.jpg" width="200" alt="Passcode keypad for unlocking hidden games, with a controller focus ring on one key">
 </p>
 
-## Fonts
+## Documentation
 
-PC games name Windows fonts that VNDegen can't ship. Like Proton, VNDegen bundles freely licensed fonts with the same metrics and gives each the Windows name the game asks for: Ume fonts for MS Gothic, MS PGothic, MS UI Gothic, MS Mincho, and MS PMincho, Liberation for Arial, Times New Roman, and Courier New, and DejaVu Sans Condensed for Tahoma. A device font with that name, such as Arial on Apple systems, comes first. Chinese and Korean games need Source Han Sans, which Settings, Fonts downloads from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean. Games started after a download use it. One table, `Engines/Shared/fonts/fonts.tsv`, maps the names. The RPG Maker MV and MZ and TyranoScript engines read it through the `FontPack` module, and KiriKiri, RGSS, and other native engines through `Engines/Shared/vnfont.h`. [docs/fonts.md](docs/fonts.md) lists the fonts, where they come from, and how closely they match.
-
-## Metadata sources
-
-Steam and VNDB work without setup. SteamGridDB and IGDB need keys, entered in Settings, Metadata Sources. The keys are stored in the Keychain.
-
-- **SteamGridDB:** an API key from your SteamGridDB profile preferences.
-- **IGDB:** the client ID and secret of a Twitch developer application.
-
-A game page's About section takes its description, genres, and screenshots from Steam, or from IGDB when Steam has none. The match you confirm in Find metadata supplies the other details, and the remaining sources fill any gaps.
-
-## Ludusavi
-
-VNDegen reaches your Ludusavi backups on the SMB share that Ludusavi's cloud sync uses. It has rclone's own SMB code built in, the code Ludusavi's rclone runs on the PCs, so it works the same on iPhone, iPad, and Mac with nothing to install.
-
-Set it up once in Settings, under Ludusavi backups:
-
-1. Enter what Ludusavi's cloud settings show for its SMB remote: the host, the port (445 unless you changed it), and the username and password. Guest is on for a new setup and matches Ludusavi's `guest` username, which logs in with no password.
-2. Enter the path from Ludusavi's cloud settings. It is the share, then the folder inside it, such as `games/Ludusavi`.
-3. Tap Test Connection. VNDegen lists the folder and shows how many games it found. The test only reads.
-4. Turn on Match my Ludusavi settings and enter the retention limits from Ludusavi's Other screen. On a Mac with Ludusavi installed, VNDegen reads them from Ludusavi's config.
-
-The password stays on the device and out of VNDegen's settings file. On iPhone and iPad it is in the Keychain, for this device only. On a Mac it is in a file only your user can read, in VNDegen's Application Support folder, so app updates don't ask for your password. rclone gets it obscured, in a config that lives in memory and never touches an rclone.conf.
-
-VNDegen never uploads with a sync. Ludusavi's upload is `rclone sync`, which deletes whatever the PC lacks. VNDegen only copies its new backup folder and then its mapping.yaml, so it never removes another device's backups.
-
-VNDegen 0.4.0 connected over SSH and rsync. Its settings turn save sync off after the update, with a note in Settings, until you enter the share. VNDegen deletes the SSH key it made then.
-
-Each game then finds its Ludusavi game by itself: by the Steam app ID in its metadata through Ludusavi's manifest, else by title. You can pick another on the game's Saves page. That page lists the game's backups with their date, source device, and kind, says whether the saves here or on the server are newer, and previews what a restore changes.
-
-- **Restore** brings a backup down and copies it into the game's save folder, after keeping a copy of the current saves for Undo.
-- **Back up now** writes a full or differential backup in Ludusavi's format, as Ludusavi would, with the same file paths as your existing backups, so Ludusavi restores it on the PC and Steam Deck. A game with no backup yet goes where the PC keeps it, under the Steam library the other backups use. With retention limits set, backups beyond them leave the backup list, as Ludusavi drops them. Their folders stay on the server until Ludusavi on a PC deletes them at its next backup of that game, because another device may still list them. Each device names its backup folders with an ID of its own, and VNDegen checks the server's backup list again right before it adds to it, so a backup from another device is not overwritten.
-- **Before a game starts**, VNDegen asks when another device backed up newer saves, or when the saves changed both here and on the server.
-- **Automatic backup** when a game closes is available and off by default. It skips a game whose saves changed in both places and leaves the choice to you.
-
-Ludusavi on a PC that syncs its backup folder with rclone sees VNDegen's backups as changes in the cloud. When Ludusavi asks, choose to download them.
-
-## Building
-
-You need a Mac with Xcode 27, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), and Go (`brew install go`) for the rclone library that save sync uses. Run `scripts/build.sh` on that Mac:
-
-```sh
-scripts/build.sh test      # package tests
-scripts/build.sh mac       # macOS app in build/mac/Build/Products/Debug/
-scripts/build.sh ios-sim   # iOS simulator app in build/sim/Build/Products/Debug-iphonesimulator/
-scripts/build.sh ipa       # unsigned build/VNDegen.ipa
-```
-
-Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it. Every build first makes rclone's library from `Packages/VNDegenKit/Rclone/` for iPhone, iPad, the simulator, and the Mac (`scripts/rclone-runtime.sh`, kept until its sources or the Go version change). The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds; in Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first. `scripts/renpy-compat.sh <folder>` boots every Ren'Py game in a folder and prints which runtime each got and whether it reached its main menu. `scripts/renpy-hook-test.sh` checks VNDegen's Ren'Py hook on both runtimes.
-
-Each bundled runtime writes the license notices of the code it links into `build/<runtime>/licenses/`: `scripts/rclone-runtime.sh` for rclone and its Go modules, `scripts/renpy-runtime.sh` for Ren'Py and its libraries, and `scripts/app-licenses.sh` for code built into the app itself. `scripts/build.sh` stops an app build when one of them wrote none. Where the texts come from is in `scripts/licenses/README.md`.
-
-Every build also makes the Ruby interpreter the RPG Maker XP, VX, and VX Ace runtime links, `Packages/VNDegenKit/build/RGSSRuby.xcframework`, with `scripts/rgss-ruby.sh`, which does nothing when it is up to date. It downloads Ruby's release, checks its SHA-256, applies the patches in `Engines/RGSSRuntime/patches`, and builds it static for the Mac, iPhone and iPad, and the simulator. The first build takes about 15 minutes. `Engines/RGSSRuntime/host` builds the runtime for Linux with a headless test tool, after `scripts/rgss-ruby.sh build/rgss linux`.
-
-From another machine, `scripts/remote.sh` copies the checkout to a Mac over SSH and runs a command there. For example, `VNDEGEN_MAC=my-mac.local scripts/remote.sh scripts/build.sh ipa`. `scripts/sim.sh` boots a simulator, installs the app, copies a game in, and launches it.
-
-### Installing a release
-
-The [Releases](https://github.com/ChronoStriker1/vndegen/releases) page has a built IPA for iPhone and iPad and a zipped app for Mac, with install steps in each release's notes. `scripts/release.sh <version>` publishes a new one from `main`.
-
-### Installing with AltStore or SideStore
-
-Add this source in AltStore or SideStore to install VNDegen and get updates:
-
-```
-https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json
-```
-
-### Installing on iPhone or iPad
-
-`scripts/build.sh ipa` makes an unsigned IPA. Sideloadly or AltStore signs and installs it with a free Apple ID. Apps signed that way expire after 7 days and need to be installed again.
-
-## Project layout
-
-```
-App/                      app entry point, icons, Info.plist
-Packages/VNDegenKit/
-  Sources/VNCore/         shared types: games, the library, the engine plugin contract, input events
-  Sources/WebRuntime/     shared host for HTML5 engines: WebKit view, game file serving, Node and NW.js layer
-  Sources/EngineRPGMaker/ RPG Maker MV and MZ: detection, key mapping, save locations
-  Sources/EngineTyrano/   TyranoScript: detection, Electron app.asar reading, save handling, controller mapping
-  Sources/EngineRenPy/    Ren'Py: detection, runtime choice, the macOS helper process, the iOS in-app session, and the in-game hook
-  Sources/CRenPy/         starts Python and runs Ren'Py inside the app on iOS
-  Sources/RenPyCompat/    command-line boot test for a folder of Ren'Py games
-  Sources/EngineKiriKiri/ KiriKiri: detection, save locations, and the in-process session on the engine framework
-  Sources/CKiriKiri/      vnkk.h, the KiriKiri engine's C interface
-  Sources/EngineRGSS/     RPG Maker XP, VX, and VX Ace: detection, the RTPs they need, saves, and the in-process session
-  Sources/CRGSS/          VNDegen's RGSS runtime, in C, with vnrgss.h as its interface
-  Sources/EngineArtemis/  Artemis: detection, save locations, input, audio, and the in-process session on the engine library
-  Sources/CArtemis/       art3m1s_api.h, the Artemis engine's C interface, and the Ogg Vorbis decoder for its audio
-  Sources/EngineGodot/    Godot 3 and 4: detection from the pack, save locations, and the in-process session
-  Sources/CGodot/         vngd.h, the Godot engines' C interface
-  Sources/EngineAliceSoft/ AliceSoft System 3 and 4: detection, save locations, input, and the System 3 session
-  Sources/CSystem3/       VNDegen's System 3 runtime in C, with vns3.h, its C interface
-  Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
-  Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
-  Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
-  Sources/HubUI/          the library, game pages, settings, and the player screen
-  Sources/GameInput/      game controllers, keyboard, and the touch overlay
-  Sources/ControllerUI/   controller focus ring, the on-screen keyboard, and controller scrolling
-  Sources/Metadata/       Steam, SteamGridDB, IGDB, and VNDB
-  Sources/Lock/           Face ID, Touch ID, and passcode
-  Sources/SaveSync/       Ludusavi backup and restore
-  Sources/Rclone/         Swift calls into rclone's library
-  Rclone/                 VNDegen's build of rclone: the Go library with the SMB and local backends
-  Sources/ArchiveImport/  unpacking zip, RAR, and 7z archives into the library
-Engines/RGSSRuntime/      the RGSS runtime's Ruby preludes, Ruby patches, Linux test host, and tools
-Engines/Artemis/          the vendored art3m1s-core engine and its save format tools; UPSTREAM.md lists every change
-Engines/KiriKiri/         the vendored krkrsdl3 engine and VNDegen's C interface to it; UPSTREAM.md lists every change
-Engines/Godot/            VNDegen's Godot modules, patches, and test host; UPSTREAM.md lists the pinned sources
-Engines/System3/          the System 3 runtime's Linux test host: a headless runner and an SDL player
-Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/
-docs/                     engine survey and screenshots
-scripts/                  build, remote build, simulator, and Ren'Py runtime helpers
-project.yml               XcodeGen project definition
-```
-
-### Adding an engine
-
-An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
-
-- `detect(_:)` inspects a folder listing and returns a match with a confidence level.
-- `makeSession(_:)` starts the game and returns an `EngineSession`, whose view the hub shows full screen and which receives controller input.
-- `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
-
-Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins. Then add its entry to `PluginInfo.catalog` in `HubUI/Plugins.swift`, which Settings' Plugins page reads for the engine versions it covers, what runs its games, and its license.
-
-An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [docs/fonts.md](docs/fonts.md).
-
-An engine that plays MIDI music uses vnmidi from `Engines/Shared/vnmidi.h`. It compiles `vnmidi.c`, or depends on the `CVNMidi` package target, and loads the General MIDI SoundFont from `MIDISoundFont.url`, the player's from Settings or the bundled one, with `MIDISoundFont.fallbackURL` through `vnmidi_font_load_fallback`. See [docs/midi.md](docs/midi.md).
-
-Windows ignores case in file and folder names, so Windows games often ask for `Img/Title.PNG` when the disk has `img/title.png`. iPhone and iPad disks, and case-sensitive Mac volumes, do not ignore case. Every engine plugin must find a game's files, folders, and archive members whatever case the game uses, for reads, writes, existence checks, and folder listings. A write to a name that exists in another case must replace that file rather than create a second one. Use the lookup of the engine's family rather than a new one:
-
-- Swift code, including the web engines' `GameFolder`, uses `FileCase` in `VNCore/FileCase.swift`.
-- C and C++ engines call `casepath_resolve` in `Engines/Shared/casepath.c` from their file layer, as the RGSS runtime's `fs.c` and KiriKiri's `unix_file.cpp` do.
-- Ren'Py's Python side uses `EngineRenPy/Support/filecase.py`, which `launcher.py` installs. `scripts/renpy-case-test.sh` tests it.
-
-Each looks a name up as written first and reads a folder's listing only when that misses, so games that use the right case pay nothing.
-
-Before a new engine plugin or a change to one ships, it passes the case check on its test games. `scripts/case-check.sh setup` copies each game into a library on a case-sensitive disk image with every name's case swapped. Each game must reach its title, start, save, and load there, on the Mac app and on an iPad simulator, both started with `-libraryRoot` on that library. The script's header has the commands. `scripts/build.sh test` runs the lookups' unit tests on a case-sensitive disk image too.
+- [library.md](docs/library.md): adding games, library folders, layouts, hidden games, and metadata sources
+- [controls.md](docs/controls.md): control methods, layouts, button mapping, Game commands, and cheats
+- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits
+- [ludusavi.md](docs/ludusavi.md): setting up and using Ludusavi backups
+- [fonts.md](docs/fonts.md): the Windows font substitutes
+- [development.md](docs/development.md): building, the project layout, and adding an engine
+- [roadmap.md](docs/roadmap.md) and [releases/](docs/releases/): the plan and each release's notes
 
 ## License
 
