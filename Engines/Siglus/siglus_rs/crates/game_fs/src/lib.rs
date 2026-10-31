@@ -47,28 +47,72 @@ pub type ReadDir = std::vec::IntoIter<io::Result<DirEntry>>;
 mod imp {
     use super::*;
     use std::fs;
+    use std::path::Component;
 
-    pub fn read(path: &Path) -> io::Result<Vec<u8>> {
-        fs::read(path)
+    /// VNDegen: `path` as it is on disk, its names matched without regard to case where the path as written is
+    /// missing, as Windows matches them. iOS and case-sensitive Mac volumes don't ignore case, and games name their
+    /// files in whatever case they like. The path as written is tried first, so a game that uses the right case pays
+    /// nothing. A name with no match anywhere stays as written, with the names before it resolved, so a new file is
+    /// created in the folder that exists.
+    pub(crate) fn resolve(path: &Path) -> PathBuf {
+        if fs::symlink_metadata(path).is_ok() {
+            return path.to_path_buf();
+        }
+        let mut resolved = PathBuf::new();
+        let mut missing = false;
+        for component in path.components() {
+            let Component::Normal(name) = component else {
+                resolved.push(component);
+                continue;
+            };
+            let candidate = resolved.join(name);
+            if missing || fs::symlink_metadata(&candidate).is_ok() {
+                resolved = candidate;
+                continue;
+            }
+            let wanted = name.to_string_lossy().to_lowercase();
+            let found = fs::read_dir(if resolved.as_os_str().is_empty() { Path::new(".") } else { &resolved })
+                .ok()
+                .and_then(|entries| {
+                    entries
+                        .flatten()
+                        .map(|entry| entry.file_name())
+                        .find(|entry| entry.to_string_lossy().to_lowercase() == wanted)
+                });
+            match found {
+                Some(entry) => resolved.push(entry),
+                None => {
+                    missing = true;
+                    resolved = candidate;
+                }
+            }
+        }
+        resolved
     }
 
+    pub fn read(path: &Path) -> io::Result<Vec<u8>> {
+        fs::read(resolve(path))
+    }
+
+    /// Writes over a file whose name differs only in case, rather than making a second one beside it.
     pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
-        fs::write(path, bytes)
+        fs::write(resolve(path), bytes)
     }
 
     pub fn create_dir_all(path: &Path) -> io::Result<()> {
-        fs::create_dir_all(path)
+        fs::create_dir_all(resolve(path))
     }
 
     pub fn remove_file(path: &Path) -> io::Result<()> {
-        fs::remove_file(path)
+        fs::remove_file(resolve(path))
     }
 
     pub fn remove_dir_all(path: &Path) -> io::Result<()> {
-        fs::remove_dir_all(path)
+        fs::remove_dir_all(resolve(path))
     }
 
     pub fn read_dir(path: &Path) -> io::Result<ReadDir> {
+        let path = &resolve(path);
         let mut out = Vec::new();
         for entry in fs::read_dir(path)? {
             out.push(entry.map(|entry| DirEntry {
@@ -82,23 +126,23 @@ mod imp {
     }
 
     pub fn is_file(path: &Path) -> bool {
-        path.is_file()
+        resolve(path).is_file()
     }
 
     pub fn is_dir(path: &Path) -> bool {
-        path.is_dir()
+        resolve(path).is_dir()
     }
 
     pub fn file_len(path: &Path) -> io::Result<u64> {
-        Ok(fs::metadata(path)?.len())
+        Ok(fs::metadata(resolve(path))?.len())
     }
 
     pub fn open(path: &Path) -> io::Result<Box<dyn ReadSeek>> {
-        Ok(Box::new(fs::File::open(path)?))
+        Ok(Box::new(fs::File::open(resolve(path))?))
     }
 
     pub fn canonicalize(path: &Path) -> io::Result<PathBuf> {
-        fs::canonicalize(path)
+        fs::canonicalize(resolve(path))
     }
 }
 
@@ -372,5 +416,29 @@ mod tests {
         assert_eq!(names, vec![std::ffi::OsString::from("a.bin")]);
         remove_dir_all(&dir).unwrap();
         assert!(!exists(&dir));
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+    #[test]
+    fn names_match_without_regard_to_case() {
+        let dir = std::env::temp_dir().join(format!("game-fs-case-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("Bgm")).unwrap();
+        std::fs::write(dir.join("Bgm/Title.NWA"), b"music").unwrap();
+        assert_eq!(read(dir.join("BGM/title.nwa")).unwrap(), b"music");
+        assert!(is_file(dir.join("bgm/TITLE.nwa")));
+        assert!(is_dir(dir.join("BGM")));
+        assert_eq!(file_len(dir.join("bgm/title.nwa")).unwrap(), 5);
+        assert_eq!(read_dir(dir.join("bgm")).unwrap().count(), 1);
+        // A write to a name that exists in another case replaces that file.
+        write(dir.join("BGM/TITLE.nwa"), b"new").unwrap();
+        let names: Vec<_> = std::fs::read_dir(dir.join("Bgm")).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert_eq!(names, vec![std::ffi::OsString::from("Title.NWA")]);
+        assert_eq!(std::fs::read(dir.join("Bgm/Title.NWA")).unwrap(), b"new");
+        // A new file goes in the folder that exists, under the name written.
+        write(dir.join("BGM/Other.nwa"), b"x").unwrap();
+        assert!(dir.join("Bgm/Other.nwa").is_file());
+        assert!(!exists(dir.join("missing/file")));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
