@@ -155,6 +155,10 @@ bool Game::start(std::string &error) {
     if (lower(ini["MainVM"]) == "sys42vm") vm->saveFormat = {false, 7};
     vm->gameName = ini.count("GameName") ? ini["GameName"] : stem;
     vm->log = [this](const std::string &s) { log(s); };
+    // The 3D libraries' per-frame calls are stubs (hll_3d.cpp); any other call starts a 3D scene.
+    vm->onUnboundHll = [this](const std::string &lib) {
+        if (lib == "SealEngine" || lib == "MarmotModelEngine") stopAt3D();
+    };
     vm->timeMs = [this] { return now(); };
     vm->peek = [this] { yieldFrame(); };
     inputLog_ = std::getenv("S4_INPUTLOG") != nullptr;
@@ -391,6 +395,31 @@ std::shared_ptr<const Image> Game::cgCachedNamed(const std::string &name) {
     cgRecent_.push_back(img);
     if (cgRecent_.size() > 64) cgRecent_.erase(cgRecent_.begin());
     return img;
+}
+
+void Game::stopAt3D() {
+    problem("the game started a 3D scene (SealEngine), which VNDegen doesn't run");
+    std::vector<uint8_t> f;
+    int w, h;
+    takeFrame(f, w, h);
+    if (f.size() != size_t(screenW) * screenH * 4) f.assign(size_t(screenW) * screenH * 4, 0);
+    for (size_t i = 0; i < f.size(); i += 4)
+        for (int k = 0; k < 3; k++) f[i + size_t(k)] = uint8_t(f[i + size_t(k)] / 4);
+    static const char *const kLines[] = {"This part of the game is in 3D, which VNDegen can't show yet.",
+                                         "Quit the game, and continue from a save made before this point."};
+    TextStyle st;
+    st.size = std::max(16, screenH / 24);
+    st.edgeWeight = 2;
+    Surface text;
+    text.create(screenW, screenH, true);
+    int lineH = st.size * 3 / 2, y = screenH / 2 - lineH;
+    for (const char *line : kLines) {
+        drawText(text, (screenW - textWidth(line, st, 0)) / 2, y, line, st, 0);
+        y += lineH;
+    }
+    blit(f.data(), screenW, screenH, 0, 0, text.px.data(), text.w, text.h, true, 255, 0);
+    showFrame(std::move(f));
+    for (;;) yieldFrame();  // ends with StopVM when the player quits
 }
 
 void Game::cgForgetNamed(const std::string &name) {

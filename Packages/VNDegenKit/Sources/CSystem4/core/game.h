@@ -71,6 +71,9 @@ public:
     Audio audio;
     void log(const std::string &s);
     void problem(const std::string &s);
+    // Where a game starts its 3D scenes (SealEngine, Test Game 56's battles and maps): shows a notice over the
+    // dimmed screen and holds the game there until the player quits.
+    [[noreturn]] void stopAt3D();
     uint32_t now() const { return clockMs_.load(); }
     // Called where the game shows a frame or polls: hands control to the host until its next step.
     void yieldFrame();

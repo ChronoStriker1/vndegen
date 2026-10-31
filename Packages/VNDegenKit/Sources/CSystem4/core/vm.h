@@ -178,6 +178,7 @@ public:
     std::function<void(const std::string &)> log;
     std::function<void(const std::string &)> trace;  // every call, for debugging
     std::function<void(const std::string &)> hllTrace;
+    std::function<void(const std::string &lib)> onUnboundHll;  // a library call nothing implements, by library name
     // "Library.Function" for each library function the game declares that VNDegen doesn't implement.
     std::vector<std::string> unboundHll() const;  // every HLL call with its argument words, for debugging
     std::function<void()> peek;             // system.Peek and other points where the host may run a frame

@@ -492,6 +492,7 @@ void VM::callHll(int32_t lib, int32_t fn) {
     } else {
         std::string name = ain.libraries[lib].name + "." + decl.name;
         if (hllWarned_.insert(name).second && log) log("unimplemented HLL " + name);
+        if (onUnboundHll) onUnboundHll(ain.libraries[lib].name);
     }
     // Arguments passed by value as slots belong to the call.
     for (size_t k = 0; k < decl.args.size(); k++) {
