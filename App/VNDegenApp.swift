@@ -113,9 +113,10 @@ struct VNDegenApp: App {
     }()
 
     init() {
-        // Game pages load screenshots through AsyncImage, which caches in the shared URL cache. Its default holds 512 KB
-        // in memory and skips any response over a twentieth of its disk space, which a 1920 by 1080 Steam screenshot,
-        // about 550 KB, can exceed, so the full-screen viewer would download each one again.
+        // Game pages load screenshots through AsyncImage, which from iOS and macOS 27 caches through a default session
+        // configuration, whose cache is this one. Its default holds 512 KB in memory and skips any response over a
+        // twentieth of its disk space, which a 1920 by 1080 Steam screenshot, about 550 KB, can exceed, so the
+        // full-screen viewer would download each one again.
         URLCache.shared = URLCache(memoryCapacity: 32 << 20, diskCapacity: 256 << 20)
     }
 

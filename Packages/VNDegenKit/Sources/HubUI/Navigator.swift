@@ -172,11 +172,12 @@ final class Navigator {
             // A license sheet closed by Done or a swipe declines it. Accept answers first, so this does nothing then.
             if case let .license(request)? = oldValue { request.respond(false) }
             // The viewer hands focus to the screenshot it showed last, so the player carries on from there in the grid.
+            // A metadata match applied meanwhile can change the page's screenshots, so it is found again by URL.
             if case let .screenshots(viewer)? = oldValue, sheet == nil, pageGameID == viewer.gameID {
-                if viewer.index >= Self.shownScreenshots(pageScreenshots.count, columns: screenshotColumns, showsAll: showsAllScreenshots) {
-                    showsAllScreenshots = true
-                }
-                focusBeforeSheet = .pageScreenshot(viewer.index)
+                let current = pageScreenshots, url = viewer.screenshots[viewer.index].url
+                focusBeforeSheet = current.firstIndex { $0.url == url }.map { .pageScreenshot($0) }
+                    ?? (current.isEmpty ? .pagePlay : .pageScreenshot(0))
+                keepScreenshotFocusShown(focusBeforeSheet)
             }
             // Focus moves into a sheet and returns to whatever opened it, however the sheet closes. A sheet that replaces
             // another, such as a license over the artwork editor, starts on its own default.
@@ -216,7 +217,9 @@ final class Navigator {
     /// Set by the game page when a narrow window puts its other buttons in a row under Play.
     var pageActionsStacked = false
     /// Set by the game page's screenshot grid from its width.
-    var screenshotColumns = 2
+    var screenshotColumns = 2 {
+        didSet { if screenshotColumns != oldValue { keepScreenshotFocusShown() } }
+    }
     /// Whether the game page's screenshot grid shows every screenshot rather than its first rows. Each page starts collapsed.
     var showsAllScreenshots = false
     private(set) var rescanning = false
@@ -391,6 +394,20 @@ final class Navigator {
 
     /// Whether the grid has more screenshots than it shows collapsed, so it offers Show all and Show fewer.
     static func collapsesScreenshots(_ total: Int, columns: Int) -> Bool { total > columns * 3 }
+
+    /// Keeps a focused screenshot in the grid when the grid shows fewer, such as after the window narrows, by showing all
+    /// of them. A Show all button that went away because the grid no longer collapses hands focus to the last screenshot.
+    private func keepScreenshotFocusShown(_ target: Target? = nil) {
+        guard let target = target ?? focus else { return }
+        let total = pageScreenshots.count
+        switch target {
+        case let .pageScreenshot(index) where index >= Self.shownScreenshots(total, columns: screenshotColumns, showsAll: showsAllScreenshots):
+            showsAllScreenshots = true
+        case .pageScreenshotsMore where !Self.collapsesScreenshots(total, columns: screenshotColumns):
+            setFocus(total > 0 ? .pageScreenshot(total - 1) : defaultFocus)
+        default: break
+        }
+    }
 
     /// `items` in rows of `columns`. Moving between them keeps the column, as moving through a grid should.
     private static func gridRows(_ id: String, _ items: [Target], columns: Int) -> [Row] {

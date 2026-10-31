@@ -311,6 +311,25 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.showsAllScreenshots)
     #expect(nav.focus == .pageScreenshot(7))
 
+    // A narrower window that collapses the grid to fewer tiles shows all of them rather than hide the focused one.
+    nav.showsAllScreenshots = false
+    nav.screenshotColumns = 4
+    nav.setFocus(.pageScreenshot(8))
+    nav.screenshotColumns = 3
+    #expect(nav.showsAllScreenshots)
+    #expect(nav.focus == .pageScreenshot(8))
+
+    // A metadata match applied while the viewer shows finds the last screenshot again by URL, or falls back to the first.
+    nav.select(.pageScreenshot(5))
+    nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots[4...6]) }
+    press(nav, .cancel)
+    #expect(nav.focus == .pageScreenshot(1))
+    nav.select(.pageScreenshot(2))
+    nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots[0...1]) }
+    press(nav, .confirm)
+    #expect(nav.focus == .pageScreenshot(0))
+    nav.hub.library.update(id) { $0.metadata?.screenshots = shots }
+
     // A shorter list shows every screenshot without the button.
     nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots.prefix(9)) }
     nav.push(.game(id))

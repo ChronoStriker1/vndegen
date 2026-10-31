@@ -180,6 +180,10 @@ struct ScreenshotViewerView: View {
                 .padding(.trailing, insets.trailing + metrics.padding)
             }
         }
+        // On an iPad, a click counts as touch, which hides the arrows. Moving the pointer brings them back.
+        .onContinuousHover { phase in
+            if case .active = phase { hub.input.noteInput(.keyboardMouse) }
+        }
         .accessibilityAddTraits(.isModal)
     }
 }
