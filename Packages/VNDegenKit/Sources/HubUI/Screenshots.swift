@@ -112,7 +112,7 @@ final class ScreenshotViewer {
     func step(_ offset: Int) {
         let next = min(max(0, index + offset), screenshots.count - 1)
         guard next != index else { return }
-        withAnimation(Theme.focusAnimation) { index = next }
+        withAnimation(.smooth(duration: 0.3)) { index = next }
     }
 }
 
@@ -143,7 +143,8 @@ struct ScreenshotViewerView: View {
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.paging)
-        .scrollPosition(id: Binding<Int?>(get: { viewer.index }, set: { if let index = $0 { viewer.index = index } }))
+        // Centered, since without an anchor a scroll to the next screenshot stops once it is visible, short of the page.
+        .scrollPosition(id: Binding<Int?>(get: { viewer.index }, set: { if let index = $0 { viewer.index = index } }), anchor: .center)
         .scrollIndicators(.hidden)
         .background(.black)
         .ignoresSafeArea()
