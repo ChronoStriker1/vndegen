@@ -24,6 +24,7 @@ final class System4Session: EngineSession {
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
     private var lastTimestamp: CFTimeInterval?
+    private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
     private var paused = false
@@ -153,7 +154,10 @@ final class System4Session: EngineSession {
     fileprivate func step(_ link: CADisplayLink) {
         guard let engine else { return }
         let now = link.timestamp
-        let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
+        // Whole milliseconds, carrying the fraction: rounding each 16.67 ms refresh to 17 ran the game 2% fast.
+        let elapsed = lastTimestamp.map { (now - $0) * 1000 + msCarry } ?? 16
+        let ms = Int(elapsed.rounded(.down))
+        msCarry = elapsed - Double(ms)
         lastTimestamp = now
         guard !paused else { return }
         // The runtime caps the step at 100 ms and logs the time it drops.
@@ -216,6 +220,7 @@ final class System4Session: EngineSession {
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
+        msCarry = 0
         #if DEBUG
         pacing?.reset()
         #endif
