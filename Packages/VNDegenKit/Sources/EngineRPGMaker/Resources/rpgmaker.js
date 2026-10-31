@@ -552,15 +552,20 @@
         if (!graphics || !graphics._app || event.target !== graphics._app.view) return;
         contextGeneration++;
         console.warn('WebGL context restored, restoring the tilemap and Effekseer');
-        if (!graphics._effekseer || typeof graphics._createEffekseerContext !== 'function') return;
-        // Frees the lost context's memory. Deleting its GL objects, which went with the context, only sets error flags,
-        // which are cleared so nothing reads them as a later call's.
-        const gl = graphics._app.renderer.gl;
+        if (typeof graphics._createEffekseerContext !== 'function' || !window.effekseer) return;
+        // The old context is left as it is rather than released: effects it is still loading finish into it, and
+        // releasing it would make their callbacks throw. It costs its memory once per restore.
+        // MZ drops the whole PIXI application when Effekseer fails to start. Here the game keeps drawing, without
+        // battle animations until the next restore.
+        const app = graphics._app;
         try {
-            if (window.effekseer && effekseer.releaseContext) effekseer.releaseContext(graphics._effekseer);
-        } catch (e) { /* already gone */ }
-        for (let i = 0; i < 16 && gl.getError() !== gl.NO_ERROR; i++);
-        graphics._createEffekseerContext();
+            graphics._createEffekseerContext();
+        } finally {
+            if (graphics._app !== app) {
+                graphics._app = app;
+                graphics._effekseer = null;
+            }
+        }
         if (window.EffectManager) EffectManager._cache = {};
     }, true);
     document.addEventListener('load', () => {
@@ -578,22 +583,29 @@
         const animation = window.Graphics && Graphics._createEffekseerContext && typeof Sprite_Animation === 'function'
             && Sprite_Animation.prototype;
         if (animation) {
-            wrap(animation, 'setup', (setup) => function () {
+            wrap(animation, 'initialize', (initialize) => function () {
                 this.vndegenContext = contextGeneration;
-                return setup.apply(this, arguments);
+                return initialize.apply(this, arguments);
             });
-            wrap(animation, 'update', (update) => function () {
-                if (this.vndegenContext !== contextGeneration) {
-                    this.vndegenContext = contextGeneration;
-                    this._handle = null;
-                    if (!this._started && this._animation && window.EffectManager) {
-                        this._effect = EffectManager.load(this._animation.effectName);
-                    }
-                }
-                return update.apply(this, arguments);
-            });
+            // Whatever reaches an animation first after a restore, an update, a draw or its end, drops its handle and
+            // effect from the lost context before they are used.
+            for (const name of ['update', '_render', 'destroy']) {
+                wrap(animation, name, (method) => function () {
+                    forgetLostEffect(this);
+                    return method.apply(this, arguments);
+                });
+            }
         }
     }, true);
+    function forgetLostEffect(animation) {
+        if (animation.vndegenContext === undefined) animation.vndegenContext = contextGeneration;
+        if (animation.vndegenContext === contextGeneration) return;
+        animation.vndegenContext = contextGeneration;
+        animation._handle = null;
+        if (!animation._started && animation._animation && window.EffectManager) {
+            animation._effect = EffectManager.load(animation._animation.effectName);
+        }
+    }
 
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
