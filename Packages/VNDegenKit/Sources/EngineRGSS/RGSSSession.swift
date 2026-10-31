@@ -90,6 +90,9 @@ final class RGSSSession: EngineSession {
         rgssLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
         running = true
         RGSSCheats.start(with: launch.game.cheats ?? CheatSettings())
+        #if DEBUG
+        RGSSCheats.runDebugScript()
+        #endif
         audio = PCMAudioOutput { out, frames in vnrgss_audio_render(out, Int32(frames)) }
         audio?.start()
         if paused { setPaused(true) }

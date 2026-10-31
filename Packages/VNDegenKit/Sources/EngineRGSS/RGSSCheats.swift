@@ -29,6 +29,24 @@ final class RGSSCheats: CheatSession {
         }
     }
 
+    #if DEBUG
+    /// `-rgss-ruby <file>` runs a Ruby file in the game once its scripts have loaded, for scripted checks, and logs
+    /// what it gives ("rgss-ruby" in the app log).
+    static func runDebugScript() {
+        guard let path = UserDefaults.standard.string(forKey: "rgss-ruby"),
+              let source = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        let request = vnrgss_run_ruby(source)
+        Task {
+            do {
+                let result = try await result(of: request, within: .seconds(120))
+                rgssLog.notice("rgss-ruby: \(result, privacy: .public)")
+            } catch {
+                rgssLog.error("rgss-ruby failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+    #endif
+
     func state() async throws -> CheatState {
         try CheatState(json: Data(try await Self.run("VNDegenCheats.state").utf8))
     }
