@@ -225,6 +225,21 @@ final class System4Session: EngineSession {
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
     }
 
+    /// The on-screen keyboard: each character's key, if it has one, then the character itself for the game's text
+    /// entry, all in order through the pacer like a hardware keyboard's.
+    func type(_ typed: TypedText) {
+        guard !paused else { return }
+        func tap(_ vk: Int32) -> [System4Input] { [.key(vk, down: true), .key(vk, down: false)] }
+        switch typed {
+        case let .text(text):
+            deliver(text.flatMap { c -> [System4Input] in
+                KeyboardKey.keys(typing: .text(String(c))).flatMap { tap(Int32($0.keyCode)) } + [.text(String(c))]
+            })
+        case .newline: deliver(tap(13))
+        case .deleteBackward: deliver(tap(8))
+        }
+    }
+
     func setPaused(_ paused: Bool) {
         let wasPaused = self.paused
         self.paused = paused
