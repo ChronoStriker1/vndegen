@@ -40,8 +40,11 @@ through the shared FrameHost module and maps the controls.
   The data the sprite engine hands the game to keep (backlog, back scenes, character sprites, MultiSprite) uses the
   PC library's encodings. Each was checked against saves the PC games wrote under Wine.
 - **Input.** The runtime takes Windows virtual-key codes and mouse positions. The games only take a click on a
-  button the pointer has rested on, and poll the mouse once a frame, so a touch's press waits three frames after its
-  pointer move and stays down at least 100 ms. Confirm is Enter, cancel and the menu
+  button the pointer has rested on, and read the keyboard and mouse once a frame, so the session paces input: a
+  touch's press waits until the game has finished three frames with the pointer there, each key or button change
+  waits until the game has read the last one, and a press stays down at least 100 ms (a release 50 ms). A game that
+  stops finishing frames holds input back at most half a second per change. Pausing drops waiting input and lets go
+  of every key and button the game holds. Confirm is Enter, cancel and the menu
   are the right mouse button, the arrows move, page up and down turn the wheel, dash is Ctrl, and the touch mouse
   and touch gamepad send the same. The default layout is keyboard and mouse.
 
