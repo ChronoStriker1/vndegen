@@ -1,0 +1,880 @@
+[
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-499DAE20.jpg",
+      "header": "header-2EA938F3.jpg",
+      "hero": "hero-B608C133.jpg",
+      "logo": "logo-FDF0BF07.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Yume Nikki",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Kikiyama"
+      ],
+      "genres": [
+        "Exploration",
+        "RPG Maker"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2018-02-23",
+      "title": "Yume Nikki"
+    },
+    "playTime": 0,
+    "title": "Yume Nikki"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-AA3046D2.jpg",
+      "header": "header-692D8FE7.jpg",
+      "hero": "hero-40023B73.jpg",
+      "logo": "logo-EAAE50D7.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "planetarian",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Key"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Kinetic Novel"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2014-09-15",
+      "title": "planetarian ~the reverie of a little planet~"
+    },
+    "playTime": 0,
+    "title": "planetarian"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-AD6F7006.jpg",
+      "header": "header-3A665D3E.jpg",
+      "hero": "hero-9E8FB13B.jpg",
+      "logo": "logo-F3D96A08.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Rakuen",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Laura Shigihara"
+      ],
+      "genres": [
+        "Adventure",
+        "RPG Maker",
+        "Puzzle"
+      ],
+      "publishers": [
+        "Leaf Mobile"
+      ],
+      "refs": [],
+      "releaseDate": "2017-05-10",
+      "summary": "A boy and his mom journey into the fantasy world of his favorite storybook to help the neighbors of a hospital ward.",
+      "title": "Rakuen"
+    },
+    "playTime": 0,
+    "title": "Rakuen"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-78DE7132.jpg",
+      "header": "header-E9CCBF30.jpg",
+      "hero": "hero-043E7A79.jpg",
+      "logo": "logo-2C01C3ED.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "VA-11 Hall-A",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-25T19:28:14Z",
+    "metadata": {
+      "developers": [
+        "Sukeban Games"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Cyberpunk",
+        "Simulation"
+      ],
+      "publishers": [
+        "Ysbryd Games"
+      ],
+      "refs": [],
+      "releaseDate": "2016-06-21",
+      "summary": "Mix drinks and change lives at a dive bar in a dystopian cyberpunk city, one conversation at a time.",
+      "title": "VA-11 Hall-A: Cyberpunk Bartender Action"
+    },
+    "playTime": 34800,
+    "title": "VA-11 Hall-A"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-27832DD6.jpg",
+      "header": "header-586EF77A.jpg",
+      "hero": "hero-2BF5F340.jpg",
+      "logo": "logo-5AFEDDA7.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Coffee Talk",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Toge Productions"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Cozy"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2020-01-29",
+      "title": "Coffee Talk"
+    },
+    "playTime": 0,
+    "title": "Coffee Talk"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-97E35B8D.jpg",
+      "header": "header-EDDAA49D.jpg",
+      "hero": "hero-C4BA9A15.jpg",
+      "logo": "logo-19AB59FA.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "To the Moon",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Freebird Games"
+      ],
+      "genres": [
+        "Adventure",
+        "RPG Maker",
+        "Story Rich"
+      ],
+      "publishers": [
+        "Freebird Games"
+      ],
+      "refs": [],
+      "releaseDate": "2011-11-01",
+      "summary": "Two doctors travel through a dying man's memories to grant his last wish: to go to the moon.",
+      "title": "To the Moon"
+    },
+    "playTime": 0,
+    "title": "To the Moon"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-897DF31F.jpg",
+      "header": "header-A20C4D64.jpg",
+      "hero": "hero-A03EC55D.jpg",
+      "logo": "logo-213A20EF.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Ace Attorney Trilogy",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Capcom"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Courtroom"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2019-04-09",
+      "title": "Phoenix Wright: Ace Attorney Trilogy"
+    },
+    "playTime": 0,
+    "title": "Ace Attorney Trilogy"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-39EFB3E0.jpg",
+      "header": "header-D5955085.jpg",
+      "hero": "hero-682FC384.jpg",
+      "logo": "logo-1E5D2EA7.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Corpse Party",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Team GrisGris"
+      ],
+      "genres": [
+        "Horror",
+        "RPG Maker"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2016-04-25",
+      "title": "Corpse Party"
+    },
+    "playTime": 0,
+    "title": "Corpse Party"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-9D7AFEB1.jpg",
+      "header": "header-D82FB273.jpg",
+      "hero": "hero-63D4320C.jpg",
+      "logo": "logo-4120E65F.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "OMORI",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-30T17:04:14Z",
+    "metadata": {
+      "developers": [
+        "OMOCAT"
+      ],
+      "genres": [
+        "RPG",
+        "Psychological Horror",
+        "Adventure"
+      ],
+      "publishers": [
+        "OMOCAT"
+      ],
+      "refs": [],
+      "releaseDate": "2020-12-25",
+      "summary": "Explore a strange world full of colorful friends and foes. When the time comes, the path you've chosen will determine your fate... and perhaps the fate of others as well.",
+      "title": "OMORI"
+    },
+    "playTime": 148920,
+    "title": "OMORI"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-E5CBF710.jpg",
+      "header": "header-67332F22.jpg",
+      "hero": "hero-34B9F948.jpg",
+      "logo": "logo-7B640966.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Mad Father",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "sen"
+      ],
+      "genres": [
+        "Horror",
+        "RPG Maker"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2016-05-27",
+      "title": "Mad Father"
+    },
+    "playTime": 0,
+    "title": "Mad Father"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-80FE76B6.jpg",
+      "header": "header-A0A66323.jpg",
+      "hero": "hero-86E4A00D.jpg",
+      "logo": "logo-0B8AC352.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Needy Streamer Overload",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "WSS playground"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Simulation"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2022-01-21",
+      "title": "NEEDY STREAMER OVERLOAD"
+    },
+    "playTime": 0,
+    "title": "Needy Streamer Overload"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-B274C837.jpg",
+      "header": "header-205D79EF.jpg",
+      "hero": "hero-3C42B6E5.jpg",
+      "logo": "logo-F5043EC6.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Muv-Luv",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "\u00e2ge"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Sci-fi"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2016-12-07",
+      "title": "Muv-Luv"
+    },
+    "playTime": 0,
+    "title": "Muv-Luv"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-D16EAC0E.jpg",
+      "header": "header-2F5D75DB.jpg",
+      "hero": "hero-714D4B13.jpg",
+      "logo": "logo-8D8925F3.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "The House in Fata Morgana",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Novectacle"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Gothic",
+        "Mystery"
+      ],
+      "publishers": [
+        "MangaGamer"
+      ],
+      "refs": [],
+      "releaseDate": "2014-07-17",
+      "summary": "A gothic tale of a cursed mansion and the tragedies that unfold within its walls across a thousand years.",
+      "title": "The House in Fata Morgana"
+    },
+    "playTime": 0,
+    "title": "The House in Fata Morgana"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-573D44B9.jpg",
+      "header": "header-A1CD4B7D.jpg",
+      "hero": "hero-BB3E2EB0.jpg",
+      "logo": "logo-F39E6AB8.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "CHAOS;CHILD",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "MAGES."
+      ],
+      "genres": [
+        "Visual Novel",
+        "Thriller"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2019-02-26",
+      "title": "CHAOS;CHILD"
+    },
+    "playTime": 0,
+    "title": "CHAOS;CHILD"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-66AC9CB8.jpg",
+      "header": "header-B00DE6FB.jpg",
+      "hero": "hero-8ABA2A2E.jpg",
+      "logo": "logo-89286C28.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "CLANNAD",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Key",
+        "VisualArts"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Drama",
+        "Romance"
+      ],
+      "publishers": [
+        "Sekai Project"
+      ],
+      "refs": [],
+      "releaseDate": "2015-11-23",
+      "summary": "Tomoya Okazaki is a delinquent who finds life dull, until he meets a girl repeating her final year at his school.",
+      "title": "CLANNAD"
+    },
+    "playTime": 0,
+    "title": "CLANNAD"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-7EDEE97B.jpg",
+      "header": "header-3B228371.jpg",
+      "hero": "hero-94E4678F.jpg",
+      "logo": "logo-33783292.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Doki Doki Literature Club",
+    "isLocked": true,
+    "lastPlayedAt": "2026-10-18T19:28:14Z",
+    "metadata": {
+      "developers": [
+        "Team Salvato"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Psychological Horror"
+      ],
+      "publishers": [
+        "Team Salvato"
+      ],
+      "refs": [],
+      "releaseDate": "2017-09-22",
+      "summary": "Join the Literature Club and write poems for the girls you like. This game is not suitable for children or those easily disturbed.",
+      "title": "Doki Doki Literature Club!"
+    },
+    "playTime": 14400,
+    "title": "Doki Doki Literature Club"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-22E26CA6.jpg",
+      "header": "header-D7991B9A.jpg",
+      "hero": "hero-4E2435C1.jpg",
+      "logo": "logo-9015BCF6.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Steins;Gate",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-29T14:40:14Z",
+    "metadata": {
+      "developers": [
+        "MAGES.",
+        "5pb."
+      ],
+      "genres": [
+        "Visual Novel",
+        "Sci-fi",
+        "Thriller"
+      ],
+      "publishers": [
+        "Spike Chunsoft"
+      ],
+      "refs": [],
+      "releaseDate": "2016-09-09",
+      "summary": "Rintaro Okabe, a self-proclaimed mad scientist, discovers that his microwave can send text messages to the past, and every message changes the world line.",
+      "title": "STEINS;GATE"
+    },
+    "playTime": 65100,
+    "title": "Steins;Gate"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-5195E441.jpg",
+      "header": "header-534AA4D8.jpg",
+      "hero": "hero-EFF3EF7B.jpg",
+      "logo": "logo-35E45B6D.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Danganronpa",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Spike Chunsoft"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Mystery"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2016-02-18",
+      "title": "Danganronpa: Trigger Happy Havoc"
+    },
+    "playTime": 0,
+    "title": "Danganronpa"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-6B2B4B87.jpg",
+      "header": "header-B0DFE035.jpg"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Higurashi",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "07th Expansion"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Horror",
+        "Mystery"
+      ],
+      "publishers": [
+        "MangaGamer"
+      ],
+      "refs": [],
+      "releaseDate": "2015-05-15",
+      "summary": "A quiet village, a summer festival, and a curse that returns every year.",
+      "title": "Higurashi When They Cry"
+    },
+    "playTime": 0,
+    "title": "Higurashi"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-AFC791F1.jpg",
+      "header": "header-BCE75209.jpg",
+      "hero": "hero-DC11E044.jpg",
+      "logo": "logo-C78CE242.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Undertale",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "tobyfox"
+      ],
+      "genres": [
+        "RPG",
+        "Bullet Hell"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2015-09-15",
+      "title": "Undertale"
+    },
+    "playTime": 0,
+    "title": "Undertale"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-D5B01507.jpg",
+      "header": "header-22EFCE32.jpg",
+      "hero": "hero-B0C95C77.jpg",
+      "logo": "logo-69A84DA2.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "The Witch's House MV",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Fummy"
+      ],
+      "genres": [
+        "Horror",
+        "Puzzle"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2018-10-26",
+      "title": "The Witch's House MV"
+    },
+    "playTime": 0,
+    "title": "The Witch's House MV"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-DD91962D.jpg",
+      "header": "header-9915AA0B.jpg",
+      "hero": "hero-58E4214D.jpg",
+      "logo": "logo-9682DA68.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Zero Escape",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Spike Chunsoft"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Puzzle",
+        "Mystery"
+      ],
+      "publishers": [
+        "Spike Chunsoft"
+      ],
+      "refs": [],
+      "releaseDate": "2017-03-24",
+      "summary": "Nine people are kidnapped and forced to play a deadly game of escape. Includes 999 and Virtue's Last Reward.",
+      "title": "Zero Escape: The Nonary Games"
+    },
+    "playTime": 0,
+    "title": "Zero Escape"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-48AC1DE7.jpg",
+      "header": "header-46A75B5E.jpg",
+      "hero": "hero-FCDCB296.jpg",
+      "logo": "logo-545DBE07.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "LISA",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Dingaling Productions"
+      ],
+      "genres": [
+        "RPG",
+        "Post-apocalyptic"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2014-12-15",
+      "title": "LISA: The Painful"
+    },
+    "playTime": 0,
+    "title": "LISA"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-4BABF70A.jpg",
+      "header": "header-5878F963.jpg",
+      "hero": "hero-73B95598.jpg",
+      "logo": "logo-F498F537.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "Ib",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "kouri"
+      ],
+      "genres": [
+        "Horror",
+        "RPG Maker"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2022-04-11",
+      "title": "Ib"
+    },
+    "playTime": 0,
+    "title": "Ib"
+  },
+  {
+    "addedAt": "2026-10-30T19:28:14Z",
+    "artwork": {
+      "capsule": "capsule-1C15902C.jpg",
+      "header": "header-BE218CFA.jpg",
+      "hero": "hero-90EFAA0B.jpg",
+      "logo": "logo-4492E2F7.png"
+    },
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.mz",
+      "evidence": "js/rmmz_core.js"
+    },
+    "id": "AI The Somnium Files",
+    "isLocked": false,
+    "metadata": {
+      "developers": [
+        "Spike Chunsoft"
+      ],
+      "genres": [
+        "Visual Novel",
+        "Detective"
+      ],
+      "publishers": [],
+      "refs": [],
+      "releaseDate": "2019-09-17",
+      "title": "AI: The Somnium Files"
+    },
+    "playTime": 0,
+    "title": "AI The Somnium Files"
+  },
+  {
+    "addedAt": "2026-10-30T21:32:51Z",
+    "artwork": {},
+    "controlMethod": "touchGamepad",
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.vxace",
+      "evidence": "Data/Scripts.rvdata2"
+    },
+    "id": "Test Game 55",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-30T23:50:12Z",
+    "playTime": 0,
+    "title": "Test Game 55"
+  },
+  {
+    "addedAt": "2026-10-30T21:32:51Z",
+    "artwork": {},
+    "controlMethod": "touchGamepad",
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.vx",
+      "evidence": "Game.rgss2a"
+    },
+    "id": "Test Game 33",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-30T23:49:32Z",
+    "playTime": 0,
+    "title": "Test Game 33"
+  },
+  {
+    "addedAt": "2026-10-30T21:32:51Z",
+    "artwork": {},
+    "controlMethod": "touchGamepad",
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.vxace",
+      "evidence": "Game.rgss3a"
+    },
+    "id": "Test Game 14",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-30T23:40:02Z",
+    "playTime": 0,
+    "title": "Test Game 14"
+  },
+  {
+    "addedAt": "2026-10-30T21:32:51Z",
+    "artwork": {},
+    "controlMethod": "touchGamepad",
+    "detected": {
+      "confidence": 2,
+      "engine": "rpgmaker.xp",
+      "evidence": "Game.rgssad"
+    },
+    "id": "Test Game 37",
+    "isLocked": false,
+    "lastPlayedAt": "2026-10-30T23:40:32Z",
+    "playTime": 0,
+    "title": "Test Game 37"
+  }
+]

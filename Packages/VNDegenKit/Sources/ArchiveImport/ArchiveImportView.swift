@@ -15,11 +15,18 @@ public final class ArchiveImportModel {
     enum Control: Hashable {
         /// An archive already in VNDegen's folder, by its first volume.
         case localArchive(URL)
-        case chooseArchive, folderName, deleteToggle, chooseAnother, startImport, passwordField, cancelPassword, unlock, cancelImport
+        case chooseArchive, folderName, destination, deleteToggle, chooseAnother, startImport, passwordField, cancelPassword, unlock, cancelImport
         case keepNested, extractNested, importAnother, done
     }
 
     let gamesRoot: URL
+    /// The library folders a game can be unpacked into, `gamesRoot` first. The reviewing step offers a choice when there
+    /// is more than one.
+    public let destinations: [ImportDestination]
+    /// Where the game is unpacked.
+    public var destination: ImportDestination {
+        didSet { importer?.destination = destination.url }
+    }
     private(set) var importer: ArchiveImporter?
     var picking = false
     var password = ""
@@ -34,13 +41,18 @@ public final class ArchiveImportModel {
     private(set) var showsFocus = false
     @ObservationIgnored private var onFinish: ((String?) -> Void)?
 
-    public init(gamesRoot: URL) { self.gamesRoot = gamesRoot }
+    public init(gamesRoot: URL, destinations: [ImportDestination] = []) {
+        self.gamesRoot = gamesRoot
+        self.destinations = destinations.isEmpty ? [ImportDestination(name: gamesRoot.lastPathComponent, url: gamesRoot)] : destinations
+        destination = self.destinations[0]
+    }
 
     /// Creates the importer once, however often the view appears.
     func start(initialSelection: [URL], onFinish: @escaping (String?) -> Void) async {
         self.onFinish = onFinish
         guard importer == nil else { return }
         let importer = ArchiveImporter(gamesRoot: gamesRoot)
+        importer.destination = destination.url
         self.importer = importer
         if !initialSelection.isEmpty { await importer.choose(initialSelection) }
         await findLocalArchives()
@@ -91,7 +103,7 @@ public final class ArchiveImportModel {
         switch importer.step {
         case .choosing: return [[.chooseArchive]] + localArchives.map { [.localArchive($0.url)] }
         case .opening: return []
-        case .reviewing: return [[.folderName]] + (importer.canDeleteArchive ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
+        case .reviewing: return [[.folderName]] + (destinations.count > 1 ? [[.destination]] : []) + (importer.canDeleteArchive ? [[.deleteToggle]] : []) + [[.chooseAnother, .startImport]]
         case .password: return [[.passwordField], [.cancelPassword, .unlock]]
         case .extracting: return [[.cancelImport]]
         case .nested: return [[.keepNested, .extractNested]]
@@ -169,6 +181,11 @@ public final class ArchiveImportModel {
                 editing = control
             }
             return
+        case .destination:
+            // A controller steps through the folders. Touch and the pointer use the menu instead.
+            let index = destinations.firstIndex(of: destination) ?? 0
+            destination = destinations[(index + 1) % destinations.count]
+            return
         case .deleteToggle:
             importer.deleteArchiveAfterImport.toggle()
             return
@@ -184,6 +201,17 @@ public final class ArchiveImportModel {
         }
         // The next step starts on its main action.
         focus = nil
+    }
+}
+
+/// A library folder a game can be unpacked into.
+public struct ImportDestination: Hashable, Sendable {
+    public let name: String
+    public let url: URL
+
+    public init(name: String, url: URL) {
+        self.name = name
+        self.url = url
     }
 }
 
@@ -350,7 +378,7 @@ private struct StepView: View {
                     .id(control)
                 }
             }
-            Text("Games are extracted into VNDegen's Games folder. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
+            Text("Games are extracted into a library folder you choose after picking the archive, VNDegen's Games folder unless you add others in Settings. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
                 .foregroundStyle(ImportTheme.tertiaryText)
             #if os(iOS)
@@ -400,6 +428,33 @@ private struct StepView: View {
                     .foregroundStyle(ImportTheme.accent)
             } else {
                 Text("The game appears in the library under this name.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(ImportTheme.tertiaryText)
+            }
+        }
+        if model.destinations.count > 1 {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Library folder")
+                Menu {
+                    Picker("Library folder", selection: $model.destination) {
+                        ForEach(model.destinations, id: \.self) { Text($0.name).tag($0) }
+                    }
+                } label: {
+                    HStack {
+                        Label(model.destination.name, systemImage: "folder")
+                            .font(.system(size: 16, weight: .semibold))
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down").foregroundStyle(ImportTheme.secondaryText)
+                    }
+                    .padding(14)
+                    .contentShape(.rect)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .fieldBackground(ImportTheme.surface, focused: model.isFocused(.destination))
+                .id(ArchiveImportModel.Control.destination)
+                Text(model.showsFocus ? "The game is unpacked into this folder. Press A for the next folder." : "The game is unpacked into this folder.")
                     .font(.system(size: 13))
                     .foregroundStyle(ImportTheme.tertiaryText)
             }

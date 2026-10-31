@@ -132,7 +132,8 @@ let package = Package(
         // which Inno Setup installers need.
         .target(name: "CLzmaDec", path: "Sources/RuntimePackages/CLzmaDec"),
         .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
-        .testTarget(name: "VNCoreTests", dependencies: ["VNCore"]),
+        // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
+        .testTarget(name: "VNCoreTests", dependencies: ["VNCore"], exclude: ["Fixtures"]),
         .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),

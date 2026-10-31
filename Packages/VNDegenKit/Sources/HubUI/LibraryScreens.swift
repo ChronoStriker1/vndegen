@@ -98,20 +98,19 @@ struct SettingsView: View {
             ScrollViewReader { proxy in
                 Form {
                     Section {
-                        LabeledContent("Games folder") {
-                            Text(Self.displayPath(hub.library.paths.gamesRoot))
-                                .font(.system(size: 13, design: .monospaced))
-                                .textSelection(.enabled)
-                        }
-                        Button(LibraryFolder.openTitle, systemImage: "folder") { nav.select(.openFolder) }
-                            .focusRow(.openFolder, nav)
+                        builtInFolderRow
+                        ForEach(hub.library.folders) { folderRow($0) }
+                        Button("Add folder…", systemImage: "folder.badge.plus") { nav.select(.addLibraryFolder) }
+                            .focusRow(.addLibraryFolder, nav)
+                            .fileImporter(isPresented: Binding(get: { nav.pickingLibraryFolder }, set: { nav.pickingLibraryFolder = $0 }),
+                                          allowedContentTypes: [.folder]) { nav.addLibraryFolder($0) }
                         Button("Rescan library", systemImage: "arrow.clockwise") { nav.select(.rescan) }
                             .disabled(nav.rescanning)
                             .focusRow(.rescan, nav)
                     } header: {
-                        Text("Library")
+                        Text("Library folders")
                     } footer: {
-                        Text(LibraryFolder.instructions)
+                        Text(FileBrowser.instructions + " " + FileBrowser.addedFolders)
                     }
 
                     Section("Sources and privacy") {
@@ -157,6 +156,14 @@ struct SettingsView: View {
                     #endif
 
                     Section {
+                        pageRow("Plugins", systemImage: "puzzlepiece.extension", value: "\(hub.library.engines.count) built in", page: .plugins)
+                    } header: {
+                        Text("Engines")
+                    } footer: {
+                        Text("Each engine plugin, the versions it covers, what runs its games, its license, and how many of your games use it.")
+                    }
+
+                    Section {
                         ForEach(FontPack.packages) { fontRow($0) }
                     } header: {
                         Text("Fonts")
@@ -193,6 +200,59 @@ struct SettingsView: View {
         }
         .balancedHorizontalSafeArea(metrics)
         .background { Theme.background.ignoresSafeArea() }
+    }
+
+    /// The built-in games folder, which can't be removed.
+    private var builtInFolderRow: some View {
+        let root = hub.library.paths.gamesRoot
+        return HStack(spacing: 12) {
+            folderSummary(name: root.lastPathComponent, path: Self.displayPath(root),
+                          status: "Built in · \(gameCount(nil))")
+            Spacer()
+            Button(FileBrowser.openTitle) { nav.select(.openFolder) }
+                .buttonStyle(.borderless)
+                .focusRow(.openFolder, nav)
+        }
+    }
+
+    /// A folder the player added: where it is, how many games it holds or why it can't be reached, and its buttons.
+    private func folderRow(_ folder: LibraryFolder) -> some View {
+        let problem = hub.library.folderProblems[folder.id]
+        return HStack(spacing: 12) {
+            folderSummary(name: folder.name, path: Self.displayPath(folder.url),
+                          status: problem.map { "Unavailable. \($0) \(gameCount(folder.id)) still listed." } ?? gameCount(folder.id),
+                          unavailable: problem != nil)
+            Spacer()
+            Button(FileBrowser.openTitle) { nav.select(.showLibraryFolder(folder.id)) }
+                .buttonStyle(.borderless)
+                .disabled(problem != nil)
+                .focusRow(.showLibraryFolder(folder.id), nav)
+            Button("Remove", role: .destructive) { nav.select(.removeLibraryFolder(folder.id)) }
+                .buttonStyle(.borderless)
+                .focusRow(.removeLibraryFolder(folder.id), nav)
+        }
+    }
+
+    private func folderSummary(name: String, path: String, status: String, unavailable: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(name, systemImage: unavailable ? "externaldrive.badge.exclamationmark" : "folder")
+                .foregroundStyle(.white)
+            Text(path)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(Theme.secondaryText)
+                .textSelection(.enabled)
+                .lineLimit(2)
+                .truncationMode(.middle)
+            Text(status)
+                .font(.footnote)
+                .foregroundStyle(unavailable ? Theme.accent : Theme.tertiaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func gameCount(_ folder: LibraryFolderID?) -> String {
+        let count = hub.library.games.filter { $0.libraryFolder == folder }.count
+        return count == 1 ? "1 game" : "\(count) games"
     }
 
     /// The SoundFont in use, and the row that opens the file picker for another.
@@ -276,7 +336,21 @@ struct SettingsView: View {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
         #else
-        return path.components(separatedBy: "/Documents/").last.map { "On My \(UIDevice.current.localizedModel) › VNDegen › \($0)" } ?? path
+        // The app's own Documents folder is On My iPhone or iPad, VNDegen, and the Files app's local storage is On My
+        // iPhone or iPad. A drive or a server connected in Files lives under LiveFiles, in a folder named for its
+        // provider and then the volume. Anything else shows its path.
+        // Symlinks resolved on both sides, since iOS reaches the app container as /var and as /private/var.
+        let full = url.resolvingSymlinksInPath().path
+        let device = "On My \(UIDevice.current.localizedModel)"
+        let documents = URL.documentsDirectory.resolvingSymlinksInPath().path + "/"
+        func trail(_ rest: Substring) -> String { rest.split(separator: "/").joined(separator: " › ") }
+        if full.hasPrefix(documents) { return "\(device) › VNDegen › " + trail(full.dropFirst(documents.count)) }
+        if let range = full.range(of: "/File Provider Storage/") { return "\(device) › " + trail(full[range.upperBound...]) }
+        if let range = full.range(of: "/LiveFiles/") {
+            // Drops the provider's folder, such as com.apple.filesystems.userfsd, which names no place the player knows.
+            return trail(full[range.upperBound...].drop { $0 != "/" })
+        }
+        return path
         #endif
     }
 }
@@ -310,6 +384,10 @@ struct SettingsPageSheet: View {
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
                     SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
                 }
+            case .plugins:
+                SheetScaffold(title: "Plugins", subtitle: "Engines built into VNDegen", escapeCloses: true) {
+                    PluginsView()
+                }
             case .licenses:
                 SheetScaffold(title: "Licenses", subtitle: "Third-party code in VNDegen", escapeCloses: true) {
                     LicensesView()
@@ -324,21 +402,31 @@ struct SettingsPageSheet: View {
 }
 
 /// Opening the games folder in the system file browser, and how to add games there.
-enum LibraryFolder {
+enum FileBrowser {
     #if os(macOS)
     static let openTitle = "Show in Finder"
     static let instructions = "Copy each game into its own folder inside ~/Games/VNDegen, then rescan. A zip, RAR, or 7z archive copied there shows up in the library under Ready to import."
-    static func open(_ url: URL) {
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    static let addedFolders = "Add folder takes another folder of game folders, such as one on an external drive or a server. Its games join the library, and stay listed as unavailable while the drive or server is away. Removing a folder takes its games out of the library and leaves its files alone."
+    /// Shows `url` in Finder. `create` makes it first, for VNDegen's own games folder. Other folders are never made, so
+    /// a folder on a drive that went away isn't made again on the disk under it.
+    static func open(_ url: URL, create: Bool = false) {
+        if create { try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
     #else
     static let openTitle = "Open in Files"
+    static let addedFolders = "Add folder takes another folder of game folders from Files, such as one on an external drive or a server connected in Files. Its games join the library, and stay listed as unavailable while the drive or server is away. Removing a folder takes its games out of the library and leaves its files alone."
     static let instructions = "In the Files app, open On My \(UIDevice.current.localizedModel), then VNDegen, then Games. Copy each game into its own folder there. A zip, RAR, or 7z archive copied into VNDegen or Games shows up in the library under Ready to import."
-    static func open(_ url: URL) {
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    /// Opens `url` in the Files app. `create` makes it first, for VNDegen's own games folder.
+    static func open(_ url: URL, create: Bool = false) {
+        if create { try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
         // The Files app opens a folder in an app's container through the shareddocuments scheme.
-        if let files = URL(string: "shareddocuments://\(url.path)") { UIApplication.shared.open(files) }
+        // Built from components, so a # or ? in a folder name stays part of the path.
+        var files = URLComponents()
+        files.scheme = "shareddocuments"
+        files.host = ""
+        files.path = url.path
+        if let files = files.url { UIApplication.shared.open(files) }
     }
     #endif
 }
@@ -390,7 +478,7 @@ struct EmptyLibraryView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus") }
                         HStack(spacing: 12) {
-                            HubButton(target: .openFolder) { Label(LibraryFolder.openTitle, systemImage: "folder.fill") }
+                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill") }
                             HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise") }
                                 .disabled(nav.rescanning)
                         }

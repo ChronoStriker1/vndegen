@@ -100,7 +100,7 @@ private struct LibraryContainer: View {
                 .environment(hub)
                 .environment(nav)
         }
-        .alert("Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { hub.launchError = nil } })) {
+        .alert(nav.errorTitle ?? "Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { nav.closeError() } })) {
             Button("OK") {}
         } message: {
             // The alert's button shows no controller focus, so controller players get the buttons spelled out.
@@ -191,6 +191,13 @@ private struct LibraryContainer: View {
             SettingsPageSheet(page: page)
         case let .importGame(model, initialSelection):
             ArchiveImportView(model: model, initialSelection: initialSelection) { nav.finishImport($0) }
+        case let .gameMenu(id):
+            if let game = hub.library.game(id) {
+                ChoiceSheet(sheet: sheet, title: hub.displayTitle(game), subtitle: SettingsView.displayPath(hub.library.folder(for: id)),
+                            footnote: "The same actions are on the game's page. A long press or a right click on a tile opens this menu too.")
+            }
+        case let .confirm(confirmation):
+            ConfirmationSheet(confirmation: confirmation)
         case let .license(request):
             RuntimeLicenseSheet(request: request)
                 .presentationDetents([.large])

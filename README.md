@@ -22,6 +22,9 @@ The PC games run unmodified. VNDegen does not convert or repack them, and their 
 - **Library views.** The view button in the top bar switches the library between three layouts. Header list stacks each game's wide header art, in as many columns as the screen allows. Capsule rows shows shelves of large portrait capsules. Featured puts the focused game's hero art, logo, and Play button above the shelves. iPhone starts on Header list, iPad on Capsule rows, and Mac on Featured, and each device remembers its choice.
 - **One layout per device.** The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad, and Mac windows of any size. Folding the Duo or rotating the iPad keeps your place. On iPad, VNDegen also runs in a window of its own, at any size iPadOS allows. The library, game pages, the in-game menu, the touch gamepad, and every engine fit the window and keep clear of its window controls.
 - **Every input method.** Touch, mouse and keyboard, and game controllers all drive both the hub and the games. A controller alone reaches every screen, including Settings, the button mapping editor, adding a game, and the lock screen, and its text fields open an on-screen keyboard the controller types on. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller), switchable from the in-game menu. Mouse works by touch, where a tap clicks right where it lands, or by a cursor you drag like a trackpad. Controller shows no overlay and ignores touches unless its Mouse checkbox is on. Every button reaches games as an Xbox controller button by default, except in KiriKiri, TyranoScript, and Flash games, which start with Steam's Keyboard and Mouse layout. Each game also has its own button mapping: any overlay or controller button can send another Xbox button, a keyboard key, a mouse click, the mouse wheel, mouse movement, or the on-screen keyboard.
+- **More than one games folder.** Settings, Library folders, adds other folders of games beside VNDegen's own, such as a folder on an external drive, a server connected in Files, or another folder on the Mac. A folder that can't be reached, such as an unplugged drive, keeps its games in the library, shown as unavailable with the reason, until it's back.
+- **Game menu.** A long press on a game in any library layout, a right click on a Mac, or X on a controller opens a menu with Play, Open game page, Change artwork, Find metadata, Hide or Unhide, Show in Finder or Open in Files, and Remove from library.
+- **Plugins.** Settings, Engines, Plugins lists every engine plugin built into the app, the engine versions it covers, what runs its games and under which license, how many of your games use it, and whether it runs on this device. Godot doesn't run on an Intel Mac, for example. Plugins are compiled into the app, so they can't be added or removed.
 - **Hidden games.** Games marked Hide disappear from the library until it is unlocked with Face ID, Touch ID, or an app passcode. The library locks again when the app goes to the background.
 - **In-game orientation.** On iPhone, games lock to landscape by default. On iPad the lock applies only when VNDegen is full screen. In a window, tiled or not, a game follows the window's shape. The setting can be changed globally or per game: Landscape, Portrait, or Follow device.
 - **Ludusavi saves.** VNDegen backs up and restores [Ludusavi](https://github.com/mtkennerly/ludusavi) backups on your SMB share, the one Ludusavi's cloud sync uses, so saves move between VNDegen and the PC copies Ludusavi manages. It matches games by itself, offers newer saves before a game starts, and restores can be undone.
@@ -84,14 +87,18 @@ AliceSoft's System 4 games run on VNDegen's own System 4 runtime, written in C++
 
 ## Adding games
 
-Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each.
+Put each game in its own folder, named as you want it to appear. The folder name is the game's identity, so the same game copied to several devices keeps its artwork and settings on each. The one exception is a game whose folder name a game in another library folder already has, described below.
 
 - **iPhone and iPad:** open the Files app, then On My iPhone (or iPad), VNDegen, Games, and copy the game folders there.
 - **Mac:** copy the game folders into `~/Games/VNDegen`. It sits outside `~/Documents` so iCloud Drive does not upload your games.
 - **From an archive:** Add game in the library unpacks a zip, RAR, or 7z into the library. You can also drag an archive from Files or Finder onto VNDegen, or open it in VNDegen from the Files Share menu or with Open With on a Mac.
 - **Archive copied into VNDegen's folder:** copy a zip, RAR, or 7z into On My iPhone (or iPad), VNDegen, or its Games folder. On a Mac, copy it into `~/Games/VNDegen`. The library lists it under Ready to import, and its Import button opens the import with the archive chosen. "Delete archive after import" starts on for these archives. Use this when choosing an archive, dropping it, or opening it in VNDegen does nothing, which happens on some sideloaded installs.
 
-VNDegen rescans the folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app.
+- **Another folder:** Settings, Library folders, Add folder adds a folder of game folders from anywhere the system's folder picker reaches: an external drive, a server connected in Files or Finder, or another folder on the Mac. Each game in it is a subfolder, as in VNDegen's own folder. Add game asks which library folder to unpack an archive into when there is more than one. On iPhone and iPad, VNDegen keeps a bookmark with permission to read and write the folder, since games write their saves into their own folders, and keeps that permission from launch until you remove the folder. On a Mac the bookmark finds the folder again after it is moved or renamed. A folder that can't be reached keeps its games in the library, shown as unavailable with the reason, and they come back on the next rescan once the drive or server is back. Remove takes a folder's games out of the library and leaves its files alone. Two folders can each hold a game of the same name, even when the names differ only in case. The second one's library ID adds its folder's name, so each keeps its own artwork, saves, and settings, and that game's identity is local to the device. A removed folder that is added back gets its games' records back. Known limit: on a Mac, if an added folder is moved and another folder is made at its old path, VNDegen finds the new one there, because macOS resolves a bookmark by path first. Remove that folder and add the right one.
+
+Remove from library, in a game's menu or on its page, deletes the game's folder after asking: on a Mac it goes to the Trash, and on iPhone and iPad it is deleted for good. Saves the game writes inside its own folder go with it. The saves VNDegen keeps in its own data folder for the game stay, and so do its artwork, play time, and settings, so copying the folder back restores it.
+
+VNDegen rescans every library folder on launch, on pull to refresh, with Rescan in Settings, and when you return to the app.
 
 ## Controls
 
@@ -111,6 +118,7 @@ The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3,
 | Confirm | A | Return or Space |
 | Cancel | B | Escape or Backspace |
 | Menu | Y or Menu | Tab |
+| Open the focused game's menu | X | |
 | Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
 | Open the VNDegen menu in a game (resume or quit to library) | Home, and View while the menu is open | Backtick (`` ` ``) |
 
@@ -256,7 +264,7 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `makeSession(_:)` starts the game and returns an `EngineSession`, whose view the hub shows full screen and which receives controller input.
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
 
-Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins.
+Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins. Then add its entry to `PluginInfo.catalog` in `HubUI/Plugins.swift`, which Settings' Plugins page reads for the engine versions it covers, what runs its games, and its license.
 
 An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [docs/fonts.md](docs/fonts.md).
 

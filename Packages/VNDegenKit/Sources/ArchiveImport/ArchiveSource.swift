@@ -180,7 +180,7 @@ nonisolated enum GameFolderName {
         let existing = (try? FileManager.default.contentsOfDirectory(atPath: gamesRoot.path)) ?? []
         // Compared without case because the default APFS volume treats "Game" and "game" as one folder.
         if existing.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
-            return "Games already has a folder named \"\(name)\". Choose another name."
+            return "\(gamesRoot.lastPathComponent) already has a folder named \"\(name)\". Choose another name."
         }
         return nil
     }
