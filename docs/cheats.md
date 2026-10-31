@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ are built, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, and XP, VX and VX Ace, are built, see below.
 
 ## Why
 
@@ -94,3 +94,40 @@ Measured on the map with the DEBUG input script's `fps` step and a count of `Sce
 | No Socks RPG (MZ) | iPad simulator | 4x | 25.7 | 17.9 | 206.4 |
 
 Simulator timing isn't iPad timing, and the Mac mini ran other threads' builds and simulators during several of these runs.
+
+## Built: RPG Maker XP, VX and VX Ace
+
+The same Cheats page, with the same four tabs and settings, for every game on VNDegen's RGSS runtime. Variables take whole numbers from -99,999,999 to 99,999,999, the range RPG Maker's own event commands use, and text. Other values are shown and left alone.
+
+How it works:
+
+- `vnrgss.h` gains `vnrgss_run_ruby` and `vnrgss_ruby_result`. The app queues Ruby, and the runtime runs it on the game thread while the game waits for its next frame. That is between two frames, with the game's objects in a consistent state, and it works while the game is paused under VNDegen's menu. The app polls for the result.
+- `rgss-cheats.rb` (EngineRGSS's resources) loads at the game's first frame, after all its scripts. It prepends small modules to the game's classes. A prepended module isn't written into a Marshal save, so saves stay ordinary. What it prepends differs by version:
+
+| | XP | VX | VX Ace |
+|---|---|---|---|
+| Keep HP and MP full | `Game_Actor#hp=` and `sp=` | `hp=` and `mp=` | `hp=` and `mp=` |
+| No random encounters | `Game_Player#encounter_count`, which the map scene waits to reach 0 | the same | `Game_Player#encounter` |
+| Walk through walls | `Game_Player#passable?`, within the map | `debug_through?`, as Control in a playtest | `debug_through?` |
+| Experience | `Game_Actor#exp=`, through which battles and events add it | `gain_exp` | `final_exp_rate` |
+
+- One-shot cheats call the game's own methods: `gain_gold`, `gain_item` (XP's `gain_weapon` and `gain_armor` too), `recover_all`, and `$game_variables` and `$game_switches`, which also refresh the map. They wait until a game is started or loaded: a title scene starting clears that, and a map scene starting sets it.
+- Game speed is `vnrgss_set_speed`. Each step lets the game draw that many times as many frames, and the runtime composites only the frames that will be shown.
+- Text a player types reaches Ruby as its characters' numbers, `[…].pack('U*')`, so no text runs as code. A string literal won't do: Ruby interpolates `#{` in a double-quoted string even when the `#` is an escape.
+
+Checked against Test Games 14 and 55 (VX Ace), 33 (VX) and 37 (XP).
+
+### Known limits
+
+- Keep HP and MP full doesn't stop a knockout state an event adds directly, as in MV and MZ.
+- XP's walk through walls replaces `Game_Player#passable?`, so it ignores what a game's own override of that method checks.
+- The editor can put a game into a state its own save can't restore. In Test Game 37, turning on switch 1 makes the game drop data its save expects, so a save made afterwards fails to load on the PC as well as here. The page says a save made before editing is the undo.
+
+### Frame rate
+
+Test Game 55, on the MacBook (120 Hz display) at a load average of 550 to 610, 40 s at each speed:
+
+| Speed | Drawn fps | 1% low | Map updates per second |
+|---|---|---|---|
+| 1x | 60.0 | 45 to 51 | 60.0 |
+| 4x | 114 to 119 | 29 to 70 | 240 |
