@@ -59,9 +59,13 @@ Environment variables turn on logs:
 - `S4_WAV`: the mix written to a WAV file, in `s4play`.
 - `S4_HITCH=n`: in `s4play`, every nth frame takes 200 ms of real time, as a slow frame on a busy machine does.
 - `S4_MUTE`: the mix is computed but the output is silent, for timing checks where nobody should hear the game.
+- `S4_INPUTLOG`: every key and mouse button change the host sends, with the pointer and the game clock.
 
 The log always notes, every 10 s of game time, frame steps over 100 ms (the clock drops the rest) and audio renders
-that took over half their length, and when a movie closes, how often its sound ran dry.
+that took over half their length. When a movie closes it notes the frames shown per second against the movie's rate,
+the longest gap between new frames, and how often its sound ran dry. A DEBUG app launched with `-frameMonitor YES`
+logs `S4FRAMES` every 10 seconds: display refreshes per second on average and over the slowest 1%, and the slowest
+step.
 - `S4_FONTS`: the font pack folder on Linux.
 
 ## Known limits

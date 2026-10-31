@@ -106,6 +106,7 @@ private:
     uint32_t budgetMs_ = 0;          // game time the current step may still use
     int hitches_ = 0, lostMs_ = 0;   // steps the clock capped and the time they dropped, since the last timing log
     uint32_t timingLoggedAt_ = 0;
+    bool inputLog_ = false;          // S4_INPUTLOG: every key and button change the host sends
     std::atomic<bool> keys_[256] = {};
     std::atomic<int> mouseX_{0}, mouseY_{0}, wheel_{0};
     std::mutex frameMu_;

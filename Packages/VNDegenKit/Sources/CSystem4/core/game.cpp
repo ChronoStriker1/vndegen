@@ -151,6 +151,7 @@ bool Game::start(std::string &error) {
     vm->log = [this](const std::string &s) { log(s); };
     vm->timeMs = [this] { return now(); };
     vm->peek = [this] { yieldFrame(); };
+    inputLog_ = std::getenv("S4_INPUTLOG") != nullptr;
     if (std::getenv("S4_TRACE")) vm->trace = [this](const std::string &t) { log("call " + t); };
     if (std::getenv("S4_HLLMISSING"))
         for (auto &n : vm->unboundHll()) log("unbound HLL " + n);
@@ -259,7 +260,11 @@ void Game::stop() {
 }
 
 void Game::key(int vk, bool down) {
-    if (vk >= 0 && vk < 256) keys_[vk] = down;
+    if (vk < 0 || vk >= 256) return;
+    if (inputLog_)
+        log("input: key " + std::to_string(vk) + (down ? " down" : " up") + " at " + std::to_string(mouseX_.load()) + "," +
+            std::to_string(mouseY_.load()) + ", clock " + std::to_string(now()));
+    keys_[vk] = down;
 }
 void Game::mouseMove(int x, int y) { mouseX_ = x; mouseY_ = y; }
 void Game::wheel(int delta) { wheel_ += delta; }
