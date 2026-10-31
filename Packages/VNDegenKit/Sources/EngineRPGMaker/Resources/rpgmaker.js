@@ -360,6 +360,13 @@
             }
         };
         video.requestVideoFrameCallback(onFrame);
+        // A clip with alpha that plays once shows its last frame when the video ends, which may come before the
+        // kept frames get there, and PIXI stops updating the texture of a video that has ended.
+        video.addEventListener('ended', () => {
+            if (state.mode !== 'kept' || !state.alpha || video.loop) return;
+            state.position = state.length;
+            redraw(state);
+        });
         // A new source starts over.
         video.addEventListener('emptied', () => {
             if (state.mode === 'done') return;
@@ -455,11 +462,10 @@
         state.decoding = null;
     }
 
-    // WebKit plays VP9 WebM without its alpha plane, so a clip made to show the scene through it, as games convert
-    // GIFs, drew its transparent parts in the color the encoder left there, often white (No Socks RPG's cutscenes). A
-    // clip whose track says it has alpha is decoded here instead, color and alpha frames each with WebCodecs, and its
-    // frames are kept with their alpha, as a short loop's frames are. Until they are ready the texture shows nothing.
-    // A clip that cannot be decoded this way plays as WebKit plays it.
+    // WebKit ignores the alpha plane of VP9 WebM and shows the color the encoder left in transparent areas, often
+    // white (No Socks RPG's cutscenes). A short clip marked AlphaMode 1 is decoded here with WebCodecs, color and
+    // alpha separately, and its frames are kept as canvases with their alpha, as a short loop's frames are. Until they
+    // are ready the texture shows nothing. A clip that cannot be decoded this way plays as WebKit plays it.
     function keepAlphaFrames(state, timeline, url) {
         const video = state.video;
         dropFrames(state, 'decoding');
@@ -472,16 +478,30 @@
                 for (const frame of kept || []) frame.canvas.width = 0;
                 return;
             }
-            if (!kept) return dropFrames(state, 'native');
+            if (!kept) {
+                dropFrames(state, 'native');
+                return redraw(state);
+            }
             const bytes = kept.length * video.videoWidth * video.videoHeight * 4;
             Object.assign(state, {
                 frames: kept, bytes, length: timeline.length, times: timeline.times, alpha: true,
                 position: video.currentTime || 0,
             });
             finishKeeping(state, performance.now());
-            // PIXI stops updating a video's texture once the video has ended or paused, so it is asked once here.
-            if (state.resource && typeof state.resource.update === 'function') state.resource.update();
-        }, () => { if (current()) dropFrames(state, 'native'); });
+            redraw(state);
+        }, () => {
+            if (!current()) return;
+            dropFrames(state, 'native');
+            redraw(state);
+        });
+    }
+
+    // Updates a video's texture now. PIXI stops updating it once the video has ended or paused, and VideoResource's
+    // own update skips calls that come sooner than its frame rate allows, so this goes through the base Resource's.
+    function redraw(state) {
+        const resource = state.resource, base = pixi && pixi.resources && pixi.resources.Resource;
+        if (!resource || resource.destroyed) return;
+        (base ? base.prototype.update : resource.update).call(resource);
     }
 
     function blankFrame(state) {

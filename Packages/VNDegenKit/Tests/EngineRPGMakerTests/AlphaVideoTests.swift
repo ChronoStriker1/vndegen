@@ -2,21 +2,24 @@ import Foundation
 import Testing
 import WebKit
 
-/// The parts of PIXI 5's video texture that VNDegen wraps. Updates the resource asks for are counted, as PIXI stops
-/// its own once a video has ended.
+/// The parts of PIXI 5's video texture that VNDegen wraps. As in PIXI, the base Resource's update reaches the texture,
+/// and VideoResource's own update is throttled, here so much that it never does. Forced updates are counted.
 private let page = """
     <html><body><script>
     var PIXI = (function () {
-        function BaseTexture(resource) { this.resource = resource; this.valid = true; this.dirtyId = 0; }
+        function BaseTexture(resource) { this.resource = resource; this.valid = true; this.dirtyId = 0; resource.texture = this; }
         BaseTexture.prototype.update = function () { this.dirtyId++; };
-        function VideoResource(source) { this.source = source; this.uploaded = []; this.updates = 0; }
+        function Resource() {}
+        Resource.prototype.update = function () { this.forced++; this.texture.update(); };
+        function VideoResource(source) { this.source = source; this.uploaded = []; this.forced = 0; }
+        VideoResource.prototype = Object.create(Resource.prototype);
         VideoResource.prototype.upload = function (renderer, baseTexture, glTexture, source) {
             this.uploaded.push(source || this.source);
             return true;
         };
-        VideoResource.prototype.update = function () { this.updates++; };
+        VideoResource.prototype.update = function () {};
         VideoResource.prototype.dispose = function () { this.source = null; };
-        return { BaseTexture: BaseTexture, resources: { VideoResource: VideoResource } };
+        return { BaseTexture: BaseTexture, resources: { Resource: Resource, VideoResource: VideoResource } };
     })();
     </script></body></html>
     """
@@ -51,9 +54,9 @@ private let setUp = """
     const resource = new PIXI.resources.VideoResource(video);
     const texture = new PIXI.BaseTexture(resource);
     let uploadedAt = -1;
-    // Uploads when the texture changed, as PIXI's renderer does, and returns the RGBA of a corner and the middle.
-    const shown = () => {
-        texture.update();
+    // Uploads when the texture changed, as PIXI's renderer does, and returns the RGBA of a corner and the middle. A
+    // stopped video's texture gets no update from PIXI, so `drawn` uploads only what an update already marked.
+    const drawn = () => {
         if (texture.dirtyId !== uploadedAt) {
             uploadedAt = texture.dirtyId;
             resource.upload(null, texture, {});
@@ -63,6 +66,11 @@ private let setUp = """
         const context = source.getContext('2d');
         return [Array.from(context.getImageData(0, 0, 1, 1).data), Array.from(context.getImageData(8, 8, 1, 1).data)];
     };
+    const shown = () => {
+        texture.update();
+        return drawn();
+    };
+    const square = (pixel) => pixel.slice(0, 3).map((channel) => channel > 192);
     const until = async (condition) => {
         for (let tries = 0; !condition(); tries++) {
             if (tries > 500) throw new Error('timed out');
@@ -137,14 +145,36 @@ private let red = [true, false, false], green = [false, true, false], blue = [fa
         // The clip plays to its end and stops while its frames decode, and PIXI no longer updates its texture.
         video.currentTime = 0.56;
         video.paused = true;
-        const updatesBefore = resource.updates;
+        const forced = resource.forced;
         openGate();
-        await until(() => resource.updates > updatesBefore);
-        now += 500;
-        return { pixel: shown()[1], asked: resource.updates - updatesBefore };
+        await until(() => resource.forced > forced);
+        return { pixel: drawn()[1], forced: resource.forced - forced };
         """)
     let pixel = try #require(values["pixel"] as? [Int])
     #expect(square(pixel) == yellow)
     #expect(pixel[3] == 255)
-    #expect(values["asked"] as? Int == 1)
+    #expect(values["forced"] as? Int == 1)
+}
+
+@Test @MainActor func aClipThatEndsAfterItsFramesDecodedShowsItsLastFrame() async throws {
+    let values = try await runWithAlphaClip("""
+        video.loop = false;
+        shown();
+        present(0);
+        await until(() => shown() !== 'video');
+        openGate();
+        await until(() => shown()[1][3] === 255);
+        // An update at 0.35 s shows the third frame, then the video stalls through its end.
+        now += 350;
+        const before = square(shown()[1]);
+        video.currentTime = 0.56;
+        video.paused = true;
+        const forced = resource.forced;
+        video.dispatchEvent(new Event('ended'));
+        return { before, after: drawn()[1], forced: resource.forced - forced };
+        """)
+    #expect(values["before"] as? [Bool] == blue)
+    let after = try #require(values["after"] as? [Int])
+    #expect(square(after) == yellow)
+    #expect(values["forced"] as? Int == 1)
 }
