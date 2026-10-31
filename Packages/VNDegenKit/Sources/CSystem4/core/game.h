@@ -29,6 +29,8 @@ struct GameConfig {
 
 std::map<std::string, std::string> readIni(const std::string &root);
 std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini);
+// The file in dir whose name matches name in any case; empty when there is none.
+std::string findCaseless(const std::string &dir, const std::string &name);
 // A sentence for the player when the game needs libraries this runtime doesn't have; empty when it can run.
 std::string unsupportedReason(const Ain &ain);
 
@@ -55,6 +57,13 @@ public:
     int screenW = 800, screenH = 600;
     std::map<std::string, std::string> ini;  // AliceStart.ini or System40.ini, keys and raw values
     std::unique_ptr<AldArchive> cgArchive, waveArchive, bgmArchive;
+    // Later games (Test Game 56) keep pictures by name in <stem>CG.afa, and load more archives through AFAFactory.
+    std::unique_ptr<AfaArchive> cgAfa;
+    std::vector<std::unique_ptr<AfaArchive>> extraAfa;
+    // A picture by its CP932 name, without extension: the CG archive's "<name>.qnt" and the like.
+    const ArchiveEntry *cgFind(const std::string &name, AfaArchive **from = nullptr) const;
+    bool cgLoadNamed(const std::string &name, Image &out);
+    std::shared_ptr<const Image> cgCachedNamed(const std::string &name);
     Sprites sprites;
     Audio audio;
     void log(const std::string &s);
@@ -121,6 +130,7 @@ private:
     std::string debugCall_;
     std::mutex cgMu_;
     std::map<int, std::weak_ptr<const Image>> cgCache_;
+    std::map<std::string, std::weak_ptr<const Image>> cgNamedCache_;
     std::vector<std::shared_ptr<const Image>> cgRecent_;  // keeps recently used pictures alive
 };
 

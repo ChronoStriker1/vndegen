@@ -29,6 +29,8 @@ std::string lower(std::string s) {
     return s;
 }
 
+}  // namespace
+
 // The file in dir whose name matches name ignoring case, or "".
 std::string findCaseless(const std::string &dir, const std::string &name) {
     std::error_code ec;
@@ -36,7 +38,6 @@ std::string findCaseless(const std::string &dir, const std::string &name) {
         if (lower(e.path().filename().string()) == lower(name)) return e.path().string();
     return {};
 }
-}  // namespace
 
 Game &game() { return *g_game; }
 
@@ -138,6 +139,7 @@ bool Game::start(std::string &error) {
             if (lower(e.path().extension().string()) == ".fnl") { setGameFontLibrary(e.path().string()); break; }
     }
     cgArchive = openAld("G");
+    if (std::string afa = findCaseless(cfg.root, stem + "CG.afa"); !afa.empty()) cgAfa = AfaArchive::open(afa);
     waveArchive = openAld("W");
     bgmArchive = openAld("B");
 
@@ -334,6 +336,46 @@ std::shared_ptr<const Image> Game::cgCached(int number) {
     if (!cgLoad(number, *img)) return nullptr;
     std::lock_guard<std::mutex> lock(cgMu_);
     cgCache_[number] = img;
+    cgRecent_.push_back(img);
+    if (cgRecent_.size() > 64) cgRecent_.erase(cgRecent_.begin());
+    return img;
+}
+
+const ArchiveEntry *Game::cgFind(const std::string &name, AfaArchive **from) const {
+    static const char *const kExts[] = {".qnt", ".png", ".ajp", ".webp", ""};
+    auto look = [&](AfaArchive *a) -> const ArchiveEntry * {
+        if (!a) return nullptr;
+        for (const char *ext : kExts)
+            if (const ArchiveEntry *e = a->find(name + ext)) {
+                if (from) *from = a;
+                return e;
+            }
+        return nullptr;
+    };
+    if (const ArchiveEntry *e = look(cgAfa.get())) return e;
+    for (auto &a : extraAfa)
+        if (const ArchiveEntry *e = look(a.get())) return e;
+    return nullptr;
+}
+
+bool Game::cgLoadNamed(const std::string &name, Image &out) {
+    AfaArchive *a = nullptr;
+    const ArchiveEntry *e = cgFind(name, &a);
+    std::vector<uint8_t> d;
+    return e && a->read(*e, d) && decodeImage(d.data(), d.size(), out);
+}
+
+std::shared_ptr<const Image> Game::cgCachedNamed(const std::string &name) {
+    {
+        std::lock_guard<std::mutex> lock(cgMu_);
+        auto it = cgNamedCache_.find(name);
+        if (it != cgNamedCache_.end())
+            if (auto p = it->second.lock()) return p;
+    }
+    auto img = std::make_shared<Image>();
+    if (!cgLoadNamed(name, *img)) return nullptr;
+    std::lock_guard<std::mutex> lock(cgMu_);
+    cgNamedCache_[name] = img;
     cgRecent_.push_back(img);
     if (cgRecent_.size() > 64) cgRecent_.erase(cgRecent_.begin());
     return img;

@@ -365,3 +365,35 @@ S4_HLL_RESET {
 
 }  // namespace
 }  // namespace s4
+
+namespace s4 {
+// ---- AFAFactory and CGManager: archives and pictures by name, as later games (Test Game 56) keep them ----
+// LoadArchive's Type is the kind of data (Test Game 56 loads its Flat archives as 2 and 3); every archive it opens
+// is searched for pictures after the game's CG archive.
+S4_HLL(AFAFactory, LoadArchive) {
+    Game &g = G();
+    std::string name = sjis::toUtf8(c.s(1));
+    std::string path = findCaseless(g.cfg.root, name);
+    if (path.empty() && name.find('.') == std::string::npos) path = findCaseless(g.cfg.root, name + ".afa");
+    auto a = path.empty() ? nullptr : AfaArchive::open(path);
+    if (!a) g.log("AFAFactory: can't open " + name);
+    else g.extraAfa.push_back(std::move(a));
+    c.retBool(!path.empty());
+}
+S4_HLL(AFAFactory, IsExistArchive) {
+    std::string name = sjis::toUtf8(c.s(0));
+    c.retBool(!findCaseless(G().cfg.root, name).empty() || !findCaseless(G().cfg.root, name + ".afa").empty());
+}
+S4_HLL(CGManager, IsExist) { c.retBool(G().cgFind(c.s(0)) != nullptr); }
+S4_HLL(CGManager, GetInfo) {
+    auto img = G().cgCachedNamed(c.s(0));
+    if (img) {
+        c.ref(1) = img->w;
+        c.ref(2) = img->h;
+        c.ref(3) = img->hasAlpha ? 32 : 24;
+        c.ref(4) = 1;
+        c.ref(5) = img->hasAlpha ? 1 : 0;
+    }
+    c.retBool(img != nullptr);
+}
+}  // namespace s4
