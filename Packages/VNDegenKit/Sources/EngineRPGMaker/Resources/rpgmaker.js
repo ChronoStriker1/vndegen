@@ -321,6 +321,7 @@
         let state = videoStates.get(resource);
         if (!state || state.video !== video) {
             state = watchVideo(video);
+            state.resource = resource;
             videoStates.set(resource, state);
         }
         if (state.mode === 'decoding') return 'decoding';
@@ -437,7 +438,10 @@
         if (state.length === null) {
             state.mode = 'ready';
         } else if (state.length > frames[frames.length - 1].time) {
-            Object.assign(state, { mode: 'kept', position: state.position % state.length, tick: now, shown: 0 });
+            // A clip that plays once stays at its end once there.
+            const position = state.alpha && !state.video.loop ? Math.min(state.position, state.length)
+                : state.position % state.length;
+            Object.assign(state, { mode: 'kept', position, tick: now, shown: 0 });
         } else {
             dropFrames(state, 'native');
         }
@@ -448,6 +452,7 @@
         state.frames = [];
         state.bytes = 0;
         state.mode = mode;
+        state.decoding = null;
     }
 
     // WebKit plays VP9 WebM without its alpha plane, so a clip made to show the scene through it, as games convert
@@ -458,19 +463,25 @@
     function keepAlphaFrames(state, timeline, url) {
         const video = state.video;
         dropFrames(state, 'decoding');
-        decodeWithAlpha(timeline.alpha, video.videoWidth, video.videoHeight).then((frames) => {
-            if (state.mode !== 'decoding' || video.currentSrc !== url) {
-                for (const frame of frames || []) frame.canvas.width = 0;
+        // A new source or the texture's end drops this decode, and its result then goes unused.
+        const decoding = state.decoding = {};
+        const current = () => state.decoding === decoding && video.currentSrc === url;
+        const decode = (frames) => frames && decodeWithAlpha(frames, video.videoWidth, video.videoHeight);
+        fileFrames(url).then(decode).then((kept) => {
+            if (!current()) {
+                for (const frame of kept || []) frame.canvas.width = 0;
                 return;
             }
-            if (!frames) return dropFrames(state, 'native');
-            const bytes = frames.length * video.videoWidth * video.videoHeight * 4;
+            if (!kept) return dropFrames(state, 'native');
+            const bytes = kept.length * video.videoWidth * video.videoHeight * 4;
             Object.assign(state, {
-                frames, bytes, length: timeline.length, times: timeline.times, alpha: true,
+                frames: kept, bytes, length: timeline.length, times: timeline.times, alpha: true,
                 position: video.currentTime || 0,
             });
             finishKeeping(state, performance.now());
-        }, () => { if (state.mode === 'decoding') dropFrames(state, 'native'); });
+            // PIXI stops updating a video's texture once the video has ended or paused, so it is asked once here.
+            if (state.resource && typeof state.resource.update === 'function') state.resource.update();
+        }, () => { if (current()) dropFrames(state, 'native'); });
     }
 
     function blankFrame(state) {
@@ -492,11 +503,13 @@
         }
         const config = { codec: 'vp09.0' + profile + '.10.08', codedWidth: width, codedHeight: height };
         if (!(await VideoDecoder.isConfigSupported(config)).supported) return null;
-        const [color, alpha] = await Promise.all([decodeVP9(config, frames.map((frame) => frame.data)),
+        const results = await Promise.allSettled([decodeVP9(config, frames.map((frame) => frame.data)),
             decodeVP9(config, frames.map((frame) => frame.alpha))]);
+        const [color, alpha] = results.map((result) => (result.status === 'fulfilled' ? result.value : []));
+        const kept = [];
         try {
-            if (color.length !== frames.length || alpha.length !== frames.length) return null;
-            const kept = [];
+            if (results.some((result) => result.status !== 'fulfilled') || color.length !== frames.length
+                || alpha.length !== frames.length) return null;
             for (let i = 0; i < frames.length; i++) {
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
@@ -509,46 +522,61 @@
                 kept.push({ time: frames[i].time, canvas });
             }
             return kept;
+        } catch (e) {
+            for (const frame of kept) frame.canvas.width = 0;
+            throw e;
         } finally {
             for (const frame of color.concat(alpha)) frame.close();
         }
     }
 
-    function decodeVP9(config, chunks) {
-        return new Promise((resolve, reject) => {
-            const out = [];
-            const decoder = new VideoDecoder({ output: (frame) => out.push(frame), error: reject });
+    // The frames decoded from chunks in order. On any failure the decoder and every frame it made are closed.
+    async function decodeVP9(config, chunks) {
+        const out = [];
+        let failure = null;
+        const decoder = new VideoDecoder({
+            output: (frame) => out.push(frame),
+            error: (error) => { failure = error; },
+        });
+        try {
             decoder.configure(config);
             chunks.forEach((data, i) => {
                 decoder.decode(new EncodedVideoChunk({ type: vp9Key(data) ? 'key' : 'delta', timestamp: i, data }));
             });
-            decoder.flush().then(() => { decoder.close(); resolve(out); }, (error) => {
-                for (const frame of out) frame.close();
-                reject(error);
-            });
-        });
+            await decoder.flush();
+            if (failure) throw failure;
+            return out;
+        } catch (error) {
+            for (const frame of out) frame.close();
+            throw error;
+        } finally {
+            if (decoder.state !== 'closed') decoder.close();
+        }
     }
 
-    // Writes an alpha frame's luma, the alpha itself, into the alpha bytes of RGBA pixels. A frame WebKit cannot copy
-    // out goes through a canvas, which turns limited-range luma into grey levels close to the original.
+    // Writes an alpha frame's luma, the alpha itself, into the alpha bytes of RGBA pixels. A frame in a planar YUV
+    // format is copied out, its first plane the luma at a byte a pixel. Any other frame goes through a canvas, which
+    // turns limited-range luma into grey levels close to the original.
     async function copyLuma(frame, pixels, width, height) {
-        try {
-            const buffer = new Uint8Array(frame.allocationSize());
-            const [luma] = await frame.copyTo(buffer);
-            for (let y = 0; y < height; y++) {
-                const row = luma.offset + y * luma.stride;
-                for (let x = 0, at = y * width * 4 + 3; x < width; x++, at += 4) pixels[at] = buffer[row + x];
-            }
-        } catch (e) {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const context = canvas.getContext('2d', { willReadFrequently: true });
-            context.drawImage(frame, 0, 0, width, height);
-            const grey = context.getImageData(0, 0, width, height).data;
-            for (let at = 3; at < pixels.length; at += 4) pixels[at] = grey[at - 3];
-            canvas.width = 0;
+        if (['I420', 'I420A', 'I422', 'I444', 'NV12'].includes(frame.format)) {
+            try {
+                const buffer = new Uint8Array(frame.allocationSize());
+                const [luma] = await frame.copyTo(buffer);
+                for (let y = 0; y < height; y++) {
+                    const row = luma.offset + y * luma.stride;
+                    for (let x = 0, at = y * width * 4 + 3; x < width; x++, at += 4) pixels[at] = buffer[row + x];
+                }
+                return;
+            } catch (e) { /* through a canvas */ }
         }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(frame, 0, 0, width, height);
+        const grey = context.getImageData(0, 0, width, height).data;
+        for (let at = 3; at < pixels.length; at += 4) pixels[at] = grey[at - 3];
+        canvas.width = 0;
     }
 
     // A VP9 frame header starts with its marker (2), profile (two bits, low first), and for profiles 0 to 2 then
@@ -562,12 +590,24 @@
         return vp9Profile(data) >= 0 && !((data[0] >> 3) & 1) && !((data[0] >> 2) & 1);
     }
 
-    // The length a WebM file states in its Segment Info, in seconds, and when each of its video frames starts, or null.
+    // The length a WebM file states in its Segment Info, in seconds, when each of its video frames starts, and whether
+    // it has alpha, or null. Only this is kept per file.
     function fileTimeline(url) {
         if (!fileTimelines.has(url)) {
-            fileTimelines.set(url, fetch(url).then((response) => response.arrayBuffer()).then(webmTimeline).catch(() => null));
+            fileTimelines.set(url, readWebM(url).then((timeline) => timeline && {
+                length: timeline.length, times: timeline.times, alpha: !!timeline.alpha,
+            }));
         }
         return fileTimelines.get(url);
+    }
+
+    // An alpha clip's frames with their color and alpha data, read again for each decode rather than kept.
+    function fileFrames(url) {
+        return readWebM(url).then((timeline) => timeline && timeline.alpha);
+    }
+
+    function readWebM(url) {
+        return fetch(url).then((response) => response.arrayBuffer()).then(webmTimeline).catch(() => null);
     }
 
     function webmTimeline(buffer) {
@@ -588,10 +628,34 @@
             at += length;
             return isID || !ones ? value : Infinity;
         };
-        // Segment, Info, Tracks, a TrackEntry and its Video, a Cluster, a BlockGroup and its BlockAdditions and
-        // BlockMore hold what is read here. Everything else is skipped by its size.
-        const containers = [0x18538067, 0x1549a966, 0x1654ae6b, 0xae, 0xe0, 0x1f43b675, 0xa0, 0x75a1, 0xa6];
-        let scale = 1e6, duration = null, entry = {}, videoTrack = null, cluster = 0, blocks = [], addition = 1;
+        const number = (body, size) => {
+            let value = 0;
+            for (let i = 0; i < size; i++) value = value * 256 + data.getUint8(body + i);
+            return value;
+        };
+        // Calls visit with each child of the element whose body runs from body to end, and returns after them.
+        const children = (body, end, visit) => {
+            for (at = body; at < end;) {
+                const id = read(true), size = read(false), start = at;
+                if (size === Infinity || start + size > end) throw new RangeError('bad child size');
+                visit(id, start, size);
+                at = start + size;
+            }
+        };
+        // A SimpleBlock or Block starts with its track, its time after the Cluster's, and flags. A laced block holds
+        // more than one frame under that one time.
+        const block = (body, size) => {
+            at = body;
+            const track = read(false);
+            const laced = data.getUint8(at + 2) & 0x06;
+            if ((videoTrack === null || track === videoTrack) && laced) throw new RangeError('laced');
+            const frame = new Uint8Array(buffer, at + 3, body + size - at - 3);
+            return { track, time: cluster + data.getInt16(at), data: frame };
+        };
+        // Segment, Info, Tracks, a TrackEntry and its Video, and a Cluster hold what is read here. A BlockGroup is read
+        // whole. Everything else is skipped by its size.
+        const containers = [0x18538067, 0x1549a966, 0x1654ae6b, 0xae, 0xe0, 0x1f43b675];
+        let scale = 1e6, duration = null, entry = {}, videoTrack = null, cluster = 0, blocks = [];
         let alpha = false;
         try {
             while (at < data.byteLength) {
@@ -602,40 +666,43 @@
                     continue;
                 }
                 if (size === Infinity) break;
-                const number = () => {
-                    let value = 0;
-                    for (let i = 0; i < size; i++) value = value * 256 + data.getUint8(body + i);
-                    return value;
-                };
                 if (id === 0x2ad7b1) {
-                    scale = number();
+                    scale = number(body, size);
                 } else if (id === 0x4489) {
                     duration = size === 4 ? data.getFloat32(body) : size === 8 ? data.getFloat64(body) : null;
                 } else if (id === 0xd7 || id === 0x83) {
-                    entry[id === 0xd7 ? 'number' : 'type'] = number();
+                    entry[id === 0xd7 ? 'number' : 'type'] = number(body, size);
                     if (entry.type === 1 && entry.number !== undefined && videoTrack === null) {
                         videoTrack = entry.number;
                         alpha = !!entry.alpha;
                     }
                 } else if (id === 0x53c0) {
                     // AlphaMode can come before the track's number and type.
-                    entry.alpha = number() === 1;
+                    entry.alpha = number(body, size) === 1;
                     if (videoTrack !== null && entry.number === videoTrack) alpha = entry.alpha;
                 } else if (id === 0xe7) {
-                    cluster = number();
-                } else if (id === 0xa3 || id === 0xa1) {
-                    // A SimpleBlock or Block starts with its track, its time after the Cluster's, and flags. A laced
-                    // block holds more than one frame under that one time.
-                    const track = read(false);
-                    if ((videoTrack === null || track === videoTrack) && data.getUint8(at + 2) & 0x06) throw new RangeError('laced');
-                    const frame = new Uint8Array(buffer, at + 3, body + size - at - 3);
-                    blocks.push({ track, time: cluster + data.getInt16(at), data: frame });
-                    addition = 1;
-                } else if (id === 0xee) {
-                    addition = number();
-                } else if (id === 0xa5 && addition === 1 && blocks.length) {
-                    // A BlockAdditional with ID 1 is the alpha plane of its block's frame, coded as its own frame.
-                    blocks[blocks.length - 1].alpha = new Uint8Array(buffer, body, size);
+                    cluster = number(body, size);
+                } else if (id === 0xa3) {
+                    blocks.push(block(body, size));
+                } else if (id === 0xa0) {
+                    // A BlockGroup's Block and BlockAdditions come in any order. The alpha plane of the Block's
+                    // frame, coded as its own frame, is the BlockAdditional of the BlockMore whose BlockAddID is 1,
+                    // the default.
+                    let found = null, alphaData;
+                    children(body, body + size, (child, childBody, childSize) => {
+                        if (child === 0xa1) found = block(childBody, childSize);
+                        if (child !== 0x75a1) return;
+                        children(childBody, childBody + childSize, (more, moreBody, moreSize) => {
+                            if (more !== 0xa6) return;
+                            let addID = 1, additional;
+                            children(moreBody, moreBody + moreSize, (field, fieldBody, fieldSize) => {
+                                if (field === 0xee) addID = number(fieldBody, fieldSize);
+                                if (field === 0xa5) additional = new Uint8Array(buffer, fieldBody, fieldSize);
+                            });
+                            if (addID === 1 && additional) alphaData = additional;
+                        });
+                    });
+                    if (found) blocks.push({ ...found, alpha: alphaData });
                 }
                 at = body + size;
             }
