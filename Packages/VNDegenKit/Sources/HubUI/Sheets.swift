@@ -52,6 +52,7 @@ struct ChoiceSheet: View {
     var body: some View {
         let selected = nav.selectedChoice(for: sheet)
         SheetScaffold(title: title, subtitle: subtitle) {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 10) {
                     ForEach(nav.choices(for: sheet)) { choice in
@@ -83,6 +84,7 @@ struct ChoiceSheet: View {
                         .buttonStyle(.plain)
                         .onHover { if $0 { nav.hover(choice.target) } }
                         .animation(Theme.focusAnimation, value: focused)
+                        .id(choice.target)
                     }
                     Text(footnote)
                         .font(.system(size: 13))
@@ -91,6 +93,12 @@ struct ChoiceSheet: View {
                 }
                 .padding(.horizontal, 22)
                 .padding(.bottom, 22)
+            }
+            // A long list runs below a medium sheet, so the controller's focus scrolls into view.
+            .onChange(of: nav.focus) { _, focus in
+                guard nav.focusMovedByController, let focus else { return }
+                withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
+            }
             }
         }
         .presentationDetents([.medium, .large])

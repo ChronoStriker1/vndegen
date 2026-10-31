@@ -397,16 +397,19 @@ enum FileBrowser {
     static let openTitle = "Show in Finder"
     static let instructions = "Copy each game into its own folder inside ~/Games/VNDegen, then rescan. A zip, RAR, or 7z archive copied there shows up in the library under Ready to import."
     static let addedFolders = "Add folder takes another folder of game folders, such as one on an external drive or a server. Its games join the library, and stay listed as unavailable while the drive or server is away. Removing a folder takes its games out of the library and leaves its files alone."
-    static func open(_ url: URL) {
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    /// Shows `url` in Finder. `create` makes it first, for VNDegen's own games folder. Other folders are never made, so
+    /// a folder on a drive that went away isn't made again on the disk under it.
+    static func open(_ url: URL, create: Bool = false) {
+        if create { try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
     #else
     static let openTitle = "Open in Files"
     static let addedFolders = "Add folder takes another folder of game folders from Files, such as one on an external drive or a server connected in Files. Its games join the library, and stay listed as unavailable while the drive or server is away. Removing a folder takes its games out of the library and leaves its files alone."
     static let instructions = "In the Files app, open On My \(UIDevice.current.localizedModel), then VNDegen, then Games. Copy each game into its own folder there. A zip, RAR, or 7z archive copied into VNDegen or Games shows up in the library under Ready to import."
-    static func open(_ url: URL) {
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    /// Opens `url` in the Files app. `create` makes it first, for VNDegen's own games folder.
+    static func open(_ url: URL, create: Bool = false) {
+        if create { try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
         // The Files app opens a folder in an app's container through the shareddocuments scheme.
         if let files = URL(string: "shareddocuments://\(url.path)") { UIApplication.shared.open(files) }
     }

@@ -1,6 +1,9 @@
 import Foundation
 
-/// A game's folder name. Stable across devices, so the same game copied to the Mac and the iPhone keeps one identity.
+/// A game's identity in the library, and the name of its artwork and data folders. It is the game's folder name, so
+/// the same game copied to the Mac and the iPhone keeps one identity, except for a game whose folder name a game in
+/// another library folder already has, whose ID adds its library folder's name. `Game.folderName` then holds the
+/// folder's own name.
 public struct GameID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }

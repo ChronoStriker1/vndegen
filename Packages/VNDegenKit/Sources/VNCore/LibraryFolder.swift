@@ -22,6 +22,9 @@ public struct LibraryFolder: Identifiable, Codable, Hashable, Sendable {
     /// Folder names of the games found by the last scan that reached the folder, so they stay in the library, shown as
     /// unavailable, while it can't be reached.
     public var lastSeen: [String]
+    /// When the player removed the folder. A removed folder is remembered, so adding the same folder again gives it
+    /// back its ID and its games their records.
+    public var removedAt: Date?
 
     public init(id: LibraryFolderID = LibraryFolderID(UUID().uuidString), url: URL, bookmark: Data, addedAt: Date = .now,
                 lastSeen: [String] = []) {
@@ -48,9 +51,9 @@ nonisolated enum FolderAccess {
         #endif
     }
 
-    /// Where `bookmark` points now, and a fresh bookmark when the old one is stale. Never asks the player to mount a
+    /// Where `bookmark` points now, and whether it is stale and should be made again. Never asks the player to mount a
     /// volume, so a share that's offline fails rather than prompting.
-    static func resolve(_ bookmark: Data) throws -> (url: URL, refreshed: Data?) {
+    static func resolve(_ bookmark: Data) throws -> (url: URL, stale: Bool) {
         #if canImport(Darwin)
         var stale = false
         #if os(macOS)
@@ -59,9 +62,9 @@ nonisolated enum FolderAccess {
         let options: URL.BookmarkResolutionOptions = [.withoutUI]
         #endif
         let url = try URL(resolvingBookmarkData: bookmark, options: options, relativeTo: nil, bookmarkDataIsStale: &stale)
-        return (url, stale ? try? self.bookmark(for: url) : nil)
+        return (url, stale)
         #else
-        return (URL(fileURLWithPath: String(decoding: bookmark, as: UTF8.self), isDirectory: true), nil)
+        return (URL(fileURLWithPath: String(decoding: bookmark, as: UTF8.self), isDirectory: true), false)
         #endif
     }
 
@@ -100,22 +103,26 @@ nonisolated enum FolderAccess {
         var problem: String?
     }
 
-    /// Lists `folder`'s games. It tries where the folder last resolved first, then resolves the bookmark again, so a
-    /// drive plugged back in or a share back online comes back on the next scan. A folder whose bookmark doesn't
-    /// resolve is looked for at its last path.
+    /// Lists `folder`'s games. The bookmark is resolved on every scan, so a drive plugged back in or a share back online
+    /// comes back, and a folder moved away isn't confused with another one made at its old path. Where it resolves to
+    /// the place it was reached before, the scope already open there is kept. A folder whose bookmark doesn't resolve
+    /// is looked for at its last path.
     static func reach(_ folder: LibraryFolder, current: Resolved?) -> Reach {
-        if let current, let names = try? gameFolders(in: current.url) {
-            return Reach(url: current.url, names: names)
-        }
-        var url = folder.url, refreshed: Data?, resolveError: (any Error)?
+        var url = folder.url, stale = false, resolveError: (any Error)?
         do {
-            (url, refreshed) = try resolve(folder.bookmark)
+            (url, stale) = try resolve(folder.bookmark)
         } catch {
             resolveError = error
         }
+        if let current, current.url.standardizedFileURL == url.standardizedFileURL, let names = try? gameFolders(in: current.url) {
+            return Reach(url: current.url, refreshed: stale ? try? bookmark(for: url) : nil, names: names)
+        }
         let opened = start(url)
         do {
-            return Reach(url: url, opened: opened, refreshed: refreshed, names: try gameFolders(in: url))
+            let names = try gameFolders(in: url)
+            // Made inside the scope, which iOS needs to write a bookmark.
+            let refreshed = stale ? try? bookmark(for: url) : nil
+            return Reach(url: url, opened: opened, refreshed: refreshed, names: names)
         } catch {
             if opened { stop(url) }
             return Reach(problem: problem(resolveError ?? error))

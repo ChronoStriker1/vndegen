@@ -38,10 +38,10 @@ public final class ArchiveImporter {
     /// VNDegen's own games folder, where the archives under Ready to import sit.
     public let gamesRoot: URL
     /// The library folder the game is unpacked into. It starts as `gamesRoot`. Extraction stages inside it, so the
-    /// finished folder moves into place without a copy.
-    public var destination: URL {
-        didSet { Self.removeLeftovers(in: stagingParent) }
-    }
+    /// finished folder moves into place without a copy. Only `gamesRoot`'s staging folder is cleaned of what a crash
+    /// left: another library folder can be shared, such as on a server, and another device's import may be staging
+    /// there.
+    public var destination: URL
     public private(set) var step: Step = .choosing {
         didSet { keepAwake(step == .extracting) }
     }
@@ -73,7 +73,8 @@ public final class ArchiveImporter {
     private var awakeActivity: NSObjectProtocol?
     #endif
 
-    /// Staging folders of imports running in this process. Any other folder in `.importing` is left from a crash.
+    /// Staging folders of imports running in this process. Any other folder in `gamesRoot`'s `.importing`, which only
+    /// this device uses, is left from a crash.
     private static var liveStagings: Set<URL> = []
 
     public init(gamesRoot: URL) {

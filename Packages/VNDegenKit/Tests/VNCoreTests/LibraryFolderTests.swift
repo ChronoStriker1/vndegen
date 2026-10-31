@@ -246,3 +246,44 @@ private func setReachable(_ folder: URL, _ reachable: Bool) throws {
     #expect(await LibraryStore.value(of: Task { 2 }, within: .seconds(5)) == 2)
     slow.cancel()
 }
+
+@Test @MainActor func namesThatDifferOnlyInCaseGetSeparateIDs() async throws {
+    let scratch = Scratch()
+    let external = scratch.folder("External")
+    try scratch.addGame("Game", in: scratch.paths.gamesRoot)
+    try scratch.addGame("game", in: external)
+    let library = scratch.library()
+    try await library.addFolder(external)
+    // The artwork and data folders are named for the ID, and a Mac volume would fold "Game" and "game" together.
+    #expect(ids(library) == ["Game", "game (External)"])
+    #expect(library.game(GameID("game (External)"))?.folderName == "game")
+}
+
+@Test @MainActor func aFolderAddedBackKeepsItsOwnRecordsWhenItsTwinIsGone() async throws {
+    let scratch = Scratch()
+    let fm = FileManager.default
+    let external = scratch.folder("External")
+    try scratch.addGame("Game", in: scratch.paths.gamesRoot)
+    try scratch.addGame("Game", in: external)
+    let library = scratch.library()
+    try await library.addFolder(external)
+    let twin = GameID("Game (External)")
+    library.update(twin) { $0.playTime = 77 }
+    library.update(GameID("Game")) { $0.playTime = 11 }
+
+    await library.removeFolder(library.folders[0].id)
+    #expect(library.unavailableReason(twin) != nil)
+    // Its record never points at the built-in game's folder.
+    #expect(library.folder(for: twin).standardizedFileURL == external.appendingPathComponent("Game").standardizedFileURL)
+    try fm.removeItem(at: scratch.paths.folder(for: GameID("Game")))
+    await library.refresh()
+
+    try await library.addFolder(external)
+    #expect(ids(library) == ["Game (External)"])
+    #expect(library.game(twin)?.playTime == 77 && library.game(GameID("Game"))?.playTime == 11)
+    #expect(library.unavailableReason(twin) == nil)
+    // Restarted, the folder is the same one.
+    let reopened = scratch.library()
+    await reopened.refresh()
+    #expect(ids(reopened) == ["Game (External)"])
+}

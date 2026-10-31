@@ -68,6 +68,19 @@ final class Navigator {
             case let .gameMenu(id): "gameMenu:\(id)"
             }
         }
+
+        /// The game the sheet is about, if any.
+        var gameID: GameID? {
+            switch self {
+            case let .engine(id), let .variant(id), let .orientation(id), let .controlMethod(id), let .gameMenu(id): id
+            case let .mapping(editor): editor.gameID
+            case let .artwork(editor): editor.gameID
+            case let .metadata(search): search.gameID
+            case let .saves(model): model.game
+            case let .launchSaves(model): model.game
+            case .unlock, .settingsPage, .importGame, .license, .confirm: nil
+            }
+        }
     }
 
     /// Settings groups that are whole forms of their own, so they open in a sheet instead of inside the settings list.
@@ -452,7 +465,7 @@ final class Navigator {
         switch target {
         case .addGame: openImport()
         case let .importArchive(url): openImport([url])
-        case .openFolder: FileBrowser.open(hub.library.paths.gamesRoot)
+        case .openFolder: FileBrowser.open(hub.library.paths.gamesRoot, create: true)
         case .rescan: rescan()
         case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
         case .layoutButton: layout = layout.next
@@ -549,7 +562,9 @@ final class Navigator {
             Task { await confirmation.perform() }
         case .confirmCancel: sheet = nil
         case .addLibraryFolder: pickingLibraryFolder = true
-        case let .showLibraryFolder(id): if let root = hub.library.root(of: id) { FileBrowser.open(root) }
+        case let .showLibraryFolder(id):
+            if let problem = hub.library.folderProblems[id] { return showError("Can't open the folder", problem) }
+            if let root = hub.library.root(of: id) { FileBrowser.open(root) }
         case let .removeLibraryFolder(id): confirmRemoving(id)
         }
     }
@@ -632,7 +647,8 @@ final class Navigator {
 
     /// Does what a game page button or a tile menu item asks. Both go through here.
     func perform(_ action: GameAction, on id: GameID) {
-        guard let game = hub.library.game(id) else { return }
+        // A hidden game's actions need the library unlocked, however they were reached.
+        guard let game = hub.library.game(id), isVisible(game) else { return }
         switch action {
         case .play: play(id)
         case .openPage: if pageGameID != id { push(.game(id)) }
@@ -888,6 +904,9 @@ final class Navigator {
             sheet = nil
             syncInputMode()
         }
+        // A sheet opened from a tile, such as its menu, isn't under a game page, so it is checked on its own. A hidden
+        // game's sheet closes when the library locks, and a deleted game's when it leaves the library.
+        if let id = sheet?.gameID, !shown.contains(id) { sheet = nil }
         // A rescan can find that an open control method sheet's game reads touches itself, such as a Ren'Py game whose
         // files finished copying. Closing it returns focus to its row, which the focus check below then moves.
         if case let .controlMethod(id)? = sheet, !offersControlMethod(id) { sheet = nil }
