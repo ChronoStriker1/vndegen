@@ -949,6 +949,57 @@ static tjs_uint TVPRebuildAutoPathTable()
     return totalcount;
 }
 //---------------------------------------------------------------------------
+std::vector<ttstr> TVPListAutoPathStorages()
+{
+    // the same files the auto path table holds, each by its full storage name
+    tTJSCriticalSectionHolder cs_holder(TVPCreateStreamCS);
+    std::vector<ttstr> storages;
+    for (const ttstr& path : TVPAutoPathList)
+    {
+        const tjs_char* sharp_pos = TJS_strchr(path.c_str(), TVPArchiveDelimiter);
+        if (sharp_pos)
+        {
+            ttstr arcname(path, (int)(sharp_pos - path.c_str()));
+            ttstr in_arc_name(sharp_pos + 1);
+            tTVPArchive::NormalizeInArchiveStorageName(in_arc_name);
+            tjs_int in_arc_name_len = in_arc_name.GetLen();
+            tTVPArchive* arc = TVPArchiveCache.Get(arcname);
+            try
+            {
+                tjs_uint storagecount = arc->GetCount();
+                tjs_int i = arc->GetFirstIndexStartsWith(in_arc_name);
+                for (; i != -1 && i < (tjs_int)storagecount; i++)
+                {
+                    ttstr name = arc->GetName(i);
+                    if (!name.StartsWith(in_arc_name))
+                        break;
+                    if (!TJS_strchr(name.c_str() + in_arc_name_len, TJS_N('/')))
+                        storages.push_back(path + TVPExtractStorageName(name));
+                }
+            }
+            catch (...)
+            {
+                arc->Release();
+                throw;
+            }
+            arc->Release();
+        }
+        else
+        {
+            class tLister : public iTVPStorageLister
+            {
+            public:
+                std::vector<ttstr> list;
+                void Add(const ttstr& file) { list.push_back(file); }
+            } lister;
+            TVPStorageMediaManager.GetListAt(path, &lister);
+            for (const ttstr& file : lister.list)
+                storages.push_back(path + file);
+        }
+    }
+    return storages;
+}
+//---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
 // TVPGetPlacedPath

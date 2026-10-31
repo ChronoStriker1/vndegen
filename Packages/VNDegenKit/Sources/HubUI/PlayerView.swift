@@ -58,7 +58,8 @@ struct PlayerView: View {
             #endif
             if menu.isOpen {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
-                               onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping)
+                               onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping,
+                               onGameMenu: menu.openGameMenu, onGameItem: choose)
                     .transition(.opacity)
             } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
@@ -178,7 +179,11 @@ struct PlayerView: View {
             if !mappingEditor.handle(button), button == .cancel || button == .hub { self.mappingEditor = nil }
             return
         }
-        let items = PlayerMenu.items(for: method)
+        switch menu.page {
+        case .main: break
+        case .game: return navigateGameMenu(button)
+        }
+        let items = menu.items(for: method)
         let index = items.firstIndex(of: menu.focus) ?? 0
         switch button {
         case .up: menu.focus = items[max(0, index - 1)]
@@ -187,11 +192,12 @@ struct PlayerView: View {
             switch menu.focus {
             case .method: setMethod(method.stepped(by: button == .left ? -1 : 1))
             case .mouseStyle: setMethod(method.switchingMouseStyle)
-            case .resume, .quit, .controllerMouse, .mapping: break
+            case .resume, .gameMenu, .quit, .controllerMouse, .mapping: break
             }
         case .confirm:
             switch menu.focus {
             case .resume: resume()
+            case .gameMenu: menu.openGameMenu()
             case .quit: hub.endSession()
             case .method: setMethod(method.stepped(by: 1))
             case .controllerMouse: setMethod(method.togglingMouse)
@@ -200,6 +206,33 @@ struct PlayerView: View {
             }
         case .cancel, .hub, .menu: resume()
         default: break
+        }
+    }
+
+    /// Up and down move through the Game menu's current level, and confirm opens a submenu or runs a command. Cancel goes
+    /// back a level, and from the top back to VNDegen's menu.
+    private func navigateGameMenu(_ button: VirtualButton) {
+        switch button {
+        case .up: menu.moveGameFocus(by: -1)
+        case .down: menu.moveGameFocus(by: 1)
+        case .confirm: if let item = menu.focusedGameItem { choose(item) }
+        case .right: if let item = menu.focusedGameItem, case .submenu = item.kind { choose(item) }
+        case .cancel, .left: menu.gameBack()
+        case .hub, .menu: resume()
+        default: break
+        }
+    }
+
+    /// A command closes VNDegen's menu and the game runs it as it resumes, as a PC game runs a menu bar command once its
+    /// menu closes. The command can open the game's own screens and dialogs, which need the game running.
+    private func choose(_ item: GameMenuItem) {
+        switch item.kind {
+        case .submenu: menu.openSubmenu(item)
+        case .command:
+            guard item.isEnabled else { return }
+            session.chooseGameMenuItem(item.id)
+            resume()
+        case .separator: break
         }
     }
 
@@ -215,13 +248,16 @@ struct PlayerView: View {
     /// Takes input from the game before pausing it, so the game handles the releases of the buttons it holds.
     private func openMenu() {
         menu.focus = .resume
+        menu.page = .main
         menu.isOpen = true
         applyInputMode()
         session.setPaused(true)
+        menu.gameItems = session.gameMenu
     }
 
     private func resume() {
         mappingEditor = nil
+        menu.page = .main
         menu.isOpen = false
         applyInputMode()
         session.setPaused(false)
@@ -232,7 +268,7 @@ struct PlayerView: View {
     private func setMethod(_ method: ControlMethod) {
         guard let id = game?.id else { return }
         hub.library.update(id) { $0.controlMethod = method }
-        if !PlayerMenu.items(for: method).contains(menu.focus) { menu.focus = .method }
+        if !menu.items(for: method).contains(menu.focus) { menu.focus = .method }
     }
 
     private func openMapping() {
@@ -258,19 +294,67 @@ struct PlayerView: View {
 @MainActor
 @Observable
 final class PlayerMenu {
-    enum Item { case resume, quit, method, controllerMouse, mouseStyle, mapping }
+    enum Item { case resume, gameMenu, quit, method, controllerMouse, mouseStyle, mapping }
+    /// What the menu's card shows: its main buttons, or a page that one of them opened.
+    enum Page { case main, game }
 
-    /// Top to bottom. The control method only matters on a touch device.
-    static func items(for method: ControlMethod) -> [Item] {
-        guard Platform.current == .iOS else { return [.resume, .quit, .mapping] }
-        var items: [Item] = [.resume, .quit, .method]
+    /// Top to bottom. The Game menu shows when the game has one. The control method only matters on a touch device.
+    func items(for method: ControlMethod) -> [Item] {
+        let session: [Item] = gameItems.isEmpty ? [.resume, .quit] : [.resume, .gameMenu, .quit]
+        guard Platform.current == .iOS else { return session + [.mapping] }
+        var items = session + [.method]
         if method.kind == .controller { items.append(.controllerMouse) }
         if method.mouse != nil { items.append(.mouseStyle) }
         return items + [.mapping]
     }
 
     var isOpen = false
+    var page = Page.main
     var focus = Item.resume
+    /// The game's own menu, read from the game each time this menu opens.
+    var gameItems: [GameMenuItem] = []
+    /// The submenus open in the Game menu, outermost first, and empty at its top.
+    var gamePath: [GameMenuItem] = []
+    var gameFocus: GameMenuItem.ID?
+
+    /// What the Game menu shows now.
+    var gameLevel: [GameMenuItem] { gamePath.last?.items ?? gameItems }
+
+    var focusedGameItem: GameMenuItem? { gameLevel.first { $0.id == gameFocus } }
+
+    func openGameMenu() {
+        page = .game
+        gamePath = []
+        gameFocus = Self.firstChoice(gameItems)
+    }
+
+    func openSubmenu(_ item: GameMenuItem) {
+        gamePath.append(item)
+        gameFocus = Self.firstChoice(item.items)
+    }
+
+    /// Up a level, with focus on the submenu just left. From the top, back to VNDegen's menu.
+    func gameBack() {
+        if let left = gamePath.popLast() {
+            gameFocus = left.id
+        } else {
+            page = .main
+            focus = .gameMenu
+        }
+    }
+
+    /// Separators take no focus. Disabled items do, so a controller shows them as a mouse would, and choosing them
+    /// does nothing.
+    func moveGameFocus(by step: Int) {
+        let choices = gameLevel.filter { $0.kind != .separator }
+        guard !choices.isEmpty else { return }
+        let index = choices.firstIndex { $0.id == gameFocus } ?? (step > 0 ? -1 : choices.count)
+        gameFocus = choices[min(choices.count - 1, max(0, index + step))].id
+    }
+
+    private static func firstChoice(_ items: [GameMenuItem]) -> GameMenuItem.ID? {
+        items.first { $0.kind != .separator }?.id
+    }
 }
 
 private struct PlayerMenuView: View {
@@ -283,26 +367,40 @@ private struct PlayerMenuView: View {
     let onQuit: () -> Void
     let onMethod: (ControlMethod) -> Void
     let onMapping: () -> Void
+    let onGameMenu: () -> Void
+    let onGameItem: (GameMenuItem) -> Void
 
     var body: some View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            // Side by side when a landscape phone or a short window has no room for one column, and is wide enough for
-            // two: the columns' 220 pt buttons, spacing and padding need about 620 pt. Not ViewThatFits: after a tap on
-            // Quit inside its second choice, SwiftUI kept the player in place, so the next game reused this view and
-            // never started.
-            let sideBySide = metrics.isShort && metrics.size.width >= 640
-            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
-            layout {
-                session
-                controls
+            switch menu.page {
+            case .main: card
+            case .game:
+                GameMenuView(menu: menu, showsFocus: showsFocus, onChoose: onGameItem)
+                    .padding(isNarrow ? 20 : 28)
+                    .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+                    .padding(12)
             }
-            .padding(isNarrow ? 20 : 28)
-            .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
-            .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
-            .padding(12)
         }
+    }
+
+    private var card: some View {
+        // Side by side when a landscape phone or a short window has no room for one column, and is wide enough for
+        // two: the columns' 220 pt buttons, spacing and padding need about 620 pt. Not ViewThatFits: after a tap on
+        // Quit inside its second choice, SwiftUI kept the player in place, so the next game reused this view and
+        // never started.
+        let sideBySide = metrics.isShort && metrics.size.width >= 640
+        let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .center, spacing: 28)) : AnyLayout(VStackLayout(spacing: 18))
+        return layout {
+            session
+            controls
+        }
+        .padding(isNarrow ? 20 : 28)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+        .padding(12)
     }
 
     private var session: some View {
@@ -315,6 +413,11 @@ private struct PlayerMenuView: View {
             Button(action: onResume) { Label("Resume", systemImage: "play.fill").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .primary, focused: isFocused(.resume)))
                 .onHover { if $0 { menu.focus = .resume } }
+            if !menu.gameItems.isEmpty {
+                Button(action: onGameMenu) { Label("Game menu", systemImage: "list.bullet").frame(minWidth: buttonWidth) }
+                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.gameMenu)))
+                    .onHover { if $0 { menu.focus = .gameMenu } }
+            }
             Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
                 .onHover { if $0 { menu.focus = .quit } }
@@ -324,7 +427,7 @@ private struct PlayerMenuView: View {
     private var controls: some View {
         VStack(spacing: 12) {
             SectionLabel(text: "Controls", systemImage: "gamecontroller")
-            let items = PlayerMenu.items(for: method)
+            let items = menu.items(for: method)
             if items.contains(.method) { methods }
             if items.contains(.controllerMouse) { controllerMouse }
             if items.contains(.mouseStyle), let style = method.mouse { mouseStyles(style) }
