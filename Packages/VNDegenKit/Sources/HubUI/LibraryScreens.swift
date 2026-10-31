@@ -336,11 +336,21 @@ struct SettingsView: View {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
         #else
-        // Only the app's own Documents folder is On My iPhone or iPad, VNDegen. A folder added from elsewhere, such as a
-        // drive or a server, shows its path.
-        let documents = URL.documentsDirectory.standardizedFileURL.path + "/"
-        guard url.standardizedFileURL.path.hasPrefix(documents) else { return path }
-        return "On My \(UIDevice.current.localizedModel) › VNDegen › " + url.standardizedFileURL.path.dropFirst(documents.count)
+        // The app's own Documents folder is On My iPhone or iPad, VNDegen, and the Files app's local storage is On My
+        // iPhone or iPad. A drive or a server connected in Files lives under LiveFiles, in a folder named for its
+        // provider and then the volume. Anything else shows its path.
+        // Symlinks resolved on both sides, since iOS reaches the app container as /var and as /private/var.
+        let full = url.resolvingSymlinksInPath().path
+        let device = "On My \(UIDevice.current.localizedModel)"
+        let documents = URL.documentsDirectory.resolvingSymlinksInPath().path + "/"
+        func trail(_ rest: Substring) -> String { rest.split(separator: "/").joined(separator: " › ") }
+        if full.hasPrefix(documents) { return "\(device) › VNDegen › " + trail(full.dropFirst(documents.count)) }
+        if let range = full.range(of: "/File Provider Storage/") { return "\(device) › " + trail(full[range.upperBound...]) }
+        if let range = full.range(of: "/LiveFiles/") {
+            // Drops the provider's folder, such as com.apple.filesystems.userfsd, which names no place the player knows.
+            return trail(full[range.upperBound...].drop { $0 != "/" })
+        }
+        return path
         #endif
     }
 }

@@ -255,7 +255,8 @@ final class Navigator {
     }
 
     var heroGame: Game? {
-        if let heroID, let game = hub.library.game(heroID), isVisible(game) { return game }
+        // Only a game still in the library, since the library keeps the records of games whose folders went away.
+        if let heroID, let game = visibleGames.first(where: { $0.id == heroID }) { return game }
         return shelves.first?.games.first
     }
 
