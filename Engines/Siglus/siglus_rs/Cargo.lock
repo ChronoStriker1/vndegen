@@ -3449,6 +3449,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "game_fs",
+ "image",
  "log",
  "pollster",
  "raw-window-handle 0.6.2",

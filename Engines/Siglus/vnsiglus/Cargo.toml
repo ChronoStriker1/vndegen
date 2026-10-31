@@ -18,6 +18,8 @@ raw-window-handle = "0.6"
 siglus_scene_vm = { path = "../siglus_rs/crates/siglus_scene_vm", default-features = false }
 reallive = { path = "../siglus_rs/crates/reallive" }
 game_fs = { path = "../siglus_rs/crates/game_fs" }
+# The Linux test host writes frames as PNG.
+image.workspace = true
 
 [lints]
 workspace = true

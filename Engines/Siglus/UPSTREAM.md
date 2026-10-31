@@ -42,7 +42,7 @@ siglus_rs is under MPL-2.0 (`siglus_rs/LICENSE-MPL-2.0`), a file-level copyleft:
 - Set `IPHONEOS_DEPLOYMENT_TARGET` and `MACOSX_DEPLOYMENT_TARGET` to the app's deployment targets. The script rebuilds a target from clean when its deployment target changes.
 - The Rust toolchain is pinned to 1.99.1, with the `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-apple-darwin`, and `x86_64-apple-darwin` targets.
 
-On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's interface and the file layer, and `cargo build --release -p siglus_scene_vm -p reallive --features reallive/desktop-player --bins` builds upstream's desktop players, `siglus_engine` and `reallive_player`, for running a game there.
+On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's interface and the file layer. `cargo run --release -p vnsiglus --bin vnsiglus-run -- <game> <saves> <frames> <out.png> [font]` runs a RealLive game headless through the same C table the app calls, pressing Return every two seconds, and writes its last frame. SiglusEngine needs a view, and `cargo build --release -p siglus_scene_vm -p reallive --features reallive/desktop-player --bins` builds upstream's desktop players, `siglus_engine` and `reallive_player`, for running a game there.
 
 ## VNDegen's changes to siglus_rs
 
