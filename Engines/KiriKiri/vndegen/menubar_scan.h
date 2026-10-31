@@ -18,9 +18,10 @@ struct VNKKMenuBarTest {
     std::string excerpt;
 };
 
-// The first test of `menu.visible` for false in a script's text, such as `kag.menu.visible == false`,
+// The first test of `menu.visible` for false in a script's code, such as `kag.menu.visible == false`,
 // `!kag.menu.visible`, or `menu.visible != true`. Other objects' menus, such as `storeMenu.visible`, don't count, and
-// neither do KAG comment lines, which start with a semicolon, or lines that start with `//`.
-std::optional<VNKKMenuBarTest> VNKKFindHiddenMenuBarTest(std::string_view script);
+// neither does text in comments or string literals. `kag` is true for a KAG scenario (.ks): there only the `exp` and
+// `cond` attributes of its tags and the TJS between [iscript] and [endscript] are code. Otherwise the text is TJS.
+std::optional<VNKKMenuBarTest> VNKKFindHiddenMenuBarTest(std::string_view script, bool kag);
 
 #endif

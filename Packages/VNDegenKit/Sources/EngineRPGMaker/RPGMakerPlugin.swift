@@ -74,18 +74,31 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     }
 
     /// Triacontane's MessageSkip, in two of the library's MV games, puts auto and skip on keys only (A, and Control
-    /// held), out of reach on a touch screen. Its own calls toggle them. Skip goes the way of the plugin's skip button,
-    /// which stops a held-key setting from turning it straight off again.
+    /// held), out of reach on a touch screen. Its own call toggles auto. Skip turns the plugin's skip flag over, as its
+    /// toggle key does. With the plugin set to skip while a key is held, as both library games are, every version of it
+    /// reads the key through `isPressedMessageSkip`, so that reports skip as a held key until it is chosen again.
     static func menuCommands(plugins: Set<String>) -> [WebMenuCommand] {
         guard plugins.contains("MessageSkip") else { return [] }
         return [
             WebMenuCommand(id: "auto", title: "Auto", script: "window.$gameMessage && $gameMessage.toggleAuto && $gameMessage.toggleAuto()"),
             WebMenuCommand(id: "skip", title: "Skip", script: """
-                if (window.$gameMessage && $gameMessage.toggleSkip) {
-                    $gameMessage.toggleSkip();
-                    var scene = SceneManager._scene, messages = scene && scene._messageWindow;
-                    if (messages) messages._pressSkipStop = true;
-                }
+                (function () {
+                    var messages = window.Window_Message && Window_Message.prototype;
+                    if (!window.$gameMessage || !$gameMessage.setSkipFlg || !messages || !messages.isPressedMessageSkip) return;
+                    if (!messages.__vndegenSkip) {
+                        var pressed = messages.isPressedMessageSkip;
+                        messages.isPressedMessageSkip = function () {
+                            return window.__vndegenMessageSkip || pressed.apply(this, arguments);
+                        };
+                        messages.__vndegenSkip = true;
+                    }
+                    // Set to skip while a key is held, the plugin sets its flag from the key every frame and clears it at a
+                    // choice, so VNDegen's held key decides. Otherwise the plugin's own flag says whether it skips now.
+                    var parameters = window.PluginManager ? PluginManager.parameters('MessageSkip') : {};
+                    var held = (parameters.PressingSkip || parameters['押し続けスキップ'] || '').toLowerCase() === 'true';
+                    window.__vndegenMessageSkip = held ? !window.__vndegenMessageSkip : !$gameMessage.skipFlg();
+                    $gameMessage.setSkipFlg(window.__vndegenMessageSkip);
+                })();
                 """),
         ]
     }
