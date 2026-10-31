@@ -108,6 +108,17 @@ final class System4Session: EngineSession {
             // While paused nothing reaches the router or the game: pausing let go of every key, and a hold recorded
             // now would disagree with the game after resume.
             guard let self, !paused else { return }
+            var pressed = pressed
+            #if os(macOS)
+            // A modifier's state comes from the system, not from the view's toggle, which a release made in another
+            // app leaves wrong (Control, the games' skip, would then stay down).
+            let flags = NSEvent.modifierFlags
+            if let down = System4InputRouter.modifierDown(hidUsage: usage, control: flags.contains(.control),
+                                                          shift: flags.contains(.shift), option: flags.contains(.option),
+                                                          command: flags.contains(.command)) {
+                pressed = down
+            }
+            #endif
             // Printable text goes to the game's text entry too, queued right after its key so it keeps its place.
             // Arrow and function keys type Apple's private-use characters, which are left out with the control
             // characters.
@@ -527,6 +538,17 @@ nonisolated struct System4InputRouter {
             guard hostKeysDown.remove(hidUsage) != nil else { return [] }
         }
         return press(vk, pressed)
+    }
+
+    /// Whether the modifier with this HID usage is down, from the system's modifier state; nil for other keys.
+    static func modifierDown(hidUsage: Int, control: Bool, shift: Bool, option: Bool, command: Bool) -> Bool? {
+        switch hidUsage {
+        case 224, 228: control
+        case 225, 229: shift
+        case 226, 230: option
+        case 227, 231: command
+        default: nil
+        }
     }
 
     /// A key pressed and let go at once, as the on-screen keyboard types. A key another source holds sends nothing.

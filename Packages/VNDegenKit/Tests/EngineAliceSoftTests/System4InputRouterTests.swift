@@ -44,4 +44,17 @@ import VNCore
         #expect(router.tap(13).isEmpty)                                // still held
         #expect(router.translate(.button(.confirm, pressed: false)) { $0 } == [.key(13, down: false)])
     }
+
+    @Test func aModifierFollowsTheSystemNotAStaleToggle() {
+        // Control was let go in another app; the view's toggle then reports its next press as a release.
+        var router = System4InputRouter()
+        _ = router.hostKey(hidUsage: 224, pressed: true)
+        _ = router.releaseAll()  // focus lost
+        let down = System4InputRouter.modifierDown(hidUsage: 224, control: true, shift: false, option: false, command: false)
+        #expect(down == true)
+        #expect(router.hostKey(hidUsage: 224, pressed: down!) == [.key(17, down: true)])
+        let up = System4InputRouter.modifierDown(hidUsage: 224, control: false, shift: false, option: false, command: false)
+        #expect(router.hostKey(hidUsage: 224, pressed: up!) == [.key(17, down: false)])
+        #expect(System4InputRouter.modifierDown(hidUsage: 40, control: true, shift: true, option: true, command: true) == nil)
+    }
 }
