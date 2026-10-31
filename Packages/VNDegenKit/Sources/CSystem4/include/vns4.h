@@ -58,6 +58,10 @@ void vns4_text(VNS4Engine *e, const char *utf8);
 // Stops the clock and sound. vns4_step does nothing while paused.
 void vns4_set_paused(VNS4Engine *e, bool paused);
 
+// How many frames the game has finished. Input set before a frame began has been there for the game to read once the
+// count has passed it; a step that times out while the game is busy doesn't count.
+uint32_t vns4_frames_done(VNS4Engine *e);
+
 // Stops the game and frees the engine.
 void vns4_stop(VNS4Engine *e);
 

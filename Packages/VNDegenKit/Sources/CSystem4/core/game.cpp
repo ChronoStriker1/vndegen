@@ -213,6 +213,7 @@ void Game::yieldFrame() {
     }
     std::unique_lock<std::mutex> lock(mu_);
     vmTurn_ = false;
+    yields++;
     cv_.notify_all();
     cv_.wait(lock, [this] { return vmTurn_ || stopping_; });
     if (stopping_) throw StopVM{};

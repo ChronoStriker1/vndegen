@@ -105,6 +105,7 @@ void vns4_mouse_move(VNS4Engine *e, int x, int y) { if (e) e->game->mouseMove(x,
 void vns4_wheel(VNS4Engine *e, int n) { if (e) e->game->wheel(n); }
 void vns4_text(VNS4Engine *e, const char *utf8) { if (e && utf8) e->game->typed(s4::sjis::fromUtf8(utf8)); }
 void vns4_set_paused(VNS4Engine *e, bool p) { if (e) e->game->setPaused(p); }
+uint32_t vns4_frames_done(VNS4Engine *e) { return e ? e->game->yields.load() : 0; }
 void vns4_stop(VNS4Engine *e) { delete e; }
 
 void vns4_debug_dump_sprites(VNS4Engine *e) { if (e) e->game->dumpSpritesOnNextFrame(); }

@@ -92,6 +92,8 @@ public:
     void dumpSpritesOnNextFrame() { dumpSprites_ = true; }  // debugging: logs every sprite
     void debugCall(const std::string &sjisName) { std::lock_guard<std::mutex> l(mu_); debugCall_ = sjisName; }
     std::atomic<bool> ended{false};
+    // Times the VM has finished a frame and handed control back: each one has had its chance to read the input.
+    std::atomic<uint32_t> yields{0};
 
 private:
     void vmMain();
