@@ -1,0 +1,158 @@
+From a509c3717b2172ef8aed14a899c85bcd4f2a719a Mon Sep 17 00:00:00 2001
+From: VNDegen <vndegen@users.noreply.github.com>
+Date: Sat, 31 Oct 2026 11:42:52 -0400
+Subject: [PATCH] web: List a movie's own context menu items for the host page
+
+A host that turns Ruffle's context menu off, because a right click belongs
+to the game, can still list the items the movie added and choose one.
+---
+ .../core/src/internal/player/inner.tsx        | 33 +++++++++++++++
+ .../internal/player/ruffle-player-element.tsx | 20 ++++++++-
+ web/src/lib.rs                                | 42 +++++++++++++++++++
+ 3 files changed, 94 insertions(+), 1 deletion(-)
+
+diff --git a/web/packages/core/src/internal/player/inner.tsx b/web/packages/core/src/internal/player/inner.tsx
+index ceaf47491..309843c43 100644
+--- a/web/packages/core/src/internal/player/inner.tsx
++++ b/web/packages/core/src/internal/player/inner.tsx
+@@ -59,6 +59,20 @@ declare global {
+     }
+ }
+ 
++/**
++ * One of a movie's own context menu items, as the movie set it.
++ */
++export interface MovieContextMenuItem {
++    /**
++     * The item's index for {@link InnerPlayer.runContextMenuItem}.
++     */
++    index: number;
++    caption: string;
++    checked: boolean;
++    enabled: boolean;
++    separatorBefore: boolean;
++}
++
+ /**
+  * An item to show in Ruffle's custom context menu.
+  */
+@@ -1495,6 +1509,25 @@ export class InnerPlayer {
+         return this.shadow.activeElement === this.virtualKeyboard;
+     }
+ 
++    /**
++     * The movie's own context menu items, without Ruffle's and Flash Player's built-in ones, for a host that lists
++     * them in a menu of its own. Unlike the context menu, it lists them while the movie is suspended too.
++     *
++     * @returns Each item with its index for {@link runContextMenuItem}.
++     */
++    movieContextMenuItems(): MovieContextMenuItem[] {
++        return this.instance?.prepare_movie_context_menu() ?? [];
++    }
++
++    /**
++     * Chooses a context menu item that {@link movieContextMenuItems} listed.
++     *
++     * @param index The item's index.
++     */
++    async runContextMenuItem(index: number): Promise<void> {
++        await this.instance?.run_context_menu_callback(index);
++    }
++
+     private contextMenuItems(): Array<ContextMenuItem | null> {
+         const items: Array<ContextMenuItem | null> = [];
+         const addSeparator = () => {
+diff --git a/web/packages/core/src/internal/player/ruffle-player-element.tsx b/web/packages/core/src/internal/player/ruffle-player-element.tsx
+index d56523aad..aaad8e6d8 100644
+--- a/web/packages/core/src/internal/player/ruffle-player-element.tsx
++++ b/web/packages/core/src/internal/player/ruffle-player-element.tsx
+@@ -7,7 +7,7 @@ import {
+     PlayerElement,
+     ReadyState,
+ } from "../../public/player/index.js";
+-import { InnerPlayer } from "./inner.js";
++import { InnerPlayer, type MovieContextMenuItem } from "./inner.js";
+ import { APIVersions } from "../../public/player/index.js";
+ import { PlayerV1Impl } from "./impl_v1.js";
+ 
+@@ -115,6 +115,24 @@ export class RufflePlayerElement extends HTMLElement implements PlayerElement {
+         this.#inner.play();
+     }
+ 
++    /**
++     * The movie's own context menu items, for a host that lists them in a menu of its own.
++     *
++     * @returns Each item with its index for {@link runContextMenuItem}.
++     */
++    movieContextMenuItems(): MovieContextMenuItem[] {
++        return this.#inner.movieContextMenuItems();
++    }
++
++    /**
++     * Chooses one of the movie's own context menu items.
++     *
++     * @param index The item's index from {@link movieContextMenuItems}.
++     */
++    async runContextMenuItem(index: number): Promise<void> {
++        await this.#inner.runContextMenuItem(index);
++    }
++
+     get isPlaying(): boolean {
+         return this.#inner.isPlaying;
+     }
+diff --git a/web/src/lib.rs b/web/src/lib.rs
+index df64fd833..6fae091af 100644
+--- a/web/src/lib.rs
++++ b/web/src/lib.rs
+@@ -387,6 +387,48 @@ impl RuffleHandle {
+         .unwrap_or(JsValue::UNDEFINED)
+     }
+ 
++    /// The movie's own context menu items, without the built-in ones such as Play and Quality, each with its index for
++    /// `run_context_menu_callback`. Prepares the menu as a right click does, so the movie's `onSelect` and
++    /// `menuSelect` handlers run first. For a host that lists them in a menu of its own.
++    pub fn prepare_movie_context_menu(&self) -> JsValue {
++        #[derive(Serialize)]
++        #[serde(rename_all = "camelCase")]
++        struct MovieContextMenuItem {
++            index: usize,
++            caption: String,
++            checked: bool,
++            enabled: bool,
++            separator_before: bool,
++        }
++
++        self.with_core_mut(|core| {
++            let info = core.prepare_context_menu();
++            let items: Vec<MovieContextMenuItem> = core.mutate_with_update_context(|context| {
++                let Some(menu) = context.current_context_menu.as_ref() else {
++                    return vec![];
++                };
++                info.iter()
++                    .enumerate()
++                    .filter(|(index, _)| {
++                        matches!(
++                            menu.callback(*index),
++                            ContextMenuCallback::Avm1 { .. } | ContextMenuCallback::Avm2 { .. }
++                        )
++                    })
++                    .map(|(index, item)| MovieContextMenuItem {
++                        index,
++                        caption: item.caption.clone(),
++                        checked: item.checked,
++                        enabled: item.enabled,
++                        separator_before: item.separator_before,
++                    })
++                    .collect()
++            });
++            serde_wasm_bindgen::to_value(&items).unwrap_or(JsValue::UNDEFINED)
++        })
++        .unwrap_or(JsValue::UNDEFINED)
++    }
++
+     pub async fn run_context_menu_callback(&self, index: usize) {
+         let is_paste = self
+             .with_core_mut(|core| {
+-- 
+2.56.0
+

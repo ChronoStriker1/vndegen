@@ -583,18 +583,18 @@ private enum FakeEngine {
 
     @Test func listsAndChoosesTheGamesMenu() async throws {
         let session = try session("Tawawa")
-        #expect(session.gameMenu.isEmpty)
+        #expect(await session.gameMenu().isEmpty)
         FakeEngine.menu = #"[{"id":"7","title":"Quick Save(&Q)","checked":false,"radio":false,"enabled":true,"items":[]}]"#
         // Not before the game runs.
-        #expect(session.gameMenu.isEmpty)
+        #expect(await session.gameMenu().isEmpty)
         try #require(session.view as? KiriKiriHostView).onReady?()
-        #expect(session.gameMenu == [GameMenuItem(id: "7", title: "Quick Save")])
+        #expect(await session.gameMenu() == [GameMenuItem(id: "7", title: "Quick Save")])
         session.chooseGameMenuItem("7")
         #expect(FakeEngine.clicked == ["7"])
         // Nor while a frame of the game's runs below, as under its Yes/No dialog.
         FakeEngine.duringFrame = {
             MainActor.assumeIsolated {
-                #expect(session.gameMenu.isEmpty)
+                #expect(session.currentMenu.isEmpty)
                 session.chooseGameMenuItem("7")
             }
         }

@@ -206,7 +206,7 @@ final class NScripterSession: EngineSession {
         finish(byGame: false)
     }
 
-    var gameMenu: [GameMenuItem] {
+    func gameMenu() async -> [GameMenuItem] {
         guard let engine, !stopped, let json = vnns_menu(engine) else { return [] }
         return NScripterMenu.items(json: String(cString: json))
     }
