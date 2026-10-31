@@ -164,3 +164,14 @@ import VNCore
     menu.closeCheats()
     #expect(menu.page == .main && menu.focus == .cheats)
 }
+
+@MainActor @Test func thePointerDoesNotTakeFocusFromAController() async {
+    let page = await page(FakeCheats())
+    page.hover(.restore)
+    #expect(page.focus.target == .restore && !page.focus.showsFocus)
+    _ = page.handle(.down)
+    _ = page.handle(.down)
+    #expect(page.isFocused(.keepHealthy))
+    page.hover(.speed)
+    #expect(page.isFocused(.keepHealthy))
+}

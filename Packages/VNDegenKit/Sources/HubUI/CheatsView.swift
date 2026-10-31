@@ -158,6 +158,13 @@ final class CheatsPage {
         if case let .tab(tab)? = focus.target, tab != self.tab { show(tab) }
     }
 
+    /// The pointer over a control focuses it, unless a controller is showing the ring. A Mac's pointer resting over the
+    /// page would otherwise take focus each time rows move under it, such as when the game's state arrives.
+    func hover(_ target: Target) {
+        guard !focus.showsFocus else { return }
+        focus.target = target
+    }
+
     /// Touch and pointer: focus the control without showing the ring, then activate it.
     func select(_ target: Target) {
         focus.select(target)
@@ -559,7 +566,7 @@ struct CheatsView: View {
         }
         .buttonStyle(.plain)
         .id(CheatsPage.Target.search)
-        .onHover { if $0 { page.focus.select(.search) } }
+        .onHover { if $0 { page.hover(.search) } }
     }
 
     private func note(_ text: String) -> some View {
@@ -628,7 +635,7 @@ struct CheatsView: View {
         .background(focused ? AnyShapeStyle(.white) : AnyShapeStyle(Theme.surface), in: .rect(cornerRadius: 12, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(focused ? .white : Theme.stroke) }
         .id(target)
-        .onHover { if $0 { page.focus.select(target) } }
+        .onHover { if $0 { page.hover(target) } }
     }
 
     private func row(target: CheatsPage.Target, action: @escaping () -> Void,
@@ -646,7 +653,7 @@ struct CheatsView: View {
         }
         .buttonStyle(.plain)
         .id(target)
-        .onHover { if $0 { page.focus.select(target) } }
+        .onHover { if $0 { page.hover(target) } }
     }
 
     private func segment(_ title: String, selected: Bool, target: CheatsPage.Target) -> some View {
@@ -658,6 +665,6 @@ struct CheatsView: View {
         .buttonStyle(.plain)
         .id(target)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .onHover { if $0 { page.focus.select(target) } }
+        .onHover { if $0 { page.hover(target) } }
     }
 }
