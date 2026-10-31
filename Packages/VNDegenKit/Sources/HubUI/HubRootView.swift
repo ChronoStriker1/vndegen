@@ -23,6 +23,14 @@ public struct HubRootView: View {
                 case .library: LibraryContainer()
                 case let .playing(_, session): PlayerView(hub: hub, session: session)
                 }
+                // The screenshot viewer covers the library from here rather than from the library's own overlay, since the
+                // game page lays the library out wider than the safe area.
+                ZStack {
+                    if case let .screenshots(viewer)? = nav.sheet {
+                        ScreenshotViewerView(viewer: viewer).transition(.opacity)
+                    }
+                }
+                .animation(.easeOut(duration: 0.2), value: nav.sheet?.id)
             }
             .environment(\.hubMetrics, HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls))
         }
@@ -99,14 +107,6 @@ private struct LibraryContainer: View {
             sheetContent(sheet)
                 .environment(hub)
                 .environment(nav)
-        }
-        .overlay {
-            ZStack {
-                if case let .screenshots(viewer)? = nav.sheet {
-                    ScreenshotViewerView(viewer: viewer).transition(.opacity)
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: nav.sheet?.id)
         }
         .alert(nav.errorTitle ?? "Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { nav.closeError() } })) {
             Button("OK") {}
@@ -206,7 +206,7 @@ private struct LibraryContainer: View {
             }
         case let .confirm(confirmation):
             ConfirmationSheet(confirmation: confirmation)
-        // Shown by the overlay above instead.
+        // HubRootView shows the viewer instead.
         case .screenshots:
             EmptyView()
         case let .license(request):

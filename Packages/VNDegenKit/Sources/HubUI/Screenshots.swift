@@ -148,10 +148,11 @@ struct ScreenshotViewerView: View {
         .scrollIndicators(.hidden)
         .background(.black)
         .ignoresSafeArea()
+        // The overlays keep to the safe area, which the screenshots behind them fill past.
         .overlay(alignment: .topLeading) {
             CircleButton(systemImage: "xmark", label: "Close") { nav.back() }
-                .padding(.leading, insets.leading + metrics.topRowPadding(.leading))
-                .padding(.top, insets.top + metrics.cornerClearance + 10)
+                .padding(.leading, metrics.topRowPadding(.leading))
+                .padding(.top, metrics.cornerClearance + 10)
                 #if os(macOS)
                 .padding(.top, 18)
                 #endif
@@ -162,7 +163,7 @@ struct ScreenshotViewerView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(.ultraThinMaterial, in: .capsule)
-                .padding(.bottom, max(insets.bottom, 16))
+                .padding(.bottom, 12)
                 .accessibilityHidden(true)
         }
         .overlay {
@@ -177,8 +178,7 @@ struct ScreenshotViewerView: View {
                         .opacity(viewer.index < viewer.screenshots.count - 1 ? 1 : 0)
                         .allowsHitTesting(viewer.index < viewer.screenshots.count - 1)
                 }
-                .padding(.leading, insets.leading + metrics.padding)
-                .padding(.trailing, insets.trailing + metrics.padding)
+                .padding(.horizontal, metrics.padding)
             }
         }
         // On an iPad, a click counts as touch, which hides the arrows. Moving the pointer brings them back.
