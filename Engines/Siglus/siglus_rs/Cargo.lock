@@ -3444,6 +3444,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "665d8a491ad572e0ebc103846c4a51e66b641c942391b7241f91c413a3a301a9"
 
 [[package]]
+name = "vnsiglus"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "game_fs",
+ "log",
+ "pollster",
+ "raw-window-handle 0.6.2",
+ "reallive",
+ "siglus_scene_vm",
+]
+
+[[package]]
 name = "walkdir"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

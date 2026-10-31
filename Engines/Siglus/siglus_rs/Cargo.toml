@@ -4,6 +4,7 @@ members = [
   "crates/*",
   # VNDegen's own crates beside this folder.
   "../wmv_stub",
+  "../vnsiglus",
 ]
 exclude = ["vendor/eluna_rs"]
 

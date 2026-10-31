@@ -1,0 +1,23 @@
+# VNDegen's C interface to siglus_rs, vnsiglus.h in Packages/VNDegenKit/Sources/CSiglus. Built as the VNSiglus framework
+# by scripts/siglus-engine.sh.
+[package]
+name = "vnsiglus"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+workspace = "../siglus_rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+pollster.workspace = true
+raw-window-handle = "0.6"
+siglus_scene_vm = { path = "../siglus_rs/crates/siglus_scene_vm", default-features = false }
+reallive = { path = "../siglus_rs/crates/reallive" }
+game_fs = { path = "../siglus_rs/crates/game_fs" }
+
+[lints]
+workspace = true
