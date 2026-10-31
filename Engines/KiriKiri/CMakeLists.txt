@@ -329,6 +329,8 @@ add_library(kirikiri_engine OBJECT
     ${KIRIKIRI_SHARED}/casepath.c
     ${KIRIKIRI_SHARED}/vnfont.c
     vndegen/ciphers.cpp
+    vndegen/game_menu.cpp
+    vndegen/menubar_scan.cpp
     vndegen/movie_decoder.cpp
     vndegen/movie_player.cpp
     vndegen/sigcheck.cpp
@@ -474,6 +476,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # Checks the native event queues. Built on demand, like KiriKiriCipherTest.
     add_executable(KiriKiriQueueTest EXCLUDE_FROM_ALL vndegen/queue_test.cpp vndegen/vnkk.mm)
     target_link_libraries(KiriKiriQueueTest PRIVATE kirikiri_engine)
+
+    # Checks which script lines count as a test for a hidden menu bar. Built on demand, like KiriKiriCipherTest.
+    add_executable(KiriKiriMenuBarScanTest EXCLUDE_FROM_ALL vndegen/menubar_scan_test.cpp vndegen/menubar_scan.cpp)
 
     add_executable(KiriKiriRestart EXCLUDE_FROM_ALL vndegen/restart_main.mm vndegen/vnkk.mm)
     set_source_files_properties(vndegen/restart_main.mm PROPERTIES COMPILE_OPTIONS -fobjc-arc)

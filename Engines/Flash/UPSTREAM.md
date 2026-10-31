@@ -27,8 +27,8 @@ app build and stages it for the app bundle.
 
 | File | SHA-256 |
 |---|---|
-| `ruffle/ruffle.js` | `f370eaf54a92cfe2f4df0943927cf2bd3310ed546da7e03ae8ad97190b0a398a` |
-| `ruffle/ruffle_web_bg.QL2FBGN7.wasm` | `b41aaf262308633b0d4d25af5719aaa928a18691a6aab6cbce0fd417ba45db4e` |
+| `ruffle/ruffle.js` | `efadfd558d756887b557b670d5a9faabad2543933a4377be019871f9c4fbed0b` |
+| `ruffle/ruffle_web_bg.VWXCL2CU.wasm` | `9314c4d69c63c55db86857df5180b340c1fdf84563b6e5e1b3bd20b77ebe6d33` |
 
 The build is reproducible. The script remaps the source tree to `/ruffle` and Cargo's home to `/cargo` in the wasm
 module's file names, and pins Ruffle's version seal, the version text and build date it would otherwise take from the
@@ -48,6 +48,12 @@ for browsers that lack them.
   is unloaded even if the movie moved that content out of the `Loader` first, as Flash Player does. Ruffle sent it only
   while the content was still the Loader's child. Test Game 127 moves each scene's movie into its own container, then
   waits for `unload` before it loads the next scene, and stopped on a black screen after its opening without this.
+- `0002-web-list-a-movies-own-context-menu-items-for-the-host-page.patch`: the player element gets
+  `movieContextMenuItems()` and `runContextMenuItem(index)`, through a new `prepare_movie_context_menu` in the wasm
+  module that prepares the context menu as a right click does and lists only the items the movie added, without the
+  built-in ones such as Play and Quality. VNDegen turns Ruffle's context menu off, because a right click belongs to
+  the game, and lists these items in its Game commands instead (`flash-page.js`). Ruffle kept the list private to its
+  player. Usashitsuke (Test Game 126) puts Return to title and Quit there.
 
 ## Licenses
 

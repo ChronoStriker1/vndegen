@@ -55,6 +55,13 @@ controllers, arrives as synthetic mouse events, which `flash.js` turns into poin
 reads keys only while it has focus, so the player takes focus again when the game resumes. Flash Player read no
 gamepad, so games start with the Keyboard and mouse layout.
 
+A movie's own right-click menu items, which an ActionScript 2 movie adds through `ContextMenu.customItems` and an
+ActionScript 3 movie through `ContextMenu.customItems` on a display object, appear in VNDegen's Game commands, since the
+right click belongs to the game. Ruffle prepares the menu as a right click would, for the object under the pointer, so
+the movie's `onSelect` and `menuSelect` handlers run first, and lists only the movie's own items, not Flash Player's
+Play or Quality (Ruffle patch 0002, see `Engines/Flash/UPSTREAM.md`). A full-screen item is left out, since the
+session owns the window. Usashitsuke's Return to title and Quit are there.
+
 ## Fonts
 
 Most movies embed their fonts. Device text, drawn in a font the computer has, goes through the browser

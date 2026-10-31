@@ -37,6 +37,7 @@ final class KiriKiriSession: EngineSession {
     private let engine: KiriKiriEngine
     private let launch: GameLaunch
     private let paths: KiriKiriPaths
+    private let menuBarSettings: KiriKiriMenuBarSettings
     private var state = State.waiting
     /// A game's own modal window, such as its Yes/No dialog, runs the host's events inside a frame or inside the
     /// engine's start, which can fire the display link or the quit timer again before the frame returns. The engine
@@ -70,6 +71,7 @@ final class KiriKiriSession: EngineSession {
         self.engine = engine
         paths = KiriKiriPaths(folder: launch.folder, dataDirectory: launch.dataDirectory, layout: layout)
         try paths.prepare()
+        menuBarSettings = KiriKiriMenuBarSettings.load(launch.dataDirectory)
         host = KiriKiriHostView()
         view = host
         host.onReady = { [weak self] in self?.start() }
@@ -96,6 +98,7 @@ final class KiriKiriSession: EngineSession {
         var settings = VNKKLaunch(gameRoot: strings[0], projectData: strings[1], logPath: strings[2], appDataDir: strings[3],
                                   personalDir: strings[4], hostView: hostView)
         engine.useFontPack()
+        engine.setMenuBar(KiriKiriMenuBar.engineMode(menuBarSettings.choice))
         Self.engineInUse = true
         state = .starting(cancelled: false)
         Self.inFrame = true
@@ -165,11 +168,27 @@ final class KiriKiriSession: EngineSession {
         displayLink = nil
         quitTimer?.invalidate()
         quitTimer = nil
+        recordMenuBar()
         engine.stop()
         Self.engineInUse = false
         kiriKiriLog.info("\(self.launch.game.id.rawValue, privacy: .public) stopped\(quitByGame ? " by the game" : "", privacy: .public)")
         stopped()
         if quitByGame { launch.onExit() }
+    }
+
+    /// Keeps what automatic told the game about its menu bar, for the game page to show.
+    private func recordMenuBar() {
+        guard menuBarSettings.choice == nil else { return }
+        let shown = engine.menuBarShown()
+        guard shown >= 0 else { return }
+        var settings = menuBarSettings
+        settings.automatic = shown == 1 ? .shown : .hidden
+        guard settings != menuBarSettings else { return }
+        do {
+            try settings.save(launch.dataDirectory)
+        } catch {
+            kiriKiriLog.error("could not record the menu bar choice: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func stopped() {
@@ -253,6 +272,22 @@ final class KiriKiriSession: EngineSession {
             quitTimer = timer
         case .quitting, .stoppingAfterFrame, .stopped:
             break
+        }
+    }
+
+    /// Read only between frames: a frame on the stack below, as under the game's own Yes/No dialog, could be partway
+    /// through changing the menu.
+    var currentMenu: [GameMenuItem] {
+        guard case .running = state, !Self.inFrame, let json = engine.menu() else { return [] }
+        return KiriKiriMenu.items(json: String(cString: json))
+    }
+
+    func gameMenu() async -> [GameMenuItem] { currentMenu }
+
+    func chooseGameMenuItem(_ id: GameMenuItem.ID) {
+        guard case .running = state, !Self.inFrame else { return }
+        if !engine.menuClick(id) {
+            kiriKiriLog.error("\(self.launch.game.id.rawValue, privacy: .public) has no menu item \(id, privacy: .public)")
         }
     }
 

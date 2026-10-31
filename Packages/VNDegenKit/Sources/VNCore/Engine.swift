@@ -184,11 +184,20 @@ public protocol EngineSession: AnyObject {
     /// Typing from VNDegen's on-screen keyboard. The default presses the keys for letters, digits, and spaces, and
     /// Return and Backspace, through `send`. Engines that read text, such as for a name the player types, take it whole.
     func type(_ typed: TypedText)
+    /// The game's own commands that VNDegen draws no place for, such as a KiriKiri game's window menu bar, as they stand
+    /// now. VNDegen's menu asks each time it opens and offers Game commands when the answer isn't empty. A game in a web
+    /// page answers once the page has. The default is empty.
+    func gameMenu() async -> [GameMenuItem]
+    /// Runs the Game commands entry with the given id. VNDegen's menu closes and resumes the game right after, and the
+    /// game handles the command then, as a PC game handles a menu click once its menu closes.
+    func chooseGameMenuItem(_ id: GameMenuItem.ID)
 }
 
 extension EngineSession {
     public func waitUntilStopped() async {}
     public var drawsOwnMenu: Bool { false }
+    public func gameMenu() async -> [GameMenuItem] { [] }
+    public func chooseGameMenuItem(_ id: GameMenuItem.ID) {}
 
     public func type(_ typed: TypedText) {
         for key in KeyboardKey.keys(typing: typed) {

@@ -22,6 +22,7 @@
 #include "TVPWindow.h"
 #include "WindowManager.h"
 #include "ciphers.h"
+#include "game_menu.h"
 #include "vnfont.h"
 
 #import <Foundation/Foundation.h>
@@ -290,6 +291,7 @@ int vnkk_start(const VNKKLaunch *launch)
 #endif
     TVPSetModalLoopHook(modalLoopPass);
     TVPSetHostEventHook(deliverText);
+    VNKKInstallMenuBarHook();
     // SDL would catch SIGINT and SIGTERM to quit the game, and the host app could no longer be ended by them.
     SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, hosted ? "1" : "0");
     // An exception the engine leaves uncaught would end the host app along with the game.
@@ -546,6 +548,30 @@ void *vnkk_view(void)
 #else
     return nullptr;
 #endif
+}
+
+void vnkk_set_menu_bar(int mode)
+{
+    VNKKSetMenuBarMode(mode);
+}
+
+int vnkk_menu_bar_shown(void)
+{
+    return VNKKMenuBarShown();
+}
+
+const char *vnkk_menu(void)
+{
+    static std::string menu;
+    if (!started || finished)
+        return nullptr;
+    menu = VNKKMenuJSON();
+    return menu.empty() ? nullptr : menu.c_str();
+}
+
+bool vnkk_menu_click(const char *id)
+{
+    return started && !finished && id && VNKKMenuClick(id);
 }
 
 void vnkk_record_problem(const char *sentence)

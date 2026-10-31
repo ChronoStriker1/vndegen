@@ -465,6 +465,10 @@ private enum FakeEngine {
     nonisolated(unsafe) static var callsInFrame: [String] = []
     nonisolated(unsafe) static var quitRequested = false
     nonisolated(unsafe) static var startResult: Int32 = 0
+    nonisolated(unsafe) static var menuBarMode: Int32 = -1
+    nonisolated(unsafe) static var menuBarShown: Int32 = -1
+    nonisolated(unsafe) static var menu: String?
+    nonisolated(unsafe) static var clicked: [String] = []
     /// Runs inside the next frame, as a native modal loop would.
     nonisolated(unsafe) static var duringFrame: (() -> Void)?
     /// Runs inside the start, as a dialog the game shows while it starts would.
@@ -475,6 +479,10 @@ private enum FakeEngine {
         callsInFrame = []
         quitRequested = false
         startResult = 0
+        menuBarMode = -1
+        menuBarShown = -1
+        menu = nil
+        clicked = []
         duringFrame = nil
         duringStart = nil
     }
@@ -513,16 +521,25 @@ private enum FakeEngine {
             text: { _ in },
             setPaused: { _ in }, requestQuit: { FakeEngine.quitRequested = true },
             saveSystemData: { FakeEngine.record("saveSystemData") },
-            stop: { FakeEngine.record("stop") }, view: { nil })
+            stop: { FakeEngine.record("stop") }, view: { nil },
+            setMenuBar: { FakeEngine.menuBarMode = $0 }, menuBarShown: { FakeEngine.menuBarShown },
+            menu: {
+                // Kept for the process's life, as the engine keeps its text until the next call.
+                FakeEngine.menu.map { UnsafePointer(strdup($0)!) }
+            },
+            menuClick: { id in
+                FakeEngine.clicked.append(String(cString: id!))
+                return true
+            })
     }
 }
 
 /// The session tests share `FakeEngine`'s records.
 @MainActor @Suite(.serialized) struct KiriKiriSessionTests {
-    private func session(_ name: String, onExit: @escaping @MainActor () -> Void = {}) throws -> KiriKiriSession {
+    private func session(_ name: String, data: URL? = nil, onExit: @escaping @MainActor () -> Void = {}) throws -> KiriKiriSession {
         FakeEngine.reset()
         let launch = GameLaunch(game: Game(id: GameID(name)), folder: URL(fileURLWithPath: "/nonexistent"),
-                                dataDirectory: try folder([:]), onExit: onExit)
+                                dataDirectory: try data ?? folder([:]), onExit: onExit)
         return try KiriKiriSession(launch, layout: KiriKiriLayout(root: "", data: .archive("data.xp3")),
                                    engine: FakeEngine.engine)
     }
@@ -540,6 +557,52 @@ private enum FakeEngine {
         }
         for await stopped in results { return stopped }
         return false
+    }
+
+    /// The player's menu bar choice reaches the engine. Automatic's answer is kept for the game page once the game stops.
+    @Test func passesTheMenuBarChoiceAndKeepsWhatAutomaticPicked() async throws {
+        let data = try folder([:])
+        try KiriKiriMenuBarSettings(choice: .hidden).save(data)
+        var session = try session("Test Game 71", data: data)
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        #expect(FakeEngine.menuBarMode == 1)
+        session.terminate()
+        session.step()
+        await session.waitUntilStopped()
+
+        try KiriKiriMenuBarSettings().save(data)
+        session = try self.session("Test Game 71", data: data)
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        #expect(FakeEngine.menuBarMode == 0)
+        FakeEngine.menuBarShown = 1
+        session.terminate()
+        session.step()
+        await session.waitUntilStopped()
+        #expect(KiriKiriMenuBarSettings.load(data) == KiriKiriMenuBarSettings(choice: nil, automatic: .shown))
+    }
+
+    @Test func listsAndChoosesTheGamesMenu() async throws {
+        let session = try session("Tawawa")
+        #expect(await session.gameMenu().isEmpty)
+        FakeEngine.menu = #"[{"id":"7","title":"Quick Save(&Q)","checked":false,"radio":false,"enabled":true,"items":[]}]"#
+        // Not before the game runs.
+        #expect(await session.gameMenu().isEmpty)
+        try #require(session.view as? KiriKiriHostView).onReady?()
+        #expect(await session.gameMenu() == [GameMenuItem(id: "7", title: "Quick Save")])
+        session.chooseGameMenuItem("7")
+        #expect(FakeEngine.clicked == ["7"])
+        // Nor while a frame of the game's runs below, as under its Yes/No dialog.
+        FakeEngine.duringFrame = {
+            MainActor.assumeIsolated {
+                #expect(session.currentMenu.isEmpty)
+                session.chooseGameMenuItem("7")
+            }
+        }
+        session.step()
+        #expect(FakeEngine.clicked == ["7"])
+        session.terminate()
+        session.step()
+        await session.waitUntilStopped()
     }
 
     @Test func runsNoEngineCallUnderAFrameThatIsStillRunning() throws {

@@ -11,7 +11,9 @@
         letterbox: 'on',
         // The PC projector has no context menu worth showing, and a right click belongs to the game.
         contextMenu: 'off',
-        menu: false,
+        // On, as in the PC projector, so Ruffle lists a movie's own context menu items, which VNDegen shows as Game
+        // commands. Ruffle's own menu stays off above.
+        menu: true,
         showSwfDownload: false,
         warnOnUnsupportedContent: false,
         allowFullscreen: false,
@@ -146,6 +148,29 @@
         };
         window.__vndegen.beforeQuit = flush;
     }
+
+    // VNDegen's Game commands list the movie's own right-click items, which Flash Player showed and a right click here,
+    // which belongs to the game, doesn't. A full-screen item is left out, since the session owns the window. The list
+    // comes from Ruffle's player with VNDegen's patch (Engines/Flash/patches/0002), and each item's id is its index.
+    const fullScreen = /full ?screen|フルスクリーン|ﾌﾙｽｸﾘｰﾝ/i;
+    const menuPlayer = () => {
+        const player = lastFocused && lastFocused.isConnected ? lastFocused : players()[0];
+        return player && typeof player.movieContextMenuItems === 'function' ? player : null;
+    };
+    window.__vndegenFlashMenu = {
+        items() {
+            const player = menuPlayer();
+            if (!player) return [];
+            return player.movieContextMenuItems().filter((item) => !fullScreen.test(item.caption)).map((item) => ({
+                id: String(item.index), title: item.caption, checked: item.checked, enabled: item.enabled,
+                separatorBefore: item.separatorBefore,
+            }));
+        },
+        choose(index) {
+            const player = menuPlayer();
+            if (player && index >= 0) player.runContextMenuItem(index).catch((error) => console.error('flash menu: ' + error));
+        },
+    };
 
     // A projector's Quit button sends fscommand("quit"), which ends the session as quitting the projector would. The
     // other commands set up the projector's window, which the session owns.

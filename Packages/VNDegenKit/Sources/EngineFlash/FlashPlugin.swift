@@ -80,11 +80,19 @@ nonisolated public struct FlashPlugin: EnginePlugin {
         // Every projector, since a launcher page can open any of them.
         for case let .projector(path, movie) in game.entries { folder.embedded["/" + path] = movie }
         flashLog.notice("starting \(entry.path, privacy: .public)")
-        return try WebGameConfiguration(
+        var configuration = WebGameConfiguration(
             folder: folder, appName: launch.game.title, runtime: .browser, userScripts: [pageScript, ruffleScript],
             storage: Self.storage(launch.dataDirectory), startPage: Self.startPage(for: entry),
             buttonScript: { _, _ in nil }, scriptArgument: "flash-script", log: flashLog
-        ).makeSession(launch)
+        )
+        configuration.pageMenu = Self.pageMenu
+        return try configuration.makeSession(launch)
+    }
+
+    /// A movie's own right-click items, which Flash Player showed and VNDegen's right click, which belongs to the game,
+    /// doesn't. flash-page.js lists them.
+    static let pageMenu = WebPageMenu(list: "JSON.stringify(window.__vndegenFlashMenu ? __vndegenFlashMenu.items() : [])") {
+        "window.__vndegenFlashMenu && __vndegenFlashMenu.choose(\(Int($0) ?? -1))"
     }
 
     /// Flash games are played with the mouse, and some with the keyboard. Flash Player read no gamepad.

@@ -175,6 +175,10 @@ public:
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
+// Decides whether a window's menu bar reports itself visible when the game set it so. Without a hook it reports
+// hidden. The hook runs on the main thread, on the game's first read and any later one.
+void TVPSetMenuBarShownHook(bool (*hook)());
+//---------------------------------------------------------------------------
 extern iTJSDispatch2* TVPCreateMenuItemObject(iTJSDispatch2* window);
 //---------------------------------------------------------------------------
 

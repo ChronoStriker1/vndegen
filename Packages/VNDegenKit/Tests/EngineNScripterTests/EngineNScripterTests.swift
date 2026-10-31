@@ -409,3 +409,64 @@ private func runScript(_ script: String, files: [String: Data] = [:]) throws -> 
         #expect(saves.relativePath("D:/Game/\(name)") == nil)
     }
 }
+
+/// A game's insertmenu menu bar, as Lilipalace builds it, lists what VNDegen runs, with the current choices checked.
+/// Volume and screen mode are left out, and a submenu of only those goes too.
+@Test func listsAndRunsTheWindowMenuBar() throws {
+    let script = """
+    *define
+    defaultspeed 0,20,10
+    kidokuskip
+    resetmenu
+    insertmenu "Skip",SKIP
+    insertmenu "Skip Setting",SUB
+    insertmenu "All",KIDOKUOFF,1
+    insertmenu "Read part",KIDOKUON,1
+    insertmenu "Volume Control",DWAVEVOLUME
+    insertmenu "Text Speed",SUB
+    insertmenu "Moment",TEXTSLOW,1
+    insertmenu "Normal",TEXTMIDDLE,1
+    insertmenu "Fast",TEXTFAST,1
+    insertmenu "Screen Mode",SUB
+    insertmenu "Fullscreen",FULL,1
+    insertmenu "Window",WINDOW,1
+    game
+    *start
+    click
+    click
+    end
+
+    """
+    let (engine, dir) = try runScript(script)
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    #expect(vnns_step(engine, 16))
+    func menu() throws -> [GameMenuItem] { NScripterMenu.items(json: String(cString: try #require(vnns_menu(engine)))) }
+    var items = try menu()
+    #expect(items.map(\.title) == ["Skip", "Skip Setting", "Text Speed"])
+    #expect(items[1].items.map(\.isChecked) == [false, true])
+    #expect(items[2].items.map(\.title) == ["Moment", "Normal", "Fast"])
+    #expect(items[2].items.map(\.isChecked) == [false, true, false])
+    #expect(items[2].items.allSatisfy { $0.isRadio })
+
+    #expect(vnns_menu_click(engine, items[2].items[2].id))
+    #expect(vnns_menu_click(engine, items[1].items[0].id))
+    items = try menu()
+    #expect(items[2].items.map(\.isChecked) == [false, false, true])
+    #expect(items[1].items.map(\.isChecked) == [true, false])
+    #expect(!vnns_menu_click(engine, "4"))  // Volume Control
+    #expect(!vnns_menu_click(engine, "99"))
+
+    // The game waits at its clicks until Skip runs through them to the end.
+    for _ in 0..<5 { #expect(vnns_step(engine, 16)) }
+    #expect(vnns_menu_click(engine, items[0].id))
+    var ended = false
+    for _ in 0..<20 where !ended { ended = !vnns_step(engine, 16) }
+    #expect(ended)
+}
+
+@Test func aGameWithoutAMenuBarHasNone() throws {
+    let (engine, dir) = try runScript("*define\ndeletemenu\ngame\n*start\nclick\nend\n")
+    defer { vnns_stop(engine); try? FileManager.default.removeItem(at: dir) }
+    #expect(vnns_step(engine, 16))
+    #expect(vnns_menu(engine) == nil)
+}
