@@ -36,6 +36,8 @@ final class System4Session: EngineSession {
     #endif
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    private lazy var system4Cheats = System4Cheats { [weak self] in self?.engine }
+    var cheats: (any CheatSession)? { system4Cheats }
 
     @MainActor static func make(_ launch: GameLaunch, root: URL) throws -> any EngineSession {
         if let reason = compatibilityNote(root: root) { throw System4Error.unsupported(reason) }
@@ -156,6 +158,7 @@ final class System4Session: EngineSession {
         }
         engine = started
         system4Log.info("started \(self.launch.game.id.rawValue, privacy: .public)")
+        system4Cheats.apply(launch.game.cheats ?? CheatSettings())
         let box = System4EngineBox(started)
         audio = PCMAudioOutput { out, frames in vns4_audio_render(box.engine, out, Int32(frames)) }
         audio?.start()

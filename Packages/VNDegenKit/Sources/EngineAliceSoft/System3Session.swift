@@ -34,6 +34,8 @@ final class System3Session: EngineSession {
     #endif
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    private lazy var system3Cheats = System3Cheats { [weak self] in self?.engine }
+    var cheats: (any CheatSession)? { system3Cheats }
 
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
@@ -90,6 +92,7 @@ final class System3Session: EngineSession {
         }
         engine = started
         system3Log.info("started \(self.launch.game.id.rawValue, privacy: .public)")
+        system3Cheats.apply(launch.game.cheats ?? CheatSettings())
         let box = EngineBox(started)
         audio = PCMAudioOutput(sampleRate: rate) { out, frames in vns3_audio(box.engine, out, Int32(frames)) }
         audio?.start()

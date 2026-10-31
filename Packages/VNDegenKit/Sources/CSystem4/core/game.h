@@ -1,6 +1,7 @@
 // One running System 4 game: its files, its VM on a thread of its own, the screen, sound and input. The host
 // drives it through the C interface in vns4.h; the HLL modules reach it through game().
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -48,6 +49,14 @@ public:
     void wheel(int delta);
     // The last presented frame, RGBA. Copies it out under the lock.
     bool takeFrame(std::vector<uint8_t> &out, int &w, int &h);
+    // Cheats (cheats.cpp), on the game's globals while the VM waits for the next step. The state is CheatState's JSON,
+    // empty while the VM is running. The setters return false when the game has no such global or the VM is running.
+    std::string cheatState();
+    bool cheatSetGlobal(int index, int32_t value);
+    bool cheatAddGold(int amount);
+    bool hasGold() const { return vm && goldGlobal() >= 0; }  // the code file never changes while the game runs
+    // The game's clock runs this many times as fast.
+    void setSpeed(int speed) { speed_ = std::clamp(speed, 1, 8); }
 
     // Game side, on the VM thread.
     GameConfig cfg;
@@ -104,6 +113,10 @@ private:
     bool vmTurn_ = false;            // the VM thread runs while true; the host waits
     bool stopping_ = false;
     std::atomic<bool> paused_{false};
+    std::atomic<int> speed_{1};
+    std::string codeStem_;            // the code file's name without .ain, such as Rance02
+    bool cheatReady() const;          // with mu_ held
+    int goldGlobal() const;           // the global the party's money is in, or -1
     std::atomic<uint32_t> clockMs_{0};
     uint32_t budgetMs_ = 0;          // game time the current step may still use
     int hitches_ = 0, lostMs_ = 0;   // steps the clock capped and the time they dropped, since the last timing log

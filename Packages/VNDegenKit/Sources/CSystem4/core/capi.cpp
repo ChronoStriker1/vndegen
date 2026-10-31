@@ -14,7 +14,7 @@
 struct VNS4Engine {
     std::unique_ptr<s4::Game> game;
     std::vector<uint8_t> frame;
-    std::string caption, problem;
+    std::string caption, problem, cheatState;
 };
 
 namespace {
@@ -110,6 +110,18 @@ void vns4_stop(VNS4Engine *e) { delete e; }
 
 void vns4_debug_dump_sprites(VNS4Engine *e) { if (e) e->game->dumpSpritesOnNextFrame(); }
 void vns4_debug_call(VNS4Engine *e, const char *utf8Name) { if (e) e->game->debugCall(s4::sjis::fromUtf8(utf8Name)); }
+
+void vns4_set_speed(VNS4Engine *e, int speed) { if (e) e->game->setSpeed(speed); }
+
+const char *vns4_cheat_state(VNS4Engine *e) {
+    if (!e) return nullptr;
+    e->cheatState = e->game->cheatState();
+    return e->cheatState.empty() ? nullptr : e->cheatState.c_str();
+}
+
+bool vns4_cheat_set_global(VNS4Engine *e, int index, int32_t value) { return e && e->game->cheatSetGlobal(index, value); }
+bool vns4_cheat_add_gold(VNS4Engine *e, int amount) { return e && e->game->cheatAddGold(amount); }
+bool vns4_cheat_has_gold(VNS4Engine *e) { return e && e->game->hasGold(); }
 
 const char *vns4_problem(VNS4Engine *e) {
     if (!e) return nullptr;

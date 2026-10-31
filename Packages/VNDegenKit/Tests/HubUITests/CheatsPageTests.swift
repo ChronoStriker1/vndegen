@@ -96,9 +96,7 @@ import VNCore
     let cheats = FakeCheats()
     let page = await page(cheats)
     page.show(.variables)
-    _ = page.handle(.down)
-    _ = page.handle(.down)
-    _ = page.handle(.down)
+    for _ in 0..<4 { _ = page.handle(.down) }
     #expect(page.isFocused(.variable(1)))
     _ = page.handle(.right)
     await settle()
@@ -137,7 +135,7 @@ import VNCore
     let cheats = FakeCheats(state: CheatState(inGame: true, variables: [CheatVariable(id: 1, name: "", value: .integer(999))]))
     let page = await page(cheats)
     page.show(.variables)
-    for _ in 0..<3 { _ = page.handle(.down) }
+    for _ in 0..<4 { _ = page.handle(.down) }
     #expect(page.isFocused(.variable(1)))
     _ = page.handle(.right)
     await settle()
@@ -145,6 +143,35 @@ import VNCore
     _ = page.handle(.left)
     await settle()
     #expect(cheats.performed == [.setVariable(id: 1, .integer(998))])
+}
+
+@MainActor @Test func findingAValueTwiceNarrowsTheVariablesToTheOneThatChanged() async throws {
+    let cheats = FakeCheats(state: CheatState(inGame: true, variables: [
+        CheatVariable(id: 1, name: "", value: .integer(500)), CheatVariable(id: 2, name: "", value: .integer(500)),
+        CheatVariable(id: 3, name: "", value: .integer(7)), CheatVariable(id: 4, name: "", value: .text("500")),
+    ]))
+    let page = await page(cheats)
+    page.show(.variables)
+    page.select(.findValue)
+    try #require(page.keyboard).replace(with: "500")
+    page.keyboard?.press(.done)
+    #expect(page.shownVariables.map(\.id) == [1, 2])
+    #expect(page.rows.contains([.findValue, .showAll]))
+    // The gold changes in the game: variable 2 now holds 450, and variable 3 does too, but it didn't hold 500 before.
+    cheats.current.variables = [CheatVariable(id: 1, name: "", value: .integer(500)), CheatVariable(id: 2, name: "", value: .integer(450)),
+                                CheatVariable(id: 3, name: "", value: .integer(450)), CheatVariable(id: 4, name: "", value: .text("500"))]
+    await page.load()
+    page.select(.findValue)
+    page.keyboard?.replace(with: "450")
+    page.keyboard?.press(.done)
+    #expect(page.shownVariables.map(\.id) == [2])
+    #expect(page.status?.isError == false)
+    page.select(.showAll)
+    #expect(page.found == nil && page.shownVariables.count == 4)
+    page.select(.findValue)
+    page.keyboard?.replace(with: "many")
+    page.keyboard?.press(.done)
+    #expect(page.status?.isError == true && page.found == nil)
 }
 
 @MainActor @Test func onTheTitleScreenOnlyTheSettingsShow() async {
