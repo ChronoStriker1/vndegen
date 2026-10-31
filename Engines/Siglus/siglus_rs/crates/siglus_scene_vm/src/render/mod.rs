@@ -468,7 +468,8 @@ impl Renderer {
             .await
     }
 
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    // VNDegen: on macOS and Linux too, where VNDegen's host hands the engine a view rather than a winit window.
+    #[cfg(any(target_os = "android", target_os = "ios", target_os = "macos", target_os = "linux"))]
     pub async unsafe fn new_from_raw_handles(
         raw_display_handle: raw_window_handle::RawDisplayHandle,
         raw_window_handle: raw_window_handle::RawWindowHandle,
