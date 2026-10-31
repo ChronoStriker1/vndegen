@@ -164,8 +164,11 @@ private let red = [true, false, false], green = [false, true, false], blue = [fa
         await until(() => shown() !== 'video');
         openGate();
         await until(() => shown()[1][3] === 255);
-        // An update at 0.35 s shows the third frame, then the video stalls through its end.
-        now += 350;
+        // Updates at 0.2 s and 0.35 s reach the third frame, then the video stalls through its end. Each update moves
+        // the kept frames at most 0.25 s, so it takes two.
+        now += 200;
+        shown();
+        now += 150;
         const before = square(shown()[1]);
         video.currentTime = 0.56;
         video.paused = true;
