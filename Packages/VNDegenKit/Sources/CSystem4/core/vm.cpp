@@ -1028,6 +1028,7 @@ void VM::run(size_t untilFrames) {
         case OP_SH_LOCAL_A_PUSHBACK_LOCAL: arrayAt(fr.localPage, A(0))->v.push_back(copyPage(localv(A(1)))); break;
         case OP_SH_LOCAL_A_PUSHBACK_LOCAL_S: arrayAt(fr.localPage, A(0))->v.push_back(newString(str(localv(A(1))))); break;
         case OP_SH_MEM_A_PUSHBACK_LOCAL_S: arrayAt(fr.structPage, A(0))->v.push_back(newString(str(localv(A(1))))); break;
+        case OP_SH_GLOBAL_A_PUSHBACK_LOCAL_S: arrayAt(globalPage, A(0))->v.push_back(newString(str(localv(A(1))))); break;
         case OP_SH_IF_SREF_NE_STR: {
             int32_t i = pop(), pg = pop();
             if (str(var(pg, i)) != ain.strings.at(A(0))) jump(A(1));

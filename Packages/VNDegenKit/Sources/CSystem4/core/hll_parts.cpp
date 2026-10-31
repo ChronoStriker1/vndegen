@@ -6,6 +6,8 @@
 // the game makes; docs/system4-cleanroom.md has the details.
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <map>
@@ -42,6 +44,11 @@ struct State {
     std::vector<Step> steps;
     Surface built;
     bool hasBuilt = false;
+    // Text drawn into a fixed area: its top left and size (0 for the text's own size).
+    int areaX = 0, areaY = 0, areaW = 0, areaH = 0;
+    // A looping CG: <base><number>, two digits, from loopStart for loopCount pictures of loopMs each.
+    std::string loopBase;
+    int loopStart = 0, loopCount = 0, loopMs = 0, loopShown = -1;
     bool empty() const { return !cg && !hasBuilt && !hasText; }
 };
 
@@ -57,6 +64,7 @@ struct Part {
     int state = 1;  // the input state, which is also the state shown: 1 normal, 2 under the pointer, 3 pressed
     int layer = 0;
     bool clickable = false;
+    bool pixelDecide = false;  // clicks count only where the picture isn't transparent
     bool lockInput = false;
     float x = 0, y = 0;
     int z = 0;
@@ -105,6 +113,7 @@ std::map<std::string, Activity> g_activities;
 std::map<std::pair<std::string, std::string>, Intent> g_intents;
 std::map<int, std::map<int, int>> g_links;  // PartsFunc's per-part values (scroll links and the like), by ID
 std::set<std::string> g_loggedOnce;
+std::vector<uint8_t> g_transFrom;  // the screen a ChipmunkSpriteEngine transition starts from
 
 void logOnce(const std::string &what) {
     if (g_loggedOnce.insert(what).second) G().log("PartsEngine: " + what);
@@ -117,6 +126,7 @@ S4_HLL_RESET {
     g_motionTime = 0;
     g_motionOn = false;
     g_textDefault = TextStyle{};
+    g_transFrom.clear();
     g_messages.clear();
     g_hover = g_pressed = 0;
     g_buttonWas = false;
@@ -147,6 +157,33 @@ State *stateOf(HllCall &c, int numberArg, int stateArg) {
     return &get(c.i(numberArg)).states[s - 1];
 }
 
+// A state's text in lines, which break at "\n", and the size it draws at.
+std::vector<std::string> textLines(const State &s) {
+    std::vector<std::string> lines(1);
+    for (char ch : s.text) {
+        if (ch == '\n') lines.emplace_back();
+        else lines.back() += ch;
+    }
+    return lines;
+}
+int lineHeight(const State &s) { return s.font.size + s.lineSpace; }
+void textSize(const State &s, int &w, int &h) {
+    auto lines = textLines(s);
+    w = 1;
+    for (const auto &l : lines) w = std::max(w, textWidth(l, s.font, s.charSpace));
+    h = int(lines.size()) * lineHeight(s) + 4;
+    if (s.areaW > 0) w = s.areaW;
+    if (s.areaH > 0) h = s.areaH;
+}
+
+// The size a state shows at: its built picture, its CG, else its text.
+void stateSize(const State &s, int &w, int &h) {
+    w = h = 0;
+    if (s.hasBuilt) { w = s.built.w; h = s.built.h; }
+    else if (s.cg) { w = s.cg->w; h = s.cg->h; }
+    else if (s.hasText && !s.text.empty()) textSize(s, w, h);
+}
+
 // The picture a state shows: what its construction steps built, its CG, or its text.
 void drawState(const State &s, Sprite &sp) {
     sp.cg.reset();
@@ -158,14 +195,16 @@ void drawState(const State &s, Sprite &sp) {
         sp.cg = s.cg;
     }
     if (s.hasText && !s.text.empty()) {
-        int w = std::max(1, textWidth(s.text, s.font, s.charSpace));
-        int h = s.font.size + 4;
+        // Each line is the font's size plus the line space below the one before.
+        auto lines = textLines(s);
+        int w, h, lineH = lineHeight(s);
+        textSize(s, w, h);
         Surface t;
         t.create(w, h, true);
-        drawText(t, 0, 0, s.text, s.font, s.charSpace);
+        for (size_t k = 0; k < lines.size(); k++) drawText(t, 0, int(k) * lineH, lines[k], s.font, s.charSpace);
         if (sp.hasOwn || sp.cg) {
             Surface &dst = sp.writable();
-            blit(dst.px.data(), dst.w, dst.h, 0, 0, t.px.data(), t.w, t.h, true, 255, 0);
+            blit(dst.px.data(), dst.w, dst.h, s.areaX, s.areaY, t.px.data(), t.w, t.h, true, 255, 0);
         } else {
             sp.own = std::move(t);
             sp.hasOwn = true;
@@ -187,7 +226,19 @@ void placement(int n, float &x, float &y, int &z, int &alpha, bool &show, int de
 
 // Draws every part into its sprite: the picture when it changed, and the placement each time.
 void syncAll() {
+    uint32_t now = G().now();
     for (auto &[n, p] : g_parts) {
+        State &ls = p.states[std::clamp(p.state, 1, 3) - 1];
+        if (ls.loopCount > 0 && ls.loopMs > 0) {
+            int k = ls.loopStart + int(now / uint32_t(ls.loopMs) % uint32_t(ls.loopCount));
+            if (k != ls.loopShown) {
+                char num[16];
+                std::snprintf(num, sizeof num, "%02d", k);
+                ls.cg = G().cgCachedNamed(ls.loopBase + num);
+                ls.loopShown = k;
+                p.dirty = true;
+            }
+        }
         Sprite &sp = G().sprites.get(kSpriteBase + n);
         sp.used = true;
         if (p.dirty) {
@@ -234,6 +285,8 @@ int hitTest(int mx, int my) {
         Sprite *sp = G().sprites.find(kSpriteBase + n);
         if (!sp || !sp->show || sp->blendRate == 0) continue;
         if (mx < sp->x || my < sp->y || mx >= sp->x + sp->width() || my >= sp->y + sp->height()) continue;
+        if (p.pixelDecide && sp->hasAlpha() && sp->pixels()[(size_t(my - sp->y) * sp->width() + (mx - sp->x)) * 4 + 3] == 0)
+            continue;
         if (!best || sp->z >= bestZ) { best = n; bestZ = sp->z; }
     }
     return best;
@@ -327,12 +380,14 @@ S4_HLL(PartsEngine, SetComponentSpeedupRateByMessageSkip) {}
 S4_HLL(PartsEngine, GetComponentSpeedupRateByMessageSkip) { c.retInt(0); }
 // A state's size and top left corner, before the part's position.
 S4_HLL(PartsEngine, Parts_GetPartsWidth) {
-    State *s = stateOf(c, 0, 1);
-    c.retInt(!s ? 0 : s->hasBuilt ? s->built.w : s->cg ? s->cg->w : 0);
+    int w = 0, h = 0;
+    if (State *s = stateOf(c, 0, 1)) stateSize(*s, w, h);
+    c.retInt(w);
 }
 S4_HLL(PartsEngine, Parts_GetPartsHeight) {
-    State *s = stateOf(c, 0, 1);
-    c.retInt(!s ? 0 : s->hasBuilt ? s->built.h : s->cg ? s->cg->h : 0);
+    int w = 0, h = 0;
+    if (State *s = stateOf(c, 0, 1)) stateSize(*s, w, h);
+    c.retInt(h);
 }
 S4_HLL(PartsEngine, Parts_GetPartsUpperLeftPosX) {
     Part *p = find(c.i(0));
@@ -373,6 +428,7 @@ S4_HLL(PartsEngine, Parts_SetText) {
     State *s = stateOf(c, 0, 2);
     if (!s) { c.retBool(false); return; }
     s->text = c.s(1);
+    if (std::getenv("S4_PARTSTEXT")) G().log("parts text " + std::to_string(c.i(0)) + ": " + sjis::toUtf8(s->text));
     s->hasText = true;
     get(c.i(0)).dirty = true;
     c.retBool(true);
@@ -410,6 +466,51 @@ S4_HLL(PartsEngine, Parts_SetPartsFontBoldWeight) {
     if (s) { s->font.boldWeight = c.f(1); get(c.i(0)).dirty = true; }
     c.retBool(s != nullptr);
 }
+S4_HLL(PartsEngine, Parts_AddPartsText) {
+    State *s = stateOf(c, 0, 2);
+    if (!s) { c.retBool(false); return; }
+    s->text += c.s(1);
+    if (std::getenv("S4_PARTSTEXT")) G().log("parts text+ " + std::to_string(c.i(0)) + ": " + sjis::toUtf8(c.s(1)));
+    s->hasText = true;
+    get(c.i(0)).dirty = true;
+    c.retBool(true);
+}
+S4_HLL(PartsEngine, Parts_SetPartsTextSurfaceArea) {
+    State *s = stateOf(c, 0, 5);
+    if (s) { s->areaX = c.i(1); s->areaY = c.i(2); s->areaW = c.i(3); s->areaH = c.i(4); get(c.i(0)).dirty = true; }
+    c.retBool(s != nullptr);
+}
+S4_HLL(PartsEngine, Parts_SetPartsFontEdgeWeight) {
+    State *s = stateOf(c, 0, 2);
+    if (s) { s->font.edgeWeight = c.f(1); get(c.i(0)).dirty = true; }
+    c.retBool(s != nullptr);
+}
+S4_HLL(PartsEngine, Parts_SetPartsFontEdgeColor) {
+    State *s = stateOf(c, 0, 4);
+    if (s) { s->font.er = c.i(1); s->font.eg = c.i(2); s->font.eb = c.i(3); get(c.i(0)).dirty = true; }
+    c.retBool(s != nullptr);
+}
+S4_HLL(PartsEngine, Parts_SetLoopCG) {
+    State *s = stateOf(c, 0, 5);
+    if (s) {
+        s->loopBase = c.s(1);
+        s->loopStart = c.i(2);
+        s->loopCount = c.i(3);
+        s->loopMs = c.i(4);
+        s->loopShown = -1;
+        s->hasBuilt = false;
+        get(c.i(0)).dirty = true;
+    }
+    c.retBool(s != nullptr);
+}
+S4_HLL(PartsEngine, Parts_IsCursorIn) {
+    Sprite *sp = G().sprites.find(kSpriteBase + c.i(0));
+    int x = c.i(1), y = c.i(2);
+    c.retBool(sp && sp->show && x >= sp->x && y >= sp->y && x < sp->x + sp->width() && y < sp->y + sp->height());
+}
+S4_HLL(PartsEngine, Parts_SetPartsPixelDecide) { get(c.i(0)).pixelDecide = c.b(1); }
+// Multiplying a part's colours isn't drawn yet.
+S4_HLL(PartsEngine, SetComponentMulColor) { logOnce("colour multiply is not drawn"); }
 S4_HLL(PartsEngine, Parts_SetTextCharSpace) {
     State *s = stateOf(c, 0, 2);
     if (s) { s->charSpace = c.i(1); get(c.i(0)).dirty = true; }
@@ -784,16 +885,36 @@ S4_HLL(ChipmunkSpriteEngine, KeepPreviousView_GetMode) { c.retInt(0); }
 S4_HLL(ChipmunkSpriteEngine, VIEW_SetMode) {}
 S4_HLL(ChipmunkSpriteEngine, VIEW_GetMode) { c.retInt(0); }
 S4_HLL(ChipmunkSpriteEngine, VIEW_SetOffsetPos) {}
-S4_HLL(ChipmunkSpriteEngine, TRANS_Begin) { c.retBool(true); }
-S4_HLL(ChipmunkSpriteEngine, TRANS_Update) { syncAll(); G().present(); }
-S4_HLL(ChipmunkSpriteEngine, TRANS_End) {}
+// A transition: the screen as it was when it began crossfades into the parts as they are, by the game's rate.
+S4_HLL(ChipmunkSpriteEngine, TRANS_Begin) {
+    syncAll();
+    g_transFrom.assign(size_t(G().screenW) * G().screenH * 4, 0);
+    G().sprites.compose(g_transFrom, G().screenW, G().screenH, 0, 0);
+    c.retBool(true);
+}
+S4_HLL(ChipmunkSpriteEngine, TRANS_Update) {
+    syncAll();
+    std::vector<uint8_t> now(size_t(G().screenW) * G().screenH * 4);
+    G().sprites.compose(now, G().screenW, G().screenH, 0, 0);
+    if (g_transFrom.size() == now.size()) {
+        int a = int(std::clamp(c.f(0), 0.0f, 1.0f) * 256);
+        for (size_t i = 0; i < now.size(); i++) now[i] = uint8_t(g_transFrom[i] + ((now[i] - g_transFrom[i]) * a >> 8));
+    }
+    G().showFrame(std::move(now));
+    c.retBool(true);
+}
+S4_HLL(ChipmunkSpriteEngine, TRANS_End) { g_transFrom.clear(); c.retBool(true); }
 S4_HLL(ChipmunkSpriteEngine, SP_SetTextSpriteType) { g_textDefault.face = c.i(0) == 1 ? 1 : 0; }
 S4_HLL(ChipmunkSpriteEngine, SP_SetTextSpriteSize) { g_textDefault.size = c.i(0); }
 S4_HLL(ChipmunkSpriteEngine, SP_SetTextSpriteColor) { g_textDefault.r = c.i(0); g_textDefault.g = c.i(1); g_textDefault.b = c.i(2); }
 S4_HLL(ChipmunkSpriteEngine, SP_SetTextSpriteBoldWeight) { g_textDefault.boldWeight = c.f(0); }
 S4_HLL(ChipmunkSpriteEngine, SP_SetTextSpriteEdgeWeight) { g_textDefault.edgeWeight = c.f(0); }
 S4_HLL(ChipmunkSpriteEngine, SP_SetTextSpriteEdgeColor) { g_textDefault.er = c.i(0); g_textDefault.eg = c.i(1); g_textDefault.eb = c.i(2); }
-S4_HLL(ChipmunkSpriteEngine, SP_GetFontWidth) { c.retInt(c.i(1) / 2); }
+// The width of text in the SP_SetTextSprite* style, which the game lays out message characters by.
+S4_HLL(ChipmunkSpriteEngine, SP_GetFontWidth) {
+    c.ref(1) = textWidth(c.s(0), g_textDefault, 0);
+    c.retBool(true);
+}
 S4_HLL(ChipmunkSpriteEngine, FPS_Get) { c.retFloat(60); }
 S4_HLL(ChipmunkSpriteEngine, SYSTEM_SetConfigOverFrameRateSleep) {}
 S4_HLL(ChipmunkSpriteEngine, SYSTEM_GetConfigOverFrameRateSleep) { c.retBool(true); }

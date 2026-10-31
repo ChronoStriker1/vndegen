@@ -231,7 +231,7 @@
     {"SH_S_ASSIGN_LOCAL", 1},  // 229
     {"SH_MEM_S_ASSIGN_LOCAL", 2},  // 230
     {"SH_LOCAL_S_EMPTY", 1},  // 231
-    {"OP_232", 2},  // 232
+    {"SH_GLOBAL_A_PUSHBACK_LOCAL_S", 2},  // 232
     {"SH_MEM_A_PUSHBACK_LOCAL_S", 2},  // 233
     {"SH_MEM_S_EMPTY", 1},  // 234
     {"OP_235", -1},  // 235
