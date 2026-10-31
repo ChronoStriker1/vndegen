@@ -180,6 +180,10 @@ struct GamePageView: View {
             #endif
             ControlsSection(game: game)
                 .padding(.top, 18)
+            if let cheats = game.cheats, cheats.isActive {
+                CheatsSection(settings: cheats)
+                    .padding(.top, 18)
+            }
         }
         .padding(18)
         .background(Theme.surface, in: .rect(cornerRadius: 16, style: .continuous))
@@ -238,6 +242,24 @@ private struct OrientationSection: View {
                 Spacer()
                 HubButton(target: .pageOrientation, kind: .secondary) { Text("Change") }
             }
+        }
+    }
+}
+
+/// The cheats that stay on for this game. They change in the Cheats page of the in-game menu.
+private struct CheatsSection: View {
+    let settings: CheatSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            SectionLabel(text: "Cheats", systemImage: "wand.and.stars")
+                .padding(.bottom, 6)
+            Text("On: " + settings.summary.joined(separator: ", "))
+                .font(.system(size: 17, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Change them in the game's Cheats menu, in the VNDegen menu while it plays.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.secondaryText)
         }
     }
 }

@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ are built, see below.
 
 ## Why
 
@@ -52,3 +52,28 @@ Visual novel engines (TyranoScript, Ren'Py, KiriKiri, NScripter, Artemis) don't 
 5. AliceSoft System 3 and 4.
 
 Each engine's work is checked like an engine change: the Mac app and an iPad simulator, a save made after cheating loads on the PC, and a Codex review.
+
+## Built: RPG Maker MV and MZ
+
+The Cheats entry sits in the VNDegen menu, between Resume (or Game menu) and Quit to library, for every MV and MZ game. Its page has four tabs:
+
+- **Quick**: add 1,000, 10,000 or 100,000 gold (the game's own maximum still applies), restore the party's HP and MP, and the settings that stay on: keep HP and MP full, no random encounters, walk through walls, game speed 1x, 2x or 4x, and experience 1x, 2x, 5x or 10x.
+- **Items**: the game's items, weapons and armor by name, with how many the party has, and +1 or +10.
+- **Variables** and **Switches**: every entry in the game's System database, with its name, a search by name or number, and editing in place. Whole numbers and text are editable. Other values a script keeps in a variable, such as arrays, are shown and left alone, since setting them from a text field could break the game.
+
+How each works, in `Packages/VNDegenKit/Sources/EngineRPGMaker/Resources/rpgmaker-cheats.js`:
+
+- One-shot cheats call the game's own methods: `$gameParty.gainGold`, `gainItem`, `recoverAll`, `$gameVariables.setValue` and `$gameSwitches.setValue`. They wait until a game is started or loaded, because the title screen's game objects are replaced when one is.
+- Settings that stay on wrap engine methods once, when `SceneManager.run` starts the boot scene, which both MV and MZ call after every plugin has loaded: `Game_BattlerBase.setHp`, `setMp` and `paySkillCost` for actors, `Game_Player.canEncounter`, `Game_Player.isThrough`, and `Game_Actor.finalExpRate`. None of them write anything a save keeps, so turning one off leaves no trace in the next save.
+- Game speed in MZ multiplies `SceneManager.determineRepeatNumber`, the count of engine updates each displayed frame runs. MV runs an update for each 1/60 s its clock has moved, so its clock (`_getTimeInMsWithoutMobileSafari`) runs faster. Either way every update runs whole, input included, so the game's timers, animations and waits stay in step. Music plays at its normal speed.
+- The library keeps the settings per game (`Game.cheats`). The game page lists them while any is on, and the session starts with them.
+
+Checked against Rookie Knight Rathi (MV 1.6.1), Mama's Secret Parent Teacher Conference (MV 1.5.2) and No Socks RPG (MZ 1.9.0).
+
+### Known limits
+
+- Keep HP and MP full stops damage, skill costs and HP or MP the game takes away. It doesn't stop a state that knocks an actor out directly, such as an event's Change State to Knockout, or a plugin that sets HP or MP fields without the engine's setters.
+- Walk through walls uses the player's through flag, as an event's Through option does. Followers still follow, and vehicles are unchanged.
+- A plugin that replaces one of the wrapped methods after the boot scene starts, rather than when it loads, replaces the cheat with it. No library game was found doing so.
+- Variables and switches past the length of the game's System lists aren't listed, since MV's and MZ's `setValue` ignores them.
+- At 4x a heavy scene runs four engine updates per displayed frame, so a game that is already slow on a device draws fewer frames, though its timing stays right.
