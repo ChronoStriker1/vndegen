@@ -37,6 +37,13 @@ clicking and saving frames at the times given, and `s3play <game>` plays it in a
 fixed date, so a run replays the same way. `--auto` answers menus by their text (`T:pick:Save`, `--prefer`, `--avoid`)
 to reach a game's save point, and `--repl FIFO` takes commands one at a time for long scripted sequences.
 
+## Frame rate
+
+The runtime steps once per display refresh and draws on the CPU. Panyon's tactical battle, the most animated screen
+among the test games (sprites, unit overlays, scrolling), held its 60 fps target: on the Mac app (Mac mini) every
+10-second window averaged 60.0 with a 1% low of 60 and a slowest step of 20 ms; on an iPad simulator, 147 one-second
+samples averaged 60.0 with one hitch. A DEBUG build launched with `-frameMonitor YES` logs `S3FRAMES` every 10 seconds.
+
 ## Known limits
 
 - Commands no test game uses are read and skipped: CT to CZ (alpha data), the CX shadow modes, ME, MF, MG, MI, MJ and
@@ -47,3 +54,6 @@ to reach a game's save point, and `--repl FIFO` takes commands one at a time for
   animating each step.
 - Text appears all at once rather than at the game's message speed.
 - System 3.0's own music format (`AMUS.DAT`) isn't played; the test games use CD tracks instead.
+- Mamatoto: in the scripted tutorial's defensive battle, the Squad Formation screen offers 2 of the 5 commanders a new
+  game adds, so the demo's scripted clicks miss and it stops at the game's own end-of-script loop before the first save
+  point. Whether the runtime or the demo's timing causes it isn't known yet.
