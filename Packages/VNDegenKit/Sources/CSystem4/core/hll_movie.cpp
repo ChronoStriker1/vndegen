@@ -4,6 +4,7 @@
 // the calls. The movie's sound is a stream in the mixer's music group, so the game's music volume applies to it.
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <filesystem>
 #include <memory>
 
@@ -46,6 +47,7 @@ struct Playback {
     bool running = false;
     int volume = 100;
     int count = 0;  // frames shown, which the game reads to measure the frame rate
+    uint32_t lastShownMs = 0, longestGapMs = 0;  // game time between new frames, for the close log
 
     bool load(const std::string &name) {
         release();
@@ -71,7 +73,12 @@ struct Playback {
     bool advance() {
         if (!movie || !running) return false;
         bool changed = movie->advanceTo((G().now() - startMs) / 1000.0);
-        if (changed) count++;
+        if (changed) {
+            uint32_t at = G().now();
+            if (count > 0) longestGapMs = std::max(longestGapMs, at - lastShownMs);
+            lastShownMs = at;
+            count++;
+        }
         return changed;
     }
     bool ended() { return !movie || (running && movie->ended()); }
@@ -81,14 +88,19 @@ struct Playback {
     }
     void release() {
         if (running) G().audio.clearStream();
-        if (movie) {
+        if (movie && running) {
             Movie::Dry d = movie->dry();
-            G().log("movie: closed after " + std::to_string((G().now() - startMs) / 1000) + " s of game time; its sound ran dry " +
+            double seconds = (G().now() - startMs) / 1000.0;
+            char rate[160];
+            std::snprintf(rate, sizeof rate, "showed %d frames, %.2f a second against the movie's %.2f, longest gap %u ms", count,
+                          seconds > 0 ? count / seconds : 0.0, movie->frameRate(), longestGapMs);
+            G().log("movie: closed after " + std::to_string(int(seconds)) + " s of game time; " + rate + "; its sound ran dry " +
                     std::to_string(d.reads) + " times, " + std::to_string(d.frames * 1000 / Movie::kAudioRate) + " ms in all");
         }
         running = false;
         movie.reset();
         count = 0;
+        lastShownMs = longestGapMs = 0;
     }
 };
 

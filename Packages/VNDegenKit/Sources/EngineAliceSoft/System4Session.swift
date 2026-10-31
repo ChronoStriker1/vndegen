@@ -27,6 +27,9 @@ final class System4Session: EngineSession {
     private var router = System4InputRouter()
     private var frameSize = CGSize(width: 800, height: 600)
     private var paused = false
+    #if DEBUG
+    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing(tag: "S4FRAMES") : nil
+    #endif
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -154,6 +157,9 @@ final class System4Session: EngineSession {
             frameSize = CGSize(width: Int(w), height: Int(h))
             frameView.present(pixels, width: Int(w), height: Int(h))
         }
+        #if DEBUG
+        pacing?.note(tick: now, presented: true, stepEnd: CACurrentMediaTime(), target: link.targetTimestamp - link.timestamp)
+        #endif
     }
 
     private func deliver(_ inputs: [System4Input]) {
@@ -201,6 +207,9 @@ final class System4Session: EngineSession {
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
+        #if DEBUG
+        pacing?.reset()
+        #endif
         if !paused { frameView.takeFocus() }
     }
 
