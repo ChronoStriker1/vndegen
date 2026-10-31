@@ -141,6 +141,7 @@ wrapper, were checked by the coordinator, not re-reviewed by Codex.
 
 ## Known limits
 
+- A movie's own right-click menu items, which an ActionScript 2 movie adds through `ContextMenu.customItems`, don't show. VNDegen turns Ruffle's context menu off, because a right click belongs to the game, and the Game menu can't list them either: Ruffle keeps the list private to its player element, so listing it needs a patched Ruffle build. In the library this hides Usashitsuke's Return to title. Its Quit is covered by VNDegen's menu, and its Fullscreen doesn't apply.
 - Ruffle's ActionScript 3 support is less complete than its ActionScript 1 and 2 support. A game that uses an API Ruffle
   lacks may stop, show a black screen, or skip what the API did. Test Game 127 needed VNDegen's patch for one.
 - Shared objects are written when the game pauses or quits, as Flash Player wrote them when it quit. A game that ends

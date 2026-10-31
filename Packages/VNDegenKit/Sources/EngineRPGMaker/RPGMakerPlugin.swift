@@ -56,11 +56,29 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
             scriptArgument: "rpgmaker-script", log: rpgLog
         )
         configuration.preloadFonts = folder.fontNames
+        configuration.menuCommands = Self.menuCommands(plugins: folder.enabledPlugins)
         if flavor == .mv && folder.shipsOnlyOggAudio {
             configuration.decodesOgg = true
             rpgLog.notice("MV game ships only Ogg audio, decoding it in the page")
         }
         return configuration
+    }
+
+    /// Triacontane's MessageSkip, in two of the library's MV games, puts auto and skip on keys only (A, and Control
+    /// held), out of reach on a touch screen. Its own calls toggle them. Skip goes the way of the plugin's skip button,
+    /// which stops a held-key setting from turning it straight off again.
+    static func menuCommands(plugins: Set<String>) -> [WebMenuCommand] {
+        guard plugins.contains("MessageSkip") else { return [] }
+        return [
+            WebMenuCommand(id: "auto", title: "Auto", script: "window.$gameMessage && $gameMessage.toggleAuto && $gameMessage.toggleAuto()"),
+            WebMenuCommand(id: "skip", title: "Skip", script: """
+                if (window.$gameMessage && $gameMessage.toggleSkip) {
+                    $gameMessage.toggleSkip();
+                    var scene = SceneManager._scene, messages = scene && scene._messageWindow;
+                    if (messages) messages._pressSkipStop = true;
+                }
+                """),
+        ]
     }
 
     /// Buttons used to press these keys, so a remap from then presses the same key.

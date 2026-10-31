@@ -91,6 +91,105 @@ void Engine::runSystemFunction(const std::string &fn) {
     }
 }
 
+namespace {
+// The menu bar functions VNDegen runs, and how each one shows. Volume (DWAVEVOLUME) opens a Windows dialog, and
+// Fullscreen and Window (FULL, WINDOW) change the window, so the Game menu leaves them out.
+enum class MenuMark { None, ReadSkipOff, ReadSkipOn, SlowText, NormalText, FastText };
+struct MenuFunction {
+    const char *name;
+    MenuMark mark;
+};
+constexpr MenuFunction kMenuFunctions[] = {
+    {"skip", MenuMark::None},           {"kidokuoff", MenuMark::ReadSkipOff}, {"kidokuon", MenuMark::ReadSkipOn},
+    {"textslow", MenuMark::SlowText},   {"textmiddle", MenuMark::NormalText}, {"textfast", MenuMark::FastText},
+};
+
+const MenuFunction *menuFunction(const std::string &fn) {
+    for (const MenuFunction &f : kMenuFunctions)
+        if (fn == f.name) return &f;
+    return nullptr;
+}
+
+void appendJsonString(std::string &out, const std::string &utf8) {
+    out += '"';
+    for (unsigned char c : utf8) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += char(c);
+        } else if (c < 0x20) {
+            char buf[8];
+            snprintf(buf, sizeof buf, "\\u%04x", c);
+            out += buf;
+        } else {
+            out += char(c);
+        }
+    }
+    out += '"';
+}
+}  // namespace
+
+std::string Engine::windowMenuJson() const {
+    size_t next = 0;
+    std::string items = windowMenuItemsJson(next, 0);
+    return items == "[]" ? std::string() : items;
+}
+
+// The items from `next` on at `level`, until one shallower. Each item's id is its index in insertmenu's order, and a
+// submenu holds the deeper items that follow it.
+std::string Engine::windowMenuItemsJson(size_t &next, int level) const {
+    std::string out = "[";
+    while (next < windowMenu_.size() && windowMenu_[next].level >= level) {
+        size_t id = next++;
+        const WindowMenuItem &item = windowMenu_[id];
+        if (item.level > level) continue;  // deeper than any submenu open here
+        bool sub = item.fn == "sub";
+        std::string children = sub ? windowMenuItemsJson(next, level + 1) : "[]";
+        const MenuFunction *f = sub ? nullptr : menuFunction(item.fn);
+        // A submenu of items VNDegen leaves out, such as Screen Mode's, goes too.
+        if (sub ? children == "[]" : !f) continue;
+        bool checked = false;
+        if (f) {
+            switch (f->mark) {
+            case MenuMark::None: break;
+            case MenuMark::ReadSkipOff: checked = !kidokuSkip_; break;
+            case MenuMark::ReadSkipOn: checked = kidokuSkip_; break;
+            case MenuMark::SlowText: checked = speedChoice_ == 0; break;
+            case MenuMark::NormalText: checked = speedChoice_ == 1; break;
+            case MenuMark::FastText: checked = speedChoice_ == 2; break;
+            }
+        }
+        if (out.size() > 1) out += ',';
+        out += "{\"id\":\"" + std::to_string(id) + "\",\"title\":";
+        appendJsonString(out, sjisToUtf8(item.text));
+        out += checked ? ",\"checked\":true" : ",\"checked\":false";
+        out += f && f->mark != MenuMark::None ? ",\"radio\":true" : ",\"radio\":false";
+        out += ",\"enabled\":true,\"items\":" + children + "}";
+    }
+    return out + "]";
+}
+
+bool Engine::chooseWindowMenuItem(size_t index) {
+    if (index >= windowMenu_.size()) return false;
+    const MenuFunction *f = menuFunction(windowMenu_[index].fn);
+    if (!f) return false;
+    logf("menu bar: %s", windowMenu_[index].fn.c_str());
+    switch (f->mark) {
+    case MenuMark::None: runSystemFunction("skip"); break;
+    case MenuMark::ReadSkipOff: kidokuSkip_ = false; break;
+    case MenuMark::ReadSkipOn:
+        kidokuSkip_ = true;
+        kidokuOn_ = true;
+        break;
+    case MenuMark::SlowText:
+    case MenuMark::NormalText:
+    case MenuMark::FastText:
+        speedChoice_ = f->mark == MenuMark::SlowText ? 0 : f->mark == MenuMark::NormalText ? 1 : 2;
+        textSpeed_ = defaultSpeeds_[speedChoice_];
+        break;
+    }
+    return true;
+}
+
 void Engine::yesNo(const std::string &message, std::function<void(bool)> done, bool okCancel) {
     SystemUi ui;
     ui.kind = SystemUi::YesNo;

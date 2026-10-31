@@ -30,13 +30,25 @@ init 999 python in _vndegen:
         global menu_open
         if menu_open:
             return
+        # On iPhone and iPad, Ren'Py shows a game's "touch" screens, and the touch quick menu of many games, such as
+        # Servant's Revenge's, drops Q.Save and Q.Load. VNDegen's menu offers them there, as the game's own quick save
+        # and quick load, which write its quick save slot.
+        quick = renpy.ios and config.has_quicksave
+        can_save = quick and not renpy.store.main_menu and not renpy.store._in_replay
+        can_load = quick and renpy.store.QuickLoad().get_sensitive()
         menu_open = True
         try:
-            leave = renpy.invoke_in_new_context(renpy.call_screen, "_vndegen_menu")
+            choice = renpy.invoke_in_new_context(renpy.call_screen, "_vndegen_menu", quick=quick, can_save=can_save,
+                                                 can_load=can_load)
         finally:
             menu_open = False
-        if leave:
+        # The game's own context runs these, after VNDegen's menu has closed, so the save's screenshot is the game's.
+        if choice is True:
             quit_game()
+        elif choice == "quicksave":
+            renpy.display.behavior.run(renpy.store.QuickSave())
+        elif choice == "quickload":
+            renpy.display.behavior.run(renpy.store.QuickLoad())
 
     config.underlay.append(renpy.Keymap(vndegen_menu=open_menu))
 
@@ -358,9 +370,10 @@ style _vndegen_button:
     background Solid("#ffffff1a")
     hover_background Solid("#ff4080")
 
-style _vndegen_button_text is _vndegen_text
+style _vndegen_button_text is _vndegen_text:
+    insensitive_color "#ffffff59"
 
-screen _vndegen_menu():
+screen _vndegen_menu(quick=False, can_save=False, can_load=False):
     modal True
     zorder 10000
 
@@ -377,4 +390,7 @@ screen _vndegen_menu():
         text "VNDegen" style "_vndegen_text" size (config.screen_height // 18) bold True
         null height 8
         textbutton "Resume" action Return(False) style "_vndegen_button" text_style "_vndegen_button_text" text_size (config.screen_height // 30)
+        if quick:
+            textbutton "Quick save" action If(can_save, Return("quicksave")) style "_vndegen_button" text_style "_vndegen_button_text" text_size (config.screen_height // 30)
+            textbutton "Quick load" action If(can_load, Return("quickload")) style "_vndegen_button" text_style "_vndegen_button_text" text_size (config.screen_height // 30)
         textbutton "Quit to library" action Return(True) style "_vndegen_button" text_style "_vndegen_button_text" text_size (config.screen_height // 30)

@@ -43,6 +43,8 @@ public struct WebGameConfiguration {
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
     public var scriptArgument: String
+    /// Commands the game has and offers no way to reach without a keyboard, for VNDegen's Game menu.
+    public var menuCommands: [WebMenuCommand] = []
     public var log: Logger
 
     /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects. A
@@ -73,6 +75,19 @@ public struct WebGameConfiguration {
     }
 }
 
+/// A Game menu command that runs `script` in the game's page, after VNDegen's menu closes.
+nonisolated public struct WebMenuCommand: Sendable, Equatable {
+    public let id: String
+    public let title: String
+    public let script: String
+
+    public init(id: String, title: String, script: String) {
+        self.id = id
+        self.title = title
+        self.script = script
+    }
+}
+
 /// Runs an HTML5 game in a WKWebView that looks enough like NW.js that the game reads and writes its own folder through
 /// Node's `fs`, the way its desktop build does.
 final class WebGameSession: NSObject, EngineSession {
@@ -86,6 +101,7 @@ final class WebGameSession: NSObject, EngineSession {
     private let storage: (any PageStorage)?
     private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
     private let scriptArgument: String
+    private let menuCommands: [WebMenuCommand]
     private let log: Logger
     private let onExit: @MainActor () -> Void
     private var ended = false
@@ -102,6 +118,7 @@ final class WebGameSession: NSObject, EngineSession {
         storage = game.storage
         buttonScript = game.buttonScript
         scriptArgument = game.scriptArgument
+        menuCommands = game.menuCommands
         log = game.log
         onExit = launch.onExit
         let shim = try Self.shimSource(for: game)
@@ -330,6 +347,15 @@ final class WebGameSession: NSObject, EngineSession {
 
     func waitUntilStopped() async {
         await stopping?.value
+    }
+
+    var gameMenu: [GameMenuItem] {
+        ended ? [] : menuCommands.map { GameMenuItem(id: $0.id, title: $0.title) }
+    }
+
+    func chooseGameMenuItem(_ id: GameMenuItem.ID) {
+        guard let command = menuCommands.first(where: { $0.id == id }) else { return }
+        run(command.script)
     }
 
     nonisolated static let beforeQuitScript = "window.__vndegen && (__vndegen.setPaused(true), __vndegen.beforeQuit())"

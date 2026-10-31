@@ -206,6 +206,18 @@ final class NScripterSession: EngineSession {
         finish(byGame: false)
     }
 
+    var gameMenu: [GameMenuItem] {
+        guard let engine, !stopped, let json = vnns_menu(engine) else { return [] }
+        return NScripterMenu.items(json: String(cString: json))
+    }
+
+    func chooseGameMenuItem(_ id: GameMenuItem.ID) {
+        guard let engine, !stopped else { return }
+        if !vnns_menu_click(engine, id) {
+            nScripterLog.error("\(self.launch.game.id.rawValue, privacy: .public) has no menu item \(id, privacy: .public)")
+        }
+    }
+
     func waitUntilStopped() async {
         if stopped { return }
         await withCheckedContinuation { stopWaiters.append($0) }

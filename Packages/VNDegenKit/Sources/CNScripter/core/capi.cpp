@@ -1,6 +1,7 @@
 // vnns.h, the C interface, over the Engine class.
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include "../include/vnns.h"
 #include "engine.h"
@@ -9,7 +10,7 @@ using vnns::Engine;
 
 struct VNNSEngine {
     std::unique_ptr<Engine> engine;
-    std::string caption, status;
+    std::string caption, status, menu;
 };
 
 static std::string gStartError;
@@ -117,6 +118,19 @@ const char *vnns_problem(VNNSEngine *e) {
 const char *vnns_debug_status(VNNSEngine *e) {
     e->status = e->engine->debugStatus();
     return e->status.c_str();
+}
+
+const char *vnns_menu(VNNSEngine *e) {
+    e->menu = e->engine->windowMenuJson();
+    return e->menu.empty() ? nullptr : e->menu.c_str();
+}
+
+bool vnns_menu_click(VNNSEngine *e, const char *id) {
+    if (!id || !*id) return false;
+    char *end = nullptr;
+    unsigned long index = strtoul(id, &end, 10);
+    if (*end) return false;
+    return guarded(e, [&] { return e->engine->chooseWindowMenuItem(index); });
 }
 
 void vnns_set_glyph_function(VNNSGlyphFunction fn, void *ctx) { vnns::setGlyphCallback(fn, ctx); }
