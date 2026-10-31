@@ -20,15 +20,15 @@ struct VNS4Engine {
 namespace {
 std::string g_startError;
 
-// vns4_unsupported's answers by code file, kept while the file's size and time are unchanged: the game page asks
+// vns4_compatibility_note's answers by code file, kept while the file's size and time are unchanged: the game page asks
 // first, off the main thread, so a launch right after it doesn't parse the file again.
-struct UnsupportedCache {
+struct NoteCache {
     std::mutex mu;
-    struct Entry { uintmax_t size; std::filesystem::file_time_type time; std::string reason; };
+    struct Entry { uintmax_t size; std::filesystem::file_time_type time; std::string note; };
     std::map<std::string, Entry> byPath;
 };
-UnsupportedCache &unsupportedCache() {
-    static UnsupportedCache c;
+NoteCache &noteCache() {
+    static NoteCache c;
     return c;
 }
 }
@@ -56,9 +56,9 @@ VNS4Engine *vns4_start(const VNS4Launch *l) {
     return e.release();
 }
 
-const char *vns4_unsupported(const char *gameRoot) {
-    static thread_local std::string reason;
-    reason.clear();
+const char *vns4_compatibility_note(const char *gameRoot) {
+    static thread_local std::string note;
+    note.clear();
     if (!gameRoot) return nullptr;
     try {
         std::string root = gameRoot;
@@ -67,26 +67,26 @@ const char *vns4_unsupported(const char *gameRoot) {
         std::error_code ec;
         uintmax_t size = std::filesystem::file_size(path, ec);
         auto time = std::filesystem::last_write_time(path, ec);
-        auto &cache = unsupportedCache();
+        auto &cache = noteCache();
         {
             std::lock_guard<std::mutex> lock(cache.mu);
             auto it = cache.byPath.find(path);
             if (!ec && it != cache.byPath.end() && it->second.size == size && it->second.time == time) {
-                reason = it->second.reason;
-                return reason.empty() ? nullptr : reason.c_str();
+                note = it->second.note;
+                return note.empty() ? nullptr : note.c_str();
             }
         }
         s4::Ain ain;
         if (!ain.load(path).empty()) return nullptr;
-        reason = s4::unsupportedReason(ain);
+        note = s4::compatibilityNote(ain);
         if (!ec) {
             std::lock_guard<std::mutex> lock(cache.mu);
-            cache.byPath[path] = {size, time, reason};
+            cache.byPath[path] = {size, time, note};
         }
     } catch (const std::exception &) {
         return nullptr;  // starting the game reports the damage
     }
-    return reason.empty() ? nullptr : reason.c_str();
+    return note.empty() ? nullptr : note.c_str();
 }
 
 const char *vns4_start_error(void) { return g_startError.empty() ? nullptr : g_startError.c_str(); }

@@ -97,16 +97,13 @@ std::string codeFile(const std::string &root, const std::map<std::string, std::s
     return path;
 }
 
-// Later System 4 games (Test Game 56) are built on libraries this runtime doesn't have yet. Starting one would only
-// show a blank screen, so it is refused with a sentence that says why.
-std::string unsupportedReason(const Ain &ain) {
-    static const char *const kMissing[] = {"PartsEngine", "ChipmunkSpriteEngine", "MainEXFile", "KiwiSoundEngine",
-                                           "SealEngine"};
+// Later games (Test Game 56) draw their battles and maps in 3D with SealEngine, which this runtime doesn't run: the
+// game stops with a notice where a 3D scene starts (Game::stopAt3D). The game page says so before the player starts.
+std::string compatibilityNote(const Ain &ain) {
     for (auto &lib : ain.libraries)
-        for (const char *m : kMissing)
-            if (lib.name == m)
-                return "This System 4 game is built on PartsEngine and the libraries that came with it, which VNDegen "
-                       "doesn't support yet.";
+        if (lib.name == "SealEngine")
+            return "The game's 3D scenes, such as its battles and maps, don't run yet. It stops with a message where "
+                   "one starts, and saves made before then still load.";
     return {};
 }
 
@@ -122,8 +119,6 @@ bool Game::start(std::string &error) {
     Ain ain;
     std::string err = ain.load(ainPath);
     if (!err.empty()) { error = "The game's code file can't be read: " + err; return false; }
-    // S4_FORCE starts such a game anyway, for work on the libraries it needs.
-    if (std::string why = unsupportedReason(ain); !why.empty() && !std::getenv("S4_FORCE")) { error = why; return false; }
 
     // Archives: <stem>GA.ald for pictures, WA for sound effects, BA for music.
     std::string stem = fs::path(ainPath).stem().string();
@@ -398,6 +393,9 @@ std::shared_ptr<const Image> Game::cgCachedNamed(const std::string &name) {
 }
 
 void Game::stopAt3D() {
+    // Code that runs while the game is stopped (destructors) can reach the 3D libraries again.
+    if (stoppedAt3D_) throw StopVM{};
+    stoppedAt3D_ = true;
     problem("the game started a 3D scene (SealEngine), which VNDegen doesn't run");
     std::vector<uint8_t> f;
     int w, h;

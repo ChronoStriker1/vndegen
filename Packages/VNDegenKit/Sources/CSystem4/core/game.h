@@ -31,8 +31,8 @@ std::map<std::string, std::string> readIni(const std::string &root);
 std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini);
 // The file in dir whose name matches name in any case; empty when there is none.
 std::string findCaseless(const std::string &dir, const std::string &name);
-// A sentence for the player when the game needs libraries this runtime doesn't have; empty when it can run.
-std::string unsupportedReason(const Ain &ain);
+// What the game page says about how the game runs, such as the parts that don't yet; empty when there is nothing.
+std::string compatibilityNote(const Ain &ain);
 
 class Game {
 public:
@@ -130,6 +130,7 @@ private:
     std::vector<uint8_t> frame_;
     FILE *logFile_ = nullptr;
     std::mutex problemMu_, typedMu_;
+    bool stoppedAt3D_ = false;  // the VM thread's
     std::string typed_;
     std::string lastProblem_;
     std::atomic<bool> dumpSprites_{false};

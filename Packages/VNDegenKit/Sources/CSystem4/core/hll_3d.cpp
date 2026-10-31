@@ -5,6 +5,8 @@
 namespace s4 {
 
 S4_HLL(SealEngine, SetMagSpeed) {}
+// The game makes its 3D view as a parts layer first; that is where its 3D scenes begin.
+S4_HLL(PartsEngine, Parts_CreateParts3DLayerPluginID) { game().stopAt3D(); }
 S4_HLL(MarmotModelEngine, Update) {}
 
 }  // namespace s4
