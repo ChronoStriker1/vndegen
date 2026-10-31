@@ -85,9 +85,18 @@ final class System4Session: EngineSession {
             let whole = Int(notches.rounded())
             if whole != 0 { deliver([.wheel(whole)]) }
         }
-        frameView.onKey = { [weak self] usage, pressed, _ in
+        frameView.onKey = { [weak self] usage, pressed, characters in
             guard let self else { return }
             deliver(router.hostKey(hidUsage: usage, pressed: pressed))
+            // Printable text goes to the game's text entry too. Arrow and function keys type Apple's private-use
+            // characters, which are left out with the control characters.
+            let text = String(String.UnicodeScalarView((characters ?? "").unicodeScalars.filter {
+                switch $0.properties.generalCategory {
+                case .control, .privateUse, .format, .surrogate, .unassigned: false
+                default: true
+                }
+            }))
+            if !text.isEmpty, let engine { text.withCString { vns4_text(engine, $0) } }
         }
     }
 
@@ -135,7 +144,8 @@ final class System4Session: EngineSession {
         let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
         lastTimestamp = now
         guard !paused else { return }
-        if !vns4_step(engine, Int32(min(max(ms, 0), 100))) {
+        // The runtime caps the step at 100 ms and logs the time it drops.
+        if !vns4_step(engine, Int32(min(max(ms, 0), 60_000))) {
             finish(byGame: true)
             return
         }

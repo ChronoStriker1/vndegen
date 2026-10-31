@@ -25,9 +25,10 @@ through the shared FrameHost module and maps the controls.
   FileOperation, MsgSkip, Math, SystemService and SystemServiceEx, InputString, PassRegister, Confirm3,
   OutputLog, IbisInputEngine, AliceLogo3 and 4 (skipped) and DrawPluginManager. A call the runtime doesn't have
   is logged once and returns zero.
-- **Files.** `.ald` archives (split over several disks too), `.afa` archives, QNT, AJP, 8-bit PMS and WebP pictures,
+- **Files.** `.ald` archives (split over several disks too), QNT, AJP, 8-bit PMS and WebP pictures,
   including WebPs drawn over a base picture, Ogg and WAV sound, `.alm` MPEG-1 movies with MP2 sound, and `.fnl` font
-  libraries.
+  libraries. A movie keeps half a second of sound decoded ahead of what has played, and its picture follows the
+  sound when the game clock falls behind, so a slow frame doesn't cut the sound.
 - **Text.** The game's own `.fnl` font library where it has the character, scaled down from its large bitmaps, then
   VNDegen's Windows font pack (`vnfont_resolve`) for MS Gothic and MS Mincho. Strings are CP932, as on the PC.
 - **Saves.** The PC engine's own files in the game's save folder (the ini's `SaveFolder`, `SaveData` by default),
@@ -55,6 +56,12 @@ Environment variables turn on logs:
 - `S4_HLLMISSING`: library functions the game declares that the runtime lacks.
 - `S4_TEXTLOG` and `S4_MSDUMP`: text drawing and MultiSprite state.
 - `S4_AUDIOLOG`: the mix's level, in `s4play`.
+- `S4_WAV`: the mix written to a WAV file, in `s4play`.
+- `S4_HITCH=n`: in `s4play`, every nth frame takes 200 ms of real time, as a slow frame on a busy machine does.
+- `S4_MUTE`: the mix is computed but the output is silent, for timing checks where nobody should hear the game.
+
+The log always notes, every 10 s of game time, frame steps over 100 ms (the clock drops the rest) and audio renders
+that took over half their length, and after a movie, how often its sound ran dry.
 - `S4_FONTS`: the font pack folder on Linux.
 
 ## Known limits
@@ -62,6 +69,8 @@ Environment variables turn on logs:
 - System 4 games built on PartsEngine and the libraries that came with it (ChipmunkSpriteEngine, KiwiSoundEngine,
   MainEXFile with `.ex` data files, SealEngine for 3D), such as Rance IX (Test Game 56), aren't supported yet. The
   runtime refuses them up front with a sentence the game page shows.
+- `.afa` archives, which later games such as Rance IX use, can be read (`AfaArchive`), but games don't load
+  pictures or sound from them yet.
 - Only the libraries and calls the test games use are built. Other System 4 games may call functions the runtime
   doesn't have yet; each is logged once.
 - `CG_RotateRGB` isn't bound: the SDK doesn't say what its channel swap does.

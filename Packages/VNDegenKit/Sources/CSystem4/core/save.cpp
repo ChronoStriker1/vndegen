@@ -55,6 +55,7 @@ bool readGD(const std::string &path, std::vector<uint8_t> &plain) {
     if (d.size() < 8 || d[0] != 'G' || d[1] != 'D') return false;
     uint32_t len;
     std::memcpy(&len, d.data() + 4, 4);
+    if (uint64_t(len) > uint64_t(d.size() - 8) * 1032 + 64) return false;  // more than zlib can expand to
     plain.resize(len);
     auto inflate = [&] {
         uLongf out = len;
@@ -115,7 +116,20 @@ std::string caseless(const fs::path &base, const std::string &rel) {
 std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
     std::string p = sjis::toUtf8(name);
     for (char &c : p) if (c == '\\') c = '/';
-    if (!p.empty() && p[0] == '/') return p;
+    // Game code only reaches its own folder and the save folder. An absolute path (the game folder, which
+    // SystemService.GetGameFolderPath hands out) must lie in one of them, and a relative one may not climb out.
+    // Anything else becomes an empty path, which every file operation fails on.
+    auto inside = [](const fs::path &path, const std::string &base) {
+        fs::path rel = path.lexically_normal().lexically_relative(fs::path(base).lexically_normal());
+        return !rel.empty() && *rel.begin() != "..";
+    };
+    if (!p.empty() && p[0] == '/') {
+        fs::path abs = fs::path(p).lexically_normal();
+        return inside(abs, vm.rootDir) || inside(abs, vm.saveDir) ? abs.string() : std::string();
+    }
+    fs::path relative = fs::path(p).lexically_normal();
+    if (!relative.empty() && *relative.begin() == "..") return {};
+    p = relative.string();
     // A path that starts with the save folder's name, as system.GetSaveFolderName returns it, is in the save folder.
     std::string first = p.substr(0, p.find('/'));
     std::string lowFirst = first, lowSave = vm.saveFolderName;
@@ -299,6 +313,9 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
 
 namespace {
 
+constexpr int32_t kMaxRank = 16;  // far above any game's arrays
+constexpr int kMaxDepth = 64;     // structs and arrays nested in a save
+
 struct Reader {
     const std::vector<uint8_t> &d;
     bool bad = false;
@@ -366,9 +383,13 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
         L.arrayAt.push_back(p);
         int32_t rank = int32_t(r.u32(p));
         if (rank < 0) { r.u32(p); continue; }
+        if (rank > kMaxRank) { r.bad = true; break; }
         p += 4 * size_t(rank);  // dimensions
         uint32_t nRows = r.u32(p);
-        for (uint32_t row = 0; row < nRows && !r.bad; row++) p += 8 * size_t(r.u32(p));
+        for (uint32_t row = 0; row < nRows && !r.bad; row++) {
+            p += 8 * size_t(r.u32(p));
+            if (p > d.size()) r.bad = true;  // a truncated last row must fail here, before anything is applied
+        }
     }
     p = hdr[12];
     for (uint32_t k = 0; k < hdr[13] && !r.bad; k++) {
@@ -386,8 +407,16 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
 struct Applier {
     VM &vm;
     Loaded &L;
+    int depth = 0;  // a damaged save's records can refer to each other in a loop
 
     void store(int32_t &dst, const VarType &t, int32_t savedType, int32_t value) {
+        if (depth >= kMaxDepth) return;
+        depth++;
+        storeValue(dst, t, savedType, value);
+        depth--;
+    }
+
+    void storeValue(int32_t &dst, const VarType &t, int32_t savedType, int32_t value) {
         if (t.type == T_STRING) {
             if (!vm.valid(dst)) dst = vm.newString();
             vm.str(dst) = value >= 0 && size_t(value) < L.strings.size() ? L.strings[value] : std::string();
@@ -430,6 +459,7 @@ struct Applier {
         Page *old = vm.page(dst);
         int32_t elemType = old ? old->elemType : T_INT, elemStruct = old ? old->elemStruct : t.structType;
         int32_t declRank = old ? old->rank : std::max(1, t.rank);
+        if (rank > kMaxRank) return;
         if (rank < 0) {
             int32_t s = vm.newArray(elemType, elemStruct, declRank, nullptr, 0);
             vm.decref(dst);

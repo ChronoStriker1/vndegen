@@ -75,7 +75,7 @@ bool unpackPMS8(const uint8_t *s, size_t n, int w, int h, std::vector<uint8_t> &
             break;
         }
         case 0xFD: {
-            if (i + 1 > n) return false;
+            if (n - i < 2) return false;
             size_t cnt = size_t(s[i++]) + 4;
             uint8_t v = s[i++];
             if (o + cnt > total) return false;
@@ -84,7 +84,7 @@ bool unpackPMS8(const uint8_t *s, size_t n, int w, int h, std::vector<uint8_t> &
             break;
         }
         case 0xFC: {
-            if (i + 2 > n) return false;
+            if (n - i < 3) return false;
             size_t cnt = size_t(s[i++]) + 3;
             uint8_t a = s[i++], b = s[i++];
             if (o + cnt * 2 > total) return false;
@@ -108,7 +108,8 @@ bool decodePMS(const uint8_t *d, size_t n, Image &out) {
     if (n < 0x30 || d[0] != 'P' || d[1] != 'M') return false;
     uint32_t bpp = d[6];
     uint32_t w = rd32(d + 0x18), h = rd32(d + 0x1C), dataOff = rd32(d + 0x20), auxOff = rd32(d + 0x24);
-    if (bpp != 8 || !w || !h || w > 16384 || h > 16384 || dataOff >= n || auxOff + 768 > n) return false;
+    if (bpp != 8 || !w || !h || w > 16384 || h > 16384 || dataOff >= n || auxOff > n || n - auxOff < 768)
+        return false;
     std::vector<uint8_t> idx;
     if (!unpackPMS8(d + dataOff, n - dataOff, int(w), int(h), idx)) return false;
     out.w = int(w); out.h = int(h);

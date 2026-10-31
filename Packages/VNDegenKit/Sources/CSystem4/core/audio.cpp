@@ -1,7 +1,9 @@
 #include "audio.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #define STB_VORBIS_NO_STDIO
@@ -13,6 +15,7 @@ namespace s4 {
 
 namespace {
 constexpr int kRate = 44100;
+constexpr int kMaxChannels = 8;  // Player::next reads one frame into a 16-float buffer
 
 uint32_t rd32(const uint8_t *p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 uint16_t rd16(const uint8_t *p) { uint16_t v; std::memcpy(&v, p, 2); return v; }
@@ -37,6 +40,11 @@ struct VorbisDecoder : Decoder {
         v = stb_vorbis_open_memory(data->data(), int(data->size()), &err, nullptr);
         if (!v) return;
         stb_vorbis_info info = stb_vorbis_get_info(v);
+        if (info.channels < 1 || info.channels > kMaxChannels || info.sample_rate == 0) {
+            stb_vorbis_close(v);
+            v = nullptr;
+            return;
+        }
         channels = info.channels;
         rate = int(info.sample_rate);
         length = stb_vorbis_stream_length_in_samples(v);
@@ -69,7 +77,7 @@ struct WavDecoder : Decoder {
             }
             i += 8 + sz + (sz & 1);
         }
-        if (channels < 1 || (bits != 8 && bits != 16)) { bytes = 0; channels = 1; }
+        if (channels < 1 || channels > kMaxChannels || rate < 1 || (bits != 8 && bits != 16)) { bytes = 0; channels = 1; rate = kRate; }
         length = int64_t(bytes / (channels * bits / 8));
     }
     int read(float *out, int frames) override {
@@ -140,7 +148,8 @@ struct Audio::Player {
     }
 };
 
-Audio::Audio() = default;
+// S4_MUTE mixes as usual but outputs silence, to measure timing without playing sound.
+Audio::Audio() : mute_(std::getenv("S4_MUTE") != nullptr) {}
 Audio::~Audio() = default;
 
 int Audio::open(std::shared_ptr<const std::vector<uint8_t>> data) {
@@ -230,8 +239,19 @@ void Audio::clearStream() {
     stream_ = nullptr;
 }
 
+Audio::Timing Audio::takeTiming() { return {slow_.exchange(0), longestUs_.exchange(0)}; }
+
 void Audio::render(float *out, int frames) {
+    auto began = std::chrono::steady_clock::now();
     std::memset(out, 0, sizeof(float) * 2 * frames);
+    renderMix(out, frames);
+    if (mute_) std::memset(out, 0, sizeof(float) * 2 * frames);
+    int us = int(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - began).count());
+    if (us > int(int64_t(frames) * 500000 / kRate)) slow_++;
+    if (us > longestUs_.load()) longestUs_ = us;
+}
+
+void Audio::renderMix(float *out, int frames) {
     std::lock_guard<std::mutex> lock(mu_);
     for (auto &[h, pp] : players_) {
         Player &p = *pp;

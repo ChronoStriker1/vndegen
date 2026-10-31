@@ -47,6 +47,13 @@ struct In {
         return v;
     }
     int32_t i32() { return int32_t(u32()); }
+    // A count of items at least `size` bytes each, bounded by the bytes left so damage can't ask for a huge
+    // allocation.
+    uint32_t count(size_t size) {
+        uint32_t n = u32();
+        if (n > (b.size() - i) / size) { bad = true; i = b.size(); return 0; }
+        return n;
+    }
     std::string str() {
         size_t j = i;
         while (j < b.size() && b[j]) j++;
@@ -85,7 +92,7 @@ int32_t elemTypeOf(int32_t arrayType) {
 
 // The length of the call instruction at an address, so a return point can be rebuilt from its call's offset.
 uint32_t insnLength(const std::vector<uint8_t> &code, uint32_t at) {
-    if (at + 2 > code.size()) return 6;
+    if (at >= code.size() || code.size() - at < 2) return 6;
     const OpInfo *oi = opInfo(code[at] | code[at + 1] << 8);
     return oi ? 2 + 4 * oi->args : 6;
 }
@@ -93,6 +100,9 @@ uint32_t insnLength(const std::vector<uint8_t> &code, uint32_t at) {
 }  // namespace
 
 std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeIp) {
+    // The PC's encoding of delegates in a resume save isn't known yet, so a heap holding one isn't saved.
+    for (const Slot &sl : heap)
+        if (sl.inUse && !sl.str && !sl.page) return {};
     Out o;
     o.b.insert(o.b.end(), {'R', 'S', 'M', 0});
     o.u32(saveFormat.resumeVersion);
@@ -227,16 +237,16 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     int32_t curFn;
     if (!readPoint(curCall, curFn)) return false;
     in.u32();
-    std::vector<int32_t> newStack(in.u32());
+    std::vector<int32_t> newStack(in.count(4));
     for (auto &v : newStack) v = in.i32();
-    uint32_t nf = in.u32();
+    uint32_t nf = in.count(4);
     std::vector<int32_t> locals(nf);
     for (auto &v : locals) v = in.i32();
-    std::vector<int32_t> kinds(in.u32());
+    std::vector<int32_t> kinds(in.count(4));
     for (auto &v : kinds) v = in.i32();
-    std::vector<int32_t> selves(in.u32());
+    std::vector<int32_t> selves(in.count(4));
     for (auto &v : selves) v = in.i32();
-    uint32_t nret = in.u32();
+    uint32_t nret = in.count(4);
     std::vector<std::pair<uint32_t, int32_t>> rets;
     for (uint32_t k = 0; k < nret; k++) {
         size_t at = in.i;
@@ -253,7 +263,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     if (in.bad || nf < 2 || kinds.size() != nf || nret + 1 != nf) { error = "the resume save is damaged"; return false; }
 
     // The new heap, slot for slot as saved.
-    std::vector<Slot> newHeap(in.u32());
+    std::vector<Slot> newHeap(in.count(4));
     for (size_t s = 0; s < newHeap.size() && !in.bad; s++) {
         int32_t kind = in.i32();
         if (kind == -1) continue;
@@ -262,12 +272,13 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         sl.refs = in.i32();
         auto page = std::make_unique<Page>();
         auto readTypes = [&]() {
-            uint32_t n = in.u32();
+            uint32_t n = in.count(4);
             for (uint32_t i = 0; i < n; i++) in.u32();
             return n;
         };
         auto readValues = [&](Page &p) {
             uint32_t bytes = in.u32();
+            if (bytes > data.size() - in.i) { in.bad = true; return; }
             p.v.resize(bytes / 4);
             for (auto &v : p.v) v = in.i32();
         };
@@ -325,6 +336,37 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         sl.page = std::move(page);
     }
     if (in.bad) { error = "the resume save is damaged"; return false; }
+
+    // The state must hold together before it replaces the live one: the VM indexes these without checks.
+    auto pageAt = [&](int32_t s, PageKind kind) -> Page * {
+        if (s < 0 || size_t(s) >= newHeap.size() || !newHeap[size_t(s)].page) return nullptr;
+        Page *p = newHeap[size_t(s)].page.get();
+        return p->kind == kind ? p : nullptr;
+    };
+    auto consistent = [&] {
+        bool global = false;
+        for (const Slot &sl : newHeap) {
+            if (sl.inUse && sl.refs < 0) return false;
+            if (!sl.page) continue;
+            const Page &p = *sl.page;
+            if (p.kind == PageKind::Global) global = p.v.size() >= ain.globals.size();
+            if (p.kind == PageKind::Struct &&
+                (p.index < 0 || size_t(p.index) >= ain.structs.size() || p.v.size() < ain.structs[size_t(p.index)].members.size()))
+                return false;
+            if (p.kind == PageKind::Local &&
+                (p.index <= 0 || size_t(p.index) >= ain.functions.size() || p.v.size() < ain.functions[size_t(p.index)].vars.size()))
+                return false;
+        }
+        if (!global || curCall >= ain.code.size()) return false;
+        size_t methods = 0;
+        for (uint32_t k = 1; k < nf; k++) {
+            if (!pageAt(locals[k], PageKind::Local)) return false;
+            if (kinds[k] == 2 && (methods >= selves.size() || !pageAt(selves[methods++], PageKind::Struct))) return false;
+            if (kinds[k] != 0 && rets[k - 1].first >= ain.code.size()) return false;
+        }
+        return true;
+    };
+    if (!consistent()) { error = "the resume save is damaged"; return false; }
 
     // Everything checked: replace the state.
     heap = std::move(newHeap);

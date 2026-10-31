@@ -170,16 +170,16 @@ S4_HLL(OutputLog, EnableAutoSave) { c.retBool(true); }
 S4_HLL(OutputLog, DisableAutoSave) { c.retBool(true); }
 S4_HLL(MusicSystem, SetErrorOutput) {}
 
-// ---- InputString: text entry, used for naming. VNDegen's keyboard reaches it as typed characters. ----
+// ---- InputString: text entry, used for naming. Text the host types (vns4_text) arrives between Begin and End. ----
 std::string g_inputResult;
 S4_HLL(InputString, SetFont) {}
 S4_HLL(InputString, SetPos) {}
-S4_HLL(InputString, Begin) {}
-S4_HLL(InputString, End) {}
+S4_HLL(InputString, Begin) { G().takeTyped(); G().textEntry = true; }
+S4_HLL(InputString, End) { G().textEntry = false; }
 S4_HLL(InputString, OpenIME) {}
 S4_HLL(InputString, CloseIME) {}
-S4_HLL(InputString, GetResultString) { c.retString(g_inputResult); g_inputResult.clear(); }
-S4_HLL(InputString, ClearResultString) { g_inputResult.clear(); }
+S4_HLL(InputString, GetResultString) { c.retString(g_inputResult + G().takeTyped()); g_inputResult.clear(); }
+S4_HLL(InputString, ClearResultString) { g_inputResult.clear(); G().takeTyped(); }
 S4_HLL(InputString, SetResultString) { g_inputResult = c.s(0); }
 
 // ---- PassRegister: sets of numbers and texts kept in a file per handle ----
@@ -259,9 +259,15 @@ S4_HLL(VSFile, ReadFloat) {
     c.retBool(ok);
 }
 S4_HLL(VSFile, ReadString) {
+    // The string must end in its NUL within 64 KB; otherwise the file is damaged and the variable keeps its value.
+    constexpr size_t kMax = 65536;
     std::string s;
-    bool ok = vsExpect(kVsString) && std::getline(g_vs, s, '\0');
-    c.refS(0) = s;
+    bool ok = vsExpect(kVsString);
+    for (int ch; ok && (ch = g_vs.get()) != 0;) {
+        if (ch == std::char_traits<char>::eof() || s.size() == kMax) ok = false;
+        else s += char(ch);
+    }
+    if (ok) c.refS(0) = s;
     c.retBool(ok);
 }
 

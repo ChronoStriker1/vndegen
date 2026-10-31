@@ -10,11 +10,24 @@ namespace fs = std::filesystem;
 
 namespace s4 {
 
+namespace {
+// The file's length, so sizes read from damaged headers can be checked before anything is allocated for them.
+uint64_t fileLength(FILE *f) {
+    if (fseeko(f, 0, SEEK_END) != 0) return 0;
+    off_t n = ftello(f);
+    return n > 0 ? uint64_t(n) : 0;
+}
+// zlib can't expand data more than about 1032 times.
+bool plausibleInflate(uint64_t compressed, uint64_t plain) { return plain <= compressed * 1032 + 64; }
+}  // namespace
+
 bool Archive::read(const ArchiveEntry &e, std::vector<uint8_t> &out) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (e.file < 0 || size_t(e.file) >= paths_.size()) return false;
     FILE *f = std::fopen(paths_[e.file].c_str(), "rb");
     if (!f) return false;
+    uint64_t length = fileLength(f);
+    if (e.offset > length || e.size > length - e.offset) { std::fclose(f); return false; }
     out.resize(e.size);
     bool ok = fseeko(f, off_t(e.offset), SEEK_SET) == 0 && std::fread(out.data(), 1, e.size, f) == e.size;
     std::fclose(f);
@@ -47,6 +60,8 @@ std::unique_ptr<AldArchive> AldArchive::open(const std::string &first) {
     }
     (void)disk0;
     auto readAt = [](FILE *f, uint64_t off, size_t n, std::vector<uint8_t> &out) {
+        uint64_t length = fileLength(f);
+        if (off > length || n > length - off) return false;
         out.resize(n);
         return fseeko(f, off_t(off), SEEK_SET) == 0 && std::fread(out.data(), 1, n, f) == n;
     };
@@ -111,6 +126,11 @@ std::unique_ptr<AfaArchive> AfaArchive::open(const std::string &path) {
     auto rd = [&](size_t o) { uint32_t v; std::memcpy(&v, h + o, 4); return v; };
     if (!ok) { std::fclose(f); return nullptr; }
     uint32_t dataOff = rd(24), infoSize = rd(32), plainSize = rd(36), count = rd(40);
+    uint64_t length = fileLength(f);
+    if (infoSize > length || !plausibleInflate(infoSize, plainSize) || fseeko(f, sizeof h, SEEK_SET) != 0) {
+        std::fclose(f);
+        return nullptr;
+    }
     std::vector<uint8_t> comp(infoSize > 16 ? infoSize - 16 : 0), plain(plainSize);
     ok = std::fread(comp.data(), 1, comp.size(), f) == comp.size();
     std::fclose(f);

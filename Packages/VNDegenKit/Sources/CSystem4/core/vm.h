@@ -3,6 +3,7 @@
 // a string. The bytecode sees slot numbers directly, for example as the value of a string or struct variable,
 // so the heap model follows what the code expects. docs/system4-cleanroom.md says where each rule came from.
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
 #include <functional>
@@ -51,7 +52,13 @@ struct HllCall {
     int32_t ret = 0;              // int, bool or float bits; for strings and structs a slot the call made
     bool retSet = false;
 
-    int32_t i(int k) const { return words[argWord[k]]; }
+    // The words are read checked: an implementation trusts its own signature, and a game may declare it otherwise.
+    int32_t word(int k, int offset = 0) const {
+        if (k < 0 || size_t(k) >= argWord.size()) return 0;
+        size_t w = size_t(argWord[size_t(k)]) + size_t(offset);
+        return w < words.size() ? words[w] : 0;
+    }
+    int32_t i(int k) const { return word(k); }
     float f(int k) const;
     bool b(int k) const { return i(k) != 0; }
     const std::string &s(int k) const;
@@ -113,6 +120,8 @@ struct ResumeJump {};
 
 // Thrown to stop the VM: system.Exit, a fatal error, or the host stopping the game.
 struct VMExit { int code; std::string reason; };
+// Thrown out of VM::run once the host sets VM::cancelled.
+struct VMCancelled {};
 
 class VM {
 public:
@@ -165,6 +174,9 @@ public:
     std::vector<std::string> unboundHll() const;  // every HLL call with its argument words, for debugging
     std::function<void()> peek;             // system.Peek and other points where the host may run a frame
     std::function<uint32_t()> timeMs;       // the game clock
+    // Set by the host to stop the game. The VM checks it every 65536 instructions, so code that never shows a frame
+    // or polls still stops.
+    std::atomic<bool> cancelled{false};
     std::string saveDir;                    // the game's SaveData folder on this machine
     std::string saveFolderName = "SaveData";  // its name as the game sees it (the ini's SaveFolder)
     // How this game's PC VM writes saves. Test Game 19's Sys42VM writes resume saves of version 7 in an un-XORed
@@ -178,7 +190,8 @@ public:
 
     std::string functionName(int32_t f) const;
 
-    // system.ResumeSave and ResumeLoad: the whole VM state in the PC engine's "RSM" layout (resume.cpp).
+    // system.ResumeSave and ResumeLoad: the whole VM state in the PC engine's "RSM" layout (resume.cpp). The snapshot is
+    // empty when the heap holds a delegate, which it can't encode yet.
     std::vector<uint8_t> resumeSnapshot(const std::string &key, uint32_t resumeIp);
     bool resumeRestore(const std::vector<uint8_t> &data, const std::string &key, std::string &error);
     [[noreturn]] void fatal(const std::string &msg);
@@ -186,6 +199,7 @@ public:
 private:
     void enter(int32_t function, int32_t thisPage, bool native);
     uint32_t curInsn_ = 0;
+    uint32_t sinceCancelCheck_ = 0;
     void leave();
     void callHll(int32_t lib, int32_t fn);
     void callSys(int32_t n);

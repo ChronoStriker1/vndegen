@@ -3,6 +3,7 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -45,9 +46,14 @@ public:
     void setStreamVolume(int volume);  // 0..100
     void clearStream();
     void render(float *out, int frames);  // the audio thread
+    // Renders that took more than half the time their frames last, which risks the host running out of sound, and
+    // the longest render in microseconds. Taking them resets them.
+    struct Timing { int slow = 0; int longestUs = 0; };
+    Timing takeTiming();
 
 private:
     struct Player;
+    void renderMix(float *out, int frames);
     std::mutex mu_;
     std::map<int, std::unique_ptr<Player>> players_;
     std::map<int, int> groupVolume_;
@@ -56,6 +62,8 @@ private:
     int streamGroup_ = 0;
     float streamVolume_ = 1;
     std::vector<float> streamBuf_;
+    std::atomic<int> slow_{0}, longestUs_{0};
+    bool mute_;
 };
 
 }  // namespace s4

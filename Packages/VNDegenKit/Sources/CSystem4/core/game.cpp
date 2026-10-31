@@ -58,7 +58,10 @@ void Game::log(const std::string &s) {
 }
 
 void Game::problem(const std::string &s) {
-    lastProblem = s;
+    {
+        std::lock_guard<std::mutex> lock(problemMu_);
+        lastProblem_ = s;
+    }
     log("problem: " + s);
 }
 
@@ -184,6 +187,7 @@ void Game::vmMain() {
         log("game ended: " + e.reason);
         if (e.code < 0) problem(e.reason);
     } catch (const StopVM &) {
+    } catch (const VMCancelled &) {
     } catch (const std::exception &e) {
         problem(std::string("runtime error: ") + e.what());
     }
@@ -216,7 +220,26 @@ void Game::yieldFrame() {
 bool Game::step(int ms) {
     if (ended) return false;
     if (paused_) return true;
-    clockMs_ += uint32_t(std::max(0, ms));
+    // A step longer than 100 ms (a hitch, or the app coming back from the background) advances the clock only
+    // 100 ms, so the game doesn't jump ahead. That time is lost to anything paced by the real clock, such as a
+    // movie's sound, so it is logged with the mixer's timing every 10 s of game time.
+    ms = std::max(0, ms);
+    if (ms > 100) {
+        hitches_++;
+        lostMs_ += ms - 100;
+        ms = 100;
+    }
+    clockMs_ += uint32_t(ms);
+    if (clockMs_ - timingLoggedAt_ >= 10000) {
+        timingLoggedAt_ = clockMs_;
+        Audio::Timing t = audio.takeTiming();
+        if (hitches_ || t.slow)
+            log("timing: " + std::to_string(hitches_) + " steps over 100 ms lost " + std::to_string(lostMs_) +
+                " ms; audio renders over half their length " + std::to_string(t.slow) + ", longest " +
+                std::to_string(t.longestUs) + " us");
+        hitches_ = 0;
+        lostMs_ = 0;
+    }
     std::unique_lock<std::mutex> lock(mu_);
     vmTurn_ = true;
     cv_.notify_all();
@@ -231,6 +254,7 @@ void Game::stop() {
         stopping_ = true;
         cv_.notify_all();
     }
+    if (vm) vm->cancelled = true;
     if (thread_.joinable()) thread_.join();
 }
 

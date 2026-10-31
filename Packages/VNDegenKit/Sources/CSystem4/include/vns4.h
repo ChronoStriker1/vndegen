@@ -24,16 +24,17 @@ typedef struct VNS4Launch {
 } VNS4Launch;
 
 // Why VNDegen can't run the System 4 game in this folder yet, as a sentence for the player, or NULL when it can (or
-// when the folder's code file can't be read, which vns4_start reports). Reads the code file; valid until the next
-// call on the same thread.
+// when the folder's code file can't be read, which vns4_start reports). Reads the code file the first time and keeps
+// the answer while the file's size and time stay the same; valid until the next call on the same thread.
 const char *vns4_unsupported(const char *gameRoot);
 
 // Starts a game. Returns NULL when it can't, with a sentence for the player in vns4_start_error().
 VNS4Engine *vns4_start(const VNS4Launch *launch);
 const char *vns4_start_error(void);
 
-// Runs the game for ms milliseconds of game time: until it shows its next frame or polls for input. Returns false
-// once the game has ended.
+// Runs the game for ms milliseconds, the real time since the last step: until it shows its next frame or polls for
+// input. Steps over 100 ms advance the game clock 100 ms, and the log counts them. Returns false once the game has
+// ended.
 bool vns4_step(VNS4Engine *e, int ms);
 
 // The current frame: RGBA8, width * height pixels, rows packed. The pointer stays valid until the next vns4_frame.
@@ -51,6 +52,8 @@ void vns4_audio_render(VNS4Engine *e, float *out, int frames);
 void vns4_key(VNS4Engine *e, int vk, bool down);
 void vns4_mouse_move(VNS4Engine *e, int x, int y);
 void vns4_wheel(VNS4Engine *e, int notches);  // positive away from the player
+// Text the player typed, UTF-8. It reaches the game's text entry (InputString) while that is open.
+void vns4_text(VNS4Engine *e, const char *utf8);
 
 // Stops the clock and sound. vns4_step does nothing while paused.
 void vns4_set_paused(VNS4Engine *e, bool paused);

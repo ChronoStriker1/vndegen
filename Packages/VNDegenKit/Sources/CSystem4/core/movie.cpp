@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 // pl_mpeg's implementation, compiled once for the runtime. Its stdio loaders are unused: the demuxer below reads
@@ -18,7 +19,7 @@ namespace {
 constexpr size_t kWindow = 256 * 1024;      // read window; a PES packet is at most 65541 bytes
 constexpr long kProbeBytes = 2 * 1024 * 1024;  // how far open() looks for the first video and audio packets
 constexpr size_t kMaxQueued = 4 * 1024 * 1024;  // cap on demuxed data waiting for the other decoder
-constexpr double kAudioLead = 0.25;          // seconds of audio decoded ahead of the video time
+constexpr double kAudioLead = 0.5;           // seconds of sound kept decoded ahead of what has played
 constexpr int kVideoStream = 0xE0, kAudioStream = 0xC0;
 
 // A 33-bit timestamp in the 5-byte PES/pack layout, in seconds.
@@ -232,20 +233,29 @@ bool Movie::open(const std::string &path) {
         audioBuf_ = nullptr;
     }
     if (audio_ && firstAudioPts_ >= 0) audioSkew_ = std::llround((firstVideoPts_ - firstAudioPts_) * kAudioRate);
+    if (std::llabs(audioSkew_) > 10 * kAudioRate) audioSkew_ = 0;  // streams 10 s apart are damaged timestamps
 
     frame_.assign(size_t(width_) * height_ * 4, 0);
     for (size_t i = 3; i < frame_.size(); i += 4) frame_[i] = 255;
     rsIn_.assign(2, 0.0f);  // one frame of history before the first sample
     rsPos_ = 1;
     std::lock_guard<std::mutex> lock(mu_);
-    ring_.assign(size_t(kAudioRate) * 2, 0.0f);  // one second
+    // A second of sound, plus room for the silence before sound that starts after the picture.
+    ring_.assign((size_t(kAudioRate) + size_t(std::max<int64_t>(0, -audioSkew_))) * 2, 0.0f);
     ringHead_ = ringCount_ = 0;
     return true;
 }
 
 bool Movie::advanceTo(double seconds) {
     if (!video_) return false;
-    now_ = std::max(now_, seconds);
+    auto buffered = [this] {
+        std::lock_guard<std::mutex> lock(mu_);
+        return ringCount_;
+    };
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        now_ = std::max({now_, seconds, double(audioRead_) / kAudioRate});
+    }
 
     // plm_video_get_time is the presentation time of the next frame to decode. Only the newest frame is converted.
     plm_frame_t *shown = nullptr;
@@ -257,10 +267,16 @@ bool Movie::advanceTo(double seconds) {
         }
         shown = f;
     }
-    while (audio_ && !audioDone_ && plm_audio_get_time(audio_) < now_ + kAudioLead) {
+    // Sound runs ahead of the game clock (as without a host pulling it) and of what has played.
+    while (audio_ && !audioDone_ &&
+           (plm_audio_get_time(audio_) < now_ + kAudioLead || buffered() < size_t(kAudioLead * kAudioRate))) {
         plm_samples_t *s = plm_audio_decode(audio_);
         if (!s) {
             audioDone_ = eof_;
+            if (audioDone_) {
+                std::lock_guard<std::mutex> lock(mu_);
+                audioEnded_ = true;
+            }
             break;
         }
         pushAudio(s->interleaved, int(s->count));
@@ -333,7 +349,17 @@ int Movie::readAudio(float *out, int frames) {
     std::memcpy(out + first * 2, ring_.data(), (n - first) * 2 * sizeof(float));
     if (cap) ringHead_ = (ringHead_ + n) % cap;
     ringCount_ -= n;
+    audioRead_ += int64_t(n);
+    if (int(n) < frames && audioPushed_ > 0 && !audioEnded_) {
+        dry_.reads++;
+        dry_.frames += frames - int64_t(n);
+    }
     return int(n);
+}
+
+Movie::Dry Movie::dry() {
+    std::lock_guard<std::mutex> lock(mu_);
+    return dry_;
 }
 
 bool Movie::ended() {
@@ -368,6 +394,9 @@ void Movie::close() {
     std::lock_guard<std::mutex> lock(mu_);
     ring_ = {};
     ringHead_ = ringCount_ = 0;
+    audioEnded_ = false;
+    audioRead_ = 0;
+    dry_ = {};
 }
 
 }  // namespace s4

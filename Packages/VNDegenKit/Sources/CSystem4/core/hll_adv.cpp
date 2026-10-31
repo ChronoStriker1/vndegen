@@ -446,9 +446,8 @@ S4_HLL(StoatSpriteEngine, CharSpriteManager_Save) {
     c.retBool(true);
 }
 S4_HLL(StoatSpriteEngine, CharSpriteManager_Load) {
+    // Every record is read before anything changes, so damaged data leaves the current sprites alone.
     Page *a = c.page(0);
-    for (auto &[h, cs] : g_chars) G().sprites.remove(cs.sprite);
-    g_chars.clear();
     size_t i = 0;
     if (!a || !serial::getTag(a->v, i, "CSM") || i + 2 > a->v.size() || a->v[i] != 0 || a->v[i + 1] < 0) {
         c.retBool(false);
@@ -457,28 +456,35 @@ S4_HLL(StoatSpriteEngine, CharSpriteManager_Load) {
     const auto &in = a->v;
     int n = in[i + 1];
     i += 2;
+    struct Rec { int handle; std::string ch; const int32_t *v; };
+    std::vector<Rec> recs;
     for (int h = 0; h < n; h++) {
-        if (i >= in.size()) break;
+        if (i >= in.size()) { c.retBool(false); return; }
         if (in[i++] == 0) continue;
         std::string ch;
-        if (!serial::getString(in, i, ch) || i + 18 > in.size()) break;
-        CharSpr &cs = g_chars[h];
-        cs.ch = ch;
+        if (!serial::getString(in, i, ch) || in.size() - i < 18) { c.retBool(false); return; }
+        recs.push_back({h, std::move(ch), &in[i]});
+        i += 18;
+    }
+    for (auto &[h, cs] : g_chars) G().sprites.remove(cs.sprite);
+    g_chars.clear();
+    for (const Rec &r : recs) {
+        const int32_t *v = r.v;
+        CharSpr &cs = g_chars[r.handle];
+        cs.ch = r.ch;
         cs.sprite = g_nextInternal++;
         CharProps &p = cs.props;
-        p.type = in[i++]; p.size = in[i++];
-        p.r = in[i++]; p.g = in[i++]; p.b = in[i++]; p.a = in[i++];
-        std::memcpy(&p.bold, &in[i++], 4);
-        std::memcpy(&p.edge, &in[i++], 4);
-        p.er = in[i++]; p.eg = in[i++]; p.eb = in[i++]; p.ea = in[i++];
-        int x = in[i++], y = in[i++], z = in[i++];
-        cs.alpha = in[i++];
-        bool show = in[i++] != 0;
-        i++;  // the PC's sprite number; this engine numbers its own
+        p.type = v[0]; p.size = v[1];
+        p.r = v[2]; p.g = v[3]; p.b = v[4]; p.a = v[5];
+        std::memcpy(&p.bold, &v[6], 4);
+        std::memcpy(&p.edge, &v[7], 4);
+        p.er = v[8]; p.eg = v[9]; p.eb = v[10]; p.ea = v[11];
+        cs.alpha = v[15];
+        // v[17] is the PC's sprite number; this engine numbers its own.
         Sprite &s = G().sprites.get(cs.sprite);
-        s.x = x; s.y = y; s.z = z;
+        s.x = v[12]; s.y = v[13]; s.z = v[14];
         drawChar(cs);
-        s.show = show;
+        s.show = v[16] != 0;
     }
     g_nextCharHandle = std::max(n, 1);
     c.retBool(true);
@@ -520,7 +526,9 @@ S4_HLL(StoatSpriteEngine, ADVLogList_Clear) { g_log.clear(); }
 S4_HLL(StoatSpriteEngine, ADVLogList_AddText) {
     if (!g_logEnabled) return;
     if (g_log.empty()) g_log.emplace_back();
-    g_log.back().lines.back() += c.s(0);
+    auto &lines = g_log.back().lines;
+    if (lines.empty()) lines.emplace_back();  // a page loaded from a save can have no lines
+    lines.back() += c.s(0);
 }
 S4_HLL(StoatSpriteEngine, ADVLogList_AddNewLine) {
     if (!g_logEnabled) return;
@@ -577,7 +585,8 @@ S4_HLL(StoatSpriteEngine, ADVLogList_Load) {
     int n = in[i + 1];
     i += 2;
     for (int k = 0; k < n; k++) {
-        if (i >= in.size() || in[i] < 0) { g_log.clear(); c.retBool(false); return; }
+        // Each line takes at least its NUL, so a count beyond what's left is damage.
+        if (i >= in.size() || in[i] < 0 || size_t(in[i]) > in.size() - i - 1) { g_log.clear(); c.retBool(false); return; }
         LogPage p;
         p.lines.assign(size_t(in[i++]), "");
         for (auto &l : p.lines)

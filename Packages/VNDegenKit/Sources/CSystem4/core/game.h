@@ -9,6 +9,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "archive.h"
@@ -72,7 +73,22 @@ public:
     int mouseX() const { return mouseX_.load(); }
     int mouseY() const { return mouseY_.load(); }
     int takeWheel() { return wheel_.exchange(0); }
-    std::string lastProblem;
+    // Typed text, CP932, from the host while the game's text entry is open (InputString.Begin to End).
+    std::atomic<bool> textEntry{false};
+    void typed(const std::string &cp932) {
+        if (!textEntry) return;
+        std::lock_guard<std::mutex> lock(typedMu_);
+        typed_ += cp932;
+    }
+    std::string takeTyped() {
+        std::lock_guard<std::mutex> lock(typedMu_);
+        return std::exchange(typed_, {});
+    }
+    // The last problem() text; the VM thread sets it while the host may read it.
+    std::string lastProblem() {
+        std::lock_guard<std::mutex> lock(problemMu_);
+        return lastProblem_;
+    }
     void dumpSpritesOnNextFrame() { dumpSprites_ = true; }  // debugging: logs every sprite
     void debugCall(const std::string &sjisName) { std::lock_guard<std::mutex> l(mu_); debugCall_ = sjisName; }
     std::atomic<bool> ended{false};
@@ -88,11 +104,16 @@ private:
     std::atomic<bool> paused_{false};
     std::atomic<uint32_t> clockMs_{0};
     uint32_t budgetMs_ = 0;          // game time the current step may still use
+    int hitches_ = 0, lostMs_ = 0;   // steps the clock capped and the time they dropped, since the last timing log
+    uint32_t timingLoggedAt_ = 0;
     std::atomic<bool> keys_[256] = {};
     std::atomic<int> mouseX_{0}, mouseY_{0}, wheel_{0};
     std::mutex frameMu_;
     std::vector<uint8_t> frame_;
     FILE *logFile_ = nullptr;
+    std::mutex problemMu_, typedMu_;
+    std::string typed_;
+    std::string lastProblem_;
     std::atomic<bool> dumpSprites_{false};
     std::string debugCall_;
     std::mutex cgMu_;

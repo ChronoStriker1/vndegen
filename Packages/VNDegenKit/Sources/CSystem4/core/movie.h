@@ -34,7 +34,9 @@ public:
     double duration() const { return duration_; }  // seconds, from the first and last video timestamps
     int sourceAudioRate() const { return srcRate_; }  // the MP2 stream's rate; 0 without audio
 
-    // Decodes video up to the playback time (seconds since the start) and audio a little ahead of it. Returns true
+    // Decodes video up to the playback time and keeps half a second of sound decoded ahead of what has played.
+    // The playback time is the later of seconds (the game clock since the start) and the sound played so far, so a
+    // game clock that falls behind real time neither starves the sound nor lets the picture lag it. Returns true
     // when frame() changed. Time only moves forward; a large jump decodes every frame in between.
     bool advanceTo(double seconds);
     // RGBA8, width*height*4, alpha 255. Black until the first frame.
@@ -44,6 +46,10 @@ public:
 
     // Interleaved stereo float at 44.1 kHz. Returns the frames written; 0 when nothing is buffered.
     int readAudio(float *out, int frames);
+    // Reads that came up short after the sound started and before it ended, and the frames missing from them.
+    // Each is a gap the listener hears as a click.
+    struct Dry { int reads = 0; int64_t frames = 0; };
+    Dry dry();
     void close();
 
 private:
@@ -88,9 +94,12 @@ private:
     int64_t audioSkew_ = 0;  // output frames to drop (>0) or silence to insert (<0) to line audio up with video
     int64_t audioPushed_ = 0;  // output frames produced so far, in movie time
 
-    std::mutex mu_;  // guards the ring
+    std::mutex mu_;  // guards the ring and the counts below it
     std::vector<float> ring_;
     size_t ringHead_ = 0, ringCount_ = 0;  // in frames
+    bool audioEnded_ = false;  // the decoder has pushed its last samples
+    int64_t audioRead_ = 0;    // frames the host has played
+    Dry dry_;
 };
 
 }  // namespace s4

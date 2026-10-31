@@ -42,9 +42,16 @@ int main(int argc, char **argv) {
     VNS4Engine *e = vns4_start(&l);
     if (!e) { std::fprintf(stderr, "start failed: %s\n", vns4_start_error()); return 1; }
     long frames = std::atol(argv[3]);
-    // Audio is pulled at the game clock's rate, 16 ms a frame. S4_AUDIOLOG prints the mix's RMS level each second.
-    std::vector<float> audio(2 * 736);
+    // Audio is pulled at the game clock's rate, 16 ms a frame. S4_AUDIOLOG prints the mix's RMS level each second;
+    // S4_WAV writes the mix to a 16-bit WAV file. S4_HITCH=n makes every nth frame a 200 ms hitch, as a slow host
+    // frame would be: the step and the sound pulled after it cover 200 ms.
+    std::vector<float> audio(2 * 8820);
+    long hitch = std::getenv("S4_HITCH") ? std::atol(std::getenv("S4_HITCH")) : 0;
+    long sampleClock = 0;  // sound frames pulled so far
     bool audioLog = std::getenv("S4_AUDIOLOG") != nullptr;
+    std::FILE *wav = std::getenv("S4_WAV") ? std::fopen(std::getenv("S4_WAV"), "wb") : nullptr;
+    if (wav) std::fseek(wav, 44, SEEK_SET);
+    uint32_t wavFrames = 0;
     double sumSq = 0;
     long sampled = 0;
     long f = 0;
@@ -63,9 +70,17 @@ int main(int argc, char **argv) {
             else if (cmd == "call") { std::string fn; ss >> fn; vns4_debug_call(e, fn.c_str()); }
             else if (cmd == "shot") { std::string file; ss >> file; shot(e, file); }
         }
-        if (!vns4_step(e, 16)) { std::printf("game ended at frame %ld\n", f); break; }
-        int n = int((f + 1) * 16 * 441 / 10 - f * 16 * 441 / 10);
+        int ms = hitch > 0 && f % hitch == hitch - 1 ? 200 : 16;
+        if (!vns4_step(e, ms)) { std::printf("game ended at frame %ld\n", f); break; }
+        int n = int(sampleClock + ms * 441 / 10 - sampleClock);
+        sampleClock += n;
         vns4_audio_render(e, audio.data(), n);
+        if (wav) {
+            std::vector<int16_t> pcm(size_t(n) * 2);
+            for (size_t i = 0; i < pcm.size(); i++) pcm[i] = int16_t(std::lround(audio[i] * 32767.0f));
+            std::fwrite(pcm.data(), 2, pcm.size(), wav);
+            wavFrames += uint32_t(n);
+        }
         if (audioLog) {
             for (int i = 0; i < n * 2; i++) sumSq += double(audio[i]) * audio[i];
             sampled += n;
@@ -75,6 +90,16 @@ int main(int argc, char **argv) {
                 sampled = 0;
             }
         }
+    }
+    if (wav) {
+        uint32_t data = wavFrames * 4, riff = 36 + data, fmtLen = 16, rate = 44100, byteRate = 44100 * 4;
+        uint16_t pcmTag = 1, channels = 2, align = 4, bits = 16;
+        std::fseek(wav, 0, SEEK_SET);
+        std::fwrite("RIFF", 1, 4, wav); std::fwrite(&riff, 4, 1, wav); std::fwrite("WAVEfmt ", 1, 8, wav);
+        std::fwrite(&fmtLen, 4, 1, wav); std::fwrite(&pcmTag, 2, 1, wav); std::fwrite(&channels, 2, 1, wav);
+        std::fwrite(&rate, 4, 1, wav); std::fwrite(&byteRate, 4, 1, wav); std::fwrite(&align, 2, 1, wav);
+        std::fwrite(&bits, 2, 1, wav); std::fwrite("data", 1, 4, wav); std::fwrite(&data, 4, 1, wav);
+        std::fclose(wav);
     }
     shot(e, "s4play-last.png");
     if (const char *p = vns4_problem(e)) std::printf("problem: %s\n", p);

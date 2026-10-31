@@ -69,7 +69,7 @@ const std::string &HllCall::s(int k) const {
 }
 int32_t &HllCall::ref(int k) const {
     static int32_t dummy;
-    int32_t pg = words[argWord[k]], idx = words[argWord[k] + 1];
+    int32_t pg = word(k), idx = word(k, 1);
     Page *p = vm.page(pg);
     if (!p || idx < 0 || size_t(idx) >= p->v.size()) { dummy = 0; return dummy; }
     return p->v[idx];
@@ -182,11 +182,13 @@ void VM::decref(int32_t slot) {
             if (dtor > 0) {
                 s.refs = 1;  // keep it alive while the destructor runs
                 call(dtor, {}, slot);
-                if (--s.refs > 0) return;
+                // The destructor may have grown the heap, which moves the slots.
+                if (--heap[slot].refs > 0) return;
             }
         }
-        std::unique_ptr<Page> owned = std::move(s.page);
-        s.inUse = false;
+        Slot &after = heap[slot];
+        std::unique_ptr<Page> owned = std::move(after.page);
+        after.inUse = false;
         freePage(*owned);
     } else {
         s.str.reset();
@@ -361,6 +363,7 @@ void VM::enter(int32_t function, int32_t thisPage, bool native) {
     if (function <= 0 || size_t(function) >= ain.functions.size()) fatal("call to bad function " + std::to_string(function));
     const Function &f = ain.functions[function];
     if (stack.size() < size_t(f.argc)) fatal("stack underflow calling " + functionName(function));
+    if (size_t(f.argc) > f.vars.size()) fatal("more arguments than variables in " + functionName(function));
     int32_t lp = newPage(PageKind::Local, function, f.vars.size());
     Page &p = *heap[lp].page;
     size_t base = stack.size() - f.argc;
@@ -505,16 +508,22 @@ void VM::callHll(int32_t lib, int32_t fn) {
 void VM::run(size_t untilFrames) {
     const std::vector<uint8_t> &code = ain.code;
     while (frames.size() > untilFrames) {
-        if (ip + 2 > code.size()) fatal("ran off the end of the code");
+        if (++sinceCancelCheck_ >= 65536) {
+            sinceCancelCheck_ = 0;
+            if (cancelled.load(std::memory_order_relaxed)) throw VMCancelled{};
+        }
+        if (ip >= code.size() || code.size() - ip < 2) fatal("ran off the end of the code");
         uint16_t op = code[ip] | code[ip + 1] << 8;
         const OpInfo *oi = opInfo(op);
         if (!oi) fatal("unknown opcode " + std::to_string(op));
+        if (code.size() - ip - 2 < size_t(4 * oi->args)) fatal("ran off the end of the code");
         uint32_t next = ip + 2 + 4 * oi->args;
         curInsn_ = ip;
         int32_t args[3] = {0, 0, 0};
         std::memcpy(args, code.data() + ip + 2, 4 * oi->args);
         auto A = [&](int k) { return args[k]; };
-        Frame &fr = frames.back();
+        // Copied, not referenced: game code an instruction runs (a constructor, a callback) can grow `frames`.
+        const struct { int32_t localPage, structPage; } fr{frames.back().localPage, frames.back().structPage};
         auto localv = [&](int32_t i) -> int32_t & { return heap[fr.localPage].page->v.at(i); };
         auto thisv = [&](int32_t i) -> int32_t & {
             Page *p = page(fr.structPage);
@@ -805,10 +814,12 @@ void VM::run(size_t untilFrames) {
             Page *d = arrayAt(pg, i);
             Page *s = page(src);
             int32_t done = 0;
-            if (d && s) {
-                for (; done < n && dstStart + done < int32_t(d->v.size()) && srcStart + done < int32_t(s->v.size()); done++) {
-                    int32_t v = s->v[srcStart + done];
-                    int32_t &dv = d->v[dstStart + done];
+            if (d && s && n > 0 && dstStart >= 0 && srcStart >= 0 && size_t(dstStart) < d->v.size() &&
+                size_t(srcStart) < s->v.size()) {
+                int32_t count = int32_t(std::min({size_t(n), d->v.size() - size_t(dstStart), s->v.size() - size_t(srcStart)}));
+                for (; done < count; done++) {
+                    int32_t v = s->v[size_t(srcStart) + size_t(done)];
+                    int32_t &dv = d->v[size_t(dstStart) + size_t(done)];
                     if (d->elemType == T_STRING) str(dv) = str(v);
                     else if (d->elemType == T_STRUCT) structAssign(dv, v);
                     else dv = v;
@@ -820,13 +831,21 @@ void VM::run(size_t untilFrames) {
         case OP_A_FILL: {
             int32_t v = pop(), n = pop(), start = pop(), i = pop(), pg = pop();
             Page *a = arrayAt(pg, i);
-            int32_t done = 0;
-            for (; done < n && start + done < int32_t(a->v.size()); done++) {
-                if (start + done < 0) continue;
-                if (a->elemType == T_STRING) str(a->v[start + done]) = str(v);
-                else a->v[start + done] = v;
+            // Fills [start, start + n) within the array; a negative start fills from 0 but counts the part before.
+            int64_t end = std::min(int64_t(start) + std::max(n, 0), int64_t(a->v.size()));
+            int32_t done = int32_t(std::max<int64_t>(0, end - start));
+            // The size is checked each time: a struct's destructor, run by the assignment, can change the array.
+            for (int64_t k = std::max<int64_t>(start, 0); k < end && size_t(k) < a->v.size(); k++) {
+                int32_t e = a->v[size_t(k)];
+                if (a->elemType == T_STRING) str(e) = str(v);
+                else if (a->elemType == T_STRUCT) {
+                    // Each element gets its own copy; the value popped is a temporary this instruction owns.
+                    if (page(e)) structAssign(e, v);
+                    else if (int32_t c = copyPage(v); size_t(k) < a->v.size()) a->v[size_t(k)] = c;
+                    else decref(c);
+                } else a->v[size_t(k)] = v;
             }
-            if (a->elemType == T_STRING) decref(v);
+            if (a->elemType == T_STRING || a->elemType == T_STRUCT) decref(v);
             push(done);
             break;
         }
@@ -1088,6 +1107,8 @@ void VM::run(size_t untilFrames) {
         }
         // A delegate call: CALLBEGIN finds the delegate below the arguments and pushes an index; each DG_CALL calls
         // the next method with copies of the arguments, or when none are left drops them and jumps past the loop.
+        // Strings and structs passed by value belong to the callee, so each method gets its own copy and the loop
+        // releases the originals at the end.
         case OP_DG_CALLBEGIN: push(0); break;
         case OP_DG_CALL: {
             const FuncType &ft = ain.delegates.at(A(0));
@@ -1098,8 +1119,14 @@ void VM::run(size_t untilFrames) {
             int32_t idx = stack[top - 1];
             int32_t dsl = stack[top - 2 - nargs];
             Delegate *d = delegate(dsl);
+            auto byValue = [&](int k) {
+                int32_t t = size_t(k) < ft.vars.size() ? ft.vars[size_t(k)].t.type : T_INT;
+                return t == T_STRING || t == T_STRUCT;
+            };
             if (!d || idx >= int32_t(d->size())) {
                 // The loop's value is the last method's return; with none called, the type's empty value.
+                for (int k = 0; k < nargs; k++)
+                    if (byValue(k)) decref(stack[top - 1 - nargs + k]);
                 stack.resize(top - 2 - nargs);
                 if (ft.ret.type != T_VOID) {
                     if (idx > 0) push(dgLastReturn_);
@@ -1110,7 +1137,12 @@ void VM::run(size_t untilFrames) {
             }
             auto [obj, fn] = (*d)[idx];
             stack[top - 1] = idx + 1;
-            for (int k = 0; k < nargs; k++) push(stack[top - 1 - nargs + k]);
+            for (int k = 0; k < nargs; k++) {
+                int32_t v = stack[top - 1 - nargs + k];
+                if (!byValue(k)) push(v);
+                else if (ft.vars[size_t(k)].t.type == T_STRING) push(newString(str(v)));
+                else push(copyPage(v));
+            }
             ip = next;
             enter(fn, obj >= 0 ? obj : -1, false);
             frames.back().discardReturn = true;
