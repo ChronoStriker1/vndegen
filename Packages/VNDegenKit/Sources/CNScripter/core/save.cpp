@@ -659,6 +659,11 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 
 void Engine::loadGlobals() {
     Bytes data;
+    // Our menu preference, separate from the PC engine's undocumented envdata.
+    if (readFile(fs_.hostPath(joinPath(saveDir_, "vndegen-text-speed.dat")), data) && data.size() == 1 && data[0] <= 2) {
+        speedChoice_ = data[0];
+        textSpeed_ = defaultSpeeds_[speedChoice_];
+    }
     globalsOnDisk_.clear();
     if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, "gloval.sav")), data)) {
         globalsOnDisk_ = data;

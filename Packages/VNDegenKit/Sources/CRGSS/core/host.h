@@ -35,6 +35,13 @@ void host_frame_reset(void);
 void host_input(HostInput *out);
 void host_set_problem(const char *problem);
 
+// Runs Ruby for vnrgss_run_ruby on the game thread and returns its last value's to_s, or the error's message with
+// `failed` set, which the caller frees. Defined by the Ruby side (rb_modules.c).
+char *rgss_run_ruby(const char *code, bool *failed);
+// Whether the frame the game is about to draw won't be shown, because the game runs faster than its frame rate and
+// more frames are already granted after it.
+bool host_frame_hidden(void);
+
 // For the Linux test host: runs Ruby on the game thread at its next Graphics.update.
 void host_test_eval(const char *code);
 // The Ruby the test host left to run, which the caller frees, or NULL.

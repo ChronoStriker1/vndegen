@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ are built, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, see below.
 
 ## Why
 
@@ -94,3 +94,74 @@ Measured on the map with the DEBUG input script's `fps` step and a count of `Sce
 | No Socks RPG (MZ) | iPad simulator | 4x | 25.7 | 17.9 | 206.4 |
 
 Simulator timing isn't iPad timing, and the Mac mini ran other threads' builds and simulators during several of these runs.
+
+## Built: RPG Maker XP, VX and VX Ace
+
+The same Cheats page, with the same four tabs and settings, for every game on VNDegen's RGSS runtime. Variables take whole numbers from -99,999,999 to 99,999,999, the range RPG Maker's own event commands use, and text. Other values are shown and left alone.
+
+How it works:
+
+- `vnrgss.h` gains `vnrgss_run_ruby` and `vnrgss_ruby_result`. The app queues Ruby, and the runtime runs it on the game thread while the game waits for its next frame. That is between two frames, with the game's objects in a consistent state, and it works while the game is paused under VNDegen's menu. The app polls for the result and waits for it however long the game takes, since a queued change can't be withdrawn. A request from a game that has ended answers "The game ended."
+- `rgss-cheats.rb` (EngineRGSS's resources) loads at the game's first frame. A game's scripts can still be loading then, and can alias or replace methods afterwards, and no section name says when they're done. So the cheats wrap methods the way RGSS scripts wrap theirs: a method on the class that calls the one it replaced. A later script's alias chains through the wrap, and a call that reaches the same wrap again, as through such an alias, goes straight to the replaced method, so a cheat applies once and nothing loops. A wrap of a method the class inherits reaches it through `super`, so a later script's change to the superclass still applies. Every second while the game runs, the app queues `VNDegenCheats.install`, which wraps classes a later script defined and methods a later script replaced outright. It runs at the runtime's frame boundary, which no game script can replace. Methods aren't written into Marshal saves, so saves stay ordinary. What it wraps differs by version:
+
+| | XP | VX | VX Ace |
+|---|---|---|---|
+| Keep HP and MP full | `Game_Actor#hp=` and `sp=` | `hp=` and `mp=` | `hp=` and `mp=` |
+| No random encounters | `Game_Player#encounter_count`, which the map scene waits to reach 0 | the same | `Game_Player#encounter` |
+| Walk through walls | `Game_Player#passable?`, within the map | `debug_through?`, as Control in a playtest | `debug_through?` |
+| Experience | `Game_Actor#exp=`, through which battles and events add it | `gain_exp` | `final_exp_rate` |
+
+- One-shot cheats call the game's own methods: `gain_gold`, `gain_item` (XP's `gain_weapon` and `gain_armor` too), `recover_all`, and `$game_variables` and `$game_switches`, which also refresh the map. They wait until a game is started or loaded: a title scene starting clears that, and a map scene starting sets it.
+- Game speed is `vnrgss_set_speed`. Each step lets the game draw that many times as many frames, and the runtime composites only the frames that will be shown.
+- Text a player types reaches Ruby as its characters' numbers, `[…].pack('U*')`, so no text runs as code. A string literal won't do: Ruby interpolates `#{` in a double-quoted string even when the `#` is an escape.
+
+Checked against Test Games 14 and 55 (VX Ace), 33 (VX) and 37 (XP).
+
+### Known limits
+
+- Keep HP and MP full doesn't stop a knockout state an event adds directly, as in MV and MZ.
+- XP's walk through walls replaces `Game_Player#passable?`, so it ignores what a game's own override of that method checks.
+- A setting a later script breaks by replacing a method outright stops working until the next install, up to a second later.
+- Each wrap passes calls through while it runs, so if a game's version of a setter sets the same value on another actor from inside it, that second actor isn't kept full.
+- The editor can put a game into a state its own save can't restore. In Test Game 37, turning on switch 1 makes the game drop data its save expects, so a save made afterwards fails to load on the PC as well as here. The page says a save made before editing is the undo.
+
+### Frame rate
+
+Test Game 55, on the MacBook (120 Hz display) at a load average of 550 to 610, 40 s at each speed:
+
+| Speed | Drawn fps | 1% low | Map updates per second |
+|---|---|---|---|
+| 1x | 60.0 | 45 to 51 | 60.0 |
+| 4x | 114 to 119 | 29 to 70 | 240 |
+
+## Built: Wolf RPG Editor
+
+Wolf RPG Editor has no gold, items, party or switches of its own. Games keep their state in normal variables and in their databases, laid out as each game likes. So what the Cheats page offers depends on the game:
+
+- **Every game**: the Variables tab, with the game's normal variables and the names its system database gives them (type 14), walk through walls, and game speed.
+- **Games built on the editor's standard systems**, recognized by the changeable database's field names: gold (type 6, field 0, 所持金), items, weapons and armor by name (counts in types 7 to 9, names in the user database's types 2 to 4), and restoring the party's HP and SP (type 0, fields 6 to 9) for the members type 6 lists. Test Games 02 and 52 are such games. Test Game 53 keeps its own layout, and its money is normal variable 17, which the Variables tab edits.
+
+How it works, in `Packages/VNDegenKit/Sources/CWolfRPG/core/cheats.cpp` and `vnwolf.h`:
+
+- The runtime is VNDegen's own, so the cheats are calls on its `Game`: they read and write the same variables and database cells the game's events do, which the save writes as it always does.
+- Walk through walls lets the hero pass where `canMove` would stop it, within the map.
+- Game speed is `vnwolf_set_speed`: each step advances that many times as many of the game's frames, and draws the last. Sound fades a command starts take that much less time too, so they end with the waits they go with.
+- After each change the runtime checks map event pages again, as it does when an event changes a variable, so a page whose condition the change meets shows.
+- Gold is held between 0 and 999,999,999, and an item's count at 99 or what the game already allows above it.
+- A game counts as using the standard systems only when every field these cheats read and write is where they expect it, as a number.
+
+Checked: on CachyOS through the runtime with Test Games 02, 52 and 53; on the Mac app by controller with Test Game 52; on an iPad simulator by touch with Test Games 02 and 53; and on an iPhone simulator with Test Game 53, where the search found its money variable. Test Game 52's save made after cheating loads in the Windows engine (Wolf RPG Editor 3.282) under Wine with 1,010 yen, 10 Sedatives and full HP.
+
+Test Game 52 on the MacBook (120 Hz display, load average about 30), 30 s at each speed, from the session's `-frameMonitor` log:
+
+| Speed | Display ticks per second | New frames drawn per second | Slowest step |
+|---|---|---|---|
+| 1x | 120 | 57.7 (the game's 60) | 3.6 ms |
+| 4x | 120 | 119.8 to 120 | 15 to 19 ms |
+
+### Known limits
+
+- Keeping HP and SP full, no random encounters, and the experience rate aren't offered: the standard systems run battles, encounters and experience in their own common events, and change HP in a battle copy of the party (the changeable database's type 10) that a cheat on type 0 wouldn't reach.
+- Restore fills HP and SP to the hero's base maximum (fields 7 and 9). Equipment that raises the maximum raises it further only in the standard system's own calculation, so the restored value can be below what the status screen shows as the maximum.
+- Spare variables, string variables and the databases themselves aren't listed.
+- A standard system translated so far that its database field names changed isn't recognized, and gets the variables only.

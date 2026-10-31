@@ -66,6 +66,25 @@ enum {
 // Stops the clock and sound. vnwolf_step does nothing while paused.
 void vnwolf_set_paused(VNWolfEngine *e, bool paused);
 
+// Runs the game `speed` times as fast, 1 being its own speed: each step advances it that many times as many frames,
+// and draws the last.
+void vnwolf_set_speed(VNWolfEngine *e, int speed);
+
+// Cheats, for VNDegen's Cheats page. Each changes the game's own variables and databases, so a save made afterwards is
+// an ordinary save.
+// Whether the game keeps gold, items and its party where Wolf RPG Editor's standard systems keep them. The gold, item
+// and restore calls work only then.
+bool vnwolf_cheat_has_party(VNWolfEngine *e);
+// The game's state as JSON, in the format VNCore's CheatState(json:) reads. Valid until the next vnwolf call.
+const char *vnwolf_cheat_state(VNWolfEngine *e);
+// Each returns false when no game is going yet or the game doesn't have what it changes. `kind` is 0 for items, 1 for
+// weapons and 2 for armor.
+bool vnwolf_cheat_add_gold(VNWolfEngine *e, int amount);
+bool vnwolf_cheat_add_item(VNWolfEngine *e, int kind, int id, int count);
+bool vnwolf_cheat_restore_party(VNWolfEngine *e);
+bool vnwolf_cheat_set_variable(VNWolfEngine *e, int id, int value);
+void vnwolf_cheat_walk_through_walls(VNWolfEngine *e, bool on);
+
 // Frees the engine.
 void vnwolf_stop(VNWolfEngine *e);
 

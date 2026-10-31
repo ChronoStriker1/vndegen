@@ -182,10 +182,14 @@ bool Engine::chooseWindowMenuItem(size_t index) {
         break;
     case MenuMark::SlowText:
     case MenuMark::NormalText:
-    case MenuMark::FastText:
+    case MenuMark::FastText: {
         speedChoice_ = f->mark == MenuMark::SlowText ? 0 : f->mark == MenuMark::NormalText ? 1 : 2;
         textSpeed_ = defaultSpeeds_[speedChoice_];
+        uint8_t choice = uint8_t(speedChoice_);
+        std::string path = fs_.hostPath(saveDir_ + "/vndegen-text-speed.dat");
+        if (!fs_.write(path, &choice, 1)) logf("could not write %s", path.c_str());
         break;
+    }
     }
     return true;
 }

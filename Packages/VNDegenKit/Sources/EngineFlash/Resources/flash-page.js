@@ -135,6 +135,9 @@
             for (const player of players()) {
                 if (paused) {
                     player.ruffle().suspend();
+                    // VNDegen owns this pause. Ruffle's play button would show beneath the session menu.
+                    const playButton = player.shadowRoot && player.shadowRoot.getElementById('play-button');
+                    if (playButton) playButton.style.display = 'none';
                 } else {
                     player.ruffle().resume();
                 }
