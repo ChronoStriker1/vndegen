@@ -7,12 +7,13 @@
 // From --auto MS on, the autopilot presses Return at message waits, and once a second at other waits, and answers menus: a pending pick first, then the
 // first --prefer text an item contains, then a seeded random item, never one containing an --avoid text.
 // With --repl, after --ms it reads commands from FIFO, one per line, and prints "ok" after each:
-//   run MS | click X Y | rclick X Y | key VK | shot FILE | where | trace 0/1 | var FROM [TO] | quit
+//   run MS | click X Y | rclick X Y | key VK | shot FILE | where | trace 0/1 | var FROM [TO] | arr VAR COUNT | quit
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 // It prints the game's problem, if one stopped it, and exits 1 then.
 #include "vns3.h"
 #include "vnfont.h"
 #include "s3.h"
+#include "vm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,6 +173,11 @@ int main(int argc, char **argv) {
             else if (!strcmp(cmd, "shot")) shot(g, arg);
             else if (!strcmp(cmd, "where")) printf("page %d pc %x wait %d menus %d\n", s->page, s->pc, s->wait, s->menuCount);
             else if (!strcmp(cmd, "trace")) s->trace = x != 0;
+            else if (!strcmp(cmd, "arr")) { // arr VAR COUNT: elements 0..COUNT-1 of an array variable
+                S3LV lv = { .var = (u16)x, .offset = 0, .element = true };
+                for (int k = 0; k < y; k++) printf("%u ", s3_lv_get(s, &lv, k));
+                printf("\n");
+            }
             else if (!strcmp(cmd, "var")) { for (int v = x; v <= (y > x ? y : x); v++) printf("v%d=%u ", v, s3_var_get(s, (u16)v)); printf("\n"); }
             else if (!strcmp(cmd, "run")) ms = x;
             else if (!strcmp(cmd, "key")) { vns3_key(g, x, true); ok = vns3_frame(g, 16) || !vns3_problem(g); for (int k = 0; k < 5; k++) vns3_frame(g, 16); vns3_key(g, x, false); }
