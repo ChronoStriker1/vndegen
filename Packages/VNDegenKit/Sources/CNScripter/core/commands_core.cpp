@@ -154,7 +154,7 @@ void cmdRmenu(E &e, const std::string &) {
     } while (e.readComma());
 }
 
-// The window menu bar, which VNDegen lists in its Game menu. resetmenu empties it before a game builds its own, and
+// The window menu bar, which VNDegen lists in its Game commands. resetmenu empties it before a game builds its own, and
 // deletemenu removes it, so the game has none.
 void cmdResetMenu(E &e, const std::string &) { e.windowMenu_.clear(); }
 

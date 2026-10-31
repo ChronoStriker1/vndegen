@@ -93,7 +93,7 @@ void Engine::runSystemFunction(const std::string &fn) {
 
 namespace {
 // The menu bar functions VNDegen runs, and how each one shows. Volume (DWAVEVOLUME) opens a Windows dialog, and
-// Fullscreen and Window (FULL, WINDOW) change the window, so the Game menu leaves them out.
+// Fullscreen and Window (FULL, WINDOW) change the window, so Game commands leave them out.
 enum class MenuMark { None, ReadSkipOff, ReadSkipOn, SlowText, NormalText, FastText };
 struct MenuFunction {
     const char *name;

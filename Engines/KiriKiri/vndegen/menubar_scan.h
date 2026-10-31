@@ -1,6 +1,6 @@
 // Finds where a game's script asks whether the window's menu bar is hidden. A game that does usually puts its menu
 // commands on screen when it is, so the engine tells it so. Without such a test the engine reports the menu bar as
-// shown, so the game builds its commands there and VNDegen lists them in its Game menu.
+// shown, so the game builds its commands there and VNDegen lists them in its Game commands.
 #ifndef VNKK_MENUBAR_SCAN_H
 #define VNKK_MENUBAR_SCAN_H
 

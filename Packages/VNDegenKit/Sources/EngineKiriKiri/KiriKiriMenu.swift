@@ -1,7 +1,7 @@
 import Foundation
 import VNCore
 
-/// A KiriKiri game's window menu bar, which the engine never draws, as VNDegen's Game menu lists it.
+/// A KiriKiri game's window menu bar, which the engine never draws, as VNDegen's Game commands list it.
 nonisolated enum KiriKiriMenu {
     /// One item as `vnkk_menu` describes it.
     private struct Item: Decodable {
@@ -13,7 +13,7 @@ nonisolated enum KiriKiriMenu {
         var items: [Item]
     }
 
-    /// The Game menu's items from `vnkk_menu`'s JSON. Separators that would start or end a list, or follow another,
+    /// The Game commands' items from `vnkk_menu`'s JSON. Separators that would start or end a list, or follow another,
     /// are left out, and so are submenus left with nothing to choose.
     static func items(json: String) -> [GameMenuItem] {
         guard let items = try? JSONDecoder().decode([Item].self, from: Data(json.utf8)) else { return [] }
@@ -65,13 +65,13 @@ nonisolated enum KiriKiriMenu {
 nonisolated enum KiriKiriMenuBar: String, Codable, CaseIterable {
     /// The game puts its menu commands on screen, if it has a way to.
     case hidden
-    /// The game builds its menu bar, and VNDegen lists it in the Game menu.
+    /// The game builds its menu bar, and VNDegen lists it in Game commands.
     case shown
 
     var title: String {
         switch self {
         case .hidden: "Commands on screen"
-        case .shown: "In the Game menu"
+        case .shown: "In Game commands"
         }
     }
 
@@ -79,7 +79,7 @@ nonisolated enum KiriKiriMenuBar: String, Codable, CaseIterable {
     var automaticTitle: String {
         switch self {
         case .hidden: "commands on screen, as the game's scripts expect"
-        case .shown: "in the Game menu, as the game's scripts expect"
+        case .shown: "in Game commands, as the game's scripts expect"
         }
     }
 

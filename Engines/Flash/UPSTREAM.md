@@ -52,7 +52,7 @@ for browsers that lack them.
   `movieContextMenuItems()` and `runContextMenuItem(index)`, through a new `prepare_movie_context_menu` in the wasm
   module that prepares the context menu as a right click does and lists only the items the movie added, without the
   built-in ones such as Play and Quality. VNDegen turns Ruffle's context menu off, because a right click belongs to
-  the game, and lists these items in its Game menu instead (`flash-page.js`). Ruffle kept the list private to its
+  the game, and lists these items in its Game commands instead (`flash-page.js`). Ruffle kept the list private to its
   player. Usashitsuke (Test Game 126) puts Return to title and Quit there.
 
 ## Licenses

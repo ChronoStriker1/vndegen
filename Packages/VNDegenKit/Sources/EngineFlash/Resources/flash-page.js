@@ -147,7 +147,7 @@
         window.__vndegen.beforeQuit = flush;
     }
 
-    // VNDegen's Game menu lists the movie's own right-click items, which Flash Player showed and a right click here,
+    // VNDegen's Game commands list the movie's own right-click items, which Flash Player showed and a right click here,
     // which belongs to the game, doesn't. A full-screen item is left out, since the session owns the window. The list
     // comes from Ruffle's player with VNDegen's patch (Engines/Flash/patches/0002), and each item's id is its index.
     const fullScreen = /full ?screen|フルスクリーン|ﾌﾙｽｸﾘｰﾝ/i;

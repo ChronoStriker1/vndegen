@@ -43,9 +43,9 @@ public struct WebGameConfiguration {
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
     public var scriptArgument: String
-    /// Commands the game has and offers no way to reach without a keyboard, for VNDegen's Game menu.
+    /// Commands the game has and offers no way to reach without a keyboard, for VNDegen's Game commands.
     public var menuCommands: [WebMenuCommand] = []
-    /// Game menu commands only the page knows, asked for each time VNDegen's menu opens.
+    /// Game commands only the page knows, asked for each time VNDegen's menu opens.
     public var pageMenu: WebPageMenu?
     public var log: Logger
 
@@ -77,7 +77,7 @@ public struct WebGameConfiguration {
     }
 }
 
-/// Game menu commands the page lists itself, such as a Flash movie's own right-click items.
+/// Game commands the page lists itself, such as a Flash movie's own right-click items.
 nonisolated public struct WebPageMenu: Sendable {
     /// JavaScript whose value is a JSON array of `{"id", "title", "checked", "enabled", "separatorBefore"}`, ids as
     /// strings.
@@ -99,7 +99,7 @@ nonisolated struct WebPageMenuItem: Decodable {
     var enabled: Bool
     var separatorBefore: Bool
 
-    /// The Game menu's items, a separator before each item that asks for one, except the first.
+    /// The Game commands' items, a separator before each item that asks for one, except the first.
     static func items(json: String, idPrefix: String) -> [GameMenuItem] {
         guard let items = try? JSONDecoder().decode([WebPageMenuItem].self, from: Data(json.utf8)) else { return [] }
         var result: [GameMenuItem] = []
@@ -111,7 +111,7 @@ nonisolated struct WebPageMenuItem: Decodable {
     }
 }
 
-/// A Game menu command that runs `script` in the game's page, after VNDegen's menu closes.
+/// A Game commands entry that runs `script` in the game's page, after VNDegen's menu closes.
 nonisolated public struct WebMenuCommand: Sendable, Equatable {
     public let id: String
     public let title: String
