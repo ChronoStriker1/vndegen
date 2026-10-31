@@ -47,6 +47,9 @@ public struct WebGameConfiguration {
     public var menuCommands: [WebMenuCommand] = []
     /// Game commands only the page knows, asked for each time VNDegen's menu opens.
     public var pageMenu: WebPageMenu?
+    /// Lets a touch scroll the page on iPhone and iPad, for games laid out as a document, such as Twine stories, rather
+    /// than drawn to one screen.
+    public var scrollsPage = false
     public var log: Logger
     /// The game's cheats, made the first time VNDegen's menu asks for them, around the session's page. Nil for engines
     /// that offer none.
@@ -63,7 +66,7 @@ public struct WebGameConfiguration {
         self.runtime = runtime ?? .nwjs(execPath: folder.mainModule)
         self.userScripts = userScripts
         self.userAgent = userAgent
-        self.storage = storage ?? storageDirectory.map(WebStorage.init)
+        self.storage = storage ?? storageDirectory.map { WebStorage(directory: $0) }
         self.startPage = startPage
         self.decodesOgg = decodesOgg
         self.buttonScript = buttonScript
@@ -74,6 +77,11 @@ public struct WebGameConfiguration {
     /// A desktop Safari user agent. Engines that check for a phone or tablet in it would otherwise lay themselves out for
     /// a mobile browser.
     nonisolated public static let desktopUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+
+    /// The user agent of Chrome on a Mac. NW.js and Electron builds run on Chromium, and engines such as TyranoScript and
+    /// Visual Novel Maker branch on the browser they see. As Safari they would ask for .m4a files in place of the .ogg
+    /// files the games ship.
+    nonisolated public static let chromeUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         try WebGameSession(launch: launch, configuration: self)
@@ -219,7 +227,7 @@ final class WebGameSession: NSObject, EngineSession {
         webView.isOpaque = true
         webView.backgroundColor = .black
         let scrollView = webView.scrollView
-        scrollView.isScrollEnabled = false
+        scrollView.isScrollEnabled = game.scrollsPage
         scrollView.bounces = false
         scrollView.bouncesZoom = false
         scrollView.minimumZoomScale = 1

@@ -1,4 +1,5 @@
 import Foundation
+import VNCore
 
 /// Where a page's localStorage lives. The shim calls it before each change reaches the page, so every write is on disk
 /// when setItem returns. Keys and values are the strings the page used.
@@ -34,6 +35,25 @@ nonisolated public struct WebStorage: PageStorage {
 
     public init(directory: URL) {
         self.directory = directory
+    }
+
+    /// The localStorage of a game whose engine keeps it in the game's data directory, in `localStorage/` there.
+    public init(dataDirectory: URL) {
+        self.init(directory: dataDirectory.appendingPathComponent(Self.folderName, isDirectory: true))
+    }
+
+    /// Save sync's rule for these files: `.../localStorage/testgame03_sf.value` maps to `testgame03_sf.value`.
+    public var saveLocation: SaveLocation {
+        SaveLocation(directory: directory, relativePath: Self.relativePath)
+    }
+
+    static let folderName = "localStorage"
+
+    /// `.../localStorage/testgame03_sf.value` maps to `testgame03_sf.value`.
+    public static func relativePath(_ path: String) -> String? {
+        let parts = path.split(separator: "/")
+        guard parts.count >= 2, parts[parts.count - 2] == Substring(folderName), parts.last!.hasSuffix(suffix) else { return nil }
+        return String(parts.last!)
     }
 
     /// Every key and value. Files named the way earlier versions named them, with upper-case letters left as they were,

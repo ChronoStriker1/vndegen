@@ -29,16 +29,17 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         guard let game = TyranoGame(folder: launch.folder) else { throw TyranoError.notTyrano }
         guard let url = Bundle.module.url(forResource: "tyrano", withExtension: "js") else { throw TyranoError.scriptMissing }
         let folder = GameFolder(root: launch.folder, webRoot: game.webRoot)
-        let storage = WebStorage(directory: Self.storageDirectory(launch.dataDirectory))
+        let storage = WebStorage(dataDirectory: launch.dataDirectory)
         do {
             try Self.adoptSaveKey(of: game, folder: launch.folder, storage: storage)
         } catch {
             tyranoLog.error("could not update the save key: \(error.localizedDescription, privacy: .public)")
         }
+        // Electron builds also mark the user agent, which is how Tyrano tells Electron from NW.js.
         var configuration = try WebGameConfiguration(
             folder: folder, appName: game.projectID, runtime: Self.runtime(for: game),
             userScripts: [try String(contentsOf: url, encoding: .utf8)],
-            userAgent: Self.chromeUserAgent + (game.packaging == .electron ? " TyranoErectron" : ""),
+            userAgent: WebGameConfiguration.chromeUserAgent + (game.packaging == .electron ? " TyranoErectron" : ""),
             storageDirectory: storage.directory, decodesOgg: true,
             buttonScript: { button, pressed in "__vndegenTyrano.button('\(button.rawValue)', \(pressed))" },
             scriptArgument: "tyrano-script", log: tyranoLog
@@ -60,11 +61,6 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
     /// hide the text and open the backlog, and only TyranoScript 5 reads a gamepad, when the game turns it on. Games
     /// that turn it on often bind no buttons, so every game starts with the keyboard and mouse layout.
     public var defaultControls: ControlLayout { .keyboardAndMouse }
-
-    /// The PC builds run on Chromium, and Tyrano branches on the browser it sees. As Safari it would ask for .m4a files
-    /// in place of the .ogg files the games ship. Electron builds also mark the user agent, which is how Tyrano tells
-    /// Electron from NW.js.
-    static let chromeUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
     /// Tyrano saves beside the PC executable. It finds that folder by cutting `process.execPath` (NW.js) or
     /// `app.getAppPath()` (Electron) at the `.app` bundle of a Mac build, so a Mac-shaped path inside the game folder

@@ -159,7 +159,7 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     defer { try? FileManager.default.removeItem(at: root) }
     let data = root.appendingPathComponent("Data")
     let tyrano = try #require(TyranoGame(folder: root))
-    let storage = WebStorage(directory: TyranoPlugin.storageDirectory(data))
+    let storage = WebStorage(dataDirectory: data)
     #expect(TyranoPlugin.saveKeyName(projectID: "testgame02") == "/game/_testgame02")
 
     try storage.set("/game/_testgame02", "THISDEVICEKEY000")

@@ -3,6 +3,7 @@ import VNCore
 import EngineRPGMaker
 import EngineTyrano
 import EngineFlash
+import EngineHTMLVN
 import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
@@ -30,6 +31,8 @@ let engines: [any EnginePlugin] = {
         ArtemisPlugin(),
         GodotPlugin(),
         FlashPlugin(),
+        VisualNovelMakerPlugin(),
+        TwinePlugin(),
         NScripterPlugin(),
         WolfRPGPlugin(),
         AliceSoftPlugin(),

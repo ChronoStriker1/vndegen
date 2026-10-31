@@ -15,10 +15,12 @@ nonisolated public struct GameFolder: Sendable {
 
     /// The game folder on disk, as the user copied it in.
     public let root: URL
-    /// Where index.html lives, relative to `root`, such as "", "www", or "resources/app.asar".
+    /// Where index.html lives, relative to `root`, such as "", "www", "resources/app.asar", or a Unity game's
+    /// "Game_Data/Resources/browser_assets".
     public let webRoot: String
-    /// The web root's archive when it is an Electron app.asar. Pages are served from inside it, read only.
-    private(set) var archive: AsarArchive?
+    /// The web root's archive when it is an Electron app.asar or an Embedded Browser pack. Pages are served from inside
+    /// it, read only.
+    private(set) var archive: (any WebRootArchive)?
     /// Folders the app ships, by the served path the page sees them at, such as `/__vndegen/` for a player. Requests
     /// under that path read from the folder, never from the game. The longest matching path wins.
     public var mounts: [String: URL] = [:]
@@ -38,8 +40,11 @@ nonisolated public struct GameFolder: Sendable {
         let fd = Darwin.open(root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         descriptorRoot = (fd >= 0 ? Self.descriptorPath(fd) : nil) ?? realRoot
         if fd >= 0 { close(fd) }
-        if webRoot.lowercased().hasSuffix(".asar") {
+        let name = (webRoot as NSString).lastPathComponent.lowercased()
+        if name.hasSuffix(".asar") {
             archive = try? archiveHandle().flatMap { try AsarArchive(reading: $0) }
+        } else if name == BrowserAssetsPack.fileName {
+            archive = try? archiveHandle().flatMap { try BrowserAssetsPack(reading: $0) }
         }
     }
 
@@ -177,6 +182,15 @@ nonisolated extension GameFolder {
     }
 }
 
+/// A web root that is one file holding the page and what it loads.
+nonisolated protocol WebRootArchive: Sendable {
+    /// The member at `path`, relative to the archive root. Nil for directories and misses.
+    func member(_ path: String) -> AsarArchive.Member?
+}
+
+extension AsarArchive: WebRootArchive {}
+extension BrowserAssetsPack: WebRootArchive {}
+
 /// Part of a file: `length` bytes from `offset`.
 nonisolated public struct FileSlice: Equatable, Sendable {
     public var offset: UInt64
@@ -260,7 +274,7 @@ nonisolated extension GameFolder {
         return FileResponse(status: status, headers: headers, body: body)
     }
 
-    /// Up to `limit` bytes of the file a page would get for `path`, from disk or from the web root's app.asar.
+    /// Up to `limit` bytes of the file a page would get for `path`, from disk or from the web root's archive.
     public func read(servedPath path: String, limit: Int) -> Data? {
         guard let (handle, base, size, _) = open(servedPath: path) else { return nil }
         try? handle.seek(toOffset: base)
@@ -268,7 +282,8 @@ nonisolated extension GameFolder {
     }
 
     /// Opens the regular file a request names: the handle to read, where its bytes start in it, its size, and its name.
-    /// A web root that is an app.asar serves its members from the archive file, or from app.asar.unpacked/ beside it.
+    /// A web root that is an archive serves its members from the archive file, or an app.asar's unpacked members from
+    /// app.asar.unpacked/ beside it.
     func open(servedPath path: String) -> (FileHandle, UInt64, Int64, String)? {
         let path = path.isEmpty || path == "/" ? "/index.html" : path
         if let (prefix, folder) = mounts.filter({ path.hasPrefix($0.key) }).max(by: { $0.key.count < $1.key.count }) {

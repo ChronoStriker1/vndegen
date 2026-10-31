@@ -9,25 +9,14 @@ extension TyranoPlugin {
     /// app's data directory, where only other VNDegen devices can use it.
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let game = TyranoGame(folder: folder) else { return [] }
-        let storage = Self.storageDirectory(dataDirectory)
+        let storage = WebStorage(dataDirectory: dataDirectory)
         if game.savesToFiles {
             let files = SaveLocation(directory: folder) { Self.saveFileName($0, projectID: game.projectID) }
             guard game.packaging == .electron else { return [files] }
             let keyFile = WebStorage.fileName(for: Self.saveKeyName(projectID: game.projectID))
-            return [files, SaveLocation(directory: storage) { Self.storageFileName($0) == keyFile ? keyFile : nil }]
+            return [files, SaveLocation(directory: storage.directory) { WebStorage.relativePath($0) == keyFile ? keyFile : nil }]
         }
-        return [SaveLocation(directory: storage, relativePath: Self.storageFileName)]
-    }
-
-    static func storageDirectory(_ dataDirectory: URL) -> URL {
-        dataDirectory.appendingPathComponent("localStorage", isDirectory: true)
-    }
-
-    /// `.../localStorage/testgame03_sf.value` maps to `testgame03_sf.value`.
-    static func storageFileName(_ path: String) -> String? {
-        let parts = path.split(separator: "/")
-        guard parts.count >= 2, parts[parts.count - 2] == "localStorage", parts.last!.hasSuffix(".value") else { return nil }
-        return String(parts.last!)
+        return [storage.saveLocation]
     }
 
     /// `C:/Games/Test Game 01/testgame01_sf.sav` maps to `testgame01_sf.sav`. A Mac build run from
