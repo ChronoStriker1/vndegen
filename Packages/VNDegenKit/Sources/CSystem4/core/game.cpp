@@ -120,7 +120,8 @@ bool Game::start(std::string &error) {
     Ain ain;
     std::string err = ain.load(ainPath);
     if (!err.empty()) { error = "The game's code file can't be read: " + err; return false; }
-    if (std::string why = unsupportedReason(ain); !why.empty()) { error = why; return false; }
+    // S4_FORCE starts such a game anyway, for work on the libraries it needs.
+    if (std::string why = unsupportedReason(ain); !why.empty() && !std::getenv("S4_FORCE")) { error = why; return false; }
 
     // Archives: <stem>GA.ald for pictures, WA for sound effects, BA for music.
     std::string stem = fs::path(ainPath).stem().string();

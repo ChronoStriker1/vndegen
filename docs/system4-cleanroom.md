@@ -164,6 +164,21 @@ its saves. Their layouts were read from the arrays in the PC save:
 A save the PC wrote loads in VNDegen, and VNDegen saves it back with the back scenes and MultiSprite data
 byte-identical. A save VNDegen wrote from its own play loads on the PC, which then plays on.
 
+### The .ex data file (`exfile.cpp`, `hll_exfile.cpp`)
+
+Test Game 56 keeps its settings and tables in `Rance9.ex`, which its own `MainEXFile` library reads. That library is
+built into the game's `Rance9.exe`, so its file reader was disassembled with Ghidra, as needed to understand the file
+format, starting from the code that checks the `EXTF` tag:
+- The header and DATA chunk: the compressed size, the plain size, and the byte unscrambling (each byte rotated by 8
+  minus its count of one bits, left when the count is even and right when odd), then zlib.
+- One reader per value type: int, float, string, table (a header of typed, named columns with key and default flags,
+  nested for columns of tables, then rows of typed cells), list, and tree (each node a name, an optional value and
+  its children).
+Every one of the 233 entries in Rance9.ex then parsed to exactly its recorded size. The ints are stored plain; the
+engine XORs them with 0x65656565 only in memory. The library's behaviour (handles, the A2, IA2, SA2 and RA2
+addressing, and tree paths joined with `.`) comes from the function names and argument names in the game's code
+file and from the calls the game makes.
+
 ### Sprite engine and the rest of the HLL libraries (`hll_*.cpp`, `gfx.cpp`, `audio.cpp`, `font.cpp`)
 
 - SACT2 behaviour (sprites, Z order, blend rates, draw methods, text metrics and shadows, key codes, sound and music
