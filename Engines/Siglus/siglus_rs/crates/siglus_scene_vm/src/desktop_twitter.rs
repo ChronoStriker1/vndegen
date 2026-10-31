@@ -1,6 +1,6 @@
 //! Desktop Twitter dialog used by the Siglus Twitter subsystem.
 
-#![cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#![cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 
 use std::io::Write;
 use std::process::{Command, Stdio};

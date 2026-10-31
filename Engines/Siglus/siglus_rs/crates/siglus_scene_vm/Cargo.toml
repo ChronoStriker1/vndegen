@@ -8,6 +8,10 @@ license.workspace = true
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [features]
+# VNDegen: upstream's desktop player, its egui windows and its Twitter client, which builds on macOS, Windows and Linux.
+# VNDegen hosts the engine in its own view on macOS as on iOS and builds without it.
+default = ["desktop"]
+desktop = ["dep:serde_json", "dep:egui", "dep:egui-wgpu", "dep:ureq"]
 # Replaces the monotonic clock with one advanced by hand
 # (`platform_time::advance_virtual_clock`), for deterministic replays of the
 # VM (examples/vm_replay.rs). Never enable it in a player.
@@ -38,13 +42,14 @@ shion-xfile = { path = "../shion-xfile" }
 [[bin]]
 name = "siglus_engine"
 path = "src/bin/siglus_engine.rs"
+required-features = ["desktop"]
 
 [[bin]]
 name = "mesh_asset_tool"
 path = "src/bin/mesh_asset_tool.rs"
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
-serde_json = "1"
+serde_json = { version = "1", optional = true }
 
 [target.'cfg(not(any(target_os = "horizon", target_os = "vita")))'.dependencies]
 kira.workspace = true
@@ -52,11 +57,11 @@ wgpu.workspace = true
 winit.workspace = true
 pollster.workspace = true
 raw-window-handle = "0.6"
-egui = "0.28.1"
-egui-wgpu = "0.28.1"
+egui = { version = "0.28.1", optional = true }
+egui-wgpu = { version = "0.28.1", optional = true }
 
 [target.'cfg(all(not(any(target_os = "horizon", target_os = "vita")), not(all(target_arch = "wasm32", target_os = "unknown"))))'.dependencies]
-ureq = "2.10"
+ureq = { version = "2.10", optional = true }
 
 [target.'cfg(target_os = "horizon")'.dependencies]
 getrandom_03 = { package = "getrandom", version = "0.3.4" }
@@ -85,6 +90,3 @@ getrandom_03 = { package = "getrandom", version = "0.3.4", features = ["wasm_js"
 [lints]
 workspace = true
 
-[[example]]
-name = "vm_replay"
-required-features = ["virtual-clock"]

@@ -1860,7 +1860,7 @@ pub fn write_global_save(ctx: &CommandContext) {
     // C++ twitter_save_state persists OAuth/user state out-of-band in the
     // Windows registry and writes nothing to the global stream.  The desktop
     // port mirrors that with a sidecar next to the original save files.
-    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    #[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     if let Err(err) = crate::runtime::twitter::save_state(ctx) {
         eprintln!("[SG_SAVE] failed to write Twitter state: {err:#}");
     }
@@ -1935,7 +1935,7 @@ pub fn load_global_save(ctx: &mut CommandContext) -> Result<()> {
         // C_tnm_cg_table::load() restores the fixed C_elm_int_list<int> verbatim.
         ctx.tables.cg_flags = cg.into_iter().map(|v| v as i32).collect();
         ctx.globals.bgm_table_flags = bgm.into_iter().map(|v| v != 0).collect();
-        #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+        #[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         crate::runtime::twitter::ensure_state_loaded(ctx);
     }
     load_read_flags(ctx)?;
@@ -4232,7 +4232,7 @@ pub fn capture_for_tweet(ctx: &mut CommandContext) -> Result<RgbaImage> {
     Ok(capture)
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn open_tweet_dialog(ctx: &mut CommandContext) -> Result<()> {
     let Some(capture) = ctx.globals.capture_image.clone() else {
         log::error!("SYSCOM.OPEN_TWEET_DIALOG called without GLOBAL.CAPTURE_FOR_TWEET capture");
@@ -4257,7 +4257,7 @@ fn open_tweet_dialog(ctx: &mut CommandContext) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+#[cfg(not(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux"))))]
 fn open_tweet_dialog(_ctx: &mut CommandContext) -> Result<()> {
     log::error!("SYSCOM.OPEN_TWEET_DIALOG is not implemented on this platform");
     Ok(())

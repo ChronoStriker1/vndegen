@@ -6,7 +6,7 @@
 //! `ureq` transport and a cross-platform sidecar instead of the Windows
 //! registry.
 
-#![cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#![cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 
 use std::fs;
 use std::io::Read;

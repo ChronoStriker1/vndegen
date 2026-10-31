@@ -3,7 +3,7 @@
 //! Desktop ports keep modal dialogs inside the winit event loop. Mobile ports use
 //! the native callback path in `host.rs`.
 
-#![cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#![cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};

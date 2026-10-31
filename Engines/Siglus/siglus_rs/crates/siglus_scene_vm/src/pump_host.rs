@@ -3,7 +3,7 @@
 //! A bundle UI can own its process/UI lifecycle and drive Siglus with
 //! `siglus_pump_step` rather than entering winit's blocking `run_app`.
 
-#![cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#![cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 
 use std::ffi::{CStr, c_char, c_void};
 use std::path::PathBuf;

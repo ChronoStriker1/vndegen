@@ -21,7 +21,7 @@ mod scene_metadata;
 pub mod string_semantics;
 pub mod tables;
 pub mod tonecurve;
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod twitter;
 pub mod ui;
 pub mod unknown;

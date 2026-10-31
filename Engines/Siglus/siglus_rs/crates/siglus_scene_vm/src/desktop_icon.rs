@@ -58,12 +58,8 @@ fn load_icon(project_dir: &Path) -> image::RgbaImage {
             Err(error) => log::warn!("Could not load window icon {}: {error}", path.display()),
         }
     }
-    image::load_from_memory_with_format(
-        include_bytes!("../../../icon/Icon.png"),
-        image::ImageFormat::Png,
-    )
-    .expect("bundled Siglus icon")
-    .into_rgba8()
+    // VNDegen leaves upstream's icon out, so a game with no icon of its own gets a blank one.
+    image::RgbaImage::new(1, 1)
 }
 
 #[cfg(target_os = "linux")]

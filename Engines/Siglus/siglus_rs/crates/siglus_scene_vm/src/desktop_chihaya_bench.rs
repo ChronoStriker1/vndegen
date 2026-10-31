@@ -5,7 +5,7 @@
 //! generic Siglus message box because the benchmark depends on the modal call
 //! boundary and exposes the complete result text for copying.
 
-#![cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#![cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 
 use std::sync::Arc;
 use std::time::Instant;

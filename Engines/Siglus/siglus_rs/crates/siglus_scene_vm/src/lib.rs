@@ -60,23 +60,23 @@ pub mod input;
 
 #[cfg(target_os = "android")]
 pub mod android_host;
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod desktop_chihaya_bench;
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod desktop_messagebox;
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod desktop_twitter;
 pub mod host;
 #[cfg(target_os = "ios")]
 pub mod ios_host;
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod pump_host;
 #[cfg(target_os = "horizon")]
 pub mod switch_host;
 
 pub mod display_ffi;
 
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod desktop_config;
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+#[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 pub mod desktop_icon;

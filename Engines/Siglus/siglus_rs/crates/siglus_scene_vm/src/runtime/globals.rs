@@ -1161,9 +1161,9 @@ pub struct GlobalState {
     /// A CAPTURE_FOR_TWEET request is materialized only at the following DISP
     /// boundary, matching the original TNM_CAPTURE_TYPE_TWEET flow.
     pub capture_for_tweet_pending: bool,
-    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    #[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     pub twitter: crate::runtime::twitter::TwitterState,
-    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+    #[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     pub twitter_dialog_request: Option<crate::runtime::twitter::TwitterDialogRequest>,
     /// Capture buffer used exclusively by OBJECT.CREATE_CAPTURE.
     pub capture_for_object_image: Option<RgbaImage>,
@@ -1266,9 +1266,9 @@ impl Default for GlobalState {
             mov: GlobalMovieState::default(),
             capture_image: None,
             capture_for_tweet_pending: false,
-            #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+            #[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
             twitter: crate::runtime::twitter::TwitterState::default(),
-            #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+            #[cfg(all(feature = "desktop", any(target_os = "macos", target_os = "windows", target_os = "linux")))]
             twitter_dialog_request: None,
             capture_for_object_image: None,
             save_thumb_capture_image: None,
