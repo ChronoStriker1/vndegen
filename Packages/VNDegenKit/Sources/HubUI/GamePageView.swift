@@ -257,7 +257,7 @@ private struct CheatsSection: View {
             Text("On: " + settings.summary.joined(separator: ", "))
                 .font(.system(size: 17, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Change them in the game's Cheats menu, in the VNDegen menu while it plays.")
+            Text("Change them on the Cheats page of the VNDegen menu while the game plays.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.secondaryText)
         }
