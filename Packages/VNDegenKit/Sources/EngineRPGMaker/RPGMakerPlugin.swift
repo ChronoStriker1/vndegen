@@ -36,7 +36,9 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
 
     /// Runs the game in the shared web host.
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
-        try webConfiguration(GameFolder(rpgMakerGameAt: launch.folder)).makeSession(launch)
+        let folder = GameFolder(rpgMakerGameAt: launch.folder)
+        if flavor == .mv { folder.moveCommunityCoreSaves() }
+        return try webConfiguration(folder).makeSession(launch)
     }
 
     /// The desktop user agent hides the iPhone from MZ's `Utils.isMobileDevice`, which would otherwise give up 10% of

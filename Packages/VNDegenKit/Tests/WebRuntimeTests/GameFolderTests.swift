@@ -142,6 +142,7 @@ private func text(of response: FileResponse) async throws -> String {
         .copyFile(from: "/game/index.html", to: "/game/outside/new.txt"),
         .rename(from: "/game/js/main.js", to: "/game/outside/new.txt"),
         .unlink(path: "/game/outside/secret.txt"),
+        .rmdir(path: "/game/outside"),
     ] {
         guard case .failure(let error) = bridge.handle(request) else { Issue.record("\(request) reached outside"); continue }
         #expect(error.code == "EACCES")
