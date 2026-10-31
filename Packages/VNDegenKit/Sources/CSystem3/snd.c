@@ -137,6 +137,7 @@ void s3_wav_play(S3 *s, int channel, const u8 *data, size_t size, int loops) {
     if (!decode_wav(data, size, &w, a->rate)) { s3_log(s, "unplayable WAV"); return; }
     w.loops = loops;
     w.on = true;
+    if (s->trace) s3_log(s, "WAV ch %d at %llu ms, %zu frames", channel, (unsigned long long)s->clockMs, w.frames);
     pthread_mutex_lock(&a->lock);
     Wav old = a->wav[channel];
     a->wav[channel] = w;
@@ -182,6 +183,7 @@ void s3_music_play(S3 *s, int track, int loops) {
     m.on = true;
     m.loops = loops;
     m.step = (double)m.mp3->sampleRate / a->rate;
+    s3_log(s, "CD track %d: %s, %u Hz, %u channels", track, a->tracks[track - 2], m.mp3->sampleRate, m.mp3->channels);
     pthread_mutex_lock(&a->lock);
     a->music = m;
     pthread_mutex_unlock(&a->lock);

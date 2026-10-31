@@ -1,6 +1,6 @@
 // Runs a System 3 game headless for testing: replays scripted input and writes frames as PPM files.
 //   s3run <gameDir> [--ms N] [--save DIR] [--log FILE] [--final FILE.ppm] [--time UNIX]
-//         [--auto MS] [--prefer TEXT]... [--avoid TEXT]... [--repl FIFO] [events...]
+//         [--auto MS] [--prefer TEXT]... [--avoid TEXT]... [--repl FIFO] [--wav FILE] [events...]
 // Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:shot:FILE.ppm, T:pick:TEXT
 // T:pick:TEXT waits from T until a menu offers an item containing TEXT, then chooses it; picks go in order, and the
 // autopilot answers the menus in between.
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     vnfont_init(S3_FONTS_DIR "/fonts.tsv", dirs, 1);
     VNS3Config cfg = { .gameDir = argv[1], .audioRate = 44100, .soundFontPath = S3_SOUNDFONT, .startTime = 1767225600 };
     int total = 10000, autoFrom = -1;
-    const char *final = NULL, *repl = NULL;
+    const char *final = NULL, *repl = NULL, *wavPath = NULL;
     static Ev ev[8192];
     int n = 0;
     for (int i = 2; i < argc; i++) {
@@ -101,6 +101,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--time") && i + 1 < argc) cfg.startTime = atoll(argv[++i]);
         else if (!strcmp(argv[i], "--auto") && i + 1 < argc) autoFrom = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--repl") && i + 1 < argc) repl = argv[++i];
+        else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wavPath = argv[++i];
         else if (!strcmp(argv[i], "--prefer") && i + 1 < argc && preferCount < 32) prefer[preferCount++] = argv[++i];
         else if (!strcmp(argv[i], "--avoid") && i + 1 < argc && avoidCount < 32) avoid[avoidCount++] = argv[++i];
         else if (n < 8192) {
@@ -118,6 +119,10 @@ int main(int argc, char **argv) {
     if (!g) { fprintf(stderr, "open failed: %s\n", err); return 1; }
     S3 *s = (S3 *)g;
     float audio[1470 * 2];
+    // --wav FILE: every sample vns3_audio returns, as 16-bit stereo at 44100 Hz (header sizes patched at the end).
+    FILE *wav = wavPath ? fopen(wavPath, "wb") : NULL;
+    long wavFrames = 0;
+    if (wav) { static const unsigned char h[44] = { 'R','I','F','F',0,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0,1,0,2,0,0x44,0xac,0,0,0x10,0xb1,2,0,4,0,16,0,'d','a','t','a',0,0,0,0 }; fwrite(h, 1, 44, wav); }
     int ok = 1, turn = 0, nextPick = 0, nextAuto = autoFrom;
     // Keys and buttons stay down for 96 ms, as a person's press does, so games that poll the state see them.
     int releaseAt = -1, heldKey = 0, heldButton = -1;
@@ -159,6 +164,16 @@ int main(int argc, char **argv) {
         }
         if (!vns3_frame(g, 16)) { ok = !vns3_problem(g); break; }
         vns3_audio(g, audio, 705); // keep the mixer moving as a device would
+        if (wav) {
+            for (int i = 0; i < 705 * 2; i++) { float v = audio[i] * 32767.0f; short x = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v); fwrite(&x, 2, 1, wav); }
+            wavFrames += 705;
+        }
+    }
+    if (wav) {
+        unsigned int data = (unsigned int)(wavFrames * 4), riff = data + 36;
+        fseek(wav, 4, SEEK_SET); fwrite(&riff, 4, 1, wav);
+        fseek(wav, 40, SEEK_SET); fwrite(&data, 4, 1, wav);
+        fclose(wav);
     }
     while (ok && repl) {
         FILE *in = fopen(repl, "r");
