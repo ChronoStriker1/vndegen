@@ -177,6 +177,17 @@ It is Godot's own speed control, the one the Godot editor's Game view has (`Engi
 - Each frame's `_process` time, and so timers, tweens and animations, advance that many times as far.
 - Godot 4.7 has the control. Godot 3.6 doesn't, and `Engines/Godot/3/patches/06-user-time-scale.patch` adds the same thing to its `Engine` and main loop.
 
+Checked on CachyOS with Godot built from the pinned sources and VNDegen's patches, and a count of physics steps and game time added to the main loop for the check only, each 5 s of real time:
+
+| Game | Speed | Physics steps | Game time | Step |
+|---|---|---|---|---|
+| Barely Working (Godot 3.6) | 1x | 300 | 5.0 s | 1/60 s |
+| Barely Working (Godot 3.6) | 4x | 1,200 | 20.0 s | 1/60 s |
+| Nitz's Debt (Godot 4.7) | 1x | 300 | 5.0 s | 1/60 s |
+| Nitz's Debt (Godot 4.7) | 4x | 1,200 | 20.0 s | 1/60 s |
+
+In the Mac app, the page set Nitz's Debt to 2x and 4x and Barely Working from 2x to 4x, and each change reached the engine. A game set to 4x started at 4x after a relaunch.
+
 ### Known limits
 
 - A game that counts frames rather than time in `_process`, or that times itself with `Time.get_ticks_msec()` (`OS.get_ticks_msec()` in Godot 3), runs those parts at normal speed.
@@ -187,6 +198,16 @@ It is Godot's own speed control, the one the Godot editor's Game view has (`Engi
 Ruffle has no way to reach a movie's variables from outside, so Flash games' Cheats page has game speed only: 1x, 2x or 4x, on the Quick tab.
 
 Ruffle has no speed setting either. Its web build advances a movie by the time between the animation frames it asks the page for: it runs as many of the movie's frames as fit in that time, and moves the movie's ActionScript timers on by it. `flash-page.js` wraps `requestAnimationFrame` before Ruffle loads, so each animation frame tells Ruffle that the time since the last one, times the speed, has passed. Every callback in one animation frame gets the same time, and the time never goes back when the speed changes. A page the game opens next, such as a movie a launcher page opens, starts at the same speed.
+
+Checked in the Mac app with Overthrow! The Demon Queen, a 24 fps movie, on a 60 Hz display. Over 5 s, the time the animation frames reported against the real time, and the frames Ruffle drew per second:
+
+| Speed | Animation frame time / real time | Frames Ruffle drew per second |
+|---|---|---|
+| 1x | 1.000 | 24.1 |
+| 2x | 2.000 | 47.9 |
+| 4x | 4.001 | 59.8 (the display's limit) |
+
+Set to 4x on the page while the movie ran, it measured 3.999 and 59.1.
 
 ### Known limits
 
