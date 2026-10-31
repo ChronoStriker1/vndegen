@@ -43,7 +43,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `03-virtual-fix-path.patch`: makes `FileAccess::fix_path` and `DirAccess::fix_path` virtual, as they are in Godot 4, so VNDegen's file access can find names whatever their case.
 - `04-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, as Godot 4's patch 07 does.
 - `05-copy-same-file.patch`: the same check in `DirAccess::copy` as Godot 4's patch 08.
-- `06-user-time-scale.patch`: the speed a player picks, on top of the game's own time scale, as Godot 4's `Engine::set_user_time_scale`. The main loop runs that many times as many physics steps of the same length, up to that many times the usual 8 per frame, and scales each frame's time by it. `vngd_set_speed` sets it.
+- `06-user-time-scale.patch`: the speed a player picks, on top of the game's own time scale, as Godot 4's `Engine::set_user_time_scale`. The main loop runs that many times as many physics steps of the same length, up to that many times the usual 8 per frame, and scales each frame's time by it. `SpatialVelocityTracker`, which measures in physics steps, counts them at that rate, as Godot 4's does. `vngd_set_speed` sets it.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|

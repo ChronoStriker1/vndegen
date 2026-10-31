@@ -794,7 +794,9 @@ extension WebGameSession {
         let frames = 0, worst = 0, last = start;
         try {
             await new Promise((done) => {
-                const tick = (now) => {
+                // The page's own clock, not the callback's time, which a game speed cheat can scale.
+                const tick = () => {
+                    const now = performance.now();
                     frames++;
                     if (drew) { presents.push(now); drew = false; }
                     worst = Math.max(worst, now - last);
