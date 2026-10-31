@@ -59,6 +59,8 @@ Commands a game keeps where VNDegen draws nothing, such as a KiriKiri game's win
 
 Game commands list one level of the game's menu at a time. Up and down move, A opens a submenu or runs a command, B goes back a level, and from the top back to the VNDegen menu. Touch and a mouse choose an item directly, and the arrow at the top goes back. A KiriKiri game whose scripts check whether the window's menu bar is hidden, and then put their commands on screen, is told it is hidden, so those buttons show. Any other KiriKiri game is told it shows, so the game builds its menu for Game commands. The game page's Window menu option overrides that per game.
 
+On iPhone and iPad, VNDegen's Ren'Py menu offers Quick save and Quick load when the game's quick menu for this device has no QuickSave action. They use the game's own quick save slot. If VNDegen cannot inspect the quick menu, it offers both commands when the game supports quick saves.
+
 ## Cheats
 
 RPG Maker MV, MZ, XP, VX, and VX Ace games have a Cheats page in the VNDegen menu: add gold, items, weapons, and armor by name from the game's own database, restore the party's HP and MP, keep them full, turn random encounters off, walk through walls, multiply experience, and run the game at 2x or 4x speed. A Variables and a Switches tab list the game's numbered variables and switches with the names its database gives them, and edit them in place. Every change goes through the game's own objects, so a save made afterwards is an ordinary save that loads on the PC. Cheats are off until you turn one on. The settings that stay on, such as game speed, are kept per game and shown on its game page.
