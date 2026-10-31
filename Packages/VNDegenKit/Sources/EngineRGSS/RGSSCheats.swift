@@ -10,21 +10,29 @@ final class RGSSCheats: CheatSession {
     /// What RPG Maker's own event commands let a variable hold.
     let variableRange = -99_999_999...99_999_999
 
-    /// Loads the cheats into a game that just started, with the settings it starts with. They run at its first frame and
-    /// wrap the game's methods once its scripts define them.
-    static func start(with settings: CheatSettings) {
+    /// Loads the cheats into a game that just started, with the settings it starts with. They run at its first frame.
+    /// A game's scripts can define or replace the methods the cheats wrap later than that, so the cheats wrap again
+    /// every second while the game runs, from the runtime's frame boundary, which no game script replaces.
+    func start(with settings: CheatSettings) {
         vnrgss_set_speed(Int32(settings.speed))
         guard let url = Bundle.module.url(forResource: "rgss-cheats", withExtension: "rb"),
               let source = try? String(contentsOf: url, encoding: .utf8) else {
             rgssLog.error("cheats: rgss-cheats.rb is missing from the app bundle")
             return
         }
-        let request = vnrgss_run_ruby(source + "\nVNDegenCheats.apply(\(ruby(settings)))")
-        Task {
+        let request = vnrgss_run_ruby(source + "\nVNDegenCheats.apply(\(Self.ruby(settings)))")
+        Task { [weak self] in
             do {
-                _ = try await result(of: request)
+                _ = try await Self.result(of: request)
+                while self != nil {
+                    try await Task.sleep(for: .seconds(1))
+                    _ = try await Self.run("VNDegenCheats.install")
+                }
             } catch {
-                rgssLog.error("cheats did not load: \(error.localizedDescription, privacy: .public)")
+                // The game ending ends the loop. Anything else is the cheats failing.
+                if case let .ruby(message)? = error as? RGSSCheatError, message != "The game ended." {
+                    rgssLog.error("cheats: \(error.localizedDescription, privacy: .public)")
+                }
             }
         }
     }

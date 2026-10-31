@@ -4,12 +4,11 @@
 #
 # A game's scripts can still be loading at that first frame, and can alias or replace the methods afterwards. So the
 # wraps are made the way RGSS scripts make theirs, as methods of the class that call the method they replaced, which a
-# later alias chains through, and every second Graphics.update wraps again whatever a later script replaced.
+# later alias chains through, and VNDegen calls install every second, which wraps again whatever a later script
+# replaced and wraps the classes a later script defined.
 module VNDegenCheats
   @settings = {}
-  @installed = false
   @wraps = {}
-  @frames = 0
   # Whether the game objects belong to a game the player started or loaded. VX and VX Ace make game objects for the
   # title screen, and starting or loading a game replaces them.
   @playing = false
@@ -27,24 +26,12 @@ module VNDegenCheats
       true
     end
 
-    # Wraps what isn't wrapped yet, once the game's classes exist.
+    # Wraps what isn't wrapped, once the game's classes exist.
     def install
-      unless @installed
-        @installed = true
-        wrap(Graphics.singleton_class, :update) do |update|
-          VNDegenCheats.tick
-          update.call
-        end
-      end
       return unless defined?(Game_Actor) && defined?(Game_Player) && defined?(Scene_Map)
       wrap_actors
       wrap_player
       wrap_scenes
-    end
-
-    def tick
-      @frames += 1
-      install if @frames % 60 == 0
     end
 
     # Makes `name` run `body`, which gets the method it replaced as a callable, on the object it was called on. A call
@@ -55,13 +42,15 @@ module VNDegenCheats
       key = [owner, name]
       return if @wraps[key] && owner.instance_method(name) == @wraps[key]
       original = owner.instance_method(name)
+      # An inherited method is reached through super, so a later script's change to the superclass reaches it too.
+      inherited = original.owner != owner
       running = :"vndegen_#{owner.object_id}_#{name}"
       owner.send(:define_method, name) do |*args, &block|
-        replaced = original.bind(self)
-        next replaced.call(*args, &block) if Thread.current[running]
+        replaced = inherited ? ->(*given) { super(*given, &block) } : ->(*given) { original.bind(self).call(*given, &block) }
+        next replaced.(*args) if Thread.current[running]
         begin
           Thread.current[running] = true
-          instance_exec(->(*given) { replaced.call(*given, &block) }, *args, &body)
+          instance_exec(replaced, *args, &body)
         ensure
           Thread.current[running] = false
         end
