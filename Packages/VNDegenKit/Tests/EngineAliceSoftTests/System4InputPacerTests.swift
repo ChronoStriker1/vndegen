@@ -20,6 +20,11 @@ private struct Harness {
         if finishes { done += 1 }
     }
     mutating func steps(_ n: Int, _ dt: Double = 1.0 / 60) { for _ in 0..<n { step(dt) } }
+    /// The game finishes frames with no poll in between, and time passes.
+    mutating func idle(frames: Int, _ dt: Double) {
+        done += frames
+        now += dt
+    }
     func at(_ input: System4Input) -> [(done: Int, time: Double)] {
         applied.filter { $0.input == input }.map { ($0.done, $0.time) }
     }
@@ -77,23 +82,54 @@ private struct Harness {
         var h = Harness()
         h.add([enter])
         h.steps(20)
-        h.add([enterUp, enter])  // fast frames: the read gate alone would let the repress through in 33 ms
-        h.steps(10)
+        h.add([enterUp])
+        // The game reads the release at once (many frames done), but only 20 ms pass: the repress must wait.
+        h.idle(frames: 5, 0.02)
+        h.add([enter])
+        #expect(h.at(enter).count == 1)
+        h.idle(frames: 5, 0.02)
+        h.add([])
+        #expect(h.at(enter).count == 1)  // 40 ms
+        h.idle(frames: 1, 0.015)
+        h.add([])
         let released = h.at(enterUp)[0], repressed = h.at(enter)[1]
         #expect(repressed.time - released.time >= System4InputPacer.releaseHold - 1e-9)
     }
 
-    @Test func aReleaseIsReadBeforeARepressEvenWhenTheGameIsBusy() {
+    @Test func aReleaseIsReadBeforeARepressWhileTheGameIsBrieflyBusy() {
         var h = Harness()
         h.add([enter])
         h.steps(20)
         h.add([enterUp, enter])
-        // The game is busy: steps time out without finishing a frame, however long they take.
-        for _ in 0..<5 { h.step(0.25, finishes: false) }
+        // Busy for 0.4 s: steps time out without finishing a frame.
+        for _ in 0..<4 { h.step(0.1, finishes: false) }
         #expect(h.at(enter).count == 1)
         h.steps(3)
         let released = h.at(enterUp)[0], repressed = h.at(enter)[1]
         #expect(repressed.done - released.done >= 2)
+    }
+
+    @Test func aBusyGameHoldsAReleaseAtMostHalfASecond() {
+        var h = Harness()
+        h.add([enter])
+        h.steps(20)
+        h.add([enterUp, enter])  // applies the release; then the game never finishes another frame
+        h.add([])
+        let released = h.at(enterUp)[0]
+        for _ in 0..<10 { h.step(0.1, finishes: false) }
+        // Nothing waits on a game that has stopped reading input for more than the limit.
+        #expect(h.at(enter).count == 2)
+        #expect(h.at(enter)[1].time - released.time <= System4InputPacer.readWaitLimit + 0.1 + 1e-9)
+    }
+
+    @Test func aPressIsntStuckBehindAGameThatStoppedReading() {
+        var h = Harness()
+        h.add([enter])
+        // The game loops without finishing frames, waiting for the key to come up.
+        for _ in 0..<3 { h.step(0.1, finishes: false) }
+        h.add([enterUp])
+        for _ in 0..<5 { h.step(0.1, finishes: false) }
+        #expect(h.at(enterUp).count == 1)
     }
 
     @Test func pauseReleasesWhatTheGameHoldsAndTheyAreReadBeforeAnythingElse() {
@@ -101,8 +137,7 @@ private struct Harness {
         h.add([.mouseMove(a)])
         h.steps(4)
         h.add([press])            // applied
-        h.add([release])          // waits behind the press's hold
-        #expect(h.at(release).isEmpty)
+        h.steps(30)               // every gate from the press long expired
         let released = h.pacer.clear(now: h.now, done: h.done)
         #expect(released == [release])
         #expect(h.pacer.down.isEmpty)
@@ -113,7 +148,7 @@ private struct Harness {
         h.steps(5)
         #expect(h.at(press).count == 2)
         #expect(h.at(press)[1].done >= pausedAt + 2)
-        #expect(h.at(release).isEmpty)  // the queued release was dropped, not replayed
+        #expect(h.at(release).isEmpty)  // only pause let go of it
     }
 
     @Test func aDragsReleaseIsNotStuckBehindItsMoves() {

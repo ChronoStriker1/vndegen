@@ -82,7 +82,7 @@ final class System4Session: EngineSession {
         view = frameView
         frameView.onReady = { [weak self] in self?.start() }
         frameView.onPointer = { [weak self] event in
-            guard let self else { return }
+            guard let self, !paused else { return }
             #if os(macOS)
             // A move with a button the system no longer holds: that button's mouse-up was lost on the way.
             if event.phase == .moved {
@@ -95,12 +95,14 @@ final class System4Session: EngineSession {
             deliver(router.pointer(event, at: event.location))
         }
         frameView.onScroll = { [weak self] notches in
-            guard let self else { return }
+            guard let self, !paused else { return }
             let whole = Int(notches.rounded())
             if whole != 0 { deliver([.wheel(whole)]) }
         }
         frameView.onKey = { [weak self] usage, pressed, characters in
-            guard let self else { return }
+            // While paused nothing reaches the router or the game: pausing let go of every key, and a hold recorded
+            // now would disagree with the game after resume.
+            guard let self, !paused else { return }
             deliver(router.hostKey(hidUsage: usage, pressed: pressed))
             // Printable text goes to the game's text entry too. Arrow and function keys type Apple's private-use
             // characters, which are left out with the control characters.
@@ -179,8 +181,7 @@ final class System4Session: EngineSession {
 
     /// Hands inputs to the runtime as System4InputPacer allows; the rest follow on later frames.
     private func deliver(_ inputs: [System4Input]) {
-        // Input while paused is dropped: the game isn't reading it, and pausing let go of everything.
-        guard !inputs.isEmpty, !paused, let engine else { return }
+        guard !inputs.isEmpty, let engine else { return }
         apply(pacer.add(inputs, now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))))
     }
 
@@ -218,6 +219,7 @@ final class System4Session: EngineSession {
     // MARK: EngineSession
 
     func send(_ event: ControllerEvent) {
+        guard !paused else { return }
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
     }
@@ -292,7 +294,8 @@ nonisolated enum System4Input: Equatable, Sendable {
 /// - a mouse button press waits until the game has finished three frames with the pointer where the press is (Rance
 ///   02's title took none at one);
 /// - after a key or button changes, nothing more applies until the game has read it, so it sees every state and a
-///   press its own position;
+///   press its own position; a game that stops finishing frames (a load, or a loop waiting for a key to come up)
+///   holds this back at most half a second, so no release waits on it for long;
 /// - and the next key or button change also waits 100 ms after a press and 50 ms after a release (Sengoku Rance missed
 ///   a 17 ms tap).
 /// Consecutive pointer moves collapse to the last, so a fast drag can't build a backlog in front of its release.
@@ -306,6 +309,8 @@ nonisolated struct System4InputPacer {
     private var position: CGPoint?
     private var keyGate = 0.0           // no key or button change applies before this time
     private var changedAt = Int.min / 2 // frames done when the last key or button changed
+    private var changedTime = -Double.infinity  // and when
+    static let readWaitLimit = 0.5
     private(set) var down: Set<Int32> = []  // keys and buttons the runtime holds
 
     /// Takes newly arrived inputs; returns those the runtime may have now. `done` is vns4_frames_done.
@@ -326,6 +331,7 @@ nonisolated struct System4InputPacer {
         defer { down = [] }
         if !down.isEmpty {
             changedAt = done
+            changedTime = now
             keyGate = now + Self.releaseHold
         }
         return down.sorted().map { .key($0, down: false) }
@@ -338,7 +344,7 @@ nonisolated struct System4InputPacer {
             if let m = move { out.append(.mouseMove(m)) }
             move = nil
         }
-        loop: while let next = queue.first, done >= changedAt + 2 {
+        loop: while let next = queue.first, done >= changedAt + 2 || now >= changedTime + Self.readWaitLimit {
             switch next {
             case let .mouseMove(p):
                 if p != position {
@@ -357,6 +363,7 @@ nonisolated struct System4InputPacer {
                 if isDown { down.insert(vk) } else { down.remove(vk) }
                 keyGate = now + (isDown ? Self.pressHold : Self.releaseHold)
                 changedAt = done
+                changedTime = now
             }
             queue.removeFirst()
         }
