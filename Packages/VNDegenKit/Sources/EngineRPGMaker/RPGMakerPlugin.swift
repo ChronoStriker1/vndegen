@@ -38,18 +38,21 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         let folder = GameFolder(rpgMakerGameAt: launch.folder)
         if flavor == .mv { folder.moveCommunityCoreSaves() }
-        return try webConfiguration(folder).makeSession(launch)
+        return try webConfiguration(folder, cheats: launch.game.cheats ?? CheatSettings()).makeSession(launch)
     }
 
     /// The desktop user agent hides the iPhone from MZ's `Utils.isMobileDevice`, which would otherwise give up 10% of
     /// the height to browser chrome that a web view does not have. iPad and macOS already report this shape. MV's
     /// `Utils.isMobileDevice` would also make it ask for .m4a files. An MV game that ships only Ogg audio gets the shared
     /// Ogg decoder, and MV plays its .ogg files through it. MZ decodes Ogg with its own bundled decoder.
-    @MainActor func webConfiguration(_ folder: GameFolder) throws -> WebGameConfiguration {
-        guard let url = Bundle.module.url(forResource: "rpgmaker", withExtension: "js") else { throw RPGMakerError.scriptMissing }
+    /// The cheats start with `cheats` on.
+    @MainActor func webConfiguration(_ folder: GameFolder, cheats: CheatSettings = CheatSettings()) throws -> WebGameConfiguration {
+        let cheatTemplate = try Self.script("rpgmaker-cheats")
+        let cheatScript = try RPGMakerCheats.script(cheatTemplate, settings: cheats)
         var configuration = try WebGameConfiguration(
             folder: folder, appName: "rmmz-game",
-            userScripts: [try String(contentsOf: url, encoding: .utf8)], userAgent: Self.userAgent,
+            userScripts: [try Self.script("rpgmaker"), cheatScript],
+            userAgent: Self.userAgent,
             buttonScript: { button, pressed in
                 KeyStroke.key(for: button).map {
                     "__vndegen.key('\(pressed ? "keydown" : "keyup")', '\($0.key)', '\($0.code)', \($0.keyCode))"
@@ -59,11 +62,17 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         )
         configuration.preloadFonts = folder.fontNames
         configuration.menuCommands = Self.menuCommands(plugins: folder.enabledPlugins)
+        configuration.cheats = { RPGMakerCheats(page: $0, template: cheatTemplate, script: cheatScript) }
         if flavor == .mv && folder.shipsOnlyOggAudio {
             configuration.decodesOgg = true
             rpgLog.notice("MV game ships only Ogg audio, decoding it in the page")
         }
         return configuration
+    }
+
+    nonisolated static func script(_ name: String) throws -> String {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "js") else { throw RPGMakerError.scriptMissing }
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     /// Triacontane's MessageSkip, in two of the library's MV games, puts auto and skip on keys only (A, and Control
@@ -115,7 +124,7 @@ nonisolated enum RPGMakerError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .scriptMissing: "The RPG Maker compatibility script is missing from the app bundle."
+        case .scriptMissing: "An RPG Maker compatibility script is missing from the app bundle."
         }
     }
 }

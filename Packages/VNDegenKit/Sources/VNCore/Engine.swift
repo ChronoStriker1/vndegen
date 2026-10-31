@@ -191,6 +191,8 @@ public protocol EngineSession: AnyObject {
     /// Runs the Game commands entry with the given id. VNDegen's menu closes and resumes the game right after, and the
     /// game handles the command then, as a PC game handles a menu click once its menu closes.
     func chooseGameMenuItem(_ id: GameMenuItem.ID)
+    /// The game's cheats, for VNDegen's Cheats page. Nil, the default, for engines that offer none.
+    var cheats: (any CheatSession)? { get }
 }
 
 extension EngineSession {
@@ -198,6 +200,7 @@ extension EngineSession {
     public var drawsOwnMenu: Bool { false }
     public func gameMenu() async -> [GameMenuItem] { [] }
     public func chooseGameMenuItem(_ id: GameMenuItem.ID) {}
+    public var cheats: (any CheatSession)? { nil }
 
     public func type(_ typed: TypedText) {
         for key in KeyboardKey.keys(typing: typed) {

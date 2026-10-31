@@ -48,6 +48,9 @@ public struct WebGameConfiguration {
     /// Game commands only the page knows, asked for each time VNDegen's menu opens.
     public var pageMenu: WebPageMenu?
     public var log: Logger
+    /// The game's cheats, made the first time VNDegen's menu asks for them, around the session's page. Nil for engines
+    /// that offer none.
+    public var cheats: (@MainActor (any GamePage) -> any CheatSession)?
 
     /// `runtime` defaults to NW.js with index.html as its executable, which is what RPG Maker expects. A
     /// `storageDirectory` keeps localStorage in `WebStorage` files there, and `storage` replaces it with another store.
@@ -75,6 +78,16 @@ public struct WebGameConfiguration {
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         try WebGameSession(launch: launch, configuration: self)
     }
+}
+
+/// A running game's page, for engine code that reads and changes the game's state.
+@MainActor
+public protocol GamePage: AnyObject {
+    /// Runs `body` as the body of an async function whose parameters are `arguments`' keys, and returns what it returns.
+    func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any?
+    /// Swaps one of the game's `WebGameConfiguration.userScripts` for `new` from the next time the page loads, such as
+    /// when the game reloads itself or WebKit restarts the page.
+    func replaceStartScript(_ old: String, with new: String)
 }
 
 /// Game commands the page lists itself, such as a Flash movie's own right-click items.
@@ -141,6 +154,11 @@ final class WebGameSession: NSObject, EngineSession {
     private let pageMenu: WebPageMenu?
     private let log: Logger
     private let onExit: @MainActor () -> Void
+    private let makeCheats: (@MainActor (any GamePage) -> any CheatSession)?
+    /// The scripts every load of the page starts with, in order.
+    private var startScripts: [String]
+    /// Made once, the first time the menu asks, so the cheats keep what they track for the whole session.
+    lazy var cheats: (any CheatSession)? = makeCheats?(self)
     private var ended = false
     private var paused = false
     /// Ends once the page has had its last word after `terminate()` and the view is torn down.
@@ -159,6 +177,7 @@ final class WebGameSession: NSObject, EngineSession {
         pageMenu = game.pageMenu
         log = game.log
         onExit = launch.onExit
+        makeCheats = game.cheats
         let shim = try Self.shimSource(for: game)
         let fonts = try Self.fontScript(preload: game.preloadFonts)
         let ogg = game.decodesOgg ? [try Self.oggScript()] : []
@@ -175,10 +194,8 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        for source in [shim, fonts] + ogg + game.userScripts {
-            configuration.userContentController.addUserScript(
-                WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        }
+        startScripts = [shim, fonts] + ogg + game.userScripts
+        Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
         super.init()
@@ -223,6 +240,12 @@ final class WebGameSession: NSObject, EngineSession {
 
     deinit {
         log.notice("session released")
+    }
+
+    private static func add(_ scripts: [String], to controller: WKUserContentController) {
+        for source in scripts {
+            controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
     }
 
     #if DEBUG && os(macOS)
@@ -489,6 +512,23 @@ final class WebGameSession: NSObject, EngineSession {
         default:
             return bridge.handle(request).json
         }
+    }
+}
+
+// MARK: - GamePage
+
+extension WebGameSession: GamePage {
+    func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any? {
+        guard !ended else { throw CancellationError() }
+        return try await webView.callAsyncJavaScript(body, arguments: arguments, contentWorld: .page)
+    }
+
+    func replaceStartScript(_ old: String, with new: String) {
+        guard !ended, let index = startScripts.firstIndex(of: old) else { return }
+        startScripts[index] = new
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        Self.add(startScripts, to: controller)
     }
 }
 

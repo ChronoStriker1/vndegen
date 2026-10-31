@@ -1,3 +1,4 @@
+import ControllerUI
 import SwiftUI
 import VNCore
 import GameInput
@@ -61,7 +62,7 @@ struct PlayerView: View {
             if menu.isOpen {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
                                onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping,
-                               onGameMenu: menu.openGameMenu, onGameItem: choose)
+                               onGameMenu: menu.openGameMenu, onGameItem: choose, onCheats: openCheats)
                     .transition(.opacity)
             } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
@@ -109,6 +110,10 @@ struct PlayerView: View {
             #if os(iOS)
             OrientationLock.apply(orientation)
             #endif
+        }
+        // Typing on the Cheats page's keyboard reaches its text field rather than the menu, as in the hub's sheets.
+        .onChange(of: menu.page == .cheats && menu.cheats?.keyboard != nil) { _, typing in
+            if menu.isOpen { hub.input.translatesKeyboard = !typing }
         }
         .onChange(of: isCovered, initial: true) { _, covered in
             applyInputMode()
@@ -184,6 +189,7 @@ struct PlayerView: View {
         switch menu.page {
         case .main: break
         case .game: return navigateGameMenu(button)
+        case .cheats: return navigateCheats(button)
         }
         let items = menu.items(for: method)
         let index = items.firstIndex(of: menu.focus) ?? 0
@@ -194,12 +200,13 @@ struct PlayerView: View {
             switch menu.focus {
             case .method: setMethod(method.stepped(by: button == .left ? -1 : 1))
             case .mouseStyle: setMethod(method.switchingMouseStyle)
-            case .resume, .gameMenu, .quit, .controllerMouse, .mapping: break
+            case .resume, .gameMenu, .cheats, .quit, .controllerMouse, .mapping: break
             }
         case .confirm:
             switch menu.focus {
             case .resume: resume()
             case .gameMenu: menu.openGameMenu()
+            case .cheats: openCheats()
             case .quit: hub.endSession()
             case .method: setMethod(method.stepped(by: 1))
             case .controllerMouse: setMethod(method.togglingMouse)
@@ -238,6 +245,28 @@ struct PlayerView: View {
         }
     }
 
+    /// The page keeps its tab and search while the game runs, and reads the game again each time it opens.
+    private func openCheats() {
+        guard let cheats = session.cheats, let game else { return }
+        if menu.cheats == nil {
+            let id = game.id
+            menu.cheats = CheatsPage(cheats: cheats, settings: game.cheats ?? CheatSettings()) { [hub] settings in
+                hub.library.update(id) { $0.cheats = settings }
+            }
+        }
+        // Opened with a controller or the keyboard, the page shows its focus ring at once, as the menu does, so the
+        // first press moves it.
+        if hub.input.lastInputKind != .touch { menu.cheats?.focus.showsFocus = true }
+        menu.page = .cheats
+    }
+
+    /// The home button resumes the game, and so does Menu unless the keyboard, where it finishes typing, is open.
+    private func navigateCheats(_ button: VirtualButton) {
+        guard let cheats = menu.cheats else { return menu.closeCheats() }
+        if button == .hub || (button == .menu && cheats.keyboard == nil) { return resume() }
+        if !cheats.handle(button) { menu.closeCheats() }
+    }
+
     private func menuButton() {
         if session.drawsOwnMenu {
             session.send(.button(.hub, pressed: true))
@@ -252,6 +281,7 @@ struct PlayerView: View {
         menu.focus = .resume
         menu.page = .main
         menu.isOpen = true
+        menu.offersCheats = session.cheats != nil
         applyInputMode()
         session.setPaused(true)
         menu.gameItems = []
@@ -303,13 +333,13 @@ struct PlayerView: View {
 @MainActor
 @Observable
 final class PlayerMenu {
-    enum Item { case resume, gameMenu, quit, method, controllerMouse, mouseStyle, mapping }
+    enum Item { case resume, gameMenu, cheats, quit, method, controllerMouse, mouseStyle, mapping }
     /// What the menu's card shows: its main buttons, or a page that one of them opened.
-    enum Page { case main, game }
+    enum Page { case main, game, cheats }
 
     /// Top to bottom. Game commands show when the game has any. The control method only matters on a touch device.
     func items(for method: ControlMethod) -> [Item] {
-        let session: [Item] = gameItems.isEmpty ? [.resume, .quit] : [.resume, .gameMenu, .quit]
+        let session: [Item] = [.resume] + (gameItems.isEmpty ? [] : [.gameMenu]) + (offersCheats ? [.cheats] : []) + [.quit]
         guard Platform.current == .iOS else { return session + [.mapping] }
         var items = session + [.method]
         if method.kind == .controller { items.append(.controllerMouse) }
@@ -325,6 +355,15 @@ final class PlayerMenu {
     /// The submenus open in Game commands, outermost first, and empty at its top.
     var gamePath: [GameMenuItem] = []
     var gameFocus: GameMenuItem.ID?
+    /// Whether the game offers cheats.
+    var offersCheats = false
+    /// The Cheats page, made the first time it opens.
+    var cheats: CheatsPage?
+
+    func closeCheats() {
+        page = .main
+        focus = .cheats
+    }
 
     /// What Game commands show now.
     var gameLevel: [GameMenuItem] { gamePath.last?.items ?? gameItems }
@@ -378,6 +417,7 @@ private struct PlayerMenuView: View {
     let onMapping: () -> Void
     let onGameMenu: () -> Void
     let onGameItem: (GameMenuItem) -> Void
+    let onCheats: () -> Void
 
     var body: some View {
         ZStack {
@@ -391,8 +431,17 @@ private struct PlayerMenuView: View {
                     .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
                     .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
                     .padding(12)
+            case .cheats:
+                if let cheats = menu.cheats {
+                    CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
+                        .padding(isNarrow || metrics.isShort ? 16 : 28)
+                        .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+                        .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+                        .padding(12)
+                }
             }
         }
+        .onScreenKeyboard(menu.page == .cheats ? menu.cheats?.keyboard : nil)
     }
 
     private var card: some View {
@@ -426,6 +475,11 @@ private struct PlayerMenuView: View {
                 Button(action: onGameMenu) { Label("Game commands", systemImage: "list.bullet").frame(minWidth: buttonWidth) }
                     .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.gameMenu)))
                     .onHover { if $0 { menu.focus = .gameMenu } }
+            }
+            if menu.offersCheats {
+                Button(action: onCheats) { Label("Cheats", systemImage: "wand.and.stars").frame(minWidth: buttonWidth) }
+                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.cheats)))
+                    .onHover { if $0 { menu.focus = .cheats } }
             }
             Button(action: onQuit) { Label("Quit to library", systemImage: "xmark").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.quit)))
@@ -515,7 +569,7 @@ private struct PlayerMenuView: View {
     private func isFocused(_ item: PlayerMenu.Item) -> Bool { showsFocus && menu.focus == item }
 }
 
-private struct SegmentLabel: View {
+struct SegmentLabel: View {
     let title: String
     let selected: Bool
 
