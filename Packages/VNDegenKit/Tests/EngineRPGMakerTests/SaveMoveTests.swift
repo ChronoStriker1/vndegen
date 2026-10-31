@@ -101,6 +101,21 @@ private func titles(_ index: String?) throws -> [Int: String] {
     #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("save").path))
 }
 
+@Test func aMoveThatStoppedBetweenASaveAndItsBackupFinishes() throws {
+    // The marker names what the move started on. file1 moved, then the app stopped before its backup and slot 2.
+    let root = try mvGame([
+        "save/file1.rpgsave.bak": "backup", "save/file2.rpgsave": "two", "save/global.rpgsave": index([1, 2]),
+        "save/.vndegen-moving-to-web-root": "file1.rpgsave\nfile1.rpgsave.bak\nfile2.rpgsave",
+        "www/save/file1.rpgsave": "one", "www/save/global.rpgsave": index([1, 2, 6]),
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(GameFolder(rpgMakerGameAt: root).moveCommunityCoreSaves() == .moved(["file1.rpgsave.bak", "file2.rpgsave"]))
+    var saves = contents(root.appendingPathComponent("www/save"))
+    #expect(try titles(saves.removeValue(forKey: "global.rpgsave")) == [1: "slot 1", 2: "slot 2", 6: "slot 6"])
+    #expect(saves == ["file1.rpgsave": "one", "file1.rpgsave.bak": "backup", "file2.rpgsave": "two"])
+    #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("save").path))
+}
+
 @Test func savesThatCantMergeStayWhereTheyAre() throws {
     let ours = ["save/file1.rpgsave": "mine", "save/global.rpgsave": index([1])]
     for (mine, theirs) in [
@@ -111,8 +126,9 @@ private func titles(_ index: String?) throws -> [Int: String] {
         (ours, ["www/save/global.rpgsave": "not an index"]),
         // An index of ours that doesn't describe the slot, so the slot would show as empty there.
         (["save/file1.rpgsave": "mine", "save/global.rpgsave": index([3])], ["www/save/global.rpgsave": index([6])]),
-        // No index of ours at all.
+        // No index of ours at all, whether or not the game has one.
         (["save/file1.rpgsave": "mine"], ["www/save/global.rpgsave": index([6])]),
+        (["save/file1.rpgsave": "mine"], [:]),
     ] {
         let root = try mvGame(mine.merging(theirs) { a, _ in a })
         defer { try? FileManager.default.removeItem(at: root) }
@@ -168,6 +184,22 @@ private func titles(_ index: String?) throws -> [Int: String] {
     #expect(GameFolder(rpgMakerGameAt: root).moveCommunityCoreSaves() == .nothing)
     #expect(contents(root.appendingPathComponent("save")) == ["file1.rpgsave": "pc"])
     #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("www/testDirectory").path))
+}
+
+@Test func savesStayWhileTestDirectoryIsASymlink() throws {
+    // A symlink there, leading nowhere or out of the game, fails the core's mkdirSync through the bridge too.
+    let fm = FileManager.default
+    let outside = fm.temporaryDirectory.appendingPathComponent("vndegen-outside-\(UUID().uuidString)", isDirectory: true)
+    try fm.createDirectory(at: outside, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: outside) }
+    for destination in [outside, outside.appendingPathComponent("missing")] {
+        let root = try mvGame(["save/file1.rpgsave": "mine", "save/global.rpgsave": index([1])])
+        defer { try? fm.removeItem(at: root) }
+        try fm.createSymbolicLink(at: root.appendingPathComponent("www/testDirectory"), withDestinationURL: destination)
+        #expect(GameFolder(rpgMakerGameAt: root).moveCommunityCoreSaves() == .nothing)
+        #expect(contents(root.appendingPathComponent("save")) == ["file1.rpgsave": "mine", "global.rpgsave": index([1])])
+    }
+    #expect(fm.fileExists(atPath: outside.path))
 }
 
 @Test func savesStayWhileTheCoreWouldStillPickSave() throws {

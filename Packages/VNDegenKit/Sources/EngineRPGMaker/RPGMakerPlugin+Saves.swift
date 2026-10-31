@@ -42,9 +42,9 @@ nonisolated extension GameFolder {
     /// Games sometimes ship saves in `www/save/`: Rookie Knight Rathi ships slot 6 and its `global.rpgsave`, the index
     /// MV lists slots from. A save the index doesn't list shows as an empty slot, and saving to that slot replaces it.
     /// So the saves move whenever no slot is in both folders and save/'s index describes every slot that moves. The
-    /// index in `www/save/` gets their entries first, so a move that stops partway leaves saves the index lists, and
-    /// the next launch finishes it. Otherwise both folders stay as they are and the game uses `www/save/`. No save is
-    /// overwritten or deleted. A file other than a slot or the index, such as `config.rpgsave`, stays in save/ when
+    /// index in `www/save/` gets their entries first, and a marker in save/ names the files to move, so a move that
+    /// stops partway leaves saves the index lists, and the next launch finishes it. Otherwise both folders stay as they
+    /// are and the game uses `www/save/`. No save is overwritten or deleted. A file other than a slot or the index, such as `config.rpgsave`, stays in save/ when
     /// `www/save/` has one.
     ///
     /// This runs before the page loads, so nothing in the game can change the folders while it works.
@@ -52,14 +52,15 @@ nonisolated extension GameFolder {
     func moveCommunityCoreSaves() -> LegacySaveMove {
         guard managersScript.contains("canMakeWwwSaveDirectory") else { return .nothing }
         let fm = FileManager.default
-        if let probe = resolve(virtualPath: "\(virtualWebRoot)/testDirectory") {
-            // rmdir(2) removes only an empty folder, and refuses a symlink.
-            if rmdir(probe.path) == 0 { rpgLog.notice("removed the empty testDirectory an earlier VNDegen left in the web root") }
-            var info = stat()
-            if lstat(probe.path, &info) == 0 {
-                rpgLog.notice("something is at testDirectory in the web root, so the game keeps saving to save/")
-                return .nothing
-            }
+        // The game's mkdirSync goes through the same resolve, so a path it refuses, such as a symlink out of the game
+        // folder, fails the core's check too.
+        guard let probe = resolve(virtualPath: "\(virtualWebRoot)/testDirectory") else { return .nothing }
+        // rmdir(2) removes only an empty folder, and refuses a symlink.
+        if rmdir(probe.path) == 0 { rpgLog.notice("removed the empty testDirectory an earlier VNDegen left in the web root") }
+        var info = stat()
+        if lstat(probe.path, &info) == 0 {
+            rpgLog.notice("something is at testDirectory in the web root, so the game keeps saving to save/")
+            return .nothing
         }
         guard !webRoot.isEmpty, let target = saveDirectory,
               let legacy = resolve(virtualPath: (virtualWebRoot as NSString).deletingLastPathComponent + "/save"),
@@ -67,10 +68,41 @@ nonisolated extension GameFolder {
         let isFile = { (url: URL) in (try? fm.attributesOfItem(atPath: url.path))?[.type] as? FileAttributeType == .typeRegular }
         // Dot files are staging files a failed write left behind.
         let files = names.filter { !$0.hasPrefix(".") && isFile(legacy.appendingPathComponent($0)) }.sorted()
-        let slots = files.compactMap(Self.slot)
-        guard !slots.isEmpty else { return .nothing }
         let present = (try? fm.contentsOfDirectory(atPath: target.path)) ?? []
         let existing = Set(present.map { $0.lowercased() })
+        let ourIndexes = files.filter { $0.lowercased() == Self.indexName }
+        let marker = legacy.appendingPathComponent(Self.markerName)
+
+        // Moves `pending`, then clears save/ of the marker and the index once every save it describes has moved.
+        func move(_ pending: [String]) -> LegacySaveMove {
+            var moved: [String] = [], failed = false
+            for name in pending {
+                do {
+                    // moveItem refuses to replace a file, so a save that appeared since the check stays.
+                    try fm.moveItem(at: legacy.appendingPathComponent(name), to: target.appendingPathComponent(name))
+                    moved.append(name)
+                } catch {
+                    failed = true
+                    rpgLog.error("could not move save/\(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            if !failed {
+                if ourIndexes.count == 1 { try? fm.removeItem(at: legacy.appendingPathComponent(ourIndexes[0])) }
+                try? fm.removeItem(at: marker)
+            }
+            // Only when it is empty, so whatever stayed behind is still there.
+            rmdir(legacy.path)
+            rpgLog.notice("moved saves from save/ to \(self.webRoot, privacy: .public)/save/: \(moved.joined(separator: ", "), privacy: .public)")
+            return .moved(moved)
+        }
+
+        // A move that stopped partway. The index in www/save/ already lists what is left, and the files it moved are
+        // not clashes.
+        if isFile(marker), let list = try? String(contentsOf: marker, encoding: .utf8) {
+            return move(list.split(separator: "\n").map(String.init).filter { files.contains($0) && !existing.contains($0.lowercased()) })
+        }
+        let slots = files.compactMap(Self.slot)
+        guard !slots.isEmpty else { return .nothing }
         let keepBoth = { (why: String) -> LegacySaveMove in
             rpgLog.notice("saves in save/ can't move to \(self.webRoot, privacy: .public)/save/ (\(why, privacy: .public)), keeping both and using \(self.webRoot, privacy: .public)/save/: \(files.joined(separator: ", "), privacy: .public)")
             return .keptBoth(files)
@@ -79,57 +111,38 @@ nonisolated extension GameFolder {
 
         // Windows ignores case, so `GLOBAL.rpgsave` is the index too. Where a case-sensitive disk holds two spellings,
         // which one the game reads depends on the spelling it asks for, so neither is chosen.
-        let ourIndexes = files.filter { $0.lowercased() == Self.indexName }
         let theirIndexes = present.filter { $0.lowercased() == Self.indexName }
         guard ourIndexes.count <= 1, theirIndexes.count <= 1 else { return keepBoth("an index is there in two spellings") }
         let ourIndex = ourIndexes.first, theirIndex = theirIndexes.first
-        var index: Data?
-        if let ourIndex {
-            // The index there must be a file in the game folder, not a symlink that leads anywhere else.
-            let theirs: String?
-            if let theirIndex {
-                let url = target.appendingPathComponent(theirIndex)
-                theirs = isFile(url) ? try? String(contentsOf: url, encoding: .utf8) : nil
-            } else {
-                theirs = LZString.compressToBase64("[]")
-            }
-            let saves = files.filter { !$0.lowercased().hasSuffix(".bak") }.compactMap(Self.slot)
-            guard let ours = try? String(contentsOf: legacy.appendingPathComponent(ourIndex), encoding: .utf8), let theirs,
-                  let merged = Self.mergedIndex(ours, into: theirs, slots: saves) else {
-                return keepBoth("an index can't be read or doesn't describe every slot")
-            }
-            index = Data(merged.utf8)
-        } else if theirIndex != nil {
-            return keepBoth("only \(webRoot)/save/ has an index")
+        guard let ourIndex else { return keepBoth("save/ has no index") }
+        // The index there must be a file in the game folder, not a symlink that leads anywhere else.
+        let theirs: String?
+        if let theirIndex {
+            let url = target.appendingPathComponent(theirIndex)
+            theirs = isFile(url) ? try? String(contentsOf: url, encoding: .utf8) : nil
+        } else {
+            theirs = LZString.compressToBase64("[]")
         }
-
+        let saves = files.filter { !$0.lowercased().hasSuffix(".bak") }.compactMap(Self.slot)
+        guard let ours = try? String(contentsOf: legacy.appendingPathComponent(ourIndex), encoding: .utf8), let theirs,
+              let merged = Self.mergedIndex(ours, into: theirs, slots: saves) else {
+            return keepBoth("an index can't be read or doesn't describe every slot")
+        }
+        let pending = files.filter { $0 != ourIndex && !existing.contains($0.lowercased()) }
         do {
             try fm.createDirectory(at: target, withIntermediateDirectories: true)
-            if let index { try index.write(to: target.appendingPathComponent(theirIndex ?? Self.indexName), options: .atomic) }
+            try Data(merged.utf8).write(to: target.appendingPathComponent(theirIndex ?? Self.indexName), options: .atomic)
+            try Data(pending.joined(separator: "\n").utf8).write(to: marker, options: .atomic)
         } catch {
-            rpgLog.error("could not prepare \(target.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            rpgLog.error("could not prepare the move to \(target.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return .nothing
         }
-        var moved: [String] = [], failed = false
-        for name in files where name != ourIndex && !existing.contains(name.lowercased()) {
-            do {
-                // moveItem refuses to replace a file, so a save that appeared since the check stays.
-                try fm.moveItem(at: legacy.appendingPathComponent(name), to: target.appendingPathComponent(name))
-                moved.append(name)
-            } catch {
-                failed = true
-                rpgLog.error("could not move save/\(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        // save/'s index is in www/save/'s now. It stays while a save it describes is still in save/.
-        if !failed, let ourIndex { try? fm.removeItem(at: legacy.appendingPathComponent(ourIndex)) }
-        // Only when it is empty, so whatever stayed behind is still there.
-        rmdir(legacy.path)
-        rpgLog.notice("moved saves from save/ to \(self.webRoot, privacy: .public)/save/: \(moved.joined(separator: ", "), privacy: .public)")
-        return .moved(moved)
+        return move(pending)
     }
 
     private static let indexName = "global.rpgsave"
+    /// Names the files a move from save/ started on. The dot keeps it out of the files a move looks at.
+    private static let markerName = ".vndegen-moving-to-web-root"
 
     /// The slot of `fileN.rpgsave`, or of `fileN.rpgsave.bak`, the backup the community core keeps while it saves. MV
     /// numbers slots from 1.
