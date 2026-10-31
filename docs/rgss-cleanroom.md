@@ -44,6 +44,9 @@ comes from.
 - **Saves.** VX (Test Game 33): the game ships two PC saves, which VNDegen's runtime loads; a save VNDegen's runtime
   wrote loads in RGSS2 under Wine. VX Ace (Test Game 14): a save VNDegen's runtime wrote loads in RGSS3 under Wine.
   Evidence in `.audit/evidence/cr-rgss/run/`.
+- **PC saves loaded in VNDegen.** New XP (Test Game 37) and VX Ace (Test Game 14) saves made through the original
+  engines' menus under Wine load through Continue in the Linux host. Map, position and direction match the PC saves;
+  screenshots show the same scenes. Evidence in `.audit/evidence/qw-rgss-pc-saves/`.
 - **XP autotiles**, as above.
 
 ## Uncertain points and how they were settled

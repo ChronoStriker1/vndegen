@@ -27,7 +27,9 @@ names, whatever case the game uses. Writes go to the save folder, so the game fo
 copied in with a PC game still load.
 
 Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's strings written without encodings as Ruby
-1.8 wrote them. VX saves from the PC engine load in VNDegen, and VNDegen's VX and VX Ace saves load in the PC engine.
+1.8 wrote them. PC saves from XP, VX and VX Ace load in VNDegen, and VNDegen's VX and VX Ace saves load in the PC engine.
+XP (Test Game 37) and VX Ace (Test Game 14) saves made through the PC engines' menus under Wine were loaded through
+Continue in the Linux host. Both resumed at the saved map, position and direction, with matching scenes in screenshots.
 
 ## Test games
 
@@ -38,9 +40,9 @@ Linux host and loaded in the app.
 
 | Game | Version | Packed | Checked |
 | --- | --- | --- | --- |
-| Test Game 14 | VX Ace | `Game.rgss3a`, VX Ace RTP | title, new game, events with pictures, choices and a minigame, save, load; the PC engine loads the save |
+| Test Game 14 | VX Ace | `Game.rgss3a`, VX Ace RTP | title, new game, events with pictures, choices and a minigame, save, load; a PC save loads in the Linux host; the PC engine loads the save |
 | Test Game 33 | VX | `Game.rgss2a`, VX RTP | title, the PC saves in its folder load, map, save; the PC engine loads the save |
-| Test Game 37 | XP | `Game.rgssad`, XP RTP | title, new game, events with pictures and messages, save, load; autotiles match the PC engine; runs at the 120 frames a second its scripts set |
+| Test Game 37 | XP | `Game.rgssad`, XP RTP | title, new game, events with pictures and messages, save, load; a PC save loads in the Linux host; autotiles match the PC engine; runs at the 120 frames a second its scripts set |
 | Test Game 55 | VX Ace | unpacked, no RTP | map at 1024x768, HUD, its own menus, save and load from the menu in the app |
 
 Frame rates, from `-frameMonitor YES` (DEBUG builds log `RGSSFRAMES` every 10 seconds) while walking or playing, with
