@@ -10,8 +10,8 @@ final class RGSSCheats: CheatSession {
     /// What RPG Maker's own event commands let a variable hold.
     let variableRange = -99_999_999...99_999_999
 
-    /// Loads the cheats into a game that just started, with the settings it starts with. They run once its scripts have
-    /// loaded, which can take a while.
+    /// Loads the cheats into a game that just started, with the settings it starts with. They run at its first frame and
+    /// wrap the game's methods once its scripts define them.
     static func start(with settings: CheatSettings) {
         vnrgss_set_speed(Int32(settings.speed))
         guard let url = Bundle.module.url(forResource: "rgss-cheats", withExtension: "rb"),
@@ -22,9 +22,7 @@ final class RGSSCheats: CheatSession {
         let request = vnrgss_run_ruby(source + "\nVNDegenCheats.apply(\(ruby(settings)))")
         Task {
             do {
-                if try await result(of: request) != "true" {
-                    rgssLog.error("cheats did not load: the game's scripts have no Game_Actor, Game_Player or Scene_Map")
-                }
+                _ = try await result(of: request)
             } catch {
                 rgssLog.error("cheats did not load: \(error.localizedDescription, privacy: .public)")
             }
@@ -85,7 +83,8 @@ final class RGSSCheats: CheatSession {
                 if failed { throw RGSSCheatError.ruby(result) }
                 return result
             }
-            try? await Task.sleep(for: .milliseconds(10))
+            // A cancelled task's own sleep returns at once, so the wait runs in a task of its own.
+            await Task.detached { try? await Task.sleep(for: .milliseconds(10)) }.value
         }
     }
 

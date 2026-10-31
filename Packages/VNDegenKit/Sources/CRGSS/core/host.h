@@ -38,8 +38,6 @@ void host_set_problem(const char *problem);
 // Runs Ruby for vnrgss_run_ruby on the game thread and returns its last value's to_s, or the error's message with
 // `failed` set, which the caller frees. Defined by the Ruby side (rb_modules.c).
 char *rgss_run_ruby(const char *code, bool *failed);
-// The game's scripts have loaded, so Ruby queued for vnrgss_run_ruby may run from now on.
-void host_scripts_loaded(void);
 // Whether the frame the game is about to draw won't be shown, because the game runs faster than its frame rate and
 // more frames are already granted after it.
 bool host_frame_hidden(void);

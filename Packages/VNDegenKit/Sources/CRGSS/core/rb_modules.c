@@ -173,12 +173,6 @@ static void update_frame(void) {
     note_timing(start, rendered, now_ms());
 }
 
-static VALUE scripts_loaded(VALUE self) {
-    (void)self;
-    host_scripts_loaded();
-    return Qnil;
-}
-
 static VALUE graphics_update(VALUE self) {
     (void)self;
     update_frame();
@@ -577,7 +571,6 @@ void rgss_define_modules(void) {
     rb_define_module_function(rb_mKernel, "rgss_read_game_file", f_rgss_read_game_file, 1);
     rb_define_module_function(rb_mKernel, "rgss_game_path", f_rgss_game_path, 2);
     rb_define_module_function(rb_mKernel, "rgss_game_dirs", f_rgss_game_dirs, 0);
-    rb_define_module_function(rb_mKernel, "rgss_scripts_loaded", scripts_loaded, 0);
     rb_define_global_function("load_data", f_load_data, 1);
     rb_define_global_function("save_data", f_save_data, 2);
     if (rgss_version == RGSS3) {

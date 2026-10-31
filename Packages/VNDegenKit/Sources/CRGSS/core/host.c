@@ -35,7 +35,6 @@ static struct {
     bool hasProblem;
     char *pendingEval; // Ruby the Linux test host asks the game thread to run
     int speed;         // frames the game draws for each one its frame rate gives
-    bool scriptsLoaded; // whether Ruby the host queued may run
 } S = {.frameRate = 60, .speed = 1};
 
 // Ruby the host asked to run, in order, and what it gave once it has run.
@@ -157,15 +156,9 @@ static void run_requests_locked(void) {
     }
 }
 
-void host_scripts_loaded(void) {
-    pthread_mutex_lock(&lock);
-    S.scriptsLoaded = true;
-    pthread_mutex_unlock(&lock);
-}
-
 bool host_wait_frame_locked(void) {
     for (;;) {
-        if (S.scriptsLoaded && !S.stopRequested) run_requests_locked();
+        if (!S.stopRequested) run_requests_locked();
         if (S.granted > 0 || S.stopRequested) break;
         pthread_cond_wait(&cond, &lock);
     }
@@ -260,7 +253,6 @@ int vnrgss_start(const VNRGSSLaunch *l) {
     S.carry = 0;
     S.frameRate = 60;
     S.speed = 1;
-    S.scriptsLoaded = false;
     // Results the last game's host never read.
     while (requests) {
         RubyRequest *r = requests;
@@ -425,9 +417,11 @@ long vnrgss_run_ruby(const char *ruby) {
 char *vnrgss_ruby_result(long request, bool *failed) {
     pthread_mutex_lock(&lock);
     char *result = NULL;
+    bool found = false;
     for (RubyRequest **link = &requests; *link; link = &(*link)->next) {
         RubyRequest *r = *link;
         if (r->id != request) continue;
+        found = true;
         if (r->done) {
             result = r->result;
             if (failed) *failed = r->failed;
@@ -435,6 +429,11 @@ char *vnrgss_ruby_result(long request, bool *failed) {
             free(r);
         }
         break;
+    }
+    // Starting the next game drops the last one's requests, so a waiter still gets an answer.
+    if (!found && request > 0 && request <= lastRequest) {
+        result = strdup("The game ended.");
+        if (failed) *failed = true;
     }
     pthread_mutex_unlock(&lock);
     return result;

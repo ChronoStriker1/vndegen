@@ -101,8 +101,8 @@ The same Cheats page, with the same four tabs and settings, for every game on VN
 
 How it works:
 
-- `vnrgss.h` gains `vnrgss_run_ruby` and `vnrgss_ruby_result`. The app queues Ruby, and the runtime runs it on the game thread while the game waits for its next frame. That is between two frames, with the game's objects in a consistent state, and it works while the game is paused under VNDegen's menu. The app polls for the result.
-- `rgss-cheats.rb` (EngineRGSS's resources) loads at the game's first frame, after all its scripts. It prepends small modules to the game's classes. A prepended module isn't written into a Marshal save, so saves stay ordinary. What it prepends differs by version:
+- `vnrgss.h` gains `vnrgss_run_ruby` and `vnrgss_ruby_result`. The app queues Ruby, and the runtime runs it on the game thread while the game waits for its next frame. That is between two frames, with the game's objects in a consistent state, and it works while the game is paused under VNDegen's menu. The app polls for the result and waits for it however long the game takes, since a queued change can't be withdrawn. A request from a game that has ended answers "The game ended."
+- `rgss-cheats.rb` (EngineRGSS's resources) loads at the game's first frame. A game's scripts can still be loading then, and can alias or replace methods afterwards, and no section name says when they're done. So the cheats wrap methods the way RGSS scripts wrap theirs: a method on the class that calls the one it replaced. A later script's alias chains through the wrap, and a call that reaches the same wrap again, as through such an alias, goes straight to the replaced method, so a cheat applies once and nothing loops. A wrap on `Graphics.update` wraps again, every 60 frames, whatever a later script replaced outright. Methods aren't written into Marshal saves, so saves stay ordinary. What it wraps differs by version:
 
 | | XP | VX | VX Ace |
 |---|---|---|---|
@@ -121,6 +121,8 @@ Checked against Test Games 14 and 55 (VX Ace), 33 (VX) and 37 (XP).
 
 - Keep HP and MP full doesn't stop a knockout state an event adds directly, as in MV and MZ.
 - XP's walk through walls replaces `Game_Player#passable?`, so it ignores what a game's own override of that method checks.
+- A setting a later script breaks by replacing a method outright stops working until the next re-wrap, up to 60 frames later.
+- Each wrap passes calls through while it runs, so if a game's version of a setter sets the same value on another actor from inside it, that second actor isn't kept full.
 - The editor can put a game into a state its own save can't restore. In Test Game 37, turning on switch 1 makes the game drop data its save expects, so a save made afterwards fails to load on the PC as well as here. The page says a save made before editing is the undo.
 
 ### Frame rate

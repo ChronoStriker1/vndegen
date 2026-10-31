@@ -1,10 +1,15 @@
 # VNDegen's cheats for RPG Maker XP, VX and VX Ace, on the game's own objects, so a save made afterwards is an ordinary
-# save. VNDegen runs this file once the game's scripts have loaded, at the first frame after its Main section starts,
-# and then calls the module the same way. The settings that stay on are modules prepended to the game's classes, which
-# Marshal doesn't write into saves.
+# save. VNDegen runs this file while the game waits for its first frame, and then calls the module the same way. The
+# settings that stay on wrap the game's methods, which Marshal doesn't write into saves.
+#
+# A game's scripts can still be loading at that first frame, and can alias or replace the methods afterwards. So the
+# wraps are made the way RGSS scripts make theirs, as methods of the class that call the method they replaced, which a
+# later alias chains through, and every second Graphics.update wraps again whatever a later script replaced.
 module VNDegenCheats
   @settings = {}
   @installed = false
+  @wraps = {}
+  @frames = 0
   # Whether the game objects belong to a game the player started or loaded. VX and VX Ace make game objects for the
   # title screen, and starting or loading a game replaces them.
   @playing = false
@@ -14,21 +19,54 @@ module VNDegenCheats
       @settings[name]
     end
 
-    # True once the wraps are in place.
     def apply(settings)
       fill = settings['keepsPartyHealthy'] && !@settings['keepsPartyHealthy']
       @settings = settings
       install
       fill_party if fill && in_game?
-      @installed
+      true
     end
 
+    # Wraps what isn't wrapped yet, once the game's classes exist.
     def install
-      return if @installed || !defined?(Game_Actor) || !defined?(Game_Player) || !defined?(Scene_Map)
-      @installed = true
+      unless @installed
+        @installed = true
+        wrap(Graphics.singleton_class, :update) do |update|
+          VNDegenCheats.tick
+          update.call
+        end
+      end
+      return unless defined?(Game_Actor) && defined?(Game_Player) && defined?(Scene_Map)
       wrap_actors
       wrap_player
       wrap_scenes
+    end
+
+    def tick
+      @frames += 1
+      install if @frames % 60 == 0
+    end
+
+    # Makes `name` run `body`, which gets the method it replaced as a callable, on the object it was called on. A call
+    # made while the same wrap runs, as through a later script's alias of it, goes straight to the replaced method, so
+    # the cheat applies once and nothing loops. Wraps again when a later script replaced the method.
+    def wrap(owner, name, &body)
+      return unless owner.method_defined?(name)
+      key = [owner, name]
+      return if @wraps[key] && owner.instance_method(name) == @wraps[key]
+      original = owner.instance_method(name)
+      running = :"vndegen_#{owner.object_id}_#{name}"
+      owner.send(:define_method, name) do |*args, &block|
+        replaced = original.bind(self)
+        next replaced.call(*args, &block) if Thread.current[running]
+        begin
+          Thread.current[running] = true
+          instance_exec(->(*given) { replaced.call(*given, &block) }, *args, &body)
+        ensure
+          Thread.current[running] = false
+        end
+      end
+      @wraps[key] = owner.instance_method(name)
     end
 
     def on_title
@@ -86,66 +124,59 @@ module VNDegenCheats
       hp_limit = Game_Actor.method_defined?(:mhp) ? :mhp : :maxhp
       mp_setter = Game_Actor.method_defined?(:mp=) ? :mp= : :sp=
       mp_limit = Game_Actor.method_defined?(:mmp) ? :mmp : Game_Actor.method_defined?(:maxmp) ? :maxmp : :maxsp
-      Game_Actor.prepend(Module.new do
-        # Damage, skill costs and events all set HP and MP through these.
-        define_method(:hp=) do |value|
-          super(VNDegenCheats.setting('keepsPartyHealthy') ? [value, send(hp_limit)].max : value)
+      # Damage, skill costs and events all set HP and MP through these.
+      wrap(Game_Actor, :hp=) do |set, value|
+        set.(VNDegenCheats.setting('keepsPartyHealthy') ? [value, send(hp_limit)].max : value)
+      end
+      wrap(Game_Actor, mp_setter) do |set, value|
+        set.(VNDegenCheats.setting('keepsPartyHealthy') ? [value, send(mp_limit)].max : value)
+      end
+      if Game_Actor.method_defined?(:final_exp_rate)
+        # VX Ace gains experience at this rate.
+        wrap(Game_Actor, :final_exp_rate) { |rate| rate.() * VNDegenCheats.setting('experienceRate') }
+      elsif Game_Actor.method_defined?(:gain_exp)
+        # VX gains experience here.
+        wrap(Game_Actor, :gain_exp) { |gain, exp, *rest| gain.(exp * VNDegenCheats.setting('experienceRate'), *rest) }
+      else
+        # XP's battles and events add experience through exp=.
+        wrap(Game_Actor, :exp=) do |set, value|
+          gained = value - @exp
+          set.(gained > 0 ? @exp + gained * VNDegenCheats.setting('experienceRate') : value)
         end
-        define_method(mp_setter) do |value|
-          super(VNDegenCheats.setting('keepsPartyHealthy') ? [value, send(mp_limit)].max : value)
-        end
-        if Game_Actor.method_defined?(:final_exp_rate)
-          # VX Ace gains experience at this rate.
-          define_method(:final_exp_rate) { super() * VNDegenCheats.setting('experienceRate') }
-        elsif Game_Actor.method_defined?(:gain_exp)
-          # VX gains experience here.
-          define_method(:gain_exp) { |exp, *rest| super(exp * VNDegenCheats.setting('experienceRate'), *rest) }
-        else
-          # XP's battles and events add experience through exp=.
-          define_method(:exp=) do |value|
-            gained = value - @exp
-            super(gained > 0 ? @exp + gained * VNDegenCheats.setting('experienceRate') : value)
-          end
-        end
-      end)
+      end
     end
 
     def wrap_player
-      Game_Player.prepend(Module.new do
-        if Game_Player.method_defined?(:encounter)
-          # VX Ace starts a random battle when this is true.
-          define_method(:encounter) { VNDegenCheats.setting('noEncounters') ? false : super() }
-        else
-          # XP's and VX's map scenes start one when this reaches 0.
-          define_method(:encounter_count) do
-            count = super()
-            VNDegenCheats.setting('noEncounters') && count < 1 ? 1 : count
-          end
+      if Game_Player.method_defined?(:encounter)
+        # VX Ace starts a random battle when this is true.
+        wrap(Game_Player, :encounter) { |encounter| VNDegenCheats.setting('noEncounters') ? false : encounter.() }
+      else
+        # XP's and VX's map scenes start one when this reaches 0.
+        wrap(Game_Player, :encounter_count) do |count|
+          steps = count.()
+          VNDegenCheats.setting('noEncounters') && steps < 1 ? 1 : steps
         end
-        if Game_Player.method_defined?(:debug_through?)
-          # VX and VX Ace: what holding Control in a playtest does.
-          define_method(:debug_through?) { VNDegenCheats.setting('walksThroughWalls') || super() }
-        else
-          # XP: anywhere on the map.
-          define_method(:passable?) do |x, y, d|
-            next super(x, y, d) unless VNDegenCheats.setting('walksThroughWalls')
-            $game_map.valid?(x + (d == 6 ? 1 : d == 4 ? -1 : 0), y + (d == 2 ? 1 : d == 8 ? -1 : 0))
-          end
+      end
+      if Game_Player.method_defined?(:debug_through?)
+        # VX and VX Ace: what holding Control in a playtest does.
+        wrap(Game_Player, :debug_through?) { |through| VNDegenCheats.setting('walksThroughWalls') || through.() }
+      else
+        # XP: anywhere on the map.
+        wrap(Game_Player, :passable?) do |passable, x, y, d|
+          next passable.(x, y, d) unless VNDegenCheats.setting('walksThroughWalls')
+          $game_map.valid?(x + (d == 6 ? 1 : d == 4 ? -1 : 0), y + (d == 2 ? 1 : d == 8 ? -1 : 0))
         end
-      end)
+      end
     end
 
     # XP runs a scene in main, VX and VX Ace start one in start.
     def wrap_scenes
       [[Scene_Map, :on_map], [defined?(Scene_Title) && Scene_Title, :on_title]].each do |scene, hook|
         next unless scene
-        entry = scene.method_defined?(:start) ? :start : :main
-        scene.prepend(Module.new do
-          define_method(entry) do |*args|
-            VNDegenCheats.send(hook)
-            super(*args)
-          end
-        end)
+        wrap(scene, scene.method_defined?(:start) ? :start : :main) do |run, *args|
+          VNDegenCheats.send(hook)
+          run.(*args)
+        end
       end
     end
 

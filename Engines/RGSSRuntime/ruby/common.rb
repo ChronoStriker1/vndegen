@@ -36,10 +36,6 @@ def rgss_run_scripts(path)
   sections = load_data(path)
   $RGSS_SCRIPTS = sections.map { |section| section[1].to_s.dup.force_encoding(Encoding::UTF_8) }
   sections.each_with_index do |section, index|
-    # Main runs the game and never returns, so the game's own definitions and aliases are all in place once it, or the
-    # last section, starts. Ruby the app queued, such as VNDegen's cheats, waits for this even when a script loading
-    # earlier draws frames.
-    rgss_scripts_loaded if index == sections.size - 1 || $RGSS_SCRIPTS[index].strip == 'Main'
     code = Zlib::Inflate.inflate(section[2]).force_encoding(Encoding::UTF_8)
     code = rgss_compatible_source(code)
     eval(code, TOPLEVEL_BINDING, format('{%04d}', index), 1)
