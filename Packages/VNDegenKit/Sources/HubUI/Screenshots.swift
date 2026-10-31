@@ -126,26 +126,31 @@ struct ScreenshotViewerView: View {
 
     var body: some View {
         let insets = metrics.insets
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 0) {
-                ForEach(viewer.screenshots.indices, id: \.self) { index in
-                    let screenshot = viewer.screenshots[index]
-                    ScreenshotImage(url: screenshot.url, placeholder: screenshot.thumbnail, contentMode: .fit)
-                        .padding(.top, insets.top + 8)
-                        .padding(.bottom, insets.bottom + 8)
-                        .padding(.leading, insets.leading)
-                        .padding(.trailing, insets.trailing)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                        .accessibilityElement()
-                        .accessibilityLabel("Screenshot \(index + 1) of \(viewer.screenshots.count)")
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(viewer.screenshots.indices, id: \.self) { index in
+                        let screenshot = viewer.screenshots[index]
+                        ScreenshotImage(url: screenshot.url, placeholder: screenshot.thumbnail, contentMode: .fit)
+                            .padding(.top, insets.top + 8)
+                            .padding(.bottom, insets.bottom + 8)
+                            .padding(.leading, insets.leading)
+                            .padding(.trailing, insets.trailing)
+                            .containerRelativeFrame([.horizontal, .vertical])
+                            .accessibilityElement()
+                            .accessibilityLabel("Screenshot \(index + 1) of \(viewer.screenshots.count)")
+                    }
                 }
+                .scrollTargetLayout()
             }
-            .scrollTargetLayout()
+            .scrollTargetBehavior(.paging)
+            // Centered, since without an anchor a scroll to the next screenshot stops once it is visible, short of the page.
+            .scrollPosition(id: Binding<Int?>(get: { viewer.index }, set: { if let index = $0 { viewer.index = index } }), anchor: .center)
+            .scrollIndicators(.hidden)
+            // A window resized while the viewer shows, such as a Mac window entering full screen, keeps the old offset,
+            // which lands between two screenshots at the new page width.
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in proxy.scrollTo(viewer.index, anchor: .center) }
         }
-        .scrollTargetBehavior(.paging)
-        // Centered, since without an anchor a scroll to the next screenshot stops once it is visible, short of the page.
-        .scrollPosition(id: Binding<Int?>(get: { viewer.index }, set: { if let index = $0 { viewer.index = index } }), anchor: .center)
-        .scrollIndicators(.hidden)
         .background(.black)
         .ignoresSafeArea()
         // The overlays keep to the safe area, which the screenshots behind them fill past.
