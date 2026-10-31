@@ -120,9 +120,7 @@ static bool save30(S3 *s, int slot) {
     put16(t->img + IMG_PAGE, s->page + 1);
     put16(t->img + IMG_PC, (int)s->pc);
     char *path = save_path(s, slot);
-    FILE *f = fopen(path, "wb");
-    bool ok = f && fwrite(t->img, 1, IMG_SIZE, f) == IMG_SIZE;
-    if (f && fclose(f) != 0) ok = false;
+    bool ok = s3_write_file(path, t->img, IMG_SIZE);
     s3_log(s, "saved slot %d: %s", slot, ok ? path : "failed");
     free(path);
     return ok;

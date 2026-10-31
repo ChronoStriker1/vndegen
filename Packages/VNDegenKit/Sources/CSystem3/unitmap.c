@@ -97,7 +97,7 @@ static void step_paint(S3 *s, int layer, int sx, int sy, int w, int h, int max) 
     static const int step[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
     while (head < tail) {
         int c = queue[head++], cx = c % m->w, cy = c / m->w, d = out[c];
-        if (d >= max) continue;
+        if (d >= max || d >= 254) continue; // 255 marks unreached cells, so counts stop at 254
         for (int k = 0; k < 4; k++) {
             int x = cx + step[k][0], y = cy + step[k][1];
             if (x < 0 || y < 0 || x + w > m->w || y + h > m->h || out[y * m->w + x] != 255) continue;

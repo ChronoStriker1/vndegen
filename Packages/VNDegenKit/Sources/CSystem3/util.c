@@ -85,6 +85,19 @@ char *s3_sjis_to_utf8(const char *s) {
     return out;
 }
 
+bool s3_write_file(const char *path, const void *data, size_t size) {
+    size_t n = strlen(path) + 8;
+    char *tmp = s3_alloc(n);
+    snprintf(tmp, n, "%s.tmp", path);
+    FILE *f = fopen(tmp, "wb");
+    bool ok = f && fwrite(data, 1, size, f) == size;
+    if (f && fclose(f) != 0) ok = false;
+    if (ok) ok = rename(tmp, path) == 0;
+    if (!ok) remove(tmp);
+    free(tmp);
+    return ok;
+}
+
 u16 s3_le16(const u8 *p) { return (u16)(p[0] | p[1] << 8); }
 u32 s3_le32(const u8 *p) { return (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24; }
 

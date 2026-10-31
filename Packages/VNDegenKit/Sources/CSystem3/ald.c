@@ -12,14 +12,14 @@ static u32 u24(const u8 *p) { return (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 1
 static bool entry(const S3Archive *a, int vol, u32 index, S3Blob *out, const char **name) {
     const u8 *d = a->vol[vol];
     size_t size = a->volSize[vol];
-    if (!d || index == 0) return false;
-    u32 first = u24(d) * 256;
+    if (!d || index == 0 || size < 3) return false;
+    size_t first = (size_t)u24(d) * 256;
     size_t slot = (size_t)index * 3;
-    if (slot + 3 > first) return false;
+    if (slot + 3 > first || slot + 3 > size) return false;
     size_t off = (size_t)u24(d + slot) * 256;
     if (!off || off + 16 > size) return false;
     u32 hs = s3_le32(d + off), ds = s3_le32(d + off + 4);
-    if (off + hs > size || off + hs + ds > size) return false;
+    if (hs > size - off || ds > size - off - hs) return false;
     out->data = d + off + hs;
     out->size = ds;
     if (name) *name = (const char *)d + off + 16;
@@ -43,6 +43,7 @@ bool s3_archive_open(S3Archive *a, const char *dir, const char *prefix, char kin
         const u8 *d = a->vol[v];
         if (!d || a->volSize[v] < 512) continue;
         size_t mapStart = (size_t)u24(d) * 256, mapEnd = (size_t)u24(d + 3) * 256;
+        if (mapStart + 3 > a->volSize[v]) continue;
         if (mapEnd <= mapStart || mapEnd > a->volSize[v]) continue;
         u32 n = (u32)((mapEnd - mapStart) / 3);
         while (n && d[mapStart + (n - 1) * 3] == 0) n--;

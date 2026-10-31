@@ -505,13 +505,18 @@ static void var_file(S3 *s, bool write, int type, const char *name, size_t nameL
     if (!path && !write) path = s3_find_file(s->gameDir, file);
     if (!path) path = s3_path(s->saveDir, file);
     if (write) {
-        FILE *f = fopen(path, "wb");
-        if (!f) { free(path); rnd(s, 255); return; }
+        size_t n = 0, cap = 64;
+        u8 *out = s3_alloc(cap);
         for (int i = 0; i < count; i++) {
-            if (type == 0) { u16 v = start->isVar ? s3_lv_get(s, &start->lv, i) : 0; u8 b[2] = { (u8)v, (u8)(v >> 8) }; fwrite(b, 1, 2, f); }
-            else { const char *x = str_slot(s, start->v + i); fwrite(x ? x : "", 1, x ? strlen(x) + 1 : 1, f); }
+            const char *x = type == 0 ? NULL : str_slot(s, start->v + i);
+            size_t need = type == 0 ? 2 : (x ? strlen(x) : 0) + 1;
+            if (n + need > cap) { cap = (n + need) * 2; out = realloc(out, cap); if (!out) abort(); }
+            if (type == 0) { u16 v = start->isVar ? s3_lv_get(s, &start->lv, i) : 0; out[n] = (u8)v; out[n + 1] = (u8)(v >> 8); }
+            else memcpy(out + n, x ? x : "", need);
+            n += need;
         }
-        rnd(s, fclose(f) == 0 ? 0 : 201);
+        rnd(s, s3_write_file(path, out, n) ? 0 : 201);
+        free(out);
     } else {
         size_t n;
         u8 *d = s3_read_file(path, &n);

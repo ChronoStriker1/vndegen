@@ -119,7 +119,7 @@ static bool decode_pms(const u8 *d, size_t size, S3Image *img) {
     if (img->w <= 0 || img->h <= 0 || img->w > 8192 || img->h > 8192 || dataOff >= size) return false;
     Rd r = { d + dataOff, d + size, false };
     if (img->bpp == 8) {
-        if (auxOff + 768 > size) return false;
+        if ((u64)auxOff + 768 > size) return false;
         for (int i = 0; i < 256; i++)
             for (int c = 0; c < 3; c++) img->pal[i][c] = d[auxOff + i * 3 + c];
         img->hasPal = true;
@@ -236,8 +236,10 @@ static bool decode_bmp(const u8 *d, size_t size, S3Image *img) {
     if (w <= 0 || h <= 0 || w > 8192 || h > 8192 || s3_le32(d + 30) != 0) return false;
     img->w = w; img->h = h;
     size_t stride = (((size_t)w * bpp + 31) / 32) * 4;
-    if (off + stride * h > size) return false;
+    if (bpp != 8 && bpp != 24 && bpp != 32) return false;
+    if (off > size || stride * (size_t)h > size - off) return false;
     if (bpp == 8) {
+        if (hs > size || (size_t)14 + hs + 1024 > size) return false;
         img->bpp = 8;
         img->hasPal = true;
         img->palMask = 0xffff;

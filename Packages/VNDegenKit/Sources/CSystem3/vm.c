@@ -73,7 +73,10 @@ void s3_var_ref(S3 *s, int c, S3LV *lv) {
         if (n == 1) {
             int hi = s3_byte(s), lo = s3_byte(s);
             lv->var = (u16)(hi << 8 | lo);
+            // An index is an expression that may hold indexed variables; real scripts nest a few deep at most.
+            if (++s->exprDepth > 32) { s->vmError = true; s->exprDepth--; return; }
             lv->offset = s3_expr(s);
+            s->exprDepth--;
             lv->element = true;
             return;
         }

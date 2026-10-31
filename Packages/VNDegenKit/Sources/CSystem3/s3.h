@@ -21,6 +21,8 @@ void *s3_alloc(size_t n);                      // zeroed, aborts on failure
 char *s3_strdup(const char *s);
 // Reads a whole file. Returns NULL when missing.
 u8 *s3_read_file(const char *path, size_t *size);
+// Writes a whole file through a temporary beside it, so a failed write leaves the old file as it was.
+bool s3_write_file(const char *path, const void *data, size_t size);
 // Finds dir/name whatever the case of name, as Windows does. Returns a malloc'd path or NULL.
 char *s3_find_file(const char *dir, const char *name);
 char *s3_path(const char *dir, const char *name); // joins without checking
@@ -204,6 +206,7 @@ struct S3 {
     // input
     int mouseX, mouseY;
     bool mouseL, mouseR, keyDown[256];
+    int exprDepth;          // nesting of index expressions being read
     u32 clickLatch;         // buttons pressed since IM last read them (16 left, 32 right), so a quick tap still counts
     // A tap moves the pointer and presses in one go. Games take their hover from the position they last polled, so a
     // press that comes with a move waits until the game has run a frame at the new position, as a mouse moves first.

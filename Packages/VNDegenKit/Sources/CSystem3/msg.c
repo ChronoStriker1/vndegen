@@ -32,6 +32,7 @@ void s3_msg_clear(S3 *s) {
 
 // Appends text to the menu item being built.
 static void menu_append(S3 *s, const char *sjis) {
+    if (s->menuBuild >= S3_MAX_MENU) return; // an item past the last one kept; its text is dropped with it
     S3MenuItem *m = &s->menu[s->menuBuild];
     m->zh = s->zh;
     size_t have = strlen(m->text), add = strlen(sjis);

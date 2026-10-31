@@ -112,9 +112,7 @@ bool s3_save_write(S3 *s, int slot) {
     char *path = slot_path(s, slot);
     if (!path) return false;
     Buf b = build(s);
-    FILE *f = fopen(path, "wb");
-    bool ok = f && fwrite(b.d, 1, b.n, f) == b.n;
-    if (f && fclose(f) != 0) ok = false;
+    bool ok = s3_write_file(path, b.d, b.n);
     free(b.d);
     s3_log(s, "saved slot %d: %s", slot, ok ? path : "failed");
     free(path);
@@ -137,7 +135,8 @@ static bool read_save(S3 *s, int slot, Save *sv) {
     sv->stack = s3_le32(sv->d + 0x860);
     sv->strings = s3_le32(sv->d + 0x864);
     sv->vars = s3_le32(sv->d + 0x870);
-    if (sv->vars + 16 + 131072 > sv->n || sv->strings + 16 > sv->n || sv->stack + 16 > sv->n) { free(sv->d); sv->d = NULL; return false; }
+    // Offsets are checked in 64 bits so a corrupt value cannot wrap around.
+    if ((u64)sv->vars + 16 + 131072 > sv->n || (u64)sv->strings + 16 > sv->n || (u64)sv->stack + 16 > sv->n) { free(sv->d); sv->d = NULL; return false; }
     return true;
 }
 
@@ -173,9 +172,9 @@ bool s3_save_load(S3 *s, int slot) {
 
     for (int page = 1; page < 256; page++) {
         u32 a = s3_le32(d + 0x870 + (size_t)page * 4);
-        if (!a || a + 16 > sv.n) continue;
+        if (!a || (u64)a + 16 > sv.n) continue;
         u32 size = s3_le32(d + a);
-        if (s3_le32(d + a + 4) != (u32)page || size % 2 || a + 16 + size > sv.n) continue;
+        if (s3_le32(d + a + 4) != (u32)page || size % 2 || (u64)a + 16 + size > sv.n) continue;
         S3ArrayPage *ap = &s->arr[page];
         u32 n = size / 2;
         if (!ap->v || ap->n != n) { free(ap->v); ap->v = s3_alloc((size_t)n * 2 + 2); ap->n = n; }
@@ -186,14 +185,20 @@ bool s3_save_load(S3 *s, int slot) {
     // The call stack, then resume where the save was made.
     s->sp = 0;
     u32 stackSize = s3_le32(d + sv.stack);
-    const u8 *q = d + sv.stack + 16, *end = q + stackSize;
-    while (q < end && s->sp < S3_MAX_FRAMES) {
-        // Entries end in their tag, so read the tag first by the entry's size.
-        if (q + 5 <= end && q[4] == 0xee) { s->stack[s->sp++] = (S3Frame){ .kind = S3_FRAME_LABEL, .pc = s3_le32(q) }; q += 5; }
-        else if (q + 7 <= end && q[6] == 0xff) { s->stack[s->sp++] = (S3Frame){ .kind = S3_FRAME_PAGE, .page = (u16)(s3_le16(q) - 1), .pc = s3_le32(q + 2) }; q += 7; }
-        else if (q + 7 <= end && q[6] == 0xdd) { s->stack[s->sp++] = (S3Frame){ .kind = S3_FRAME_PUSH, .var = (u16)s3_le32(q), .value = s3_le16(q + 4) }; q += 7; }
+    if (stackSize > sv.n - sv.stack - 16) stackSize = (u32)(sv.n - sv.stack - 16);
+    // Each entry ends in its tag, and a pushed value can equal a tag byte, so read the entries from the end back.
+    const u8 *start = d + sv.stack + 16, *q = start + stackSize;
+    S3Frame *frames = s3_alloc(sizeof(S3Frame) * S3_MAX_FRAMES);
+    int frameCount = 0;
+    while (q > start && frameCount < S3_MAX_FRAMES) {
+        u8 tag = q[-1];
+        if (tag == 0xee && q - start >= 5) { q -= 5; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_LABEL, .pc = s3_le32(q) }; }
+        else if (tag == 0xff && q - start >= 7) { q -= 7; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_PAGE, .page = (u16)(s3_le16(q) - 1), .pc = s3_le32(q + 2) }; }
+        else if (tag == 0xdd && q - start >= 7) { q -= 7; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_PUSH, .var = (u16)s3_le32(q), .value = s3_le16(q + 4) }; }
         else break;
     }
+    for (int i = 0; i < frameCount; i++) s->stack[s->sp++] = frames[frameCount - 1 - i];
+    free(frames);
     u32 page = s3_le32(d + 0x50), pc = s3_le32(d + 0x54);
     free(sv.d);
     s->menuCount = 0;
@@ -209,11 +214,7 @@ bool s3_save_copy(S3 *s, int to, int from) {
     size_t n;
     u8 *d = src ? s3_read_file(src, &n) : NULL;
     bool ok = false;
-    if (d && dst) {
-        FILE *f = fopen(dst, "wb");
-        ok = f && fwrite(d, 1, n, f) == n;
-        if (f && fclose(f) != 0) ok = false;
-    }
+    if (d && dst) ok = s3_write_file(dst, d, n);
     free(d); free(src); free(dst);
     return ok;
 }
@@ -222,9 +223,9 @@ bool s3_save_copy(S3 *s, int to, int from) {
 static u8 *page_values(Save *sv, int page, u32 *count) {
     if (page < 0 || page > 255) return NULL;
     u32 a = s3_le32(sv->d + 0x870 + (size_t)page * 4);
-    if (!a || a + 16 > sv->n) return NULL;
+    if (!a || (u64)a + 16 > sv->n) return NULL;
     u32 size = s3_le32(sv->d + a);
-    if (s3_le32(sv->d + a + 4) != (u32)page || a + 16 + (size_t)size > sv->n) return NULL;
+    if (s3_le32(sv->d + a + 4) != (u32)page || (u64)a + 16 + size > sv->n) return NULL;
     *count = size / 2;
     return sv->d + a + 16;
 }
@@ -245,9 +246,7 @@ bool s3_save_write_part(S3 *s, int slot, const S3LV *from, int count) {
         values[(base + (u32)i) * 2 + 1] = (u8)(v >> 8);
     }
     char *path = slot_path(s, slot);
-    FILE *f = path ? fopen(path, "wb") : NULL;
-    bool ok = f && fwrite(sv.d, 1, sv.n, f) == sv.n;
-    if (f && fclose(f) != 0) ok = false;
+    bool ok = path && s3_write_file(path, sv.d, sv.n);
     free(path);
     free(sv.d);
     return ok;
