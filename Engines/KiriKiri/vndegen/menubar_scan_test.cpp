@@ -75,6 +75,20 @@ int main()
     ks("[link text=\"!kag.menu.visible\" target=*a]", nullptr);
     ks("[iscript]\nx();\n[endscript]\nWhen menu.visible == false, nothing happens.", nullptr);
 
+    // KAG attribute syntax: names in any case, backtick escapes, values of other attributes.
+    ks("[if EXP=\"!kag.menu.visible\"]", "negation");
+    ks("[if exp=\"f.name == `\"x`\" && !kag.menu.visible\"]", "negation");
+    ks("[link text=\"cond='!kag.menu.visible'\" target=*help]", nullptr);
+    ks("Press [[if exp=!kag.menu.visible] to see it.", nullptr);
+    ks("*label|cond !kag.menu.visible", nullptr);
+    ks("@iscript\nvar a = 1;\nif (!kag.menu.visible) x();\n@endscript", "negation", 3);
+    // TJS strings that span lines, nested comments, and double negation.
+    tjs("var s = \"first line\n!kag.menu.visible in the string\";", nullptr);
+    tjs("/* outer /* inner */ if (!kag.menu.visible) fallback(); */ x();", nullptr);
+    tjs("if (!!kag.menu.visible) makeMenu();", nullptr);
+    tjs("if (!!!kag.menu.visible) fallback();", "negation");
+    ks("[iscript]\nvar s = 'a\n[endscript]\n';\nif (!kag.menu.visible) x();\n[endscript]", "negation", 5);
+
     if (failures) {
         printf("%d failed\n", failures);
         return 1;

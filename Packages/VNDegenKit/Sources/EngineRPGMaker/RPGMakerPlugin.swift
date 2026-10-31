@@ -65,9 +65,9 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     }
 
     /// Triacontane's MessageSkip, in two of the library's MV games, puts auto and skip on keys only (A, and Control
-    /// held), out of reach on a touch screen. Its own call toggles auto. Skip stays on until chosen again: with the
-    /// plugin set to skip while a key is held, as Mama Kondon is, every version of it reads the key through
-    /// `isPressedMessageSkip`, so that reports the toggle as a held key too.
+    /// held), out of reach on a touch screen. Its own call toggles auto. Skip turns the plugin's skip flag over, as its
+    /// toggle key does. With the plugin set to skip while a key is held, as Mama Kondon is, every version of it reads the
+    /// key through `isPressedMessageSkip`, so that reports skip as a held key until it is chosen again.
     static func menuCommands(plugins: Set<String>) -> [WebMenuCommand] {
         guard plugins.contains("MessageSkip") else { return [] }
         return [
@@ -83,7 +83,8 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
                         };
                         messages.__vndegenSkip = true;
                     }
-                    window.__vndegenMessageSkip = !window.__vndegenMessageSkip;
+                    // The plugin's own flag says whether it skips now, as it clears the flag itself at a choice.
+                    window.__vndegenMessageSkip = !$gameMessage.skipFlg();
                     $gameMessage.setSkipFlg(window.__vndegenMessageSkip);
                 })();
                 """),
