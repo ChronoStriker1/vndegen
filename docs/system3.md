@@ -46,6 +46,7 @@ samples averaged 60.0 with one hitch. A DEBUG build launched with `-frameMonitor
 
 ## Known limits
 
+- Ludusavi's manifest lists none of the 10 test games, so Ludusavi doesn't find their saves on its own.
 - Commands no test game uses are read and skipped: CT to CZ (alpha data), the CX shadow modes, ME, MF, MG, MI, MJ and
   MN (string search and input), VJ (weighted step paint), the LX file commands, the network commands, verb and object
   menus, and DLL commands.
