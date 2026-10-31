@@ -571,6 +571,18 @@ impl Sound {
         Self::new(&Gameexe::default(), false)
     }
 
+    /// VNDegen: silences every sound while the host's menu is open. Kira 0.9 can't pause its mixer, so sounds keep
+    /// playing, unheard, until `set_muted(false)`.
+    pub fn set_muted(&mut self, muted: bool) {
+        #[cfg(not(target_os = "horizon"))]
+        if let Some(manager) = self.manager.as_mut() {
+            let amplitude = if muted { 0.0 } else { 1.0 };
+            manager
+                .main_track()
+                .set_volume(kira::Volume::Amplitude(amplitude), Tween::default());
+        }
+    }
+
     pub fn has_device(&self) -> bool {
         #[cfg(not(target_os = "horizon"))]
         {
