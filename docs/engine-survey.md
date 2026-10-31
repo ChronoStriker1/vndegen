@@ -8,6 +8,56 @@ Status since the survey: RPG Maker MV/MZ, TyranoScript, Ren'Py, RPG Maker XP, VX
 
 The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one row per library folder.
 
+## Additions on 2026-10-31
+
+167 folders (403.4 GB) arrived after the survey, so the library now has 688. The TSV includes them, with the same columns and method. The rest of this document still describes the original 521 folders.
+
+| Engine | Games | Size (GB) | VNDegen |
+|---|---:|---:|---|
+| Unity | 63 | 163.2 | Not a target |
+| RPG Maker MV | 22 | 23.7 | Shipped |
+| KiriKiri | 12 | 19.4 | Shipped |
+| Ren'Py | 10 | 11.6 | Shipped |
+| GameMaker | 8 | 6.2 | Not a target |
+| RPG Maker MZ | 7 | 14.6 | Shipped |
+| NScripter | 7 | 10.2 | Shipped |
+| Unreal | 6 | 21.1 | Not a target |
+| Custom native | 5 | 38.4 | Not a target |
+| TyranoScript | 4 | 9.9 | Shipped |
+| Wolf RPG Editor | 2 | 2.1 | Shipped |
+| Godot | 2 | 2.1 | Shipped, one candidate (see below) |
+| Artemis | 1 | 1.1 | Shipped |
+| AliceSoft System 4 | 1 | 1.6 | In progress |
+| Nitroplus NPK, cocos2d-x, LÖVE, GZDoom, Electron, NW.js | 1 each | 5.8 total | Not a target |
+| Unknown | 11 | 72.3 | |
+
+Details that matter for the shipped engines follow.
+- NScripter grows from 6 games to 13. The new ones are Tsukihime, four Umineko releases, Mizuiro (a disc image inside a zip), and Lilitales. Lilitales uses `.ns2` archives and NSLua (`system.lua`, `nslua.dll`), which the runtime supports.
+- Three TyranoScript games are Electron apps with the game in `resources/app.asar`, a web root the plugin already checks. Punishment NyanNyan is an old NW.js build with the game packed into its exe. All four are identified from Tyrano save file names (`*_tyrano_data.sav`, `*_sf.sav`), because the scripts sit inside the packed app.
+- Lust Arcanum is a Godot C# game (`GodotSharp.dll`), which the Godot plugin does not run. Train45 ships the GodotSteam extension (`libgodotsteam.windows.template_release.x86_64.dll`), which VNDegen's Godot replaces with its own `Steam` class.
+- Evenicle is a System 4 game (`Evenicle.ain`) and a test candidate for the clean-room System 4 runtime.
+- 21 of 29 new MV and MZ games use encrypted assets. 13 of the 63 Unity games are IL2CPP and 18 use Naninovel.
+- 49 games ship a `SOVEREIGN.dll` beside the exe. It does not change engine detection.
+- The 11 unknown folders are 6 scene disc images or multi-part archives, 2 GOG installers, 1 Linux self-extracting installer, Neverwood (no known signature), and Double Date Dilemma. Double Date Dilemma has the same `.gax` and `emotedriver.dll` layout as one of the unidentified games in the first survey. Its exe has `MOGraSystem` and `MOSceSystem` classes.
+
+New test picks for the shipped engines, smallest first where the variant allows.
+
+| Engine | Game folder | Size (MB) | Why |
+|---|---|---:|---|
+| NScripter | Tsukihime | 122 | Smallest new NScripter game, `arc.nsa` |
+| NScripter | Umineko no Naku Koro ni Hane | 371 | Smallest Umineko release |
+| NScripter | Lilitales | 591 | `.ns2` archives and NSLua |
+| TyranoScript | Punishment NyanNyan | 462 | Old NW.js, game packed into the exe |
+| TyranoScript | Punishment NyanNyan R | 2195 | Electron, `resources/app.asar` |
+| KiriKiri | Taiman Building Up!_ Yanke Emusume's Meat Hole_ Even Though He's Bad, He's In Good Condition Over There | 440 | Loose `data/` scripts beside six `.xp3` archives, no `data.xp3` |
+| Ren'Py | Animahjong  X | 115 | Smallest Ren'Py 8 |
+| RPG Maker MV | Exorcist Reina_ The Mysterious Yoma Organization | 149 | Smallest new MV, encrypted assets |
+| RPG Maker MZ | Zombies & Utopia | 189 | Smallest new MZ, encrypted assets |
+| Wolf RPG Editor | Niplheim's Hunter - Branded Azel | 457 | Installed, `Data/*.wolf` archives |
+| Artemis | AMANATSU+ | 1116 | Only new Artemis game, `amanatu_plus.pfs` |
+| Godot | Train45 | 1790 | Installed, pack inside the 1.6 GB exe, GodotSteam extension |
+| AliceSoft System 4 | Evenicle | 1555 | System 4 with `.afa` CG archives |
+
 ## Summary
 
 The library has 521 folders and 684.5 GB (637.5 GiB). Signatures identify the engine for 446 folders. 75 stay unknown.
