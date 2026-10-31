@@ -1,0 +1,26 @@
+--- a/vm_dump.c
++++ b/vm_dump.c
+@@ -1095,9 +1095,15 @@
+ # define rb_dump_machine_register(errout, ctx) ((void)0)
+ #endif /* dump_machine_register */
+ 
++#ifdef __APPLE__
++# include <TargetConditionals.h>
++#endif
++
+ bool
+ rb_vm_bugreport(const void *ctx, FILE *errout)
+ {
++    /* VNDegen: iOS apps can't call system(), so RUBY_ON_BUG has no effect there. */
++#if !defined(__APPLE__) || !TARGET_OS_IPHONE
+     const char *cmd = getenv("RUBY_ON_BUG");
+     if (cmd) {
+         char buf[0x100];
+@@ -1107,6 +1113,7 @@
+             snprintf(buf, sizeof(buf), "Launching RUBY_ON_BUG command failed.");
+         }
+     }
++#endif
+ 
+     // Thread unsafe best effort attempt to stop printing the bug report in an
+     // infinite loop. Can happen with corrupt Ruby stack.

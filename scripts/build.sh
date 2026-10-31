@@ -12,6 +12,8 @@ cd "$(dirname "$0")/.."
 xcodegen generate --quiet
 # Save sync's rclone library, which the package links on every platform.
 scripts/rclone-runtime.sh
+# The Ruby interpreter VNDegen's RGSS runtime links, for RPG Maker XP, VX and VX Ace.
+scripts/rgss-ruby.sh build/rgss >build/rgss-ruby.log 2>&1 || { tail -n 40 build/rgss-ruby.log; exit 1; }
 scripts/app-licenses.sh
 scripts/fonts-licenses.sh
 scripts/midi-licenses.sh
@@ -29,12 +31,11 @@ require_licenses() {
   done
 }
 
-# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The RGSS,
+# xcodebuild prints every warning and compiler command. Errors and the final status are what matter here. The
 # KiriKiri, Godot, and Artemis engines build first, so a failure shows its log. The app's own build phases then find
 # them up to date.
 xcb() {
   mkdir -p build
-  scripts/rgss-engine.sh build/rgss >build/rgss-engine.log 2>&1 || { tail -n 40 build/rgss-engine.log; return 1; }
   scripts/kirikiri-engine.sh build/kirikiri >build/kirikiri-engine.log 2>&1 || { tail -n 40 build/kirikiri-engine.log; return 1; }
   scripts/godot-engine.sh build/godot >build/godot-engine.log 2>&1 || { tail -n 40 build/godot-engine.log; return 1; }
   scripts/artemis-engine.sh build/artemis >build/artemis-engine.log 2>&1 || { tail -n 40 build/artemis-engine.log; return 1; }

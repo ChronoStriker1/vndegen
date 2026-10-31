@@ -56,9 +56,17 @@ let package = Package(
         // The KiriKiri engine's C interface. The engine itself is a framework the app embeds, found at run time.
         .target(name: "CKiriKiri"),
         .target(name: "EngineKiriKiri", dependencies: ["VNCore", "CKiriKiri", "FontPack"], swiftSettings: mainActorByDefault),
-        // The RGSS engine's C interface. The engine itself is a framework the app embeds, opened at run time.
-        .target(name: "CRGSS"),
-        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
+        // VNDegen's own RGSS runtime for RPG Maker XP, VX and VX Ace, in C, with vnrgss.h as its C interface. It runs
+        // games' scripts on MRI Ruby, which scripts/rgss-ruby.sh builds into build/RGSSRuby.xcframework (not in git;
+        // scripts/build.sh makes it). third_party holds stb and dr_libs, which the runtime's sources include directly.
+        // Engines/RGSSRuntime/host builds the same sources for the Linux test tools.
+        .binaryTarget(name: "RGSSRuby", path: "build/RGSSRuby.xcframework"),
+        .target(
+            name: "CRGSS", dependencies: ["RGSSRuby", "CVNFont", "CVNMidi"], exclude: ["third_party"],
+            // The runtime draws every frame on the CPU, so Debug builds are optimized too, as NScripter's are.
+            cSettings: [.unsafeFlags(["-O2"])],
+            linkerSettings: [.linkedLibrary("z")]),
+        .target(name: "EngineRGSS", dependencies: ["VNCore", "CRGSS", "FrameHost", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
         // The Godot engines' C interface. The engines are frameworks the app embeds, opened at run time.
         .target(name: "CGodot"),
         .target(name: "EngineGodot", dependencies: ["VNCore", "CGodot", "FontPack"], swiftSettings: mainActorByDefault),

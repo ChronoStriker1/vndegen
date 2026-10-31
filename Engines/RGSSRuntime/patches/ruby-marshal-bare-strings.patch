@@ -1,0 +1,17 @@
+--- a/marshal.c
++++ b/marshal.c
+@@ -642,9 +642,14 @@
+     return ST_CONTINUE;
+ }
+ 
++/* VNDegen: RPG Maker XP and VX ran Ruby 1.8, whose Marshal wrote strings and symbols without an encoding. When this
++ * is set, dumps leave the encoding out, so the original engines read the saves. */
++int rb_marshal_rgss_bare_strings = 0;
++
+ static VALUE
+ encoding_name(VALUE obj, struct dump_arg *arg)
+ {
++    if (rb_marshal_rgss_bare_strings) return Qnil;
+     if (rb_enc_capable(obj)) {
+         int encidx = rb_enc_get_index(obj);
+         rb_encoding *enc = 0;
