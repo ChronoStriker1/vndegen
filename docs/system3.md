@@ -20,7 +20,7 @@ of the app; `docs/system3-cleanroom.md` lists where each part came from. It cove
 - Draws text in the Windows font pack's MS Gothic substitute, as fixed full- and half-width cells, with the engines'
   conversion of half-width kana to hiragana. Translated text breaks between words.
 - Saves where the PC engines do, in the game's folder: `<prefix>S<letter>.ASD` for System 3.9 (slot 1 is `A`) and
-  `ASLEEP_<letter>.DAT` for System 3.0. The files are byte for byte what the PC engines write, checked on 38 System 3.9
+  `ASLEEP_<letter>.DAT` for System 3.0. The files are byte for byte what the PC engines write, checked on 41 System 3.9
   and 9 System 3.0 test saves, so Ludusavi backups and PC copies of a game load either way. Files games write with QE,
   such as Toushin Toshi II's `tt2FS.ALD` of game-wide flags, are kept in the PC format too. A Japanese name ending in
   two letters and `.ALD` takes the archives' prefix, as the English releases renamed those files.
@@ -33,13 +33,17 @@ right click, the arrows the arrow keys, and Dash holds Control.
 ## Testing on Linux
 
 `Engines/System3/host` builds the runtime with CMake. `s3run <game> --ms N [events]` runs a game headless, pressing keys,
-clicking and saving frames at the times given, and `s3play <game>` plays it in an SDL window.
+clicking and saving frames at the times given, and `s3play <game>` plays it in an SDL window. The game clock starts at a
+fixed date, so a run replays the same way. `--auto` answers menus by their text (`T:pick:Save`, `--prefer`, `--avoid`)
+to reach a game's save point, and `--repl FIFO` takes commands one at a time for long scripted sequences.
 
 ## Known limits
 
-Commands no test game uses are read and skipped: CD (sprite copy with effects), CP (flood fill), CT to CZ (alpha
-data), the CX shadow modes, ME, MF, MG, MI, MJ and MN (string search and input), NI (number input), the ND
-double-precision commands, VJ (weighted step paint), LL and the LX file commands, the network commands, verb and object
-menus, and DLL commands. CE transitions show their result after the transition's time rather than animating each
-pattern. Text appears all at once rather than at the game's message speed. System 3.0's own music format (`AMUS.DAT`)
-isn't played; the test games use CD tracks instead.
+- Commands no test game uses are read and skipped: CT to CZ (alpha data), the CX shadow modes, ME, MF, MG, MI, MJ and
+  MN (string search and input), VJ (weighted step paint), the LX file commands, the network commands, verb and object
+  menus, and DLL commands.
+- NI, the number input box, takes its default as if OK were pressed; Panyon's shop then buys its default quantity.
+- CE transitions show their result after the transition's time, and CD sprite copies show theirs at once, rather than
+  animating each step.
+- Text appears all at once rather than at the game's message speed.
+- System 3.0's own music format (`AMUS.DAT`) isn't played; the test games use CD tracks instead.

@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     VNS3Config cfg = { .gameDir = argv[1], .audioRate = 44100, .soundFontPath = S3_SOUNDFONT, .startTime = 1767225600 };
     int total = 10000, autoFrom = -1;
     const char *final = NULL, *repl = NULL;
-    static Ev ev[1024];
+    static Ev ev[8192];
     int n = 0;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--ms") && i + 1 < argc) total = atoi(argv[++i]);
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--repl") && i + 1 < argc) repl = argv[++i];
         else if (!strcmp(argv[i], "--prefer") && i + 1 < argc && preferCount < 32) prefer[preferCount++] = argv[++i];
         else if (!strcmp(argv[i], "--avoid") && i + 1 < argc && avoidCount < 32) avoid[avoidCount++] = argv[++i];
-        else if (n < 1024) {
+        else if (n < 8192) {
             Ev *e = &ev[n];
             memset(e, 0, sizeof *e);
             char rest[600] = "";

@@ -12,7 +12,9 @@ reading xsystem35, xsystem35-sdl2, system3-sdl2, alicetools or any fork of them,
 | AliceSoft System 3.9 SDK (`Sys39SDK.zip`): the command manual (Japanese, with a partial English translation), sample scenario sources and objects, `Sys39c.exe`, `NL4.EXE`, `System39.exe` | AliceSoft's own published SDK. Its terms forbid redistributing it, so nothing from it is copied into VNDegen | Command names, arguments and behaviour; the compiler and linker as black boxes; the engine as a black box for saves |
 | AliceSoft System 3.5 SDK (`Sys35SDK.7z`): manual and `SYS35C.EXE` | As above | Older command encodings that some games use, through the compiler as a black box |
 | The games' own files (`.ALD` archives, `System39.ain`, CGs, sound, `_inmm.ini`) | The player's copies | Archive, table, image and sound layouts, read from the files |
-| `System39.exe` run under Wine as a black box | AliceSoft's engine | The save file format, from saves it wrote for test scenarios built with the SDK |
+| `System39.exe` run under Wine as a black box | AliceSoft's engine | The save file format, from saves it wrote for test scenarios built with the SDK, and the behaviour of commands the manual leaves open |
+| `SYSTEM3.EXE` (the Windows 3.1 engine of the System 3.0 games) run under 32-bit Wine in a local Docker image as a black box | AliceSoft's engine | The System 3.0 save format and command behaviour, from hand-assembled test pages |
+| The English releases' `replacement.txt` and `GAIJI.DAT` | The player's copies | Translated text, and the custom characters of the save lists, read from the files |
 | GARbro, `ArcFormats/AliceSoft/ImagePMS.cs` (morkt/GARbro, one commit, 698d509c, 2017-11-26) | MIT, with no credit to or trace of another project | The PMS image layout and its row codes, checked against the games' CGs |
 | stb_truetype 1.26 (nothings/stb 003501f) | Public domain or MIT | Glyph rasterizing, vendored in `third_party/` |
 | dr_mp3 (mackron/dr_libs a466dbe), with minimp3 | Unlicense or MIT-0; minimp3 CC0 | MP3 decoding for CD music tracks, vendored in `third_party/` |
@@ -32,8 +34,17 @@ reading xsystem35, xsystem35-sdl2, system3-sdl2, alicetools or any fork of them,
   bit-plane data, checked by decoding the games' CGs. See the note below.
 - **Saves.** Test scenarios built with the SDK's compiler and linker set known values (variables, strings, arrays,
   windows, fonts and colours, calls and pushed variables) and saved with `QD` on the SDK's `System39.exe` under Wine.
-  The runtime's saves for the same scenarios are byte-identical to the 38 files the original wrote. The same runs
+  The runtime's saves for the same scenarios are byte-identical to the 41 files the original wrote. The same runs
   showed that `LD` resumes after the `QD` that made the save.
+- **Commands the manual leaves open**, each settled by an SDK test page run on `System39.exe` and read back from the
+  save it wrote: `N&`, `N|` and `N^` write their result into the second variable and leave the first alone; `VG`
+  outside the unit map gives 65535 and `VS` there changes nothing; `ND` values read out truncated and modulo 65536;
+  `VH`'s step paint for movers larger than one unit; the `VA` sprite moves, by recording a sprite's state over time;
+  `LE` and `QE` variable files; key input during timed waits.
+- **System 3.0.** `ADISK.DAT` and the CG `.DAT` archives were read from the files. The bytecode follows the System 3.5
+  manual where it agrees, and the rest was settled with test pages assembled by hand into a copy of `ADISK.DAT` and run on
+  `SYSTEM3.EXE` under 32-bit Wine in a local Docker image, which also wrote the reference saves: the runtime's
+  `ASLEEP_<slot>.DAT` files match the original's on 9 test pages, including how it pops a pushed variable.
 - **Everything else** (windows, menus, text, palettes and fades, sound commands) follows the SDK manual.
 
 ## Exposure note
@@ -45,8 +56,8 @@ told. The VSP decoder was then written from the game files as described above.
 
 ## Open questions and how they were settled
 
-- **VA.** Used only by one test game's minigame screens and in neither SDK manual. The 3.9 compiler accepts `VA` 0 to 8,
-  each with three arguments; the games' scripts show what each sets.
+- **VA.** In neither SDK manual. The 3.9 compiler accepts it with a subcommand and three arguments; what each
+  subcommand does came from the games' scripts and from `System39.exe` running test pages under Wine.
 - **String count in saves.** The save counts strings from string 0: 5000 by default, and `MZ` n gives n + 1.
 - **The save's tail.** 256 bytes of `ff`, then one zero byte per label call and two per page call on the stack, their
   count, and `INFS`. Every test save matched this; what the bytes mean was not needed.
