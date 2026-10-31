@@ -41,6 +41,8 @@ final class Navigator {
         case importGame(ArchiveImportModel, initialSelection: [URL])
         /// A runtime package's license, which its install waits on.
         case license(LicenseRequest)
+        /// A question asked before a change, such as removing a library folder.
+        case confirm(Confirmation)
 
         var id: String {
             switch self {
@@ -57,6 +59,7 @@ final class Navigator {
             case let .settingsPage(page): "settings:\(page)"
             case .importGame: "import"
             case let .license(request): "license:\(request.id)"
+            case let .confirm(confirmation): "confirm:\(confirmation.id)"
             }
         }
     }
@@ -107,6 +110,10 @@ final class Navigator {
         case fontPackage(String)
         /// The MIDI SoundFont rows in Settings: choose a file, and go back to the bundled font.
         case soundFont, soundFontReset
+        /// Settings' library folder rows: add one, and show or remove an added one.
+        case addLibraryFolder, showLibraryFolder(LibraryFolderID), removeLibraryFolder(LibraryFolderID)
+        /// The confirmation sheet's buttons.
+        case confirmAction, confirmCancel
     }
 
     enum RuntimeAction: Hashable {
@@ -163,6 +170,12 @@ final class Navigator {
     private(set) var rescanning = false
     /// Settings' SoundFont file picker is open.
     var pickingSoundFont = false
+    /// Settings' folder picker for a new library folder is open.
+    var pickingLibraryFolder = false
+    /// The title of the alert showing `hub.launchError`, when it reports something other than a failed launch.
+    var errorTitle: String?
+    /// The open import sheet's model, which knows the library folder the game went into after the sheet closes.
+    @ObservationIgnored private var importing: ArchiveImportModel?
     /// The file name of the player's MIDI SoundFont, nil for the bundled one, and why the last choice failed.
     private(set) var soundFontName = MIDISoundFont.userFont()?.lastPathComponent
     private(set) var soundFontError: String?
@@ -236,6 +249,7 @@ final class Navigator {
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
             case .license: return [Row(id: "license", items: [.licenseAccept, .licenseDecline])]
+            case .confirm: return [Row(id: "confirm", items: [.confirmAction, .confirmCancel])]
             // These take controller input through their own models.
             case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping: return []
             }
@@ -284,7 +298,9 @@ final class Navigator {
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
         case .settings:
-            var items: [Target] = [.back, .openFolder, .rescan, .settingsPage(.metadata), .settingsPage(.lock), .settingsPage(.saves)]
+            var rows = [Row(id: "settings-back", items: [.back]), Row(id: "settings-openFolder", items: [.openFolder])]
+            rows += hub.library.folders.map { Row(id: "settings-folder-\($0.id)", items: [.showLibraryFolder($0.id), .removeLibraryFolder($0.id)]) }
+            var items: [Target] = [.addLibraryFolder, .rescan, .settingsPage(.metadata), .settingsPage(.lock), .settingsPage(.saves)]
             #if os(iOS)
             let method = ControlMethod.setting
             items.append(.controlMethod)
@@ -297,7 +313,7 @@ final class Navigator {
             if soundFontName != nil { items.append(.soundFontReset) }
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
-            return items.map { Row(id: "settings-\($0)", items: [$0]) }
+            return rows + items.map { Row(id: "settings-\($0)", items: [$0]) }
         }
     }
 
@@ -316,6 +332,8 @@ final class Navigator {
             case .metadata: return .metadataQuery
             // The player asked to install the package, so Accept is the likely answer.
             case .license: return .licenseAccept
+            // A slip of the A button shouldn't delete or remove anything.
+            case .confirm: return .confirmCancel
             default: return selectedChoice(for: sheet)
             }
         }
@@ -419,7 +437,7 @@ final class Navigator {
         switch target {
         case .addGame: openImport()
         case let .importArchive(url): openImport([url])
-        case .openFolder: LibraryFolder.open(hub.library.paths.gamesRoot)
+        case .openFolder: FileBrowser.open(hub.library.paths.gamesRoot)
         case .rescan: rescan()
         case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
         case .layoutButton: layout = layout.next
@@ -504,6 +522,14 @@ final class Navigator {
             guard case let .license(request) = sheet else { return }
             request.respond(target == .licenseAccept)
             sheet = nil
+        case .confirmAction:
+            guard case let .confirm(confirmation) = sheet else { return }
+            sheet = nil
+            Task { await confirmation.perform() }
+        case .confirmCancel: sheet = nil
+        case .addLibraryFolder: pickingLibraryFolder = true
+        case let .showLibraryFolder(id): if let root = hub.library.root(of: id) { FileBrowser.open(root) }
+        case let .removeLibraryFolder(id): confirmRemoving(id)
         }
     }
 
@@ -522,7 +548,15 @@ final class Navigator {
     func openImport(_ urls: [URL] = []) {
         if case let .importGame(model, _)? = sheet, !urls.isEmpty { return model.choose(urls) }
         guard sheet == nil else { return ArchiveImporter.discard(urls) }
-        sheet = .importGame(ArchiveImportModel(gamesRoot: hub.library.paths.gamesRoot), initialSelection: urls)
+        let library = hub.library
+        // Folders that can't be reached now aren't offered.
+        let added = library.folders.filter { library.folderProblems[$0.id] == nil }.compactMap { folder in
+            library.root(of: folder.id).map { ImportDestination(name: folder.name, url: $0) }
+        }
+        let builtIn = ImportDestination(name: library.paths.gamesRoot.lastPathComponent, url: library.paths.gamesRoot)
+        let model = ArchiveImportModel(gamesRoot: library.paths.gamesRoot, destinations: [builtIn] + added)
+        importing = model
+        sheet = .importGame(model, initialSelection: urls)
     }
 
     /// Deletes Inbox copies nothing imports. Call each time the app goes to the background. A copy is deleted once it
@@ -535,11 +569,14 @@ final class Navigator {
     /// Closes the import sheet, then shows the new game in the library.
     func finishImport(_ folderName: String?) {
         if case .importGame? = sheet { sheet = nil }
+        let destination = importing?.destination.url
+        importing = nil
         guard let folderName else { return }
         Task {
             await hub.refreshLibrary()
-            let id = GameID(folderName)
-            guard hub.library.game(id) != nil else { return }
+            let library = hub.library
+            let folder = library.folders.first { library.root(of: $0.id) == destination }?.id
+            guard let id = library.gameID(named: folderName, in: folder) else { return }
             heroID = id
             if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) {
                 setFocus(tile)
@@ -547,6 +584,52 @@ final class Navigator {
                 revealRequest = tile
             }
         }
+    }
+
+    // MARK: Library folders
+
+    /// Adds the folder the player picked in Settings, then looks up metadata for its games.
+    func addLibraryFolder(_ result: Result<URL, Error>) {
+        let url: URL
+        do {
+            url = try result.get()
+        } catch let error as CocoaError where error.code == .userCancelled {
+            return
+        } catch {
+            return showError("Can't add the folder", error.localizedDescription)
+        }
+        Task {
+            do {
+                try await hub.addLibraryFolder(url)
+            } catch {
+                showError("Can't add the folder", error.localizedDescription)
+            }
+        }
+    }
+
+    private func confirmRemoving(_ id: LibraryFolderID) {
+        guard let folder = hub.library.folders.first(where: { $0.id == id }) else { return }
+        let count = hub.library.games.filter { $0.libraryFolder == id }.count
+        let games = count == 1 ? "Its 1 game leaves" : "Its \(count) games leave"
+        sheet = .confirm(Confirmation(
+            title: "Remove \(folder.name)?",
+            message: "\(games) the library. The folder and the files in it stay where they are, at \(SettingsView.displayPath(folder.url)). Adding the folder again brings its games back with their artwork, play time, and settings.",
+            action: "Remove folder", destructive: true) { [weak self] in
+                guard let self else { return }
+                await hub.library.removeFolder(id)
+                setFocus(.addLibraryFolder)
+            })
+    }
+
+    /// Shows `message` in the hub's alert, under `title`.
+    func showError(_ title: String, _ message: String) {
+        errorTitle = title
+        hub.launchError = message
+    }
+
+    func closeError() {
+        hub.launchError = nil
+        errorTitle = nil
     }
 
     /// Copies the SoundFont the player chose into the app, for engines started after this.
@@ -615,7 +698,7 @@ final class Navigator {
         _ = variantRevision
         guard let game = hub.library.game(id), let plugin = hub.library.plugin(for: game.engine) else { return nil }
         let paths = hub.library.paths
-        return plugin.variants(for: game, folder: paths.folder(for: id), dataDirectory: paths.dataDirectory(for: id))
+        return plugin.variants(for: game, folder: hub.library.folder(for: id), dataDirectory: paths.dataDirectory(for: id))
     }
 
     private func selectVariant(_ variant: String?, for id: GameID) {
@@ -754,7 +837,7 @@ final class Navigator {
         case .controlMethod:
             let fixed = ControlMethod.allCases.map { Choice(target: .controlMethodOption($0), title: $0.title, detail: $0.detail) }
             return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license:
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm:
             return []
         }
     }
@@ -765,7 +848,7 @@ final class Navigator {
         case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license: nil
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm: nil
         }
     }
 
@@ -829,15 +912,16 @@ final class Navigator {
         guard case let .button(button, pressed: true) = event else { return }
         // The alert covers everything else, and it shows no focus, so A and B both close it.
         if hub.launchError != nil {
-            if button == .confirm || button == .cancel { hub.launchError = nil }
+            if button == .confirm || button == .cancel { closeError() }
             return
         }
         // A system file picker covers the hub and takes no controller input, so presses mustn't reach the rows behind
         // it. B closes it.
-        if pickingSoundFont || runtimes.pickingFolder {
+        if pickingSoundFont || runtimes.pickingFolder || pickingLibraryFolder {
             if button == .cancel {
                 pickingSoundFont = false
                 runtimes.pickingFolder = false
+                pickingLibraryFolder = false
             }
             return
         }

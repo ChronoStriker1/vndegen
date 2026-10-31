@@ -214,3 +214,23 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.focus == .layoutButton)
     #expect(UserDefaults.standard.string(forKey: LibraryLayout.storageKey) == LibraryLayout.featured.rawValue)
 }
+
+@MainActor
+@Test func settingsListsEachAddedFolderWithItsButtons() async throws {
+    let (nav, _) = try await makeNavigator()
+    let added = nav.hub.library.paths.gamesRoot.deletingLastPathComponent().appendingPathComponent("Added", isDirectory: true)
+    try FileManager.default.createDirectory(at: added, withIntermediateDirectories: true)
+    try await nav.hub.addLibraryFolder(added)
+    let folder = try #require(nav.hub.library.folders.first)
+    nav.back()
+    nav.push(.settings)
+    let items = nav.rows().map(\.items)
+    #expect(items.prefix(4) == [[.back], [.openFolder], [.showLibraryFolder(folder.id), .removeLibraryFolder(folder.id)], [.addLibraryFolder]])
+    nav.activate(.removeLibraryFolder(folder.id))
+    guard case let .confirm(confirmation)? = nav.sheet else { Issue.record("no confirmation"); return }
+    // What Remove folder runs, awaited here rather than in the task the button starts.
+    nav.sheet = nil
+    await confirmation.perform()
+    #expect(nav.hub.library.folders.isEmpty)
+    #expect(FileManager.default.fileExists(atPath: added.path))
+}

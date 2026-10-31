@@ -26,6 +26,9 @@ public struct LibraryPaths: Sendable {
     }
 
     public var libraryFile: URL { support.appendingPathComponent("library.json") }
+    /// The games folders the player added, beside `gamesRoot`.
+    public var foldersFile: URL { support.appendingPathComponent("folders.json") }
+    /// A game's folder in `gamesRoot`. `LibraryStore.folder(for:)` finds a game in any library folder.
     public func folder(for id: GameID) -> URL { gamesRoot.appendingPathComponent(id.rawValue, isDirectory: true) }
     public func artworkDirectory(for id: GameID) -> URL {
         support.appendingPathComponent("Artwork/\(id.rawValue)", isDirectory: true)
@@ -37,21 +40,42 @@ public struct LibraryPaths: Sendable {
     public var runtimesDirectory: URL { support.appendingPathComponent("Runtimes", isDirectory: true) }
 }
 
-/// The game library. Folders on disk decide which games exist. library.json keeps everything the user or metadata added,
-/// so a game that is removed and copied back keeps its artwork, engine override, and lock.
+
+/// The game library. Folders on disk decide which games exist: each subfolder of the built-in games folder and of every
+/// folder the player added is a game. library.json keeps everything the user or metadata added, so a game that is
+/// removed and copied back keeps its artwork, engine override, and lock.
 @MainActor
 @Observable
 public final class LibraryStore {
     public let paths: LibraryPaths
     public let engines: [any EnginePlugin]
-    /// Games whose folder is present, most recently played first, then by title.
+    /// Games whose folder is present, or was when its library folder was last reached, most recently played first, then
+    /// by title.
     public private(set) var games: [Game] = []
+    /// The games folders the player added, in the order they were added. The built-in folder, `paths.gamesRoot`, isn't
+    /// among them.
+    public private(set) var folders: [LibraryFolder] = []
+    /// Why each added folder the last scan couldn't reach is unavailable. Its games stay in `games`.
+    public private(set) var folderProblems: [LibraryFolderID: String] = [:]
     private var records: [GameID: Game] = [:]
+    /// Where each added folder resolved to. A security scope opened there stays open from then until the player removes
+    /// the folder or the app quits, rather than around each scan and launch, because the game page, runtime package
+    /// checks, save sync, and Open in Files read game folders too.
+    @ObservationIgnored private var resolved: [LibraryFolderID: FolderAccess.Resolved] = [:]
+    @ObservationIgnored private var refreshing: Task<Void, Never>?
+    /// A deleted game folder goes to the Trash on a Mac. Tests turn it off, so they never fill the Trash of the Mac
+    /// they run on.
+    @ObservationIgnored var deletesToTrash = Platform.current == .macOS
+
+    /// How long a scan waits for an added folder to answer before calling it unavailable, so an offline share can't
+    /// hold up the whole library.
+    static let reachTimeout: Duration = .seconds(15)
 
     public init(paths: LibraryPaths = .standard, engines: [any EnginePlugin]) {
         self.paths = paths
         self.engines = engines
         records = (try? Self.load(paths.libraryFile)) ?? [:]
+        folders = (try? Self.loadFolders(paths.foldersFile)) ?? []
     }
 
     public func plugin(for id: EngineID?) -> (any EnginePlugin)? {
@@ -64,29 +88,88 @@ public final class LibraryStore {
     /// Every game the library remembers, including those whose folder is missing.
     public var allGames: [Game] { Array(records.values) }
 
-    /// Rescans the games folder and re-runs detection on every present game.
-    public func refresh() async {
-        let paths = paths, engines = engines
-        let scanned: [(GameID, EngineMatch?)] = await Task.detached(priority: .userInitiated) {
-            try? FileManager.default.createDirectory(at: paths.gamesRoot, withIntermediateDirectories: true)
-            let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.gamesRoot.path)) ?? []
-            return names.filter { name in
-                var isDir: ObjCBool = false
-                return !name.hasPrefix(".")
-                    && FileManager.default.fileExists(atPath: paths.gamesRoot.appendingPathComponent(name).path, isDirectory: &isDir)
-                    && isDir.boolValue
-            }.map { name in
-                let probe = FolderProbe(scanning: paths.gamesRoot.appendingPathComponent(name, isDirectory: true))
-                return (GameID(name), EngineDetector.detect(probe, using: engines))
-            }
-        }.value
+    /// The folder that holds `folder`'s games: the built-in folder for nil, or where an added folder resolved to. Nil for
+    /// a folder that was removed.
+    public func root(of folder: LibraryFolderID?) -> URL? {
+        guard let folder else { return paths.gamesRoot }
+        return resolved[folder]?.url ?? folders.first { $0.id == folder }?.url
+    }
 
-        for (id, match) in scanned {
-            records[id, default: Game(id: id)].detected = match
+    /// The game's own folder, in whichever library folder holds it.
+    public func folder(for id: GameID) -> URL {
+        guard let game = records[id], let root = root(of: game.libraryFolder) else { return paths.folder(for: id) }
+        return root.appendingPathComponent(game.folderName ?? id.rawValue, isDirectory: true)
+    }
+
+    /// Why the game can't be reached, when its library folder is unavailable.
+    public func unavailableReason(_ id: GameID) -> String? {
+        records[id]?.libraryFolder.flatMap { folderProblems[$0] }
+    }
+
+    /// The game whose folder is `name` in `folder`, nil for the built-in folder.
+    public func gameID(named name: String, in folder: LibraryFolderID?) -> GameID? {
+        records.values.first { $0.libraryFolder == folder && ($0.folderName ?? $0.id.rawValue) == name }?.id
+    }
+
+    /// Rescans every library folder and re-runs detection on every present game. Rescans run one after another.
+    public func refresh() async {
+        let previous = refreshing
+        let task = Task { await previous?.value; await scan() }
+        refreshing = task
+        await task.value
+    }
+
+    /// Adds a games folder the player picked. On iPhone and iPad, `url` is the picker's security-scoped URL.
+    public func addFolder(_ url: URL) async throws {
+        let candidate = Self.realPath(url)
+        for existing in [paths.gamesRoot] + folders.map(\.url) {
+            let other = Self.realPath(existing)
+            if candidate == other || candidate.hasPrefix(other + "/") || other.hasPrefix(candidate + "/") {
+                throw LibraryFolderError(message: existing == paths.gamesRoot
+                    ? "That folder is VNDegen's own games folder, or overlaps it."
+                    : "That folder is already in the library, or overlaps \(existing.lastPathComponent).")
+            }
         }
-        let present = Set(scanned.map(\.0))
-        games = records.values.filter { present.contains($0.id) }.sorted(by: Self.libraryOrder)
-        save()
+        let opened = FolderAccess.start(url)
+        let bookmark: Data
+        do {
+            bookmark = try FolderAccess.bookmark(for: url)
+        } catch {
+            if opened { FolderAccess.stop(url) }
+            throw error
+        }
+        let folder = LibraryFolder(url: url, bookmark: bookmark)
+        folders.append(folder)
+        resolved[folder.id] = FolderAccess.Resolved(url: url, scoped: opened)
+        saveFolders()
+        await refresh()
+    }
+
+    /// Takes an added folder out of the library. Its games leave the library and its files stay where they are. Their
+    /// records stay too, so adding the folder back brings back their artwork, play time, and settings.
+    public func removeFolder(_ id: LibraryFolderID) async {
+        folders.removeAll { $0.id == id }
+        folderProblems[id] = nil
+        if let access = resolved.removeValue(forKey: id), access.scoped { FolderAccess.stop(access.url) }
+        saveFolders()
+        await refresh()
+    }
+
+    /// Deletes the game's folder: to the Trash on a Mac, for good on iPhone and iPad. Nothing outside that folder is
+    /// touched, so the saves and artwork VNDegen keeps for the game stay, and its record stays as for any game whose
+    /// folder disappeared, so putting the folder back restores it. Refuses a folder that can't be reached, or that isn't
+    /// a real folder directly inside its library folder.
+    public func deleteFolder(of id: GameID) async throws {
+        guard let game = records[id], games.contains(where: { $0.id == id }) else {
+            throw LibraryFolderError(message: "That game isn't in the library.")
+        }
+        if let problem = unavailableReason(id) {
+            throw LibraryFolderError(message: "\(game.title)'s folder can't be reached. \(problem)")
+        }
+        guard let root = root(of: game.libraryFolder) else { throw LibraryFolderError(message: "\(game.title)'s library folder was removed.") }
+        let folder = folder(for: id), toTrash = deletesToTrash
+        try await Task.detached { try FolderAccess.delete(folder, inside: root, toTrash: toTrash) }.value
+        await refresh()
     }
 
     public func update(_ id: GameID, _ mutate: (inout Game) -> Void) {
@@ -122,8 +205,165 @@ public final class LibraryStore {
         guard let game = records[id] else { return nil }
         let data = paths.dataDirectory(for: id)
         try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
-        return GameLaunch(game: game, folder: paths.folder(for: id), dataDirectory: data, onExit: onExit)
+        return GameLaunch(game: game, folder: folder(for: id), dataDirectory: data, onExit: onExit)
     }
+
+    // MARK: Scanning
+
+    /// One library folder's game folders, as a scan found them.
+    struct Listing {
+        let folder: LibraryFolderID?
+        let root: URL
+        let names: [String]
+        /// False when the folder couldn't be reached, so `names` are the ones its last scan found.
+        let available: Bool
+        /// Shown in the ID of a game whose folder name another library folder already uses.
+        let label: String
+    }
+
+    private func scan() async {
+        let gamesRoot = paths.gamesRoot
+        let builtIn = await Task.detached {
+            try? FileManager.default.createDirectory(at: gamesRoot, withIntermediateDirectories: true)
+            return (try? FolderAccess.gameFolders(in: gamesRoot)) ?? []
+        }.value
+        var reached: [LibraryFolderID: FolderAccess.Reach] = [:]
+        await withTaskGroup(of: (LibraryFolderID, FolderAccess.Reach).self) { group in
+            for folder in folders { group.addTask { (folder.id, await self.reach(folder)) } }
+            for await (id, reach) in group { reached[id] = reach }
+        }
+
+        var listings = [Listing(folder: nil, root: gamesRoot, names: builtIn, available: true, label: "VNDegen")]
+        for index in folders.indices {
+            let folder = folders[index]
+            guard let reach = reached[folder.id] else { continue }
+            if let names = reach.names, let url = reach.url {
+                folders[index].url = url
+                if let refreshed = reach.refreshed { folders[index].bookmark = refreshed }
+                folders[index].lastSeen = names.sorted()
+                folderProblems[folder.id] = nil
+                listings.append(Listing(folder: folder.id, root: url, names: names, available: true, label: folder.name))
+            } else {
+                folderProblems[folder.id] = reach.problem ?? "The folder can't be reached."
+                listings.append(Listing(folder: folder.id, root: root(of: folder.id) ?? folder.url, names: folder.lastSeen,
+                                        available: false, label: folder.name))
+            }
+        }
+
+        let placed = Self.place(listings, in: &records)
+        let engines = engines
+        let probes = placed.filter(\.available).map { ($0.id, $0.url) }
+        let matches = await Task.detached {
+            probes.map { id, url in (id, EngineDetector.detect(FolderProbe(scanning: url), using: engines)) }
+        }.value
+        for (id, match) in matches { records[id]?.detected = match }
+        games = placed.compactMap { records[$0.id] }.sorted(by: Self.libraryOrder)
+        save()
+        saveFolders()
+    }
+
+    /// A game a scan placed in the library.
+    struct Placed {
+        let id: GameID
+        let url: URL
+        let available: Bool
+    }
+
+    /// Gives every game folder in `listings` its record, so IDs stay unique across library folders and stay the same
+    /// from scan to scan. A folder keeps the record that last held it. A folder new to the library takes the record whose
+    /// ID is its name when no present folder holds that record, which is how a game moved between library folders, or a
+    /// folder removed and added back, keeps its artwork and play time. Otherwise, when another library folder has a game
+    /// of the same name, its ID adds its library folder's name. Earlier listings win, and the built-in folder comes first.
+    static func place(_ listings: [Listing], in records: inout [GameID: Game]) -> [Placed] {
+        struct Key: Hashable { let folder: LibraryFolderID?; let name: String }
+        var held: [Key: GameID] = [:]
+        for game in records.values { held[Key(folder: game.libraryFolder, name: game.folderName ?? game.id.rawValue)] = game.id }
+
+        var placed: [Placed] = []
+        var claimed = Set<GameID>()
+        var unplaced: [(Listing, String)] = []
+        for listing in listings {
+            for name in listing.names {
+                if let id = held[Key(folder: listing.folder, name: name)], !claimed.contains(id) {
+                    claimed.insert(id)
+                    placed.append(Placed(id: id, url: listing.root.appendingPathComponent(name, isDirectory: true), available: listing.available))
+                } else if listing.available {
+                    unplaced.append((listing, name))
+                }
+            }
+        }
+        for (listing, name) in unplaced {
+            // A record can be taken over when nothing present holds it and it was made for a folder of this name.
+            func free(_ id: GameID) -> Bool {
+                guard !claimed.contains(id) else { return false }
+                guard let record = records[id] else { return true }
+                return (record.folderName ?? record.id.rawValue) == name
+            }
+            var id = GameID(name)
+            if !free(id) {
+                let base = "\(name) (\(listing.label))"
+                id = GameID(base)
+                var number = 2
+                while !free(id) {
+                    id = GameID("\(base) \(number)")
+                    number += 1
+                }
+            }
+            var game = records[id] ?? Game(id: id, title: name)
+            game.libraryFolder = listing.folder
+            game.folderName = id.rawValue == name ? nil : name
+            records[id] = game
+            claimed.insert(id)
+            placed.append(Placed(id: id, url: listing.root.appendingPathComponent(name, isDirectory: true), available: true))
+        }
+        return placed
+    }
+
+    /// Reaches an added folder within `reachTimeout`, keeping the security scope that reaching it opened.
+    private func reach(_ folder: LibraryFolder) async -> FolderAccess.Reach {
+        let current = resolved[folder.id]
+        let work = Task.detached { FolderAccess.reach(folder, current: current) }
+        guard let reach = await Self.value(of: work, within: Self.reachTimeout) else {
+            // The folder answers after the scan gave up on it. The next scan reaches it again, so close what this one opened.
+            Task.detached {
+                let late = await work.value
+                if late.opened, let url = late.url { FolderAccess.stop(url) }
+            }
+            return FolderAccess.Reach(problem: "The folder didn't answer. The drive or share that holds it may be offline.")
+        }
+        guard folders.contains(where: { $0.id == folder.id }) else {
+            // Removed while the scan reached it.
+            if reach.opened, let url = reach.url { FolderAccess.stop(url) }
+            return reach
+        }
+        if reach.names != nil, let url = reach.url, reach.opened || url != current?.url {
+            if let current, current.scoped { FolderAccess.stop(current.url) }
+            resolved[folder.id] = FolderAccess.Resolved(url: url, scoped: reach.opened)
+        }
+        return reach
+    }
+
+    /// `work`'s value, or nil once `timeout` passes. A task group can't do this, because it waits for every child and
+    /// awaiting a task's value ignores cancellation.
+    static func value<T: Sendable>(of work: Task<T, Never>, within timeout: Duration) async -> T? {
+        let (results, continuation) = AsyncStream<T?>.makeStream()
+        let timer = Task {
+            try? await Task.sleep(for: timeout)
+            continuation.yield(nil)
+            continuation.finish()
+        }
+        Task {
+            continuation.yield(await work.value)
+            continuation.finish()
+        }
+        for await result in results {
+            timer.cancel()
+            return result
+        }
+        return nil
+    }
+
+    private static func realPath(_ url: URL) -> String { url.standardizedFileURL.resolvingSymlinksInPath().path }
 
     private static func libraryOrder(_ a: Game, _ b: Game) -> Bool {
         switch (a.lastPlayedAt, b.lastPlayedAt) {
@@ -137,19 +377,47 @@ public final class LibraryStore {
     private func save() {
         do {
             try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            encoder.dateEncodingStrategy = .iso8601
-            try encoder.encode(Array(records.values)).write(to: paths.libraryFile, options: .atomic)
+            try Self.encoder.encode(Array(records.values)).write(to: paths.libraryFile, options: .atomic)
         } catch {
             assertionFailure("library save failed: \(error)")
         }
     }
 
-    private static func load(_ url: URL) throws -> [GameID: Game] {
+    private func saveFolders() {
+        do {
+            try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
+            try Self.encoder.encode(folders).write(to: paths.foldersFile, options: .atomic)
+        } catch {
+            assertionFailure("library folders save failed: \(error)")
+        }
+    }
+
+    private static var encoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private static var decoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    private static func load(_ url: URL) throws -> [GameID: Game] {
         let games = try decoder.decode([Game].self, from: Data(contentsOf: url))
         return Dictionary(games.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     }
+
+    private static func loadFolders(_ url: URL) throws -> [LibraryFolder] {
+        try decoder.decode([LibraryFolder].self, from: Data(contentsOf: url))
+    }
+}
+
+/// Why a library folder change or a game folder deletion was refused, in words the player reads.
+public struct LibraryFolderError: LocalizedError, Sendable {
+    public let message: String
+    public init(message: String) { self.message = message }
+    public var errorDescription: String? { message }
 }

@@ -115,6 +115,10 @@ public struct Game: Identifiable, Codable, Hashable, Sendable {
     /// button. Buttons missing here keep that layout. Nil follows the engine's default layout instead, so an empty
     /// mapping is the plain Xbox layout in an engine whose default is another.
     public var buttonMapping: [ControlInput: ControlAction]?
+    /// The added library folder that holds the game. Nil is the built-in games folder.
+    public var libraryFolder: LibraryFolderID?
+    /// The game's folder name, when it isn't its ID because another library folder has a game of the same name.
+    public var folderName: String?
 
     public var engine: EngineID? { engineOverride ?? detected?.engine }
 

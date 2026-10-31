@@ -35,7 +35,13 @@ public final class ArchiveImporter {
         public var keptArchives: [String] = []
     }
 
+    /// VNDegen's own games folder, where the archives under Ready to import sit.
     public let gamesRoot: URL
+    /// The library folder the game is unpacked into. It starts as `gamesRoot`. Extraction stages inside it, so the
+    /// finished folder moves into place without a copy.
+    public var destination: URL {
+        didSet { Self.removeLeftovers(in: stagingParent) }
+    }
     public private(set) var step: Step = .choosing {
         didSet { keepAwake(step == .extracting) }
     }
@@ -72,15 +78,20 @@ public final class ArchiveImporter {
 
     public init(gamesRoot: URL) {
         self.gamesRoot = gamesRoot
+        destination = gamesRoot
+        Self.removeLeftovers(in: stagingParent)
+    }
+
+    private var stagingParent: URL { destination.appendingPathComponent(".importing", isDirectory: true) }
+
+    private static func removeLeftovers(in stagingParent: URL) {
         let leftovers = (try? FileManager.default.contentsOfDirectory(at: stagingParent, includingPropertiesForKeys: nil)) ?? []
-        for url in leftovers where !Self.liveStagings.contains(url.standardizedFileURL) {
+        for url in leftovers where !liveStagings.contains(url.standardizedFileURL) {
             try? FileManager.default.removeItem(at: url)
         }
     }
 
-    private var stagingParent: URL { gamesRoot.appendingPathComponent(".importing", isDirectory: true) }
-
-    public var folderNameProblem: String? { GameFolderName.problem(with: folderName, in: gamesRoot) }
+    public var folderNameProblem: String? { GameFolderName.problem(with: folderName, in: destination) }
 
     /// Deletes the copies the system made for VNDegen among `urls`, for files from a drop or Open in VNDegen that
     /// nothing imports.
@@ -224,7 +235,7 @@ public final class ArchiveImporter {
         task = Task {
             do {
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-                try ArchiveExtractor.checkSpace(for: contents, on: gamesRoot)
+                try ArchiveExtractor.checkSpace(for: contents, on: destination)
                 let extracted = try await selection.read {
                     try await Self.extract(source, password: password, into: staging, total: contents) { progress in
                         Task { @MainActor in
@@ -267,8 +278,8 @@ public final class ArchiveImporter {
         let name = folderName.trimmingCharacters(in: .whitespaces)
         do {
             // Checked again because another import or the Files app may have taken the name meanwhile.
-            if let problem = GameFolderName.problem(with: name, in: gamesRoot) { throw ImportFailure(message: problem) }
-            try FileManager.default.moveItem(at: root, to: gamesRoot.appendingPathComponent(name, isDirectory: true))
+            if let problem = GameFolderName.problem(with: name, in: destination) { throw ImportFailure(message: problem) }
+            try FileManager.default.moveItem(at: root, to: destination.appendingPathComponent(name, isDirectory: true))
         } catch {
             discardStagings()
             fail(error, returningTo: .reviewing)

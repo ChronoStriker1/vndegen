@@ -49,6 +49,17 @@ public final class Hub {
         async let archives = LocalArchives.find(gamesRoot: library.paths.gamesRoot)
         await library.refresh()
         localArchives = await archives
+        matchMetadata()
+    }
+
+    /// Adds a games folder the player picked, then looks up metadata for its games.
+    public func addLibraryFolder(_ url: URL) async throws {
+        try await library.addFolder(url)
+        matchMetadata()
+    }
+
+    /// Looks up metadata for games that have none, without holding up the caller.
+    private func matchMetadata() {
         guard matching == nil else { return }
         let unmatched = library.games.filter { $0.metadata == nil }.map(\.id)
         guard !unmatched.isEmpty else { return }
@@ -68,6 +79,10 @@ public final class Hub {
             launchError = "No engine is set for \(game.title). Pick one on the game's page."
             return
         }
+        if let problem = library.unavailableReason(id) {
+            launchError = "\(game.title) is in \(folderName(of: game.libraryFolder)), which VNDegen can't reach. \(problem)"
+            return
+        }
         guard plugin.descriptor.platforms.contains(.current) else {
             launchError = "\(plugin.descriptor.displayName) does not run on this device yet."
             return
@@ -81,6 +96,11 @@ public final class Hub {
         } catch {
             launchError = "\(game.title) failed to start: \(error.localizedDescription)"
         }
+    }
+
+    /// The name of the library folder `folder`, nil for the built-in one.
+    public func folderName(of folder: LibraryFolderID?) -> String {
+        library.folders.first { $0.id == folder }?.name ?? library.paths.gamesRoot.lastPathComponent
     }
 
     public func endSession() {

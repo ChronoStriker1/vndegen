@@ -525,3 +525,53 @@ struct MetadataSearchSheet: View {
         .contentShape(.rect)
     }
 }
+
+// MARK: Confirmation
+
+/// A question asked before a change the player might not mean, such as removing a library folder or deleting a game's
+/// folder. Cancel has the focus at first, so a stray press of A changes nothing.
+final class Confirmation {
+    let id = UUID()
+    let title: String
+    let message: String
+    /// The button that goes ahead, such as "Remove folder".
+    let action: String
+    /// Draws that button in red, for a change that removes or deletes something.
+    let destructive: Bool
+    let perform: @MainActor () async -> Void
+
+    init(title: String, message: String, action: String, destructive: Bool, perform: @escaping @MainActor () async -> Void) {
+        self.title = title
+        self.message = message
+        self.action = action
+        self.destructive = destructive
+        self.perform = perform
+    }
+}
+
+struct ConfirmationSheet: View {
+    let confirmation: Confirmation
+
+    var body: some View {
+        SheetScaffold(title: confirmation.title, escapeCloses: true) {
+            VStack(alignment: .leading, spacing: 22) {
+                Text(confirmation.message)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                HStack(spacing: 12) {
+                    HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
+                    HubButton(target: .confirmCancel) { Text("Cancel") }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 22)
+        }
+        .presentationDetents([.medium])
+        #if os(macOS)
+        .frame(minWidth: 480, minHeight: 280)
+        #endif
+    }
+}

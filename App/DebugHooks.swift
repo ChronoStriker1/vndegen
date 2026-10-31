@@ -42,6 +42,8 @@ import AppKit
 ///   -layoutSize 320x480      lays the whole app out in a frame of that size in the middle of the screen, as in a window
 ///                            of that size, iOS only. Unlike -windowSize it takes any size, below the smallest window
 ///                            iPadOS allows too, and needs no resizing, but the frame has no window controls
+///   -addLibraryFolder <path>   adds that folder to the library at launch, unless it's already there, as Add folder in
+///                            Settings would. On iPhone and iPad it can only reach folders the app may read without a picker
 ///   -ignoreOcclusion YES     web engine pages keep running while no window shows, as on a Mac whose screen is locked, macOS only
 enum DebugHooks {
     static func run(_ hub: Hub) async {
@@ -58,6 +60,12 @@ enum DebugHooks {
         #endif
         if UserDefaults.standard.bool(forKey: "seedDemoLibrary") {
             await DemoLibrary.seed(hub.library)
+        }
+        if let path = UserDefaults.standard.string(forKey: "addLibraryFolder") {
+            let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
+            if !hub.library.folders.contains(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
+                do { try await hub.addLibraryFolder(url) } catch { NSLog("addLibraryFolder failed: %@", error.localizedDescription) }
+            }
         }
     }
 
