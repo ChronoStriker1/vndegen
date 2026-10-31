@@ -156,6 +156,14 @@ static void menu_rect(S3 *s, int *x, int *y, int *w, int *h) {
     if (*x + *w > right) *x = right - *w > 0 ? right - *w : 0;
 }
 
+// The centre of menu item i on screen, for test tools that tap menus.
+void s3_menu_item_center(S3 *s, int i, int *x, int *y) {
+    int mx, my, mw, mh;
+    menu_rect(s, &mx, &my, &mw, &mh);
+    *x = mx + mw / 2 - s->viewX;
+    *y = my + 4 + i * menu_row_height(s) + menu_row_height(s) / 2 - s->viewY;
+}
+
 static void menu_draw(S3 *s) {
     int x, y, w, h;
     menu_rect(s, &x, &y, &w, &h);

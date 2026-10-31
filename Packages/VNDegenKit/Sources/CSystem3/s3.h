@@ -280,6 +280,7 @@ void s3_msg_newline(S3 *s);
 void s3_msg_clear(S3 *s);
 // CP932 text as the window shows it (hiragana for half-width kana, full-width ASCII under ZH 0), in UTF-8.
 char *s3_display_utf8(S3 *s, const char *sjis);
+void s3_menu_item_center(S3 *s, int i, int *x, int *y);
 void s3_msg_select_window(S3 *s, int n, int frame, int noClear, int restore);
 void s3_menu_open(S3 *s);
 bool s3_menu_update(S3 *s);   // true when a choice was made or cancelled

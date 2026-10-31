@@ -7,7 +7,7 @@
 // From --auto MS on, the autopilot presses Return at message waits, and once a second at other waits, and answers menus: a pending pick first, then the
 // first --prefer text an item contains, then a seeded random item, never one containing an --avoid text.
 // With --repl, after --ms it reads commands from FIFO, one per line, and prints "ok" after each:
-//   run MS | click X Y | rclick X Y | key VK | shot FILE | where | trace 0/1 | var FROM [TO] | arr VAR COUNT | quit
+//   run MS | click X Y | tap X Y | rclick X Y | key VK | shot FILE | where | trace 0/1 | var FROM [TO] | arr VAR COUNT | quit
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 // It prints the game's problem, if one stopped it, and exits 1 then.
 #include "vns3.h"
@@ -75,7 +75,9 @@ static int choose(S3 *s, const char *pick, bool autopilot, int *turn, bool *pick
     if (choice >= 0) {
         printf("%llu ms: menu", (unsigned long long)s->clockMs);
         for (int i = 0; i < count; i++) printf(" %s[%s]", i == choice ? "*" : "", items[i]);
-        printf("\n");
+        int cx, cy;
+        s3_menu_item_center(s, choice, &cx, &cy);
+        printf(" @%d,%d\n", cx, cy);
         for (int i = 0; i < count; i++) if (strstr(items[i], "\xef\xbf\xbd")) { printf("  raw %d zh %d:", i, s->menu[i].zh); for (const unsigned char *q = (const unsigned char *)s->menu[i].text; *q; q++) printf(" %02x", *q); printf("\n"); }
     }
     for (int i = 0; i < count; i++) free(items[i]);
@@ -181,6 +183,11 @@ int main(int argc, char **argv) {
             else if (!strcmp(cmd, "var")) { for (int v = x; v <= (y > x ? y : x); v++) printf("v%d=%u ", v, s3_var_get(s, (u16)v)); printf("\n"); }
             else if (!strcmp(cmd, "run")) ms = x;
             else if (!strcmp(cmd, "key")) { vns3_key(g, x, true); ok = vns3_frame(g, 16) || !vns3_problem(g); for (int k = 0; k < 5; k++) vns3_frame(g, 16); vns3_key(g, x, false); }
+            else if (!strcmp(cmd, "tap")) { // a touch: move, down and up between two frames, as iOS delivers it
+                vns3_mouse_move(g, x, y);
+                vns3_mouse_button(g, VNS3_MOUSE_LEFT, true);
+                vns3_mouse_button(g, VNS3_MOUSE_LEFT, false);
+            }
             else if (!strcmp(cmd, "click") || !strcmp(cmd, "rclick")) {
                 int b = cmd[0] == 'r' ? VNS3_MOUSE_RIGHT : VNS3_MOUSE_LEFT;
                 vns3_mouse_move(g, x, y);
