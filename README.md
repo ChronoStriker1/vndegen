@@ -151,6 +151,8 @@ Steam and VNDB work without setup. SteamGridDB and IGDB need keys, entered in Se
 
 A game page's About section takes its description, genres, and screenshots from Steam, or from IGDB when Steam has none. The match you confirm in Find metadata supplies the other details, and the remaining sources fill any gaps.
 
+The screenshots fill a grid whose column count follows the window: two on an iPhone held upright, and more on an iPad or a wide Mac window, where tiles drawn wider than Steam's thumbnails load the full-size image. A long list shows two rows and a Show all button. A tap, a click, or A on a screenshot opens it full screen. Swipes, the arrow buttons and keys, and a controller's left and right move between screenshots, and B, Escape, or the close button go back to the page.
+
 ## Ludusavi
 
 VNDegen reaches your Ludusavi backups on the SMB share that Ludusavi's cloud sync uses. It has rclone's own SMB code built in, the code Ludusavi's rclone runs on the PCs, so it works the same on iPhone, iPad, and Mac with nothing to install.

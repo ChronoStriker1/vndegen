@@ -112,6 +112,13 @@ struct VNDegenApp: App {
                    saveSync: SaveSyncService(library: library))
     }()
 
+    init() {
+        // Game pages load screenshots through AsyncImage, which caches in the shared URL cache. Its default holds 512 KB
+        // in memory and skips any response over a twentieth of its disk space, which a 1920 by 1080 Steam screenshot,
+        // about 550 KB, can exceed, so the full-screen viewer would download each one again.
+        URLCache.shared = URLCache(memoryCapacity: 32 << 20, diskCapacity: 256 << 20)
+    }
+
     var body: some Scene {
         #if os(macOS)
         // One window only. The hub and its play session are app-wide, and a second window would try to host the same

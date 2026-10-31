@@ -95,10 +95,18 @@ private struct LibraryContainer: View {
             }
         }
         .animation(.smooth(duration: 0.2), value: nav.checkingSaves)
-        .sheet(item: $nav.sheet) { sheet in
+        .sheet(item: $nav.presentedSheet) { sheet in
             sheetContent(sheet)
                 .environment(hub)
                 .environment(nav)
+        }
+        .overlay {
+            ZStack {
+                if case let .screenshots(viewer)? = nav.sheet {
+                    ScreenshotViewerView(viewer: viewer).transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: nav.sheet?.id)
         }
         .alert(nav.errorTitle ?? "Can't launch", isPresented: Binding(get: { hub.launchError != nil }, set: { if !$0 { nav.closeError() } })) {
             Button("OK") {}
@@ -198,6 +206,9 @@ private struct LibraryContainer: View {
             }
         case let .confirm(confirmation):
             ConfirmationSheet(confirmation: confirmation)
+        // Shown by the overlay above instead.
+        case .screenshots:
+            EmptyView()
         case let .license(request):
             RuntimeLicenseSheet(request: request)
                 .presentationDetents([.large])
