@@ -567,24 +567,50 @@
         }
     }, true);
 
-    // Frees the lost Effekseer context and its effects. An effect still loading would go on, when its file or a texture
-    // arrives, into the released context, so its callbacks do nothing from now on. Deleting GL objects that went with
-    // the lost context only sets error flags, which are cleared so nothing reads them as a later call's.
+    // Frees the lost Effekseer context and every effect it made, including ones a plugin loaded itself and ones still
+    // waiting for a file or texture. Their callbacks do nothing from now on, so nothing that arrives later reaches the
+    // released context or reports an error for it. Deleting GL objects that went with the lost context only sets error
+    // flags, which are cleared so nothing reads them as a later call's.
     function retireEffekseer(graphics) {
         const lost = graphics._effekseer, gl = graphics._app.renderer.gl;
-        const effects = window.EffectManager ? Object.values(EffectManager._cache) : [];
-        if (window.EffectManager) EffectManager._cache = {};
+        const effects = new Set(lost && lost.vndegenEffects);
+        if (window.EffectManager) {
+            for (const effect of Object.values(EffectManager._cache)) if (effect) effects.add(effect);
+            EffectManager._cache = {};
+        }
+        if (lost) lost.vndegenRetired = true;
         for (const effect of effects) {
-            if (!effect) continue;
             effect._load = effect._update = effect._reload = () => {};
             effect.onload = effect.onerror = null;
         }
         if (!lost) return;
-        try {
-            for (const effect of effects) if (effect && effect.isLoaded && effect.nativeptr) lost.releaseEffect(effect);
-            effekseer.releaseContext(lost);
-        } catch (e) { /* already gone */ }
+        for (const effect of effects) {
+            if (effect.context !== lost || !effect.nativeptr) continue;
+            // releaseEffect only warns about an effect still waiting for its textures, which holds native memory too.
+            effect.isLoaded = true;
+            try { lost.releaseEffect(effect); } catch (e) { /* already gone */ }
+        }
+        try { effekseer.releaseContext(lost); } catch (e) { /* already gone */ }
         for (let i = 0; i < 16 && gl.getError() !== gl.NO_ERROR; i++);
+    }
+
+    // Each Effekseer context keeps the effects it loads, for retireEffekseer. Their load and error callbacks are
+    // wrapped as they are passed in, as Effekseer hands them on to its loaders by value.
+    function trackEffects(context) {
+        const effects = context.vndegenEffects = new Set();
+        const loadEffect = context.loadEffect, releaseEffect = context.releaseEffect;
+        if (typeof loadEffect !== 'function' || typeof releaseEffect !== 'function') return;
+        context.loadEffect = function (...args) {
+            const live = args.map((arg) => typeof arg !== 'function' ? arg
+                : function () { if (!context.vndegenRetired) return arg.apply(this, arguments); });
+            const effect = loadEffect.apply(this, live);
+            if (effect) effects.add(effect);
+            return effect;
+        };
+        context.releaseEffect = function (effect) {
+            effects.delete(effect);
+            return releaseEffect.apply(this, arguments);
+        };
     }
 
     document.addEventListener('load', () => {
@@ -596,6 +622,13 @@
                     this.vndegenContext = contextGeneration;
                 }
                 return render.apply(this, arguments);
+            });
+        }
+        if (window.effekseer) {
+            wrap(effekseer, 'createContext', (createContext) => function () {
+                const context = createContext.apply(this, arguments);
+                if (context) trackEffects(context);
+                return context;
             });
         }
         // MV's animations are sprites, which PIXI restores.

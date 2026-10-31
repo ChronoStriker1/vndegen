@@ -12,12 +12,20 @@ private let page = """
         init() { if (this.fails) throw new Error('no context'); }
         setRestorationOfStatesFlag() {}
         check() { if (!this.nativeptr) throw new Error('released context ' + this.id); }
-        loadEffect(name) { this.check(); return new Effect(this, name); }
-        releaseEffect(effect) { this.check(); effekseer.releasedEffects.push(effect.name); effect.nativeptr = null; }
+        loadEffect(name, scale, onload, onerror) { this.check(); return new Effect(this, name, onerror); }
+        // Like Effekseer's, this only warns about an effect still waiting for its textures.
+        releaseEffect(effect) {
+            this.check();
+            if (!effect.isLoaded) return;
+            effekseer.releasedEffects.push(effect.name);
+            effect.nativeptr = null;
+        }
         play(effect) { this.check(); return { context: this, get exists() { this.context.check(); return true; }, stop() { this.context.check(); } }; }
     }
     class Effect {
-        constructor(context, name) { this.context = context; this.name = name; this.isLoaded = false; this.nativeptr = 0; }
+        constructor(context, name, onerror) {
+            Object.assign(this, { context, name, onerror, isLoaded: false, nativeptr: 0 });
+        }
         // A texture that arrives later reloads the effect in its context.
         _update() { this.context.check(); this.isLoaded = true; this.nativeptr = 1; }
     }
@@ -47,7 +55,6 @@ private let page = """
             }
         },
     };
-    Graphics._createEffekseerContext();
     window.EffectManager = {
         _cache: {},
         load(name) { return this._cache[name] || (this._cache[name] = Graphics._effekseer && Graphics._effekseer.loadEffect(name)); },
@@ -86,6 +93,7 @@ private let page = """
     let result = try await webView.callAsyncJavaScript("""
         // The engine's scripts finish loading, which is when rpgmaker.js wraps what they define.
         document.dispatchEvent(new Event('load'));
+        Graphics._createEffekseerContext();
         const restore = async () => {
             const lose = gl.getExtension('WEBGL_lose_context');
             const restored = new Promise((resolve) => canvas.addEventListener('webglcontextrestored', resolve, { once: true }));
@@ -97,9 +105,15 @@ private let page = """
         const layer = new Tilemap.Layer();
         layer._needsTexturesUpdate = true;
         layer.render();
-        // One effect has loaded, another still waits for a texture.
+        // One effect has loaded. Another has its native effect and still waits for a texture, and so does one a plugin
+        // loaded itself, which keeps the error callback it was given.
         EffectManager.load('slash')._update();
         const pending = EffectManager.load('mist');
+        pending.nativeptr = 5;
+        let oldError = false;
+        const direct = Graphics._effekseer.loadEffect('direct', 1, null, () => { oldError = true; });
+        direct.nativeptr = 6;
+        const reportError = direct.onerror;
         const playing = new Sprite_Animation(), drawn = new Sprite_Animation(), ended = new Sprite_Animation();
         for (const animation of [playing, drawn, ended]) {
             animation.setup({ effectName: 'slash' });
@@ -124,6 +138,8 @@ private let page = """
         ended.destroy();
         late.checkEnd();
         pending._update();
+        direct._update();
+        reportError();
         playing.update();
         waiting.update();
         const after = Graphics._effekseer.id, cache = Object.keys(EffectManager._cache).sort();
@@ -134,7 +150,7 @@ private let page = """
             uploads: layer.uploads, after, cache, releasedContexts: effekseer.releasedContexts,
             releasedEffects: effekseer.releasedEffects, playing: playing._handle === null, drawn: drawn.drew,
             late: late.ended, steady: steady.sawHandle === true, reloaded: waiting._effect.context.id,
-            keptApp: Graphics._app === app, effekseerAfterFailure: Graphics._effekseer, glError: gl.getError(),
+            oldError, keptApp: Graphics._app === app, effekseerAfterFailure: Graphics._effekseer, glError: gl.getError(),
         };
         """, arguments: [:], contentWorld: .page) as? [String: Any]
     let values = try #require(result)
@@ -144,10 +160,12 @@ private let page = """
     // Only the effect the waiting animation loaded again is cached, in the new context.
     #expect(values["cache"] as? [String] == ["fire"])
     #expect(values["reloaded"] as? Int == 2)
-    // The lost context and its loaded effects are freed, both times. The second context's cache held only 'fire',
-    // which had not loaded.
+    // The lost context and every effect holding native memory are freed, both times, including effects still waiting
+    // for textures and one a plugin loaded. The second context held only 'fire', which had not loaded at all.
     #expect(values["releasedContexts"] as? [Int] == [1, 2])
-    #expect(values["releasedEffects"] as? [String] == ["slash"])
+    #expect(values["releasedEffects"] as? [String] == ["slash", "mist", "direct"])
+    // An old request's error arriving after the restore reports nothing.
+    #expect(values["oldError"] as? Bool == false)
     #expect(values["playing"] as? Bool == true)
     #expect(values["drawn"] as? Bool == false)
     #expect(values["late"] as? Bool == true)
