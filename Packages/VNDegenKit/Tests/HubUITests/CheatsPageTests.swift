@@ -4,6 +4,7 @@ import VNCore
 
 @MainActor private final class FakeCheats: CheatSession {
     let features: CheatFeatures
+    let variableRange = -999...999
     var current: CheatState
     var performed: [CheatAction] = []
     var applied: [CheatSettings] = []
@@ -123,11 +124,27 @@ import VNCore
     keyboard.press(.done)
     await settle()
     #expect(page.keyboard == nil && page.variable(12)?.value == .integer(250))
-    page.select(.variable(12))
-    page.keyboard?.replace(with: "lots")
-    page.keyboard?.press(.done)
+    for typed in ["lots", "1000"] {
+        page.select(.variable(12))
+        page.keyboard?.replace(with: typed)
+        page.keyboard?.press(.done)
+        await settle()
+        #expect(page.status?.isError == true && cheats.performed.count == 1)
+    }
+}
+
+@MainActor @Test func steppingStopsAtTheEndsOfWhatAVariableHolds() async {
+    let cheats = FakeCheats(state: CheatState(inGame: true, variables: [CheatVariable(id: 1, name: "", value: .integer(999))]))
+    let page = await page(cheats)
+    page.show(.variables)
+    for _ in 0..<3 { _ = page.handle(.down) }
+    #expect(page.isFocused(.variable(1)))
+    _ = page.handle(.right)
     await settle()
-    #expect(page.status?.isError == true && cheats.performed.count == 1)
+    #expect(cheats.performed.isEmpty)
+    _ = page.handle(.left)
+    await settle()
+    #expect(cheats.performed == [.setVariable(id: 1, .integer(998))])
 }
 
 @MainActor @Test func onTheTitleScreenOnlyTheSettingsShow() async {

@@ -26,9 +26,12 @@ private func engine(mv: Bool = false) -> String {
     Game_Player.prototype.canEncounter = function () { return true; };
     Game_Player.prototype.isThrough = function () { return false; };
     function Scene_Title() {}
+    function Scene_Options() {}
     function Scene_Map() {}
     var SceneManager = {
-        run(scene) { this._scene = new scene(); },
+        run(scene) { this.goto(scene); },
+        goto(scene) { this._scene = new scene(); this.onSceneStart(); },
+        onSceneStart() {},
         \(mv ? "_getTimeInMsWithoutMobileSafari() { return window.now; }," : "determineRepeatNumber() { return 1; },")
     };
     window.now = 1000;
@@ -89,8 +92,17 @@ private func engine(mv: Bool = false) -> String {
     _ = try await page.run("SceneManager.run(Scene_Title)")
     #expect(try await cheats.state() == CheatState(inGame: false))
     await #expect(throws: RPGMakerCheatError.self) { try await cheats.perform(.addGold(100)) }
+    // The title screen's options and load screens hold the title's game objects too.
+    _ = try await page.run("SceneManager.goto(Scene_Options)")
+    #expect(try await cheats.state().inGame == false)
 
-    _ = try await page.run("SceneManager.run(Scene_Map)")
+    _ = try await page.run("SceneManager.goto(Scene_Map)")
+    #expect(try await cheats.state().inGame)
+    _ = try await page.run("SceneManager.goto(Scene_Options)")
+    #expect(try await cheats.state().inGame)
+    _ = try await page.run("SceneManager.goto(Scene_Title)")
+    #expect(try await cheats.state().inGame == false)
+    _ = try await page.run("SceneManager.goto(Scene_Map)")
     let state = try await cheats.state()
     #expect(state.inGame && state.gold == 50 && state.currencyUnit == "G")
     #expect(state.party == [CheatPartyMember(name: "Rathi", hp: 40, maxHP: 100, mp: 10, maxMP: 30),
@@ -160,6 +172,17 @@ private func engine(mv: Bool = false) -> String {
     #expect(try await page.run("[\(actor).hp, \(actor).mp].join()") as? String == "100,30")
     // Enemies take damage as before.
     #expect(try await page.run("(() => { const enemy = new Game_BattlerBase(); enemy.mhp = 50; enemy.setHp(20); return enemy.hp; })()") as? Int == 20)
+}
+
+@Test @MainActor func aPartyStartsFullWhenTheGameStartsWithKeepingItHealthyOn() async throws {
+    var settings = CheatSettings()
+    settings.keepsPartyHealthy = true
+    let page = try await TestPage(settings: settings)
+    _ = try await page.run("SceneManager.run(Scene_Title)")
+    #expect(try await page.run("$gameParty.allMembers()[0].hp") as? Int == 40)
+    // A save loads its own HP and MP, and the map that starts after it fills them.
+    _ = try await page.run("SceneManager.goto(Scene_Map)")
+    #expect(try await page.run("$gameParty.allMembers().map((a) => a.hp + '/' + a.mp).join()") as? String == "100/30,100/30")
 }
 
 @Test @MainActor func mvRunsItsClockFasterAtHigherSpeeds() async throws {

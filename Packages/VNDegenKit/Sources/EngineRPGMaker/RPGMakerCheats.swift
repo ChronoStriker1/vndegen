@@ -14,6 +14,9 @@ final class RPGMakerCheats: CheatSession {
     let features: CheatFeatures = [.gold, .restoreParty, .items, .keepPartyHealthy, .noEncounters, .walkThroughWalls,
                                    .speed, .experience, .variables, .switches]
 
+    /// JavaScript's safe integers. Past them a number no longer holds every whole value.
+    let variableRange = -9_007_199_254_740_991...9_007_199_254_740_991
+
     func state() async throws -> CheatState {
         guard let json = try await call("return __vndegen.cheats.state()") as? String else { throw RPGMakerCheatError.noAnswer }
         return try Self.state(fromJSON: Data(json.utf8))

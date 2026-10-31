@@ -178,7 +178,10 @@ final class CheatsPage {
         case .speed: change { $0.speed = Self.stepped(CheatSettings.speeds, from: $0.speed, by: step) }
         case .experience: change { $0.experienceRate = Self.stepped(CheatSettings.experienceRates, from: $0.experienceRate, by: step) }
         case let .variable(id):
-            if case let .integer(value)? = variable(id)?.value { setVariable(id, to: .integer(value + step)) }
+            guard case let .integer(value)? = variable(id)?.value else { return }
+            let range = cheats.variableRange
+            let stepped = value.addingReportingOverflow(step)
+            if !stepped.overflow, range.contains(stepped.partialValue) { setVariable(id, to: .integer(stepped.partialValue)) }
         default: break
         }
     }
@@ -273,8 +276,10 @@ final class CheatsPage {
     private func finishEditing(_ variable: CheatVariable, typed: String) {
         switch variable.value {
         case .integer:
-            guard let number = Int(typed.trimmingCharacters(in: .whitespaces)) else {
-                status = Status(text: "\(variable.id) takes a whole number", isError: true)
+            let range = cheats.variableRange
+            guard let number = Int(typed.trimmingCharacters(in: .whitespaces)), range.contains(number) else {
+                status = Status(text: "Variable \(variable.id) takes a whole number from \(range.lowerBound.formatted()) to \(range.upperBound.formatted())",
+                                isError: true)
                 return
             }
             setVariable(variable.id, to: .integer(number))

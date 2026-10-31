@@ -5,6 +5,9 @@
 
     let settings = __VNDEGEN_CHEATS__;
     let installed = false;
+    // Whether the game objects belong to a game the player started or loaded. The boot scene sets up a new game for the
+    // title screen, and starting or loading one from there replaces it, as returning to the title does again.
+    let playing = false;
 
     // The cheats that stay on wrap engine methods once every plugin has loaded, so they wrap what the plugins left.
     // Both MV and MZ start the boot scene through SceneManager.run after the window's load event, which waits for
@@ -23,6 +26,16 @@
     function install() {
         if (installed || !window.SceneManager || !window.Game_BattlerBase || !window.Game_Player || !window.Game_Actor) return;
         installed = true;
+        wrap(SceneManager, 'onSceneStart', (onSceneStart) => function () {
+            const scene = this._scene;
+            if (window.Scene_Title && scene instanceof Scene_Title) playing = false;
+            if (window.Scene_Map && scene instanceof Scene_Map) {
+                playing = true;
+                // A party from a new game or a save starts full too.
+                if (settings.keepsPartyHealthy) fillParty();
+            }
+            return onSceneStart.apply(this, arguments);
+        });
         const battler = Game_BattlerBase.prototype;
         const keepsFull = (target) => settings.keepsPartyHealthy && target.isActor && target.isActor();
         wrap(battler, 'setHp', (setHp) => function (hp) {
@@ -71,11 +84,8 @@
         if (typeof original === 'function') owner[name] = make(original);
     }
 
-    // Starting or loading a game replaces what the title screen's game objects hold.
     function inGame() {
-        const scene = window.SceneManager && SceneManager._scene;
-        return !!(scene && window.$gameParty && window.$gameVariables && window.$dataSystem
-            && !(window.Scene_Boot && scene instanceof Scene_Boot) && !(window.Scene_Title && scene instanceof Scene_Title));
+        return playing && !!(window.$gameParty && window.$gameVariables && window.$dataSystem);
     }
 
     function party() {

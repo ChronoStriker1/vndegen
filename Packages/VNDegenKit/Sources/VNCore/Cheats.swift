@@ -6,6 +6,8 @@ import Foundation
 public protocol CheatSession: AnyObject {
     /// What this game can do. The page shows nothing else.
     var features: CheatFeatures { get }
+    /// The whole numbers a variable can hold.
+    var variableRange: ClosedRange<Int> { get }
     /// The game's state now.
     func state() async throws -> CheatState
     func perform(_ action: CheatAction) async throws

@@ -111,6 +111,10 @@ struct PlayerView: View {
             OrientationLock.apply(orientation)
             #endif
         }
+        // Typing on the Cheats page's keyboard reaches its text field rather than the menu, as in the hub's sheets.
+        .onChange(of: menu.page == .cheats && menu.cheats?.keyboard != nil) { _, typing in
+            if menu.isOpen { hub.input.translatesKeyboard = !typing }
+        }
         .onChange(of: isCovered, initial: true) { _, covered in
             applyInputMode()
             if covered {
