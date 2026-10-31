@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 import PhotosUI
 import UniformTypeIdentifiers
 import VNCore
@@ -314,11 +315,7 @@ struct ArtworkEditorSheet: View {
                 ForEach(Array(editor.candidates.enumerated()), id: \.element.id) { index, candidate in
                     let target = Navigator.Target.artworkCandidate(index)
                     Button { nav.select(target) } label: {
-                        AsyncImage(url: candidate.thumbnail ?? candidate.url) { image in
-                            image.resizable().aspectRatio(contentMode: slot == .logo ? .fit : .fill)
-                        } placeholder: {
-                            Theme.surface
-                        }
+                        PickerThumbnail(candidate: candidate, contentMode: slot == .logo ? .fit : .fill)
                         .aspectRatio(aspect, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .clipShape(.rect(cornerRadius: 8, style: .continuous))
@@ -364,6 +361,43 @@ struct ArtworkEditorSheet: View {
             editor.error = nil
         } catch {
             editor.error = "Couldn't import that file: \(error.localizedDescription)"
+        }
+    }
+}
+
+/// Uses the fingerprint's bytes for this sheet, with no second request or shared image store.
+private struct PickerThumbnail: View {
+    let candidate: ArtworkCandidate
+    let contentMode: ContentMode
+    @State private var decoded: CGImage?
+
+    var body: some View {
+        if let data = candidate.thumbnailData {
+            Group {
+                if let decoded {
+                    Image(decorative: decoded, scale: 1).resizable().aspectRatio(contentMode: contentMode)
+                } else {
+                    Theme.surface
+                }
+            }
+            .task(id: candidate.id) {
+                decoded = await Task.detached(priority: .userInitiated) { () -> CGImage? in
+                    guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
+                    else { return nil }
+                    return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                        kCGImageSourceCreateThumbnailFromImageAlways: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                        kCGImageSourceThumbnailMaxPixelSize: 512,
+                        kCGImageSourceShouldCacheImmediately: true,
+                    ] as CFDictionary)
+                }.value
+            }
+        } else {
+            AsyncImage(url: candidate.thumbnail ?? candidate.url) { image in
+                image.resizable().aspectRatio(contentMode: contentMode)
+            } placeholder: {
+                Theme.surface
+            }
         }
     }
 }

@@ -263,6 +263,31 @@ private func picture(_ seed: Int, width: Int, height: Int) -> Data {
     #expect(capsules.map(\.source) == [.steamGridDB, .steam], "IGDB's copy of Steam's capsule is hidden")
 }
 
+@Test @MainActor func fingerprintedThumbnailsAreReturnedForDisplay() async throws {
+    let steam = picture(1, width: 300, height: 450), other = picture(2, width: 267, height: 400)
+    let network = StubNetwork(images: { url in
+        switch url.host {
+        case "shared.akamai.steamstatic.com", "images.igdb.com": steam
+        case "cdn2.steamgriddb.com": other
+        default: nil
+        }
+    })
+    let service = MetadataService(credentials: MemoryCredentials(allKeys), http: network.http)
+    var game = Game(id: GameID("No Socks RPG"))
+    game.metadata = GameMetadata(refs: [ExternalRef(source: .steam, id: "4929970"), ExternalRef(source: .igdb, id: "411478"),
+                                        ExternalRef(source: .steamGridDB, id: "5519261")])
+
+    let candidates = await service.artworkCandidates(for: game, slot: .capsule)
+
+    #expect(candidates.map(\.thumbnailData) == [other, steam])
+    for candidate in candidates {
+        let data = try #require(candidate.thumbnailData)
+        #expect(CGImageSourceCreateWithData(data as CFData, nil) != nil, "the grid can decode the retained bytes")
+        let url = candidate.thumbnail ?? candidate.url
+        #expect(network.requests(to: url.host!).filter { $0.url == url && $0.httpMethod == "GET" }.count == 1)
+    }
+}
+
 @Test @MainActor func artworkCandidatesKeepOneSourcesLookalikes() async throws {
     let network = StubNetwork(images: { url in
         switch url.host {
