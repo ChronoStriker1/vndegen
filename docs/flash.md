@@ -62,6 +62,13 @@ the movie's `onSelect` and `menuSelect` handlers run first, and lists only the m
 Play or Quality (Ruffle patch 0002, see `Engines/Flash/UPSTREAM.md`). A full-screen item is left out, since the
 session owns the window. Usashitsuke's Return to title and Quit are there.
 
+## Game speed
+
+The Cheats page in the VNDegen menu runs a movie at 2x or 4x. Ruffle has no speed setting of its own. It advances a
+movie by the time between the animation frames it asks the page for, so `flash-page.js` hands it animation frames that
+say that many times as much time has passed. The movie's frames and its ActionScript timers, such as `setInterval` and
+`Timer`, run that much faster. [cheats.md](cheats.md#built-game-speed-for-flash) has the limits.
+
 ## Fonts
 
 Most movies embed their fonts. Device text, drawn in a font the computer has, goes through the browser

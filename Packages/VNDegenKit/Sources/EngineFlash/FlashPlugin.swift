@@ -73,7 +73,8 @@ nonisolated public struct FlashPlugin: EnginePlugin {
         guard let host = Self.hostDirectory,
               let pageSource = try? String(contentsOf: host.appendingPathComponent("flash-page.js"), encoding: .utf8)
         else { throw FlashError.hostMissing }
-        let pageScript = try FlashFonts.pageScript(pageSource)
+        let pageTemplate = try FlashFonts.pageScript(pageSource)
+        let pageScript = FlashCheats.script(pageTemplate, speed: launch.game.cheats?.speed ?? 1)
         let entry = Self.entry(for: game, dataDirectory: launch.dataDirectory)
         var folder = GameFolder(root: launch.folder, webRoot: "")
         folder.mounts = [Self.hostPath: host, Self.hostPath + "ruffle/": ruffle]
@@ -86,6 +87,7 @@ nonisolated public struct FlashPlugin: EnginePlugin {
             buttonScript: { _, _ in nil }, scriptArgument: "flash-script", log: flashLog
         )
         configuration.pageMenu = Self.pageMenu
+        configuration.cheats = { FlashCheats(page: $0, template: pageTemplate, script: pageScript) }
         return try configuration.makeSession(launch)
     }
 

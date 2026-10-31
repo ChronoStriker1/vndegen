@@ -17,6 +17,7 @@ struct GodotEngine {
     let joyButton: @convention(c) (Int32, Bool) -> Void
     let joyAxis: @convention(c) (Int32, Float) -> Void
     let setPaused: @convention(c) (Bool) -> Void
+    let setSpeed: @convention(c) (Int32) -> Void
     let requestQuit: @convention(c) () -> Void
     let stop: @convention(c) () -> Void
     let problem: @convention(c) () -> UnsafePointer<CChar>?
@@ -53,13 +54,14 @@ struct GodotEngine {
               let joyButton: @convention(c) (Int32, Bool) -> Void = function("vngd_joy_button"),
               let joyAxis: @convention(c) (Int32, Float) -> Void = function("vngd_joy_axis"),
               let setPaused: @convention(c) (Bool) -> Void = function("vngd_set_paused"),
+              let setSpeed: @convention(c) (Int32) -> Void = function("vngd_set_speed"),
               let requestQuit: @convention(c) () -> Void = function("vngd_request_quit"),
               let stop: @convention(c) () -> Void = function("vngd_stop"),
               let problem: @convention(c) () -> UnsafePointer<CChar>? = function("vngd_problem")
         else { return nil }
         return GodotEngine(start: start, iterate: iterate, resize: resize, key: key, text: text, mouseMove: mouseMove,
                            mouseButton: mouseButton, wheel: wheel, touch: touch, joyButton: joyButton, joyAxis: joyAxis,
-                           setPaused: setPaused, requestQuit: requestQuit, stop: stop, problem: problem)
+                           setPaused: setPaused, setSpeed: setSpeed, requestQuit: requestQuit, stop: stop, problem: problem)
         #else
         return nil
         #endif

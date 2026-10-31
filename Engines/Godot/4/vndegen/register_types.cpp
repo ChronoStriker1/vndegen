@@ -21,6 +21,7 @@ __attribute__((used)) static const void *vngd_functions[] = {
 	(const void *)&vngd_joy_button,
 	(const void *)&vngd_joy_axis,
 	(const void *)&vngd_set_paused,
+	(const void *)&vngd_set_speed,
 	(const void *)&vngd_request_quit,
 	(const void *)&vngd_stop,
 	(const void *)&vngd_problem,

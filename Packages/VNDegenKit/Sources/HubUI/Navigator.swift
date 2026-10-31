@@ -48,6 +48,9 @@ final class Navigator {
         case confirm(Confirmation)
         /// A library tile's menu, which a controller opens. Touch and the pointer get the same actions as a context menu.
         case gameMenu(GameID)
+        /// A game page's screenshots full screen. It covers the hub as an overlay rather than a sheet, so it can fill the
+        /// screen on every platform.
+        case screenshots(ScreenshotViewer)
 
         var id: String {
             switch self {
@@ -66,6 +69,7 @@ final class Navigator {
             case let .license(request): "license:\(request.id)"
             case let .confirm(confirmation): "confirm:\(confirmation.id)"
             case let .gameMenu(id): "gameMenu:\(id)"
+            case let .screenshots(viewer): "screenshots:\(viewer.gameID)"
             }
         }
 
@@ -79,6 +83,7 @@ final class Navigator {
             case let .saves(model): model.game
             case let .launchSaves(model): model.game
             case let .confirm(confirmation): confirmation.gameID
+            case let .screenshots(viewer): viewer.gameID
             case .unlock, .settingsPage, .importGame, .license: nil
             }
         }
@@ -112,6 +117,9 @@ final class Navigator {
         case gridTile(GameID)
         case back
         case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageShowFolder, pageRemove, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
+        /// A screenshot in the game page's grid, by its index in the game's screenshots, and the button under the grid
+        /// that shows all of them or fewer.
+        case pageScreenshot(Int), pageScreenshotsMore
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
         case controlMethod, controllerMouse, mouseStyle, playOrientation
@@ -163,13 +171,21 @@ final class Navigator {
             if case let .importGame(model, _)? = oldValue, sheet == nil { model.close() }
             // A license sheet closed by Done or a swipe declines it. Accept answers first, so this does nothing then.
             if case let .license(request)? = oldValue { request.respond(false) }
+            // The viewer hands focus to the screenshot it showed last, so the player carries on from there in the grid.
+            // A metadata match applied meanwhile can change the page's screenshots, so it is found again by URL.
+            if case let .screenshots(viewer)? = oldValue, sheet == nil, pageGameID == viewer.gameID {
+                let current = pageScreenshots, url = viewer.screenshots[viewer.index].url
+                focusBeforeSheet = current.firstIndex { $0.url == url }.map { .pageScreenshot($0) }
+                    ?? (current.isEmpty ? .pagePlay : .pageScreenshot(0))
+            }
             // Focus moves into a sheet and returns to whatever opened it, however the sheet closes. A sheet that replaces
             // another, such as a license over the artwork editor, starts on its own default.
             if oldValue == nil, sheet != nil {
                 focusBeforeSheet = focus
                 setFocus(defaultFocus)
             } else if sheet == nil, oldValue != nil {
-                setFocus(focusBeforeSheet)
+                // The window can resize under a sheet, which changes the screenshot grid it returns to.
+                setFocus(shownScreenshotTarget(focusBeforeSheet))
                 focusBeforeSheet = nil
             } else if let sheet, let oldValue, sheet.id != oldValue.id {
                 setFocus(defaultFocus)
@@ -180,6 +196,12 @@ final class Navigator {
                 if case .settingsPage(.saves)? = oldValue { saveSettings.keyboard?.close() }
             }
         }
+    }
+    /// The sheet SwiftUI presents: every sheet but the screenshot viewer, which fills the screen, something a sheet can't
+    /// do on a Mac or an iPad, so the library shows it as an overlay.
+    var presentedSheet: Sheet? {
+        get { if case .screenshots? = sheet { nil } else { sheet } }
+        set { sheet = newValue }
     }
     @ObservationIgnored private var focusBeforeSheet: Target?
     private(set) var focus: Target?
@@ -194,6 +216,12 @@ final class Navigator {
     var headerColumns = 1
     /// Set by the game page when a narrow window puts its other buttons in a row under Play.
     var pageActionsStacked = false
+    /// Set by the game page's screenshot grid from its width.
+    var screenshotColumns = 2 {
+        didSet { if screenshotColumns != oldValue, sheet == nil { setFocus(shownScreenshotTarget(focus)) } }
+    }
+    /// Whether the game page's screenshot grid shows every screenshot rather than its first rows. Each page starts collapsed.
+    var showsAllScreenshots = false
     private(set) var rescanning = false
     /// Settings' SoundFont file picker is open.
     var pickingSoundFont = false
@@ -279,7 +307,7 @@ final class Navigator {
             case .license: return [Row(id: "license", items: [.licenseAccept, .licenseDecline])]
             case .confirm: return [Row(id: "confirm", items: [.confirmAction, .confirmCancel])]
             // These take controller input through their own models.
-            case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping: return []
+            case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .screenshots: return []
             }
         }
         switch route {
@@ -315,13 +343,20 @@ final class Navigator {
                     : [.runtime(package.id, .install), .runtime(package.id, .importFolder)]
                 return Row(id: "page-runtime-\(package.id)", items: items)
             }
+            // The screenshots sit under the actions in a narrow window, and in the column beside the details in a wide one.
+            // Either way they come before the engine row, so a controller reaches them straight from Play.
+            let screenshots = pageScreenshots
+            let columns = max(1, screenshotColumns)
+            let shown = Self.shownScreenshots(screenshots.count, columns: columns, showsAll: showsAllScreenshots)
+            let screenshotRows = Self.gridRows("page-screenshots", (0..<shown).map { Target.pageScreenshot($0) }, columns: columns)
+                + (Self.collapsesScreenshots(screenshots.count, columns: columns) ? [Row(id: "page-screenshots-more", items: [.pageScreenshotsMore])] : [])
             let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder, .pageRemove]
             let pageActions = pageActionsStacked
                 ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
                 : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
             return [
                 Row(id: "page-back", items: [.back]),
-            ] + pageActions + runtimes + [
+            ] + pageActions + runtimes + screenshotRows + [
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
@@ -343,6 +378,38 @@ final class Navigator {
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return rows + items.map { Row(id: "settings-\($0)", items: [$0]) }
+        }
+    }
+
+    /// The open game page's screenshots, empty until a lookup finds some.
+    var pageScreenshots: [Screenshot] {
+        pageGameID.flatMap { hub.library.game($0)?.metadata?.screenshots } ?? []
+    }
+
+    /// How many of `total` screenshots the game page's grid shows at `columns`: the first two rows until the player asks
+    /// for all, unless three rows hold them all, since hiding a few behind a button saves little.
+    static func shownScreenshots(_ total: Int, columns: Int, showsAll: Bool) -> Int {
+        showsAll || !collapsesScreenshots(total, columns: columns) ? total : columns * 2
+    }
+
+    /// Whether the grid has more screenshots than it shows collapsed, so it offers Show all and Show fewer.
+    static func collapsesScreenshots(_ total: Int, columns: Int) -> Bool { total > columns * 3 }
+
+    /// Where focus on `target` belongs after the screenshot grid changed under it, such as when the window narrowed or
+    /// widened. A screenshot the grid no longer shows makes it show all of them, and a Show all button that went away,
+    /// because the grid no longer collapses, hands focus to the last screenshot.
+    private func shownScreenshotTarget(_ target: Target?) -> Target? {
+        let total = pageScreenshots.count
+        switch target {
+        case let .pageScreenshot(index)? where index >= total:
+            return total > 0 ? .pageScreenshot(total - 1) : .pagePlay
+        case let .pageScreenshot(index)? where index >= Self.shownScreenshots(total, columns: screenshotColumns, showsAll: showsAllScreenshots):
+            showsAllScreenshots = true
+            return target
+        case .pageScreenshotsMore? where !Self.collapsesScreenshots(total, columns: screenshotColumns):
+            return total > 0 ? .pageScreenshot(total - 1) : .pagePlay
+        default:
+            return target
         }
     }
 
@@ -484,6 +551,12 @@ final class Navigator {
         case .pageShowFolder: if let id = pageGameID { perform(.showFolder, on: id) }
         case .pageRemove: if let id = pageGameID { perform(.remove, on: id) }
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
+        case let .pageScreenshot(index):
+            let screenshots = pageScreenshots
+            if let id = pageGameID, screenshots.indices.contains(index) {
+                sheet = .screenshots(ScreenshotViewer(gameID: id, screenshots: screenshots, index: index))
+            }
+        case .pageScreenshotsMore: showsAllScreenshots.toggle()
         case let .settingsPage(page):
             // These pages start from the stored settings and the top each time. The Ludusavi page keeps what was typed
             // into it, like the service it shows.
@@ -831,6 +904,7 @@ final class Navigator {
 
     func push(_ route: Route) {
         path.append(route)
+        if case .game = route { showsAllScreenshots = false }
         syncInputMode()
         setFocus(defaultFocus)
     }
@@ -951,7 +1025,7 @@ final class Navigator {
             return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
         case let .gameMenu(id):
             return gameActions(id).map { Choice(target: .gameAction($0.action), title: $0.title, systemImage: $0.systemImage) }
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm:
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm, .screenshots:
             return []
         }
     }
@@ -962,7 +1036,7 @@ final class Navigator {
         case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm, .gameMenu: nil
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm, .gameMenu, .screenshots: nil
         }
     }
 
@@ -974,6 +1048,8 @@ final class Navigator {
             guard let self else { return }
             let offer = await hub.saveSync.launchOffer(id)
             checkingSaves = nil
+            // The screenshot viewer can open while the saves are checked, and it mustn't stay over the game.
+            if case .screenshots? = sheet { sheet = nil }
             guard let offer else { return hub.launch(id) }
             sheet = .launchSaves(LaunchSavesModel(service: hub.saveSync, game: id, offer: offer) { [weak self] start in
                 self?.sheet = nil
@@ -1069,6 +1145,14 @@ final class Navigator {
         case let .mapping(editor)?:
             if !editor.handle(button), button == .cancel { back() }
             return
+        case let .screenshots(viewer)?:
+            switch button {
+            case .left, .pageUp: viewer.step(-1)
+            case .right, .pageDown: viewer.step(1)
+            case .confirm, .cancel: back()
+            default: break
+            }
+            return
         case let .importGame(model, _)?:
             if let button = ArchiveImportModel.Button(button) { model.handle(button) }
             return
@@ -1142,6 +1226,7 @@ extension Navigator {
         if case let .mapping(editor)? = self.sheet {
             detail = " mapping=\(editor.picking.map { "\($0)" } ?? "list"):\(editor.focus.map { "\($0)" } ?? "none")"
         }
+        if case let .screenshots(viewer)? = self.sheet { detail = " screenshot=\(viewer.index)" }
         NSLog("HUBNAV route=%@ sheet=%@ focus=%@ keyboard=%@ alert=%@%@", route, sheet, focus.map { "\($0)" } ?? "none", keyboard,
               hub.launchError ?? "none", detail)
     }

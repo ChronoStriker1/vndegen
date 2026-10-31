@@ -508,3 +508,14 @@ private func refusal(_ layout: GodotLayout, _ game: GameFolder) -> String? {
         #expect(location.relativePath("/tmp/data/AppData/Roaming/Godot/app_userdata/Game/save1.json") == "save1.json")
     }
 }
+
+@MainActor @Test func cheatsOfferGameSpeedOnly() async throws {
+    var speeds: [Int] = []
+    let cheats = GodotCheats { speeds.append($0) }
+    #expect(cheats.features == .speed)
+    #expect(try await cheats.state().inGame)
+    var settings = CheatSettings()
+    settings.speed = 4
+    cheats.apply(settings)
+    #expect(speeds == [4])
+}

@@ -272,3 +272,85 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.hub.library.folders.isEmpty)
     #expect(FileManager.default.fileExists(atPath: added.path))
 }
+
+@MainActor
+@Test func screenshotTilesAreAGridUnderTheActionsAndTheViewerReturnsFocusToTheLastOneShown() async throws {
+    let (nav, id) = try await makeNavigator()
+    let shots = (0..<10).map { Screenshot(url: URL(string: "https://example.com/\($0).jpg")!, thumbnail: URL(string: "https://example.com/\($0)-t.jpg")!) }
+    nav.hub.library.update(id) { $0.metadata = GameMetadata(screenshots: shots) }
+    nav.screenshotColumns = 3
+
+    // Ten don't fit three rows of three, so the grid shows two rows and a Show all button, then the engine row.
+    press(nav, .down)
+    #expect(nav.focus == .pageScreenshot(0))
+    press(nav, .right, .down)
+    #expect(nav.focus == .pageScreenshot(4))
+    press(nav, .down)
+    #expect(nav.focus == .pageScreenshotsMore)
+    press(nav, .confirm)
+    #expect(nav.showsAllScreenshots)
+    press(nav, .up)
+    #expect(nav.focus == .pageScreenshot(9))
+    press(nav, .down, .down)
+    #expect(nav.focus == .pageEngine)
+    press(nav, .up, .confirm)
+    #expect(!nav.showsAllScreenshots)
+
+    // The viewer takes left and right, and B returns focus to the screenshot it showed last, opening the grid for it.
+    nav.select(.pageScreenshot(1))
+    guard case let .screenshots(viewer)? = nav.sheet else { Issue.record("no screenshot viewer"); return }
+    #expect(nav.presentedSheet == nil, "the viewer is an overlay, not a presented sheet")
+    nav.hover(.pageScreenshot(2))
+    #expect(nav.focus != .pageScreenshot(2), "tiles behind the viewer can't take focus")
+    press(nav, .right, .right, .right, .right, .right, .right, .right, .right, .right)
+    #expect(viewer.index == 9)
+    press(nav, .left, .left)
+    #expect(viewer.index == 7)
+    press(nav, .cancel)
+    #expect(nav.sheet == nil)
+    #expect(nav.showsAllScreenshots)
+    #expect(nav.focus == .pageScreenshot(7))
+
+    // A narrower window that collapses the grid to fewer tiles shows all of them rather than hide the focused one.
+    nav.showsAllScreenshots = false
+    nav.screenshotColumns = 4
+    nav.setFocus(.pageScreenshot(8))
+    nav.screenshotColumns = 3
+    #expect(nav.showsAllScreenshots)
+    #expect(nav.focus == .pageScreenshot(8))
+
+    // A metadata match applied while the viewer shows finds the last screenshot again by URL, or falls back to the first.
+    nav.select(.pageScreenshot(5))
+    nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots[4...6]) }
+    press(nav, .cancel)
+    #expect(nav.focus == .pageScreenshot(1))
+    nav.select(.pageScreenshot(2))
+    nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots[0...1]) }
+    press(nav, .confirm)
+    #expect(nav.focus == .pageScreenshot(0))
+    nav.hub.library.update(id) { $0.metadata?.screenshots = shots }
+
+    // The window can resize under another sheet. Closing it brings focus back to a screenshot the grid shows, and a Show
+    // all button that went away hands focus to the last screenshot.
+    nav.showsAllScreenshots = false
+    nav.screenshotColumns = 4
+    nav.setFocus(.pageScreenshot(8))
+    nav.activate(.pageEngine)
+    nav.screenshotColumns = 3
+    press(nav, .cancel)
+    #expect(nav.showsAllScreenshots)
+    #expect(nav.focus == .pageScreenshot(8))
+    nav.showsAllScreenshots = false
+    nav.setFocus(.pageScreenshotsMore)
+    nav.activate(.pageEngine)
+    nav.screenshotColumns = 4
+    press(nav, .cancel)
+    #expect(nav.focus == .pageScreenshot(9))
+
+    // A shorter list shows every screenshot without the button.
+    nav.hub.library.update(id) { $0.metadata?.screenshots = Array(shots.prefix(9)) }
+    nav.push(.game(id))
+    #expect(!nav.showsAllScreenshots)
+    #expect(!nav.rows().contains { $0.items.contains(.pageScreenshotsMore) })
+    #expect(nav.rows().flatMap(\.items).filter { if case .pageScreenshot = $0 { true } else { false } }.count == 9)
+}
