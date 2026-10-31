@@ -57,24 +57,47 @@ private func engine(mv: Bool = false) -> String {
 /// A page with VNDegen's scripts and the stand-in engine, run the way MV and MZ start their boot scene.
 @MainActor private final class TestPage: GamePage {
     let webView: WKWebView
+    let template: String
+    private let launchScript: String
+    private var startScripts: [String]
+    private let html: String
 
     init(settings: CheatSettings, mv: Bool = false) async throws {
         let scripts = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../Sources/EngineRPGMaker/Resources")
-        let cheats = try RPGMakerCheats.script(
-            try String(contentsOf: scripts.appending(path: "rpgmaker-cheats.js").standardized, encoding: .utf8), settings: settings)
+        template = try String(contentsOf: scripts.appending(path: "rpgmaker-cheats.js").standardized, encoding: .utf8)
+        launchScript = try RPGMakerCheats.script(template, settings: settings)
+        startScripts = ["window.__vndegen = {};", launchScript]
         let configuration = WKWebViewConfiguration()
-        for script in ["window.__vndegen = {};", cheats] {
-            configuration.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        }
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
         let tags = [engine(mv: mv), "window.started = true;"]
             .map { "<script src=\"data:text/javascript;base64,\(Data($0.utf8).base64EncodedString())\"></script>" }
-        webView.loadHTMLString("<html><body>\(tags.joined())</body></html>", baseURL: nil)
+        html = "<html><body>\(tags.joined())</body></html>"
+        try await load()
+    }
+
+    /// Loads the page again with the start scripts as they are now, as a reload does.
+    func load() async throws {
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        for script in startScripts {
+            controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        _ = try? await webView.evaluateJavaScript("window.started = false")
+        webView.loadHTMLString(html, baseURL: nil)
         let deadline = ContinuousClock.now + .seconds(20)
         while try await webView.evaluateJavaScript("document.readyState === 'complete' && !!window.started") as? Bool != true {
             guard ContinuousClock.now < deadline else { throw CancellationError() }
             try await Task.sleep(for: .milliseconds(50))
         }
+    }
+
+    func cheats() -> RPGMakerCheats {
+        RPGMakerCheats(page: self, template: template, script: launchScript)
+    }
+
+    func replaceStartScript(_ old: String, with new: String) {
+        guard let index = startScripts.firstIndex(of: old) else { return }
+        startScripts[index] = new
     }
 
     func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any? {
@@ -88,7 +111,7 @@ private func engine(mv: Bool = false) -> String {
 
 @Test @MainActor func cheatsWaitForAGameAndReadItsState() async throws {
     let page = try await TestPage(settings: CheatSettings())
-    let cheats = RPGMakerCheats(page: page)
+    let cheats = page.cheats()
     _ = try await page.run("SceneManager.run(Scene_Title)")
     #expect(try await cheats.state() == CheatState(inGame: false))
     await #expect(throws: RPGMakerCheatError.self) { try await cheats.perform(.addGold(100)) }
@@ -118,7 +141,7 @@ private func engine(mv: Bool = false) -> String {
 
 @Test @MainActor func actionsChangeTheGamesOwnObjects() async throws {
     let page = try await TestPage(settings: CheatSettings())
-    let cheats = RPGMakerCheats(page: page)
+    let cheats = page.cheats()
     _ = try await page.run("SceneManager.run(Scene_Map)")
     try await cheats.perform(.addGold(1_000))
     try await cheats.perform(.restoreParty)
@@ -150,7 +173,7 @@ private func engine(mv: Bool = false) -> String {
     #expect(try await page.run("$gameParty.allMembers()[0].finalExpRate()") as? Double == 15)
     #expect(try await page.run("SceneManager.determineRepeatNumber(1)") as? Int == 4)
 
-    let cheats = RPGMakerCheats(page: page)
+    let cheats = page.cheats()
     cheats.apply(CheatSettings())
     try await Task.sleep(for: .milliseconds(200))
     #expect(try await page.run("$gamePlayer.canEncounter()") as? Bool == true)
@@ -164,7 +187,7 @@ private func engine(mv: Bool = false) -> String {
     _ = try await page.run("SceneManager.run(Scene_Map)")
     var settings = CheatSettings()
     settings.keepsPartyHealthy = true
-    RPGMakerCheats(page: page).apply(settings)
+    page.cheats().apply(settings)
     try await Task.sleep(for: .milliseconds(200))
     let actor = "$gameParty.allMembers()[0]"
     #expect(try await page.run("[\(actor).hp, \(actor).mp].join()") as? String == "100,30")
@@ -185,6 +208,40 @@ private func engine(mv: Bool = false) -> String {
     #expect(try await page.run("$gameParty.allMembers().map((a) => a.hp + '/' + a.mp).join()") as? String == "100/30,100/30")
 }
 
+@Test @MainActor func aReloadStartsWithTheSettingsAsTheyAreNow() async throws {
+    var settings = CheatSettings()
+    settings.walksThroughWalls = true
+    let page = try await TestPage(settings: settings)
+    let cheats = page.cheats()
+    settings.walksThroughWalls = false
+    settings.noEncounters = true
+    cheats.apply(settings)
+    try await page.load()
+    _ = try await page.run("SceneManager.run(Scene_Map)")
+    #expect(try await page.run("$gamePlayer.isThrough()") as? Bool == false)
+    #expect(try await page.run("$gamePlayer.canEncounter()") as? Bool == false)
+    // Twice, so the script the page starts with is the one the last change made.
+    settings.noEncounters = false
+    cheats.apply(settings)
+    try await page.load()
+    _ = try await page.run("SceneManager.run(Scene_Map)")
+    #expect(try await page.run("$gamePlayer.canEncounter()") as? Bool == true)
+}
+
+@Test @MainActor func cheatsOpenedDuringBootWaitForThePluginsToLoad() async throws {
+    let page = try await TestPage(settings: CheatSettings())
+    let cheats = page.cheats()
+    #expect(try await cheats.state().inGame == false)
+    var settings = CheatSettings()
+    settings.noEncounters = true
+    cheats.apply(settings)
+    try await Task.sleep(for: .milliseconds(200))
+    // A plugin that loads after that replaces the method outright.
+    _ = try await page.run("(Game_Player.prototype.canEncounter = function () { return true; }, true)")
+    _ = try await page.run("SceneManager.run(Scene_Map)")
+    #expect(try await page.run("$gamePlayer.canEncounter()") as? Bool == false)
+}
+
 @Test @MainActor func mvRunsItsClockFasterAtHigherSpeeds() async throws {
     var settings = CheatSettings()
     settings.speed = 2
@@ -194,7 +251,7 @@ private func engine(mv: Bool = false) -> String {
     _ = try await page.run("window.now = 1100")
     #expect(try await page.run("SceneManager._getTimeInMsWithoutMobileSafari()") as? Int == 1200)
     settings.speed = 1
-    RPGMakerCheats(page: page).apply(settings)
+    page.cheats().apply(settings)
     try await Task.sleep(for: .milliseconds(200))
     // A speed change keeps the clock going on from where it was.
     _ = try await page.run("window.now = 1150")

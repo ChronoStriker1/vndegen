@@ -23,6 +23,14 @@
         scenes.run.vndegenCheats = true;
     }, true);
 
+    // A game whose plugins replaced SceneManager.run without calling the one before it never ran the wrapper above. Once
+    // a scene exists, boot has started, so every plugin has loaded and the cheats can wrap what they left.
+    function installAfterBoot() {
+        if (installed || !window.SceneManager || !SceneManager._scene) return;
+        install();
+        if (window.Scene_Map && SceneManager._scene instanceof Scene_Map) playing = true;
+    }
+
     function install() {
         if (installed || !window.SceneManager || !window.Game_BattlerBase || !window.Game_Player || !window.Game_Actor) return;
         installed = true;
@@ -118,13 +126,13 @@
         apply(next) {
             const fill = next.keepsPartyHealthy && !settings.keepsPartyHealthy;
             settings = next;
-            install();
+            installAfterBoot();
             if (fill && inGame()) fillParty();
         },
 
         // JSON, so the app decodes one string rather than WebKit's conversion of every value.
         state() {
-            install();
+            installAfterBoot();
             if (!inGame()) return JSON.stringify({ inGame: false });
             const system = $dataSystem;
             const names = (list) => list || [];

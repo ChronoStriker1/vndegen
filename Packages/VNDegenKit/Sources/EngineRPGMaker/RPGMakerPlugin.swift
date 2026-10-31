@@ -45,9 +45,11 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     /// Ogg decoder, and MV plays its .ogg files through it. MZ decodes Ogg with its own bundled decoder.
     /// The cheats start with `cheats` on.
     @MainActor func webConfiguration(_ folder: GameFolder, cheats: CheatSettings = CheatSettings()) throws -> WebGameConfiguration {
+        let cheatTemplate = try Self.script("rpgmaker-cheats")
+        let cheatScript = try RPGMakerCheats.script(cheatTemplate, settings: cheats)
         var configuration = try WebGameConfiguration(
             folder: folder, appName: "rmmz-game",
-            userScripts: [try Self.script("rpgmaker"), try RPGMakerCheats.script(Self.script("rpgmaker-cheats"), settings: cheats)],
+            userScripts: [try Self.script("rpgmaker"), cheatScript],
             userAgent: Self.userAgent,
             buttonScript: { button, pressed in
                 KeyStroke.key(for: button).map {
@@ -58,7 +60,7 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         )
         configuration.preloadFonts = folder.fontNames
         configuration.menuCommands = Self.menuCommands(plugins: folder.enabledPlugins)
-        configuration.cheats = { RPGMakerCheats(page: $0) }
+        configuration.cheats = { RPGMakerCheats(page: $0, template: cheatTemplate, script: cheatScript) }
         if flavor == .mv && folder.shipsOnlyOggAudio {
             configuration.decodesOgg = true
             rpgLog.notice("MV game ships only Ogg audio, decoding it in the page")

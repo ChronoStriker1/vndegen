@@ -6,9 +6,16 @@ import WebRuntime
 final class RPGMakerCheats: CheatSession {
     /// Weak: the page's session owns these cheats.
     private weak var page: (any GamePage)?
+    /// rpgmaker-cheats.js as it is in the app.
+    private let template: String
+    /// The script the page starts with, with the settings it starts with.
+    private var script: String
 
-    init(page: any GamePage) {
+    /// `script` is what `script(_:settings:)` made of `template` for the page's first load.
+    init(page: any GamePage, template: String, script: String) {
         self.page = page
+        self.template = template
+        self.script = script
     }
 
     let features: CheatFeatures = [.gold, .restoreParty, .items, .keepPartyHealthy, .noEncounters, .walkThroughWalls,
@@ -27,7 +34,13 @@ final class RPGMakerCheats: CheatSession {
         else { throw RPGMakerCheatError.notInGame }
     }
 
+    /// The page that's running gets the settings now. A reload, by the game or after WebKit restarted the page, starts
+    /// with them too.
     func apply(_ settings: CheatSettings) {
+        if let next = try? Self.script(template, settings: settings) {
+            page?.replaceStartScript(script, with: next)
+            script = next
+        }
         Task {
             do {
                 _ = try await call("__vndegen.cheats.apply(settings)", arguments: ["settings": Self.arguments(for: settings)])

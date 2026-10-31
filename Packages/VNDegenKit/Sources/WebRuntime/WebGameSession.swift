@@ -85,6 +85,9 @@ public struct WebGameConfiguration {
 public protocol GamePage: AnyObject {
     /// Runs `body` as the body of an async function whose parameters are `arguments`' keys, and returns what it returns.
     func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any?
+    /// Swaps one of the game's `WebGameConfiguration.userScripts` for `new` from the next time the page loads, such as
+    /// when the game reloads itself or WebKit restarts the page.
+    func replaceStartScript(_ old: String, with new: String)
 }
 
 /// Game commands the page lists itself, such as a Flash movie's own right-click items.
@@ -152,6 +155,8 @@ final class WebGameSession: NSObject, EngineSession {
     private let log: Logger
     private let onExit: @MainActor () -> Void
     private let makeCheats: (@MainActor (any GamePage) -> any CheatSession)?
+    /// The scripts every load of the page starts with, in order.
+    private var startScripts: [String]
     /// Made once, the first time the menu asks, so the cheats keep what they track for the whole session.
     lazy var cheats: (any CheatSession)? = makeCheats?(self)
     private var ended = false
@@ -189,10 +194,8 @@ final class WebGameSession: NSObject, EngineSession {
         configuration.dataDetectorTypes = []
         configuration.defaultWebpagePreferences.preferredContentMode = .mobile
         #endif
-        for source in [shim, fonts] + ogg + game.userScripts {
-            configuration.userContentController.addUserScript(
-                WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        }
+        startScripts = [shim, fonts] + ogg + game.userScripts
+        Self.add(startScripts, to: configuration.userContentController)
         webView = GameWebView(frame: .zero, configuration: configuration)
         view = webView
         super.init()
@@ -237,6 +240,12 @@ final class WebGameSession: NSObject, EngineSession {
 
     deinit {
         log.notice("session released")
+    }
+
+    private static func add(_ scripts: [String], to controller: WKUserContentController) {
+        for source in scripts {
+            controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
     }
 
     #if DEBUG && os(macOS)
@@ -512,6 +521,14 @@ extension WebGameSession: GamePage {
     func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any? {
         guard !ended else { throw CancellationError() }
         return try await webView.callAsyncJavaScript(body, arguments: arguments, contentWorld: .page)
+    }
+
+    func replaceStartScript(_ old: String, with new: String) {
+        guard !ended, let index = startScripts.firstIndex(of: old) else { return }
+        startScripts[index] = new
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        Self.add(startScripts, to: controller)
     }
 }
 
