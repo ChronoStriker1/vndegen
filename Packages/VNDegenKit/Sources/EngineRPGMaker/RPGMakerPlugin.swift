@@ -65,18 +65,27 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
     }
 
     /// Triacontane's MessageSkip, in two of the library's MV games, puts auto and skip on keys only (A, and Control
-    /// held), out of reach on a touch screen. Its own calls toggle them. Skip goes the way of the plugin's skip button,
-    /// which stops a held-key setting from turning it straight off again.
+    /// held), out of reach on a touch screen. Its own call toggles auto. Skip stays on until chosen again: with the
+    /// plugin set to skip while a key is held, as Mama Kondon is, every version of it reads the key through
+    /// `isPressedMessageSkip`, so that reports the toggle as a held key too.
     static func menuCommands(plugins: Set<String>) -> [WebMenuCommand] {
         guard plugins.contains("MessageSkip") else { return [] }
         return [
             WebMenuCommand(id: "auto", title: "Auto", script: "window.$gameMessage && $gameMessage.toggleAuto && $gameMessage.toggleAuto()"),
             WebMenuCommand(id: "skip", title: "Skip", script: """
-                if (window.$gameMessage && $gameMessage.toggleSkip) {
-                    $gameMessage.toggleSkip();
-                    var scene = SceneManager._scene, messages = scene && scene._messageWindow;
-                    if (messages) messages._pressSkipStop = true;
-                }
+                (function () {
+                    var messages = window.Window_Message && Window_Message.prototype;
+                    if (!window.$gameMessage || !$gameMessage.setSkipFlg || !messages || !messages.isPressedMessageSkip) return;
+                    if (!messages.__vndegenSkip) {
+                        var pressed = messages.isPressedMessageSkip;
+                        messages.isPressedMessageSkip = function () {
+                            return window.__vndegenMessageSkip || pressed.apply(this, arguments);
+                        };
+                        messages.__vndegenSkip = true;
+                    }
+                    window.__vndegenMessageSkip = !window.__vndegenMessageSkip;
+                    $gameMessage.setSkipFlg(window.__vndegenMessageSkip);
+                })();
                 """),
         ]
     }

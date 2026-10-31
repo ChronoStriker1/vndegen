@@ -11,7 +11,9 @@
         letterbox: 'on',
         // The PC projector has no context menu worth showing, and a right click belongs to the game.
         contextMenu: 'off',
-        menu: false,
+        // On, as in the PC projector, so Ruffle lists a movie's own context menu items, which VNDegen shows as Game
+        // commands. Ruffle's own menu stays off above.
+        menu: true,
         showSwfDownload: false,
         warnOnUnsupportedContent: false,
         allowFullscreen: false,

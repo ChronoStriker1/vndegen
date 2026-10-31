@@ -228,10 +228,10 @@ struct PlayerView: View {
     /// A command closes VNDegen's menu and the game runs it as it resumes, as a PC game runs a menu bar command once its
     /// menu closes. The command can open the game's own screens and dialogs, which need the game running.
     private func choose(_ item: GameMenuItem) {
+        guard item.isEnabled else { return }
         switch item.kind {
         case .submenu: menu.openSubmenu(item)
         case .command:
-            guard item.isEnabled else { return }
             session.chooseGameMenuItem(item.id)
             resume()
         case .separator: break

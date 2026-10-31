@@ -31,26 +31,28 @@ int VNKKMenuBarShown()
     return menuBarShown;
 }
 
-static bool endsWithScriptExtension(const std::string &name)
+// ".ks" for a KAG scenario, ".tjs" for TJS, or nullptr for any other file.
+static const char *scriptExtension(const std::string &name)
 {
-    auto endsWith = [&](const char *suffix) {
+    for (const char *suffix : {".ks", ".tjs"}) {
         size_t n = strlen(suffix);
         if (name.size() < n)
-            return false;
-        for (size_t i = 0; i < n; i++) {
+            continue;
+        bool same = true;
+        for (size_t i = 0; i < n && same; i++) {
             char c = name[name.size() - n + i];
-            if (c >= 'A' && c <= 'Z')
-                c += 'a' - 'A';
-            if (c != suffix[i])
-                return false;
+            same = (c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c) == suffix[i];
         }
-        return true;
-    };
-    return endsWith(".ks") || endsWith(".tjs");
+        if (same)
+            return suffix;
+    }
+    return nullptr;
 }
 
 // Reads every script the game can load by name, through the archives' ciphers and the engine's text decoding, and
-// looks for a test of whether the menu bar is hidden. The game has added its search paths by the time it asks.
+// looks for a test of whether the menu bar is hidden. A name in several search paths, such as a script a patch
+// archive replaces, is read only where the engine's own lookup finds it. The game has added its search paths by the
+// time it asks.
 static bool scriptsTestForHiddenMenuBar()
 {
     Uint64 start = SDL_GetTicks();
@@ -61,13 +63,19 @@ static bool scriptsTestForHiddenMenuBar()
     } catch (...) {
         SDL_Log("vnkk: could not list the game's scripts");
     }
+    std::set<std::string> names, placed;
     for (const ttstr &storage : storages) {
-        std::string name = storage.AsStdString();
-        if (!endsWithScriptExtension(name))
+        ttstr name = TVPExtractStorageName(storage);
+        const char *extension = scriptExtension(name.AsStdString());
+        if (!extension || !names.insert(name.AsLowerCase().AsStdString()).second)
             continue;
+        ttstr path;
         ttstr text;
         try {
-            iTJSTextReadStream *stream = TVPCreateTextStreamForRead(storage, TJS_N(""));
+            path = TVPGetPlacedPath(name);
+            if (path.IsEmpty() || !placed.insert(path.AsStdString()).second)
+                continue;
+            iTJSTextReadStream *stream = TVPCreateTextStreamForRead(path, TJS_N(""));
             try {
                 stream->Read(text, 0);
             } catch (...) {
@@ -76,13 +84,13 @@ static bool scriptsTestForHiddenMenuBar()
             }
             stream->Destruct();
         } catch (...) {
-            SDL_Log("vnkk: could not read %s to check its menu bar test", name.c_str());
+            SDL_Log("vnkk: could not read %s to check its menu bar test", name.AsStdString().c_str());
             continue;
         }
         scanned++;
-        if (auto hit = VNKKFindHiddenMenuBarTest(text.AsStdString())) {
-            SDL_Log("vnkk: the menu bar reports hidden: %s line %zu tests for it (%s): %s", name.c_str(), hit->line,
-                    hit->rule, hit->excerpt.c_str());
+        if (auto hit = VNKKFindHiddenMenuBarTest(text.AsStdString(), !strcmp(extension, ".ks"))) {
+            SDL_Log("vnkk: the menu bar reports hidden: %s line %zu tests for it (%s): %s", path.AsStdString().c_str(),
+                    hit->line, hit->rule, hit->excerpt.c_str());
             SDL_Log("vnkk: checked %d scripts for a menu bar test in %llu ms", scanned,
                     (unsigned long long)(SDL_GetTicks() - start));
             return true;
