@@ -186,6 +186,20 @@ private struct Harness {
         #expect(h.at(enter)[1].done >= resumedAt + 2)
     }
 
+    @Test func typedTextKeepsItsPlaceBehindWaitingKeys() {
+        var h = Harness()
+        // a, Return, b typed fast: the text after Return must wait for Return.
+        h.add([.key(65, down: true), .text("a"), .key(65, down: false)])
+        h.add([enter, enterUp])
+        h.add([.key(66, down: true), .text("b"), .key(66, down: false)])
+        #expect(h.applied.map(\.input).contains(.text("b")) == false)
+        h.steps(60)
+        let order = h.applied.map(\.input).filter {
+            switch $0 { case .text, .key(13, _): true; default: false }
+        }
+        #expect(order == [.text("a"), enter, enterUp, .text("b")])
+    }
+
     @Test func resumeRenewsOnlyOnce() {
         var h = Harness()
         h.add([enter])

@@ -103,16 +103,16 @@ final class System4Session: EngineSession {
             // While paused nothing reaches the router or the game: pausing let go of every key, and a hold recorded
             // now would disagree with the game after resume.
             guard let self, !paused else { return }
-            deliver(router.hostKey(hidUsage: usage, pressed: pressed))
-            // Printable text goes to the game's text entry too. Arrow and function keys type Apple's private-use
-            // characters, which are left out with the control characters.
+            // Printable text goes to the game's text entry too, queued right after its key so it keeps its place.
+            // Arrow and function keys type Apple's private-use characters, which are left out with the control
+            // characters.
             let text = String(String.UnicodeScalarView((characters ?? "").unicodeScalars.filter {
                 switch $0.properties.generalCategory {
                 case .control, .privateUse, .format, .surrogate, .unassigned: false
                 default: true
                 }
             }))
-            if !text.isEmpty, let engine { text.withCString { vns4_text(engine, $0) } }
+            deliver(router.hostKey(hidUsage: usage, pressed: pressed) + (text.isEmpty ? [] : [.text(text)]))
         }
     }
 
@@ -193,6 +193,7 @@ final class System4Session: EngineSession {
             case let .mouseMove(p):
                 vns4_mouse_move(engine, Int32((p.x * frameSize.width).rounded(.down)), Int32((p.y * frameSize.height).rounded(.down)))
             case let .wheel(n): vns4_wheel(engine, Int32(n))
+            case let .text(t): t.withCString { vns4_text(engine, $0) }
             }
         }
     }
@@ -284,6 +285,7 @@ nonisolated enum System4Input: Equatable, Sendable {
     case key(Int32, down: Bool)
     case mouseMove(CGPoint)
     case wheel(Int)
+    case text(String)  // typed characters for the game's text entry, in order with the keys around them
 }
 
 /// Turns VNDegen's controller events and the session view's own keyboard into keys the game reads. Several buttons
@@ -370,7 +372,7 @@ nonisolated struct System4InputPacer {
                     movedTime = now
                 }
                 move = p
-            case .wheel:
+            case .wheel, .text:
                 flushMove()
                 out.append(next)
             case let .key(vk, isDown):
