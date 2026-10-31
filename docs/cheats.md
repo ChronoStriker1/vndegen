@@ -148,7 +148,14 @@ How it works, in `Packages/VNDegenKit/Sources/CWolfRPG/core/cheats.cpp` and `vnw
 - Game speed is `vnwolf_set_speed`: each step advances that many times as many of the game's frames, and draws the last.
 - Gold is held between 0 and 999,999,999, and an item's count at 99 or what the game already allows above it.
 
-Checked: on CachyOS through the runtime with Test Games 02, 52 and 53. Test Game 52's save made after cheating loads in the Windows engine (Wolf RPG Editor 3.282) under Wine with 1,010 yen, 10 Sedatives and full HP.
+Checked: on CachyOS through the runtime with Test Games 02, 52 and 53; on the Mac app by controller with Test Game 52; on an iPad simulator by touch with Test Games 02 and 53; and on an iPhone simulator with Test Game 53, where the search found its money variable. Test Game 52's save made after cheating loads in the Windows engine (Wolf RPG Editor 3.282) under Wine with 1,010 yen, 10 Sedatives and full HP.
+
+Test Game 52 on the MacBook (120 Hz display, load average about 30), 30 s at each speed, from the session's `-frameMonitor` log:
+
+| Speed | Display ticks per second | New frames drawn per second | Slowest step |
+|---|---|---|---|
+| 1x | 120 | 57.7 (the game's 60) | 3.6 ms |
+| 4x | 120 | 119.8 to 120 | 15 to 19 ms |
 
 ### Known limits
 
