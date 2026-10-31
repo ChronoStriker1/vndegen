@@ -110,6 +110,12 @@ struct GamePageView: View {
                 .onAppear { nav.pageActionsStacked = true }
             }
             HeroFacts(game: game)
+            if let problem = hub.library.unavailableReason(game.id) {
+                Label("\(hub.folderName(of: game.libraryFolder)) can't be reached. \(problem)", systemImage: "externaldrive.badge.xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -132,6 +138,9 @@ struct GamePageView: View {
             labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels)
         }
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
+        // The folder and Remove buttons have icons only, as they matter less and the row is long already.
+        HubButton(target: .pageShowFolder, kind: .icon) { Image(systemName: "folder").accessibilityLabel(FileBrowser.openTitle) }
+        HubButton(target: .pageRemove, kind: .icon) { Image(systemName: "trash").accessibilityLabel("Remove from library") }
     }
 
     @ViewBuilder
@@ -171,7 +180,8 @@ struct GamePageView: View {
             InfoRow(label: "Publisher", value: metadata?.publishers.joined(separator: ", "))
             InfoRow(label: "Released", value: metadata?.releaseDate.map(Self.formatRelease))
             InfoRow(label: "Play time", value: game.playTime.playTimeText ?? "None")
-            InfoRow(label: "Folder", value: game.id.rawValue)
+            InfoRow(label: "Folder", value: game.folderName ?? game.id.rawValue)
+            InfoRow(label: "Library folder", value: hub.library.folders.isEmpty ? nil : hub.folderName(of: game.libraryFolder))
             EngineSection(game: game)
                 .padding(.top, 14)
             #if os(iOS)
@@ -347,7 +357,7 @@ private struct EngineSection: View {
         // The note can read the game's folder, so it is worked out off the main thread. It follows the engine choice,
         // the engine's options, and what the last play recorded once that play has finished closing.
         .task(id: "\(game.engine?.rawValue ?? "")|\(hub.closing.contains(game.id))|\(nav.variantRevision)") {
-            let folder = hub.library.paths.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
+            let folder = hub.library.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
             note = await Task.detached { [game] in plugin?.compatibilityNote(for: game, folder: folder, dataDirectory: data) }.value
         }
     }

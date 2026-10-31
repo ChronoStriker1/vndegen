@@ -690,8 +690,10 @@ public final class SaveSyncService {
     }
 
     private func saveLocations(_ id: GameID) throws -> [SaveLocation] {
+        // A game whose library folder can't be reached, or was removed, has no save folder to read or restore into.
+        if let problem = library.unavailableReason(id) { throw SaveSyncError.gameFolderUnavailable(problem) }
         guard let plugin = library.plugin(for: library.game(id)?.engine) else { throw SaveSyncError.engineUnsupported }
-        let locations = plugin.saveLocations(folder: library.paths.folder(for: id), dataDirectory: library.paths.dataDirectory(for: id))
+        let locations = plugin.saveLocations(folder: library.folder(for: id), dataDirectory: library.paths.dataDirectory(for: id))
         guard !locations.isEmpty else { throw SaveSyncError.engineUnsupported }
         return locations
     }
@@ -700,7 +702,7 @@ public final class SaveSyncService {
     /// where the Steam library is the one most backups in the store record and the install dir comes from the manifest.
     private func pcFolders(_ id: GameID, match: GameMatch, locations: [SaveLocation]) -> [Int: String] {
         guard let steamLibrary else { return [:] }
-        let game = library.paths.folder(for: id).resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        let game = library.folder(for: id).resolvingSymlinksInPath().standardizedFileURL.pathComponents
         let install = manifest?.game(match.title)?.installDirs.first ?? id.rawValue
         var folders: [Int: String] = [:]
         for (index, location) in locations.enumerated() {

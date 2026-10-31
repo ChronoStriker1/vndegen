@@ -52,6 +52,7 @@ struct ChoiceSheet: View {
     var body: some View {
         let selected = nav.selectedChoice(for: sheet)
         SheetScaffold(title: title, subtitle: subtitle) {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 10) {
                     ForEach(nav.choices(for: sheet)) { choice in
@@ -59,9 +60,10 @@ struct ChoiceSheet: View {
                         let isSelected = selected == choice.target
                         Button { nav.select(choice.target) } label: {
                             HStack(spacing: 14) {
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                Image(systemName: choice.systemImage ?? (isSelected ? "checkmark.circle.fill" : "circle"))
                                     .font(.system(size: 20))
-                                    .foregroundStyle(isSelected ? Theme.accent : Theme.tertiaryText)
+                                    .foregroundStyle(isSelected || choice.systemImage != nil ? Theme.accent : Theme.tertiaryText)
+                                    .frame(width: 26)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(choice.title).font(.system(size: 16, weight: .semibold))
                                     if let detail = choice.detail {
@@ -82,6 +84,7 @@ struct ChoiceSheet: View {
                         .buttonStyle(.plain)
                         .onHover { if $0 { nav.hover(choice.target) } }
                         .animation(Theme.focusAnimation, value: focused)
+                        .id(choice.target)
                     }
                     Text(footnote)
                         .font(.system(size: 13))
@@ -90,6 +93,12 @@ struct ChoiceSheet: View {
                 }
                 .padding(.horizontal, 22)
                 .padding(.bottom, 22)
+            }
+            // A long list runs below a medium sheet, so the controller's focus scrolls into view.
+            .onChange(of: nav.focus) { _, focus in
+                guard nav.focusMovedByController, let focus else { return }
+                withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
+            }
             }
         }
         .presentationDetents([.medium, .large])
@@ -523,5 +532,63 @@ struct MetadataSearchSheet: View {
         }
         .animation(Theme.focusAnimation, value: focused)
         .contentShape(.rect)
+    }
+}
+
+// MARK: Confirmation
+
+/// A question asked before a change the player might not mean, such as removing a library folder or deleting a game's
+/// folder. Cancel has the focus at first, so a stray press of A changes nothing.
+final class Confirmation {
+    let id = UUID()
+    let title: String
+    let message: String
+    /// The button that goes ahead, such as "Remove folder".
+    let action: String
+    /// Draws that button in red, for a change that removes or deletes something.
+    let destructive: Bool
+    /// The game it's about, so the sheet closes when that game is hidden or leaves the library.
+    let gameID: GameID?
+    let perform: @MainActor () async -> Void
+
+    init(title: String, message: String, action: String, destructive: Bool, gameID: GameID? = nil,
+         perform: @escaping @MainActor () async -> Void) {
+        self.title = title
+        self.message = message
+        self.action = action
+        self.destructive = destructive
+        self.gameID = gameID
+        self.perform = perform
+    }
+}
+
+struct ConfirmationSheet: View {
+    let confirmation: Confirmation
+
+    var body: some View {
+        SheetScaffold(title: confirmation.title, escapeCloses: true) {
+            VStack(alignment: .leading, spacing: 22) {
+                // Scrolls, so a long path never pushes the buttons off a small screen.
+                ScrollView {
+                    Text(confirmation.message)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.86))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                HStack(spacing: 12) {
+                    HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
+                    HubButton(target: .confirmCancel) { Text("Cancel") }
+                }
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 22)
+        }
+        .presentationDetents([.medium, .large])
+        #if os(macOS)
+        .frame(minWidth: 480, minHeight: 280)
+        #endif
     }
 }
