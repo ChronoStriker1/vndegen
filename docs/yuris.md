@@ -87,6 +87,38 @@ Rough, for one developer working with the Linux host first:
 That is 5 to 8 weeks in total. The biggest risk is CGACT, which has dozens of image effects; how many the games
 actually use decides a large part of the graphics time.
 
+## Status (2026-10-31, work in progress)
+
+Built so far, Linux host only, no Apple build yet:
+
+- `CYuRIS` reads every `.ypf` archive of the 5 test games, loads the compiled project (command table, scripts with
+  their key, variables with their initial values, labels, script list, config with screen size and window caption),
+  and detects UTF-8 games (Another Way of Gettin' Paid).
+- The script machine runs ERIS's startup code in 4 of the 5 games for 8 seconds without stopping: expressions,
+  variables and arrays, IF/ELSE/IFBLEND, LOOP, GOSUB and RETURN with parameters and results, GO, TASK, TASKEND and
+  TASKINFO, the variable commands (declarations, LET with compound operators, VARACT, VARINFO, MATH, LABELINFO),
+  text output into `$_TEXT` and `$_TEXT_FLAG`, DIALOG (logged), FILEINFO.
+- First versions of the CG layer tree and compositor, CG, CGEND, CGINFO, most CGACT forms, FONT, FONTINFO and
+  CGACT text drawing. Nothing shows on screen yet: the title screens stay black.
+- `Engines/YuRIS/host` builds the runtime and `yrrun`, a headless runner with scripted input and PPM screenshots.
+  Debug switches: `YR_TRACE_GOSUB=1` logs every GOSUB with its parameters, `YR_WATCH=<variable id>` logs every store
+  to one variable, `YR_DUMP_LAYERS=1` logs the layer tree at close.
+
+Where it stopped: tracing why ERIS's button setup (`es.BT.SET` in Another Way of Gettin' Paid) ends up with empty
+image paths and button names. The parameter table is filled correctly (watched with `YR_WATCH=1513`); the copy into
+the button tables at script 1, instructions 1102 to 1129, is the next thing to check.
+
+Next, in order:
+
+1. Fix the button-table bug above, then get the ERIS title screen of each game drawn.
+2. Z as a double: ERIS uses Z values such as 81312121000000000000, beyond 64-bit integers.
+3. SOUND (Ogg through stb_vorbis, already vendored), INPUT, MOUSE, WAIT timing, FPS.
+4. The 0.488 system-variable table for Saimin Seishidou (no SDK matches it; see the provenance file) and the
+   undocumented names (`$_CHR`, `@_DXMODE`, `@_KEYLAST` and others) for every version.
+5. SAVE, LOAD and TASKINFO SCRIPTPOS in the PC format, settled with the original engine under Wine.
+6. Saimin Gakushū: it ends at once with END; it reads its story from `.txt` files in `sc.ypf`.
+7. MA☆KO HUNTER's MPEG-1 movies through pl_mpeg; the Swift plugin, Mac and iOS builds, case check, frame rate.
+
 ## Known limits
 
 Filled in as the runtime lands.

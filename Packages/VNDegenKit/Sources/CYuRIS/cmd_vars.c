@@ -30,6 +30,8 @@ static int declare(YCall *c, u8 t) {
     // Without a value the manual gives 0, or an empty string.
     YVal init = value && value->size ? yr_eval(c->y, c->t, value->data, value->size) : (YVal){ 0 };
     if (r.var->init.t) t = r.var->init.t;   // ysv knows the declared type
+    if ((long)r.vid == c->y->watchVid)
+        yr_log(c->y, "watch: var %u declared (script %u ip %u)\n", r.vid, c->t->script, c->t->ip);
     yr_var_declare(c->y, r.var, t, (u8)nd, dims, init.t ? &init : NULL);
     yv_free(&init);
     return YR_NEXT;

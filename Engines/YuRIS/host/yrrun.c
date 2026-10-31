@@ -3,6 +3,7 @@
 // Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:wheel:N, T:shot:FILE.ppm
 // The game clock starts at --time, 2026-01-01 by default, so a run replays the same way.
 #include "vnyuris.h"
+#include "vnfont.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,6 @@ int main(int argc, char **argv) {
     cfg.gameDir = argv[1];
     cfg.audioRate = 44100;
     cfg.startTime = 1767225600;   // 2026-01-01
-    cfg.fontDir = YR_FONTS_DIR;
     int ms = 5000;
     const char *final = NULL;
     Ev ev[256];
@@ -50,6 +50,8 @@ int main(int argc, char **argv) {
             nev++;
         }
     }
+    const char *fontDirs[] = { YR_FONTS_DIR };
+    vnfont_init(YR_FONTS_DIR "/fonts.tsv", fontDirs, 1);
     char err[512] = "";
     VNY *g = vny_open(&cfg, err, sizeof err);
     if (!g) { fprintf(stderr, "open failed: %s\n", err); return 1; }

@@ -2,7 +2,7 @@
 //
 // The runtime has no threads and no platform code. The host calls vny_frame about 60 times a second, shows the frame
 // it returns, sends input, and pulls audio. All calls for one VNY must come from one thread, except vny_audio, which
-// may run on the audio thread.
+// may run on the audio thread. Text uses the shared Windows font pack (vnfont.h), which the host initializes.
 #ifndef VNYURIS_H
 #define VNYURIS_H
 
@@ -19,8 +19,6 @@ typedef struct VNY VNY;
 typedef struct VNYConfig {
     const char *gameDir;   // the folder holding the game's .exe, yscfg.dat and .ypf archives
     const char *saveDir;   // where save files are read and written; the game's savedata folder on PC
-    const char *fontDir;   // folder of the shared font pack; NULL leaves font lookup to fontTable
-    const char *fontTable; // the font pack's substitution table for vnfont_init; may be NULL
     const char *logPath;   // log file, appended to; NULL logs nothing
     int audioRate;         // output sample rate for vny_audio, such as 44100
     long long startTime;   // the game clock's start in Unix seconds; 0 starts it now. Tests pin it, since games read it.

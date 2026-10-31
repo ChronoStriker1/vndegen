@@ -48,6 +48,7 @@ typedef struct YTask {
     u64 order;        // creation order, for tasks of equal priority
     bool enabled;     // TASK[E=0] stops a task without ending it
     YValues tvals;    // TINT, TFLT and TSTR given at creation, read as @_TINT(n) and the like
+    bool clearText;   // rested at a RETURNCODE: $_TEXT and $_TEXT_FLAG empty when it runs again
 } YTask;
 
 // Results of one instruction for the scheduler.
@@ -112,8 +113,8 @@ struct YR {
     YSnd *snd;
     YText *txt;
     int audioRate;
-    char *fontDir, *fontTable;
     u32 serial;
+    long watchVid;              // logs stores to this variable id, from YR_WATCH; -1 for none
     bool traceGosub;            // logs every GOSUB, from the YR_TRACE_GOSUB environment variable
     uint32_t *screen;           // RGBA, width x height
 };

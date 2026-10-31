@@ -17,7 +17,7 @@ find_package(ZLIB REQUIRED)
 file(GLOB RUNTIME_SOURCES ${RUNTIME}/*.c)
 add_library(yuris STATIC ${RUNTIME_SOURCES} ${SHARED}/vnfont.c)
 target_include_directories(yuris PUBLIC ${RUNTIME} ${RUNTIME}/include ${SHARED})
-target_compile_options(yuris PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare)
+target_compile_options(yuris PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function)
 target_link_libraries(yuris PUBLIC ZLIB::ZLIB m)
 
 add_executable(yrrun yrrun.c)

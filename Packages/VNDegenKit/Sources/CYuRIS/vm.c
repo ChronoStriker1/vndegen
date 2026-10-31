@@ -315,6 +315,12 @@ static int exec(YR *y, YTask *t, YScript *s) {
 // Runs one task until it rests.
 static void run_task(YR *y, YTask *t) {
     y->cur = t;
+    if (t->clearText) {
+        t->clearText = false;
+        free(y->text);
+        free(y->textFlag);
+        y->text = y->textFlag = NULL;
+    }
     for (long n = 0; t->alive && !y->quit; n++) {
         if (n >= BUDGET) {
             yr_log(y, "task %s ran %d instructions in one frame; resting it\n", t->id, BUDGET);
@@ -368,7 +374,14 @@ void yr_vm_step(YR *y) {
 }
 
 bool yr_vm_start(YR *y) {
-    // The system task starts at the top of system_start.yst.
+    // The system task starts at the label SYSTEM_START (as the 0.495 engine requires), or else at the top of
+    // system_start.yst.
+    const YLabel *start = yr_label(y, "SYSTEM_START");
+    if (start && yr_script(y, start->script)) {
+        yr_task_new(y, "SYSTEM", 100, start->script, start->ip);
+        yr_log(y, "start: label SYSTEM_START in script %u\n", start->script);
+        return true;
+    }
     for (u32 i = 0; i < y->scriptCount; i++) {
         const char *n = y->scripts[i].name;
         size_t len = strlen(n);
@@ -377,11 +390,6 @@ bool yr_vm_start(YR *y) {
             yr_log(y, "start: script %u (%s)\n", i, n);
             return true;
         }
-    }
-    const YLabel *l = yr_label(y, "SYSTEM_START");
-    if (l) {
-        yr_task_new(y, "SYSTEM", 100, l->script, l->ip);
-        return true;
     }
     yr_fail(y, "the game's start script (system_start.yst) is missing");
     return false;

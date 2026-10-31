@@ -1,11 +1,15 @@
 // The public interface (vnyuris.h).
 #include "yr.h"
 #include "vm.h"
+#include "gfx.h"
+#include "text.h"
 #include <time.h>
 
 static void free_all(YR *y) {
     for (int i = 0; i < y->taskCount; i++) yr_task_free(y->tasks[i]);
     free(y->tasks);
+    yr_text_close(y);
+    yr_gfx_close(y);
     yr_script_close(y);
     yr_fs_close(y);
     free(y->text);
@@ -14,8 +18,6 @@ static void free_all(YR *y) {
     free(y->screen);
     free(y->gameDir);
     free(y->saveDir);
-    free(y->fontDir);
-    free(y->fontTable);
     if (y->log) fclose(y->log);
     free(y);
 }
@@ -24,18 +26,19 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
     YR *y = yr_alloc(sizeof(YR));
     y->gameDir = yr_strdup(config->gameDir);
     y->saveDir = yr_strdup(config->saveDir ? config->saveDir : config->gameDir);
-    if (config->fontDir) y->fontDir = yr_strdup(config->fontDir);
-    if (config->fontTable) y->fontTable = yr_strdup(config->fontTable);
     y->audioRate = config->audioRate > 0 ? config->audioRate : 44100;
     y->startUnix = config->startTime ? config->startTime : (i64)time(NULL);
     if (config->logPath) y->log = fopen(config->logPath, "a");
     y->fps = 60;
     y->traceGosub = getenv("YR_TRACE_GOSUB") != NULL;
+    y->watchVid = getenv("YR_WATCH") ? strtol(getenv("YR_WATCH"), NULL, 0) : -1;
     bool ok = yr_fs_open(y) && yr_script_open(y);
     if (ok) {
         yr_sysvars_init(y, y->scriptVersion);
         yr_vars_init_strings(y);
         y->screen = yr_alloc(sizeof(uint32_t) * (size_t)y->width * (size_t)y->height);
+        yr_gfx_open(y);
+        yr_text_open(y);
         ok = yr_vm_start(y);
     }
     if (!ok) {
@@ -46,7 +49,11 @@ VNY *vny_open(const VNYConfig *config, char *err, size_t errSize) {
     return (VNY *)y;
 }
 
-void vny_close(VNY *v) { if (v) free_all((YR *)v); }
+void vny_close(VNY *v) {
+    if (!v) return;
+    if (getenv("YR_DUMP_LAYERS")) yr_gfx_dump((YR *)v);
+    free_all((YR *)v);
+}
 
 bool vny_frame(VNY *v, uint32_t elapsedMs) {
     YR *y = (YR *)v;
@@ -55,6 +62,7 @@ bool vny_frame(VNY *v, uint32_t elapsedMs) {
     y->clock += elapsedMs;
     y->frameNo++;
     yr_vm_step(y);
+    yr_gfx_present(y);
     return !y->quit;
 }
 

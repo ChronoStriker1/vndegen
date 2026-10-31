@@ -232,6 +232,12 @@ YVal yr_ref_get(YR *y, YTask *t, const YRef *r) {
 }
 
 void yr_ref_set(YR *y, YTask *t, const YRef *r, const YVal *v) {
+    if ((long)r->vid == y->watchVid) {
+        char *str = yv_as_str(v);
+        yr_log(y, "watch: var %u[%ld] = \"%s\" (task %s script %u ip %u)\n", r->vid, r->index, str, t ? t->id : "-",
+               t ? t->script : 0, t ? t->ip : 0);
+        free(str);
+    }
     if (!r->var) { if (r->vid < 1000) yr_sys_set(y, t, &r->sys, r->nsub, r->sub, v); return; }
     if (!r->var->count) yr_var_declare(y, r->var, r->var->init.t ? r->var->init.t : v->t, 0, NULL, NULL);
     if (r->index < 0) {   // a whole array takes the value in every element
