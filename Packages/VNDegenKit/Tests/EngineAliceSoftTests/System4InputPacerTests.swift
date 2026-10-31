@@ -170,6 +170,22 @@ private struct Harness {
         #expect(h.at(enter).count == 1)
     }
 
+    @Test func aReleaseUnreadAtPauseIsStillReadAfterALongPause() {
+        var h = Harness()
+        h.add([enter])
+        h.steps(20)
+        h.add([enterUp])                                // applied between steps: unread
+        #expect(h.pacer.clear(now: h.now, done: h.done).isEmpty)
+        h.now += 5                                      // paused five seconds
+        h.pacer.resumed(now: h.now, done: h.done)
+        let resumedAt = h.done
+        h.add([enter])                                  // before the first resumed step
+        #expect(h.at(enter).count == 1)
+        h.steps(4)
+        #expect(h.at(enter).count == 2)
+        #expect(h.at(enter)[1].done >= resumedAt + 2)
+    }
+
     @Test func resumeRenewsOnlyOnce() {
         var h = Harness()
         h.add([enter])

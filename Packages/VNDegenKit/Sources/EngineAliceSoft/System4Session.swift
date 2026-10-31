@@ -313,7 +313,7 @@ nonisolated struct System4InputPacer {
     private var keyGate = 0.0           // no key or button change applies before this time
     private var changedAt = Int.min / 2 // frames done when the last key or button changed
     private var changedTime = -Double.infinity  // and when
-    private var releasedAtPause = false  // the last clear() let go of something the game hasn't read yet
+    private var releasedAtPause = false  // at the last clear(), a change was still unread or pause let go of something
     static let readWaitLimit = 0.5
     private(set) var down: Set<Int32> = []  // keys and buttons the runtime holds
 
@@ -333,6 +333,8 @@ nonisolated struct System4InputPacer {
     mutating func clear(now: Double, done: Int) -> [System4Input] {
         queue = []
         defer { down = [] }
+        // A change the game hadn't read yet (a key let go just before the pause) must still be read after resume.
+        if done < changedAt + 2 { releasedAtPause = true }
         if !down.isEmpty {
             changedAt = done
             changedTime = now
