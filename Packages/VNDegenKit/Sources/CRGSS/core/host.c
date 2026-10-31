@@ -34,7 +34,19 @@ static struct {
     char problem[2048];
     bool hasProblem;
     char *pendingEval; // Ruby the Linux test host asks the game thread to run
-} S = {.frameRate = 60};
+    int speed;         // frames the game draws for each one its frame rate gives
+} S = {.frameRate = 60, .speed = 1};
+
+// Ruby the host asked to run, in order, and what it gave once it has run.
+typedef struct RubyRequest {
+    long id;
+    char *code;   // NULL once it has started running
+    char *result; // set once done
+    bool failed, done;
+    struct RubyRequest *next;
+} RubyRequest;
+static RubyRequest *requests;
+static long lastRequest;
 
 // The copy the main thread reads, so the game can draw its next frame meanwhile.
 static Pixel *shown;
@@ -81,6 +93,13 @@ static void *game_thread(void *unused) {
         rgss_run_game(&launch);
 
         pthread_mutex_lock(&lock);
+        for (RubyRequest *r = requests; r; r = r->next) {
+            if (r->done) continue;
+            free(r->code);
+            r->code = NULL;
+            r->result = strdup("The game ended.");
+            r->failed = r->done = true;
+        }
         S.running = false;
         S.ended = true;
         pthread_cond_broadcast(&cond);
@@ -107,8 +126,42 @@ bool host_present(const Image *frame) {
     return go;
 }
 
+static RubyRequest *find_request(long id) {
+    for (RubyRequest *r = requests; r; r = r->next) if (r->id == id) return r;
+    return NULL;
+}
+
+// Runs the host's Ruby while the game waits for a frame, so its objects are between two frames.
+static void run_requests_locked(void) {
+    for (;;) {
+        RubyRequest *r = requests;
+        while (r && !r->code) r = r->next;
+        if (!r) return;
+        long id = r->id;
+        char *code = r->code;
+        r->code = NULL;
+        pthread_mutex_unlock(&lock);
+        bool failed = false;
+        char *result = rgss_run_ruby(code, &failed);
+        free(code);
+        pthread_mutex_lock(&lock);
+        // The host may have read or dropped requests meanwhile.
+        if ((r = find_request(id))) {
+            r->result = result;
+            r->failed = failed;
+            r->done = true;
+        } else {
+            free(result);
+        }
+    }
+}
+
 bool host_wait_frame_locked(void) {
-    while (S.granted <= 0 && !S.stopRequested) pthread_cond_wait(&cond, &lock);
+    for (;;) {
+        if (!S.stopRequested) run_requests_locked();
+        if (S.granted > 0 || S.stopRequested) break;
+        pthread_cond_wait(&cond, &lock);
+    }
     if (S.stopRequested) return false;
     S.granted--;
     return true;
@@ -132,6 +185,13 @@ void host_set_frame_rate(int rate) {
     pthread_mutex_lock(&lock);
     S.frameRate = rate;
     pthread_mutex_unlock(&lock);
+}
+
+bool host_frame_hidden(void) {
+    pthread_mutex_lock(&lock);
+    bool hidden = S.speed > 1 && S.granted > 1;
+    pthread_mutex_unlock(&lock);
+    return hidden;
 }
 
 void host_frame_reset(void) {
@@ -192,6 +252,15 @@ int vnrgss_start(const VNRGSSLaunch *l) {
     S.granted = 1;
     S.carry = 0;
     S.frameRate = 60;
+    S.speed = 1;
+    // Results the last game's host never read.
+    while (requests) {
+        RubyRequest *r = requests;
+        requests = r->next;
+        free(r->code);
+        free(r->result);
+        free(r);
+    }
     memset(&S.input, 0, sizeof S.input);
     memset(S.latched, 0, sizeof S.latched);
     memset(S.mouseLatched, 0, sizeof S.mouseLatched);
@@ -241,12 +310,12 @@ int vnrgss_step(double seconds) {
         if (seconds > 0.25) seconds = 0.25;
         // Rounded rather than truncated: display refreshes jitter around 1/60 s, and truncating would grant no frame on
         // one refresh and two on the next, so one of the two would never be shown. The carry stays within half a frame.
-        S.carry += seconds * S.frameRate;
+        S.carry += seconds * S.frameRate * S.speed;
         int frames = (int)(S.carry + 0.5);
         S.carry -= frames;
         S.granted += frames;
         // A game that falls behind runs at its own pace rather than racing to catch up.
-        if (S.granted > 2) S.granted = 2;
+        if (S.granted > 2 * S.speed) S.granted = 2 * S.speed;
         if (frames > 0) pthread_cond_broadcast(&cond);
     }
     pthread_mutex_unlock(&lock);
@@ -317,6 +386,50 @@ void vnrgss_set_paused(bool paused) {
     S.carry = 0;
     pthread_mutex_unlock(&lock);
     audio_set_paused(paused);
+}
+
+void vnrgss_set_speed(int speed) {
+    pthread_mutex_lock(&lock);
+    S.speed = speed < 1 ? 1 : speed;
+    S.carry = 0;
+    pthread_mutex_unlock(&lock);
+}
+
+long vnrgss_run_ruby(const char *ruby) {
+    pthread_mutex_lock(&lock);
+    if (!S.running || S.ended || !ruby) {
+        pthread_mutex_unlock(&lock);
+        return 0;
+    }
+    RubyRequest *request = calloc(1, sizeof *request);
+    request->id = ++lastRequest;
+    request->code = strdup(ruby);
+    RubyRequest **end = &requests;
+    while (*end) end = &(*end)->next;
+    *end = request;
+    // A game waiting for its next frame runs it now.
+    pthread_cond_broadcast(&cond);
+    long id = request->id;
+    pthread_mutex_unlock(&lock);
+    return id;
+}
+
+char *vnrgss_ruby_result(long request, bool *failed) {
+    pthread_mutex_lock(&lock);
+    char *result = NULL;
+    for (RubyRequest **link = &requests; *link; link = &(*link)->next) {
+        RubyRequest *r = *link;
+        if (r->id != request) continue;
+        if (r->done) {
+            result = r->result;
+            if (failed) *failed = r->failed;
+            *link = r->next;
+            free(r);
+        }
+        break;
+    }
+    pthread_mutex_unlock(&lock);
+    return result;
 }
 
 void vnrgss_stop(void) {
