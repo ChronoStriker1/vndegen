@@ -244,7 +244,7 @@ struct SiglusPrompt {
     let close: (_ index: Int) -> Void
 
     /// The buttons of each kind of message box, in the order the engine counts them.
-    static func buttons(_ kind: Int32) -> [String] {
+    nonisolated static func buttons(_ kind: Int32) -> [String] {
         switch kind {
         case 1: ["OK", "Cancel"]
         case 2: ["Yes", "No"]

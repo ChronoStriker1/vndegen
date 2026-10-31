@@ -17,7 +17,6 @@ final class SiglusHostView: UIView {
     var onEvent: ((ControllerEvent) -> Void)?
 
     override class var layerClass: AnyClass { CAMetalLayer.self }
-    var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
 
     init() {
         super.init(frame: .zero)
