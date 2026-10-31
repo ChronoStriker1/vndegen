@@ -831,21 +831,24 @@ void VM::run(size_t untilFrames) {
         case OP_A_FILL: {
             int32_t v = pop(), n = pop(), start = pop(), i = pop(), pg = pop();
             Page *a = arrayAt(pg, i);
+            // Each element gets its own copy of a struct; the value popped is a temporary this instruction owns.
+            bool strings = a->elemType == T_STRING, structs = a->elemType == T_STRUCT && a->rank <= 1;
             // Fills [start, start + n) within the array; a negative start fills from 0 but counts the part before.
             int64_t end = std::min(int64_t(start) + std::max(n, 0), int64_t(a->v.size()));
             int32_t done = int32_t(std::max<int64_t>(0, end - start));
-            // The size is checked each time: a struct's destructor, run by the assignment, can change the array.
-            for (int64_t k = std::max<int64_t>(start, 0); k < end && size_t(k) < a->v.size(); k++) {
+            // The array is looked up each time: a struct's destructor, run by the assignment, can change or free it.
+            for (int64_t k = std::max<int64_t>(start, 0); k < end; k++) {
+                a = arrayAt(pg, i);
+                if (!a || size_t(k) >= a->v.size()) break;
                 int32_t e = a->v[size_t(k)];
-                if (a->elemType == T_STRING) str(e) = str(v);
-                else if (a->elemType == T_STRUCT && a->rank <= 1) {
-                    // Each element gets its own copy; the value popped is a temporary this instruction owns.
+                if (strings) str(e) = str(v);
+                else if (structs) {
                     if (page(e)) structAssign(e, v);
-                    else if (int32_t c = copyPage(v); size_t(k) < a->v.size()) a->v[size_t(k)] = c;
+                    else if (int32_t c = copyPage(v); (a = arrayAt(pg, i)) && size_t(k) < a->v.size()) a->v[size_t(k)] = c;
                     else decref(c);
                 } else a->v[size_t(k)] = v;
             }
-            if (a->elemType == T_STRING || (a->elemType == T_STRUCT && a->rank <= 1)) decref(v);
+            if (strings || structs) decref(v);
             push(done);
             break;
         }

@@ -1,5 +1,6 @@
 #include "ain.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -238,8 +239,9 @@ std::string Ain::parse(const std::vector<uint8_t> &plain) {
     if (code.empty()) return "no CODE section";
     // A struct can't hold itself by value. The VM and the save encoders recurse through struct members, so a
     // damaged file with such a cycle, or an absurdly deep chain, is refused here.
-    // Depth-first with an explicit stack, so a long chain of struct types can't overflow the native one.
-    std::vector<int> state(structs.size(), 0);  // 0 unvisited, 1 on the path, 2 done
+    // Depth-first with an explicit stack, so a long chain of struct types can't overflow the native one. Each
+    // struct's nesting depth is kept, since making one recurses that deep.
+    std::vector<int> state(structs.size(), 0), depth(structs.size(), 0);  // state: 0 unvisited, 1 on the path, 2 done
     auto memberStruct = [&](size_t s, size_t m) -> int {
         const VarType &t = structs[s].members[m].t;
         return t.type == T_STRUCT && t.structType >= 0 && size_t(t.structType) < structs.size() ? t.structType : -1;
@@ -249,17 +251,21 @@ std::string Ain::parse(const std::vector<uint8_t> &plain) {
         std::vector<std::pair<size_t, size_t>> path{{root, 0}};  // struct, next member to look at
         state[root] = 1;
         while (!path.empty()) {
-            auto &[s, m] = path.back();
+            auto [s, m] = path.back();
             if (m == structs[s].members.size()) {
+                int deepest = 0;
+                for (size_t k = 0; k < structs[s].members.size(); k++)
+                    if (int c = memberStruct(s, k); c >= 0) deepest = std::max(deepest, depth[size_t(c)]);
+                depth[s] = deepest + 1;
+                if (depth[s] > 256) return "struct " + structs[s].name + " nests too deeply";
                 state[s] = 2;
                 path.pop_back();
                 continue;
             }
-            int child = memberStruct(s, m++);
+            path.back().second++;
+            int child = memberStruct(s, m);
             if (child < 0 || state[size_t(child)] == 2) continue;
             if (state[size_t(child)] == 1) return "struct " + structs[size_t(child)].name + " contains itself";
-            // Making a struct recurses through its members, so a chain this deep would overflow later instead.
-            if (path.size() >= 256) return "struct " + structs[size_t(child)].name + " nests too deeply";
             state[size_t(child)] = 1;
             path.push_back({size_t(child), 0});
         }

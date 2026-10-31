@@ -316,6 +316,9 @@ namespace {
 
 constexpr int32_t kMaxRank = 16;           // far above any game's arrays
 constexpr size_t kMaxArrayPages = 1 << 20;  // arrays one load may make; empty dimensions cost no bytes in the file
+// Structs and arrays nested in one saved value. Loading recurses this deep on the VM thread, whose stack is 512 KB on
+// Apple systems; no game's data comes close.
+constexpr int kMaxNesting = 128;
 
 struct Reader {
     const std::vector<uint8_t> &d;
@@ -405,18 +408,21 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
 }
 
 // Walks what Applier would fill without touching the VM: a record or array that refers back to one being filled,
-// or more arrays than kMaxArrayPages, fails the load before any global changes.
+// nesting deeper than kMaxNesting, or more arrays than kMaxArrayPages fails the load before any global changes.
 struct Checker {
     VM &vm;
     Loaded &L;
     std::vector<char> recordOpen = std::vector<char>(L.records.size()), arrayOpen = std::vector<char>(L.arrayAt.size());
     size_t pages = 0;
+    int depth = 0;
     bool failed = false;
 
     void value(const VarType &t, int32_t v) {
         if (failed) return;
-        if (t.type == T_STRUCT) record(t.structType, v);
+        if (++depth > kMaxNesting) failed = true;
+        else if (t.type == T_STRUCT) record(t.structType, v);
         else if (isArray(t.type)) array(arrayElem(t.type) == T_STRUCT ? t.structType : -1, v);
+        depth--;
     }
     void record(int32_t structType, int32_t index) {
         if (index < 0 || size_t(index) >= L.records.size() || structType < 0 || size_t(structType) >= vm.ain.structs.size()) return;
@@ -442,12 +448,14 @@ struct Checker {
         size_t p = L.arrayAt[size_t(index)];
         int32_t rank = int32_t(r.u32(p));
         if (rank > kMaxRank) { failed = true; return; }
-        if (rank > 0) {
+        if (rank >= 0) {  // as Applier::node, rank 0 is read like rank 1
             std::vector<uint32_t> dims(static_cast<size_t>(rank), 0);
             for (auto &d : dims) d = r.u32(p);
             r.u32(p);
-            // Applier makes one array per node: the outer dimensions' running products.
+            // Applier makes the top array, then one per node below it: the outer dimensions' running products,
+            // the last of which are the innermost rows.
             uint64_t level = 1;
+            pages++;
             for (int k = rank - 1; k >= 1 && !failed; k--) {
                 level *= dims[size_t(k)];
                 pages += size_t(std::min<uint64_t>(level, kMaxArrayPages + 1));
@@ -455,12 +463,14 @@ struct Checker {
             }
             // The innermost rows, in order, with their struct elements.
             for (uint64_t row = 0; row < level && !failed && !r.bad; row++) {
-                if (++pages > kMaxArrayPages) { failed = true; break; }
                 uint32_t n = r.u32(p);
                 for (uint32_t k = 0; k < n && !r.bad && !failed; k++) {
                     int32_t val = int32_t(r.u32(p));
                     r.u32(p);
-                    if (elemStruct >= 0) record(elemStruct, val);
+                    // Applier stores each element as a value, one level down.
+                    if (++depth > kMaxNesting) failed = true;
+                    else if (elemStruct >= 0) record(elemStruct, val);
+                    depth--;
                 }
             }
         }
@@ -476,10 +486,17 @@ struct Applier {
     // Either fails the load; nothing is skipped silently.
     std::vector<char> recordOpen = std::vector<char>(L.records.size()), arrayOpen = std::vector<char>(L.arrayAt.size());
     size_t pages = 0;
+    int depth = 0;
     bool failed = false;
 
     void store(int32_t &dst, const VarType &t, int32_t savedType, int32_t value) {
         if (failed) return;
+        if (++depth > kMaxNesting) failed = true;  // as Checker; it has refused such a save already
+        else storeValue(dst, t, savedType, value);
+        depth--;
+    }
+
+    void storeValue(int32_t &dst, const VarType &t, int32_t savedType, int32_t value) {
         if (t.type == T_STRING) {
             if (!vm.valid(dst)) dst = vm.newString();
             vm.str(dst) = value >= 0 && size_t(value) < L.strings.size() ? L.strings[value] : std::string();

@@ -74,6 +74,8 @@ that took over half their length, and after a movie, how often its sound ran dry
 - Only the libraries and calls the test games use are built. Other System 4 games may call functions the runtime
   doesn't have yet; each is logged once.
 - `CG_RotateRGB` isn't bound: the SDK doesn't say what its channel swap does.
+- Resume saves aren't written while the game holds a delegate, because the PC's encoding of delegates in them isn't
+  known yet; the game is told the save failed. Test Games 19 and 46 hold none when they save.
 - Global and group saves in layout 7, which Sys43VM writes for code files other than version 5, aren't read or
   written; no test game uses them.
 - Four MultiSprite fields keep the PC's values without a known meaning, and moves in progress aren't saved, as on the
