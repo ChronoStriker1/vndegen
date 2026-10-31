@@ -2,18 +2,33 @@ import Foundation
 import Testing
 import WebKit
 
-/// Enough of MZ around a real WebGL canvas: a tile layer, an animation sprite, and Effekseer's context and effect cache,
-/// shaped as rmmz_core.js and rmmz_sprites.js have them.
+/// Enough of MZ around a real WebGL canvas: a tile layer, an animation sprite, and Effekseer's contexts, effects, and
+/// handles, shaped as rmmz_core.js, rmmz_sprites.js, and effekseer.min.js have them. Anything that reaches a released
+/// Effekseer context throws, as Effekseer's native calls fail once their context is gone.
 private let page = """
     <html><body><script>
+    class Context {
+        constructor(id, fails) { this.id = id; this.fails = fails; this.nativeptr = id; }
+        init() { if (this.fails) throw new Error('no context'); }
+        setRestorationOfStatesFlag() {}
+        check() { if (!this.nativeptr) throw new Error('released context ' + this.id); }
+        loadEffect(name) { this.check(); return new Effect(this, name); }
+        releaseEffect(effect) { this.check(); effekseer.releasedEffects.push(effect.name); effect.nativeptr = null; }
+        play(effect) { this.check(); return { context: this, get exists() { this.context.check(); return true; }, stop() { this.context.check(); } }; }
+    }
+    class Effect {
+        constructor(context, name) { this.context = context; this.name = name; this.isLoaded = false; this.nativeptr = 0; }
+        // A texture that arrives later reloads the effect in its context.
+        _update() { this.context.check(); this.isLoaded = true; this.nativeptr = 1; }
+    }
     window.effekseer = {
-        made: 0, released: [], failNext: false,
+        made: 0, failNext: false, releasedContexts: [], releasedEffects: [],
         createContext() {
             const fails = this.failNext;
             this.failNext = false;
-            return { id: ++this.made, init() { if (fails) throw new Error('no context'); }, setRestorationOfStatesFlag() {} };
+            return new Context(++this.made, fails);
         },
-        releaseContext(context) { this.released.push(context.id); },
+        releaseContext(context) { this.releasedContexts.push(context.id); context.nativeptr = null; },
     };
     const canvas = document.createElement('canvas');
     document.body.appendChild(canvas);
@@ -33,17 +48,24 @@ private let page = """
         },
     };
     Graphics._createEffekseerContext();
-    window.EffectManager = { _cache: { 'effects/old.efkefc': {} }, load(name) { return this._cache[name] = { name }; } };
+    window.EffectManager = {
+        _cache: {},
+        load(name) { return this._cache[name] || (this._cache[name] = Graphics._effekseer && Graphics._effekseer.loadEffect(name)); },
+    };
     window.Tilemap = { Layer: function () {} };
-    Tilemap.Layer.prototype.render = function () { this.uploads = (this.uploads || 0) + (this._needsTexturesUpdate ? 1 : 0); this._needsTexturesUpdate = false; };
-    // A handle from a released or lost context throws when read, as Effekseer's does once its context is gone.
-    window.handle = (context) => ({ get exists() { if (context !== Graphics._effekseer) throw new Error('lost handle'); return true; }, stop() { this.stopped = true; } });
-    window.Sprite_Animation = function () { this.initialize(); };
-    Sprite_Animation.prototype.initialize = function () { this._handle = null; this._started = false; };
+    Tilemap.Layer.prototype.render = function () {
+        this.uploads = (this.uploads || 0) + (this._needsTexturesUpdate ? 1 : 0);
+        this._needsTexturesUpdate = false;
+    };
+    window.Sprite_Animation = function () { this._handle = null; this._started = false; };
     Sprite_Animation.prototype.setup = function (animation) { this._animation = animation; this._effect = EffectManager.load(animation.effectName); };
+    Sprite_Animation.prototype.start = function () { this._handle = Graphics._effekseer.play(this._effect); this._started = true; };
     Sprite_Animation.prototype.update = function () { if (this._handle) this.sawHandle = this._handle.exists; };
     Sprite_Animation.prototype._render = function () { this.drew = !!(this._handle && this._handle.exists); };
     Sprite_Animation.prototype.destroy = function () { if (this._handle) this._handle.stop(); };
+    Sprite_Animation.prototype.checkEnd = function () { this.ended = !(this._handle && this._handle.exists); };
+    Sprite_Animation.prototype.setRotation = function () {};
+    Sprite_Animation.prototype.updateEffectGeometry = function () {};
     </script></body></html>
     """
 
@@ -75,27 +97,33 @@ private let page = """
         const layer = new Tilemap.Layer();
         layer._needsTexturesUpdate = true;
         layer.render();
+        // One effect has loaded, another still waits for a texture.
+        EffectManager.load('slash')._update();
+        const pending = EffectManager.load('mist');
         const playing = new Sprite_Animation(), drawn = new Sprite_Animation(), ended = new Sprite_Animation();
-        const waiting = new Sprite_Animation();
         for (const animation of [playing, drawn, ended]) {
             animation.setup({ effectName: 'slash' });
-            animation._started = true;
-            animation._handle = handle(Graphics._effekseer);
+            animation.start();
         }
-        const endedHandle = ended._handle;
+        const waiting = new Sprite_Animation();
         waiting.setup({ effectName: 'fire' });
-        // An animation a plugin made without MZ's constructor keeps its handle while no context is lost.
-        const plugin = Object.create(Sprite_Animation.prototype);
-        plugin._started = true;
-        plugin._handle = handle(Graphics._effekseer);
-        plugin.update();
+        // Animations a plugin made without MZ's constructor: one runs through no loss, the other is first touched after.
+        const steady = Object.create(Sprite_Animation.prototype), late = Object.create(Sprite_Animation.prototype);
+        for (const animation of [steady, late]) {
+            animation._started = true;
+            animation._handle = Graphics._effekseer.play(EffectManager.load('slash'));
+        }
+        steady.update();
         const app = Graphics._app;
         await restore();
         layer.render();
         layer.render();
-        // After the restore, one animation is drawn and one ends before either is updated.
+        // After the restore, animations are drawn, end, and are checked before any update, and the waiting texture
+        // arrives.
         drawn._render();
         ended.destroy();
+        late.checkEnd();
+        pending._update();
         playing.update();
         waiting.update();
         const after = Graphics._effekseer.id, cache = Object.keys(EffectManager._cache).sort();
@@ -103,10 +131,9 @@ private let page = """
         effekseer.failNext = true;
         await restore();
         return {
-            uploads: layer.uploads, after, released: effekseer.released, cache,
-            playing: playing._handle === null, drawn: drawn.drew, stopped: !!endedHandle.stopped,
-            plugin: plugin.sawHandle === true && plugin._handle !== null,
-            reloaded: waiting._effect !== null && waiting._effect.name === 'fire',
+            uploads: layer.uploads, after, cache, releasedContexts: effekseer.releasedContexts,
+            releasedEffects: effekseer.releasedEffects, playing: playing._handle === null, drawn: drawn.drew,
+            late: late.ended, steady: steady.sawHandle === true, reloaded: waiting._effect.context.id,
             keptApp: Graphics._app === app, effekseerAfterFailure: Graphics._effekseer, glError: gl.getError(),
         };
         """, arguments: [:], contentWorld: .page) as? [String: Any]
@@ -114,15 +141,17 @@ private let page = """
     // The tileset went up once before the loss and once after it, not on every frame.
     #expect(values["uploads"] as? Int == 2)
     #expect(values["after"] as? Int == 2)
-    // The old context stays as it is, for effects it was still loading.
-    #expect(values["released"] as? [Int] == [])
     // Only the effect the waiting animation loaded again is cached, in the new context.
     #expect(values["cache"] as? [String] == ["fire"])
+    #expect(values["reloaded"] as? Int == 2)
+    // The lost context and its loaded effects are freed, both times. The second context's cache held only 'fire',
+    // which had not loaded.
+    #expect(values["releasedContexts"] as? [Int] == [1, 2])
+    #expect(values["releasedEffects"] as? [String] == ["slash"])
     #expect(values["playing"] as? Bool == true)
     #expect(values["drawn"] as? Bool == false)
-    #expect(values["stopped"] as? Bool == false)
-    #expect(values["plugin"] as? Bool == true)
-    #expect(values["reloaded"] as? Bool == true)
+    #expect(values["late"] as? Bool == true)
+    #expect(values["steady"] as? Bool == true)
     #expect(values["keptApp"] as? Bool == true)
     #expect(values["effekseerAfterFailure"] is NSNull)
     #expect(values["glError"] as? Int == 0)

@@ -553,8 +553,7 @@
         contextGeneration++;
         console.warn('WebGL context restored, restoring the tilemap and Effekseer');
         if (typeof graphics._createEffekseerContext !== 'function' || !window.effekseer) return;
-        // The old context is left as it is rather than released: effects it is still loading finish into it, and
-        // releasing it would make their callbacks throw. It costs its memory once per restore.
+        retireEffekseer(graphics);
         // MZ drops the whole PIXI application when Effekseer fails to start. Here the game keeps drawing, without
         // battle animations until the next restore.
         const app = graphics._app;
@@ -566,8 +565,28 @@
                 graphics._effekseer = null;
             }
         }
-        if (window.EffectManager) EffectManager._cache = {};
     }, true);
+
+    // Frees the lost Effekseer context and its effects. An effect still loading would go on, when its file or a texture
+    // arrives, into the released context, so its callbacks do nothing from now on. Deleting GL objects that went with
+    // the lost context only sets error flags, which are cleared so nothing reads them as a later call's.
+    function retireEffekseer(graphics) {
+        const lost = graphics._effekseer, gl = graphics._app.renderer.gl;
+        const effects = window.EffectManager ? Object.values(EffectManager._cache) : [];
+        if (window.EffectManager) EffectManager._cache = {};
+        for (const effect of effects) {
+            if (!effect) continue;
+            effect._load = effect._update = effect._reload = () => {};
+            effect.onload = effect.onerror = null;
+        }
+        if (!lost) return;
+        try {
+            for (const effect of effects) if (effect && effect.isLoaded && effect.nativeptr) lost.releaseEffect(effect);
+            effekseer.releaseContext(lost);
+        } catch (e) { /* already gone */ }
+        for (let i = 0; i < 16 && gl.getError() !== gl.NO_ERROR; i++);
+    }
+
     document.addEventListener('load', () => {
         const layer = window.Tilemap && Tilemap.Layer && Tilemap.Layer.prototype;
         if (layer) {
@@ -582,27 +601,23 @@
         // MV's animations are sprites, which PIXI restores.
         const animation = window.Graphics && Graphics._createEffekseerContext && typeof Sprite_Animation === 'function'
             && Sprite_Animation.prototype;
-        if (animation) {
-            wrap(animation, 'initialize', (initialize) => function () {
-                this.vndegenContext = contextGeneration;
-                return initialize.apply(this, arguments);
+        if (!animation) return;
+        // Every method that reads an animation's handle first drops a handle, or an effect not yet playing, that
+        // belongs to an Effekseer context other than the current one.
+        for (const name of ['update', '_render', 'destroy', 'setRotation', 'updateEffectGeometry', 'checkEnd']) {
+            wrap(animation, name, (method) => function () {
+                forgetLostEffect(this);
+                return method.apply(this, arguments);
             });
-            // Whatever reaches an animation first after a restore, an update, a draw or its end, drops its handle and
-            // effect from the lost context before they are used.
-            for (const name of ['update', '_render', 'destroy']) {
-                wrap(animation, name, (method) => function () {
-                    forgetLostEffect(this);
-                    return method.apply(this, arguments);
-                });
-            }
         }
     }, true);
     function forgetLostEffect(animation) {
-        if (animation.vndegenContext === undefined) animation.vndegenContext = contextGeneration;
-        if (animation.vndegenContext === contextGeneration) return;
-        animation.vndegenContext = contextGeneration;
-        animation._handle = null;
-        if (!animation._started && animation._animation && window.EffectManager) {
+        const current = window.Graphics && Graphics._effekseer;
+        const handle = animation._handle;
+        if (handle && handle.context && handle.context !== current) animation._handle = null;
+        const effect = animation._effect;
+        if (!animation._started && effect && effect.context && effect.context !== current && animation._animation
+            && window.EffectManager) {
             animation._effect = EffectManager.load(animation._animation.effectName);
         }
     }
