@@ -157,6 +157,31 @@ private struct Harness {
         #expect(h.at(enter)[1].done >= resumedAt + 2)
     }
 
+    @Test func anIdlePauseLeavesPacingAlone() {
+        var h = Harness()
+        h.add([.mouseMove(a)])
+        h.steps(4)
+        #expect(h.pacer.clear(now: h.now, done: h.done).isEmpty)  // nothing held
+        h.now += 2
+        h.pacer.resumed(now: h.now, done: h.done)
+        h.add([.mouseMove(b), .wheel(1)])
+        #expect(h.applied.suffix(2).map(\.input) == [.mouseMove(b), .wheel(1)])  // at once
+        h.add([enter])
+        #expect(h.at(enter).count == 1)
+    }
+
+    @Test func resumeRenewsOnlyOnce() {
+        var h = Harness()
+        h.add([enter])
+        h.steps(20)
+        _ = h.pacer.clear(now: h.now, done: h.done)
+        h.pacer.resumed(now: h.now, done: h.done)
+        h.steps(4)  // the release has been read
+        h.pacer.resumed(now: h.now, done: h.done)  // a second resume with no pause between
+        h.add([enter])
+        #expect(h.at(enter).count == 2)
+    }
+
     @Test func pauseDropsAQueuedRelease() {
         var h = Harness()
         h.add([.mouseMove(a)])

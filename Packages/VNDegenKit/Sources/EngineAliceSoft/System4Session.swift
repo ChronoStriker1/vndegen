@@ -225,6 +225,7 @@ final class System4Session: EngineSession {
     }
 
     func setPaused(_ paused: Bool) {
+        let wasPaused = self.paused
         self.paused = paused
         guard let engine else { return }
         if paused {
@@ -232,7 +233,7 @@ final class System4Session: EngineSession {
             _ = router.releaseAll()
             apply(pacer.clear(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))))
         }
-        if !paused { pacer.resumed(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))) }
+        if !paused, wasPaused { pacer.resumed(now: CACurrentMediaTime(), done: Int(vns4_frames_done(engine))) }
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
@@ -312,6 +313,7 @@ nonisolated struct System4InputPacer {
     private var keyGate = 0.0           // no key or button change applies before this time
     private var changedAt = Int.min / 2 // frames done when the last key or button changed
     private var changedTime = -Double.infinity  // and when
+    private var releasedAtPause = false  // the last clear() let go of something the game hasn't read yet
     static let readWaitLimit = 0.5
     private(set) var down: Set<Int32> = []  // keys and buttons the runtime holds
 
@@ -335,13 +337,16 @@ nonisolated struct System4InputPacer {
             changedAt = done
             changedTime = now
             keyGate = now + Self.releaseHold
+            releasedAtPause = true
         }
         return down.sorted().map { .key($0, down: false) }
     }
 
     /// Called on resume: the game couldn't read anything while paused, so what pause let go of must still be read
-    /// before anything else applies, however long the pause was.
+    /// before anything else applies, however long the pause was. A pause that let go of nothing leaves pacing as it was.
     mutating func resumed(now: Double, done: Int) {
+        guard releasedAtPause else { return }
+        releasedAtPause = false
         changedAt = done
         changedTime = now
         keyGate = max(keyGate, now + Self.releaseHold)
