@@ -3,8 +3,13 @@ import Testing
 import VNCore
 @testable import EngineSiglus
 
+/// `VNDEGEN_TEST_DIR` puts the games on another volume, such as the case-sensitive disk image `scripts/build.sh test`
+/// mounts.
+private let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+    ?? FileManager.default.temporaryDirectory
+
 private func folder(_ files: [String: Data]) throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appending(path: "siglus-\(UUID().uuidString)")
+    let root = scratch.appending(path: "siglus-\(UUID().uuidString)")
     for (path, data) in files {
         let url = root.appending(path: path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -73,7 +78,9 @@ private let seen = Data([0x00, 0x00, 0x00, 0x00, 0x40, 0x9c, 0x00, 0x00])
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appending(path: "data")
         let siglus = try #require(SiglusPlugin().saveLocations(folder: root, dataDirectory: data).first)
-        #expect(siglus.directory.lastPathComponent == "SaveData")
+        // The folder as it is on disk, on a volume that doesn't ignore case.
+        #expect(siglus.directory.lastPathComponent.lowercased() == "savedata")
+        #expect(FileManager.default.fileExists(atPath: siglus.directory.appending(path: "0001.sav").path))
         let realLive = try #require(RealLivePlugin().saveLocations(folder: root, dataDirectory: data).first)
         #expect(realLive.directory == data.appending(path: "savedata_rs", directoryHint: .isDirectory))
         #expect(RealLivePlugin().backupWarning(for: Game(id: GameID("g")), dataDirectory: data) != nil)
@@ -105,7 +112,8 @@ private let seen = Data([0x00, 0x00, 0x00, 0x00, 0x40, 0x9c, 0x00, 0x00])
         var router = SiglusInputRouter()
         #expect(router.scroll(30) == [])
         #expect(router.scroll(20) == [.wheel(-1)])
-        #expect(router.scroll(-85) == [.wheel(2)])
+        // 10 points carry over from the last notch.
+        #expect(router.scroll(-90) == [.wheel(2)])
     }
 
     @Test func pointsLandOnTheGamesScreen() {
