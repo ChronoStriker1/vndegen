@@ -62,6 +62,11 @@ nonisolated extension GameFolder {
             rpgLog.notice("something is at testDirectory in the web root, so the game keeps saving to save/")
             return .nothing
         }
+        // The core's own check, which a web root VNDegen can't write to fails.
+        guard mkdir(probe.path, 0o755) == 0, rmdir(probe.path) == 0 else {
+            rpgLog.notice("testDirectory can't be made and removed in the web root, so the game keeps saving to save/")
+            return .nothing
+        }
         guard !webRoot.isEmpty, let target = saveDirectory,
               let legacy = resolve(virtualPath: (virtualWebRoot as NSString).deletingLastPathComponent + "/save"),
               let names = try? fm.contentsOfDirectory(atPath: legacy.path) else { return .nothing }
@@ -96,10 +101,46 @@ nonisolated extension GameFolder {
             return .moved(moved)
         }
 
-        // A move that stopped partway. The index in www/save/ already lists what is left, and the files it moved are
-        // not clashes.
+        // Windows ignores case, so `GLOBAL.rpgsave` is the index too. Where a case-sensitive disk holds two spellings,
+        // which one the game reads depends on the spelling it asks for, so neither is chosen.
+        let theirIndexes = present.filter { $0.lowercased() == Self.indexName }
+        let oneIndexEach = ourIndexes.count <= 1 && theirIndexes.count <= 1
+        let ourIndex = ourIndexes.first, theirIndex = theirIndexes.first
+
+        // The index in www/save/ with save/'s entries for the slots among `pending` added, written there. False when an
+        // index can't be read, or save/'s doesn't describe every one of those slots.
+        func addToIndex(_ pending: [String]) -> Bool {
+            guard oneIndexEach, let ourIndex else { return false }
+            // The index there must be a file in the game folder, not a symlink that leads anywhere else.
+            let theirs: String?
+            if let theirIndex {
+                let url = target.appendingPathComponent(theirIndex)
+                theirs = isFile(url) ? try? String(contentsOf: url, encoding: .utf8) : nil
+            } else {
+                theirs = LZString.compressToBase64("[]")
+            }
+            let saves = pending.filter { !$0.lowercased().hasSuffix(".bak") }.compactMap(Self.slot)
+            guard let ours = try? String(contentsOf: legacy.appendingPathComponent(ourIndex), encoding: .utf8), let theirs,
+                  let merged = Self.mergedIndex(ours, into: theirs, slots: saves) else { return false }
+            do {
+                try fm.createDirectory(at: target, withIntermediateDirectories: true)
+                try Data(merged.utf8).write(to: target.appendingPathComponent(theirIndex ?? Self.indexName), options: .atomic)
+                return true
+            } catch {
+                rpgLog.error("could not write the index in \(target.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                return false
+            }
+        }
+
+        // A move that stopped partway. The files it moved are not clashes. The game may have rewritten its index since,
+        // dropping slots whose files were still in save/, so what is left goes into the index again first.
         if isFile(marker), let list = try? String(contentsOf: marker, encoding: .utf8) {
-            return move(list.split(separator: "\n").map(String.init).filter { files.contains($0) && !existing.contains($0.lowercased()) })
+            let pending = list.split(separator: "\n").map(String.init).filter { files.contains($0) && !existing.contains($0.lowercased()) }
+            guard pending.isEmpty || addToIndex(pending) else {
+                rpgLog.notice("saves in save/ wait to finish moving: the index in \(self.webRoot, privacy: .public)/save/ can't take them")
+                return .nothing
+            }
+            return move(pending)
         }
         let slots = files.compactMap(Self.slot)
         guard !slots.isEmpty else { return .nothing }
@@ -108,33 +149,14 @@ nonisolated extension GameFolder {
             return .keptBoth(files)
         }
         if let clash = Set(slots).intersection(present.compactMap(Self.slot)).min() { return keepBoth("slot \(clash) is in both") }
-
-        // Windows ignores case, so `GLOBAL.rpgsave` is the index too. Where a case-sensitive disk holds two spellings,
-        // which one the game reads depends on the spelling it asks for, so neither is chosen.
-        let theirIndexes = present.filter { $0.lowercased() == Self.indexName }
-        guard ourIndexes.count <= 1, theirIndexes.count <= 1 else { return keepBoth("an index is there in two spellings") }
-        let ourIndex = ourIndexes.first, theirIndex = theirIndexes.first
+        guard oneIndexEach else { return keepBoth("an index is there in two spellings") }
         guard let ourIndex else { return keepBoth("save/ has no index") }
-        // The index there must be a file in the game folder, not a symlink that leads anywhere else.
-        let theirs: String?
-        if let theirIndex {
-            let url = target.appendingPathComponent(theirIndex)
-            theirs = isFile(url) ? try? String(contentsOf: url, encoding: .utf8) : nil
-        } else {
-            theirs = LZString.compressToBase64("[]")
-        }
-        let saves = files.filter { !$0.lowercased().hasSuffix(".bak") }.compactMap(Self.slot)
-        guard let ours = try? String(contentsOf: legacy.appendingPathComponent(ourIndex), encoding: .utf8), let theirs,
-              let merged = Self.mergedIndex(ours, into: theirs, slots: saves) else {
-            return keepBoth("an index can't be read or doesn't describe every slot")
-        }
         let pending = files.filter { $0 != ourIndex && !existing.contains($0.lowercased()) }
+        guard addToIndex(pending) else { return keepBoth("an index can't be read or doesn't describe every slot") }
         do {
-            try fm.createDirectory(at: target, withIntermediateDirectories: true)
-            try Data(merged.utf8).write(to: target.appendingPathComponent(theirIndex ?? Self.indexName), options: .atomic)
             try Data(pending.joined(separator: "\n").utf8).write(to: marker, options: .atomic)
         } catch {
-            rpgLog.error("could not prepare the move to \(target.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            rpgLog.error("could not start the move to \(target.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return .nothing
         }
         return move(pending)

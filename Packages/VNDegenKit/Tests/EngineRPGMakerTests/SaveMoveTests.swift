@@ -116,6 +116,32 @@ private func titles(_ index: String?) throws -> [Int: String] {
     #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("save").path))
 }
 
+@Test func aRetryPutsWhatIsLeftBackInTheIndex() throws {
+    // Slot 2 couldn't move. The game then saved slot 1, and MV wrote its index without slot 2, whose file was missing.
+    let root = try mvGame([
+        "save/file2.rpgsave": "two", "save/global.rpgsave": index([1, 2]),
+        "save/.vndegen-moving-to-web-root": "file1.rpgsave\nfile2.rpgsave",
+        "www/save/file1.rpgsave": "one", "www/save/global.rpgsave": index([1, 6]),
+    ])
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(GameFolder(rpgMakerGameAt: root).moveCommunityCoreSaves() == .moved(["file2.rpgsave"]))
+    #expect(try titles(contents(root.appendingPathComponent("www/save"))["global.rpgsave"]) == [1: "slot 1", 2: "slot 2", 6: "slot 6"])
+    #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("save").path))
+}
+
+@Test func savesStayWhenTheWebRootCantBeWritten() throws {
+    // The core can't make testDirectory there either, so it keeps using save/.
+    let root = try mvGame(["save/file1.rpgsave": "mine", "save/global.rpgsave": index([1]), "www/save/config.rpgsave": "c"])
+    let www = root.appendingPathComponent("www")
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: www.path)
+        try? FileManager.default.removeItem(at: root)
+    }
+    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: www.path)
+    #expect(GameFolder(rpgMakerGameAt: root).moveCommunityCoreSaves() == .nothing)
+    #expect(contents(root.appendingPathComponent("save")) == ["file1.rpgsave": "mine", "global.rpgsave": index([1])])
+}
+
 @Test func savesThatCantMergeStayWhereTheyAre() throws {
     let ours = ["save/file1.rpgsave": "mine", "save/global.rpgsave": index([1])]
     for (mine, theirs) in [
