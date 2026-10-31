@@ -19,3 +19,12 @@ target_link_libraries(vnns_host PRIVATE ${FREETYPE_LIBRARIES} bz2 pthread)
 target_compile_options(vnns_host PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
 set_source_files_properties(${RUNTIME}/core/audio.cpp ${RUNTIME}/core/gfx.cpp ${RUNTIME}/core/video.cpp ${RUNTIME}/core/lua_all.c
   PROPERTIES COMPILE_OPTIONS "-w")
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(text_speed_test text_speed_test.cpp ${RUNTIME_SOURCES} ${RUNTIME}/core/lua_all.c ${SHARED}/casepath.c)
+  target_include_directories(text_speed_test PRIVATE ${RUNTIME}/include ${RUNTIME}/core ${SHARED})
+  target_link_libraries(text_speed_test PRIVATE bz2 pthread)
+  target_compile_options(text_speed_test PRIVATE -UNDEBUG)
+  add_test(NAME text_speed_round_trip COMMAND text_speed_test)
+endif()
