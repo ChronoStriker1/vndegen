@@ -246,11 +246,21 @@ void tTJSNI_MenuItem::SetVisible(bool b)
     // 	if(Window) Window->SetMenuBarVisible(b); else MenuItem->setVisible (b);
 }
 //---------------------------------------------------------------------------
+static bool (*menuBarShownHook)();
+
+void TVPSetMenuBarShownHook(bool (*hook)())
+{
+    menuBarShownHook = hook;
+}
+
 bool tTJSNI_MenuItem::GetVisible() const
 {
-    // A window's own item is its menu bar, which the engine never draws. Games that read it put their menu commands
-    // on screen instead.
-    return !Window && IsVisible;
+    // A window's own item is its menu bar, which the engine never draws. The host decides what a game that reads it
+    // is told: hidden, so it puts its menu commands on screen, or as the game set it, so it builds its menu, which the
+    // host shows in a menu of its own.
+    if (Window)
+        return IsVisible && menuBarShownHook && menuBarShownHook();
+    return IsVisible;
 }
 
 //---------------------------------------------------------------------------
