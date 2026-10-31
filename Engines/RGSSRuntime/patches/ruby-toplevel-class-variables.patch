@@ -1,0 +1,15 @@
+--- a/vm_insnhelper.c
++++ b/vm_insnhelper.c
+@@ -1178,9 +1178,9 @@
+             CREF_PUSHED_BY_EVAL(cref) || CREF_SINGLETON(cref))) {
+         cref = CREF_NEXT(cref);
+     }
+-    if (top_level_raise && !CREF_NEXT(cref)) {
+-        rb_raise(rb_eRuntimeError, "class variable access from toplevel");
+-    }
++    /* VNDegen: Ruby 1.8 and 1.9, which RPG Maker's games were written for, let a top-level `class << SomeModule`
++     * body use class variables, which then belong to Object. Ruby 3 raises here; games still need the old way. */
++    (void)top_level_raise;
+ 
+     klass = vm_get_iclass(cfp, CREF_CLASS(cref));
+ 

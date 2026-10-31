@@ -1,5 +1,8 @@
 # RPG Maker XP, VX and VX Ace feasibility spike
 
+This records the first RGSS engine, built on mkxp-z, which VNDegen no longer uses. VNDegen now runs these games on
+its own runtime; [rgss.md](rgss.md) describes it. The RTP section below still applies.
+
 Spike date 2026-10-26, on branch `ws/rgss`. The questions were whether mkxp-z can run the library's RGSS games (RPG Maker XP, VX and VX Ace) on macOS and on the iPhone simulator, how the RPG Maker RTP should work, and what mkxp-z's GPL means for VNDegen. This document records the answers, the experiments behind them, a recommended architecture, and the remaining work. This reading of licenses is not legal advice.
 
 ## Answer

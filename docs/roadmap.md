@@ -16,7 +16,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Xbox gamepad controls by default for the touch gamepad and real controllers, every Xbox button in the mapping editor with an RPG Maker preset, touch buttons that press on touch-down, a cross-shaped D-pad, and the iPad tilt-shift blur fix (0.4.2).
 - Ludusavi save sync over SMB, with Ludusavi's SMB settings and rclone's own code built into the app, replacing SSH and rsync (0.4.3).
 - A fix for RPG Maker MZ's Ogg decoder reusing IDs, which stopped games with "RangeError: length cannot be negative" (0.4.4).
-- RPG Maker XP, VX, and VX Ace on Mac, iPhone, and iPad, built on mkxp-z's libretro core in the app, Apple silicon only on Mac, with the RTPs downloaded and installed in the app (0.5.0). `docs/rgss-spike.md` has the feasibility test and what was built.
+- RPG Maker XP, VX, and VX Ace on Mac, iPhone, and iPad, built on mkxp-z's libretro core in the app, Apple silicon only on Mac, with the RTPs downloaded and installed in the app (0.5.0). VNDegen's own runtime replaced mkxp-z in 0.12.0. `docs/rgss-spike.md` records the first engine.
 - License notices in Settings, Licenses, for every third-party component in the app (0.5.0).
 - The real fix for RPG Maker MZ's "RangeError: length cannot be negative": sounds with Ogg names that hold WAV or MP3 data play through the system decoder, and a decoder failure no longer stops the game (0.5.1).
 - KiriKiri 2 and KiriKiri Z on Mac, iPhone, and iPad, built on krkrsdl3, with the common ciphers, Windows plugins, and movie formats built in (0.6.0).
@@ -39,14 +39,15 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - A shared MIDI player (0.11.0), vnmidi on TinySoundFont, with the FluidR3 Mono SoundFont built in and a Settings option to choose your own. `docs/midi.md` has the details.
 - Game page screenshots and cleaner artwork (0.11.0): the About section shows Steam or IGDB screenshots, the artwork picker hides another source's copy of the same picture, and iPhone portrait art takes less height.
 - Library views (0.11.0): Header list, Capsule rows, and Featured layouts for the library home, switched from the top bar, with a default per device.
+- RPG Maker XP, VX, and VX Ace on VNDegen's own clean-room RGSS runtime (0.12.0), replacing mkxp-z, so no GPL engine is left in the app. It runs the games' Ruby scripts on MRI Ruby 3.4 (BSD-2) with no JIT, draws on the CPU through FrameHost, and plays MIDI through the shared player. Intel Macs run these games too. All 4 test games reach their title, play, save, and load on the Mac and the iPad simulator and pass the case check, and two run on the iPhone simulator. Saves are the PC format: VX both ways, and VNDegen's XP and VX Ace saves load on the PC. `docs/rgss.md` has the known limits and `docs/rgss-cleanroom.md` the sources.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Paused, to resume one at a time: the clean-room runtimes for RGSS and for AliceSoft System 3 and System 4 (item 4).
+- The clean-room runtimes for AliceSoft System 3 and System 4 (item 4), on `ws/cr-system3` and `ws/cr-system4`.
 
 ## Licenses
-VNDegen should stay free to distribute and may be sold on the App Store later. Builds that include mkxp-z, the RGSS runtime, are GPL-3.0 as a whole, as the README's License section explains. To change that:
-- VNDegen's own MIT runtimes replace the GPL ones. The clean-room RGSS runtime replaces mkxp-z once it runs the same test games. NScripter and AliceSoft System 3 and System 4 are clean-room from the start, so VNDegen never ships ONScripter, xsystem35, or xsystem4. The clean-room runtimes are written from the game files and the engines' own documentation, never from GPL code. The original engines run under Wine only to settle open questions, such as the PC save format. With no GPL runtime left, the app is MIT for its own code plus permissive notices.
+VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it, and no GPL component is left:
+- VNDegen's own MIT runtimes replace the GPL ones. The clean-room RGSS runtime replaced mkxp-z in 0.12.0. NScripter and AliceSoft System 3 and System 4 are clean-room from the start, so VNDegen never ships ONScripter, xsystem35, or xsystem4. The clean-room runtimes are written from the game files and the engines' own documentation, never from GPL code. The original engines run under Wine only to settle open questions, such as the PC save format. With no GPL runtime left, the app is MIT for its own code plus permissive notices.
 - New engines use only permissive licenses: MIT, BSD, zlib, Apache-2.0, ISC, MPL-2.0, or public domain, and OFL-1.1 for fonts.
 - The LGPL libraries linked statically today are item 13.
 

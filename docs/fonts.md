@@ -114,10 +114,10 @@ the table, and `FontPack.folders` and `FontPack.table` are what a native engine 
   `Font.getList`, and makes ＭＳ Ｐゴシック, the Windows engine's default, the default font of games that ship none.
   Droid Sans Fallback, which upstream used for every missing font, now draws only characters the font lacks. The
   engine log names each substitute when it opens. `Engines/KiriKiri/UPSTREAM.md`, change 57, has the details.
-- **RGSS** (RPG Maker XP, VX, and VX Ace on mkxp-z) draws fonts the game doesn't ship in their substitutes, and
-  `Font.exist?` reports them as present. Games on the Japanese XP player default to ＭＳ Ｐゴシック, as that player
-  does; games on the English one keep Arial, which is Liberation Sans. VX's default list already names MS Gothic.
-  `Engines/RGSS/UPSTREAM.md` describes the patch.
+- **RGSS** (RPG Maker XP, VX, and VX Ace on VNDegen's runtime) looks a font up in the game's `Fonts/` folder and the
+  RTP's first, then resolves the name through the table, and `Font.exist?` reports substitutes as present. Text in a
+  character the font lacks is drawn in the substitutes for MS PGothic, MS Gothic or Arial. XP's default font is
+  MS PGothic, VX's list names MS Gothic, and VX Ace's is VL Gothic, which its RTP ships.
 - **Ren'Py** games ship their own fonts, so Ren'Py doesn't use the table.
 
 CSS matches family names exactly, apart from ASCII case, as Windows does. A game that asks for "ＭＳＰ明朝" without

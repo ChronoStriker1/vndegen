@@ -52,8 +52,7 @@ it doesn't need access to the original later, and Settings shows
 its name with a button that goes back to the bundled font. The choice is app-wide and applies to games started after
 it.
 
-It covers the engines that play MIDI through vnmidi: Wolf RPG Editor. The RPG Maker XP, VX and VX Ace engine
-(mkxp-z) plays MIDI with its own synthesizer and embedded font and doesn't use it.
+It covers the engines that play MIDI through vnmidi: RPG Maker XP, VX and VX Ace, and Wolf RPG Editor.
 
 An engine loads the player's font with `vnmidi_font_load_fallback`, which loads the bundled font instead when the
 player's can't be read and says why, which the engine logs.
