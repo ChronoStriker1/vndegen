@@ -35,6 +35,8 @@ struct PluginInfo {
             EngineID("kirikiri"): PluginInfo(versions: "KiriKiri 2 and KiriKiri Z", runtime: "krkrsdl3, an SDL3 port of KiriKiri Z",
                                              license: "KiriKiri Z license, BSD 3-clause"),
             EngineID("artemis"): PluginInfo(versions: "Artemis", runtime: "art3m1s-core, with Lua 5.1 and no JIT", license: "MPL 2.0"),
+            EngineID("siglus"): PluginInfo(versions: "SiglusEngine", runtime: "siglus_rs, drawn through Metal", license: "MPL 2.0"),
+            EngineID("reallive"): PluginInfo(versions: "RealLive", runtime: "siglus_rs", license: "MPL 2.0"),
             EngineID("godot"): PluginInfo(versions: "Godot 3 and Godot 4, from Godot 3.3 to 4.7 exports",
                                           runtime: "Godot 4.7 and Godot 3.6, built into the app", license: "MIT",
                                           notHere: "Godot is built for Apple silicon only, so an Intel Mac lists these games but can't run them."),

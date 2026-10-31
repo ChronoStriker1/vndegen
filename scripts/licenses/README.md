@@ -17,6 +17,9 @@ its own:
   `scripts/ruffle-web.sh` writes when it builds Ruffle: Ruffle's license, the license files of every Rust crate in its
   wasm module and every JavaScript package in `ruffle.js`, and the texts in `Engines/Flash/licenses/` for the Noto font
   and symphonia.
+- `scripts/siglus-engine.sh` writes `build/siglus/licenses/`: siglus_rs's MPL-2.0 license, libtheora's for theora-rs,
+  and the license files of every crate in the engine's iOS build, or for a crate that ships none, the text in
+  `Engines/Siglus/licenses/` of the license its manifest names.
 - `scripts/app-licenses.sh` writes `build/app/licenses/` for third-party code in VNDegen's own sources.
 - `scripts/fonts-licenses.sh` writes `build/fonts/licenses/` from the license files in `Engines/Shared/fonts/licenses/`
   for the fonts the app bundles: Liberation, DejaVu, and the Ume fonts, whose license page it turns into text. The

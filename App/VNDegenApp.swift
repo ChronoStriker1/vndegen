@@ -7,6 +7,7 @@ import EngineRenPy
 import EngineKiriKiri
 import EngineRGSS
 import EngineArtemis
+import EngineSiglus
 import EngineGodot
 import EngineNScripter
 import EngineWolfRPG
@@ -28,6 +29,8 @@ let engines: [any EnginePlugin] = {
         RenPyPlugin(),
         KiriKiriPlugin(),
         ArtemisPlugin(),
+        SiglusPlugin(),
+        RealLivePlugin(),
         GodotPlugin(),
         FlashPlugin(),
         NScripterPlugin(),

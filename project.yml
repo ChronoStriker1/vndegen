@@ -28,6 +28,17 @@ aggregateTargets:
           set -euo pipefail
           env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
             ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} "$SRCROOT/scripts/artemis-engine.sh" "$SRCROOT/build/artemis"
+  # scripts/siglus-engine.sh builds the SiglusEngine and RealLive engine, siglus_rs, into build/siglus as a framework,
+  # and does nothing when it is up to date. It runs with a clean environment for the same reason as ArtemisEngine.
+  SiglusEngine:
+    buildScripts:
+      - name: Build the SiglusEngine and RealLive engine
+        basedOnDependencyAnalysis: false
+        shell: /bin/bash
+        script: |
+          set -euo pipefail
+          env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} "$SRCROOT/scripts/siglus-engine.sh" "$SRCROOT/build/siglus"
   KiriKiriEngine:
     buildScripts:
       - name: Build the KiriKiri engine
@@ -55,7 +66,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: VNDegenKit
-        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineWolfRPG, EngineAliceSoft, EngineGodot, EngineArtemis, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
+        products: [VNCore, EngineRPGMaker, EngineTyrano, EngineFlash, EngineRenPy, EngineRGSS, EngineKiriKiri, EngineNScripter, EngineWolfRPG, EngineAliceSoft, EngineGodot, EngineArtemis, EngineSiglus, RuntimePackages, FontPack, Metadata, GameInput, Lock, SaveSync, ArchiveImport, HubUI]
       # Ren'Py 8 runs inside the app on iOS, from Ren'Py's static libraries and MetalANGLE, its OpenGL ES on Metal.
       # `scripts/renpy-runtime.sh build/renpy ios` makes both, and scripts/build.sh runs it before an iOS build.
       - framework: build/renpy/ios/RenPyRuntime.xcframework
@@ -68,6 +79,10 @@ targets:
       - target: ArtemisEngine
       - framework: build/artemis/ios/Art3m1s.xcframework
         embed: false
+      # The SiglusEngine and RealLive engine, which SiglusEngine below builds first. EngineSiglus finds it at run time.
+      - target: SiglusEngine
+      - framework: build/siglus/VNSiglus.xcframework
+        embed: true
       # The KiriKiri engine, which KiriKiriEngine below builds first. EngineKiriKiri finds it at run time.
       - target: KiriKiriEngine
       - framework: build/kirikiri/ios/KiriKiri.xcframework
