@@ -35,8 +35,8 @@ public:
     int sourceAudioRate() const { return srcRate_; }  // the MP2 stream's rate; 0 without audio
 
     // Decodes video up to the playback time and keeps half a second of sound decoded ahead of what has played.
-    // The playback time is the later of seconds (the game clock since the start) and the sound played so far, so a
-    // game clock that falls behind real time neither starves the sound nor lets the picture lag it. Returns true
+    // The playback time is seconds (the game clock since the start), or the sound played so far less 50 ms when that
+    // is later, so a game clock that falls behind real time neither starves the sound nor lets the picture lag it. Returns true
     // when frame() changed. Time only moves forward; a large jump decodes every frame in between.
     bool advanceTo(double seconds);
     // RGBA8, width*height*4, alpha 255. Black until the first frame.

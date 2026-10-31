@@ -19,6 +19,7 @@ constexpr size_t kWindow = 256 * 1024;      // read window; a PES packet is at m
 constexpr long kProbeBytes = 2 * 1024 * 1024;  // how far open() looks for the first video and audio packets
 constexpr size_t kMaxQueued = 4 * 1024 * 1024;  // cap on demuxed data waiting for the other decoder
 constexpr double kAudioLead = 0.5;           // seconds of sound kept decoded ahead of what has played
+constexpr double kAudioSlack = 0.05;         // how far the picture may trail the sound before it catches up
 constexpr int kVideoStream = 0xE0, kAudioStream = 0xC0;
 
 // A 33-bit timestamp in the 5-byte PES/pack layout, in seconds.
@@ -258,8 +259,12 @@ bool Movie::advanceTo(double seconds) {
         return ringCount_ + size_t(leadSilence_);
     };
     {
+        // The game clock drives the picture, stepping evenly with the display. The sound played moves in audio
+        // buffers, so it only takes over when it is well ahead, as after a hitch that the game clock dropped. Once the
+        // sound has played out, the picture catches up to it fully, or its last frames would wait for the game clock.
         std::lock_guard<std::mutex> lock(mu_);
-        now_ = std::max({now_, seconds, double(audioRead_) / kAudioRate});
+        double slack = audioEnded_ && ringCount_ == 0 ? 0 : kAudioSlack;
+        now_ = std::max({now_, seconds, double(audioRead_) / kAudioRate - slack});
     }
 
     // plm_video_get_time is the presentation time of the next frame to decode. Only the newest frame is converted.
