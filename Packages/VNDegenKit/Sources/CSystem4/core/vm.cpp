@@ -378,7 +378,18 @@ void VM::enter(int32_t function, int32_t thisPage, bool native) {
         if (isRefPair(t.type)) k++;
     }
     if (thisPage >= 0) incref(thisPage);
-    if (trace) trace(std::string(frames.size(), ' ') + functionName(function) + (thisPage >= 0 ? " this=" + std::to_string(thisPage) : ""));
+    if (trace) {
+        // String arguments are shown in quotes, others as their words.
+        std::string t = std::string(frames.size(), ' ') + functionName(function) + (thisPage >= 0 ? " this=" + std::to_string(thisPage) : "");
+        Page &tp = *heap[lp].page;
+        for (int k = 0; k < f.argc && size_t(k) < tp.v.size(); k++) {
+            if (f.vars[size_t(k)].t.type == T_STRING && valid(tp.v[size_t(k)]) && heap[size_t(tp.v[size_t(k)])].str)
+                t += " \"" + sjis::toUtf8(*heap[size_t(tp.v[size_t(k)])].str) + "\"";
+            else
+                t += " " + std::to_string(tp.v[size_t(k)]);
+        }
+        trace(t);
+    }
     frames.push_back(Frame{function, lp, thisPage, ip, stack.size(), native, native ? 0 : curInsn_, thisPage >= 0});
     ip = f.address;
 }
@@ -758,24 +769,26 @@ void VM::run(size_t untilFrames) {
                     }
                 }
             } else {
-                int32_t s = newArray(et, es, std::max(rk, nd), dims.data(), nd);
-                int32_t old = var(pg, i);
-                var(pg, i) = s;
-                decref(old);
+                // The array changes in place: a `ref` array parameter is the caller's array, and Test Game 46's
+                // SplitToLines fills one after freeing it.
+                int32_t fresh = newArray(et, es, std::max(rk, nd), dims.data(), nd);
+                int32_t s = var(pg, i);
+                std::vector<int32_t> old = std::move(heap[s].page->v);
+                heap[s].page->v = std::move(heap[fresh].page->v);
+                heap[s].page->rank = heap[fresh].page->rank;
+                heap[fresh].page->v.clear();
+                decref(fresh);
+                for (int32_t v : old) releaseElem(*heap[s].page, v);
             }
             break;
         }
         case OP_A_FREE: {
             int32_t i = pop(), pg = pop();
-            Page *a = arrayAt(pg, i);
-            int32_t s = newPage(PageKind::Array, -1, 0);
-            Page &np = *heap[s].page;
-            np.elemType = a->elemType;
-            np.elemStruct = a->elemStruct;
-            np.rank = a->rank;
-            int32_t old = var(pg, i);
-            var(pg, i) = s;
-            decref(old);
+            arrayAt(pg, i);
+            int32_t s = var(pg, i);
+            std::vector<int32_t> old = std::move(heap[s].page->v);
+            heap[s].page->v.clear();
+            for (int32_t v : old) releaseElem(*heap[s].page, v);
             break;
         }
         case OP_A_NUMOF: {
