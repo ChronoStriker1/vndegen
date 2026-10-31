@@ -2,7 +2,7 @@
 
 VNDegen runs VisualArt's SiglusEngine and RealLive games on siglus_rs, an open-source Rust reimplementation of both engines (https://github.com/xmoezzz/siglus_rs, MPL-2.0). `Engines/Siglus/UPSTREAM.md` lists the pinned commit, the licenses, how the engine is built, and every change VNDegen made to it.
 
-Status: design checkpoint, 2026-10-31. No SiglusEngine or RealLive game is in the library yet, so nothing below has run a game in VNDegen.
+Status, 2026-10-31: the plugins, the engine framework and its build are in place. No SiglusEngine or RealLive game is in the library yet, so no game has run in VNDegen.
 
 ## Design
 
@@ -36,7 +36,9 @@ The engine is built as a dynamic framework, `VNSiglus.framework`, in `build/sigl
 `EngineSiglus` holds two plugins on the same engine, so the library shows each game's real engine:
 
 - `SiglusPlugin` (`siglus`): a `Scene.pck` or `Gameexe.dat` in the game folder or one folder down. Certain.
-- `RealLivePlugin` (`reallive`): a `Gameexe.ini` with a `SEEN.TXT` beside it or in the folder its `#FOLDNAME.TXT` names. Certain.
+- `RealLivePlugin` (`reallive`): a `Gameexe.ini` with a `SEEN.TXT` beside it or in a folder directly below it, such as `DAT/`, in the game folder or one folder down. AVG32, RealLive's predecessor, uses the same names, and its `SEEN.TXT` starts with `PACL`, so such a folder isn't taken for RealLive. Certain.
+
+A folder with both kinds of files is a SiglusEngine game, since some SiglusEngine games ship a `Gameexe.ini` too.
 
 AVG32 and UK2, which siglus_rs also runs, aren't detected: no library game or English test game uses them.
 
@@ -47,7 +49,11 @@ AVG32 and UK2, which siglus_rs also runs, aren't detected: no library game or En
 
 ### Input
 
-Both engines read a mouse and keyboard, so games start with the "Keyboard and mouse" layout. Touches act as the mouse. The keyboard reaches the game through the host view, as in Artemis.
+Both engines read a mouse and keyboard, so games start with the "Keyboard and mouse" layout. Touches act as the mouse. The keyboard reaches the game through the host view, as in Artemis. Through VNDegen's buttons, Confirm presses Return, Cancel presses Escape, Menu right clicks, Dash holds Control, and the page buttons turn the mouse wheel.
+
+A SiglusEngine game's message box shows as a system alert. Confirm, Return or Space picks its first button, and Cancel, Escape or E its last. VNDegen's on-screen keyboard types into a game's text field when one has focus, and presses keys otherwise.
+
+While VNDegen's menu is open, the game stops and its sound is muted. Kira 0.9, the engines' mixer, can't pause, so sounds keep playing unheard. Each engine writes its global save then, since iOS can end a paused app without warning.
 
 ### File name case
 
@@ -88,6 +94,16 @@ None are in the library. VNDB's engine field for the English Windows releases on
 | RealLive | Tomoyo After ~It's a Wonderful Life~ English Edition | r21869 |
 
 planetarian ~Snow Globe~ on Steam is Luca System.
+
+## Known limits
+
+- No game has run yet. Everything about games is untested.
+- `.wmv` movies don't play, because the WMV and WMA decoder is LGPL. What a game does when the engine can't open its movie hasn't been checked. `.omv` (Ogg Theora) and `.mpg` (MPEG-1 and MPEG-2) movies use decoders VNDegen ships.
+- Tomoyo After's dungeon game and Little Busters!' baseball game don't run (see the open question below).
+- Sound keeps playing, muted, while VNDegen's menu is open.
+- RealLive saves don't move to or from the PC version.
+- SiglusEngine games read a gamepad on the PC. VNDegen sends them keys and clicks instead, so a game's own gamepad prompts don't show.
+- Network features, such as Rewrite's Twitter posting, do nothing.
 
 ## Open question for the user
 
