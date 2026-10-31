@@ -1,0 +1,27 @@
+The MIT License (MIT)
+
+Copyright(c) 2019 Dominic Szablewski
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files(the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and / or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions :
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+pl_mpeg.h is from https://github.com/phoboslab/pl_mpeg at commit
+c871f2be022ece7ef4f64230b4fb8e1fb9eb6023 (2025-12-30), with one VNDegen patch (marked
+"VNDegen patch" in plm_audio_read_samples: MP2 requantization step). The repository
+carries no separate LICENSE file; the header declares SPDX-License-Identifier: MIT.
+The notice above is the full MIT text the header carried before it switched to
+the SPDX tag (commit 16a6a11, 2024-10-11).

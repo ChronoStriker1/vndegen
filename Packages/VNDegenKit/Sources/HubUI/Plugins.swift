@@ -44,7 +44,8 @@ struct PluginInfo {
                                               license: "VNDegen, MIT"),
             EngineID("wolfrpg"): PluginInfo(versions: "Wolf RPG Editor 2 and 3", runtime: "VNDegen's Wolf RPG Editor runtime, in C++",
                                             license: "VNDegen, MIT"),
-            EngineID("alicesoft"): PluginInfo(versions: "AliceSoft System 3.0 to 3.9", runtime: "VNDegen's System 3 runtime, in C",
+            EngineID("alicesoft"): PluginInfo(versions: "AliceSoft System 3.0 to 3.9 and System 4",
+                                              runtime: "VNDegen's System 3 runtime, in C, and System 4 runtime, in C++",
                                               license: "VNDegen, MIT"),
         ]
     }()

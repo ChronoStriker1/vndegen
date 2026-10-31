@@ -655,6 +655,20 @@
         }
     }
 
+    // Early MV cores (1.2.0 in the library) build the save folder from the page's address: index.html's folder, less a
+    // last /www, plus save/. On the PC that is the game's top-level save/. Here the address is vndegen://game/index.html,
+    // so the folder came out as /save/, outside the game folder, and every save failed. The same rule applied to
+    // index.html's path in the game folder gives the PC's folder. GameFolder.saveDirectory follows it too. The method is
+    // checked after every script loads, since a plugin may replace it.
+    document.addEventListener('load', () => {
+        const storage = window.StorageManager;
+        if (!storage || typeof storage.localFileDirectoryPath !== 'function'
+            || !String(storage.localFileDirectoryPath).includes('location.pathname')) return;
+        storage.localFileDirectoryPath = function () {
+            return window.process.mainModule.filename.replace(/(\/www|)\/[^\/]*$/, '/save/');
+        };
+    }, true);
+
     // A paused session stops the engine's scene loop. On resume, Input.clear drops keys that were down when it paused.
     window.__vndegen.onPause = (paused) => {
         sessionPaused = paused;

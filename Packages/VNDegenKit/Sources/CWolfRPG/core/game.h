@@ -179,6 +179,7 @@ struct MapEventState {
     std::array<int32_t, 10> self{};
     bool erased = false;
     bool ranAutorun = false;
+    bool pageChanged = false;  // since its parallel script last started
 };
 
 class Game {
@@ -244,7 +245,23 @@ public:
     // Expands Wolf's text codes that the interpreter resolves: \v[n], \s[n], \self[n], \cself[n], \sys[n].
     std::string expandText(const std::string &text, const Thread *t) const;
 
+    // Cheats (cheats.cpp), for VNDegen's Cheats page. Each changes the game's own state, so a save made afterwards is
+    // an ordinary save.
+    // Whether the game keeps gold, items and the party where Wolf RPG Editor's standard systems keep them.
+    bool hasStandardParty() const;
+    // The state as JSON, in the format VNCore's CheatState(json:) reads.
+    std::string cheatState() const;
+    // Each returns false when the game doesn't have what it changes.
+    bool cheatAddGold(int amount);
+    bool cheatAddItem(int kind, int id, int count);  // kind 0 item, 1 weapon, 2 armor
+    bool cheatRestoreParty();
+    bool cheatSetVariable(int id, int value);
+    void setWalkThroughWalls(bool on) { walkThroughWalls_ = on; }
+    // The host runs `speed` of the game's frames for each one of real time, so fades started now take that much less.
+    void setSpeed(int speed);
+
 private:
+    bool walkThroughWalls_ = false;
     // Variables.
     int32_t value(int32_t v, const Thread &t);  // a literal, or the variable it names when 1,000,000 or above
     int32_t readVar(int32_t id, const Thread &t);

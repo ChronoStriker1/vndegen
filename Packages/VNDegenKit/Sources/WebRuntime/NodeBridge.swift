@@ -11,6 +11,8 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
     /// `text` true writes `data` as UTF-8, which is what Node does for a string; false decodes base64 bytes.
     case writeFile(path: String, data: String, text: Bool)
     case mkdir(path: String, recursive: Bool)
+    /// Removes an empty directory, as Node's `rmdirSync` does without options.
+    case rmdir(path: String)
     case readdir(path: String)
     case rename(from: String, to: String)
     case unlink(path: String)
@@ -41,6 +43,7 @@ nonisolated enum BridgeRequest: Equatable, Sendable, Decodable {
         case "mkdir":
             self = .mkdir(path: try c.decode(String.self, forKey: .path),
                           recursive: try c.decodeIfPresent(Bool.self, forKey: .recursive) ?? false)
+        case "rmdir": self = .rmdir(path: try c.decode(String.self, forKey: .path))
         case "readdir": self = .readdir(path: try c.decode(String.self, forKey: .path))
         case "rename": self = .rename(from: try c.decode(String.self, forKey: .from), to: try c.decode(String.self, forKey: .to))
         case "unlink": self = .unlink(path: try c.decode(String.self, forKey: .path))
@@ -170,6 +173,12 @@ nonisolated struct NodeBridge: Sendable {
                 let (directory, name) = try openParent(path)
                 guard mkdirat(directory.fileDescriptor, name, 0o755) == 0 else { throw Self.posixError(path) }
             }
+            return .null
+
+        case .rmdir(let path):
+            let (directory, name) = try openParent(path)
+            // AT_REMOVEDIR removes only an empty directory and refuses a symlink with ENOTDIR instead of following it.
+            guard unlinkat(directory.fileDescriptor, name, AT_REMOVEDIR) == 0 else { throw Self.posixError(path) }
             return .null
 
         case .readdir(let path):

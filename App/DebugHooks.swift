@@ -34,6 +34,8 @@ import AppKit
 ///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
+///   -rgss-ruby <file>        RPG Maker XP, VX and VX Ace games run the Ruby file once their scripts have loaded, through
+///                            the runtime's vnrgss_run_ruby, and log what it gives ("rgss-ruby" in the app log)
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. NScripter and System 3 sessions
 ///                            also log their own pacing every 10 seconds ("NSFRAMES", "S3FRAMES"), on macOS too
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
