@@ -170,11 +170,12 @@ final class System4Session: EngineSession {
         #endif
         focusObservers = names.map { name in
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                // Only the window's identity crosses into the main actor; the notification isn't Sendable.
+                let window = (note.object as? AnyObject).map(ObjectIdentifier.init)
+                let isWindow = note.name != names[0]
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    #if os(macOS)
-                    if let window = note.object as? NSWindow, window !== self.frameView.window { return }
-                    #endif
+                    if isWindow, window != self.frameView.window.map(ObjectIdentifier.init) { return }
                     self.releaseHeldInput()
                 }
             }
