@@ -154,6 +154,19 @@ void cmdRmenu(E &e, const std::string &) {
     } while (e.readComma());
 }
 
+// The window menu bar, which VNDegen lists in its Game menu. resetmenu empties it before a game builds its own, and
+// deletemenu removes it, so the game has none.
+void cmdResetMenu(E &e, const std::string &) { e.windowMenu_.clear(); }
+
+void cmdInsertMenu(E &e, const std::string &) {
+    E::WindowMenuItem item;
+    item.text = e.readStr();
+    e.readComma();
+    item.fn = e.readWord();
+    if (e.readComma()) item.level = e.readInt();
+    e.windowMenu_.push_back(std::move(item));
+}
+
 void cmdTransMode(E &e, const std::string &) {
     std::string m = e.readWord();
     e.transMode_ = m == "copy" ? "c" : m == "alpha" ? "a" : "l";
@@ -828,7 +841,10 @@ void registerCoreCommands(std::unordered_map<std::string, CommandFn> &t) {
     t["isskip"] = cmdIsSkip;
     t["autoclick"] = cmdAutoClick;
     // Windows-only or cosmetic settings.
-    for (const char *n : {"deletemenu", "resetmenu", "insertmenu", "killmenu", "versionstr", "mode_saya", "mode_ext",
+    t["resetmenu"] = cmdResetMenu;
+    t["deletemenu"] = cmdResetMenu;
+    t["insertmenu"] = cmdInsertMenu;
+    for (const char *n : {"killmenu", "versionstr", "mode_saya", "mode_ext",
                           "automode", "menusetwindow", "menuselectcolor", "menuselectvoice", "selectvoice",
                           "clickvoice", "mousecursor", "mousemode", "debuglog", "errorsave", "spi",
                           "arc", "soundpressplgin", "noteraseman",

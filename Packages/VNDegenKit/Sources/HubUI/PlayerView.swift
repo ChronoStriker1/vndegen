@@ -10,6 +10,8 @@ struct PlayerView: View {
     @Environment(Navigator.self) private var nav
     @State private var menu = PlayerMenu()
     @State private var mappingEditor: ButtonMappingEditor?
+    /// Asks the game for its Game menu while VNDegen's menu is open.
+    @State private var menuLoad: Task<Void, Never>?
     @AppStorage(ControlMethod.storageKey) private var defaultMethod = ControlMethod.automatic
     /// Whether the menu or the unlock screen has input rather than the game. Nil until the view first takes input.
     @State private var navigating: Bool?
@@ -252,11 +254,18 @@ struct PlayerView: View {
         menu.isOpen = true
         applyInputMode()
         session.setPaused(true)
-        menu.gameItems = session.gameMenu
+        menu.gameItems = []
+        menuLoad?.cancel()
+        menuLoad = Task {
+            let items = await session.gameMenu()
+            guard !Task.isCancelled, menu.isOpen else { return }
+            menu.gameItems = items
+        }
     }
 
     private func resume() {
         mappingEditor = nil
+        menuLoad?.cancel()
         menu.page = .main
         menu.isOpen = false
         applyInputMode()

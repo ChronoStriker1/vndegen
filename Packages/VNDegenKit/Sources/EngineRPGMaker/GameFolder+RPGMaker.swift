@@ -34,6 +34,16 @@ extension GameFolder {
         return hasOgg
     }
 
+    /// The names of the plugins `js/plugins.js` turns on.
+    nonisolated var enabledPlugins: Set<String> {
+        guard let data = read(servedPath: "/js/plugins.js", limit: 8 << 20) else { return [] }
+        let text = String(decoding: data, as: UTF8.self)
+        guard let start = text.firstIndex(of: "["), let end = text.lastIndex(of: "]"), start < end,
+              let list = try? JSONSerialization.jsonObject(with: Data(text[start...end].utf8)) as? [[String: Any]]
+        else { return [] }
+        return Set(list.compactMap { $0["status"] as? Bool == true ? $0["name"] as? String : nil })
+    }
+
     /// The Windows font names the game asks for in its plugins, plugin settings, and database, whose substitutes the
     /// page loads before the boot scene ends. MV's core asks for SimHei in Chinese games and Dotum in Korean ones.
     nonisolated var fontNames: Set<String> {

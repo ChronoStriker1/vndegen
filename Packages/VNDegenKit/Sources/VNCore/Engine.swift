@@ -185,8 +185,9 @@ public protocol EngineSession: AnyObject {
     /// Return and Backspace, through `send`. Engines that read text, such as for a name the player types, take it whole.
     func type(_ typed: TypedText)
     /// The game's own commands that VNDegen draws no place for, such as a KiriKiri game's window menu bar, as they stand
-    /// now. VNDegen's menu reads it each time it opens and offers a Game menu when it isn't empty. The default is empty.
-    var gameMenu: [GameMenuItem] { get }
+    /// now. VNDegen's menu asks each time it opens and offers a Game menu when the answer isn't empty. A game in a web
+    /// page answers once the page has. The default is empty.
+    func gameMenu() async -> [GameMenuItem]
     /// Runs the Game menu command with the given id. VNDegen's menu closes and resumes the game right after, and the
     /// game handles the command then, as a PC game handles a menu click once its menu closes.
     func chooseGameMenuItem(_ id: GameMenuItem.ID)
@@ -197,7 +198,7 @@ public protocol EngineSession: AnyObject {
 extension EngineSession {
     public func waitUntilStopped() async {}
     public var drawsOwnMenu: Bool { false }
-    public var gameMenu: [GameMenuItem] { [] }
+    public func gameMenu() async -> [GameMenuItem] { [] }
     public func chooseGameMenuItem(_ id: GameMenuItem.ID) {}
     public var cheats: (any CheatSession)? { nil }
 

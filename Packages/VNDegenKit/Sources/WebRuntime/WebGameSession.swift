@@ -43,6 +43,10 @@ public struct WebGameConfiguration {
     public var buttonScript: @MainActor (VirtualButton, _ pressed: Bool) -> String?
     /// The DEBUG input script launch argument, such as "rpgmaker-script".
     public var scriptArgument: String
+    /// Commands the game has and offers no way to reach without a keyboard, for VNDegen's Game menu.
+    public var menuCommands: [WebMenuCommand] = []
+    /// Game menu commands only the page knows, asked for each time VNDegen's menu opens.
+    public var pageMenu: WebPageMenu?
     public var log: Logger
     /// The game's cheats, made the first time VNDegen's menu asks for them, around the session's page. Nil for engines
     /// that offer none.
@@ -83,6 +87,53 @@ public protocol GamePage: AnyObject {
     func callFunction(_ body: String, arguments: [String: Any]) async throws -> Any?
 }
 
+/// Game menu commands the page lists itself, such as a Flash movie's own right-click items.
+nonisolated public struct WebPageMenu: Sendable {
+    /// JavaScript whose value is a JSON array of `{"id", "title", "checked", "enabled", "separatorBefore"}`, ids as
+    /// strings.
+    public let list: String
+    /// The JavaScript that chooses the item with the given id.
+    public let choose: @Sendable (String) -> String
+
+    public init(list: String, choose: @escaping @Sendable (String) -> String) {
+        self.list = list
+        self.choose = choose
+    }
+}
+
+/// One item as `WebPageMenu.list` describes it.
+nonisolated struct WebPageMenuItem: Decodable {
+    var id: String
+    var title: String
+    var checked: Bool
+    var enabled: Bool
+    var separatorBefore: Bool
+
+    /// The Game menu's items, a separator before each item that asks for one, except the first.
+    static func items(json: String, idPrefix: String) -> [GameMenuItem] {
+        guard let items = try? JSONDecoder().decode([WebPageMenuItem].self, from: Data(json.utf8)) else { return [] }
+        var result: [GameMenuItem] = []
+        for item in items {
+            if item.separatorBefore, !result.isEmpty { result.append(.separator(id: idPrefix + "separator-" + item.id)) }
+            result.append(GameMenuItem(id: idPrefix + item.id, title: item.title, isChecked: item.checked, isEnabled: item.enabled))
+        }
+        return result
+    }
+}
+
+/// A Game menu command that runs `script` in the game's page, after VNDegen's menu closes.
+nonisolated public struct WebMenuCommand: Sendable, Equatable {
+    public let id: String
+    public let title: String
+    public let script: String
+
+    public init(id: String, title: String, script: String) {
+        self.id = id
+        self.title = title
+        self.script = script
+    }
+}
+
 /// Runs an HTML5 game in a WKWebView that looks enough like NW.js that the game reads and writes its own folder through
 /// Node's `fs`, the way its desktop build does.
 final class WebGameSession: NSObject, EngineSession {
@@ -96,6 +147,8 @@ final class WebGameSession: NSObject, EngineSession {
     private let storage: (any PageStorage)?
     private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
     private let scriptArgument: String
+    private let menuCommands: [WebMenuCommand]
+    private let pageMenu: WebPageMenu?
     private let log: Logger
     private let onExit: @MainActor () -> Void
     private let makeCheats: (@MainActor (any GamePage) -> any CheatSession)?
@@ -115,6 +168,8 @@ final class WebGameSession: NSObject, EngineSession {
         storage = game.storage
         buttonScript = game.buttonScript
         scriptArgument = game.scriptArgument
+        menuCommands = game.menuCommands
+        pageMenu = game.pageMenu
         log = game.log
         onExit = launch.onExit
         makeCheats = game.cheats
@@ -345,6 +400,31 @@ final class WebGameSession: NSObject, EngineSession {
     func waitUntilStopped() async {
         await stopping?.value
     }
+
+    func gameMenu() async -> [GameMenuItem] {
+        guard !ended else { return [] }
+        var items = menuCommands.map { GameMenuItem(id: $0.id, title: $0.title) }
+        if let pageMenu {
+            do {
+                let json = try await webView.evaluateJavaScript(pageMenu.list) as? String ?? "[]"
+                items += WebPageMenuItem.items(json: json, idPrefix: Self.pageMenuPrefix)
+            } catch {
+                log.error("game menu: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        return items
+    }
+
+    func chooseGameMenuItem(_ id: GameMenuItem.ID) {
+        if id.hasPrefix(Self.pageMenuPrefix), let pageMenu {
+            run(pageMenu.choose(String(id.dropFirst(Self.pageMenuPrefix.count))))
+        } else if let command = menuCommands.first(where: { $0.id == id }) {
+            run(command.script)
+        }
+    }
+
+    /// Keeps the page's ids apart from `menuCommands`'.
+    static let pageMenuPrefix = "page:"
 
     nonisolated static let beforeQuitScript = "window.__vndegen && (__vndegen.setPaused(true), __vndegen.beforeQuit())"
 

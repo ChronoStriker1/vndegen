@@ -277,10 +277,12 @@ final class KiriKiriSession: EngineSession {
 
     /// Read only between frames: a frame on the stack below, as under the game's own Yes/No dialog, could be partway
     /// through changing the menu.
-    var gameMenu: [GameMenuItem] {
+    var currentMenu: [GameMenuItem] {
         guard case .running = state, !Self.inFrame, let json = engine.menu() else { return [] }
         return KiriKiriMenu.items(json: String(cString: json))
     }
+
+    func gameMenu() async -> [GameMenuItem] { currentMenu }
 
     func chooseGameMenuItem(_ id: GameMenuItem.ID) {
         guard case .running = state, !Self.inFrame else { return }

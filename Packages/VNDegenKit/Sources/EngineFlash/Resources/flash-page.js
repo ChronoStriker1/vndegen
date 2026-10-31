@@ -147,6 +147,29 @@
         window.__vndegen.beforeQuit = flush;
     }
 
+    // VNDegen's Game menu lists the movie's own right-click items, which Flash Player showed and a right click here,
+    // which belongs to the game, doesn't. A full-screen item is left out, since the session owns the window. The list
+    // comes from Ruffle's player with VNDegen's patch (Engines/Flash/patches/0002), and each item's id is its index.
+    const fullScreen = /full ?screen|フルスクリーン|ﾌﾙｽｸﾘｰﾝ/i;
+    const menuPlayer = () => {
+        const player = lastFocused && lastFocused.isConnected ? lastFocused : players()[0];
+        return player && typeof player.movieContextMenuItems === 'function' ? player : null;
+    };
+    window.__vndegenFlashMenu = {
+        items() {
+            const player = menuPlayer();
+            if (!player) return [];
+            return player.movieContextMenuItems().filter((item) => !fullScreen.test(item.caption)).map((item) => ({
+                id: String(item.index), title: item.caption, checked: item.checked, enabled: item.enabled,
+                separatorBefore: item.separatorBefore,
+            }));
+        },
+        choose(index) {
+            const player = menuPlayer();
+            if (player && index >= 0) player.runContextMenuItem(index).catch((error) => console.error('flash menu: ' + error));
+        },
+    };
+
     // A projector's Quit button sends fscommand("quit"), which ends the session as quitting the projector would. The
     // other commands set up the projector's window, which the session owns.
     const quitHandled = new WeakSet();
