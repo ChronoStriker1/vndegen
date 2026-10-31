@@ -26,6 +26,11 @@ struct GameConfig {
     std::string fontsDir;    // VNDegen's Windows font pack (fonts.tsv), may be empty
 };
 
+std::map<std::string, std::string> readIni(const std::string &root);
+std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini);
+// A sentence for the player when the game needs libraries this runtime doesn't have; empty when it can run.
+std::string unsupportedReason(const Ain &ain);
+
 class Game {
 public:
     explicit Game(GameConfig cfg);

@@ -40,6 +40,14 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
         }
     }
 
+    public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? {
+        guard let layout = AliceSoftLayout(FolderProbe(scanning: folder)) else { return nil }
+        switch layout.system {
+        case .system30, .system39: return nil
+        case .system4: return System4Session.compatibilityNote(root: layout.url(in: folder))
+        }
+    }
+
     /// System 3 games read the keyboard and mouse only.
     public var defaultControls: ControlLayout { .keyboardAndMouse }
 }

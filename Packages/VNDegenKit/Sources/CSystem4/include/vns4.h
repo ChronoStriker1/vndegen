@@ -23,6 +23,11 @@ typedef struct VNS4Launch {
     const char *fontsDir;  // VNDegen's Windows font pack (the folder holding fonts.tsv); NULL uses the system's fonts
 } VNS4Launch;
 
+// Why VNDegen can't run the System 4 game in this folder yet, as a sentence for the player, or NULL when it can (or
+// when the folder's code file can't be read, which vns4_start reports). Reads the code file; valid until the next
+// call on the same thread.
+const char *vns4_unsupported(const char *gameRoot);
+
 // Starts a game. Returns NULL when it can't, with a sentence for the player in vns4_start_error().
 VNS4Engine *vns4_start(const VNS4Launch *launch);
 const char *vns4_start_error(void);

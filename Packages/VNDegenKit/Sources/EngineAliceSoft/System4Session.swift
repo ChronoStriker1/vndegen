@@ -31,7 +31,14 @@ final class System4Session: EngineSession {
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
 
     @MainActor static func make(_ launch: GameLaunch, root: URL) throws -> any EngineSession {
-        System4Session(launch, root: root)
+        if let reason = compatibilityNote(root: root) { throw System4Error.unsupported(reason) }
+        return System4Session(launch, root: root)
+    }
+
+    /// Why VNDegen can't run this System 4 game yet, for the game page, or nil when it can. Reads the game's code
+    /// file to see which libraries it is built on.
+    nonisolated static func compatibilityNote(root: URL) -> String? {
+        root.path.withCString { vns4_unsupported($0).map { String(cString: $0) } }
     }
 
     /// System 4 games keep their saves in the folder the ini's SaveFolder names, SaveData beside the .ain, on every
@@ -213,6 +220,16 @@ private final class System4FrameTarget: NSObject {
 
 /// Input for the runtime, in vns4.h's terms: Windows virtual-key codes (the mouse buttons are VK_LBUTTON 1 and
 /// VK_RBUTTON 2) and points normalized over the frame.
+nonisolated enum System4Error: Error, LocalizedError {
+    case unsupported(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .unsupported(reason): reason
+        }
+    }
+}
+
 nonisolated enum System4Input: Equatable, Sendable {
     case key(Int32, down: Bool)
     case mouseMove(CGPoint)

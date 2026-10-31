@@ -62,38 +62,62 @@ void Game::problem(const std::string &s) {
     log("problem: " + s);
 }
 
+// The ini names the code file and the screen size. Both AliceStart.ini and System40.ini use "Key = value".
+std::map<std::string, std::string> readIni(const std::string &root) {
+    std::map<std::string, std::string> ini;
+    std::string iniPath = findCaseless(root, "AliceStart.ini");
+    if (iniPath.empty()) iniPath = findCaseless(root, "System40.ini");
+    if (iniPath.empty()) return ini;
+    std::ifstream f(iniPath, std::ios::binary);
+    std::string line;
+    while (std::getline(f, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == ';') continue;
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string k = trim(line.substr(0, eq)), v = trim(line.substr(eq + 1));
+        if (v.size() >= 2 && v.front() == '"' && v.back() == '"') v = v.substr(1, v.size() - 2);
+        ini[k] = v;
+    }
+    return ini;
+}
+
+std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini) {
+    auto it = ini.find("CodeName");
+    std::string path = it != ini.end() ? findCaseless(root, it->second) : std::string();
+    if (!path.empty()) return path;
+    std::error_code ec;
+    for (auto &e : fs::directory_iterator(root, ec))
+        if (lower(e.path().extension().string()) == ".ain") path = e.path().string();
+    return path;
+}
+
+// Later System 4 games (Test Game 56) are built on libraries this runtime doesn't have yet. Starting one would only
+// show a blank screen, so it is refused with a sentence that says why.
+std::string unsupportedReason(const Ain &ain) {
+    static const char *const kMissing[] = {"PartsEngine", "ChipmunkSpriteEngine", "MainEXFile", "KiwiSoundEngine",
+                                           "SealEngine"};
+    for (auto &lib : ain.libraries)
+        for (const char *m : kMissing)
+            if (lib.name == m)
+                return "This System 4 game is built on PartsEngine and the libraries that came with it, which VNDegen "
+                       "doesn't support yet.";
+    return {};
+}
+
 bool Game::start(std::string &error) {
     if (!cfg.logPath.empty()) logFile_ = std::fopen(cfg.logPath.c_str(), "a");
     HllState::resetAll();
     if (!cfg.fontsDir.empty()) setFontPackDir(cfg.fontsDir);
-    // The ini names the code file and the screen size. Both AliceStart.ini and System40.ini use "Key = value".
-    std::string iniPath = findCaseless(cfg.root, "AliceStart.ini");
-    if (iniPath.empty()) iniPath = findCaseless(cfg.root, "System40.ini");
-    if (!iniPath.empty()) {
-        std::ifstream f(iniPath, std::ios::binary);
-        std::string line;
-        while (std::getline(f, line)) {
-            line = trim(line);
-            if (line.empty() || line[0] == ';') continue;
-            size_t eq = line.find('=');
-            if (eq == std::string::npos) continue;
-            std::string k = trim(line.substr(0, eq)), v = trim(line.substr(eq + 1));
-            if (v.size() >= 2 && v.front() == '"' && v.back() == '"') v = v.substr(1, v.size() - 2);
-            ini[k] = v;
-        }
-    }
+    ini = readIni(cfg.root);
     if (ini.count("ViewWidth")) screenW = std::atoi(ini["ViewWidth"].c_str());
     if (ini.count("ViewHeight")) screenH = std::atoi(ini["ViewHeight"].c_str());
-    std::string ainPath = ini.count("CodeName") ? findCaseless(cfg.root, ini["CodeName"]) : std::string();
-    if (ainPath.empty()) {
-        std::error_code ec;
-        for (auto &e : fs::directory_iterator(cfg.root, ec))
-            if (lower(e.path().extension().string()) == ".ain") ainPath = e.path().string();
-    }
+    std::string ainPath = codeFile(cfg.root, ini);
     if (ainPath.empty()) { error = "This folder has no System 4 code file (.ain)."; return false; }
     Ain ain;
     std::string err = ain.load(ainPath);
     if (!err.empty()) { error = "The game's code file can't be read: " + err; return false; }
+    if (std::string why = unsupportedReason(ain); !why.empty()) { error = why; return false; }
 
     // Archives: <stem>GA.ald for pictures, WA for sound effects, BA for music.
     std::string stem = fs::path(ainPath).stem().string();

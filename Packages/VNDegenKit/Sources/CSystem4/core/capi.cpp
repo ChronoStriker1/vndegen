@@ -36,6 +36,19 @@ VNS4Engine *vns4_start(const VNS4Launch *l) {
     return e;
 }
 
+const char *vns4_unsupported(const char *gameRoot) {
+    static thread_local std::string reason;
+    reason.clear();
+    if (!gameRoot) return nullptr;
+    std::string root = gameRoot;
+    std::string path = s4::codeFile(root, s4::readIni(root));
+    if (path.empty()) return nullptr;
+    s4::Ain ain;
+    if (!ain.load(path).empty()) return nullptr;
+    reason = s4::unsupportedReason(ain);
+    return reason.empty() ? nullptr : reason.c_str();
+}
+
 const char *vns4_start_error(void) { return g_startError.empty() ? nullptr : g_startError.c_str(); }
 bool vns4_step(VNS4Engine *e, int ms) { return e && e->game->step(ms); }
 
