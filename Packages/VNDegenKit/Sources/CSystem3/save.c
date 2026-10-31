@@ -140,9 +140,26 @@ static bool read_save(S3 *s, int slot, Save *sv) {
     return true;
 }
 
+// Checks every section a save refers to and its resume point, so a bad save is refused before anything changes.
+static bool save_valid(S3 *s, const Save *sv) {
+    const u8 *d = sv->d;
+    for (int page = 1; page < 256; page++) {
+        u32 a = s3_le32(d + 0x870 + (size_t)page * 4);
+        if (!a) continue;
+        if ((u64)a + 16 > sv->n) return false;
+        u32 size = s3_le32(d + a);
+        if (s3_le32(d + a + 4) != (u32)page || size % 2 || (u64)a + 16 + size > sv->n) return false;
+    }
+    if ((u64)s3_le32(d + sv->stack) + sv->stack + 16 > sv->n) return false;
+    u32 page = s3_le32(d + 0x50), pc = s3_le32(d + 0x54);
+    S3Blob b;
+    return page >= 1 && page <= 0xffff && s3_archive_get(&s->sa, page, &b, NULL) && pc < b.size;
+}
+
 bool s3_save_load(S3 *s, int slot) {
     Save sv;
     if (!read_save(s, slot, &sv)) return false;
+    if (!save_valid(s, &sv)) { s3_log(s, "slot %d is damaged; not loaded", slot); free(sv.d); return false; }
     const u8 *d = sv.d;
     s->menuFontSize = d[0x40]; s->menuColor = d[0x41]; s->menuBg = d[0x42]; s->menuFrame = d[0x43];
     s->fontSize = d[0x44]; s->msgColor = d[0x45]; s->msgBg = d[0x46]; s->msgFrame = d[0x47];
@@ -172,9 +189,8 @@ bool s3_save_load(S3 *s, int slot) {
 
     for (int page = 1; page < 256; page++) {
         u32 a = s3_le32(d + 0x870 + (size_t)page * 4);
-        if (!a || (u64)a + 16 > sv.n) continue;
+        if (!a) continue; // save_valid checked the rest
         u32 size = s3_le32(d + a);
-        if (s3_le32(d + a + 4) != (u32)page || size % 2 || (u64)a + 16 + size > sv.n) continue;
         S3ArrayPage *ap = &s->arr[page];
         u32 n = size / 2;
         if (!ap->v || ap->n != n) { free(ap->v); ap->v = s3_alloc((size_t)n * 2 + 2); ap->n = n; }
@@ -185,7 +201,6 @@ bool s3_save_load(S3 *s, int slot) {
     // The call stack, then resume where the save was made.
     s->sp = 0;
     u32 stackSize = s3_le32(d + sv.stack);
-    if (stackSize > sv.n - sv.stack - 16) stackSize = (u32)(sv.n - sv.stack - 16);
     // Each entry ends in its tag, and a pushed value can equal a tag byte, so read the entries from the end back.
     const u8 *start = d + sv.stack + 16, *q = start + stackSize;
     S3Frame *frames = s3_alloc(sizeof(S3Frame) * S3_MAX_FRAMES);

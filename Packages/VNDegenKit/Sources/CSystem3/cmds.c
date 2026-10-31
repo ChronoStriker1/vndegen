@@ -2,6 +2,7 @@
 // e = expression, b = raw byte, s = NUL-terminated string, f = function reference, m = u32.
 // Behaviour follows AliceSoft's System 3.9 SDK manual, checked against the original engine.
 #include "vm.h"
+#include <math.h>
 #include <strings.h>
 #include <time.h>
 
@@ -199,7 +200,13 @@ void s3_service_wait(S3 *s) {
     }
     case S3_WAIT_INPUT_POLL: {
         u32 p = s->pressedMask | keymask_now(s);
-        if (p) { rnd(s, (u16)p); s->pressedMask = 0; s->wait = S3_WAIT_NONE; }
+        if (p) {
+            rnd(s, (u16)p);
+            // System 3.0's K also returns the pointer, in variables 57 and 58.
+            if (s->sys30) { s3_var_set(s, 57, (u16)s->mouseX); s3_var_set(s, 58, (u16)s->mouseY); }
+            s->pressedMask = 0;
+            s->wait = S3_WAIT_NONE;
+        }
         break;
     }
     case S3_WAIT_EFFECT:
@@ -504,6 +511,13 @@ static void var_file(S3 *s, bool write, int type, const char *name, size_t nameL
         snprintf(file, sizeof file, "%s", utf8);
         free(utf8);
     }
+    // A plain file name only: nothing that leaves the save or game folder. Checked after the UTF-8 conversion, since a
+    // Shift-JIS trail byte can be 0x5C.
+    if (!file[0] || strchr(file, '/') || strchr(file, '\\') || strchr(file, ':') || !strcmp(file, ".") || !strcmp(file, "..")) {
+        s3_log(s, "LE/QE refused file name %s", file);
+        rnd(s, 255);
+        return;
+    }
     // Files the game writes live in the save folder; ones it only reads, such as shipped maps, may be in the game's.
     char *path = s3_find_file(s->saveDir, file);
     if (!path && !write) path = s3_find_file(s->gameDir, file);
@@ -546,16 +560,23 @@ static void table_read(S3 *s, int sub, Arg *a) {
     case 1: { // F1 string, skip
         u32 p = s->dataPtr;
         for (int i = 0; i < a[1].v && p < n; i++) { while (p < n && d[p]) p++; p++; }
-        if (p < n) { str_set(s, a[0].v, (const char *)d + p); while (p < n && d[p]) p++; p++; }
+        if (p < n) {
+            u32 e = p;
+            while (e < n && d[e]) e++;
+            char t[1024];
+            snprintf(t, sizeof t, "%.*s", (int)(e - p < sizeof t ? e - p : sizeof t - 1), (const char *)d + p);
+            str_set(s, a[0].v, t);
+            p = e + 1;
+        }
         s->dataPtr = p;
         return;
     }
     case 2: case 3: case 4: case 5: {
-        u32 p = s->dataPtr + (u32)a[1].v * 2;
+        u64 p = (u64)s->dataPtr + (u64)a[1].v * 2;
         u16 v = p + 2 <= n ? s3_le16(d + p) : 0;
-        if (s->trace) s3_log(s, "TBL F%d page %d at %x skip %d -> %u", sub, s->dataPage, p, a[1].v, v);
+        if (s->trace) s3_log(s, "TBL F%d page %d at %llx skip %d -> %u", sub, s->dataPage, (unsigned long long)p, a[1].v, v);
         put(s, &a[0], 0, v);
-        if (sub == 2 || sub == 4) s->dataPtr = p + 2;
+        if (sub == 2 || sub == 4) s->dataPtr = p + 2 <= n ? (u32)p + 2 : n;
         return;
     }
     default: unimpl(s, "F table");
@@ -716,10 +737,11 @@ static void cmd_N(S3 *s) {
     case 'B': {
         // NB dest, src, count. Copies through a buffer, so overlapping ranges copy as if separate.
         args(s, "eee", a);
-        u16 tmp[4096];
-        int n = a[2].v < 4096 ? a[2].v : 4096;
+        int n = a[2].v;
+        u16 *tmp = s3_alloc(sizeof(u16) * (size_t)(n + 1));
         for (int i = 0; i < n; i++) tmp[i] = s3_lv_get(s, &a[1].lv, i);
         for (int i = 0; i < n; i++) put(s, &a[0], i, tmp[i]);
+        free(tmp);
         return;
     }
     case 'C': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, 0); return;
@@ -757,7 +779,12 @@ static void cmd_N(S3 *s) {
         double *w = s->w64;
         switch (op) {
         case 'C': w[b[0].v & 255] = b[1].v; return;
-        case 'D': { double v = w[b[1].v & 255]; put(s, &b[0], 0, (u16)(long long)v); return; } // truncated, then wraps
+        case 'D': { // truncated toward zero, then modulo 65536; NaN and infinities give 0
+            double v = w[b[1].v & 255];
+            double r = isfinite(v) ? fmod(trunc(v), 65536.0) : 0;
+            put(s, &b[0], 0, (u16)(r < 0 ? r + 65536.0 : r));
+            return;
+        }
         case '+': w[b[0].v & 255] = w[b[1].v & 255] + w[b[2].v & 255]; return;
         case '-': w[b[0].v & 255] = w[b[1].v & 255] - w[b[2].v & 255]; return;
         case '*': w[b[0].v & 255] = w[b[1].v & 255] * w[b[2].v & 255]; return;
@@ -838,7 +865,7 @@ static void cmd_S(S3 *s) {
         else { put(s, &a[0], 0, (u16)s->cdTrack); put(s, &a[0], 1, (u16)(t / 60000)); put(s, &a[0], 2, (u16)(t / 1000 % 60)); put(s, &a[0], 3, (u16)(t % 1000 * 75 / 1000)); } }
         return;
     case 'R': { int sub = s3_byte(s); args(s, "e", a);
-        put(s, &a[0], 0, (u16)(sub == 0 ? (s3_music_position(s) >= 0 ? s->cdTrack : 0) : s->midiPlaying));
+        put(s, &a[0], 0, (u16)(sub == 0 ? (s3_music_position(s) >= 0 ? s->cdTrack : 0) : s3_midi_playing(s)));
         for (int i = 1; i < 4; i++) put(s, &a[0], i, 0);
         return; }
     case 'I': { s3_byte(s); args(s, "e", a); put(s, &a[0], 0, 1); return; }

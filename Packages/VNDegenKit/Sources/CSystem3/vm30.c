@@ -251,12 +251,14 @@ bool s3_open30(S3 *s) {
 
 void s3_close30(S3 *s) {
     S3State30 *t = s->s30;
-    if (!t) return;
-    for (int i = 0; i < t->pairs; i++) { free(t->jp[i]); free(t->en[i]); }
-    free(t->jp);
-    free(t->en);
-    free(t);
-    s->s30 = NULL;
+    if (t) {
+        for (int i = 0; i < t->pairs; i++) { free(t->jp[i]); free(t->en[i]); }
+        free(t->jp);
+        free(t->en);
+        free(t);
+        s->s30 = NULL;
+    }
+    // The archives are closed whatever state the open reached; closing an unopened one does nothing.
     s3_dat_close(&s->adisk);
     s3_dat_close(&s->cg30);
     free(s->gaiji);

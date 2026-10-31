@@ -20,7 +20,7 @@ of the app; `docs/system3-cleanroom.md` lists where each part came from. It cove
 - Draws text in the Windows font pack's MS Gothic substitute, as fixed full- and half-width cells, with the engines'
   conversion of half-width kana to hiragana. Translated text breaks between words.
 - Saves where the PC engines do, in the game's folder: `<prefix>S<letter>.ASD` for System 3.9 (slot 1 is `A`) and
-  `ASLEEP_<letter>.DAT` for System 3.0. The files are byte for byte what the PC engines write, checked on 41 System 3.9
+  `ASLEEP_<letter>.DAT` for System 3.0. The files are byte for byte what the PC engines write, checked on 40 System 3.9
   and 9 System 3.0 test saves, so Ludusavi backups and PC copies of a game load either way. Files games write with QE,
   such as Toushin Toshi II's `tt2FS.ALD` of game-wide flags, are kept in the PC format too. A Japanese name ending in
   two letters and `.ALD` takes the archives' prefix, as the English releases renamed those files.

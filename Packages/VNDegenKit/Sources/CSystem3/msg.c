@@ -95,18 +95,29 @@ void s3_msg_text(S3 *s, const char *sjis) {
     }
 }
 
-// Copies a window's rectangle of the DIB out to *buf (allocating it) or back in.
-static void window_area(S3 *s, const S3Win *win, u8 **buf, bool out) {
+// Keeps the part of the DIB a window covers, with the rectangle and depth it was taken at.
+static void under_save(S3 *s, const S3Win *win, struct S3Under *u) {
+    free(u->px);
+    memset(u, 0, sizeof *u);
     int x = win->x, y = win->y, w = win->w, h = win->h;
     if (!s3_clip(s, &x, &y, &w, &h)) return;
     size_t px = s->dib.depth == 8 ? 1 : 4, row = (size_t)w * px;
-    if (out && !*buf) *buf = s3_alloc(row * (size_t)h);
-    if (!*buf) return;
-    for (int j = 0; j < h; j++) {
-        u8 *dib = (s->dib.depth == 8 ? s->dib.p8 : (u8 *)s->dib.p32) + ((size_t)(y + j) * s->dib.w + x) * px;
-        if (out) memcpy(*buf + (size_t)j * row, dib, row); else memcpy(dib, *buf + (size_t)j * row, row);
+    u->px = s3_alloc(row * (size_t)h);
+    *u = (struct S3Under){ u->px, x, y, w, h, s->dib.depth };
+    for (int j = 0; j < h; j++)
+        memcpy(u->px + (size_t)j * row, (s->dib.depth == 8 ? s->dib.p8 : (u8 *)s->dib.p32) + ((size_t)(y + j) * s->dib.w + x) * px, row);
+}
+
+// Puts a kept area back where it was taken, if the DIB still has that depth and room for it.
+static void under_restore(S3 *s, struct S3Under *u) {
+    if (u->px && u->depth == s->dib.depth && u->x + u->w <= s->dib.w && u->y + u->h <= s->dib.h) {
+        size_t px = u->depth == 8 ? 1 : 4, row = (size_t)u->w * px;
+        for (int j = 0; j < u->h; j++)
+            memcpy((u->depth == 8 ? s->dib.p8 : (u8 *)s->dib.p32) + ((size_t)(u->y + j) * s->dib.w + u->x) * px, u->px + (size_t)j * row, row);
+        s3_mark_dirty(s);
     }
-    if (!out) { free(*buf); *buf = NULL; s3_mark_dirty(s); }
+    free(u->px);
+    memset(u, 0, sizeof *u);
 }
 
 // B4 num, frame, -, -, noClear, restore. restore 0 keeps what the window covers when its B3 asked to, then makes it the
@@ -114,8 +125,8 @@ static void window_area(S3 *s, const S3Win *win, u8 **buf, bool out) {
 // window as it is, as the System 3.0 games' save screens rely on.
 void s3_msg_select_window(S3 *s, int n, int frame, int noClear, int restore) {
     if (n < 1 || n > 100) return;
-    if (restore) { if (s->msgUnder[n]) window_area(s, &s->msgWin[n], &s->msgUnder[n], false); return; }
-    if (s->msgWin[n].save) { free(s->msgUnder[n]); s->msgUnder[n] = NULL; window_area(s, &s->msgWin[n], &s->msgUnder[n], true); }
+    if (restore) { under_restore(s, &s->msgUnder[n]); return; }
+    if (s->msgWin[n].save) under_save(s, &s->msgWin[n], &s->msgUnder[n]);
     s->curMsg = n;
     s->msgFrameOn = frame;
     S3Win *w = msgwin(s);
@@ -263,7 +274,7 @@ bool s3_menu_update(S3 *s) {
         (void)click;
         if (hit >= 0 || !(pressed & 0x10000)) { s->waitArg[0] = hit >= 0 && (pressed & 0x10000) ? hit : s->menuCursorPos; return true; }
     }
-    if (pressed & 32) { s->waitArg[0] = -1; return true; }                  // escape or right click
+    if (pressed & (32 | 64)) { s->waitArg[0] = -1; return true; }           // space, right click or escape
     return false;
 }
 

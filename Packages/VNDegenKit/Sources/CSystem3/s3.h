@@ -172,7 +172,8 @@ struct S3 {
     int msgBgAlpha, menuBgAlpha, menuDefault;
     int palBank;
     S3Win msgWin[128], selWin[128];  // the PC save keeps 128 of each
-    u8 *msgUnder[101];      // what B4 covered with a message window whose B3 asked to keep it, for B4 ... ,1
+    struct S3Under { u8 *px; int x, y, w, h, depth; } msgUnder[101]; // what B4 covered with a message window whose
+                            // B3 asked to keep it, and where, for B4 ... ,1
     int curMsg, curSel;
     int msgFrameOn, selFrameOn;
     int tx, ty;                // next text position
@@ -306,6 +307,7 @@ void s3_music_stop(S3 *s);
 int s3_music_position(S3 *s);
 void s3_midi_play(S3 *s, int n, int loops);
 void s3_midi_stop(S3 *s);
+int s3_midi_playing(S3 *s);
 void s3_audio_pause(S3 *s, bool paused);
 
 #endif

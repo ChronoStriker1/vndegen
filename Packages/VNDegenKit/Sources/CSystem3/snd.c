@@ -26,7 +26,7 @@ typedef struct Wav {
 
 typedef struct Music {
     u8 *file;
-    drmp3 mp3;
+    drmp3 *mp3;          // on the heap: dr_mp3's memory reader points into the decoder, so it must never move
     bool open, on;
     int loops;           // 0 forever, otherwise plays this many times
     double step, frac;
@@ -78,7 +78,8 @@ void s3_audio_init(S3 *s) {
 static void wav_free(Wav *w) { free(w->pcm); memset(w, 0, sizeof *w); }
 
 static void music_close(Music *m) {
-    if (m->open) drmp3_uninit(&m->mp3);
+    if (m->open) drmp3_uninit(m->mp3);
+    free(m->mp3);
     free(m->file);
     memset(m, 0, sizeof *m);
 }
@@ -175,11 +176,12 @@ void s3_music_play(S3 *s, int track, int loops) {
     if (!d) { s3_log(s, "CD track %d file missing: %s", track, a->tracks[track - 2]); return; }
     Music m = {0};
     m.file = d;
-    if (!drmp3_init_memory(&m.mp3, d, n, NULL)) { free(d); s3_log(s, "CD track %d is not MP3", track); return; }
+    m.mp3 = s3_alloc(sizeof *m.mp3);
+    if (!drmp3_init_memory(m.mp3, d, n, NULL)) { free(m.mp3); free(d); s3_log(s, "CD track %d is not MP3", track); return; }
     m.open = true;
     m.on = true;
     m.loops = loops;
-    m.step = (double)m.mp3.sampleRate / a->rate;
+    m.step = (double)m.mp3->sampleRate / a->rate;
     pthread_mutex_lock(&a->lock);
     a->music = m;
     pthread_mutex_unlock(&a->lock);
@@ -208,14 +210,14 @@ int s3_music_position(S3 *s) {
 static bool music_frame(Music *m, float out[2]) {
     float f[2];
     for (int tries = 0; tries < 2; tries++) {
-        if (drmp3_read_pcm_frames_f32(&m->mp3, 1, f) == 1) {
-            if (m->mp3.channels == 1) f[1] = f[0];
+        if (drmp3_read_pcm_frames_f32(m->mp3, 1, f) == 1) {
+            if (m->mp3->channels == 1) f[1] = f[0];
             out[0] = f[0]; out[1] = f[1];
             return true;
         }
         if (m->loops == 1) return false;
         if (m->loops > 1) m->loops--;
-        drmp3_seek_to_pcm_frame(&m->mp3, 0);
+        drmp3_seek_to_pcm_frame(m->mp3, 0);
     }
     return false;
 }
@@ -236,6 +238,16 @@ void s3_midi_play(S3 *s, int n, int loops) {
     a->midi = p;
     pthread_mutex_unlock(&a->lock);
     s->midiPlaying = n;
+}
+
+// The MIDI number playing, or 0 once a one-shot piece has ended or nothing plays.
+int s3_midi_playing(S3 *s) {
+    S3Audio *a = s->audio;
+    if (!a || !s->midiPlaying) return 0;
+    pthread_mutex_lock(&a->lock);
+    bool on = a->midi && vnmidi_player_playing(a->midi);
+    pthread_mutex_unlock(&a->lock);
+    return on ? s->midiPlaying : 0;
 }
 
 void s3_midi_stop(S3 *s) {

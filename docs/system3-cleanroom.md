@@ -34,7 +34,7 @@ reading xsystem35, xsystem35-sdl2, system3-sdl2, alicetools or any fork of them,
   bit-plane data, checked by decoding the games' CGs. See the note below.
 - **Saves.** Test scenarios built with the SDK's compiler and linker set known values (variables, strings, arrays,
   windows, fonts and colours, calls and pushed variables) and saved with `QD` on the SDK's `System39.exe` under Wine.
-  The runtime's saves for the same scenarios are byte-identical to the 41 files the original wrote. The same runs
+  The runtime's saves for the same scenarios are byte-identical to the 40 files the original wrote. The same runs
   showed that `LD` resumes after the `QD` that made the save.
 - **Commands the manual leaves open**, each settled by an SDK test page run on `System39.exe` and read back from the
   save it wrote: `N&`, `N|` and `N^` write their result into the second variable and leave the first alone; `VG`

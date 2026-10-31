@@ -319,7 +319,7 @@ static void exec_one(S3 *s) {
         if (n == 0) s->dataPtr = addr;
         else {
             // The label holds a table of addresses written by _label: entries, numbered from 1.
-            u32 at = addr + (u32)(n - 1) * 4;
+            u64 at = (u64)addr + (u64)(n - 1) * 4;
             s->dataPtr = at + 4 <= s->codeSize ? s3_le32(s->code + at) : 0;
         }
         return;
