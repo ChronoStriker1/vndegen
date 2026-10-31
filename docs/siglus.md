@@ -95,6 +95,21 @@ None are in the library. VNDB's engine field for the English Windows releases on
 
 planetarian ~Snow Globe~ on Steam is Luca System.
 
+## Where the work stopped (2026-10-31)
+
+The work stopped at the user's request before any Apple app build finished. Verified:
+
+- Linux: siglus_rs builds, the Apple dependency tree has no egui, ureq, webpki-roots or WMV crates, `cargo test -p vnsiglus -p game_fs` passes, and 305 of upstream's 308 unit tests in `siglus_scene_vm` and `reallive` pass. Two of the failures also happen on unmodified upstream, and the third tests the WMV decoder VNDegen leaves out. `vnsiglus-run` reports a RealLive folder with no scenarios as an error through the C table.
+- Mac: `scripts/siglus-engine.sh` builds `VNSiglus.xcframework` (iOS device and simulator for iOS 18, macOS arm64 and x86_64) with 202 notices. `scripts/build.sh test` passes, including the 12 `EngineSiglusTests` on the case-sensitive volume.
+
+Not done yet, in order:
+
+1. `scripts/build.sh ios-sim` and `mac`, which were stopped while building Godot in the remote folder.
+2. An iPad simulator smoke test on `vn-siglus`, with the probe folders the Mac holds in `~/vndegen-siglus/probes`: an empty `Scene.pck` should get as far as the wgpu renderer and fail in the VM, and logs/siglus.txt should say so.
+3. A Codex review.
+4. With games: title, play, save and load on Linux (`siglus_engine`, `vnsiglus-run`), the Mac app and an iPad simulator, an iPhone simulator for one game, the case check, Ludusavi paths, and a movie frame rate check.
+5. `scripts/build.sh ipa`, once with `build/siglus` deleted.
+
 ## Known limits
 
 - No game has run yet. Everything about games is untested.

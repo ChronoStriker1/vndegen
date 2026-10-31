@@ -978,8 +978,20 @@ impl<'a> OriginalStreamReader<'a> {
     }
 }
 
+/// VNDegen: the save folder as it is on disk, so a `SaveData` folder a PC backup restored on a disk that doesn't ignore
+/// case is the one the engine reads and writes, rather than a second `savedata` beside it.
 pub fn save_dir(project_dir: &Path) -> PathBuf {
-    project_dir.join("savedata")
+    existing_spelling(project_dir.join("savedata"))
+}
+
+/// VNDegen: `path` as it is on disk when it exists in another case, else `path` itself, so a save replaces a file
+/// whose name differs only in case rather than writing a second one.
+fn existing_spelling(path: PathBuf) -> PathBuf {
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+    if let Ok(Some(found)) = crate::resource::resolve_game_path(&path) {
+        return found;
+    }
+    path
 }
 
 pub fn original_save_no(
@@ -1130,6 +1142,7 @@ pub fn write_local_save_file(
         fs::create_dir_all(parent)
             .with_context(|| format!("create save dir {}", parent.display()))?;
     }
+    let path = &existing_spelling(path.to_path_buf());
     fs::write(path, out).with_context(|| format!("write save file {}", path.display()))?;
     crate::resource::invalidate_game_path_cache(path);
     Ok(())
@@ -1218,6 +1231,7 @@ pub fn write_global_save_file(project_dir: &Path, global_stream: &[u8]) -> Resul
     }
     let mut out = header.to_bytes();
     out.extend_from_slice(&packed);
+    let path = existing_spelling(path);
     fs::write(&path, out).with_context(|| format!("write global save file {}", path.display()))?;
     crate::resource::invalidate_game_path_cache(&path);
     Ok(())
@@ -1270,6 +1284,7 @@ pub fn write_read_save_file(project_dir: &Path, scene_rows: &[(String, Vec<u8>)]
     push_i32(&mut out, packed.len().min(i32::MAX as usize) as i32);
     push_i32(&mut out, scene_rows.len().min(i32::MAX as usize) as i32);
     out.extend_from_slice(&packed);
+    let path = existing_spelling(path);
     fs::write(&path, out).with_context(|| format!("write read save file {}", path.display()))?;
     crate::resource::invalidate_game_path_cache(&path);
     Ok(())
@@ -1342,6 +1357,7 @@ pub fn write_config_save_file(project_dir: &Path, config_stream: &[u8]) -> Resul
     }
     let mut out = header.to_bytes();
     out.extend_from_slice(&packed);
+    let path = existing_spelling(path);
     fs::write(&path, out).with_context(|| format!("write config save file {}", path.display()))?;
     crate::resource::invalidate_game_path_cache(&path);
     Ok(())
@@ -1854,5 +1870,26 @@ mod local_layout_tests {
             rd.skip(start).unwrap();
             assert!(rd.detect_local_layout().is_err());
         }
+    }
+}
+
+#[cfg(all(test, not(all(target_arch = "wasm32", target_os = "unknown"))))]
+mod vndegen_case_tests {
+    use super::*;
+
+    /// A PC backup restored on a disk that doesn't ignore case keeps the PC's spelling, and saves go there.
+    #[test]
+    fn saves_use_the_spelling_on_disk() {
+        let root = std::env::temp_dir().join(format!("siglus-save-case-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("SaveData")).unwrap();
+        fs::write(root.join("SaveData/GLOBAL.SAV"), b"old").unwrap();
+        assert_eq!(save_dir(&root), root.join("SaveData"));
+        assert_eq!(existing_spelling(save_dir(&root).join("global.sav")), root.join("SaveData/GLOBAL.SAV"));
+        assert_eq!(existing_spelling(save_dir(&root).join("0001.sav")), root.join("SaveData/0001.sav"));
+        let fresh = root.join("fresh");
+        fs::create_dir_all(&fresh).unwrap();
+        assert_eq!(save_dir(&fresh), fresh.join("savedata"));
+        fs::remove_dir_all(&root).unwrap();
     }
 }

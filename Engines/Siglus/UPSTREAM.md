@@ -52,4 +52,5 @@ On Linux, `cargo test -p vnsiglus -p game_fs` in `siglus_rs/` tests VNDegen's in
 - Create the renderer from a view on macOS and Linux too (`Renderer::new_from_raw_handles`).
 - Put upstream's desktop player behind `siglus_scene_vm`'s `desktop` feature, on by default: its egui windows, its Twitter client and HTTP client (ureq), and the winit pump host. Without it the engine's HTTP requests fail, as on the consoles, and the desktop window icon is blank instead of upstream's image.
 - Find RealLive's files whatever case the game uses: `game_fs` looks a path up as written, then matches each missing name against its folder's listing without regard to case, for reads, writes, existence checks and listings. A write to a name that exists in another case replaces that file.
+- Write SiglusEngine saves to the save folder and file names as they are on disk (`original_save::save_dir`, `existing_spelling`), so a `SaveData/` folder a PC backup restored on a case-sensitive disk is the one the engine uses, rather than a second `savedata/` beside it.
 - Let the host mute both engines (`AudioHub::set_muted`, `Sound::set_muted`) while VNDegen's menu is open.
