@@ -115,6 +115,34 @@ static void note_timing(double start, double rendered, double end) {
     }
 }
 
+static VALUE eval_request(VALUE code) {
+    return rb_funcall(rb_mKernel, rb_intern("eval"), 3, code, rb_const_get(rb_cObject, rb_intern("TOPLEVEL_BINDING")),
+                      rb_str_new_cstr("vndegen"));
+}
+
+static VALUE describe_value(VALUE value) { return rb_obj_as_string(value); }
+
+static VALUE describe_error(VALUE error) { return rb_funcall(error, rb_intern("full_message"), 0); }
+
+char *rgss_run_ruby(const char *code, bool *failed) {
+    int state = 0;
+    VALUE value = rb_protect(eval_request, rb_utf8_str_new_cstr(code), &state);
+    VALUE text = Qnil;
+    if (!state) text = rb_protect(describe_value, value, &state);
+    if (state) {
+        *failed = true;
+        VALUE error = rb_errinfo();
+        rb_set_errinfo(Qnil);
+        text = NIL_P(error) ? Qnil : rb_protect(describe_error, error, &state);
+        rb_set_errinfo(Qnil);
+        if (state || NIL_P(text)) return strdup("The game's Ruby failed.");
+    }
+    char *copy = malloc((size_t)RSTRING_LEN(text) + 1);
+    memcpy(copy, RSTRING_PTR(text), (size_t)RSTRING_LEN(text));
+    copy[RSTRING_LEN(text)] = 0;
+    return copy;
+}
+
 static void update_frame(void) {
     char *code = host_take_eval();
     if (code) {
@@ -128,6 +156,12 @@ static void update_frame(void) {
         free(code);
     }
     ensure_screen();
+    // Faster than its frame rate, the game composites only the frames that are shown.
+    if (host_frame_hidden()) {
+        rgss_frame_count++;
+        if (!host_wait_frame()) stop_game();
+        return;
+    }
     double start = now_ms();
     if (isFrozen) {
         present(&frozen);

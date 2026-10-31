@@ -32,6 +32,7 @@ final class RGSSSession: EngineSession {
     /// When each key the game holds went down, and the releases held back for `shortestPress`.
     private var pressedAt: [UInt32: ContinuousClock.Instant] = [:]
     private var heldReleases: [UInt32: Task<Void, Never>] = [:]
+    let cheats: (any CheatSession)? = RGSSCheats()
 
     /// RGSS reads its input once a frame. The runtime keeps a key pressed and released between two frames down for one
     /// frame, but some games check a key on two frames in a row, so a quick tap of a touch or controller button is held
@@ -88,6 +89,7 @@ final class RGSSSession: EngineSession {
         }
         rgssLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
         running = true
+        RGSSCheats.start(with: launch.game.cheats ?? CheatSettings())
         audio = PCMAudioOutput { out, frames in vnrgss_audio_render(out, Int32(frames)) }
         audio?.start()
         if paused { setPaused(true) }

@@ -5,7 +5,8 @@
 //
 // A script has one command per line: "N tap KEY" presses a key at frame N and releases it two frames later,
 // "N down KEY" and "N up KEY" hold and release it, "N shot FILE" saves frame N, "N eval CODE" runs the rest of the
-// line as Ruby in the game. KEY is a libretro key code or a
+// line as Ruby in the game. "N ruby CODE" and "N rubyfile FILE" run Ruby through vnrgss_run_ruby, as the app's cheats
+// do, and print what it gave. KEY is a libretro key code or a
 // name: up, down, left, right, enter, esc, space, shift, or a single letter. Lines starting with # are comments.
 // Everything after --then is a second game's arguments; it starts in the same process once the first has stopped, as
 // the app starts one game after another.
@@ -13,13 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <time.h>
 
 #include "host.h"
 #include "vnrgss.h"
 
 typedef struct {
     long frame;
-    int kind; // 0 down, 1 up, 2 shot, 3 eval
+    int kind; // 0 down, 1 up, 2 shot, 3 eval, 4 ruby, 5 rubyfile
     unsigned key;
     char file[1024];
 } Command;
@@ -57,9 +59,9 @@ static void read_script(const char *path) {
         char verb[32], arg[512];
         if (sscanf(line, "%ld %31s %511s", &frame, verb, arg) != 3) continue;
         Command c = {.frame = frame};
-        if (!strcmp(verb, "eval")) {
-            c.kind = 3;
-            const char *code = strstr(line, "eval") + 5;
+        if (!strcmp(verb, "eval") || !strcmp(verb, "ruby") || !strcmp(verb, "rubyfile")) {
+            c.kind = !strcmp(verb, "eval") ? 3 : !strcmp(verb, "ruby") ? 4 : 5;
+            const char *code = strstr(line, verb) + strlen(verb) + 1;
             snprintf(c.file, sizeof c.file, "%s", code);
             c.file[strcspn(c.file, "\n")] = 0;
             add(c);
@@ -92,6 +94,38 @@ static void save_frame(const char *path) {
 }
 
 static int run(int argc, char **argv);
+
+// Runs Ruby while the game waits for its next frame, as the app does, and prints the result.
+static void run_ruby(long frame, const char *code, bool fromFile) {
+    char *source = NULL;
+    if (fromFile) {
+        FILE *file = fopen(code, "rb");
+        if (!file) {
+            printf("ruby %ld: no file %s\n", frame, code);
+            return;
+        }
+        fseek(file, 0, SEEK_END);
+        long size = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        source = calloc((size_t)size + 1, 1);
+        fread(source, 1, (size_t)size, file);
+        fclose(file);
+    }
+    long request = vnrgss_run_ruby(source ? source : code);
+    free(source);
+    for (int tries = 0; request && tries < 500; tries++) {
+        bool failed = false;
+        char *result = vnrgss_ruby_result(request, &failed);
+        if (result) {
+            printf("ruby %ld%s: %s\n", frame, failed ? " failed" : "", result);
+            free(result);
+            return;
+        }
+        struct timespec pause = {0, 10000000};
+        nanosleep(&pause, NULL);
+    }
+    printf("ruby %ld: no answer\n", frame);
+}
 
 int main(int argc, char **argv) {
     int split = argc;
@@ -150,6 +184,7 @@ static int run(int argc, char **argv) {
             if (commands[i].frame != frame) continue;
             if (commands[i].kind == 2) save_frame(commands[i].file);
             else if (commands[i].kind == 3) host_test_eval(commands[i].file);
+            else if (commands[i].kind == 4 || commands[i].kind == 5) run_ruby(frame, commands[i].file, commands[i].kind == 5);
             else vnrgss_key(commands[i].key, commands[i].kind == 0);
         }
         if (!host_test_step(20000)) break;
