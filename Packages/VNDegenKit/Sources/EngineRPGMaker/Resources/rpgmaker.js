@@ -539,6 +539,122 @@
         });
     }, true);
 
+    // iOS can end WebKit's GPU process, such as when it needs the memory, and the page loses its WebGL context. WebKit
+    // restores it at once and PIXI uploads its textures again, but two parts of MZ kept what lived in the lost context.
+    // Tile layers copy their tilesets into the tilemap renderer's own textures only when the tileset changes, so the
+    // map went black. Effekseer, which draws battle animations, went on drawing with its lost buffers and programs, and
+    // its failing calls broke PIXI's next buffer uploads, so sprites drew in the wrong places and order, more of them
+    // with each battle, until the map showed none. After a restore, each tile layer copies its tilesets again, and
+    // Effekseer gets a new context whose effects load again. Animations that were playing end, as their effect is gone.
+    let contextGeneration = 0;
+    window.addEventListener('webglcontextrestored', (event) => {
+        const graphics = window.Graphics;
+        if (!graphics || !graphics._app || event.target !== graphics._app.view) return;
+        contextGeneration++;
+        console.warn('WebGL context restored, restoring the tilemap and Effekseer');
+        if (typeof graphics._createEffekseerContext !== 'function' || !window.effekseer) return;
+        retireEffekseer(graphics);
+        // MZ drops the whole PIXI application when Effekseer fails to start. Here the game keeps drawing, without
+        // battle animations until the next restore.
+        const app = graphics._app;
+        try {
+            graphics._createEffekseerContext();
+        } finally {
+            if (graphics._app !== app) {
+                graphics._app = app;
+                graphics._effekseer = null;
+            }
+        }
+    }, true);
+
+    // Frees the lost Effekseer context and every effect it made, including ones a plugin loaded itself and ones still
+    // waiting for a file or texture. Their callbacks do nothing from now on, so nothing that arrives later reaches the
+    // released context or reports an error for it. Deleting GL objects that went with the lost context only sets error
+    // flags, which are cleared so nothing reads them as a later call's.
+    function retireEffekseer(graphics) {
+        const lost = graphics._effekseer, gl = graphics._app.renderer.gl;
+        const effects = new Set(lost && lost.vndegenEffects);
+        if (window.EffectManager) {
+            for (const effect of Object.values(EffectManager._cache)) if (effect) effects.add(effect);
+            EffectManager._cache = {};
+        }
+        if (lost) lost.vndegenRetired = true;
+        for (const effect of effects) {
+            effect._load = effect._update = effect._reload = () => {};
+            effect.onload = effect.onerror = null;
+        }
+        if (!lost) return;
+        for (const effect of effects) {
+            if (effect.context !== lost || !effect.nativeptr) continue;
+            // releaseEffect only warns about an effect still waiting for its textures, which holds native memory too.
+            effect.isLoaded = true;
+            try { lost.releaseEffect(effect); } catch (e) { /* already gone */ }
+        }
+        try { effekseer.releaseContext(lost); } catch (e) { /* already gone */ }
+        for (let i = 0; i < 16 && gl.getError() !== gl.NO_ERROR; i++);
+    }
+
+    // Each Effekseer context keeps the effects it loads, for retireEffekseer. Their load and error callbacks are
+    // wrapped as they are passed in, as Effekseer hands them on to its loaders by value.
+    function trackEffects(context) {
+        const effects = context.vndegenEffects = new Set();
+        const loadEffect = context.loadEffect, releaseEffect = context.releaseEffect;
+        if (typeof loadEffect !== 'function' || typeof releaseEffect !== 'function') return;
+        context.loadEffect = function (...args) {
+            const live = args.map((arg) => typeof arg !== 'function' ? arg
+                : function () { if (!context.vndegenRetired) return arg.apply(this, arguments); });
+            const effect = loadEffect.apply(this, live);
+            if (effect) effects.add(effect);
+            return effect;
+        };
+        context.releaseEffect = function (effect) {
+            effects.delete(effect);
+            return releaseEffect.apply(this, arguments);
+        };
+    }
+
+    document.addEventListener('load', () => {
+        const layer = window.Tilemap && Tilemap.Layer && Tilemap.Layer.prototype;
+        if (layer) {
+            wrap(layer, 'render', (render) => function () {
+                if (this.vndegenContext !== contextGeneration) {
+                    if (this.vndegenContext !== undefined) this._needsTexturesUpdate = true;
+                    this.vndegenContext = contextGeneration;
+                }
+                return render.apply(this, arguments);
+            });
+        }
+        if (window.effekseer) {
+            wrap(effekseer, 'createContext', (createContext) => function () {
+                const context = createContext.apply(this, arguments);
+                if (context) trackEffects(context);
+                return context;
+            });
+        }
+        // MV's animations are sprites, which PIXI restores.
+        const animation = window.Graphics && Graphics._createEffekseerContext && typeof Sprite_Animation === 'function'
+            && Sprite_Animation.prototype;
+        if (!animation) return;
+        // Every method that reads an animation's handle first drops a handle, or an effect not yet playing, that
+        // belongs to an Effekseer context other than the current one.
+        for (const name of ['update', '_render', 'destroy', 'setRotation', 'updateEffectGeometry', 'checkEnd']) {
+            wrap(animation, name, (method) => function () {
+                forgetLostEffect(this);
+                return method.apply(this, arguments);
+            });
+        }
+    }, true);
+    function forgetLostEffect(animation) {
+        const current = window.Graphics && Graphics._effekseer;
+        const handle = animation._handle;
+        if (handle && handle.context && handle.context !== current) animation._handle = null;
+        const effect = animation._effect;
+        if (!animation._started && effect && effect.context && effect.context !== current && animation._animation
+            && window.EffectManager) {
+            animation._effect = EffectManager.load(animation._animation.effectName);
+        }
+    }
+
     // Early MV cores (1.2.0 in the library) build the save folder from the page's address: index.html's folder, less a
     // last /www, plus save/. On the PC that is the game's top-level save/. Here the address is vndegen://game/index.html,
     // so the folder came out as /save/, outside the game folder, and every save failed. The same rule applied to
