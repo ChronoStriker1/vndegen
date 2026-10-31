@@ -27,7 +27,7 @@ static void shot(VNS3 *g, const char *file) {
     if (!f || !px) { fprintf(stderr, "cannot write %s\n", file); if (f) fclose(f); return; }
     fprintf(f, "P6\n%d %d\n255\n", w, h);
     for (int i = 0; i < w * h; i++) {
-        unsigned char c[3] = { (unsigned char)(px[i] >> 16), (unsigned char)(px[i] >> 8), (unsigned char)px[i] };
+        unsigned char c[3] = { (unsigned char)px[i], (unsigned char)(px[i] >> 8), (unsigned char)(px[i] >> 16) };
         fwrite(c, 1, 3, f);
     }
     fclose(f);

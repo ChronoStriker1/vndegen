@@ -208,7 +208,8 @@ void s3_gfx_present(S3 *s) {
                 else { r -= r * f / 255; g -= g * f / 255; b -= b * f / 255; }
                 c = (u32)r << 16 | (u32)g << 8 | (u32)b;
             }
-            o[x] = 0xff000000u | c;
+            // RGBA bytes, as FrameView takes them: R in the lowest byte of a little-endian word.
+            o[x] = 0xff000000u | (c & 0xff) << 16 | (c & 0xff00) | (c >> 16 & 0xff);
         }
     }
     s->serial++;

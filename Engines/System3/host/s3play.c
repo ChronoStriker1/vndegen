@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
             const uint32_t *px = vns3_pixels(game, &w, &h);
             if (w != tw || h != th) {
                 if (tex) SDL_DestroyTexture(tex);
-                tex = SDL_CreateTexture(r, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+                tex = SDL_CreateTexture(r, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, w, h);
                 tw = w; th = h;
                 SDL_RenderSetLogicalSize(r, w, h);
             }

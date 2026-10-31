@@ -36,7 +36,8 @@ void vns3_close(VNS3 *s3);
 // Runs the game for elapsedMs milliseconds of wall time. Returns false once the game has quit.
 bool vns3_frame(VNS3 *s3, uint32_t elapsedMs);
 
-// The visible screen as 0xAARRGGBB pixels, rows top to bottom. Valid until the next vns3_frame.
+// The visible screen as RGBA8 pixels (bytes R, G, B, A; 0xAABBGGRR read as a little-endian word), rows top to bottom.
+// Valid until the next vns3_frame.
 const uint32_t *vns3_pixels(VNS3 *s3, int *width, int *height);
 // Bumped whenever the screen changed, so the host can skip unchanged frames.
 uint32_t vns3_frame_serial(VNS3 *s3);
