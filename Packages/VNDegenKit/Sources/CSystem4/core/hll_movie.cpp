@@ -62,6 +62,7 @@ struct Playback {
         if (!movie) return false;
         startMs = G().now();
         running = true;
+        G().log("movie: playing");
         Movie *m = movie.get();
         G().audio.setStream([m](float *out, int frames) { return m->readAudio(out, frames); }, kMusicGroup, volume);
         return true;
@@ -80,8 +81,11 @@ struct Playback {
     }
     void release() {
         if (running) G().audio.clearStream();
-        if (Movie::Dry d = movie ? movie->dry() : Movie::Dry{}; d.reads > 0)
-            G().log("movie: sound ran dry " + std::to_string(d.reads) + " times, " + std::to_string(d.frames * 1000 / Movie::kAudioRate) + " ms in all");
+        if (movie) {
+            Movie::Dry d = movie->dry();
+            G().log("movie: closed after " + std::to_string((G().now() - startMs) / 1000) + " s of game time; its sound ran dry " +
+                    std::to_string(d.reads) + " times, " + std::to_string(d.frames * 1000 / Movie::kAudioRate) + " ms in all");
+        }
         running = false;
         movie.reset();
         count = 0;

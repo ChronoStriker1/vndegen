@@ -61,7 +61,7 @@ Environment variables turn on logs:
 - `S4_MUTE`: the mix is computed but the output is silent, for timing checks where nobody should hear the game.
 
 The log always notes, every 10 s of game time, frame steps over 100 ms (the clock drops the rest) and audio renders
-that took over half their length, and after a movie, how often its sound ran dry.
+that took over half their length, and when a movie closes, how often its sound ran dry.
 - `S4_FONTS`: the font pack folder on Linux.
 
 ## Known limits
