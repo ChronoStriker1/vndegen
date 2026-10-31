@@ -81,6 +81,15 @@ final class System4Session: EngineSession {
         frameView.onReady = { [weak self] in self?.start() }
         frameView.onPointer = { [weak self] event in
             guard let self else { return }
+            #if os(macOS)
+            // A move with a button the system no longer holds: that button's mouse-up was lost on the way.
+            if event.phase == .moved {
+                let pressed = NSEvent.pressedMouseButtons
+                for button in router.pointerButtons where pressed & (button == 1 ? 1 : 2) == 0 {
+                    deliver(router.pointerReleased(button))
+                }
+            }
+            #endif
             deliver(router.pointer(event, at: event.location))
         }
         frameView.onScroll = { [weak self] notches in
@@ -261,6 +270,7 @@ nonisolated struct System4InputRouter {
     static let pointsPerNotch = 40.0
     private var held: [Int32: Int] = [:]
     private var hostKeysDown: Set<Int> = []
+    private var pointerDown: Set<Int32> = []  // mouse buttons a pointer holds: 1 left, 2 right
     private var scrolled = 0.0
 
     mutating func translate(_ event: ControllerEvent, frame: (CGPoint) -> CGPoint) -> [System4Input] {
@@ -290,10 +300,25 @@ nonisolated struct System4InputRouter {
     mutating func pointer(_ pointer: PointerEvent, at location: CGPoint) -> [System4Input] {
         let button: Int32 = pointer.button == .primary ? 1 : 2
         switch pointer.phase {
-        case .began: return [.mouseMove(location)] + press(button, true)
+        case .began:
+            // A press of a button the router thinks is still down means its release was lost (AppKit has dropped a
+            // mouse-up); without letting go first, the game would see one endless press and no click from here on.
+            let stale = pointerDown.insert(button).inserted ? [] : press(button, false)
+            return [.mouseMove(location)] + stale + press(button, true)
         case .moved: return [.mouseMove(location)]
-        case .ended, .cancelled: return [.mouseMove(location)] + press(button, false)
+        case .ended, .cancelled:
+            guard pointerDown.remove(button) != nil else { return [.mouseMove(location)] }
+            return [.mouseMove(location)] + press(button, false)
         }
+    }
+
+    /// The pointer buttons held as far as the router knows, to check against the system's own state.
+    var pointerButtons: Set<Int32> { pointerDown }
+
+    /// Lets go of a pointer button whose release never arrived.
+    mutating func pointerReleased(_ button: Int32) -> [System4Input] {
+        guard pointerDown.remove(button) != nil else { return [] }
+        return press(button, false)
     }
 
     /// The controls System 4 games share: Confirm is Return (it advances text and picks), Cancel and Menu right click
@@ -329,6 +354,7 @@ nonisolated struct System4InputRouter {
         let out = held.keys.map { System4Input.key($0, down: false) }
         held = [:]
         hostKeysDown = []
+        pointerDown = []
         return out
     }
 
