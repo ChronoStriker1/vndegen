@@ -350,8 +350,16 @@ struct CheatsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            tabBar
+            // A landscape phone has room for about two rows of a list below the header and the tabs, one above the other.
+            if metrics.isShort {
+                HStack(spacing: 16) {
+                    header
+                    tabBar
+                }
+            } else {
+                header
+                tabBar
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 6) { content }
@@ -371,7 +379,7 @@ struct CheatsView: View {
             }
         }
         .frame(width: min(560, max(0, metrics.size.width - 64)))
-        .frame(maxHeight: max(240, metrics.size.height - 90))
+        .frame(maxHeight: max(200, metrics.size.height - (metrics.isShort ? 60 : 90)))
         .task { await page.load() }
     }
 

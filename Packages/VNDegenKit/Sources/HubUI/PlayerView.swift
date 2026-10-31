@@ -431,7 +431,7 @@ private struct PlayerMenuView: View {
             case .cheats:
                 if let cheats = menu.cheats {
                     CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
-                        .padding(isNarrow ? 20 : 28)
+                        .padding(isNarrow || metrics.isShort ? 16 : 28)
                         .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
                         .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
                         .padding(12)
