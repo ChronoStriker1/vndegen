@@ -19,6 +19,9 @@
 //     3 array      u32 3, u32 refs, u32 0, u32 array type, struct name, u32 rank, u32 1, u32 bytes, values
 //     4 struct     u32 4, u32 refs, constructor name, destructor name (each empty for none), u32 0, struct name,
 //                  u32 n, n types, u32 bytes, values
+//     6 delegate   VNDegen's own record, as the PC's encoding isn't known (Test Game 56 holds delegates): u32 6,
+//                  u32 refs, u32 n, then each method's object slot (-1 for none) and function name. The PC engine
+//                  can't load a save with one.
 //   u32 n, every function name, by index
 #include <cstring>
 
@@ -27,6 +30,8 @@
 
 namespace s4 {
 namespace {
+
+constexpr int32_t kDelegateType = 63;  // a delegate variable's type in the code file
 
 
 struct Out {
@@ -97,12 +102,13 @@ uint32_t insnLength(const std::vector<uint8_t> &code, uint32_t at) {
     return oi ? 2 + 4 * oi->args : 6;
 }
 
+bool isDelegateCall(const std::vector<uint8_t> &code, uint32_t at) {
+    return at < code.size() && code.size() - at >= 2 && (code[at] | code[at + 1] << 8) == OP_DG_CALL;
+}
+
 }  // namespace
 
 std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeIp) {
-    // The PC's encoding of delegates in a resume save isn't known yet, so a heap holding one isn't saved.
-    for (const Slot &sl : heap)
-        if (sl.inUse && !sl.str && !sl.page) return {};
     Out o;
     o.b.insert(o.b.end(), {'R', 'S', 'M', 0});
     o.u32(saveFormat.resumeVersion);
@@ -147,6 +153,16 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         const Slot &sl = heap[s];
         if (!sl.inUse) { o.u32(uint32_t(-1)); continue; }
         int32_t refs = sl.refs - frameRefs[s];
+        if (sl.dg) {
+            o.u32(6);
+            o.u32(uint32_t(refs));
+            o.u32(uint32_t(sl.dg->size()));
+            for (auto &[obj, fn] : *sl.dg) {
+                o.u32(uint32_t(obj));
+                o.str(fn >= 0 && size_t(fn) < ain.functions.size() ? ain.functions[size_t(fn)].name : "");
+            }
+            continue;
+        }
         if (sl.str) {
             o.u32(2);
             o.u32(uint32_t(refs));
@@ -329,6 +345,18 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
             readValues(*page);
             break;
         }
+        case 6: {
+            auto dg = std::make_unique<Delegate>();
+            uint32_t n = in.count(5);
+            for (uint32_t k = 0; k < n && !in.bad; k++) {
+                int32_t obj = in.i32();
+                int32_t fn = ain.findFunction(in.str());
+                if (fn < 0) in.bad = true;
+                dg->push_back({obj, fn});
+            }
+            sl.dg = std::move(dg);
+            continue;
+        }
         default:
             error = "the resume save has an unknown kind of data";
             return false;
@@ -359,7 +387,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         }
         if (!global || curCall >= ain.code.size()) return false;
         // Every slot a page holds must be NULL (-1) or a live slot of the kind its type needs; the VM trusts this.
-        enum Want { String, StructPage, ArrayPage, AnyPage };
+        enum Want { String, StructPage, ArrayPage, AnyPage, DelegateSlot };
         auto holds = [&](int32_t v, Want want) {
             if (v == -1) return true;
             if (v < 0 || size_t(v) >= newHeap.size() || !newHeap[size_t(v)].inUse) return false;
@@ -369,9 +397,14 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
             case StructPage: return sl.page && sl.page->kind == PageKind::Struct;
             case ArrayPage: return sl.page && sl.page->kind == PageKind::Array;
             case AnyPage: return bool(sl.page);
+            case DelegateSlot: return bool(sl.dg);
             }
             return false;
         };
+        for (const Slot &sl : newHeap)
+            if (sl.dg)
+                for (auto &[obj, fn] : *sl.dg)
+                    if (!holds(obj, StructPage)) return false;
         for (const Slot &sl : newHeap) {
             if (!sl.page) continue;
             const Page &p = *sl.page;
@@ -380,6 +413,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
                 bool ok = true;
                 if (t == T_STRING || t == T_REF_STRING) ok = holds(v, String);
                 else if (t == T_STRUCT || t == T_REF_STRUCT) ok = holds(v, StructPage);
+                else if (t == kDelegateType) ok = holds(v, DelegateSlot);
                 else if (isArray(t) || (t >= T_REF_ARRAY_INT && t <= T_REF_ARRAY_STRUCT) || t == T_REF_ARRAY_FUNCTYPE ||
                          t == T_REF_ARRAY_BOOL)
                     ok = holds(v, ArrayPage);
@@ -424,6 +458,11 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         f.structPage = f.method && self < selves.size() ? selves[self++] : -1;
         f.callSite = rets[k - 1].first;
         f.returnAddress = f.native ? 0 : f.callSite + insnLength(ain.code, f.callSite);
+        // A method a delegate called returns to the DG_CALL itself, which calls the next one, and drops its value.
+        if (!f.native && isDelegateCall(ain.code, f.callSite)) {
+            f.returnAddress = f.callSite;
+            f.discardReturn = true;
+        }
         f.stackBase = kUnknownBase;
         frames.push_back(f);
     }

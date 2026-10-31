@@ -1065,7 +1065,10 @@ void VM::run(size_t untilFrames) {
                     for (auto &e : add) { incref(e.first); d->push_back(e); }
                     for (auto &e : old) decref(e.first);
                 } else if (op == OP_DG_PLUSA) {
-                    for (auto &e : add) { incref(e.first); d->push_back(e); }
+                    // A delegate holds each method once: Test Game 56 compares two by adding one to a copy of
+                    // the other and checking the count didn't change.
+                    for (auto &e : add)
+                        if (std::find(d->begin(), d->end(), e) == d->end()) { incref(e.first); d->push_back(e); }
                 } else {
                     for (auto &e : add) {
                         auto it = std::find(d->begin(), d->end(), e);
@@ -1097,7 +1100,8 @@ void VM::run(size_t untilFrames) {
         }
         case OP_DG_ADD: {
             int32_t fn = pop(), obj = pop(), dsl = pop();
-            if (Delegate *d = delegate(dsl)) { incref(obj); d->push_back({obj, fn}); }
+            Delegate *d = delegate(dsl);
+            if (d && std::find(d->begin(), d->end(), std::make_pair(obj, fn)) == d->end()) { incref(obj); d->push_back({obj, fn}); }
             break;
         }
         case OP_DG_NEW_FROM_METHOD: { int32_t fn = pop(), obj = pop(); push(newDelegate(Delegate{{obj, fn}})); break; }

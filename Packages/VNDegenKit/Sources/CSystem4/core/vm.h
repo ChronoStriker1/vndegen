@@ -102,6 +102,9 @@ struct HllState {
     static void hll_##lib##_##fn(s4::HllCall &c); \
     static s4::HllRegistry::Add reg_##lib##_##fn(#lib "." #fn, hll_##lib##_##fn); \
     static void hll_##lib##_##fn([[maybe_unused]] s4::HllCall &c)
+// Another library's function of the same name and arguments, run by implLib's implementation.
+#define S4_HLL_ALIAS(lib, fn, implLib) \
+    static s4::HllRegistry::Add regAlias_##lib##_##fn(#lib "." #fn, hll_##implLib##_##fn)
 
 constexpr size_t kUnknownBase = SIZE_MAX;
 

@@ -1,4 +1,5 @@
 #include "game.h"
+#include "save.h"
 
 #include <chrono>
 #include <cstdio>
@@ -364,7 +365,16 @@ bool Game::cgLoadNamed(const std::string &name, Image &out) {
     AfaArchive *a = nullptr;
     const ArchiveEntry *e = cgFind(name, &a);
     std::vector<uint8_t> d;
-    return e && a->read(*e, d) && decodeImage(d.data(), d.size(), out);
+    if (e) return a->read(*e, d) && decodeImage(d.data(), d.size(), out);
+    // A file: "<save>" and a name in the save folder (a save's thumbnail), or a path in the game folder.
+    static const std::string kSave = "<save>";
+    bool inSave = name.compare(0, kSave.size(), kSave) == 0;
+    std::string path = vm ? save::hostPath(*vm, inSave ? name.substr(kSave.size()) : name, inSave) : std::string();
+    std::error_code ec;
+    if (path.empty() || !fs::is_regular_file(path, ec)) return false;
+    std::ifstream f(path, std::ios::binary);
+    d.assign(std::istreambuf_iterator<char>(f), {});
+    return !d.empty() && decodeImage(d.data(), d.size(), out);
 }
 
 std::shared_ptr<const Image> Game::cgCachedNamed(const std::string &name) {
@@ -381,6 +391,11 @@ std::shared_ptr<const Image> Game::cgCachedNamed(const std::string &name) {
     cgRecent_.push_back(img);
     if (cgRecent_.size() > 64) cgRecent_.erase(cgRecent_.begin());
     return img;
+}
+
+void Game::cgForgetNamed(const std::string &name) {
+    std::lock_guard<std::mutex> lock(cgMu_);
+    cgNamedCache_.erase(name);
 }
 
 }  // namespace s4

@@ -10,6 +10,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <set>
 #include <string>
@@ -17,13 +19,17 @@
 #include <vector>
 
 #include "game.h"
+#include "cg.h"
 #include "gfx.h"
+#include "save.h"
+#include "serial.h"
 #include "sjis.h"
 
 namespace s4 {
 namespace {
 
 Game &G() { return game(); }
+namespace fs = std::filesystem;
 
 constexpr int kSpriteBase = 1000000;  // parts' sprite numbers, above any the earlier sprite engines use
 
@@ -114,6 +120,10 @@ std::map<std::pair<std::string, std::string>, Intent> g_intents;
 std::map<int, std::map<int, int>> g_links;  // PartsFunc's per-part values (scroll links and the like), by ID
 std::set<std::string> g_loggedOnce;
 std::vector<uint8_t> g_transFrom;  // the screen a ChipmunkSpriteEngine transition starts from
+// The parts in the game's last screen snapshot (SaveWithoutHideParts): the scene a save thumbnail shows, without the
+// save screen drawn over it.
+std::set<int> g_sceneParts;
+int g_thumbReduction = 1;
 
 void logOnce(const std::string &what) {
     if (g_loggedOnce.insert(what).second) G().log("PartsEngine: " + what);
@@ -127,6 +137,8 @@ S4_HLL_RESET {
     g_motionOn = false;
     g_textDefault = TextStyle{};
     g_transFrom.clear();
+    g_sceneParts.clear();
+    g_thumbReduction = 1;
     g_messages.clear();
     g_hover = g_pressed = 0;
     g_buttonWas = false;
@@ -171,7 +183,8 @@ void textSize(const State &s, int &w, int &h) {
     auto lines = textLines(s);
     w = 1;
     for (const auto &l : lines) w = std::max(w, textWidth(l, s.font, s.charSpace));
-    h = int(lines.size()) * lineHeight(s) + 4;
+    // The line space comes between lines only.
+    h = std::max(1, int(lines.size()) * s.font.size + (int(lines.size()) - 1) * s.lineSpace);
     if (s.areaW > 0) w = s.areaW;
     if (s.areaH > 0) h = s.areaH;
 }
@@ -331,6 +344,57 @@ int motionEnd() {
     return e;
 }
 
+// Runs a state's construction steps into its built picture.
+void build(State &s) {
+    Surface out;
+    for (const Step &st : s.steps) {
+        switch (st.kind) {
+        case Step::Create: out.create(std::max(0, st.w), std::max(0, st.h), true); out.fill(0, 0, out.w, out.h, 0, 0, 0, 0); break;
+        case Step::CreatePixelOnly: out.create(std::max(0, st.w), std::max(0, st.h), false); break;
+        case Step::Fill: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, out.hasAlpha ? 255 : -1); break;
+        case Step::FillAlpha: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, st.a); break;
+        case Step::FillBlend: {
+            Surface f;
+            f.create(std::max(0, st.w), std::max(0, st.h), true);
+            f.fill(0, 0, f.w, f.h, st.r, st.g, st.b, std::clamp(st.a, 0, 255));
+            if (out.w > 0) blit(out.px.data(), out.w, out.h, st.x, st.y, f.px.data(), f.w, f.h, true, 255, 0);
+            break;
+        }
+        case Step::CopyCG:
+        case Step::DrawCG: {
+            auto img = G().cgCachedNamed(st.cg);
+            if (!img || out.w <= 0 || st.w <= 0 || st.h <= 0 || st.sw <= 0 || st.sh <= 0) {
+                logOnce("construction step: no CG " + sjis::toUtf8(st.cg));
+                break;
+            }
+            Surface cut;
+            cut.create(st.w, st.h, true);
+            for (int y = 0; y < st.h; y++)
+                for (int x = 0; x < st.w; x++) {
+                    int sx = st.sx + x * st.sw / st.w, sy = st.sy + y * st.sh / st.h;
+                    if (sx < 0 || sy < 0 || sx >= img->w || sy >= img->h) continue;
+                    std::memcpy(cut.px.data() + (size_t(y) * st.w + x) * 4, img->rgba.data() + (size_t(sy) * img->w + sx) * 4, 4);
+                }
+            if (st.kind == Step::DrawCG) {
+                blit(out.px.data(), out.w, out.h, st.x, st.y, cut.px.data(), cut.w, cut.h, true, 255, 0);
+                break;
+            }
+            for (int y = 0; y < st.h; y++) {
+                int dy = st.y + y;
+                if (dy < 0 || dy >= out.h) continue;
+                for (int x = 0; x < st.w; x++) {
+                    int dx = st.x + x;
+                    if (dx >= 0 && dx < out.w)
+                        std::memcpy(out.px.data() + (size_t(dy) * out.w + dx) * 4, cut.px.data() + (size_t(y) * st.w + x) * 4, 4);
+                }
+            }
+            break;
+        }
+        }
+    }
+    s.built = std::move(out);
+    s.hasBuilt = s.built.w > 0 && s.built.h > 0;
+}
 }  // namespace
 
 // ---- parts ----
@@ -508,9 +572,12 @@ S4_HLL(PartsEngine, Parts_IsCursorIn) {
     int x = c.i(1), y = c.i(2);
     c.retBool(sp && sp->show && x >= sp->x && y >= sp->y && x < sp->x + sp->width() && y < sp->y + sp->height());
 }
+S4_HLL(PartsEngine, Parts_SetThumbnailReductionSize) { g_thumbReduction = c.i(0); c.retBool(true); }
+S4_HLL(PartsEngine, Parts_SetThumbnailMode) { c.retBool(true); }
 S4_HLL(PartsEngine, Parts_SetPartsPixelDecide) { get(c.i(0)).pixelDecide = c.b(1); }
-// Multiplying a part's colours isn't drawn yet.
-S4_HLL(PartsEngine, SetComponentMulColor) { logOnce("colour multiply is not drawn"); }
+// Multiplying or adding to a part's colours isn't drawn yet.
+S4_HLL(PartsEngine, SetComponentMulColor) { logOnce("colour multiply and add are not drawn"); }
+S4_HLL(PartsEngine, SetComponentAddColor) { logOnce("colour multiply and add are not drawn"); }
 S4_HLL(PartsEngine, Parts_SetTextCharSpace) {
     State *s = stateOf(c, 0, 2);
     if (s) { s->charSpace = c.i(1); get(c.i(0)).dirty = true; }
@@ -569,54 +636,7 @@ S4_HLL(PartsEngine, Parts_AddDrawCutCGToPartsConstructionProcess) { addCut(c, St
 S4_HLL(PartsEngine, Parts_BuildPartsConstructionProcess) {
     State *s = stateOf(c, 0, 1);
     if (!s) { c.retBool(false); return; }
-    Surface out;
-    for (const Step &st : s->steps) {
-        switch (st.kind) {
-        case Step::Create: out.create(std::max(0, st.w), std::max(0, st.h), true); out.fill(0, 0, out.w, out.h, 0, 0, 0, 0); break;
-        case Step::CreatePixelOnly: out.create(std::max(0, st.w), std::max(0, st.h), false); break;
-        case Step::Fill: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, out.hasAlpha ? 255 : -1); break;
-        case Step::FillAlpha: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, st.a); break;
-        case Step::FillBlend: {
-            Surface f;
-            f.create(std::max(0, st.w), std::max(0, st.h), true);
-            f.fill(0, 0, f.w, f.h, st.r, st.g, st.b, std::clamp(st.a, 0, 255));
-            if (out.w > 0) blit(out.px.data(), out.w, out.h, st.x, st.y, f.px.data(), f.w, f.h, true, 255, 0);
-            break;
-        }
-        case Step::CopyCG:
-        case Step::DrawCG: {
-            auto img = G().cgCachedNamed(st.cg);
-            if (!img || out.w <= 0 || st.w <= 0 || st.h <= 0 || st.sw <= 0 || st.sh <= 0) {
-                logOnce("construction step: no CG " + sjis::toUtf8(st.cg));
-                break;
-            }
-            Surface cut;
-            cut.create(st.w, st.h, true);
-            for (int y = 0; y < st.h; y++)
-                for (int x = 0; x < st.w; x++) {
-                    int sx = st.sx + x * st.sw / st.w, sy = st.sy + y * st.sh / st.h;
-                    if (sx < 0 || sy < 0 || sx >= img->w || sy >= img->h) continue;
-                    std::memcpy(cut.px.data() + (size_t(y) * st.w + x) * 4, img->rgba.data() + (size_t(sy) * img->w + sx) * 4, 4);
-                }
-            if (st.kind == Step::DrawCG) {
-                blit(out.px.data(), out.w, out.h, st.x, st.y, cut.px.data(), cut.w, cut.h, true, 255, 0);
-                break;
-            }
-            for (int y = 0; y < st.h; y++) {
-                int dy = st.y + y;
-                if (dy < 0 || dy >= out.h) continue;
-                for (int x = 0; x < st.w; x++) {
-                    int dx = st.x + x;
-                    if (dx >= 0 && dx < out.w)
-                        std::memcpy(out.px.data() + (size_t(dy) * out.w + dx) * 4, cut.px.data() + (size_t(y) * st.w + x) * 4, 4);
-                }
-            }
-            break;
-        }
-        }
-    }
-    s->built = std::move(out);
-    s->hasBuilt = s->built.w > 0 && s->built.h > 0;
+    build(*s);
     get(c.i(0)).dirty = true;
     c.retBool(true);
 }
@@ -696,6 +716,120 @@ S4_HLL(PartsEngine, Parts_SetNumeralSpace) { c.retBool(true); }
 S4_HLL(PartsEngine, Parts_SetNumeralLength) { c.retBool(true); }
 S4_HLL(PartsEngine, BeginInput) {}
 S4_HLL(PartsEngine, EndInput) {}
+
+// ---- saving: the parts into an int array the game keeps in its save. VNDegen's own layout ("VPT", version 1):
+// the PC engine's isn't known, so a PC save's parts don't load here. Motions and Flat animations aren't kept. ----
+namespace {
+
+int32_t fbits(float f) { int32_t b; std::memcpy(&b, &f, 4); return b; }
+float bitsf(int32_t b) { float f; std::memcpy(&f, &b, 4); return f; }
+
+void putPart(std::vector<int32_t> &out, int n, const Part &p) {
+    out.insert(out.end(), {n, p.state, p.layer, p.clickable, p.pixelDecide, p.lockInput, fbits(p.x), fbits(p.y), p.z,
+                           p.show, p.alpha, p.originMode, p.parent, p.messageWindowLink, p.delegate, p.type});
+    for (const State &st : p.states) {
+        serial::putString(out, st.cgName);
+        out.push_back(st.hasText);
+        serial::putString(out, st.text);
+        const TextStyle &f = st.font;
+        out.insert(out.end(), {f.r, f.g, f.b, f.size, f.weight, f.face, fbits(f.boldWeight), fbits(f.edgeWeight), f.er, f.eg,
+                               f.eb, st.charSpace, st.lineSpace, st.areaX, st.areaY, st.areaW, st.areaH});
+        serial::putString(out, st.loopBase);
+        out.insert(out.end(), {st.loopStart, st.loopCount, st.loopMs, int32_t(st.steps.size())});
+        for (const Step &k : st.steps) {
+            out.insert(out.end(), {int32_t(k.kind), k.x, k.y, k.w, k.h, k.r, k.g, k.b, k.a});
+            serial::putString(out, k.cg);
+            out.insert(out.end(), {k.sx, k.sy, k.sw, k.sh});
+        }
+        out.push_back(st.hasBuilt);
+    }
+}
+
+// Reads one part; false when the data runs out or is damaged.
+bool getPart(const std::vector<int32_t> &in, size_t &i, int &n, Part &p) {
+    auto take = [&](std::initializer_list<int32_t *> vs) {
+        if (in.size() - i < vs.size()) return false;
+        for (int32_t *v : vs) *v = in[i++];
+        return true;
+    };
+    int32_t clickable, pixelDecide, lockInput, x, y, show, link;
+    if (i > in.size() || !take({&n, &p.state, &p.layer, &clickable, &pixelDecide, &lockInput, &x, &y, &p.z, &show, &p.alpha,
+                                 &p.originMode, &p.parent, &link, &p.delegate, &p.type}))
+        return false;
+    p.clickable = clickable; p.pixelDecide = pixelDecide; p.lockInput = lockInput;
+    p.x = bitsf(x); p.y = bitsf(y); p.show = show; p.messageWindowLink = link;
+    for (State &st : p.states) {
+        int32_t hasText, bold, edge, nsteps, hasBuilt;
+        TextStyle &f = st.font;
+        if (!serial::getString(in, i, st.cgName) || !take({&hasText}) || !serial::getString(in, i, st.text) ||
+            !take({&f.r, &f.g, &f.b, &f.size, &f.weight, &f.face, &bold, &edge, &f.er, &f.eg, &f.eb, &st.charSpace,
+                   &st.lineSpace, &st.areaX, &st.areaY, &st.areaW, &st.areaH}) ||
+            !serial::getString(in, i, st.loopBase) || !take({&st.loopStart, &st.loopCount, &st.loopMs, &nsteps}) ||
+            nsteps < 0 || size_t(nsteps) > in.size() - i)
+            return false;
+        st.hasText = hasText;
+        f.boldWeight = bitsf(bold);
+        f.edgeWeight = bitsf(edge);
+        for (int32_t k = 0; k < nsteps; k++) {
+            Step sp{Step::Create};
+            int32_t kind;
+            if (!take({&kind, &sp.x, &sp.y, &sp.w, &sp.h, &sp.r, &sp.g, &sp.b, &sp.a}) || !serial::getString(in, i, sp.cg) ||
+                !take({&sp.sx, &sp.sy, &sp.sw, &sp.sh}) || kind < Step::Create || kind > Step::DrawCG)
+                return false;
+            sp.kind = Step::Kind(kind);
+            st.steps.push_back(std::move(sp));
+        }
+        if (!take({&hasBuilt})) return false;
+        st.cg = st.cgName.empty() ? nullptr : G().cgCachedNamed(st.cgName);
+        if (hasBuilt) build(st);
+    }
+    return true;
+}
+
+void saveParts(HllCall &c, bool shownOnly) {
+    Page *a = c.page(0);
+    if (!a) { c.retBool(false); return; }
+    std::vector<int32_t> out;
+    serial::putTag(out, "VPT");
+    out.push_back(1);
+    size_t countAt = out.size();
+    out.push_back(0);
+    if (shownOnly) g_sceneParts.clear();
+    for (auto &[n, p] : g_parts) {
+        if (shownOnly && !p.show) continue;
+        putPart(out, n, p);
+        out[countAt]++;
+        if (shownOnly) g_sceneParts.insert(n);
+    }
+    a->v = std::move(out);
+    c.retBool(true);
+}
+
+}  // namespace
+
+S4_HLL(PartsEngine, Save) { saveParts(c, false); }
+S4_HLL(PartsEngine, SaveWithoutHideParts) { saveParts(c, true); }
+S4_HLL(PartsEngine, Load) {
+    Page *a = c.page(0);
+    size_t i = 0;
+    if (!a || !serial::getTag(a->v, i, "VPT") || a->v.size() - i < 2 || a->v[i] != 1) { c.retBool(false); return; }
+    int count = a->v[i + 1];
+    i += 2;
+    std::map<int, Part> loaded;
+    for (int k = 0; k < count; k++) {
+        int n;
+        Part p;
+        if (!getPart(a->v, i, n, p)) { c.retBool(false); return; }
+        loaded[n] = std::move(p);
+    }
+    for (auto &[n, p] : g_parts) G().sprites.remove(kSpriteBase + n);
+    g_parts = std::move(loaded);
+    g_motions.clear();
+    g_messages.clear();
+    g_hover = g_pressed = 0;
+    syncAll();
+    c.retBool(true);
+}
 
 // ---- PartsFunc: many small calls behind one, by number. The inputs fill the int, float and string arrays in
 // order, a reference argument is read back from its slot, and the result takes the last slot of its type's array,
@@ -850,6 +984,43 @@ void partsFunc(int id, FuncArgs a) {
         auto &m = g_links[id == 49 ? 47 : id == 50 ? 48 : id == 52 ? 51 : 53];
         auto it = m.find(a.i(0));
         a.retInt(it == m.end() ? 0 : it->second);
+        break;
+    }
+    case 6: {  // SaveThumbnail(file name): the scene, reduced, as a QNT
+        std::string name = a.s(0);
+        std::string path = save::hostPath(*G().vm, name, false);
+        int r = std::max(1, g_thumbReduction), sw = G().screenW, sh = G().screenH;
+        // Only the scene's parts draw; the save screen's sprites are hidden for the moment.
+        std::vector<int> hidden;
+        if (!g_sceneParts.empty())
+            for (auto &[n, p] : g_parts)
+                if (!g_sceneParts.count(n))
+                    if (Sprite *sp = G().sprites.find(kSpriteBase + n); sp && sp->show) { sp->show = false; hidden.push_back(n); }
+        std::vector<uint8_t> frame(size_t(sw) * sh * 4);
+        G().sprites.compose(frame, sw, sh, 0, 0);
+        for (int n : hidden) G().sprites.get(kSpriteBase + n).show = true;
+        int tw = sw / r, th = sh / r;
+        std::vector<uint8_t> small(size_t(tw) * th * 4);
+        for (int y = 0; y < th; y++)
+            for (int x = 0; x < tw; x++)
+                for (int k = 0; k < 4; k++) {
+                    int sum = 0;
+                    for (int dy = 0; dy < r; dy++)
+                        for (int dx = 0; dx < r; dx++) sum += frame[((size_t(y) * r + dy) * sw + size_t(x) * r + dx) * 4 + k];
+                    small[(size_t(y) * tw + x) * 4 + k] = uint8_t(sum / (r * r));
+                }
+        std::vector<uint8_t> qnt = encodeQNT(small.data(), tw, th);
+        bool ok = !path.empty() && !qnt.empty();
+        if (ok) {
+            std::error_code ec;
+            fs::create_directories(fs::path(path).parent_path(), ec);
+            std::ofstream f(path, std::ios::binary | std::ios::trunc);
+            ok = bool(f.write(reinterpret_cast<const char *>(qnt.data()), std::streamsize(qnt.size())));
+        }
+        // The save list shows it as "<save>" and the file's name.
+        G().cgForgetNamed(name);
+        G().cgForgetNamed("<save>" + name.substr(name.find_last_of("\\/") + 1));
+        a.retBool(ok);
         break;
     }
     case 162: {  // a drawing plugin's surface on a part (number, width, height, three plugin values, state)

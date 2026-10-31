@@ -66,6 +66,7 @@ public:
     const ArchiveEntry *cgFind(const std::string &name, AfaArchive **from = nullptr) const;
     bool cgLoadNamed(const std::string &name, Image &out);
     std::shared_ptr<const Image> cgCachedNamed(const std::string &name);
+    void cgForgetNamed(const std::string &name);  // after the game rewrites a picture file, such as a thumbnail
     Sprites sprites;
     Audio audio;
     void log(const std::string &s);

@@ -366,7 +366,7 @@ S4_HLL(IbisInputEngine, MouseWheel_GetCount) {
 }
 
 // ---- SystemService additions in later games (Test Game 56) ----
-S4_HLL(SystemService, GetTime) {
+std::tm localNow() {
     std::time_t t = std::time(nullptr);
     std::tm lt{};
 #if defined(_WIN32)
@@ -374,6 +374,17 @@ S4_HLL(SystemService, GetTime) {
 #else
     localtime_r(&t, &lt);
 #endif
+    return lt;
+}
+S4_HLL(SystemService, GetDate) {
+    std::tm lt = localNow();
+    c.ref(0) = lt.tm_year + 1900;
+    c.ref(1) = lt.tm_mon + 1;
+    c.ref(2) = lt.tm_mday;
+    c.ref(3) = lt.tm_wday;
+}
+S4_HLL(SystemService, GetTime) {
+    std::tm lt = localNow();
     c.ref(0) = lt.tm_hour;
     c.ref(1) = lt.tm_min;
     c.ref(2) = lt.tm_sec;
