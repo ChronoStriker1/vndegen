@@ -72,7 +72,7 @@ final class Navigator {
 
     /// Settings groups that are whole forms of their own, so they open in a sheet instead of inside the settings list.
     enum SettingsPage {
-        case metadata, lock, saves, licenses
+        case metadata, lock, saves, plugins, licenses
     }
 
     enum Shelf: String, CaseIterable {
@@ -321,6 +321,7 @@ final class Navigator {
             if method.mouse != nil { items.append(.mouseStyle) }
             items.append(.playOrientation)
             #endif
+            items.append(.settingsPage(.plugins))
             items += FontPack.packages.map { .fontPackage($0.id) }
             items.append(.soundFont)
             if soundFontName != nil { items.append(.soundFontReset) }
@@ -474,7 +475,7 @@ final class Navigator {
             switch page {
             case .metadata: metadataSettings = MetadataSettingsModel(service: hub.metadata)
             case .lock: lockSettings = LockSettingsModel(lock: hub.lock)
-            case .saves, .licenses: break
+            case .saves, .plugins, .licenses: break
             }
             sheet = .settingsPage(page)
         case .pageEngine: if let id = pageGameID { sheet = .engine(id) }
@@ -1036,8 +1037,8 @@ final class Navigator {
         case .settingsPage(.lock)?:
             if !lockSettings.handle(button), button == .cancel { back() }
             return
-        case .settingsPage(.licenses)?, .license?:
-            // Licenses are text to read: up and down scroll a little, the shoulder buttons a page.
+        case .settingsPage(.licenses)?, .settingsPage(.plugins)?, .license?:
+            // Licenses and the plugin list are text to read: up and down scroll a little, the shoulder buttons a page.
             switch button {
             case .up, .down: return pager.scroll(pages: button == .up ? -0.3 : 0.3)
             case .pageUp, .pageDown: return pager.scroll(pages: button == .pageUp ? -1 : 1)

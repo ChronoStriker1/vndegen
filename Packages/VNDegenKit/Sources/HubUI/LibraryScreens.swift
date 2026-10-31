@@ -156,6 +156,14 @@ struct SettingsView: View {
                     #endif
 
                     Section {
+                        pageRow("Plugins", systemImage: "puzzlepiece.extension", value: "\(hub.library.engines.count) built in", page: .plugins)
+                    } header: {
+                        Text("Engines")
+                    } footer: {
+                        Text("Each engine plugin, the versions it covers, what runs its games, its license, and how many of your games use it.")
+                    }
+
+                    Section {
                         ForEach(FontPack.packages) { fontRow($0) }
                     } header: {
                         Text("Fonts")
@@ -365,6 +373,10 @@ struct SettingsPageSheet: View {
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
                     SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
+                }
+            case .plugins:
+                SheetScaffold(title: "Plugins", subtitle: "Engines built into VNDegen", escapeCloses: true) {
+                    PluginsView()
                 }
             case .licenses:
                 SheetScaffold(title: "Licenses", subtitle: "Third-party code in VNDegen", escapeCloses: true) {
