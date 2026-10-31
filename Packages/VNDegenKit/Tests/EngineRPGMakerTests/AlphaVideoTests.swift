@@ -24,7 +24,7 @@ private let page = """
     </script></body></html>
     """
 
-/// A 16 by 16 VP9 clip with an alpha channel, four frames of 0.14 s: a square of red, green, blue, then yellow on a
+/// A 64 by 64 VP9 clip with an alpha channel, four frames of 0.14 s: a square of red, green, blue, then yellow on a
 /// transparent background whose color plane is white, as GIFs converted to WebM have it. The video element plays
 /// nothing, so a test presents its frames and sets the clock. Decoding waits until the test opens the gate.
 private let setUp = """
@@ -38,7 +38,7 @@ private let setUp = """
     };
     const video = document.createElement('video');
     for (const [name, value] of Object.entries({
-        videoWidth: 16, videoHeight: 16, paused: false, duration: 0.56, currentTime: 0,
+        videoWidth: 64, videoHeight: 64, paused: false, duration: 0.56, currentTime: 0,
         currentSrc: 'data:video/webm;base64,' + clip,
     })) {
         Object.defineProperty(video, name, { value, writable: true });
@@ -64,7 +64,7 @@ private let setUp = """
         const source = resource.uploaded[resource.uploaded.length - 1];
         if (!(source instanceof HTMLCanvasElement)) return 'video';
         const context = source.getContext('2d');
-        return [Array.from(context.getImageData(0, 0, 1, 1).data), Array.from(context.getImageData(8, 8, 1, 1).data)];
+        return [Array.from(context.getImageData(0, 0, 1, 1).data), Array.from(context.getImageData(32, 32, 1, 1).data)];
     };
     const shown = () => {
         texture.update();

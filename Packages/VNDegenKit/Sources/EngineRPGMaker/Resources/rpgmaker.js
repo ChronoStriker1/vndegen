@@ -514,10 +514,12 @@
         return state.blank;
     }
 
-    // The frames of an alpha clip as canvases, or null when there are too many or WebCodecs cannot decode them.
+    // The frames of an alpha clip as canvases, or null when there are too many or WebCodecs cannot decode them. WebKit's
+    // VP9 decoder on macOS ended the page's content process on a 16 by 16 clip and decoded 64 by 64 ones, so smaller
+    // clips play as WebKit plays them.
     async function decodeWithAlpha(frames, width, height) {
         const profile = vp9Profile(frames[0].data);
-        if (typeof VideoDecoder !== 'function' || !width || !height || profile < 0 || profile > 1
+        if (typeof VideoDecoder !== 'function' || width < 64 || height < 64 || profile < 0 || profile > 1
             || frames.length * width * height * 4 > loopLimits.bytes || frames.some((frame) => !frame.alpha)) {
             return null;
         }
