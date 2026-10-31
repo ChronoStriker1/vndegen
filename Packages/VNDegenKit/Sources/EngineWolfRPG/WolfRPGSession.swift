@@ -32,6 +32,8 @@ final class WolfRPGSession: EngineSession {
     private var paused = false
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+    private lazy var wolfCheats = WolfRPGCheats { [weak self] in self?.engine }
+    var cheats: (any CheatSession)? { wolfCheats }
 
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
@@ -72,6 +74,7 @@ final class WolfRPGSession: EngineSession {
         }
         engine = started
         wolfRPGLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
+        wolfCheats.apply(launch.game.cheats ?? CheatSettings())
         let box = EngineBox(started)
         audio = PCMAudioOutput { out, frames in vnwolf_audio_render(box.engine, out, Int32(frames)) }
         audio?.start()

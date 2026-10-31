@@ -75,7 +75,7 @@ uint32_t Game::tileFlags(int x, int y) const {
 bool Game::canMove(const Actor &a, int dir) const {
     int nx = a.tx + dirX(dir), ny = a.ty + dirY(dir);
     if (!map_ || nx < 0 || ny < 0 || nx >= map_->width || ny >= map_->height) return false;
-    if (a.through) return true;
+    if (a.through || (walkThroughWalls_ && &a == &hero_)) return true;
     if ((tileFlags(nx, ny) & 0x0F) == 0x0F) return false;
     // Other characters with a graphic block the way.
     auto blocks = [&](const Actor &o) {

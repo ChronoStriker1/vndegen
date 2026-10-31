@@ -8,11 +8,13 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 
 <p align="center">
   <img src="docs/screenshots/hub-ipad.jpg" width="820" alt="The library on iPad in Capsule rows, the iPad default: a Recently played shelf with Barely Working, Nitz's Debt, Warding Witches, and Kichikuou Rance above the All games shelf">
+  <br><sub>iPad: Capsule rows</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/hub-iphone.jpg" width="260" alt="The library on iPhone in portrait, in Header list, the iPhone default: wide header art for Warding Witches, Kichikuou Rance, Nitz's Debt, and Barely Working">
   <img src="docs/screenshots/hub-mac.jpg" width="560" alt="The library on Mac in Featured, the Mac default: Warding Witches' hero art, a Godot badge, its description, and Play and Details buttons above the Recently played shelf">
+  <br><sub>iPhone in portrait: Header list &nbsp;·&nbsp; Mac: Featured</sub>
 </p>
 
 ## Features
@@ -25,7 +27,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **More than one games folder**, such as an external drive or a server, and archives unpack straight into the library. [Library](docs/library.md#adding-games)
 - **Game menu.** A long press, a right click, or X on a controller opens Play, Change artwork, Hide, Remove, and more. [Library](docs/library.md#the-game-menu)
 - **Game commands.** Menus a game keeps in its window's menu bar, such as KiriKiri's, appear in the VNDegen menu. [Controls](docs/controls.md#game-commands)
-- **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace: gold, items, encounters, game speed, variables, and switches. [Controls](docs/controls.md#cheats)
+- **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace, and Wolf RPG Editor: gold, items, encounters, game speed, variables, and switches. [Controls](docs/controls.md#cheats)
 - **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
 - **Ludusavi saves.** Back up and restore through your Ludusavi SMB share, so saves move between VNDegen and your PCs. [Ludusavi](docs/ludusavi.md)
 - **Windows fonts.** Games that ask for MS Gothic, Arial, and other Windows fonts get free fonts with the same metrics. [Fonts](docs/fonts.md)
@@ -37,19 +39,23 @@ The view button in the top bar switches between Header list, Capsule rows, and F
 
 <p align="center">
   <img src="docs/screenshots/hub-iphone-landscape.jpg" width="820" alt="iPhone in landscape in Featured: Nitz's Debt's hero art, a Godot badge, and Play and Details buttons above the Recently played shelf">
+  <br><sub>iPhone in landscape: Featured</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/hub-ipad-featured.jpg" width="820" alt="iPad in Featured: Kaeru nyo Panyon, an AliceSoft System 3 game, with its hero art, description, and Play and Details buttons above the Recently played shelf">
+  <br><sub>iPad: Featured</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/hub-duo-outer.jpg" width="300" alt="iPhone Duo folded, on the outer display, in Header list: one column of header art beside the camera inset">
   <img src="docs/screenshots/hub-duo-inner.jpg" width="520" alt="iPhone Duo unfolded, on the inner display, in Header list: two columns of header art">
+  <br><sub>iPhone Duo folded, outer display &nbsp;·&nbsp; iPhone Duo unfolded, inner display: Header list</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/hub-mac-headers.jpg" width="820" alt="A wide Mac window in Header list: sixteen games' header art in five columns, including Warding Witches, five Rance games, Lilipalace, and No Socks RPG">
+  <br><sub>Mac, wide window: Header list</sub>
 </p>
 
 ## Supported engines
@@ -99,11 +105,22 @@ VNDegen rescans on launch, on pull to refresh, and when you return to the app. [
 <p align="center">
   <img src="docs/screenshots/game-page-mac.jpg" width="560" alt="Warding Witches' game page on Mac: hero banner, Play, Artwork, Find metadata, Saves, and Hide buttons, a Godot badge, the Steam description and screenshots, and a details card with developer, publisher, release date, and the detected Godot 4.5.1 engine">
   <img src="docs/screenshots/game-menu.jpg" width="260" alt="The menu a long press opens on a library game on iPhone: Play, Open game page, Change artwork, Find metadata, Hide, Open in Files, and Remove from library">
+  <br><sub>Mac: a game page &nbsp;·&nbsp; iPhone: a game's long-press menu</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/vndegen-menu.jpg" width="400" alt="The VNDegen menu over Lilipalace, an NScripter game, on iPad: Resume, Game commands, Quit to library, the control methods, and Button mapping">
   <img src="docs/screenshots/game-commands.jpg" width="400" alt="Game commands for Lilipalace on iPad: the game's own Skip, Skip Setting, and Text Speed menu items">
+  <br><sub>iPad: the VNDegen menu and its Game commands</sub>
+</p>
+
+## Hidden games
+
+Games marked Hide leave the library until it is unlocked with Face ID, Touch ID, or the app passcode, and the library locks again when VNDegen goes to the background. [docs/library.md](docs/library.md#hidden-games) has the details.
+
+<p align="center">
+  <img src="docs/screenshots/unlock.jpg" width="200" alt="Passcode keypad for unlocking hidden games, with a controller focus ring on one key">
+  <br><sub>iPhone: the passcode keypad, with controller focus on one key</sub>
 </p>
 
 ## Controls
@@ -124,11 +141,12 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 
 <p align="center">
   <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
+  <br><sub>iPhone in landscape: No Socks RPG</sub>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/touch-controls.jpg" width="560" alt="On-screen gamepad overlay with a cross D-pad, Xbox A B X Y buttons, LB RB LT RT shoulder buttons, a home button, and View and Menu buttons over No Socks RPG gameplay, with the player on the beach map">
-  <img src="docs/screenshots/unlock.jpg" width="200" alt="Passcode keypad for unlocking hidden games, with a controller focus ring on one key">
+  <br><sub>iPhone in landscape: the touch gamepad over No Socks RPG</sub>
 </p>
 
 ## Documentation

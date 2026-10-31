@@ -20,6 +20,27 @@ init 999 python in _vndegen:
 
     menu_open = False
 
+    def has_quicksave(node):
+        import ast
+        for name, expression in getattr(node, "keyword", []):
+            if name == "action" and any(isinstance(call, ast.Call) and
+                    (getattr(call.func, "id", None) == "QuickSave" or
+                     getattr(call.func, "attr", None) == "QuickSave")
+                    for call in ast.walk(ast.parse(expression, mode="eval"))):
+                return True
+        return any(has_quicksave(child) for child in getattr(node, "children", [])) or any(
+            has_quicksave(block) for condition, block in getattr(node, "entries", []))
+
+    # Use Ren'Py's device variant, once per game. Unknown screens keep the quick-save fallback.
+    quick_menu_has_quicksave = False
+    if renpy.ios:
+        try:
+            screen = renpy.display.screen.get_screen_variant("quick_menu")
+            quick_menu_has_quicksave = has_quicksave(screen.ast) if screen and screen.ast else False
+        except Exception:
+            pass
+        print("VNDegen quick_menu QuickSave: %s" % quick_menu_has_quicksave)
+
     def quit_game():
         # What Ren'Py's own Quit action does after the player confirms.
         if not renpy.store.main_menu and config.autosave_on_quit:
@@ -31,9 +52,8 @@ init 999 python in _vndegen:
         if menu_open:
             return
         # On iPhone and iPad, Ren'Py shows a game's "touch" screens, and the touch quick menu of many games, such as
-        # Servant's Revenge's, drops Q.Save and Q.Load. VNDegen's menu offers them there, as the game's own quick save
-        # and quick load, which write its quick save slot.
-        quick = renpy.ios and config.has_quicksave
+        # Servant's Revenge's, drops Q.Save and Q.Load. Offer the game's quick save slot when its menu lacks QuickSave.
+        quick = renpy.ios and config.has_quicksave and not quick_menu_has_quicksave
         can_save = quick and not renpy.store.main_menu and not renpy.store._in_replay
         can_load = quick and renpy.store.QuickLoad().get_sensitive()
         menu_open = True
