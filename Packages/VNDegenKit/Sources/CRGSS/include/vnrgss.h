@@ -54,6 +54,18 @@ void vnrgss_wheel(float notches);
 // Stops the game's clock and sound. vnrgss_step does nothing while paused.
 void vnrgss_set_paused(bool paused);
 
+// Runs the game `speed` times as fast, 1 being its own speed: each step lets it draw `speed` times as many frames, and
+// only the frames that will be shown are composited.
+void vnrgss_set_speed(int speed);
+
+// Queues Ruby to run on the game thread while the game waits for its next frame, between two frames, whether or not
+// it is paused. Returns a request number for vnrgss_ruby_result, or 0 when no game is running.
+long vnrgss_run_ruby(const char *ruby);
+
+// What a request's Ruby gave, as its last value's to_s, or with `failed` set, why it failed: its exception's message, or
+// the game ending before it ran or before its result was read. The caller frees it. NULL while the request waits.
+char *vnrgss_ruby_result(long request, bool *failed);
+
 // Ends the game and waits for its thread to unwind. RGSS games save only when the player saves, so nothing is lost.
 void vnrgss_stop(void);
 
