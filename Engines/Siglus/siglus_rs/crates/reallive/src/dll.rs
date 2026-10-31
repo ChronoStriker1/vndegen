@@ -4,12 +4,10 @@
 //!   eight tracks of 32 random control points; function 1 evaluates a
 //!   uniform cubic B-spline through them at `F[1162 + track]` / 1000 and
 //!   projects the point, writing `F[1151..=1153]`.
-//! * `DT00` (Tomoyo After's dungeon RPG): the translation in
-//!   [`crate::dt00`], reading its tables from the game's `dt00.dll`.
-//! * `PT00` (Little Busters! baseball): the native port in [`crate::pt00`].
-//!   It reads its data tables from the game's own `PT00.dll`, loaded on
-//!   the first call. The DLL's integer array is the script's `intD`,
-//!   copied in before and out after each call.
+//!
+//! VNDegen leaves out upstream's ports of `DT00` (Tomoyo After's dungeon
+//! RPG) and `PT00` (Little Busters! baseball), which are translated from
+//! the decompiled DLLs, so those load as unknown DLLs whose calls return 0.
 
 use std::collections::HashMap;
 
@@ -27,10 +25,6 @@ const TRACK: usize = 0x60;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Dll {
     Ef00(Vec<f64>),
-    /// Built on the first call.
-    Pt00(Option<Box<crate::pt00::Pt00>>),
-    /// Built on the first call.
-    Dt00(Option<Box<crate::dt00::Dt00>>),
     /// Loaded by name but unknown: calls return 0.
     Unknown(String),
 }
@@ -44,8 +38,6 @@ impl Dll {
             .to_ascii_uppercase();
         match stem.as_str() {
             "EF00" => Dll::Ef00(Vec::new()),
-            "PT00" => Dll::Pt00(None),
-            "DT00" => Dll::Dt00(None),
             _ => Dll::Unknown(name.to_owned()),
         }
     }
@@ -53,8 +45,6 @@ impl Dll {
     pub fn name(&self) -> &str {
         match self {
             Dll::Ef00(_) => "EF00",
-            Dll::Pt00(_) => "PT00",
-            Dll::Dt00(_) => "DT00",
             Dll::Unknown(name) => name,
         }
     }
@@ -167,112 +157,6 @@ fn ef00_calculate(params: &[f64], memory: &mut dyn DllMemory, track: i32) -> Res
     Ok(())
 }
 
-fn pt00_call(
-    state: &mut Option<Box<crate::pt00::Pt00>>,
-    sys: &mut System,
-    memory: &mut dyn DllMemory,
-    args: [i32; 5],
-) -> Result<i32> {
-    use crate::pt00::{F_LEN, Pt00};
-    let pt = match state {
-        Some(pt) => pt,
-        None => {
-            let path = sys.resources.root_file("PT00.dll").ok_or_else(|| {
-                anyhow::anyhow!("reallive: PT00.dll not found in the game directory")
-            })?;
-            let dll = game_fs::read(&path)?;
-            let seed = sys.random(0, i32::MAX) as u32;
-            state.insert(Box::new(Pt00::load(&dll, seed)?))
-        }
-    };
-    let words = memory.bank(BANK_D)?;
-    let len = words.len().min(F_LEN);
-    pt.write_f(&words[..len]);
-    let result = pt.call(args[0], args[1], args[2], args[3], args[4]);
-    pt.read_f(&mut memory.bank(BANK_D)?[..len]);
-    Ok(result)
-}
-
-fn dt00_call(
-    state: &mut Option<Box<crate::dt00::Dt00>>,
-    sys: &mut System,
-    memory: &mut dyn DllMemory,
-    args: [i32; 5],
-) -> Result<i32> {
-    use crate::dt00::{BANK_COUNT, Dt00};
-    let dt = match state {
-        Some(dt) => dt,
-        None => {
-            let path = sys.resources.root_file("dt00.dll").ok_or_else(|| {
-                anyhow::anyhow!("reallive: dt00.dll not found in the game directory")
-            })?;
-            let dll = game_fs::read(&path)?;
-            let seed = sys.random(0, i32::MAX) as u32;
-            dt00_trace(|out| {
-                out.extend_from_slice(b"DT00TRC1");
-                out.extend_from_slice(&seed.to_le_bytes());
-            });
-            state.insert(Box::new(Dt00::load(&dll, seed)?))
-        }
-    };
-    // intA–intF, intG, intZ, in the order of RealLiveState.
-    let mut record = Vec::new();
-    for arg in args {
-        record.extend_from_slice(&arg.to_le_bytes());
-    }
-    for bank in 0..BANK_COUNT {
-        let words = memory.bank(bank as u8)?;
-        record.extend(
-            words
-                .iter()
-                .take(crate::dt00::BANK_LEN)
-                .flat_map(|v| v.to_le_bytes()),
-        );
-        dt.write_bank(bank, words);
-    }
-    let result = dt.call(args[0], args[1], args[2], args[3], args[4]);
-    for bank in 0..BANK_COUNT {
-        let words = memory.bank(bank as u8)?;
-        dt.read_bank(bank, words);
-        record.extend(
-            words
-                .iter()
-                .take(crate::dt00::BANK_LEN)
-                .flat_map(|v| v.to_le_bytes()),
-        );
-    }
-    record.extend_from_slice(&dt.image_hash().to_le_bytes());
-    dt00_trace(|out| out.extend_from_slice(&record));
-    if let Some(dir) = std::env::var_os("RL_DT00_IMAGES") {
-        static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-        let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let _ = game_fs::write(
-            std::path::Path::new(&dir).join(format!("image_{n}.bin")),
-            dt.image(),
-        );
-    }
-    Ok(result)
-}
-
-/// With `RL_DT00_TRACE=<file>`, every DT00 call is appended to the file
-/// (arguments, banks before and after, a hash of the DLL's data), for
-/// checking the translation against the original DLL.
-fn dt00_trace(write: impl FnOnce(&mut Vec<u8>)) {
-    use std::io::Write;
-    let Some(path) = std::env::var_os("RL_DT00_TRACE") else {
-        return;
-    };
-    let mut out = Vec::new();
-    write(&mut out);
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-    {
-        let _ = file.write_all(&out);
-    }
-}
-
 /// DLL slots of a running game.
 #[derive(Debug, Default, Clone)]
 pub struct Dlls {
@@ -304,8 +188,6 @@ impl Dlls {
                 1 => ef00_calculate(params, memory, args[1])?,
                 other => bail!("reallive: EF00 has no function {other}"),
             },
-            Dll::Pt00(state) => return pt00_call(state, sys, memory, args),
-            Dll::Dt00(state) => return dt00_call(state, sys, memory, args),
             Dll::Unknown(_) => return Ok(0),
         }
         Ok(0)
