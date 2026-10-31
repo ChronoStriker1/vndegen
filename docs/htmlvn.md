@@ -9,14 +9,17 @@ This is the design written at the start of the work (2026-10-31). The sections b
 
 ## Test games
 
-All four are free official releases, downloaded from itch.io for this work:
+Free official releases from itch.io, all in the library:
 
 | Game | Engine | Packaging |
 |---|---|---|
 | Siren's Call 1.131 (Windows) | Visual Novel Maker | Electron, `resources/app/`, Live2D libraries, one WebM movie |
-| Love ritual demo (Windows 64-bit) | Visual Novel Maker | NW.js at the top of the folder, Live2D models on the title screen, WebM overlays |
-| EVISCERATETHISGIRL.COM 2.1 | Twine 2, SugarCube 2.36.1 | one `index.html` beside its `assets/` |
-| Asher (Windows) | Twine 2, Harlowe 2.1.0 | a Unity player with Zen Fulcrum's Embedded Browser, the story and pictures packed in `Asher_Data/Resources/browser_assets` |
+| EVISCERATETHISGIRL.COM 2.1 | Twine 2, SugarCube 2.36.1 | one `index.html` beside its `assets/`. The game never saves: it replaces SugarCube's UI and turns autosave off |
+| Forgotten Fiction | Twine 2, SugarCube 2.34.1 | one `Forgotten Fiction.html` beside its pictures and sounds |
+| Asher (Windows) | Twine 2, Harlowe 2.1.0 | a Unity player with Zen Fulcrum's Embedded Browser, the story and pictures packed in `Asher_Data/Resources/browser_assets`. Set aside as a test game by the brief |
+
+The Love ritual demo (NW.js, Live2D title, WebM overlays) was looked at for the design and isn't in the library, so
+NW.js builds are covered by package tests only.
 
 ## Visual Novel Maker
 
@@ -103,6 +106,39 @@ directory, which moves saves between VNDegen devices only, as for TyranoScript b
 ### Controls
 
 Twine reads the mouse and touch, and some games the keyboard. Games start with the "Keyboard and mouse" layout.
+
+## Status (2026-10-31, work stopped)
+
+Built and committed: the `EngineHTMLVN` module with both plugins, registration in the app, Settings' Plugins entries,
+Embedded Browser packs in `WebRuntime`, `WebGameConfiguration.scrollsPage` and `chromeUserAgent`, the shared
+localStorage save rule in `WebStorage` (TyranoScript uses it now), `twine.js`, package tests, and README entries.
+Version detection for Visual Novel Maker isn't possible, since ENGINE.js holds no version.
+
+Verified:
+- `build.sh test` on the MacBook passes, including 15 new engine tests, 3 pack tests and the TyranoScript tests.
+- `build.sh mac` succeeded on the MacBook.
+- Mac app, on the Mac mini with its screen locked, so through logs only with `-ignoreOcclusion YES`: Siren's Call is
+  detected one folder down, boots, starts Live2D's Cubism core and its intro scene, and draws at 60 fps (1% low 40 fps
+  over 5 s, with other threads' builds running). EVISCERATETHISGIRL.COM is detected, opens on SugarCube's Main Menu
+  and uses localStorage through VNDegen's files.
+- Linux, in Playwright's Chromium with VNDegen's shim and a bridge on disk (`~/vndegen-src/htmlvn-tools/harness.mjs`,
+  not in the repo): EVISCERATETHISGIRL.COM reaches its Main Menu. Playwright's WebKit needs Ubuntu libraries CachyOS
+  lacks, so WebKit itself wasn't run on Linux.
+
+Not done yet, in order:
+1. Forgotten Fiction on Linux and in the app: play, save to a slot through SugarCube's Saves dialog, load.
+2. Siren's Call past its intro to the title, a new game, a save and a load, on the Mac app, with the saves checked as
+   `.vndata` files beside `Game.exe`.
+3. `build.sh ios-sim` (it was stopped part way) and both games on an iPad simulator: touch, the touch gamepad, a
+   controller, LB and RB scrolling a Twine page, and touch scrolling. One game on an iPhone simulator.
+4. The case check (`scripts/case-check.sh`) on both games on the Mac and an iPad simulator.
+5. Frame rate of Siren's Call's Live2D and WebM scenes on the Mac app and an iPad simulator.
+6. `build.sh ipa`, run once with the engine's cached pieces deleted (this engine has none of its own).
+7. A Codex review, then `docs/htmlvn.md` and the README updated with the results.
+
+Known limits so far: a Visual Novel Maker game set to internal storage (`gameDataPath` 2) can't save, and an Electron
+build set to AppData stops at its first save, since `process.argv` holds no `--user-data-dir`. No test game uses
+either. SugarCube's "Save to disk" and "Load from disk" aren't wired. Twine saves don't reach a PC.
 
 ## Estimate
 
