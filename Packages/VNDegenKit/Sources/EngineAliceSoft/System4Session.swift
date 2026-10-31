@@ -225,9 +225,9 @@ final class System4Session: EngineSession {
         self.paused = paused
         guard let engine else { return }
         if paused {
-            // Input still waiting is dropped and every held key and button lets go now, not after the queue.
-            pacer.clear()
-            apply(router.releaseAll())
+            // Input still waiting is dropped, and every key and button the game holds lets go now.
+            _ = router.releaseAll()
+            apply(pacer.clear())
         }
         vns4_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
@@ -286,64 +286,77 @@ nonisolated enum System4Input: Equatable, Sendable {
 /// Paces input for the games, which read the keyboard and mouse once per game frame and only take a click on a button
 /// the pointer has rested on. A touch moves the pointer, presses and lets go within a few milliseconds, which they
 /// would miss. Inputs apply in the order they came, with these waits:
-/// - a mouse button press waits until the pointer has stayed put for three frames (Rance 02's title took none at one);
-/// - after a key or button changes, the next change waits 100 ms after a press and 50 ms after a release, so the game
-///   sees each state (Sengoku Rance missed a 17 ms tap).
-/// Pointer moves never wait except behind such a change, and consecutive ones collapse to the last, so a fast drag can't
-/// build a backlog in front of its release.
+/// - a mouse button press waits until the game has run three frames with the pointer where the press is (Rance 02's
+///   title took none at one);
+/// - after a key or button changes, nothing more applies until the game has run a frame with it, so it sees every
+///   state and a press its own position;
+/// - and the next key or button change also waits 100 ms after a press and 50 ms after a release (Sengoku Rance missed
+///   a 17 ms tap).
+/// Consecutive pointer moves collapse to the last, so a fast drag can't build a backlog in front of its release.
+/// nextFrame must be called once per game step, just before it.
 nonisolated struct System4InputPacer {
     static let hoverFrames = 3
     static let pressHold = 0.1
     static let releaseHold = 0.05
 
     private var queue: [System4Input] = []
-    private var frame = 0
-    private var movedAt = -hoverFrames  // the frame the pointer last moved to a new place
+    private var frame = 0          // game steps begun
+    private var movedAt = -hoverFrames  // the step that first saw the pointer where it is
     private var position: CGPoint?
-    private var keyGate = 0.0  // no key or button change applies before this time
+    private var keyGate = 0.0      // no key or button change applies before this time
+    private var lastChange = -1    // the step that first sees the last key or button change
+    private(set) var down: Set<Int32> = []  // keys and buttons the runtime holds
 
     /// Takes newly arrived inputs; returns those the runtime may have now.
     mutating func add(_ inputs: [System4Input], now: Double) -> [System4Input] {
         queue += inputs
-        return drain(now)
+        return drain(now, seenBy: frame + 1)  // between steps: the next one sees it
     }
 
-    /// Called once per display frame, before the game steps; returns the inputs now due.
+    /// Called just before each game step; returns the inputs now due.
     mutating func nextFrame(now: Double) -> [System4Input] {
         frame += 1
-        return drain(now)
+        return drain(now, seenBy: frame)
     }
 
-    /// Drops everything waiting, as when the game pauses and lets go of every key.
-    mutating func clear() {
+    /// Drops everything waiting and returns the releases of every key and button the runtime holds, as when the game
+    /// pauses.
+    mutating func clear() -> [System4Input] {
         queue = []
         keyGate = 0
+        lastChange = -1
+        defer { down = [] }
+        return down.sorted().map { .key($0, down: false) }
     }
 
-    private mutating func drain(_ now: Double) -> [System4Input] {
+    /// Applies what is due; `seenBy` is the game step that will first see it.
+    private mutating func drain(_ now: Double, seenBy: Int) -> [System4Input] {
         var out: [System4Input] = []
         var move: CGPoint?
         func flushMove() {
             if let m = move { out.append(.mouseMove(m)) }
             move = nil
         }
-        loop: while let next = queue.first {
+        // Nothing passes a key or button change until a step after the one that sees it.
+        loop: while let next = queue.first, seenBy > lastChange {
             switch next {
             case let .mouseMove(p):
                 if p != position {
                     position = p
-                    movedAt = frame
+                    movedAt = seenBy
                 }
                 move = p
             case .wheel:
                 flushMove()
                 out.append(next)
-            case let .key(vk, down):
+            case let .key(vk, isDown):
                 if now < keyGate { break loop }
-                if down, vk == 1 || vk == 2, frame - movedAt < Self.hoverFrames { break loop }
+                if isDown, vk == 1 || vk == 2, seenBy - movedAt < Self.hoverFrames { break loop }
                 flushMove()
                 out.append(next)
-                keyGate = now + (down ? Self.pressHold : Self.releaseHold)
+                if isDown { down.insert(vk) } else { down.remove(vk) }
+                keyGate = now + (isDown ? Self.pressHold : Self.releaseHold)
+                lastChange = seenBy
             }
             queue.removeFirst()
         }
