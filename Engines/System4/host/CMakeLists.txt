@@ -24,7 +24,7 @@ target_link_libraries(system4 PUBLIC ZLIB::ZLIB PkgConfig::FREETYPE PkgConfig::W
 # Tools write PNGs with stb_image_write, from the Wolf runtime's copy of stb.
 target_include_directories(system4 PUBLIC ${RUNTIME}/../CWolfRPG/third_party)
 
-foreach(tool s4dis s4play s4cg s4cgcheck s4save s4movie s4fnl)
+foreach(tool s4dis s4play s4cg s4cgcheck s4save s4movie s4fnl s4drawtest)
   add_executable(${tool} tools/${tool}.cpp)
   # HLL modules register themselves from static initializers, so keep every object.
   target_link_libraries(${tool} PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,system4>")
