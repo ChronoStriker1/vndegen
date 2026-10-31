@@ -47,3 +47,24 @@ import VNCore
         #expect(layout(["Something.ain", "Game.exe"]) == nil)
     }
 }
+
+@Suite struct AliceSoftSaveTests {
+    @Test func system39Saves() {
+        #expect(AliceSoftPlugin.system3SaveName("C:/Games/Rance/RanceSA.ASD") == "RanceSA.ASD")
+        #expect(AliceSoftPlugin.system3SaveName("C:/Games/tt2/tt2sz.asd") == "tt2sz.asd")
+        #expect(AliceSoftPlugin.system3SaveName("C:/Games/Rance/RanceSA.ALD") == nil)
+        #expect(AliceSoftPlugin.system3SaveName("C:/Games/Rance/System39.ain") == nil)
+    }
+
+    @Test func system30Saves() {
+        #expect(AliceSoftPlugin.system3SaveName("D:/Rance 4.1 32bit/ASLEEP_A.DAT") == "ASLEEP_A.DAT")
+        #expect(AliceSoftPlugin.system3SaveName("D:/Rance 4.1 32bit/ASLEEP.DAT") == "ASLEEP.DAT")
+        #expect(AliceSoftPlugin.system3SaveName("D:/Rance 4.1 32bit/ADISK.DAT") == nil)
+    }
+
+    @Test func flagFiles() {
+        #expect(AliceSoftPlugin.system3SaveName("C:/Games/tt2/tt2FS.ALD") == "tt2FS.ALD")
+        // Panyon ships its floor maps; only its map editor rewrites them.
+        #expect(AliceSoftPlugin.system3SaveName("C:/Panyon/FLOOR_12.MAP") == nil)
+    }
+}

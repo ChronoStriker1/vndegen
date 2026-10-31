@@ -1,8 +1,9 @@
 // Files, case-insensitive lookup, Shift-JIS, and logging.
 #include "s3.h"
-#include <ctype.h>
-#include <dirent.h>
+#include "s3_casepath.h"
 #include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
 
 extern const uint16_t s3_sjis_table[];
 
@@ -45,39 +46,15 @@ char *s3_path(const char *dir, const char *name) {
     return p;
 }
 
-static bool same_nocase(const char *a, const char *b) {
-    for (; *a && *b; a++, b++)
-        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return false;
-    return *a == *b;
-}
-
-// Games ask for names in any case, and may use backslashes. Each path component is matched
-// without regard to ASCII case, as on Windows.
+// Games ask for names in any case, and may use backslashes. The shared lookup matches each path component without
+// regard to ASCII case, as Windows does.
 char *s3_find_file(const char *dir, const char *name) {
-    char *cur = s3_strdup(dir);
-    char *rest = s3_strdup(name);
-    for (char *c = rest; *c; c++) if (*c == '\\') *c = '/';
-    char *save = NULL;
-    for (char *part = strtok_r(rest, "/", &save); part; part = strtok_r(NULL, "/", &save)) {
-        char *exact = s3_path(cur, part);
-        struct stat st;
-        if (stat(exact, &st) == 0) { free(cur); cur = exact; continue; }
-        free(exact);
-        DIR *d = opendir(cur);
-        char *found = NULL;
-        if (d) {
-            struct dirent *e;
-            while ((e = readdir(d))) {
-                if (same_nocase(e->d_name, part)) { found = s3_path(cur, e->d_name); break; }
-            }
-            closedir(d);
-        }
-        free(cur);
-        if (!found) { free(rest); return NULL; }
-        cur = found;
-    }
-    free(rest);
-    return cur;
+    char *joined = s3_path(dir, name);
+    for (char *c = joined; *c; c++) if (*c == '\\') *c = '/';
+    char out[4096];
+    int found = s3_casepath_resolve(joined, out, sizeof out);
+    free(joined);
+    return found == 1 ? s3_strdup(out) : NULL;
 }
 
 bool s3_sjis_lead(u8 c) { return (c >= 0x81 && c <= 0x9f) || (c >= 0xe0 && c <= 0xfc); }
@@ -109,6 +86,47 @@ char *s3_sjis_to_utf8(const char *s) {
     }
     *o = 0;
     return out;
+}
+
+bool s3_write_file(const char *path, const void *data, size_t size) {
+    // The temporary gets a fresh name, created exclusively, so nothing already at that path (a symlink included) is
+    // written through; the rename then replaces the destination's directory entry. mkstemp makes it private (0600); a
+    // file being replaced keeps its own permissions.
+    struct stat old;
+    bool had = stat(path, &old) == 0;
+    size_t n = strlen(path) + 16;
+    char *tmp = s3_alloc(n);
+    snprintf(tmp, n, "%s.XXXXXX", path);
+    int fd = mkstemp(tmp);
+    bool ok = fd >= 0;
+    if (ok && had && fchmod(fd, old.st_mode & 0777) != 0) { close(fd); remove(tmp); ok = false; fd = -1; }
+    if (ok) {
+        FILE *f = fdopen(fd, "wb");
+        if (!f) { close(fd); ok = false; }
+        else {
+            ok = fwrite(data, 1, size, f) == size;
+            if (fclose(f) != 0) ok = false;
+        }
+        if (ok) ok = rename(tmp, path) == 0;
+        if (!ok) remove(tmp);
+    }
+    free(tmp);
+    return ok;
+}
+
+bool s3_path_inside(const char *path, const char *root) {
+    char rootReal[PATH_MAX], real[PATH_MAX];
+    if (!realpath(root, rootReal)) return false;
+    if (!realpath(path, real)) {
+        // A file not made yet: its folder must exist inside the root.
+        char *dir = s3_strdup(path), *slash = strrchr(dir, '/');
+        if (slash) *slash = 0;
+        bool ok = slash && realpath(dir, real);
+        free(dir);
+        if (!ok) return false;
+    }
+    size_t r = strlen(rootReal);
+    return !strncmp(real, rootReal, r) && (real[r] == '/' || real[r] == 0);
 }
 
 u16 s3_le16(const u8 *p) { return (u16)(p[0] | p[1] << 8); }

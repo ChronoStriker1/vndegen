@@ -106,7 +106,10 @@ let package = Package(
                              .linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         // AliceSoft System 3.x and System 4 games, each on VNDegen's own clean-room runtime.
-        .target(name: "EngineAliceSoft", dependencies: ["VNCore", "CSystem4", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
+        // VNDegen's System 3 runtime, in C, with the shared font and MIDI code. Engines/System3/host builds the same
+        // sources for the Linux test tools. It draws every frame on the CPU, so Debug builds are optimized too.
+        .target(name: "CSystem3", dependencies: ["CVNFont", "CVNMidi"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
+        .target(name: "EngineAliceSoft", dependencies: ["VNCore", "CSystem3", "CSystem4", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),

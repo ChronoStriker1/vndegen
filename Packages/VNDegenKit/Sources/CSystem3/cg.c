@@ -119,7 +119,7 @@ static bool decode_pms(const u8 *d, size_t size, S3Image *img) {
     if (img->w <= 0 || img->h <= 0 || img->w > 8192 || img->h > 8192 || dataOff >= size) return false;
     Rd r = { d + dataOff, d + size, false };
     if (img->bpp == 8) {
-        if (auxOff + 768 > size) return false;
+        if ((u64)auxOff + 768 > size) return false;
         for (int i = 0; i < 256; i++)
             for (int c = 0; c < 3; c++) img->pal[i][c] = d[auxOff + i * 3 + c];
         img->hasPal = true;
@@ -139,8 +139,29 @@ static bool decode_pms(const u8 *d, size_t size, S3Image *img) {
     return true;
 }
 
+// The 256-colour form of VSP, flagged by 1 at byte 8: a box in pixels, ends included, the banks it keeps at 0x0a, the
+// palette at 0x20, and rows coded as PMS rows from 0x320. Read from the System 3.0 games' CGs.
+static bool decode_vsp256(const u8 *d, size_t size, S3Image *img) {
+    if (size < 0x320) return false;
+    int x0 = s3_le16(d), y0 = s3_le16(d + 2), x1 = s3_le16(d + 4), y1 = s3_le16(d + 6);
+    if (x1 < x0 || y1 < y0 || x1 > 4096 || y1 > 4096) return false;
+    img->bpp = 8;
+    img->x = x0; img->y = y0;
+    img->w = x1 - x0 + 1; img->h = y1 - y0 + 1;
+    img->hasPal = true;
+    // Bits set at 0x0a mark the 16-colour banks the CG leaves alone; it sets the others. Read the other way, the
+    // CGs of one scene overwrite each other's colours.
+    img->palMask = (u16)~s3_le16(d + 0x0a);
+    for (int i = 0; i < 256; i++) for (int c = 0; c < 3; c++) img->pal[i][c] = d[0x20 + i * 3 + c];
+    img->pixels8 = s3_alloc((size_t)img->w * img->h);
+    Rd r = { d + 0x320, d + size, false };
+    pms8(&r, img->pixels8, img->w, img->h);
+    return true;
+}
+
 static bool decode_vsp(const u8 *d, size_t size, S3Image *img) {
     if (size < 0x3a) return false;
+    if (d[8] == 1) return decode_vsp256(d, size, img);
     int x0 = s3_le16(d), y0 = s3_le16(d + 2), x1 = s3_le16(d + 4), y1 = s3_le16(d + 6);
     if (x1 <= x0 || y1 <= y0 || x1 > 400 || y1 > 2048) return false;
     int cols = x1 - x0, h = y1 - y0;
@@ -150,6 +171,7 @@ static bool decode_vsp(const u8 *d, size_t size, S3Image *img) {
     img->w = cols * 8;
     img->h = h;
     img->palBank = d[9];
+    img->vsp = true;
     img->hasPal = true;
     img->palMask = (u16)(1u << (img->palBank & 15));
     for (int i = 0; i < 16; i++) {
@@ -214,8 +236,10 @@ static bool decode_bmp(const u8 *d, size_t size, S3Image *img) {
     if (w <= 0 || h <= 0 || w > 8192 || h > 8192 || s3_le32(d + 30) != 0) return false;
     img->w = w; img->h = h;
     size_t stride = (((size_t)w * bpp + 31) / 32) * 4;
-    if (off + stride * h > size) return false;
+    if (bpp != 8 && bpp != 24 && bpp != 32) return false;
+    if (off > size || stride * (size_t)h > size - off) return false;
     if (bpp == 8) {
+        if (hs > size || (size_t)14 + hs + 1024 > size) return false;
         img->bpp = 8;
         img->hasPal = true;
         img->palMask = 0xffff;

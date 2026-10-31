@@ -173,7 +173,7 @@ struct SettingsView: View {
                     } header: {
                         Text("MIDI music")
                     } footer: {
-                        Text("RPG Maker XP, VX and VX Ace and Wolf RPG Editor games play their MIDI music through a General MIDI SoundFont. Choose an .sf2 or .sf3 file to use instead of the built-in FluidR3 Mono; VNDegen keeps a copy of it. If it can't be read, the built-in font plays. Games started after a change use it.")
+                        Text("RPG Maker XP, VX and VX Ace, Wolf RPG Editor and AliceSoft System 3 games play their MIDI music through a General MIDI SoundFont. Choose an .sf2 or .sf3 file to use instead of the built-in FluidR3 Mono; VNDegen keeps a copy of it. If it can't be read, the built-in font plays. Games started after a change use it.")
                     }
 
                     Section {

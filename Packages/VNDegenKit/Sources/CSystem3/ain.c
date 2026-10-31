@@ -9,6 +9,7 @@
 #include "s3.h"
 
 static bool take_str(const u8 *d, size_t n, size_t *p, const char **out) {
+    if (*p >= n) return false;
     const u8 *e = memchr(d + *p, 0, n - *p);
     if (!e) return false;
     if (out) *out = (const char *)d + *p;
@@ -29,6 +30,7 @@ bool s3_ain_open(S3Ain *ain, const char *path) {
         const u8 *tag = d + p;
         u32 count = s3_le32(d + p + 8);
         p += 12;
+        if (count > n - p) return true; // every entry takes at least one byte
         if (!memcmp(tag, "HEL0", 4)) {
             for (u32 i = 0; i < count; i++) {
                 if (!take_str(d, n, &p, NULL) || p + 4 > n) return true;
@@ -36,6 +38,7 @@ bool s3_ain_open(S3Ain *ain, const char *path) {
                 for (u32 j = 0; j < fns; j++) {
                     if (!take_str(d, n, &p, NULL) || p + 4 > n) return true;
                     u32 args = s3_le32(d + p);
+                    if ((size_t)args > (n - p - 4) / 4) return true;
                     p += 4 + (size_t)args * 4;
                 }
             }

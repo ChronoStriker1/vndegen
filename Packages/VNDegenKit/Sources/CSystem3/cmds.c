@@ -2,6 +2,8 @@
 // e = expression, b = raw byte, s = NUL-terminated string, f = function reference, m = u32.
 // Behaviour follows AliceSoft's System 3.9 SDK manual, checked against the original engine.
 #include "vm.h"
+#include <math.h>
+#include <strings.h>
 #include <time.h>
 
 typedef struct Arg { u16 v; S3LV lv; bool isVar; const char *s; u32 u; u16 fpage; } Arg;
@@ -128,10 +130,12 @@ static void wait_ms(S3 *s, u32 ms, bool keyCancels) {
     s->wait = S3_WAIT_TIME;
     s->waitUntil = s->clockMs + ms;
     s->waitArg[0] = keyCancels;
+    s->waitArg[1] = 0;
     s->pressedMask = 0;
 }
 
 static void start_fade(S3 *s, bool in, bool white, int frames16, bool keyCancels) {
+    memcpy(s->shownPal, s->pal, sizeof s->pal); // a fade shows the palette being drawn with
     s->fadeWhite = white;
     s->wait = S3_WAIT_FADE;
     s->waitArg[0] = in;
@@ -157,6 +161,7 @@ void s3_service_wait(S3 *s) {
     case S3_WAIT_MENU:
         if (s3_menu_update(s)) {
             int choice = s->waitArg[0];
+            if (s->trace) s3_log(s, "menu choice %d of %d", choice, s->menuCount);
             s3_menu_close(s, choice);
             s->wait = S3_WAIT_NONE;
             if (choice >= 0) {
@@ -170,8 +175,13 @@ void s3_service_wait(S3 *s) {
         }
         break;
     case S3_WAIT_TIME:
-        if (s->waitArg[0] && s->pressedMask) { rnd(s, (u16)s->pressedMask); s->wait = S3_WAIT_NONE; }
-        else if (s->clockMs >= s->waitUntil) s->wait = S3_WAIT_NONE;
+        // Keys pressed during the wait reach RND whether or not they may end it (Y3, ZT20, ZT21).
+        s->waitArg[1] |= (int)(s->pressedMask & 0xff);
+        s->pressedMask = 0;
+        if ((s->waitArg[0] && s->waitArg[1]) || s->clockMs >= s->waitUntil) {
+            rnd(s, (u16)s->waitArg[1]);
+            s->wait = S3_WAIT_NONE;
+        }
         break;
     case S3_WAIT_FADE: {
         int elapsed = (int)(s->clockMs - (u64)(u32)s->waitArg[2]);
@@ -190,7 +200,13 @@ void s3_service_wait(S3 *s) {
     }
     case S3_WAIT_INPUT_POLL: {
         u32 p = s->pressedMask | keymask_now(s);
-        if (p) { rnd(s, (u16)p); s->pressedMask = 0; s->wait = S3_WAIT_NONE; }
+        if (p) {
+            rnd(s, (u16)p);
+            // System 3.0's K also returns the pointer, in variables 57 and 58.
+            if (s->sys30) { s3_var_set(s, 57, (u16)s->mouseX); s3_var_set(s, 58, (u16)s->mouseY); }
+            s->pressedMask = 0;
+            s->wait = S3_WAIT_NONE;
+        }
         break;
     }
     case S3_WAIT_EFFECT:
@@ -206,24 +222,39 @@ void s3_service_wait(S3 *s) {
 
 // ---- CG loading ----
 
-static void load_cg(S3 *s, int n, int key) {
+void s3_load_cg(S3 *s, int n, int key, int yOffset) {
     S3Blob b;
-    if (!s3_archive_get(&s->ga, (u32)n, &b, NULL)) { s3_log(s, "CG %d missing", n); s->cgPos = false; return; }
+    bool found = s->sys30 ? s3_dat_get(&s->cg30, (u32)n, &b) : s3_archive_get(&s->ga, (u32)n, &b, NULL);
+    if (!found) { s3_log(s, "CG %d missing", n); s->cgPos = false; return; }
     S3Image img;
     if (!s3_cg_decode(b.data, b.size, &img)) { s3_log(s, "CG %d undecodable", n); s->cgPos = false; return; }
+    // A 16-colour VSP whose header names bank 0 goes to the bank ZC 0 chose (1 at start), so it leaves the colours
+    // the game set in bank 0 alone.
+    if (img.vsp && img.palBank == 0 && s->palBank > 0 && s->palBank < 16) {
+        int shift = s->palBank * 16;
+        for (int i = 0; i < img.w * img.h; i++) img.pixels8[i] = (u8)(img.pixels8[i] + shift);
+        memcpy(img.pal[shift], img.pal[0], 48);
+        img.palMask = (u16)(1u << s->palBank);
+        if (key >= 0 && key < 16) key += shift;
+    }
+    // A 16-colour VSP's transparent colour counts within its own bank.
+    if (img.vsp && img.palBank > 0 && key >= 0 && key < 16) key += (img.palBank & 15) * 16;
     int x = img.x, y = img.y;
     if (s->cgPos) {
-        if (s->cgPosMode == 0 || s->cgPosMode == 2) { x = s->cgX; y = s->cgY; }
+        if (s->cgPosMode == 0 || s->cgPosMode == 2 || s->cgPosMode == 30) { x = s->cgX; y = s->cgY; }
         else { x += s->cgX; y += s->cgY; }
         s->cgPos = false;
     }
+    y += yOffset;
+    if (s->trace) s3_log(s, "CG %d at %d,%d %dx%d bpp %d mask %04x pc %d", n, x, y, img.w, img.h, img.bpp, img.palMask, s->pcMode);
     if (img.hasPal && (s->pcMode & 4) && n != s->noPalCg) {
         for (int bank = 0; bank < 16; bank++) {
             if (!(img.palMask & (1u << bank))) continue;
             memcpy(s->pal[bank * 16], img.pal[bank * 16], 48);
-            if (s->pcMode & 2) memcpy(s->shownPal[bank * 16], img.pal[bank * 16], 48);
         }
     }
+    // Palette expansion copies the whole palette to the screen, including entries PS set.
+    if (s->pcMode & 2) memcpy(s->shownPal, s->pal, sizeof s->pal);
     if (s->pcMode & 1) s3_draw_image(s, &img, x, y, key);
     s3_mark_dirty(s);
     s->lastCg = n;
@@ -305,7 +336,11 @@ static void cmd_C(S3 *s) {
         s3_fill(s, a[0].v, a[1].v, 1, a[3].v, a[4].v); s3_fill(s, a[0].v + a[2].v - 1, a[1].v, 1, a[3].v, a[4].v);
         return;
     case 'C': args(s, "eeeeee", a); s3_copy(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v); return;
-    case 'D': args(s, "eeeeeeeeee", a); unimpl(s, "CD"); return;
+    case 'D': // CD sx, sy, w, h, dx, dy, effect, wait, keyFlag, key: a keyed copy shown at once, without the effect
+        args(s, "eeeeeeeeee", a);
+        s3_copy_key(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v, a[9].v);
+        if (a[8].v) rnd(s, 0);
+        return;
     case 'E': args(s, "eeeeeeeee", a); effect_copy(s, a); return;
     case 'F': args(s, "eeeee", a); s3_fill(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v); return;
     case 'K': {
@@ -367,7 +402,7 @@ static void cmd_C(S3 *s) {
         s3_mark_dirty(s);
         return;
     }
-    case 'P': args(s, "eee", a); unimpl(s, "CP"); return;
+    case 'P': args(s, "eee", a); s3_paint(s, a[0].v, a[1].v, a[2].v); return;
     case 'S': args(s, "eeeeeee", a); s3_copy_key(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v, a[6].v); return;
     case 'T': args(s, "eee", a); unimpl(s, "CT"); return;
     case 'U': case 'V': args(s, "eeeeee", a); unimpl(s, "CU/CV"); return;
@@ -455,6 +490,82 @@ static void cmd_E(S3 *s) {
     }
 }
 
+// LE and QE: variables or strings to and from a file in the save folder. Numbers are little-endian u16, strings
+// NUL-terminated, as System39.exe writes them. A file too short for the count still loads what it has (RND 0).
+static void var_file(S3 *s, bool write, int type, const char *name, size_t nameLen, const Arg *start, int count) {
+    char file[256];
+    snprintf(file, sizeof file, "%.*s", (int)nameLen, name);
+    bool ascii = true;
+    for (const char *c = file; *c; c++) if ((u8)*c >= 0x80) ascii = false;
+    size_t len = strlen(file);
+    if (!ascii && len >= 6 && !strcasecmp(file + len - 4, ".ALD") && s->prefix[0]) {
+        // A Japanese name ending in <two letters>.ALD names a file beside the game's archives. English releases rename
+        // those archives (TG108's 闘神ⅡSA.ALD is tt2SA.ALD, and its PC copy keeps this data as tt2FS.ALD), so use the
+        // archives' prefix.
+        char tail[8];
+        snprintf(tail, sizeof tail, "%s", file + len - 6);
+        snprintf(file, sizeof file, "%s%s", s->prefix, tail);
+    } else if (!ascii) {
+        // File systems want UTF-8 names.
+        char *utf8 = s3_sjis_to_utf8(file);
+        snprintf(file, sizeof file, "%s", utf8);
+        free(utf8);
+    }
+    // A relative path, with Windows separators allowed, that stays inside the save or game folder: no drive, no leading
+    // separator, no "..". Checked after the UTF-8 conversion, since a Shift-JIS trail byte can be 0x5C. Symlinks are
+    // followed for the containment check below.
+    for (char *c = file; *c; c++) if (*c == '\\') *c = '/';
+    bool bad = !file[0] || file[0] == '/' || strchr(file, ':');
+    for (const char *c = file; !bad && *c;) {
+        const char *e = strchr(c, '/');
+        size_t len = e ? (size_t)(e - c) : strlen(c);
+        if (len == 2 && c[0] == '.' && c[1] == '.') bad = true;
+        c = e ? e + 1 : c + len;
+    }
+    if (bad) {
+        s3_log(s, "LE/QE refused file name %s", file);
+        rnd(s, 255);
+        return;
+    }
+    // Files the game writes live in the save folder; ones it only reads, such as shipped maps, may be in the game's.
+    char *path = s3_find_file(s->saveDir, file);
+    const char *root = s->saveDir;
+    if (!path && !write && (path = s3_find_file(s->gameDir, file))) root = s->gameDir;
+    if (!path) path = s3_path(s->saveDir, file);
+    if (!s3_path_inside(path, root)) {
+        s3_log(s, "LE/QE refused %s: it resolves outside the game's folders", file);
+        free(path);
+        rnd(s, 255);
+        return;
+    }
+    if (write) {
+        size_t n = 0, cap = 64;
+        u8 *out = s3_alloc(cap);
+        for (int i = 0; i < count; i++) {
+            const char *x = type == 0 ? NULL : str_slot(s, start->v + i);
+            size_t need = type == 0 ? 2 : (x ? strlen(x) : 0) + 1;
+            if (n + need > cap) { cap = (n + need) * 2; out = realloc(out, cap); if (!out) abort(); }
+            if (type == 0) { u16 v = start->isVar ? s3_lv_get(s, &start->lv, i) : 0; out[n] = (u8)v; out[n + 1] = (u8)(v >> 8); }
+            else memcpy(out + n, x ? x : "", need);
+            n += need;
+        }
+        rnd(s, s3_write_file(path, out, n) ? 0 : 201);
+        free(out);
+    } else {
+        size_t n;
+        u8 *d = s3_read_file(path, &n);
+        if (!d) { free(path); rnd(s, 255); return; }
+        size_t p = 0;
+        for (int i = 0; i < count; i++) {
+            if (type == 0) { if (p + 2 > n) break; if (start->isVar) s3_lv_set(s, &start->lv, i, s3_le16(d + p)); p += 2; }
+            else { if (p >= n) break; str_set(s, start->v + i, (const char *)d + p); p += strlen((const char *)d + p) + 1; }
+        }
+        free(d);
+        rnd(s, 0);
+    }
+    free(path);
+}
+
 static void table_read(S3 *s, int sub, Arg *a) {
     // Data tables hold u16 words (from [n] data) and NUL-terminated strings (from "str").
     S3Blob b;
@@ -465,15 +576,23 @@ static void table_read(S3 *s, int sub, Arg *a) {
     case 1: { // F1 string, skip
         u32 p = s->dataPtr;
         for (int i = 0; i < a[1].v && p < n; i++) { while (p < n && d[p]) p++; p++; }
-        if (p < n) { str_set(s, a[0].v, (const char *)d + p); while (p < n && d[p]) p++; p++; }
+        if (p < n) {
+            u32 e = p;
+            while (e < n && d[e]) e++;
+            char t[1024];
+            snprintf(t, sizeof t, "%.*s", (int)(e - p < sizeof t ? e - p : sizeof t - 1), (const char *)d + p);
+            str_set(s, a[0].v, t);
+            p = e + 1;
+        }
         s->dataPtr = p;
         return;
     }
     case 2: case 3: case 4: case 5: {
-        u32 p = s->dataPtr + (u32)a[1].v * 2;
+        u64 p = (u64)s->dataPtr + (u64)a[1].v * 2;
         u16 v = p + 2 <= n ? s3_le16(d + p) : 0;
+        if (s->trace) s3_log(s, "TBL F%d page %d at %llx skip %d -> %u", sub, s->dataPage, (unsigned long long)p, a[1].v, v);
         put(s, &a[0], 0, v);
-        if (sub == 2 || sub == 4) s->dataPtr = p + 2;
+        if (sub == 2 || sub == 4) s->dataPtr = p + 2 <= n ? (u32)p + 2 : n;
         return;
     }
     default: unimpl(s, "F table");
@@ -516,7 +635,7 @@ static void cmd_I(S3 *s) {
         return;
     }
     case 'M': args(s, "ee", a); put(s, &a[0], 0, (u16)(s->mouseX + s->viewX)); put(s, &a[1], 0, (u16)(s->mouseY + s->viewY));
-        rnd(s, (u16)((s->mouseL ? 16 : 0) | (s->mouseR ? 32 : 0))); s->polls++; return;
+        rnd(s, (u16)((s->mouseL ? 16 : 0) | (s->mouseR ? 32 : 0) | s->clickLatch)); s->clickLatch = 0; s->polls++; return;
     case 'X': args(s, "e", a); put(s, &a[0], 0, 0); return;
     case 'Y': args(s, "e", a); return;
     case 'Z': args(s, "ee", a); s->mouseX = a[0].v - s->viewX; s->mouseY = a[1].v - s->viewY; return;
@@ -528,10 +647,26 @@ static void cmd_L(S3 *s) {
     int k = s3_byte(s);
     Arg a[4];
     switch (k) {
-    case 'D': args(s, "e", a); rnd(s, (u16)(s3_save_load(s, a[0].v) ? 0 : 255)); return;
+    case 'D': args(s, "e", a); if (!s3_save_load(s, a[0].v)) rnd(s, 255); return; // success resumes after the QD
     case 'P': args(s, "eee", a); rnd(s, (u16)(s3_save_load_part(s, a[0].v, &a[1].lv, a[2].v) ? 0 : 255)); return;
-    case 'T': args(s, "ee", a); rnd(s, (u16)(s3_save_time(s, a[0].v, a) ? 0 : 255)); return;
-    case 'L': args(s, "beee", a); unimpl(s, "LL"); return;
+    case 'T': {
+        args(s, "ee", a);
+        u16 t[7];
+        bool ok = s3_save_time(s, a[0].v, t);
+        if (ok) for (int i = 0; i < 7; i++) put(s, &a[1], i, t[i]);
+        rnd(s, ok ? 0 : 255);
+        return;
+    }
+    case 'L': { // LL 0, link, start, count: count words from data link `link` (the DA archive) into variables
+        args(s, "beee", a);
+        S3Blob b;
+        if (!s3_archive_get(&s->da, a[1].v, &b, NULL)) { rnd(s, 255); return; }
+        int n = 0;
+        for (; n < a[3].v && (size_t)n * 2 + 2 <= b.size; n++) if (a[2].isVar) s3_lv_set(s, &a[2].lv, n, s3_le16(b.data + n * 2));
+        rnd(s, n < a[3].v ? 254 : 0);
+        return;
+    }
+    case 'E': args(s, "b:ee", a); var_file(s, false, a[0].v, a[1].s, strcspn(a[1].s, ":"), &a[2], a[3].v); return; // old form: the name ends with ':'
     case 'H': { int k2 = s3_byte(s); (void)k2; args(s, "be", a); rnd(s, 0); return; }
     case 'X': { int k2 = s3_byte(s); (void)k2; args(s, "eee", a); unimpl(s, "LX"); return; }
     default: s->vmError = true;
@@ -556,14 +691,29 @@ static void cmd_M(S3 *s) {
     case 'L': args(s, "ee", a); { const char *x = str_slot(s, a[1].v); put(s, &a[0], 0, (u16)(x ? sjis_chars(x) : 0)); } return;
     case 'M': args(s, "ee", a); { const char *src = str_slot(s, a[1].v); if (src) { snprintf(buf, sizeof buf, "%s", src); str_set(s, a[0].v, buf); } } return;
     case 'N': args(s, "bee", a); unimpl(s, "MN"); return;
-    case 'P': args(s, "ee", a); { const char *x = str_slot(s, a[0].v); if (x) { snprintf(buf, sizeof buf, "%s", x);
-        int chars = 0; size_t i = 0; while (buf[i] && chars < a[1].v) { i += s3_sjis_lead((u8)buf[i]) ? 2 : 1; chars++; } buf[i] = 0; s3_msg_text(s, buf); } } return;
+    case 'P': { // MP str, n: n full-width cells of the string, padded with spaces. A half-width character takes half a
+        // cell, except under ZH 0, which shows it full-width.
+        args(s, "ee", a);
+        const char *x = str_slot(s, a[0].v);
+        int room = a[1].v * 2;
+        size_t o = 0;
+        for (const u8 *q = (const u8 *)(x ? x : ""); *q && o + 2 < sizeof buf;) {
+            int n = s3_sjis_lead(*q) && q[1] ? 2 : 1, cells = n == 1 && s->zh != 0 ? 1 : 2;
+            if (cells > room) break;
+            memcpy(buf + o, q, (size_t)n);
+            o += (size_t)n; q += n; room -= cells;
+        }
+        while (room > 0 && o + 1 < sizeof buf) { buf[o++] = ' '; room -= s->zh != 0 ? 1 : 2; }
+        buf[o] = 0;
+        s3_msg_text(s, buf);
+        return;
+    }
     case 'S': args(s, "e:", a); { size_t n = 0; while (a[1].s[n] && a[1].s[n] != ':') n += s3_sjis_lead((u8)a[1].s[n]) ? 2 : 1;
         snprintf(buf, sizeof buf, "%.*s", (int)n, a[1].s); str_set(s, a[0].v, buf); } return;
     case 'T': args(s, ":", a); { size_t n = 0; while (a[0].s[n] && a[0].s[n] != ':') n += s3_sjis_lead((u8)a[0].s[n]) ? 2 : 1;
         snprintf(buf, sizeof buf, "%.*s", (int)n, a[0].s); char *u = s3_sjis_to_utf8(buf); snprintf(s->title, sizeof s->title, "%s", u); free(u); } return;
     case 'V': args(s, "e", a); return;
-    case 'Z': args(s, "beee", a); if (a[0].v == 0) { s->strCount = a[1].v; s->strLen = a[2].v > 0 ? a[2].v * 2 : s->strLen; } return;
+    case 'Z': args(s, "beee", a); if (a[0].v == 0 && a[2].v > 0 && a[2].v < S3_MAX_STRINGS) s->strCount = a[2].v; return; // MZ0,reserved,count,reserved
     default: s->vmError = true;
     }
 }
@@ -592,23 +742,30 @@ static void cmd_N(S3 *s) {
     case '\\': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, !s3_lv_get(s, &a[0].lv, i)); return;
     case '~': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, (u16)~s3_lv_get(s, &a[0].lv, i)); return;
     case '&': case '|': case '^': {
+        // N& var1, count, var2: var2's values become var1's AND var2's; var1 keeps its own (System39.exe under Wine).
         args(s, "eee", a);
         for (int i = 0; i < a[1].v; i++) {
             u16 x = s3_lv_get(s, &a[0].lv, i), y = s3_lv_get(s, &a[2].lv, i);
-            put(s, &a[0], i, k == '&' ? x & y : k == '|' ? x | y : x ^ y);
+            put(s, &a[2], i, k == '&' ? x & y : k == '|' ? x | y : x ^ y);
         }
         return;
     }
     case 'B': {
+        // NB dest, src, count. Copies through a buffer, so overlapping ranges copy as if separate.
         args(s, "eee", a);
-        u16 tmp[4096];
-        int n = a[2].v < 4096 ? a[2].v : 4096;
-        for (int i = 0; i < n; i++) tmp[i] = s3_lv_get(s, &a[0].lv, i);
-        for (int i = 0; i < n; i++) put(s, &a[1], i, tmp[i]);
+        int n = a[2].v;
+        u16 *tmp = s3_alloc(sizeof(u16) * (size_t)(n + 1));
+        for (int i = 0; i < n; i++) tmp[i] = s3_lv_get(s, &a[1].lv, i);
+        for (int i = 0; i < n; i++) put(s, &a[0], i, tmp[i]);
+        free(tmp);
         return;
     }
     case 'C': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, 0); return;
-    case 'I': args(s, "eeee", a); unimpl(s, "NI"); return;
+    case 'I': // NI var, default, min, max: a number input box. There is no keypad, so it takes the default, as OK would.
+        args(s, "eeee", a);
+        put(s, &a[0], 0, a[1].v < a[2].v ? a[2].v : a[1].v > a[3].v ? a[3].v : a[1].v);
+        rnd(s, 0);
+        return;
     case 'P': {
         args(s, "eeee", a);
         bool same = true;
@@ -629,12 +786,42 @@ static void cmd_N(S3 *s) {
         return;
     }
     case 'D': {
-        // Double-precision (32-bit) numbers kept in variable pairs, numbered by the first arg.
+        // ND: doubles in a work area of their own, w64 0 to 255 (SDK manual). C copies a number in; D copies one out to
+        // a variable, truncated and taken modulo 65536 as System39.exe does; + - * / combine two into the first; A and
+        // M convert from and to a string; H prints.
         int op = s3_byte(s);
         Arg b[3];
         if (op == '+' || op == '-' || op == '*' || op == '/') args(s, "eee", b); else args(s, "ee", b);
-        unimpl(s, "ND");
-        return;
+        double *w = s->w64;
+        switch (op) {
+        case 'C': w[b[0].v & 255] = b[1].v; return;
+        case 'D': { // truncated toward zero, then modulo 65536; NaN and infinities give 0
+            double v = w[b[1].v & 255];
+            double r = isfinite(v) ? fmod(trunc(v), 65536.0) : 0;
+            put(s, &b[0], 0, (u16)(r < 0 ? r + 65536.0 : r));
+            return;
+        }
+        case '+': w[b[0].v & 255] = w[b[1].v & 255] + w[b[2].v & 255]; return;
+        case '-': w[b[0].v & 255] = w[b[1].v & 255] - w[b[2].v & 255]; return;
+        case '*': w[b[0].v & 255] = w[b[1].v & 255] * w[b[2].v & 255]; return;
+        case '/': { double y = w[b[2].v & 255]; w[b[0].v & 255] = y != 0 ? w[b[1].v & 255] / y : 0; return; }
+        case 'A': { const char *x = str_slot(s, b[0].v); w[b[1].v & 255] = x ? atof(x) : 0; return; }
+        case 'M': { char t[64]; snprintf(t, sizeof t, "%.0f", w[b[1].v & 255]); str_set(s, b[0].v, t); return; }
+        case 'H': {
+            double v = w[b[0].v & 255];
+            char t[64], out[160];
+            snprintf(t, sizeof t, "%.0f", v < 0 ? 0 : v);
+            size_t n = strlen(t);
+            const char *digits = b[1].v > 0 && (size_t)b[1].v < n ? t + n - b[1].v : t;
+            size_t o = 0;
+            for (int pad = b[1].v - (int)n; pad > 0 && o + 2 < sizeof out; pad--) { out[o++] = (char)0x81; out[o++] = (char)0x40; }
+            for (const char *q = digits; *q && o + 2 < sizeof out; q++) { out[o++] = (char)0x82; out[o++] = (char)(0x4f + (*q - '0')); }
+            out[o] = 0;
+            s3_msg_text(s, out);
+            return;
+        }
+        default: s->vmError = true; return;
+        }
     }
     default: s->vmError = true;
     }
@@ -673,12 +860,12 @@ static void cmd_P(S3 *s) {
 
 static void cmd_Q(S3 *s) {
     int k = s3_byte(s);
-    Arg a[3];
+    Arg a[4];
     switch (k) {
     case 'C': args(s, "ee", a); rnd(s, (u16)(s3_save_copy(s, a[0].v, a[1].v) ? 1 : 255)); return;
     case 'D': args(s, "e", a); rnd(s, (u16)(s3_save_write(s, a[0].v) ? 1 : 255)); return;
     case 'P': args(s, "eee", a); rnd(s, (u16)(s3_save_write_part(s, a[0].v, &a[1].lv, a[2].v) ? 1 : 255)); return;
-    case 'E': { s3_byte(s); Arg b[3]; args(s, "see", b); unimpl(s, "QE"); return; }
+    case 'E': args(s, "b:ee", a); var_file(s, true, a[0].v, a[1].s, strcspn(a[1].s, ":"), &a[2], a[3].v); return; // old form: the name ends with ':'
     default: s->vmError = true;
     }
 }
@@ -694,8 +881,9 @@ static void cmd_S(S3 *s) {
         else { put(s, &a[0], 0, (u16)s->cdTrack); put(s, &a[0], 1, (u16)(t / 60000)); put(s, &a[0], 2, (u16)(t / 1000 % 60)); put(s, &a[0], 3, (u16)(t % 1000 * 75 / 1000)); } }
         return;
     case 'R': { int sub = s3_byte(s); args(s, "e", a);
-        put(s, &a[0], 0, (u16)(sub == 0 ? (s3_music_position(s) >= 0 ? s->cdTrack : 0) : s->midiPlaying));
-        for (int i = 1; i < 4; i++) put(s, &a[0], i, 0); return; }
+        put(s, &a[0], 0, (u16)(sub == 0 ? (s3_music_position(s) >= 0 ? s->cdTrack : 0) : s3_midi_playing(s)));
+        for (int i = 1; i < 4; i++) put(s, &a[0], i, 0);
+        return; }
     case 'I': { s3_byte(s); args(s, "e", a); put(s, &a[0], 0, 1); return; }
     case 'P': args(s, "ee", a); { S3Blob b; if (s3_archive_get(&s->wa, a[0].v, &b, NULL)) s3_wav_play(s, 0, b.data, b.size, a[1].v); } return;
     case 'Q': args(s, "eee", a); { S3Blob b; if (s3_archive_get(&s->wa, a[0].v, &b, NULL)) s3_wav_play(s, 0, b.data, b.size, a[2].v); } return;
@@ -808,7 +996,7 @@ static void cmd_Z(S3 *s) {
         args(s, "e", a);
         u64 t = s->clockMs - s->timerBase[0];
         switch (sub) {
-        case 0: { time_t now = time(NULL); struct tm tm; localtime_r(&now, &tm);
+        case 0: { time_t now = (time_t)(s->startTime + (long long)(s->clockMs / 1000)); struct tm tm; localtime_r(&now, &tm);
             int v[7] = { tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tm.tm_wday };
             for (int i = 0; i < 7; i++) put(s, &a[0], i, (u16)v[i]); } break;
         case 1: s->timerBase[0] = s->clockMs - (u64)a[0].v * 10; break;
@@ -848,21 +1036,32 @@ static void cmd_Z(S3 *s) {
 static void cmd_V(S3 *s) {
     int k = s3_byte(s);
     Arg a[10];
+    u16 v[10] = {0};
+    const char *sig;
     switch (k) {
-    case 'A': { int sub = s3_byte(s); args(s, sub == 3 || sub == 4 ? "eee" : "ee", a); unimpl(s, "VA"); return; }
-    case 'B': case 'C': args(s, "eeeeeee", a); break;
-    case 'E': case 'H': case 'P': args(s, "eeeeee", a); break;
-    case 'F': break;
-    case 'G': case 'J': case 'X': args(s, "eeee", a); break;
-    case 'I': s3_byte(s); args(s, "eeee", a); break;
-    case 'R': case 'W': args(s, "eee", a); break;
-    case 'S': args(s, "eeeee", a); break;
-    case 'T': args(s, "eeeeeeeeee", a); break;
-    case 'V': args(s, "ee", a); break;
-    case 'Z': args(s, "bee", a); break;
+    case 'A': { // VA sub,n,a,b: sprites (sprite.c)
+        int sub = s3_byte(s);
+        args(s, "eee", a);
+        s3_sprite_command(s, sub, a[0].v, a[1].v, a[2].v, a[1].isVar ? &a[1].lv : NULL, a[2].isVar ? &a[2].lv : NULL);
+        return;
+    }
+    case 'B': case 'C': sig = "eeeeeee"; break;
+    case 'E': case 'H': case 'P': sig = "eeeeee"; break;
+    case 'F': sig = ""; break;
+    case 'G': case 'J': sig = "eeee"; break;
+    case 'I': v[4] = s3_byte(s) == 'P'; sig = "eeee"; break; // VIC or VIP
+    case 'R': case 'W': sig = "eee"; break;
+    case 'S': sig = "eeeee"; break;
+    case 'T': sig = "eeeeeeeeee"; break;
+    case 'V': sig = "ee"; break;
+    case 'X': sig = "eeee"; break;
+    case 'Z': sig = "bee"; break;
     default: s->vmError = true; return;
     }
-    unimpl(s, "unit map");
+    args(s, sig, a);
+    for (size_t i = 0; sig[i]; i++) if (k != 'I' || i < 4) v[i] = a[i].v;
+    if (k == 'J') { unimpl(s, "VJ"); return; }
+    s3_unitmap_command(s, k, v, (k == 'R' || k == 'W') && a[2].isVar ? &a[2].lv : NULL);
 }
 
 static void cmd_Y(S3 *s) {
@@ -900,9 +1099,9 @@ static void cmd_slash(S3 *s) {
         if (d && s3_cg_decode(d, n, &img)) { s3_draw_image(s, &img, a[0].v, a[1].v, -1); s3_image_free(&img); }
         free(d); free(p);
     } return;
-    case 0x24: args(s, "bsee", a); unimpl(s, "LE"); return;
+    case 0x24: args(s, "bsee", a); var_file(s, false, a[0].v, a[1].s, strlen(a[1].s), &a[2], a[3].v); return; // LE
     case 0x26: args(s, "ees", a); unimpl(s, "MI"); return;
-    case 0x2a: args(s, "bsee", a); unimpl(s, "QE"); return;
+    case 0x2a: args(s, "bsee", a); var_file(s, true, a[0].v, a[1].s, strlen(a[1].s), &a[2], a[3].v); return; // QE
     case 0x47: return;  // emitted before ]; no visible effect found
     case 0x00: case 0x01: case 0x04: // TOC TOS TOP
         if (s->textSp > 0) { s->textSp--; int *t = s->textStack[s->textSp];
@@ -953,8 +1152,8 @@ void s3_command(S3 *s) {
     case 'F': cmd_F(s, s3_byte(s)); return;
     case 'G': {
         int k = s3_byte(s);
-        if (k == 0) { args(s, "e", a); load_cg(s, a[0].v, -1); }
-        else if (k == 1) { args(s, "ee", a); load_cg(s, a[0].v, a[1].v); }
+        if (k == 0) { args(s, "e", a); s3_load_cg(s, a[0].v, -1, 0); }
+        else if (k == 1) { args(s, "ee", a); s3_load_cg(s, a[0].v, a[1].v, 0); }
         else if (k == 'S') {
             args(s, "ee", a);
             S3Blob b; S3Image img;
@@ -964,7 +1163,7 @@ void s3_command(S3 *s) {
                 put(s, &a[1], 0, (u16)x); put(s, &a[1], 1, (u16)y); put(s, &a[1], 2, (u16)img.w); put(s, &a[1], 3, (u16)img.h);
                 s3_image_free(&img);
             }
-        } else if (k == 'X') { args(s, "ee", a); load_cg(s, a[0].v, -1); }
+        } else if (k == 'X') { args(s, "ee", a); s3_load_cg(s, a[0].v, -1, 0); }
         else s->vmError = true;
         return;
     }

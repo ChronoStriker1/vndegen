@@ -1,6 +1,6 @@
 # MIDI music
 
-Many PC games, RPG Maker and Wolf RPG Editor games above all, play their music from MIDI files and leave the sound to
+Many PC games, RPG Maker, Wolf RPG Editor and AliceSoft System 3 games among them, play their music from MIDI files and leave the sound to
 Windows' General MIDI synthesizer. VNDegen's native engines play them with vnmidi, a small C player in
 `Engines/Shared`, through a General MIDI SoundFont the app bundles.
 
@@ -52,7 +52,7 @@ it doesn't need access to the original later, and Settings shows
 its name with a button that goes back to the bundled font. The choice is app-wide and applies to games started after
 it.
 
-It covers the engines that play MIDI through vnmidi: RPG Maker XP, VX and VX Ace, and Wolf RPG Editor.
+It covers the engines that play MIDI through vnmidi: RPG Maker XP, VX and VX Ace, Wolf RPG Editor, and AliceSoft System 3.
 
 An engine loads the player's font with `vnmidi_font_load_fallback`, which loads the bundled font instead when the
 player's can't be read and says why, which the engine logs.

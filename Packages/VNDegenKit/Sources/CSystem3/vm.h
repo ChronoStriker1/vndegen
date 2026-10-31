@@ -13,6 +13,9 @@ u16 s3_u16(S3 *s);
 u32 s3_u32(S3 *s);
 u16 s3_expr(S3 *s);
 void s3_lvarg(S3 *s, S3LV *lv);
+// A variable reference whose first byte c was already read.
+void s3_var_ref(S3 *s, int c, S3LV *lv);
+void s3_lv_locate(S3 *s, const S3LV *lv, int *page, u32 *index);
 const char *s3_strarg(S3 *s);
 u16 *s3_lv_at(S3 *s, const S3LV *lv, int k);
 u16 s3_lv_get(S3 *s, const S3LV *lv, int k);
@@ -25,7 +28,23 @@ void s3_return(S3 *s, bool page);
 void s3_push_var(S3 *s, u16 var);
 void s3_message(S3 *s, u32 index);
 
+// unitmap.c: the V commands, with their arguments' values and, for VR and VW, the variable argument
+void s3_unitmap_command(S3 *s, int k, const u16 *args, const S3LV *lv);
+void s3_unitmap_free(S3 *s);
+
+// sprite.c: VA
+void s3_sprite_command(S3 *s, int sub, int n, u16 a, u16 b, const S3LV *va, const S3LV *vb);
+void s3_sprite_update(S3 *s);
+void s3_sprite_free(S3 *s);
+
+// vm30.c: System 3.0
+bool s3_open30(S3 *s);
+void s3_close30(S3 *s);
+void s3_exec30(S3 *s);
+
 // cmds.c
+// Draws CG n with palette index key transparent (or -1), yOffset added to its placement (System 3.0 screens).
+void s3_load_cg(S3 *s, int n, int key, int yOffset);
 void s3_command(S3 *s);
 void s3_cmd_wait_key(S3 *s);
 void s3_cmd_open_menu(S3 *s);

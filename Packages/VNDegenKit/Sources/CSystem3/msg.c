@@ -32,7 +32,9 @@ void s3_msg_clear(S3 *s) {
 
 // Appends text to the menu item being built.
 static void menu_append(S3 *s, const char *sjis) {
+    if (s->menuBuild >= S3_MAX_MENU) return; // an item past the last one kept; its text is dropped with it
     S3MenuItem *m = &s->menu[s->menuBuild];
+    m->zh = s->zh;
     size_t have = strlen(m->text), add = strlen(sjis);
     if (have + add >= sizeof m->text) add = sizeof m->text - 1 - have;
     memcpy(m->text + have, sjis, add);
@@ -42,6 +44,8 @@ static void menu_append(S3 *s, const char *sjis) {
 // Converts one character for display under the current ZH mode. Returns the code point and
 // whether it takes a half-width cell.
 static int next_char(S3 *s, const u8 *p, u32 *cp, bool *half) {
+    int g = s->gaijiCount && p[0] >= 0xeb && p[1] ? s3_gaiji_find(s, p) : -1;
+    if (g >= 0) { *cp = S3_GAIJI + (u32)g; *half = false; return 2; }
     int n = s3_sjis_decode(p, cp);
     *half = n == 1;
     if (s->zh == 0 && n == 1) {
@@ -61,6 +65,10 @@ static int next_char(S3 *s, const u8 *p, u32 *cp, bool *half) {
         else if (c == ' ') *cp = 0x3000;
         else if (c > ' ' && c < 0x7f) *cp = c + 0xfee0;
         *half = false;
+    } else if (s->zh == 1 && n == 2) {
+        // Half-width mode narrows full-width ASCII and spaces, such as the digits H prints.
+        if (*cp >= 0xff01 && *cp <= 0xff5e) { *cp -= 0xfee0; *half = true; }
+        else if (*cp == 0x3000) { *cp = ' '; *half = true; }
     }
     return n;
 }
@@ -68,23 +76,60 @@ static int next_char(S3 *s, const u8 *p, u32 *cp, bool *half) {
 void s3_msg_text(S3 *s, const char *sjis) {
     if (s->menuBuild >= 0) { menu_append(s, sjis); return; }
     S3Win *w = msgwin(s);
+    // Text placed with T outside the window (games draw numbers off screen and copy them in) never wraps.
+    bool wraps = s->tx >= w->x && s->tx < w->x + w->w && s->ty >= w->y && s->ty < w->y + w->h;
     const u8 *p = (const u8 *)sjis;
     while (*p) {
+        // A half-width word that would not fit starts a new line, so translated text breaks between words.
+        if (*p > ' ' && *p < 0x7f && s->zh != 0 && (p == (const u8 *)sjis || p[-1] == ' ')) {
+            int word = 0;
+            for (const u8 *q = p; *q > ' ' && *q < 0x7f; q++) word += s->fontSize / 2;
+            if (wraps && s->tx + word > w->x + w->w && s->tx > w->x && word <= w->w) s3_msg_newline(s);
+        }
         u32 cp; bool half;
         p += next_char(s, p, &cp, &half);
         int adv = half ? s->fontSize / 2 : s->fontSize;
-        if (s->tx + adv > w->x + w->w && s->tx > w->x) s3_msg_newline(s);
+        if (wraps && s->tx + adv > w->x + w->w && s->tx > w->x) s3_msg_newline(s);
         s3_draw_char(s, cp, half, s->tx, s->ty, s->fontSize, s->msgColor);
         s->tx += adv;
     }
 }
 
+// Keeps the part of the DIB a window covers, with the rectangle and depth it was taken at.
+static void under_save(S3 *s, const S3Win *win, struct S3Under *u) {
+    free(u->px);
+    memset(u, 0, sizeof *u);
+    int x = win->x, y = win->y, w = win->w, h = win->h;
+    if (!s3_clip(s, &x, &y, &w, &h)) return;
+    size_t px = s->dib.depth == 8 ? 1 : 4, row = (size_t)w * px;
+    u->px = s3_alloc(row * (size_t)h);
+    *u = (struct S3Under){ u->px, x, y, w, h, s->dib.depth };
+    for (int j = 0; j < h; j++)
+        memcpy(u->px + (size_t)j * row, (s->dib.depth == 8 ? s->dib.p8 : (u8 *)s->dib.p32) + ((size_t)(y + j) * s->dib.w + x) * px, row);
+}
+
+// Puts a kept area back where it was taken, if the DIB still has that depth and room for it.
+static void under_restore(S3 *s, struct S3Under *u) {
+    if (u->px && u->depth == s->dib.depth && u->x + u->w <= s->dib.w && u->y + u->h <= s->dib.h) {
+        size_t px = u->depth == 8 ? 1 : 4, row = (size_t)u->w * px;
+        for (int j = 0; j < u->h; j++)
+            memcpy((u->depth == 8 ? s->dib.p8 : (u8 *)s->dib.p32) + ((size_t)(u->y + j) * s->dib.w + u->x) * px, u->px + (size_t)j * row, row);
+        s3_mark_dirty(s);
+    }
+    free(u->px);
+    memset(u, 0, sizeof *u);
+}
+
+// B4 num, frame, -, -, noClear, restore. restore 0 keeps what the window covers when its B3 asked to, then makes it the
+// message window and clears it unless noClear; restore 1 puts back what the window covered and leaves the current
+// window as it is, as the System 3.0 games' save screens rely on.
 void s3_msg_select_window(S3 *s, int n, int frame, int noClear, int restore) {
     if (n < 1 || n > 100) return;
+    if (restore) { under_restore(s, &s->msgUnder[n]); return; }
+    if (s->msgWin[n].save) under_save(s, &s->msgWin[n], &s->msgUnder[n]);
     s->curMsg = n;
     s->msgFrameOn = frame;
     S3Win *w = msgwin(s);
-    (void)restore;
     if (!noClear) s3_msg_clear(s);
     s->tx = w->x;
     s->ty = w->y;
@@ -108,13 +153,26 @@ static int text_width(S3 *s, const char *sjis, int size) {
 static void menu_rect(S3 *s, int *x, int *y, int *w, int *h) {
     S3Win *win = &s->selWin[s->curSel > 0 && s->curSel <= 100 ? s->curSel : 1];
     *x = win->x; *y = win->y; *w = win->w; *h = win->h;
-    int need = 0;
+    int need = 0, zh = s->zh;
     for (int i = 0; i < s->menuCount; i++) {
+        s->zh = s->menu[i].zh;
         int tw = text_width(s, s->menu[i].text, s->menuFontSize);
         if (tw > need) need = tw;
     }
+    s->zh = zh;
     if (*w < need + 16) *w = need + 16;
     *h = s->menuCount * menu_row_height(s) + 8;
+    // A box that grew past the right of the screen, as translated text can make it, moves left.
+    int right = s->viewX + (s->viewW > 0 ? s->viewW : s->dib.w);
+    if (*x + *w > right) *x = right - *w > 0 ? right - *w : 0;
+}
+
+// The centre of menu item i on screen, for test tools that tap menus.
+void s3_menu_item_center(S3 *s, int i, int *x, int *y) {
+    int mx, my, mw, mh;
+    menu_rect(s, &mx, &my, &mw, &mh);
+    *x = mx + mw / 2 - s->viewX;
+    *y = my + 4 + i * menu_row_height(s) + menu_row_height(s) / 2 - s->viewY;
 }
 
 static void menu_draw(S3 *s) {
@@ -130,13 +188,15 @@ static void menu_draw(S3 *s) {
         bool sel = i == s->menuCursorPos;
         int color = sel && s->menuCursor == 2 ? s->menuBg : s->menuColor;
         if (sel && s->menuCursor == 2) s3_fill(s, x + 4, ry, w - 8, menu_row_height(s) - 2, s->menuColor);
-        int tx = x + 8;
+        int tx = x + 8, zh = s->zh;
+        s->zh = s->menu[i].zh;
         const u8 *p = (const u8 *)s->menu[i].text;
         while (*p) {
             u32 cp; bool half;
             p += next_char(s, p, &cp, &half);
             tx += s3_draw_char(s, cp, half, tx, ry + 1, s->menuFontSize, color);
         }
+        s->zh = zh;
         if (sel && s->menuCursor != 2) {
             int t = s->menuCursor == 1 ? 1 : 2;
             int rw = w - 8, rh = menu_row_height(s) - 1;
@@ -214,11 +274,28 @@ bool s3_menu_update(S3 *s) {
         (void)click;
         if (hit >= 0 || !(pressed & 0x10000)) { s->waitArg[0] = hit >= 0 && (pressed & 0x10000) ? hit : s->menuCursorPos; return true; }
     }
-    if (pressed & 32) { s->waitArg[0] = -1; return true; }                  // escape or right click
+    if (pressed & (32 | 64)) { s->waitArg[0] = -1; return true; }           // space, right click or escape
     return false;
 }
 
 void s3_menu_close(S3 *s, int choice) {
     (void)choice;
     menu_restore(s);
+}
+
+char *s3_display_utf8(S3 *s, const char *sjis) {
+    size_t n = strlen(sjis);
+    char *out = s3_alloc(n * 4 + 1), *o = out;
+    const u8 *p = (const u8 *)sjis;
+    while (*p) {
+        u32 cp;
+        bool half;
+        p += next_char(s, p, &cp, &half);
+        if (cp < 0x80) *o++ = (char)cp;
+        else if (cp < 0x800) { *o++ = (char)(0xc0 | cp >> 6); *o++ = (char)(0x80 | (cp & 0x3f)); }
+        else if (cp < 0x10000) { *o++ = (char)(0xe0 | cp >> 12); *o++ = (char)(0x80 | ((cp >> 6) & 0x3f)); *o++ = (char)(0x80 | (cp & 0x3f)); }
+        else { *o++ = (char)(0xf0 | cp >> 18); *o++ = (char)(0x80 | ((cp >> 12) & 0x3f)); *o++ = (char)(0x80 | ((cp >> 6) & 0x3f)); *o++ = (char)(0x80 | (cp & 0x3f)); }
+    }
+    *o = 0;
+    return out;
 }

@@ -1,6 +1,6 @@
 // Development tool: decodes CG link n of an ALD to a PPM file.
 //   cgdump <archive.ALD dir> <prefix> <kind> <n> <out.ppm>
-#include "../../../Packages/VNDegenKit/Sources/CSystem3/s3.h"
+#include "s3.h"
 
 int main(int argc, char **argv) {
     if (argc < 6) { fprintf(stderr, "usage: cgdump dir prefix kind n out.ppm\n"); return 2; }
