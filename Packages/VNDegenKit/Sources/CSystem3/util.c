@@ -99,8 +99,8 @@ bool s3_write_file(const char *path, const void *data, size_t size) {
     snprintf(tmp, n, "%s.XXXXXX", path);
     int fd = mkstemp(tmp);
     bool ok = fd >= 0;
+    if (ok && had && fchmod(fd, old.st_mode & 0777) != 0) { close(fd); remove(tmp); ok = false; fd = -1; }
     if (ok) {
-        if (had) fchmod(fd, old.st_mode & 0777);
         FILE *f = fdopen(fd, "wb");
         if (!f) { close(fd); ok = false; }
         else {

@@ -173,6 +173,9 @@ final class System3Session: EngineSession {
         vns3_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
         lastTimestamp = nil
+        #if DEBUG
+        pacing?.reset()
+        #endif
         if !paused { frameView.takeFocus() }
     }
 
@@ -209,6 +212,14 @@ private final class System3FramePacing {
     private var intervals: [Double] = []
     private var presented = 0
     private var worstStep = 0.0
+
+    /// Starts a new window, so the gap across a pause doesn't count as a slow frame.
+    func reset() {
+        last = nil
+        intervals.removeAll(keepingCapacity: true)
+        presented = 0
+        worstStep = 0
+    }
 
     func note(tick: CFTimeInterval, presented drew: Bool, stepEnd: CFTimeInterval, target: CFTimeInterval) {
         defer { last = tick }
