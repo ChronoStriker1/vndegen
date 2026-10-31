@@ -1,8 +1,11 @@
 #include "ain.h"
 
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <zlib.h>
+
+#include "save.h"
 
 namespace s4 {
 namespace {
@@ -64,6 +67,13 @@ std::string Ain::load(const std::string &path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return "cannot open " + path;
     std::vector<uint8_t> raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    // The SDK's compiler writes the sections XORed with the save cipher seeded 0x5D3E3 (found by searching for the
+    // seed that turns the first bytes into "VERS"); the games' files are "AI2" zlib containers.
+    if (raw.size() >= 4 && std::memcmp(raw.data(), "AI2\0", 4) != 0) {
+        std::vector<uint8_t> plain = raw;
+        save::mtXor(plain.data(), plain.size(), 0x5D3E3);
+        if (std::memcmp(plain.data(), "VERS", 4) == 0) return parse(plain);
+    }
     if (raw.size() < 16 || std::memcmp(raw.data(), "AI2\0", 4) != 0)
         return "not a compressed (AI2) .ain file";
     uint32_t usize, csize;
@@ -79,8 +89,9 @@ std::string Ain::load(const std::string &path) {
 
 std::string Ain::parse(const std::vector<uint8_t> &plain) {
     Reader r{plain};
-    std::string t;
+    std::string t, prev;
     while (r.i < plain.size() && !r.bad) {
+        prev = t;
         t = r.tag();
         if (t == "VERS") {
             version = r.i32();
@@ -112,7 +123,7 @@ std::string Ain::parse(const std::vector<uint8_t> &plain) {
             for (auto &g : globals) {
                 g.name = r.str();
                 g.t = r.vtype();
-                g.group = r.i32();
+                if (version >= 5) g.group = r.i32();  // the SDK compiler's version 4 has no save groups
             }
         } else if (t == "GSET") {
             int n = r.i32();
@@ -204,7 +215,12 @@ std::string Ain::parse(const std::vector<uint8_t> &plain) {
             int n = r.i32();
             for (int k = 0; k < n && !r.bad; k++) objGroups.push_back(r.str());
         } else {
-            return "unknown .ain section " + t;
+        {
+            char hex[16];
+            std::string tag;
+            for (unsigned char ch : t) { std::snprintf(hex, sizeof hex, "%02x", ch); tag += hex; }
+            return "unknown .ain section " + tag + " at " + std::to_string(r.i - 4) + " after " + prev;
+        }
         }
     }
     if (r.bad) return "truncated .ain section " + t;

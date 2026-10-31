@@ -26,9 +26,10 @@ port. This file lists where each part of the runtime came from, and what was unc
   the SDK's runtime, to see the save layout of a later VM.
 - **Minimal disassembly**, only where a file format couldn't be settled otherwise: in the SDK's `Sys42VM.dll`, the
   routine that writes a save file's "GD" header and the XOR routine it calls (see Saves); in Test Game 19's
-  `StoatSpriteEngine.dll`, the routine that writes MultiSprite_Encode's data, for the order and width of its fields.
+  `StoatSpriteEngine.dll`, the routine that writes MultiSprite_Encode's data, for the order and width of its fields;
+  in Test Games 19's and 46's VM DLLs, the routine that writes global and group saves, for which layout they pick.
 - **The PC games under Wine** in a headless gamescope session, to make real saves and load VNDegen's: Test Game 19
-  saved on the PC and loaded in VNDegen, and the other way round.
+  saved on the PC and loaded in VNDegen, and the other way round; Test Game 46 the same.
 - **Permissive code**: stb_image and stb_vorbis (public domain or MIT), pl_mpeg (MIT), zlib, and FreeType and libwebp
   on the Linux test host only. The text and font code is adapted from VNDegen's own Wolf RPG Editor runtime.
 - **Reference outputs**: the ffmpeg and mpg123 command-line programs decoded the games' movies so the movie
@@ -138,6 +139,15 @@ calls were read from how the games call them.
   the XOR and the resume save as version 7; VNDegen picks that format from the ini's `MainVM`. Struct records name
   the struct's constructor and destructor functions. A string record's length is the PC's buffer, which can run past
   the text's NUL. Saved reference counts leave out the reference each method frame holds on its `this`.
+- Global and group saves come in two layouts. Test Game 19's VM always writes the one above, numbered 5 in the
+  header. Test Game 46's VM writes it for a version 5 code file and otherwise a layout 7 that no test game uses
+  (seen by running SDK test programs on it). Arrays give every dimension's length, innermost first, then the
+  innermost rows: Test Game 46's PC loaded a save that gave the rank in place of the outer length with 2 rows.
+  Test Game 46's own slot saves load into VNDegen and save back with identical contents.
+- The read-message file (MsgSkip) starts with the number of messages, as Test Game 46's PC copy has it; without it
+  the PC game stops at its load screen.
+- The SDK compiler's code files are the sections XORed with the save cipher seeded 0x5D3E3 (found by searching for
+  the seed that gives "VERS"); version 4 has no save groups. VNDegen reads them so SDK test programs run in both.
 - Save slot details go through VSFile, whose files start "VSF", four zero bytes, then each value as a type byte (1 an
   int, 3 a NUL-terminated string) and its data, as Test Game 19's PC save shows.
 
@@ -166,5 +176,6 @@ byte-identical. A save VNDegen wrote from its own play loads on the PC, which th
 ## Known gaps and open questions
 
 - Four MultiSprite fields keep the PC's values without a known meaning. Moves in progress aren't saved, as on the PC.
-- Resume saves are verified on the PC for Test Game 19, and against the SDK runtime and Test Game 46's VM; Test
-  Game 56 isn't checked on the PC yet.
+- Resume saves are verified on the PC for Test Game 19, and against the SDK runtime and Test Game 46's VM. Test Game
+  46 saves with group saves, checked on the PC both ways. Test Game 56 isn't checked on the PC yet.
+- MsgSkip's bit order within a byte is assumed (low bit first): the PC file seen had no bit set.

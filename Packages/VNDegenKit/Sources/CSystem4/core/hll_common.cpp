@@ -2,7 +2,9 @@
 // VSFile, FileOperation, Confirm3, AliceLogo4, IbisInputEngine, DrawPluginManager, MusicSystem. Behaviour follows the
 // SDK manuals where they describe a library, otherwise the names and how the games use the results.
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <ctime>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -56,9 +58,13 @@ struct MsgSkipState {
     std::vector<uint8_t> flags;
     int state = 0, enable = 1, use = 1;
 } g_skip;
+// The file, as Test Game 46's PC copy has it: u32 the number of messages, then one bit per message (bit n%8 of byte
+// n/8, an assumption: the PC file had no bit set).
 void skipSave() {
     if (g_skip.file.empty()) return;
     std::ofstream f(save::hostPath(*G().vm, g_skip.file, true), std::ios::binary);
+    uint32_t n = uint32_t(G().vm->ain.messages.size());
+    f.write(reinterpret_cast<const char *>(&n), 4);
     f.write(reinterpret_cast<const char *>(g_skip.flags.data()), std::streamsize(g_skip.flags.size()));
 }
 S4_HLL(MsgSkip, Init) {
@@ -66,7 +72,10 @@ S4_HLL(MsgSkip, Init) {
     g_skip.flags.assign((G().vm->ain.messages.size() + 7) / 8, 0);
     std::ifstream f(save::hostPath(*G().vm, g_skip.file, true), std::ios::binary);
     std::vector<uint8_t> d((std::istreambuf_iterator<char>(f)), {});
-    std::copy_n(d.begin(), std::min(d.size(), g_skip.flags.size()), g_skip.flags.begin());
+    if (d.size() >= 4) {
+        size_t bits = d.size() - 4;
+        std::copy_n(d.begin() + 4, std::min(bits, g_skip.flags.size()), g_skip.flags.begin());
+    }
     c.retInt(1);
 }
 S4_HLL(MsgSkip, UseFlag) { g_skip.use = c.i(0); }
@@ -267,6 +276,34 @@ S4_HLL(FileOperation, GetFileSize) {
     auto n = fs::file_size(gamePath(c.s(0)), ec);
     c.ref(1) = ec ? 0 : int32_t(n);
     c.retBool(!ec);
+}
+
+// ---- File: Test Game 46's save folder housekeeping. Paths start with the save folder's name. ----
+S4_HLL(File, MakeDirectory) {
+    std::error_code ec;
+    fs::create_directories(gamePath(c.s(0)), ec);
+    c.retInt(fs::is_directory(gamePath(c.s(0)), ec) ? 1 : 0);
+}
+S4_HLL(File, Delete) { std::error_code ec; c.retInt(fs::remove(gamePath(c.s(0)), ec) ? 1 : 0); }
+// Fills a date struct (year, month, day, hour, minute, second, day of the week from Sunday 0) with the file's local
+// modification time; 0 when the file is missing.
+S4_HLL(File, GetTime) {
+    std::error_code ec;
+    auto t = fs::last_write_time(gamePath(c.s(0)), ec);
+    Page *p = c.page(1);
+    if (ec || !p || p->v.size() < 7) { c.retInt(0); return; }
+    auto sys = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        t - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+    std::time_t tt = std::chrono::system_clock::to_time_t(sys);
+    std::tm lt{};
+#if defined(_WIN32)
+    localtime_s(&lt, &tt);
+#else
+    localtime_r(&tt, &lt);
+#endif
+    int32_t vals[7] = {lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday, lt.tm_hour, lt.tm_min, lt.tm_sec, lt.tm_wday};
+    for (int k = 0; k < 7; k++) p->v[size_t(k)] = vals[k];
+    c.retInt(1);
 }
 
 // ---- Confirm3: a disc and file check at startup; the files are the game's own ----

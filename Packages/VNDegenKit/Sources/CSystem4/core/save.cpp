@@ -22,9 +22,13 @@ namespace s4::save {
 
 namespace {
 
-void cipher(uint8_t *p, size_t n) {
+constexpr uint32_t kGDSeed = 0x12320F;
+
+}  // namespace
+
+void mtXor(uint8_t *p, size_t n, uint32_t seed) {
     uint32_t mt[624];
-    mt[0] = 0x12320F;
+    mt[0] = seed;
     for (int i = 1; i < 624; i++) mt[i] = mt[i - 1] * 69069u;
     int idx = 624;
     for (size_t k = 0; k < n; k++) {
@@ -44,8 +48,6 @@ void cipher(uint8_t *p, size_t n) {
     }
 }
 
-}  // namespace
-
 bool readGD(const std::string &path, std::vector<uint8_t> &plain) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
@@ -60,7 +62,7 @@ bool readGD(const std::string &path, std::vector<uint8_t> &plain) {
     };
     // Plain zlib first: XORed data never inflates cleanly, since its header bytes are scrambled.
     if (inflate()) return true;
-    cipher(d.data() + 8, d.size() - 8);
+    mtXor(d.data() + 8, d.size() - 8, kGDSeed);
     return inflate();
 }
 
@@ -72,7 +74,7 @@ bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xo
     d[0] = 'G'; d[1] = 'D'; d[2] = 1; d[3] = 1;
     uint32_t len = uint32_t(plain.size());
     std::memcpy(d.data() + 4, &len, 4);
-    if (xorData) cipher(d.data() + 8, cap);
+    if (xorData) mtXor(d.data() + 8, cap, kGDSeed);
     // Write beside the target, then rename, so a crash never leaves half a save.
     std::error_code ec;
     fs::create_directories(fs::path(path).parent_path(), ec);
@@ -126,14 +128,15 @@ std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
 
 // ---- global and group saves ----
 //
-// The plain text: the key, then a 56-byte header (format 1000, the .ain version, 56, the number of globals in the
+// The plain text: the key, then a 56-byte header (1000, the layout version 5, 56, the number of globals in the
 // program, and (offset, count) for five sections), the group name, then the sections:
 //   records      u32 kind, name, u32 n, n value indexes. Record 0 (kind 1000, no name) lists the saved globals;
 //                the rest are struct instances (kind 13, the struct's name) listing their members' values.
 //   globals      u32 type, u32 value, name, u32 1 for each saved global.
 //   strings      every string value, NUL terminated.
-//   arrays       i32 rank (-1 when not allocated), i32 the innermost length, then the elements: a dimension is
-//                its length then its elements; the first level also gives the rank first.
+//   arrays       i32 rank (-1, then 0, when not allocated), each dimension's length innermost first, the number
+//                of innermost rows, then each row: its length and (value, type) per element. Test Game 46's PC
+//                showed the dimensions: a save with the rank where the outer length belongs loaded as 2 rows.
 //   struct values u32 type, u32 value, name for each struct member.
 // A string's value is its index in the string section, an array's its index in the array section and a struct's its
 // record. Everything is written depth first, children before parents. Worked out from saves the SDK runtime wrote
@@ -190,20 +193,20 @@ struct Writer {
         return int32_t(records.size() - 1);
     }
 
-    void arrayNode(std::vector<uint8_t> &out, int32_t slot, int rank, bool top) {
+    // Appends the innermost rows of an array of this rank, in order.
+    void rows(std::vector<uint8_t> &out, int32_t slot, int rank, uint32_t &nRows) {
         Page *a = vm.page(slot);
         size_t n = a ? a->v.size() : 0;
-        if (top) u32(out, uint32_t(rank));
+        if (rank > 1) {
+            for (size_t i = 0; i < n; i++) rows(out, vm.page(slot)->v[i], rank - 1, nRows);
+            return;
+        }
+        nRows++;
         u32(out, uint32_t(n));
         for (size_t i = 0; i < n; i++) {
-            int32_t v = vm.page(slot)->v[i];
-            if (rank > 1) {
-                arrayNode(out, v, rank - 1, false);
-                continue;
-            }
             Page &ap = *vm.page(slot);
             VarType et{ap.elemType, ap.elemStruct, 0};
-            int32_t val = value(et, v);
+            int32_t val = value(et, ap.v[i]);
             u32(out, uint32_t(val));
             u32(out, uint32_t(et.type));
         }
@@ -217,12 +220,18 @@ struct Writer {
             u32(rec, 0);
         } else {
             int rank = std::max(1, a->rank);
-            // The second header word is the length of the innermost dimension, read down the first elements.
-            Page *inner = a;
-            for (int r = rank; r > 1 && inner && !inner->v.empty(); r--) inner = vm.page(inner->v[0]);
+            // Each dimension's length, read down the first elements, innermost first.
+            std::vector<uint32_t> dims;
+            for (Page *d = a; d && int(dims.size()) < rank; d = d->v.empty() ? nullptr : vm.page(d->v[0]))
+                dims.insert(dims.begin(), uint32_t(d->v.size()));
+            while (int(dims.size()) < rank) dims.insert(dims.begin(), 0);
             u32(rec, uint32_t(rank));
-            u32(rec, uint32_t(inner ? inner->v.size() : 0));
-            arrayNode(rec, slot, rank, true);
+            for (uint32_t d : dims) u32(rec, d);
+            std::vector<uint8_t> body;
+            uint32_t nRows = 0;
+            rows(body, slot, rank, nRows);
+            u32(rec, nRows);
+            rec.insert(rec.end(), body.begin(), body.end());
         }
         (void)t;
         arrays.insert(arrays.end(), rec.begin(), rec.end());
@@ -277,7 +286,9 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
     out.insert(out.end(), w.arrays.begin(), w.arrays.end());
     uint32_t structOff = uint32_t(out.size());
     out.insert(out.end(), w.structVals.begin(), w.structVals.end());
-    uint32_t hdr[14] = {1000, uint32_t(vm.ain.version), 56, uint32_t(vm.ain.globals.size()),
+    // Layout 5, the one below. Test Game 19's Sys42VM always writes it; Test Game 46's Sys43VM writes it for a
+    // version 5 code file and a different layout, 7, otherwise (both read from the VMs' save routines).
+    uint32_t hdr[14] = {1000, 5, 56, uint32_t(vm.ain.globals.size()),
                         recordsOff, uint32_t(w.records.size()), globalsOff, uint32_t(saved.size()),
                         stringsOff, uint32_t(w.nStrings), arraysOff, uint32_t(w.nArrays), structOff, uint32_t(w.nStructVals)};
     std::memcpy(out.data() + headerAt, hdr, 56);
@@ -326,6 +337,7 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
     uint32_t hdr[14];
     for (auto &x : hdr) x = r.u32(h);
     if (r.bad || hdr[0] != 1000) return false;
+    if (hdr[1] == 7) return false;  // layout 7 (struct definitions at the end): no test game writes it
     size_t g = i + 56;
     group = r.cstr(g);
     size_t p = hdr[4];
@@ -350,20 +362,13 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
     for (uint32_t k = 0; k < hdr[9] && !r.bad; k++) L.strings.push_back(r.cstr(p));
     // Array records vary in length, so walk them to find each one's start.
     p = hdr[10];
-    std::function<void(size_t &, int)> skipNode = [&](size_t &q, int rank) {
-        uint32_t n = r.u32(q);
-        for (uint32_t k = 0; k < n && !r.bad; k++) {
-            if (rank > 1) skipNode(q, rank - 1);
-            else { r.u32(q); r.u32(q); }
-        }
-    };
     for (uint32_t k = 0; k < hdr[11] && !r.bad; k++) {
         L.arrayAt.push_back(p);
         int32_t rank = int32_t(r.u32(p));
-        r.u32(p);
-        if (rank < 0) continue;
-        r.u32(p);  // the rank again
-        skipNode(p, rank);
+        if (rank < 0) { r.u32(p); continue; }
+        p += 4 * size_t(rank);  // dimensions
+        uint32_t nRows = r.u32(p);
+        for (uint32_t row = 0; row < nRows && !r.bad; row++) p += 8 * size_t(r.u32(p));
     }
     p = hdr[12];
     for (uint32_t k = 0; k < hdr[13] && !r.bad; k++) {
@@ -422,7 +427,6 @@ struct Applier {
         Reader r{*L.data};
         size_t p = L.arrayAt[index];
         int32_t rank = int32_t(r.u32(p));
-        r.u32(p);
         Page *old = vm.page(dst);
         int32_t elemType = old ? old->elemType : T_INT, elemStruct = old ? old->elemStruct : t.structType;
         int32_t declRank = old ? old->rank : std::max(1, t.rank);
@@ -432,25 +436,30 @@ struct Applier {
             dst = s;
             return;
         }
-        r.u32(p);
-        int32_t s = node(r, p, elemType, elemStruct, rank);
+        std::vector<uint32_t> dims(static_cast<size_t>(rank));
+        for (auto &d : dims) d = r.u32(p);
+        r.u32(p);  // the number of rows, which the dimensions give
+        int32_t s = node(r, p, elemType, elemStruct, rank, dims);
         vm.decref(dst);
         dst = s;
     }
 
-    int32_t node(Reader &r, size_t &p, int32_t elemType, int32_t elemStruct, int rank) {
-        uint32_t n = r.u32(p);
-        int32_t dims[1] = {0};
-        int32_t s = vm.newArray(elemType, elemStruct, rank, dims, 1);
-        for (uint32_t k = 0; k < n && !r.bad; k++) {
-            int32_t v;
-            if (rank > 1) {
-                v = node(r, p, elemType, elemStruct, rank - 1);
-            } else {
-                int32_t val = int32_t(r.u32(p)), typ = int32_t(r.u32(p));
-                v = elemType == T_STRING ? vm.newString() : elemType == T_STRUCT ? vm.newStruct(elemStruct) : 0;
-                store(v, VarType{elemType, elemStruct, 0}, typ, val);
+    // An array of this rank: its outer length from the dimensions, its innermost rows read in order.
+    int32_t node(Reader &r, size_t &p, int32_t elemType, int32_t elemStruct, int rank, const std::vector<uint32_t> &dims) {
+        int32_t none[1] = {0};
+        int32_t s = vm.newArray(elemType, elemStruct, rank, none, 1);
+        if (rank > 1) {
+            for (uint32_t k = 0; k < dims[size_t(rank - 1)] && !r.bad; k++) {
+                int32_t v = node(r, p, elemType, elemStruct, rank - 1, dims);
+                vm.page(s)->v.push_back(v);
             }
+            return s;
+        }
+        uint32_t n = r.u32(p);
+        for (uint32_t k = 0; k < n && !r.bad; k++) {
+            int32_t val = int32_t(r.u32(p)), typ = int32_t(r.u32(p));
+            int32_t v = elemType == T_STRING ? vm.newString() : elemType == T_STRUCT ? vm.newStruct(elemStruct) : 0;
+            store(v, VarType{elemType, elemStruct, 0}, typ, val);
             vm.page(s)->v.push_back(v);
         }
         return s;
