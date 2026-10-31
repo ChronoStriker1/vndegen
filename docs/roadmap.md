@@ -44,10 +44,12 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Library folders, a menu on each library game, and Settings > Plugins (0.14.0): more than one games folder, with unreachable folders kept; Play, game page, artwork, metadata, Hide, Show in Finder and Remove from library from a long press, right click, or controller X.
 - Game commands (0.14.0): VNDegen's in-game menu runs commands a game keeps where VNDegen draws nothing, from KiriKiri and NScripter menu bars, Flash right-click items, RPG Maker MV's MessageSkip plugin, and Ren'Py quick save on iPhone and iPad.
 - Cheats for RPG Maker MV and MZ (0.14.0): gold, items, party restore, settings that stay on per game, and a variable and switch editor, through the game's own objects. `docs/cheats.md` has the rest of the plan.
+- AliceSoft System 4 (0.15.0), on VNDegen's own clean-room runtime, MIT licensed, on Mac, iPhone, and iPad. Test Games 19 and 46 play, save and load on the Mac and the iPad simulator, pass the case check, and exchange saves with the PC in both directions; Test Game 56, built on PartsEngine, stops with a message. `docs/system4.md` has the known limits.
+- Cheats for RPG Maker XP, VX, VX Ace and Wolf RPG Editor (0.15.0).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- The clean-room runtime for AliceSoft System 4 (item 4), on `ws/cr-system4`.
+- AliceSoft System 4 games built on PartsEngine and later, on `ws/cr-system4`. Cheats game speed for Godot and Flash, on `feature/cheats-request`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it, and no GPL component is left:
@@ -59,7 +61,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 1. A frame rate check of every engine plugin, limited to the games where it matters: games that aren't strictly visual novels, such as RPG Maker games, and visual novels with video, such as movies or animated clips. Text, still images and transitions don't need it. Each of those test games should reach the frame rate it targets, such as 60 fps for RPG Maker MV and MZ, and hold it on average through normal play, including scenes with heavy effects. Where a game falls short, find out whether VNDegen or the engine plugin causes it, or something on the test machine, and fix what is VNDegen's. Every new engine plugin gets the same check, on the same kinds of games, before it ships.
 2. NScripter, on VNDegen's own clean-room runtime. Shipped in 0.8.0.
 3. A controller layout library, like Steam's controller layouts. Each game uses a layout from the library, and the player can pick another, edit it, or save their own. The library starts with VNDegen's built-in layouts, among them "Keyboard and mouse", copied from Steam's template of that name, which engines without gamepad support use by default unless an engine has a better standard layout. It then takes in suggested layouts: on a game's first start, VNDegen reads the game's files for the controls it uses, such as its key bindings and whether it relies on the mouse, and proposes a layout that maps those keys, the mouse pointer, and mouse buttons to the controller, which the player can accept or change. Suggestions may be hard and costly, so they come after the library itself.
-4. AliceSoft System 3 and System 4, on VNDegen's own clean-room runtimes, including the oldest `SYSTEM3.EXE` games. System 3 shipped in 0.13.0.
+4. AliceSoft System 3 and System 4, on VNDegen's own clean-room runtimes, including the oldest `SYSTEM3.EXE` games. System 3 shipped in 0.13.0 and System 4 in 0.15.0.
 5. Artemis, on art3m1s-core (MPL-2.0). Shipped in 0.10.0.
 6. Wolf RPG Editor, on VNDegen's own runtime. Shipped in 0.11.0.
 7. Flash, through Ruffle (MIT or Apache-2.0) in the web view the RPG Maker MV/MZ and TyranoScript plugins already use. 14 library games. Shipped in 0.7.0.

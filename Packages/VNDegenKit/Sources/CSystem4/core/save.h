@@ -1,0 +1,28 @@
+// Save files: system.GlobalSave and GroupSave write the globals (or one group of them) in the PC engine's format,
+// so saves move between VNDegen and the PC game both ways. File names are relative to the game's save folder.
+#pragma once
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace s4 {
+class VM;
+namespace save {
+
+int32_t globalSave(VM &vm, const std::string &key, const std::string &file, const std::string &group, int32_t *count = nullptr);
+int32_t globalLoad(VM &vm, const std::string &key, const std::string &file, const std::string &group, int32_t *count = nullptr);
+int32_t exists(VM &vm, const std::string &name, bool inSaveFolder);
+int32_t remove(VM &vm, const std::string &name);
+int32_t copy(VM &vm, const std::string &dst, const std::string &src);
+// XORs bytes with the low byte of each output of a Mersenne Twister seeded the old way (each state word the previous
+// times 69069). The GD container and the SDK compiler's .ain files use it with different seeds.
+void mtXor(uint8_t *p, size_t n, uint32_t seed);
+// The GD container: zlib, under a Mersenne Twister XOR for most VMs. Read takes either and returns the plain bytes.
+bool readGD(const std::string &path, std::vector<uint8_t> &plain);
+bool writeGD(const std::string &path, const std::vector<uint8_t> &plain, bool xorData);
+// The host path of a game path: CP932 to UTF-8, backslashes to slashes, matched case-insensitively. Empty for a path
+// outside the game and save folders.
+std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder);
+
+}  // namespace save
+}  // namespace s4

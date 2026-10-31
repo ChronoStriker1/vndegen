@@ -9,3 +9,6 @@ Packages/VNDegenKit/.build/
 Engines/Artemis/art3m1s-core/target*/
 Engines/Artemis/art3m1s-core/**/target/
 __pycache__/
+
+# System 4 test host output
+s4play-last.png

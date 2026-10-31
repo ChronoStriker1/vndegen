@@ -18,6 +18,7 @@ scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ### What a build makes first
 
 - **KiriKiri.** Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it.
+- **Godot.** Every app build first builds Godot 3 and 4 into `build/godot` with `scripts/godot-engine.sh`, which does nothing when its inputs haven't changed. The Godot sources and SCons are cached in `~/Library/Caches/VNDegen/godot`, and each build folder gets its own work folder there, so builds of different branches don't rebuild each other's objects. A first build in a new folder compiles Godot from scratch. `VNDEGEN_GODOT_CACHE` moves the cache.
 - **rclone.** Every build first makes rclone's library from `Packages/VNDegenKit/Rclone/` for iPhone, iPad, the simulator, and the Mac (`scripts/rclone-runtime.sh`, kept until its sources or the Go version change).
 - **Ren'Py.** The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds. In Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first.
 - **Ruby.** Every build also makes the Ruby interpreter the RPG Maker XP, VX, and VX Ace runtime links, `Packages/VNDegenKit/build/RGSSRuby.xcframework`, with `scripts/rgss-ruby.sh`, which does nothing when it is up to date. It downloads Ruby's release, checks its SHA-256, applies the patches in `Engines/RGSSRuntime/patches`, and builds it static for the Mac, iPhone and iPad, and the simulator. The first build takes about 15 minutes. `Engines/RGSSRuntime/host` builds the runtime for Linux with a headless test tool, after `scripts/rgss-ruby.sh build/rgss linux`.
@@ -72,8 +73,9 @@ Packages/VNDegenKit/
   Sources/CNScripter/     VNDegen's NScripter runtime in C++
   Sources/EngineWolfRPG/  Wolf RPG Editor: detection, input, saves, and the in-process session
   Sources/CWolfRPG/       VNDegen's Wolf RPG Editor runtime in C++
-  Sources/EngineAliceSoft/ AliceSoft System 3 and 4: detection, save locations, input, and the System 3 session
+  Sources/EngineAliceSoft/ AliceSoft System 3 and 4: detection, save locations, input, and both sessions
   Sources/CSystem3/       VNDegen's System 3 runtime in C, with vns3.h, its C interface
+  Sources/CSystem4/       VNDegen's AliceSoft System 4 runtime in C++, with vns4.h, its C interface
   Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
   Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
   Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
@@ -95,6 +97,7 @@ Engines/Flash/            Ruffle's web player, built by scripts/ruffle-web.sh, w
 Engines/NScripter/        the NScripter runtime's Linux test host and tools
 Engines/WolfRPG/          the Wolf RPG Editor runtime's Linux test host
 Engines/System3/          the System 3 runtime's Linux test host: a headless runner and an SDL player
+Engines/System4/          the System 4 runtime's Linux test host and tools; UPSTREAM.md lists the vendored libraries
 Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/,
                           the MIDI player and SoundFonts, and the case-insensitive path lookup
 docs/                     user and engine docs, the engine survey, release notes, and screenshots

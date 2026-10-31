@@ -28,7 +28,7 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
         guard let layout = AliceSoftLayout(FolderProbe(scanning: launch.folder)) else { throw AliceSoftError.notAliceSoft }
         switch layout.system {
         case .system30, .system39: return System3Session(launch, root: layout.url(in: launch.folder))
-        case .system4: throw AliceSoftError.notAvailable
+        case .system4: return try System4Session.make(launch, root: layout.url(in: launch.folder))
         }
     }
 
@@ -36,7 +36,7 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
         guard let layout = AliceSoftLayout(FolderProbe(scanning: folder)) else { return [] }
         switch layout.system {
         case .system30, .system39: return system3SaveLocations(root: layout.url(in: folder))
-        case .system4: return []
+        case .system4: return System4Session.saveLocations(root: layout.url(in: folder), dataDirectory: dataDirectory)
         }
     }
 
@@ -44,22 +44,20 @@ nonisolated public struct AliceSoftPlugin: EnginePlugin {
         guard let layout = AliceSoftLayout(FolderProbe(scanning: folder)) else { return nil }
         switch layout.system {
         case .system30, .system39: return nil
-        case .system4: return nil
+        case .system4: return System4Session.compatibilityNote(root: layout.url(in: folder))
         }
     }
 
-    /// System 3 games read the keyboard and mouse only.
+    /// AliceSoft games read the keyboard and mouse only.
     public var defaultControls: ControlLayout { .keyboardAndMouse }
 }
 
 nonisolated public enum AliceSoftError: Error, LocalizedError {
     case notAliceSoft
-    case notAvailable
 
     public var errorDescription: String? {
         switch self {
         case .notAliceSoft: "No AliceSoft game was found in this folder."
-        case .notAvailable: "VNDegen can't run this AliceSoft game yet."
         }
     }
 }

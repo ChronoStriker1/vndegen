@@ -27,4 +27,6 @@ cp "$kit/Sources/CWolfRPG/third_party/LICENSE-stb.txt" "$out.part/stb_image and 
 cp "$kit/Sources/CWolfRPG/third_party/LICENSE-dr_libs.txt" "$out.part/dr_mp3 and dr_wav (Wolf RPG Editor MP3 and WAV).txt"
 cp "$kit/Sources/CSystem3/third_party/LICENSE-stb_truetype.txt" "$out.part/stb_truetype (AliceSoft System 3 text).txt"
 cp "$kit/Sources/CSystem3/third_party/LICENSE-dr_mp3.txt" "$out.part/dr_mp3 (AliceSoft System 3 CD music).txt"
+cp "$kit/Sources/CSystem4/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (System 4 images and Ogg).txt"
+cp "$kit/Sources/CSystem4/third_party/pl_mpeg/LICENSE" "$out.part/pl_mpeg (System 4 movies).txt"
 rm -rf "$out" && mv "$out.part" "$out"
