@@ -8,6 +8,9 @@ import Lock
 import SaveSync
 import ArchiveImport
 import ControllerUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Where the user is in the hub, what has focus, and how controller events move it.
 ///
@@ -43,6 +46,8 @@ final class Navigator {
         case license(LicenseRequest)
         /// A question asked before a change, such as removing a library folder.
         case confirm(Confirmation)
+        /// A library tile's menu, which a controller opens. Touch and the pointer get the same actions as a context menu.
+        case gameMenu(GameID)
 
         var id: String {
             switch self {
@@ -60,6 +65,7 @@ final class Navigator {
             case .importGame: "import"
             case let .license(request): "license:\(request.id)"
             case let .confirm(confirmation): "confirm:\(confirmation.id)"
+            case let .gameMenu(id): "gameMenu:\(id)"
             }
         }
     }
@@ -91,7 +97,7 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
+        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageShowFolder, pageRemove, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
         case settingsPage(SettingsPage)
         /// Settings pickers, iOS only. Confirm and left and right step through the values.
         case controlMethod, controllerMouse, mouseStyle, playOrientation
@@ -114,6 +120,13 @@ final class Navigator {
         case addLibraryFolder, showLibraryFolder(LibraryFolderID), removeLibraryFolder(LibraryFolderID)
         /// The confirmation sheet's buttons.
         case confirmAction, confirmCancel
+        /// An action in a library tile's menu.
+        case gameAction(GameAction)
+    }
+
+    /// What a library tile's menu offers, which the game page offers too.
+    enum GameAction: Hashable {
+        case play, openPage, artwork, metadata, hide, showFolder, remove
     }
 
     enum RuntimeAction: Hashable {
@@ -241,7 +254,7 @@ final class Navigator {
     func rows() -> [Row] {
         if let sheet {
             switch sheet {
-            case .engine, .variant, .orientation, .controlMethod: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
+            case .engine, .variant, .orientation, .controlMethod, .gameMenu: return choices(for: sheet).map { Row(id: "\($0.target)", items: [$0.target]) }
             case let .artwork(editor):
                 let candidates = Self.gridRows("candidates", editor.candidates.indices.map { .artworkCandidate($0) }, columns: editor.columns)
                 return [Row(id: "slots", items: ArtworkSlot.allCases.map { .artworkSlot($0) })] + candidates
@@ -287,7 +300,7 @@ final class Navigator {
                     : [.runtime(package.id, .install), .runtime(package.id, .importFolder)]
                 return Row(id: "page-runtime-\(package.id)", items: items)
             }
-            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock]
+            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder, .pageRemove]
             let pageActions = pageActionsStacked
                 ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
                 : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
@@ -334,6 +347,7 @@ final class Navigator {
             case .license: return .licenseAccept
             // A slip of the A button shouldn't delete or remove anything.
             case .confirm: return .confirmCancel
+            case .gameMenu: return .gameAction(.play)
             default: return selectedChoice(for: sheet)
             }
         }
@@ -448,9 +462,11 @@ final class Navigator {
         case .details: if let game = heroGame { push(.game(game.id)) }
         case let .tile(_, id), let .gridTile(id): push(.game(id))
         case .back: back()
-        case .pagePlay: if let id = pageGameID { play(id) }
-        case .pageArtwork: if let id = pageGameID { sheet = .artwork(ArtworkEditor(hub: hub, gameID: id)) }
-        case .pageMetadata: if let id = pageGameID { sheet = .metadata(MetadataSearch(hub: hub, gameID: id)) }
+        case .pagePlay: if let id = pageGameID { perform(.play, on: id) }
+        case .pageArtwork: if let id = pageGameID { perform(.artwork, on: id) }
+        case .pageMetadata: if let id = pageGameID { perform(.metadata, on: id) }
+        case .pageShowFolder: if let id = pageGameID { perform(.showFolder, on: id) }
+        case .pageRemove: if let id = pageGameID { perform(.remove, on: id) }
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
         case let .settingsPage(page):
             // These pages start from the stored settings and the top each time. The Ludusavi page keeps what was typed
@@ -466,7 +482,11 @@ final class Navigator {
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
         case .pageControls: if let id = pageGameID, offersControlMethod(id) { sheet = .controlMethod(id) }
         case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
-        case .pageLock: if let id = pageGameID { toggleGameLock(id) }
+        case .pageLock: if let id = pageGameID { perform(.hide, on: id) }
+        case let .gameAction(action):
+            guard case let .gameMenu(id) = sheet else { return }
+            sheet = nil
+            perform(action, on: id)
         case let .engineOption(engine):
             if case let .engine(id) = sheet { hub.library.update(id) { $0.engineOverride = engine } }
             sheet = nil
@@ -584,6 +604,73 @@ final class Navigator {
                 revealRequest = tile
             }
         }
+    }
+
+    // MARK: Game actions
+
+    /// A library tile's menu, in order. Hide reads Unhide for a hidden game, which shows only while the library is
+    /// unlocked.
+    func gameActions(_ id: GameID) -> [GameMenuItem] {
+        let hidden = hub.library.game(id)?.isLocked == true
+        return [
+            GameMenuItem(action: .play, title: "Play", systemImage: "play.fill"),
+            GameMenuItem(action: .openPage, title: "Open game page", systemImage: "info.circle"),
+            GameMenuItem(action: .artwork, title: "Change artwork", systemImage: "photo.on.rectangle"),
+            GameMenuItem(action: .metadata, title: "Find metadata", systemImage: "text.magnifyingglass"),
+            GameMenuItem(action: .hide, title: hidden ? "Unhide" : "Hide", systemImage: hidden ? "lock.open" : "lock"),
+            GameMenuItem(action: .showFolder, title: FileBrowser.openTitle, systemImage: "folder"),
+            GameMenuItem(action: .remove, title: "Remove from library", systemImage: "trash"),
+        ]
+    }
+
+    struct GameMenuItem {
+        let action: GameAction
+        let title: String
+        let systemImage: String
+    }
+
+    /// Does what a game page button or a tile menu item asks. Both go through here.
+    func perform(_ action: GameAction, on id: GameID) {
+        guard let game = hub.library.game(id) else { return }
+        switch action {
+        case .play: play(id)
+        case .openPage: if pageGameID != id { push(.game(id)) }
+        case .artwork: sheet = .artwork(ArtworkEditor(hub: hub, gameID: id))
+        case .metadata: sheet = .metadata(MetadataSearch(hub: hub, gameID: id))
+        case .hide: toggleGameLock(id)
+        case .showFolder:
+            if let problem = hub.library.unavailableReason(id) {
+                return showError("Can't open the folder", "\(hub.folderName(of: game.libraryFolder)) can't be reached. \(problem)")
+            }
+            FileBrowser.open(hub.library.folder(for: id))
+        case .remove: confirmDeleting(id)
+        }
+    }
+
+    /// Asks before deleting the game's folder, saying what goes and what stays on this device.
+    private func confirmDeleting(_ id: GameID) {
+        guard let game = hub.library.game(id) else { return }
+        if let problem = hub.library.unavailableReason(id) {
+            return showError("Can't remove \(hub.displayTitle(game))", "Its folder can't be reached, so VNDegen can't delete it. \(problem)")
+        }
+        let path = SettingsView.displayPath(hub.library.folder(for: id))
+        let stays = "Saves VNDegen keeps for the game in its own data folder stay, and so do the game's artwork, play time, and settings, which come back if you put the folder back. Saves the game writes inside its folder go with it."
+        #if os(macOS)
+        let message = "VNDegen moves the game's folder, \(path), to the Trash. \(stays)"
+        let action = "Move to Trash"
+        #else
+        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone. \(stays)"
+        let action = "Delete folder"
+        #endif
+        sheet = .confirm(Confirmation(title: "Remove \(hub.displayTitle(game)) from the library?", message: message,
+                                      action: action, destructive: true) { [weak self] in
+            guard let self else { return }
+            do {
+                try await hub.library.deleteFolder(of: id)
+            } catch {
+                showError("Can't remove \(hub.displayTitle(game))", error.localizedDescription)
+            }
+        })
     }
 
     // MARK: Library folders
@@ -814,6 +901,8 @@ final class Navigator {
         let target: Target
         let title: String
         var detail: String?
+        /// Shown in place of the selection mark, for a sheet of actions rather than values.
+        var systemImage: String?
         var id: Target { target }
     }
 
@@ -837,6 +926,8 @@ final class Navigator {
         case .controlMethod:
             let fixed = ControlMethod.allCases.map { Choice(target: .controlMethodOption($0), title: $0.title, detail: $0.detail) }
             return [Choice(target: .controlMethodOption(nil), title: "Use default", detail: "Currently \(ControlMethod.setting.title), from Settings")] + fixed
+        case let .gameMenu(id):
+            return gameActions(id).map { Choice(target: .gameAction($0.action), title: $0.title, systemImage: $0.systemImage) }
         case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm:
             return []
         }
@@ -848,7 +939,7 @@ final class Navigator {
         case let .variant(id): .variantOption(variants(id)?.selected)
         case let .orientation(id): .orientationOption(hub.library.game(id)?.orientation)
         case let .controlMethod(id): .controlMethodOption(hub.library.game(id)?.controlMethod)
-        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm: nil
+        case .unlock, .artwork, .metadata, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .license, .confirm, .gameMenu: nil
         }
     }
 
@@ -983,9 +1074,11 @@ final class Navigator {
         case .confirm: if let focus { activate(focus) } else { setFocus(defaultFocus) }
         case .cancel: back()
         case .menu: if sheet == nil, route != .settings { push(.settings) }
+        // X opens the focused tile's menu. Nothing else in the library uses it.
+        case .dash: if sheet == nil, let id = focus?.gameID { sheet = .gameMenu(id) }
         case .pageUp: page(false)
         case .pageDown: page(true)
-        case .dash, .hub: break
+        case .hub: break
         }
     }
 }

@@ -216,6 +216,44 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
+@Test func xOpensTheFocusedTilesMenuWithTheGamePagesActions() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.back()
+    nav.layout = .capsules
+    nav.setFocus(.tile(.all, id))
+    press(nav, .dash)
+    guard case .gameMenu(id)? = nav.sheet else { Issue.record("no game menu"); return }
+    let actions: [Navigator.GameAction] = [.play, .openPage, .artwork, .metadata, .hide, .showFolder, .remove]
+    #expect(nav.rows().flatMap(\.items) == actions.map { .gameAction($0) })
+    #expect(nav.focus == .gameAction(.play))
+    press(nav, .down, .confirm)
+    #expect(nav.sheet == nil && nav.route == .game(id))
+    nav.back()
+    #expect(nav.focus == .tile(.all, id))
+    press(nav, .dash, .down, .down, .confirm)
+    guard case .artwork? = nav.sheet else { Issue.record("no artwork editor"); return }
+    press(nav, .cancel)
+    #expect(nav.sheet == nil && nav.focus == .tile(.all, id))
+    // X does nothing where no game has focus.
+    nav.setFocus(.settingsButton)
+    press(nav, .dash)
+    #expect(nav.sheet == nil)
+}
+
+@MainActor
+@Test func removingAGameAsksFirstWithCancelFocused() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.perform(.remove, on: id)
+    guard case .confirm? = nav.sheet else { Issue.record("no confirmation"); return }
+    #expect(nav.focus == .confirmCancel)
+    #expect(nav.rows().flatMap(\.items) == [.confirmAction, .confirmCancel])
+    press(nav, .confirm)
+    #expect(nav.sheet == nil)
+    #expect(FileManager.default.fileExists(atPath: nav.hub.library.folder(for: id).path))
+    #expect(nav.hub.library.games.map(\.id) == [id])
+}
+
+@MainActor
 @Test func settingsListsEachAddedFolderWithItsButtons() async throws {
     let (nav, _) = try await makeNavigator()
     let added = nav.hub.library.paths.gamesRoot.deletingLastPathComponent().appendingPathComponent("Added", isDirectory: true)

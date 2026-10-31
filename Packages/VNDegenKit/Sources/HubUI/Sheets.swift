@@ -59,9 +59,10 @@ struct ChoiceSheet: View {
                         let isSelected = selected == choice.target
                         Button { nav.select(choice.target) } label: {
                             HStack(spacing: 14) {
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                Image(systemName: choice.systemImage ?? (isSelected ? "checkmark.circle.fill" : "circle"))
                                     .font(.system(size: 20))
-                                    .foregroundStyle(isSelected ? Theme.accent : Theme.tertiaryText)
+                                    .foregroundStyle(isSelected || choice.systemImage != nil ? Theme.accent : Theme.tertiaryText)
+                                    .frame(width: 26)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(choice.title).font(.system(size: 16, weight: .semibold))
                                     if let detail = choice.detail {

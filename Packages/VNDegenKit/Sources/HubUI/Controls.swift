@@ -63,6 +63,7 @@ struct GameTile: View {
                 .unavailable(nav.hub.library.unavailableReason(game.id) != nil)
         }
         .buttonStyle(TileButtonStyle(focused: focused))
+        .gameMenu(game.id)
         .onHover { if $0 { nav.hover(target) } }
         .id(target)
         .accessibilityLabel(nav.hub.displayTitle(game))
@@ -97,13 +98,35 @@ struct HeaderTile: View {
             .unavailable(hub.library.unavailableReason(game.id) != nil)
         }
         .buttonStyle(TileButtonStyle(focused: nav.isFocused(target)))
+        .gameMenu(game.id)
         .onHover { if $0 { nav.hover(target) } }
         .id(target)
         .accessibilityLabel(hub.displayTitle(game))
     }
 }
 
+/// A library tile's menu for a long press or a right click. A controller's X opens the same actions in a sheet.
+private struct GameMenu: ViewModifier {
+    @Environment(Navigator.self) private var nav
+    let id: GameID
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            ForEach(nav.gameActions(id), id: \.action) { item in
+                Button(role: item.action == .remove ? .destructive : nil) {
+                    nav.perform(item.action, on: id)
+                } label: {
+                    Label(item.title, systemImage: item.systemImage)
+                }
+                if item.action == .metadata || item.action == .showFolder { Divider() }
+            }
+        }
+    }
+}
+
 extension View {
+    func gameMenu(_ id: GameID) -> some View { modifier(GameMenu(id: id)) }
+
     /// Dims a tile whose game is in a library folder that can't be reached, and marks it with a drive icon.
     @ViewBuilder
     func unavailable(_ unavailable: Bool) -> some View {

@@ -138,6 +138,9 @@ struct GamePageView: View {
             labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels)
         }
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
+        // The folder and Remove buttons have icons only, as they matter less and the row is long already.
+        HubButton(target: .pageShowFolder, kind: .icon) { Image(systemName: "folder").accessibilityLabel(FileBrowser.openTitle) }
+        HubButton(target: .pageRemove, kind: .icon) { Image(systemName: "trash").accessibilityLabel("Remove from library") }
     }
 
     @ViewBuilder
