@@ -455,7 +455,7 @@ struct Checker {
             // Applier makes the top array, then one per node below it: the outer dimensions' running products,
             // the last of which are the innermost rows.
             uint64_t level = 1;
-            pages++;
+            if (++pages > kMaxArrayPages) failed = true;
             for (int k = rank - 1; k >= 1 && !failed; k--) {
                 level *= dims[size_t(k)];
                 pages += size_t(std::min<uint64_t>(level, kMaxArrayPages + 1));
