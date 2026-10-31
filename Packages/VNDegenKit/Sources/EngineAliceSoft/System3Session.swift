@@ -28,6 +28,9 @@ final class System3Session: EngineSession {
     private var frameSize = CGSize(width: 640, height: 480)
     private var shownSerial: UInt32 = .max
     private var paused = false
+    #if DEBUG
+    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? System3FramePacing() : nil
+    #endif
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -111,6 +114,10 @@ final class System3Session: EngineSession {
             return
         }
         let serial = vns3_frame_serial(engine)
+        #if DEBUG
+        pacing?.note(tick: now, presented: serial != shownSerial, stepEnd: CACurrentMediaTime(),
+                     target: link.targetTimestamp - link.timestamp)
+        #endif
         guard serial != shownSerial else { return }
         shownSerial = serial
         var w: Int32 = 0, h: Int32 = 0
@@ -192,3 +199,35 @@ private final class FrameTarget: NSObject {
     init(_ session: System3Session) { self.session = session }
     @objc func step(_ link: CADisplayLink) { session?.step(link) }
 }
+
+#if DEBUG
+/// With `-frameMonitor YES`, logs the runtime's pacing every 10 seconds ("S3FRAMES" in the app log): display link ticks
+/// per second on average and over the slowest 1% of ticks, frames the runtime drew, and the slowest step.
+private final class System3FramePacing {
+    private var last: CFTimeInterval?
+    private var start: CFTimeInterval = 0
+    private var intervals: [Double] = []
+    private var presented = 0
+    private var worstStep = 0.0
+
+    func note(tick: CFTimeInterval, presented drew: Bool, stepEnd: CFTimeInterval, target: CFTimeInterval) {
+        defer { last = tick }
+        guard let last else {
+            start = tick
+            return
+        }
+        intervals.append(tick - last)
+        if drew { presented += 1 }
+        worstStep = max(worstStep, stepEnd - tick)
+        guard tick - start >= 10 else { return }
+        let slowest = intervals.sorted(by: >).prefix(max(1, intervals.count / 100))
+        let low = Double(slowest.count) / slowest.reduce(0, +)
+        NSLog("S3FRAMES seconds=%.1f average=%.1f low1=%.1f drawn=%.1f worstStep=%.1fms target=%.1f", tick - start,
+              Double(intervals.count) / (tick - start), low, Double(presented) / (tick - start), worstStep * 1000, 1 / target)
+        intervals.removeAll(keepingCapacity: true)
+        presented = 0
+        worstStep = 0
+        start = tick
+    }
+}
+#endif

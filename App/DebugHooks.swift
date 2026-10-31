@@ -34,8 +34,8 @@ import AppKit
 ///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
-///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. NScripter sessions
-///                            also log their own pacing every 10 seconds ("NSFRAMES"), on macOS too
+///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. NScripter and System 3 sessions
+///                            also log their own pacing every 10 seconds ("NSFRAMES", "S3FRAMES"), on macOS too
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
 ///   -windowSize 900x600      resizes the window before the snapshot on macOS. On iPad, in Windowed Apps or Stage Manager,
 ///                            the window takes that size the next time it is resized
