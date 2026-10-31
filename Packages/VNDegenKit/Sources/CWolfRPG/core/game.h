@@ -179,6 +179,7 @@ struct MapEventState {
     std::array<int32_t, 10> self{};
     bool erased = false;
     bool ranAutorun = false;
+    bool pageChanged = false;  // since its parallel script last started
 };
 
 class Game {
@@ -395,7 +396,6 @@ private:
     std::deque<Thread> threads_;
     std::vector<Thread> parallel_;     // parallel common events, one per event
     std::vector<Thread> mapParallel_;  // parallel map event pages
-    std::vector<int> mapParallelPage_;  // the page each of mapParallel_ started on
     std::map<int, Picture> pictures_;
     ChoiceState choice_;
     MessageState message_;

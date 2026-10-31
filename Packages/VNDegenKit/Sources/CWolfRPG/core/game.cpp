@@ -489,6 +489,7 @@ void Game::refreshPages() {
             auto &e = events_[i];
             e.page = page;
             e.ranAutorun = false;
+            e.pageChanged = true;
             Actor &a = e.actor;
             Character &c = a.chara;
             c.visible = page >= 0;
@@ -622,20 +623,17 @@ void Game::update(const Input &input) {
     }
 
     // Parallel map event pages.
-    if (mapParallel_.size() != events_.size() || mapParallelPage_.size() != events_.size()) {
-        mapParallel_.assign(events_.size(), Thread{});
-        mapParallelPage_.assign(events_.size(), -1);
-    }
+    if (mapParallel_.size() != events_.size()) mapParallel_.assign(events_.size(), Thread{});
     for (size_t i = 0; i < events_.size(); i++) {
         auto &e = events_[i];
         if (e.page < 0 || e.data->pages[e.page].trigger != 2) continue;
         Thread &t = mapParallel_[i];
-        // An event whose page changed runs its new page's script from the start, here between frames rather than in
-        // refreshPages, which can run while this script does.
-        if (t.done() || mapParallelPage_[i] != e.page) {
+        // An event whose page changed, even away and back, runs its page's script from the start: here between frames
+        // rather than in refreshPages, which can run while this script does.
+        if (t.done() || e.pageChanged) {
             t = Thread{};
             startPage(int(i), t);
-            mapParallelPage_[i] = e.page;
+            e.pageChanged = false;
         }
         run(t);
         if (mapId_ != loadedMap_) break;  // the event moved the hero to another map
