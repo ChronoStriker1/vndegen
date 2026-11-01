@@ -172,7 +172,8 @@
             }
             return JSON.stringify({
                 inGame: true,
-                gold: $gameParty.gold(),
+                // Difficulty plugins can award fractional gold. Round only the display, not the game's balance.
+                gold: Math.round($gameParty.gold()),
                 currencyUnit: system.currencyUnit || '',
                 party: party().map((actor) => [actor.name(), actor.hp, actor.mhp, actor.mp, actor.mmp]),
                 items, variables, switches,

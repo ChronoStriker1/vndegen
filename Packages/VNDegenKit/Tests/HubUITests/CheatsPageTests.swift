@@ -8,6 +8,7 @@ import VNCore
     var current: CheatState
     var performed: [CheatAction] = []
     var applied: [CheatSettings] = []
+    var failsToReadState = false
 
     init(features: CheatFeatures = [.gold, .restoreParty, .items, .keepPartyHealthy, .noEncounters, .walkThroughWalls, .speed,
                                     .experience, .variables, .switches],
@@ -21,7 +22,10 @@ import VNCore
         current = state
     }
 
-    func state() async throws -> CheatState { current }
+    func state() async throws -> CheatState {
+        if failsToReadState { throw CancellationError() }
+        return current
+    }
     func perform(_ action: CheatAction) async throws { performed.append(action) }
     func apply(_ settings: CheatSettings) { applied.append(settings) }
 }
@@ -35,6 +39,16 @@ import VNCore
 /// Lets the page's change task finish.
 @MainActor private func settle() async {
     for _ in 0..<10 { await Task.yield() }
+}
+
+@MainActor @Test func readingAgainAfterAFailureClearsTheError() async {
+    let cheats = FakeCheats()
+    cheats.failsToReadState = true
+    let page = await page(cheats)
+    #expect(page.state == nil && page.status?.isError == true)
+    cheats.failsToReadState = false
+    await page.load()
+    #expect(page.state == cheats.current && page.status == nil)
 }
 
 @MainActor @Test func settingsThatStayOnAreSavedAndSentToTheGame() async {

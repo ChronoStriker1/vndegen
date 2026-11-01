@@ -385,6 +385,7 @@ final class CheatsPage {
     }
 
     func load() async {
+        status = nil
         do {
             state = try await cheats.state()
         } catch {
@@ -461,7 +462,9 @@ struct CheatsView: View {
 
     @ViewBuilder private var content: some View {
         if page.state == nil {
-            ProgressView().frame(maxWidth: .infinity).padding(20)
+            if page.status == nil {
+                ProgressView().frame(maxWidth: .infinity).padding(20)
+            }
         } else {
             switch page.tab {
             case .quick: quick

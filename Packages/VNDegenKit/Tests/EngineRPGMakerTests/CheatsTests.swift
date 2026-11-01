@@ -143,6 +143,21 @@ private func engine(mv: Bool = false) -> String {
     #expect(state.switches == [CheatSwitch(id: 1, name: "Met the king", isOn: true), CheatSwitch(id: 2, name: "", isOn: false)])
 }
 
+@Test @MainActor func fractionalGoldDoesNotPreventReadingTheGame() async throws {
+    let page = try await TestPage(settings: CheatSettings())
+    let cheats = page.cheats()
+    _ = try await page.run("SceneManager.run(Scene_Map)")
+    // Difficulty plugins can award fractional gold after a battle.
+    _ = try await page.run("$gameParty._gold = 38.400000000000006")
+    let state = try await cheats.state()
+    #expect(state.gold == 38)
+    #expect(state.party.count == 2 && state.items.count == 2 && state.variables.count == 3)
+    #expect(try await page.run("$gameParty.gold()") as? Double == 38.400000000000006)
+    try await cheats.perform(.addGold(1_000))
+    #expect(try await cheats.state().gold == 1_038)
+    #expect(try await page.run("$gameParty.gold()") as? Double == 1_038.4)
+}
+
 @Test @MainActor func actionsChangeTheGamesOwnObjects() async throws {
     let page = try await TestPage(settings: CheatSettings())
     let cheats = page.cheats()
