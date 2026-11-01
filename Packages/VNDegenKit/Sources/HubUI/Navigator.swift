@@ -117,7 +117,7 @@ final class Navigator {
         case tile(Shelf, GameID)
         case gridTile(GameID)
         case back
-        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageShowFolder, pageRemove, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
+        case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageShowFolder, pageEngineFiles, pageRemove, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
         /// A screenshot in the game page's grid, by its index in the game's screenshots, and the button under the grid
         /// that shows all of them or fewer.
         case pageScreenshot(Int), pageScreenshotsMore
@@ -150,7 +150,7 @@ final class Navigator {
 
     /// What a library tile's menu offers, which the game page offers too.
     enum GameAction: Hashable {
-        case play, openPage, artwork, metadata, hide, showFolder, remove
+        case play, openPage, artwork, metadata, hide, showFolder, removeEngineFiles, remove
     }
 
     enum RuntimeAction: Hashable {
@@ -352,7 +352,8 @@ final class Navigator {
             let shown = Self.shownScreenshots(screenshots.count, columns: columns, showsAll: showsAllScreenshots)
             let screenshotRows = Self.gridRows("page-screenshots", (0..<shown).map { Target.pageScreenshot($0) }, columns: columns)
                 + (Self.collapsesScreenshots(screenshots.count, columns: columns) ? [Row(id: "page-screenshots-more", items: [.pageScreenshotsMore])] : [])
-            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder, .pageRemove]
+            let engineFiles: [Target] = pageGameID.map(hub.library.offersEngineFiles) == true ? [.pageEngineFiles] : []
+            let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder] + engineFiles + [.pageRemove]
             let pageActions = pageActionsStacked
                 ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
                 : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
@@ -552,6 +553,7 @@ final class Navigator {
         case .pageArtwork: if let id = pageGameID { perform(.artwork, on: id) }
         case .pageMetadata: if let id = pageGameID { perform(.metadata, on: id) }
         case .pageShowFolder: if let id = pageGameID { perform(.showFolder, on: id) }
+        case .pageEngineFiles: if let id = pageGameID { perform(.removeEngineFiles, on: id) }
         case .pageRemove: if let id = pageGameID { perform(.remove, on: id) }
         case .pageSaves: if let id = pageGameID { sheet = .saves(GameSavesModel(service: hub.saveSync, game: id)) }
         case let .pageScreenshot(index):
@@ -697,6 +699,7 @@ final class Navigator {
             let folder = library.folders.first { library.root(of: $0.id) == destination }?.id
             guard let id = library.gameID(named: folderName, in: folder) else { return }
             heroID = id
+            offerRemovingEngineFiles(id, onlyIfAny: true)
             if let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) {
                 setFocus(tile)
                 // The new game can sort far down the header list, so the library scrolls to it whatever the input.
@@ -711,6 +714,8 @@ final class Navigator {
     /// unlocked.
     func gameActions(_ id: GameID) -> [GameMenuItem] {
         let hidden = hub.library.game(id)?.isLocked == true
+        let engineFiles = hub.library.offersEngineFiles(id)
+            ? [GameMenuItem(action: .removeEngineFiles, title: "Remove engine files", systemImage: "externaldrive.badge.minus")] : []
         return [
             GameMenuItem(action: .play, title: "Play", systemImage: "play.fill"),
             GameMenuItem(action: .openPage, title: "Open game page", systemImage: "info.circle"),
@@ -718,6 +723,7 @@ final class Navigator {
             GameMenuItem(action: .metadata, title: "Find metadata", systemImage: "text.magnifyingglass"),
             GameMenuItem(action: .hide, title: hidden ? "Unhide" : "Hide", systemImage: hidden ? "lock.open" : "lock"),
             GameMenuItem(action: .showFolder, title: FileBrowser.openTitle, systemImage: "folder"),
+        ] + engineFiles + [
             GameMenuItem(action: .remove, title: "Remove from library", systemImage: "trash"),
         ]
     }
@@ -743,8 +749,67 @@ final class Navigator {
                 return showError("Can't open the folder", "\(hub.folderName(of: game.libraryFolder)) can't be reached. \(problem)")
             }
             FileBrowser.open(hub.library.folder(for: id))
+        case .removeEngineFiles: offerRemovingEngineFiles(id)
         case .remove: confirmDeleting(id)
         }
+    }
+
+    /// Shows the engine files a game can do without and what removing them means, and removes them only if the player
+    /// says so. With `onlyIfAny`, as after an import, a game with nothing to offer says nothing.
+    func offerRemovingEngineFiles(_ id: GameID, onlyIfAny: Bool = false) {
+        Task {
+            let plan = await hub.library.engineFilePlan(for: id)
+            guard let game = hub.library.game(id), isVisible(game), !onlyIfAny || (plan.problem == nil && !plan.files.isEmpty && sheet == nil) else { return }
+            let title = hub.displayTitle(game)
+            if let problem = plan.problem { return showError("Can't remove \(title)'s engine files", problem) }
+            guard !plan.files.isEmpty else {
+                return showError("Nothing to remove", "\(title) has no engine files left that VNDegen can remove.")
+            }
+            let size = plan.size.formatted(.byteCount(style: .file))
+            sheet = .confirm(Confirmation(
+                title: "Remove \(size) of engine files from \(title)?",
+                message: Self.engineFilesMessage(plan),
+                rows: plan.files.map { file in
+                    let size = file.size.formatted(.byteCount(style: .file))
+                    return (file.path, file.fileCount > 1 ? "\(file.fileCount.formatted()) files, \(size)" : size)
+                },
+                action: Self.engineFilesAction(plan), destructive: true, gameID: id) { [weak self] in
+                    // The library may have locked since the question was asked.
+                    guard let self, let game = hub.library.game(id), isVisible(game) else { return }
+                    let result = await hub.library.removeEngineFiles(plan.files, of: id)
+                    let removed = result.removed.reduce(0) { $0 + $1.size }.formatted(.byteCount(style: .file))
+                    let summary = "VNDegen removed \(result.removed.count) of \(plan.files.count) items, \(removed)."
+                    if result.failed.isEmpty {
+                        showError("Engine files removed", summary)
+                    } else {
+                        let gone = result.removed.map(\.path).joined(separator: "\n")
+                        let kept = result.failed.map { "\($0.path): \($0.reason)" }.joined(separator: "\n")
+                        showError("Some engine files weren't removed", "\(summary)\n\nThese stay:\n\(kept)\n\nThese went:\n\(gone)")
+                    }
+                })
+        }
+    }
+
+    /// Says what the player gives up and where the files go. Claims only what VNDegen knows about recovery.
+    private static func engineFilesMessage(_ plan: EngineFilePlan) -> String {
+        let what = "VNDegen doesn't use these PC engine files. The game keeps running here, and its saves and its own data stay. It won't run on a PC from this folder afterwards."
+        if plan.inICloud {
+            return "\(what) This folder is in iCloud Drive, so the removal reaches every device on this iCloud account. iCloud Drive's Recently Deleted should keep the files for about 30 days."
+        }
+        #if os(macOS)
+        return "\(what) They go to the Trash. The space comes back when you empty it."
+        #else
+        return "\(what) They are deleted from this \(UIDevice.current.localizedModel) for good. This can't be undone."
+        #endif
+    }
+
+    private static func engineFilesAction(_ plan: EngineFilePlan) -> String {
+        if plan.inICloud { return "Remove files" }
+        #if os(macOS)
+        return "Move to Trash"
+        #else
+        return "Delete files"
+        #endif
     }
 
     /// Asks before deleting the game's folder, saying what goes and what stays on this device.
@@ -1143,8 +1208,9 @@ final class Navigator {
         case .settingsPage(.lock)?:
             if !lockSettings.handle(button), button == .cancel { back() }
             return
-        case .settingsPage(.licenses)?, .settingsPage(.plugins)?, .license?:
-            // Licenses and the plugin list are text to read: up and down scroll a little, the shoulder buttons a page.
+        case .settingsPage(.licenses)?, .settingsPage(.plugins)?, .license?, .confirm?:
+            // Licenses, the plugin list, and a question's details are text to read: up and down scroll a little, the
+            // shoulder buttons a page.
             switch button {
             case .up, .down: return pager.scroll(pages: button == .up ? -0.3 : 0.3)
             case .pageUp, .pageDown: return pager.scroll(pages: button == .pageUp ? -1 : 1)

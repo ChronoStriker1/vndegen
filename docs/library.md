@@ -29,6 +29,27 @@ Known limit: on a Mac, if an added folder is moved and another folder is made at
 
 Remove from library, in a game's menu or on its page, deletes the game's folder after asking: on a Mac it goes to the Trash, and on iPhone and iPad it is deleted for good. Saves the game writes inside its own folder go with it. The saves VNDegen keeps in its own data folder for the game stay, and so do its artwork, play time, and settings, so copying the folder back restores it.
 
+## Removing engine files
+
+RPG Maker MV and MZ, TyranoScript, and Ren'Py games ship PC engine files that VNDegen doesn't use. Remove engine files, in a game's menu or on its page, lists them with the space they take and asks before removing anything. An archive you import asks once, when the game it adds has any. The game keeps running in VNDegen, but it won't run on a PC from that folder afterwards.
+
+| Engine | Average saved per game | What goes |
+|---|---|---|
+| RPG Maker MZ | 295 MB | NW.js |
+| RPG Maker MV | 148 MB | NW.js |
+| TyranoScript | 183 MB | NW.js or Electron |
+| Ren'Py | 88 MB | The Windows, Linux, and Mac libraries in `lib/`, and the `.exe` and `.app` launchers |
+
+The averages come from the maintainer's library. Each plugin names exactly what it may remove, and anything else stays, including saves, the game's own data, and whatever a mod or a translation added, such as a picture or a settings file left in `lib/`. The exception is a program, Python, or certificate file a mod put in one of Ren'Py's `lib/` folders, which VNDegen can't tell from the engine's own. VNDegen loads nothing from those folders, so the game runs as before, but the mod's file is gone. An `.exe` under another name goes only when it's the one file of 30 MB or more beside the runtime's files. A game packed entirely inside its `.exe` isn't detected as these engines and offers nothing. Nothing is offered without the game's data on disk, and no `.exe` of 250 MB or more is offered. Known limit: a smaller `.exe` that holds more of the game than its loose files is treated as the runtime. No library game is laid out that way. The other engines list nothing, because VNDegen reads their `.exe` and `.dll` files or names to recognize or run a game, or because there is little to gain.
+
+Where the files go depends on where the game is:
+
+- **Mac.** They go to the Trash. The space comes back when you empty it.
+- **iPhone and iPad.** They are deleted for good.
+- **iCloud Drive.** The removal reaches every device on that iCloud account. iCloud Drive's Recently Deleted should keep the files for about 30 days. Files not downloaded yet are measured and removed without downloading them.
+
+VNDegen shows the reason and removes nothing for a folder that can't be reached, one it can't write to, a network share, or a cloud service other than iCloud Drive. On iPhone and iPad that also covers folders you added from On My iPhone or iPad outside VNDegen's own folder, because VNDegen can't tell those from another provider's. VNDegen's own Games folder isn't affected. If some files can't be removed, it lists them with what it did remove. A game whose engine you assigned by hand offers nothing.
+
 ## Video cache
 
 RPG Maker MV and MZ clips with transparency are converted the first time they play, and kept in a cache outside the game folder. The cache holds up to 512 MB, dropping the clips used least recently, and isn't backed up. Clear video cache in Settings empties it, and a clip then converts again the next time it plays. [engines.md](engines.md#rpg-maker-mv-and-mz) has more.
@@ -47,7 +68,7 @@ The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad,
 
 ## The game menu
 
-A long press on a game in any library layout, a right click on a Mac, or X on a controller opens a menu with Play, Open game page, Change artwork, Find metadata, Hide or Unhide, Show in Finder or Open in Files, and Remove from library.
+A long press on a game in any library layout, a right click on a Mac, or X on a controller opens a menu with Play, Open game page, Change artwork, Find metadata, Hide or Unhide, Show in Finder or Open in Files, Remove engine files for the engines that list any, and Remove from library.
 
 <p align="center">
   <img src="screenshots/game-menu.jpg" width="260" alt="The menu a long press opens on a library game on iPhone: Play, Open game page, Change artwork, Find metadata, Hide, Open in Files, and Remove from library">

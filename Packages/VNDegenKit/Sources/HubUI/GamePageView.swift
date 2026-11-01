@@ -140,6 +140,9 @@ struct GamePageView: View {
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
         // The folder and Remove buttons have icons only, as they matter less and the row is long already.
         HubButton(target: .pageShowFolder, kind: .icon) { Image(systemName: "folder").accessibilityLabel(FileBrowser.openTitle) }
+        if hub.library.offersEngineFiles(game.id) {
+            HubButton(target: .pageEngineFiles, kind: .icon) { Image(systemName: "externaldrive.badge.minus").accessibilityLabel("Remove engine files") }
+        }
         HubButton(target: .pageRemove, kind: .icon) { Image(systemName: "trash").accessibilityLabel("Remove from library") }
     }
 

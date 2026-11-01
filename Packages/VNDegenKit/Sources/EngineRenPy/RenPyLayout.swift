@@ -84,6 +84,58 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         self.init(base: base, version: version?.map(String.init).joined(separator: "."), runtime: runtime, evidence: evidence)
     }
 
+    /// What VNDegen doesn't use of a PC build: the Python and platform libraries in `lib/`, since a game runs on a bundled
+    /// runtime, and the launchers Ren'Py names after the game's `.py`. `renpy/`, `game/`, and the small `.py` and `.sh`
+    /// launchers stay. In `lib/` only files of the kinds Ren'Py ships count, because mods and patches leave others there:
+    /// the library has pictures, `sovereign.ini`, and `.bak` files in it. VNDegen loads nothing from `lib/`. `lib/` stays when its names are what tell this
+    /// game's Ren'Py line apart, unless the compiled files say the same and `lib/` holds only that line, so a removal that
+    /// stops partway can't change the answer.
+    func engineFiles(_ probe: FolderProbe) -> EngineFileList {
+        let base = probe.root.appendingPathComponent(self.base, isDirectory: true)
+        let names = { (folder: String) in
+            ((try? FileManager.default.contentsOfDirectory(atPath: FileCase.resolve(folder, in: base).path)) ?? []).map { $0.lowercased() }
+        }
+        let prefix = self.base.isEmpty ? "" : "\(self.base)/".lowercased()
+        let top = probe.entries.map { $0.lowercased() }.filter { $0.hasPrefix(prefix) && !$0.dropFirst(prefix.count).contains("/") }
+            .map { String($0.dropFirst(prefix.count)) }
+        // A PC build has one launcher `.py`. With more, one may be a mod's, and its `.exe` a mod's tool, so all of them stay.
+        let scripts = top.filter { $0.hasSuffix(".py") }
+        let stem = scripts.count == 1 ? scripts.first.map { String($0.dropLast(3)) } : nil
+
+        var files = Set<String>(), folders = Set<String>()
+        if let stem {
+            files = ["\(stem).exe", "\(stem)-32.exe"]
+            // A Mac build can hold the game itself, and then it isn't a launcher.
+            let app = "\(stem).app"
+            if top.contains(app), !FileManager.default.fileExists(atPath: FileCase.resolve("\(app)/Contents/Resources/autorun/game", in: base).path) {
+                folders.insert(app)
+            }
+        }
+        var trees: [String: @Sendable (String) -> Bool] = [:]
+        let libraries = names("lib").filter { $0.wholeMatch(of: /(py[23]-)?(windows|linux|darwin|mac)-[a-z0-9_]+|python[23](\.\d+)?|pythonlib[23]?(\.\d+)?/) != nil }
+        // Every name that can decide the line, also those that stay.
+        let lines = Set(names("lib").compactMap { Self.runtime(libraries: [$0]) })
+        if evidence != .libraries || (lines.count == 1 && Self.runtime(engineFiles: names("renpy")) == runtime) {
+            for library in libraries {
+                let isPython = library.hasPrefix("python")
+                trees["lib/\(library)"] = { Self.isEngineLibraryFile($0, inPythonFolder: isPython, launcher: stem) }
+            }
+        }
+        return EngineFileList(root: self.base, files: files, trees: trees, folders: folders)
+    }
+
+    /// The kinds of file Ren'Py's `lib/` folders hold, from the library's 54 games. `name` is lower case. Python folders
+    /// hold Python's standard library, and the others the platform's programs and libraries.
+    private static func isEngineLibraryFile(_ name: String, inPythonFolder: Bool, launcher: String?) -> Bool {
+        if inPythonFolder {
+            return [".py", ".pyc", ".pyo", ".pem"].contains { name.hasSuffix($0) } || ["empty.txt", "py.typed"].contains(name)
+        }
+        let endings = [".so", ".pyo", ".pyd", ".dll", ".exe", ".dylib", ".egg", ".manifest", ".vbs"]
+        let names = ["python", "pythonw", "zsync", "zsyncmake", "dynload.txt", "libwinpthread-1.txt"]
+        return endings.contains { name.hasSuffix($0) } || names.contains(name) || name == launcher
+            || name.firstMatch(of: /\.so(\.\d+)+$/) != nil
+    }
+
     /// Folders that may be the base directory, shallowest first and then by name: the game folder and any folder up to
     /// two levels down that holds a `renpy` entry. The probe already lists those levels, so this reads nothing from
     /// disk. Each candidate can cost a walk of its `game/` folder, so only the first `limit` are tried.

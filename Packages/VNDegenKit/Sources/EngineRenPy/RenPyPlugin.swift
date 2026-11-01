@@ -25,6 +25,12 @@ nonisolated public struct RenPyPlugin: EnginePlugin {
         return EngineMatch(engine: descriptor.id, confidence: .certain, version: layout.version, evidence: layout.path("renpy/"))
     }
 
+    public var listsEngineFiles: Bool { true }
+
+    public func engineFileList(_ probe: FolderProbe) -> EngineFileList? {
+        RenPyLayout(probe)?.engineFiles(probe)
+    }
+
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
         #if os(macOS)
         guard let layout = RenPyLayout(FolderProbe(scanning: launch.folder)) else { throw RenPyError.notRenPy }

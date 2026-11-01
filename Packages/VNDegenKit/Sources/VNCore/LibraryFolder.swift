@@ -129,12 +129,21 @@ nonisolated enum FolderAccess {
         }
     }
 
-    /// Deletes `folder`, a game's folder directly inside the library folder `root`, to the Trash or for good. Refuses a
-    /// link, so a deletion never reaches outside the library folder, and anything that isn't a direct subfolder of `root`.
+    /// Deletes `folder`, a game's folder directly inside the library folder `root`, to the Trash or for good.
     static func delete(_ folder: URL, inside root: URL, toTrash: Bool) throws {
         let fm = FileManager.default
+        try checkGameFolder(folder, inside: root)
+        #if os(macOS)
+        if toTrash { return try fm.trashItem(at: folder, resultingItemURL: nil) }
+        #endif
+        try fm.removeItem(at: folder)
+    }
+
+    /// Refuses a link, so removing files never reaches outside the library folder, and anything that isn't a direct
+    /// subfolder of `root`.
+    static func checkGameFolder(_ folder: URL, inside root: URL) throws {
         // Not followed: the attributes of a link are the link's own.
-        let type = try fm.attributesOfItem(atPath: folder.path)[.type] as? FileAttributeType
+        let type = try FileManager.default.attributesOfItem(atPath: folder.path)[.type] as? FileAttributeType
         guard type == .typeDirectory else {
             throw LibraryFolderError(message: "\(folder.lastPathComponent) is a link or not a folder, so VNDegen won't delete it. Delete it yourself if you want it gone.")
         }
@@ -143,10 +152,6 @@ nonisolated enum FolderAccess {
               !["", ".", ".."].contains(folder.lastPathComponent) else {
             throw LibraryFolderError(message: "\(folder.lastPathComponent) isn't a game folder inside its library folder, so VNDegen won't delete it.")
         }
-        #if os(macOS)
-        if toTrash { return try fm.trashItem(at: folder, resultingItemURL: nil) }
-        #endif
-        try fm.removeItem(at: folder)
     }
 
     /// The game folders directly inside `root`: every visible subfolder.
