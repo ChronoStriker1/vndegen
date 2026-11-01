@@ -275,7 +275,7 @@ public:
     std::string faceGraphic(int n) const;
     int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
     std::string systemString(int i) const;
-    int systemNumber(int i) const { return i >= 0 && i < int(system_.size()) ? system_[i] : 0; }
+    int32_t systemNumber(int i) const;
     std::array<uint8_t, 3> textColor(int i) const;
     uint64_t frameCount() const { return frame_; }
     const ShakeState &shake() const { return shake_; }

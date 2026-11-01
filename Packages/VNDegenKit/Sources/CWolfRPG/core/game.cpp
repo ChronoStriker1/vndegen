@@ -272,6 +272,31 @@ int32_t Game::value(int32_t v, const Thread &t) {
     return readVar(v, t);
 }
 
+// A system variable, some of which report the engine's state (the manual's system variable list).
+int32_t Game::systemNumber(int i) const {
+    // 77 to 82 are the local date and time, which games copy into their saves for the save screen.
+    if (i >= 77 && i <= 82) {
+        std::time_t now = std::time(nullptr);
+        std::tm tm{};
+#ifdef _WIN32
+        localtime_s(&tm, &now);
+#else
+        localtime_r(&now, &tm);
+#endif
+        const int parts[] = {tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec};
+        return parts[i - 77];
+    }
+    switch (i) {
+        // Parade Buster confirms a choice with a click when this reads 1, as a click does on the PC.
+        case 12: return message_.active || choice_.active;
+        case 13: return !threads_.empty();
+        case 20: return choice_.active ? choice_.cursor : -1;
+        case 31: case 32: return gameDat_.fps();
+        case 35: return hero_.moving();
+    }
+    return i >= 0 && i < int(system_.size()) ? system_[i] : 0;
+}
+
 // The character a variable address names: 9100000 + 10 * Y + X a map event, 9180000 + 10 * Y + X the hero (0) or a party
 // member, and 9190000 + X this event.
 Actor *Game::actorAtAddress(int32_t id, const Thread &t) {
@@ -299,28 +324,7 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
         int range = id - 8000000;
         return std::uniform_int_distribution<int>(0, std::max(0, range))(rng_);
     }
-    // System variables 77 to 82 are the local date and time, which games copy into their saves for the save screen.
-    if (id >= 9000077 && id <= 9000082) {
-        std::time_t now = std::time(nullptr);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &now);
-#else
-        localtime_r(&now, &tm);
-#endif
-        const int parts[] = {tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec};
-        return parts[id - 9000077];
-    }
-    // System variables that report the engine's state (the manual's system variable list).
-    switch (id) {
-        // Parade Buster confirms a choice with a click when this reads 1, as a click does on the PC.
-        case 9000012: return message_.active || choice_.active;
-        case 9000013: return !threads_.empty();
-        case 9000020: return choice_.active ? choice_.cursor : -1;
-        case 9000031: case 9000032: return gameDat_.fps();
-        case 9000035: return hero_.moving();
-    }
-    if (id >= 9000000 && id < 9100000) return id - 9000000 < int(system_.size()) ? system_[id - 9000000] : 0;
+    if (id >= 9000000 && id < 9100000) return systemNumber(id - 9000000);
     if (id >= 1000000000) {
         const Database &db = id >= 1300000000 ? sdb_ : id >= 1100000000 ? cdb_ : udb_;
         // 1 X TT DDDD FF: X picks the database, then type, row and field.
@@ -505,7 +509,7 @@ std::string Game::expandText(const std::string &text, const Thread *t) const {
             i = close;
         } else if (code("sys")) {
             int n = number(i + 4);
-            if (n >= 0 && n < int(system_.size())) out += std::to_string(system_[n]);
+            if (n >= 0 && n < int(system_.size())) out += std::to_string(systemNumber(n));
             i = close;
         } else if (code("sysS")) {
             int n = number(i + 5);
