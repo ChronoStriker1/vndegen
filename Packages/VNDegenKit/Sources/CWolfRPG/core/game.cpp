@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <ctime>
 #include <type_traits>
 
 namespace fs = std::filesystem;
@@ -271,6 +272,18 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
     if (id >= 8000000 && id < 9000000) {
         int range = id - 8000000;
         return std::uniform_int_distribution<int>(0, std::max(0, range))(rng_);
+    }
+    // System variables 77 to 82 are the local date and time, which games copy into their saves for the save screen.
+    if (id >= 9000077 && id <= 9000082) {
+        std::time_t now = std::time(nullptr);
+        std::tm tm{};
+#ifdef _WIN32
+        localtime_s(&tm, &now);
+#else
+        localtime_r(&now, &tm);
+#endif
+        const int parts[] = {tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec};
+        return parts[id - 9000077];
     }
     if (id >= 9000000 && id < 9100000) return id - 9000000 < int(system_.size()) ? system_[id - 9000000] : 0;
     if (id >= 1000000000) {
