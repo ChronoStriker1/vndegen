@@ -315,9 +315,8 @@ bool Game::keyInput(Thread &t, const Command &c) {
     bool wait = flags & 0x80;
     uint32_t keys = wait ? (input_.pressed | autoKeys_) : keysNow();
     // Wolf RPG Editor 3: bit 0x20000 reports only a key that was just pressed, so a menu opened by a key doesn't
-    // see that key still held and close again (Clumsy Witch Seris). Games poll every other frame with a one-frame
-    // wait, so a press counts on the frame it goes down and the next.
-    if (flags & 0x20000) keys = input_.pressed | lastPressed_ | autoKeys_;
+    // see that key still held and close again (Clumsy Witch Seris).
+    if (flags & 0x20000) keys = input_.pressed | autoKeys_;
     int32_t v = 0;
     if (kind == 0 && (flags & 0x40000)) {
         // Wolf RPG Editor 3: how many frames one key has been held, 0 when it is up. The low byte names the key as

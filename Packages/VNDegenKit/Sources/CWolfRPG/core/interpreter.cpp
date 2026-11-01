@@ -21,10 +21,9 @@ int resolveRelativeCommon(int id, const Thread &t) {
 }  // namespace
 
 void Game::run(Thread &t) {
-    if (t.wait > 0) {
-        t.wait--;
-        return;
-    }
+    // A wait of n frames resumes on the nth frame after it, so a loop with a one-frame wait runs every frame: games
+    // count on that, such as The Clumsy Witch Seris's menus, which accept a key held for exactly one frame.
+    if (t.wait > 0 && --t.wait > 0) return;
     // A thread runs until it waits. The cap stops a loop without waits from hanging the frame.
     for (int budget = 0; budget < 100000 && !t.done(); budget++) {
         if (!step(t)) return;
