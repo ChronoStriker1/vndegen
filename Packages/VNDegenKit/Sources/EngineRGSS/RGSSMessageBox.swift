@@ -21,6 +21,8 @@ final class RGSSMessageBox {
 
 struct RGSSMessageBoxView: View {
     let box: RGSSMessageBox
+    /// The message's height at the box's width, so the box is as tall as its text, up to half the screen.
+    @State private var textHeight: CGFloat = 0
     private static let space = "RGSSMessageBox"
 
     var body: some View {
@@ -34,11 +36,15 @@ struct RGSSMessageBoxView: View {
                             .lineLimit(2)
                     }
                     // As tall as the text, up to half the screen; a longer message scrolls.
-                    ViewThatFits(in: .vertical) {
-                        message
-                        ScrollView { message }
+                    ScrollView {
+                        Text(box.text)
+                            .font(.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { textHeight = $0 }
                     }
-                    .frame(maxHeight: whole.size.height * 0.5)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(height: min(textHeight, whole.size.height * 0.5))
                     HStack {
                         Spacer()
                         Button(action: box.onOK) {
@@ -67,12 +73,5 @@ struct RGSSMessageBoxView: View {
             .coordinateSpace(.named(Self.space))
         }
         .ignoresSafeArea()
-    }
-
-    private var message: some View {
-        Text(box.text)
-            .font(.body)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }
