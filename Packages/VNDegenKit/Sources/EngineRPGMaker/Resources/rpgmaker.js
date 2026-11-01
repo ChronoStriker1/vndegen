@@ -263,8 +263,39 @@
     }
 
     // HEVC alpha survives a canvas upload, while WebKit drops it when WebGL uploads a video directly.
-    const alphaURLs = new Set(), alphaCanvases = new WeakMap();
-    window.__vndegen.alphaVideo = (url) => { alphaURLs.add(url.split('#')[0]); };
+    const alphaURLs = new Set(), alphaCanvases = new WeakMap(), videos = [];
+    const createElement = document.createElement;
+    document.createElement = function (...args) {
+        const element = createElement.apply(this, args);
+        if (element instanceof HTMLVideoElement) videos.push(new WeakRef(element));
+        return element;
+    };
+    window.__vndegen.alphaVideo = (url) => {
+        url = url.split('#')[0];
+        alphaURLs.add(url);
+        // WebKit keeps the WebM reader selected from the URL even when the response is QuickTime.
+        // A typed source selects the HEVC reader; reloading preserves the plugin's media event listeners.
+        const live = new Set(document.querySelectorAll('video'));
+        for (let i = videos.length - 1; i >= 0; i--) {
+            const video = videos[i].deref();
+            if (video) live.add(video); else videos.splice(i, 1);
+        }
+        for (const video of live) {
+            const direct = video.src.split('#')[0] === url;
+            let source = [...video.querySelectorAll('source')].find(item => item.src.split('#')[0] === url);
+            if (!direct && (!source || source.type === 'video/quicktime')) continue;
+            const playing = !video.paused || video.autoplay;
+            if (!source) {
+                source = document.createElement('source');
+                source.src = url;
+                video.prepend(source);
+            }
+            source.type = 'video/quicktime';
+            if (direct) video.removeAttribute('src');
+            video.load();
+            if (playing) video.play().catch(() => {});
+        }
+    };
     const loadingVideoStyle = document.createElement('style');
     loadingVideoStyle.textContent = 'video[data-vndegen-loading] { visibility: hidden !important; }';
     document.addEventListener('loadstart', (event) => {
