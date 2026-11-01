@@ -968,6 +968,14 @@ void Game::typeText(const std::string &utf8) {
 // the manual's hint describes.
 void Game::updateTextEntry() {
     if (!textEntry_.active) return;
+    // The event that asked may have ended, as a parallel event whose condition stopped holding does.
+    auto waiting = [](const auto &threads) {
+        return std::any_of(threads.begin(), threads.end(), [](const Thread &t) { return t.waitingText; });
+    };
+    if (!waiting(threads_) && !waiting(parallel_) && !waiting(mapParallel_)) {
+        textEntry_.active = false;
+        return;
+    }
     if (input_.keysPressed[114]) {
         std::string &s = textEntry_.text;
         size_t last = s.size();
@@ -1035,16 +1043,14 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     };
     if (show) {
         Picture fresh;
+        // A file with exactly this name wins over text codes in it, as the manual's picture page says.
+        auto fileName = [&](const std::string &name) { return files_.exists(name) ? name : expandText(name, &t); };
         switch (display) {
-            case 0x00:
-                // A file with exactly this name wins over text codes in it, as the manual's picture page says.
-                fresh.kind = PictureKind::File;
-                fresh.source = files_.exists(c.str(0)) ? c.str(0) : expandText(c.str(0), &t);
-                break;
-            case 0x10: fresh.kind = PictureKind::File; fresh.source = readStr(c.arg(11), t); break;
+            case 0x00: fresh.kind = PictureKind::File; fresh.source = fileName(c.str(0)); break;
+            case 0x10: fresh.kind = PictureKind::File; fresh.source = fileName(readStr(c.arg(11), t)); break;
             case 0x20: fresh.kind = PictureKind::Text; fresh.source = expandText(c.str(0), &t); break;
-            case 0x30: fresh.kind = PictureKind::Window; fresh.source = c.str(0); break;
-            default: fresh.kind = PictureKind::Window; fresh.source = readStr(c.arg(11), t); break;
+            case 0x30: fresh.kind = PictureKind::Window; fresh.source = fileName(c.str(0)); break;
+            default: fresh.kind = PictureKind::Window; fresh.source = fileName(readStr(c.arg(11), t)); break;
         }
         fresh.generation = ++generation_;
         if (fresh.kind == PictureKind::File) {

@@ -169,10 +169,13 @@ final class WolfRPGSession: EngineSession {
     func send(_ event: ControllerEvent) {
         // A controller's Confirm and Cancel finish the game's text entry, since neither types anything.
         if let engine, vnwolf_wants_text(engine) {
-            if case let .button(button, true) = event {
-                if button == .confirm { deliver(router.tap(Int32(VNWOLF_KEY_RETURN))) }
-                if button == .cancel { deliver(router.tap(Int32(VNWOLF_KEY_ESCAPE))) }
+            let button: VirtualButton? = switch event {
+            case let .button(button, true): button
+            case let .gamepad(input, true): input.virtualButton
+            default: nil
             }
+            if button == .confirm { deliver(router.tap(Int32(VNWOLF_KEY_RETURN))) }
+            if button == .cancel { deliver(router.tap(Int32(VNWOLF_KEY_ESCAPE))) }
         }
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })

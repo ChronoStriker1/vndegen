@@ -52,6 +52,12 @@ std::optional<fs::path> GameFiles::findCaseless(const fs::path &base, const std:
     std::string out(want.size() + 1024, '\0');
     if (casepath_resolve(want.c_str(), out.data(), out.size()) != 1) return std::nullopt;
     out.resize(std::strlen(out.c_str()));
+    // A link inside the game folder mustn't lead out of it either.
+    std::error_code e1, e2;
+    fs::path real = fs::weakly_canonical(out, e1), realTop = fs::weakly_canonical(root_, e2);
+    if (e1 || e2) return std::nullopt;
+    auto [inReal, inRealTop] = std::mismatch(real.begin(), real.end(), realTop.begin(), realTop.end());
+    if (inRealTop != realTop.end() && !(std::next(inRealTop) == realTop.end() && inRealTop->empty())) return std::nullopt;
     return fs::path(out);
 }
 
