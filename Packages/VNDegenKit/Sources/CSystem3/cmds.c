@@ -620,7 +620,7 @@ static void cmd_I(S3 *s) {
     case 'K': {
         int n = s3_byte(s);
         s->polls++;
-        if (n == 0 || n == 1) {
+        if ((n == 0 || n == 1) && !s->msgSkip) { // the text skip passes these waits too, as games wait for text with them
             u32 m = keymask_now(s);
             if (m) { rnd(s, (u16)m); return; }
             s->pressedMask = 0;

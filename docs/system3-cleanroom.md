@@ -51,8 +51,8 @@ reading xsystem35, xsystem35-sdl2, system3-sdl2, alicetools or any fork of them,
   from that table in places: effect 4 has width / 2 steps, 7 and 8 move 16 pixels a step, and 17 has 16 steps. CD effect
   1001 was read from a source of all 256 colours over two backgrounds.
 - **NI and the text skip.** The same way: what `NI` leaves in the variable and RND after OK and Escape, from saves; what
-  the 文字送り menu item passes and where it stops, from markers drawn between waits. Rance 4.2's Skip until choice item
-  stops at a choice the same way.
+  the 文字送り menu item passes (A and IK waits) and where it stops, from markers drawn between waits. Rance 4.2's Skip until
+  choice item stops at a choice the same way, and doesn't pass SYSTEM3.EXE's K.
 - **US and UG on DS-bound variables.** `US v,n` on a bound variable pushes the array's next n elements, and the save stores
   each as array page << 16 | index with its value; `UG v,n` pops into v and the elements after it, at its pointer then.
   Settled by an SDK test page and `System39.exe`'s saves, which VNDegen's now match byte for byte. Pushing them as
