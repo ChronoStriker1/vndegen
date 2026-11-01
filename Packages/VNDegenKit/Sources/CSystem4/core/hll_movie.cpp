@@ -62,7 +62,7 @@ struct Playback {
     }
     bool run() {
         if (!movie) return false;
-        startMs = G().now();
+        startMs = G().movieNow();
         running = true;
         G().log("movie: playing");
         Movie *m = movie.get();
@@ -72,9 +72,9 @@ struct Playback {
     // Decodes up to the game clock. True when the frame changed.
     bool advance() {
         if (!movie || !running) return false;
-        bool changed = movie->advanceTo((G().now() - startMs) / 1000.0);
+        bool changed = movie->advanceTo((G().movieNow() - startMs) / 1000.0);
         if (changed) {
-            uint32_t at = G().now();
+            uint32_t at = G().movieNow();
             if (count > 0) longestGapMs = std::max(longestGapMs, at - lastShownMs);
             lastShownMs = at;
             count++;
@@ -90,7 +90,7 @@ struct Playback {
         if (running) G().audio.clearStream();
         if (movie && running) {
             Movie::Dry d = movie->dry();
-            double seconds = (G().now() - startMs) / 1000.0;
+            double seconds = (G().movieNow() - startMs) / 1000.0;
             char rate[160];
             std::snprintf(rate, sizeof rate, "showed %d frames, %.2f a second against the movie's %.2f, longest gap %u ms", count,
                           seconds > 0 ? count / seconds : 0.0, movie->frameRate(), longestGapMs);

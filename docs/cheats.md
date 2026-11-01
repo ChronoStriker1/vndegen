@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, and game speed for Godot and Flash, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, Wolf RPG Editor, and AliceSoft System 3 and 4 are built, and game speed for Godot and Flash, see below.
 
 ## Why
 
@@ -41,7 +41,7 @@ Visual novel engines (TyranoScript, Ren'Py, KiriKiri, NScripter, Artemis) don't 
 
 1. The variable and switch editor is included. A save made before editing is the undo, and the editor says so.
 2. Game speed sits with the cheats, in every engine that can do it.
-3. AliceSoft System 3 and 4 get per-game tables that say which variable holds gold, HP and the like, for the library games that have them. The variable list works for every game.
+3. AliceSoft System 3 and 4 get the variable list, and the Variables tab gets a find by value, which finds the variable that holds gold or HP in any game. System 3 games name their variables `VAR0000` and on, or not at all, so per-game tables would mean reading each game's script. System 4 gets gold for the library games whose globals name it. (Revised by the maintainer the same day: tables for System 3 were the first plan.)
 
 ## Suggested order
 
@@ -215,3 +215,25 @@ Set to 4x on the page while the movie ran, it measured 3.999 and 59.1.
 - A timeline's streamed sound, mostly in animated scenes, holds its movie clip to the sound, which plays at normal speed. Such a scene runs at normal speed.
 - Ruffle runs at most 5 of a movie's frames per animation frame, and fewer when the movie's frames take long to run. A 60 fps movie at 4x on a 60 Hz display needs 4, and a 120 Hz display halves that.
 - Music and sounds play at their normal speed.
+
+## Built: AliceSoft System 3 and 4
+
+Both runtimes are VNDegen's own, so their Cheats pages are calls on the runtime's variables, which the games' saves keep as always.
+
+- **System 3** (`vns3.h`): the Variables tab lists the game's variables, 0 to 65,535 each, with the names `System39.ain` gives them, and game speed. Nine of the ten library games name them `VAR0000` and on, and Kichikuou Rance's fan translation names 24, none of them gold or HP. A `SYSTEM3.EXE` game (Rance 4.1 and 4.2) names none, and the tab lists the 512 variables its saves keep.
+- **System 4** (`vns4.h`): the Variables tab lists the game's globals by name: whole numbers to edit, a bool taking 0 or 1, and decimals and text to read. Gold is on the Quick tab for the library games whose globals say which one holds the party's money: `GOLD` in Rance 02, `◆金` in Sengoku Rance and `g_nPartyMoney` in Evenicle. Rance IX, which the runtime doesn't run yet, keeps its money in a structure, so it would get the variables and speed only. The VM runs on a thread of its own, so the cheats work while it waits for the host's next step, which is whenever the game isn't in the middle of a long load.
+- **Find by value**, on every engine's Variables tab: type the number the game shows, such as your gold, and the list keeps the variables that hold it. Change the number in the game, by buying something, then find the new number: the list keeps those of them that hold it, usually one. Show all clears it. The page keeps what it found while the game runs.
+- **Game speed** runs the runtime's clock that many times as fast, so its waits, fades, animations and timers pass sooner. Music plays at normal speed, and a System 4 movie keeps to its sound on a clock of its own, so it plays at normal speed too.
+
+Checked on CachyOS through the runtimes:
+
+- System 3, Kichikuou Rance (`System39.ain`) and Rance 4.1 (`SYSTEM3.EXE`): 806 and 512 variables listed, a variable set to 4,242 and one held to 65,535, and the clock running 3,840 ms for 960 ms of frames at 4x. Kichikuou Rance's save written after the change, in its own `KICHIKUSA.ASD`, loaded with the new value.
+- System 4, Rance 02 and Sengoku Rance: 218 and 107 globals listed, gold found and raised by 1,000, a bool refusing 4,242, and a global of another type refused.
+
+Checked in the app on an iPad simulator (the page and the runtime calls are the same on every device): in Kichikuou Rance, finding 24 kept the two variables holding it, and after one changed to 30, finding 30 kept that one. In Rance 02, the Quick tab showed Gold 0, +10,000 made it 10,000, and the Variables tab's search found `GOLD` at 10,000.
+
+### Known limits
+
+- Party HP, items and the like live in each game's own structures, not in single variables, and aren't offered. Find by value reaches one that is a single variable.
+- A System 4 global that is a structure, an array or a reference isn't listed.
+- In System 3, the game's clock is also where it reads the time of day, which runs that much faster too.

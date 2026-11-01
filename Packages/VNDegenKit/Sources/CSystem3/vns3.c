@@ -80,6 +80,7 @@ VNS3 *vns3_open(const VNS3Config *config, char *err, size_t errSize) {
     if (config->logPath) s->log = fopen(config->logPath, "a");
     s->trace = getenv("S3_TRACE") != NULL;
     s->startTime = config->startTime ? config->startTime : (long long)time(NULL);
+    s->speed = 1;
     s->vars = s3_alloc(65536 * sizeof(u16));
     s->bind = s3_alloc(16384 * sizeof(S3Bind));
     defaults(s);
@@ -149,6 +150,7 @@ void vns3_close(VNS3 *s3) {
     for (int i = 0; i < 101; i++) free(s->msgUnder[i].px);
     if (s->log) fclose(s->log);
     free(s->gameDir);
+    free(s->cheatName);
     free(s->saveDir);
     free(s);
 }
@@ -162,7 +164,7 @@ bool vns3_frame(VNS3 *s3, uint32_t elapsedMs) {
     S3 *s = (S3 *)s3;
     if (s->quit) return false;
     if (s->paused) return true;
-    s->clockMs += elapsedMs > 200 ? 200 : elapsedMs;
+    s->clockMs += (u64)(elapsedMs > 200 ? 200 : elapsedMs) * (u64)s->speed;
     // One held-back button change per frame, so a tap's down and up each reach the game.
     if (s->buttonsQueued && !s->movedThisFrame) {
         u8 e = s->buttonQueue[0];
@@ -248,3 +250,33 @@ const char *vns3_problem(VNS3 *s3) {
     S3 *s = (S3 *)s3;
     return s->problem[0] ? s->problem : NULL;
 }
+
+// ---- cheats ----
+
+int vns3_variable_count(VNS3 *s3) {
+    S3 *s = (S3 *)s3;
+    // A SYSTEM3.EXE game saves variables 0 to 511, all it uses.
+    if (s->sys30) return 512;
+    return s->hasAin ? (int)s->ain.varCount : 0;
+}
+
+const char *vns3_variable_name(VNS3 *s3, int index) {
+    S3 *s = (S3 *)s3;
+    if (s->sys30 || !s->hasAin || index < 0 || (u32)index >= s->ain.varCount || !s->ain.varNames[index]) return NULL;
+    free(s->cheatName);
+    s->cheatName = s3_sjis_to_utf8(s->ain.varNames[index]);
+    return s->cheatName;
+}
+
+int vns3_variable(VNS3 *s3, int index) {
+    if (index < 0 || index >= vns3_variable_count(s3)) return 0;
+    return s3_var_get((S3 *)s3, (u16)index);
+}
+
+bool vns3_set_variable(VNS3 *s3, int index, int value) {
+    if (index < 0 || index >= vns3_variable_count(s3)) return false;
+    s3_var_set((S3 *)s3, (u16)index, (u16)(value < 0 ? 0 : value > 65535 ? 65535 : value));
+    return true;
+}
+
+void vns3_set_speed(VNS3 *s3, int speed) { ((S3 *)s3)->speed = speed < 1 ? 1 : speed > 8 ? 8 : speed; }

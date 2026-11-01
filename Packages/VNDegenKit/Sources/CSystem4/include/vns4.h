@@ -58,6 +58,30 @@ void vns4_text(VNS4Engine *e, const char *utf8);
 // Stops the clock and sound. vns4_step does nothing while paused.
 void vns4_set_paused(VNS4Engine *e, bool paused);
 
+// Runs the game's clock 1 to 8 times as fast, so its waits, animations and timers pass that much sooner. 1 when the
+// game starts.
+void vns4_set_speed(VNS4Engine *e, int speed);
+
+// Cheats, for VNDegen's Cheats page, on the game's own globals, which its saves keep. They work while the game waits
+// for the next vns4_step, which is whenever vns4_step has returned unless a long load is still running.
+// The globals as JSON: {"inGame": true, "gold": n, "variables": [[index, name, value]]}, with whole-number globals as
+// numbers and floats and strings as {"o": text}. "gold" is there for the library games whose globals say which holds
+// the party's money. NULL while the game is running. Valid until the next call.
+const char *vns4_cheat_state(VNS4Engine *e);
+// Sets a whole-number global: an int, a bool (0 or 1), or one of the v6 games' 32-bit counts.
+enum {
+    VNS4_CHEAT_OK = 0,
+    VNS4_CHEAT_BUSY = 1,        // the game is running, as in a long load; try again
+    VNS4_CHEAT_NOT_NUMBER = 2,  // no such global, or not a whole number
+    VNS4_CHEAT_BOOL = 3,        // a bool, which takes only 0 or 1
+};
+int vns4_cheat_set_global(VNS4Engine *e, int index, int32_t value);
+// Whether the game is one whose globals say which holds the party's money.
+bool vns4_cheat_has_gold(VNS4Engine *e);
+// Adds to the party's money, held between 0 and 9,999,999 or the game's amount if higher. False for a game without
+// a money global or while the game is running.
+bool vns4_cheat_add_gold(VNS4Engine *e, int amount);
+
 // How many frames the game has finished. Input set before a frame began has been there for the game to read once the
 // count has passed it; a step that times out while the game is busy doesn't count.
 uint32_t vns4_frames_done(VNS4Engine *e);

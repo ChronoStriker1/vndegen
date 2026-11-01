@@ -65,6 +65,20 @@ const char *vns3_title(VNS3 *s3);
 // A sentence describing the last problem that stopped the game, or NULL.
 const char *vns3_problem(VNS3 *s3);
 
+// Cheats, for VNDegen's Cheats page. They read and write the game's own variables, which its saves keep.
+// How many variables the game has: the ones System39.ain names, or the 512 a SYSTEM3.EXE game saves.
+int vns3_variable_count(VNS3 *s3);
+// A variable's name from System39.ain in UTF-8, such as "VAR0012", or NULL when the game names none. Valid until the
+// next call.
+const char *vns3_variable_name(VNS3 *s3, int index);
+// A variable's value as the game reads it, 0 to 65535.
+int vns3_variable(VNS3 *s3, int index);
+// Sets a variable, held to 0 to 65535. False when the game has no such variable.
+bool vns3_set_variable(VNS3 *s3, int index, int value);
+// Runs the game's clock 1 to 8 times as fast, so its waits, fades and timers pass that much sooner. 1 when the game
+// opens.
+void vns3_set_speed(VNS3 *s3, int speed);
+
 
 #ifdef __cplusplus
 }
