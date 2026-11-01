@@ -449,10 +449,11 @@ Map parseMap(std::span<const uint8_t> data) {
             for (auto &o : pg.condOps) o = p.r.u8();
             for (auto &v : pg.condVars) v = p.r.s32();
             for (auto &v : pg.condValues) v = p.r.s32();
-            pg.moveType = p.r.u8();
+            // In this order, as WodiLib's MpsFileReader reads them.
+            pg.animSpeed = p.r.u8();
             pg.moveSpeed = p.r.u8();
             pg.moveFrequency = p.r.u8();
-            pg.animSpeed = p.r.u8();
+            pg.moveType = p.r.u8();
             pg.flags = p.r.u8();
             uint8_t routeFlags = p.r.u8();
             pg.route = p.route(routeFlags);

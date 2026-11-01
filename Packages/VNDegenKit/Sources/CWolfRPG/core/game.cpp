@@ -293,6 +293,7 @@ int32_t Game::systemNumber(int i) const {
         case 20: return choice_.active ? choice_.cursor : -1;
         case 31: case 32: return gameDat_.fps();
         case 35: return hero_.moving();
+        case 111: return 1;  // the window is active: the runtime only steps while the game is in front
     }
     return i >= 0 && i < int(system_.size()) ? system_[i] : 0;
 }

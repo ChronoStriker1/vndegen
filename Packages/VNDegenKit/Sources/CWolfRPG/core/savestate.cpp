@@ -350,8 +350,8 @@ SaveFile Game::snapshot() {
         c.hidden = e.page < 0 || !e.actor.chara.visible;
         if (e.page >= 0) {
             const MapPage &pg = e.data->pages[e.page];
-            c.route.flags = {pg.moveType, pg.moveSpeed, pg.moveFrequency, pg.animSpeed, pg.flags, pg.route.flags};
-            c.unknown9 = {0, uint16_t(pg.moveSpeed), uint16_t(pg.moveFrequency), uint16_t(pg.animSpeed ? pg.animSpeed : 3), 0, 0};
+            c.route.flags = {pg.animSpeed, pg.moveSpeed, pg.moveFrequency, pg.moveType, pg.flags, pg.route.flags};
+            c.unknown9 = {0, uint16_t(pg.moveSpeed), uint16_t(pg.moveFrequency), uint16_t(pg.moveType ? pg.moveType : 3), 0, 0};
         }
         c.route.steps.clear();
         c.route2.steps.clear();

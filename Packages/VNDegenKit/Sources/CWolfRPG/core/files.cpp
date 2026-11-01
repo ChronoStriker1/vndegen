@@ -45,7 +45,7 @@ GameFiles::GameFiles(fs::path root) : root_(std::move(root)) {
 // The path as it is on disk, matched without regard to case as Windows matches it (casepath, shared by the engines).
 std::optional<fs::path> GameFiles::findCaseless(const fs::path &base, const std::string &rel) const {
     // Games name files from Data or the game folder, "../Save/x.png" among them, but never outside the game folder.
-    fs::path joined = (base / rel).lexically_normal(), top = root_.lexically_normal();
+    fs::path joined = fs::absolute(base / rel).lexically_normal(), top = fs::absolute(root_).lexically_normal();
     auto [inJoined, inTop] = std::mismatch(joined.begin(), joined.end(), top.begin(), top.end());
     if (inTop != top.end() && !(std::next(inTop) == top.end() && inTop->empty())) return std::nullopt;
     std::string want = (base / rel).string();
