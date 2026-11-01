@@ -49,6 +49,26 @@
       },
       "versions": [
         {
+          "version": "0.20.3",
+          "buildVersion": "1065",
+          "date": "2026-11-01T16:41:18Z",
+          "localizedDescription": "Skip and Auto in TyranoScript games now work the way they do in other visual novels.\n\n## Downloads\n\n- `VNDegen-0.20.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.20.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- TyranoScript: tapping a game's Skip or Auto button works at any moment, including while a line is typing or the game is waiting. Before, the tap was ignored then.\n- TyranoScript: a second tap turns the mode off. Before, it started the mode again.\n- TyranoScript: the running button glows blue, so you can see which mode is on.\n- TyranoScript: Skip passes unread text, unless the game's own settings screen stores a choice about that. Most games stopped Skip at the first unread line, so the button looked dead on a first playthrough.\n\n## Known limits\n\n- TyranoScript: these changes were checked on the iPad simulator, not on the Mac app or a real iPad.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.20.3/VNDegen-0.20.3.ipa",
+          "size": 122350549,
+          "sha256": "377869e717369735a6040661852ced70118a2d236af0f0d065118ba5db2f29f0",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.20.2",
+          "buildVersion": "1057",
+          "date": "2026-11-01T16:13:39Z",
+          "localizedDescription": "Fixes the hero not showing in new games in several Wolf RPG Editor games.\n\n## Downloads\n\n- `VNDegen-0.20.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.20.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- Wolf RPG Editor: a new game now shows the hero in ANGEL QUEST and MARAGON QUEST, and in other games that set the party's graphics the same way, such as Parade Buster, YUME-SAME and Holy Grail. Before, the hero was invisible.\n\n## Known limits\n\n- Wolf RPG Editor: a save made in VNDegen while the hero was invisible stays that way until the game sets the party's graphics again.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.20.2/VNDegen-0.20.2.ipa",
+          "size": 122349189,
+          "sha256": "d53a940ea9e2185375ca352a1c57dfcd1052fcf3bb0c0740cdf52c1b3c7a27e7",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.20.1",
           "buildVersion": "1052",
           "date": "2026-11-01T15:31:47Z",
