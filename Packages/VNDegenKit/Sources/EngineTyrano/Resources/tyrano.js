@@ -132,16 +132,25 @@
     const modeRole = (el) => { const role = el instanceof Element ? roleOf(el) : ''; return role === 'skip' || role === 'auto' ? role : ''; };
     const runningModes = (stat) => ({ skip: stat.is_skip === true, auto: stat.is_auto === true });
     let modesAtPress = null;
+    // Set only between a press's release and the click that release sends, which the browser delivers together. A press
+    // that never ends in a click, or a click with no press, such as Tyrano's own focus sends, leaves nothing behind here.
+    let modesBeforeClick = null;
 
     document.addEventListener('mousedown', (event) => {
         const k = kag();
         modesAtPress = k && k.stat && modeRole(event.target) ? runningModes(k.stat) : null;
     }, true);
 
+    document.addEventListener('mouseup', () => {
+        modesBeforeClick = modesAtPress;
+        modesAtPress = null;
+        setTimeout(() => { modesBeforeClick = null; }, 0);
+    }, true);
+
     document.addEventListener('click', (event) => {
         const k = kag(), role = modeRole(event.target);
-        const was = modesAtPress;
-        modesAtPress = null;
+        const was = modesBeforeClick;
+        modesBeforeClick = null;
         if (!k || !k.stat || !k.layer || !role) return;
         const stat = k.stat, running = was || runningModes(stat);
         const busy = !stat.is_strong_stop && (stat.is_adding_text || k.layer.layer_event.css('display') === 'none');

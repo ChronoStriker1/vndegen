@@ -238,6 +238,23 @@ for (const id of ['skip', 'auto']) document.getElementById(id).addEventListener(
     #expect(try await read(view, "[stat.is_auto, orders].join()") == "false,0")
 }
 
+@MainActor @Test func aCanceledPressDoesNotDecideALaterActivation() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    let press = { (type: String) in "document.getElementById('auto').dispatchEvent(new MouseEvent('\(type)', { bubbles: true, cancelable: true }))" }
+    // The press never ends on the button, then Auto stops some other way, and Tyrano's focus activates it with a click alone.
+    for ending in ["", "document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))"] {
+        _ = try await read(view, "tap('auto')")
+        _ = try await read(view, press("mousedown"))
+        _ = try await read(view, ending.isEmpty ? "0" : ending)
+        _ = try await read(view, "stat.is_auto = false")
+        try await Task.sleep(for: .milliseconds(50))
+        _ = try await read(view, "document.getElementById('auto').click()")
+        #expect(try await read(view, "stat.is_auto") == "true", "ending: \(ending)")
+        _ = try await read(view, "stat.is_auto = false")
+    }
+}
+
 @MainActor @Test func skipPassesUnreadTextUnlessTheGameStoredAChoice() async throws {
     let (view, loader) = try await modesView()
     _ = loader
