@@ -129,6 +129,9 @@ struct PlayerView: View {
         .onChange(of: hub.input.mouse.showsKeyboard) { _, shows in
             if !shows, !menu.isOpen { session.view.becomeFirstResponder() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .gameWantsKeyboard, object: session)) { note in
+            if note.userInfo?["wants"] as? Bool == true { hub.input.mouse.showKeyboard() } else { hub.input.mouse.hideKeyboard() }
+        }
         #endif
     }
 

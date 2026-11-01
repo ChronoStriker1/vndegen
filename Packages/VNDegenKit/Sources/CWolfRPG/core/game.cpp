@@ -125,11 +125,15 @@ void Game::returnToTitle() {
         log(std::string("cannot reread the databases: ") + e.what());
     }
     eventSelf_.clear();
+    xyNumbered_.clear();
+    xyNamed_.clear();
+    textEntry_ = {};
     threads_.clear();
     parallel_.clear();
     mapParallel_.clear();
     pictures_.clear();
     events_.clear();
+    madeEvents_.clear();
     map_.reset();
     mapId_ = loadedMap_ = -1;
     choice_ = {};
@@ -138,8 +142,12 @@ void Game::returnToTitle() {
     party_ = {};
     cameraX_ = cameraY_ = scrollX_ = scrollY_ = 0;
     moveDuringEvents_ = haltNonPicture_ = scrollLocked_ = false;
-    autoKeys_ = 0;
-    keyControl_ = 0;
+    autoKeys_ = autoMouse_ = 0;
+    autoKeyCodes_.reset();
+    autoWheel_ = 0;
+    basicControl_ = {};
+    keyboardOff_ = mouseOff_ = false;
+    keyCodesOff_.reset();
     shake_ = {};
     mapZoom_ = {100, 100};
     mapZoomX_ = mapZoomY_ = {};
@@ -243,6 +251,7 @@ int32_t *Game::dbNumberCell(int32_t id) { return dbCell<int32_t>({&udb_, &cdb_, 
 std::string *Game::dbStringCell(int32_t id) { return dbCell<std::string>({&udb_, &cdb_, &sdb_}, id, true); }
 
 bool Game::isStringVar(int32_t id) const {
+    if (id >= 9100000 && id < 9200000 && (id - 9100000) % 10 == 9) return true;
     if (id >= 3000000 && id < 4000000) return true;
     if (id >= 9900000 && id < 10000000) return true;
     if (id >= 1600005 && id < 1600010) return true;
@@ -263,7 +272,50 @@ int32_t Game::value(int32_t v, const Thread &t) {
     return readVar(v, t);
 }
 
+// A system variable, some of which report the engine's state (the manual's system variable list).
+int32_t Game::systemNumber(int i) const {
+    // 77 to 82 are the local date and time, which games copy into their saves for the save screen.
+    if (i >= 77 && i <= 82) {
+        std::time_t now = std::time(nullptr);
+        std::tm tm{};
+#ifdef _WIN32
+        localtime_s(&tm, &now);
+#else
+        localtime_r(&now, &tm);
+#endif
+        const int parts[] = {tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec};
+        return parts[i - 77];
+    }
+    switch (i) {
+        // Parade Buster confirms a choice with a click when this reads 1, as a click does on the PC.
+        case 12: return message_.active || choice_.active;
+        case 13: return !threads_.empty();
+        case 20: return choice_.active ? choice_.cursor : -1;
+        case 31: case 32: return gameDat_.fps();
+        case 35: return hero_.moving();
+        case 111: return 1;  // the window is active: the runtime only steps while the game is in front
+    }
+    return i >= 0 && i < int(system_.size()) ? system_[i] : 0;
+}
+
+// The character a variable address names: 9100000 + 10 * Y + X a map event, 9180000 + 10 * Y + X the hero (0) or a party
+// member, and 9190000 + X this event.
+Actor *Game::actorAtAddress(int32_t id, const Thread &t) {
+    if (id < 9100000 || id >= 9200000) return nullptr;
+    if (id >= 9190000) return actorFor(-1, t);
+    if (id >= 9180000) {
+        int member = (id - 9180000) / 10;
+        return member == 0 ? &hero_ : member <= int(party_.size()) ? &party_[member - 1] : nullptr;
+    }
+    return actorFor((id - 9100000) / 10, t);
+}
+
 int32_t Game::readVar(int32_t id, const Thread &t) {
+    // A number read from a string variable is the number its text starts with (Two Beasts keeps labels this way).
+    if (isStringVar(id)) {
+        long long n = std::strtoll(readStr(id, t).c_str(), nullptr, 10);
+        return int32_t(std::clamp<long long>(n, INT32_MIN, INT32_MAX));
+    }
     if (id >= 2000000 && id < 2100000) return id - 2000000 < int(normal_.size()) ? normal_[id - 2000000] : 0;
     if (id >= 2100000 && id < 3000000) {
         int bank = (id - 2100000) / 100000, i = (id - 2100000) % 100000;
@@ -273,19 +325,7 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
         int range = id - 8000000;
         return std::uniform_int_distribution<int>(0, std::max(0, range))(rng_);
     }
-    // System variables 77 to 82 are the local date and time, which games copy into their saves for the save screen.
-    if (id >= 9000077 && id <= 9000082) {
-        std::time_t now = std::time(nullptr);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &now);
-#else
-        localtime_r(&now, &tm);
-#endif
-        const int parts[] = {tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec};
-        return parts[id - 9000077];
-    }
-    if (id >= 9000000 && id < 9100000) return id - 9000000 < int(system_.size()) ? system_[id - 9000000] : 0;
+    if (id >= 9000000 && id < 9100000) return systemNumber(id - 9000000);
     if (id >= 1000000000) {
         const Database &db = id >= 1300000000 ? sdb_ : id >= 1100000000 ? cdb_ : udb_;
         // 1 X TT DDDD FF: X picks the database, then type, row and field.
@@ -295,7 +335,19 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
         return dbNumber(db, type, row, field);
     }
     if (int32_t *s = selfSlot(id, t)) return *s;
-    if (id >= 9180000 && id < 9200000) return 0;  // hero and event info, filled in with movement
+    if (Actor *a = actorAtAddress(id, t)) {
+        // The fields of a character's address (the manual's variable list): tile, half tile, height, shadow, direction.
+        switch ((id - 9100000) % 10) {
+            case 0: return a->tx;
+            case 1: return a->ty;
+            case 2: return a->tx * 2;
+            case 3: return a->ty * 2;
+            case 4: return a->chara.lift;
+            case 5: return a->chara.shadow;
+            case 6: return a->chara.direction;
+            default: return 0;
+        }
+    }
     return id;
 }
 
@@ -311,6 +363,20 @@ void Game::writeVar(int32_t id, int32_t v, const Thread &t) {
         size_t i = (id - 2100000) % 100000;
         if (i >= spare_[bank].size()) spare_[bank].resize(i + 1);
         spare_[bank][i] = v;
+        return;
+    }
+    if (Actor *a = actorAtAddress(id, t)) {
+        // Writing a position moves the character there at once. The PC engine walks it at its speed.
+        switch ((id - 9100000) % 10) {
+            case 0: a->placeAt(v, a->ty); break;
+            case 1: a->placeAt(a->tx, v); break;
+            case 2: a->placeAt(v / 2, a->ty); break;
+            case 3: a->placeAt(a->tx, v / 2); break;
+            case 4: a->chara.lift = v; break;
+            case 5: a->chara.shadow = v; break;
+            case 6: a->chara.direction = v; break;
+            default: break;
+        }
         return;
     }
     if (id >= 9000000 && id < 9100000) {
@@ -331,6 +397,11 @@ void Game::writeVar(int32_t id, int32_t v, const Thread &t) {
 }
 
 std::string Game::readStr(int32_t id, const Thread &t) const {
+    // Field 9 of a character's address is its image file.
+    if (id >= 9100000 && id < 9200000 && (id - 9100000) % 10 == 9) {
+        const Actor *a = const_cast<Game *>(this)->actorAtAddress(id, t);
+        return a ? a->chara.graphic : "";
+    }
     if (id >= 3000000 && id < 4000000) return id - 3000000 < int(strings_.size()) ? strings_[id - 3000000] : "";
     if (id >= 9900000 && id < 10000000)
         return id - 9900000 < int(systemStrings_.size()) ? systemStrings_[id - 9900000] : "";
@@ -348,6 +419,10 @@ std::string Game::readStr(int32_t id, const Thread &t) const {
 }
 
 void Game::writeStr(int32_t id, const std::string &s, const Thread &t) {
+    if (id >= 9100000 && id < 9200000 && (id - 9100000) % 10 == 9) {
+        if (Actor *a = actorAtAddress(id, t)) a->chara.graphic = s;
+        return;
+    }
     if (id >= 3000000 && id < 4000000) {
         size_t i = id - 3000000;
         if (i >= strings_.size()) strings_.resize(i + 1);
@@ -435,7 +510,7 @@ std::string Game::expandText(const std::string &text, const Thread *t) const {
             i = close;
         } else if (code("sys")) {
             int n = number(i + 4);
-            if (n >= 0 && n < int(system_.size())) out += std::to_string(system_[n]);
+            if (n >= 0 && n < int(system_.size())) out += std::to_string(systemNumber(n));
             i = close;
         } else if (code("sysS")) {
             int n = number(i + 5);
@@ -475,6 +550,7 @@ bool Game::loadMap(int id) {
     for (auto *list : {&parallel_, &mapParallel_})
         for (auto &t : *list) dropMapWait(t);
     events_.clear();
+    eventNames_.clear();
     for (auto &ev : map_->events) {
         MapEventState s;
         s.data = &ev;
@@ -569,9 +645,8 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 // Frame
 
 void Game::update(const Input &input) {
-    input_ = input;
-    for (size_t k = 0; k < heldFrames_.size(); k++)
-        heldFrames_[k] = ((input.held | autoKeys_) >> k) & 1 ? heldFrames_[k] + 1 : 0;
+    gatherInput(input);
+    updateTextEntry();
     frame_++;
     // A load requested last frame takes effect before anything runs (savestate.cpp).
     if (pendingLoad_) applyPendingLoad();
@@ -582,26 +657,39 @@ void Game::update(const Input &input) {
         if (system_[28] % gameDat_.fps() == 0) system_[29]++;
     }
 
+    // System variable 73 lets a click work the game's messages and choices.
+    bool mouseText = system_.size() > 73 && system_[73] == 1;
     // Choices take the keys while they are open.
     if (choice_.active && !choice_.visible.empty()) {
         int n = int(choice_.visible.size());
-        if (input.pressed & KeyDown) choice_.cursor = (choice_.cursor + 1) % n;
-        if (input.pressed & KeyUp) choice_.cursor = (choice_.cursor + n - 1) % n;
-        if (input.pressed & KeyConfirm) {
+        if (input_.pressed & KeyDown) choice_.cursor = (choice_.cursor + 1) % n;
+        if (input_.pressed & KeyUp) choice_.cursor = (choice_.cursor + n - 1) % n;
+        bool click = false;
+        if (mouseText && choiceBox_.lineH > 0 && mouseX_ >= choiceBox_.x && mouseX_ < choiceBox_.x + choiceBox_.w &&
+            mouseY_ >= choiceBox_.y && mouseY_ < choiceBox_.y + choiceBox_.lineH * n) {
+            int under = int((mouseY_ - choiceBox_.y) / choiceBox_.lineH);
+            if (mouseX_ != lastMouseX_ || mouseY_ != lastMouseY_ || (input_.mousePressed & MouseLeft)) choice_.cursor = under;
+            click = input_.mousePressed & MouseLeft;
+        }
+        if ((input_.pressed & KeyConfirm) || click) {
             choice_.result = choice_.visible[choice_.cursor] + 1;
             choice_.active = false;
-        } else if ((input.pressed & KeyCancel) && choice_.cancelCase >= 0) {
+        } else if (((input_.pressed & KeyCancel) || (mouseText && (input_.mousePressed & MouseRight))) && choice_.cancelCase >= 0) {
             choice_.result = choice_.cancelCase;
             choice_.active = false;
         }
         input_.pressed &= ~(KeyConfirm | KeyCancel);
+        if (!choice_.active && message_.heldForChoice) message_.active = false;
     }
     // Messages type one character a frame. The first confirm shows the rest at once, the next closes the window.
     if (message_.active) {
-        if (message_.shown < message_.total) {
-            if (input.pressed & (KeyConfirm | KeyCancel)) message_.shown = message_.total;
+        bool advance = (input_.pressed & (KeyConfirm | KeyCancel)) || (mouseText && (input_.mousePressed & MouseLeft));
+        if (message_.heldForChoice) {
+            message_.shown = std::min(message_.shown + 1, message_.total);
+        } else if (message_.shown < message_.total) {
+            if (advance) message_.shown = message_.total;
             else message_.shown++;
-        } else if (input.pressed & (KeyConfirm | KeyCancel)) {
+        } else if (advance) {
             message_.active = false;
         }
         // The press that finishes or closes a message is used up, so it doesn't also talk to the event in front.
@@ -656,8 +744,10 @@ void Game::update(const Input &input) {
     }
 
     // Parallel map event pages.
-    if (mapParallel_.size() != events_.size()) mapParallel_.assign(events_.size(), Thread{});
-    for (size_t i = 0; i < events_.size(); i++) {
+    // A hidden code can add events while parallel ones run.
+    if (mapParallel_.size() != events_.size()) mapParallel_.resize(events_.size());
+    // An event added while these run starts on the next frame.
+    for (size_t i = 0, count = mapParallel_.size(); i < count; i++) {
         auto &e = events_[i];
         if (e.page < 0 || e.data->pages[e.page].trigger != 2) continue;
         Thread &t = mapParallel_[i];
@@ -689,7 +779,6 @@ void Game::update(const Input &input) {
         shake_.offset = shake_.frames ? std::sin(frame_ * 0.3 * shake_.speed) * shake_.power * 2 : 0;
     }
     if (transition_.frames > 0 && ++transition_.elapsed >= transition_.frames) transition_.frames = 0;
-    autoKeys_ = 0;
     tintR_.step();
     tintG_.step();
     tintB_.step();
@@ -699,7 +788,9 @@ void Game::update(const Input &input) {
 
 void Game::updatePictures() {
     for (auto &[n, p] : pictures_) {
-        for (Tween *tw : {&p.x, &p.y, &p.opacity, &p.zoomX, &p.zoomY, &p.angle, &p.r, &p.g, &p.b}) tw->step();
+        for (Tween *tw : {&p.x, &p.y, &p.opacity, &p.zoomX, &p.zoomY, &p.angle, &p.r, &p.g, &p.b, &p.effectZoom, &p.effectZoomX,
+                          &p.effectZoomY})
+            tw->step();
         if (p.autoPatternMode && ++p.autoTimer >= p.autoInterval) {
             p.autoTimer = 0;
             int next = p.pattern + p.autoDir;

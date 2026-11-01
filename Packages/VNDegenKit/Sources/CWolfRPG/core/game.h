@@ -7,6 +7,7 @@
 #include "files.h"
 
 #include <array>
+#include <bitset>
 #include <deque>
 #include <cstdlib>
 #include <cstdint>
@@ -14,6 +15,7 @@
 #include <map>
 #include <memory>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -30,9 +32,37 @@ enum Key : uint32_t {
     KeySub = 1 << 6,
 };
 
+// Mouse buttons, as bits of Input's mouse fields.
+enum MouseButton : uint32_t {
+    MouseLeft = 1 << 0,
+    MouseRight = 1 << 1,
+    MouseMiddle = 1 << 2,
+};
+
+// Keyboard keys by Wolf's own key code, 100 and up: 100 plus the DirectInput scan code of the key (the manual's key
+// input page and WodiLib's KeyboardCode).
+constexpr int kKeyCodeCount = 356;
+using KeyCodes = std::bitset<kKeyCodeCount>;
+
 struct Input {
     uint32_t held = 0;
     uint32_t pressed = 0;  // went down this frame
+    KeyCodes keysHeld, keysPressed;
+    int mouseX = 0, mouseY = 0;  // in the game's pixels
+    uint32_t mouseHeld = 0, mousePressed = 0;
+    int wheel = 0;  // notches this frame, positive away from the player
+};
+
+// An XY array (Wolf RPG Editor 3's command 255): numbers by X, then by Y.
+using XYArray = std::vector<std::vector<int32_t>>;
+
+// A picture named <XY_IMAGE/A=../R=../G=../B=../XSIZE=../YSIZE=..> or <XYN_IMAGE/...>, the second going by array names:
+// copies of the four arrays, null where one is missing or left empty, and the image's size. The picture shows them as
+// they were when shown. The manual's picture page: an empty alpha means 255 and an empty colour 0, and without XSIZE or
+// YSIZE the largest array gives the size.
+struct XYImage {
+    std::array<std::shared_ptr<const XYArray>, 4> channels{};  // A, R, G, B
+    int w = 0, h = 0;
 };
 
 // What a picture shows: an image file, text, or a window skin stretched to a size.
@@ -59,6 +89,9 @@ struct Picture {
     int blend = 0;       // 0 normal, 1 add, 2 subtract, 3 multiply
     int divX = 1, divY = 1, pattern = 1;
     int imageW = 0, imageH = 0;  // size of the image file, the text or the window, for the variable command
+    // <CUT/Xa-b/Yc-d> before a file name shows that part of each pattern, in pixels, inclusive. cutW is 0 without one.
+    int cutX = 0, cutY = 0, cutW = 0, cutH = 0;
+    std::shared_ptr<const XYImage> xyImage;  // for a picture made from XY arrays
     int windowW = 0, windowH = 0;  // size of a window picture: a window skin stretched, or a shape
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
@@ -68,6 +101,8 @@ struct Picture {
     int shakePower = 0, shakeSpeed = 0, shakeFrames = 0;
     double shakeOffset = 0;
     int shiftX = 0, shiftY = 0;  // the effect command's draw position shift, added to the position when drawing
+    // The effect command's zoom: the picture scales around a screen point by this rate, on top of its own zoom.
+    Tween effectZoom{100, 100}, effectZoomX, effectZoomY;
     // The effect command's pulse (点滅A): the colour swings to its value plus these offsets and back, once every two
     // intervals. An interval of 0 stops it.
     std::array<int, 3> pulse{0, 0, 0};
@@ -102,6 +137,16 @@ struct MessageState {
     int face = -1;           // face graphic from "@n" at the start of the text, or -1
     size_t shown = 0, total = 0;  // characters typed so far, and in all
     bool instant = false;
+    bool heldForChoice = false;  // stays up until the choice after it is answered
+};
+
+// The string command's keyboard mode while the player types.
+struct TextEntry {
+    bool active = false;
+    int32_t target = 0;
+    int maxLength = 0;
+    bool canCancel = false;
+    std::string text;
 };
 
 // A character on the map: the hero, a party member following the hero, or a map event.
@@ -138,7 +183,7 @@ struct Thread {
     };
     std::vector<Call> stack;
     int wait = 0;
-    bool waitingMessage = false, waitingChoice = false;
+    bool waitingMessage = false, waitingChoice = false, waitingText = false;
     int choiceIndent = 0;
     const struct Actor *waitingRoute = nullptr;
     bool done() const { return stack.empty(); }
@@ -199,7 +244,13 @@ public:
     const GameFiles &files() const { return files_; }
     const std::map<int, Picture> &pictures() const { return pictures_; }
     const ChoiceState &choice() const { return choice_; }
+    void setChoiceBox(float x, float y, float w, float lineH) const { choiceBox_ = {x, y, w, lineH}; }
     const MessageState &message() const { return message_; }
+    const TextEntry &textEntry() const { return textEntry_; }
+    const XYArray *xyArray(int number) const;
+    const XYArray *xyArray(const std::string &name) const;
+    // Text the player typed, for the string command's keyboard mode. Does nothing when it isn't waiting.
+    void typeText(const std::string &utf8);
     const Map *map() const { return map_.get(); }
     int mapId() const { return mapId_; }
     // The hero's tile and facing, for tests and the debug status.
@@ -224,6 +275,7 @@ public:
     std::string faceGraphic(int n) const;
     int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
     std::string systemString(int i) const;
+    int32_t systemNumber(int i) const;
     std::array<uint8_t, 3> textColor(int i) const;
     uint64_t frameCount() const { return frame_; }
     const ShakeState &shake() const { return shake_; }
@@ -288,6 +340,13 @@ private:
     void pictureCommandOne(Thread &t, const Command &c, int number);
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
+    void extendedString(Thread &t, const Command &c, int32_t target, int op);
+    std::string expandRegexCodes(const std::string &pattern, const Thread &t) const;
+    std::string hiddenCode(const std::string &name, const std::string &arg);
+    std::string makeEvent(const std::string &options, const std::string &image);
+    std::string findPath(const std::string &options);
+    void startTextEntry(Thread &t, const Command &c);
+    void updateTextEntry();
     std::string textAt(int32_t address, const Thread &t);
     void showMessage(std::string text);
     bool condition(Thread &t, const Command &c);
@@ -296,6 +355,11 @@ private:
     const CommonEvent *commonById(int id) const;
     void databaseCommand(Thread &t, const Command &c);
     void setVariablePlus(Thread &t, const Command &c);
+    void csvCommand(Thread &t, const Command &c);
+    void dbRowCommand(Thread &t, const Command &c);  // 252: copying and sorting rows
+    void xyCommand(Thread &t, const Command &c);     // 255
+    void xySortCommand(Thread &t, const Command &c);  // 257
+    XYArray *xyTarget(Thread &t, const Command &c, bool create);
     bool keyInput(Thread &t, const Command &c);
     void partyCommand(Thread &t, const Command &c);
     void effectCommand(Thread &t, const Command &c);
@@ -342,6 +406,12 @@ private:
     // --- end of savestate.cpp declarations ---
     Database *databaseKind(int kind);
     uint32_t keysNow() const;
+    void gatherInput(const Input &input);  // this frame's input: the host's, with auto input and the game's key rules
+    void keyControl(Thread &t, const Command &c);  // command 126
+    void autoInput(Thread &t, const Command &c);   // command 125
+    bool pictureUnderMouse(const Picture &p) const;
+    int eventUnderMouse() const;
+    void chooseWithMouse(int n);
 
     // Maps and events.
     bool loadMap(int id);
@@ -355,6 +425,7 @@ private:
 
     // Characters (characters.cpp).
     Actor *actorFor(int target, const Thread &t);  // -1 this event, -2 the hero, 0 and up a map event id
+    Actor *actorAtAddress(int32_t id, const Thread &t);
     uint32_t tileFlags(int x, int y) const;         // passability of the uppermost tile that decides it
     bool canMove(const Actor &a, int dir) const;
     bool step(Actor &a, int dir);                  // starts a step; false when blocked
@@ -385,7 +456,12 @@ private:
 
     int mapId_ = -1, loadedMap_ = -1;
     std::shared_ptr<Map> map_;
-    std::vector<MapEventState> events_;
+    // A deque, so an event a hidden code adds moves no other: moves in progress point at their characters.
+    std::deque<MapEventState> events_;
+    // Events hidden codes made. They leave events_ with the map, as the manual says, but stay here until the title,
+    // since a call that outlives the map change may still be running one's commands.
+    std::deque<MapEvent> madeEvents_;
+    std::map<int, std::string> eventNames_;  // names hidden codes gave events, by id
     // Self variables of map events, kept per map and event id for as long as the game runs.
     std::map<std::pair<int, int>, std::array<int32_t, 10>> eventSelf_;
     Actor hero_;
@@ -398,8 +474,14 @@ private:
     std::vector<Thread> parallel_;     // parallel common events, one per event
     std::vector<Thread> mapParallel_;  // parallel map event pages
     std::map<int, Picture> pictures_;
+    std::map<std::string, std::array<int, 2>> imageSizes_;  // of image files, by name: the game's data doesn't change
+    std::map<int32_t, XYArray> xyNumbered_;
+    std::map<std::string, XYArray> xyNamed_;
     ChoiceState choice_;
     MessageState message_;
+    TextEntry textEntry_;
+    Thread textEntryScope_;  // a copy of the call that asked, whose self variables the target may name
+    std::set<std::string> hiddenCodesLogged_;  // what has been logged once: hidden codes and missing event names
     Tween tintR_, tintG_, tintB_;
     Input input_;
     std::array<int, 7> heldFrames_{};  // frames each Wolf key has been held, by bit of Key
@@ -414,13 +496,32 @@ private:
     bool moveDuringEvents_ = false, haltNonPicture_ = false, scrollLocked_ = false;
     bool pendingTitle_ = false, quitRequested_ = false;
     std::string soundFont_, soundFontFallback_;
-    uint32_t autoKeys_ = 0;
-    int keyControl_ = 0;
+    // What command 125 presses, which counts as input on the next frame.
+    uint32_t autoKeys_ = 0, autoMouse_ = 0;
+    KeyCodes autoKeyCodes_;
+    int autoWheel_ = 0;
+    // Command 126: for each Wolf key, 0 accepts it, 1 stops it moving the hero or starting events, and 2 stops it
+    // altogether. Keys the game turned off by device.
+    std::array<int, 7> basicControl_{};
+    bool keyboardOff_ = false, mouseOff_ = false;
+    KeyCodes keyCodesOff_;
+    // Last frame's state, for the edges of pressing and letting go.
+    uint32_t lastHeld_ = 0, lastMouseHeld_ = 0;
+    KeyCodes lastKeysHeld_;
+    std::array<int, 3> mouseHeldFrames_{};
+    std::array<int, kKeyCodeCount> keyHeldFrames_{};
+    int mouseX_ = 0, mouseY_ = 0, lastMouseX_ = 0, lastMouseY_ = 0, hostMouseX_ = -1, hostMouseY_ = -1;
+    // Where the renderer drew the choice window, for the mouse. Zero height until it first draws.
+    struct ChoiceBox { float x = 0, y = 0, w = 0, lineH = 0; };
+    mutable ChoiceBox choiceBox_;
     ShakeState shake_;
     Tween mapZoom_{100, 100}, mapZoomX_, mapZoomY_;
     TransitionState transition_;
     int transitionFrames_ = 0;
     double scrollX_ = 0, scrollY_ = 0;
 };
+
+class Game;
+XYImage resolveXYImage(const std::string &source, const Game &game);
 
 }  // namespace wolf

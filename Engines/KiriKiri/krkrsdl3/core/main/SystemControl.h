@@ -18,6 +18,8 @@ class tTVPSystemControl
 {
 private: // ユーザー宣言
     bool ContinuousEventCalling;
+    tjs_uint64 NextContinuousTick = 0;
+    bool ContinuousEventDue();
     bool AutoShowConsoleOnError;
 
     bool EventEnable;

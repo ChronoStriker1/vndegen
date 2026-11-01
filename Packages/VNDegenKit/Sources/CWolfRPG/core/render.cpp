@@ -25,7 +25,7 @@ void line(Bitmap &b, float x0, float y0, float x1, float y1, int thick) {
 }
 
 // Wolf's generated shapes, which a window picture shows when its file name is one of these codes: <SQUARE>,
-// <LINE> or <LINE-n> (n pixels thick), <TRI-UP>, <TRI-DOWN>, <TRI-LEFT> and <TRI-RIGHT>, each with FRAME after it
+// <LINE> or <LINE-n> (n pixels thick), <CIRCLE>, <TRI-UP>, <TRI-DOWN>, <TRI-LEFT> and <TRI-RIGHT>, each with FRAME after it
 // for the outline only, and <GRADX-aaa-bbb> and <GRADY-aaa-bbb>, gradients between two colours given as red, green
 // and blue levels from 0 to 9. Shapes are white unless a gradient; the picture's colour tints them. False when the
 // name is no shape.
@@ -48,13 +48,27 @@ bool makeShape(const std::string &name, int w, int h, Bitmap &out, float &offset
     }
     if (w <= 0 || h <= 0) {
         out = Bitmap();
-        return code == "SQUARE" || code.rfind("TRI-", 0) == 0 || code.rfind("GRAD", 0) == 0;
+        return code == "SQUARE" || code == "CIRCLE" || code.rfind("TRI-", 0) == 0 || code.rfind("GRAD", 0) == 0;
     }
     if (code == "SQUARE") {
         out = Bitmap(w, h);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
                 if (!frame || x == 0 || y == 0 || x == w - 1 || y == h - 1) plot(out, x, y);
+        return true;
+    }
+    if (code == "CIRCLE") {
+        // An ellipse filling the size. Its outline is the pixels with a neighbour outside it.
+        out = Bitmap(w, h);
+        float rx = w / 2.0f, ry = h / 2.0f;
+        auto inside = [&](int x, int y) {
+            float dx = (x + 0.5f - rx) / rx, dy = (y + 0.5f - ry) / ry;
+            return dx * dx + dy * dy <= 1;
+        };
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (inside(x, y) && (!frame || !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1)))
+                    plot(out, x, y);
         return true;
     }
     if (code.rfind("TRI-", 0) == 0) {
@@ -132,13 +146,34 @@ void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opa
 const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offsetX, float &offsetY) {
     CachedImage &cached = pictureImages_[number];
     int w = p.kind == PictureKind::Window ? p.windowW : 0, h = p.kind == PictureKind::Window ? p.windowH : 0;
-    if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h) {
+    bool fromArrays = p.kind == PictureKind::File;
+    // An image made from arrays is made when shown, so it follows the generation rather than the name.
+    if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h ||
+        (fromArrays && cached.generation != p.generation)) {
         cached.kind = p.kind;
         cached.source = p.source;
         cached.w = w;
         cached.h = h;
+        cached.generation = p.generation;
         cached.offsetX = cached.offsetY = 0;
-        if (p.kind == PictureKind::Text) {
+        if (fromArrays) {
+            static const XYImage empty;
+            const XYImage &xy = p.xyImage ? *p.xyImage : empty;
+            cached.bitmap = xy.w > 0 && xy.h > 0 ? Bitmap(xy.w, xy.h) : Bitmap();
+            auto at = [](const std::shared_ptr<const XYArray> &a, int x, int y, int fallback) {
+                if (!a) return fallback;
+                return x < int(a->size()) && y < int((*a)[x].size()) ? (*a)[x][y] : 0;
+            };
+            for (int y = 0; y < xy.h; y++) {
+                uint8_t *row = cached.bitmap.row(y);
+                for (int x = 0; x < xy.w; x++) {
+                    row[x * 4 + 0] = uint8_t(std::clamp(at(xy.channels[1], x, y, 0), 0, 255));
+                    row[x * 4 + 1] = uint8_t(std::clamp(at(xy.channels[2], x, y, 0), 0, 255));
+                    row[x * 4 + 2] = uint8_t(std::clamp(at(xy.channels[3], x, y, 0), 0, 255));
+                    row[x * 4 + 3] = uint8_t(std::clamp(at(xy.channels[0], x, y, 255), 0, 255));
+                }
+            }
+        } else if (p.kind == PictureKind::Text) {
             TextBlock block = text_.render(p.source, baseTextStyle(game_));
             cached.bitmap = std::move(block.bitmap);
             cached.offsetX = cached.offsetY = -float(block.origin);
@@ -160,10 +195,10 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     const Bitmap *img = nullptr;
     BitmapPtr file;
     float offsetX = 0, offsetY = 0;
-    if (p.kind == PictureKind::File) {
+    if (p.kind == PictureKind::File && !p.source.starts_with("<XY")) {
         file = images_.get(p.source);
         img = file.get();
-    } else if (p.kind == PictureKind::Text || p.kind == PictureKind::Window) {
+    } else {
         img = pictureImage(number, p, offsetX, offsetY);
     }
     if (!img || img->empty()) return;
@@ -174,6 +209,13 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     int cellW = img->w / divX, cellH = img->h / divY;
     int cell = std::clamp(p.pattern - 1, 0, divX * divY - 1);
     RectI from{cell % divX * cellW, cell / divX * cellH, cellW, cellH};
+    // A cut shows part of each pattern.
+    if (p.cutW > 0 && p.cutH > 0) {
+        from.x += p.cutX;
+        from.y += p.cutY;
+        cellW = from.w = p.cutW;
+        cellH = from.h = p.cutH;
+    }
     float zoomX = float(p.zoomX.value() / 100), zoomY = float(p.zoomY.value() / 100);
     // The anchor places the picture by its laid-out size; a text bitmap's margin and a line's offset come on top.
     float sizeW = cellW, sizeH = cellH;
@@ -187,9 +229,17 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         case 3: x -= aw; break;
         case 4: x -= aw; y -= ah; break;
         case 5: x -= aw / 2; break;
+        case 6: x -= aw / 2; y -= ah; break;
     }
     x += offsetX * zoomX;
     y += offsetY * zoomY;
+    if (float rate = float(p.effectZoom.value() / 100); rate != 1) {
+        float cx = float(p.effectZoomX.value()), cy = float(p.effectZoomY.value());
+        x = cx + (x - cx) * rate;
+        y = cy + (y - cy) * rate;
+        w *= rate;
+        h *= rate;
+    }
     DrawOptions o;
     o.opacity = opacity;
     float swing = 0;
@@ -261,6 +311,7 @@ void Renderer::drawChoices(Canvas &canvas) {
     RectF box{x, bottom - h, w, h};
     // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement.
     if (int top = game_.choiceTop(); top >= 0) box.y = float(top);
+    game_.setChoiceBox(box.x + pad, box.y + pad, w - pad * 2, lineH);
     drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.9f);
     BitmapPtr cursor = images_.get(game_.cursorSkin());
     float blink = 0.6f + 0.4f * float(std::sin(game_.frameCount() * 0.1));
@@ -268,6 +319,15 @@ void Renderer::drawChoices(Canvas &canvas) {
         drawWindow(canvas, *cursor, {box.x + pad, box.y + pad + c.cursor * lineH, w - pad * 2, lineH}, blink);
     for (size_t i = 0; i < lines.size(); i++)
         canvas.draw(lines[i].bitmap, box.x + pad * 2 - lines[i].origin, box.y + pad + i * lineH - lines[i].origin);
+}
+
+// The text being typed, at the place system variables 40 and 41 give, with a cursor bar after it.
+void Renderer::drawTextEntry(Canvas &canvas) {
+    const TextEntry &entry = game_.textEntry();
+    if (!entry.active) return;
+    TextStyle style = baseTextStyle(game_);
+    TextBlock block = text_.render(entry.text + (game_.frameCount() / 30 % 2 ? " " : "_"), style);
+    canvas.draw(block.bitmap, float(game_.systemNumber(40) - block.origin), float(game_.systemNumber(41) - block.origin));
 }
 
 void Renderer::draw(Bitmap &frame) {
@@ -316,6 +376,7 @@ void Renderer::draw(Bitmap &frame) {
     }
     drawMessage(canvas);
     drawChoices(canvas);
+    drawTextEntry(canvas);
 
     if (tr.prepared) {
         frozen_ = frame;

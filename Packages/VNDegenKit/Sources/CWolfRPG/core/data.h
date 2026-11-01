@@ -15,6 +15,9 @@ namespace wolf {
 enum class Encoding { ShiftJIS, UTF8 };
 
 std::string toUtf8(const std::string &raw, Encoding enc);
+// A text file a game reads into a string or a database: UTF-8 with or without a byte order mark, or else Shift-JIS, as
+// the PC engine's automatic choice takes them. The Clumsy Witch Seris, a UTF-8 game, keeps its scene text in Shift-JIS.
+std::string decodeTextFile(std::string raw);
 
 struct RouteStep {
     uint8_t id = 0;

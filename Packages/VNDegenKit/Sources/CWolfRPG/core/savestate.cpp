@@ -74,6 +74,9 @@ std::string encode(const std::string &utf8, Encoding enc) {
 #endif
 }
 
+// A save slot's file. Slot 0 has no number or extension on the PC, as Two Beasts' first start shows under Wine.
+std::string slotFile(int slot) { return slot == 0 ? std::string("Save/SaveData") : format("Save/SaveData%02d.sav", slot); }
+
 SaveString saveString(const std::string &utf8, Encoding enc) { return {encode(utf8, enc), true}; }
 
 std::string text(const SaveString &s, Encoding enc) { return toUtf8(s.bytes, enc); }
@@ -285,6 +288,11 @@ SaveFile Game::snapshot() {
     SaveFile f = saveBase_ ? *saveBase_ : blankSave();
     f.title = saveString(gameDat_.title, enc);
     f.header[6] = enc == Encoding::UTF8 ? 'U' : 0;
+    // The XY arrays, which saves hold from version 0x9F.
+    f.numberedArrays.clear();
+    f.namedArrays.clear();
+    for (auto &[number, rows] : xyNumbered_) f.numberedArrays.push_back({number, {}, rows});
+    for (auto &[name, rows] : xyNamed_) f.namedArrays.push_back({0, saveString(name, enc), rows});
     std::random_device rd;
     // Fresh seeds, as each PC save has: at 0, 3 and 9 for the XOR, and in the 3.5 container the whole header but the
     // encoding mark and the container byte.
@@ -342,8 +350,8 @@ SaveFile Game::snapshot() {
         c.hidden = e.page < 0 || !e.actor.chara.visible;
         if (e.page >= 0) {
             const MapPage &pg = e.data->pages[e.page];
-            c.route.flags = {pg.moveType, pg.moveSpeed, pg.moveFrequency, pg.animSpeed, pg.flags, pg.route.flags};
-            c.unknown9 = {0, uint16_t(pg.moveSpeed), uint16_t(pg.moveFrequency), uint16_t(pg.animSpeed ? pg.animSpeed : 3), 0, 0};
+            c.route.flags = {pg.animSpeed, pg.moveSpeed, pg.moveFrequency, pg.moveType, pg.flags, pg.route.flags};
+            c.unknown9 = {0, uint16_t(pg.moveSpeed), uint16_t(pg.moveFrequency), uint16_t(pg.moveType ? pg.moveType : 3), 0, 0};
         }
         c.route.steps.clear();
         c.route2.steps.clear();
@@ -426,7 +434,7 @@ bool Game::saveSlot(int slot, std::string *error) {
         return false;
     }
     SaveFile f = snapshot();
-    if (!writeSave(saveFilePath(format("Save/SaveData%02d.sav", slot)), f, error)) return false;
+    if (!writeSave(saveFilePath(slotFile(slot)), f, error)) return false;
     saveBase_ = std::make_shared<SaveFile>(std::move(f));
     return true;
 }
@@ -435,7 +443,7 @@ bool Game::saveSlot(int slot, std::string *error) {
 // Reading it back
 
 bool Game::loadSlot(int slot, std::string *error) {
-    auto s = readSave(saveFilePath(format("Save/SaveData%02d.sav", slot)), error);
+    auto s = readSave(saveFilePath(slotFile(slot)), error);
     if (!s) return false;
     if (s->map.mapId < 0) {
         if (error) *error = "the save holds no map";
@@ -458,6 +466,11 @@ void Game::applySave(const SaveFile &s) {
     threads_.clear();
     parallel_.clear();
     mapParallel_.clear();
+    xyNumbered_.clear();
+    xyNamed_.clear();
+    for (auto &a : s.numberedArrays) xyNumbered_[a.key] = a.rows;
+    for (auto &a : s.namedArrays) xyNamed_[toUtf8(a.name.bytes, enc)] = a.rows;
+    textEntry_ = {};
     message_ = {};
     choice_ = {};
     shake_ = {};
@@ -465,7 +478,13 @@ void Game::applySave(const SaveFile &s) {
     transition_ = {.generation = transition_.generation + 1};
     scrollX_ = scrollY_ = 0;
     pictures_.clear();  // the PC engine shows no pictures after a load, not even those in the save
-    autoKeys_ = 0;
+    autoKeys_ = autoMouse_ = 0;
+    autoKeyCodes_.reset();
+    autoWheel_ = 0;
+    // The events that set these rules ended with the load, and nothing would undo them.
+    basicControl_ = {};
+    keyboardOff_ = mouseOff_ = false;
+    keyCodesOff_.reset();
 
     // Variables first: the map's event pages depend on them.
     const SaveVariables &v = s.variables;
@@ -598,7 +617,7 @@ void Game::applySave(const SaveFile &s) {
 // The slot argument is a slot number, or a string variable that names the file, such as "Save/System.sav".
 fs::path Game::saveTarget(int32_t slotArg, const Thread &t) {
     if (isStringVar(slotArg)) return saveFilePath(readStr(slotArg, t));
-    return saveFilePath(format("Save/SaveData%02d.sav", value(slotArg, t)));
+    return saveFilePath(slotFile(value(slotArg, t)));
 }
 
 void Game::readSavedVariable(const SaveFile *s, int32_t address, int32_t target, Thread &t) {
@@ -694,6 +713,8 @@ void Game::writeSavedVariable(SaveFile &s, int32_t address, int32_t source, Thre
                         saveString(isStringVar(source) ? readStr(source, t) : std::to_string(x), enc);
             }
         }
+    } else if (address >= 9000100 && address <= 9000102) {
+        s.system.volumes[size_t(address - 9000100)] = x;  // Two Beasts keeps its volume settings in its system save
     } else {
         log(format("save: writing variable %d into a save is not supported", address));
     }

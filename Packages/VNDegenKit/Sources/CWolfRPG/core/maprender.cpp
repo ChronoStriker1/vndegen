@@ -81,21 +81,23 @@ void MapRenderer::drawCharacter(Canvas &canvas, const Tileset &ts, const Charact
     const auto &settings = game_.gameDat().settings;
     bool eight = settings.size() > 1 && settings[1] == 8;
     int patterns = settings.size() > 7 && settings[7] == 5 ? 5 : 3;
-    int cellW = img->w / patterns, cellH = img->h / (eight ? 8 : 4);
+    // An eight-direction image has two blocks of four rows side by side: down, left, right and up, then down left, down
+    // right, up left and up right (the manual's material page).
+    int cellW = img->w / (eight ? patterns * 2 : patterns), cellH = img->h / 4;
     if (cellW <= 0 || cellH <= 0) return;
-    int row;
+    int row, block = 0;
     switch (c.direction) {
         case 4: row = 1; break;
         case 6: row = 2; break;
         case 8: row = 3; break;
         // Four-direction images show diagonal movement with the side views.
-        case 1: row = eight ? 4 : 1; break;
-        case 3: row = eight ? 5 : 2; break;
-        case 7: row = eight ? 6 : 1; break;
-        case 9: row = eight ? 7 : 2; break;
+        case 1: row = eight ? 0 : 1; block = eight; break;
+        case 3: row = eight ? 1 : 2; block = eight; break;
+        case 7: row = eight ? 2 : 1; block = eight; break;
+        case 9: row = eight ? 3 : 2; block = eight; break;
         default: row = 0; break;
     }
-    int col = std::clamp(c.pattern, 0, patterns - 1);
+    int col = std::clamp(c.pattern, 0, patterns - 1) + block * patterns;
     canvas.draw(*img, {col * cellW, row * cellH, cellW, cellH},
                 {float(tx + (tile - cellW) / 2), float(ty + tile - cellH), float(cellW), float(cellH)}, o);
 }

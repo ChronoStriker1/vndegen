@@ -19,8 +19,12 @@ std::string upperAscii(std::string s) {
 }
 
 std::vector<uint8_t> readAll(const fs::path &p) {
-    std::ifstream f(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(f), {}};
+    std::ifstream f(p, std::ios::binary | std::ios::ate);
+    if (!f) return {};
+    std::vector<uint8_t> bytes(size_t(f.tellg()));
+    f.seekg(0);
+    f.read(reinterpret_cast<char *>(bytes.data()), std::streamsize(bytes.size()));
+    return bytes;
 }
 
 }  // namespace
@@ -44,10 +48,20 @@ GameFiles::GameFiles(fs::path root) : root_(std::move(root)) {
 
 // The path as it is on disk, matched without regard to case as Windows matches it (casepath, shared by the engines).
 std::optional<fs::path> GameFiles::findCaseless(const fs::path &base, const std::string &rel) const {
+    // Games name files from Data or the game folder, "../Save/x.png" among them, but never outside the game folder.
+    fs::path joined = fs::absolute(base / rel).lexically_normal(), top = fs::absolute(root_).lexically_normal();
+    auto [inJoined, inTop] = std::mismatch(joined.begin(), joined.end(), top.begin(), top.end());
+    if (inTop != top.end() && !(std::next(inTop) == top.end() && inTop->empty())) return std::nullopt;
     std::string want = (base / rel).string();
     std::string out(want.size() + 1024, '\0');
     if (casepath_resolve(want.c_str(), out.data(), out.size()) != 1) return std::nullopt;
     out.resize(std::strlen(out.c_str()));
+    // A link inside the game folder mustn't lead out of it either.
+    std::error_code e1, e2;
+    fs::path real = fs::weakly_canonical(out, e1), realTop = fs::weakly_canonical(root_, e2);
+    if (e1 || e2) return std::nullopt;
+    auto [inReal, inRealTop] = std::mismatch(real.begin(), real.end(), realTop.begin(), realTop.end());
+    if (inRealTop != realTop.end() && !(std::next(inRealTop) == realTop.end() && inRealTop->empty())) return std::nullopt;
     return fs::path(out);
 }
 

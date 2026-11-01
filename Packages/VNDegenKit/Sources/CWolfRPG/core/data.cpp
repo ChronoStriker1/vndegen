@@ -47,6 +47,26 @@ bool convertCharacter(const char *bytes, size_t n, std::string &out) {
 
 // Converts Shift-JIS (code page 932) to UTF-8, one character at a time. Translated games often hold stray bytes that
 // are not valid Shift-JIS, which become U+FFFD rather than failing the whole file.
+std::string decodeTextFile(std::string raw) {
+    if (raw.starts_with("\xEF\xBB\xBF")) return raw.substr(3);
+    for (size_t i = 0; i < raw.size();) {
+        auto c = static_cast<unsigned char>(raw[i]);
+        size_t n = c < 0x80 ? 1 : (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 0;
+        if (n == 0 || i + n > raw.size()) return toUtf8(raw, Encoding::ShiftJIS);
+        uint32_t code = n == 1 ? c : c & (0xFF >> (n + 1));
+        for (size_t k = 1; k < n; k++) {
+            auto next = static_cast<unsigned char>(raw[i + k]);
+            if ((next & 0xC0) != 0x80) return toUtf8(raw, Encoding::ShiftJIS);
+            code = code << 6 | (next & 0x3F);
+        }
+        // Overlong forms, surrogates and values past Unicode's end aren't UTF-8.
+        static constexpr uint32_t smallest[] = {0, 0, 0x80, 0x800, 0x10000};
+        if (code < smallest[n] || (code >= 0xD800 && code < 0xE000) || code > 0x10FFFF) return toUtf8(raw, Encoding::ShiftJIS);
+        i += n;
+    }
+    return raw;
+}
+
 std::string toUtf8(const std::string &raw, Encoding enc) {
     if (enc == Encoding::UTF8) return raw;
     std::string out;
@@ -429,10 +449,11 @@ Map parseMap(std::span<const uint8_t> data) {
             for (auto &o : pg.condOps) o = p.r.u8();
             for (auto &v : pg.condVars) v = p.r.s32();
             for (auto &v : pg.condValues) v = p.r.s32();
-            pg.moveType = p.r.u8();
+            // In this order, as WodiLib's MpsFileReader reads them.
+            pg.animSpeed = p.r.u8();
             pg.moveSpeed = p.r.u8();
             pg.moveFrequency = p.r.u8();
-            pg.animSpeed = p.r.u8();
+            pg.moveType = p.r.u8();
             pg.flags = p.r.u8();
             uint8_t routeFlags = p.r.u8();
             pg.route = p.route(routeFlags);

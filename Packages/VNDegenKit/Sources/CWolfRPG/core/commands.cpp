@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <fstream>
+#include <string_view>
+#include <tuple>
 
 namespace wolf {
 
@@ -39,6 +42,22 @@ void Game::databaseCommand(Thread &t, const Command &c) {
             if (names[i] == n) return int(i);
         return -1;
     };
+    // A row's name is the one the project file gives it, or by the type's setting its first string field, or the name
+    // of the same row in the type before (the manual's database command page and wolf-rpg-formats' data_id_method).
+    auto rowName = [&db](int typeIndex, int r) {
+        const DatabaseType &rt = db.types[typeIndex];
+        if (rt.idMethod == 1) {
+            for (size_t f = 0; f < rt.fieldKinds.size(); f++)
+                if (rt.isString(f)) return r < int(rt.rows.size()) && rt.slot(f) < rt.rows[r].strings.size() ? rt.rows[r].strings[rt.slot(f)] : std::string();
+        }
+        const DatabaseType &named = rt.idMethod == 2 && typeIndex > 0 ? db.types[typeIndex - 1] : rt;
+        return r < int(named.dataNames.size()) ? named.dataNames[r] : std::string();
+    };
+    auto findRow = [&](int typeIndex, const std::string &n) {
+        for (int r = 0; r < int(db.types[typeIndex].rows.size()); r++)
+            if (rowName(typeIndex, r) == n) return r;
+        return -1;
+    };
     int type = byName & 0x01 ? -1 : value(c.arg(0), t);
     if (byName & 0x01) {
         for (size_t i = 0; i < db.types.size(); i++)
@@ -47,7 +66,7 @@ void Game::databaseCommand(Thread &t, const Command &c) {
     int row = value(c.arg(1), t), field = value(c.arg(2), t);
     DatabaseType *dt = type >= 0 && type < int(db.types.size()) ? &db.types[type] : nullptr;
     // The command's strings are the text to write, then the type, row and field names.
-    if (dt && (byName & 0x02)) row = findName(dt->dataNames, c.str(2));
+    if (dt && (byName & 0x02)) row = findRow(type, c.str(2));
     if (dt && (byName & 0x04)) field = findName(dt->fieldNames, c.str(3));
     int32_t target = c.arg(4);
 
@@ -58,12 +77,15 @@ void Game::databaseCommand(Thread &t, const Command &c) {
         return;
     }
     if (c.arg(2) == -3) {  // row name or id
-        if (byName & 0x02) writeVar(target, row, t);
-        else writeStr(target, dt && row >= 0 && row < int(dt->dataNames.size()) ? dt->dataNames[row] : "", t);
+        // The row may be named by a string variable, which looks its text up the same way (Clumsy Witch Seris's tags).
+        if (dt && isStringVar(c.arg(1))) writeVar(target, findRow(type, readStr(c.arg(1), t)), t);
+        else if (byName & 0x02) writeVar(target, row, t);
+        else writeStr(target, dt && row >= 0 ? rowName(type, row) : "", t);
         return;
     }
     if (c.arg(1) == -3) {  // field name or id
-        if (byName & 0x04) writeVar(target, field, t);
+        if (dt && isStringVar(c.arg(2))) writeVar(target, findName(dt->fieldNames, readStr(c.arg(2), t)), t);
+        else if (byName & 0x04) writeVar(target, field, t);
         else writeStr(target, dt && field >= 0 && field < int(dt->fieldNames.size()) ? dt->fieldNames[field] : "", t);
         return;
     }
@@ -159,6 +181,308 @@ void Game::databaseCommand(Thread &t, const Command &c) {
     }
 }
 
+namespace {
+
+// Splits CSV text into rows of cells. A cell may be quoted, which lets it hold commas and line breaks, with "" for a
+// quote inside. Each row of Wolf's own files ends with a comma, which adds no cell.
+std::vector<std::vector<std::string>> parseCsv(std::string_view text) {
+    std::vector<std::vector<std::string>> rows;
+    std::vector<std::string> row;
+    std::string cell;
+    bool quoted = false, started = false;
+    auto endCell = [&] {
+        row.push_back(std::move(cell));
+        cell.clear();
+        started = false;
+    };
+    auto endRow = [&] {
+        if (started || !cell.empty()) endCell();
+        rows.push_back(std::move(row));
+        row.clear();
+    };
+    for (size_t i = 0; i < text.size(); i++) {
+        char ch = text[i];
+        if (quoted) {
+            if (ch != '"') cell += ch;
+            else if (i + 1 < text.size() && text[i + 1] == '"') {
+                cell += '"';
+                i++;
+            } else {
+                quoted = false;
+            }
+        } else if (ch == '"') {
+            quoted = started = true;
+        } else if (ch == ',') {
+            endCell();
+        } else if (ch == '\n') {
+            endRow();
+        } else if (ch != '\r') {
+            cell += ch;
+            started = true;
+        }
+    }
+    if (started || !cell.empty() || !row.empty()) endRow();
+    return rows;
+}
+
+}  // namespace
+
+// Command 252. The flags' second byte's high nibble is 0x20 to copy the row in field 4 onto the row in field 1, or 0x30
+// to sort the rows from field 1 on, as many as field 4, by the field in field 2. Byte three has 0x10 for descending.
+void Game::dbRowCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    Database &db = *databaseKind((flags >> 8) & 0x0F);
+    int type = value(c.arg(0), t);
+    if (flags & 0x10000) {
+        type = -1;
+        for (size_t i = 0; i < db.types.size(); i++)
+            if (db.types[i].name == c.str(1)) type = int(i);
+    }
+    if (type < 0 || type >= int(db.types.size())) return;
+    DatabaseType &dt = db.types[type];
+    int row = value(c.arg(1), t), field = value(c.arg(2), t), other = value(c.arg(4), t);
+    int rows = int(dt.rows.size());
+    switch ((flags >> 8) & 0xF0) {
+        case 0x20:
+            if (row >= 0 && row < rows && other >= 0 && other < rows && row != other) dt.rows[row] = dt.rows[other];
+            break;
+        case 0x30: {
+            if (row < 0 || row >= rows || field < 0 || field >= int(dt.fieldKinds.size())) break;
+            bool descending = flags & 0x100000;
+            size_t slot = dt.slot(field);
+            bool isString = dt.isString(field);
+            auto less = [&](const DatabaseType::Row &a, const DatabaseType::Row &b) {
+                if (isString) return slot < a.strings.size() && slot < b.strings.size() && a.strings[slot] < b.strings[slot];
+                return slot < a.numbers.size() && slot < b.numbers.size() && a.numbers[slot] < b.numbers[slot];
+            };
+            auto first = dt.rows.begin() + row, last = first + std::min(std::max(other, 0), rows - row);
+            if (descending) std::stable_sort(first, last, [&](auto &a, auto &b) { return less(b, a); });
+            else std::stable_sort(first, last, less);
+            break;
+        }
+        default:
+            unsupported(c);
+            break;
+    }
+}
+
+const XYArray *Game::xyArray(int number) const {
+    auto it = xyNumbered_.find(number);
+    return it == xyNumbered_.end() ? nullptr : &it->second;
+}
+
+const XYArray *Game::xyArray(const std::string &name) const {
+    auto it = xyNamed_.find(name);
+    return it == xyNamed_.end() ? nullptr : &it->second;
+}
+
+// The array a command names: by the string after the file name when the flags' 0x10000 is set, by number otherwise.
+XYArray *Game::xyTarget(Thread &t, const Command &c, bool create) {
+    if (uint32_t(c.arg(3)) & 0x10000) {
+        auto it = xyNamed_.find(c.str(1));
+        if (it != xyNamed_.end()) return &it->second;
+        return create ? &xyNamed_[c.str(1)] : nullptr;
+    }
+    int number = value(c.arg(0), t);
+    auto it = xyNumbered_.find(number);
+    if (it != xyNumbered_.end()) return &it->second;
+    return create ? &xyNumbered_[number] : nullptr;
+}
+
+// Command 255, the XY arrays of the manual's database command page. The fields are the array, X, Y, the flags and a
+// value. The flags work as the database command's do: 0x1000 reads into the variable named by the value, otherwise the
+// value goes in with the operator in the low byte. X of -1 reads the number of columns, and Y of -1 the number of values
+// in column X. X of -2 deletes the array, and Y of -2 zeroes column X.
+void Game::xyCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    bool read = ((flags >> 8) & 0xF0) == 0x10;
+    int op = flags & 0xF0, leftCode = flags & 0x0F;
+    int32_t target = c.arg(4);
+    int rawX = c.arg(1), rawY = c.arg(2);
+    int x = value(rawX, t), y = value(rawY, t);
+    // A Y of 10000 or more moves on to the next column, as the manual says.
+    if (y >= 10000) {
+        x += y / 10000;
+        y %= 10000;
+    }
+    if (read) {
+        const XYArray *a = xyTarget(t, c, false);
+        int32_t v = 0;
+        if (rawX == -1) v = a ? int32_t(a->size()) : 0;
+        else if (rawY == -1) v = a && x >= 0 && x < int(a->size()) ? int32_t((*a)[x].size()) : 0;
+        else if (a && x >= 0 && x < int(a->size()) && y >= 0 && y < int((*a)[x].size())) v = (*a)[x][y];
+        int32_t cur = op ? readVar(target, t) : 0;
+        switch (op) {
+            case 0x00: cur = v; break;
+            case 0x10: cur += v; break;
+            case 0x20: cur -= v; break;
+            case 0x30: cur *= v; break;
+            case 0x40: cur = v ? cur / v : cur; break;
+            case 0x50: cur = v ? cur % v : cur; break;
+            case 0x60: cur = std::max(cur, v); break;
+            case 0x70: cur = std::min(cur, v); break;
+        }
+        writeVar(target, cur, t);
+        return;
+    }
+    if (rawX == -2) {
+        if (flags & 0x10000) xyNamed_.erase(c.str(1));
+        else xyNumbered_.erase(value(c.arg(0), t));
+        return;
+    }
+    if (rawY == -2) {
+        if (XYArray *a = xyTarget(t, c, false); a && x >= 0 && x < int(a->size())) std::fill((*a)[x].begin(), (*a)[x].end(), 0);
+        return;
+    }
+    if (x < 0 || y < 0 || x >= 10000) return;
+    XYArray &a = *xyTarget(t, c, true);
+    if (x >= int(a.size())) a.resize(x + 1);
+    if (y >= int(a[x].size())) a[x].resize(y + 1);
+    int32_t v = leftCode == 1 ? target : value(target, t);
+    int32_t &cell = a[x][y];
+    switch (op) {
+        case 0x00: cell = v; break;
+        case 0x10: cell += v; break;
+        case 0x20: cell -= v; break;
+        case 0x30: cell *= v; break;
+        case 0x40: cell = v ? cell / v : cell; break;
+        case 0x50: cell = v ? cell % v : cell; break;
+        case 0x60: cell = std::max(cell, v); break;
+        case 0x70: cell = std::min(cell, v); break;
+    }
+}
+
+// Command 257 sorts columns of an XY array: from column field 1, as many as the value, by the number at Y field 2. The
+// flags' 0x100000 is descending, as for command 252.
+void Game::xySortCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    XYArray *a = xyTarget(t, c, false);
+    if (!a || ((flags >> 8) & 0xF0) != 0x30) return;
+    int first = value(c.arg(1), t), y = value(c.arg(2), t), count = value(c.arg(4), t);
+    if (first < 0 || first >= int(a->size())) return;
+    auto key = [y](const std::vector<int32_t> &col) { return y >= 0 && y < int(col.size()) ? col[y] : 0; };
+    auto begin = a->begin() + first, end = begin + std::min(std::max(count, 0), int(a->size()) - first);
+    bool descending = flags & 0x100000;
+    std::stable_sort(begin, end, [&](const auto &l, const auto &r) { return descending ? key(l) > key(r) : key(l) < key(r); });
+}
+
+XYImage resolveXYImage(const std::string &source, const Game &game) {
+    XYImage out;
+    bool named = source.starts_with("<XYN_IMAGE");
+    size_t end = source.find('>');
+    std::string body = source.substr(0, end);
+    int xsize = 0, ysize = 0;
+    for (size_t at = body.find('/'); at != std::string::npos;) {
+        size_t next = body.find('/', at + 1);
+        std::string part = body.substr(at + 1, next == std::string::npos ? next : next - at - 1);
+        size_t eq = part.find('=');
+        if (eq != std::string::npos) {
+            std::string key = part.substr(0, eq), val = part.substr(eq + 1);
+            int channel = key == "A" ? 0 : key == "R" ? 1 : key == "G" ? 2 : key == "B" ? 3 : -1;
+            if (channel >= 0 && !val.empty()) {
+                const XYArray *a = named ? game.xyArray(val) : game.xyArray(std::atoi(val.c_str()));
+                if (a) out.channels[channel] = std::make_shared<const XYArray>(*a);
+            }
+            if (key == "XSIZE") xsize = std::atoi(val.c_str());
+            if (key == "YSIZE") ysize = std::atoi(val.c_str());
+        }
+        at = next;
+    }
+    for (auto &a : out.channels) {
+        if (!a) continue;
+        out.w = std::max(out.w, int(a->size()));
+        for (auto &col : *a) out.h = std::max(out.h, int(col.size()));
+    }
+    if (xsize > 0) out.w = xsize;
+    if (ysize > 0) out.h = ysize;
+    return out;
+}
+
+// Command 251: reads rows of a database from a CSV file, or writes them to one. The fields are the type, first row and
+// first field, the flags, and the number of rows; the strings are the file, relative to the game folder, and the type's
+// name when the flags say it goes by name. As the PC engine writes them, files start with a byte order mark and a row
+// of the field names, every row ends with a comma, and strings are quoted.
+void Game::csvCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    Database &db = *databaseKind((flags >> 8) & 0x0F);
+    bool write = ((flags >> 8) & 0xF0) == 0x10;
+    int type = value(c.arg(0), t);
+    if (flags & 0x10000) {
+        type = -1;
+        for (size_t i = 0; i < db.types.size(); i++)
+            if (db.types[i].name == c.str(1)) type = int(i);
+    }
+    if (type < 0 || type >= int(db.types.size())) return;
+    DatabaseType &dt = db.types[type];
+    int firstRow = value(c.arg(1), t), firstField = value(c.arg(2), t), count = value(c.arg(4), t);
+    if (firstRow < 0 || firstField < 0 || firstField >= int(dt.fieldKinds.size())) return;
+    std::string name = expandText(c.str(0), &t);
+    std::filesystem::path path = saveFilePath(name);
+
+    if (write) {
+        if (path.empty()) {
+            log("cannot write " + name);
+            return;
+        }
+        // A quote inside a string doubles, which parseCsv undoes.
+        auto quoted = [](std::string text) {
+            for (size_t p = 0; (p = text.find('"', p)) != std::string::npos; p += 2) text.insert(p, 1, '"');
+            return '"' + text + "\",";
+        };
+        std::string out = "\xEF\xBB\xBF";
+        for (size_t f = firstField; f < dt.fieldKinds.size(); f++)
+            out += quoted(f < dt.fieldNames.size() ? dt.fieldNames[f] : std::string());
+        out += "\r\n";
+        for (int r = firstRow; r < firstRow + count && r < int(dt.rows.size()); r++) {
+            for (size_t f = firstField; f < dt.fieldKinds.size(); f++) {
+                if (dt.isString(f)) out += quoted(dt.slot(f) < dt.rows[r].strings.size() ? dt.rows[r].strings[dt.slot(f)] : std::string());
+                else out += std::to_string(dt.slot(f) < dt.rows[r].numbers.size() ? dt.rows[r].numbers[dt.slot(f)] : 0) + ",";
+            }
+            out += "\r\n";
+        }
+        std::error_code ec;
+        std::filesystem::create_directories(path.parent_path(), ec);
+        std::ofstream file(path, std::ios::binary);
+        file.write(out.data(), std::streamsize(out.size()));
+        if (!file) log("cannot write " + name);
+        return;
+    }
+
+    if (path.empty()) {
+        log("no CSV file " + name);
+        return;
+    }
+    std::string text;
+    if (std::ifstream file(path, std::ios::binary); file) text.assign(std::istreambuf_iterator<char>(file), {});
+    else if (auto bytes = files_.read(name)) text.assign(bytes->begin(), bytes->end());
+    else {
+        log("no CSV file " + name);
+        return;
+    }
+    auto rows = parseCsv(decodeTextFile(text));
+    size_t numbers = 0, strings = 0;
+    for (size_t f = 0; f < dt.fieldKinds.size(); f++) (dt.isString(f) ? strings : numbers)++;
+    // The first row names the fields. The rest fill the rows from firstRow, as many as the command says and the file has.
+    for (int i = 0; i < count && size_t(i) + 1 < rows.size(); i++) {
+        int r = firstRow + i;
+        while (int(dt.rows.size()) <= r) {
+            DatabaseType::Row added;
+            added.numbers.assign(numbers, 0);
+            added.strings.assign(strings, "");
+            dt.rows.push_back(std::move(added));
+        }
+        const auto &cells = rows[size_t(i) + 1];
+        for (size_t col = 0; col < cells.size() && firstField + col < dt.fieldKinds.size(); col++) {
+            size_t f = firstField + col;
+            if (dt.isString(f)) {
+                if (dt.slot(f) < dt.rows[r].strings.size()) dt.rows[r].strings[dt.slot(f)] = cells[col];
+            } else if (dt.slot(f) < dt.rows[r].numbers.size()) {
+                dt.rows[r].numbers[dt.slot(f)] = std::atoi(cells[col].c_str());
+            }
+        }
+    }
+}
+
 // Reads a property of a character, a map position, a picture, or the game into a variable.
 void Game::setVariablePlus(Thread &t, const Command &c) {
     int32_t target = c.arg(0);
@@ -166,7 +490,8 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
     if (flags & 0x10) target = readVar(target, t);
     int exec = (flags >> 8) & 0xF0;
     int assign = (flags >> 8) & 0x0F;
-    int info = (flags >> 16) & 0xFF;
+    // A map position names what to read in the flags. A character, a picture and "other" name it in a field of its own.
+    int info = exec == 0x20 ? (flags >> 16) & 0xFF : exec == 0x30 ? c.arg(2) : c.arg(3);
     int32_t v = 0;
     int tile = gameDat_.tileSize();
     if (exec == 0x10) {  // character
@@ -256,7 +581,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
     } else if (exec == 0x40) {  // picture
         auto it = pictures_.find(value(c.arg(2), t));
         if (it == pictures_.end()) {
-            v = info == 9 ? 0 : 0;
+            v = 0;
         } else {
             const Picture &p = it->second;
             switch (info) {
@@ -269,14 +594,26 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 case 6: v = int(p.angle.value()); break;
                 case 7: case 11: v = int(p.zoomX.value()); break;
                 case 12: v = int(p.zoomY.value()); break;
+                case 8: v = pictureUnderMouse(p); break;
                 case 9: v = 1; break;
                 case 10: v = 1; break;
                 default: v = 0; break;
             }
         }
     } else if (exec == 0x30) {  // other
+        // The clicks read 0 up, 1 held and 2 just pressed (the manual's variable operation page).
+        auto click = [&](uint32_t button) { return input_.mousePressed & button ? 2 : input_.mouseHeld & button ? 1 : 0; };
         switch (info) {
             case 0: v = mapId_; break;
+            case 7: v = click(MouseLeft); break;
+            case 8: v = click(MouseRight); break;
+            case 9: v = click(MouseMiddle); break;
+            case 10: v = input_.wheel; break;
+            case 11: v = mouseX_ - lastMouseX_; break;
+            case 12: v = mouseY_ - lastMouseY_; break;
+            case 13: v = eventUnderMouse(); break;
+            case 20: v = mouseX_; break;
+            case 21: v = mouseY_; break;
             case 14: {
                 const auto &call = t.stack.back();
                 v = call.mapEvent < 0 || call.map != map_ ? -1 : events_[call.mapEvent].data->id;
@@ -306,7 +643,176 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
     writeVar(target, cur, t);
 }
 
-uint32_t Game::keysNow() const { return input_.held | autoKeys_; }
+uint32_t Game::keysNow() const { return input_.held; }
+
+// Builds this frame's input from the host's and from what command 125 pressed last frame. Input a game turned off with
+// command 126 counts as not there, except what command 125 presses. The manual's key input page says auto input of
+// basic keys obeys command 126, but YUME-SAME turns confirm off every frame and presses it with command 125 for each
+// click, so the engine can't work that way.
+void Game::gatherInput(const Input &in) {
+    input_ = in;
+    if (keyboardOff_) {
+        input_.held = input_.pressed = 0;
+        input_.keysHeld.reset();
+        input_.keysPressed.reset();
+    }
+    input_.keysHeld &= ~keyCodesOff_;
+    input_.keysPressed &= ~keyCodesOff_;
+    if (mouseOff_) input_.mouseHeld = input_.mousePressed = 0, input_.wheel = 0;
+
+    input_.keysHeld |= autoKeyCodes_;
+    input_.keysPressed |= autoKeyCodes_ & ~lastKeysHeld_;
+    input_.mouseHeld |= autoMouse_;
+    input_.mousePressed |= autoMouse_ & ~lastMouseHeld_;
+    input_.wheel += autoWheel_;
+    // The keys the game's own key settings name work as the basic keys (system variables 52 to 54).
+    static const std::array<Key, 3> configured = {KeyConfirm, KeyCancel, KeySub};
+    for (size_t i = 0; i < configured.size() && 52 + i < system_.size(); i++) {
+        int code = system_[52 + i];
+        if (code > 0 && code < kKeyCodeCount && input_.keysHeld[code]) {
+            input_.held |= configured[i];
+            if (input_.keysPressed[code]) input_.pressed |= configured[i];
+        }
+    }
+    for (size_t k = 0; k < basicControl_.size(); k++) {
+        if (basicControl_[k] == 2) {
+            input_.held &= ~(1u << k);
+            input_.pressed &= ~(1u << k);
+        }
+    }
+    input_.held |= autoKeys_;
+    input_.pressed |= autoKeys_ & ~lastHeld_;
+    autoKeys_ = autoMouse_ = 0;
+    autoKeyCodes_.reset();
+    autoWheel_ = 0;
+
+    for (size_t k = 0; k < heldFrames_.size(); k++) heldFrames_[k] = (input_.held >> k) & 1 ? heldFrames_[k] + 1 : 0;
+    for (size_t k = 0; k < mouseHeldFrames_.size(); k++)
+        mouseHeldFrames_[k] = (input_.mouseHeld >> k) & 1 ? mouseHeldFrames_[k] + 1 : 0;
+    for (int k = 0; k < kKeyCodeCount; k++) keyHeldFrames_[k] = input_.keysHeld[k] ? keyHeldFrames_[k] + 1 : 0;
+    lastHeld_ = input_.held;
+    lastMouseHeld_ = input_.mouseHeld;
+    lastKeysHeld_ = input_.keysHeld;
+
+    // The pointer follows the host's whenever that moves. Otherwise it stays where it is, which may be where the game
+    // put it, with command 125 or by writing system variables 71 and 72.
+    lastMouseX_ = mouseX_;
+    lastMouseY_ = mouseY_;
+    if (system_.size() > 72 && (system_[71] != mouseX_ || system_[72] != mouseY_)) {
+        mouseX_ = system_[71];
+        mouseY_ = system_[72];
+    }
+    if (in.mouseX != hostMouseX_ || in.mouseY != hostMouseY_) {
+        mouseX_ = hostMouseX_ = in.mouseX;
+        mouseY_ = hostMouseY_ = in.mouseY;
+    }
+    if (system_.size() > 72) {
+        system_[71] = mouseX_;
+        system_[72] = mouseY_;
+    }
+}
+
+// Command 125. The top byte says what it presses: basic keys (flag bits below), one keyboard key, or the mouse.
+void Game::autoInput(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(0));
+    switch (flags >> 24) {
+        case 0x00: {
+            static const std::array<std::pair<uint32_t, Key>, 7> bits = {{{0x01, KeyConfirm}, {0x02, KeyCancel}, {0x04, KeySub},
+                {0x10, KeyDown}, {0x20, KeyLeft}, {0x40, KeyRight}, {0x80, KeyUp}}};
+            for (auto [bit, key] : bits)
+                if (flags & bit) autoKeys_ |= key;
+            break;
+        }
+        case 0x10: {
+            int code = value(c.arg(1), t);
+            if (code >= 0 && code < kKeyCodeCount) autoKeyCodes_.set(code);
+            break;
+        }
+        case 0x20:
+            if (flags & 0x01) autoMouse_ |= MouseLeft;
+            if (flags & 0x02) autoMouse_ |= MouseRight;
+            if (flags & 0x04) autoMouse_ |= MouseMiddle;
+            if (flags & 0x08) {
+                mouseX_ = value(c.arg(1), t);
+                mouseY_ = value(c.arg(2), t);
+                if (system_.size() > 72) {
+                    system_[71] = mouseX_;
+                    system_[72] = mouseY_;
+                }
+            }
+            if (flags & 0x10) autoWheel_ += value(c.arg(1), t);
+            break;
+        default:
+            unsupported(c);
+            break;
+    }
+}
+
+// Command 126. A top byte of 0 sets how the basic keys named by the low byte work; 0x10 turns a device on or off: the
+// low byte is 0 for a keyboard key (-1 for all of them), 1 the mouse, 2 a gamepad and 3 every device, and the next
+// byte is 1 for off. VNDegen delivers gamepads as keyboard keys, so a keyboard turned off stops those too, and a
+// gamepad off alone changes nothing.
+void Game::keyControl(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(0));
+    int mode = (flags >> 8) & 0xFF;
+    if ((flags >> 24) == 0x10) {
+        bool off = mode == 1;
+        switch (flags & 0xFF) {
+            case 0: {
+                int code = value(c.arg(1), t);
+                if (code < 0) keyboardOff_ = off;
+                else if (code < kKeyCodeCount) keyCodesOff_.set(code, off);
+                break;
+            }
+            case 1: mouseOff_ = off; break;
+            case 2: break;
+            default:
+                keyboardOff_ = mouseOff_ = off;
+                break;
+        }
+        return;
+    }
+    static const std::array<std::pair<uint32_t, Key>, 7> bits = {{{0x01, KeyConfirm}, {0x02, KeyCancel}, {0x04, KeySub},
+        {0x10, KeyDown}, {0x20, KeyLeft}, {0x40, KeyRight}, {0x80, KeyUp}}};
+    for (auto [bit, key] : bits)
+        if (flags & bit) basicControl_[std::countr_zero(uint32_t(key))] = mode;
+}
+
+// The rectangle a picture covers, by its anchor and zoom. A turned picture counts as its unturned rectangle.
+bool Game::pictureUnderMouse(const Picture &p) const {
+    double w = p.imageW * p.zoomX.value() / 100, h = p.imageH * p.zoomY.value() / 100;
+    if (p.kind == PictureKind::File) {
+        w /= std::max(1, p.divX);
+        h /= std::max(1, p.divY);
+    }
+    double x = p.x.value() + p.shiftX, y = p.y.value() + p.shiftY;
+    switch (p.anchor) {
+        case 1: x -= w / 2; y -= h / 2; break;
+        case 2: y -= h; break;
+        case 3: x -= w; break;
+        case 4: x -= w; y -= h; break;
+        case 5: x -= w / 2; break;
+        case 6: x -= w / 2; y -= h; break;
+    }
+    double rate = p.effectZoom.value() / 100;
+    x = p.effectZoomX.value() + (x - p.effectZoomX.value()) * rate;
+    y = p.effectZoomY.value() + (y - p.effectZoomY.value()) * rate;
+    w *= rate;
+    h *= rate;
+    return mouseX_ >= x && mouseX_ < x + w && mouseY_ >= y && mouseY_ < y + h;
+}
+
+// The lowest numbered map event under the pointer, or -1: one tile wide and tall, the map's own coordinates.
+int Game::eventUnderMouse() const {
+    int tile = gameDat_.tileSize(), best = -1;
+    for (auto &e : events_) {
+        if (e.page < 0) continue;
+        double x = e.actor.chara.x * tile - cameraX_, y = e.actor.chara.y * tile - cameraY_;
+        if (mouseX_ >= x && mouseX_ < x + tile && mouseY_ >= y && mouseY_ < y + tile && (best < 0 || e.data->id < best))
+            best = e.data->id;
+    }
+    return best;
+}
 
 // Key input. Basic keys give 2 4 6 8 for the directions (1 3 7 9 for diagonals), 10 confirm, 11 cancel, 12 sub,
 // and 0 for none. With "wait for input" the event waits until one of the accepted keys is pressed.
@@ -315,15 +821,16 @@ bool Game::keyInput(Thread &t, const Command &c) {
     uint32_t flags = uint32_t(c.arg(1));
     int kind = (flags >> 8) & 0x0F;
     bool wait = flags & 0x80;
-    uint32_t keys = wait ? (input_.pressed | autoKeys_) : keysNow();
     // Wolf RPG Editor 3: bit 0x20000 reports only a key that was just pressed, so a menu opened by a key doesn't
-    // see that key still held and close again (Clumsy Witch Seris).
-    if (flags & 0x20000) keys = input_.pressed | autoKeys_;
+    // see that key still held and close again (Clumsy Witch Seris). Bit 0x40000 reports how long it has been held.
+    bool fresh = wait || (flags & 0x20000);
+    bool heldTime = flags & 0x40000;
+    uint32_t keys = fresh ? input_.pressed : keysNow();
     int32_t v = 0;
-    if (kind == 0 && (flags & 0x40000)) {
-        // Wolf RPG Editor 3: how many frames one key has been held, 0 when it is up. The low byte names the key as
-        // the direction and button fields do: 3 up, 4 down, 5 left, 6 right, 0x10 confirm, 0x20 cancel, 0x40 sub.
-        // Games use it for their own key repeat in menus (Clumsy Witch Seris).
+    uint32_t usedMouse = 0;
+    if (kind == 0 && heldTime) {
+        // The low byte names the key as the direction and button fields do: 3 up, 4 down, 5 left, 6 right, 0x10
+        // confirm, 0x20 cancel, 0x40 sub. Games use it for their own key repeat in menus (Clumsy Witch Seris).
         static const std::pair<int, Key> named[] = {{3, KeyUp}, {4, KeyDown}, {5, KeyLeft}, {6, KeyRight},
                                                     {0x10, KeyConfirm}, {0x20, KeyCancel}, {0x40, KeySub}};
         for (auto [code, key] : named)
@@ -349,40 +856,51 @@ bool Game::keyInput(Thread &t, const Command &c) {
                 else if (u && (dirs <= 2 || dirs == 3 || dirs == 7)) v = 8;
             }
         }
-    } else if (kind == 1 || kind == 2) {
-        // Keyboard and pad codes. VNDegen maps controllers and touch onto the Wolf keys, so these report the key a
-        // game most often asks for: the keyboard keys behind confirm, cancel, sub and the arrows.
-        bool specific = (flags >> 8) & 0xF0;
+    } else if (kind == 1) {
+        // Keyboard keys by Wolf's key code: one key, which reads 1 when down, or the first key down from the code given.
+        const KeyCodes &codes = fresh ? input_.keysPressed : input_.keysHeld;
         int code = value(c.arg(2), t);
-        auto held = [&](int k) {
-            switch (k) {
-                case 13: case 32: case 90: return bool(keys & KeyConfirm);
-                case 27: case 88: return bool(keys & KeyCancel);
-                case 16: return bool(keys & KeySub);
-                case 37: return bool(keys & KeyLeft);
-                case 38: return bool(keys & KeyUp);
-                case 39: return bool(keys & KeyRight);
-                case 40: return bool(keys & KeyDown);
-            }
-            return false;
-        };
-        if (specific) v = held(code) ? 1 : 0;
-        else {
-            for (int k : {90, 88, 16, 37, 38, 39, 40})
-                if (held(k)) {
-                    v = k;
-                    break;
-                }
+        if ((flags >> 8) & 0xF0) {
+            if (code >= 0 && code < kKeyCodeCount) v = heldTime ? keyHeldFrames_[code] : codes[code];
+        } else {
+            for (int k = 100; k < kKeyCodeCount && !v; k++)
+                if (codes[k]) v = heldTime ? keyHeldFrames_[k] : k;
         }
-    } else {
-        v = 0;  // mouse
+    } else if (kind == 3) {
+        // The mouse: the low nibble is 0 for clicks, reading 20 left, 21 right and 22 middle, 1 for X, 2 for Y, and 3
+        // for the wheel (WodiLib's KeyInputMouse).
+        switch (flags & 0x0F) {
+            case 1: v = mouseX_; break;
+            case 2: v = mouseY_; break;
+            case 3: v = input_.wheel; break;
+            default: {
+                uint32_t buttons = fresh ? input_.mousePressed : input_.mouseHeld;
+                static const std::array<std::tuple<uint32_t, uint32_t, int>, 3> accepted = {{{0x10, MouseLeft, 20},
+                    {0x20, MouseRight, 21}, {0x40, MouseMiddle, 22}}};
+                for (size_t i = 0; i < accepted.size() && !v; i++) {
+                    auto [bit, button, result] = accepted[i];
+                    if (!(flags & bit)) continue;
+                    if (heldTime) v = mouseHeldFrames_[i];
+                    else if (buttons & button) {
+                        v = result;
+                        usedMouse |= button;
+                    }
+                }
+                break;
+            }
+        }
     }
+    // Kind 2 is a gamepad's own buttons. VNDegen delivers gamepads as keyboard keys, so none reads as down.
     if (wait && v == 0) {
         t.stack.back().pc--;
         return false;
     }
     // A press a waiting input accepts is used up, so the next wait in the same frame waits for a press of its own.
-    if (wait) input_.pressed &= ~keys;
+    if (wait) {
+        input_.pressed &= ~keys;
+        input_.mousePressed &= ~usedMouse;
+        if (kind == 1) input_.keysPressed.reset();
+    }
     writeVar(target, v, t);
     return true;
 }
@@ -397,12 +915,13 @@ void Game::partyCommand(Thread &t, const Command &c) {
         if (!n.empty() || i == 10) members.push_back(n);
     }
     int index = value(c.arg(1), t);
-    std::string graphic = (flags >> 8) & 0x10 ? readStr(c.arg(2), t) : c.str(0);
+    std::string graphic = (flags >> 8) & 0x01 ? readStr(c.arg(2), t) : c.str(0);
     switch (exec) {
         case 0:  // remove a member
             if (index >= 0 && index < int(members.size())) members.erase(members.begin() + index);
             break;
-        case 1:  // insert a member
+        case 1:  // insert a member. An erased party has no members, so the first one inserted is the hero at any index.
+            if (members.size() == 1 && members[0].empty()) members.clear();
             index = std::clamp(index, 0, int(members.size()));
             members.insert(members.begin() + index, graphic);
             break;
@@ -456,9 +975,10 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.shakeSpeed = a2;
                     p.shakeFrames = frames;
                     break;
-                case 0x40:  // zoom
-                    p.zoomX.set(a1, frames);
-                    p.zoomY.set(a2 ? a2 : a1, frames);
+                case 0x40:  // zoom around the point a1, a2 by the rate a3 (the manual's effect page)
+                    p.effectZoomX.set(a1, frames);
+                    p.effectZoomY.set(a2, frames);
+                    p.effectZoom.set(a3, frames);
                     break;
                 case 0x50:  // pulse the colour by the offsets, the frames field giving the interval
                     p.pulse = {a1, a2, a3};

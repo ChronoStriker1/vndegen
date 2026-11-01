@@ -49,6 +49,26 @@
       },
       "versions": [
         {
+          "version": "0.20.1",
+          "buildVersion": "1052",
+          "date": "2026-11-01T15:31:47Z",
+          "localizedDescription": "Four more KiriKiri games run, and AlphaMovie animations and a game's Display options work.\n\n## Downloads\n\n- `VNDegen-0.20.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.20.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- KiriKiri: Marshmallow Imouto Succubus, Submissive Married Woman Agent Shion, Cult Of The Serpent and Cosplaying in Costalia now start and play with sound. Before, they stopped at startup with an encryption error.\n- KiriKiri: AlphaMovie battle animations in the Violated Hero games appear where they should and at the right speed.\n- KiriKiri: Display choices in a game's own menu, such as zoom, smoothing and frame rate limit, take effect and are remembered. Items that can't apply in VNDegen, such as window sizes, are gone from Game commands.\n\n## Known limits\n\n- KiriKiri: OPPAI Ero App, OPPAI Succubus, Motto Maid, Motto Bunny, Motto Spy and Sabbat of the Witch can't start, because they use a publisher's encryption VNDegen doesn't read. OPPAI Academy probably can't either. They show a message saying so.\n- KiriKiri: saving and loading in the four newly working games hasn't been checked.\n- KiriKiri: MP3 sound isn't played. No game that could be checked uses it.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.20.1/VNDegen-0.20.1.ipa",
+          "size": 122352683,
+          "sha256": "ef5a0aad22bc0f48cfc7e96937135b6e6f60c0b881f7356e9c52ea158b6a684a",
+          "minOSVersion": "18.0"
+        },
+        {
+          "version": "0.20.0",
+          "buildVersion": "1042",
+          "date": "2026-11-01T12:53:48Z",
+          "localizedDescription": "Wolf RPG Editor games now take the mouse, touch as a mouse, and typed names, and AliceSoft System 3 games play their transitions step by step.\n\n## Downloads\n\n- `VNDegen-0.20.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.20.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New: Wolf RPG Editor mouse and text\n\n- Wolf RPG Editor games take the mouse, and touch works as a mouse. Parade Buster and YUME-SAME play their action battles.\n- Two Beasts Or Not To Beast! plays from its title to a save, and its saves move to and from the PC.\n- Games can type text on the on-screen keyboard, so MARAGON QUEST takes a name. A hardware keyboard is built in but wasn't tested.\n- Games can import CSV files.\n- The Clumsy Witch Seris gets its minimap and scene text, and its system voices now find their files.\n\n## New: AliceSoft System 3 transitions and small features\n\n- System 3 games play their CE and CD transitions step by step, as on the PC.\n- Skip until choice is in Game commands. It passes messages and stops at a choice or a left click.\n- The number box works with touch, a keyboard, a controller and the on-screen keyboard.\n\n## Fixes\n\n- Wolf RPG Editor, in every game: NPCs stay where they belong instead of walking at the hero, eight-direction sprites draw correctly, commands that read character and picture details return the right value, and battles that show many pictures no longer slow down.\n- Wolf RPG Editor: fonts are found when the Data folder's case differs.\n- AliceSoft: Mamatoto's tutorial runs through to its first save point.\n- AliceSoft: Rance 4.1 and 4.2 no longer go silent when you pick the FM sound source.\n- AliceSoft: in System 4 games, a controller button let go after switching apps no longer releases a key held on the keyboard.\n\n## Known limits\n\n- The Mac app wasn't tested for these features, because the test Macs were locked. The iPad simulator was.\n- AliceSoft System 4: the openings can't be skipped the first time a game runs, because the games' own scripts forbid it.\n- Wolf RPG Editor: a Two Beasts save can open on a different screen depending on where it loads. The PC reopens the phone from a VNDegen save and shows a black map from its own, and VNDegen shows the room from either.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.20.0/VNDegen-0.20.0.ipa",
+          "size": 122348416,
+          "sha256": "c612a93951e2f7dfb0c0b0b04cee74b0641ae83d741f7472d32c217da399b917",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.19.0",
           "buildVersion": "1004",
           "date": "2026-11-01T07:30:04Z",

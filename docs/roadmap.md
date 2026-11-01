@@ -50,11 +50,13 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Cheats for AliceSoft System 3 and 4, find by value on every game's Variables tab, and TyranoScript 5.2 Electron builds (0.17.0).
 - AliceSoft System 4 games built on PartsEngine, such as Rance IX: story scenes, saves and loads, and a clear stop where a 3D scene starts, and Artemis movies and screen effects (0.18.0).
 - RPG Maker VX Ace movies, message boxes in RPG Maker XP, VX and VX Ace shown in the app, and Wolf RPG Editor 3.5 games with their saves, and version 8 archives (0.19.0).
-- AliceSoft System 3 transitions, text skip, number box and Mamatoto's tutorial (on `dev`, in the next release).
+- AliceSoft System 3 transitions, text skip, number box and Mamatoto's tutorial, and Wolf RPG Editor mouse, touch as a mouse, CSV import and typed text (0.20.0).
+- KiriKiri: four more library games start, AlphaMovie clips draw in place and at the right speed, and a game's own Display choices apply (0.20.1).
+- Wolf RPG Editor: the hero shows in new games (0.20.2).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Wolf RPG Editor mouse and text input, on `feat/wolf-input`. RPG Maker MV and MZ small fixes, on `fix/rpgmaker-polish`.
+- RPG Maker MV and MZ small fixes, on `fix/rpgmaker-polish`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
@@ -78,7 +80,7 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 13. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
 14. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
 15. Cheats for games that aren't visual novels: quick cheats such as gold, items, encounters and game speed, plus a variable and switch editor, through each engine's own state, so saves stay in the PC format. Plan in `docs/cheats.md`. Done: RPG Maker MV and MZ in 0.14.0, XP, VX, VX Ace and Wolf RPG Editor in 0.15.0, Godot and Flash game speed in 0.16.0, and AliceSoft System 3 and 4 in 0.17.0.
-16. What released engines still lack, then their small fixes, one engine at a time: Artemis movies and screen effects, Wolf RPG Editor's newer data formats and its mouse and text input, RPG Maker XP, VX and VX Ace movies and message boxes, and AliceSoft System 3's transitions. Each is built only for the library games that need it.
+16. What released engines still lacked, built only for the library games that need it: Artemis movies and screen effects (0.18.0), Wolf RPG Editor's newer data formats (0.19.0) and its mouse and text input (0.20.0), RPG Maker VX Ace movies and message boxes (0.19.0), and AliceSoft System 3's transitions (0.20.0). Their small fixes come next, one engine at a time.
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.

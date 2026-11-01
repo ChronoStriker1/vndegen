@@ -891,6 +891,9 @@ void TVPRenderTextureBackend(TVPSprite* sp, int posX, int posY, int width, int h
     rectBuff.y = posY;
     rectBuff.w = width;
     rectBuff.h = height;
+    tTJSVariant smooth;
+    bool nearest = TVPGetCommandLine(TJS_N("-smoothzoom"), &smooth) && ttstr(smooth) == TJS_N("no");
+    SDL_SetTextureScaleMode((SDL_Texture*)sp->texture, nearest ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR);
     SDL_RenderTexture(tvp_renderer, (SDL_Texture*)sp->texture, NULL, &rectBuff);
 }
 

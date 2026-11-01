@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <regex>
 
 #include "images.h"
 
@@ -56,7 +58,7 @@ bool Game::jumpToCase(Thread::Call &c, int indent, int caseValue) {
 }
 
 void Game::unsupported(const Command &c) {
-    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet", c.code));
+    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet (%x)", c.code, c.arg(1)));
 }
 
 bool Game::step(Thread &t) {
@@ -68,6 +70,10 @@ bool Game::step(Thread &t) {
     if (t.waitingRoute) {
         if (t.waitingRoute->route) return false;
         t.waitingRoute = nullptr;
+    }
+    if (t.waitingText) {
+        if (textEntry_.active) return false;
+        t.waitingText = false;
     }
     if (t.waitingChoice) {
         if (choice_.active) return false;
@@ -107,6 +113,11 @@ bool Game::step(Thread &t) {
 
         case 101:  // message: the thread resumes once the player closes the window
             showMessage(expandText(cmd.str(0), &t));
+            // A choice right after a message opens with the message still showing, as on the PC (Parade Buster).
+            if (c.pc < c.commands->size() && (*c.commands)[c.pc].code == 102) {
+                message_.heldForChoice = true;
+                return true;
+            }
             t.waitingMessage = true;
             return false;
 
@@ -159,13 +170,24 @@ bool Game::step(Thread &t) {
                 int op = (leftWord >> 24) & 0xF0;
                 bool rightIsVar = ((leftWord >> 24) & 0x0F) == 1;
                 std::string left = readStr(leftId >= 1000000 ? leftId : 3000000 + leftId, t);
-                std::string right = rightIsVar ? readStr(cmd.arg(1 + count + i), t) : cmd.str(i);
+                std::string right = rightIsVar ? readStr(cmd.arg(1 + count + i), t) : expandText(cmd.str(i), &t);
                 bool ok = false;
                 switch (op) {
                     case 0x00: ok = left == right; break;
                     case 0x10: ok = left != right; break;
                     case 0x20: ok = left.find(right) != std::string::npos; break;
                     case 0x30: ok = left.starts_with(right); break;
+                    case 0x40: ok = left.find(right) == std::string::npos; break;
+                    case 0x50: ok = left.ends_with(right); break;
+                    case 0x60:  // a regular expression, which takes text codes only inside << and >>
+                        try {
+                            // The whole text must match, as the manual's page on this condition says.
+                            ok = std::regex_match(left, std::regex(expandRegexCodes(rightIsVar ? right : cmd.str(i), t),
+                                                                   std::regex::ECMAScript));
+                        } catch (const std::regex_error &) {
+                            log("bad regular expression " + right);
+                        }
+                        break;
                 }
                 if (ok) {
                     chosen = i + 1;
@@ -190,11 +212,8 @@ bool Game::step(Thread &t) {
             setVariable(t, cmd);
             return true;
         case 122:
-            // Typing text on the keyboard waits for the player in Wolf. With no text entry yet the command keeps the
-            // text already there and takes a frame, so a loop around it runs once a frame instead of spinning.
             if ((uint32_t(cmd.arg(1)) & 0x0F) == 3) {
-                unsupported(cmd);
-                t.wait = 1;
+                startTextEntry(t, cmd);
                 return false;
             }
             setString(t, cmd);
@@ -207,10 +226,17 @@ bool Game::step(Thread &t) {
         case 151: {  // change screen colour
             int32_t packed = cmd.arg(0);
             int frames = value(cmd.arg(1), t);
-            // The colour is three percentages packed into one value, red in the lowest byte.
-            tintR_.set(packed & 0xFF, frames);
-            tintG_.set((packed >> 8) & 0xFF, frames);
-            tintB_.set((packed >> 16) & 0xFF, frames);
+            // The colour is three percentages packed into one value, red in the lowest byte. A top byte of 1 flashes: the
+            // screen takes the colour at once, then returns to normal over the frames.
+            bool flash = (uint32_t(packed) >> 24) == 1;
+            tintR_.set(packed & 0xFF, flash ? 0 : frames);
+            tintG_.set((packed >> 8) & 0xFF, flash ? 0 : frames);
+            tintB_.set((packed >> 16) & 0xFF, flash ? 0 : frames);
+            if (flash) {
+                tintR_.set(100, frames);
+                tintG_.set(100, frames);
+                tintB_.set(100, frames);
+            }
             return true;
         }
 
@@ -315,9 +341,11 @@ bool Game::step(Thread &t) {
             return true;
         }
         case 300: {
-            int id = commonByName(cmd.str(0));
+            // The name may hold text codes, as "\\cself[5]" (Clumsy Witch Seris).
+            std::string name = expandText(cmd.str(0), &t);
+            int id = commonByName(name);
             if (id < 0) {
-                log("no common event named " + cmd.str(0));
+                if (hiddenCodesLogged_.insert(name).second) log("no common event named " + name);
                 return true;
             }
             callCommon(t, id, cmd, 1);
@@ -390,12 +418,11 @@ bool Game::step(Thread &t) {
             return true;
         case 123:
             return keyInput(t, cmd);
-        case 125: {  // press keys automatically
-            autoKeys_ |= uint32_t(cmd.arg(0));
+        case 125:
+            autoInput(t, cmd);
             return true;
-        }
-        case 126:  // enable or disable standard keys
-            keyControl_ = cmd.arg(0);
+        case 126:
+            keyControl(t, cmd);
             return true;
 
         case 270:
@@ -466,7 +493,18 @@ bool Game::step(Thread &t) {
         case 242:
             chipCommand(t, cmd);
             return true;
-        case 251:  // CSV import and export of database data
+        case 251:
+            csvCommand(t, cmd);
+            return true;
+        case 252:
+            dbRowCommand(t, cmd);
+            return true;
+        case 255:
+            xyCommand(t, cmd);
+            return true;
+        case 257:
+            xySortCommand(t, cmd);
+            return true;
         case 260:  // download a file
             unsupported(cmd);
             return true;
@@ -520,6 +558,10 @@ void Game::setVariable(Thread &t, const Command &c) {
     uint8_t b0 = flags & 0xFF, b1 = (flags >> 8) & 0xFF;
     int calc = b1 & 0xF0, assign = b1 & 0x0F;
     if (b0 & 0x10) target = readVar(target, t);
+    // Target 1,100,000,000 with three more fields writes a changeable database cell named by those fields, which may
+    // be variables (WodiLib's SetVariableChangeableDB).
+    if (target == 1100000000 && c.args.size() >= 7)
+        target += value(c.arg(4), t) * 1000000 + value(c.arg(5), t) * 100 + value(c.arg(6), t);
     int32_t a = (b0 & 0x04) ? r1 : value(r1, t);
     if (b0 & 0x20) a = readVar(readVar(r1, t), t);
     int32_t b = (b0 & 0x08) ? r2 : value(r2, t);
@@ -612,6 +654,11 @@ void Game::setString(Thread &t, const Command &c) {
     int assign = (flags >> 8) & 0x0F;
     if (flags & 0xF0) target = readVar(target, t);
     if (target < 1000000) target += 3000000;
+    // Wolf RPG Editor 3's operations keep a group of their own in the third byte: hidden codes and regular expressions.
+    if (((flags >> 16) & 0xFF) == 4) {
+        extendedString(t, c, target, assign);
+        return;
+    }
     // The right side: typed text, the text at an address, or the text at an address held in a variable.
     int32_t source = 0;
     std::string rhs;
@@ -640,8 +687,24 @@ void Game::setString(Thread &t, const Command &c) {
         }
         case 0x05: {  // read a text file of the game
             auto bytes = files_.read(rhs);
-            std::string text = bytes ? std::string(bytes->begin(), bytes->end()) : "";
-            writeStr(target, toUtf8(text, gameDat_.encoding), t);
+            if (!bytes) {
+                writeStr(target, "<NoFile>", t);
+                break;
+            }
+            writeStr(target, decodeTextFile(std::string(bytes->begin(), bytes->end())), t);
+            break;
+        }
+        case 0x06: {  // write the variable's text to a file, with a byte order mark as the PC's default
+            std::filesystem::path path = saveFilePath(rhs);
+            if (path.empty()) {
+                log("cannot write " + rhs);
+                break;
+            }
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            std::ofstream file(path, std::ios::binary);
+            file << "\xEF\xBB\xBF" << cur;
+            if (!file) log("cannot write " + rhs);
             break;
         }
         case 0x07: {  // the files in a folder, one name a line; <<ERROR>> for a folder packed in an archive
@@ -668,8 +731,268 @@ void Game::setString(Thread &t, const Command &c) {
             writeStr(target, cur, t);
             break;
         }
+        case 0x0A: {  // the part before the given text
+            size_t p = cur.find(rhs);
+            writeStr(target, p == std::string::npos ? "<<NotFound>>" : cur.substr(0, p), t);
+            break;
+        }
+        case 0x0B: {  // the part after the given text
+            size_t p = cur.find(rhs);
+            writeStr(target, p == std::string::npos ? "<<NotFound>>" : cur.substr(p + rhs.size()), t);
+            break;
+        }
         default: unsupported(c); break;
     }
+}
+
+// A regular expression as a game wrote it: only the parts between << and >> take text codes.
+std::string Game::expandRegexCodes(const std::string &pattern, const Thread &t) const {
+    std::string expanded;
+    for (size_t at = 0; at < pattern.size();) {
+        size_t open = pattern.find("<<", at);
+        size_t close = open == std::string::npos ? open : pattern.find(">>", open);
+        if (close == std::string::npos) {
+            expanded += pattern.substr(at);
+            break;
+        }
+        expanded += pattern.substr(at, open - at) + expandText(pattern.substr(open + 2, close - open - 2), &t);
+        at = close + 2;
+    }
+    return expanded;
+}
+
+// The third-byte group of the string command. Operation 2 runs a hidden code, written <<NAME>> before its argument.
+// Operations 5 and 6 store what a regular expression's first group catches in the variable's text: the first match, or
+// every match with a line break between. In a regular expression only the parts inside << and >> take text codes.
+void Game::extendedString(Thread &t, const Command &c, int32_t target, int op) {
+    if (op == 5 || op == 6) {
+        std::string expanded = expandRegexCodes(c.str(0), t);
+        std::string text = readStr(target, t), found;
+        try {
+            // Line by line, as the manual's hint on matching line breaks describes.
+            std::regex re(expanded, std::regex::ECMAScript | std::regex::multiline);
+            for (std::sregex_iterator it(text.begin(), text.end(), re), end; it != end; ++it) {
+                if (!found.empty()) found += '\n';
+                found += it->size() > 1 ? (*it)[1].str() : it->str();
+                if (op == 5) break;
+            }
+        } catch (const std::regex_error &) {
+            log("bad regular expression " + expanded);
+        }
+        writeStr(target, found, t);
+        return;
+    }
+    if (op != 2) {
+        unsupported(c);
+        return;
+    }
+    std::string code = expandText(c.str(0), &t);
+    size_t close = code.find(">>");
+    if (!code.starts_with("<<") || close == std::string::npos) {
+        writeStr(target, "<<Error>> Missing \">>\"", t);
+        return;
+    }
+    std::string name = code.substr(2, close - 2), arg = code.substr(close + 2);
+    writeStr(target, hiddenCode(name, arg), t);
+}
+
+// The hidden codes the library's games use, from the manual's list. Each returns the text the variable gets.
+std::string Game::hiddenCode(const std::string &name, const std::string &arg) {
+    // The characters of a text, counting ASCII as width 1 and the rest as 2, as the manual does.
+    auto width = [](const std::string &s) {
+        int n = 0;
+        for (size_t i = 0; i < s.size(); i += utf8Length(s.substr(i, 4))) n += static_cast<unsigned char>(s[i]) < 0x80 ? 1 : 2;
+        return n;
+    };
+    auto event = [&](int id) -> const MapEventState * {
+        for (auto &e : events_)
+            if (e.data->id == id) return &e;
+        return nullptr;
+    };
+    if (name == "GET_FILE_EXIST") {
+        // A path from the game folder, where saves are, or in the game's data, which may be in an archive.
+        std::error_code ec;
+        std::filesystem::path path = saveFilePath(arg);
+        if (path.empty()) return "0";
+        return std::filesystem::exists(path, ec) || files_.exists(arg) ? "1" : "0";
+    }
+    if (name == "GET_STRING_WIDTH_COUNT") return std::to_string(width(arg));
+    if (name == "GET_STRING_BYTE_COUNT") return std::to_string(arg.size());
+    if (name == "GET_TITLE") return gameDat_.title;
+    if (name == "GET_TITLE_PLUS") return "";
+    if (name == "GET_COMMONEVENT_ID_FROM_NAME") return std::to_string(commonByName(arg));
+    if (name == "GET_MAPEVENT_NAME_FROM_ID") {
+        int id = std::atoi(arg.c_str());
+        if (auto it = eventNames_.find(id); it != eventNames_.end()) return it->second;
+        const MapEventState *e = event(id);
+        return e ? e->data->name : "";
+    }
+    if (name.starts_with("MAKE_EVENT_")) return makeEvent(name.substr(11), arg);
+    if (name.starts_with("SET_EVENT_NAME_ID=")) {
+        eventNames_[std::atoi(name.c_str() + 18)] = arg;
+        return "";
+    }
+    if (name.starts_with("FIND_PATH_DIR")) return findPath(name.substr(13));
+    if (name == "GET_MAPEV_FILENAME") {
+        const MapEventState *e = event(std::atoi(arg.c_str()));
+        return e ? e->actor.chara.graphic : "";
+    }
+    if (name == "GET_FILENAME_FROM_PICTURE") {
+        auto it = pictures_.find(std::atoi(arg.c_str()));
+        return it == pictures_.end() ? "" : it->second.source;
+    }
+    if (hiddenCodesLogged_.insert(name.substr(0, name.find_first_of("_=/", 12))).second) log("hidden code <<" + name + ">> is not supported");
+    return "";
+}
+
+// <<MAKE_EVENT_X=x/Y=y/...>>image, from the manual's hidden code list. Makes an empty event, or a copy of the one /COPY
+// names, and returns its id, the lowest one free. /TR picks its trigger: 1 confirm, 2 hero touch, 3 event touch.
+std::string Game::makeEvent(const std::string &options, const std::string &image) {
+    int x = 0, y = 0, trigger = 1, shade = -1, copy = -1;
+    bool half = false;
+    for (size_t at = 0; at < options.size();) {
+        size_t end = std::min(options.find('/', at), options.size());
+        std::string part = options.substr(at, end - at);
+        size_t eq = part.find('=');
+        int number = eq == std::string::npos ? 0 : std::atoi(part.c_str() + eq + 1);
+        if (part.starts_with("X=")) x = number;
+        else if (part.starts_with("Y=")) y = number;
+        else if (part.starts_with("TR=")) trigger = number;
+        else if (part.starts_with("SHADE=")) shade = number;
+        else if (part.starts_with("COPY=")) copy = number;
+        else if (part == "HALF") half = true;
+        at = end + 1;
+    }
+    MapEvent made;
+    made.pages.emplace_back();
+    made.pages[0].moveSpeed = 3;
+    made.pages[0].moveFrequency = 3;
+    made.pages[0].animSpeed = 3;
+    made.pages[0].flags = 0x02;
+    made.pages[0].direction = 2;
+    made.pages[0].frame = 1;
+    made.pages[0].trigger = trigger == 2 ? 3 : trigger == 3 ? 4 : 0;
+    for (auto &e : events_)
+        if (copy >= 0 && e.data->id == copy) made = *e.data;
+    int id = 0;
+    for (bool taken = true; taken; id += taken) {
+        taken = false;
+        for (auto &e : events_) taken = taken || e.data->id == id;
+    }
+    made.id = id;
+    made.x = half ? x / 2 : x;
+    made.y = half ? y / 2 : y;
+    for (auto &page : made.pages) {
+        if (!image.empty()) page.graphic = image;
+        if (shade >= 0) page.shadow = uint8_t(shade);
+    }
+    MapEventState state;
+    state.data = &madeEvents_.emplace_back(std::move(made));
+    state.actor.placeAt(state.data->x, state.data->y);
+    state.actor.chara.visible = false;
+    events_.push_back(state);
+    refreshPages();
+    return std::to_string(id);
+}
+
+// <<FIND_PATH_DIR4_SX=a/SY=b/EX=c/EY=d>>: the shortest way between two tiles as directions, as "2466/END", by the rules
+// that move a character, or "NoPath" (from the manual's list; Clumsy Witch Seris checks for that text). Library games use
+// four directions and none of the options.
+std::string Game::findPath(const std::string &options) {
+    int sx = 0, sy = 0, ex = 0, ey = 0, dirs = 4;
+    if (std::sscanf(options.c_str(), "%d_SX=%d/SY=%d/EX=%d/EY=%d", &dirs, &sx, &sy, &ex, &ey) != 5 || !map_) return "NoPath";
+    int w = map_->width, h = map_->height;
+    auto inside = [&](int x, int y) { return x >= 0 && y >= 0 && x < w && y < h; };
+    if (!inside(sx, sy) || !inside(ex, ey)) return "NoPath";
+    std::vector<char> from(size_t(w) * h, 0);
+    std::deque<std::pair<int, int>> queue{{sx, sy}};
+    from[size_t(sy) * w + sx] = 5;  // 5 marks the start
+    Actor walker;
+    while (!queue.empty() && from[size_t(ey) * w + ex] == 0) {
+        auto [x, y] = queue.front();
+        queue.pop_front();
+        walker.tx = x;
+        walker.ty = y;
+        for (int dir : {2, 4, 6, 8}) {
+            int nx = x + (dir == 4 ? -1 : dir == 6 ? 1 : 0), ny = y + (dir == 8 ? -1 : dir == 2 ? 1 : 0);
+            if (!inside(nx, ny) || from[size_t(ny) * w + nx] != 0 || !canMove(walker, dir)) continue;
+            from[size_t(ny) * w + nx] = char(dir);
+            queue.emplace_back(nx, ny);
+        }
+    }
+    if (from[size_t(ey) * w + ex] == 0) return "NoPath";
+    std::string path;
+    for (int x = ex, y = ey; from[size_t(y) * w + x] != 5;) {
+        int dir = from[size_t(y) * w + x];
+        path.insert(path.begin(), char('0' + dir));
+        x -= dir == 4 ? -1 : dir == 6 ? 1 : 0;
+        y -= dir == 8 ? -1 : dir == 2 ? 1 : 0;
+    }
+    return path + "/END";
+}
+
+// The string command's keyboard mode: the event waits while the player types. Its flags' second byte has 0x10 when
+// Escape may cancel and 0x20 when typing starts from the text the variable holds, and field 2 is the length allowed.
+void Game::startTextEntry(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(1));
+    int32_t target = c.arg(0);
+    if (flags & 0xF0) target = readVar(target, t);
+    if (target < 1000000) target += 3000000;
+    textEntry_ = TextEntry{};
+    textEntry_.active = true;
+    textEntry_.target = target;
+    textEntryScope_.stack.assign(1, t.stack.back());
+    textEntry_.maxLength = value(c.arg(2), t);
+    textEntry_.canCancel = (flags >> 8) & 0x10;
+    if ((flags >> 8) & 0x20) textEntry_.text = readStr(target, t);
+    t.waitingText = true;
+}
+
+// Adds typed text, as far as the length the command allows. Line breaks and control characters don't go in.
+void Game::typeText(const std::string &utf8) {
+    if (!textEntry_.active) return;
+    for (size_t i = 0; i < utf8.size();) {
+        size_t n = utf8Length(utf8.substr(i, 4));
+        if (auto c = static_cast<unsigned char>(utf8[i]); c >= 0x20 && c != 0x7F) {
+            size_t count = 0;
+            for (size_t j = 0; j < textEntry_.text.size(); j += utf8Length(textEntry_.text.substr(j, 4))) count++;
+            if (textEntry_.maxLength > 0 && count >= size_t(textEntry_.maxLength)) return;
+            textEntry_.text += utf8.substr(i, n);
+        }
+        i += n;
+    }
+}
+
+// Enter finishes with the typed text, and Escape cancels when the command allows it, leaving the variable as it was.
+// System variable 39 tells the game which it was. Backspace deletes a character. Auto input of Enter also finishes, as
+// the manual's hint describes.
+void Game::updateTextEntry() {
+    if (!textEntry_.active) return;
+    // The event that asked may have ended, as a parallel event whose condition stopped holding does.
+    auto waiting = [](const auto &threads) {
+        return std::any_of(threads.begin(), threads.end(), [](const Thread &t) { return t.waitingText; });
+    };
+    if (!waiting(threads_) && !waiting(parallel_) && !waiting(mapParallel_)) {
+        textEntry_.active = false;
+        return;
+    }
+    if (input_.keysPressed[114]) {
+        std::string &s = textEntry_.text;
+        size_t last = s.size();
+        while (last > 0 && (static_cast<unsigned char>(s[--last]) & 0xC0) == 0x80) {}
+        s.erase(last);
+    }
+    bool enter = input_.keysPressed[128], cancel = textEntry_.canCancel && input_.keysPressed[101];
+    if (enter || cancel) {
+        if (enter) writeStr(textEntry_.target, textEntry_.text, textEntryScope_);
+        if (system_.size() > 39) system_[39] = enter ? 0 : -1;
+        textEntry_.active = false;
+    }
+    // While typing, keys and clicks reach no event (system variable 38 can let some through; no library game sets it).
+    Input cleared;
+    cleared.mouseX = input_.mouseX;
+    cleared.mouseY = input_.mouseY;
+    input_ = cleared;
 }
 
 // Applies a picture command to one picture, or to a range of pictures when its multi-target flag is set.
@@ -720,18 +1043,52 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     };
     if (show) {
         Picture fresh;
+        // A file with exactly this name wins over text codes in it, as the manual's picture page says.
+        auto fileName = [&](const std::string &name) {
+            if (name.find('\\') == std::string::npos) return name;  // no text codes to choose between
+            return files_.exists(name) ? name : expandText(name, &t);
+        };
         switch (display) {
-            case 0x00: fresh.kind = PictureKind::File; fresh.source = c.str(0); break;
-            case 0x10: fresh.kind = PictureKind::File; fresh.source = readStr(c.arg(11), t); break;
+            case 0x00: fresh.kind = PictureKind::File; fresh.source = fileName(c.str(0)); break;
+            case 0x10: fresh.kind = PictureKind::File; fresh.source = fileName(readStr(c.arg(11), t)); break;
             case 0x20: fresh.kind = PictureKind::Text; fresh.source = expandText(c.str(0), &t); break;
-            case 0x30: fresh.kind = PictureKind::Window; fresh.source = c.str(0); break;
-            default: fresh.kind = PictureKind::Window; fresh.source = readStr(c.arg(11), t); break;
+            case 0x30: fresh.kind = PictureKind::Window; fresh.source = fileName(c.str(0)); break;
+            default: fresh.kind = PictureKind::Window; fresh.source = fileName(readStr(c.arg(11), t)); break;
         }
         fresh.generation = ++generation_;
         if (fresh.kind == PictureKind::File) {
-            if (auto bytes = files_.read(fresh.source)) imageSize(*bytes, fresh.imageW, fresh.imageH);
             fresh.divX = std::max(1, field(3, 1));
             fresh.divY = std::max(1, field(4, 1));
+            // <CUT/Xa-b/Yc-d>, from the manual's picture page, applies to each pattern of a divided image.
+            if (fresh.source.starts_with("<CUT/")) {
+                int x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+                size_t end = fresh.source.find('>');
+                if (end != std::string::npos && std::sscanf(fresh.source.c_str(), "<CUT/X%d-%d/Y%d-%d>", &x1, &x2, &y1, &y2) == 4) {
+                    fresh.cutX = x1;
+                    fresh.cutY = y1;
+                    fresh.cutW = std::max(0, x2 - x1 + 1);
+                    fresh.cutH = std::max(0, y2 - y1 + 1);
+                    fresh.source.erase(0, end + 1);
+                }
+            }
+            if (fresh.source.starts_with("<XY")) {
+                auto xy = std::make_shared<const XYImage>(resolveXYImage(fresh.source, *this));
+                fresh.imageW = xy->w;
+                fresh.imageH = xy->h;
+                fresh.xyImage = xy;
+            } else {
+                // Games show the same pictures every frame in battle, so a file is read for its size only once.
+                auto [known, added] = imageSizes_.try_emplace(fresh.source);
+                if (added) {
+                    if (auto bytes = files_.read(fresh.source)) imageSize(*bytes, known->second[0], known->second[1]);
+                }
+                fresh.imageW = known->second[0];
+                fresh.imageH = known->second[1];
+            }
+            if (fresh.cutW > 0) {
+                fresh.imageW = fresh.cutW * fresh.divX;
+                fresh.imageH = fresh.cutH * fresh.divY;
+            }
         } else if (fresh.kind == PictureKind::Window) {
             // A window picture's two division fields are its size, which is also the size it reports.
             fresh.windowW = fresh.imageW = field(3, 0);

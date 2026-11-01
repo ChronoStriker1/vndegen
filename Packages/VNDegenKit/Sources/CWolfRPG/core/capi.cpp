@@ -23,6 +23,10 @@ struct VNWolfEngine {
     std::string cheatState;
     std::map<int, int> keysDown;  // key code to the number of times it is held
     uint32_t pressed = 0;         // Wolf keys pressed since the last frame, so a quick tap still counts
+    KeyCodes codesPressed;        // the same by Wolf key code
+    float mouseX = 0, mouseY = 0;  // normalized over the frame
+    uint32_t mouseHeld = 0, mousePressed = 0;
+    int wheel = 0;
     std::string caption, status, problem;
 };
 
@@ -45,10 +49,41 @@ uint32_t wolfKey(int key) {
     }
 }
 
+// Wolf's key code for a vnwolf.h key code, or 0: 100 plus the key's DirectInput scan code.
+int wolfKeyCode(int key) {
+    static const std::map<int, int> table = [] {
+        std::map<int, int> t = {
+            {VNWOLF_KEY_ESCAPE, 101}, {VNWOLF_KEY_BACKSPACE, 114}, {VNWOLF_KEY_TAB, 115}, {VNWOLF_KEY_RETURN, 128},
+            {VNWOLF_KEY_CTRL, 129}, {VNWOLF_KEY_SHIFT, 142}, {VNWOLF_KEY_SPACE, 157}, {VNWOLF_KEY_UP, 300},
+            {VNWOLF_KEY_PAGEUP, 301}, {VNWOLF_KEY_LEFT, 303}, {VNWOLF_KEY_RIGHT, 305}, {VNWOLF_KEY_DOWN, 308},
+            {VNWOLF_KEY_PAGEDOWN, 309}, {'0', 111},
+        };
+        for (int d = 1; d <= 9; d++) t['0' + d] = 101 + d;
+        const char *rows[] = {"QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"};
+        int starts[] = {116, 130, 144};
+        for (int r = 0; r < 3; r++)
+            for (int i = 0; rows[r][i]; i++) t[rows[r][i]] = starts[r] + i;
+        for (int f = 0; f < 10; f++) t[VNWOLF_KEY_F1 + f] = 159 + f;
+        t[VNWOLF_KEY_F1 + 10] = 187;
+        t[VNWOLF_KEY_F1 + 11] = 188;
+        return t;
+    }();
+    auto it = table.find(key);
+    return it == table.end() ? 0 : it->second;
+}
+
 uint32_t heldKeys(const VNWolfEngine *e) {
     uint32_t held = 0;
     for (auto &[k, n] : e->keysDown)
         if (n > 0) held |= wolfKey(k);
+    return held;
+}
+
+KeyCodes heldKeyCodes(const VNWolfEngine *e) {
+    KeyCodes held;
+    for (auto &[k, n] : e->keysDown)
+        if (n > 0) held.set(wolfKeyCode(k));
+    held.reset(0);
     return held;
 }
 
@@ -98,7 +133,17 @@ bool vnwolf_step(VNWolfEngine *e, int ms) {
         Input in;
         in.held = heldKeys(e) | e->pressed;
         in.pressed = e->pressed;
+        in.keysHeld = heldKeyCodes(e) | e->codesPressed;
+        in.keysPressed = e->codesPressed;
+        in.mouseX = std::clamp(int(e->mouseX * e->game->screenWidth()), 0, e->game->screenWidth() - 1);
+        in.mouseY = std::clamp(int(e->mouseY * e->game->screenHeight()), 0, e->game->screenHeight() - 1);
+        in.mouseHeld = e->mouseHeld | e->mousePressed;
+        in.mousePressed = e->mousePressed;
+        in.wheel = e->wheel;
         e->pressed = 0;
+        e->codesPressed.reset();
+        e->mousePressed = 0;
+        e->wheel = 0;
         e->game->update(in);
         e->elapsedMs -= frameMs;
         frames++;
@@ -132,10 +177,40 @@ void vnwolf_key(VNWolfEngine *e, int key, bool down) {
     if (!e) return;
     int &n = e->keysDown[key];
     if (down) {
-        if (n++ == 0) e->pressed |= wolfKey(key);
+        if (n++ == 0) {
+            e->pressed |= wolfKey(key);
+            if (int code = wolfKeyCode(key)) e->codesPressed.set(code);
+        }
     } else if (n > 0) {
         n--;
     }
+}
+
+void vnwolf_text(VNWolfEngine *e, const char *utf8) {
+    if (e && utf8) e->game->typeText(utf8);
+}
+
+bool vnwolf_wants_text(VNWolfEngine *e) { return e && e->game->textEntry().active; }
+
+void vnwolf_mouse_move(VNWolfEngine *e, float x, float y) {
+    if (!e) return;
+    e->mouseX = x;
+    e->mouseY = y;
+}
+
+void vnwolf_mouse_button(VNWolfEngine *e, int button, bool down) {
+    if (!e || button < 0 || button > 2) return;
+    uint32_t bit = 1u << button;
+    if (down) {
+        if (!(e->mouseHeld & bit)) e->mousePressed |= bit;
+        e->mouseHeld |= bit;
+    } else {
+        e->mouseHeld &= ~bit;
+    }
+}
+
+void vnwolf_mouse_wheel(VNWolfEngine *e, int notches) {
+    if (e) e->wheel += notches;
 }
 
 void vnwolf_set_paused(VNWolfEngine *e, bool paused) {
@@ -143,6 +218,9 @@ void vnwolf_set_paused(VNWolfEngine *e, bool paused) {
     e->paused = paused;
     e->keysDown.clear();
     e->pressed = 0;
+    e->codesPressed.reset();
+    e->mouseHeld = e->mousePressed = 0;
+    e->wheel = 0;
     e->elapsedMs = 0;
     if (Audio *a = e->game->audio()) {
         if (paused) a->pause();

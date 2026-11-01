@@ -12,6 +12,7 @@ VNDegen's Wolf RPG Editor runtime is its own code under VNDegen's MIT license. N
 | [WolfTL](https://github.com/Sinflower/WolfTL), commit `bfc38fc2735ab4f7f7ddbec8d57b7fef65f0712f` | MIT | Built and run on the test games to see what a parser of these formats produces. No code used |
 | README of [Wolf_RPG_Decompyler](https://github.com/Daviid-P/Wolf_RPG_Decompyler) | No license; prose only was read | Which archive versions and key strings Wolf RPG Editor versions use |
 | The test games' own files, and the original engine run under Wine as a black box | | Checking each format against real data, and engine behavior |
+| The official manual, [silversecond.com/WolfRPGEditor/Help](https://silversecond.com/WolfRPGEditor/Help/), read 2026-11-01 | Maker's documentation | Key input, command 125 and 126 behavior, key codes, system variables, the string command's operations and hidden codes, string conditions, XY arrays, CSV, `<CUT>` and `<XY_IMAGE>` pictures, flash, the picture zoom effect |
 | The LZ4 project's block format description, `lz4_Block_format.md` | BSD-2-Clause | The LZ4 decoder and encoder in `data.cpp` and `savefile.cpp`, written from the description. No LZ4 code is used |
 | DxLib's own archive source, DxLib 3.19f and 3.25a from dxlib.xsrv.jp | DxLib's own notice (no standard license) | Read only by one agent, with the coordinator's approval (2026-11-01), who wrote the prose section "DxLib archive versions 7 and 8" below and then deleted the source. A second agent that never saw DxLib wrote the version 8 reader in `dxa.cpp` from that section and the archive bytes. No DxLib code is in VNDegen |
 | `GamePro.exe` of The Clumsy Witch Seris, Wolf RPG Editor 3.714 (file version 3.714.2026.728, SHA-256 `7bd0b31f…79fce4`) | The game's own engine | Disassembled with the coordinator's approval (2026-11-01), limited to the save path: the routine that writes a save file, the body writer and its section writers, the two routines that encrypt a save, and the check value routine. The encrypt routine was also run on test buffers in an emulator to confirm the keystream. The findings are written as prose below ("Wolf RPG Editor 3.5 saves"); no listing is kept in the repository |
@@ -267,3 +268,16 @@ What the new fields mean isn't known. VNDegen carries them over from the last sa
 - The engine writes the two u32 in each character before `unknown5`, and VNDegen keeps them there. The eight extra u32 in each picture lie somewhere in the run between `v72b` and `v89Lists`; VNDegen keeps them after `v87`. Neither placement matters while those fields are only carried over.
 - Saves of versions 0x8F to 0x9E, from Wolf RPG Editor 3.3x, haven't been seen. VNDegen refuses them rather than guess.
 
+## Input, CSV and arrays
+
+The layouts of commands 122, 123, 125, 126 and 251 and of the variable command's "other" values come from WodiLib (MIT), the behavior from the official manual, each checked on the games. WodiLib predates Wolf RPG Editor 3's additions, and the manual doesn't give numbers, so these were read from how The Clumsy Witch Seris and Two Beasts use them, with no disassembly:
+
+- Command 255: array, X, Y, flags, value. The flags' 0x10000 means the array goes by name, in the command's second string. 0x1000 reads into the variable the value names. X of -1 reads the column count and Y of -1 the size of a column; X of -2 deletes the array. Y of -2 zeroing a column follows the manual's list; no library game uses it.
+- Command 252: the flags' 0x2000 copies, and Clumsy Witch Seris's backup and restore of a row show the row in field 1 is the destination. 0x3000 sorts.
+- Command 257: sorts columns. 0x100000 descending is read from its one use, and the same bit in command 252 is assumed.
+- The string command's third byte 4: operation 2 runs a hidden code, 5 stores a regular expression's first match and 6 every match, told apart by their uses and the manual's list. The ordering of 5 and 6 is inferred.
+- Key input's Wolf RPG Editor 3 modes: 0x20000 new presses and 0x40000 frames held, from earlier work on Clumsy Witch Seris. 0x10000 appears only together with the wait flag and is ignored.
+- String condition operators: 0x40 does not contain and 0x50 ends with, by the manual's order and Clumsy Witch Seris's comments. 0x60 is the regular expression match, in the manual's order. It searches rather than matching the whole text, which no library game's pattern tells apart.
+- CSV files: the exact bytes come from files the PC engine wrote for Two Beasts under Wine. VNDegen's output compared byte for byte equal for the three files written on first start.
+- `MAKE_EVENT`'s page defaults (speed, frequency, walk animation) are chosen to match a typical page. The manual doesn't give them.
+- Regular expressions run on `std::regex`, on UTF-8 bytes, which suits the patterns the library's games use.

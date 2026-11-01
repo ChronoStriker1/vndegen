@@ -1411,7 +1411,7 @@ struct AlphaMovieHeader
     tjs_uint32 quantaization_table_size_plus_hdr_size;
     tjs_uint32 unk;
     tjs_uint32 frame_cnt;
-    tjs_uint32 unk2;
+    tjs_uint32 frame_rate_scale;
     tjs_uint32 frame_rate;
     tjs_uint16 width;
     tjs_uint16 height;
@@ -1425,7 +1425,7 @@ struct AlphaMovieHeader
         stream->ReadBuffer(&quantaization_table_size_plus_hdr_size, 4);
         stream->ReadBuffer(&unk, 4);
         stream->ReadBuffer(&frame_cnt, 4);
-        stream->ReadBuffer(&unk2, 4);
+        stream->ReadBuffer(&frame_rate_scale, 4);
         stream->ReadBuffer(&frame_rate, 4);
         stream->ReadBuffer(&width, 2);
         stream->ReadBuffer(&height, 2);
@@ -1442,8 +1442,9 @@ struct AlphaMovieFrame
     char magic[4];
     tjs_uint32 size_of_frame;
     tjs_uint32 index_of_cur_frame;
-    tjs_uint16 alpha_channel_width;
-    tjs_uint16 alpha_channel_height;
+    // Where the frame sits on the screen. A frame stores only the rectangle it covers.
+    tjs_uint16 frame_x;
+    tjs_uint16 frame_y;
     tjs_uint16 frame_width;
     tjs_uint16 frame_height;
 
@@ -1461,8 +1462,8 @@ struct AlphaMovieFrame
         stream->ReadBuffer(&size_of_frame, 4);
         size_of_frame -= (isZlib ? 16 : 12);
         stream->ReadBuffer(&index_of_cur_frame, 4);
-        stream->ReadBuffer(&alpha_channel_width, 2);
-        stream->ReadBuffer(&alpha_channel_height, 2);
+        stream->ReadBuffer(&frame_x, 2);
+        stream->ReadBuffer(&frame_y, 2);
         stream->ReadBuffer(&frame_width, 2);
         stream->ReadBuffer(&frame_height, 2);
         if (isZlib)
@@ -1555,6 +1556,8 @@ void tTJSNI_AlphaMovie::open(tTJSString fileName)
     _header.parseAMVHeader(filePtr);
     _numOfFrame = _header.frame_cnt;
     _FPSRate = _header.frame_rate;
+    // Clips at 29.97 frames per second store 2997 over 100.
+    _FPSScale = _header.frame_rate_scale ? _header.frame_rate_scale : 1;
     _screenWidth = _header.width;
     _screenHeight = _header.height;
 
@@ -1699,8 +1702,21 @@ tjs_int tTJSNI_AlphaMovie::showNextImage(tTJSVariant layer)
         if (_frame > frameInfoList.size())
             _frame = 1;
         AlphaMovieFrame& currentFrame = frameInfoList.at(_frame - 1);
-        m_BmpBits->Update(currentFrame.ptrData, currentFrame.frame_width * 4, _left, _top,
-                          currentFrame.frame_width, currentFrame.frame_height);
+        m_BmpBits->Fill(tTVPRect(0, 0, _header.width, _header.height), 0);
+        tTVPRect rect(_left + currentFrame.frame_x, _top + currentFrame.frame_y,
+                      _left + currentFrame.frame_x + currentFrame.frame_width,
+                      _top + currentFrame.frame_y + currentFrame.frame_height);
+        tTVPRect visible(rect);
+        if (currentFrame.ptrData && visible.clip(tTVPRect(0, 0, _header.width, _header.height)))
+        {
+            // tTVPBaseTexture::Update takes only rectangles that start at the left edge.
+            const tjs_uint8* from = currentFrame.ptrData +
+                                    (visible.top - rect.top) * currentFrame.frame_width * 4 +
+                                    (visible.left - rect.left) * 4;
+            for (tjs_int y = visible.top; y < visible.bottom; y++, from += currentFrame.frame_width * 4)
+                memcpy((tjs_uint8*)m_BmpBits->GetScanLineForWrite(y) + visible.left * 4, from,
+                       visible.get_width() * 4);
+        }
         src->AssignMainImage(m_BmpBits);
         src->Update();
     }

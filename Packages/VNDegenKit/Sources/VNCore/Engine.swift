@@ -210,6 +210,12 @@ extension EngineSession {
     }
 }
 
+extension Notification.Name {
+    /// A session whose game starts or stops waiting for typed text. The object is the session, and userInfo["wants"] a
+    /// Bool. The hub opens or closes its keyboard for it.
+    public static let gameWantsKeyboard = Notification.Name("VNDegen.gameWantsKeyboard")
+}
+
 extension KeyboardKey {
     /// The keys the default `EngineSession.type(_:)` presses for `typed`: letters, digits, and spaces, and Return and
     /// Backspace.

@@ -4,17 +4,24 @@
 //   wolfplay <game folder> --frames 300 --shot 120:title.png --press 200:confirm
 //   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames, until frame U with 20:confirm:U; hold a key)
 //   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
+//   wolfplay <game folder> --mouse 200:640,480 --click 210:640,480   (move the pointer, or move and left click)
+//   wolfplay <game folder> --type 300:Ann --key 310:128   (types text into a text entry, then presses Enter)
+//   wolfplay <game folder> --draw 1000-2000   (draws every frame in that range and reports the time per frame)
+//   wolfplay <game folder> --pics 200   (lists the pictures shown at that frame)
+//   wolfplay <game folder> --rclick 210:640,480 --wheel 220:-1 --key 230:144   (a keyboard key by Wolf's code)
 #include "game.h"
 #include "render.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../../../../Packages/VNDegenKit/Sources/CWolfRPG/third_party/stb/stb_image_write.h"
 
+#include <chrono>
 #include <cstdio>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
 
 using namespace wolf;
@@ -39,6 +46,12 @@ int main(int argc, char **argv) {
     std::multimap<int, uint32_t> presses;
     std::vector<std::tuple<int, uint32_t, int>> repeats;  // press a key every N frames, until a frame
     std::vector<std::tuple<int, int, uint32_t>> holds;  // hold a key from one frame to another
+    struct MouseAt { int x, y; uint32_t button; };
+    std::multimap<int, MouseAt> mouse;
+    std::multimap<int, int> wheels, keyCodes;
+    std::set<int> picLists;
+    int drawFrom = 0, drawTo = -1;
+    std::multimap<int, std::string> typed;
     for (int i = 2; i + 1 < argc; i += 2) {
         std::string opt = argv[i], val = argv[i + 1];
         size_t colon = val.find(':');
@@ -60,6 +73,18 @@ int main(int argc, char **argv) {
             }
             repeats.emplace_back(std::max(1, std::atoi(val.c_str())), keyNamed(key), until);
         }
+        else if ((opt == "--mouse" || opt == "--click" || opt == "--rclick") && colon != std::string::npos) {
+            int x = 0, y = 0;
+            std::sscanf(val.c_str() + colon + 1, "%d,%d", &x, &y);
+            mouse.emplace(std::atoi(val.c_str()), MouseAt{x, y, opt == "--click" ? MouseLeft : opt == "--rclick" ? MouseRight : 0u});
+        }
+        else if (opt == "--type" && colon != std::string::npos) typed.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
+        else if (opt == "--draw") std::sscanf(val.c_str(), "%d-%d", &drawFrom, &drawTo);
+        else if (opt == "--pics") picLists.insert(std::atoi(val.c_str()));
+        else if (opt == "--wheel" && colon != std::string::npos)
+            wheels.emplace(std::atoi(val.c_str()), std::atoi(val.c_str() + colon + 1));
+        else if (opt == "--key" && colon != std::string::npos)
+            keyCodes.emplace(std::atoi(val.c_str()), std::atoi(val.c_str() + colon + 1));
         else if (opt == "--hold" && colon != std::string::npos) {
             int from = 0, to = 0;
             std::sscanf(val.c_str(), "%d-%d", &from, &to);
@@ -84,8 +109,25 @@ int main(int argc, char **argv) {
         Renderer renderer(game);
         Bitmap frame;
         uint32_t held = 0;
+        int mouseX = 0, mouseY = 0;
+        bool wasTyping = false, wasChoosing = false;
+        double drawSeconds = 0, updateSeconds = 0;
         for (int f = 1; f <= frames; f++) {
             Input in;
+            // A scripted click holds the button for this frame only.
+            for (auto [it, end] = mouse.equal_range(f); it != end; ++it) {
+                mouseX = it->second.x;
+                mouseY = it->second.y;
+                in.mouseHeld |= it->second.button;
+                in.mousePressed |= it->second.button;
+            }
+            in.mouseX = mouseX;
+            in.mouseY = mouseY;
+            for (auto [it, end] = wheels.equal_range(f); it != end; ++it) in.wheel += it->second;
+            for (auto [it, end] = keyCodes.equal_range(f); it != end; ++it) {
+                in.keysHeld.set(it->second);
+                in.keysPressed.set(it->second);
+            }
             auto [a, b] = presses.equal_range(f);
             for (auto it = a; it != b; ++it) in.pressed |= it->second;
             for (auto [n, k, until] : repeats)
@@ -98,11 +140,33 @@ int main(int argc, char **argv) {
             // A scripted press holds the key for this frame only.
             in.held = held | in.pressed;
             if (f == titleAt) game.debugReturnToTitle();
+            for (auto [it, end] = typed.equal_range(f); it != end; ++it) game.typeText(it->second);
+            auto updateStart = std::chrono::steady_clock::now();
             game.update(in);
+            if (f >= drawFrom && f <= drawTo) updateSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - updateStart).count();
             if (std::getenv("WOLF_HERO") && f % 30 == 0) {
                 auto h = game.heroTile();
                 std::printf("frame %d: map %d hero %d,%d facing %d%s%s\n", f, game.mapId(), h[0], h[1], h[2],
                             game.message().active ? " (message)" : "", game.choice().active ? " (choice)" : "");
+            }
+            if (bool choosing = game.choice().active; choosing != wasChoosing) {
+                wasChoosing = choosing;
+                std::printf("frame %d: choice %s\n", f, choosing ? "starts" : "ends");
+            }
+            if (bool typing = game.textEntry().active; typing != wasTyping) {
+                wasTyping = typing;
+                std::printf("frame %d: text entry %s \"%s\"\n", f, typing ? "starts" : "ends", game.textEntry().text.c_str());
+            }
+            if (picLists.count(f)) {
+                for (auto &[n, p] : game.pictures())
+                    std::printf("pic %d kind %d blend %d rgb %.0f,%.0f,%.0f %.0f,%.0f anchor %d size %dx%d zoom %.0f/%.0f opacity %.0f \"%.50s\"\n", n, int(p.kind), p.blend, p.r.value(), p.g.value(), p.b.value(), p.x.value(),
+                                p.y.value(), p.anchor, p.imageW, p.imageH, p.zoomX.value(), p.zoomY.value(), p.opacity.value(), p.source.c_str());
+            }
+            if (f >= drawFrom && f <= drawTo) {
+                auto start = std::chrono::steady_clock::now();
+                renderer.draw(frame);
+                drawSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+                if (f == drawTo) std::printf("draw: %.2f ms a frame over %d frames, update %.2f ms a frame\n", drawSeconds * 1000 / (drawTo - drawFrom + 1), drawTo - drawFrom + 1, updateSeconds * 1000 / (drawTo - drawFrom + 1));
             }
             auto [sa, sb] = shots.equal_range(f);
             if (sa != sb) {
