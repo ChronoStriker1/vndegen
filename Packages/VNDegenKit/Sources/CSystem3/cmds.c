@@ -121,6 +121,7 @@ void s3_cmd_wait_key(S3 *s) {
 void s3_cmd_open_menu(S3 *s) {
     s->menuBuild = -1;
     if (s->menuCount == 0) return;
+    s->msgSkip = false; // the engines' menu item skips until a choice, and turns itself off there
     s3_menu_open(s);
     s->pressedMask = 0;
     s->wait = S3_WAIT_MENU;
@@ -152,7 +153,7 @@ void s3_service_wait(S3 *s) {
     case S3_WAIT_KEY: {
         u32 p = s->pressedMask;
         s->pressedMask = 0;
-        if (p & (16 | 32)) {
+        if ((p & (16 | 32)) || s->msgSkip) {
             s->wait = S3_WAIT_NONE;
             s3_msg_clear(s);
         }
@@ -635,7 +636,7 @@ static void cmd_I(S3 *s) {
     case 'M': args(s, "ee", a); put(s, &a[0], 0, (u16)(s->mouseX + s->viewX)); put(s, &a[1], 0, (u16)(s->mouseY + s->viewY));
         rnd(s, (u16)((s->mouseL ? 16 : 0) | (s->mouseR ? 32 : 0) | s->clickLatch)); s->clickLatch = 0; s->polls++; return;
     case 'X': args(s, "e", a); put(s, &a[0], 0, 0); return;
-    case 'Y': args(s, "e", a); return;
+    case 'Y': args(s, "e", a); if (a[0].v < 2) s->msgSkip = a[0].v == 1; return; // 2 and 3: no library game uses them
     case 'Z': args(s, "ee", a); s->mouseX = a[0].v - s->viewX; s->mouseY = a[1].v - s->viewY; return;
     default: s->vmError = true;
     }
@@ -759,10 +760,13 @@ static void cmd_N(S3 *s) {
         return;
     }
     case 'C': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, 0); return;
-    case 'I': // NI var, default, min, max: a number input box. There is no keypad, so it takes the default, as OK would.
+    case 'I': // NI var, default, min, max: the host asks the player (vns3_number_request).
         args(s, "eeee", a);
-        put(s, &a[0], 0, a[1].v < a[2].v ? a[2].v : a[1].v > a[3].v ? a[3].v : a[1].v);
-        rnd(s, 0);
+        s->numberLv = a[0].isVar ? a[0].lv : (S3LV){ .var = 0xffff };
+        s->numberMin = a[2].v;
+        s->numberMax = a[3].v;
+        s->numberValue = a[1].v < a[2].v ? a[2].v : a[1].v > a[3].v ? a[3].v : a[1].v;
+        s->wait = S3_WAIT_NUMBER;
         return;
     case 'P': {
         args(s, "eeee", a);

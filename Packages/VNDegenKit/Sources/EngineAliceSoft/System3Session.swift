@@ -4,6 +4,7 @@ import FrameHost
 import Foundation
 import OSLog
 import QuartzCore
+import SwiftUI
 import VNCore
 #if canImport(UIKit)
 import UIKit
@@ -32,10 +33,17 @@ final class System3Session: EngineSession {
     #if DEBUG
     private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing(tag: "S3FRAMES") : nil
     #endif
+    private var numberBox: System3NumberBox?
+    private var numberView: PlatformView?
+    #if canImport(UIKit)
+    private var numberController: UIHostingController<System3NumberBoxView>?
+    #endif
+    private var pointerLocation: CGPoint?
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
     private lazy var system3Cheats = System3Cheats { [weak self] in self?.engine }
     var cheats: (any CheatSession)? { system3Cheats }
+    private static let textSkipItem = "textSkip"
 
     init(_ launch: GameLaunch, root: URL) {
         self.launch = launch
@@ -125,6 +133,7 @@ final class System3Session: EngineSession {
         pacing?.note(tick: now, presented: serial != shownSerial, stepEnd: CACurrentMediaTime(),
                      target: link.targetTimestamp - link.timestamp)
         #endif
+        if numberBox == nil { showNumberBoxIfAsked() }
         guard serial != shownSerial else { return }
         shownSerial = serial
         var w: Int32 = 0, h: Int32 = 0
@@ -136,6 +145,17 @@ final class System3Session: EngineSession {
 
     private func deliver(_ inputs: [System3Input]) {
         guard let engine else { return }
+        if let numberBox {
+            // The box takes the input while it's up. A right click is the game's cancel, and the box's too.
+            for input in inputs {
+                switch input {
+                case let .key(code, down: true): numberBox.press(virtualKey: code)
+                case .mouseButton(mouseRight, down: true): numberBox.press(.cancel)
+                default: break
+                }
+            }
+            return
+        }
         for input in inputs {
             switch input {
             case let .key(code, down): vns3_key(engine, code, down)
@@ -147,7 +167,68 @@ final class System3Session: EngineSession {
         }
     }
 
+    // MARK: Number box
+
+    private func showNumberBoxIfAsked() {
+        guard let engine else { return }
+        var value: Int32 = 0, minimum: Int32 = 0, maximum: Int32 = 0
+        guard vns3_number_request(engine, &value, &minimum, &maximum) else { return }
+        // The box takes the input, so the game sees every key and mouse button it holds come up, as when the menu opens.
+        deliver(router.releaseAll())
+        let entry = System3NumberEntry(value: Int(value), minimum: Int(minimum), maximum: Int(maximum))
+        let box = System3NumberBox(entry: entry) { [weak self] answer in self?.answerNumberBox(answer) }
+        numberBox = box
+        let content = System3NumberBoxView(box: box)
+        #if canImport(UIKit)
+        let controller = UIHostingController(rootView: content)
+        controller.view.backgroundColor = .clear
+        numberController = controller
+        let shown: PlatformView = controller.view
+        shown.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        #else
+        let shown: PlatformView = NSHostingView(rootView: content)
+        shown.autoresizingMask = [.width, .height]
+        #endif
+        shown.frame = frameView.bounds
+        frameView.addSubview(shown)
+        numberView = shown
+        frameView.takeFocus()
+    }
+
+    private func closeNumberBox() {
+        numberBox = nil
+        numberView?.removeFromSuperview()
+        numberView = nil
+        #if canImport(UIKit)
+        numberController = nil
+        #endif
+    }
+
+    private func answerNumberBox(_ answer: Int?) {
+        closeNumberBox()
+        guard let engine else { return }
+        vns3_number_answer(engine, Int32(answer ?? 0), answer != nil)
+        frameView.takeFocus()
+    }
+
+    /// A touch mouse's tap, or a button bound to a click, presses the control under the pointer when it lifts.
+    private func pressesNumberBoxControl(_ event: ControllerEvent, in box: System3NumberBox) -> Bool {
+        switch event {
+        case let .pointer(pointer):
+            pointerLocation = pointer.location
+            if pointer.phase == .ended, let control = box.control(at: pointer.location) { box.press(control) }
+            return true
+        case let .click(button, pressed):
+            guard button == .primary else { return false }
+            if !pressed, let location = pointerLocation, let control = box.control(at: location) { box.press(control) }
+            return true
+        default:
+            return false
+        }
+    }
+
     private func finish(byGame: Bool) {
+        closeNumberBox()
         displayLink?.invalidate()
         displayLink = nil
         audio?.stop()
@@ -169,6 +250,8 @@ final class System3Session: EngineSession {
     // MARK: EngineSession
 
     func send(_ event: ControllerEvent) {
+        if case let .pointer(pointer) = event { pointerLocation = pointer.location }
+        if let numberBox, pressesNumberBoxControl(event, in: numberBox) { return }
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
     }
@@ -190,6 +273,18 @@ final class System3Session: EngineSession {
     func terminate() {
         guard !stopped else { return }
         finish(byGame: false)
+    }
+
+    /// The PC engines keep this in the window's menu bar: 文字送り on System 3.9, Skip until choice in the English
+    /// System 3.0 exes. It turns itself off at the next choice or left click, so the menu asks the runtime each time.
+    func gameMenu() async -> [GameMenuItem] {
+        guard let engine, !stopped else { return [] }
+        return [GameMenuItem(id: Self.textSkipItem, title: "Skip until choice", isChecked: vns3_text_skip(engine))]
+    }
+
+    func chooseGameMenuItem(_ id: GameMenuItem.ID) {
+        guard let engine, !stopped, id == Self.textSkipItem else { return }
+        vns3_set_text_skip(engine, !vns3_text_skip(engine))
     }
 
     func waitUntilStopped() async {

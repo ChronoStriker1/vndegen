@@ -141,4 +141,4 @@ nonisolated struct System3InputRouter {
 
 /// vns3.h's mouse buttons.
 nonisolated private let mouseLeft: Int32 = 1
-nonisolated private let mouseRight: Int32 = 2
+nonisolated let mouseRight: Int32 = 2

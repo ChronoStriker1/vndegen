@@ -4,10 +4,6 @@
 
 #include "s3.h"
 
-// A variable argument. element marks an array element (var[offset]); otherwise offset steps to
-// following variables, as commands that fill var, var+1, ... do.
-typedef struct S3LV { u16 var; int offset; bool element; } S3LV;
-
 int s3_byte(S3 *s);
 u16 s3_u16(S3 *s);
 u32 s3_u32(S3 *s);

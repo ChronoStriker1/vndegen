@@ -105,10 +105,14 @@ typedef struct S3Surface {
 
 typedef struct S3 S3;
 
+// A variable argument. element marks an array element (var[offset]); otherwise offset steps to
+// following variables, as commands that fill var, var+1, ... do.
+typedef struct S3LV { u16 var; int offset; bool element; } S3LV;
+
 // ---- the runtime ----
 typedef enum {
     S3_WAIT_NONE, S3_WAIT_KEY, S3_WAIT_MENU, S3_WAIT_TIME, S3_WAIT_FADE, S3_WAIT_INPUT_POLL,
-    S3_WAIT_EFFECT, S3_WAIT_QUIT,
+    S3_WAIT_EFFECT, S3_WAIT_NUMBER, S3_WAIT_QUIT,
 } S3WaitKind;
 
 typedef enum { S3_FRAME_LABEL, S3_FRAME_PAGE, S3_FRAME_PUSH, S3_FRAME_TEXT } S3FrameKind;
@@ -181,6 +185,8 @@ struct S3 {
     int tx, ty;                // next text position
     bool msgClearOnSelect;
     int keyMode[8];
+    bool msgSkip;              // passing message waits until a choice
+    S3LV numberLv; int numberValue, numberMin, numberMax; // the number box NI is waiting at
     S3MenuItem menu[S3_MAX_MENU];
     int menuCount;
     int menuBuild;             // index of the menu item being built, or -1

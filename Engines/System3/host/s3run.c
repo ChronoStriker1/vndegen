@@ -1,7 +1,8 @@
 // Runs a System 3 game headless for testing: replays scripted input and writes frames as PPM files.
 //   s3run <gameDir> [--ms N] [--save DIR] [--log FILE] [--final FILE.ppm] [--time UNIX]
 //         [--auto MS] [--prefer TEXT]... [--avoid TEXT]... [--repl FIFO] [--wav FILE] [events...]
-// Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:shot:FILE.ppm, T:pick:TEXT
+// Events, by time in ms: T:key:VK, T:click:X,Y, T:rclick:X,Y, T:move:X,Y, T:shot:FILE.ppm, T:pick:TEXT, T:skip:0/1,
+// T:number:V (the answer for the next number box; -1 cancels it, and without one the box takes its default)
 // T:pick:TEXT waits from T until a menu offers an item containing TEXT, then chooses it; picks go in order, and the
 // autopilot answers the menus in between.
 // From --auto MS on, the autopilot presses Return at message waits, and once a second at other waits, and answers menus: a pending pick first, then the
@@ -127,6 +128,8 @@ int main(int argc, char **argv) {
     int ok = 1, turn = 0, nextPick = 0, nextAuto = autoFrom;
     // Keys and buttons stay down for 96 ms, as a person's press does, so games that poll the state see them.
     int releaseAt = -1, heldKey = 0, heldButton = -1;
+    int numberAnswer = 0;
+    bool numberSet = false;
     for (int t = 0; t < total; t += 16) {
         if (releaseAt >= 0 && t >= releaseAt) {
             if (heldKey) vns3_key(g, heldKey, false);
@@ -144,6 +147,15 @@ int main(int argc, char **argv) {
                 vns3_mouse_button(g, heldButton, true);
                 releaseAt = t + 96;
             } else if (!strcmp(e->kind, "shot")) shot(g, e->file);
+            else if (!strcmp(e->kind, "skip")) vns3_set_text_skip(g, e->a != 0);
+            else if (!strcmp(e->kind, "number")) { numberAnswer = e->a; numberSet = true; }
+        }
+        int boxValue, boxMin, boxMax;
+        if (vns3_number_request(g, &boxValue, &boxMin, &boxMax)) {
+            int answer = numberSet ? numberAnswer : boxValue;
+            printf("%d ms: number box %d, %d to %d, answered %d\n", t, boxValue, boxMin, boxMax, answer);
+            vns3_number_answer(g, answer, answer >= 0);
+            numberSet = false;
         }
         // The next pick whose time has come, if any.
         while (nextPick < n && strcmp(ev[nextPick].kind, "pick")) nextPick++;

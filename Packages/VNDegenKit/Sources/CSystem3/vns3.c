@@ -157,7 +157,7 @@ void vns3_close(VNS3 *s3) {
 }
 
 static void apply_button(S3 *s, int button, bool down) {
-    if (button == VNS3_MOUSE_LEFT) { s->mouseL = down; if (down) { s->pressedMask |= 16 | 0x10000; s->clickLatch |= 16; } }
+    if (button == VNS3_MOUSE_LEFT) { s->mouseL = down; if (down) { s->msgSkip = false; s->pressedMask |= 16 | 0x10000; s->clickLatch |= 16; } }
     if (button == VNS3_MOUSE_RIGHT) { s->mouseR = down; if (down) { s->pressedMask |= 32 | 0x20000; s->clickLatch |= 32; } }
 }
 
@@ -278,6 +278,26 @@ bool vns3_set_variable(VNS3 *s3, int index, int value) {
     if (index < 0 || index >= vns3_variable_count(s3)) return false;
     s3_var_set((S3 *)s3, (u16)index, (u16)(value < 0 ? 0 : value > 65535 ? 65535 : value));
     return true;
+}
+
+void vns3_set_text_skip(VNS3 *s3, bool on) { ((S3 *)s3)->msgSkip = on; }
+bool vns3_text_skip(VNS3 *s3) { return ((S3 *)s3)->msgSkip; }
+
+bool vns3_number_request(VNS3 *s3, int *value, int *min, int *max) {
+    S3 *s = (S3 *)s3;
+    if (s->wait != S3_WAIT_NUMBER) return false;
+    *value = s->numberValue;
+    *min = s->numberMin;
+    *max = s->numberMax;
+    return true;
+}
+
+void vns3_number_answer(VNS3 *s3, int value, bool ok) {
+    S3 *s = (S3 *)s3;
+    if (s->wait != S3_WAIT_NUMBER) return;
+    if (ok && s->numberLv.var != 0xffff) s3_lv_set(s, &s->numberLv, 0, (u16)value);
+    s3_var_set(s, 0, ok ? 0 : 255); // RND, as System39.exe's box sets it; cancelling leaves the variable alone
+    s->wait = S3_WAIT_NONE;
 }
 
 void vns3_set_speed(VNS3 *s3, int speed) { ((S3 *)s3)->speed = speed < 1 ? 1 : speed > 8 ? 8 : speed; }
