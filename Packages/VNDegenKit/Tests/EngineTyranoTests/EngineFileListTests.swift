@@ -80,6 +80,17 @@ private struct Scratch {
     #expect(await library.engineFilePlan(for: scratch.id).files.isEmpty)
 }
 
+/// A `kag.js` left behind doesn't show the game is on disk. Its data does.
+@Test @MainActor func aLeftoverEngineFileBesideAPackedExeOffersNothing() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("Game.exe", size: 900_000_000)
+    for path in ["tyrano/plugins/kag/kag.js", "nw.pak", "package.json"] { try scratch.write(path) }
+    let library = await scratch.library()
+    #expect(library.game(scratch.id)?.detected?.engine == .tyrano)
+    #expect(await library.engineFilePlan(for: scratch.id).files.isEmpty)
+}
+
 /// The library's `TyranoScript (packed in exe)` games show no `kag.js` on disk, so detection finds nothing.
 @Test @MainActor func aGameAppendedToItsExeOffersNothing() async throws {
     let scratch = Scratch()

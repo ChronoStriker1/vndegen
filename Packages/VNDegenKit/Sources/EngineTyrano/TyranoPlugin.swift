@@ -52,9 +52,12 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
 
     public var listsEngineFiles: Bool { true }
 
-    /// The game's NW.js or Electron runtime. Its web root, `package.json`, `node_modules`, and `.sav` saves stay.
+    /// The game's NW.js or Electron runtime. Its web root, `package.json`, `node_modules`, and `.sav` saves stay. Without
+    /// the game's data in its web root `kag.js` may be a leftover and the game in the `.exe`, so nothing is offered.
     public func engineFileList(_ probe: FolderProbe) -> EngineFileList? {
-        DesktopRuntimeFiles.electron(probe) ?? DesktopRuntimeFiles.nwjs(probe)
+        guard let game = TyranoGame(folder: probe.root),
+              GameFolder(root: probe.root, webRoot: game.webRoot).read(servedPath: "/data/system/Config.tjs", limit: 1) != nil else { return nil }
+        return DesktopRuntimeFiles.electron(probe) ?? DesktopRuntimeFiles.nwjs(probe)
     }
 
     /// Buttons used to run Tyrano's actions here directly, which still works. As an Xbox button, such a remap would do

@@ -782,8 +782,9 @@ final class Navigator {
                     if result.failed.isEmpty {
                         showError("Engine files removed", summary)
                     } else {
-                        let failures = result.failed.prefix(20).map { "\($0.path): \($0.reason)" }.joined(separator: "\n")
-                        showError("Some engine files weren't removed", "\(summary) These stay:\n\(failures)")
+                        let gone = result.removed.map(\.path).joined(separator: "\n")
+                        let kept = result.failed.map { "\($0.path): \($0.reason)" }.joined(separator: "\n")
+                        showError("Some engine files weren't removed", "\(summary)\n\nThese stay:\n\(kept)\n\nThese went:\n\(gone)")
                     }
                 })
         }

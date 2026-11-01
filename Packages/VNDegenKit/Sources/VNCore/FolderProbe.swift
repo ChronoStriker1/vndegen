@@ -44,7 +44,8 @@ public struct FolderProbe: Sendable {
 
     /// The size of a file in the folder, from its metadata, so a file not downloaded yet stays that way. Nil when missing.
     public func size(_ path: String) -> Int64? {
-        let actual = entries.first { $0.lowercased() == path.lowercased() } ?? path
+        // The exact name first, since a disk that minds case can hold two files whose names differ only in case.
+        let actual = entries.contains(path) ? path : entries.first { $0.lowercased() == path.lowercased() } ?? path
         let values = try? FileManager.default.attributesOfItem(atPath: root.appendingPathComponent(actual).path)
         return (values?[.size] as? NSNumber)?.int64Value
     }

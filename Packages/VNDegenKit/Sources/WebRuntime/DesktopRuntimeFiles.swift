@@ -30,8 +30,9 @@ nonisolated public enum DesktopRuntimeFiles {
                 "payload.exe", "notification_helper.exe", "nacl_irt_x86_64.nexe", "nw.pak", "nw_100_percent.pak", "nw_200_percent.pak",
             ]), probe),
             filesOfAtLeast: ["credits.html": creditsSize],
-            fileEndings: locales,
-            folders: ["pnacl", "nwjs.app"])
+            fileEndings: locales.merging(["pnacl": ["_nexe"]]) { a, _ in a },
+            // NW.js's own Mac build holds nothing else. An `app.nw` in it could be the game.
+            folders: FileManager.default.fileExists(atPath: FileCase.resolve("nwjs.app/Contents/Resources/app.nw", in: probe.root).path) ? [] : ["nwjs.app"])
     }
 
     /// Electron's files. Nil unless `icudtl.dat` and the game's `resources/app` or `app.asar` are there. The game stays.
@@ -45,8 +46,13 @@ nonisolated public enum DesktopRuntimeFiles {
     }
 
     /// Adds the one large `.exe` beside the runtime's files. With two, VNDegen can't tell which is the runtime and which
-    /// a game or a translation brought, so neither is listed, even under a name on the list.
+    /// a game or a translation brought, so neither is listed, even under a name on the list. With one not downloaded yet,
+    /// iCloud's placeholder hides it from this count, so no `.exe` is listed at all.
     private static func withRenamedRuntime(_ names: Set<String>, _ probe: FolderProbe) -> Set<String> {
+        let hidden = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.path)) ?? []
+        if hidden.contains(where: { $0.hasPrefix(".") && $0.lowercased().hasSuffix(".exe.icloud") }) {
+            return Set(names.map { $0.lowercased() }.filter { !$0.hasSuffix(".exe") })
+        }
         let large = probe.entries.filter { !$0.contains("/") && $0.lowercased().hasSuffix(".exe") && (probe.size($0) ?? 0) >= renamedRuntimeSize }
         let lowered = Set(names.map { $0.lowercased() })
         return large.count == 1 ? lowered.union(large.map { $0.lowercased() }) : lowered.subtracting(large.map { $0.lowercased() })

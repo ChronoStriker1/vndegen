@@ -86,22 +86,24 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
 
     /// What VNDegen doesn't use of a PC build: the Python and platform libraries in `lib/`, since a game runs on a bundled
     /// runtime, and the launchers Ren'Py names after the game's `.py`. `renpy/`, `game/`, and the small `.py` and `.sh`
-    /// launchers stay. `lib/` stays when its names are what told this game's Ren'Py line apart.
+    /// launchers stay. In `lib/` only files of the kinds Ren'Py ships count, because mods and patches leave others there:
+    /// the library has pictures, `sovereign.ini`, and `.bak` files in it. `lib/` stays when its names are what tell this
+    /// game's Ren'Py line apart, unless the compiled files say the same and `lib/` holds only that line, so a removal that
+    /// stops partway can't change the answer.
     func engineFiles(_ probe: FolderProbe) -> EngineFileList {
         let base = probe.root.appendingPathComponent(self.base, isDirectory: true)
-        let names = { (folder: String) in (try? FileManager.default.contentsOfDirectory(atPath: FileCase.resolve(folder, in: base).path)) ?? [] }
-        var folders = Set<String>()
-        if evidence != .libraries || Self.runtime(engineFiles: names("renpy").map { $0.lowercased() }) == runtime {
-            let prefixes = ["py2-", "py3-", "windows-", "linux-", "darwin-", "mac-", "python2", "python3", "pythonlib"]
-            for name in names("lib").map({ $0.lowercased() }) where prefixes.contains(where: { name.hasPrefix($0) }) { folders.insert("lib/\(name)") }
+        let names = { (folder: String) in
+            ((try? FileManager.default.contentsOfDirectory(atPath: FileCase.resolve(folder, in: base).path)) ?? []).map { $0.lowercased() }
         }
         let prefix = self.base.isEmpty ? "" : "\(self.base)/".lowercased()
         let top = probe.entries.map { $0.lowercased() }.filter { $0.hasPrefix(prefix) && !$0.dropFirst(prefix.count).contains("/") }
             .map { String($0.dropFirst(prefix.count)) }
-        var files = Set<String>()
         // A PC build has one launcher `.py`. With more, one may be a mod's, and its `.exe` a mod's tool, so all of them stay.
         let scripts = top.filter { $0.hasSuffix(".py") }
-        if scripts.count == 1, let stem = scripts.first?.dropLast(3) {
+        let stem = scripts.count == 1 ? scripts.first.map { String($0.dropLast(3)) } : nil
+
+        var files = Set<String>(), folders = Set<String>()
+        if let stem {
             files = ["\(stem).exe", "\(stem)-32.exe"]
             // A Mac build can hold the game itself, and then it isn't a launcher.
             let app = "\(stem).app"
@@ -109,7 +111,20 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
                 folders.insert(app)
             }
         }
-        return EngineFileList(root: self.base, files: files, folders: folders)
+        var trees: [String: @Sendable (String) -> Bool] = [:]
+        let libraries = names("lib").filter { $0.wholeMatch(of: /(py[23]-)?(windows|linux|darwin|mac)-[a-z0-9_]+|python[23](\.\d+)?|pythonlib[23]?(\.\d+)?/) != nil }
+        let lines = Set(libraries.compactMap { Self.runtime(libraries: [$0]) })
+        if evidence != .libraries || (lines.count == 1 && Self.runtime(engineFiles: names("renpy")) == runtime) {
+            for library in libraries { trees["lib/\(library)"] = { Self.isEngineLibraryFile($0, launcher: stem) } }
+        }
+        return EngineFileList(root: self.base, files: files, trees: trees, folders: folders)
+    }
+
+    /// The kinds of file Ren'Py's `lib/` folders hold, from the library's 54 games. `name` is lower case.
+    private static func isEngineLibraryFile(_ name: String, launcher: String?) -> Bool {
+        let endings = [".py", ".pyc", ".pyo", ".pyd", ".so", ".dll", ".exe", ".dylib", ".pem", ".egg", ".manifest", ".vbs"]
+        let names = ["python", "pythonw", "zsync", "zsyncmake", "empty.txt", "dynload.txt", "libwinpthread-1.txt", "py.typed"]
+        return endings.contains { name.hasSuffix($0) } || names.contains(name) || name == launcher || name.contains(".so.")
     }
 
     /// Folders that may be the base directory, shallowest first and then by name: the game folder and any folder up to

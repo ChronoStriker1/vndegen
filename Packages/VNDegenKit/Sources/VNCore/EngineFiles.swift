@@ -2,7 +2,7 @@ import Foundation
 
 /// What an engine plugin says it may remove from a game folder: only what its games don't need in VNDegen. It is an
 /// allowlist, so anything it doesn't name stays. Names match in any case and are relative to `root`.
-public struct EngineFileList: Equatable, Sendable {
+public struct EngineFileList: Sendable {
     /// Where the names below are, relative to the game folder. Empty when they are at its top.
     public var root: String
     /// Files, by path, such as `nw.dll` or `resources/electron.asar`.
@@ -11,29 +11,36 @@ public struct EngineFileList: Equatable, Sendable {
     public var filesOfAtLeast: [String: Int64]
     /// Folders whose files count when their names end in one of these, such as `.pak` in `locales`.
     public var fileEndings: [String: [String]]
-    /// Folders that go whole, because only the engine puts anything in them.
+    /// Folders where a file counts, however deep, when this says its lower-case name is the engine's.
+    public var trees: [String: @Sendable (String) -> Bool]
+    /// Folders that go whole, such as a Mac app bundle. Nothing unknown is looked for inside, so check first that the game
+    /// isn't in one.
     public var folders: Set<String>
 
     public init(root: String = "", files: Set<String> = [], filesOfAtLeast: [String: Int64] = [:],
-                fileEndings: [String: [String]] = [:], folders: Set<String> = []) {
+                fileEndings: [String: [String]] = [:], trees: [String: @Sendable (String) -> Bool] = [:], folders: Set<String> = []) {
         self.root = root
         self.files = Set(files.map { $0.lowercased() })
         self.filesOfAtLeast = Dictionary(uniqueKeysWithValues: filesOfAtLeast.map { ($0.key.lowercased(), $0.value) })
         self.fileEndings = Dictionary(uniqueKeysWithValues: fileEndings.map { ($0.key.lowercased(), $0.value.map { $0.lowercased() }) })
+        self.trees = Dictionary(uniqueKeysWithValues: trees.map { ($0.key.lowercased(), $0.value) })
         self.folders = Set(folders.map { $0.lowercased() })
     }
 
     func names(file path: String, size: Int64) -> Bool {
         if files.contains(path) { return true }
         if let least = filesOfAtLeast[path], size >= least { return true }
-        guard let slash = path.lastIndex(of: "/"), let endings = fileEndings[String(path[..<slash])] else { return false }
-        return endings.contains { path.hasSuffix($0) }
+        guard let slash = path.lastIndex(of: "/") else { return false }
+        if let endings = fileEndings[String(path[..<slash])], endings.contains(where: { path.hasSuffix($0) }) { return true }
+        let name = String(path[path.index(after: slash)...])
+        return trees.contains { path.hasPrefix($0.key + "/") && $0.value(name) }
     }
 
     /// True when something the list names may be inside the folder at `path`.
     func reaches(folder path: String) -> Bool {
         let prefix = path + "/"
-        return fileEndings[path] != nil || (Array(files) + Array(filesOfAtLeast.keys) + Array(folders)).contains { $0.hasPrefix(prefix) }
+        if fileEndings[path] != nil || trees.keys.contains(where: { $0 == path || path.hasPrefix($0 + "/") }) { return true }
+        return (Array(files) + Array(filesOfAtLeast.keys) + Array(folders) + Array(trees.keys)).contains { $0.hasPrefix(prefix) }
     }
 }
 
@@ -87,16 +94,19 @@ nonisolated enum EngineFiles {
         #endif
     }
 
-    /// `isUbiquitous` is true for iCloud Drive and for some other cloud providers, so it can't tell them apart. The path
-    /// can: iCloud Drive is under `Library/Mobile Documents` on every Apple platform. The path can't name every other
-    /// provider, because on iPhone and iPad they share `File Provider Storage` with On My iPhone. A provider there that
-    /// doesn't report `isUbiquitous` looks local.
+    /// `isUbiquitous` can't tell iCloud Drive from every other cloud provider. The path can: iCloud Drive is under
+    /// `Library/Mobile Documents` on every Apple platform. On iPhone and iPad, other providers and On My iPhone all sit
+    /// under `File Provider Storage`, so no path tells them apart, and those folders are refused. VNDegen's own Games
+    /// folder is in the app's Documents, so it isn't one of them.
     static func place(path: String, isLocal: Bool, isReadOnly: Bool, isUbiquitous: Bool) -> Place {
         if !isLocal || path.contains("/com.apple.filesystems.smbclientd/") {
             return .refused("This folder is on a network share, so VNDegen won't remove files from it.")
         }
         if isReadOnly { return .refused("This folder is on a read-only volume, so VNDegen can't remove files from it.") }
         if path.contains("/Library/Mobile Documents/") { return .iCloud }
+        if path.contains("/File Provider Storage/") {
+            return .refused("VNDegen can't tell whether this folder is on this device or in a cloud service, so it won't remove files from it.")
+        }
         if isUbiquitous || path.contains("/Library/CloudStorage/") {
             return .refused("This folder is in a cloud storage service, so VNDegen won't remove files from it. Of the cloud services, only iCloud Drive is allowed.")
         }
@@ -115,9 +125,9 @@ nonisolated enum EngineFiles {
         return String(name.dropFirst().dropLast(".icloud".count))
     }
 
-    /// A placeholder is a small property list that records the real file's size.
+    /// A placeholder is a small property list that records the real file's size. Anything else counts as nothing.
     static func placeholderSize(_ url: URL) -> Int64 {
-        guard let data = try? Data(contentsOf: url), data.count < 1 << 16,
+        guard let item = attributes(url.path), item.type == .typeRegular, item.size < 1 << 16, let data = try? Data(contentsOf: url),
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         else { return 0 }
         return (plist["NSURLFileSizeKey"] as? NSNumber)?.int64Value ?? 0
@@ -136,9 +146,30 @@ nonisolated enum EngineFiles {
         return (size, count)
     }
 
+    /// True when every folder on the way from `folder` down `relative` is a real folder, not a link.
+    static func noLinks(on relative: String, in folder: URL) -> Bool {
+        var url = folder
+        for part in relative.split(separator: "/") {
+            url = url.appendingPathComponent(String(part))
+            guard attributes(url.path)?.type == .typeDirectory else { return false }
+        }
+        return true
+    }
+
+    /// True when `url` is still what the player saw, in size and for a folder in number of files too.
+    private static func unchanged(_ file: EngineFile, at url: URL, iCloud: Bool) -> Bool {
+        guard let item = attributes(url.path) else { return false }
+        if item.type == .typeDirectory {
+            let contents = folderContents(url, iCloud: iCloud)
+            return contents.size == file.size && contents.count == file.fileCount
+        }
+        return item.type == .typeRegular && (file.stored == file.path ? item.size : placeholderSize(url)) == file.size
+    }
+
     /// What `list` names in `folder`, read from the disk now. A link is never followed or offered. A folder all of whose
     /// entries are named is offered as one folder, so it leaves no empty folder behind and goes back whole from the Trash.
     static func files(_ list: EngineFileList, in folder: URL, iCloud: Bool = false) -> [EngineFile] {
+        guard noLinks(on: list.root, in: folder) else { return [] }
         let base = list.root.isEmpty ? "" : list.root + "/"
 
         func visit(_ relative: String) -> (found: [EngineFile], all: Bool) {
@@ -183,11 +214,14 @@ nonisolated enum EngineFiles {
         return visit("").found.sorted { $0.size != $1.size ? $0.size > $1.size : $0.path < $1.path }
     }
 
-    /// Removes one offered file or folder: to the Trash when `toTrash`, otherwise for good. An iCloud item goes through a
-    /// file coordinator, which lets iCloud finish with it first, and deleting never downloads it.
+    /// Removes one offered file or folder: to the Trash when `toTrash`, otherwise for good. It looks once more right before
+    /// removing, so a folder something wrote into meanwhile stays. An iCloud item goes through a file coordinator, which
+    /// lets iCloud finish with it first and may move it, and deleting never downloads it.
     static func remove(_ file: EngineFile, in folder: URL, toTrash: Bool, iCloud: Bool) throws {
-        let stored = folder.appendingPathComponent(file.stored)
         func delete(_ url: URL) throws {
+            guard noLinks(on: (file.stored as NSString).deletingLastPathComponent, in: folder), unchanged(file, at: url, iCloud: iCloud) else {
+                throw LibraryFolderError(message: "It changed after VNDegen listed it.")
+            }
             #if canImport(Darwin)
             if toTrash { return try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
             #endif
@@ -195,16 +229,29 @@ nonisolated enum EngineFiles {
         }
         #if canImport(Darwin)
         if iCloud {
-            let named = folder.appendingPathComponent(file.path)
+            let storedName = (file.stored as NSString).lastPathComponent
             var coordination: NSError?, failure: (any Error)?
-            NSFileCoordinator().coordinate(writingItemAt: named, options: .forDeleting, error: &coordination) { actual in
-                do { try delete(file.stored == file.path ? actual : stored) } catch { failure = error }
+            NSFileCoordinator().coordinate(writingItemAt: folder.appendingPathComponent(file.path), options: .forDeleting, error: &coordination) { actual in
+                do { try delete(actual.deletingLastPathComponent().appendingPathComponent(storedName)) } catch { failure = error }
             }
             if let error = coordination ?? failure { throw error }
             return
         }
         #endif
-        try delete(stored)
+        try delete(folder.appendingPathComponent(file.stored))
+    }
+
+    /// True when a link kept in the game folder leads into something about to go, as a game's `www` could into an app
+    /// bundle. The web engines follow such a link, so removing the bundle would take the game with it.
+    static func linkLeadsInto(_ gone: [EngineFile], entries: Set<String>, in folder: URL) -> Bool {
+        let root = folder.resolvingSymlinksInPath().path
+        let targets = gone.map { root + "/" + $0.stored }
+        return entries.contains { entry in
+            let url = folder.appendingPathComponent(entry)
+            guard attributes(url.path)?.type == .typeSymbolicLink else { return false }
+            let target = url.resolvingSymlinksInPath().path
+            return targets.contains { target == $0 || target.hasPrefix($0 + "/") }
+        }
     }
 }
 
@@ -282,7 +329,8 @@ extension LibraryStore {
             let lower = entry.lowercased()
             return !gone.contains { lower == $0 || lower.hasPrefix($0 + "/") }
         }
-        guard plugin.detect(FolderProbe(root: folder, entries: kept))?.engine == game.detected?.engine else { return EngineFilePlan() }
+        guard plugin.detect(FolderProbe(root: folder, entries: kept))?.engine == game.detected?.engine,
+              !EngineFiles.linkLeadsInto(files, entries: kept, in: folder) else { return EngineFilePlan() }
         return EngineFilePlan(files: files, inICloud: place == .iCloud)
     }
 }

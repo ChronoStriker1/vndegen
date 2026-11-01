@@ -99,14 +99,75 @@ private let gameID = GameID("Game")
     #expect(EngineFiles.files(ListPlugin().list!, in: scratch.game, iCloud: false).isEmpty)
 }
 
+@Test func aFileNamedByATreeCountsAtAnyDepthAndOthersStay() throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    for path in ["lib/py3/a.dll", "lib/py3/deep/b.dll", "lib/py3/end1.jpg", "lib/py2/c.dll", "lib/py2/deep/d.dll"] { try scratch.write(path) }
+    let list = EngineFileList(trees: ["lib/py3": { $0.hasSuffix(".dll") }, "lib/py2": { $0.hasSuffix(".dll") }])
+    let found = EngineFiles.files(list, in: scratch.game).map(\.path).sorted()
+    // py2 holds only named files, so it goes whole. py3 has a picture a mod left, so it stays with that in it.
+    #expect(found == ["lib/py2", "lib/py3/a.dll", "lib/py3/deep"])
+}
+
+/// A folder in the game that is a link leads somewhere the safety checks on the game folder don't look.
+@Test func aListRootThroughALinkFindsNothing() throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    let outside = scratch.base.appendingPathComponent("outside", isDirectory: true)
+    try scratch.write("Game.exe", in: outside)
+    try FileManager.default.createDirectory(at: scratch.game, withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(at: scratch.game.appendingPathComponent("Outer"), withDestinationURL: outside)
+    var list = ListPlugin().list!
+    list.root = "Outer"
+    #expect(EngineFiles.files(list, in: scratch.game).isEmpty)
+}
+
+/// A placeholder-shaped name that is really a link isn't read.
+@Test func aPlaceholderThatIsALinkCountsAsNothing() throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    let plist = try PropertyListSerialization.data(fromPropertyList: ["NSURLFileSizeKey": 5000], format: .binary, options: 0)
+    let outside = scratch.base.appendingPathComponent("outside.plist")
+    try FileManager.default.createDirectory(at: scratch.base, withIntermediateDirectories: true)
+    try plist.write(to: outside)
+    try FileManager.default.createDirectory(at: scratch.game.appendingPathComponent("pnacl"), withIntermediateDirectories: true)
+    let link = scratch.game.appendingPathComponent("pnacl/.a.icloud")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+    #expect(EngineFiles.placeholderSize(link) == 0)
+    let file = try #require(EngineFiles.files(ListPlugin().list!, in: scratch.game, iCloud: true).first)
+    #expect(file.path == "pnacl" && file.size == 0)
+}
+
+/// Something wrote into a folder after VNDegen listed it, and even after the check that starts a removal.
+@Test func aFolderThatGainedAFileAtTheLastMomentStays() throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("pnacl/a")
+    let file = try #require(EngineFiles.files(ListPlugin().list!, in: scratch.game).first)
+    try scratch.write("pnacl/save.json")
+    #expect(throws: LibraryFolderError.self) { try EngineFiles.remove(file, in: scratch.game, toTrash: false, iCloud: false) }
+    #expect(scratch.exists("pnacl/save.json"))
+}
+
+/// A link kept in the game that leads into an offered bundle would lose what the link holds.
+@Test @MainActor func aKeptLinkIntoAnOfferedFolderOffersNothing() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("pnacl/game/js/rmmz_core.js")
+    try scratch.write("Game.exe")
+    try FileManager.default.createSymbolicLink(at: scratch.game.appendingPathComponent("js"), withDestinationURL: scratch.game.appendingPathComponent("pnacl/game/js"))
+    let library = await scratch.library()
+    #expect(library.game(gameID)?.detected != nil)
+    #expect(await library.engineFilePlan(for: gameID).files.isEmpty)
+}
+
 /// The one place that decides, for each kind of place.
 @Test func placesAreSortedAsTheyShouldBe() {
     func place(_ path: String, local: Bool = true, readOnly: Bool = false, ubiquitous: Bool = false) -> EngineFiles.Place {
         EngineFiles.place(path: path, isLocal: local, isReadOnly: readOnly, isUbiquitous: ubiquitous)
     }
     #expect(place("/Users/a/Games/VNDegen/Game") == .local)
-    // On My iPhone and other cloud providers share this path, so isUbiquitous is what tells them apart.
-    #expect(place("/private/var/mobile/Containers/Shared/AppGroup/X/File Provider Storage/Games/Game") == .local)
+    #expect(place("/private/var/mobile/Containers/Data/Application/X/Documents/Games/Game") == .local)
     #expect(place("/Users/a/Library/Mobile Documents/com~apple~CloudDocs/Games/Game", ubiquitous: true) == .iCloud)
     #expect(place("/private/var/mobile/Library/Mobile Documents/com~apple~CloudDocs/Games/Game", ubiquitous: true) == .iCloud)
     for refused in [place("/Volumes/share/Game", local: false),
@@ -114,7 +175,9 @@ private let gameID = GameID("Game")
                     place("/private/var/mobile/Library/LiveFiles/com.apple.filesystems.smbclientd/x/Game"),
                     place("/Volumes/disk/Game", readOnly: true),
                     place("/Users/a/Library/CloudStorage/Dropbox/Game"),
-                    place("/private/var/mobile/Containers/Shared/AppGroup/X/File Provider Storage/Game", ubiquitous: true)] {
+                    // On My iPhone and other providers both look like this, and no path tells them apart.
+                    place("/private/var/mobile/Containers/Shared/AppGroup/X/File Provider Storage/Game"),
+                    place("/Users/a/Elsewhere/Game", ubiquitous: true)] {
         guard case .refused = refused else { Issue.record("not refused: \(refused)"); continue }
     }
 }

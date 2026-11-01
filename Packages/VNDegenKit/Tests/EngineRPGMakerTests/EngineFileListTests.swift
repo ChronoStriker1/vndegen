@@ -67,7 +67,7 @@ private let mine = ["package.json", "Game_en.exe", "ym.exe", "winmm.dll", "sover
     let scratch = Scratch()
     defer { try? FileManager.default.removeItem(at: scratch.base) }
     // The library has an MZ game with translations in locales, and MZ's web root is the top of the game.
-    let game = ["js/rmmz_core.js", "index.html", "data/System.json", "save/file1.rmmzsave", "locales/en.json", "locales/ja.json"]
+    let game = ["js/rmmz_core.js", "index.html", "data/System.json", "save/file1.rmmzsave", "locales/en.json", "locales/ja.json", "pnacl/mine.txt"]
     for path in runtime + mine + game { try scratch.write(path) }
     let library = await scratch.library(.mz)
     let plan = await library.engineFilePlan(for: scratch.id)
@@ -82,7 +82,7 @@ private let mine = ["package.json", "Game_en.exe", "ym.exe", "winmm.dll", "sover
 @Test @MainActor func aSmallCreditsPageIsTheGames() async throws {
     let scratch = Scratch()
     defer { try? FileManager.default.removeItem(at: scratch.base) }
-    for path in ["js/rmmz_core.js", "nw.dll"] { try scratch.write(path) }
+    for path in ["js/rmmz_core.js", "data/System.json", "nw.dll"] { try scratch.write(path) }
     try scratch.write("credits.html", size: 401)
     let library = await scratch.library(.mz)
     #expect(await library.engineFilePlan(for: scratch.id).files.map(\.path) == ["nw.dll"])
@@ -102,11 +102,57 @@ private let mine = ["package.json", "Game_en.exe", "ym.exe", "winmm.dll", "sover
     #expect(scratch.exists("Game.exe"))
 }
 
+/// An engine core left behind by a patch or an extraction doesn't show the game is on disk. Its data does.
+@Test @MainActor func aLeftoverCoreBesideAPackedExeOffersNothing() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("Game.exe", size: 400_000_000)
+    for path in ["www/js/rpg_core.js", "nw.dll", "nw.pak"] { try scratch.write(path) }
+    let library = await scratch.library(.mv)
+    #expect(library.game(scratch.id)?.detected?.engine == .rpgMakerMV)
+    #expect(await library.engineFilePlan(for: scratch.id).files.isEmpty)
+    #expect(scratch.exists("Game.exe"))
+}
+
+/// iCloud hides a file not downloaded yet from the listing, so the one large `.exe` VNDegen sees may not be the only one.
+@Test @MainActor func anExeNotDownloadedLeavesEveryExe() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    for path in ["js/rmmz_core.js", "data/System.json", "nw.pak", ".Game.exe.icloud"] { try scratch.write(path) }
+    try scratch.write("Patch.exe", size: 50_000_000)
+    let library = await scratch.library(.mz)
+    #expect(await library.engineFilePlan(for: scratch.id).files.map(\.path) == ["nw.pak"])
+}
+
+/// A disk that minds case can hold both spellings, and the small one mustn't hide the large one.
+@Test @MainActor func twoSpellingsOfAnExeAreMeasuredApart() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    for path in ["js/rmmz_core.js", "data/System.json", "nw.pak"] { try scratch.write(path) }
+    try scratch.write("Patch.exe", size: 50_000_000)
+    try scratch.write("Runtime.exe", size: 40_000_000)
+    let probe = FolderProbe(root: scratch.game, entries: ["Patch.exe", "Runtime.exe", "runtime.EXE"])
+    #expect(probe.size("Runtime.exe") == 40_000_000)
+    let library = await scratch.library(.mz)
+    #expect(await library.engineFilePlan(for: scratch.id).files.map(\.path) == ["nw.pak"])
+}
+
+/// NW.js's Mac build holds only NW.js, as in two library games. With `app.nw` it could hold the game.
+@Test @MainActor func aMacBuildHoldingAnAppStays() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    for path in ["js/rmmz_core.js", "data/System.json", "nw.pak", "nwjs.app/Contents/Resources/app.icns"] { try scratch.write(path) }
+    let library = await scratch.library(.mz)
+    #expect(Set(await library.engineFilePlan(for: scratch.id).files.map(\.path)) == ["nw.pak", "nwjs.app"])
+    try scratch.write("nwjs.app/Contents/Resources/app.nw/js/rmmz_core.js")
+    #expect(await library.engineFilePlan(for: scratch.id).files.map(\.path) == ["nw.pak"])
+}
+
 /// Without NW.js's own files, `Game.exe` could be anything.
 @Test @MainActor func namesAloneDontProveItsNWjs() async throws {
     let scratch = Scratch()
     defer { try? FileManager.default.removeItem(at: scratch.base) }
-    for path in ["js/rmmz_core.js", "Game.exe", "icudtl.dat", "d3dcompiler_47.dll"] { try scratch.write(path) }
+    for path in ["js/rmmz_core.js", "data/System.json", "Game.exe", "icudtl.dat", "d3dcompiler_47.dll"] { try scratch.write(path) }
     let library = await scratch.library(.mz)
     #expect(await library.engineFilePlan(for: scratch.id).files.isEmpty)
 }
@@ -114,7 +160,7 @@ private let mine = ["package.json", "Game_en.exe", "ym.exe", "winmm.dll", "sover
 @Test @MainActor func theOneLargeExeIsTheRuntimeWhateverItsName() async throws {
     let scratch = Scratch()
     defer { try? FileManager.default.removeItem(at: scratch.base) }
-    for path in ["js/rmmz_core.js", "nw.pak", "game_en.exe"] { try scratch.write(path) }
+    for path in ["js/rmmz_core.js", "data/System.json", "nw.pak", "game_en.exe"] { try scratch.write(path) }
     try scratch.write("ButterflyAffection.exe", size: 46_000_000)
     let library = await scratch.library(.mz)
     #expect(Set(await library.engineFilePlan(for: scratch.id).files.map(\.path)) == ["ButterflyAffection.exe", "nw.pak"])
@@ -123,7 +169,7 @@ private let mine = ["package.json", "Game_en.exe", "ym.exe", "winmm.dll", "sover
 @Test @MainActor func twoLargeExesBothStayEvenUnderAListedName() async throws {
     let scratch = Scratch()
     defer { try? FileManager.default.removeItem(at: scratch.base) }
-    for path in ["js/rmmz_core.js", "nw.pak"] { try scratch.write(path) }
+    for path in ["js/rmmz_core.js", "data/System.json", "nw.pak"] { try scratch.write(path) }
     try scratch.write("Game.exe", size: 46_000_000)
     try scratch.write("Game_JP.exe", size: 46_000_000)
     let library = await scratch.library(.mz)

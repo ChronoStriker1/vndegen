@@ -40,7 +40,7 @@ RPG Maker MV and MZ, TyranoScript, and Ren'Py games ship PC engine files that VN
 | TyranoScript | 183 MB | NW.js or Electron |
 | Ren'Py | 88 MB | The Windows, Linux, and Mac libraries in `lib/`, and the `.exe` and `.app` launchers |
 
-The averages come from the maintainer's library. Each plugin names exactly what it may remove, and anything else stays, including saves, the game's own data, and whatever a mod or a translation added. A file in a game's own `locales/` or `lib/` folder stays when it isn't the engine's. An `.exe` under another name goes only when it's the one file of 30 MB or more beside the runtime's files. The other engines list nothing, because VNDegen reads their `.exe` and `.dll` files or names to recognize or run a game, or because there is little to gain.
+The averages come from the maintainer's library. Each plugin names exactly what it may remove, and anything else stays, including saves, the game's own data, and whatever a mod or a translation added, such as a picture or a settings file left in `lib/`. The exception is a `.dll`, `.exe`, or other program file a mod put in one of Ren'Py's `lib/` platform folders, which VNDegen can't tell from the engine's own and only a PC could load. An `.exe` under another name goes only when it's the one file of 30 MB or more beside the runtime's files, and nothing is offered unless the game's data is on disk, so a game packed inside its `.exe` keeps it. The other engines list nothing, because VNDegen reads their `.exe` and `.dll` files or names to recognize or run a game, or because there is little to gain.
 
 Where the files go depends on where the game is:
 
@@ -48,7 +48,7 @@ Where the files go depends on where the game is:
 - **iPhone and iPad.** They are deleted for good.
 - **iCloud Drive.** The removal reaches every device on that iCloud account. iCloud Drive's Recently Deleted should keep the files for about 30 days. Files not downloaded yet are measured and removed without downloading them.
 
-VNDegen shows the reason and removes nothing for a folder that can't be reached, one it can't write to, a network share, or a cloud service other than iCloud Drive. If some files can't be removed, it lists them with what it did remove. A game whose engine you assigned by hand offers nothing.
+VNDegen shows the reason and removes nothing for a folder that can't be reached, one it can't write to, a network share, or a cloud service other than iCloud Drive. On iPhone and iPad that also covers folders you added from On My iPhone or iPad outside VNDegen's own folder, because VNDegen can't tell those from another provider's. VNDegen's own Games folder isn't affected. If some files can't be removed, it lists them with what it did remove. A game whose engine you assigned by hand offers nothing.
 
 ## Layouts
 
