@@ -11,7 +11,7 @@ through the shared FrameHost module and maps the controls.
 |---|---|
 | Rance 02 (Test Game 19) | Title, opening movie, play, camp menus, saves and loads. Saves move between VNDegen and the PC game in both directions. |
 | Sengoku Rance (Test Game 46) | Title, opening movie, story scenes, battles, the strategy map, saves and loads. Saves move between VNDegen and the PC game in both directions. |
-| Rance IX (Test Game 56) | Logos, warning, opening movie, title, the prologue's story scenes, saves and loads. Its battles and maps are 3D: where the first one starts, the game stops with a message (see Known limits), and its game page says so beforehand. |
+| Rance IX (Test Game 56) | Logos, warning, opening movie, title, the prologue's story scenes, saves and loads. Its battles and maps are 3D: at the first one, the chapter 1 map, the game stops with a message (see Known limits), and its game page says so beforehand. |
 
 ## What the runtime does
 
@@ -38,8 +38,8 @@ through the shared FrameHost module and maps the controls.
   VNDegen's Windows font pack (`vnfont_resolve`) for MS Gothic and MS Mincho. Strings are CP932, as on the PC.
 - **Saves.** The PC engine's own files in the game's save folder (the ini's `SaveFolder`, `SaveData` by default),
   which `saveLocations` gives Ludusavi:
-  - resume saves ("RSM" snapshots of the VM, version 7 or 8 by the game's VM),
-  - global and group saves (layout 5),
+  - resume saves ("RSM" snapshots of the VM, version 7, 8 or 9 by the game's VM),
+  - global and group saves (layout 5, or 7 for Rance IX),
   - the GD container around both (zlib, XORed for Sys43VM games),
   - the slot details VSFile writes, and the read-message file.
   The data the sprite engine hands the game to keep (backlog, back scenes, character sprites, MultiSprite) uses the
@@ -107,9 +107,10 @@ pushed the Mac mini's load average to about 80, with a median 1% low of 37.
 - Only the libraries and calls the test games use are built. Other System 4 games may call functions the runtime
   doesn't have yet; each is logged once.
 - `CG_RotateRGB` isn't bound: the SDK doesn't say what its channel swap does.
-- TODO-PC: Rance IX save compatibility.
-- Global and group saves in layout 7, which Sys43VM writes for code files other than version 5, aren't read or
-  written; no test game uses them.
+- A Rance IX save moves between VNDegen and the PC, and the story carries on from it, but the screen shows only the
+  message text and the system bar until the scene redraws. PartsEngine keeps the scene's parts in data of its own
+  inside the save, which the PC and VNDegen lay out differently. Saves made and loaded in VNDegen restore the whole
+  screen.
 - Four MultiSprite fields keep the PC's values without a known meaning, and moves in progress aren't saved, as on the
   PC.
 - The read-message file's bit order within a byte is assumed; the PC file seen had no bit set.

@@ -152,6 +152,17 @@ calls were read from how the games call them.
   (seen by running SDK test programs on it). Arrays give every dimension's length, innermost first, then the
   innermost rows: Test Game 46's PC loaded a save that gave the rank in place of the outer length with 2 rows.
   Test Game 46's own slot saves load into VNDegen and save back with identical contents.
+- Test Game 56's VM was read from a save its PC copy wrote under Wine and from VNDegen's save at the same moment:
+  - It writes the GD container without the XOR, and global saves in layout 7. Its group saves load in VNDegen and
+    save back with the same contents.
+  - Its resume saves are version 9. Before the slot count comes the next object number, and each live slot has its
+    object number after the reference count. A delegate is kind 5: a byte count, then 12-byte entries (object
+    slot, function index, object number). The root stands for the entry function, which has no frame of its own.
+  - A method a delegate calls returns past the DG_CALL to the jump back to it, so its call site is stored as the
+    DG_CALL's address plus 4. While a delegate call runs, the delegate sits above its arguments on the stack.
+  - Reference counts include each method frame's on its `this`, and delegates hold none.
+  - PartsEngine.Save writes a u32 plain length and zlib data holding the library's own state, which VNDegen doesn't
+    read; VNDegen's parts data is its own ("VPT").
 - The read-message file (MsgSkip) starts with the number of messages, as Test Game 46's PC copy has it; without it
   the PC game stops at its load screen.
 - The SDK compiler's code files are the sections XORed with the save cipher seeded 0x5D3E3 (found by searching for
@@ -222,5 +233,6 @@ and what the game does with the results. Specifically:
 
 - Four MultiSprite fields keep the PC's values without a known meaning. Moves in progress aren't saved, as on the PC.
 - Resume saves are verified on the PC for Test Game 19, and against the SDK runtime and Test Game 46's VM. Test Game
-  46 saves with group saves, checked on the PC both ways. Test Game 56 isn't checked on the PC yet.
+  46 saves with group saves, checked on the PC both ways. Test Game 56's saves were checked on the PC both ways,
+  except for PartsEngine's data.
 - MsgSkip's bit order within a byte is assumed (low bit first): the PC file seen had no bit set.

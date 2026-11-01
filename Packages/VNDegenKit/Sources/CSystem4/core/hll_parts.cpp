@@ -492,7 +492,6 @@ S4_HLL(PartsEngine, Parts_SetText) {
     State *s = stateOf(c, 0, 2);
     if (!s) { c.retBool(false); return; }
     s->text = c.s(1);
-    if (std::getenv("S4_PARTSTEXT")) G().log("parts text " + std::to_string(c.i(0)) + ": " + sjis::toUtf8(s->text));
     s->hasText = true;
     get(c.i(0)).dirty = true;
     c.retBool(true);
@@ -534,7 +533,6 @@ S4_HLL(PartsEngine, Parts_AddPartsText) {
     State *s = stateOf(c, 0, 2);
     if (!s) { c.retBool(false); return; }
     s->text += c.s(1);
-    if (std::getenv("S4_PARTSTEXT")) G().log("parts text+ " + std::to_string(c.i(0)) + ": " + sjis::toUtf8(c.s(1)));
     s->hasText = true;
     get(c.i(0)).dirty = true;
     c.retBool(true);
