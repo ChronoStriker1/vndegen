@@ -35,6 +35,7 @@ public struct WebGameConfiguration {
     public var startPage: String
     /// Decodes Ogg Vorbis in the page, for engines that have no Ogg decoder of their own.
     public var decodesOgg: Bool
+    public var convertsAlphaVideo = false
     /// Windows font names, as `FontPack.referencedNames` finds them in the game's files, whose substitutes load before
     /// the page draws. Every other substitute loads when the page first uses it.
     public var preloadFonts: Set<String> = []
@@ -147,6 +148,7 @@ final class WebGameSession: NSObject, EngineSession {
     private let webView: GameWebView
     private let folder: GameFolder
     private let bridge: NodeBridge
+    private let schemeHandler: GameSchemeHandler
     private let storage: (any PageStorage)?
     private let buttonScript: @MainActor (VirtualButton, Bool) -> String?
     private let scriptArgument: String
@@ -170,6 +172,7 @@ final class WebGameSession: NSObject, EngineSession {
     init(launch: GameLaunch, configuration game: WebGameConfiguration) throws {
         folder = game.folder
         bridge = NodeBridge(folder: folder)
+        schemeHandler = GameSchemeHandler(folder: game.folder, log: game.log, alpha: game.convertsAlphaVideo)
         storage = game.storage
         buttonScript = game.buttonScript
         scriptArgument = game.scriptArgument
@@ -186,7 +189,7 @@ final class WebGameSession: NSObject, EngineSession {
             try? FileManager.default.removeItem(at: URL.cachesDirectory.appendingPathComponent("TranscodedAudio"))
         }
         let configuration = WKWebViewConfiguration()
-        configuration.setURLSchemeHandler(GameSchemeHandler(folder: folder, log: log), forURLScheme: GameFolder.scheme)
+        configuration.setURLSchemeHandler(schemeHandler, forURLScheme: GameFolder.scheme)
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #if os(iOS)
         configuration.allowsInlineMediaPlayback = true
@@ -395,6 +398,7 @@ final class WebGameSession: NSObject, EngineSession {
     func terminate() {
         guard stopping == nil else { return }
         ended = true
+        schemeHandler.cancel()
         #if DEBUG
         script?.cancel()
         #endif
@@ -402,6 +406,7 @@ final class WebGameSession: NSObject, EngineSession {
         // the delegates this tears down. A page that doesn't answer gets a few seconds.
         stopping = Task {
             await evaluate(Self.beforeQuitScript, within: .seconds(5))
+            await schemeHandler.waitUntilStopped()
             tearDown()
         }
     }

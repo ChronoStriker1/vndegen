@@ -8,6 +8,7 @@ import Lock
 import SaveSync
 import ArchiveImport
 import ControllerUI
+import WebRuntime
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -138,6 +139,7 @@ final class Navigator {
         case fontPackage(String)
         /// The MIDI SoundFont rows in Settings: choose a file, and go back to the bundled font.
         case soundFont, soundFontReset
+        case clearVideoCache
         /// Settings' library folder rows: add one, and show or remove an added one.
         case addLibraryFolder, showLibraryFolder(LibraryFolderID), removeLibraryFolder(LibraryFolderID)
         /// The confirmation sheet's buttons.
@@ -375,6 +377,7 @@ final class Navigator {
             items += FontPack.packages.map { .fontPackage($0.id) }
             items.append(.soundFont)
             if soundFontName != nil { items.append(.soundFontReset) }
+            items.append(.clearVideoCache)
             // In screen order, so Licenses, at the bottom, comes last.
             items.append(.settingsPage(.licenses))
             return rows + items.map { Row(id: "settings-\($0)", items: [$0]) }
@@ -618,6 +621,11 @@ final class Navigator {
                 runtimes.install(package, for: nil)
             }
         case .soundFont: pickingSoundFont = true
+        case .clearVideoCache:
+            Task {
+                do { try await AlphaVideoCache.shared.clear() }
+                catch { showError("Can't clear video cache", error.localizedDescription) }
+            }
         case .soundFontReset:
             do {
                 try MIDISoundFont.reset()

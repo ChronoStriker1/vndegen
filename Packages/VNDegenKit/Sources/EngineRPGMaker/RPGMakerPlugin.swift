@@ -61,6 +61,7 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
             scriptArgument: "rpgmaker-script", log: rpgLog
         )
         configuration.preloadFonts = folder.fontNames
+        configuration.convertsAlphaVideo = true
         configuration.menuCommands = Self.menuCommands(plugins: folder.enabledPlugins)
         configuration.cheats = { RPGMakerCheats(page: $0, template: cheatTemplate, script: cheatScript) }
         if flavor == .mv && folder.shipsOnlyOggAudio {

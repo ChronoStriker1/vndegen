@@ -184,6 +184,13 @@ struct SettingsView: View {
                     }
 
                     Section {
+                        Button("Clear video cache", systemImage: "trash") { nav.select(.clearVideoCache) }
+                            .focusRow(.clearVideoCache, nav)
+                    } footer: {
+                        Text("Keeps up to 512 MB of prepared transparent movies. Clearing the cache prepares them again when needed.")
+                    }
+
+                    Section {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                         pageRow("Licenses", systemImage: "doc.text", value: "", page: .licenses)
                     }

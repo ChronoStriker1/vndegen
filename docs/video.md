@@ -1,5 +1,11 @@
 # Movies in native engines
 
+RPG Maker MV and MZ transparent VP9 WebM movies use a separate native converter, `vnalpha.[h,mm]`. It decodes color and alpha with libvpx and writes HEVC with alpha through AVAssetWriter, with Opus audio converted to AAC. Other audio codecs and non-I420 video are currently unsupported. Games keep their original files and media controls.
+
+Conversion runs serially off the main thread. The original request stays pending until the completed movie is renamed into the cache. DOM videos stay hidden until their first decoded frame. PIXI uploads the corrected video through one reusable canvas because WebKit drops alpha on direct video uploads. Quitting cancels conversion and removes its partial file. The app logs each conversion's clip length, elapsed time and process peak resident memory, which includes earlier app activity.
+
+The cache lives under the app's Caches directory, is excluded from backups, and evicts the least recently used movies before exceeding 512 MiB. Settings has a Clear video cache button. The old WebCodecs alpha pre-decode path is removed. The short opaque-loop smoothing path retains its separate frame budget.
+
 vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/vnvideo.[ch]`. It plays:
 
 - MPEG-1 video with MPEG-1 Layer II sound, through pl_mpeg.

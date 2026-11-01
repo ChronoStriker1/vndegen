@@ -7,6 +7,7 @@
 #include "vpx/vp8dx.h"
 #include "third_party/opus/include/opus.h"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <stdexcept>
@@ -15,6 +16,10 @@
 #include <thread>
 #include <vector>
 
+struct vnalpha_control { std::atomic<bool> cancelled{false}; };
+vnalpha_control *vnalpha_control_create() { return new vnalpha_control; }
+void vnalpha_control_cancel(vnalpha_control *control) { control->cancelled.store(true); }
+void vnalpha_control_destroy(vnalpha_control *control) { delete control; }
 namespace {
 struct Element { long long id, start, end; };
 struct Track {
@@ -52,6 +57,8 @@ class Conversion {
     long long audio_track = 0, audio_delay = 0;
     int channels = 0, preskip = 0;
     bool probing = true;
+    bool headers_only = false;
+    vnalpha_control *control;
     int video_packets = 0, audio_packets = 0;
     CMAudioFormatDescriptionRef audio_format = nullptr;
     AVAssetWriter *writer = nil;
@@ -60,6 +67,9 @@ class Conversion {
     AVAssetWriterInputPixelBufferAdaptor *adaptor = nil;
     vnalpha_result& result;
     std::string destination;
+    void checkCancelled() {
+        if (control && control->cancelled.load()) throw std::runtime_error("Conversion cancelled");
+    }
     Element next(long long& position, long long end) {
         long long id, size;
         if (mkvparser::ParseElementHeader(&reader, position, end, id, size))
@@ -126,8 +136,10 @@ class Conversion {
         int skipped = std::min(count, preskip); preskip -= skipped; count -= skipped;
         if (!count) return;
         if (!writer) openWriter();
-        while (!audio_input.readyForMoreMediaData && writer.status == AVAssetWriterStatusWriting)
+        while (!audio_input.readyForMoreMediaData && writer.status == AVAssetWriterStatusWriting) {
+            checkCancelled();
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
         check(writer.status == AVAssetWriterStatusWriting);
         size_t length = count * channels * sizeof(float), sample_size = channels * sizeof(float);
         CMBlockBufferRef block = nullptr;
@@ -165,8 +177,10 @@ class Conversion {
         if (yuv->d_w != result.width || yuv->d_h != result.height || mask->d_w != yuv->d_w || mask->d_h != yuv->d_h)
             throw std::runtime_error("WebM frame dimensions changed");
         if (!writer) openWriter();
-        while (!input.readyForMoreMediaData && writer.status == AVAssetWriterStatusWriting)
+        while (!input.readyForMoreMediaData && writer.status == AVAssetWriterStatusWriting) {
+            checkCancelled();
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
         check(writer.status == AVAssetWriterStatusWriting);
         CVPixelBufferRef buffer = nullptr;
         check(CVPixelBufferPoolCreatePixelBuffer(nullptr, adaptor.pixelBufferPool, &buffer) == kCVReturnSuccess);
@@ -223,6 +237,7 @@ class Conversion {
     void walk(long long start, long long end, int depth = 0) {
         if (depth > 6) throw std::runtime_error("Excessive WebM nesting");
         for (auto position = start; position < end;) {
+            checkCancelled();
             auto element = next(position, end);
             switch (element.id) {
             case 0x1654ae6b:
@@ -232,7 +247,7 @@ class Conversion {
                 walk(element.start, element.end, depth + 1); break;
             case 0xae:
                 track = {}; walk(element.start, element.end, depth + 1);
-                if (track.type == 2) {
+                if (track.type == 2 && !headers_only) {
                     if (track.codec != "A_OPUS" || track.header.size() < 19 || track.header[18] != 0)
                         throw std::runtime_error("Only mono/stereo Opus audio is supported");
                     channels = track.header[9];
@@ -250,7 +265,9 @@ class Conversion {
                     video_track = track.number; result.width = static_cast<int>(track.width); result.height = static_cast<int>(track.height);
                 }
                 break;
-            case 0x1f43b675: cluster_time = 0; walk(element.start, element.end, depth + 1); break;
+            case 0x1f43b675:
+                if (headers_only) return;
+                cluster_time = 0; walk(element.start, element.end, depth + 1); break;
             case 0x2ad7b1: scale = number(element); break;
             case 0x4489:
                 if (mkvparser::UnserializeFloat(&reader, element.start, element.end - element.start, duration_ticks))
@@ -271,11 +288,17 @@ class Conversion {
         }
     }
 public:
-    Conversion(vnalpha_result& output, const char *path) : result(output), destination(path) {}
+    Conversion(vnalpha_result& output, const char *path, vnalpha_control *cancel = nullptr)
+        : control(cancel), result(output), destination(path) {}
     ~Conversion() {
         if (writer.status == AVAssetWriterStatusWriting) [writer cancelWriting];
         if (opus) opus_decoder_destroy(opus);
         if (audio_format) CFRelease(audio_format);
+    }
+    int inspect(const char *source) {
+        headers_only = true;
+        run(source);
+        return video_track != 0;
     }
     void run(const char *source) {
         if (reader.Open(source)) throw std::runtime_error("Cannot open WebM");
@@ -283,6 +306,8 @@ public:
         if (reader.Length(&size, &available)) throw std::runtime_error("Cannot read WebM length");
         // An input can end before the other. Tell AVAssetWriter at that packet, or its interleaver waits forever.
         walk(0, size);
+        if (headers_only) return;
+        result.duration = duration_ticks * scale / 1e9;
         probing = false;
         walk(0, size);
         result.duration = duration_ticks * scale / 1e9;
@@ -290,31 +315,36 @@ public:
         [writer endSessionAtSourceTime:CMTimeMakeWithSeconds(result.duration, 1000000000)];
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
         [writer finishWritingWithCompletionHandler:^{ dispatch_semaphore_signal(done); }];
-        dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
+        while (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC))) checkCancelled();
         check(writer.status == AVAssetWriterStatusCompleted);
     }
 };
 }
-int vnalpha_convert(const char *source, const char *destination, vnalpha_result *result, char *error, int error_size) {
+int vnalpha_is_alpha(const char *source) {
+    try { vnalpha_result result{}; return Conversion(result, "").inspect(source); }
+    catch (...) { return 0; }
+}
+int vnalpha_convert(const char *source, const char *destination, vnalpha_control *control, vnalpha_result *result, char *error, int error_size) {
     @autoreleasepool {
         *result = {};
         auto start = std::chrono::steady_clock::now();
-        try { Conversion conversion(*result, destination); conversion.run(source); }
+        int status = 0;
+        try { Conversion conversion(*result, destination, control); conversion.run(source); }
         catch (const std::exception& failure) {
             snprintf(error, error_size, "%s", failure.what());
             [[NSFileManager defaultManager] removeItemAtPath:@(destination) error:nil];
-            return -1;
+            status = -1;
         }
         result->seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
         struct rusage usage{}; getrusage(RUSAGE_SELF, &usage); result->peak_bytes = usage.ru_maxrss;
-        return 0;
+        return status;
     }
 }
 #ifdef VNALPHA_TOOL
 int main(int argc, char **argv) {
     if (argc != 3) { fprintf(stderr, "usage: vnalpha source.webm destination.mov\n"); return 2; }
     vnalpha_result result{}; char error[512]{};
-    int status = vnalpha_convert(argv[1], argv[2], &result, error, sizeof(error));
+    int status = vnalpha_convert(argv[1], argv[2], nullptr, &result, error, sizeof(error));
     if (status) { fprintf(stderr, "%s\n", error); return 1; }
     printf("frames=%d width=%d height=%d duration=%.6f seconds=%.6f peak_bytes=%llu\n", result.frames,
            result.width, result.height, result.duration, result.seconds, static_cast<unsigned long long>(result.peak_bytes));
