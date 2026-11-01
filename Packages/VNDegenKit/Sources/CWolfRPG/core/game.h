@@ -91,6 +91,8 @@ struct Picture {
     int shakePower = 0, shakeSpeed = 0, shakeFrames = 0;
     double shakeOffset = 0;
     int shiftX = 0, shiftY = 0;  // the effect command's draw position shift, added to the position when drawing
+    // The effect command's zoom: the picture scales around a screen point by this rate, on top of its own zoom.
+    Tween effectZoom{100, 100}, effectZoomX, effectZoomY;
     // The effect command's pulse (点滅A): the colour swings to its value plus these offsets and back, once every two
     // intervals. An interval of 0 stops it.
     std::array<int, 3> pulse{0, 0, 0};

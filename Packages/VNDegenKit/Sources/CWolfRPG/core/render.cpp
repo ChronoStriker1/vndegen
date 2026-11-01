@@ -218,6 +218,13 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     }
     x += offsetX * zoomX;
     y += offsetY * zoomY;
+    if (float rate = float(p.effectZoom.value() / 100); rate != 1) {
+        float cx = float(p.effectZoomX.value()), cy = float(p.effectZoomY.value());
+        x = cx + (x - cx) * rate;
+        y = cy + (y - cy) * rate;
+        w *= rate;
+        h *= rate;
+    }
     DrawOptions o;
     o.opacity = opacity;
     float swing = 0;

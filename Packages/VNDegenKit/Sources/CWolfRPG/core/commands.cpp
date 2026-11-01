@@ -778,6 +778,11 @@ bool Game::pictureUnderMouse(const Picture &p) const {
         case 5: x -= w / 2; break;
         case 6: x -= w / 2; y -= h; break;
     }
+    double rate = p.effectZoom.value() / 100;
+    x = p.effectZoomX.value() + (x - p.effectZoomX.value()) * rate;
+    y = p.effectZoomY.value() + (y - p.effectZoomY.value()) * rate;
+    w *= rate;
+    h *= rate;
     return mouseX_ >= x && mouseX_ < x + w && mouseY_ >= y && mouseY_ < y + h;
 }
 
@@ -953,9 +958,10 @@ void Game::effectCommand(Thread &t, const Command &c) {
                     p.shakeSpeed = a2;
                     p.shakeFrames = frames;
                     break;
-                case 0x40:  // zoom
-                    p.zoomX.set(a1, frames);
-                    p.zoomY.set(a2 ? a2 : a1, frames);
+                case 0x40:  // zoom around the point a1, a2 by the rate a3 (the manual's effect page)
+                    p.effectZoomX.set(a1, frames);
+                    p.effectZoomY.set(a2, frames);
+                    p.effectZoom.set(a3, frames);
                     break;
                 case 0x50:  // pulse the colour by the offsets, the frames field giving the interval
                     p.pulse = {a1, a2, a3};
