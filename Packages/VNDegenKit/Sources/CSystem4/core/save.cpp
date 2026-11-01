@@ -460,8 +460,10 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
     if (L.layout7 && !r.bad) {
         // The definitions give each struct record its name, and its values their members' types and names.
         struct Def { std::string name; std::vector<Loaded::Val> members; };
-        std::vector<Def> defs(r.u32(p));
-        if (defs.size() > d.size()) return false;
+        // Each definition takes at least its name's NUL and its member count.
+        uint32_t nDefs = r.u32(p);
+        if (r.bad || nDefs > (d.size() - p) / 5) return false;
+        std::vector<Def> defs(nDefs);
         for (Def &def : defs) {
             def.name = r.cstr(p);
             uint32_t n = r.u32(p);

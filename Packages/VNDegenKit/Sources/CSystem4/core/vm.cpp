@@ -1138,6 +1138,7 @@ void VM::run(size_t untilFrames) {
             if (top < size_t(nargs) + 2) fatal("delegate call without its delegate");
             int32_t idx = stack[top - 1];
             int32_t dsl = stack[top - 2];
+            if (idx < 0) fatal("delegate call with a negative index");  // only a damaged resume save gives one
             Delegate *d = delegate(dsl);
             auto byValue = [&](int k) {
                 int32_t t = size_t(k) < ft.vars.size() ? ft.vars[size_t(k)].t.type : T_INT;

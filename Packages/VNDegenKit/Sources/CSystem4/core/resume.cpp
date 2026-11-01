@@ -30,6 +30,7 @@
 // heap's slot count, and u32 each live slot's object number after its reference count. VNDegen numbers the slots
 // by position: slot s is object s + 1. It also has no frame for the entry function: the root stands for it, so the
 // lists of local pages and kinds have one entry fewer and the return points one per local page, the root's -1.
+#include <algorithm>
 #include <cstring>
 
 #include "opcodes.h"
@@ -117,6 +118,13 @@ bool isDelegateCall(const std::vector<uint8_t> &code, uint32_t at) {
 // returns past its DG_CALL (10 bytes) to the jump back to it, so its call site is stored as the DG_CALL's address
 // plus 4 (seen in Test Game 56's PC save).
 constexpr uint32_t kDelegateCallSiteShift = 4;
+
+// Whether an instruction starts at `at`, walking the instructions from `from`, the start of the function holding it.
+bool startsInstruction(const std::vector<uint8_t> &code, uint32_t from, uint32_t at) {
+    uint32_t p = from;
+    while (p < at && p < code.size()) p += insnLength(code, p);
+    return p == at;
+}
 
 }  // namespace
 
@@ -500,7 +508,13 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         }
         return true;
     };
-    if (!consistent()) { error = "the resume save is damaged"; return false; }
+    // Version 9's entry function, which gets a frame of its own (below): the one the first saved frame returns
+    // into, or the one the save was made in.
+    const int32_t entryFn = version < 9 ? -1 : nf > 1 ? retAt(1).second : curFn;
+    if (!consistent() || (version >= 9 && (entryFn <= 0 || size_t(entryFn) >= ain.functions.size()))) {
+        error = "the resume save is damaged";
+        return false;
+    }
 
     // Everything checked: replace the state.
     heap = std::move(newHeap);
@@ -514,7 +528,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     frames.clear();
     size_t self = 0;
     for (uint32_t k = 1; k < nf; k++) {
-        Frame f;
+        Frame f{};
         f.localPage = locals[k];
         Page *lp = page(f.localPage);
         f.function = lp ? lp->index : -1;
@@ -524,7 +538,11 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         f.callSite = retAt(k).first;
         f.returnAddress = f.native ? 0 : f.callSite + insnLength(ain.code, f.callSite);
         // A method a delegate called returns to the DG_CALL itself, which calls the next one, and drops its value.
-        if (!f.native && f.callSite >= kDelegateCallSiteShift && isDelegateCall(ain.code, f.callSite - kDelegateCallSiteShift)) {
+        // The DG_CALL must start an instruction of the caller: the bytes of an operand can look like one.
+        int32_t caller = retAt(k).second;
+        if (!f.native && caller > 0 && f.callSite >= kDelegateCallSiteShift &&
+            isDelegateCall(ain.code, f.callSite - kDelegateCallSiteShift) &&
+            startsInstruction(ain.code, ain.functions[size_t(caller)].address, f.callSite - kDelegateCallSiteShift)) {
             f.callSite -= kDelegateCallSiteShift;
             f.returnAddress = f.callSite;
             f.discardReturn = true;
@@ -535,17 +553,28 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     if (version >= 9) {
         // VNDegen runs the entry function as a frame of its own, which version 9 doesn't keep: the function the
         // first saved frame returns into (or the one the save was made in), with fresh locals.
-        Frame e;
-        e.function = nf > 1 ? retAt(1).second : curFn;
-        const Function &fn = ain.functions[size_t(e.function)];
-        e.localPage = newPage(PageKind::Local, e.function, fn.vars.size());
-        for (size_t k = 0; k < fn.vars.size(); k++) {
-            int32_t t = fn.vars[k].t.type;
-            initVar(*heap[size_t(e.localPage)].page, k, fn.vars[k].t);
-            if (t == T_REF_INT || t == T_REF_FLOAT || t == T_REF_BOOL || t == 59) k++;  // a (page, index) pair
-        }
+        Frame e{};
+        e.function = entryFn;
+        e.structPage = -1;
+        e.returnAddress = 0;
         e.native = true;
         e.stackBase = kUnknownBase;
+        // VNDegen's own saves keep the entry frame's locals in the heap, held by nothing listed; the PC's don't.
+        e.localPage = -1;
+        for (size_t s = 0; s < heap.size() && e.localPage < 0; s++) {
+            const Page *lp = heap[s].page.get();
+            if (!lp || lp->kind != PageKind::Local || lp->index != entryFn) continue;
+            if (std::find(locals.begin() + 1, locals.end(), int32_t(s)) == locals.end()) e.localPage = int32_t(s);
+        }
+        if (e.localPage < 0) {
+            const Function &fn = ain.functions[size_t(entryFn)];
+            e.localPage = newPage(PageKind::Local, entryFn, fn.vars.size());
+            for (size_t k = 0; k < fn.vars.size(); k++) {
+                int32_t t = fn.vars[k].t.type;
+                initVar(*heap[size_t(e.localPage)].page, k, fn.vars[k].t);
+                if (t == T_REF_INT || t == T_REF_FLOAT || t == T_REF_BOOL || t == 59) k++;  // a (page, index) pair
+            }
+        }
         frames.insert(frames.begin(), e);
     }
     // The first frame is the entry; when it returns, the game ends.

@@ -812,6 +812,7 @@ S4_HLL(PartsEngine, Load) {
     size_t i = 0;
     if (!a || !serial::getTag(a->v, i, "VPT") || a->v.size() - i < 2 || a->v[i] != 1) { c.retBool(false); return; }
     int count = a->v[i + 1];
+    if (count < 0) { c.retBool(false); return; }
     i += 2;
     std::map<int, Part> loaded;
     for (int k = 0; k < count; k++) {
