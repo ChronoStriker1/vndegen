@@ -183,7 +183,15 @@ class Conversion {
         }
         check(writer.status == AVAssetWriterStatusWriting);
         CVPixelBufferRef buffer = nullptr;
-        check(CVPixelBufferPoolCreatePixelBuffer(nullptr, adaptor.pixelBufferPool, &buffer) == kCVReturnSuccess);
+        NSDictionary *limit = @{(__bridge NSString *)kCVPixelBufferPoolAllocationThresholdKey: @8};
+        CVReturn allocated;
+        while ((allocated = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nullptr, adaptor.pixelBufferPool,
+                (__bridge CFDictionaryRef)limit, &buffer)) == kCVReturnWouldExceedAllocationThreshold) {
+            checkCancelled();
+            check(writer.status == AVAssetWriterStatusWriting);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        check(allocated == kCVReturnSuccess);
         CVPixelBufferLockBaseAddress(buffer, 0);
         vImage_Buffer planes[3];
         for (int plane = 0; plane < 3; ++plane)
