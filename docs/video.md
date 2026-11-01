@@ -6,6 +6,8 @@ Conversion runs serially off the main thread. The original request stays pending
 
 The output pixel pool holds at most eight buffers, about 63 MiB at 1080p. Conversion waits when those buffers are in use. Decoder reference frames and the encoder's internal allocations are additional memory; the pool limit is not a limit on the whole conversion's memory.
 
+Cold conversion can add substantial resident memory to the native app. A single 1080p check added about 164 MiB on a Mac and 389 MiB on an iPad simulator, beyond each paused game's baseline. Those figures exclude the game's separate WebContent heap. Physical iPad memory and conversion speed remain unmeasured; the simulator figures are not device estimates. Cached playback avoids this conversion cost.
+
 The cache lives under the app's Caches directory, is excluded from backups, and evicts the least recently used movies before exceeding 512 MiB. Settings has a Clear video cache button. The old WebCodecs alpha pre-decode path is removed. The short opaque-loop smoothing path retains its separate frame budget.
 
 vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/vnvideo.[ch]`. It plays:
