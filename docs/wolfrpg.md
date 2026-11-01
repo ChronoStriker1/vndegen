@@ -118,7 +118,7 @@ Saves are the PC engine's own files in the `Save` folder beside `Game.exe` (`Sav
 games that keep values across saves), so they move between VNDegen and a PC copy of the game, and Ludusavi backs them
 up. Saves the PC engine wrote load in the runtime, and saves the runtime wrote load in the PC engine, checked under
 Wine for a Wolf RPG Editor 2 and a Wolf RPG Editor 3 test game, and for The Clumsy Witch Seris (Wolf RPG Editor 3.5,
-save version 159 in its compressed and encrypted container) and ANGEL QUEST (Wolf RPG Editor 2, version 123). Fields
+save version 159 in its compressed and encrypted container) and ANGEL QUEST (Wolf RPG Editor 2, version 123), and for Two Beasts Or Not To Beast! (version 142). Two Beasts saves from its phone, and a load differs there: the PC engine shows the phone again from a VNDegen save and a black map with its HUD from its own save, where a right click opens the phone, and VNDegen shows the room from either. Fields
 the runtime doesn't use are carried over from the last save read or written. `docs/wolfrpg-save-format.md` describes the
 format and how each field was established, and `docs/wolfrpg-cleanroom.md` the version 159 container and additions. A
 Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf RPG Editor 3.714 writes.
