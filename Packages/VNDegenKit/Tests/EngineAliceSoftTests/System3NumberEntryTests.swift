@@ -61,3 +61,13 @@ import VNCore
     box.type(.newline)
     #expect(answers == [4])
 }
+
+/// Return held on the choice that opened the box repeats while the box is up. That must not press OK.
+@Test func aKeyHeldWhenTheBoxOpensRepeatsAsNothing() {
+    var router = System3InputRouter()
+    #expect(router.hostKey(hidUsage: 40, pressed: true) == [.key(0x0d, down: true)])
+    #expect(router.releaseToNumberBox() == [.key(0x0d, down: false)])
+    #expect(router.hostKey(hidUsage: 40, pressed: true).isEmpty)
+    #expect(router.hostKey(hidUsage: 40, pressed: false).isEmpty)
+    #expect(router.hostKey(hidUsage: 40, pressed: true) == [.key(0x0d, down: true)])
+}

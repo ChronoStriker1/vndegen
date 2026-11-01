@@ -77,6 +77,10 @@ samples averaged 60.0 with one hitch. A DEBUG build launched with `-frameMonitor
   menus, and DLL commands.
 - CE effects 1, 2, 5 and 24 to 54, and CD effects 1 to 3 and 5, show their result at once. No library game uses them.
 - IY 2 and 3, which set whether a click stops the text skip, are read and skipped. No library game uses them.
+- With the number box up, keys bound to controller buttons mean what the default layout's buttons do: 1 to 4 and WASD
+  step the number, and E cancels. A button bound to a digit in a custom layout therefore steps rather than types.
+- A controller button let go after the number box closes, while the keyboard holds the same key, can release that
+  keyboard press.
 - LE and QE files stay inside the save and game folders: absolute paths, drives and `..` are refused, and the resolved
   path, symlinks followed, is checked before each read or write. The check and the open are separate steps, so a
   process that swaps a folder for a symlink between them could still redirect the access. Such a process already runs

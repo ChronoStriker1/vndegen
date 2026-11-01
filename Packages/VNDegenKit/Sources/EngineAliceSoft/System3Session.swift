@@ -174,7 +174,7 @@ final class System3Session: EngineSession {
         var value: Int32 = 0, minimum: Int32 = 0, maximum: Int32 = 0
         guard vns3_number_request(engine, &value, &minimum, &maximum) else { return }
         // The box takes the input, so the game sees every key and mouse button it holds come up, as when the menu opens.
-        deliver(router.releaseAll())
+        deliver(router.releaseToNumberBox())
         let entry = System3NumberEntry(value: Int(value), minimum: Int(minimum), maximum: Int(maximum))
         let title = String(cString: vns3_number_title(engine))
         let box = System3NumberBox(title: title.isEmpty ? "Enter a number" : title, entry: entry) { [weak self] answer in
