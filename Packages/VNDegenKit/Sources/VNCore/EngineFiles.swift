@@ -254,7 +254,8 @@ nonisolated enum EngineFiles {
 
     /// True when a link kept in the game folder, however deep, leads into something about to go, as a game's `www` could
     /// into an app bundle. The web engines follow such a link, so removing the bundle would take the game with it. It reads
-    /// every kept entry's metadata and nothing else. A folder it can't walk counts as true, so nothing is offered.
+    /// every kept entry's metadata and nothing else. A game folder it can't start walking counts as true. A folder inside
+    /// the game that it can't list is skipped, so a link in there isn't seen. No library game has one.
     static func linkLeadsInto(_ gone: [EngineFile], in folder: URL) -> Bool {
         guard let items = FileManager.default.enumerator(atPath: folder.path) else { return true }
         let root = folder.resolvingSymlinksInPath().path
