@@ -797,7 +797,7 @@ final class Navigator {
             return "\(what) This folder is in iCloud Drive, so the removal reaches every device on this iCloud account. iCloud Drive's Recently Deleted should keep the files for about 30 days."
         }
         #if os(macOS)
-        return "\(what) They go to the Trash, where Put Back in Finder restores them. The space comes back when you empty the Trash."
+        return "\(what) They go to the Trash. The space comes back when you empty it."
         #else
         return "\(what) They are deleted from this \(UIDevice.current.localizedModel) for good. This can't be undone."
         #endif

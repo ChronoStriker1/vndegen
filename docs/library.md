@@ -44,7 +44,7 @@ The averages come from the maintainer's library. Each plugin names exactly what 
 
 Where the files go depends on where the game is:
 
-- **Mac.** They go to the Trash, and Put Back in Finder restores them. The space comes back when you empty the Trash.
+- **Mac.** They go to the Trash. The space comes back when you empty it.
 - **iPhone and iPad.** They are deleted for good.
 - **iCloud Drive.** The removal reaches every device on that iCloud account. iCloud Drive's Recently Deleted should keep the files for about 30 days. Files not downloaded yet are measured and removed without downloading them.
 

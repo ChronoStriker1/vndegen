@@ -167,7 +167,7 @@ nonisolated enum EngineFiles {
     }
 
     /// What `list` names in `folder`, read from the disk now. A link is never followed or offered. A folder all of whose
-    /// entries are named is offered as one folder, so it leaves no empty folder behind and goes back whole from the Trash.
+    /// entries are named is offered as one folder, so it leaves no empty folder behind and reaches the Trash in one piece.
     static func files(_ list: EngineFileList, in folder: URL, iCloud: Bool = false) -> [EngineFile] {
         guard noLinks(on: list.root, in: folder) else { return [] }
         let base = list.root.isEmpty ? "" : list.root + "/"
