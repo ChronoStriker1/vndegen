@@ -370,6 +370,23 @@
     if (config.runtime === 'electron') {
         modules.electron = electron;
         process.versions.electron = '22.0.0';
+        // TyranoScript 5.2 and later build for Electron with context isolation. Their preload script hands the page
+        // these modules and a synchronous channel to the main process as window.studio_api, and the page stops at
+        // startup without it. sendSync gives the answers the template's main.js gives.
+        const mainProcess = {
+            getAppPath: () => config.appPath,
+            getProcess: () => ({
+                platform: process.platform, __dirname: config.appPath, execPath: process.execPath, env: { HOME: config.cwd },
+            }),
+            doubleCheck: () => true,
+        };
+        window.studio_api = {
+            fs: fsExtra, fs_default: fs, shell: electron.shell, path: path, admzip: AdmZip,
+            ipcRenderer: Object.assign({}, electron.ipcRenderer, {
+                sendSync: (channel) => (mainProcess[channel] ? mainProcess[channel]() : undefined),
+            }),
+            handleMainEvent: noop,
+        };
     } else {
         modules['nw.gui'] = nw;
     }

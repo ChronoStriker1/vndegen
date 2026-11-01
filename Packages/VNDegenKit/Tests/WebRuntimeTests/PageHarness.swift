@@ -9,12 +9,12 @@ import WebKit
     var answer: (BridgeRequest) -> BridgeReply
     private var loaded: CheckedContinuation<Void, any Error>?
 
-    /// `folder` sets the paths the shim reports, such as `process.mainModule.filename`.
+    /// `folder` sets the paths the shim reports, such as `process.mainModule.filename`, and `runtime` what it emulates.
     init(storage: Bool = true, scripts: [String] = [], scheme: (any WKURLSchemeHandler)? = nil, folder: GameFolder? = nil,
-         answer: @escaping (BridgeRequest) -> BridgeReply) throws {
+         runtime: PageRuntime? = nil, answer: @escaping (BridgeRequest) -> BridgeReply) throws {
         self.answer = answer
         let root = FileManager.default.temporaryDirectory
-        let game = WebGameConfiguration(folder: folder ?? GameFolder(root: root, webRoot: ""), appName: "test",
+        let game = WebGameConfiguration(folder: folder ?? GameFolder(root: root, webRoot: ""), appName: "test", runtime: runtime,
                                         storageDirectory: storage ? root : nil, buttonScript: { _, _ in nil },
                                         scriptArgument: "test-script", log: Logger())
         let configuration = WKWebViewConfiguration()

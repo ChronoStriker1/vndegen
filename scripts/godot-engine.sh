@@ -60,11 +60,20 @@ fetch() {
   rm -rf "$3" && mv "$3.part" "$3"
 }
 
+# The venv is shared by every build folder, so one build at a time checks and installs it.
+venv_lock="$cache/venv.lock"
+until mkdir "$venv_lock" 2>/dev/null; do
+  holder=$(cat "$venv_lock/pid" 2>/dev/null || true)
+  if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$venv_lock"; continue; fi
+  sleep 5
+done
+echo $$ > "$venv_lock/pid"
 if [ ! -x "$cache/venv/bin/scons" ] || [ "$("$cache/venv/bin/scons" --version | sed -n 's/.*SCons: v\([0-9.]*\).*/\1/p' | head -1)" != "$scons_version" ]; then
   rm -rf "$cache/venv"
   python3 -m venv "$cache/venv"
   "$cache/venv/bin/pip" install --quiet "scons==$scons_version"
 fi
+rm -rf "$venv_lock"
 scons="$cache/venv/bin/scons"
 
 # prepare <major> <commit>: the patched sources in $work/godot<major>. They are made fresh, then copied over the
