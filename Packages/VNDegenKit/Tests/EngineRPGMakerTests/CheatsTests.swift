@@ -32,9 +32,13 @@ private func engine(mv: Bool = false) -> String {
         run(scene) { this.goto(scene); },
         goto(scene) { this._scene = new scene(); this.onSceneStart(); },
         onSceneStart() {},
-        \(mv ? "_getTimeInMsWithoutMobileSafari() { return window.now; }," : "determineRepeatNumber() { return 1; },")
+        \(mv ? "_getTimeInMsWithoutMobileSafari() { return window.now; }," : "determineRepeatNumber() { return window.repeatCount; },")
     };
+    // MZ's application, whose render takes as long as a test asks.
+    window.renderMs = 0;
+    window.Graphics = { _app: { render() { const end = performance.now() + window.renderMs; while (performance.now() < end); } } };
     window.now = 1000;
+    window.repeatCount = 1;
     var $dataSystem = { currencyUnit: 'G', variables: ['', 'Chapter', '', 'Hero name'], switches: ['', 'Met the king', ''] };
     var $dataItems = [null, { id: 1, name: 'Potion' }, { id: 2, name: '' }];
     var $dataWeapons = [null, { id: 1, name: 'Sword' }];
@@ -172,6 +176,13 @@ private func engine(mv: Bool = false) -> String {
     #expect(try await page.run("$gamePlayer.isThrough()") as? Bool == true)
     #expect(try await page.run("$gameParty.allMembers()[0].finalExpRate()") as? Double == 15)
     #expect(try await page.run("SceneManager.determineRepeatNumber(1)") as? Int == 4)
+    // A count raised to catch up counts in full after a frame with little work of its own, as on a slow screen, and
+    // once after a frame that spent its time on its own work. A frame with no update stays so.
+    #expect(try await page.run("(window.repeatCount = 2, SceneManager.determineRepeatNumber(2), Graphics._app.render(), SceneManager.determineRepeatNumber(2))") as? Int == 8)
+    #expect(try await page.run("(window.renderMs = 50, SceneManager.determineRepeatNumber(2), Graphics._app.render(), window.renderMs = 0, SceneManager.determineRepeatNumber(2))") as? Int == 4)
+    // A frame that draws nothing doesn't count the last drawn frame's time again.
+    #expect(try await page.run("SceneManager.determineRepeatNumber(2)") as? Int == 8)
+    #expect(try await page.run("(window.repeatCount = 0, SceneManager.determineRepeatNumber(1))") as? Int == 0)
 
     let cheats = page.cheats()
     cheats.apply(CheatSettings())
@@ -179,7 +190,8 @@ private func engine(mv: Bool = false) -> String {
     #expect(try await page.run("$gamePlayer.canEncounter()") as? Bool == true)
     #expect(try await page.run("$gamePlayer.isThrough()") as? Bool == false)
     #expect(try await page.run("$gameParty.allMembers()[0].finalExpRate()") as? Double == 1.5)
-    #expect(try await page.run("SceneManager.determineRepeatNumber(1)") as? Int == 1)
+    // At normal speed MZ's own catch-up is untouched.
+    #expect(try await page.run("(window.repeatCount = 2, SceneManager.determineRepeatNumber(1))") as? Int == 2)
 }
 
 @Test @MainActor func keepingThePartyHealthyFillsItAndHoldsHPAndMP() async throws {

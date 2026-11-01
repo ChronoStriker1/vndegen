@@ -73,8 +73,27 @@
         // Game speed runs more engine updates per displayed frame. MZ counts the updates a frame takes in
         // determineRepeatNumber. MV runs an update for each 1/60 s its clock has moved, so its clock runs faster.
         if (typeof SceneManager.determineRepeatNumber === 'function') {
-            wrap(SceneManager, 'determineRepeatNumber', (repeat) => function () {
-                return repeat.apply(this, arguments) * settings.speed;
+            // MZ counts 2 after slow frames, to catch up. Multiplied by the speed, that made each next frame slow too, so
+            // the count stayed at 2: No Socks RPG ran 8 updates a frame at 4x and drew 23 frames a second, not 38. A
+            // frame that spent over half its time on its own work is not caught up after. One that did not is on a slow
+            // screen, such as at 30 Hz, and still needs its count for the game to run at the chosen speed.
+            let timedApp = null, started = 0, spent = 0;
+            wrap(SceneManager, 'determineRepeatNumber', (repeat) => function (deltaTime) {
+                const count = repeat.apply(this, arguments);
+                const app = window.Graphics && Graphics._app;
+                if (app && app !== timedApp) {
+                    timedApp = app;
+                    wrap(app, 'render', (render) => function () {
+                        const result = render.apply(this, arguments);
+                        spent = performance.now() - started;
+                        return result;
+                    });
+                }
+                started = performance.now();
+                const selfMade = settings.speed > 1 && count > 1 && spent * 2 > deltaTime * 1000 / 60;
+                // A frame that draws nothing leaves no time behind for the next.
+                spent = 0;
+                return (selfMade ? 1 : count) * settings.speed;
             });
         } else if (typeof SceneManager._getTimeInMsWithoutMobileSafari === 'function') {
             let real = null, virtual = 0;

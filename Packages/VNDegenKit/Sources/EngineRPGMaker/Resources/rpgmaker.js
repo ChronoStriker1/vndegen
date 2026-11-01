@@ -685,6 +685,10 @@
     let contextGeneration = 0;
     window.addEventListener('webglcontextrestored', (event) => {
         const graphics = window.Graphics;
+        if (graphics && graphics._renderer && event.target === graphics._renderer.view) {
+            renewFilters(graphics._renderer);
+            return;
+        }
         if (!graphics || !graphics._app || event.target !== graphics._app.view) return;
         contextGeneration++;
         console.warn('WebGL context restored, restoring the tilemap and Effekseer');
@@ -702,6 +706,36 @@
             }
         }
     }, true);
+
+    // MV's PIXI 4 keeps much of what lived in the lost context after a restore: its filter manager's quad, shaders and
+    // pooled render targets, each filter's shader, and the render targets, graphics and meshes it keys by CONTEXT_UID.
+    // MV draws the map and windows through filters, so the map went black and the windows drew upside down. This runs
+    // before PIXI's own handler on the canvas. A new CONTEXT_UID, set after PIXI has cleared its texture records under
+    // the old one, makes PIXI build all of these again as it needs them. The filter manager is made only once, so its
+    // own objects are replaced here, and the graphics renderer's pool of used buffers is emptied. pixi-tilemap makes its index buffer only when its indices grow, so it would go on
+    // drawing the map with the lost one. Emptying them makes it build the buffer again when PIXI announces the context.
+    function renewFilters(renderer) {
+        const filters = renderer.filterManager, initContext = renderer._initContext;
+        if (!filters || !filters.quad || typeof initContext !== 'function') return;
+        console.warn('WebGL context restored, renewing PIXI 4 filters');
+        renderer._initContext = function () {
+            this._initContext = initContext;
+            // PIXI numbers its renderers from 0, so this does not meet another renderer's number.
+            this.CONTEXT_UID += 1000;
+            filters.quad = new filters.quad.constructor(this.gl, this.state.attribState);
+            filters.shaderCache = {};
+            filters.pool = {};
+            // Older versions of the plugin register as tile.
+            const graphics = this.plugins && this.plugins.graphics;
+            if (graphics && graphics.graphicsDataPool) graphics.graphicsDataPool.length = 0;
+            const tilemap = this.plugins && (this.plugins.tilemap || this.plugins.tile);
+            if (tilemap && tilemap.indexBuffer) {
+                tilemap.indices = new Uint16Array(0);
+                tilemap.indexBuffer = null;
+            }
+            return initContext.apply(this, arguments);
+        };
+    }
 
     // Frees the lost Effekseer context and every effect it made, including ones a plugin loaded itself and ones still
     // waiting for a file or texture. Their callbacks do nothing from now on, so nothing that arrives later reaches the

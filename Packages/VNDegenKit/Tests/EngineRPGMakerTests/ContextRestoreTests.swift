@@ -174,3 +174,82 @@ private let page = """
     #expect(values["effekseerAfterFailure"] is NSNull)
     #expect(values["glError"] as? Int == 0)
 }
+
+/// Enough of MV's PIXI 4 around a real WebGL canvas: a renderer that restores its context as pixi.js 4.5.4 does, with a
+/// filter manager made once and a pixi-tilemap renderer that makes its index buffer only when its indices grow.
+private let mvPage = """
+    <html><body><script>
+    class Quad { constructor(gl, attribState) { this.attribState = attribState; } }
+    const canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    const gl = canvas.getContext('webgl');
+    const tilemap = {
+        indices: new Uint16Array(12000), indexBuffer: 'lost buffer',
+        onContextChange() {
+            if (!this.indices.length) { this.indices = new Uint16Array(12000); this.indexBuffer = 'new buffer'; }
+        },
+    };
+    const renderer = {
+        view: canvas, gl, CONTEXT_UID: 0, state: { attribState: {} }, plugins: { tilemap, graphics: { graphicsDataPool: ['lost buffers'] } },
+        removedUnder: [], madeUnder: [],
+        filterManager: { quad: new Quad(), shaderCache: { tone: 'lost shader' }, pool: { 1: ['lost target'] } },
+        _initContext() { this.madeUnder.push(this.CONTEXT_UID); this.plugins.tilemap.onContextChange(); },
+    };
+    canvas.addEventListener('webglcontextlost', (event) => event.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => {
+        renderer.removedUnder.push(renderer.CONTEXT_UID);
+        renderer._initContext();
+    });
+    window.Graphics = { _renderer: renderer };
+    </script></body></html>
+    """
+
+@Test @MainActor func aRestoredPixi4ContextRenewsWhatItKeptFromTheLostOne() async throws {
+    let source = URL(filePath: #filePath).deletingLastPathComponent()
+        .appending(path: "../../Sources/EngineRPGMaker/Resources/rpgmaker.js").standardized
+    let configuration = WKWebViewConfiguration()
+    for script in ["window.__vndegen = {};", try String(contentsOf: source, encoding: .utf8)] {
+        configuration.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    }
+    let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
+    webView.loadHTMLString(mvPage, baseURL: nil)
+    let deadline = ContinuousClock.now + .seconds(20)
+    while try await webView.evaluateJavaScript("document.readyState === 'complete' && !!window.Graphics") as? Bool != true {
+        guard ContinuousClock.now < deadline else { throw CancellationError() }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    let result = try await webView.callAsyncJavaScript("""
+        const restore = async () => {
+            const lose = gl.getExtension('WEBGL_lose_context');
+            const restored = new Promise((resolve) => canvas.addEventListener('webglcontextrestored', resolve, { once: true }));
+            lose.loseContext();
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            lose.restoreContext();
+            await restored;
+        };
+        const quad = renderer.filterManager.quad;
+        await restore();
+        const first = {
+            newQuad: renderer.filterManager.quad !== quad && renderer.filterManager.quad.attribState === renderer.state.attribState,
+            shaders: Object.keys(renderer.filterManager.shaderCache).length, pool: Object.keys(renderer.filterManager.pool).length,
+            indexBuffer: tilemap.indexBuffer, indices: tilemap.indices.length, pooled: renderer.plugins.graphics.graphicsDataPool.length,
+        };
+        // The second restore finds the plugin under the name its older versions use.
+        tilemap.indexBuffer = 'lost again';
+        renderer.plugins = { tile: tilemap };
+        renderer._initContext = function () { this.madeUnder.push(this.CONTEXT_UID); this.plugins.tile.onContextChange(); };
+        await restore();
+        return { ...first, removedUnder: renderer.removedUnder, madeUnder: renderer.madeUnder, indexBufferAgain: tilemap.indexBuffer };
+        """, arguments: [:], contentWorld: .page) as? [String: Any]
+    let values = try #require(result)
+    #expect(values["newQuad"] as? Bool == true)
+    #expect(values["shaders"] as? Int == 0)
+    #expect(values["pooled"] as? Int == 0)
+    #expect(values["pool"] as? Int == 0)
+    #expect(values["indexBuffer"] as? String == "new buffer")
+    #expect(values["indices"] as? Int == 12000)
+    #expect(values["indexBufferAgain"] as? String == "new buffer")
+    // PIXI clears its texture records under the old number and makes everything else under a new one, both times.
+    #expect(values["removedUnder"] as? [Int] == [0, 1000])
+    #expect(values["madeUnder"] as? [Int] == [1000, 2000])
+}

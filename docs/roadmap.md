@@ -54,10 +54,11 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - KiriKiri: four more library games start, AlphaMovie clips draw in place and at the right speed, and a game's own Display choices apply (0.20.1).
 - Wolf RPG Editor: the hero shows in new games (0.20.2).
 - TyranoScript: Skip and Auto answer at any moment and turn off with a second tap (0.20.3).
+- RPG Maker MV graphics recovery on PIXI 4, and smoother game speed in MZ (on `dev`, in the next release).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- RPG Maker MV and MZ small fixes, on `fix/rpgmaker-polish`.
+- See-through video clips in RPG Maker MV and MZ games, on `fix/alpha-clips`. Artemis and Godot small fixes, on `fix/artemis-godot-polish`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
