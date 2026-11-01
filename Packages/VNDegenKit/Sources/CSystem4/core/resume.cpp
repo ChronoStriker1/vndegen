@@ -119,10 +119,17 @@ bool isDelegateCall(const std::vector<uint8_t> &code, uint32_t at) {
 // plus 4 (seen in Test Game 56's PC save).
 constexpr uint32_t kDelegateCallSiteShift = 4;
 
-// Whether an instruction starts at `at`, walking the instructions from `from`, the start of the function holding it.
+// Whether an instruction of the function starting at `from` starts at `at`: the walk stops at the function's end
+// (ENDFUNC or the next FUNC) and at bytes that aren't an instruction.
 bool startsInstruction(const std::vector<uint8_t> &code, uint32_t from, uint32_t at) {
     uint32_t p = from;
-    while (p < at && p < code.size()) p += insnLength(code, p);
+    while (p < at) {
+        if (p >= code.size() || code.size() - p < 2) return false;
+        uint16_t op = uint16_t(code[p] | code[p + 1] << 8);
+        const OpInfo *oi = opInfo(op);
+        if (!oi || op == OP_FUNC || op == OP_ENDFUNC) return false;
+        p += 2 + 4 * uint32_t(oi->args);
+    }
     return p == at;
 }
 
@@ -182,7 +189,11 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
                 for (auto &[obj, fn] : *sl.dg)
                     if (obj >= 0 && size_t(obj) < heap.size()) uncounted[size_t(obj)]++;
     }
-    if (v9) o.u32(uint32_t(heap.size() + 1));
+    // Version 9: the entry frame's local page, which the frame lists leave out, is marked by its object number,
+    // heap.size() + 1 (every other slot s is object s + 1), so a VNDegen load finds it again.
+    const int32_t entryPage = v9 && !frames.empty() ? frames.front().localPage : -1;
+    auto objectNumber = [&](size_t s) { return uint32_t(int32_t(s) == entryPage ? heap.size() + 1 : s + 1); };
+    if (v9) o.u32(uint32_t(heap.size() + 2));
     o.u32(uint32_t(heap.size()));
     for (size_t s = 0; s < heap.size(); s++) {
         const Slot &sl = heap[s];
@@ -191,12 +202,12 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         if (sl.dg && v9) {
             o.u32(5);
             o.u32(uint32_t(refs));
-            o.u32(uint32_t(s + 1));
+            o.u32(objectNumber(s));
             o.u32(uint32_t(sl.dg->size() * 12));
             for (auto &[obj, fn] : *sl.dg) {
                 o.u32(uint32_t(obj));
                 o.u32(uint32_t(fn));
-                o.u32(obj >= 0 ? uint32_t(obj + 1) : 0);
+                o.u32(obj >= 0 ? objectNumber(size_t(obj)) : 0);
             }
             continue;
         }
@@ -213,7 +224,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         if (sl.str) {
             o.u32(2);
             o.u32(uint32_t(refs));
-            if (v9) o.u32(uint32_t(s + 1));
+            if (v9) o.u32(objectNumber(s));
             o.u32(0);
             o.u32(uint32_t(sl.str->size() + 1));
             o.str(*sl.str);
@@ -232,7 +243,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Global:
             o.u32(0);
             o.u32(uint32_t(refs));
-            if (v9) o.u32(uint32_t(s + 1));
+            if (v9) o.u32(objectNumber(s));
             o.u32(uint32_t(-1));
             types();
             values();
@@ -240,7 +251,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Local: {
             o.u32(1);
             o.u32(uint32_t(refs));
-            if (v9) o.u32(uint32_t(s + 1));
+            if (v9) o.u32(objectNumber(s));
             o.str(ain.functions[p.index].name);
             types();
             int32_t self = -1;
@@ -253,7 +264,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Array: {
             o.u32(3);
             o.u32(uint32_t(refs));
-            if (v9) o.u32(uint32_t(s + 1));
+            if (v9) o.u32(objectNumber(s));
             o.u32(0);
             o.u32(uint32_t(arrayTypeOf(p.elemType)));
             o.str(p.elemType == T_STRUCT && p.elemStruct >= 0 ? ain.structs[p.elemStruct].name : "");
@@ -265,7 +276,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Struct:
             o.u32(4);
             o.u32(uint32_t(refs));
-            if (v9) o.u32(uint32_t(s + 1));
+            if (v9) o.u32(objectNumber(s));
             const Struct &st = ain.structs[p.index];
             auto fnName = [&](int32_t fn) { return fn >= 0 && size_t(fn) < ain.functions.size() ? ain.functions[fn].name : ""; };
             o.str(fnName(st.constructor));
@@ -337,15 +348,16 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     auto retAt = [&](uint32_t k) { return rets[version >= 9 ? k : k - 1]; };
 
     // The new heap, slot for slot as saved.
-    if (version >= 9) in.u32();  // the next object number
+    uint32_t nextObject = version >= 9 ? in.u32() : 0;
     std::vector<Slot> newHeap(in.count(4));
+    std::vector<uint32_t> objectNumbers(newHeap.size());  // version 9
     for (size_t s = 0; s < newHeap.size() && !in.bad; s++) {
         int32_t kind = in.i32();
         if (kind == -1) continue;
         Slot &sl = newHeap[s];
         sl.inUse = true;
         sl.refs = in.i32();
-        if (version >= 9) in.u32();  // the object number
+        if (version >= 9) objectNumbers[s] = in.u32();
         auto page = std::make_unique<Page>();
         auto readTypes = [&]() {
             uint32_t n = in.count(4);
@@ -559,12 +571,15 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         e.returnAddress = 0;
         e.native = true;
         e.stackBase = kUnknownBase;
-        // VNDegen's own saves keep the entry frame's locals in the heap, held by nothing listed; the PC's don't.
+        // VNDegen's own saves keep the entry frame's locals in the heap, marked by the object number just below the
+        // next one (see resumeSnapshot); the PC's have none.
         e.localPage = -1;
         for (size_t s = 0; s < heap.size() && e.localPage < 0; s++) {
             const Page *lp = heap[s].page.get();
-            if (!lp || lp->kind != PageKind::Local || lp->index != entryFn) continue;
-            if (std::find(locals.begin() + 1, locals.end(), int32_t(s)) == locals.end()) e.localPage = int32_t(s);
+            if (lp && lp->kind == PageKind::Local && lp->index == entryFn && nextObject > 0 &&
+                objectNumbers[s] == nextObject - 1 &&
+                std::find(locals.begin() + 1, locals.end(), int32_t(s)) == locals.end())
+                e.localPage = int32_t(s);
         }
         if (e.localPage < 0) {
             const Function &fn = ain.functions[size_t(entryFn)];

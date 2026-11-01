@@ -1,7 +1,9 @@
 // MainEXFile: the game's .ex data file (exfile.h), read through handles. A handle names one value: a top-level
 // entry, a list item or a table cell. Tables are addressed by column and row (A2), by the value in the key column
 // and a column's name (IA2 for an int key, SA2 for a string key), or by row and a column's name (RA2). Handle 0 is
-// none.
+// none. Every value gets its handle when the file loads, by one walk of the file (entries in order; each value, then
+// its list items, table cells row by row and tree nodes' values, depth first), so a handle a resume save holds names
+// the same value in every session.
 #include <filesystem>
 #include <strings.h>
 #include <memory>
@@ -33,6 +35,25 @@ S4_HLL_RESET {
     g_missing.clear();
 }
 
+void number(const ExValue *v);
+void numberTable(const ExTable &t) {
+    for (auto &row : t.rows)
+        for (auto &c : row) number(c.get());
+}
+void numberNode(const ExNode *n) {
+    if (!n) return;
+    number(n->value.get());
+    for (auto &c : n->children) numberNode(c.get());
+}
+void number(const ExValue *v) {
+    if (!v) return;
+    g_handleOf.emplace(v, int32_t(g_handles.size()));
+    g_handles.push_back(v);
+    for (auto &item : v->list) number(item.get());
+    numberTable(v->table);
+    numberNode(v->tree.get());
+}
+
 // The .ex file beside the code file, with the code file's name.
 const ExFile *ex() {
     if (!g_tried) {
@@ -46,7 +67,10 @@ const ExFile *ex() {
             if (a.size() == b.size() && strcasecmp(a.c_str(), b.c_str()) == 0) {
                 auto f = std::make_unique<ExFile>();
                 std::string err;
-                if (f->load(e.path().string(), err)) g_ex = std::move(f);
+                if (f->load(e.path().string(), err)) {
+                    g_ex = std::move(f);
+                    for (auto &v : g_ex->entries()) number(v.get());
+                }
                 else g.log("MainEXFile: " + e.path().string() + ": " + err);
                 break;
             }
@@ -89,10 +113,8 @@ const ExValue *named(const std::string &name) {
 }
 
 int32_t handleFor(const ExValue *v) {
-    if (!v) return 0;
-    auto [it, added] = g_handleOf.emplace(v, int32_t(g_handles.size()));
-    if (added) g_handles.push_back(v);
-    return it->second;
+    auto it = v ? g_handleOf.find(v) : g_handleOf.end();
+    return it == g_handleOf.end() ? 0 : it->second;
 }
 
 const ExValue *at(int32_t h) { return h > 0 && size_t(h) < g_handles.size() ? g_handles[size_t(h)] : nullptr; }

@@ -32,6 +32,7 @@ Game &G() { return game(); }
 namespace fs = std::filesystem;
 
 constexpr int kSpriteBase = 1000000;  // parts' sprite numbers, above any the earlier sprite engines use
+constexpr int kMaxSide = 8192;         // the largest picture side construction steps make
 
 struct Step {  // a construction step
     enum Kind { Create, CreatePixelOnly, Fill, FillAlpha, FillBlend, CopyCG, DrawCG } kind;
@@ -349,8 +350,13 @@ void build(State &s) {
     Surface out;
     for (const Step &st : s.steps) {
         switch (st.kind) {
-        case Step::Create: out.create(std::max(0, st.w), std::max(0, st.h), true); out.fill(0, 0, out.w, out.h, 0, 0, 0, 0); break;
-        case Step::CreatePixelOnly: out.create(std::max(0, st.w), std::max(0, st.h), false); break;
+        case Step::Create:
+        case Step::CreatePixelOnly:
+            // A picture larger than any screen comes only from damaged data; it is skipped.
+            if (st.w < 0 || st.h < 0 || st.w > kMaxSide || st.h > kMaxSide) break;
+            out.create(st.w, st.h, st.kind == Step::Create);
+            if (st.kind == Step::Create) out.fill(0, 0, out.w, out.h, 0, 0, 0, 0);
+            break;
         case Step::Fill: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, out.hasAlpha ? 255 : -1); break;
         case Step::FillAlpha: out.fill(st.x, st.y, st.w, st.h, st.r, st.g, st.b, st.a); break;
         case Step::FillBlend: {
@@ -583,7 +589,7 @@ S4_HLL(PartsEngine, Parts_SetTextCharSpace) {
 }
 S4_HLL(PartsEngine, Parts_SetTextLineSpace) {
     State *s = stateOf(c, 0, 2);
-    if (s) s->lineSpace = c.i(1);
+    if (s) { s->lineSpace = c.i(1); get(c.i(0)).dirty = true; }
     c.retBool(s != nullptr);
 }
 
@@ -775,6 +781,7 @@ bool getPart(const std::vector<int32_t> &in, size_t &i, int &n, Part &p) {
                 !take({&sp.sx, &sp.sy, &sp.sw, &sp.sh}) || kind < Step::Create || kind > Step::DrawCG)
                 return false;
             sp.kind = Step::Kind(kind);
+            if (sp.w < 0 || sp.h < 0 || sp.w > kMaxSide || sp.h > kMaxSide) return false;
             st.steps.push_back(std::move(sp));
         }
         if (!take({&hasBuilt})) return false;
@@ -1025,10 +1032,12 @@ void partsFunc(int id, FuncArgs a) {
     case 162: {  // a drawing plugin's surface on a part (number, width, height, three plugin values, state)
         int st = a.i(6);
         if (st < 1 || st > 3 || a.i(1) <= 0 || a.i(2) <= 0) { a.retBool(false); break; }
+        if (a.i(1) > kMaxSide || a.i(2) > kMaxSide) { a.retBool(false); break; }
         Part &p = get(a.i(0));
         State &s = p.states[st - 1];
-        s.built.create(a.i(1), a.i(2), false);
-        s.hasBuilt = true;
+        // As a construction step, so a save keeps the surface (not what the plugin drew on it).
+        s.steps.assign(1, Step{Step::CreatePixelOnly, 0, 0, a.i(1), a.i(2)});
+        build(s);
         p.dirty = true;
         a.retBool(true);
         break;
