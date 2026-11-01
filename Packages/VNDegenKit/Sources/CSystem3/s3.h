@@ -105,10 +105,14 @@ typedef struct S3Surface {
 
 typedef struct S3 S3;
 
+// A variable argument. element marks an array element (var[offset]); otherwise offset steps to
+// following variables, as commands that fill var, var+1, ... do.
+typedef struct S3LV { u16 var; int offset; bool element; } S3LV;
+
 // ---- the runtime ----
 typedef enum {
     S3_WAIT_NONE, S3_WAIT_KEY, S3_WAIT_MENU, S3_WAIT_TIME, S3_WAIT_FADE, S3_WAIT_INPUT_POLL,
-    S3_WAIT_EFFECT, S3_WAIT_QUIT,
+    S3_WAIT_EFFECT, S3_WAIT_NUMBER, S3_WAIT_QUIT,
 } S3WaitKind;
 
 typedef enum { S3_FRAME_LABEL, S3_FRAME_PAGE, S3_FRAME_PUSH, S3_FRAME_TEXT } S3FrameKind;
@@ -116,7 +120,7 @@ typedef struct S3Frame {
     u8 kind;
     u16 page;                 // return page (LABEL/PAGE)
     u32 pc;                   // return address
-    u16 var;                  // pushed variable (PUSH)
+    u32 var;                  // where a push came from (PUSH): array page << 16 | index, page 0 the normal variables
     u16 value;                // pushed value (PUSH)
 } S3Frame;
 
@@ -181,6 +185,9 @@ struct S3 {
     int tx, ty;                // next text position
     bool msgClearOnSelect;
     int keyMode[8];
+    bool msgSkip;              // passing message waits until a choice
+    S3LV numberLv; int numberValue, numberMin, numberMax; // the number box NI is waiting at
+    char numberTitle[512];     // NT, in UTF-8; it stays until set again
     S3MenuItem menu[S3_MAX_MENU];
     int menuCount;
     int menuBuild;             // index of the menu item being built, or -1
@@ -197,6 +204,7 @@ struct S3 {
     int pdLevel;               // PD brightness
     int cgX, cgY; bool cgPos; int cgPosMode;
     bool flip;                 // WZ: copy to screen
+    struct S3Effect *effect;   // the CE or CD in progress
     u32 *screen; int screenW, screenH;
     u32 serial;
     bool dirty;
@@ -268,6 +276,13 @@ void s3_copy_key(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key);
 void s3_draw_image(S3 *s, const S3Image *img, int x, int y, int key);
 void s3_mark_dirty(S3 *s);
 bool s3_clip(S3 *s, int *x, int *y, int *w, int *h);
+bool s3_clip_copy(S3 *s, int *sx, int *sy, int *w, int *h, int *dx, int *dy);
+void s3_copy_bank(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key);
+
+// effect.c
+bool s3_effect_start(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int number, int ms, int key);
+bool s3_effect_update(S3 *s, bool finish);
+void s3_effect_free(S3 *s);
 
 // text.c
 bool s3_font_open(S3 *s, const char *path, int index);

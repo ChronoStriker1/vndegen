@@ -82,7 +82,7 @@ void s3_fill(S3 *s, int x, int y, int w, int h, int color) {
 }
 
 // Clips a copy against both the source and the destination.
-static bool clip2(S3 *s, int *sx, int *sy, int *w, int *h, int *dx, int *dy) {
+bool s3_clip_copy(S3 *s, int *sx, int *sy, int *w, int *h, int *dx, int *dy) {
     if (*sx < 0) { *w += *sx; *dx -= *sx; *sx = 0; }
     if (*sy < 0) { *h += *sy; *dy -= *sy; *sy = 0; }
     if (*dx < 0) { *w += *dx; *sx -= *dx; *dx = 0; }
@@ -96,7 +96,7 @@ static bool clip2(S3 *s, int *sx, int *sy, int *w, int *h, int *dx, int *dy) {
 }
 
 void s3_copy(S3 *s, int sx, int sy, int w, int h, int dx, int dy) {
-    if (!clip2(s, &sx, &sy, &w, &h, &dx, &dy)) return;
+    if (!s3_clip_copy(s, &sx, &sy, &w, &h, &dx, &dy)) return;
     int W = s->dib.w;
     bool up = dy > sy;
     for (int k = 0; k < h; k++) {
@@ -108,7 +108,7 @@ void s3_copy(S3 *s, int sx, int sy, int w, int h, int dx, int dy) {
 }
 
 void s3_copy_key(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key) {
-    if (!clip2(s, &sx, &sy, &w, &h, &dx, &dy)) return;
+    if (!s3_clip_copy(s, &sx, &sy, &w, &h, &dx, &dy)) return;
     int W = s->dib.w;
     bool up = dy > sy;
     if (s->dib.depth == 8) {
@@ -136,6 +136,23 @@ void s3_copy_key(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key) {
 
 // Draws a decoded CG. key is a palette index left transparent, or -1. 16-bit CGs with alpha
 // blend; PD darkens CGs drawn on a high-colour DIB.
+// CD effect 1001: where the source isn't the key colour, the destination keeps its low four bits and takes the
+// source's palette bank, so a palette change to that bank then shades the shape. Read from System39.exe under Wine.
+void s3_copy_bank(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key) {
+    if (s->dib.depth != 8 || !s3_clip_copy(s, &sx, &sy, &w, &h, &dx, &dy)) return;
+    // A row at a time from a copy, in the order s3_copy_key takes, so an overlap reads the source as it was.
+    u8 *tmp = s3_alloc((size_t)w);
+    bool up = dy > sy;
+    for (int k = 0; k < h; k++) {
+        int j = up ? h - 1 - k : k;
+        memcpy(tmp, s->dib.p8 + (size_t)(sy + j) * s->dib.w + sx, (size_t)w);
+        u8 *dst = s->dib.p8 + (size_t)(dy + j) * s->dib.w + dx;
+        for (int i = 0; i < w; i++) if (tmp[i] != (u8)key) dst[i] = (tmp[i] & 0xf0) | (dst[i] & 0x0f);
+    }
+    free(tmp);
+    s3_mark_dirty(s);
+}
+
 void s3_draw_image(S3 *s, const S3Image *img, int x, int y, int key) {
     int W = s->dib.w, H = s->dib.h;
     for (int j = 0; j < img->h; j++) {

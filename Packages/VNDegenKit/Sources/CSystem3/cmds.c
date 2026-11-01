@@ -121,6 +121,7 @@ void s3_cmd_wait_key(S3 *s) {
 void s3_cmd_open_menu(S3 *s) {
     s->menuBuild = -1;
     if (s->menuCount == 0) return;
+    s->msgSkip = false; // the engines' menu item skips until a choice, and turns itself off there
     s3_menu_open(s);
     s->pressedMask = 0;
     s->wait = S3_WAIT_MENU;
@@ -152,7 +153,7 @@ void s3_service_wait(S3 *s) {
     case S3_WAIT_KEY: {
         u32 p = s->pressedMask;
         s->pressedMask = 0;
-        if (p & (16 | 32)) {
+        if ((p & (16 | 32)) || s->msgSkip) {
             s->wait = S3_WAIT_NONE;
             s3_msg_clear(s);
         }
@@ -200,7 +201,7 @@ void s3_service_wait(S3 *s) {
     }
     case S3_WAIT_INPUT_POLL: {
         u32 p = s->pressedMask | keymask_now(s);
-        if (p) {
+        if (p || (s->msgSkip && !s->sys30)) {
             rnd(s, (u16)p);
             // System 3.0's K also returns the pointer, in variables 57 and 58.
             if (s->sys30) { s3_var_set(s, 57, (u16)s->mouseX); s3_var_set(s, 58, (u16)s->mouseY); }
@@ -210,7 +211,7 @@ void s3_service_wait(S3 *s) {
         break;
     }
     case S3_WAIT_EFFECT:
-        if (s->clockMs >= s->waitUntil || (s->waitArg[0] && s->pressedMask)) {
+        if (s3_effect_update(s, s->waitArg[0] && s->pressedMask)) {
             if (s->waitArg[0]) rnd(s, (u16)s->pressedMask);
             s->wait = S3_WAIT_NONE;
         }
@@ -268,19 +269,21 @@ void s3_load_cg(S3 *s, int n, int key, int yOffset) {
 
 // ---- effects ----
 
-static void effect_copy(S3 *s, const Arg *a) {
+// CE and CD. Time a step takes comes from the option, in milliseconds.
+static void effect_copy(S3 *s, const Arg *a, int key) {
     int sx = a[0].v, sy = a[1].v, w = a[2].v, h = a[3].v, dx = a[4].v, dy = a[5].v;
-    int effect = a[6].v, opt = a[7].v, keyFlag = a[8].v;
-    s3_copy(s, sx, sy, w, h, dx, dy);
-    // Transitions run about a second at default speed on the original; until each pattern is
-    // drawn, show the result after the same delay.
-    int ms = effect >= 2000 ? 0 : opt ? opt * 16 : 500;
-    if (ms > 0) {
+    int number = a[6].v, opt = a[7].v, keyFlag = a[8].v;
+    if (key >= 0 && number == 1001) { s3_copy_bank(s, sx, sy, w, h, dx, dy, key); return; }
+    if (s3_effect_start(s, sx, sy, w, h, dx, dy, number, opt, key)) {
         s->wait = S3_WAIT_EFFECT;
-        s->waitUntil = s->clockMs + (u64)ms;
         s->waitArg[0] = keyFlag;
         s->pressedMask = 0;
+        return;
     }
+    // No library game uses the other effects; they show the result at once.
+    if (key >= 0) s3_copy_key(s, sx, sy, w, h, dx, dy, key);
+    else s3_copy(s, sx, sy, w, h, dx, dy);
+    if (keyFlag) rnd(s, 0);
 }
 
 // ---- the dispatcher ----
@@ -336,12 +339,8 @@ static void cmd_C(S3 *s) {
         s3_fill(s, a[0].v, a[1].v, 1, a[3].v, a[4].v); s3_fill(s, a[0].v + a[2].v - 1, a[1].v, 1, a[3].v, a[4].v);
         return;
     case 'C': args(s, "eeeeee", a); s3_copy(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v); return;
-    case 'D': // CD sx, sy, w, h, dx, dy, effect, wait, keyFlag, key: a keyed copy shown at once, without the effect
-        args(s, "eeeeeeeeee", a);
-        s3_copy_key(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v, a[9].v);
-        if (a[8].v) rnd(s, 0);
-        return;
-    case 'E': args(s, "eeeeeeeee", a); effect_copy(s, a); return;
+    case 'D': args(s, "eeeeeeeeee", a); effect_copy(s, a, a[9].v); return;
+    case 'E': args(s, "eeeeeeeee", a); effect_copy(s, a, -1); return;
     case 'F': args(s, "eeeee", a); s3_fill(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v); return;
     case 'K': {
         args(s, "beeeeeeee", a);
@@ -621,7 +620,7 @@ static void cmd_I(S3 *s) {
     case 'K': {
         int n = s3_byte(s);
         s->polls++;
-        if (n == 0 || n == 1) {
+        if ((n == 0 || n == 1) && !s->msgSkip) { // the text skip passes these waits too, as games wait for text with them
             u32 m = keymask_now(s);
             if (m) { rnd(s, (u16)m); return; }
             s->pressedMask = 0;
@@ -637,7 +636,7 @@ static void cmd_I(S3 *s) {
     case 'M': args(s, "ee", a); put(s, &a[0], 0, (u16)(s->mouseX + s->viewX)); put(s, &a[1], 0, (u16)(s->mouseY + s->viewY));
         rnd(s, (u16)((s->mouseL ? 16 : 0) | (s->mouseR ? 32 : 0) | s->clickLatch)); s->clickLatch = 0; s->polls++; return;
     case 'X': args(s, "e", a); put(s, &a[0], 0, 0); return;
-    case 'Y': args(s, "e", a); return;
+    case 'Y': args(s, "e", a); if (a[0].v < 2) s->msgSkip = a[0].v == 1; return; // 2 and 3: no library game uses them
     case 'Z': args(s, "ee", a); s->mouseX = a[0].v - s->viewX; s->mouseY = a[1].v - s->viewY; return;
     default: s->vmError = true;
     }
@@ -761,10 +760,13 @@ static void cmd_N(S3 *s) {
         return;
     }
     case 'C': args(s, "ee", a); for (int i = 0; i < a[1].v; i++) put(s, &a[0], i, 0); return;
-    case 'I': // NI var, default, min, max: a number input box. There is no keypad, so it takes the default, as OK would.
+    case 'I': // NI var, default, min, max: the host asks the player (vns3_number_request).
         args(s, "eeee", a);
-        put(s, &a[0], 0, a[1].v < a[2].v ? a[2].v : a[1].v > a[3].v ? a[3].v : a[1].v);
-        rnd(s, 0);
+        s->numberLv = a[0].isVar ? a[0].lv : (S3LV){ .var = 0xffff };
+        s->numberMin = a[2].v;
+        s->numberMax = a[3].v;
+        s->numberValue = a[1].v < a[2].v ? a[2].v : a[1].v > a[3].v ? a[3].v : a[1].v;
+        s->wait = S3_WAIT_NUMBER;
         return;
     case 'P': {
         args(s, "eeee", a);
@@ -918,14 +920,16 @@ static void cmd_U(S3 *s) {
     int k = s3_byte(s);
     Arg a[2];
     switch (k) {
-    case 'S': args(s, "ee", a); if (a[0].isVar) for (int i = 0; i < (a[1].v ? a[1].v : 1); i++) s3_push_var(s, (u16)(a[0].lv.var + i)); return;
+    case 'S': args(s, "ee", a); if (a[0].isVar) for (int i = 0; i < (a[1].v ? a[1].v : 1); i++) s3_push_lv(s, &a[0].lv, i); return;
     case 'G': args(s, "ee", a); {
-        // Pops pushes in reverse; values return to the variables they came from.
-        for (int i = 0; i < (a[1].v ? a[1].v : 1) && s->sp > 0; i++) {
+        // Pops pushes in reverse into the variables it names, as System39.exe does after an LD that left them unbound.
+        int count = a[1].v ? a[1].v : 1;
+        for (int i = 0; i < count && s->sp > 0; i++) {
             S3Frame f = s->stack[s->sp - 1];
             if (f.kind != S3_FRAME_PUSH) break;
             s->sp--;
-            s3_var_set(s, f.var, f.value);
+            if (a[0].isVar) s3_lv_set(s, &a[0].lv, count - 1 - i, f.value);
+            else s3_pop_push(s, &f);
         }
     } return;
     case 'C': args(s, "be", a); {
@@ -933,7 +937,7 @@ static void cmd_U(S3 *s) {
         if (mode == 0 || mode == 3) s->sp = 0;
         else {
             int want = mode == 1 ? S3_FRAME_LABEL : S3_FRAME_PAGE, n = a[1].v;
-            while (n > 0 && s->sp > 0) { S3Frame f = s->stack[--s->sp]; if (f.kind == S3_FRAME_PUSH) s3_var_set(s, f.var, f.value); if (f.kind == want) n--; }
+            while (n > 0 && s->sp > 0) { S3Frame f = s->stack[--s->sp]; if (f.kind == S3_FRAME_PUSH) s3_pop_push(s, &f); if (f.kind == want) n--; }
         }
     } return;
     case 'D': args(s, "e", a); if (a[0].v == 0) { s->sp = 0; s3_goto_page(s, 0, 0); } else s3_return(s, true); return;
@@ -1090,7 +1094,7 @@ static void cmd_slash(S3 *s) {
     case 0x7f: args(s, "me", a); { const char *x = str_slot(s, a[1].v); if (x) s3_msg_text(s, x); } return;
     case 0x27: args(s, "es", a); str_set(s, a[0].v, a[1].s); return;
     case 0x28: args(s, "s", a); { char *u = s3_sjis_to_utf8(a[0].s); snprintf(s->title, sizeof s->title, "%s", u); free(u); } return;
-    case 0x29: args(s, "s", a); return;
+    case 0x29: args(s, "s", a); { char *u = s3_sjis_to_utf8(a[0].s); snprintf(s->numberTitle, sizeof s->numberTitle, "%s", u); free(u); } return; // NT: the title for NI
     case 0x2c: cmd_F(s, s3_byte(s)); return;
     case 0x23: args(s, "ees", a); { // LC x,y,file
         char *p = s3_find_file(s->gameDir, a[2].s);

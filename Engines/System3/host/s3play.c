@@ -58,6 +58,8 @@ int main(int argc, char **argv) {
             } else if (e.type == SDL_MOUSEWHEEL) vns3_wheel(game, e.wheel.y);
         }
         Uint32 now = SDL_GetTicks();
+        int boxValue, boxMin, boxMax;
+        if (vns3_number_request(game, &boxValue, &boxMin, &boxMax)) vns3_number_answer(game, boxValue, true); // the default
         if (!vns3_frame(game, now - last)) run = false;
         last = now;
         if (vns3_frame_serial(game) != shown) {

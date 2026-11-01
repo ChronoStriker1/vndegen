@@ -4,10 +4,6 @@
 
 #include "s3.h"
 
-// A variable argument. element marks an array element (var[offset]); otherwise offset steps to
-// following variables, as commands that fill var, var+1, ... do.
-typedef struct S3LV { u16 var; int offset; bool element; } S3LV;
-
 int s3_byte(S3 *s);
 u16 s3_u16(S3 *s);
 u32 s3_u32(S3 *s);
@@ -25,7 +21,8 @@ bool s3_goto_page(S3 *s, int page, u32 addr);
 void s3_label_call(S3 *s, u32 addr);
 void s3_page_call(S3 *s, int page, u32 addr);
 void s3_return(S3 *s, bool page);
-void s3_push_var(S3 *s, u16 var);
+void s3_push_lv(S3 *s, const S3LV *lv, int k);
+void s3_pop_push(S3 *s, const S3Frame *f);
 void s3_message(S3 *s, u32 index);
 
 // unitmap.c: the V commands, with their arguments' values and, for VR and VW, the variable argument

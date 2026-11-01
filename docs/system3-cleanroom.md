@@ -45,6 +45,21 @@ reading xsystem35, xsystem35-sdl2, system3-sdl2, alicetools or any fork of them,
   manual where it agrees, and the rest was settled with test pages assembled by hand into a copy of `ADISK.DAT` and run on
   `SYSTEM3.EXE` under 32-bit Wine in a local Docker image, which also wrote the reference saves: the runtime's
   `ASLEEP_<slot>.DAT` files match the original's on 9 test pages, including how it pops a pushed variable.
+- **CE and CD.** SDK test scenarios ran each effect on `System39.exe` under Wine with a slowed step time, recorded at 30
+  frames a second, over a source whose cells are all different colours. The step counts and patterns come from those
+  frames, and the default times from the SDK's table (`cetime.html`), which the same recordings confirmed. They differ
+  from that table in places: effect 4 has width / 2 steps, 7 and 8 move 16 pixels a step, and 17 has 16 steps. CD effect
+  1001 was read from a source of all 256 colours over two backgrounds.
+- **NI and the text skip.** The same way: what `NI` leaves in the variable and RND after OK and Escape, from saves; what
+  the 文字送り menu item passes (A and IK waits) and where it stops, from markers drawn between waits. Rance 4.2's Skip until
+  choice item stops at a choice the same way, and doesn't pass SYSTEM3.EXE's K.
+- **US and UG on DS-bound variables.** `US v,n` on a bound variable pushes the array's next n elements, and the save stores
+  each as array page << 16 | index with its value; `UG v,n` pops into v and the elements after it, at its pointer then.
+  Settled by an SDK test page and `System39.exe`'s saves, which VNDegen's now match byte for byte. Pushing them as
+  consecutive variables overwrote Mamatoto's commander records during its sort, which stopped its tutorial.
+- **`Y 13` and `Y 14`.** `Y 14`'s answers come from a hand-assembled page on SYSTEM3.EXE and the save it wrote. Wine's
+  `+relay` log shows `Y 13` changes nothing: a line's `TextOut` calls come in one millisecond, and `AMUS.DAT` is never
+  opened by a test page that plays music with no CD track.
 - **Everything else** (windows, menus, text, palettes and fades, sound commands) follows the SDK manual.
 
 ## Exposure note

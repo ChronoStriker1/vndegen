@@ -120,10 +120,10 @@ pushed the Mac mini's load average to about 80, with a median 1% low of 37.
   02's and Rance IX's menu bars hold only Screenshot, Restart, Exit and About.
 - Movies are MPEG-1 video with MP2 sound, which is what the test games ship. A damaged `.alm` could still crash
   pl_mpeg's decoder, whose upstream has open issues with corrupt input.
-- A controller button held while the app loses focus and then let go after a keyboard press of the same key can
-  release that keyboard press.
 - Input is paced for the games: a busy game can hold a key change back up to half a second, and a click after a new
   pointer move up to about a second, so a ten-letter name typed on the on-screen keyboard takes a second or two.
-- The openings can't be skipped the first time a game runs; they skip with a tap once they have played through.
+- Rance 02 and Sengoku Rance won't let the player skip their opening movie the first time, and neither does the PC game:
+  each game's own script passes skip only once the opening is marked as seen (`game_main` in Rance 02, the start of the
+  game in Sengoku Rance). This comes from reading the scripts, because Wine can't decode these movies.
 - Rance 02's copy names its movie `Rance02.alm` while the game asks for `ランス０２.alm`. When the named movie is
   missing and its folder holds exactly one movie, that one plays.

@@ -87,6 +87,13 @@ nonisolated struct System3InputRouter {
     }
 
     mutating func releaseAll() -> [System3Input] {
+        hostKeysDown = []
+        return releaseToNumberBox()
+    }
+
+    /// Lets go of everything the game sees held, as `releaseAll` does, but remembers which hardware keys are down, so a
+    /// key still held when the number box opens repeats as nothing rather than as a new press.
+    mutating func releaseToNumberBox() -> [System3Input] {
         let out = held.keys.map { hold -> System3Input in
             switch hold {
             case let .key(k): .key(k, down: false)
@@ -94,7 +101,6 @@ nonisolated struct System3InputRouter {
             }
         }
         held = [:]
-        hostKeysDown = []
         return out
     }
 
@@ -141,4 +147,4 @@ nonisolated struct System3InputRouter {
 
 /// vns3.h's mouse buttons.
 nonisolated private let mouseLeft: Int32 = 1
-nonisolated private let mouseRight: Int32 = 2
+nonisolated let mouseRight: Int32 = 2

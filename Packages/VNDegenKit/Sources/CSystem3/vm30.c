@@ -311,7 +311,7 @@ static void cmd_y30(S3 *s, int a, int b) {
     case 7: { S3Win w = s->msgWin[b > 0 && b < 128 ? b : 1]; s3_fill(s, w.x, w.y, w.w, w.h, s->msgBg); return; }
     case 8: t->textIndex = b; return;
     case 10: s->noPalCg = b; return;
-    case 14: s3_var_set(s, 0, 1); return;
+    case 14: s3_var_set(s, 0, b == 2); return; // only the CD drive: SYSTEM3.EXE says no to FM (0) and the others
     case 16: s3_music_stop(s); return;
     case 17: s3_var_set(s, 0, (u16)(b == 0 && s3_music_position(s) >= 0)); return;
     case 18: s3_var_set(s, 1, 0); s3_var_set(s, 2, 0); return;
@@ -356,7 +356,7 @@ static void cmd_y30(S3 *s, int a, int b) {
     case 252: s3_var_set(s, 0, 8); return;
     case 254: s3_var_set(s, 0, 1); return;   // Windows 3.1
     case 255: s->quit = true; return;
-    default: return; // 5, 6, 13 (text speed), 15, 21-24, 60 and the rest change nothing VNDegen shows
+    default: return; // 5, 6, 13 (text speed, which SYSTEM3.EXE ignores too), 15, 21-24, 60 and the rest change nothing VNDegen shows
     }
 }
 
