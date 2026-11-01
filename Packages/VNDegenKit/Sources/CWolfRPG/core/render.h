@@ -35,6 +35,7 @@ private:
     // Keyed by what the image shows rather than by the picture's generation: the standard systems show the same text
     // and windows again every frame.
     struct CachedImage {
+        uint64_t generation = 0;
         PictureKind kind = PictureKind::None;
         std::string source;
         int w = 0, h = 0;

@@ -125,6 +125,9 @@ void Game::returnToTitle() {
         log(std::string("cannot reread the databases: ") + e.what());
     }
     eventSelf_.clear();
+    xyNumbered_.clear();
+    xyNamed_.clear();
+    textEntry_ = {};
     threads_.clear();
     parallel_.clear();
     mapParallel_.clear();

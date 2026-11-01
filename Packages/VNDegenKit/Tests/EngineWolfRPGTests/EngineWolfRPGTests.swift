@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 import VNCore
@@ -62,5 +63,26 @@ import VNCore
         #expect(locations.count == 1)
         #expect(location.directory.resolvingSymlinksInPath().path
             == root.appending(path: "Game/Save").resolvingSymlinksInPath().path)
+    }
+}
+
+@Suite struct WolfRPGInputTests {
+    @Test func pointerDrivesTheMouse() {
+        var router = WolfRPGInputRouter()
+        let at = CGPoint(x: 0.5, y: 0.25)
+        #expect(router.pointer(PointerEvent(phase: .began, location: at), at: at) == [.mouseMove(at), .mouseButton(0, down: true)])
+        #expect(router.pointer(PointerEvent(phase: .moved, location: at), at: at) == [.mouseMove(at)])
+        #expect(router.pointer(PointerEvent(phase: .ended, location: at), at: at) == [.mouseMove(at), .mouseButton(0, down: false)])
+    }
+
+    @Test func aBoundRightClickHoldsUntilLetGo() {
+        var router = WolfRPGInputRouter()
+        #expect(router.translate(.click(.secondary, pressed: true)) { $0 } == [.mouseButton(1, down: true)])
+        #expect(router.releaseAll() == [.mouseButton(1, down: false)])
+    }
+
+    @Test func scrollingUpTurnsTheWheelAwayFromThePlayer() {
+        var router = WolfRPGInputRouter()
+        #expect(router.translate(.scroll(dy: -WolfRPGInputRouter.pointsPerNotch)) { $0 } == [.wheel(1)])
     }
 }

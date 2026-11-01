@@ -132,13 +132,33 @@ void Renderer::drawWindow(Canvas &canvas, const Bitmap &skin, RectF d, float opa
 const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offsetX, float &offsetY) {
     CachedImage &cached = pictureImages_[number];
     int w = p.kind == PictureKind::Window ? p.windowW : 0, h = p.kind == PictureKind::Window ? p.windowH : 0;
-    if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h) {
+    bool fromArrays = p.kind == PictureKind::File;
+    // An image made from arrays is made when shown, so it follows the generation rather than the name.
+    if (cached.kind != p.kind || cached.source != p.source || cached.w != w || cached.h != h ||
+        (fromArrays && cached.generation != p.generation)) {
         cached.kind = p.kind;
         cached.source = p.source;
         cached.w = w;
         cached.h = h;
+        cached.generation = p.generation;
         cached.offsetX = cached.offsetY = 0;
-        if (p.kind == PictureKind::Text) {
+        if (fromArrays) {
+            XYImage xy = resolveXYImage(p.source, game_);
+            cached.bitmap = xy.w > 0 && xy.h > 0 ? Bitmap(xy.w, xy.h) : Bitmap();
+            auto at = [](const XYArray *a, int x, int y, int fallback) {
+                if (!a) return fallback;
+                return x < int(a->size()) && y < int((*a)[x].size()) ? (*a)[x][y] : 0;
+            };
+            for (int y = 0; y < xy.h; y++) {
+                uint8_t *row = cached.bitmap.row(y);
+                for (int x = 0; x < xy.w; x++) {
+                    row[x * 4 + 0] = uint8_t(std::clamp(at(xy.channels[1], x, y, 0), 0, 255));
+                    row[x * 4 + 1] = uint8_t(std::clamp(at(xy.channels[2], x, y, 0), 0, 255));
+                    row[x * 4 + 2] = uint8_t(std::clamp(at(xy.channels[3], x, y, 0), 0, 255));
+                    row[x * 4 + 3] = uint8_t(std::clamp(at(xy.channels[0], x, y, 255), 0, 255));
+                }
+            }
+        } else if (p.kind == PictureKind::Text) {
             TextBlock block = text_.render(p.source, baseTextStyle(game_));
             cached.bitmap = std::move(block.bitmap);
             cached.offsetX = cached.offsetY = -float(block.origin);
@@ -160,10 +180,10 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     const Bitmap *img = nullptr;
     BitmapPtr file;
     float offsetX = 0, offsetY = 0;
-    if (p.kind == PictureKind::File) {
+    if (p.kind == PictureKind::File && !p.source.starts_with("<XY")) {
         file = images_.get(p.source);
         img = file.get();
-    } else if (p.kind == PictureKind::Text || p.kind == PictureKind::Window) {
+    } else {
         img = pictureImage(number, p, offsetX, offsetY);
     }
     if (!img || img->empty()) return;
@@ -174,6 +194,13 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
     int cellW = img->w / divX, cellH = img->h / divY;
     int cell = std::clamp(p.pattern - 1, 0, divX * divY - 1);
     RectI from{cell % divX * cellW, cell / divX * cellH, cellW, cellH};
+    // A cut shows part of each pattern.
+    if (p.cutW > 0 && p.cutH > 0) {
+        from.x += p.cutX;
+        from.y += p.cutY;
+        cellW = from.w = p.cutW;
+        cellH = from.h = p.cutH;
+    }
     float zoomX = float(p.zoomX.value() / 100), zoomY = float(p.zoomY.value() / 100);
     // The anchor places the picture by its laid-out size; a text bitmap's margin and a line's offset come on top.
     float sizeW = cellW, sizeH = cellH;

@@ -224,6 +224,174 @@ std::vector<std::vector<std::string>> parseCsv(std::string_view text) {
 
 }  // namespace
 
+// Command 252. The flags' second byte's high nibble is 0x20 to copy the row in field 4 onto the row in field 1, or 0x30
+// to sort the rows from field 1 on, as many as field 4, by the field in field 2. Byte three has 0x10 for descending.
+void Game::dbRowCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    Database &db = *databaseKind((flags >> 8) & 0x0F);
+    int type = value(c.arg(0), t);
+    if (flags & 0x10000) {
+        type = -1;
+        for (size_t i = 0; i < db.types.size(); i++)
+            if (db.types[i].name == c.str(1)) type = int(i);
+    }
+    if (type < 0 || type >= int(db.types.size())) return;
+    DatabaseType &dt = db.types[type];
+    int row = value(c.arg(1), t), field = value(c.arg(2), t), other = value(c.arg(4), t);
+    int rows = int(dt.rows.size());
+    switch ((flags >> 8) & 0xF0) {
+        case 0x20:
+            if (row >= 0 && row < rows && other >= 0 && other < rows && row != other) dt.rows[row] = dt.rows[other];
+            break;
+        case 0x30: {
+            if (row < 0 || row >= rows || field < 0 || field >= int(dt.fieldKinds.size())) break;
+            bool descending = flags & 0x100000;
+            size_t slot = dt.slot(field);
+            bool isString = dt.isString(field);
+            auto less = [&](const DatabaseType::Row &a, const DatabaseType::Row &b) {
+                if (isString) return slot < a.strings.size() && slot < b.strings.size() && a.strings[slot] < b.strings[slot];
+                return slot < a.numbers.size() && slot < b.numbers.size() && a.numbers[slot] < b.numbers[slot];
+            };
+            auto first = dt.rows.begin() + row, last = first + std::min(std::max(other, 0), rows - row);
+            if (descending) std::stable_sort(first, last, [&](auto &a, auto &b) { return less(b, a); });
+            else std::stable_sort(first, last, less);
+            break;
+        }
+        default:
+            unsupported(c);
+            break;
+    }
+}
+
+const XYArray *Game::xyArray(int number) const {
+    auto it = xyNumbered_.find(number);
+    return it == xyNumbered_.end() ? nullptr : &it->second;
+}
+
+const XYArray *Game::xyArray(const std::string &name) const {
+    auto it = xyNamed_.find(name);
+    return it == xyNamed_.end() ? nullptr : &it->second;
+}
+
+// The array a command names: by the string after the file name when the flags' 0x10000 is set, by number otherwise.
+XYArray *Game::xyTarget(Thread &t, const Command &c, bool create) {
+    if (uint32_t(c.arg(3)) & 0x10000) {
+        auto it = xyNamed_.find(c.str(1));
+        if (it != xyNamed_.end()) return &it->second;
+        return create ? &xyNamed_[c.str(1)] : nullptr;
+    }
+    int number = value(c.arg(0), t);
+    auto it = xyNumbered_.find(number);
+    if (it != xyNumbered_.end()) return &it->second;
+    return create ? &xyNumbered_[number] : nullptr;
+}
+
+// Command 255, the XY arrays of the manual's database command page. The fields are the array, X, Y, the flags and a
+// value. The flags work as the database command's do: 0x1000 reads into the variable named by the value, otherwise the
+// value goes in with the operator in the low byte. X of -1 reads the number of columns, and Y of -1 the number of values
+// in column X. X of -2 deletes the array, and Y of -2 zeroes column X.
+void Game::xyCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    bool read = ((flags >> 8) & 0xF0) == 0x10;
+    int op = flags & 0xF0, leftCode = flags & 0x0F;
+    int32_t target = c.arg(4);
+    int rawX = c.arg(1), rawY = c.arg(2);
+    int x = value(rawX, t), y = value(rawY, t);
+    // A Y of 10000 or more moves on to the next column, as the manual says.
+    if (y >= 10000) {
+        x += y / 10000;
+        y %= 10000;
+    }
+    if (read) {
+        const XYArray *a = xyTarget(t, c, false);
+        int32_t v = 0;
+        if (rawX == -1) v = a ? int32_t(a->size()) : 0;
+        else if (rawY == -1) v = a && x >= 0 && x < int(a->size()) ? int32_t((*a)[x].size()) : 0;
+        else if (a && x >= 0 && x < int(a->size()) && y >= 0 && y < int((*a)[x].size())) v = (*a)[x][y];
+        int32_t cur = op ? readVar(target, t) : 0;
+        switch (op) {
+            case 0x00: cur = v; break;
+            case 0x10: cur += v; break;
+            case 0x20: cur -= v; break;
+            case 0x30: cur *= v; break;
+            case 0x40: cur = v ? cur / v : cur; break;
+            case 0x50: cur = v ? cur % v : cur; break;
+            case 0x60: cur = std::max(cur, v); break;
+            case 0x70: cur = std::min(cur, v); break;
+        }
+        writeVar(target, cur, t);
+        return;
+    }
+    if (rawX == -2) {
+        if (flags & 0x10000) xyNamed_.erase(c.str(1));
+        else xyNumbered_.erase(value(c.arg(0), t));
+        return;
+    }
+    if (rawY == -2) {
+        if (XYArray *a = xyTarget(t, c, false); a && x >= 0 && x < int(a->size())) std::fill((*a)[x].begin(), (*a)[x].end(), 0);
+        return;
+    }
+    if (x < 0 || y < 0 || x >= 10000) return;
+    XYArray &a = *xyTarget(t, c, true);
+    if (x >= int(a.size())) a.resize(x + 1);
+    if (y >= int(a[x].size())) a[x].resize(y + 1);
+    int32_t v = leftCode == 1 ? target : value(target, t);
+    int32_t &cell = a[x][y];
+    switch (op) {
+        case 0x00: cell = v; break;
+        case 0x10: cell += v; break;
+        case 0x20: cell -= v; break;
+        case 0x30: cell *= v; break;
+        case 0x40: cell = v ? cell / v : cell; break;
+        case 0x50: cell = v ? cell % v : cell; break;
+        case 0x60: cell = std::max(cell, v); break;
+        case 0x70: cell = std::min(cell, v); break;
+    }
+}
+
+// Command 257 sorts columns of an XY array: from column field 1, as many as the value, by the number at Y field 2. The
+// flags' 0x100000 is descending, as for command 252.
+void Game::xySortCommand(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(3));
+    XYArray *a = xyTarget(t, c, false);
+    if (!a || ((flags >> 8) & 0xF0) != 0x30) return;
+    int first = value(c.arg(1), t), y = value(c.arg(2), t), count = value(c.arg(4), t);
+    if (first < 0 || first >= int(a->size())) return;
+    auto key = [y](const std::vector<int32_t> &col) { return y >= 0 && y < int(col.size()) ? col[y] : 0; };
+    auto begin = a->begin() + first, end = begin + std::min(std::max(count, 0), int(a->size()) - first);
+    bool descending = flags & 0x100000;
+    std::stable_sort(begin, end, [&](const auto &l, const auto &r) { return descending ? key(l) > key(r) : key(l) < key(r); });
+}
+
+XYImage resolveXYImage(const std::string &source, const Game &game) {
+    XYImage out;
+    bool named = source.starts_with("<XYN_IMAGE");
+    size_t end = source.find('>');
+    std::string body = source.substr(0, end);
+    int xsize = 0, ysize = 0;
+    for (size_t at = body.find('/'); at != std::string::npos;) {
+        size_t next = body.find('/', at + 1);
+        std::string part = body.substr(at + 1, next == std::string::npos ? next : next - at - 1);
+        size_t eq = part.find('=');
+        if (eq != std::string::npos) {
+            std::string key = part.substr(0, eq), val = part.substr(eq + 1);
+            int channel = key == "A" ? 0 : key == "R" ? 1 : key == "G" ? 2 : key == "B" ? 3 : -1;
+            if (channel >= 0 && !val.empty()) out.channels[channel] = named ? game.xyArray(val) : game.xyArray(std::atoi(val.c_str()));
+            if (key == "XSIZE") xsize = std::atoi(val.c_str());
+            if (key == "YSIZE") ysize = std::atoi(val.c_str());
+        }
+        at = next;
+    }
+    for (const XYArray *a : out.channels) {
+        if (!a) continue;
+        out.w = std::max(out.w, int(a->size()));
+        for (auto &col : *a) out.h = std::max(out.h, int(col.size()));
+    }
+    if (xsize > 0) out.w = xsize;
+    if (ysize > 0) out.h = ysize;
+    return out;
+}
+
 // Command 251: reads rows of a database from a CSV file, or writes them to one. The fields are the type, first row and
 // first field, the flags, and the number of rows; the strings are the file, relative to the game folder, and the type's
 // name when the flags say it goes by name. As the PC engine writes them, files start with a byte order mark and a row

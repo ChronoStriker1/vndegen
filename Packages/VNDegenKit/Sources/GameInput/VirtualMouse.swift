@@ -49,6 +49,10 @@ public final class VirtualMouse {
         showsKeyboard = false
     }
 
+    public func showKeyboard() {
+        showsKeyboard = true
+    }
+
     /// A press of `source` doing `action`. Returns false for actions this does not do, which the hub delivers itself.
     func press(_ source: InputSource, _ action: ControlAction, hasConsumer: Bool) -> Bool {
         guard action.isVirtualMouse else { return false }

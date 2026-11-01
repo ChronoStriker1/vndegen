@@ -470,6 +470,15 @@ bool Game::step(Thread &t) {
         case 251:
             csvCommand(t, cmd);
             return true;
+        case 252:
+            dbRowCommand(t, cmd);
+            return true;
+        case 255:
+            xyCommand(t, cmd);
+            return true;
+        case 257:
+            xySortCommand(t, cmd);
+            return true;
         case 260:  // download a file
             unsupported(cmd);
             return true;
@@ -805,7 +814,7 @@ void Game::typeText(const std::string &utf8) {
     if (!textEntry_.active) return;
     for (size_t i = 0; i < utf8.size();) {
         size_t n = utf8Length(utf8.substr(i, 4));
-        if (static_cast<unsigned char>(utf8[i]) >= 0x20) {
+        if (auto c = static_cast<unsigned char>(utf8[i]); c >= 0x20 && c != 0x7F) {
             size_t count = 0;
             for (size_t j = 0; j < textEntry_.text.size(); j += utf8Length(textEntry_.text.substr(j, 4))) count++;
             if (textEntry_.maxLength > 0 && count >= size_t(textEntry_.maxLength)) return;
@@ -888,7 +897,7 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     if (show) {
         Picture fresh;
         switch (display) {
-            case 0x00: fresh.kind = PictureKind::File; fresh.source = c.str(0); break;
+            case 0x00: fresh.kind = PictureKind::File; fresh.source = expandText(c.str(0), &t); break;
             case 0x10: fresh.kind = PictureKind::File; fresh.source = readStr(c.arg(11), t); break;
             case 0x20: fresh.kind = PictureKind::Text; fresh.source = expandText(c.str(0), &t); break;
             case 0x30: fresh.kind = PictureKind::Window; fresh.source = c.str(0); break;
@@ -896,9 +905,31 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         }
         fresh.generation = ++generation_;
         if (fresh.kind == PictureKind::File) {
-            if (auto bytes = files_.read(fresh.source)) imageSize(*bytes, fresh.imageW, fresh.imageH);
             fresh.divX = std::max(1, field(3, 1));
             fresh.divY = std::max(1, field(4, 1));
+            // <CUT/Xa-b/Yc-d>, from the manual's picture page, applies to each pattern of a divided image.
+            if (fresh.source.starts_with("<CUT/")) {
+                int x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+                size_t end = fresh.source.find('>');
+                if (end != std::string::npos && std::sscanf(fresh.source.c_str(), "<CUT/X%d-%d/Y%d-%d>", &x1, &x2, &y1, &y2) == 4) {
+                    fresh.cutX = x1;
+                    fresh.cutY = y1;
+                    fresh.cutW = std::max(0, x2 - x1 + 1);
+                    fresh.cutH = std::max(0, y2 - y1 + 1);
+                    fresh.source.erase(0, end + 1);
+                }
+            }
+            if (fresh.source.starts_with("<XY")) {
+                XYImage xy = resolveXYImage(fresh.source, *this);
+                fresh.imageW = xy.w;
+                fresh.imageH = xy.h;
+            } else if (auto bytes = files_.read(fresh.source)) {
+                imageSize(*bytes, fresh.imageW, fresh.imageH);
+            }
+            if (fresh.cutW > 0) {
+                fresh.imageW = fresh.cutW * fresh.divX;
+                fresh.imageH = fresh.cutH * fresh.divY;
+            }
         } else if (fresh.kind == PictureKind::Window) {
             // A window picture's two division fields are its size, which is also the size it reports.
             fresh.windowW = fresh.imageW = field(3, 0);

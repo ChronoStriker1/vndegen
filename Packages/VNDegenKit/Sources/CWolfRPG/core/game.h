@@ -53,6 +53,9 @@ struct Input {
     int wheel = 0;  // notches this frame, positive away from the player
 };
 
+// An XY array (Wolf RPG Editor 3's command 255): numbers by X, then by Y.
+using XYArray = std::vector<std::vector<int32_t>>;
+
 // What a picture shows: an image file, text, or a window skin stretched to a size.
 enum class PictureKind { None, File, Text, Window };
 
@@ -77,6 +80,8 @@ struct Picture {
     int blend = 0;       // 0 normal, 1 add, 2 subtract, 3 multiply
     int divX = 1, divY = 1, pattern = 1;
     int imageW = 0, imageH = 0;  // size of the image file, the text or the window, for the variable command
+    // <CUT/Xa-b/Yc-d> before a file name shows that part of each pattern, in pixels, inclusive. cutW is 0 without one.
+    int cutX = 0, cutY = 0, cutW = 0, cutH = 0;
     int windowW = 0, windowH = 0;  // size of a window picture: a window skin stretched, or a shape
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
@@ -230,6 +235,8 @@ public:
     void setChoiceBox(float x, float y, float w, float lineH) const { choiceBox_ = {x, y, w, lineH}; }
     const MessageState &message() const { return message_; }
     const TextEntry &textEntry() const { return textEntry_; }
+    const XYArray *xyArray(int number) const;
+    const XYArray *xyArray(const std::string &name) const;
     // Text the player typed, for the string command's keyboard mode. Does nothing when it isn't waiting.
     void typeText(const std::string &utf8);
     const Map *map() const { return map_.get(); }
@@ -334,6 +341,10 @@ private:
     void databaseCommand(Thread &t, const Command &c);
     void setVariablePlus(Thread &t, const Command &c);
     void csvCommand(Thread &t, const Command &c);
+    void dbRowCommand(Thread &t, const Command &c);  // 252: copying and sorting rows
+    void xyCommand(Thread &t, const Command &c);     // 255
+    void xySortCommand(Thread &t, const Command &c);  // 257
+    XYArray *xyTarget(Thread &t, const Command &c, bool create);
     bool keyInput(Thread &t, const Command &c);
     void partyCommand(Thread &t, const Command &c);
     void effectCommand(Thread &t, const Command &c);
@@ -443,6 +454,8 @@ private:
     std::vector<Thread> parallel_;     // parallel common events, one per event
     std::vector<Thread> mapParallel_;  // parallel map event pages
     std::map<int, Picture> pictures_;
+    std::map<int32_t, XYArray> xyNumbered_;
+    std::map<std::string, XYArray> xyNamed_;
     ChoiceState choice_;
     MessageState message_;
     TextEntry textEntry_;
@@ -485,5 +498,14 @@ private:
     int transitionFrames_ = 0;
     double scrollX_ = 0, scrollY_ = 0;
 };
+
+// A picture named <XY_IMAGE/A=../R=../G=../B=../XSIZE=../YSIZE=..> or <XYN_IMAGE/...>, the second going by array names:
+// the four arrays, null where one is missing or left empty, and the image's size. The manual's picture page: an empty
+// alpha means 255 and an empty colour 0, and without XSIZE or YSIZE the largest array gives the size.
+struct XYImage {
+    std::array<const XYArray *, 4> channels{};  // A, R, G, B
+    int w = 0, h = 0;
+};
+XYImage resolveXYImage(const std::string &source, const Game &game);
 
 }  // namespace wolf

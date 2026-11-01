@@ -285,6 +285,11 @@ SaveFile Game::snapshot() {
     SaveFile f = saveBase_ ? *saveBase_ : blankSave();
     f.title = saveString(gameDat_.title, enc);
     f.header[6] = enc == Encoding::UTF8 ? 'U' : 0;
+    // The XY arrays, which saves hold from version 0x9F.
+    f.numberedArrays.clear();
+    f.namedArrays.clear();
+    for (auto &[number, rows] : xyNumbered_) f.numberedArrays.push_back({number, {}, rows});
+    for (auto &[name, rows] : xyNamed_) f.namedArrays.push_back({0, saveString(name, enc), rows});
     std::random_device rd;
     // Fresh seeds, as each PC save has: at 0, 3 and 9 for the XOR, and in the 3.5 container the whole header but the
     // encoding mark and the container byte.
@@ -458,6 +463,11 @@ void Game::applySave(const SaveFile &s) {
     threads_.clear();
     parallel_.clear();
     mapParallel_.clear();
+    xyNumbered_.clear();
+    xyNamed_.clear();
+    for (auto &a : s.numberedArrays) xyNumbered_[a.key] = a.rows;
+    for (auto &a : s.namedArrays) xyNamed_[toUtf8(a.name.bytes, enc)] = a.rows;
+    textEntry_ = {};
     message_ = {};
     choice_ = {};
     shake_ = {};

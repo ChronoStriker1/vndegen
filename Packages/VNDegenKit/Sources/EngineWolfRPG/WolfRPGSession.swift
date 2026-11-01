@@ -29,6 +29,7 @@ final class WolfRPGSession: EngineSession {
     private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
     #endif
     private var router = WolfRPGInputRouter()
+    private var wantedText = false
     private var paused = false
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
@@ -40,9 +41,21 @@ final class WolfRPGSession: EngineSession {
         self.root = root
         view = frameView
         frameView.onReady = { [weak self] in self?.start() }
-        frameView.onKey = { [weak self] usage, pressed, _ in
+        frameView.onPointer = { [weak self] event in
+            guard let self else { return }
+            deliver(router.pointer(event, at: event.location))
+        }
+        frameView.onScroll = { [weak self] notches in
+            guard let self else { return }
+            let whole = Int(notches.rounded())
+            if whole != 0 { deliver([.wheel(whole)]) }
+        }
+        frameView.onKey = { [weak self] usage, pressed, characters in
             guard let self else { return }
             deliver(router.hostKey(hidUsage: usage, pressed: pressed))
+            if pressed, let characters, !characters.isEmpty, characters.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value < 0xF700 }), let engine {
+                vnwolf_text(engine, characters)
+            }
         }
     }
 
@@ -99,6 +112,12 @@ final class WolfRPGSession: EngineSession {
             finish(byGame: true)
             return
         }
+        // The game asks for typed text: the hub opens its keyboard for as long as the game waits.
+        let wantsText = vnwolf_wants_text(engine)
+        if wantsText != wantedText {
+            wantedText = wantsText
+            NotificationCenter.default.post(name: .gameWantsKeyboard, object: self, userInfo: ["wants": wantsText])
+        }
         var w: Int32 = 0, h: Int32 = 0
         var changed = false
         if let pixels = vnwolf_frame(engine, &w, &h, &changed), changed {
@@ -109,9 +128,16 @@ final class WolfRPGSession: EngineSession {
         #endif
     }
 
-    private func deliver(_ keys: [WolfRPGKey]) {
+    private func deliver(_ inputs: [WolfRPGInput]) {
         guard let engine else { return }
-        for key in keys { vnwolf_key(engine, key.code, key.down) }
+        for input in inputs {
+            switch input {
+            case let .key(code, down): vnwolf_key(engine, code, down)
+            case let .mouseButton(button, down): vnwolf_mouse_button(engine, button, down)
+            case let .mouseMove(point): vnwolf_mouse_move(engine, Float(point.x), Float(point.y))
+            case let .wheel(notches): vnwolf_mouse_wheel(engine, Int32(notches))
+            }
+        }
     }
 
     private func finish(byGame: Bool) {
@@ -136,7 +162,24 @@ final class WolfRPGSession: EngineSession {
     // MARK: EngineSession
 
     func send(_ event: ControllerEvent) {
-        deliver(router.translate(event))
+        // A controller's Confirm and Cancel finish the game's text entry, since neither types anything.
+        if let engine, vnwolf_wants_text(engine) {
+            if case let .button(button, true) = event {
+                if button == .confirm { deliver(router.tap(Int32(VNWOLF_KEY_RETURN))) }
+                if button == .cancel { deliver(router.tap(Int32(VNWOLF_KEY_ESCAPE))) }
+            }
+        }
+        let frame = frameView
+        deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
+    }
+
+    func type(_ typed: TypedText) {
+        guard let engine else { return }
+        switch typed {
+        case let .text(text): vnwolf_text(engine, text)
+        case .newline: deliver(router.tap(Int32(VNWOLF_KEY_RETURN)))
+        case .deleteBackward: deliver(router.tap(Int32(VNWOLF_KEY_BACKSPACE)))
+        }
     }
 
     func setPaused(_ paused: Bool) {
