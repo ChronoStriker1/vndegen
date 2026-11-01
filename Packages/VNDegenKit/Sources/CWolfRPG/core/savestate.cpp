@@ -28,9 +28,10 @@ namespace wolf {
 
 namespace {
 
-// Save versions the PC engine writes: Wolf RPG Editor 2.2x writes 125, 3.x writes 142. Newer engines read older
-// versions, so a game whose own saves are unknown gets the older one unless its data is in the 3.x format.
-constexpr uint16_t kVersion2 = 125, kVersion3 = 142;
+// Save versions the PC engine writes: Wolf RPG Editor 2.2x writes 125, 3.x writes 142, and 3.71 writes 159 (0x9F)
+// in the 3.5 container. Newer engines read older versions, so a game whose own saves are unknown gets the older one
+// unless its data is in the 3.x or 3.5 format.
+constexpr uint16_t kVersion2 = 125, kVersion3 = 142, kVersion35 = 0x9F;
 
 // UTF-8 to the game's encoding. Characters Shift-JIS lacks become '?'.
 std::string encode(const std::string &utf8, Encoding enc) {
@@ -77,9 +78,14 @@ SaveString saveString(const std::string &utf8, Encoding enc) { return {encode(ut
 
 std::string text(const SaveString &s, Encoding enc) { return toUtf8(s.bytes, enc); }
 
-// A character as the PC engine writes one with nothing special about it.
+// A character as the PC engine writes one with nothing special about it. The fields from version 0x9F hold what
+// Wolf RPG Editor 3.71 writes for the hero and party; map events differ in v9fA and v9fD (snapshot sets those).
 SaveCharacter defaultCharacter(int32_t id) {
     SaveCharacter c;
+    c.v9fPairLists.resize(4);
+    c.v9fD = 1;
+    c.v9fFlag2 = 1;
+    c.v9fE = {0, 1, 0, 0, 0, 0, 1, 0};
     c.id = id;
     c.unknown5 = -1;
     c.appearance = {255, 0, 2, 1};
@@ -129,6 +135,8 @@ SaveFile defaultSave(uint16_t version, bool utf8) {
     s.v8dBytes.fill(1);
     s.v8d2 = {1, 1};
     s.v8e = 1;
+    s.v9fValues = {0, 1, 0, 1};
+    s.v9fCount = 1;
     f.party.hero = defaultCharacter(-2);
     for (int i = 0; i < 5; i++) f.party.members.push_back(defaultCharacter(-3 - i));
     f.variableDb.unknown = 111;
@@ -136,7 +144,7 @@ SaveFile defaultSave(uint16_t version, bool utf8) {
     std::random_device rd;
     for (auto &b : f.header) b = uint8_t(rd());
     f.header[6] = utf8 ? 'U' : 0;
-    f.header[8] = 0;
+    f.header[8] = version >= kVersion35 ? 3 : 0;  // the 3.5 container (savefile.cpp)
     return f;
 }
 
@@ -235,6 +243,7 @@ int Game::playSeconds() const { return loadedPlaySeconds_ + int((frame_ - frameA
 SaveFile Game::blankSave() {
     Encoding enc = gameDat_.encoding;
     uint16_t version = saveBase_ ? saveBase_->version
+                       : wolf35_                                                    ? kVersion35
                        : (enc == Encoding::UTF8 || gameDat_.settings.size() > 21) ? kVersion3
                                                                                    : kVersion2;
     SaveFile f = defaultSave(version, enc == Encoding::UTF8);
@@ -243,6 +252,7 @@ SaveFile Game::blankSave() {
     f.map.width = 20;
     f.map.height = 15;
     f.map.hasTiles = true;
+    f.map.layers = 3;
     f.map.tiles.assign(3 * 20 * 15, 100000);
     f.variables.numbers.push_back(savedList({}, sdb_, SysNormalVarNames));
     for (int i = 0; i < 9; i++) f.variables.numbers.push_back(savedList({}, sdb_, SysSpare1 + i));
@@ -276,7 +286,14 @@ SaveFile Game::snapshot() {
     f.title = saveString(gameDat_.title, enc);
     f.header[6] = enc == Encoding::UTF8 ? 'U' : 0;
     std::random_device rd;
-    for (int i : {0, 3, 9}) f.header[i] = uint8_t(rd());  // fresh XOR seeds, as each PC save has
+    // Fresh seeds, as each PC save has: at 0, 3 and 9 for the XOR, and in the 3.5 container the whole header but the
+    // encoding mark and the container byte.
+    if (f.header[8] == 3) {
+        for (int i = 0; i < 20; i++)
+            if (i != 6 && i != 8) f.header[i] = uint8_t(rd());
+    } else {
+        for (int i : {0, 3, 9}) f.header[i] = uint8_t(rd());
+    }
 
     // Section 1: the map, its tiles and tileset, and its events.
     SaveMap &m = f.map;
@@ -291,7 +308,11 @@ SaveFile Game::snapshot() {
         m.width = map_->width;
         m.height = map_->height;
         // System variable 127 asks the engine not to save the map's tiles.
-        m.hasTiles = !(system_.size() > 127 && system_[127] == 1) && map_->tiles.size() == 3 * size_t(m.width) * m.height;
+        // Saves before version 0x9F hold three layers.
+        m.layers = map_->layers;
+        m.hasTiles = !(system_.size() > 127 && system_[127] == 1) && (f.version >= kVersion35 || m.layers == 3) &&
+                     map_->tiles.size() == size_t(m.layers) * size_t(m.width) * size_t(m.height);
+        if (!m.hasTiles && f.version < kVersion35) m.layers = 3;
         if (m.hasTiles) m.tiles = map_->tiles;
         if (map_->tileset >= 0 && map_->tileset < int(tilesets_.size())) {
             const Tileset &ts = tilesets_[map_->tileset];
@@ -310,6 +331,11 @@ SaveFile Game::snapshot() {
     };
     for (auto &e : events_) {
         SaveCharacter c = defaultCharacter(e.data->id);
+        c.v9fA = {-1, -1};
+        c.v9fD = 0;
+        // Wolf RPG Editor 3.71 follows each map event with its name.
+        c.v9fNoteFlag = 1;
+        c.v9fNote = saveString(e.data->name, enc);
         for (auto &o : old.events)
             if (old.mapId == mapId_ && o.id == e.data->id) c = o;
         fill(c, e.actor);

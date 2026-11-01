@@ -52,7 +52,7 @@ bool Game::load(std::string *error) {
             return d;
         };
         gameDat_ = parseGameDat(basic("BasicData/Game.dat", BasicFile::GameDat));
-        commons_ = parseCommonEvents(basic("BasicData/CommonEvent.dat", BasicFile::CommonEvent));
+        commons_ = parseCommonEvents(basic("BasicData/CommonEvent.dat", BasicFile::CommonEvent), &wolf35_);
         readDatabases();
         tilesets_ = parseTilesets(basic("BasicData/TileSetData.dat", BasicFile::Other));
     } catch (const std::exception &e) {

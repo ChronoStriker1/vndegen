@@ -500,9 +500,14 @@ void Game::callCommon(Thread &t, int id, const Command &cmd, int argBase) {
     std::array<int32_t, 5> nums{};
     std::array<std::string, 5> strs;
     for (int i = 0; i < numbers; i++) nums[i] = value(cmd.arg(argBase + 1 + i), t);
+    // Each string argument has a number slot after the number arguments (WodiLib's CallCommonEventBase). Bit 0x10 << i
+    // of the second flag byte marks string i as text written in the command; otherwise its slot names a string
+    // variable. The return address follows all the slots.
     int next = argBase + 1 + numbers;
-    for (int i = 0; i < strings; i++)
-        strs[i] = (refFlags & (1 << i)) ? readStr(cmd.arg(next++), t) : expandText(cmd.str(1 + i), &t);
+    for (int i = 0; i < strings; i++) {
+        int32_t slot = cmd.arg(next++);
+        strs[i] = (refFlags & (0x10 << i)) ? expandText(cmd.str(1 + i), &t) : readStr(slot, t);
+    }
     for (int i = 0; i < numbers; i++) cself_[id][i] = nums[i];
     for (int i = 0; i < strings; i++) cselfStr_[id][5 + i] = std::move(strs[i]);
     int32_t returnTo = wantsReturn ? cmd.arg(next) : 0;

@@ -1,6 +1,7 @@
 // Reads Wolf RPG Editor save files.
 //   wolfsave dump <SaveDataNN.sav>        prints every field, one per line, so two dumps diff cleanly
-//   wolfsave check <file.sav>...          parses and re-serializes each file and compares the bytes
+//   wolfsave check <file.sav>...          parses and re-serializes each file and compares the bytes (the content, for a
+//                                          Wolf RPG Editor 3.5 save)
 //   wolfsave decrypt <in.sav> <out.bin>   writes the file with the XOR layer removed
 #include "data.h"
 #include "reader.h"
@@ -256,8 +257,18 @@ int main(int argc, char **argv) {
             for (int i = 2; i < argc; i++) {
                 try {
                     auto bytes = readFile(argv[i]);
-                    auto again = serializeSave(parseSave(bytes));
+                    SaveFile parsed = parseSave(bytes);
+                    auto again = serializeSave(parsed);
                     bool same = again == bytes;
+                    // A Wolf RPG Editor 3.5 save is LZ4-compressed, and VNDegen's encoder picks other matches than the
+                    // engine's, so its content is compared instead: both written in the older container must agree.
+                    if (!same && bytes.size() > 8 && bytes[8] == 3) {
+                        SaveFile reparsed = parseSave(again);
+                        // The packed bytes' sum lives in header byte 3, so the headers are taken as equal.
+                        reparsed.header = parsed.header;
+                        parsed.header[8] = reparsed.header[8] = 0;
+                        same = serializeSave(parsed) == serializeSave(reparsed);
+                    }
                     std::printf("%s %s (%zu bytes)\n", same ? "OK  " : "DIFF", argv[i], bytes.size());
                     failed += !same;
                 } catch (const std::exception &e) {

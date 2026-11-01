@@ -66,24 +66,6 @@ std::string toUtf8(const std::string &raw, Encoding enc) {
     return out;
 }
 
-namespace {
-
-// Data files start with a zero byte and a magic number in which one byte is 'U' for UTF-8 files.
-Encoding readMagic(Reader &r, std::initializer_list<uint8_t> magic, size_t encodingIndex, const char *what) {
-    Encoding enc = Encoding::ShiftJIS;
-    size_t i = 0;
-    for (uint8_t m : magic) {
-        uint8_t b = r.u8();
-        if (i == encodingIndex && b == 'U') enc = Encoding::UTF8;
-        else if (b != m) throw FormatError(std::string("bad magic in ") + what);
-        i++;
-    }
-    return enc;
-}
-
-// Wolf RPG Editor 3.5 compresses the body of its common event, database and map files with LZ4. From `at` on, such a
-// file holds the unpacked size, the packed size, and one LZ4 block (the block format of the LZ4 project's
-// lz4_Block_format.md). This returns the file with that part unpacked, the bytes before `at` kept as they are.
 std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at) {
     Reader r(data);
     r.seek(at);
@@ -123,6 +105,21 @@ std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at) {
     }
     if (out.size() - at != unpacked) throw FormatError("LZ4 output size differs from its header");
     return out;
+}
+
+namespace {
+
+// Data files start with a zero byte and a magic number in which one byte is 'U' for UTF-8 files.
+Encoding readMagic(Reader &r, std::initializer_list<uint8_t> magic, size_t encodingIndex, const char *what) {
+    Encoding enc = Encoding::ShiftJIS;
+    size_t i = 0;
+    for (uint8_t m : magic) {
+        uint8_t b = r.u8();
+        if (i == encodingIndex && b == 'U') enc = Encoding::UTF8;
+        else if (b != m) throw FormatError(std::string("bad magic in ") + what);
+        i++;
+    }
+    return enc;
 }
 
 struct Parser {
@@ -228,13 +225,14 @@ GameDat parseGameDat(std::span<const uint8_t> data) {
     return g;
 }
 
-std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data) {
+std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data, bool *wolf35) {
     Reader r(data);
     Encoding enc = readMagic(r, {0x00, 'W', 0, 0, 'O', 'L', 0, 'F', 'C', 0}, 6, "CommonEvent.dat");
     uint8_t version = r.u8();
     // Wolf RPG Editor 3.5 compresses the rest of the file, and its commands end with a few bytes of their own.
     std::vector<uint8_t> unpacked;
     bool v35 = version == 0x93 || version == 0xCC;
+    if (wolf35) *wolf35 = v35;
     if (v35) {
         unpacked = unpackLz4(data, r.pos());
         r = Reader(unpacked);
