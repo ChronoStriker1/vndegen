@@ -358,7 +358,8 @@ static void TVPReadConfigFileOptions(const ttstr& exe)
 }
 
 // <exe>.cfu in the data folder holds what the game's own Display menu chose, in the .cf format. It ranks above the
-// .cf, as on Windows, and may also set the smoothing and draw threads the player chose.
+// .cf, as on Windows, and may also set the smoothing and draw threads the player chose. Windows Kirikiri writes it in
+// UTF-16 and escapes everything but ASCII, so dropping the byte order mark and the zero bytes reads a save from a PC.
 static void TVPReadUserConfigOptions(const ttstr& exe, const ttstr& dataFolder)
 {
     std::string name = exe.AsStdString();
@@ -368,12 +369,16 @@ static void TVPReadUserConfigOptions(const ttstr& exe, const ttstr& dataFolder)
     std::string line;
     while (std::getline(file, line))
     {
+        if (line.compare(0, 2, "\xff\xfe") == 0)
+            line.erase(0, 2);
+        line.erase(std::remove(line.begin(), line.end(), '\0'), line.end());
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
         if (line.empty() || line[0] == ';')
             continue;
         ttstr option = TVPParseCommandLineOne(ttstr("-" + line));
-        if (option.StartsWith(TJS_N("-smoothzoom=")) || option.StartsWith(TJS_N("-drawthread=")) ||
+        if (option.StartsWith(TJS_N("-smoothzoom=")) ||
+            (option.StartsWith(TJS_N("-drawthread=")) && !option.StartsWith(TJS_N("-drawthread=-"))) ||
             !TVPConfigOptionIgnored(option))
             TVPProgramArguments.insert(TVPProgramArguments.begin(), option);
     }

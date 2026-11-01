@@ -138,7 +138,7 @@ static const tjs_char *const skippedItems =
           " 'fullScrResMiddleMenuItem', 'middleZoomPercentMenuItem', 'menuBarHideMenuItem', 'helpMenu', 'helpIndexMenuItem', 'helpAboutMenuItem', 'chChangeFontMenuItem', 'debugMenu'];"
           " for (var i = 0; i < n.count; i++) { var o = typeof w[n[i]] == 'undefined' ? void : w[n[i]];"
           " if (typeof o == 'Object' && o !== null) r.add(o); }"
-          " if (typeof w.fullScrResMenu == 'Object') { var c = w.fullScrResMenu.children;"
+          " if (typeof w.fullScrResMenu == 'Object' && w.fullScrResMenu !== null) { var c = w.fullScrResMenu.children;"
           " for (var i = 0; i < c.count; i++) if (typeof c[i].value != 'undefined' &&"
           " ['auto', 'nochange', 'nearest', 'proportional'].find(c[i].value) >= 0) r.add(c[i]); }"
           " return r; })()");
