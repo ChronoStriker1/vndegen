@@ -67,6 +67,7 @@ VNDegen added `flate2` as a direct dependency for compressed PC saves. It was al
 - Use a host's font only for a face the game ships no font file for, instead of for every face, so games keep their own fonts.
 - Draw ASCII from the bitmap fonts some games ship as `.rft` files (`src/text/rft.rs`), advanced as the PC engine advances them, so English text wraps where it does on the PC. The files store no character map, so other characters use the host's font.
 - Find save files and the loose files beside a game's archives in any case, as VNDegen's `Engines/Shared/casepath.c` does, and use a save folder restored with Windows' cp1252 spelling of its name.
+- Compile the DX9 effect files games ship as Artemis HLSL: split their global declarations only at semicolons outside braces, so a `sampler_state { ... }` with several fields on one line is skipped as a whole, and accept `float name[N]` constants, which the uniform writer fills 16 bytes per element as an HLSL constant buffer lays them out. Test Game 78's sepia, negative, blur and other screen effects compile this way.
 - Format VNDegen's changes with rustfmt.
 - The C API table gains `runtime_set_pc_save_version`, `resources_file_size`, and `resources_read` at its end, which a host reads when `struct_size` covers them.
 - Test tooling: the `game-probes` probe answers media commands like a host, gives a host font from `PROBE_HOST_FONT`, sets the save version from the archives, and mounts archive names as Shift_JIS. Examples dump PFS archives, scripts, and PC saves.

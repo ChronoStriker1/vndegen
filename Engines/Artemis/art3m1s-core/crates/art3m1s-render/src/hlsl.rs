@@ -76,6 +76,11 @@ pub enum ShaderValueType {
     Float3,
     Float4,
     Float4x4,
+    /// A `float name[count]` constant, whose elements sit `stride` bytes apart, 16 in an HLSL cbuffer (VNDegen).
+    FloatArray {
+        count: u32,
+        stride: u32,
+    },
 }
 
 impl ShaderValueType {
@@ -86,6 +91,7 @@ impl ShaderValueType {
             Self::Float3 => 3,
             Self::Float4 => 4,
             Self::Float4x4 => 16,
+            Self::FloatArray { count, .. } => count as usize,
         }
     }
 }
@@ -279,9 +285,12 @@ impl ShaderReflection {
                 continue;
             };
             let start = uniform.offset as usize;
-            let available = (uniform.size as usize / 4).min(uniform.value_type.value_count());
+            let (available, stride) = match uniform.value_type {
+                ShaderValueType::FloatArray { count, stride } => (count as usize, stride as usize),
+                other => ((uniform.size as usize / 4).min(other.value_count()), 4),
+            };
             for (index, value) in values.iter().copied().take(available).enumerate() {
-                let offset = start + index * 4;
+                let offset = start + index * stride;
                 if let Some(target) = bytes.get_mut(offset..offset + 4) {
                     target.copy_from_slice(&value.to_le_bytes());
                 }
@@ -489,6 +498,24 @@ fn reflect(name: &str, spirv: &[u32]) -> Result<ShaderReflection, ShaderCompileE
                     rows: 4,
                     ..
                 } => ShaderValueType::Float4x4,
+                TypeInner::Array {
+                    dimensions,
+                    stride: Some(stride),
+                    ..
+                } => match dimensions.as_slice() {
+                    [spirv_cross2::reflect::ArrayDimension::Literal(count)] => {
+                        ShaderValueType::FloatArray {
+                            count: *count,
+                            stride,
+                        }
+                    }
+                    _ => {
+                        return Err(ShaderCompileError::new(
+                            name,
+                            format!("unsupported uniform array {member_name}"),
+                        ));
+                    }
+                },
                 _ => {
                     return Err(ShaderCompileError::new(
                         name,
@@ -648,7 +675,7 @@ float4 art3m1s_fragment(Art3m1sFragmentInput input) : SV_Target0 {{
 fn normalize_globals(name: &str, source: &str) -> Result<(String, String), ShaderCompileError> {
     let mut constants = String::new();
     let mut uniforms = String::new();
-    for statement in source.split(';') {
+    for statement in top_level_statements(source) {
         let statement = statement.trim();
         if statement.is_empty()
             || statement == "}"
@@ -680,7 +707,19 @@ fn normalize_globals(name: &str, source: &str) -> Result<(String, String), Shade
         if matches!(uniform_name, "alpha" | "colorMultiply") {
             continue;
         }
-        if !uniform_name
+        // A one-dimensional array, such as the blur shaders' `float weights[8]`.
+        let identifier = match uniform_name.split_once('[') {
+            Some((identifier, count))
+                if kind == "float"
+                    && count
+                        .strip_suffix(']')
+                        .is_some_and(|count| count.parse::<u32>().is_ok_and(|n| n > 0)) =>
+            {
+                identifier
+            }
+            _ => uniform_name,
+        };
+        if !identifier
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
         {
@@ -696,6 +735,28 @@ fn normalize_globals(name: &str, source: &str) -> Result<(String, String), Shade
         uniforms.push_str(";\n");
     }
     Ok((constants, uniforms))
+}
+
+/// Splits declarations at the semicolons outside braces, so a sampler written as
+/// `sampler s = sampler_state { MinFilter = LINEAR; ... };` stays one statement (VNDegen).
+#[cfg_attr(not(feature = "runtime-shader"), allow(dead_code))]
+fn top_level_statements(source: &str) -> Vec<&str> {
+    let mut statements = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0;
+    for (offset, ch) in source.char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            ';' if depth == 0 => {
+                statements.push(&source[start..offset]);
+                start = offset + 1;
+            }
+            _ => {}
+        }
+    }
+    statements.push(&source[start..]);
+    statements
 }
 
 #[cfg_attr(not(feature = "runtime-shader"), allow(dead_code))]
@@ -851,6 +912,60 @@ technique technique0 { }
         assert!(shader.reflection.resources.iter().any(|resource| {
             resource.kind == ShaderResourceKind::Sampler && resource.binding == 5
         }));
+    }
+
+    /// The DX9 effect files TG78 (My Slow Life) ships: sampler states with several fields on one line, and the blur
+    /// shaders' weight array (VNDegen).
+    const BLUR: &str = r#"
+texture textureFore;
+sampler samplerFore = sampler_state { texture = <textureFore>; MinFilter = LINEAR; MagFilter = LINEAR; AddressU = Clamp; };
+float  alpha;
+float  weights[3];
+float  width;
+void vs(float4 position : POSITION) { }
+void ps(float2 texCoord0 : TEXCOORD0, float2 texCoord1 : TEXCOORD1, out float4 result : COLOR0)
+{
+	float4 fore = tex2D(samplerFore, texCoord1) * weights[0];
+	fore += tex2D(samplerFore, texCoord1 + float2(width, 0.0)) * weights[2];
+	fore.a *= alpha;
+	result = fore;
+}
+"#;
+
+    #[cfg(feature = "runtime-shader")]
+    #[test]
+    fn compiler_reads_one_line_sampler_states_and_float_arrays() {
+        let shader = ShaderCompiler::compile_hlsl("blur_h", BLUR.as_bytes()).unwrap();
+        let weights = shader
+            .reflection
+            .uniforms
+            .iter()
+            .find(|value| value.name == "weights")
+            .unwrap();
+        assert_eq!(
+            weights.value_type,
+            ShaderValueType::FloatArray {
+                count: 3,
+                stride: 16
+            }
+        );
+        let values = BTreeMap::from([("weights".to_owned(), vec![0.5, 0.25, 0.125])]);
+        let parameters = ShaderRuntimeParameters {
+            transform: [0.0; 16],
+            uv: [0.0; 4],
+            clip: [0.0; 4],
+            wipe: [0.0; 4],
+            color: [0.0; 4],
+            color_flags: [0.0; 4],
+            frame: [0.0; 4],
+            effect_values: &values,
+        };
+        let bytes = shader.reflection.encode_uniforms(&parameters);
+        let at = |index: usize| {
+            let offset = weights.offset as usize + index * 16;
+            f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+        };
+        assert_eq!([at(0), at(1), at(2)], [0.5, 0.25, 0.125]);
     }
 
     #[test]
