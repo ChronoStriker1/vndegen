@@ -22,10 +22,10 @@ of the app; `docs/system3-cleanroom.md` lists where each part came from. It cove
 - Runs CE and CD copies step by step, with the patterns and timing of System39.exe: effects 3, 4 and 6 to 23 of CE, the
   ones the library's games use, and CD effects 4 and 1001. CD 1001 moves the destination into the source's palette bank
   rather than copying the picture. The picture at the end is the plain copy, so saves don't depend on an effect.
-- Shows the games' number box (NI) over the game, with a keypad and steppers for touch, digits and arrows on a keyboard,
-  and up, down, left and right on a controller, which change the number by 1 and 10. Return or Confirm is OK, and Escape,
-  Space or Cancel cancels, which gives RND 255 and leaves the variable alone, as on the PC. A number outside the range
-  can't be accepted.
+- Shows the games' number box (NI) over the game, with a keypad and steppers for touch and digits and arrows on a
+  keyboard. On a controller, up, down, left and right change the number by 1 and 10, and the D-pad does so under the
+  default Keyboard and mouse layout too. Return, Space, Confirm or A is OK, and Escape, a right click, Cancel or B cancels,
+  which gives RND 255 and leaves the variable alone, as on the PC. A number outside the range can't be accepted.
 - Text skip: Skip until choice, in Game commands, passes message waits until the next choice or left click, which turn
   it off, as the same item does in the PC exes' menu bars (文字送り in System 3.9). On System 3.9 that also passes IK 0 and
   1, the key waits Panyon's messages use. Timed waits, fades and effects still run, as they do on the PC.

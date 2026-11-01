@@ -1,4 +1,5 @@
 import Testing
+import VNCore
 @testable import EngineAliceSoft
 
 @Test func numberEntryStartsWithTheGameValueSelected() {
@@ -34,4 +35,29 @@ import Testing
     #expect(entry.value == 5)
     entry.step(by: -10)
     #expect(entry.value == 1)
+}
+
+/// Under the Keyboard and mouse layout a controller's D-pad sends 1 to 4, A Space and B E.
+@MainActor @Test func numberBoxTakesTheDefaultControllerLayout() {
+    var answers: [Int?] = []
+    let box = System3NumberBox(title: "", entry: System3NumberEntry(value: 7, minimum: 1, maximum: 99)) { answers.append($0) }
+    box.press(boundKey: 0x31) // D-pad up
+    #expect(box.entry.value == 8)
+    box.press(boundKey: 0x34) // D-pad right
+    #expect(box.entry.value == 18)
+    box.press(boundKey: 0x20) // A
+    #expect(answers == [18])
+    box.press(boundKey: 0x45) // B
+    #expect(answers == [18, nil])
+}
+
+@MainActor @Test func numberBoxTakesTheOnScreenKeyboard() {
+    var answers: [Int?] = []
+    let box = System3NumberBox(title: "", entry: System3NumberEntry(value: 7, minimum: 1, maximum: 99)) { answers.append($0) }
+    box.type(.text("42"))
+    #expect(box.entry.value == 42)
+    box.type(.deleteBackward)
+    #expect(box.entry.value == 4)
+    box.type(.newline)
+    #expect(answers == [4])
 }

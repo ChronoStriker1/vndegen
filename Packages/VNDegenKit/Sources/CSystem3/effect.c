@@ -114,6 +114,7 @@ bool s3_effect_start(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int nu
     s3_effect_free(s);
     int steps = 0, perTime = 1, defaultMs = 0;
     if (!s3_clip_copy(s, &sx, &sy, &w, &h, &dx, &dy) || !effect_params(number, w, h, &steps, &perTime, &defaultMs)) return false;
+    if (steps < 1) steps = 1; // a rectangle one pixel wide or high still has to arrive
     S3Effect *e = s3_alloc(sizeof *e);
     *e = (S3Effect){ dx, dy, w, h, number, steps, perTime, ms > 0 ? ms : defaultMs, 0, key, s->clockMs, NULL, NULL };
     for (int j = 0; j < h; j++) {

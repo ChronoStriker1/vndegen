@@ -214,16 +214,22 @@ final class System3Session: EngineSession {
         frameView.takeFocus()
     }
 
-    /// A touch mouse's tap, or a button bound to a click, presses the control under the pointer when it lifts.
-    private func pressesNumberBoxControl(_ event: ControllerEvent, in box: System3NumberBox) -> Bool {
+    /// Input for the box that doesn't go through the router. A touch mouse's tap, or a button bound to a click, presses
+    /// the control under the pointer when it lifts, and a secondary one cancels, as a right click does.
+    private func handledByNumberBox(_ event: ControllerEvent, _ box: System3NumberBox) -> Bool {
         switch event {
         case let .pointer(pointer):
             pointerLocation = pointer.location
-            if pointer.phase == .ended, let control = box.control(at: pointer.location) { box.press(control) }
+            guard pointer.phase == .ended else { return true }
+            if pointer.button == .secondary { box.press(.cancel) }
+            else if let control = box.control(at: pointer.location) { box.press(control) }
             return true
         case let .click(button, pressed):
             guard button == .primary else { return false }
             if !pressed, let location = pointerLocation, let control = box.control(at: location) { box.press(control) }
+            return true
+        case let .key(key, pressed):
+            if pressed { box.press(boundKey: key.keyCode) }
             return true
         default:
             return false
@@ -254,7 +260,7 @@ final class System3Session: EngineSession {
 
     func send(_ event: ControllerEvent) {
         if case let .pointer(pointer) = event { pointerLocation = pointer.location }
-        if let numberBox, pressesNumberBoxControl(event, in: numberBox) { return }
+        if let numberBox, handledByNumberBox(event, numberBox) { return }
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
     }
@@ -276,6 +282,17 @@ final class System3Session: EngineSession {
     func terminate() {
         guard !stopped else { return }
         finish(byGame: false)
+    }
+
+    func type(_ typed: TypedText) {
+        if let numberBox {
+            numberBox.type(typed)
+            return
+        }
+        for key in KeyboardKey.keys(typing: typed) {
+            send(.key(key, pressed: true))
+            send(.key(key, pressed: false))
+        }
     }
 
     /// The PC engines keep this in the window's menu bar: 文字送り on System 3.9, Skip until choice in the English

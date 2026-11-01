@@ -1,4 +1,5 @@
 import SwiftUI
+import VNCore
 
 /// What the player has typed into a System 3 game's number box (NI). As on the PC, a value outside the range can't be
 /// accepted. The box starts with the game's value selected, so the first digit replaces it.
@@ -70,7 +71,8 @@ final class System3NumberBox {
         frames.first { $0.value.contains(point) }?.key
     }
 
-    /// A key or button the runtime would have got: digits type, the arrows step, Return is OK, Escape and Space cancel.
+    /// A key from a hardware keyboard, or one the router made from a control: digits type, the arrows step, Return and
+    /// Space are OK, and Escape cancels.
     func press(virtualKey key: Int32) {
         switch key {
         case 0x30...0x39: press(.digit(Int(key) - 0x30))
@@ -80,9 +82,31 @@ final class System3NumberBox {
         case 0x28: press(.step(-1))
         case 0x27: press(.step(10))
         case 0x25: press(.step(-10))
-        case 0x0d: press(.ok)
-        case 0x1b, 0x20: press(.cancel)
+        case 0x0d, 0x20: press(.ok)
+        case 0x1b: press(.cancel)
         default: break
+        }
+    }
+
+    /// A key a controller or touch gamepad button is bound to. Under the Keyboard and mouse layout, the one AliceSoft
+    /// games start with, the D-pad is 1 to 4, the left stick WASD, A Space and B E, so those mean what the buttons do
+    /// rather than what the keys type.
+    func press(boundKey key: Int) {
+        switch key {
+        case 0x31, 0x57: press(.step(1))
+        case 0x32, 0x53: press(.step(-1))
+        case 0x33, 0x41: press(.step(-10))
+        case 0x34, 0x44: press(.step(10))
+        case 0x45: press(.cancel)
+        default: press(virtualKey: Int32(key))
+        }
+    }
+
+    func type(_ typed: TypedText) {
+        switch typed {
+        case let .text(text): text.compactMap(\.wholeNumberValue).filter { (0...9).contains($0) }.forEach { press(.digit($0)) }
+        case .newline: press(.ok)
+        case .deleteBackward: press(.backspace)
         }
     }
 }

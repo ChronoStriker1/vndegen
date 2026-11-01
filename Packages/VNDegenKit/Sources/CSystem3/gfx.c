@@ -140,11 +140,16 @@ void s3_copy_key(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key) {
 // source's palette bank, so a palette change to that bank then shades the shape. Read from System39.exe under Wine.
 void s3_copy_bank(S3 *s, int sx, int sy, int w, int h, int dx, int dy, int key) {
     if (s->dib.depth != 8 || !s3_clip_copy(s, &sx, &sy, &w, &h, &dx, &dy)) return;
-    for (int j = 0; j < h; j++) {
-        const u8 *src = s->dib.p8 + (size_t)(sy + j) * s->dib.w + sx;
+    // A row at a time from a copy, in the order s3_copy_key takes, so an overlap reads the source as it was.
+    u8 *tmp = s3_alloc((size_t)w);
+    bool up = dy > sy;
+    for (int k = 0; k < h; k++) {
+        int j = up ? h - 1 - k : k;
+        memcpy(tmp, s->dib.p8 + (size_t)(sy + j) * s->dib.w + sx, (size_t)w);
         u8 *dst = s->dib.p8 + (size_t)(dy + j) * s->dib.w + dx;
-        for (int i = 0; i < w; i++) if (src[i] != (u8)key) dst[i] = (src[i] & 0xf0) | (dst[i] & 0x0f);
+        for (int i = 0; i < w; i++) if (tmp[i] != (u8)key) dst[i] = (tmp[i] & 0xf0) | (dst[i] & 0x0f);
     }
+    free(tmp);
     s3_mark_dirty(s);
 }
 
