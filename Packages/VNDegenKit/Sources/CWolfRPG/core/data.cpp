@@ -66,14 +66,13 @@ std::string toUtf8(const std::string &raw, Encoding enc) {
     return out;
 }
 
-std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at) {
+std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at, uint32_t budget) {
     Reader r(data);
     r.seek(at);
     uint32_t unpacked = r.u32(), packed = r.u32();
     // LZ4 expands at most 255 to 1, so a larger claim is damage. The largest real file seen unpacks to under 3 MB; the
     // budget keeps a damaged size from reserving gigabytes.
-    constexpr uint32_t kBudget = 256u << 20;
-    if (unpacked > kBudget || uint64_t(unpacked) > uint64_t(packed) * 255 + 16) throw FormatError("bad LZ4 sizes");
+    if (unpacked > budget || uint64_t(unpacked) > uint64_t(packed) * 255 + 16) throw FormatError("bad LZ4 sizes");
     auto src = r.bytes(packed);
     std::vector<uint8_t> out(data.begin(), data.begin() + at);
     out.reserve(at + unpacked);

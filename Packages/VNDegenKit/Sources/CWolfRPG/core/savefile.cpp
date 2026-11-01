@@ -306,9 +306,9 @@ template <class IO, class C> void character(IO &io, C &c) {
     if (io.version >= 0x8B) io.s32(c.v8b);
     if (io.version >= 0x8C) io.s32(c.v8c);
     if (io.version >= 0x9F) {
-        io.count32(c.v9fPairLists, 4);
+        io.count32(c.v9fPairLists, 4, 1000, "save character lists too large");
         for (auto &list : c.v9fPairLists) {
-            io.count32(list, 8);
+            io.count32(list, 8, 100000, "save character lists too large");
             for (auto &pair : list) io.s32s(pair);
         }
         io.s32(c.v9fB);
@@ -345,7 +345,7 @@ template <class IO, class M> void mapSection(IO &io, M &m) {
             if constexpr (IO::reading) v = b;
         }
     }
-    io.count32(m.events, 40);
+    io.count32(m.events, 40, 10000, "too many map events");
     for (auto &e : m.events) {
         character(io, e);
         if (io.version >= 0x9F) {
@@ -393,7 +393,7 @@ template <class IO, class S> void systemSection(IO &io, S &s) {
         io.s32s(s.v108a);
         if (io.version >= 0x9F) {
             io.s32(s.v9fH);
-            io.count32(s.v9f108, 22);
+            io.count32(s.v9f108, 22, 100000, "save system lists too large");
             for (auto &x : s.v9f108) {
                 io.u32(x.number);
                 io.str(x.text, true);
@@ -435,15 +435,15 @@ template <class IO, class S> void systemSection(IO &io, S &s) {
     }
     if (io.version >= 0x8E) io.s32(s.v8e);
     if (io.version >= 0x9F) {
-        io.count32(s.v9fGroups, 4);
+        io.count32(s.v9fGroups, 4, 10000, "save system lists too large");
         for (auto &group : s.v9fGroups) {
-            io.count32(group, 8);
+            io.count32(group, 8, 100000, "save system lists too large");
             for (auto &x : group) {
                 io.u32(x.number);
                 io.str(x.text);
             }
         }
-        io.count32(s.v9fPairs, 8);
+        io.count32(s.v9fPairs, 8, 100000, "save system lists too large");
         for (auto &pair : s.v9fPairs) {
             io.str(pair[0]);
             io.str(pair[1]);
@@ -609,8 +609,11 @@ template <class IO, class S> void section7(IO &io, S &s) {
     }
 }
 
-template <class IO, class A> void arrayRows(IO &io, A &a) {
+// Each row is a list object made from as little as 2 bytes, so the rows of all arrays together are capped.
+template <class IO, class A> void arrayRows(IO &io, A &a, size_t &rowsSoFar) {
     io.count16(a.rows, 2);
+    rowsSoFar += a.rows.size();
+    if (rowsSoFar > 1000000) throw FormatError("save arrays too large");
     for (auto &row : a.rows) {
         io.count16(row, 4);
         for (auto &v : row) io.s32(v);
@@ -619,15 +622,16 @@ template <class IO, class A> void arrayRows(IO &io, A &a) {
 
 // Version 0x9F: the arrays, by number, then by name.
 template <class IO, class F> void arrays(IO &io, F &f) {
-    io.count32(f.numberedArrays, 6);
+    size_t rows = 0;
+    io.count32(f.numberedArrays, 6, 100000, "too many save arrays");
     for (auto &a : f.numberedArrays) {
         io.s32(a.key);
-        arrayRows(io, a);
+        arrayRows(io, a, rows);
     }
-    io.count32(f.namedArrays, 6);
+    io.count32(f.namedArrays, 6, 100000, "too many save arrays");
     for (auto &a : f.namedArrays) {
         io.str(a.name);
-        arrayRows(io, a);
+        arrayRows(io, a, rows);
     }
 }
 
@@ -647,7 +651,7 @@ template <class IO, class F> void body(IO &io, F &f) {
     partySection(io, f.party);
     pictures(io, f.pictures);
     if (f.version >= 0x9F) {
-        io.count32(f.v9fNamedValues, 16);
+        io.count32(f.v9fNamedValues, 16, 100000, "save lists too large");
         for (auto &x : f.v9fNamedValues) {
             io.str(x.name);
             io.s32s(x.values);
@@ -683,7 +687,9 @@ SaveFile parseSave(std::span<const uint8_t> fileBytes) {
         Reader sizes(plain);
         sizes.seek(kHeaderSize + 4);
         if (sizes.u32() != plain.size() - kHeaderSize - 8) throw FormatError("save packed size mismatch");
-        plain = unpackLz4(plain, kHeaderSize);
+        // The largest save seen unpacks to 2.7 MB. Lists in a save body become objects many times their bytes, so the
+        // body's budget is far below the data files'.
+        plain = unpackLz4(plain, kHeaderSize, 32u << 20);
         uint16_t check = container35Check(std::span(plain).subspan(kHeaderSize), plain[9]);
         if (plain[4] != uint8_t(check >> 8) || plain[7] != uint8_t(check)) throw FormatError("save check value mismatch");
     } else {
