@@ -4,6 +4,7 @@
 #include "reader.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <type_traits>
@@ -11,6 +12,19 @@
 namespace fs = std::filesystem;
 
 namespace wolf {
+
+namespace {
+// Wolf compares file names as Windows does: without regard to case, with either slash.
+bool sameFileName(const std::string &a, const std::string &b) {
+    if (a.size() != b.size()) return false;
+    for (size_t i = 0; i < a.size(); i++) {
+        char x = a[i] == '\\' ? '/' : char(std::tolower(static_cast<unsigned char>(a[i])));
+        char y = b[i] == '\\' ? '/' : char(std::tolower(static_cast<unsigned char>(b[i])));
+        if (x != y) return false;
+    }
+    return true;
+}
+}  // namespace
 
 
 Game::Game(fs::path root) : root_(root), files_(root) {}
@@ -511,8 +525,12 @@ void Game::refreshPages() {
                     a.routeStep = 0;
                     a.routeFromCommand = false;
                 }
-                c.graphic = pg.graphic;
-                c.chip = pg.graphic.empty() && pg.chip > 0 ? pg.chip : -1;
+                // A page drawn as a map tile names no image, or (in Wolf RPG Editor 3.5) the map's own tileset image;
+                // tile 0 draws nothing.
+                bool tileImage = !pg.graphic.empty() && map_->tileset >= 0 && map_->tileset < int(tilesets_.size()) &&
+                                 sameFileName(pg.graphic, tilesets_[map_->tileset].baseFile);
+                c.graphic = tileImage ? std::string() : pg.graphic;
+                c.chip = (pg.graphic.empty() || tileImage) && pg.chip > 0 ? pg.chip : -1;
                 c.direction = validDirection(pg.direction);
                 c.pattern = pg.frame;
                 c.opacity = pg.opacity;
@@ -539,6 +557,8 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 
 void Game::update(const Input &input) {
     input_ = input;
+    for (size_t k = 0; k < heldFrames_.size(); k++)
+        heldFrames_[k] = ((input.held | autoKeys_) >> k) & 1 ? heldFrames_[k] + 1 : 0;
     frame_++;
     // A load requested last frame takes effect before anything runs (savestate.cpp).
     if (pendingLoad_) applyPendingLoad();
