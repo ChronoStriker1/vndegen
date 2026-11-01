@@ -53,6 +53,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - AliceSoft System 3 transitions, text skip, number box and Mamatoto's tutorial, and Wolf RPG Editor mouse, touch as a mouse, CSV import and typed text (0.20.0).
 - KiriKiri: four more library games start, AlphaMovie clips draw in place and at the right speed, and a game's own Display choices apply (0.20.1).
 - Wolf RPG Editor: the hero shows in new games (0.20.2).
+- TyranoScript: Skip and Auto answer at any moment and turn off with a second tap (0.20.3).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
