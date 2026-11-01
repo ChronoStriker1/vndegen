@@ -21,10 +21,9 @@ int resolveRelativeCommon(int id, const Thread &t) {
 }  // namespace
 
 void Game::run(Thread &t) {
-    if (t.wait > 0) {
-        t.wait--;
-        return;
-    }
+    // A wait of n frames resumes on the nth frame after it, so a loop with a one-frame wait runs every frame: games
+    // count on that, such as The Clumsy Witch Seris's menus, which accept a key held for exactly one frame.
+    if (t.wait > 0 && --t.wait > 0) return;
     // A thread runs until it waits. The cap stops a loop without waits from hanging the frame.
     for (int budget = 0; budget < 100000 && !t.done(); budget++) {
         if (!step(t)) return;
@@ -500,9 +499,14 @@ void Game::callCommon(Thread &t, int id, const Command &cmd, int argBase) {
     std::array<int32_t, 5> nums{};
     std::array<std::string, 5> strs;
     for (int i = 0; i < numbers; i++) nums[i] = value(cmd.arg(argBase + 1 + i), t);
+    // Each string argument has a number slot after the number arguments (WodiLib's CallCommonEventBase). Bit 0x10 << i
+    // of the second flag byte marks string i as text written in the command; otherwise its slot names a string
+    // variable. The return address follows all the slots.
     int next = argBase + 1 + numbers;
-    for (int i = 0; i < strings; i++)
-        strs[i] = (refFlags & (1 << i)) ? readStr(cmd.arg(next++), t) : expandText(cmd.str(1 + i), &t);
+    for (int i = 0; i < strings; i++) {
+        int32_t slot = cmd.arg(next++);
+        strs[i] = (refFlags & (0x10 << i)) ? expandText(cmd.str(1 + i), &t) : readStr(slot, t);
+    }
     for (int i = 0; i < numbers; i++) cself_[id][i] = nums[i];
     for (int i = 0; i < strings; i++) cselfStr_[id][5 + i] = std::move(strs[i]);
     int32_t returnTo = wantsReturn ? cmd.arg(next) : 0;
@@ -768,12 +772,15 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         p.zoomY.set(field(18, int32_t(p.zoomY.to)), over);
     }
     p.angle.set(field(10, int32_t(p.angle.to)), over);
-    // Field 12's top byte is 1 when the colour stays as it is.
+    // Field 12's top byte is 1 when the colour stays as it is. Otherwise the editor stores the colour only when it
+    // isn't 100 (WodiLib's PictureDrawBase), so a command without colour fields sets it back to 100: a game can show
+    // a picture at colour 0 and fade it in from black with a plain move.
     bool sameColor = c.args.size() > 12 && (uint32_t(c.arg(12)) >> 24) == 1;
-    if (c.args.size() > 17 && !sameColor) {
-        p.r.set(field(15, int32_t(p.r.to)), over);
-        p.g.set(field(16, int32_t(p.g.to)), over);
-        p.b.set(field(17, int32_t(p.b.to)), over);
+    if (!sameColor) {
+        bool given = c.args.size() > 17;
+        p.r.set(given ? field(15, int32_t(p.r.to)) : 100, over);
+        p.g.set(given ? field(16, int32_t(p.g.to)) : 100, over);
+        p.b.set(given ? field(17, int32_t(p.b.to)) : 100, over);
     }
 }
 

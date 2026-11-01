@@ -144,8 +144,15 @@ inline uint32_t tilePassability(const Tileset &ts, int32_t value) {
     return index < ts.passability.size() ? ts.passability[index] : 0;
 }
 
+// Wolf RPG Editor 3.5 compresses the body of its common event, database and map files, and its saves, with LZ4. From
+// `at` on, such a file holds the unpacked size, the packed size, and one LZ4 block (the block format of the LZ4 project's
+// lz4_Block_format.md). This returns the file with that part unpacked, the bytes before `at` kept as they are.
+// `budget` caps the unpacked size, so a damaged size can't reserve much.
+std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at, uint32_t budget = 256u << 20);
+
 GameDat parseGameDat(std::span<const uint8_t> data);
-std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data);
+// `wolf35`, when given, is set to whether the file is in Wolf RPG Editor 3.5's compressed format.
+std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data, bool *wolf35 = nullptr);
 // A database is a .project file with types, field names and row names, and a .dat file with the values.
 Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t> dat, Encoding enc);
 Map parseMap(std::span<const uint8_t> data);

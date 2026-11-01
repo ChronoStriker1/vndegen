@@ -4,6 +4,7 @@
 #include "game_internal.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 
 namespace wolf {
@@ -234,7 +235,8 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 if (layer < 0) {
                     for (layer = map_->layers - 1; layer > 0 && map_->tile(layer, x, y) == 0; layer--) {}
                 }
-                v = map_->tile(layer, x, y);
+                // A Wolf RPG Editor 3.5 map may have fewer than three layers; a layer it lacks reads as empty.
+                v = layer < map_->layers ? map_->tile(layer, x, y) : 0;
                 break;
             }
             default: {  // tile tags
@@ -244,6 +246,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 if (layer < 0) {
                     for (layer = map_->layers - 1; layer > 0 && map_->tile(layer, x, y) == 0; layer--) {}
                 }
+                if (layer >= map_->layers) break;
                 int32_t tv = map_->tile(layer, x, y);
                 size_t index = tv >= 100000 ? size_t(tv / 100000) : size_t(tv) + 16;
                 v = index < tags.size() ? tags[index] : 0;
@@ -313,8 +316,19 @@ bool Game::keyInput(Thread &t, const Command &c) {
     int kind = (flags >> 8) & 0x0F;
     bool wait = flags & 0x80;
     uint32_t keys = wait ? (input_.pressed | autoKeys_) : keysNow();
+    // Wolf RPG Editor 3: bit 0x20000 reports only a key that was just pressed, so a menu opened by a key doesn't
+    // see that key still held and close again (Clumsy Witch Seris).
+    if (flags & 0x20000) keys = input_.pressed | autoKeys_;
     int32_t v = 0;
-    if (kind == 0) {
+    if (kind == 0 && (flags & 0x40000)) {
+        // Wolf RPG Editor 3: how many frames one key has been held, 0 when it is up. The low byte names the key as
+        // the direction and button fields do: 3 up, 4 down, 5 left, 6 right, 0x10 confirm, 0x20 cancel, 0x40 sub.
+        // Games use it for their own key repeat in menus (Clumsy Witch Seris).
+        static const std::pair<int, Key> named[] = {{3, KeyUp}, {4, KeyDown}, {5, KeyLeft}, {6, KeyRight},
+                                                    {0x10, KeyConfirm}, {0x20, KeyCancel}, {0x40, KeySub}};
+        for (auto [code, key] : named)
+            if (int(flags & 0xFF) == code) v = heldFrames_[std::countr_zero(uint32_t(key))];
+    } else if (kind == 0) {
         int dirs = flags & 0x0F;
         bool ok = flags & 0x10, cancel = flags & 0x20, sub = flags & 0x40;
         if (ok && (keys & KeyConfirm)) v = 10;

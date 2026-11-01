@@ -293,10 +293,12 @@ void Renderer::draw(Bitmap &frame) {
     } else {
         map_.draw(canvas);
     }
-    std::erase_if(pictureImages_, [&](auto &kv) { return !game_.pictures().count(kv.first); });
-    for (auto &[n, p] : game_.pictures()) drawPicture(canvas, n, p);
+    // The screen colour tints the map only: the PC engine shows pictures at their own colour over a screen it has
+    // turned black (ANGEL QUEST's opening).
     auto tint = game_.screenColor();
     canvas.tint(float(tint[0] / 100), float(tint[1] / 100), float(tint[2] / 100));
+    std::erase_if(pictureImages_, [&](auto &kv) { return !game_.pictures().count(kv.first); });
+    for (auto &[n, p] : game_.pictures()) drawPicture(canvas, n, p);
 
     int shake = int(std::lround(game_.shake().offset));
     if (shake) {
