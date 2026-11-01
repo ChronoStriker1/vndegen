@@ -11,7 +11,7 @@ through the shared FrameHost module and maps the controls.
 |---|---|
 | Rance 02 (Test Game 19) | Title, opening movie, play, camp menus, saves and loads. Saves move between VNDegen and the PC game in both directions. |
 | Sengoku Rance (Test Game 46) | Title, opening movie, story scenes, battles, the strategy map, saves and loads. Saves move between VNDegen and the PC game in both directions. |
-| Rance IX (Test Game 56) | Not supported yet: it is built on PartsEngine (see Known limits). Its game page says so, and starting it shows the same sentence. |
+| Rance IX (Test Game 56) | Logos, warning, opening movie, title, the prologue's story scenes, saves and loads. Its battles and maps are 3D: where the first one starts, the game stops with a message (see Known limits), and its game page says so beforehand. |
 
 ## What the runtime does
 
@@ -23,9 +23,14 @@ through the shared FrameHost module and maps the controls.
   music, transitions, MultiSprite, CharSprite, the backlog and saved scenes), DrawGraph (the whole drawing
   library), SengokuRanceFont, MsgLogManager and MsgLogViewer, DrawMovie2, DrawMovie3 and PlayMovie, VSFile, File,
   FileOperation, MsgSkip, Math, SystemService and SystemServiceEx, InputString, PassRegister, Confirm3,
-  OutputLog, IbisInputEngine, AliceLogo3 and 4 (skipped) and DrawPluginManager. A call the runtime doesn't have
-  is logged once and returns zero.
-- **Files.** `.ald` archives (split over several disks too), QNT, AJP, 8-bit PMS and WebP pictures,
+  OutputLog, IbisInputEngine, AliceLogo3 and 4 (skipped) and DrawPluginManager. Rance IX adds PartsEngine (numbered
+  parts with three input states, text, construction steps, motions, click messages, activities, saves),
+  ChipmunkSpriteEngine (the frame, transitions and text measures), KiwiSoundEngine, MainEXFile, CommonSystemData,
+  AnteaterADVEngine (Stoat's backlog and scene keeper), AFAFactory and CGManager. A call the runtime doesn't have
+  is logged once and returns zero. A call to SealEngine or MarmotModelEngine, Rance IX's 3D libraries, other than
+  the few each 2D frame makes, stops the game with a message over the dimmed screen until the player quits.
+- **Files.** `.ald` and `.afa` archives (pictures by name, and numbered music and sound), `.ex` data files, QNT
+  (versions 0 to 2), AJP, 8-bit PMS and WebP pictures,
   including WebPs drawn over a base picture, Ogg and WAV sound, `.alm` MPEG-1 movies with MP2 sound, and `.fnl` font
   libraries. A movie keeps half a second of sound decoded ahead of what has played, and its picture follows the
   sound when the game clock falls behind, so a slow frame doesn't cut the sound.
@@ -91,16 +96,18 @@ pushed the Mac mini's load average to about 80, with a median 1% low of 37.
 
 ## Known limits
 
-- System 4 games built on PartsEngine and the libraries that came with it (ChipmunkSpriteEngine, KiwiSoundEngine,
-  MainEXFile with `.ex` data files, SealEngine for 3D), such as Rance IX (Test Game 56), aren't supported yet. The
-  runtime refuses them up front with a sentence the game page shows.
-- `.afa` archives, which later games such as Rance IX use, can be read (`AfaArchive`), but games don't load
-  pictures or sound from them yet.
+- Rance IX's 3D scenes (SealEngine and MarmotModelEngine), which include its battles and maps, don't run. The game
+  stops with a message where the first one starts (in the first chapter); saves made before then load.
+- Rance IX's Flat animations (the Flash-like `.flat` files) aren't played: each reports itself finished at once, so
+  the title screen has no logo animation. Numerals (numbers drawn from digit pictures), colour multiply and add on
+  parts, and Parts_SetPartsConstructionSurfaceArea aren't drawn yet.
+- Rance IX's message lines sit closer than on the PC with VNDegen's fallback fonts, which are wider than MS Gothic,
+  so a line wraps sooner.
+- Music loops from its start; the loop points in the `.bgi` files aren't read.
 - Only the libraries and calls the test games use are built. Other System 4 games may call functions the runtime
   doesn't have yet; each is logged once.
 - `CG_RotateRGB` isn't bound: the SDK doesn't say what its channel swap does.
-- Resume saves aren't written while the game holds a delegate, because the PC's encoding of delegates in them isn't
-  known yet; the game is told the save failed. Test Games 19 and 46 hold none when they save.
+- TODO-PC: Rance IX save compatibility.
 - Global and group saves in layout 7, which Sys43VM writes for code files other than version 5, aren't read or
   written; no test game uses them.
 - Four MultiSprite fields keep the PC's values without a known meaning, and moves in progress aren't saved, as on the

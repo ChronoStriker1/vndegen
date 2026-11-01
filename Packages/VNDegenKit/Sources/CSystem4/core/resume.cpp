@@ -19,10 +19,17 @@
 //     3 array      u32 3, u32 refs, u32 0, u32 array type, struct name, u32 rank, u32 1, u32 bytes, values
 //     4 struct     u32 4, u32 refs, constructor name, destructor name (each empty for none), u32 0, struct name,
 //                  u32 n, n types, u32 bytes, values
-//     6 delegate   VNDegen's own record, as the PC's encoding isn't known (Test Game 56 holds delegates): u32 6,
-//                  u32 refs, u32 n, then each method's object slot (-1 for none) and function name. The PC engine
-//                  can't load a save with one.
+//     5 delegate   (version 9) u32 5, u32 refs, u32 object number, u32 bytes, then 12 bytes per method: i32 the
+//                  object's slot (-1 for none), u32 the function's index, u32 the object's number (0 for none)
+//     6 delegate   VNDegen's own record for versions 7 and 8, whose PC encoding isn't known (Test Games 19 and 46
+//                  hold no delegates when they save): u32 6, u32 refs, u32 n, then each method's object slot and
+//                  function name.
 //   u32 n, every function name, by index
+//
+// Version 9 (Test Game 56's VM, read from a save it wrote under Wine) puts u32 the next object number before the
+// heap's slot count, and u32 each live slot's object number after its reference count. VNDegen numbers the slots
+// by position: slot s is object s + 1. It also has no frame for the entry function: the root stands for it, so the
+// lists of local pages and kinds have one entry fewer and the return points one per local page, the root's -1.
 #include <cstring>
 
 #include "opcodes.h"
@@ -106,6 +113,11 @@ bool isDelegateCall(const std::vector<uint8_t> &code, uint32_t at) {
     return at < code.size() && code.size() - at >= 2 && (code[at] | code[at + 1] << 8) == OP_DG_CALL;
 }
 
+// The PC stores a frame's call site as its return address less 6, the length of a call. A method a delegate called
+// returns past its DG_CALL (10 bytes) to the jump back to it, so its call site is stored as the DG_CALL's address
+// plus 4 (seen in Test Game 56's PC save).
+constexpr uint32_t kDelegateCallSiteShift = 4;
+
 }  // namespace
 
 std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeIp) {
@@ -125,21 +137,26 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
     o.u32(0);
     o.u32(uint32_t(stack.size()));
     for (int32_t v : stack) o.u32(uint32_t(v));
-    o.u32(uint32_t(frames.size() + 1));
+    const bool v9 = saveFormat.resumeVersion >= 9;
+    // Version 9 leaves the entry frame (frames[0], where the game's main runs) out: the root stands for it.
+    const size_t first = v9 && !frames.empty() ? 1 : 0;
+    o.u32(uint32_t(frames.size() - first + 1));
     o.u32(uint32_t(-1));
-    for (auto &f : frames) o.u32(uint32_t(f.localPage));
-    o.u32(uint32_t(frames.size() + 1));
+    for (size_t k = first; k < frames.size(); k++) o.u32(uint32_t(frames[k].localPage));
+    o.u32(uint32_t(frames.size() - first + 1));
     o.u32(4);
-    for (auto &f : frames) o.u32(f.native ? 0 : f.method ? 2 : 1);
+    for (size_t k = first; k < frames.size(); k++) o.u32(frames[k].native ? 0 : frames[k].method ? 2 : 1);
     uint32_t methods = 0;
-    for (auto &f : frames) methods += f.method && !f.native;
+    for (size_t k = first; k < frames.size(); k++) methods += frames[k].method && !frames[k].native;
     o.u32(methods);
-    for (auto &f : frames)
-        if (f.method && !f.native) o.u32(uint32_t(f.structPage));
+    for (size_t k = first; k < frames.size(); k++)
+        if (frames[k].method && !frames[k].native) o.u32(uint32_t(frames[k].structPage));
     o.u32(uint32_t(frames.size()));
     for (size_t k = 0; k < frames.size(); k++) {
         if (frames[k].native || k == 0) { o.u32(uint32_t(-1)); continue; }
-        point(frames[k].returnAddress, frames[k].callSite, frames[k - 1].function);
+        uint32_t cs = frames[k].callSite;
+        if (frames[k].discardReturn && isDelegateCall(ain.code, cs)) cs += kDelegateCallSiteShift;
+        point(frames[k].returnAddress, cs, frames[k - 1].function);
     }
     o.u32(0);
     o.u32(0);
@@ -148,11 +165,24 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
     std::vector<int32_t> frameRefs(heap.size());
     for (auto &f : frames)
         if (f.structPage >= 0 && size_t(f.structPage) < heap.size()) frameRefs[size_t(f.structPage)]++;
+    if (v9) o.u32(uint32_t(heap.size() + 1));
     o.u32(uint32_t(heap.size()));
     for (size_t s = 0; s < heap.size(); s++) {
         const Slot &sl = heap[s];
         if (!sl.inUse) { o.u32(uint32_t(-1)); continue; }
         int32_t refs = sl.refs - frameRefs[s];
+        if (sl.dg && v9) {
+            o.u32(5);
+            o.u32(uint32_t(refs));
+            o.u32(uint32_t(s + 1));
+            o.u32(uint32_t(sl.dg->size() * 12));
+            for (auto &[obj, fn] : *sl.dg) {
+                o.u32(uint32_t(obj));
+                o.u32(uint32_t(fn));
+                o.u32(obj >= 0 ? uint32_t(obj + 1) : 0);
+            }
+            continue;
+        }
         if (sl.dg) {
             o.u32(6);
             o.u32(uint32_t(refs));
@@ -166,6 +196,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         if (sl.str) {
             o.u32(2);
             o.u32(uint32_t(refs));
+            if (v9) o.u32(uint32_t(s + 1));
             o.u32(0);
             o.u32(uint32_t(sl.str->size() + 1));
             o.str(*sl.str);
@@ -184,6 +215,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Global:
             o.u32(0);
             o.u32(uint32_t(refs));
+            if (v9) o.u32(uint32_t(s + 1));
             o.u32(uint32_t(-1));
             types();
             values();
@@ -191,6 +223,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Local: {
             o.u32(1);
             o.u32(uint32_t(refs));
+            if (v9) o.u32(uint32_t(s + 1));
             o.str(ain.functions[p.index].name);
             types();
             int32_t self = -1;
@@ -203,6 +236,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Array: {
             o.u32(3);
             o.u32(uint32_t(refs));
+            if (v9) o.u32(uint32_t(s + 1));
             o.u32(0);
             o.u32(uint32_t(arrayTypeOf(p.elemType)));
             o.str(p.elemType == T_STRUCT && p.elemStruct >= 0 ? ain.structs[p.elemStruct].name : "");
@@ -214,6 +248,7 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
         case PageKind::Struct:
             o.u32(4);
             o.u32(uint32_t(refs));
+            if (v9) o.u32(uint32_t(s + 1));
             const Struct &st = ain.structs[p.index];
             auto fnName = [&](int32_t fn) { return fn >= 0 && size_t(fn) < ain.functions.size() ? ain.functions[fn].name : ""; };
             o.str(fnName(st.constructor));
@@ -235,7 +270,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     if (data.size() < 8 || std::memcmp(data.data(), "RSM", 4) != 0) { error = "not a resume save"; return false; }
     in.i = 4;
     uint32_t version = in.u32();
-    if (version < 7 || version > 8) { error = "resume save version " + std::to_string(version) + " is not supported"; return false; }
+    if (version < 7 || version > 9) { error = "resume save version " + std::to_string(version) + " is not supported"; return false; }
     if (in.str() != key) { error = "the save belongs to another game"; return false; }
     in.u32();
     // An address record: the function by name, then the call's offset in it.
@@ -276,9 +311,16 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     in.u32();
     in.u32();
     in.u32();
-    if (in.bad || nf < 2 || kinds.size() != nf || nret + 1 != nf) { error = "the resume save is damaged"; return false; }
+    // Return points: one per frame below the root, and in version 9 one for the root too (its -1).
+    if (in.bad || nf < 1 || kinds.size() != nf || nret != (version >= 9 ? nf : nf - 1) || (version < 9 && nf < 2)) {
+        error = "the resume save is damaged";
+        return false;
+    }
+    // The return point of the frame at locals[k], k >= 1.
+    auto retAt = [&](uint32_t k) { return rets[version >= 9 ? k : k - 1]; };
 
     // The new heap, slot for slot as saved.
+    if (version >= 9) in.u32();  // the next object number
     std::vector<Slot> newHeap(in.count(4));
     for (size_t s = 0; s < newHeap.size() && !in.bad; s++) {
         int32_t kind = in.i32();
@@ -286,6 +328,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         Slot &sl = newHeap[s];
         sl.inUse = true;
         sl.refs = in.i32();
+        if (version >= 9) in.u32();  // the object number
         auto page = std::make_unique<Page>();
         auto readTypes = [&]() {
             uint32_t n = in.count(4);
@@ -344,6 +387,19 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
             readTypes();
             readValues(*page);
             break;
+        }
+        case 5: {
+            uint32_t bytes = in.u32();
+            if (bytes % 12 || bytes > data.size() - std::min(data.size(), in.i)) { in.bad = true; break; }
+            auto dg = std::make_unique<Delegate>();
+            for (uint32_t k = 0; k < bytes / 12; k++) {
+                int32_t obj = in.i32(), fn = in.i32();
+                in.u32();  // the object's number
+                if (fn < 0 || size_t(fn) >= ain.functions.size()) in.bad = true;
+                dg->push_back({obj, fn});
+            }
+            sl.dg = std::move(dg);
+            continue;
         }
         case 6: {
             auto dg = std::make_unique<Delegate>();
@@ -431,7 +487,7 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         for (uint32_t k = 1; k < nf; k++) {
             if (!pageAt(locals[k], PageKind::Local)) return false;
             if (kinds[k] == 2 && (methods >= selves.size() || !pageAt(selves[methods++], PageKind::Struct))) return false;
-            if (kinds[k] != 0 && rets[k - 1].first >= ain.code.size()) return false;
+            if (kinds[k] != 0 && retAt(k).first >= ain.code.size()) return false;
         }
         return true;
     };
@@ -456,15 +512,32 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
         f.native = kinds[k] == 0;
         f.method = kinds[k] == 2;
         f.structPage = f.method && self < selves.size() ? selves[self++] : -1;
-        f.callSite = rets[k - 1].first;
+        f.callSite = retAt(k).first;
         f.returnAddress = f.native ? 0 : f.callSite + insnLength(ain.code, f.callSite);
         // A method a delegate called returns to the DG_CALL itself, which calls the next one, and drops its value.
-        if (!f.native && isDelegateCall(ain.code, f.callSite)) {
+        if (!f.native && f.callSite >= kDelegateCallSiteShift && isDelegateCall(ain.code, f.callSite - kDelegateCallSiteShift)) {
+            f.callSite -= kDelegateCallSiteShift;
             f.returnAddress = f.callSite;
             f.discardReturn = true;
         }
         f.stackBase = kUnknownBase;
         frames.push_back(f);
+    }
+    if (version >= 9) {
+        // VNDegen runs the entry function as a frame of its own, which version 9 doesn't keep: the function the
+        // first saved frame returns into (or the one the save was made in), with fresh locals.
+        Frame e;
+        e.function = nf > 1 ? retAt(1).second : curFn;
+        const Function &fn = ain.functions[size_t(e.function)];
+        e.localPage = newPage(PageKind::Local, e.function, fn.vars.size());
+        for (size_t k = 0; k < fn.vars.size(); k++) {
+            int32_t t = fn.vars[k].t.type;
+            initVar(*heap[size_t(e.localPage)].page, k, fn.vars[k].t);
+            if (t == T_REF_INT || t == T_REF_FLOAT || t == T_REF_BOOL || t == 59) k++;  // a (page, index) pair
+        }
+        e.native = true;
+        e.stackBase = kUnknownBase;
+        frames.insert(frames.begin(), e);
     }
     // The first frame is the entry; when it returns, the game ends.
     if (!frames.empty()) frames.front().native = true;

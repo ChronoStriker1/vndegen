@@ -189,10 +189,12 @@ public:
     std::string saveDir;                    // the game's SaveData folder on this machine
     std::string saveFolderName = "SaveData";  // its name as the game sees it (the ini's SaveFolder)
     // How this game's PC VM writes saves. Test Game 19's Sys42VM writes resume saves of version 7 in an un-XORed
-    // GD container; Test Game 46's Sys43VM writes version 8 under the XOR.
+    // GD container and global saves in layout 5; Test Game 46's Sys43VM writes version 8 under the XOR, and layout 5
+    // for its version 5 code file; Test Game 56's VM writes layout 7 for its version 6 one.
     struct SaveFormat {
         bool xorData = true;
         uint32_t resumeVersion = 8;
+        uint32_t globalLayout = 5;
     } saveFormat;
     std::string rootDir;                    // the game's folder
     std::string gameName;

@@ -147,7 +147,11 @@ bool Game::start(std::string &error) {
     if (ini.count("SaveFolder")) vm->saveFolderName = ini["SaveFolder"];
     // Test Game 19's 2009 Sys42VM writes plain GD containers and version 7 resume saves (checked with a PC save
     // made under Wine). Sys43VM (Test Game 46) uses the XOR and version 8, the default.
-    if (lower(ini["MainVM"]) == "sys42vm") vm->saveFormat = {false, 7};
+    if (lower(ini["MainVM"]) == "sys42vm") vm->saveFormat = {false, 7, 5};
+    else if (vm->ain.version != 5) vm->saveFormat.globalLayout = 7;
+    // A game whose ini names no VM DLL runs the VM built into its exe; Test Game 56's writes resume saves of
+    // version 9 (checked with a PC save made under Wine).
+    if (ini["MainVM"].empty()) vm->saveFormat.resumeVersion = 9;
     vm->gameName = ini.count("GameName") ? ini["GameName"] : stem;
     vm->log = [this](const std::string &s) { log(s); };
     // The 3D libraries' per-frame calls are stubs (hll_3d.cpp); any other call starts a 3D scene.

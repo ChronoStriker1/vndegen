@@ -1,5 +1,7 @@
 #include "save.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -156,12 +158,23 @@ std::string hostPath(VM &vm, const std::string &name, bool inSaveFolder) {
 // A string's value is its index in the string section, an array's its index in the array section and a struct's its
 // record. Everything is written depth first, children before parents. Worked out from saves the SDK runtime wrote
 // for test programs with every kind of global, and checked against Test Game 46's own saves.
+//
+// Layout 7 (Test Game 56's VM, read from its PC saves) moves the struct members' types and names into definitions:
+//   records      i32 -1 for record 0, or a struct record's definition index; u32 n, n value indexes. No names.
+//   globals      u32 type, u32 value, name.
+//   arrays       as layout 5, except that each row is its length, the element type once, then the values.
+//   struct values u32 value each; the record's definition gives the members' types and names, in order.
+//   An empty string isn't in the string section: its value is INT32_MAX.
+//   definitions  after the struct values: u32 count, then for each struct the program saved (in the order of the
+//                code file's struct table) its name, u32 n, and u32 type and name for each member.
 
 namespace {
 
 struct Writer {
     VM &vm;
+    bool layout7 = vm.saveFormat.globalLayout == 7;
     std::vector<std::vector<uint8_t>> records;   // record 0 first
+    std::vector<std::pair<size_t, int32_t>> structRecords;  // layout 7: each struct record and its struct type
     std::vector<uint8_t> globals, strings, arrays, structVals;
     int nStrings = 0, nArrays = 0, nStructVals = 0;
 
@@ -169,6 +182,8 @@ struct Writer {
     static void cstr(std::vector<uint8_t> &b, const std::string &s) { b.insert(b.end(), s.begin(), s.end()); b.push_back(0); }
 
     int32_t addString(int32_t slot) {
+        // Test Game 56's PC save stores an empty string as INT32_MAX and leaves it out of the string section.
+        if (layout7 && vm.str(slot).empty()) return INT32_MAX;
         cstr(strings, vm.str(slot));
         return nStrings++;
     }
@@ -194,14 +209,19 @@ struct Writer {
         for (size_t i = 0; i < st.members.size() && i < p->v.size(); i++) {
             const VarType &mt = st.members[i].t;
             int32_t val = value(mt, vm.page(slot)->v[i]);
-            u32(structVals, uint32_t(mt.type));
+            if (!layout7) u32(structVals, uint32_t(mt.type));
             u32(structVals, uint32_t(val));
-            cstr(structVals, st.members[i].name);
+            if (!layout7) cstr(structVals, st.members[i].name);
             idx.push_back(nStructVals++);
         }
         std::vector<uint8_t> r;
-        u32(r, T_STRUCT);
-        cstr(r, st.name);
+        if (layout7) {
+            u32(r, 0);  // the definition's index, known once every struct is written (patched in definitions())
+            structRecords.emplace_back(records.size(), p->index);
+        } else {
+            u32(r, T_STRUCT);
+            cstr(r, st.name);
+        }
         u32(r, uint32_t(idx.size()));
         for (int32_t i : idx) u32(r, uint32_t(i));
         records.push_back(std::move(r));
@@ -218,12 +238,13 @@ struct Writer {
         }
         nRows++;
         u32(out, uint32_t(n));
+        if (layout7) u32(out, uint32_t(a ? a->elemType : T_INT));
         for (size_t i = 0; i < n; i++) {
             Page &ap = *vm.page(slot);
             VarType et{ap.elemType, ap.elemStruct, 0};
             int32_t val = value(et, ap.v[i]);
             u32(out, uint32_t(val));
-            u32(out, uint32_t(et.type));
+            if (!layout7) u32(out, uint32_t(et.type));
         }
     }
 
@@ -252,6 +273,30 @@ struct Writer {
         arrays.insert(arrays.end(), rec.begin(), rec.end());
         return nArrays++;
     }
+
+    // Layout 7: the definitions of the structs written, in struct table order, and each struct record's index.
+    std::vector<uint8_t> definitions() {
+        std::vector<int32_t> types;
+        for (auto &[rec, type] : structRecords) types.push_back(type);
+        std::sort(types.begin(), types.end());
+        types.erase(std::unique(types.begin(), types.end()), types.end());
+        for (auto &[rec, type] : structRecords) {
+            uint32_t at = uint32_t(std::lower_bound(types.begin(), types.end(), type) - types.begin());
+            std::memcpy(records[rec].data(), &at, 4);
+        }
+        std::vector<uint8_t> out;
+        u32(out, uint32_t(types.size()));
+        for (int32_t type : types) {
+            const Struct &st = vm.ain.structs[size_t(type)];
+            cstr(out, st.name);
+            u32(out, uint32_t(st.members.size()));
+            for (const Variable &m : st.members) {
+                u32(out, uint32_t(m.t.type));
+                cstr(out, m.name);
+            }
+        }
+        return out;
+    }
 };
 
 }  // namespace
@@ -275,16 +320,22 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
         Writer::u32(w.globals, uint32_t(g.t.type));
         Writer::u32(w.globals, uint32_t(val));
         Writer::cstr(w.globals, g.name);
-        Writer::u32(w.globals, 1);
+        if (!w.layout7) Writer::u32(w.globals, 1);
         saved.push_back(int32_t(saved.size()));
         gp = vm.page(vm.globalPage);
     }
     auto &r0 = w.records[0];
-    Writer::u32(r0, 1000);
-    r0.push_back(0);
+    if (w.layout7) {
+        Writer::u32(r0, uint32_t(-1));
+    } else {
+        Writer::u32(r0, 1000);
+        r0.push_back(0);
+    }
     Writer::u32(r0, uint32_t(saved.size()));
     for (int32_t i : saved) Writer::u32(r0, uint32_t(i));
 
+    // Layout 7's definitions, which also fill in each struct record's definition index.
+    std::vector<uint8_t> defs = w.layout7 ? w.definitions() : std::vector<uint8_t>{};
     std::vector<uint8_t> out;
     Writer::cstr(out, key);
     size_t keyLen = out.size();
@@ -301,9 +352,10 @@ int32_t globalSave(VM &vm, const std::string &key, const std::string &file, cons
     out.insert(out.end(), w.arrays.begin(), w.arrays.end());
     uint32_t structOff = uint32_t(out.size());
     out.insert(out.end(), w.structVals.begin(), w.structVals.end());
-    // Layout 5, the one below. Test Game 19's Sys42VM always writes it; Test Game 46's Sys43VM writes it for a
-    // version 5 code file and a different layout, 7, otherwise (both read from the VMs' save routines).
-    uint32_t hdr[14] = {1000, 5, 56, uint32_t(vm.ain.globals.size()),
+    out.insert(out.end(), defs.begin(), defs.end());
+    // Test Game 19's Sys42VM always writes layout 5; Test Game 46's Sys43VM writes it for a version 5 code file and
+    // layout 7 otherwise (both read from the VMs' save routines), as Test Game 56's VM does.
+    uint32_t hdr[14] = {1000, vm.saveFormat.globalLayout, 56, uint32_t(vm.ain.globals.size()),
                         recordsOff, uint32_t(w.records.size()), globalsOff, uint32_t(saved.size()),
                         stringsOff, uint32_t(w.nStrings), arraysOff, uint32_t(w.nArrays), structOff, uint32_t(w.nStructVals)};
     std::memcpy(out.data() + headerAt, hdr, 56);
@@ -348,6 +400,7 @@ struct Loaded {
     std::vector<std::string> strings;
     std::vector<size_t> arrayAt;   // offset of each array record
     const std::vector<uint8_t> *data = nullptr;
+    bool layout7 = false;  // rows give their element type once, before the values
 };
 
 bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::string &group) {
@@ -357,15 +410,15 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
     size_t h = i;
     uint32_t hdr[14];
     for (auto &x : hdr) x = r.u32(h);
-    if (r.bad || hdr[0] != 1000) return false;
-    if (hdr[1] == 7) return false;  // layout 7 (struct definitions at the end): no test game writes it
+    if (r.bad || hdr[0] != 1000 || (hdr[1] != 5 && hdr[1] != 7)) return false;
+    L.layout7 = hdr[1] == 7;
     size_t g = i + 56;
     group = r.cstr(g);
     size_t p = hdr[4];
     for (uint32_t k = 0; k < hdr[5] && !r.bad; k++) {
         Loaded::Rec rec;
-        rec.kind = int32_t(r.u32(p));
-        rec.name = r.cstr(p);
+        rec.kind = int32_t(r.u32(p));  // in layout 7, a struct record's definition index
+        if (!L.layout7) rec.name = r.cstr(p);
         uint32_t n = r.u32(p);
         for (uint32_t m = 0; m < n && !r.bad; m++) rec.idx.push_back(int32_t(r.u32(p)));
         L.records.push_back(std::move(rec));
@@ -376,7 +429,7 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
         v.type = int32_t(r.u32(p));
         v.value = int32_t(r.u32(p));
         v.name = r.cstr(p);
-        r.u32(p);
+        if (!L.layout7) r.u32(p);
         L.globals.push_back(std::move(v));
     }
     p = hdr[8];
@@ -391,17 +444,47 @@ bool parse(const std::vector<uint8_t> &d, Loaded &L, std::string &key, std::stri
         p += 4 * size_t(rank);  // dimensions
         uint32_t nRows = r.u32(p);
         for (uint32_t row = 0; row < nRows && !r.bad; row++) {
-            p += 8 * size_t(r.u32(p));
+            size_t n = r.u32(p);
+            p += L.layout7 ? 4 + 4 * n : 8 * n;
             if (p > d.size()) r.bad = true;  // a truncated last row must fail here, before anything is applied
         }
     }
     p = hdr[12];
     for (uint32_t k = 0; k < hdr[13] && !r.bad; k++) {
         Loaded::Val v;
-        v.type = int32_t(r.u32(p));
+        if (!L.layout7) v.type = int32_t(r.u32(p));
         v.value = int32_t(r.u32(p));
-        v.name = r.cstr(p);
+        if (!L.layout7) v.name = r.cstr(p);
         L.structVals.push_back(std::move(v));
+    }
+    if (L.layout7 && !r.bad) {
+        // The definitions give each struct record its name, and its values their members' types and names.
+        struct Def { std::string name; std::vector<Loaded::Val> members; };
+        std::vector<Def> defs(r.u32(p));
+        if (defs.size() > d.size()) return false;
+        for (Def &def : defs) {
+            def.name = r.cstr(p);
+            uint32_t n = r.u32(p);
+            for (uint32_t m = 0; m < n && !r.bad; m++) {
+                Loaded::Val mv;
+                mv.type = int32_t(r.u32(p));
+                mv.name = r.cstr(p);
+                def.members.push_back(std::move(mv));
+            }
+            if (r.bad) return false;
+        }
+        for (size_t k = 1; k < L.records.size(); k++) {
+            Loaded::Rec &rec = L.records[k];
+            if (rec.kind < 0 || size_t(rec.kind) >= defs.size()) return false;
+            const Def &def = defs[size_t(rec.kind)];
+            rec.name = def.name;
+            for (size_t m = 0; m < rec.idx.size() && m < def.members.size(); m++) {
+                int32_t vi = rec.idx[m];
+                if (vi < 0 || size_t(vi) >= L.structVals.size()) return false;
+                L.structVals[size_t(vi)].type = def.members[m].type;
+                L.structVals[size_t(vi)].name = def.members[m].name;
+            }
+        }
     }
     L.data = &d;
     return !r.bad;
@@ -464,9 +547,10 @@ struct Checker {
             // The innermost rows, in order, with their struct elements.
             for (uint64_t row = 0; row < level && !failed && !r.bad; row++) {
                 uint32_t n = r.u32(p);
+                if (L.layout7) r.u32(p);  // the row's element type
                 for (uint32_t k = 0; k < n && !r.bad && !failed; k++) {
                     int32_t val = int32_t(r.u32(p));
-                    r.u32(p);
+                    if (!L.layout7) r.u32(p);
                     // Applier stores each element as a value, one level down.
                     if (++depth > kMaxNesting) failed = true;
                     else if (elemStruct >= 0) record(elemStruct, val);
@@ -582,8 +666,9 @@ struct Applier {
             return s;
         }
         uint32_t n = r.u32(p);
+        int32_t rowType = L.layout7 ? int32_t(r.u32(p)) : 0;
         for (uint32_t k = 0; k < n && !r.bad && !failed; k++) {
-            int32_t val = int32_t(r.u32(p)), typ = int32_t(r.u32(p));
+            int32_t val = int32_t(r.u32(p)), typ = L.layout7 ? rowType : int32_t(r.u32(p));
             int32_t v = elemType == T_STRING ? vm.newString() : elemType == T_STRUCT ? vm.newStruct(elemStruct) : 0;
             store(v, VarType{elemType, elemStruct, 0}, typ, val);
             vm.page(s)->v.push_back(v);

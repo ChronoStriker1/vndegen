@@ -69,7 +69,9 @@ port. This file lists where each part of the runtime came from, and what was unc
     198 calls a method on a member of a member of `this` (a first guess, "a member of a global", failed at the save
     screen, where the struct types prove the member reading); 207 is a reference check with no effect on the stack;
     212 assigns the string at (page, index) to a string; 214 is "the string at (page, index) is empty"; 227 assigns
-    a function-stack name, used only in error reporting.
+    a function-stack name, used only in error reporting; 232, which only Test Game 56 uses, pushes a local string
+    onto a global array, like 226 (onto a local array) and 233 (onto a member), and its one use adds a name to a
+    list when it isn't there yet.
 - Heap model: pages (globals, a function's locals, a struct, an array) and strings in reference-counted slots whose
   numbers the code handles directly, as the SDK listings show (string variables hold slots, `SH_LOCALCREATE` makes a
   struct, references are page and index pairs and keep their page alive).
@@ -96,6 +98,12 @@ save file and 28 copy one were read from the game functions that wrap them (thei
 - AFA (Test Game 56): an "AFAH" header naming "AlicArch", then an "INFO" block holding a zlib-compressed index. Each
   index entry is a name length, a padded length, the name, two unused words, the offset from the data block and the
   size. Read from the files and checked by listing every entry of Test Game 56's archives.
+- QNT version 2 (Test Game 56): the header is 0x44 bytes, and the alpha plane's width is rounded up to even while
+  an odd height is left as is. Both were read from the sizes in the files: the header's plane sizes add up to the
+  file, and the alpha plane inflates to width rounded up times height. The save thumbnails VNDegen writes are
+  version 0 QNTs made by running the decoder's prediction backwards.
+- AFA music and sound (Test Game 56): `BA.afa` and `WA.afa` hold entries named by number, `00001.ogg`, as listing
+  the archives shows.
 - WebP: some later pictures, and some AJP masks, are WebP files. They decode with ImageIO on Apple and libwebp on
   the Linux host.
 
@@ -189,6 +197,26 @@ file and from the calls the game makes.
   reference's `draw_graph` page; the readings taken where they are silent are commented in the file.
 - Encodings these libraries hand the game to store in its saves (MultiSprite_Encode, CharSpriteManager_Save,
   ADVLogList_Save, ADVSceneKeeper_Save) follow the PC's; see the section above.
+
+### PartsEngine and the libraries Test Game 56 adds (`hll_parts.cpp`, `hll_kiwi.cpp`, `hll_commondata.cpp`, `hll_3d.cpp`)
+
+None of these libraries has SDK documentation, and they are built into `Rance9.exe`. Their behaviour comes from the
+game's code file: the libraries' function and argument names (`s4dis --lib`), the game functions that wrap them,
+and what the game does with the results. Specifically:
+- PartsFunc takes a function number and int, float and string arrays. The numbers and argument orders came from the
+  game's wrapper functions (each pushes its number, fills the arrays and reads the result back); the result is the
+  last element of its type's array, which each wrapper fills with a placeholder first. Number 162 makes a drawing
+  plugin's surface on a part and 163 returns its handle, which the game then passes to DrawMovie3.Draw.
+- Message types (1 pointer enters, 2 moves, 3 leaves, 4 wheel, 5 click, 14 to 17 keys, 18 and 19 focus) and their
+  variables (the pointer's x and y, then the key for a click) came from the game's message dispatcher, a switch over
+  the type whose cases call one handler each.
+- The parts layer numbers, the activity and intent calls and the thumbnail call came from their wrappers' names and
+  arguments. A save thumbnail's file name and the `<save>` prefix the save list loads it by are strings in the code.
+- Delegates hold each method once: the game decides whether two button functions are the same by adding one to a
+  copy of the other and checking the count didn't change. A method a delegate calls returns to the DG_CALL
+  instruction, which calls the next one; a resume save made inside one resumes there.
+- Test Game 56's 3D starts where it makes a 3D parts layer (Parts_CreateParts3DLayerPluginID) or calls SealEngine
+  beyond the settings each 2D frame makes; both were seen in a run into the first chapter.
 
 ## Known gaps and open questions
 

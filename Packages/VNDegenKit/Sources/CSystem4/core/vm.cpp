@@ -1118,7 +1118,18 @@ void VM::run(size_t untilFrames) {
         // the next method with copies of the arguments, or when none are left drops them and jumps past the loop.
         // Strings, structs and delegates passed by value belong to the callee, so each method gets its own copy and
         // the loop releases the originals at the end.
-        case OP_DG_CALLBEGIN: push(0); break;
+        case OP_DG_CALLBEGIN: {
+            // The delegate moves above its arguments for the call, [arguments..., delegate, index], as in the PC's VM:
+            // Test Game 56's resume saves made inside a delegate call hold the stack that way.
+            size_t nargs = size_t(ain.delegates.at(A(0)).argc);
+            if (stack.size() < nargs + 1) fatal("delegate call without its delegate");
+            size_t at = stack.size() - nargs - 1;
+            int32_t dsl = stack[at];
+            stack.erase(stack.begin() + ptrdiff_t(at));
+            stack.push_back(dsl);
+            push(0);
+            break;
+        }
         case OP_DG_CALL: {
             const FuncType &ft = ain.delegates.at(A(0));
             int nargs = 0;
@@ -1126,7 +1137,7 @@ void VM::run(size_t untilFrames) {
             size_t top = stack.size();
             if (top < size_t(nargs) + 2) fatal("delegate call without its delegate");
             int32_t idx = stack[top - 1];
-            int32_t dsl = stack[top - 2 - nargs];
+            int32_t dsl = stack[top - 2];
             Delegate *d = delegate(dsl);
             auto byValue = [&](int k) {
                 int32_t t = size_t(k) < ft.vars.size() ? ft.vars[size_t(k)].t.type : T_INT;
@@ -1138,7 +1149,7 @@ void VM::run(size_t untilFrames) {
                 int32_t result = idx > 0 ? dgLastReturn_ : ft.ret.type == T_STRING ? newString() : ft.ret.type == T_STRUCT ? -1 : 0;
                 std::vector<int32_t> owned;
                 for (int k = 0; k < nargs; k++)
-                    if (byValue(k)) owned.push_back(stack[top - 1 - nargs + k]);
+                    if (byValue(k)) owned.push_back(stack[top - 2 - nargs + k]);
                 stack.resize(top - 2 - nargs);
                 for (int32_t v : owned) decref(v);
                 if (ft.ret.type != T_VOID) push(result);
@@ -1148,7 +1159,7 @@ void VM::run(size_t untilFrames) {
             auto [obj, fn] = (*d)[idx];
             stack[top - 1] = idx + 1;
             for (int k = 0; k < nargs; k++) {
-                int32_t v = stack[top - 1 - nargs + k];
+                int32_t v = stack[top - 2 - nargs + k];
                 int32_t t = byValue(k) ? ft.vars[size_t(k)].t.type : T_INT;
                 if (t == T_STRING) push(newString(str(v)));
                 else if (t == T_STRUCT) push(copyPage(v));
