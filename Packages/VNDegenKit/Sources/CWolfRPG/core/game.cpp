@@ -138,8 +138,12 @@ void Game::returnToTitle() {
     party_ = {};
     cameraX_ = cameraY_ = scrollX_ = scrollY_ = 0;
     moveDuringEvents_ = haltNonPicture_ = scrollLocked_ = false;
-    autoKeys_ = 0;
-    keyControl_ = 0;
+    autoKeys_ = autoMouse_ = 0;
+    autoKeyCodes_.reset();
+    autoWheel_ = 0;
+    basicControl_ = {};
+    keyboardOff_ = mouseOff_ = false;
+    keyCodesOff_.reset();
     shake_ = {};
     mapZoom_ = {100, 100};
     mapZoomX_ = mapZoomY_ = {};
@@ -569,9 +573,7 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 // Frame
 
 void Game::update(const Input &input) {
-    input_ = input;
-    for (size_t k = 0; k < heldFrames_.size(); k++)
-        heldFrames_[k] = ((input.held | autoKeys_) >> k) & 1 ? heldFrames_[k] + 1 : 0;
+    gatherInput(input);
     frame_++;
     // A load requested last frame takes effect before anything runs (savestate.cpp).
     if (pendingLoad_) applyPendingLoad();
@@ -582,15 +584,24 @@ void Game::update(const Input &input) {
         if (system_[28] % gameDat_.fps() == 0) system_[29]++;
     }
 
+    // System variable 73 lets a click work the game's messages and choices.
+    bool mouseText = system_.size() > 73 && system_[73] == 1;
     // Choices take the keys while they are open.
     if (choice_.active && !choice_.visible.empty()) {
         int n = int(choice_.visible.size());
-        if (input.pressed & KeyDown) choice_.cursor = (choice_.cursor + 1) % n;
-        if (input.pressed & KeyUp) choice_.cursor = (choice_.cursor + n - 1) % n;
-        if (input.pressed & KeyConfirm) {
+        if (input_.pressed & KeyDown) choice_.cursor = (choice_.cursor + 1) % n;
+        if (input_.pressed & KeyUp) choice_.cursor = (choice_.cursor + n - 1) % n;
+        bool click = false;
+        if (mouseText && choiceBox_.lineH > 0 && mouseX_ >= choiceBox_.x && mouseX_ < choiceBox_.x + choiceBox_.w &&
+            mouseY_ >= choiceBox_.y && mouseY_ < choiceBox_.y + choiceBox_.lineH * n) {
+            int under = int((mouseY_ - choiceBox_.y) / choiceBox_.lineH);
+            if (mouseX_ != lastMouseX_ || mouseY_ != lastMouseY_ || (input_.mousePressed & MouseLeft)) choice_.cursor = under;
+            click = input_.mousePressed & MouseLeft;
+        }
+        if ((input_.pressed & KeyConfirm) || click) {
             choice_.result = choice_.visible[choice_.cursor] + 1;
             choice_.active = false;
-        } else if ((input.pressed & KeyCancel) && choice_.cancelCase >= 0) {
+        } else if (((input_.pressed & KeyCancel) || (mouseText && (input_.mousePressed & MouseRight))) && choice_.cancelCase >= 0) {
             choice_.result = choice_.cancelCase;
             choice_.active = false;
         }
@@ -598,10 +609,11 @@ void Game::update(const Input &input) {
     }
     // Messages type one character a frame. The first confirm shows the rest at once, the next closes the window.
     if (message_.active) {
+        bool advance = (input_.pressed & (KeyConfirm | KeyCancel)) || (mouseText && (input_.mousePressed & MouseLeft));
         if (message_.shown < message_.total) {
-            if (input.pressed & (KeyConfirm | KeyCancel)) message_.shown = message_.total;
+            if (advance) message_.shown = message_.total;
             else message_.shown++;
-        } else if (input.pressed & (KeyConfirm | KeyCancel)) {
+        } else if (advance) {
             message_.active = false;
         }
         // The press that finishes or closes a message is used up, so it doesn't also talk to the event in front.
@@ -689,7 +701,6 @@ void Game::update(const Input &input) {
         shake_.offset = shake_.frames ? std::sin(frame_ * 0.3 * shake_.speed) * shake_.power * 2 : 0;
     }
     if (transition_.frames > 0 && ++transition_.elapsed >= transition_.frames) transition_.frames = 0;
-    autoKeys_ = 0;
     tintR_.step();
     tintG_.step();
     tintB_.step();

@@ -63,6 +63,12 @@ enum {
     VNWOLF_KEY_F1 = 300,  // F1..F12 are VNWOLF_KEY_F1 + 0..11
 };
 
+// The mouse. x and y are normalized over the frame, 0 to 1. Buttons are 0 left, 1 right, 2 middle. A notch of the wheel
+// is positive away from the player.
+void vnwolf_mouse_move(VNWolfEngine *e, float x, float y);
+void vnwolf_mouse_button(VNWolfEngine *e, int button, bool down);
+void vnwolf_mouse_wheel(VNWolfEngine *e, int notches);
+
 // Stops the clock and sound. vnwolf_step does nothing while paused.
 void vnwolf_set_paused(VNWolfEngine *e, bool paused);
 

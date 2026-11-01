@@ -261,6 +261,7 @@ void Renderer::drawChoices(Canvas &canvas) {
     RectF box{x, bottom - h, w, h};
     // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement.
     if (int top = game_.choiceTop(); top >= 0) box.y = float(top);
+    game_.setChoiceBox(box.x + pad, box.y + pad, w - pad * 2, lineH);
     drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.9f);
     BitmapPtr cursor = images_.get(game_.cursorSkin());
     float blink = 0.6f + 0.4f * float(std::sin(game_.frameCount() * 0.1));

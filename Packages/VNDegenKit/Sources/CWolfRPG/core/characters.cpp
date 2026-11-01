@@ -1,5 +1,7 @@
 // Characters on the map: movement, passability, move routes, the hero's controls, and event triggers.
 #include "game.h"
+
+#include <bit>
 #include "game_internal.h"
 
 #include <algorithm>
@@ -321,12 +323,14 @@ void Game::heroControl() {
     // Commands 230 and 231 let the hero walk while an event runs; the event goes on meanwhile.
     bool eventRunning = !threads_.empty();
     if ((eventRunning && !moveDuringEvents_) || message_.active || choice_.active || hero_.moving() || hero_.route) return;
+    // Keys command 126 stopped from moving the hero or starting events still reach key input commands.
+    auto moves = [&](Key key) { return (input_.held & key) && basicControl_[std::countr_zero(uint32_t(key))] == 0; };
     int dir = 0;
-    if (input_.held & KeyDown) dir = 2;
-    else if (input_.held & KeyLeft) dir = 4;
-    else if (input_.held & KeyRight) dir = 6;
-    else if (input_.held & KeyUp) dir = 8;
-    if ((input_.pressed & KeyConfirm) && !eventRunning) {
+    if (moves(KeyDown)) dir = 2;
+    else if (moves(KeyLeft)) dir = 4;
+    else if (moves(KeyRight)) dir = 6;
+    else if (moves(KeyUp)) dir = 8;
+    if ((input_.pressed & KeyConfirm) && !eventRunning && basicControl_[std::countr_zero(uint32_t(KeyConfirm))] == 0) {
         // The event on the hero's tile, then the one in front, then one across a counter.
         int fx = hero_.tx + dirX(hero_.chara.direction), fy = hero_.ty + dirY(hero_.chara.direction);
         if (eventAt(hero_.tx, hero_.ty, 0, true) || eventAt(fx, fy, 0, true)) return;

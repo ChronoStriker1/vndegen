@@ -7,6 +7,7 @@
 #include "files.h"
 
 #include <array>
+#include <bitset>
 #include <deque>
 #include <cstdlib>
 #include <cstdint>
@@ -30,9 +31,25 @@ enum Key : uint32_t {
     KeySub = 1 << 6,
 };
 
+// Mouse buttons, as bits of Input's mouse fields.
+enum MouseButton : uint32_t {
+    MouseLeft = 1 << 0,
+    MouseRight = 1 << 1,
+    MouseMiddle = 1 << 2,
+};
+
+// Keyboard keys by Wolf's own key code, 100 and up: 100 plus the DirectInput scan code of the key (the manual's key
+// input page and WodiLib's KeyboardCode).
+constexpr int kKeyCodeCount = 356;
+using KeyCodes = std::bitset<kKeyCodeCount>;
+
 struct Input {
     uint32_t held = 0;
     uint32_t pressed = 0;  // went down this frame
+    KeyCodes keysHeld, keysPressed;
+    int mouseX = 0, mouseY = 0;  // in the game's pixels
+    uint32_t mouseHeld = 0, mousePressed = 0;
+    int wheel = 0;  // notches this frame, positive away from the player
 };
 
 // What a picture shows: an image file, text, or a window skin stretched to a size.
@@ -199,6 +216,7 @@ public:
     const GameFiles &files() const { return files_; }
     const std::map<int, Picture> &pictures() const { return pictures_; }
     const ChoiceState &choice() const { return choice_; }
+    void setChoiceBox(float x, float y, float w, float lineH) const { choiceBox_ = {x, y, w, lineH}; }
     const MessageState &message() const { return message_; }
     const Map *map() const { return map_.get(); }
     int mapId() const { return mapId_; }
@@ -296,6 +314,7 @@ private:
     const CommonEvent *commonById(int id) const;
     void databaseCommand(Thread &t, const Command &c);
     void setVariablePlus(Thread &t, const Command &c);
+    void csvCommand(Thread &t, const Command &c);
     bool keyInput(Thread &t, const Command &c);
     void partyCommand(Thread &t, const Command &c);
     void effectCommand(Thread &t, const Command &c);
@@ -342,6 +361,12 @@ private:
     // --- end of savestate.cpp declarations ---
     Database *databaseKind(int kind);
     uint32_t keysNow() const;
+    void gatherInput(const Input &input);  // this frame's input: the host's, with auto input and the game's key rules
+    void keyControl(Thread &t, const Command &c);  // command 126
+    void autoInput(Thread &t, const Command &c);   // command 125
+    bool pictureUnderMouse(const Picture &p) const;
+    int eventUnderMouse() const;
+    void chooseWithMouse(int n);
 
     // Maps and events.
     bool loadMap(int id);
@@ -414,8 +439,24 @@ private:
     bool moveDuringEvents_ = false, haltNonPicture_ = false, scrollLocked_ = false;
     bool pendingTitle_ = false, quitRequested_ = false;
     std::string soundFont_, soundFontFallback_;
-    uint32_t autoKeys_ = 0;
-    int keyControl_ = 0;
+    // What command 125 presses, which counts as input on the next frame.
+    uint32_t autoKeys_ = 0, autoMouse_ = 0;
+    KeyCodes autoKeyCodes_;
+    int autoWheel_ = 0;
+    // Command 126: for each Wolf key, 0 accepts it, 1 stops it moving the hero or starting events, and 2 stops it
+    // altogether. Keys the game turned off by device.
+    std::array<int, 7> basicControl_{};
+    bool keyboardOff_ = false, mouseOff_ = false;
+    KeyCodes keyCodesOff_;
+    // Last frame's state, for the edges of pressing and letting go.
+    uint32_t lastHeld_ = 0, lastMouseHeld_ = 0;
+    KeyCodes lastKeysHeld_;
+    std::array<int, 3> mouseHeldFrames_{};
+    std::array<int, kKeyCodeCount> keyHeldFrames_{};
+    int mouseX_ = 0, mouseY_ = 0, lastMouseX_ = 0, lastMouseY_ = 0, hostMouseX_ = -1, hostMouseY_ = -1;
+    // Where the renderer drew the choice window, for the mouse. Zero height until it first draws.
+    struct ChoiceBox { float x = 0, y = 0, w = 0, lineH = 0; };
+    mutable ChoiceBox choiceBox_;
     ShakeState shake_;
     Tween mapZoom_{100, 100}, mapZoomX_, mapZoomY_;
     TransitionState transition_;

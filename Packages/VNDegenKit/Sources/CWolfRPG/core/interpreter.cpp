@@ -390,12 +390,11 @@ bool Game::step(Thread &t) {
             return true;
         case 123:
             return keyInput(t, cmd);
-        case 125: {  // press keys automatically
-            autoKeys_ |= uint32_t(cmd.arg(0));
+        case 125:
+            autoInput(t, cmd);
             return true;
-        }
-        case 126:  // enable or disable standard keys
-            keyControl_ = cmd.arg(0);
+        case 126:
+            keyControl(t, cmd);
             return true;
 
         case 270:
@@ -466,7 +465,9 @@ bool Game::step(Thread &t) {
         case 242:
             chipCommand(t, cmd);
             return true;
-        case 251:  // CSV import and export of database data
+        case 251:
+            csvCommand(t, cmd);
+            return true;
         case 260:  // download a file
             unsupported(cmd);
             return true;
@@ -520,6 +521,10 @@ void Game::setVariable(Thread &t, const Command &c) {
     uint8_t b0 = flags & 0xFF, b1 = (flags >> 8) & 0xFF;
     int calc = b1 & 0xF0, assign = b1 & 0x0F;
     if (b0 & 0x10) target = readVar(target, t);
+    // Target 1,100,000,000 with three more fields writes a changeable database cell named by those fields, which may
+    // be variables (WodiLib's SetVariableChangeableDB).
+    if (target == 1100000000 && c.args.size() >= 7)
+        target += value(c.arg(4), t) * 1000000 + value(c.arg(5), t) * 100 + value(c.arg(6), t);
     int32_t a = (b0 & 0x04) ? r1 : value(r1, t);
     if (b0 & 0x20) a = readVar(readVar(r1, t), t);
     int32_t b = (b0 & 0x08) ? r2 : value(r2, t);
