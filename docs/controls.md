@@ -59,6 +59,8 @@ Commands a game keeps where VNDegen draws nothing, such as a KiriKiri game's win
 
 Game commands list one level of the game's menu at a time. Up and down move, A opens a submenu or runs a command, B goes back a level, and from the top back to the VNDegen menu. Touch and a mouse choose an item directly, and the arrow at the top goes back. A KiriKiri game whose scripts check whether the window's menu bar is hidden, and then put their commands on screen, is told it is hidden, so those buttons show. Any other KiriKiri game is told it shows, so the game builds its menu for Game commands. The game page's Window menu option overrides that per game.
 
+AliceSoft System 3 games have Skip until choice there, which the PC keeps in the window's menu bar. It passes message waits until the next choice or left click.
+
 On iPhone and iPad, VNDegen's Ren'Py menu offers Quick save and Quick load when the game's quick menu for this device has no QuickSave action. They use the game's own quick save slot. If VNDegen cannot inspect the quick menu, it offers both commands when the game supports quick saves.
 
 ## Cheats

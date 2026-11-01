@@ -45,6 +45,15 @@ import VNCore
         #expect(router.translate(.button(.confirm, pressed: false)) { $0 } == [.key(13, down: false)])
     }
 
+    @Test func aControllerReleaseAfterFocusLossLeavesAKeyboardPressAlone() {
+        var router = System4InputRouter()
+        _ = router.translate(.button(.confirm, pressed: true)) { $0 }  // Confirm holds Return
+        _ = router.releaseAll()                                        // the app lost focus
+        #expect(router.hostKey(hidUsage: 40, pressed: true) == [.key(13, down: true)])  // Return on the keyboard
+        #expect(router.translate(.button(.confirm, pressed: false)) { $0 }.isEmpty)     // the button comes up late
+        #expect(router.hostKey(hidUsage: 40, pressed: false) == [.key(13, down: false)])
+    }
+
     @Test func aModifierFollowsTheSystemNotAStaleToggle() {
         // Control was let go in another app; the view's toggle then reports its next press as a release.
         var router = System4InputRouter()

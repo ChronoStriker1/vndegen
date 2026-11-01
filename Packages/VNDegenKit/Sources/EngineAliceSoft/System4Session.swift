@@ -453,19 +453,29 @@ nonisolated struct System4InputRouter {
     private var held: [Int32: Int] = [:]
     private var hostKeysDown: Set<Int> = []
     private var pointerDown: Set<Int32> = []  // mouse buttons a pointer holds: 1 left, 2 right
+    /// What holds each of the controls and bound keys, so a release that `releaseAll` already answered lets go of
+    /// nothing, rather than a press of the same key from another source.
+    private var controlsDown: [ControlSource: Int] = [:]
     private var scrolled = 0.0
+
+    private enum ControlSource: Hashable {
+        case button(VirtualButton)
+        case key(Int32)
+        case click(Int32)
+    }
 
     mutating func translate(_ event: ControllerEvent, frame: (CGPoint) -> CGPoint) -> [System4Input] {
         switch event {
         case let .button(button, pressed):
-            return control(button, pressed)
+            return tracking(.button(button), pressed) ? control(button, pressed) : []
         case let .gamepad(input, pressed):
             guard let button = input.virtualButton else { return [] }
-            return control(button, pressed)
+            return tracking(.button(button), pressed) ? control(button, pressed) : []
         case let .key(key, pressed):
-            return press(Int32(key.keyCode), pressed)
+            return tracking(.key(Int32(key.keyCode)), pressed) ? press(Int32(key.keyCode), pressed) : []
         case let .click(button, pressed):
-            return press(button == .primary ? 1 : 2, pressed)
+            let vk: Int32 = button == .primary ? 1 : 2
+            return tracking(.click(vk), pressed) ? press(vk, pressed) : []
         case let .pointer(pointer):
             return self.pointer(pointer, at: frame(pointer.location))
         case let .scroll(dy):
@@ -476,6 +486,18 @@ nonisolated struct System4InputRouter {
             // Content scrolling down is the wheel turned toward the player, which opens no backlog.
             return [.wheel(-notches)]
         }
+    }
+
+    /// Counts a press or release of a source. False for a release of something this router isn't holding.
+    private mutating func tracking(_ source: ControlSource, _ pressed: Bool) -> Bool {
+        let count = controlsDown[source, default: 0]
+        if pressed {
+            controlsDown[source] = count + 1
+            return true
+        }
+        guard count > 0 else { return false }
+        controlsDown[source] = count == 1 ? nil : count - 1
+        return true
     }
 
     /// A pointer event whose location is already normalized over the frame, from the session view itself.
@@ -553,6 +575,7 @@ nonisolated struct System4InputRouter {
         held = [:]
         hostKeysDown = []
         pointerDown = []
+        controlsDown = [:]
         return out
     }
 
