@@ -106,6 +106,11 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         ]
     }
 
+    public var listsEngineFiles: Bool { true }
+
+    /// The NW.js runtime around the game. `www/`, `js/`, `save/`, and `package.json` stay.
+    public func engineFileList(_ probe: FolderProbe) -> EngineFileList? { DesktopRuntimeFiles.nwjs(probe) }
+
     /// Buttons used to press these keys, so a remap from then presses the same key.
     public func legacyAction(for button: VirtualButton) -> ControlAction? {
         KeyStroke.key(for: button).map(ControlAction.key)

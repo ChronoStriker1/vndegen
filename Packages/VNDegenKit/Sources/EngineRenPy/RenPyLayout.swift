@@ -84,6 +84,34 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         self.init(base: base, version: version?.map(String.init).joined(separator: "."), runtime: runtime, evidence: evidence)
     }
 
+    /// What VNDegen doesn't use of a PC build: the Python and platform libraries in `lib/`, since a game runs on a bundled
+    /// runtime, and the launchers Ren'Py names after the game's `.py`. `renpy/`, `game/`, and the small `.py` and `.sh`
+    /// launchers stay. `lib/` stays when its names are what told this game's Ren'Py line apart.
+    func engineFiles(_ probe: FolderProbe) -> EngineFileList {
+        let base = probe.root.appendingPathComponent(self.base, isDirectory: true)
+        let names = { (folder: String) in (try? FileManager.default.contentsOfDirectory(atPath: FileCase.resolve(folder, in: base).path)) ?? [] }
+        var folders = Set<String>()
+        if evidence != .libraries || Self.runtime(engineFiles: names("renpy").map { $0.lowercased() }) == runtime {
+            let prefixes = ["py2-", "py3-", "windows-", "linux-", "darwin-", "mac-", "python2", "python3", "pythonlib"]
+            for name in names("lib").map({ $0.lowercased() }) where prefixes.contains(where: { name.hasPrefix($0) }) { folders.insert("lib/\(name)") }
+        }
+        let prefix = self.base.isEmpty ? "" : "\(self.base)/".lowercased()
+        let top = probe.entries.map { $0.lowercased() }.filter { $0.hasPrefix(prefix) && !$0.dropFirst(prefix.count).contains("/") }
+            .map { String($0.dropFirst(prefix.count)) }
+        var files = Set<String>()
+        // A PC build has one launcher `.py`. With more, one may be a mod's, and its `.exe` a mod's tool, so all of them stay.
+        let scripts = top.filter { $0.hasSuffix(".py") }
+        if scripts.count == 1, let stem = scripts.first?.dropLast(3) {
+            files = ["\(stem).exe", "\(stem)-32.exe"]
+            // A Mac build can hold the game itself, and then it isn't a launcher.
+            let app = "\(stem).app"
+            if top.contains(app), !FileManager.default.fileExists(atPath: FileCase.resolve("\(app)/Contents/Resources/autorun/game", in: base).path) {
+                folders.insert(app)
+            }
+        }
+        return EngineFileList(root: self.base, files: files, folders: folders)
+    }
+
     /// Folders that may be the base directory, shallowest first and then by name: the game folder and any folder up to
     /// two levels down that holds a `renpy` entry. The probe already lists those levels, so this reads nothing from
     /// disk. Each candidate can cost a walk of its `game/` folder, so only the first `limit` are tried.

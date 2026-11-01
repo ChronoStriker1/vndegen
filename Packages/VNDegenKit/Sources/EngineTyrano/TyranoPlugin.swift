@@ -50,6 +50,13 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
         return try configuration.makeSession(launch)
     }
 
+    public var listsEngineFiles: Bool { true }
+
+    /// The game's NW.js or Electron runtime. Its web root, `package.json`, `node_modules`, and `.sav` saves stay.
+    public func engineFileList(_ probe: FolderProbe) -> EngineFileList? {
+        DesktopRuntimeFiles.electron(probe) ?? DesktopRuntimeFiles.nwjs(probe)
+    }
+
     /// Buttons used to run Tyrano's actions here directly, which still works. As an Xbox button, such a remap would do
     /// what the game's own KeyConfig.js says when the game reads the gamepad.
     public func legacyAction(for button: VirtualButton) -> ControlAction? {

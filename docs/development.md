@@ -113,6 +113,7 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `detect(_:)` inspects a folder listing and returns a match with a confidence level.
 - `makeSession(_:)` starts the game and returns an `EngineSession`, whose view the hub shows full screen and which receives controller input.
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
+- `engineFileList(_:)`, with `listsEngineFiles`, names the PC engine files a game can do without, for Remove engine files. It's an allowlist, and optional. List a file only after checking that nothing in VNDegen reads it, including detection, and only from what real games ship. It must not read the files it names, which may not be downloaded. `VNCore/EngineFiles.swift` does the rest, and decides there which kinds of folder are refused.
 
 Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins. Then add its entry to `PluginInfo.catalog` in `HubUI/Plugins.swift`, which Settings' Plugins page reads for the engine versions it covers, what runs its games, and its license.
 

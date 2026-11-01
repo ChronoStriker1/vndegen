@@ -577,6 +577,8 @@ final class Confirmation {
     let id = UUID()
     let title: String
     let message: String
+    /// What the change takes away, each with its size or other detail, listed under the message.
+    let rows: [(name: String, detail: String)]
     /// The button that goes ahead, such as "Remove folder".
     let action: String
     /// Draws that button in red, for a change that removes or deletes something.
@@ -585,10 +587,11 @@ final class Confirmation {
     let gameID: GameID?
     let perform: @MainActor () async -> Void
 
-    init(title: String, message: String, action: String, destructive: Bool, gameID: GameID? = nil,
+    init(title: String, message: String, rows: [(name: String, detail: String)] = [], action: String, destructive: Bool, gameID: GameID? = nil,
          perform: @escaping @MainActor () async -> Void) {
         self.title = title
         self.message = message
+        self.rows = rows
         self.action = action
         self.destructive = destructive
         self.gameID = gameID
@@ -597,6 +600,7 @@ final class Confirmation {
 }
 
 struct ConfirmationSheet: View {
+    @Environment(Navigator.self) private var nav
     let confirmation: Confirmation
 
     var body: some View {
@@ -604,14 +608,27 @@ struct ConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 22) {
                 // Scrolls, so a long path never pushes the buttons off a small screen.
                 ScrollView {
-                    Text(confirmation.message)
-                        .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.86))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(confirmation.message)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white.opacity(0.86))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        LazyVStack(alignment: .leading, spacing: 6) {
+                            ForEach(confirmation.rows, id: \.name) { row in
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(row.name).foregroundStyle(.white)
+                                    Spacer(minLength: 12)
+                                    Text(row.detail).foregroundStyle(Theme.tertiaryText).fixedSize()
+                                }
+                                .font(.system(size: 13))
+                            }
+                        }
+                    }
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                .scrollPager(nav.pager)
                 HStack(spacing: 12) {
                     HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
                     HubButton(target: .confirmCancel) { Text("Cancel") }

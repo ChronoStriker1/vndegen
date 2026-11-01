@@ -29,6 +29,27 @@ Known limit: on a Mac, if an added folder is moved and another folder is made at
 
 Remove from library, in a game's menu or on its page, deletes the game's folder after asking: on a Mac it goes to the Trash, and on iPhone and iPad it is deleted for good. Saves the game writes inside its own folder go with it. The saves VNDegen keeps in its own data folder for the game stay, and so do its artwork, play time, and settings, so copying the folder back restores it.
 
+## Removing engine files
+
+RPG Maker MV and MZ, TyranoScript, and Ren'Py games ship PC engine files that VNDegen doesn't use. Remove engine files, in a game's menu or on its page, lists them with the space they take and asks before removing anything. An archive you import asks once, when the game it adds has any. The game keeps running in VNDegen, but it won't run on a PC from that folder afterwards.
+
+| Engine | Average saved per game | What goes |
+|---|---|---|
+| RPG Maker MZ | 295 MB | NW.js |
+| RPG Maker MV | 148 MB | NW.js |
+| TyranoScript | 183 MB | NW.js or Electron |
+| Ren'Py | 88 MB | The Windows, Linux, and Mac libraries in `lib/`, and the `.exe` and `.app` launchers |
+
+The averages come from the maintainer's library. Each plugin names exactly what it may remove, and anything else stays, including saves, the game's own data, and whatever a mod or a translation added. A file in a game's own `locales/` or `lib/` folder stays when it isn't the engine's. An `.exe` under another name goes only when it's the one file of 30 MB or more beside the runtime's files. The other engines list nothing, because VNDegen reads their `.exe` and `.dll` files or names to recognize or run a game, or because there is little to gain.
+
+Where the files go depends on where the game is:
+
+- **Mac.** They go to the Trash, and Put Back in Finder restores them. The space comes back when you empty the Trash.
+- **iPhone and iPad.** They are deleted for good.
+- **iCloud Drive.** The removal reaches every device on that iCloud account. iCloud Drive's Recently Deleted should keep the files for about 30 days. Files not downloaded yet are measured and removed without downloading them.
+
+VNDegen shows the reason and removes nothing for a folder that can't be reached, one it can't write to, a network share, or a cloud service other than iCloud Drive. If some files can't be removed, it lists them with what it did remove. A game whose engine you assigned by hand offers nothing.
+
 ## Layouts
 
 The view button in the top bar switches the library between three layouts:
@@ -43,7 +64,7 @@ The hub adapts to iPhone portrait and landscape, both iPhone Duo displays, iPad,
 
 ## The game menu
 
-A long press on a game in any library layout, a right click on a Mac, or X on a controller opens a menu with Play, Open game page, Change artwork, Find metadata, Hide or Unhide, Show in Finder or Open in Files, and Remove from library.
+A long press on a game in any library layout, a right click on a Mac, or X on a controller opens a menu with Play, Open game page, Change artwork, Find metadata, Hide or Unhide, Show in Finder or Open in Files, Remove engine files for the engines that list any, and Remove from library.
 
 <p align="center">
   <img src="screenshots/game-menu.jpg" width="260" alt="The menu a long press opens on a library game on iPhone: Play, Open game page, Change artwork, Find metadata, Hide, Open in Files, and Remove from library">

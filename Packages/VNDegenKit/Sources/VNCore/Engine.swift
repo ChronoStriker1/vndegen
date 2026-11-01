@@ -107,6 +107,11 @@ public protocol EnginePlugin: Sendable {
     /// The button layout a game follows until the player changes it. Engines with no gamepad support use the keyboard
     /// and mouse layout.
     var defaultControls: ControlLayout { get }
+    /// True when `engineFileList` can name anything, so the game's page and menu offer to remove engine files.
+    var listsEngineFiles: Bool { get }
+    /// The bundled PC engine files a game no longer needs in VNDegen, which the player may choose to remove. Only names
+    /// VNDegen never reads for this game may be on it. It must not read the files it names, which may not be downloaded.
+    func engineFileList(_ probe: FolderProbe) -> EngineFileList?
 }
 
 extension EnginePlugin {
@@ -122,6 +127,8 @@ extension EnginePlugin {
     public func runtimePackages(for game: Game, folder: URL) -> [RuntimePackage] { [] }
     public func legacyAction(for button: VirtualButton) -> ControlAction? { nil }
     public var defaultControls: ControlLayout { .gamepad }
+    public var listsEngineFiles: Bool { false }
+    public func engineFileList(_ probe: FolderProbe) -> EngineFileList? { nil }
 }
 
 /// The ways an engine can run one game, such as the Ren'Py runtimes. Automatic, the engine's own choice, is the
