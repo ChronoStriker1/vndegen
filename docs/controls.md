@@ -25,6 +25,10 @@ With the Xbox gamepad layout instead, a TyranoScript game reads the gamepad when
 
 While a game runs, the keyboard and mouse go straight to the game, which uses its own keys. For RPG Maker, MV and MZ as well as XP, VX, and VX Ace, those are the arrows, Z or Return, X or Escape, Shift, and Q and W. In a KiriKiri game on the Xbox gamepad layout, A is Return, B is a right click, Y and Menu are Escape, X holds Control, and L and R turn the mouse wheel, which opens and pages back through the message history, as in KAG3's own controls. A KiriKiri game's text fields get what the keyboard types, as on Windows. In an Artemis game, Return reads on, a right click opens the game's menu, Control skips, and the mouse wheel opens the message history.
 
+## Dialogs a game opens
+
+Some games ask for something through a dialog of their own, which VNDegen shows in the app and answers with touch, the mouse, a keyboard, or a controller. Artemis games' name entry and Yes or No questions are sheets. AliceSoft System 3's number box has a keypad and steppers. RPG Maker XP, VX, and VX Ace message boxes wait until you press OK. Wolf RPG Editor games that ask for typed text use the on-screen keyboard or a hardware keyboard.
+
 ## The library and the VNDegen menu
 
 | Action in the library and the VNDegen menu | Controller | Keyboard in the library |

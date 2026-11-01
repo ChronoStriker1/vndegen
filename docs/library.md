@@ -50,6 +50,10 @@ Where the files go depends on where the game is:
 
 VNDegen shows the reason and removes nothing for a folder that can't be reached, one it can't write to, a network share, or a cloud service other than iCloud Drive. On iPhone and iPad that also covers folders you added from On My iPhone or iPad outside VNDegen's own folder, because VNDegen can't tell those from another provider's. VNDegen's own Games folder isn't affected. If some files can't be removed, it lists them with what it did remove. A game whose engine you assigned by hand offers nothing.
 
+## Video cache
+
+RPG Maker MV and MZ clips with transparency are converted the first time they play, and kept in a cache outside the game folder. The cache holds up to 512 MB, dropping the clips used least recently, and isn't backed up. Clear video cache in Settings empties it, and a clip then converts again the next time it plays. [engines.md](engines.md#rpg-maker-mv-and-mz) has more.
+
 ## Layouts
 
 The view button in the top bar switches the library between three layouts:

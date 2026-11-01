@@ -18,7 +18,8 @@ scripts/build.sh ipa       # unsigned build/VNDegen.ipa
 ### What a build makes first
 
 - **KiriKiri.** Every app build first builds the KiriKiri engine into `build/kirikiri` with `scripts/kirikiri-engine.sh`, which does nothing when the engine is up to date. Its dependencies come from vcpkg, cached in `~/Library/Caches/VNDegen`, so the first build takes a while and later ones skip it.
-- **Godot.** Every app build first builds Godot 3 and 4 into `build/godot` with `scripts/godot-engine.sh`, which does nothing when its inputs haven't changed. The Godot sources and SCons are cached in `~/Library/Caches/VNDegen/godot`, and each build folder gets its own work folder there, so builds of different branches don't rebuild each other's objects. A first build in a new folder compiles Godot from scratch. `VNDEGEN_GODOT_CACHE` moves the cache.
+- **Godot.** Every app build first builds Godot 3 and 4 into `build/godot` with `scripts/godot-engine.sh`, which does nothing when its inputs haven't changed. The Godot sources and SCons are cached in `~/Library/Caches/VNDegen/godot`, and each build folder gets its own work folder there, so builds of different branches don't rebuild each other's objects. A first build in a new folder compiles Godot from scratch, which can take a Mac's load past 500, so run it where nothing else is going. `VNDEGEN_GODOT_CACHE` moves the cache.
+- **Alpha clips.** Every build makes the VP9 decoder the RPG Maker clip converter links, with `scripts/alpha-video.sh`, from the libvpx source in `Engines/Shared/third_party`. It builds the decoder alone.
 - **rclone.** Every build first makes rclone's library from `Packages/VNDegenKit/Rclone/` for iPhone, iPad, the simulator, and the Mac (`scripts/rclone-runtime.sh`, kept until its sources or the Go version change).
 - **Ren'Py.** The macOS build downloads the two Ren'Py SDKs once, checks their SHA-256, and copies the trimmed runtimes into the app (`scripts/renpy-runtime.sh`, cached in `~/Library/Caches/VNDegen/renpy-sdk`). iOS builds also download Ren'Py's iOS libraries (renios) and link them into the app. `scripts/build.sh` does that before it builds. In Xcode, run `scripts/renpy-runtime.sh build/renpy ios` once first.
 - **Ruby.** Every build also makes the Ruby interpreter the RPG Maker XP, VX, and VX Ace runtime links, `Packages/VNDegenKit/build/RGSSRuby.xcframework`, with `scripts/rgss-ruby.sh`, which does nothing when it is up to date. It downloads Ruby's release, checks its SHA-256, applies the patches in `Engines/RGSSRuntime/patches`, and builds it static for the Mac, iPhone and iPad, and the simulator. The first build takes about 15 minutes. `Engines/RGSSRuntime/host` builds the runtime for Linux with a headless test tool, after `scripts/rgss-ruby.sh build/rgss linux`.
@@ -45,7 +46,7 @@ A DEBUG build takes `-libraryRoot <folder>`, which points the app at a separate 
 
 ### Releases
 
-`scripts/release.sh <version>` publishes a new release from `main` to the [Releases](https://github.com/ChronoStriker1/vndegen/releases) page and adds it to the AltStore source. `scripts/check-public.sh` must pass first, and `release.sh` runs it. Each release's notes are in `releases/`.
+`scripts/release.sh <version>` publishes a new release from `main` to the [Releases](https://github.com/ChronoStriker1/vndegen/releases) page and adds it to the AltStore source. `scripts/check-public.sh` must pass first, and `release.sh` runs it. Each release's notes are in `releases/`. Packaged builds (`ipa` and `release`) delete the previous built app first, because Xcode keeps files in a built app that the project no longer makes. Compiled objects stay cached.
 
 ## Project layout
 
@@ -81,6 +82,7 @@ Packages/VNDegenKit/
   Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
   Sources/CVNMidi/        links to Engines/Shared/vnmidi.[ch], the MIDI player native engines share
   Sources/CVNVideo/       links to Engines/Shared/vnvideo.[ch], the movie decoder native engines share, and its libraries
+  Sources/CVNAlpha/       links to Engines/Shared/vnalpha.[h,mm], which converts VP9 clips with alpha for RPG Maker MV and MZ
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/ControllerUI/   controller focus ring, the on-screen keyboard, and controller scrolling

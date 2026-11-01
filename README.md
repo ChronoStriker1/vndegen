@@ -31,6 +31,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
 - **Ludusavi saves.** Back up and restore through your Ludusavi SMB share, so saves move between VNDegen and your PCs. [Ludusavi](docs/ludusavi.md)
 - **Windows fonts.** Games that ask for MS Gothic, Arial, and other Windows fonts get free fonts with the same metrics. [Fonts](docs/fonts.md)
+- **Movies and see-through clips.** Native engines decode their own movies, and RPG Maker MV and MZ clips with transparency are converted the first time they play. [Video](docs/video.md)
 - **Hardware rendering** through Metal, directly or through WebGL, OpenGL, or ANGLE. [Engines](docs/engines.md)
 
 ## Layouts on each device
@@ -152,8 +153,10 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 ## Documentation
 
 - [library.md](docs/library.md): adding games, library folders, layouts, hidden games, and metadata sources
-- [controls.md](docs/controls.md): control methods, layouts, button mapping, Game commands, and cheats
-- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits
+- [controls.md](docs/controls.md): control methods, layouts, button mapping, a game's dialogs, and Game commands
+- [cheats.md](docs/cheats.md): what the Cheats page does in each engine
+- [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), and [flash.md](docs/flash.md)
+- [video.md](docs/video.md): movie decoding and the see-through clip converter
 - [ludusavi.md](docs/ludusavi.md): setting up and using Ludusavi backups
 - [fonts.md](docs/fonts.md): the Windows font substitutes
 - [development.md](docs/development.md): building, the project layout, and adding an engine
