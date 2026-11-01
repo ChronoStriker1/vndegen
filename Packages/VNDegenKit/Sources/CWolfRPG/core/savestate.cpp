@@ -74,6 +74,9 @@ std::string encode(const std::string &utf8, Encoding enc) {
 #endif
 }
 
+// A save slot's file. Slot 0 has no number or extension on the PC, as Two Beasts' first start shows under Wine.
+std::string slotFile(int slot) { return slot == 0 ? std::string("Save/SaveData") : format("Save/SaveData%02d.sav", slot); }
+
 SaveString saveString(const std::string &utf8, Encoding enc) { return {encode(utf8, enc), true}; }
 
 std::string text(const SaveString &s, Encoding enc) { return toUtf8(s.bytes, enc); }
@@ -431,7 +434,7 @@ bool Game::saveSlot(int slot, std::string *error) {
         return false;
     }
     SaveFile f = snapshot();
-    if (!writeSave(saveFilePath(format("Save/SaveData%02d.sav", slot)), f, error)) return false;
+    if (!writeSave(saveFilePath(slotFile(slot)), f, error)) return false;
     saveBase_ = std::make_shared<SaveFile>(std::move(f));
     return true;
 }
@@ -440,7 +443,7 @@ bool Game::saveSlot(int slot, std::string *error) {
 // Reading it back
 
 bool Game::loadSlot(int slot, std::string *error) {
-    auto s = readSave(saveFilePath(format("Save/SaveData%02d.sav", slot)), error);
+    auto s = readSave(saveFilePath(slotFile(slot)), error);
     if (!s) return false;
     if (s->map.mapId < 0) {
         if (error) *error = "the save holds no map";
@@ -608,7 +611,7 @@ void Game::applySave(const SaveFile &s) {
 // The slot argument is a slot number, or a string variable that names the file, such as "Save/System.sav".
 fs::path Game::saveTarget(int32_t slotArg, const Thread &t) {
     if (isStringVar(slotArg)) return saveFilePath(readStr(slotArg, t));
-    return saveFilePath(format("Save/SaveData%02d.sav", value(slotArg, t)));
+    return saveFilePath(slotFile(value(slotArg, t)));
 }
 
 void Game::readSavedVariable(const SaveFile *s, int32_t address, int32_t target, Thread &t) {
