@@ -81,6 +81,9 @@ case "${1:?destination}" in
   mac) xcb -destination 'platform=macOS' -derivedDataPath build/mac build ;;
   ios-sim) xcb -destination 'generic/platform=iOS Simulator' -derivedDataPath build/sim build ;;
   ipa)
+    # Xcode keeps files in a built app that the project no longer makes, such as a framework it dropped, so packaged
+    # builds start from a fresh app. The compiled objects stay cached.
+    rm -rf build/device/Build/Products
     xcb -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO build
     rm -rf build/Payload && mkdir -p build/Payload
     cp -R build/device/Build/Products/Release-iphoneos/VNDegen.app build/Payload/
@@ -89,7 +92,8 @@ case "${1:?destination}" in
   release)
     version=${2:?version} number=${3:?build number}
     stamp=(MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$number")
-    rm -rf build/release build/Payload && mkdir -p build/release build/Payload
+    rm -rf build/release build/Payload build/device/Build/Products build/macrelease/Build/Products
+    mkdir -p build/release build/Payload
     xcb -configuration Release -destination 'generic/platform=iOS' -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO "${stamp[@]}" build
     cp -R build/device/Build/Products/Release-iphoneos/VNDegen.app build/Payload/
     (cd build && zip -qry "release/VNDegen-$version.ipa" Payload)
