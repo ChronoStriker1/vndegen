@@ -186,6 +186,12 @@ void vnwolf_key(VNWolfEngine *e, int key, bool down) {
     }
 }
 
+void vnwolf_text(VNWolfEngine *e, const char *utf8) {
+    if (e && utf8) e->game->typeText(utf8);
+}
+
+bool vnwolf_wants_text(VNWolfEngine *e) { return e && e->game->textEntry().active; }
+
 void vnwolf_mouse_move(VNWolfEngine *e, float x, float y) {
     if (!e) return;
     e->mouseX = x;

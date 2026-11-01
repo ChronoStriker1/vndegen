@@ -271,6 +271,15 @@ void Renderer::drawChoices(Canvas &canvas) {
         canvas.draw(lines[i].bitmap, box.x + pad * 2 - lines[i].origin, box.y + pad + i * lineH - lines[i].origin);
 }
 
+// The text being typed, at the place system variables 40 and 41 give, with a cursor bar after it.
+void Renderer::drawTextEntry(Canvas &canvas) {
+    const TextEntry &entry = game_.textEntry();
+    if (!entry.active) return;
+    TextStyle style = baseTextStyle(game_);
+    TextBlock block = text_.render(entry.text + (game_.frameCount() / 30 % 2 ? " " : "_"), style);
+    canvas.draw(block.bitmap, float(game_.systemNumber(40) - block.origin), float(game_.systemNumber(41) - block.origin));
+}
+
 void Renderer::draw(Bitmap &frame) {
     int w = game_.screenWidth(), h = game_.screenHeight();
     if (frame.w != w || frame.h != h) frame = Bitmap(w, h);
@@ -317,6 +326,7 @@ void Renderer::draw(Bitmap &frame) {
     }
     drawMessage(canvas);
     drawChoices(canvas);
+    drawTextEntry(canvas);
 
     if (tr.prepared) {
         frozen_ = frame;

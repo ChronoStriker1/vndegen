@@ -15,6 +15,7 @@
 #include <map>
 #include <memory>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -121,6 +122,16 @@ struct MessageState {
     bool instant = false;
 };
 
+// The string command's keyboard mode while the player types.
+struct TextEntry {
+    bool active = false;
+    int32_t target = 0;
+    const struct Thread *thread = nullptr;
+    int maxLength = 0;
+    bool canCancel = false;
+    std::string text;
+};
+
 // A character on the map: the hero, a party member following the hero, or a map event.
 struct Character {
     std::string graphic;  // character image file; nothing is drawn when it is empty and chip is negative
@@ -155,7 +166,7 @@ struct Thread {
     };
     std::vector<Call> stack;
     int wait = 0;
-    bool waitingMessage = false, waitingChoice = false;
+    bool waitingMessage = false, waitingChoice = false, waitingText = false;
     int choiceIndent = 0;
     const struct Actor *waitingRoute = nullptr;
     bool done() const { return stack.empty(); }
@@ -218,6 +229,9 @@ public:
     const ChoiceState &choice() const { return choice_; }
     void setChoiceBox(float x, float y, float w, float lineH) const { choiceBox_ = {x, y, w, lineH}; }
     const MessageState &message() const { return message_; }
+    const TextEntry &textEntry() const { return textEntry_; }
+    // Text the player typed, for the string command's keyboard mode. Does nothing when it isn't waiting.
+    void typeText(const std::string &utf8);
     const Map *map() const { return map_.get(); }
     int mapId() const { return mapId_; }
     // The hero's tile and facing, for tests and the debug status.
@@ -242,6 +256,7 @@ public:
     std::string faceGraphic(int n) const;
     int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
     std::string systemString(int i) const;
+    int systemNumber(int i) const { return i >= 0 && i < int(system_.size()) ? system_[i] : 0; }
     std::array<uint8_t, 3> textColor(int i) const;
     uint64_t frameCount() const { return frame_; }
     const ShakeState &shake() const { return shake_; }
@@ -306,6 +321,10 @@ private:
     void pictureCommandOne(Thread &t, const Command &c, int number);
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
+    void extendedString(Thread &t, const Command &c, int32_t target, int op);
+    std::string hiddenCode(const std::string &name, const std::string &arg);
+    void startTextEntry(Thread &t, const Command &c);
+    void updateTextEntry();
     std::string textAt(int32_t address, const Thread &t);
     void showMessage(std::string text);
     bool condition(Thread &t, const Command &c);
@@ -380,6 +399,7 @@ private:
 
     // Characters (characters.cpp).
     Actor *actorFor(int target, const Thread &t);  // -1 this event, -2 the hero, 0 and up a map event id
+    Actor *actorAtAddress(int32_t id, const Thread &t);
     uint32_t tileFlags(int x, int y) const;         // passability of the uppermost tile that decides it
     bool canMove(const Actor &a, int dir) const;
     bool step(Actor &a, int dir);                  // starts a step; false when blocked
@@ -425,6 +445,8 @@ private:
     std::map<int, Picture> pictures_;
     ChoiceState choice_;
     MessageState message_;
+    TextEntry textEntry_;
+    std::set<std::string> hiddenCodesLogged_;
     Tween tintR_, tintG_, tintB_;
     Input input_;
     std::array<int, 7> heldFrames_{};  // frames each Wolf key has been held, by bit of Key

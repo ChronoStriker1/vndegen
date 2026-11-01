@@ -23,6 +23,7 @@ private:
     void drawWindow(Canvas &canvas, const Bitmap &skin, RectF r, float opacity);
     void drawMessage(Canvas &canvas);
     void drawChoices(Canvas &canvas);
+    void drawTextEntry(Canvas &canvas);
     // The image a text or window picture shows, made when its source or size changes. `offset` is where its top
     // left sits from the picture's position, for lines drawn up or to the left.
     const Bitmap *pictureImage(int number, const Picture &p, float &offsetX, float &offsetY);

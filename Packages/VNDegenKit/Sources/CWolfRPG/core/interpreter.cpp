@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <regex>
 
 #include "images.h"
 
@@ -68,6 +69,10 @@ bool Game::step(Thread &t) {
     if (t.waitingRoute) {
         if (t.waitingRoute->route) return false;
         t.waitingRoute = nullptr;
+    }
+    if (t.waitingText) {
+        if (textEntry_.active) return false;
+        t.waitingText = false;
     }
     if (t.waitingChoice) {
         if (choice_.active) return false;
@@ -159,7 +164,7 @@ bool Game::step(Thread &t) {
                 int op = (leftWord >> 24) & 0xF0;
                 bool rightIsVar = ((leftWord >> 24) & 0x0F) == 1;
                 std::string left = readStr(leftId >= 1000000 ? leftId : 3000000 + leftId, t);
-                std::string right = rightIsVar ? readStr(cmd.arg(1 + count + i), t) : cmd.str(i);
+                std::string right = rightIsVar ? readStr(cmd.arg(1 + count + i), t) : expandText(cmd.str(i), &t);
                 bool ok = false;
                 switch (op) {
                     case 0x00: ok = left == right; break;
@@ -190,11 +195,8 @@ bool Game::step(Thread &t) {
             setVariable(t, cmd);
             return true;
         case 122:
-            // Typing text on the keyboard waits for the player in Wolf. With no text entry yet the command keeps the
-            // text already there and takes a frame, so a loop around it runs once a frame instead of spinning.
             if ((uint32_t(cmd.arg(1)) & 0x0F) == 3) {
-                unsupported(cmd);
-                t.wait = 1;
+                startTextEntry(t, cmd);
                 return false;
             }
             setString(t, cmd);
@@ -617,6 +619,11 @@ void Game::setString(Thread &t, const Command &c) {
     int assign = (flags >> 8) & 0x0F;
     if (flags & 0xF0) target = readVar(target, t);
     if (target < 1000000) target += 3000000;
+    // Wolf RPG Editor 3's operations keep a group of their own in the third byte: hidden codes and regular expressions.
+    if (((flags >> 16) & 0xFF) == 4) {
+        extendedString(t, c, target, assign);
+        return;
+    }
     // The right side: typed text, the text at an address, or the text at an address held in a variable.
     int32_t source = 0;
     std::string rhs;
@@ -645,8 +652,13 @@ void Game::setString(Thread &t, const Command &c) {
         }
         case 0x05: {  // read a text file of the game
             auto bytes = files_.read(rhs);
-            std::string text = bytes ? std::string(bytes->begin(), bytes->end()) : "";
-            writeStr(target, toUtf8(text, gameDat_.encoding), t);
+            if (!bytes) {
+                writeStr(target, "<NoFile>", t);
+                break;
+            }
+            std::string text(bytes->begin(), bytes->end());
+            if (text.starts_with("\xEF\xBB\xBF")) writeStr(target, text.substr(3), t);
+            else writeStr(target, toUtf8(text, gameDat_.encoding), t);
             break;
         }
         case 0x07: {  // the files in a folder, one name a line; <<ERROR>> for a folder packed in an archive
@@ -673,8 +685,158 @@ void Game::setString(Thread &t, const Command &c) {
             writeStr(target, cur, t);
             break;
         }
+        case 0x0A: {  // the part before the given text
+            size_t p = cur.find(rhs);
+            writeStr(target, p == std::string::npos ? "<<NotFound>>" : cur.substr(0, p), t);
+            break;
+        }
+        case 0x0B: {  // the part after the given text
+            size_t p = cur.find(rhs);
+            writeStr(target, p == std::string::npos ? "<<NotFound>>" : cur.substr(p + rhs.size()), t);
+            break;
+        }
         default: unsupported(c); break;
     }
+}
+
+// The third-byte group of the string command. Operation 2 runs a hidden code, written <<NAME>> before its argument.
+// Operations 5 and 6 store what a regular expression's first group catches in the variable's text: the first match, or
+// every match with a line break between. In a regular expression only the parts inside << and >> take text codes.
+void Game::extendedString(Thread &t, const Command &c, int32_t target, int op) {
+    if (op == 5 || op == 6) {
+        std::string pattern = c.str(0), expanded;
+        for (size_t at = 0; at < pattern.size();) {
+            size_t open = pattern.find("<<", at);
+            size_t close = open == std::string::npos ? open : pattern.find(">>", open);
+            if (close == std::string::npos) {
+                expanded += pattern.substr(at);
+                break;
+            }
+            expanded += pattern.substr(at, open - at) + expandText(pattern.substr(open + 2, close - open - 2), &t);
+            at = close + 2;
+        }
+        std::string text = readStr(target, t), found;
+        try {
+            // Line by line, as the manual's hint on matching line breaks describes.
+            std::regex re(expanded, std::regex::ECMAScript | std::regex::multiline);
+            for (std::sregex_iterator it(text.begin(), text.end(), re), end; it != end; ++it) {
+                if (!found.empty()) found += '\n';
+                found += it->size() > 1 ? (*it)[1].str() : it->str();
+                if (op == 5) break;
+            }
+        } catch (const std::regex_error &) {
+            log("bad regular expression " + expanded);
+        }
+        writeStr(target, found, t);
+        return;
+    }
+    if (op != 2) {
+        unsupported(c);
+        return;
+    }
+    std::string code = expandText(c.str(0), &t);
+    size_t close = code.find(">>");
+    if (!code.starts_with("<<") || close == std::string::npos) {
+        writeStr(target, "<<Error>> Missing \">>\"", t);
+        return;
+    }
+    std::string name = code.substr(2, close - 2), arg = code.substr(close + 2);
+    writeStr(target, hiddenCode(name, arg), t);
+}
+
+// The hidden codes the library's games use, from the manual's list. Each returns the text the variable gets.
+std::string Game::hiddenCode(const std::string &name, const std::string &arg) {
+    // The characters of a text, counting ASCII as width 1 and the rest as 2, as the manual does.
+    auto width = [](const std::string &s) {
+        int n = 0;
+        for (size_t i = 0; i < s.size(); i += utf8Length(s.substr(i, 4))) n += static_cast<unsigned char>(s[i]) < 0x80 ? 1 : 2;
+        return n;
+    };
+    auto event = [&](int id) -> const MapEventState * {
+        for (auto &e : events_)
+            if (e.data->id == id) return &e;
+        return nullptr;
+    };
+    if (name == "GET_FILE_EXIST") {
+        // A path from the game folder, where saves are, or in the game's data, which may be in an archive.
+        std::error_code ec;
+        return std::filesystem::exists(saveFilePath(arg), ec) || files_.exists(arg) ? "1" : "0";
+    }
+    if (name == "GET_STRING_WIDTH_COUNT") return std::to_string(width(arg));
+    if (name == "GET_STRING_BYTE_COUNT") return std::to_string(arg.size());
+    if (name == "GET_TITLE") return gameDat_.title;
+    if (name == "GET_TITLE_PLUS") return "";
+    if (name == "GET_COMMONEVENT_ID_FROM_NAME") return std::to_string(commonByName(arg));
+    if (name == "GET_MAPEVENT_NAME_FROM_ID") {
+        const MapEventState *e = event(std::atoi(arg.c_str()));
+        return e ? e->data->name : "";
+    }
+    if (name == "GET_MAPEV_FILENAME") {
+        const MapEventState *e = event(std::atoi(arg.c_str()));
+        return e ? e->actor.chara.graphic : "";
+    }
+    if (name == "GET_FILENAME_FROM_PICTURE") {
+        auto it = pictures_.find(std::atoi(arg.c_str()));
+        return it == pictures_.end() ? "" : it->second.source;
+    }
+    if (hiddenCodesLogged_.insert(name.substr(0, name.find_first_of("_=/", 12))).second) log("hidden code <<" + name + ">> is not supported");
+    return "";
+}
+
+// The string command's keyboard mode: the event waits while the player types. Its flags' second byte has 0x10 when
+// Escape may cancel and 0x20 when typing starts from the text the variable holds, and field 2 is the length allowed.
+void Game::startTextEntry(Thread &t, const Command &c) {
+    uint32_t flags = uint32_t(c.arg(1));
+    int32_t target = c.arg(0);
+    if (flags & 0xF0) target = readVar(target, t);
+    if (target < 1000000) target += 3000000;
+    textEntry_ = TextEntry{};
+    textEntry_.active = true;
+    textEntry_.target = target;
+    textEntry_.thread = &t;
+    textEntry_.maxLength = value(c.arg(2), t);
+    textEntry_.canCancel = (flags >> 8) & 0x10;
+    if ((flags >> 8) & 0x20) textEntry_.text = readStr(target, t);
+    t.waitingText = true;
+}
+
+// Adds typed text, as far as the length the command allows. Line breaks and control characters don't go in.
+void Game::typeText(const std::string &utf8) {
+    if (!textEntry_.active) return;
+    for (size_t i = 0; i < utf8.size();) {
+        size_t n = utf8Length(utf8.substr(i, 4));
+        if (static_cast<unsigned char>(utf8[i]) >= 0x20) {
+            size_t count = 0;
+            for (size_t j = 0; j < textEntry_.text.size(); j += utf8Length(textEntry_.text.substr(j, 4))) count++;
+            if (textEntry_.maxLength > 0 && count >= size_t(textEntry_.maxLength)) return;
+            textEntry_.text += utf8.substr(i, n);
+        }
+        i += n;
+    }
+}
+
+// Enter finishes with the typed text, and Escape cancels when the command allows it, leaving the variable as it was.
+// System variable 39 tells the game which it was. Backspace deletes a character. Auto input of Enter also finishes, as
+// the manual's hint describes.
+void Game::updateTextEntry() {
+    if (!textEntry_.active) return;
+    if (input_.keysPressed[114]) {
+        std::string &s = textEntry_.text;
+        size_t last = s.size();
+        while (last > 0 && (static_cast<unsigned char>(s[--last]) & 0xC0) == 0x80) {}
+        s.erase(last);
+    }
+    bool enter = input_.keysPressed[128], cancel = textEntry_.canCancel && input_.keysPressed[101];
+    if (enter || cancel) {
+        if (enter) writeStr(textEntry_.target, textEntry_.text, *textEntry_.thread);
+        if (system_.size() > 39) system_[39] = enter ? 0 : -1;
+        textEntry_.active = false;
+    }
+    // While typing, keys and clicks reach no event (system variable 38 can let some through; no library game sets it).
+    Input cleared;
+    cleared.mouseX = input_.mouseX;
+    cleared.mouseY = input_.mouseY;
+    input_ = cleared;
 }
 
 // Applies a picture command to one picture, or to a range of pictures when its multi-target flag is set.

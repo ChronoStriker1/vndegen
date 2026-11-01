@@ -5,6 +5,7 @@
 //   wolfplay <game folder> --every 20:confirm --hold 500-560:left   (press every 20 frames, until frame U with 20:confirm:U; hold a key)
 //   wolfplay <game folder> --map 3,10,7 --frames 2 --shot 1:map.png   (map id, hero x, y; skips the title)
 //   wolfplay <game folder> --mouse 200:640,480 --click 210:640,480   (move the pointer, or move and left click)
+//   wolfplay <game folder> --type 300:Ann --key 310:128   (types text into a text entry, then presses Enter)
 //   wolfplay <game folder> --pics 200   (lists the pictures shown at that frame)
 //   wolfplay <game folder> --rclick 210:640,480 --wheel 220:-1 --key 230:144   (a keyboard key by Wolf's code)
 #include "game.h"
@@ -47,6 +48,7 @@ int main(int argc, char **argv) {
     std::multimap<int, MouseAt> mouse;
     std::multimap<int, int> wheels, keyCodes;
     std::set<int> picLists;
+    std::multimap<int, std::string> typed;
     for (int i = 2; i + 1 < argc; i += 2) {
         std::string opt = argv[i], val = argv[i + 1];
         size_t colon = val.find(':');
@@ -73,6 +75,7 @@ int main(int argc, char **argv) {
             std::sscanf(val.c_str() + colon + 1, "%d,%d", &x, &y);
             mouse.emplace(std::atoi(val.c_str()), MouseAt{x, y, opt == "--click" ? MouseLeft : opt == "--rclick" ? MouseRight : 0u});
         }
+        else if (opt == "--type" && colon != std::string::npos) typed.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
         else if (opt == "--pics") picLists.insert(std::atoi(val.c_str()));
         else if (opt == "--wheel" && colon != std::string::npos)
             wheels.emplace(std::atoi(val.c_str()), std::atoi(val.c_str() + colon + 1));
@@ -131,6 +134,7 @@ int main(int argc, char **argv) {
             // A scripted press holds the key for this frame only.
             in.held = held | in.pressed;
             if (f == titleAt) game.debugReturnToTitle();
+            for (auto [it, end] = typed.equal_range(f); it != end; ++it) game.typeText(it->second);
             game.update(in);
             if (std::getenv("WOLF_HERO") && f % 30 == 0) {
                 auto h = game.heroTile();

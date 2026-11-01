@@ -267,7 +267,21 @@ int32_t Game::value(int32_t v, const Thread &t) {
     return readVar(v, t);
 }
 
+// The character a variable address names: 9100000 + 10 * Y + X a map event, 9180000 + 10 * Y + X the hero (0) or a party
+// member, and 9190000 + X this event.
+Actor *Game::actorAtAddress(int32_t id, const Thread &t) {
+    if (id < 9100000 || id >= 9200000) return nullptr;
+    if (id >= 9190000) return actorFor(-1, t);
+    if (id >= 9180000) {
+        int member = (id - 9180000) / 10;
+        return member == 0 ? &hero_ : member <= int(party_.size()) ? &party_[member - 1] : nullptr;
+    }
+    return actorFor((id - 9100000) / 10, t);
+}
+
 int32_t Game::readVar(int32_t id, const Thread &t) {
+    // A number read from a string variable is the number its text starts with (Two Beasts keeps labels this way).
+    if (isStringVar(id)) return std::atoi(readStr(id, t).c_str());
     if (id >= 2000000 && id < 2100000) return id - 2000000 < int(normal_.size()) ? normal_[id - 2000000] : 0;
     if (id >= 2100000 && id < 3000000) {
         int bank = (id - 2100000) / 100000, i = (id - 2100000) % 100000;
@@ -299,7 +313,19 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
         return dbNumber(db, type, row, field);
     }
     if (int32_t *s = selfSlot(id, t)) return *s;
-    if (id >= 9180000 && id < 9200000) return 0;  // hero and event info, filled in with movement
+    if (Actor *a = actorAtAddress(id, t)) {
+        // The fields of a character's address (the manual's variable list): tile, half tile, height, shadow, direction.
+        switch ((id - 9100000) % 10) {
+            case 0: return a->tx;
+            case 1: return a->ty;
+            case 2: return a->tx * 2;
+            case 3: return a->ty * 2;
+            case 4: return a->chara.lift;
+            case 5: return a->chara.shadow;
+            case 6: return a->chara.direction;
+            default: return 0;
+        }
+    }
     return id;
 }
 
@@ -315,6 +341,20 @@ void Game::writeVar(int32_t id, int32_t v, const Thread &t) {
         size_t i = (id - 2100000) % 100000;
         if (i >= spare_[bank].size()) spare_[bank].resize(i + 1);
         spare_[bank][i] = v;
+        return;
+    }
+    if (Actor *a = actorAtAddress(id, t)) {
+        // Writing a position moves the character there at once. The PC engine walks it at its speed.
+        switch ((id - 9100000) % 10) {
+            case 0: a->placeAt(v, a->ty); break;
+            case 1: a->placeAt(a->tx, v); break;
+            case 2: a->placeAt(v / 2, a->ty); break;
+            case 3: a->placeAt(a->tx, v / 2); break;
+            case 4: a->chara.lift = v; break;
+            case 5: a->chara.shadow = v; break;
+            case 6: a->chara.direction = v; break;
+            default: break;
+        }
         return;
     }
     if (id >= 9000000 && id < 9100000) {
@@ -574,6 +614,7 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 
 void Game::update(const Input &input) {
     gatherInput(input);
+    updateTextEntry();
     frame_++;
     // A load requested last frame takes effect before anything runs (savestate.cpp).
     if (pendingLoad_) applyPendingLoad();
