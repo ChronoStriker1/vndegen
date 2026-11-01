@@ -556,6 +556,7 @@ bool Game::commonConditionMet(const CommonEvent &ce) {
 // Frame
 
 void Game::update(const Input &input) {
+    lastPressed_ = input_.pressed;
     input_ = input;
     for (size_t k = 0; k < heldFrames_.size(); k++)
         heldFrames_[k] = ((input.held | autoKeys_) >> k) & 1 ? heldFrames_[k] + 1 : 0;

@@ -402,6 +402,7 @@ private:
     Tween tintR_, tintG_, tintB_;
     Input input_;
     std::array<int, 7> heldFrames_{};  // frames each Wolf key has been held, by bit of Key
+    uint32_t lastPressed_ = 0;         // keys that went down the frame before this one
     uint64_t frame_ = 0, generation_ = 0;
     std::shared_ptr<class TextRenderer> textMeasure_;  // sizes text pictures (pictureCommandOne; text.h)
     std::mt19937 rng_{12345};
