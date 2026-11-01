@@ -47,7 +47,17 @@ arguments. The runtime runs the commands the library's games use: variables and 
 calling common events with arguments and return values, the database command, the extended variable read (characters,
 map positions, pictures, the current map), key input, messages and choices, pictures with their effects, screen colour,
 shake and transitions, sound, map changes, move routes, party graphics, map tile changes, and saving and loading.
-Battles and menus are common events in each game's own data, so they need nothing of their own.
+Battles and menus are common events in each game's own data, so they need nothing of their own. It also runs CSV import
+and export (command 251), row copying and sorting (252), Wolf RPG Editor 3's XY arrays (255 and 257), and the string
+command's typed text, regular expressions, file export and hidden codes.
+
+Common events and strings can read a text file. As on the PC, the runtime takes UTF-8 with or without a byte order mark,
+and otherwise Shift-JIS: The Clumsy Witch Seris is a UTF-8 game that keeps its scene text in Shift-JIS. Reading a string
+variable as a number gives the number its text starts with, which Two Beasts counts on for its script labels. A choice
+right after a message opens with that message still showing.
+
+XY arrays draw as pictures through `<XY_IMAGE/...>` and `<XYN_IMAGE/...>`, The Clumsy Witch Seris's minimap, and saves of
+version 159 keep them. `<CUT/Xa-b/Yc-d>` before a file name shows part of each pattern.
 
 Text uses a font file the game ships whose family name matches the one Game.dat names, then VNDegen's Windows font pack
 (`docs/fonts.md`), then Hiragino on Apple systems. `\font[n]` switches to the sub fonts Game.dat names.
@@ -75,6 +85,27 @@ Wolf RPG Editor reads gamepads, so the default layout is the gamepad: A confirms
 opens the menu in most games), the Dash button is the sub key (Shift), and the D-pad and left stick move. A keyboard
 works as on Windows: Z, Return or Space confirm, X or Escape cancel, Shift is sub, and the arrows or the number pad move.
 
+Event commands read the keyboard by Wolf's own key codes, 100 plus the key's DirectInput scan code. The mouse works through
+the view: a pointer, a touch under the Touch and Touch mouse control methods, or a controller's pointer actions move it, and
+scrolling turns its wheel. A game reads it through key input, the variable command's "other" values, system variables 71
+and 72, and whether it is over a picture. System variable 73 lets it work messages and choices.
+
+When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.
+Return finishes and Backspace deletes. A controller's Confirm finishes and Cancel cancels.
+
+### Commands 125 and 126
+
+Command 126 can stop basic keys, and command 125 presses keys for the next frame. The manual's key input page says a basic
+key stopped by 126 can't be pressed by 125 either. VNDegen lets 125 through regardless, and only what the player presses
+obeys 126. Two games need this:
+
+- YUME-SAME turns confirm and sub off every frame (`126 517`) and presses confirm with 125 for each click. No click would
+  do anything otherwise. YUME-SAME has no PC comparison: its `Game.exe` stops with a buffer overrun under Wine, in every
+  locale tried.
+- Parade Buster turns cancel off when an attack starts (`126 610`) and, if the click was on its MENU button, presses cancel
+  with 125. Under Wine the PC engine (Parade Buster's own `Game.exe`) opens the menu, which settles the question, and
+  VNDegen does the same. A cancel key the player presses during that attack stays blocked in VNDegen.
+
 ## Saves
 
 Saves are the PC engine's own files in the `Save` folder beside `Game.exe` (`SaveDataNN.sav`, and `System.sav` for
@@ -99,25 +130,24 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - Wolf RPG Editor Pro's encrypted data (basic data files whose second byte is `P`) isn't read. No library game needs
   it: the two library games with `GamePro.exe`, The Clumsy Witch Seris and Two Beasts Or Not To Beast!, both ship their
   data unencrypted (checked in every basic data file, loose and inside Two Beasts' version 8 archives).
-- Two Beasts Or Not To Beast! reads its version 8 archives, starts, and stops at its first-start notice, which waits
-  for a mouse click on its OK button. Mouse input and CSV import (command 251), which it uses next, are not supported.
 - Save versions 143 to 158 (Wolf RPG Editor 3.3x) aren't read: no save of those versions has been seen. Saves under 200
   bytes in the 3.5 container use another scheme that isn't read; real saves are never that small.
-- Wolf RPG Editor 3 commands not supported yet, which The Clumsy Witch Seris uses: arrays (command 255, its minimap and
-  building labels, which sit on the wrong buildings), the regular expression string operation (its voice lines pick
-  their folder with it, so system voices are silent), and `<XYN_IMAGE>` pictures.
-- Mouse input, CSV import (command 251) and file downloads (260) aren't supported. The test games don't use them; two
-  library games need the mouse, one to pick its control scheme on its first screen and one for its action battles.
-- Typing text on the keyboard (a string command mode) isn't supported: the command keeps the text already in the
-  variable after a frame. Games that offer a default, such as a name, go on with it.
+- File downloads (command 260) aren't supported. Two Beasts' update check and the standard "sodeba" tools use them, and nothing needs the result.
+- Input a player doesn't have on VNDegen: a game's own gamepad button queries (key input kind 2) read nothing, since VNDegen delivers controllers as keyboard keys, and system variable 38 isn't read, so no key or click reaches an event while the player types. Multiple touch and analog stick queries aren't used by a library game.
+- YUME-SAME and Parade Buster are played by mouse. On a touch screen pick the Touch or Touch mouse control method: the default touch gamepad presses Z and X, which YUME-SAME turns off. Parade Buster and Two Beasts also take right clicks, which the Touch method has no gesture for; Touch mouse does.
+- Hidden string codes run only for what library games use in play: `GET_FILE_EXIST`, `GET_STRING_WIDTH_COUNT`, `GET_STRING_BYTE_COUNT`, `GET_TITLE`, `GET_TITLE_PLUS` (empty), `GET_COMMONEVENT_ID_FROM_NAME`, `GET_MAPEVENT_NAME_FROM_ID`, `GET_MAPEV_FILENAME`, `GET_FILENAME_FROM_PICTURE`, `MAKE_EVENT`, `SET_EVENT_NAME_ID` and `FIND_PATH_DIR4`. Others log once and give empty text; in The Clumsy Witch Seris they are in its debug events. Events `MAKE_EVENT` adds aren't written into saves.
+- Writing an event's position through a variable address moves it at once, where the PC walks it. Command 240 (tile passability settings) isn't run: The Clumsy Witch Seris has two uses, neither in the parts played. Move route step 48 isn't run.
+- CSV and text files are written as UTF-8 with a byte order mark, as Wolf RPG Editor 3 games write them. The one Shift-JIS game that writes a CSV (YUME-SAME) does so only in a debug event.
+- The string command's typed text draws at system variables 40 and 41 at the base font size. No PC comparison: the one library game we typed in on Linux, MARAGON QUEST, doesn't start on the PC under Wine, because its map file names came out of its archive mangled.
+- Cancelling typed text leaves the variable as it was, and system variable 39 reads -1. Not compared with the PC.
+- Command 222 can't write key settings (system variables 52 to 57) into a save, which The Clumsy Witch Seris's configuration tries: they aren't kept between sessions.
 - Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
   variables other than the choice window's top may place them differently.
 - Picture commands with a start delay run at once, and the delay reset command does nothing. The standard systems
   repeat their slide-in moves with delays of 3 and 5 frames toward the same place, so the result looks the same.
 - Free-form pictures (the four-corner flag) draw as plain rectangles. Only Test Game 02's developer debug tool uses
   them.
-- Not drawn, as no test game uses them: the `<CIRCLE>` shape, `<SCREENSHOT>`, `<MAP_SCREENSHOT>`, `<CUT/...>` and
-  `<XY_IMAGE/...>` pictures, video pictures, the centre bottom anchor, and the text codes `\f+`, `\fR`, `\wE`, `\cS`,
+- Not drawn, as no test game uses them: `<SCREENSHOT>` and `<MAP_SCREENSHOT>` pictures, video pictures, and the text codes `\f+`, `\fR`, `\wE`, `\cS`,
   `\cR`, `\img`, `\isize`, `\bx` and `\se`. `\A+` and `\A-` are read but text is always antialiased.
 - Pictures numbered 100,000 and above draw below the message window, not above it. Only Test Game 02's debug tool
   uses such numbers.

@@ -25,7 +25,7 @@ void line(Bitmap &b, float x0, float y0, float x1, float y1, int thick) {
 }
 
 // Wolf's generated shapes, which a window picture shows when its file name is one of these codes: <SQUARE>,
-// <LINE> or <LINE-n> (n pixels thick), <TRI-UP>, <TRI-DOWN>, <TRI-LEFT> and <TRI-RIGHT>, each with FRAME after it
+// <LINE> or <LINE-n> (n pixels thick), <CIRCLE>, <TRI-UP>, <TRI-DOWN>, <TRI-LEFT> and <TRI-RIGHT>, each with FRAME after it
 // for the outline only, and <GRADX-aaa-bbb> and <GRADY-aaa-bbb>, gradients between two colours given as red, green
 // and blue levels from 0 to 9. Shapes are white unless a gradient; the picture's colour tints them. False when the
 // name is no shape.
@@ -48,13 +48,27 @@ bool makeShape(const std::string &name, int w, int h, Bitmap &out, float &offset
     }
     if (w <= 0 || h <= 0) {
         out = Bitmap();
-        return code == "SQUARE" || code.rfind("TRI-", 0) == 0 || code.rfind("GRAD", 0) == 0;
+        return code == "SQUARE" || code == "CIRCLE" || code.rfind("TRI-", 0) == 0 || code.rfind("GRAD", 0) == 0;
     }
     if (code == "SQUARE") {
         out = Bitmap(w, h);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
                 if (!frame || x == 0 || y == 0 || x == w - 1 || y == h - 1) plot(out, x, y);
+        return true;
+    }
+    if (code == "CIRCLE") {
+        // An ellipse filling the size. Its outline is the pixels with a neighbour outside it.
+        out = Bitmap(w, h);
+        float rx = w / 2.0f, ry = h / 2.0f;
+        auto inside = [&](int x, int y) {
+            float dx = (x + 0.5f - rx) / rx, dy = (y + 0.5f - ry) / ry;
+            return dx * dx + dy * dy <= 1;
+        };
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (inside(x, y) && (!frame || !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1)))
+                    plot(out, x, y);
         return true;
     }
     if (code.rfind("TRI-", 0) == 0) {
