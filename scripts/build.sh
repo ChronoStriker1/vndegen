@@ -12,6 +12,7 @@ cd "$(dirname "$0")/.."
 xcodegen generate --quiet
 # Save sync's rclone library, which the package links on every platform.
 scripts/rclone-runtime.sh
+scripts/alpha-video.sh bundle
 # The Ruby interpreter VNDegen's RGSS runtime links, for RPG Maker XP, VX and VX Ace.
 scripts/rgss-ruby.sh build/rgss >build/rgss-ruby.log 2>&1 || { tail -n 40 build/rgss-ruby.log; exit 1; }
 scripts/app-licenses.sh

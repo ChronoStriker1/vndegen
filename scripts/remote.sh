@@ -10,6 +10,6 @@ host=${VNDEGEN_MAC:-$(cat ~/.config/vndegen/mac-host 2>/dev/null)}
 root=$(git rev-parse --show-toplevel)
 dest="vndegen-build/${VNDEGEN_REMOTE_NAME:-$(basename "$root")}"
 ssh -o BatchMode=yes "chronostriker1@$host" "mkdir -p ~/$dest"
-rsync -az --delete --exclude .git --exclude build --exclude '*.xcodeproj' --exclude .audit \
+rsync -az --delete --include '/Engines/Shared/third_party/libvpx/build/***' --exclude .git --exclude build --exclude '*.xcodeproj' --exclude .audit \
   --exclude .build --exclude .swiftpm --exclude /Engines/Artemis/art3m1s-core/target "$root/" "chronostriker1@$host:$dest/"
 ssh -o BatchMode=yes "chronostriker1@$host" "export PATH=/opt/homebrew/bin:\$PATH; cd ~/$dest && $*"

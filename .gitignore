@@ -1,5 +1,6 @@
 .DS_Store
 build/
+!Engines/Shared/third_party/libvpx/build/
 DerivedData/
 *.xcodeproj
 .swiftpm/
