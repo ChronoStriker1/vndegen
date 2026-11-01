@@ -161,16 +161,25 @@ std::vector<uint8_t> VM::resumeSnapshot(const std::string &key, uint32_t resumeI
     o.u32(0);
     o.u32(0);
     o.u32(0);
-    // The PC's counts leave out the reference each method frame holds on its `this`, which this VM counts.
-    std::vector<int32_t> frameRefs(heap.size());
-    for (auto &f : frames)
-        if (f.structPage >= 0 && size_t(f.structPage) < heap.size()) frameRefs[size_t(f.structPage)]++;
+    // References this VM counts that the PC's don't. Versions 7 and 8 leave out the one each method frame holds on
+    // its `this`; version 9 keeps it, but its delegates hold none, while this VM's do (both seen by comparing
+    // Test Game 56's PC save with VNDegen's of the same moment).
+    std::vector<int32_t> uncounted(heap.size());
+    if (!v9) {
+        for (auto &f : frames)
+            if (f.structPage >= 0 && size_t(f.structPage) < heap.size()) uncounted[size_t(f.structPage)]++;
+    } else {
+        for (const Slot &sl : heap)
+            if (sl.inUse && sl.dg)
+                for (auto &[obj, fn] : *sl.dg)
+                    if (obj >= 0 && size_t(obj) < heap.size()) uncounted[size_t(obj)]++;
+    }
     if (v9) o.u32(uint32_t(heap.size() + 1));
     o.u32(uint32_t(heap.size()));
     for (size_t s = 0; s < heap.size(); s++) {
         const Slot &sl = heap[s];
         if (!sl.inUse) { o.u32(uint32_t(-1)); continue; }
-        int32_t refs = sl.refs - frameRefs[s];
+        int32_t refs = sl.refs - uncounted[s];
         if (sl.dg && v9) {
             o.u32(5);
             o.u32(uint32_t(refs));
@@ -541,9 +550,17 @@ bool VM::resumeRestore(const std::vector<uint8_t> &data, const std::string &key,
     }
     // The first frame is the entry; when it returns, the game ends.
     if (!frames.empty()) frames.front().native = true;
-    // Each method frame holds a reference on its `this`, which the saved counts leave out.
-    for (auto &f : frames)
-        if (f.structPage >= 0) incref(f.structPage);
+    // Put back the references the saved counts leave out: before version 9 each method frame's on its `this`, from
+    // version 9 each delegate's on its methods' objects.
+    if (version < 9) {
+        for (auto &f : frames)
+            if (f.structPage >= 0) incref(f.structPage);
+    } else {
+        for (Slot &sl : heap)
+            if (sl.inUse && sl.dg)
+                for (auto &[obj, fn] : *sl.dg)
+                    if (obj >= 0) incref(obj);
+    }
     ip = curCall + insnLength(ain.code, curCall);
     curInsn_ = curCall;
     push(0);  // ResumeSave returns 0 after a load
