@@ -42,6 +42,8 @@ final class ArtemisSession: EngineSession {
     private var prompt: Prompt?
     /// Keys and mouse buttons pressed while a fullscreen movie plays, whose release can skip it.
     private var moviePresses: Set<Int32> = []
+    /// Pointer buttons the game has seen go down and not yet up.
+    private var buttonsDown: Set<Int32> = []
 
     /// Whether a session's runtime is alive. The core keeps some state per process, so one game runs at a time.
     private(set) static var engineInUse = false
@@ -195,6 +197,15 @@ final class ArtemisSession: EngineSession {
         let body = command["payload"] as? [String: Any] ?? [:]
         switch name {
         case "video_play":
+            // A fullscreen movie takes the input, so the game first sees every key and button it holds come up, as when
+            // the menu opens. Otherwise a key held into the movie, such as Control for skipping, would stay down.
+            if body["id"] == nil, !movies.playingFullscreen, let runtime {
+                router.releaseAll().forEach(deliver)
+                // Touches and mouse buttons aren't counted by the router, such as the tap that started the movie.
+                for button in buttonsDown { core.api.runtime_feed_mouse_button!(runtime, UInt32(button), 0) }
+                buttonsDown.removeAll()
+                moviePresses.removeAll()
+            }
             // A movie that can't play ends at once, so the script waiting on it goes on.
             if !movies.play(body) { finishMovie(body["id"] as? String) }
         case "video_stop_all":
@@ -310,6 +321,7 @@ final class ArtemisSession: EngineSession {
             movePointer(to, runtime)
         case let .mouseButton(button, down, at):
             movePointer(at, runtime)
+            if down { buttonsDown.insert(button) } else { buttonsDown.remove(button) }
             core.api.runtime_feed_mouse_button!(runtime, UInt32(button), down ? 1 : 0)
         case let .click(button, down):
             core.api.runtime_feed_mouse_button!(runtime, UInt32(button), down ? 1 : 0)

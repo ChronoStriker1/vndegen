@@ -69,10 +69,10 @@ static int play(const char *path, int loop, double limit, result *out, vnvideo_i
             out->frames++;
         }
         // The decoder runs on its own thread, so the clock waits for each frame, which measures decoding speed. After
-        // 0.4 s with no new frame the decoder has finished or stalled, and the clock moves on.
+        // 20 ms with no new frame the movie is holding a picture, or has finished or stalled, and the clock moves on.
         if (!changed) {
             nanosleep(&pause, NULL);
-            if (++idle < 2000) continue;
+            if (++idle < 100) continue;
         }
         idle = 0;
         if (info->audio_rate) {
@@ -133,6 +133,21 @@ static void builtin(const char *dir) {
     snprintf(path, sizeof path, "%s/red-tone.mpg", dir);
     check(play(path, 1, 2.5, &r, &info), "looping MPEG-1 opens");
     check(r.frames >= 60, "looping MPEG-1 runs on");
+
+    // Sound that ends long before the picture: the movie still plays to its last frame and ends.
+    snprintf(path, sizeof path, "%s/short-sound.ogv", dir);
+    check(play(path, 0, 10, &r, &info), "short sound opens");
+    check(r.frames >= 58 && r.seconds >= 1.95 && r.seconds < 2.5, "a movie whose sound ends early plays to its end");
+
+    // One picture and 8 s of sound: playback starts though the frame ring never fills, and lasts as long as the sound.
+    snprintf(path, sizeof path, "%s/long-sound.ogv", dir);
+    check(play(path, 0, 20, &r, &info), "long sound opens");
+    check(r.frames == 1 && r.seconds >= 7.9 && r.seconds < 8.5, "a movie whose sound outlasts its picture plays it all");
+
+    // Repeated frames at the end still count toward the movie's length.
+    snprintf(path, sizeof path, "%s/held-end.ogv", dir);
+    check(play(path, 0, 10, &r, &info), "held ending opens");
+    check(r.seconds >= 0.99 && r.seconds < 1.2, "repeated last frames count toward the movie's length");
 
     char garbage[] = "/dev/null";
     check(!play(garbage, 0, 1, &r, &info), "an empty file is refused");

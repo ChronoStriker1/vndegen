@@ -56,6 +56,10 @@ struct vnvideo {
 
     // Decode thread side: time decoded so far in this pass, and the clock offset of earlier passes of a loop.
     double video_time, audio_time, base;
+    // The end of this pass's last frame, repeated frames included, and whether its sound stream has ended, after which
+    // the sound is padded with silence up to the picture so the sound clock never stops short of it.
+    double pass_end;
+    int sound_ended;
     uint64_t audio_frames_decoded;
     float *pcm;
 
@@ -70,10 +74,14 @@ struct vnvideo {
     double due[FRAME_SLOTS];
     int head, count;
     uint8_t *current;
-    double current_due, last_due;
+    double current_due;
+    // When the last frame of the last pass ends, set as decoding finishes, and whether the picture stream has ended.
+    double end_time;
+    int video_ended;
     int has_current;
-    // Nothing is handed out until the frame ring first fills or decoding ends, so playback starts with a few frames
-    // in hand, even when the decoder starts slowly while the engine loads a screen.
+    // Nothing is handed out until the frame ring first fills, the picture stream ends, the sound buffer is half full,
+    // or decoding ends, so playback starts with frames in hand, even when the decoder starts slowly while the engine
+    // loads a screen.
     int started;
 
     // Sound ring of interleaved floats.
@@ -159,7 +167,14 @@ static void push_frame(vnvideo *v, double due) {
     pthread_mutex_lock(&v->lock);
     v->due[(v->head + v->count) % FRAME_SLOTS] = due;
     v->count++;
-    v->last_due = due;
+    pthread_mutex_unlock(&v->lock);
+}
+
+static void end_video(vnvideo *v) {
+    v->video_time = INFINITY;
+    pthread_mutex_lock(&v->lock);
+    v->video_ended = 1;
+    pthread_cond_broadcast(&v->wake);
     pthread_mutex_unlock(&v->lock);
 }
 
@@ -179,6 +194,19 @@ static int push_audio(vnvideo *v, const float *samples, size_t frames) {
     v->audio_frames_decoded += frames;
     v->audio_time = (double)v->audio_frames_decoded / v->info.audio_rate - v->base;
     return 1;
+}
+
+// Once the sound stream has ended, pads it with a frame's worth of silence while the picture goes on, and stops it
+// when the picture ends too. Returns 0 when the movie is closing.
+static int pad_sound(vnvideo *v) {
+    if (!isfinite(v->video_time)) {
+        v->audio_time = INFINITY;
+        return 1;
+    }
+    size_t frames = (size_t)ceil(v->info.audio_rate / v->info.fps);
+    if (frames > OPUS_MAX_FRAMES) frames = OPUS_MAX_FRAMES;
+    memset(v->pcm, 0, frames * (size_t)v->info.audio_channels * sizeof(float));
+    return push_audio(v, v->pcm, frames);
 }
 
 // MARK: MPEG-1
@@ -207,10 +235,10 @@ static int mpeg_open(vnvideo *v) {
 // Decodes the next frame or block of sound, whichever is due first. Returns 0 at the end of the stream.
 static int mpeg_step(vnvideo *v) {
     if (isfinite(v->audio_time) && v->audio_time <= v->video_time) {
+        if (v->sound_ended) return pad_sound(v);
         plm_samples_t *samples = plm_decode_audio(v->plm);
         if (samples) return push_audio(v, samples->interleaved, samples->count);
-        // The sound ran out: carry on with the picture alone.
-        v->audio_time = INFINITY;
+        v->sound_ended = 1;
         return 1;
     }
     if (!isfinite(v->video_time)) return 0;
@@ -218,12 +246,13 @@ static int mpeg_step(vnvideo *v) {
     if (!slot) return 0;
     plm_frame_t *frame = plm_decode_video(v->plm);
     if (!frame) {
-        v->video_time = INFINITY;
+        end_video(v);
         return isfinite(v->audio_time);
     }
     yuv420_to_rgba(frame->y.data, (int)frame->y.width, frame->cb.data, (int)frame->cb.width, frame->cr.data,
                    (int)frame->cr.width, 0, 0, v->info.width, v->info.height, slot);
     v->video_time = frame->time;
+    v->pass_end = frame->time + 1.0 / v->info.fps;
     push_frame(v, v->base + frame->time);
     return 1;
 }
@@ -274,7 +303,8 @@ static void ogg_close_streams(ogg_state *s) {
 }
 
 // Reads the beginning-of-stream pages, keeps the first Theora and the first Opus stream, and parses their headers.
-static int ogg_open(vnvideo *v, char *error, size_t error_size) {
+// The movie's format goes to `info`, so a loop that reopens the stream leaves the published format alone.
+static int ogg_open(vnvideo *v, vnvideo_info *info, char *error, size_t error_size) {
     ogg_state *s = &v->ogg;
     memset(s, 0, sizeof *s);
     ogg_sync_init(&s->sync);
@@ -355,16 +385,16 @@ static int ogg_open(vnvideo *v, char *error, size_t error_size) {
         snprintf(error, error_size, "the Theora decoder could not start");
         return 0;
     }
-    v->info.width = (int)s->info.pic_width;
-    v->info.height = (int)s->info.pic_height;
-    v->info.fps = s->info.fps_denominator ? (double)s->info.fps_numerator / s->info.fps_denominator : 30;
+    info->width = (int)s->info.pic_width;
+    info->height = (int)s->info.pic_height;
+    info->fps = s->info.fps_denominator ? (double)s->info.fps_numerator / s->info.fps_denominator : 30;
     // Opus has a second header, its tags, which carries nothing the decoder needs.
     if (s->has_audio_stream && opus_headers == 1 && ogg_next_packet(v, &s->audio_stream, &packet)) {
         int status = 0;
         if (channels >= 1 && channels <= 2) s->opus = opus_decoder_create(48000, channels, &status);
         if (s->opus && status == OPUS_OK) {
-            v->info.audio_rate = 48000;
-            v->info.audio_channels = channels;
+            info->audio_rate = 48000;
+            info->audio_channels = channels;
         }
     }
     return 1;
@@ -374,8 +404,9 @@ static int ogg_step(vnvideo *v) {
     ogg_state *s = &v->ogg;
     ogg_packet packet;
     if (isfinite(v->audio_time) && v->audio_time <= v->video_time) {
+        if (v->sound_ended) return pad_sound(v);
         if (!ogg_next_packet(v, &s->audio_stream, &packet)) {
-            v->audio_time = INFINITY;
+            v->sound_ended = 1;
             return 1;
         } else {
             int frames = opus_decode_float(s->opus, packet.packet, (opus_int32)packet.bytes, v->pcm, OPUS_MAX_FRAMES, 0);
@@ -393,11 +424,12 @@ static int ogg_step(vnvideo *v) {
         packet = s->first_video;
         s->first_video.packet = NULL;
     } else if (!ogg_next_packet(v, &s->video_stream, &packet)) {
-        v->video_time = INFINITY;
+        end_video(v);
         return isfinite(v->audio_time);
     }
     double due = v->video_time;
     v->video_time += 1.0 / v->info.fps;
+    v->pass_end = v->video_time;
     // A duplicate frame repeats the last picture, which the host keeps showing.
     if (th_decode_packetin(s->decoder, &packet, NULL) != 0) return 1;
     th_ycbcr_buffer planes;
@@ -411,13 +443,11 @@ static int ogg_step(vnvideo *v) {
 }
 
 static int ogg_rewind(vnvideo *v) {
-    vnvideo_info info = v->info;
     ogg_close_streams(&v->ogg);
     v->position = 0;
+    vnvideo_info info = {0};
     char error[64];
-    if (!ogg_open(v, error, sizeof error)) return 0;
-    v->info = info;
-    return 1;
+    return ogg_open(v, &info, error, sizeof error);
 }
 
 // MARK: Decode thread
@@ -426,6 +456,8 @@ static int ogg_rewind(vnvideo *v) {
 static void reset_clocks(vnvideo *v) {
     v->video_time = 0;
     v->audio_time = v->info.audio_rate ? 0 : INFINITY;
+    v->pass_end = 0;
+    v->sound_ended = 0;
 }
 
 static void *decode_thread(void *argument) {
@@ -440,9 +472,7 @@ static void *decode_thread(void *argument) {
         if (more) continue;
         if (!v->loop) break;
         // Start over, with the clock running on from the end of this pass.
-        double length = 0;
-        if (isfinite(v->video_time)) length = v->video_time;
-        else length = v->last_due - v->base + 1.0 / v->info.fps;
+        double length = v->pass_end;
         if (v->info.audio_rate) {
             double sound = (double)v->audio_frames_decoded / v->info.audio_rate - v->base;
             if (sound > length) length = sound;
@@ -460,6 +490,7 @@ static void *decode_thread(void *argument) {
         }
     }
     pthread_mutex_lock(&v->lock);
+    v->end_time = v->base + v->pass_end;
     v->done = 1;
     pthread_cond_broadcast(&v->wake);
     pthread_mutex_unlock(&v->lock);
@@ -502,7 +533,7 @@ vnvideo *vnvideo_open(vnvideo_read_fn read, void *user, uint64_t size, int loop,
     int opened;
     if (!memcmp(magic, "OggS", 4)) {
         v->format = FORMAT_OGG;
-        opened = ogg_open(v, error, error_size);
+        opened = ogg_open(v, &v->info, error, error_size);
     } else if (magic[0] == 0 && magic[1] == 0 && magic[2] == 1 && (magic[3] == 0xBA || magic[3] == 0xB3)) {
         v->format = FORMAT_MPEG;
         opened = mpeg_open(v);
@@ -539,7 +570,9 @@ void vnvideo_get_info(const vnvideo *video, vnvideo_info *info) {
 
 // Whether playback may start. The caller holds the lock.
 static int ready(vnvideo *v) {
-    if (!v->started && (v->count == FRAME_SLOTS || v->done)) v->started = 1;
+    if (!v->started && (v->count == FRAME_SLOTS || v->done || v->video_ended ||
+                        (v->audio_capacity && v->audio_fill * 2 >= v->audio_capacity)))
+        v->started = 1;
     return v->started;
 }
 
@@ -590,7 +623,7 @@ double vnvideo_audio_time(vnvideo *v) {
 
 int vnvideo_ended(vnvideo *v, double time) {
     pthread_mutex_lock(&v->lock);
-    int ended = v->done && v->count == 0 && v->audio_fill == 0 && time >= v->last_due + 1.0 / v->info.fps;
+    int ended = v->done && v->count == 0 && v->audio_fill == 0 && time >= v->end_time;
     pthread_mutex_unlock(&v->lock);
     return ended;
 }
