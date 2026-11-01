@@ -1044,7 +1044,10 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     if (show) {
         Picture fresh;
         // A file with exactly this name wins over text codes in it, as the manual's picture page says.
-        auto fileName = [&](const std::string &name) { return files_.exists(name) ? name : expandText(name, &t); };
+        auto fileName = [&](const std::string &name) {
+            if (name.find('\\') == std::string::npos) return name;  // no text codes to choose between
+            return files_.exists(name) ? name : expandText(name, &t);
+        };
         switch (display) {
             case 0x00: fresh.kind = PictureKind::File; fresh.source = fileName(c.str(0)); break;
             case 0x10: fresh.kind = PictureKind::File; fresh.source = fileName(readStr(c.arg(11), t)); break;
@@ -1073,8 +1076,14 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
                 fresh.imageW = xy->w;
                 fresh.imageH = xy->h;
                 fresh.xyImage = xy;
-            } else if (auto bytes = files_.read(fresh.source)) {
-                imageSize(*bytes, fresh.imageW, fresh.imageH);
+            } else {
+                // Games show the same pictures every frame in battle, so a file is read for its size only once.
+                auto [known, added] = imageSizes_.try_emplace(fresh.source);
+                if (added) {
+                    if (auto bytes = files_.read(fresh.source)) imageSize(*bytes, known->second[0], known->second[1]);
+                }
+                fresh.imageW = known->second[0];
+                fresh.imageH = known->second[1];
             }
             if (fresh.cutW > 0) {
                 fresh.imageW = fresh.cutW * fresh.divX;

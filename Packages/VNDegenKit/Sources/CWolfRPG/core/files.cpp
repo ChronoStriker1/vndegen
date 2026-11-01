@@ -19,8 +19,12 @@ std::string upperAscii(std::string s) {
 }
 
 std::vector<uint8_t> readAll(const fs::path &p) {
-    std::ifstream f(p, std::ios::binary);
-    return {std::istreambuf_iterator<char>(f), {}};
+    std::ifstream f(p, std::ios::binary | std::ios::ate);
+    if (!f) return {};
+    std::vector<uint8_t> bytes(size_t(f.tellg()));
+    f.seekg(0);
+    f.read(reinterpret_cast<char *>(bytes.data()), std::streamsize(bytes.size()));
+    return bytes;
 }
 
 }  // namespace

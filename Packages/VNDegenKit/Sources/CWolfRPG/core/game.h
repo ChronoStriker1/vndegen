@@ -474,6 +474,7 @@ private:
     std::vector<Thread> parallel_;     // parallel common events, one per event
     std::vector<Thread> mapParallel_;  // parallel map event pages
     std::map<int, Picture> pictures_;
+    std::map<std::string, std::array<int, 2>> imageSizes_;  // of image files, by name: the game's data doesn't change
     std::map<int32_t, XYArray> xyNumbered_;
     std::map<std::string, XYArray> xyNamed_;
     ChoiceState choice_;
