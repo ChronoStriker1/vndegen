@@ -44,6 +44,7 @@ Godot 3.6.3's `COPYRIGHT.txt` names no GPL or LGPL code, and the build copies it
 - `04-restart-setup.patch`: clears the pointers `Main::cleanup` frees, at the start of `Main::setup`, as Godot 4's patch 07 does.
 - `05-copy-same-file.patch`: the same check in `DirAccess::copy` as Godot 4's patch 08.
 - `06-user-time-scale.patch`: the speed a player picks, on top of the game's own time scale, as Godot 4's `Engine::set_user_time_scale`. The main loop runs that many times as many physics steps of the same length, up to that many times the usual 8 per frame, and scales each frame's time by it. `SpatialVelocityTracker`, which measures in physics steps, counts them at that rate, as Godot 4's does. `vngd_set_speed` sets it.
+- `07-angle-copy-screen.patch`: skips `glInvalidateFramebuffer` in `_copy_screen` on MetalANGLE builds. With it, a game whose Environment uses the Canvas background mode, such as Test Game 113, shows the canvas layers that go through the copy as black. The Mac build uses desktop OpenGL and never made the call.
 
 | Pull request | Title | Author | Commit ported |
 |---|---|---|---|

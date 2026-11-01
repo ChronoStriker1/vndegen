@@ -1,0 +1,13 @@
+--- a/drivers/gles3/rasterizer_scene_gles3.cpp
++++ b/drivers/gles3/rasterizer_scene_gles3.cpp
+@@ -3101,7 +3101,9 @@
+ }
+ 
+ void RasterizerSceneGLES3::_copy_screen(bool p_invalidate_color, bool p_invalidate_depth) {
+-#ifndef GLES_OVER_GL
++// VNDegen: with this invalidate, what the draw below draws is lost under MetalANGLE. A game whose Environment uses the
++// Canvas background mode then shows its bottom canvas layers black.
++#if !defined(GLES_OVER_GL) && !defined(VNDEGEN_ANGLE)
+ 	if (p_invalidate_color) {
+ 		GLenum attachments[2] = {
+ 			GL_COLOR_ATTACHMENT0,
