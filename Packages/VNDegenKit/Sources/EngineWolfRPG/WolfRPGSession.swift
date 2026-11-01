@@ -30,6 +30,7 @@ final class WolfRPGSession: EngineSession {
     #endif
     private var router = WolfRPGInputRouter()
     private var wantedText = false
+    private var scrolledNotches = 0.0
     private var paused = false
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
@@ -47,8 +48,12 @@ final class WolfRPGSession: EngineSession {
         }
         frameView.onScroll = { [weak self] notches in
             guard let self else { return }
-            let whole = Int(notches.rounded())
-            if whole != 0 { deliver([.wheel(whole)]) }
+            // A trackpad reports fractions of a notch, which add up over a slow scroll.
+            scrolledNotches += notches
+            let whole = Int(scrolledNotches)
+            guard whole != 0 else { return }
+            scrolledNotches -= Double(whole)
+            deliver([.wheel(whole)])
         }
         frameView.onKey = { [weak self] usage, pressed, characters in
             guard let self else { return }

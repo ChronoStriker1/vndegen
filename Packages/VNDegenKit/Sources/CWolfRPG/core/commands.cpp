@@ -379,13 +379,16 @@ XYImage resolveXYImage(const std::string &source, const Game &game) {
         if (eq != std::string::npos) {
             std::string key = part.substr(0, eq), val = part.substr(eq + 1);
             int channel = key == "A" ? 0 : key == "R" ? 1 : key == "G" ? 2 : key == "B" ? 3 : -1;
-            if (channel >= 0 && !val.empty()) out.channels[channel] = named ? game.xyArray(val) : game.xyArray(std::atoi(val.c_str()));
+            if (channel >= 0 && !val.empty()) {
+                const XYArray *a = named ? game.xyArray(val) : game.xyArray(std::atoi(val.c_str()));
+                if (a) out.channels[channel] = std::make_shared<const XYArray>(*a);
+            }
             if (key == "XSIZE") xsize = std::atoi(val.c_str());
             if (key == "YSIZE") ysize = std::atoi(val.c_str());
         }
         at = next;
     }
-    for (const XYArray *a : out.channels) {
+    for (auto &a : out.channels) {
         if (!a) continue;
         out.w = std::max(out.w, int(a->size()));
         for (auto &col : *a) out.h = std::max(out.h, int(col.size()));
@@ -417,13 +420,22 @@ void Game::csvCommand(Thread &t, const Command &c) {
     std::filesystem::path path = saveFilePath(name);
 
     if (write) {
+        if (path.empty()) {
+            log("cannot write " + name);
+            return;
+        }
+        // A quote inside a string doubles, which parseCsv undoes.
+        auto quoted = [](std::string text) {
+            for (size_t p = 0; (p = text.find('"', p)) != std::string::npos; p += 2) text.insert(p, 1, '"');
+            return '"' + text + "\",";
+        };
         std::string out = "\xEF\xBB\xBF";
         for (size_t f = firstField; f < dt.fieldKinds.size(); f++)
-            out += '"' + (f < dt.fieldNames.size() ? dt.fieldNames[f] : std::string()) + "\",";
+            out += quoted(f < dt.fieldNames.size() ? dt.fieldNames[f] : std::string());
         out += "\r\n";
         for (int r = firstRow; r < firstRow + count && r < int(dt.rows.size()); r++) {
             for (size_t f = firstField; f < dt.fieldKinds.size(); f++) {
-                if (dt.isString(f)) out += '"' + (dt.slot(f) < dt.rows[r].strings.size() ? dt.rows[r].strings[dt.slot(f)] : std::string()) + "\",";
+                if (dt.isString(f)) out += quoted(dt.slot(f) < dt.rows[r].strings.size() ? dt.rows[r].strings[dt.slot(f)] : std::string());
                 else out += std::to_string(dt.slot(f) < dt.rows[r].numbers.size() ? dt.rows[r].numbers[dt.slot(f)] : 0) + ",";
             }
             out += "\r\n";
@@ -436,6 +448,10 @@ void Game::csvCommand(Thread &t, const Command &c) {
         return;
     }
 
+    if (path.empty()) {
+        log("no CSV file " + name);
+        return;
+    }
     std::string text;
     if (std::ifstream file(path, std::ios::binary); file) text.assign(std::istreambuf_iterator<char>(file), {});
     else if (auto bytes = files_.read(name)) text.assign(bytes->begin(), bytes->end());

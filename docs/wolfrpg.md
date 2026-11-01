@@ -140,6 +140,8 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - CSV and text files are written as UTF-8 with a byte order mark, as Wolf RPG Editor 3 games write them. The one Shift-JIS game that writes a CSV (YUME-SAME) does so only in a debug event.
 - The string command's typed text draws at system variables 40 and 41 at the base font size. No PC comparison: the one library game we typed in on Linux, MARAGON QUEST, doesn't start on the PC under Wine, because its map file names came out of its archive mangled.
 - Cancelling typed text leaves the variable as it was, and system variable 39 reads -1. Not compared with the PC.
+- Command 126 turning off one keyboard key stops event commands reading that key, but its basic key still works when it maps to one. The runtime gets basic keys from the host without knowing which key caused them. Library games turn off Control, Print Screen, S and the keyboard as a whole, none of which this touches.
+- Saves of versions before 159 have no arrays. A Wolf RPG Editor 3.5 game that started from an older save loses its arrays when saved in VNDegen. The Clumsy Witch Seris, the one library game with arrays, writes version 159.
 - Command 222 can't write key settings (system variables 52 to 57) into a save, which The Clumsy Witch Seris's configuration tries: they aren't kept between sessions.
 - Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
   variables other than the choice window's top may place them differently.

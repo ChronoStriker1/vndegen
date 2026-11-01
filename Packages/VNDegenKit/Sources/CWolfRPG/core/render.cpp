@@ -157,9 +157,10 @@ const Bitmap *Renderer::pictureImage(int number, const Picture &p, float &offset
         cached.generation = p.generation;
         cached.offsetX = cached.offsetY = 0;
         if (fromArrays) {
-            XYImage xy = resolveXYImage(p.source, game_);
+            static const XYImage empty;
+            const XYImage &xy = p.xyImage ? *p.xyImage : empty;
             cached.bitmap = xy.w > 0 && xy.h > 0 ? Bitmap(xy.w, xy.h) : Bitmap();
-            auto at = [](const XYArray *a, int x, int y, int fallback) {
+            auto at = [](const std::shared_ptr<const XYArray> &a, int x, int y, int fallback) {
                 if (!a) return fallback;
                 return x < int(a->size()) && y < int((*a)[x].size()) ? (*a)[x][y] : 0;
             };

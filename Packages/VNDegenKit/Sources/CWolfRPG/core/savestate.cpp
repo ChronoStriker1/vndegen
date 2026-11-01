@@ -478,7 +478,13 @@ void Game::applySave(const SaveFile &s) {
     transition_ = {.generation = transition_.generation + 1};
     scrollX_ = scrollY_ = 0;
     pictures_.clear();  // the PC engine shows no pictures after a load, not even those in the save
-    autoKeys_ = 0;
+    autoKeys_ = autoMouse_ = 0;
+    autoKeyCodes_.reset();
+    autoWheel_ = 0;
+    // The events that set these rules ended with the load, and nothing would undo them.
+    basicControl_ = {};
+    keyboardOff_ = mouseOff_ = false;
+    keyCodesOff_.reset();
 
     // Variables first: the map's event pages depend on them.
     const SaveVariables &v = s.variables;

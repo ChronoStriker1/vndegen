@@ -53,8 +53,15 @@ std::string decodeTextFile(std::string raw) {
         auto c = static_cast<unsigned char>(raw[i]);
         size_t n = c < 0x80 ? 1 : (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 0;
         if (n == 0 || i + n > raw.size()) return toUtf8(raw, Encoding::ShiftJIS);
-        for (size_t k = 1; k < n; k++)
-            if ((static_cast<unsigned char>(raw[i + k]) & 0xC0) != 0x80) return toUtf8(raw, Encoding::ShiftJIS);
+        uint32_t code = n == 1 ? c : c & (0xFF >> (n + 1));
+        for (size_t k = 1; k < n; k++) {
+            auto next = static_cast<unsigned char>(raw[i + k]);
+            if ((next & 0xC0) != 0x80) return toUtf8(raw, Encoding::ShiftJIS);
+            code = code << 6 | (next & 0x3F);
+        }
+        // Overlong forms, surrogates and values past Unicode's end aren't UTF-8.
+        static constexpr uint32_t smallest[] = {0, 0, 0x80, 0x800, 0x10000};
+        if (code < smallest[n] || (code >= 0xD800 && code < 0xE000) || code > 0x10FFFF) return toUtf8(raw, Encoding::ShiftJIS);
         i += n;
     }
     return raw;

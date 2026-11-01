@@ -181,8 +181,9 @@ bool Game::step(Thread &t) {
                     case 0x50: ok = left.ends_with(right); break;
                     case 0x60:  // a regular expression, which takes text codes only inside << and >>
                         try {
-                            ok = std::regex_search(left, std::regex(expandRegexCodes(rightIsVar ? right : cmd.str(i), t),
-                                                                    std::regex::ECMAScript | std::regex::multiline));
+                            // The whole text must match, as the manual's page on this condition says.
+                            ok = std::regex_match(left, std::regex(expandRegexCodes(rightIsVar ? right : cmd.str(i), t),
+                                                                   std::regex::ECMAScript));
                         } catch (const std::regex_error &) {
                             log("bad regular expression " + right);
                         }
@@ -344,7 +345,7 @@ bool Game::step(Thread &t) {
             std::string name = expandText(cmd.str(0), &t);
             int id = commonByName(name);
             if (id < 0) {
-                log("no common event named " + name);
+                if (hiddenCodesLogged_.insert(name).second) log("no common event named " + name);
                 return true;
             }
             callCommon(t, id, cmd, 1);
@@ -695,6 +696,10 @@ void Game::setString(Thread &t, const Command &c) {
         }
         case 0x06: {  // write the variable's text to a file, with a byte order mark as the PC's default
             std::filesystem::path path = saveFilePath(rhs);
+            if (path.empty()) {
+                log("cannot write " + rhs);
+                break;
+            }
             std::error_code ec;
             std::filesystem::create_directories(path.parent_path(), ec);
             std::ofstream file(path, std::ios::binary);
@@ -807,7 +812,9 @@ std::string Game::hiddenCode(const std::string &name, const std::string &arg) {
     if (name == "GET_FILE_EXIST") {
         // A path from the game folder, where saves are, or in the game's data, which may be in an archive.
         std::error_code ec;
-        return std::filesystem::exists(saveFilePath(arg), ec) || files_.exists(arg) ? "1" : "0";
+        std::filesystem::path path = saveFilePath(arg);
+        if (path.empty()) return "0";
+        return std::filesystem::exists(path, ec) || files_.exists(arg) ? "1" : "0";
     }
     if (name == "GET_STRING_WIDTH_COUNT") return std::to_string(width(arg));
     if (name == "GET_STRING_BYTE_COUNT") return std::to_string(arg.size());
@@ -934,7 +941,7 @@ void Game::startTextEntry(Thread &t, const Command &c) {
     textEntry_ = TextEntry{};
     textEntry_.active = true;
     textEntry_.target = target;
-    textEntry_.thread = &t;
+    textEntryScope_.stack.assign(1, t.stack.back());
     textEntry_.maxLength = value(c.arg(2), t);
     textEntry_.canCancel = (flags >> 8) & 0x10;
     if ((flags >> 8) & 0x20) textEntry_.text = readStr(target, t);
@@ -969,7 +976,7 @@ void Game::updateTextEntry() {
     }
     bool enter = input_.keysPressed[128], cancel = textEntry_.canCancel && input_.keysPressed[101];
     if (enter || cancel) {
-        if (enter) writeStr(textEntry_.target, textEntry_.text, *textEntry_.thread);
+        if (enter) writeStr(textEntry_.target, textEntry_.text, textEntryScope_);
         if (system_.size() > 39) system_[39] = enter ? 0 : -1;
         textEntry_.active = false;
     }
@@ -1029,7 +1036,11 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
     if (show) {
         Picture fresh;
         switch (display) {
-            case 0x00: fresh.kind = PictureKind::File; fresh.source = expandText(c.str(0), &t); break;
+            case 0x00:
+                // A file with exactly this name wins over text codes in it, as the manual's picture page says.
+                fresh.kind = PictureKind::File;
+                fresh.source = files_.exists(c.str(0)) ? c.str(0) : expandText(c.str(0), &t);
+                break;
             case 0x10: fresh.kind = PictureKind::File; fresh.source = readStr(c.arg(11), t); break;
             case 0x20: fresh.kind = PictureKind::Text; fresh.source = expandText(c.str(0), &t); break;
             case 0x30: fresh.kind = PictureKind::Window; fresh.source = c.str(0); break;
@@ -1052,9 +1063,10 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
                 }
             }
             if (fresh.source.starts_with("<XY")) {
-                XYImage xy = resolveXYImage(fresh.source, *this);
-                fresh.imageW = xy.w;
-                fresh.imageH = xy.h;
+                auto xy = std::make_shared<const XYImage>(resolveXYImage(fresh.source, *this));
+                fresh.imageW = xy->w;
+                fresh.imageH = xy->h;
+                fresh.xyImage = xy;
             } else if (auto bytes = files_.read(fresh.source)) {
                 imageSize(*bytes, fresh.imageW, fresh.imageH);
             }

@@ -56,6 +56,15 @@ struct Input {
 // An XY array (Wolf RPG Editor 3's command 255): numbers by X, then by Y.
 using XYArray = std::vector<std::vector<int32_t>>;
 
+// A picture named <XY_IMAGE/A=../R=../G=../B=../XSIZE=../YSIZE=..> or <XYN_IMAGE/...>, the second going by array names:
+// copies of the four arrays, null where one is missing or left empty, and the image's size. The picture shows them as
+// they were when shown. The manual's picture page: an empty alpha means 255 and an empty colour 0, and without XSIZE or
+// YSIZE the largest array gives the size.
+struct XYImage {
+    std::array<std::shared_ptr<const XYArray>, 4> channels{};  // A, R, G, B
+    int w = 0, h = 0;
+};
+
 // What a picture shows: an image file, text, or a window skin stretched to a size.
 enum class PictureKind { None, File, Text, Window };
 
@@ -82,6 +91,7 @@ struct Picture {
     int imageW = 0, imageH = 0;  // size of the image file, the text or the window, for the variable command
     // <CUT/Xa-b/Yc-d> before a file name shows that part of each pattern, in pixels, inclusive. cutW is 0 without one.
     int cutX = 0, cutY = 0, cutW = 0, cutH = 0;
+    std::shared_ptr<const XYImage> xyImage;  // for a picture made from XY arrays
     int windowW = 0, windowH = 0;  // size of a window picture: a window skin stretched, or a shape
     Tween x, y, opacity, zoomX, zoomY, angle, r, g, b;
     uint64_t generation = 0;  // changes whenever the source changes, so the renderer reloads it
@@ -134,7 +144,6 @@ struct MessageState {
 struct TextEntry {
     bool active = false;
     int32_t target = 0;
-    const struct Thread *thread = nullptr;
     int maxLength = 0;
     bool canCancel = false;
     std::string text;
@@ -449,7 +458,9 @@ private:
     std::shared_ptr<Map> map_;
     // A deque, so an event a hidden code adds moves no other: moves in progress point at their characters.
     std::deque<MapEventState> events_;
-    std::deque<MapEvent> madeEvents_;  // events hidden codes made, gone with the map as the manual says
+    // Events hidden codes made. They leave events_ with the map, as the manual says, but stay here until the title,
+    // since a call that outlives the map change may still be running one's commands.
+    std::deque<MapEvent> madeEvents_;
     std::map<int, std::string> eventNames_;  // names hidden codes gave events, by id
     // Self variables of map events, kept per map and event id for as long as the game runs.
     std::map<std::pair<int, int>, std::array<int32_t, 10>> eventSelf_;
@@ -468,7 +479,8 @@ private:
     ChoiceState choice_;
     MessageState message_;
     TextEntry textEntry_;
-    std::set<std::string> hiddenCodesLogged_;
+    Thread textEntryScope_;  // a copy of the call that asked, whose self variables the target may name
+    std::set<std::string> hiddenCodesLogged_;  // what has been logged once: hidden codes and missing event names
     Tween tintR_, tintG_, tintB_;
     Input input_;
     std::array<int, 7> heldFrames_{};  // frames each Wolf key has been held, by bit of Key
@@ -508,13 +520,7 @@ private:
     double scrollX_ = 0, scrollY_ = 0;
 };
 
-// A picture named <XY_IMAGE/A=../R=../G=../B=../XSIZE=../YSIZE=..> or <XYN_IMAGE/...>, the second going by array names:
-// the four arrays, null where one is missing or left empty, and the image's size. The manual's picture page: an empty
-// alpha means 255 and an empty colour 0, and without XSIZE or YSIZE the largest array gives the size.
-struct XYImage {
-    std::array<const XYArray *, 4> channels{};  // A, R, G, B
-    int w = 0, h = 0;
-};
+class Game;
 XYImage resolveXYImage(const std::string &source, const Game &game);
 
 }  // namespace wolf
