@@ -84,8 +84,8 @@ final class ArtemisSession: EngineSession {
         host.onKey = { [weak self] key, pressed, isRepeat in
             guard let self else { return }
             if let prompt {
-                // A key meant for the hub's menu must not answer the dialog waiting behind it.
-                if pressed, !isRepeat, !paused { prompt.handleHostKey(key) }
+                // A key meant for the hub's menu must not answer the dialog waiting behind it, which is off screen then.
+                if pressed, !isRepeat, promptHost != nil { prompt.handleHostKey(key) }
                 return
             }
             router.hostKey(key, pressed: pressed, isRepeat: isRepeat).forEach(deliver)
@@ -376,12 +376,19 @@ final class ArtemisSession: EngineSession {
         movies.paused()
         if let runtime { core.api.runtime_notify_lifecycle!(runtime, paused ? 1 : 2) }
         // The dialog leaves the screen while the hub's menu is up, since its text field would keep the keyboard and take
-        // the menu's Return as its answer. Shown again, the field takes focus back as it appears.
+        // the menu's Return as its answer. It comes back a moment after the menu goes, because the Return that chose
+        // Resume reaches the app's key handling just after the hub acts on it. The field takes focus as it appears.
         if paused {
             removePromptView()
         } else {
             host.takeFocus()
-            if let prompt { hostPromptView(prompt) }
+            if let prompt {
+                Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard let self, !self.paused, self.prompt === prompt else { return }
+                    hostPromptView(prompt)
+                }
+            }
         }
     }
 
