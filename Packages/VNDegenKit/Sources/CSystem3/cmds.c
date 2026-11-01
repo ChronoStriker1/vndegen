@@ -210,7 +210,7 @@ void s3_service_wait(S3 *s) {
         break;
     }
     case S3_WAIT_EFFECT:
-        if (s->clockMs >= s->waitUntil || (s->waitArg[0] && s->pressedMask)) {
+        if (s3_effect_update(s, s->waitArg[0] && s->pressedMask)) {
             if (s->waitArg[0]) rnd(s, (u16)s->pressedMask);
             s->wait = S3_WAIT_NONE;
         }
@@ -268,19 +268,21 @@ void s3_load_cg(S3 *s, int n, int key, int yOffset) {
 
 // ---- effects ----
 
-static void effect_copy(S3 *s, const Arg *a) {
+// CE and CD. Time a step takes comes from the option, in milliseconds.
+static void effect_copy(S3 *s, const Arg *a, int key) {
     int sx = a[0].v, sy = a[1].v, w = a[2].v, h = a[3].v, dx = a[4].v, dy = a[5].v;
-    int effect = a[6].v, opt = a[7].v, keyFlag = a[8].v;
-    s3_copy(s, sx, sy, w, h, dx, dy);
-    // Transitions run about a second at default speed on the original; until each pattern is
-    // drawn, show the result after the same delay.
-    int ms = effect >= 2000 ? 0 : opt ? opt * 16 : 500;
-    if (ms > 0) {
+    int number = a[6].v, opt = a[7].v, keyFlag = a[8].v;
+    if (key >= 0 && number == 1001) { s3_copy_bank(s, sx, sy, w, h, dx, dy, key); return; }
+    if (s3_effect_start(s, sx, sy, w, h, dx, dy, number, opt, key)) {
         s->wait = S3_WAIT_EFFECT;
-        s->waitUntil = s->clockMs + (u64)ms;
         s->waitArg[0] = keyFlag;
         s->pressedMask = 0;
+        return;
     }
+    // No library game uses the other effects; they show the result at once.
+    if (key >= 0) s3_copy_key(s, sx, sy, w, h, dx, dy, key);
+    else s3_copy(s, sx, sy, w, h, dx, dy);
+    if (keyFlag) rnd(s, 0);
 }
 
 // ---- the dispatcher ----
@@ -336,12 +338,8 @@ static void cmd_C(S3 *s) {
         s3_fill(s, a[0].v, a[1].v, 1, a[3].v, a[4].v); s3_fill(s, a[0].v + a[2].v - 1, a[1].v, 1, a[3].v, a[4].v);
         return;
     case 'C': args(s, "eeeeee", a); s3_copy(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v); return;
-    case 'D': // CD sx, sy, w, h, dx, dy, effect, wait, keyFlag, key: a keyed copy shown at once, without the effect
-        args(s, "eeeeeeeeee", a);
-        s3_copy_key(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v, a[5].v, a[9].v);
-        if (a[8].v) rnd(s, 0);
-        return;
-    case 'E': args(s, "eeeeeeeee", a); effect_copy(s, a); return;
+    case 'D': args(s, "eeeeeeeeee", a); effect_copy(s, a, a[9].v); return;
+    case 'E': args(s, "eeeeeeeee", a); effect_copy(s, a, -1); return;
     case 'F': args(s, "eeeee", a); s3_fill(s, a[0].v, a[1].v, a[2].v, a[3].v, a[4].v); return;
     case 'K': {
         args(s, "beeeeeeee", a);

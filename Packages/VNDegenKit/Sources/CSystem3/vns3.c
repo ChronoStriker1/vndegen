@@ -143,6 +143,7 @@ void vns3_close(VNS3 *s3) {
     for (int i = 0; i < S3_MAX_STRINGS; i++) free(s->str[i]);
     free(s->vars);
     free(s->bind);
+    s3_effect_free(s);
     free(s->dib.p8);
     free(s->dib.p32);
     free(s->screen);
