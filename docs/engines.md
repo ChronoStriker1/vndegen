@@ -36,7 +36,7 @@ MV and MZ games also have a Cheats page in the VNDegen menu, described in [contr
 
 ## TyranoScript
 
-TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. iOS cannot play Ogg, so VNDegen decodes Ogg Vorbis inside the game's page with libvorbis compiled to WebAssembly, the first time each track plays.
+TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. iOS cannot play Ogg, so VNDegen decodes Ogg Vorbis inside the game's page with libvorbis compiled to WebAssembly, the first time each track plays. Electron builds of TyranoScript 5.2 and later, which reach Node through the `window.studio_api` their preload script sets up, get the same modules from VNDegen.
 
 ## Ren'Py
 
