@@ -30,7 +30,8 @@ Editor 2 game ships.
 
 - Game data: `Game.dat`, `CommonEvent.dat`, the user, changeable and system databases with their `.project` files,
   `TileSetData.dat`, and the maps (`.mps`). `Game.dat`, `CommonEvent.dat` and `TileSetData.dat` may be encrypted with
-  Wolf RPG Editor 2's basic data encryption. Text is Shift-JIS in Wolf RPG Editor 2 and UTF-8 in Wolf RPG Editor 3
+  Wolf RPG Editor 2's basic data encryption. Wolf RPG Editor 3.5 compresses common events, databases and maps with
+  LZ4, and its maps have their own number of tile layers. Text is Shift-JIS in Wolf RPG Editor 2 and UTF-8 in Wolf RPG Editor 3
   games that say so. Translated games often hold bytes that aren't valid Shift-JIS; they become U+FFFD.
 - Archives: `Data.wolf`, or one `.wolf` archive per top-level data folder, as DxLib archives of versions 1 to 6 with
   the encryption keys of Wolf RPG Editor 2. Loose files win over archives.
@@ -78,15 +79,25 @@ works as on Windows: Z, Return or Space confirm, X or Escape cancel, Shift is su
 Saves are the PC engine's own files in the `Save` folder beside `Game.exe` (`SaveDataNN.sav`, and `System.sav` for
 games that keep values across saves), so they move between VNDegen and a PC copy of the game, and Ludusavi backs them
 up. Saves the PC engine wrote load in the runtime, and saves the runtime wrote load in the PC engine, checked under
-Wine for a Wolf RPG Editor 2 and a Wolf RPG Editor 3 test game. Fields the runtime doesn't use are carried over from the
-last save read or written. `docs/wolfrpg-save-format.md` describes the format and how each field was established.
+Wine for a Wolf RPG Editor 2 and a Wolf RPG Editor 3 test game, and for The Clumsy Witch Seris (Wolf RPG Editor 3.5,
+save version 159 in its compressed and encrypted container) and ANGEL QUEST (Wolf RPG Editor 2, version 123). Fields
+the runtime doesn't use are carried over from the last save read or written. `docs/wolfrpg-save-format.md` describes the
+format and how each field was established, and `docs/wolfrpg-cleanroom.md` the version 159 container and additions. A
+Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf RPG Editor 3.714 writes.
 
 ## Known limits
 
 - A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
   playing. The PC engine shows no saved pictures after a load either; the map's own music starts.
-- Wolf RPG Editor 3.5 games, whose data files are compressed, and DxLib archive versions 7 and 8 (Wolf RPG Editor 2.225
-  and later, and 3.x) aren't read yet. None of the test games uses them; one library game each does.
+- After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and
+  building labels again only once the menu has been opened and closed. Wolf RPG Editor 3.5 restores pictures from a
+  save, and VNDegen neither writes pictures into saves nor restores them. Saves made and loaded within VNDegen behave
+  as before.
+- Save versions 143 to 158 (Wolf RPG Editor 3.3x) aren't read: no save of those versions has been seen. Saves under 200
+  bytes in the 3.5 container use another scheme that isn't read; real saves are never that small.
+- Wolf RPG Editor 3 commands not supported yet, which The Clumsy Witch Seris uses: arrays (command 255, its minimap and
+  building labels, which sit on the wrong buildings), the regular expression string operation (its voice lines pick
+  their folder with it, so system voices are silent), and `<XYN_IMAGE>` pictures.
 - Wolf RPG Editor Pro's encrypted data isn't read. One library game is a Pro game.
 - Mouse input, CSV import (command 251) and file downloads (260) aren't supported. The test games don't use them; two
   library games need the mouse, one to pick its control scheme on its first screen and one for its action battles.
