@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.21.1",
+          "buildVersion": "1099",
+          "date": "2026-11-01T19:37:32Z",
+          "localizedDescription": "Karryn's Prison starts, Artemis quick load and dialogs are fixed, and Godot 3 games with canvas backgrounds draw on iPhone and iPad.\n\n## Downloads\n\n- `VNDegen-0.21.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.21.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- RPG Maker: Karryn's Prison now starts and reaches its first map. Its frame rate and saves haven't been checked yet.\n- Artemis: a quick load shows the saved page straight away, instead of staying black until a click.\n- Artemis: a game's own dialogs, such as name entry, are now in-app sheets you can use with touch, a keyboard or a controller.\n- Godot 3: games with a canvas background, such as Sexual Sealing Dungeon Eronest, now draw it on iPhone and iPad. This was checked on the iPad simulator, up to the game's first map.\n\n## Known limits\n\n- Artemis: on a Mac, a name field selects its text when it regains focus after VNDegen's menu, so the next key replaces the text.\n- Artemis: bitmap `.rft` fonts draw only ASCII. Eight pages of Test Game 81 showed no overflow or clipping.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.21.1/VNDegen-0.21.1.ipa",
+          "size": 122544524,
+          "sha256": "25f9a24f0c4292da3424375e43ae09f4574c3ee80700cd23b03cd007fcdad232",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.21.0",
           "buildVersion": "1088",
           "date": "2026-11-01T18:54:44Z",
