@@ -49,6 +49,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Game page screenshots in a grid with a full-screen viewer, game speed for Godot and Flash, and RPG Maker MZ alpha cutscene clips (0.16.0).
 - Cheats for AliceSoft System 3 and 4, find by value on every game's Variables tab, and TyranoScript 5.2 Electron builds (0.17.0).
 - AliceSoft System 4 games built on PartsEngine, such as Rance IX: story scenes, saves and loads, and a clear stop where a 3D scene starts, and Artemis movies and screen effects (0.18.0).
+- RPG Maker VX Ace movies, and message boxes in RPG Maker XP, VX and VX Ace shown in the app (on `dev`, in the next release).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
