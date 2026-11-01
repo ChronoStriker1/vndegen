@@ -233,7 +233,10 @@ private let mvPage = """
             shaders: Object.keys(renderer.filterManager.shaderCache).length, pool: Object.keys(renderer.filterManager.pool).length,
             indexBuffer: tilemap.indexBuffer, indices: tilemap.indices.length,
         };
+        // The second restore finds the plugin under the name its older versions use.
         tilemap.indexBuffer = 'lost again';
+        renderer.plugins = { tile: tilemap };
+        renderer._initContext = function () { this.madeUnder.push(this.CONTEXT_UID); this.plugins.tile.onContextChange(); };
         await restore();
         return { ...first, removedUnder: renderer.removedUnder, madeUnder: renderer.madeUnder, indexBufferAgain: tilemap.indexBuffer };
         """, arguments: [:], contentWorld: .page) as? [String: Any]

@@ -32,7 +32,17 @@ WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV gam
 
 Up to 0.13.0, MV games on the community core (`rpg_managers.js` "community-1.3b") saved to the game's top-level `save/` in VNDegen, because the layer lacked the `fs.rmdirSync` that core uses to test `www/`. The first launch of such a game after updating moves those saves into `www/save/` and adds them to the game's slot index there, unless a slot is in both folders or the move would hide a save, in which case both folders stay. Early MV cores, such as 1.2.0, save to the game's top-level `save/`, as they do on the PC.
 
+iOS can end WebKit's GPU process, which loses the page's WebGL context. MZ games and MV games on PIXI 4 recover from that with their map, sprites, and battles drawn as before. The earliest MV cores use PIXI 2, and those games stay black until the game restarts: The Midsummer Night's Sabbat and Queena's Legend in the library.
+
 MV and MZ games also have a Cheats page in the VNDegen menu, described in [controls.md](controls.md#cheats).
+
+Known limits, for WebM clips with alpha, from a scan of the movies in the library's 118 MV and MZ games and No Socks RPG on 2026-11-01:
+
+- VP8 clips with alpha get no special handling. No library game has one.
+- VP9 clips in profile 2 or 3 with alpha get no special handling. No library game has one.
+- Clips under 64 pixels on a side play as WebKit plays them, without their alpha. The library's only one is `siru.webm` (50 by 200) in Trinity Dungeon, an MV game.
+- The scan could not see inside the exe of Futanari Remedies, Succubus Farm, or Treasure Hunter Koo and the Ancient King, which keep their files there.
+- Larger clips with alpha are in progress on the `fix/alpha-clips` branch.
 
 ## TyranoScript
 

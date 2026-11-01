@@ -65,7 +65,7 @@ How each works, in `Packages/VNDegenKit/Sources/EngineRPGMaker/Resources/rpgmake
 
 - One-shot cheats call the game's own methods: `$gameParty.gainGold`, `gainItem`, `recoverAll`, `$gameVariables.setValue` and `$gameSwitches.setValue`. They wait until a game is started or loaded, because the title screen's game objects are replaced when one is.
 - Settings that stay on wrap engine methods once, when `SceneManager.run` starts the boot scene, which both MV and MZ call after every plugin has loaded: `Game_BattlerBase.setHp`, `setMp` and `paySkillCost` for actors, `Game_Player.canEncounter`, `Game_Player.isThrough`, and `Game_Actor.finalExpRate`. None of them write anything a save keeps, so turning one off leaves no trace in the next save.
-- Game speed in MZ multiplies `SceneManager.determineRepeatNumber`, the count of engine updates each displayed frame runs. MV runs an update for each 1/60 s its clock has moved, so its clock (`_getTimeInMsWithoutMobileSafari`) runs faster. Either way every update runs whole, input included, so the game's timers, animations and waits stay in step. Music plays at its normal speed.
+- Game speed in MZ sets `SceneManager.determineRepeatNumber`, the count of engine updates each displayed frame runs, to the speed. MZ's extra updates to catch up after a slow frame are multiplied only when that frame spent under half its time on its own work, as on a screen below 60 Hz. Otherwise they kept each next frame slow too. MV runs an update for each 1/60 s its clock has moved, so its clock (`_getTimeInMsWithoutMobileSafari`) runs faster. Either way every update runs whole, input included, so the game's timers, animations and waits stay in step. Music plays at its normal speed.
 - The library keeps the settings per game (`Game.cheats`). The game page lists them while any is on, and the session starts with them.
 
 Checked against Rookie Knight Rathi (MV 1.6.1), Mama's Secret Parent Teacher Conference (MV 1.5.2) and No Socks RPG (MZ 1.9.0).
@@ -76,7 +76,7 @@ Checked against Rookie Knight Rathi (MV 1.6.1), Mama's Secret Parent Teacher Con
 - Walk through walls uses the player's through flag, as an event's Through option does. Followers still follow, and vehicles are unchanged.
 - A plugin that replaces one of the wrapped methods after the boot scene starts, rather than when it loads, replaces the cheat with it. No library game was found doing so.
 - Variables and switches past the length of the game's System lists aren't listed, since MV's and MZ's `setValue` ignores them.
-- At 4x every displayed frame runs four engine updates, and MZ runs more after a slow frame to catch up, so a game whose updates are expensive draws fewer frames. No Socks RPG, with 87 VisuStella plugins, drew about 24 frames a second at 4x on the Mac mini and 26 on an iPad simulator, while its game ran at about 3.2x. Rookie Knight Rathi held 60.
+- At 4x every displayed frame runs four engine updates, so a game whose updates cost much draws fewer frames and runs below 4x. On its map 4, No Socks RPG draws 38 frames a second at 4x on an iPad simulator and its game runs at about 2.5x. Each update adds about 3.5 ms to the one texture upload of each frame, which looks like the game's own canvas drawing landing in that upload. The Mac holds 60 at 4x when it is otherwise quiet. Rookie Knight Rathi holds 60.
 
 ### Frame rate
 
@@ -87,13 +87,13 @@ Measured on the map with the DEBUG input script's `fps` step and a count of `Sce
 | Rookie Knight Rathi (MV) | Mac | 1x | 60.0 | 52.6 | 60.0 |
 | Rookie Knight Rathi (MV) | Mac | 4x | 60.0 | 52.6 | 240.2 |
 | No Socks RPG (MZ) | Mac | 1x | 56.1 | 26.3 | 56.6 |
-| No Socks RPG (MZ) | Mac | 4x | 23.9 | 14.1 | 190.8 |
+| No Socks RPG (MZ) | Mac | 4x | 60.0 | 52.6 | 240.1 |
 | Rookie Knight Rathi (MV) | iPad simulator | 1x | 56.2 | 24.4 | 59.2 |
 | Rookie Knight Rathi (MV) | iPad simulator | 4x | 59.6 | 35.7 | 240.0 |
 | No Socks RPG (MZ) | iPad simulator | 1x | 51.5 | 29.4 | 52.4 |
-| No Socks RPG (MZ) | iPad simulator | 4x | 25.7 | 17.9 | 206.4 |
+| No Socks RPG (MZ) | iPad simulator | 4x | 38.2 | 33.3 | 152.8 |
 
-Simulator timing isn't iPad timing, and the Mac mini ran other threads' builds and simulators during several of these runs.
+The No Socks RPG rows at 4x were measured again on 2026-11-01 after the change to catch-up updates, on the Mac with a load average of 7 and on the simulator with 4. Before it they were 23.9 fps with 190.8 updates a second on the Mac, at a load average of 65, and 23 fps with 184 updates a second on the simulator. Simulator timing isn't iPad timing, and the Mac mini ran other threads' builds and simulators during several of these runs.
 
 ## Built: RPG Maker XP, VX and VX Ace
 

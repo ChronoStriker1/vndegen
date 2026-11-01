@@ -816,13 +816,14 @@
         if (!filters || !filters.quad || typeof initContext !== 'function') return;
         console.warn('WebGL context restored, renewing PIXI 4 filters');
         renderer._initContext = function () {
-            delete this._initContext;
+            this._initContext = initContext;
             // PIXI numbers its renderers from 0, so this does not meet another renderer's number.
             this.CONTEXT_UID += 1000;
             filters.quad = new filters.quad.constructor(this.gl, this.state.attribState);
             filters.shaderCache = {};
             filters.pool = {};
-            const tilemap = this.plugins && this.plugins.tilemap;
+            // Older versions of the plugin register as tile.
+            const tilemap = this.plugins && (this.plugins.tilemap || this.plugins.tile);
             if (tilemap && tilemap.indexBuffer) {
                 tilemap.indices = new Uint16Array(0);
                 tilemap.indexBuffer = null;
