@@ -26,6 +26,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **Touch, mouse and keyboard, and controllers** drive the hub and the games, with a per-game button mapping. [Controls](docs/controls.md)
 - **More than one games folder**, such as an external drive or a server, and archives unpack straight into the library. [Library](docs/library.md#adding-games)
 - **Game menu.** A long press, a right click, or X on a controller opens Play, Change artwork, Hide, Remove, and more. [Library](docs/library.md#the-game-menu)
+- **Remove engine files.** RPG Maker MV and MZ, TyranoScript, and Ren'Py games can drop the PC engine files they don't need in VNDegen, about 88 to 295 MB a game on average. The game won't run on a PC from that folder afterwards. [Library](docs/library.md#removing-engine-files)
 - **Game commands.** Menus a game keeps in its window's menu bar, such as KiriKiri's, appear in the VNDegen menu. [Controls](docs/controls.md#game-commands)
 - **Cheats** for RPG Maker MV, MZ, XP, VX, and VX Ace, Wolf RPG Editor, and AliceSoft System 3 and 4: gold, items, encounters, game speed, variables with a find by value, and switches. Godot and Flash games get game speed. [Controls](docs/controls.md#cheats)
 - **Hidden games** behind Face ID, Touch ID, or a passcode. [Library](docs/library.md#hidden-games)
