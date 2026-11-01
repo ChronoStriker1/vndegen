@@ -95,6 +95,10 @@ and 72, and whether it is over a picture. System variable 73 lets it work messag
 When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.
 Return finishes and Backspace deletes. A controller's Confirm finishes and Cancel cancels. Touching the game brings back a keyboard the player hid.
 
+### The hero's image
+
+Game.dat names a starting hero image, but most of the library's games leave it empty and set it with the party graphics command: erase everyone, then insert the image from a string variable (bit 0x01 of the command's second flag byte). An erased party has no members, so that insert makes the hero whatever index it gives. A wrong flag check hid the hero after a new game in those games, up to and including 0.20.0. A save made in VNDegen in that state keeps the empty image until the game runs the command again.
+
 ### ANGEL QUEST's mouse
 
 ANGEL QUEST walks the hero toward the pointer by pressing arrow keys with command 125, and blocks those keys only for 5 frames after an event ends. It's an ordinary user of command 126, not evidence about 125 getting past it. Run from the same PC save, the hero steps left and right of the throne room carpet with the pointer on both the PC engine under Wine and VNDegen.
