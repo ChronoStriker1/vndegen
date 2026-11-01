@@ -333,6 +333,8 @@ private:
     void extendedString(Thread &t, const Command &c, int32_t target, int op);
     std::string expandRegexCodes(const std::string &pattern, const Thread &t) const;
     std::string hiddenCode(const std::string &name, const std::string &arg);
+    std::string makeEvent(const std::string &options, const std::string &image);
+    std::string findPath(const std::string &options);
     void startTextEntry(Thread &t, const Command &c);
     void updateTextEntry();
     std::string textAt(int32_t address, const Thread &t);
@@ -444,7 +446,10 @@ private:
 
     int mapId_ = -1, loadedMap_ = -1;
     std::shared_ptr<Map> map_;
-    std::vector<MapEventState> events_;
+    // A deque, so an event a hidden code adds moves no other: moves in progress point at their characters.
+    std::deque<MapEventState> events_;
+    std::deque<MapEvent> madeEvents_;  // events hidden codes made, gone with the map as the manual says
+    std::map<int, std::string> eventNames_;  // names hidden codes gave events, by id
     // Self variables of map events, kept per map and event id for as long as the game runs.
     std::map<std::pair<int, int>, std::array<int32_t, 10>> eventSelf_;
     Actor hero_;

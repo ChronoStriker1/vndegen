@@ -541,6 +541,8 @@ bool Game::loadMap(int id) {
     for (auto *list : {&parallel_, &mapParallel_})
         for (auto &t : *list) dropMapWait(t);
     events_.clear();
+    madeEvents_.clear();
+    eventNames_.clear();
     for (auto &ev : map_->events) {
         MapEventState s;
         s.data = &ev;
@@ -731,7 +733,8 @@ void Game::update(const Input &input) {
     }
 
     // Parallel map event pages.
-    if (mapParallel_.size() != events_.size()) mapParallel_.assign(events_.size(), Thread{});
+    // A hidden code can add events while parallel ones run.
+    if (mapParallel_.size() != events_.size()) mapParallel_.resize(events_.size());
     for (size_t i = 0; i < events_.size(); i++) {
         auto &e = events_[i];
         if (e.page < 0 || e.data->pages[e.page].trigger != 2) continue;

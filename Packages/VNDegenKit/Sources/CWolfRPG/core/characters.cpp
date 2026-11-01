@@ -296,7 +296,8 @@ void Game::autonomousMove(MapEventState &e) {
     if (!step(a, dir) && pg.trigger == 4 && hero_.tx == a.tx + dirX(dir) && hero_.ty == a.ty + dirY(dir)) {
         // An event that starts on touching the hero starts when it walks into the hero.
         Thread t;
-        startPage(int(&e - events_.data()), t);
+        for (size_t i = 0; i < events_.size(); i++)
+            if (&events_[i] == &e) startPage(int(i), t);
         threads_.push_back(std::move(t));
     }
 }

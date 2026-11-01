@@ -810,9 +810,17 @@ std::string Game::hiddenCode(const std::string &name, const std::string &arg) {
     if (name == "GET_TITLE_PLUS") return "";
     if (name == "GET_COMMONEVENT_ID_FROM_NAME") return std::to_string(commonByName(arg));
     if (name == "GET_MAPEVENT_NAME_FROM_ID") {
-        const MapEventState *e = event(std::atoi(arg.c_str()));
+        int id = std::atoi(arg.c_str());
+        if (auto it = eventNames_.find(id); it != eventNames_.end()) return it->second;
+        const MapEventState *e = event(id);
         return e ? e->data->name : "";
     }
+    if (name.starts_with("MAKE_EVENT_")) return makeEvent(name.substr(11), arg);
+    if (name.starts_with("SET_EVENT_NAME_ID=")) {
+        eventNames_[std::atoi(name.c_str() + 18)] = arg;
+        return "";
+    }
+    if (name.starts_with("FIND_PATH_DIR")) return findPath(name.substr(13));
     if (name == "GET_MAPEV_FILENAME") {
         const MapEventState *e = event(std::atoi(arg.c_str()));
         return e ? e->actor.chara.graphic : "";
@@ -823,6 +831,92 @@ std::string Game::hiddenCode(const std::string &name, const std::string &arg) {
     }
     if (hiddenCodesLogged_.insert(name.substr(0, name.find_first_of("_=/", 12))).second) log("hidden code <<" + name + ">> is not supported");
     return "";
+}
+
+// <<MAKE_EVENT_X=x/Y=y/...>>image, from the manual's hidden code list. Makes an empty event, or a copy of the one /COPY
+// names, and returns its id, the lowest one free. /TR picks its trigger: 1 confirm, 2 hero touch, 3 event touch.
+std::string Game::makeEvent(const std::string &options, const std::string &image) {
+    int x = 0, y = 0, trigger = 1, shade = -1, copy = -1;
+    bool half = false;
+    for (size_t at = 0; at < options.size();) {
+        size_t end = std::min(options.find('/', at), options.size());
+        std::string part = options.substr(at, end - at);
+        size_t eq = part.find('=');
+        int number = eq == std::string::npos ? 0 : std::atoi(part.c_str() + eq + 1);
+        if (part.starts_with("X=")) x = number;
+        else if (part.starts_with("Y=")) y = number;
+        else if (part.starts_with("TR=")) trigger = number;
+        else if (part.starts_with("SHADE=")) shade = number;
+        else if (part.starts_with("COPY=")) copy = number;
+        else if (part == "HALF") half = true;
+        at = end + 1;
+    }
+    MapEvent made;
+    made.pages.emplace_back();
+    made.pages[0].moveSpeed = 3;
+    made.pages[0].moveFrequency = 3;
+    made.pages[0].animSpeed = 3;
+    made.pages[0].flags = 0x02;
+    made.pages[0].direction = 2;
+    made.pages[0].frame = 1;
+    made.pages[0].trigger = trigger == 2 ? 3 : trigger == 3 ? 4 : 0;
+    for (auto &e : events_)
+        if (copy >= 0 && e.data->id == copy) made = *e.data;
+    int id = 0;
+    for (bool taken = true; taken; id += taken) {
+        taken = false;
+        for (auto &e : events_) taken = taken || e.data->id == id;
+    }
+    made.id = id;
+    made.x = half ? x / 2 : x;
+    made.y = half ? y / 2 : y;
+    for (auto &page : made.pages) {
+        if (!image.empty()) page.graphic = image;
+        if (shade >= 0) page.shadow = uint8_t(shade);
+    }
+    MapEventState state;
+    state.data = &madeEvents_.emplace_back(std::move(made));
+    state.actor.placeAt(state.data->x, state.data->y);
+    state.actor.chara.visible = false;
+    events_.push_back(state);
+    refreshPages();
+    return std::to_string(id);
+}
+
+// <<FIND_PATH_DIR4_SX=a/SY=b/EX=c/EY=d>>: the shortest way between two tiles as directions, as "2466/END", by the rules
+// that move a character, or "NoPath" (from the manual's list; Clumsy Witch Seris checks for that text). Library games use
+// four directions and none of the options.
+std::string Game::findPath(const std::string &options) {
+    int sx = 0, sy = 0, ex = 0, ey = 0, dirs = 4;
+    if (std::sscanf(options.c_str(), "%d_SX=%d/SY=%d/EX=%d/EY=%d", &dirs, &sx, &sy, &ex, &ey) != 5 || !map_) return "NoPath";
+    int w = map_->width, h = map_->height;
+    auto inside = [&](int x, int y) { return x >= 0 && y >= 0 && x < w && y < h; };
+    if (!inside(sx, sy) || !inside(ex, ey)) return "NoPath";
+    std::vector<char> from(size_t(w) * h, 0);
+    std::deque<std::pair<int, int>> queue{{sx, sy}};
+    from[size_t(sy) * w + sx] = 5;  // 5 marks the start
+    Actor walker;
+    while (!queue.empty() && from[size_t(ey) * w + ex] == 0) {
+        auto [x, y] = queue.front();
+        queue.pop_front();
+        walker.tx = x;
+        walker.ty = y;
+        for (int dir : {2, 4, 6, 8}) {
+            int nx = x + (dir == 4 ? -1 : dir == 6 ? 1 : 0), ny = y + (dir == 8 ? -1 : dir == 2 ? 1 : 0);
+            if (!inside(nx, ny) || from[size_t(ny) * w + nx] != 0 || !canMove(walker, dir)) continue;
+            from[size_t(ny) * w + nx] = char(dir);
+            queue.emplace_back(nx, ny);
+        }
+    }
+    if (from[size_t(ey) * w + ex] == 0) return "NoPath";
+    std::string path;
+    for (int x = ex, y = ey; from[size_t(y) * w + x] != 5;) {
+        int dir = from[size_t(y) * w + x];
+        path.insert(path.begin(), char('0' + dir));
+        x -= dir == 4 ? -1 : dir == 6 ? 1 : 0;
+        y -= dir == 8 ? -1 : dir == 2 ? 1 : 0;
+    }
+    return path + "/END";
 }
 
 // The string command's keyboard mode: the event waits while the player types. Its flags' second byte has 0x10 when
