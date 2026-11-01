@@ -294,7 +294,9 @@
             state.dirty = true;
         }
         if (state.dirty) {
-            canvas.getContext('2d').drawImage(video, 0, 0);
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(video, 0, 0);
             state.dirty = false;
         }
         return canvas;

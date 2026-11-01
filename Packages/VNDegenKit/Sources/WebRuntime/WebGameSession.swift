@@ -406,8 +406,8 @@ final class WebGameSession: NSObject, EngineSession {
         // the delegates this tears down. A page that doesn't answer gets a few seconds.
         stopping = Task {
             await evaluate(Self.beforeQuitScript, within: .seconds(5))
-            await schemeHandler.waitUntilStopped()
             tearDown()
+            await schemeHandler.waitUntilStopped()
         }
     }
 
