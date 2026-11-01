@@ -1,4 +1,6 @@
 #include "tjsCommHead.h"
+
+#include <algorithm>
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
@@ -102,6 +104,21 @@ void tTVPSystemControl::NotifyEventDelivered()
     // if(TVPHaltWarnForm) delete TVPHaltWarnForm, TVPHaltWarnForm = NULL;
 }
 
+// Honors -contfreq, the game's frame rate limit. The host's frames come at 60 per second, so only a limit below that
+// has anything to do.
+bool tTVPSystemControl::ContinuousEventDue()
+{
+    tTJSVariant option;
+    tjs_int freq = TVPGetCommandLine(TJS_N("-contfreq"), &option) ? (tjs_int)option : 0;
+    if (freq <= 0 || freq >= 60)
+        return true;
+    const tjs_uint64 tick = TVPGetRoughTickCount();
+    if (tick < NextContinuousTick)
+        return false;
+    NextContinuousTick = std::max(NextContinuousTick + 1000 / freq, tick);
+    return true;
+}
+
 bool tTVPSystemControl::ApplicationIdle()
 {
     DeliverEvents();
@@ -112,7 +129,7 @@ bool tTVPSystemControl::ApplicationIdle()
 
 void tTVPSystemControl::DeliverEvents()
 {
-    if (ContinuousEventCalling)
+    if (ContinuousEventCalling && ContinuousEventDue())
         TVPProcessContinuousHandlerEventFlag = true; // set flag
 
     if (EventEnable)

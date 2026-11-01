@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.20.1",
+          "buildVersion": "1052",
+          "date": "2026-11-01T15:31:47Z",
+          "localizedDescription": "Four more KiriKiri games run, and AlphaMovie animations and a game's Display options work.\n\n## Downloads\n\n- `VNDegen-0.20.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.20.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- KiriKiri: Marshmallow Imouto Succubus, Submissive Married Woman Agent Shion, Cult Of The Serpent and Cosplaying in Costalia now start and play with sound. Before, they stopped at startup with an encryption error.\n- KiriKiri: AlphaMovie battle animations in the Violated Hero games appear where they should and at the right speed.\n- KiriKiri: Display choices in a game's own menu, such as zoom, smoothing and frame rate limit, take effect and are remembered. Items that can't apply in VNDegen, such as window sizes, are gone from Game commands.\n\n## Known limits\n\n- KiriKiri: OPPAI Ero App, OPPAI Succubus, Motto Maid, Motto Bunny, Motto Spy and Sabbat of the Witch can't start, because they use a publisher's encryption VNDegen doesn't read. OPPAI Academy probably can't either. They show a message saying so.\n- KiriKiri: saving and loading in the four newly working games hasn't been checked.\n- KiriKiri: MP3 sound isn't played. No game that could be checked uses it.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.20.1/VNDegen-0.20.1.ipa",
+          "size": 122352683,
+          "sha256": "ef5a0aad22bc0f48cfc7e96937135b6e6f60c0b881f7356e9c52ea158b6a684a",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.20.0",
           "buildVersion": "1042",
           "date": "2026-11-01T12:53:48Z",

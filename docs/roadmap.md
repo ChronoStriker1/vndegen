@@ -51,6 +51,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - AliceSoft System 4 games built on PartsEngine, such as Rance IX: story scenes, saves and loads, and a clear stop where a 3D scene starts, and Artemis movies and screen effects (0.18.0).
 - RPG Maker VX Ace movies, message boxes in RPG Maker XP, VX and VX Ace shown in the app, and Wolf RPG Editor 3.5 games with their saves, and version 8 archives (0.19.0).
 - AliceSoft System 3 transitions, text skip, number box and Mamatoto's tutorial, and Wolf RPG Editor mouse, touch as a mouse, CSV import and typed text (0.20.0).
+- KiriKiri: four more library games start, AlphaMovie clips draw in place and at the right speed, and a game's own Display choices apply (0.20.1).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

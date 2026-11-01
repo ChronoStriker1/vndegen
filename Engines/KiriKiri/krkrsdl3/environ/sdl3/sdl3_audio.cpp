@@ -38,6 +38,8 @@ public:
     SDL_AudioStream* _stream = NULL;
     SDL_AudioSpec spec;
     tjs_int BitsPerSample = 0;
+    Uint64 _logBytes = 0, _logNext = 0;
+    int _logPeak = 0;
     int _frame_size = 0;
 
     void UpdateQueueData()
@@ -210,8 +212,29 @@ public:
             _bufferIdx = 0;
 
         SDL_PutAudioStreamData(_stream, _inbuf, inlen);
+        LogAppended(_inbuf, inlen);
         _bufferSizeCache[_bufferIdx] = inlen;
         totalBufferSize += inlen;
+    }
+    // With VNKK_AUDIO_LOG set, logs what reaches the output about every two seconds, so a test can confirm sound without
+    // hearing it.
+    void LogAppended(const void* data, unsigned int size)
+    {
+        static const bool enabled = SDL_getenv("VNKK_AUDIO_LOG") != nullptr;
+        if (!enabled)
+            return;
+        if (BitsPerSample == 16)
+            for (const Sint16 *s = (const Sint16 *)data, *end = s + size / 2; s < end; s++)
+                _logPeak = SDL_max(_logPeak, SDL_abs((int)*s));
+        _logBytes += size;
+        const Uint64 frames = _logBytes / (BitsPerSample / 8 * spec.channels);
+        if (frames >= _logNext)
+        {
+            SDL_Log("vnkk: audio buffer %p: %d Hz, %d channels, %d bits, %llu frames, peak %d", (void *)this, spec.freq,
+                    spec.channels, BitsPerSample, (unsigned long long)frames, _logPeak);
+            _logNext = frames + spec.freq * 2;
+            _logPeak = 0;
+        }
     }
     virtual bool IsBufferValid() override
     {

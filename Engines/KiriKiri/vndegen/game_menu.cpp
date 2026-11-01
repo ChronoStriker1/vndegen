@@ -128,14 +128,20 @@ void VNKKInstallMenuBarHook()
 }
 
 // Items VNDegen's own menu covers or that can't work here, by the names KAG gives them on the main window: quitting,
-// windowed and full screen, the help file and About window, the font dialog, which the engine lacks, and the debug
-// menu. A game's own item stored under one of these names, as Tawawa's Quit Game is, is left out too.
+// windowed and full screen, the window sizes, since VNDegen sizes the window, the display method and screen resolutions,
+// since VNDegen draws through Metal and never changes the screen's mode, the middle zoom, which games enable only for
+// their own stand-in for full screen on Windows, the button that hides the menu bar, the help file
+// and About window, the font dialog, which the engine lacks, and the debug menu. A game's own item stored under one of these names, as Tawawa's Quit Game is, is left out too.
 static const tjs_char *const skippedItems =
     TJS_N("(function { var w = Window.mainWindow, r = []; if (w === null || !(isvalid w)) return r;"
-          " var n = ['exitMenuItem', 'windowedMenuItem', 'fullScreenMenuItem', 'helpMenu', 'helpIndexMenuItem',"
-          " 'helpAboutMenuItem', 'chChangeFontMenuItem', 'debugMenu'];"
+          " var n = ['exitMenuItem', 'windowedMenuItem', 'fullScreenMenuItem', 'winResMenu', 'dispDoubleBufferMenu',"
+          " 'fullScrResMiddleMenuItem', 'middleZoomPercentMenuItem', 'menuBarHideMenuItem', 'helpMenu', 'helpIndexMenuItem', 'helpAboutMenuItem', 'chChangeFontMenuItem', 'debugMenu'];"
           " for (var i = 0; i < n.count; i++) { var o = typeof w[n[i]] == 'undefined' ? void : w[n[i]];"
-          " if (typeof o == 'Object' && o !== null) r.add(o); } return r; })()");
+          " if (typeof o == 'Object' && o !== null) r.add(o); }"
+          " if (typeof w.fullScrResMenu == 'Object' && w.fullScrResMenu !== null) { var c = w.fullScrResMenu.children;"
+          " for (var i = 0; i < c.count; i++) if (typeof c[i].value != 'undefined' &&"
+          " ['auto', 'nochange', 'nearest', 'proportional'].find(c[i].value) >= 0) r.add(c[i]); }"
+          " return r; })()");
 
 static tTJSNI_MenuItem *mainMenu(tTJSVariant &holder)
 {
