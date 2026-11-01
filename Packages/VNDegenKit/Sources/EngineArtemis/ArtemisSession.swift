@@ -84,7 +84,7 @@ final class ArtemisSession: EngineSession {
         host.onKey = { [weak self] key, pressed, isRepeat in
             guard let self else { return }
             if let prompt {
-                // A key meant for the hub's menu over the game must not answer the dialog under it.
+                // A key meant for the hub's menu must not answer the dialog waiting behind it.
                 if pressed, !isRepeat, !paused { prompt.handleHostKey(key) }
                 return
             }
@@ -260,6 +260,7 @@ final class ArtemisSession: EngineSession {
     }
 
     private func hostPromptView(_ prompt: ArtemisPrompt) {
+        removePromptView()
         let content = ArtemisPromptView(prompt: prompt)
         #if canImport(UIKit)
         let controller = UIHostingController(rootView: content)
@@ -374,13 +375,13 @@ final class ArtemisSession: EngineSession {
         lastFrame = nil
         movies.paused()
         if let runtime { core.api.runtime_notify_lifecycle!(runtime, paused ? 1 : 2) }
-        if !paused {
+        // The dialog leaves the screen while the hub's menu is up, since its text field would keep the keyboard and take
+        // the menu's Return as its answer. Shown again, the field takes focus back as it appears.
+        if paused {
+            removePromptView()
+        } else {
             host.takeFocus()
-            // The keyboard's field takes focus when it appears, so a Mac's keyboard types into it again after the menu.
-            if let prompt, prompt.keyboard != nil {
-                removePromptView()
-                hostPromptView(prompt)
-            }
+            if let prompt { hostPromptView(prompt) }
         }
     }
 
