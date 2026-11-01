@@ -237,7 +237,9 @@ TextRenderer::Layout TextRenderer::layout(const std::string &text, const TextSty
                 BitmapPtr icon;
                 if (images_) {
                     char path[64];
+                    // Games name icons with three digits (icon001.png) or none (icon1.png, The Clumsy Witch Seris).
                     std::snprintf(path, sizeof path, "BasicData/icon%03d.png", t.value);
+                    if (!game_.files().exists(path)) std::snprintf(path, sizeof path, "BasicData/icon%d.png", t.value);
                     icon = images_->get(path);
                 }
                 if (shown < visible)
