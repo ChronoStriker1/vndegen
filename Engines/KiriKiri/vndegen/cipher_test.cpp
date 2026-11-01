@@ -399,6 +399,7 @@ static int runTests()
 
     writeArchive(path("plain.xp3"), entries, none, adler);
     writeArchive(path("xor.xp3"), entries, encryptXor, adler);
+    writeArchive(path("inverted.xp3"), entries, [](uint32_t hash, Bytes &data) { encryptXor(~(hash + 1), data); }, adler);
     writeArchive(path("banded.xp3"), entries, encryptBanded, adler);
     // Protected archives add a warning text file whose checksum is made up.
     std::vector<Entry> withDecoy = entries;
@@ -426,6 +427,10 @@ static int runTests()
     check(banded && cipherName(banded) == "bandedXorAdd", "a banded archive is detected as bandedXorAdd");
     check(xorArchive && readsPlain(xorArchive, entries), "an XOR archive decrypts to its plain contents");
     check(banded && readsPlain(banded, entries), "a banded archive decrypts to its plain contents");
+
+    tTVPXP3Archive *inverted = openArchive(path("inverted.xp3"));
+    check(inverted && cipherName(inverted) == "xorByInvertedChecksum", "an inverted XOR archive is detected");
+    check(inverted && readsPlain(inverted, entries), "an inverted XOR archive decrypts to its plain contents");
 
     tTVPXP3Archive *decoy = openArchive(path("decoy.xp3"));
     check(decoy && cipherName(decoy) == "xorByChecksum", "an archive with a made-up checksum on one entry is still detected");

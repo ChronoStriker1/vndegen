@@ -360,6 +360,17 @@ TJS_END_NATIVE_PROP_SETTER
 }
 TJS_END_NATIVE_STATIC_PROP_DECL(drawThreadNum)
 //----------------------------------------------------------------------
+// The engine build some games ship adds this property, holding an id compiled into the .exe. The game
+// quits unless it equals the id in the game's own script, so it reads that id.
+TJS_BEGIN_NATIVE_PROP_DECL(checkAppId){TJS_BEGIN_NATIVE_PROP_GETTER{
+    TVPExecuteExpression(TJS_N("typeof global.APP_ID != 'undefined' ? global.APP_ID : void"), result);
+return TJS_S_OK;
+}
+TJS_END_NATIVE_PROP_GETTER
+TJS_DENY_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_STATIC_PROP_DECL(checkAppId)
+//----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_PROP_DECL(processorNum){
     TJS_BEGIN_NATIVE_PROP_GETTER{* result = TVPGetProcessorNum();
 return TJS_S_OK;

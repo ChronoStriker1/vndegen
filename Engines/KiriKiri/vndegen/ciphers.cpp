@@ -20,6 +20,14 @@ static void xorByChecksum(uint32_t hash, uint64_t, uint8_t *buffer, size_t size)
         buffer[i] ^= k;
 }
 
+// The cipher of a 61 KB .tpm plugin such as xp3dec.tpm: Marshmallow Imouto Succubus, Agent Shion, Kagachi-sama.
+static void xorByInvertedChecksum(uint32_t hash, uint64_t, uint8_t *buffer, size_t size)
+{
+    const uint8_t k = ~(hash + 1);
+    for (size_t i = 0; i < size; i++)
+        buffer[i] ^= k;
+}
+
 // The decoder.tpm plugin's cipher, in four bands by position within the file. Each band is its own
 // loop, so the compiler can vectorize the last one, which holds nearly every byte.
 static void bandedXorAdd(uint32_t hash, uint64_t offset, uint8_t *buffer, size_t size)
@@ -41,6 +49,7 @@ static void bandedXorAdd(uint32_t hash, uint64_t offset, uint8_t *buffer, size_t
 static const VNKKCipher ciphers[] = {
     {"xorByChecksum", xorByChecksum},
     {"bandedXorAdd", bandedXorAdd},
+    {"xorByInvertedChecksum", xorByInvertedChecksum},
 };
 
 static const size_t maxSamples = 8;
