@@ -145,9 +145,12 @@ bool decodeQNT(const uint8_t *d, size_t n, Image &out) {
     }
     out.hasAlpha = asize != 0;
     if (asize) {
-        std::vector<uint8_t> a;
-        if (!inflateTo(d + hdr + psize, asize, a, plane)) return false;
-        // The alpha plane is stored row by row with the same prediction.
+        // The alpha plane is stored row by row with the same prediction. Its width is rounded up to even; version 2
+        // files (Test Game 56) leave an odd height as is, so the missing last row reads as zeros.
+        std::vector<uint8_t> a(plane, 0);
+        uLongf len = plane;
+        if (uncompress(a.data(), &len, d + hdr + psize, asize) != Z_OK || (len != plane && len != size_t(W) * h))
+            return false;
         std::vector<uint8_t> blocked(plane);
         size_t k = 0;
         for (int yy = 0; yy < H; yy += 2)
@@ -160,6 +163,40 @@ bool decodeQNT(const uint8_t *d, size_t n, Image &out) {
         unpackPlane(blocked.data(), w, h, out.rgba.data() + 3, 4);
     }
     return true;
+}
+
+std::vector<uint8_t> encodeQNT(const uint8_t *rgba, int w, int h) {
+    int W = (w + 1) & ~1, H = (h + 1) & ~1;
+    size_t plane = size_t(W) * H;
+    std::vector<uint8_t> planes(plane * 3, 0);
+    // The inverse of unpackPlane: each byte is the prediction minus the pixel, in 2x2 blocks; padding stays 0.
+    for (int c = 0; c < 3; c++) {
+        const uint8_t *src = rgba + (2 - c);  // stored blue, green, red
+        auto px = [&](int x, int y) { return int(src[(size_t(y) * w + x) * 4]); };
+        std::vector<uint8_t> diff(plane, 0);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                int pred = x == 0 && y == 0 ? 0 : y == 0 ? px(x - 1, 0) : x == 0 ? px(0, y - 1) : (px(x, y - 1) + px(x - 1, y)) >> 1;
+                diff[size_t(y) * W + x] = uint8_t(x == 0 && y == 0 ? px(0, 0) : pred - px(x, y));
+            }
+        uint8_t *out = planes.data() + plane * c;
+        size_t k = 0;
+        for (int y = 0; y < H; y += 2)
+            for (int x = 0; x < W; x += 2) {
+                out[k++] = diff[size_t(y) * W + x];
+                out[k++] = diff[size_t(y + 1) * W + x];
+                out[k++] = diff[size_t(y) * W + x + 1];
+                out[k++] = diff[size_t(y + 1) * W + x + 1];
+            }
+    }
+    uLongf cap = compressBound(uLong(planes.size()));
+    std::vector<uint8_t> d(0x30 + cap, 0);
+    if (compress2(d.data() + 0x30, &cap, planes.data(), uLong(planes.size()), 9) != Z_OK) return {};
+    d.resize(0x30 + cap);
+    std::memcpy(d.data(), "QNT", 4);
+    uint32_t fields[] = {0, 0, 0, uint32_t(w), uint32_t(h), 24, 1, uint32_t(cap), 0};  // version, x, y, w, h, bpp, ?, sizes
+    std::memcpy(d.data() + 4, fields, sizeof fields);
+    return d;
 }
 
 bool decodeWebP(const uint8_t *d, size_t n, Image &out);

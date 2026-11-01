@@ -30,8 +30,10 @@ struct GameConfig {
 
 std::map<std::string, std::string> readIni(const std::string &root);
 std::string codeFile(const std::string &root, const std::map<std::string, std::string> &ini);
-// A sentence for the player when the game needs libraries this runtime doesn't have; empty when it can run.
-std::string unsupportedReason(const Ain &ain);
+// The file in dir whose name matches name in any case; empty when there is none.
+std::string findCaseless(const std::string &dir, const std::string &name);
+// What the game page says about how the game runs, such as the parts that don't yet; empty when there is nothing.
+std::string compatibilityNote(const Ain &ain);
 
 class Game {
 public:
@@ -64,10 +66,23 @@ public:
     int screenW = 800, screenH = 600;
     std::map<std::string, std::string> ini;  // AliceStart.ini or System40.ini, keys and raw values
     std::unique_ptr<AldArchive> cgArchive, waveArchive, bgmArchive;
+    // Later games (Test Game 56) keep pictures by name in <stem>CG.afa, and load more archives through AFAFactory.
+    std::unique_ptr<AfaArchive> cgAfa;
+    // Their music and sounds are numbered entries ("00001.ogg") of <stem>BA.afa and <stem>WA.afa.
+    std::unique_ptr<AfaArchive> bgmAfa, waveAfa;
+    std::vector<std::unique_ptr<AfaArchive>> extraAfa;
+    // A picture by its CP932 name, without extension: the CG archive's "<name>.qnt" and the like.
+    const ArchiveEntry *cgFind(const std::string &name, AfaArchive **from = nullptr) const;
+    bool cgLoadNamed(const std::string &name, Image &out);
+    std::shared_ptr<const Image> cgCachedNamed(const std::string &name);
+    void cgForgetNamed(const std::string &name);  // after the game rewrites a picture file, such as a thumbnail
     Sprites sprites;
     Audio audio;
     void log(const std::string &s);
     void problem(const std::string &s);
+    // Where a game starts its 3D scenes (SealEngine, Test Game 56's battles and maps): shows a notice over the
+    // dimmed screen and holds the game there until the player quits.
+    [[noreturn]] void stopAt3D();
     uint32_t now() const { return clockMs_.load(); }
     // Time stepped without the Cheats page's game speed: a movie keeps to its sound, which plays at normal speed.
     uint32_t movieNow() const { return movieClockMs_.load(); }
@@ -131,12 +146,14 @@ private:
     std::vector<uint8_t> frame_;
     FILE *logFile_ = nullptr;
     std::mutex problemMu_, typedMu_;
+    bool stoppedAt3D_ = false;  // the VM thread's
     std::string typed_;
     std::string lastProblem_;
     std::atomic<bool> dumpSprites_{false};
     std::string debugCall_;
     std::mutex cgMu_;
     std::map<int, std::weak_ptr<const Image>> cgCache_;
+    std::map<std::string, std::weak_ptr<const Image>> cgNamedCache_;
     std::vector<std::shared_ptr<const Image>> cgRecent_;  // keeps recently used pictures alive
 };
 

@@ -21,5 +21,7 @@ bool decodeImage(const uint8_t *data, size_t size, Image &out);
 bool decodeQNT(const uint8_t *data, size_t size, Image &out);
 bool decodeAJP(const uint8_t *data, size_t size, Image &out);
 bool decodePMS(const uint8_t *data, size_t size, Image &out);  // 8-bit only, its index as alpha
+// An opaque version 0 QNT of an RGBA picture (its alpha is dropped), as decodeQNT reads it.
+std::vector<uint8_t> encodeQNT(const uint8_t *rgba, int w, int h);
 
 }  // namespace s4

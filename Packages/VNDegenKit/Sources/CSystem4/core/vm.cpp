@@ -492,6 +492,7 @@ void VM::callHll(int32_t lib, int32_t fn) {
     } else {
         std::string name = ain.libraries[lib].name + "." + decl.name;
         if (hllWarned_.insert(name).second && log) log("unimplemented HLL " + name);
+        if (onUnboundHll) onUnboundHll(ain.libraries[lib].name);
     }
     // Arguments passed by value as slots belong to the call.
     for (size_t k = 0; k < decl.args.size(); k++) {
@@ -1028,6 +1029,7 @@ void VM::run(size_t untilFrames) {
         case OP_SH_LOCAL_A_PUSHBACK_LOCAL: arrayAt(fr.localPage, A(0))->v.push_back(copyPage(localv(A(1)))); break;
         case OP_SH_LOCAL_A_PUSHBACK_LOCAL_S: arrayAt(fr.localPage, A(0))->v.push_back(newString(str(localv(A(1))))); break;
         case OP_SH_MEM_A_PUSHBACK_LOCAL_S: arrayAt(fr.structPage, A(0))->v.push_back(newString(str(localv(A(1))))); break;
+        case OP_SH_GLOBAL_A_PUSHBACK_LOCAL_S: arrayAt(globalPage, A(0))->v.push_back(newString(str(localv(A(1))))); break;
         case OP_SH_IF_SREF_NE_STR: {
             int32_t i = pop(), pg = pop();
             if (str(var(pg, i)) != ain.strings.at(A(0))) jump(A(1));
@@ -1064,7 +1066,10 @@ void VM::run(size_t untilFrames) {
                     for (auto &e : add) { incref(e.first); d->push_back(e); }
                     for (auto &e : old) decref(e.first);
                 } else if (op == OP_DG_PLUSA) {
-                    for (auto &e : add) { incref(e.first); d->push_back(e); }
+                    // A delegate holds each method once: Test Game 56 compares two by adding one to a copy of
+                    // the other and checking the count didn't change.
+                    for (auto &e : add)
+                        if (std::find(d->begin(), d->end(), e) == d->end()) { incref(e.first); d->push_back(e); }
                 } else {
                     for (auto &e : add) {
                         auto it = std::find(d->begin(), d->end(), e);
@@ -1096,7 +1101,8 @@ void VM::run(size_t untilFrames) {
         }
         case OP_DG_ADD: {
             int32_t fn = pop(), obj = pop(), dsl = pop();
-            if (Delegate *d = delegate(dsl)) { incref(obj); d->push_back({obj, fn}); }
+            Delegate *d = delegate(dsl);
+            if (d && std::find(d->begin(), d->end(), std::make_pair(obj, fn)) == d->end()) { incref(obj); d->push_back({obj, fn}); }
             break;
         }
         case OP_DG_NEW_FROM_METHOD: { int32_t fn = pop(), obj = pop(); push(newDelegate(Delegate{{obj, fn}})); break; }
@@ -1112,7 +1118,18 @@ void VM::run(size_t untilFrames) {
         // the next method with copies of the arguments, or when none are left drops them and jumps past the loop.
         // Strings, structs and delegates passed by value belong to the callee, so each method gets its own copy and
         // the loop releases the originals at the end.
-        case OP_DG_CALLBEGIN: push(0); break;
+        case OP_DG_CALLBEGIN: {
+            // The delegate moves above its arguments for the call, [arguments..., delegate, index], as in the PC's VM:
+            // Test Game 56's resume saves made inside a delegate call hold the stack that way.
+            size_t nargs = size_t(ain.delegates.at(A(0)).argc);
+            if (stack.size() < nargs + 1) fatal("delegate call without its delegate");
+            size_t at = stack.size() - nargs - 1;
+            int32_t dsl = stack[at];
+            stack.erase(stack.begin() + ptrdiff_t(at));
+            stack.push_back(dsl);
+            push(0);
+            break;
+        }
         case OP_DG_CALL: {
             const FuncType &ft = ain.delegates.at(A(0));
             int nargs = 0;
@@ -1120,7 +1137,8 @@ void VM::run(size_t untilFrames) {
             size_t top = stack.size();
             if (top < size_t(nargs) + 2) fatal("delegate call without its delegate");
             int32_t idx = stack[top - 1];
-            int32_t dsl = stack[top - 2 - nargs];
+            int32_t dsl = stack[top - 2];
+            if (idx < 0) fatal("delegate call with a negative index");  // only a damaged resume save gives one
             Delegate *d = delegate(dsl);
             auto byValue = [&](int k) {
                 int32_t t = size_t(k) < ft.vars.size() ? ft.vars[size_t(k)].t.type : T_INT;
@@ -1132,7 +1150,7 @@ void VM::run(size_t untilFrames) {
                 int32_t result = idx > 0 ? dgLastReturn_ : ft.ret.type == T_STRING ? newString() : ft.ret.type == T_STRUCT ? -1 : 0;
                 std::vector<int32_t> owned;
                 for (int k = 0; k < nargs; k++)
-                    if (byValue(k)) owned.push_back(stack[top - 1 - nargs + k]);
+                    if (byValue(k)) owned.push_back(stack[top - 2 - nargs + k]);
                 stack.resize(top - 2 - nargs);
                 for (int32_t v : owned) decref(v);
                 if (ft.ret.type != T_VOID) push(result);
@@ -1142,7 +1160,7 @@ void VM::run(size_t untilFrames) {
             auto [obj, fn] = (*d)[idx];
             stack[top - 1] = idx + 1;
             for (int k = 0; k < nargs; k++) {
-                int32_t v = stack[top - 1 - nargs + k];
+                int32_t v = stack[top - 2 - nargs + k];
                 int32_t t = byValue(k) ? ft.vars[size_t(k)].t.type : T_INT;
                 if (t == T_STRING) push(newString(str(v)));
                 else if (t == T_STRUCT) push(copyPage(v));

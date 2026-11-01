@@ -1,4 +1,5 @@
 #include "game.h"
+#include "save.h"
 
 #include <chrono>
 #include <cstdio>
@@ -29,6 +30,8 @@ std::string lower(std::string s) {
     return s;
 }
 
+}  // namespace
+
 // The file in dir whose name matches name ignoring case, or "".
 std::string findCaseless(const std::string &dir, const std::string &name) {
     std::error_code ec;
@@ -36,7 +39,6 @@ std::string findCaseless(const std::string &dir, const std::string &name) {
         if (lower(e.path().filename().string()) == lower(name)) return e.path().string();
     return {};
 }
-}  // namespace
 
 Game &game() { return *g_game; }
 
@@ -95,16 +97,13 @@ std::string codeFile(const std::string &root, const std::map<std::string, std::s
     return path;
 }
 
-// Later System 4 games (Test Game 56) are built on libraries this runtime doesn't have yet. Starting one would only
-// show a blank screen, so it is refused with a sentence that says why.
-std::string unsupportedReason(const Ain &ain) {
-    static const char *const kMissing[] = {"PartsEngine", "ChipmunkSpriteEngine", "MainEXFile", "KiwiSoundEngine",
-                                           "SealEngine"};
+// Later games (Test Game 56) draw their battles and maps in 3D with SealEngine, which this runtime doesn't run: the
+// game stops with a notice where a 3D scene starts (Game::stopAt3D). The game page says so before the player starts.
+std::string compatibilityNote(const Ain &ain) {
     for (auto &lib : ain.libraries)
-        for (const char *m : kMissing)
-            if (lib.name == m)
-                return "This System 4 game is built on PartsEngine and the libraries that came with it, which VNDegen "
-                       "doesn't support yet.";
+        if (lib.name == "SealEngine")
+            return "The game's 3D scenes, such as its battles and maps, don't run yet. It stops with a message where "
+                   "one starts, and saves made before then still load.";
     return {};
 }
 
@@ -120,7 +119,6 @@ bool Game::start(std::string &error) {
     Ain ain;
     std::string err = ain.load(ainPath);
     if (!err.empty()) { error = "The game's code file can't be read: " + err; return false; }
-    if (std::string why = unsupportedReason(ain); !why.empty()) { error = why; return false; }
 
     // Archives: <stem>GA.ald for pictures, WA for sound effects, BA for music.
     std::string stem = fs::path(ainPath).stem().string();
@@ -138,6 +136,9 @@ bool Game::start(std::string &error) {
             if (lower(e.path().extension().string()) == ".fnl") { setGameFontLibrary(e.path().string()); break; }
     }
     cgArchive = openAld("G");
+    if (std::string afa = findCaseless(cfg.root, stem + "CG.afa"); !afa.empty()) cgAfa = AfaArchive::open(afa);
+    if (std::string afa = findCaseless(cfg.root, stem + "BA.afa"); !afa.empty()) bgmAfa = AfaArchive::open(afa);
+    if (std::string afa = findCaseless(cfg.root, stem + "WA.afa"); !afa.empty()) waveAfa = AfaArchive::open(afa);
     waveArchive = openAld("W");
     bgmArchive = openAld("B");
 
@@ -147,9 +148,20 @@ bool Game::start(std::string &error) {
     if (ini.count("SaveFolder")) vm->saveFolderName = ini["SaveFolder"];
     // Test Game 19's 2009 Sys42VM writes plain GD containers and version 7 resume saves (checked with a PC save
     // made under Wine). Sys43VM (Test Game 46) uses the XOR and version 8, the default.
-    if (lower(ini["MainVM"]) == "sys42vm") vm->saveFormat = {false, 7};
+    if (lower(ini["MainVM"]) == "sys42vm") vm->saveFormat = {false, 7, 5};
+    else if (vm->ain.version != 5) vm->saveFormat.globalLayout = 7;
+    // A game whose ini names no VM DLL runs the VM built into its exe. Test Game 56's writes resume saves of version
+    // 9 in a GD container without the XOR (checked with a PC save made under Wine).
+    if (ini["MainVM"].empty()) {
+        vm->saveFormat.resumeVersion = 9;
+        vm->saveFormat.xorData = false;
+    }
     vm->gameName = ini.count("GameName") ? ini["GameName"] : stem;
     vm->log = [this](const std::string &s) { log(s); };
+    // The 3D libraries' per-frame calls are stubs (hll_3d.cpp); any other call starts a 3D scene.
+    vm->onUnboundHll = [this](const std::string &lib) {
+        if (lib == "SealEngine" || lib == "MarmotModelEngine") stopAt3D();
+    };
     vm->timeMs = [this] { return now(); };
     vm->peek = [this] { yieldFrame(); };
     inputLog_ = std::getenv("S4_INPUTLOG") != nullptr;
@@ -338,6 +350,88 @@ std::shared_ptr<const Image> Game::cgCached(int number) {
     cgRecent_.push_back(img);
     if (cgRecent_.size() > 64) cgRecent_.erase(cgRecent_.begin());
     return img;
+}
+
+const ArchiveEntry *Game::cgFind(const std::string &name, AfaArchive **from) const {
+    static const char *const kExts[] = {".qnt", ".png", ".ajp", ".webp", ""};
+    auto look = [&](AfaArchive *a) -> const ArchiveEntry * {
+        if (!a) return nullptr;
+        for (const char *ext : kExts)
+            if (const ArchiveEntry *e = a->find(name + ext)) {
+                if (from) *from = a;
+                return e;
+            }
+        return nullptr;
+    };
+    if (const ArchiveEntry *e = look(cgAfa.get())) return e;
+    for (auto &a : extraAfa)
+        if (const ArchiveEntry *e = look(a.get())) return e;
+    return nullptr;
+}
+
+bool Game::cgLoadNamed(const std::string &name, Image &out) {
+    AfaArchive *a = nullptr;
+    const ArchiveEntry *e = cgFind(name, &a);
+    std::vector<uint8_t> d;
+    if (e) return a->read(*e, d) && decodeImage(d.data(), d.size(), out);
+    // A file: "<save>" and a name in the save folder (a save's thumbnail), or a path in the game folder.
+    static const std::string kSave = "<save>";
+    bool inSave = name.compare(0, kSave.size(), kSave) == 0;
+    std::string path = vm ? save::hostPath(*vm, inSave ? name.substr(kSave.size()) : name, inSave) : std::string();
+    std::error_code ec;
+    if (path.empty() || !fs::is_regular_file(path, ec)) return false;
+    std::ifstream f(path, std::ios::binary);
+    d.assign(std::istreambuf_iterator<char>(f), {});
+    return !d.empty() && decodeImage(d.data(), d.size(), out);
+}
+
+std::shared_ptr<const Image> Game::cgCachedNamed(const std::string &name) {
+    {
+        std::lock_guard<std::mutex> lock(cgMu_);
+        auto it = cgNamedCache_.find(name);
+        if (it != cgNamedCache_.end())
+            if (auto p = it->second.lock()) return p;
+    }
+    auto img = std::make_shared<Image>();
+    if (!cgLoadNamed(name, *img)) return nullptr;
+    std::lock_guard<std::mutex> lock(cgMu_);
+    cgNamedCache_[name] = img;
+    cgRecent_.push_back(img);
+    if (cgRecent_.size() > 64) cgRecent_.erase(cgRecent_.begin());
+    return img;
+}
+
+void Game::stopAt3D() {
+    // Code that runs while the game is stopped (destructors) can reach the 3D libraries again.
+    if (stoppedAt3D_) throw StopVM{};
+    stoppedAt3D_ = true;
+    problem("the game started a 3D scene (SealEngine), which VNDegen doesn't run");
+    std::vector<uint8_t> f;
+    int w, h;
+    takeFrame(f, w, h);
+    if (f.size() != size_t(screenW) * screenH * 4) f.assign(size_t(screenW) * screenH * 4, 0);
+    for (size_t i = 0; i < f.size(); i += 4)
+        for (int k = 0; k < 3; k++) f[i + size_t(k)] = uint8_t(f[i + size_t(k)] / 4);
+    static const char *const kLines[] = {"This part of the game is in 3D, which VNDegen can't show yet.",
+                                         "Quit the game, and continue from a save made before this point."};
+    TextStyle st;
+    st.size = std::max(16, screenH / 24);
+    st.edgeWeight = 2;
+    Surface text;
+    text.create(screenW, screenH, true);
+    int lineH = st.size * 3 / 2, y = screenH / 2 - lineH;
+    for (const char *line : kLines) {
+        drawText(text, (screenW - textWidth(line, st, 0)) / 2, y, line, st, 0);
+        y += lineH;
+    }
+    blit(f.data(), screenW, screenH, 0, 0, text.px.data(), text.w, text.h, true, 255, 0);
+    showFrame(std::move(f));
+    for (;;) yieldFrame();  // ends with StopVM when the player quits
+}
+
+void Game::cgForgetNamed(const std::string &name) {
+    std::lock_guard<std::mutex> lock(cgMu_);
+    cgNamedCache_.erase(name);
 }
 
 }  // namespace s4

@@ -739,6 +739,35 @@ S4_HLL(StoatSpriteEngine, ADVSceneKeeper_Load) {
     c.retBool(true);
 }
 
+// ---- AnteaterADVEngine (Test Game 56): the same backlog and scene keeper. Its AddText also names the message
+// window, which the backlog doesn't need, and a page may list voices; VNDegen's pages keep one. ----
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_Clear, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_AddText, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_AddNewLine, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_AddNewPage, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_AddVoice, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_SetEnable, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_IsEnable, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_GetNumofADVLog, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_GetNumofADVLogText, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_GetADVLogText, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_Save, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVLogList_Load, StoatSpriteEngine);
+S4_HLL(AnteaterADVEngine, ADVLogList_GetNumofADVLogVoice) {
+    int n = c.i(0);
+    c.retInt(n >= 0 && size_t(n) < g_log.size() && g_log[size_t(n)].voice ? 1 : 0);
+}
+S4_HLL(AnteaterADVEngine, ADVLogList_GetADVLogVoice) {
+    int n = c.i(0);
+    c.retInt(n >= 0 && size_t(n) < g_log.size() && c.i(1) == 0 ? g_log[size_t(n)].voice : 0);
+}
+S4_HLL_ALIAS(AnteaterADVEngine, ADVSceneKeeper_AddADVScene, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVSceneKeeper_GetNumofADVScene, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVSceneKeeper_GetADVScene, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVSceneKeeper_Clear, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVSceneKeeper_Save, StoatSpriteEngine);
+S4_HLL_ALIAS(AnteaterADVEngine, ADVSceneKeeper_Load, StoatSpriteEngine);
+
 S4_HLL_RESET {
     g_nextInternal = 1000000;
     g_multi.clear();

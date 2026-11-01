@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.17.0",
+          "buildVersion": "946",
+          "date": "2026-11-01T02:08:59Z",
+          "localizedDescription": "Adds cheats for AliceSoft System 3 and 4 games and a find-by-value search on every game's Variables tab, and fixes Las Gorditas 2 starting on a black screen.\n\n## Downloads\n\n- `VNDegen-0.17.0-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.17.0.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New: cheats for AliceSoft System 3 and 4\n\n- AliceSoft System 3 and 4 games get the Cheats page: a Variables tab and 2x or 4x game speed. Rance 02 and Sengoku Rance also get gold on the Quick tab.\n- Saves made afterwards are the games' ordinary saves.\n- Movies keep normal speed while the game runs faster, so their pictures stay with their sound.\n\n## New: find a value\n\n- Every game's Variables tab can find a value. Type a number the game shows, such as your gold, and the list keeps only the variables holding it. After the number changes in the game, find the new value to narrow the list to one.\n\n## Fixes\n\n- TyranoScript: Las Gorditas 2 and other Electron builds made with TyranoScript 5.2 or later no longer stop on a black screen at startup.\n\n## Known limits\n\n- AliceSoft System 3 games have no gold on the Quick tab. Find a value finds it on the Variables tab.\n- A yes-or-no variable in System 4 takes only 0 or 1.\n- The cheats' variable editor can put a game into a state its own save can't restore. A save made before editing is the undo.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.17.0/VNDegen-0.17.0.ipa",
+          "size": 145278210,
+          "sha256": "d639507796e32ef063d5f387fa2e06c03c3eb62e63dc523da7c478037f57afd6",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.16.0",
           "buildVersion": "933",
           "date": "2026-10-31T23:49:03Z",

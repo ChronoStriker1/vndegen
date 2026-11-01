@@ -69,7 +69,9 @@ port. This file lists where each part of the runtime came from, and what was unc
     198 calls a method on a member of a member of `this` (a first guess, "a member of a global", failed at the save
     screen, where the struct types prove the member reading); 207 is a reference check with no effect on the stack;
     212 assigns the string at (page, index) to a string; 214 is "the string at (page, index) is empty"; 227 assigns
-    a function-stack name, used only in error reporting.
+    a function-stack name, used only in error reporting; 232, which only Test Game 56 uses, pushes a local string
+    onto a global array, like 226 (onto a local array) and 233 (onto a member), and its one use adds a name to a
+    list when it isn't there yet.
 - Heap model: pages (globals, a function's locals, a struct, an array) and strings in reference-counted slots whose
   numbers the code handles directly, as the SDK listings show (string variables hold slots, `SH_LOCALCREATE` makes a
   struct, references are page and index pairs and keep their page alive).
@@ -96,6 +98,12 @@ save file and 28 copy one were read from the game functions that wrap them (thei
 - AFA (Test Game 56): an "AFAH" header naming "AlicArch", then an "INFO" block holding a zlib-compressed index. Each
   index entry is a name length, a padded length, the name, two unused words, the offset from the data block and the
   size. Read from the files and checked by listing every entry of Test Game 56's archives.
+- QNT version 2 (Test Game 56): the header is 0x44 bytes, and the alpha plane's width is rounded up to even while
+  an odd height is left as is. Both were read from the sizes in the files: the header's plane sizes add up to the
+  file, and the alpha plane inflates to width rounded up times height. The save thumbnails VNDegen writes are
+  version 0 QNTs made by running the decoder's prediction backwards.
+- AFA music and sound (Test Game 56): `BA.afa` and `WA.afa` hold entries named by number, `00001.ogg`, as listing
+  the archives shows.
 - WebP: some later pictures, and some AJP masks, are WebP files. They decode with ImageIO on Apple and libwebp on
   the Linux host.
 
@@ -144,6 +152,17 @@ calls were read from how the games call them.
   (seen by running SDK test programs on it). Arrays give every dimension's length, innermost first, then the
   innermost rows: Test Game 46's PC loaded a save that gave the rank in place of the outer length with 2 rows.
   Test Game 46's own slot saves load into VNDegen and save back with identical contents.
+- Test Game 56's VM was read from a save its PC copy wrote under Wine and from VNDegen's save at the same moment:
+  - It writes the GD container without the XOR, and global saves in layout 7. Its group saves load in VNDegen and
+    save back with the same contents.
+  - Its resume saves are version 9. Before the slot count comes the next object number, and each live slot has its
+    object number after the reference count. A delegate is kind 5: a byte count, then 12-byte entries (object
+    slot, function index, object number). The root stands for the entry function, which has no frame of its own.
+  - A method a delegate calls returns past the DG_CALL to the jump back to it, so its call site is stored as the
+    DG_CALL's address plus 4. While a delegate call runs, the delegate sits above its arguments on the stack.
+  - Reference counts include each method frame's on its `this`, and delegates hold none.
+  - PartsEngine.Save writes a u32 plain length and zlib data holding the library's own state, which VNDegen doesn't
+    read; VNDegen's parts data is its own ("VPT").
 - The read-message file (MsgSkip) starts with the number of messages, as Test Game 46's PC copy has it; without it
   the PC game stops at its load screen.
 - The SDK compiler's code files are the sections XORed with the save cipher seeded 0x5D3E3 (found by searching for
@@ -164,6 +183,21 @@ its saves. Their layouts were read from the arrays in the PC save:
 A save the PC wrote loads in VNDegen, and VNDegen saves it back with the back scenes and MultiSprite data
 byte-identical. A save VNDegen wrote from its own play loads on the PC, which then plays on.
 
+### The .ex data file (`exfile.cpp`, `hll_exfile.cpp`)
+
+Test Game 56 keeps its settings and tables in `Rance9.ex`, which its own `MainEXFile` library reads. That library is
+built into the game's `Rance9.exe`, so its file reader was disassembled with Ghidra, as needed to understand the file
+format, starting from the code that checks the `EXTF` tag:
+- The header and DATA chunk: the compressed size, the plain size, and the byte unscrambling (each byte rotated by 8
+  minus its count of one bits, left when the count is even and right when odd), then zlib.
+- One reader per value type: int, float, string, table (a header of typed, named columns with key and default flags,
+  nested for columns of tables, then rows of typed cells), list, and tree (each node a name, an optional value and
+  its children).
+Every one of the 233 entries in Rance9.ex then parsed to exactly its recorded size. The ints are stored plain; the
+engine XORs them with 0x65656565 only in memory. The library's behaviour (handles, the A2, IA2, SA2 and RA2
+addressing, and tree paths joined with `.`) comes from the function names and argument names in the game's code
+file and from the calls the game makes.
+
 ### Sprite engine and the rest of the HLL libraries (`hll_*.cpp`, `gfx.cpp`, `audio.cpp`, `font.cpp`)
 
 - SACT2 behaviour (sprites, Z order, blend rates, draw methods, text metrics and shadows, key codes, sound and music
@@ -175,9 +209,30 @@ byte-identical. A save VNDegen wrote from its own play loads on the PC, which th
 - Encodings these libraries hand the game to store in its saves (MultiSprite_Encode, CharSpriteManager_Save,
   ADVLogList_Save, ADVSceneKeeper_Save) follow the PC's; see the section above.
 
+### PartsEngine and the libraries Test Game 56 adds (`hll_parts.cpp`, `hll_kiwi.cpp`, `hll_commondata.cpp`, `hll_3d.cpp`)
+
+None of these libraries has SDK documentation, and they are built into `Rance9.exe`. Their behaviour comes from the
+game's code file: the libraries' function and argument names (`s4dis --lib`), the game functions that wrap them,
+and what the game does with the results. Specifically:
+- PartsFunc takes a function number and int, float and string arrays. The numbers and argument orders came from the
+  game's wrapper functions (each pushes its number, fills the arrays and reads the result back); the result is the
+  last element of its type's array, which each wrapper fills with a placeholder first. Number 162 makes a drawing
+  plugin's surface on a part and 163 returns its handle, which the game then passes to DrawMovie3.Draw.
+- Message types (1 pointer enters, 2 moves, 3 leaves, 4 wheel, 5 click, 14 to 17 keys, 18 and 19 focus) and their
+  variables (the pointer's x and y, then the key for a click) came from the game's message dispatcher, a switch over
+  the type whose cases call one handler each.
+- The parts layer numbers, the activity and intent calls and the thumbnail call came from their wrappers' names and
+  arguments. A save thumbnail's file name and the `<save>` prefix the save list loads it by are strings in the code.
+- Delegates hold each method once: the game decides whether two button functions are the same by adding one to a
+  copy of the other and checking the count didn't change. A method a delegate calls returns to the DG_CALL
+  instruction, which calls the next one; a resume save made inside one resumes there.
+- Test Game 56's 3D starts where it makes a 3D parts layer (Parts_CreateParts3DLayerPluginID) or calls SealEngine
+  beyond the settings each 2D frame makes; both were seen in a run into the first chapter.
+
 ## Known gaps and open questions
 
 - Four MultiSprite fields keep the PC's values without a known meaning. Moves in progress aren't saved, as on the PC.
 - Resume saves are verified on the PC for Test Game 19, and against the SDK runtime and Test Game 46's VM. Test Game
-  46 saves with group saves, checked on the PC both ways. Test Game 56 isn't checked on the PC yet.
+  46 saves with group saves, checked on the PC both ways. Test Game 56's saves were checked on the PC both ways,
+  except for PartsEngine's data.
 - MsgSkip's bit order within a byte is assumed (low bit first): the PC file seen had no bit set.

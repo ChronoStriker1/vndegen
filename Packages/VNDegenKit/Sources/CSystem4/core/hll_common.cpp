@@ -345,6 +345,59 @@ S4_HLL(IbisInputEngine, Joystick_ClearCaptureFlag) {}
 S4_HLL(IbisInputEngine, Joystick_GetNumofDevice) { c.retInt(0); }
 S4_HLL(IbisInputEngine, Joystick_IsKeyDown) { c.retBool(false); }
 S4_HLL(IbisInputEngine, Joystick_GetAxis) { c.retFloat(0); }
+S4_HLL(IbisInputEngine, Key_IsDown) { c.retBool(G().keyDown(c.i(0))); }
+bool g_hideCursor = false;  // the game's wish; VNDegen's host shows its own pointer
+S4_HLL(IbisInputEngine, Mouse_HideCursorByGame) { g_hideCursor = c.b(0); c.retBool(true); }
+S4_HLL(IbisInputEngine, Mouse_IsHideCursorByGame) { c.retBool(g_hideCursor); }
+S4_HLL(IbisInputEngine, Mouse_GetPos) {
+    c.ref(0) = G().mouseX();
+    c.ref(1) = G().mouseY();
+    c.retBool(true);
+}
+S4_HLL(IbisInputEngine, Mouse_MovePosImmediately) { G().mouseMove(c.i(0), c.i(1)); c.retBool(true); }
+S4_HLL(IbisInputEngine, Mouse_HideByStepMessage) {}
+int g_ibisWheelForward = 0, g_ibisWheelBack = 0;
+S4_HLL(IbisInputEngine, MouseWheel_ClearCount) { G().takeWheel(); g_ibisWheelForward = g_ibisWheelBack = 0; }
+S4_HLL(IbisInputEngine, MouseWheel_GetCount) {
+    int d = G().takeWheel();
+    if (d > 0) g_ibisWheelForward += d; else g_ibisWheelBack -= d;
+    c.ref(0) = g_ibisWheelForward;
+    c.ref(1) = g_ibisWheelBack;
+}
+
+// ---- SystemService additions in later games (Test Game 56) ----
+std::tm localNow() {
+    std::time_t t = std::time(nullptr);
+    std::tm lt{};
+#if defined(_WIN32)
+    localtime_s(&lt, &t);
+#else
+    localtime_r(&t, &lt);
+#endif
+    return lt;
+}
+S4_HLL(SystemService, GetDate) {
+    std::tm lt = localNow();
+    c.ref(0) = lt.tm_year + 1900;
+    c.ref(1) = lt.tm_mon + 1;
+    c.ref(2) = lt.tm_mday;
+    c.ref(3) = lt.tm_wday;
+}
+S4_HLL(SystemService, GetTime) {
+    std::tm lt = localNow();
+    c.ref(0) = lt.tm_hour;
+    c.ref(1) = lt.tm_min;
+    c.ref(2) = lt.tm_sec;
+}
+S4_HLL(SystemService, UpdateView) { c.retBool(true); }
+// A system message is a request from the window, such as closing it; VNDegen's host stops the game itself.
+S4_HLL(SystemService, IsExistSystemMessage) { c.retBool(false); }
+
+// ---- Libraries for outside services and tools: Discord presence and the log viewer. VNDegen has neither. ----
+S4_HLL(Discord, Update) {}
+S4_HLL(Discord, UpdateActivity) {}
+S4_HLL(CrayfishLogViewer, SetWindowTitleName) {}
+S4_HLL(CrayfishLogViewer, SetSaveFolderName) {}
 
 // ---- DrawPluginManager: the games load drawing plugins by name; VNDegen's drawing is built in. ----
 S4_HLL(DrawPluginManager, Load) { c.retInt(1); }
@@ -358,10 +411,44 @@ S4_HLL_RESET {
     g_windowSettings.clear();
     g_cursorConfig.clear();
     g_inputResult.clear();
+    g_ibisWheelForward = g_ibisWheelBack = 0;
+    g_hideCursor = false;
     g_pass.clear();
     g_vs.close();
     g_confirm.close();
 }
 
 }  // namespace
+}  // namespace s4
+
+namespace s4 {
+// ---- AFAFactory and CGManager: archives and pictures by name, as later games (Test Game 56) keep them ----
+// LoadArchive's Type is the kind of data (Test Game 56 loads its Flat archives as 2 and 3); every archive it opens
+// is searched for pictures after the game's CG archive.
+S4_HLL(AFAFactory, LoadArchive) {
+    Game &g = G();
+    std::string name = sjis::toUtf8(c.s(1));
+    std::string path = findCaseless(g.cfg.root, name);
+    if (path.empty() && name.find('.') == std::string::npos) path = findCaseless(g.cfg.root, name + ".afa");
+    auto a = path.empty() ? nullptr : AfaArchive::open(path);
+    if (!a) g.log("AFAFactory: can't open " + name);
+    else g.extraAfa.push_back(std::move(a));
+    c.retBool(!path.empty());
+}
+S4_HLL(AFAFactory, IsExistArchive) {
+    std::string name = sjis::toUtf8(c.s(0));
+    c.retBool(!findCaseless(G().cfg.root, name).empty() || !findCaseless(G().cfg.root, name + ".afa").empty());
+}
+S4_HLL(CGManager, IsExist) { c.retBool(G().cgFind(c.s(0)) != nullptr); }
+S4_HLL(CGManager, GetInfo) {
+    auto img = G().cgCachedNamed(c.s(0));
+    if (img) {
+        c.ref(1) = img->w;
+        c.ref(2) = img->h;
+        c.ref(3) = img->hasAlpha ? 32 : 24;
+        c.ref(4) = 1;
+        c.ref(5) = img->hasAlpha ? 1 : 0;
+    }
+    c.retBool(img != nullptr);
+}
 }  // namespace s4

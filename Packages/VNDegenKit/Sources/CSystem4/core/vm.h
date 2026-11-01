@@ -102,6 +102,9 @@ struct HllState {
     static void hll_##lib##_##fn(s4::HllCall &c); \
     static s4::HllRegistry::Add reg_##lib##_##fn(#lib "." #fn, hll_##lib##_##fn); \
     static void hll_##lib##_##fn([[maybe_unused]] s4::HllCall &c)
+// Another library's function of the same name and arguments, run by implLib's implementation.
+#define S4_HLL_ALIAS(lib, fn, implLib) \
+    static s4::HllRegistry::Add regAlias_##lib##_##fn(#lib "." #fn, hll_##implLib##_##fn)
 
 constexpr size_t kUnknownBase = SIZE_MAX;
 
@@ -175,6 +178,7 @@ public:
     std::function<void(const std::string &)> log;
     std::function<void(const std::string &)> trace;  // every call, for debugging
     std::function<void(const std::string &)> hllTrace;
+    std::function<void(const std::string &lib)> onUnboundHll;  // a library call nothing implements, by library name
     // "Library.Function" for each library function the game declares that VNDegen doesn't implement.
     std::vector<std::string> unboundHll() const;  // every HLL call with its argument words, for debugging
     std::function<void()> peek;             // system.Peek and other points where the host may run a frame
@@ -185,10 +189,12 @@ public:
     std::string saveDir;                    // the game's SaveData folder on this machine
     std::string saveFolderName = "SaveData";  // its name as the game sees it (the ini's SaveFolder)
     // How this game's PC VM writes saves. Test Game 19's Sys42VM writes resume saves of version 7 in an un-XORed
-    // GD container; Test Game 46's Sys43VM writes version 8 under the XOR.
+    // GD container and global saves in layout 5; Test Game 46's Sys43VM writes version 8 under the XOR, and layout 5
+    // for its version 5 code file; Test Game 56's VM writes layout 7 for its version 6 one.
     struct SaveFormat {
         bool xorData = true;
         uint32_t resumeVersion = 8;
+        uint32_t globalLayout = 5;
     } saveFormat;
     std::string rootDir;                    // the game's folder
     std::string gameName;
