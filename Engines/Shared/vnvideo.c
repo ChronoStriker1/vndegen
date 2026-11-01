@@ -72,6 +72,9 @@ struct vnvideo {
     uint8_t *current;
     double current_due, last_due;
     int has_current;
+    // Nothing is handed out until the frame ring first fills or decoding ends, so playback starts with a few frames
+    // in hand, even when the decoder starts slowly while the engine loads a screen.
+    int started;
 
     // Sound ring of interleaved floats.
     float *audio;
@@ -534,10 +537,16 @@ void vnvideo_get_info(const vnvideo *video, vnvideo_info *info) {
     *info = video->info;
 }
 
+// Whether playback may start. The caller holds the lock.
+static int ready(vnvideo *v) {
+    if (!v->started && (v->count == FRAME_SLOTS || v->done)) v->started = 1;
+    return v->started;
+}
+
 const uint8_t *vnvideo_frame(vnvideo *v, double time, int *changed) {
     int moved = 0;
     pthread_mutex_lock(&v->lock);
-    while (v->count > 0 && (v->due[v->head] <= time || !v->has_current)) {
+    while (ready(v) && v->count > 0 && (v->due[v->head] <= time || !v->has_current)) {
         // Swap the due frame's buffer with the shown one, so nothing is copied.
         uint8_t *shown = v->current;
         v->current = v->slots[v->head];
@@ -559,7 +568,7 @@ size_t vnvideo_read_audio(vnvideo *v, float *out, size_t frames) {
     if (!v->info.audio_rate) return 0;
     size_t channels = (size_t)v->info.audio_channels;
     pthread_mutex_lock(&v->lock);
-    size_t available = v->audio_fill / channels;
+    size_t available = ready(v) ? v->audio_fill / channels : 0;
     if (frames > available) frames = available;
     size_t total = frames * channels;
     for (size_t i = 0; i < total; i++) out[i] = v->audio[(v->audio_read + i) % v->audio_capacity];

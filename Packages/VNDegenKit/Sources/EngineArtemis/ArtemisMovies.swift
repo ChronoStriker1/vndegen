@@ -20,6 +20,9 @@ final class ArtemisMovies {
         var elapsed = 0.0
         /// Display times of the frames shown, for the frame rate the log reports.
         var shown: [Double] = []
+        /// The longest gap between two of the host's frames while it played, in milliseconds. A gap as long as the
+        /// movie's longest frame gap means the host stalled, not the decoder.
+        var longestHostFrame = 0.0
 
         init(id: String?, file: String, skipKeys: Set<Int32>, decoder: MovieDecoder) {
             self.id = id
@@ -41,6 +44,8 @@ final class ArtemisMovies {
     private let screen: CALayer
     private let log: (String) -> Void
     private var movies: [Movie] = []
+    /// The display time of the host's last frame.
+    private var lastFrame: Double?
 
     /// `screen` is the layer a fullscreen movie shows in, over the game.
     init(core: ArtemisCore, files: ArtemisCore.Files, audio: ArtemisAudio, screen: CALayer, log: @escaping (String) -> Void) {
@@ -92,8 +97,14 @@ final class ArtemisMovies {
     /// id, with nil for the fullscreen one, so the core can end its wait or run its handler.
     func advance(_ milliseconds: Double, runtime: OpaquePointer, at timestamp: Double) -> [String?] {
         var ended: [String?] = []
+        let hostGap = lastFrame.map { (timestamp - $0) * 1000 } ?? 0
+        lastFrame = timestamp
         for movie in movies {
-            movie.elapsed += milliseconds / 1000
+            // A silent movie's clock starts with its first frame, so a slow start doesn't skip its opening frames.
+            if !movie.shown.isEmpty {
+                movie.elapsed += milliseconds / 1000
+                movie.longestHostFrame = max(movie.longestHostFrame, hostGap)
+            }
             let time = movie.time
             var changed: Int32 = 0
             if let pixels = vnvideo_frame(movie.video, time, &changed), changed != 0 {
@@ -121,6 +132,11 @@ final class ArtemisMovies {
         return true
     }
 
+    /// Forgets the last frame's time, so the time paused doesn't count as a stall.
+    func paused() {
+        lastFrame = nil
+    }
+
     func stopAll() {
         movies.forEach { remove($0, reason: "stopped") }
     }
@@ -137,7 +153,8 @@ final class ArtemisMovies {
             screen.contents = nil
         }
         let sound = movie.sound != nil ? String(format: ", %.2f s of sound played", vnvideo_audio_time(movie.video)) : ""
-        log("[I] movie \(movie.file) \(reason)" + Self.frameRate(movie.shown) + sound)
+        log("[I] movie \(movie.file) \(reason)" + Self.frameRate(movie.shown) + sound
+            + String(format: ", longest host frame %.0f ms", movie.longestHostFrame))
     }
 
     /// The average and 1% low frame rate of the frames shown, from their display times.

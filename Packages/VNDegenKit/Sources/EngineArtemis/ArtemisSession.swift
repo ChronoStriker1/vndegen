@@ -367,6 +367,7 @@ final class ArtemisSession: EngineSession {
         if paused { router.releaseAll().forEach(deliver) }
         audio.setPaused(paused)
         lastFrame = nil
+        movies.paused()
         if let runtime { core.api.runtime_notify_lifecycle!(runtime, paused ? 1 : 2) }
         if !paused { host.takeFocus() }
     }

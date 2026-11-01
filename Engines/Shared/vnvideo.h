@@ -29,7 +29,8 @@ typedef struct vnvideo_info {
 vnvideo *vnvideo_open(vnvideo_read_fn read, void *user, uint64_t size, int loop, char *error, size_t error_size);
 void vnvideo_get_info(const vnvideo *video, vnvideo_info *info);
 
-// The newest frame due at `time` seconds, as width * height RGBA pixels, or NULL before the first frame is decoded.
+// The newest frame due at `time` seconds, as width * height RGBA pixels, or NULL until playback starts, once a few
+// frames are decoded. Sound is held back until then too, so a movie's clock starts with frames in hand.
 // `changed` says whether it differs from the frame the last call returned. The pixels stay valid until the next call.
 const uint8_t *vnvideo_frame(vnvideo *video, double time, int *changed);
 
