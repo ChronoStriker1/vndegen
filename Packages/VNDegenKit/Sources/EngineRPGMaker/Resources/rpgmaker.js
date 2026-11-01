@@ -263,7 +263,17 @@
     }
 
     // HEVC alpha survives a canvas upload, while WebKit drops it when WebGL uploads a video directly.
-    const alphaURLs = new Set(), alphaCanvases = new WeakMap(), videos = [];
+    const alphaURLs = new Set(), alphaCanvases = new WeakMap(), alphaPlays = new WeakMap(), videos = [];
+    const playVideo = HTMLMediaElement.prototype.play;
+    // The internal reload aborts an earlier play(). Its caller must await the replacement playback.
+    HTMLMediaElement.prototype.play = function (...args) {
+        const before = alphaPlays.get(this);
+        return playVideo.apply(this, args).catch(error => {
+            const replacement = alphaPlays.get(this);
+            if (error.name === 'AbortError' && replacement && replacement !== before) return replacement;
+            throw error;
+        });
+    };
     const createElement = document.createElement;
     document.createElement = function (...args) {
         const element = createElement.apply(this, args);
@@ -282,18 +292,23 @@
         }
         for (const video of live) {
             const direct = video.src.split('#')[0] === url;
+            if (!direct && (video.src || video.currentSrc && video.currentSrc.split('#')[0] !== url)) continue;
             let source = [...video.querySelectorAll('source')].find(item => item.src.split('#')[0] === url);
             if (!direct && (!source || source.type === 'video/quicktime')) continue;
             const playing = !video.paused || video.autoplay;
             if (!source) {
                 source = document.createElement('source');
                 source.src = url;
-                video.prepend(source);
             }
+            video.prepend(source);
             source.type = 'video/quicktime';
             if (direct) video.removeAttribute('src');
             video.load();
-            if (playing) video.play().catch(() => {});
+            if (playing) {
+                const replacement = playVideo.call(video);
+                alphaPlays.set(video, replacement);
+                replacement.catch(() => {});
+            }
         }
     };
     const loadingVideoStyle = document.createElement('style');
