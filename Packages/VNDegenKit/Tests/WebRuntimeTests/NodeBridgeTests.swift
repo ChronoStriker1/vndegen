@@ -139,13 +139,16 @@ private func decode(_ json: String) throws -> BridgeRequest {
         const fs = window.studio_api.fs;
         fs.writeFileSync('/game/Goon_sf.sav', 'saved');
         return [window.studio_api.ipcRenderer.sendSync('doubleCheck', {}), window.studio_api.ipcRenderer.sendSync('getAppPath', {}),
-                process.platform, process.execPath, fs.existsSync('/game/Goon_sf.sav')];
+                process.platform, process.execPath, fs.existsSync('/game/Goon_sf.sav'), process.__dirname, process.env.HOME];
         """) as? [Any]
     #expect(answers?[0] as? Bool == true)
     #expect(answers?[1] as? String == appPath)
     #expect(answers?[2] as? String == "darwin")
     #expect(answers?[3] as? String == "/game/index.html")
     #expect(answers?[4] as? Bool == true)
+    // $.getUnzipPath reads __dirname, and an .asar in it keeps the game from unpacking patches into its folder.
+    #expect(answers?[5] as? String == appPath)
+    #expect(answers?[6] as? String == "/game")
     #expect(try String(contentsOf: root.appendingPathComponent("Goon_sf.sav"), encoding: .utf8) == "saved")
 }
 
