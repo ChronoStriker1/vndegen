@@ -46,10 +46,11 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Cheats for RPG Maker MV and MZ (0.14.0): gold, items, party restore, settings that stay on per game, and a variable and switch editor, through the game's own objects. `docs/cheats.md` has the rest of the plan.
 - AliceSoft System 4 (0.15.0), on VNDegen's own clean-room runtime, MIT licensed, on Mac, iPhone, and iPad. Test Games 19 and 46 play, save and load on the Mac and the iPad simulator, pass the case check, and exchange saves with the PC in both directions; Test Game 56, built on PartsEngine, stops with a message. `docs/system4.md` has the known limits.
 - Cheats for RPG Maker XP, VX, VX Ace and Wolf RPG Editor (0.15.0).
+- Game page screenshots in a grid with a full-screen viewer, game speed for Godot and Flash, and RPG Maker MZ alpha cutscene clips (0.16.0).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- AliceSoft System 4 games built on PartsEngine and later, on `ws/cr-system4`. Cheats game speed for Godot and Flash, on `feature/cheats-request`.
+- AliceSoft System 4 games built on PartsEngine and later, on `ws/cr-system4`. Cheats for AliceSoft System 3 and 4, on `feature/cheats-request`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it, and no GPL component is left:
