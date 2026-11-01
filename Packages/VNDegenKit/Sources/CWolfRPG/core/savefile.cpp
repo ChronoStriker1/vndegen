@@ -157,6 +157,12 @@ public:
     // Reads a count and sizes `v` to it. Each element takes at least `minSize` bytes, which bounds the count by what
     // is left of the file before anything is allocated.
     template <class T> void count32(std::vector<T> &v, size_t minSize) { sized(v, r_.u32(), minSize); }
+    // The same with a fixed cap, checked before anything is allocated.
+    template <class T> void count32(std::vector<T> &v, size_t minSize, uint32_t max, const char *what) {
+        uint32_t n = r_.u32();
+        if (n > max) throw FormatError(what);
+        sized(v, n, minSize);
+    }
     template <class T> void count16(std::vector<T> &v, size_t minSize) { sized(v, r_.u16(), minSize); }
     template <class T> void count8(std::vector<T> &v, size_t minSize) { sized(v, r_.u8(), minSize); }
     template <class T> void sized(std::vector<T> &v, uint32_t n, size_t minSize) {
@@ -222,6 +228,10 @@ public:
     }
 
     template <class T> void count32(const std::vector<T> &v, size_t) { u32(checked(v.size(), 0x7FFFFFFF)); }
+    template <class T> void count32(const std::vector<T> &v, size_t, uint32_t max, const char *what) {
+        if (v.size() > max) throw FormatError(what);
+        u32(uint32_t(v.size()));
+    }
     template <class T> void count16(const std::vector<T> &v, size_t) { u16(uint16_t(checked(v.size(), 0xFFFF))); }
     template <class T> void count8(const std::vector<T> &v, size_t) { u8(uint8_t(checked(v.size(), 0xFF))); }
 
@@ -247,8 +257,7 @@ template <class IO, class S> void oldOrNewStr(IO &io, S &s) { io.str(s, io.versi
 
 template <class IO, class R> void route(IO &io, R &r) {
     io.u8s(r.flags);
-    io.count32(r.steps, 3);
-    if (r.steps.size() > 0x10000) throw FormatError("move route too long");
+    io.count32(r.steps, 3, 0x10000, "move route too long");
     for (auto &st : r.steps) {
         io.u8(st.id);
         io.count8(st.args, 4);
@@ -455,23 +464,20 @@ template <class IO, class S> void variablesSection(IO &io, S &s) {
             for (auto &v : inner) io.s32(v);
         }
     }
-    io.count32(s.numbers, 4);
-    if (s.numbers.size() > 9999) throw FormatError("section 3: too many number lists");
+    io.count32(s.numbers, 4, 9999, "section 3: too many number lists");
     for (auto &l : s.numbers) {
         io.count32(l, 4);
         for (auto &v : l) io.s32(v);
     }
     io.count32(s.strings, 2);
     for (auto &x : s.strings) oldOrNewStr(io, x);
-    io.count32(s.commonSelf, 1);
-    if (s.commonSelf.size() > 10000) throw FormatError("section 3: too many lists");
+    io.count32(s.commonSelf, 1, 10000, "section 3: too many lists");
     for (auto &l : s.commonSelf) {
         io.count8(l, 4);
         for (auto &v : l) io.s32(v);
     }
-    io.count32(s.commonSelfStrings, 1);
-    if (s.commonSelfStrings.empty() || s.commonSelfStrings.size() > 10000)
-        throw FormatError("section 3: bad string list count");
+    io.count32(s.commonSelfStrings, 1, 10000, "section 3: bad string list count");
+    if (s.commonSelfStrings.empty()) throw FormatError("section 3: bad string list count");
     for (auto &l : s.commonSelfStrings) {
         io.count8(l, 2);
         for (auto &x : l) oldOrNewStr(io, x);

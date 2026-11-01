@@ -106,7 +106,6 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - Wolf RPG Editor 3 commands not supported yet, which The Clumsy Witch Seris uses: arrays (command 255, its minimap and
   building labels, which sit on the wrong buildings), the regular expression string operation (its voice lines pick
   their folder with it, so system voices are silent), and `<XYN_IMAGE>` pictures.
-- Wolf RPG Editor Pro's encrypted data isn't read. One library game is a Pro game.
 - Mouse input, CSV import (command 251) and file downloads (260) aren't supported. The test games don't use them; two
   library games need the mouse, one to pick its control scheme on its first screen and one for its action battles.
 - Typing text on the keyboard (a string command mode) isn't supported: the command keeps the text already in the

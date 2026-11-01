@@ -89,11 +89,15 @@ void xorStream(uint8_t *data, size_t size, const std::vector<uint8_t> &key, uint
     }
 }
 
+// The largest file an archive may hold, stored or unpacked. No library game comes near it.
+constexpr uint64_t kFileLimit = 512u << 20;
+
 // DxLib's Huffman decoding. The header is read most significant bit first: the decoded size and the coded size, each
 // as a 6-bit width less one and then that many bits, and 256 byte weights, each as a delta from the previous one. The
 // coded data starts at the next byte and is read least significant bit first. `expected` is the size the caller
-// needs, or UINT64_MAX for any.
-std::optional<std::vector<uint8_t>> huffmanDecode(std::span<const uint8_t> src, uint64_t expected) {
+// needs, or UINT64_MAX for any up to `limit`.
+std::optional<std::vector<uint8_t>> huffmanDecode(std::span<const uint8_t> src, uint64_t expected,
+                                                  uint64_t limit = UINT64_MAX) {
     uint64_t pos = 0;
     bool past = false;
     auto bits = [&](unsigned n) {
@@ -120,7 +124,8 @@ std::optional<std::vector<uint8_t>> huffmanDecode(std::span<const uint8_t> src, 
     if (past) return std::nullopt;
     size_t start = size_t((pos + 7) / 8);
     // Every byte takes at least one bit, which bounds the size a damaged header can claim.
-    if ((expected != UINT64_MAX && size != expected) || size > uint64_t(src.size() - start) * 8) return std::nullopt;
+    if ((expected != UINT64_MAX && size != expected) || size > limit || size > uint64_t(src.size() - start) * 8)
+        return std::nullopt;
 
     // The tree must come out exactly as the encoder built it: each inner node joins the two parentless nodes of lowest
     // weight, ties going to the lower node number, the first taken as its 0 child. All 256 byte values take part, even
@@ -325,26 +330,30 @@ bool Archive::load8(const Header8 &h, std::string_view keyString, std::string *e
     keyString_ = std::string(keyString.substr(0, 63));
     key_ = h.flags & 1 ? std::vector<uint8_t>() : makeKey8(keyString_);
     // Compressed tables run to the end of the file; nothing records their stored length. The largest library archive
-    // has tables of under 1 MB, so a size past 64 MB is damage, refused before anything is allocated for it.
-    if (h.tableSize > (64u << 20)) {
+    // has tables of under 1 MB, so tables, their stored bytes and their Huffman output past 64 MB are damage, refused
+    // before anything that size is allocated. A stored table cut at 64 MB still decodes, as decoding stops at its size.
+    constexpr uint64_t kTableLimit = 64u << 20;
+    if (h.tableSize > kTableLimit) {
         *error = "tables too large";
         return false;
     }
     bool compressed = !(h.flags & 2);
-    std::vector<uint8_t> head(compressed ? fileSize_ - h.tableStart : h.tableSize);
+    std::vector<uint8_t> head(compressed ? std::min<uint64_t>(fileSize_ - h.tableStart, kTableLimit) : h.tableSize);
     if (!readAt(file_, h.tableStart, head.data(), head.size())) {
         *error = "cannot read tables";
         return false;
     }
     xorStream(head.data(), head.size(), key_, 0);
     if (compressed) {
-        auto coded = huffmanDecode(head, UINT64_MAX);
+        auto coded = huffmanDecode(head, UINT64_MAX, kTableLimit);
         // Checking the LZ header's size first keeps a wrong key from asking for a large buffer.
+        std::optional<std::vector<uint8_t>> decoded;
         if (!coded || coded->size() < 4 || Tables{*coded, 4}.field(0, 4) != h.tableSize ||
-            (head = dxlibDecode(coded->data(), coded->size(), h.tableSize)).size() != h.tableSize) {
+            !(decoded = dxlibDecode(coded->data(), coded->size(), h.tableSize))) {
             *error = "cannot decode tables";
             return false;
         }
+        head = std::move(*decoded);
     }
 
     version_ = 8;
@@ -439,15 +448,15 @@ std::optional<std::vector<uint8_t>> Archive::read(const std::string &path) const
     auto it = entries_.find(pathKey(path));
     if (it == entries_.end()) return std::nullopt;
     const Entry &e = it->second;
+    // No file in the library comes near 512 MB, stored or unpacked; a larger claim is damage.
+    if (e.stored > kFileLimit || e.size > kFileLimit) return std::nullopt;
     std::vector<uint8_t> stored(e.stored);
     if (!readAt(file_, e.offset, stored.data(), stored.size())) return std::nullopt;
     if (version_ >= 8) return read8(e, std::move(stored));
     // Versions 5 and 6 key each file's bytes from its unpacked size rather than its place in the archive.
     xorStream(stored.data(), stored.size(), key_, version_ >= 5 ? e.size : e.offset);
     if (e.packedSize == UINT64_MAX) return stored;
-    auto out = dxlibDecode(stored.data(), stored.size(), e.size);
-    if (out.size() != e.size) return std::nullopt;
-    return out;
+    return dxlibDecode(stored.data(), stored.size(), e.size);
 }
 
 // The encoder applies LZ, then Huffman, then XOR, so they are undone in the reverse order.
@@ -459,22 +468,20 @@ std::optional<std::vector<uint8_t>> Archive::read8(const Entry &e, std::vector<u
     if (e.huffmanSize == UINT64_MAX) {
         data = std::move(stored);
     } else if (uint64_t k = uint64_t(huffmanKiB_) * 1024; huffmanKiB_ == 255 || length <= 2 * k) {
-        auto whole = huffmanDecode(stored, length);
+        auto whole = huffmanDecode(stored, length, kFileLimit);
         if (!whole) return std::nullopt;
         data = std::move(*whole);
     } else {
         // The coded bytes decode to the first k bytes and then the last k bytes; the middle follows them as is.
-        auto ends = huffmanDecode(std::span<const uint8_t>(stored).first(e.huffmanSize), 2 * k);
+        auto ends = huffmanDecode(std::span<const uint8_t>(stored).first(e.huffmanSize), 2 * k, kFileLimit);
         if (!ends) return std::nullopt;
-        data.reserve(length);
+        data.reserve(stored.size() - e.huffmanSize + ends->size());
         data.insert(data.end(), ends->begin(), ends->begin() + ptrdiff_t(k));
         data.insert(data.end(), stored.begin() + ptrdiff_t(e.huffmanSize), stored.end());
         data.insert(data.end(), ends->begin() + ptrdiff_t(k), ends->end());
     }
     if (!packed) return data;
-    auto out = dxlibDecode(data.data(), data.size(), e.size);
-    if (out.size() != e.size) return std::nullopt;
-    return out;
+    return dxlibDecode(data.data(), data.size(), e.size);
 }
 
 std::vector<std::string> Archive::paths() const {
@@ -485,25 +492,26 @@ std::vector<std::string> Archive::paths() const {
     return out;
 }
 
-std::vector<uint8_t> dxlibDecode(const uint8_t *src, size_t srcSize, uint64_t expected) {
-    if (srcSize < 9) return {};
+std::optional<std::vector<uint8_t>> dxlibDecode(const uint8_t *src, size_t srcSize, uint64_t expected) {
+    if (srcSize < 9) return std::nullopt;
     uint64_t size = uint32_t(src[0] | src[1] << 8 | src[2] << 16 | uint32_t(src[3]) << 24);
-    if (size != expected) return {};
+    if (size != expected || size > kFileLimit) return std::nullopt;
     size_t end = uint32_t(src[4] | src[5] << 8 | src[6] << 16 | uint32_t(src[7]) << 24);
     uint8_t escape = src[8];
-    if (end < 9 || end > srcSize) return {};
+    if (end < 9 || end > srcSize) return std::nullopt;
     // A back-reference copies at most 8195 bytes from 4 bytes of input, so a larger size means a corrupt header.
-    if (size > uint64_t(end - 9) * 2049) return {};
+    if (size > uint64_t(end - 9) * 2049) return std::nullopt;
 
     std::vector<uint8_t> out;
-    out.reserve(size);
+    // The buffer grows with what actually decodes, so a size claim alone can't reserve much.
+    out.reserve(size_t(std::min<uint64_t>(size, uint64_t(end) * 4)));
     size_t i = 9;
     while (i < end) {
         uint8_t b = src[i++];
         if (b != escape) {
             out.push_back(b);
         } else {
-            if (i >= end) return {};
+            if (i >= end) return std::nullopt;
             uint8_t c = src[i++];
             if (c == escape) {
                 out.push_back(escape);
@@ -511,23 +519,23 @@ std::vector<uint8_t> dxlibDecode(const uint8_t *src, size_t srcSize, uint64_t ex
                 if (c > escape) c--;
                 size_t length = c >> 3;
                 if (c & 4) {
-                    if (i >= end) return {};
+                    if (i >= end) return std::nullopt;
                     length += size_t(src[i++]) << 5;
                 }
                 length += 4;
                 size_t bytes = (c & 3) + 1;
-                if (bytes > 3 || bytes > end - i) return {};
+                if (bytes > 3 || bytes > end - i) return std::nullopt;
                 size_t distance = 0;
                 for (size_t k = 0; k < bytes; k++) distance |= size_t(src[i++]) << (8 * k);
                 distance++;
-                if (distance > out.size() || length > size - out.size()) return {};
+                if (distance > out.size() || length > size - out.size()) return std::nullopt;
                 size_t from = out.size() - distance;
                 for (size_t k = 0; k < length; k++) out.push_back(out[from + k]);
             }
         }
-        if (out.size() > size) return {};
+        if (out.size() > size) return std::nullopt;
     }
-    if (out.size() != size) return {};
+    if (out.size() != size) return std::nullopt;
     return out;
 }
 

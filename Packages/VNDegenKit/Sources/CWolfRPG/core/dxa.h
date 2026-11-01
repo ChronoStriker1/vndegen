@@ -56,7 +56,8 @@ private:
 };
 
 // DxLib's LZ decompression. The source starts with the decoded size, the packed size, and the escape byte. Returns
-// nothing when the decoded size isn't `expected`, before allocating, so a damaged size can't ask for a large buffer.
-std::vector<uint8_t> dxlibDecode(const uint8_t *src, size_t srcSize, uint64_t expected);
+// nothing for damaged data, and before allocating when the decoded size isn't `expected` or exceeds 512 MB, so a damaged
+// size can't ask for a large buffer.
+std::optional<std::vector<uint8_t>> dxlibDecode(const uint8_t *src, size_t srcSize, uint64_t expected);
 
 }  // namespace wolf
