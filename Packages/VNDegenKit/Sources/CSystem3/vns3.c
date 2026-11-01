@@ -292,6 +292,8 @@ bool vns3_number_request(VNS3 *s3, int *value, int *min, int *max) {
     return true;
 }
 
+const char *vns3_number_title(VNS3 *s3) { return ((S3 *)s3)->numberTitle; }
+
 void vns3_number_answer(VNS3 *s3, int value, bool ok) {
     S3 *s = (S3 *)s3;
     if (s->wait != S3_WAIT_NUMBER) return;

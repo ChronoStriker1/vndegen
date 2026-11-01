@@ -58,6 +58,8 @@ bool vns3_text_skip(VNS3 *s3);
 // until vns3_number_answer, with ok false for Cancel. value must be in the range.
 bool vns3_number_request(VNS3 *s3, int *value, int *min, int *max);
 void vns3_number_answer(VNS3 *s3, int value, bool ok);
+// The title the game gave the box, in UTF-8; empty if none.
+const char *vns3_number_title(VNS3 *s3);
 
 // Fills frames of interleaved stereo float audio at the configured rate. Safe to call on the audio thread.
 void vns3_audio(VNS3 *s3, float *out, int frames);

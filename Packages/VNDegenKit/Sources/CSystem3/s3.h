@@ -187,6 +187,7 @@ struct S3 {
     int keyMode[8];
     bool msgSkip;              // passing message waits until a choice
     S3LV numberLv; int numberValue, numberMin, numberMax; // the number box NI is waiting at
+    char numberTitle[512];     // NT, in UTF-8; it stays until set again
     S3MenuItem menu[S3_MAX_MENU];
     int menuCount;
     int menuBuild;             // index of the menu item being built, or -1

@@ -43,12 +43,14 @@ final class System3NumberBox {
         case digit(Int), backspace, step(Int), ok, cancel
     }
 
+    let title: String
     var entry: System3NumberEntry
     /// Each control's frame, normalized over the session's view, so a touch mouse's tap on one counts as pressing it.
     @ObservationIgnored var frames: [Control: CGRect] = [:]
     @ObservationIgnored let onDone: (Int?) -> Void
 
-    init(entry: System3NumberEntry, onDone: @escaping (Int?) -> Void) {
+    init(title: String, entry: System3NumberEntry, onDone: @escaping (Int?) -> Void) {
+        self.title = title
         self.entry = entry
         self.onDone = onDone
     }
@@ -93,47 +95,52 @@ struct System3NumberBoxView: View {
         GeometryReader { whole in
             ZStack {
                 Color.black.opacity(0.4)
-                HStack(alignment: .top, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(box.entry.text.isEmpty ? " " : box.entry.text)
-                            .font(.largeTitle.monospacedDigit().weight(.semibold))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .padding(.horizontal, 10)
-                            .background(.black.opacity(0.35), in: .rect(cornerRadius: 8))
-                            .accessibilityLabel("Number")
-                        Text("From \(box.entry.minimum) to \(box.entry.maximum)")
-                            .font(.footnote)
-                            .foregroundStyle(box.entry.isValid ? Color.secondary : Color.red)
-                        HStack(spacing: 6) {
-                            ForEach([-10, -1, 1, 10], id: \.self) { amount in
-                                key(amount > 0 ? "+\(amount)" : "\(amount)", .step(amount), size: whole.size)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(box.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                    HStack(alignment: .top, spacing: 20) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(box.entry.text.isEmpty ? " " : box.entry.text)
+                                .font(.largeTitle.monospacedDigit().weight(.semibold))
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .padding(.horizontal, 10)
+                                .background(.black.opacity(0.35), in: .rect(cornerRadius: 8))
+                                .accessibilityLabel("Number")
+                            Text("From \(box.entry.minimum) to \(box.entry.maximum)")
+                                .font(.footnote)
+                                .foregroundStyle(box.entry.isValid ? Color.secondary : Color.red)
+                            HStack(spacing: 6) {
+                                ForEach([-10, -1, 1, 10], id: \.self) { amount in
+                                    key(amount > 0 ? "+\(amount)" : "\(amount)", .step(amount), size: whole.size)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            HStack(spacing: 8) {
+                                key("Cancel", .cancel, size: whole.size)
+                                key("OK", .ok, size: whole.size, prominent: true)
+                                    .disabled(!box.entry.isValid)
                             }
                         }
-                        Spacer(minLength: 0)
-                        HStack(spacing: 8) {
-                            key("Cancel", .cancel, size: whole.size)
-                            key("OK", .ok, size: whole.size, prominent: true)
-                                .disabled(!box.entry.isValid)
-                        }
-                    }
-                    .frame(width: 200)
-                    Grid(horizontalSpacing: 6, verticalSpacing: 6) {
-                        ForEach([[7, 8, 9], [4, 5, 6], [1, 2, 3]], id: \.self) { row in
+                        .frame(width: 200)
+                        Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                            ForEach([[7, 8, 9], [4, 5, 6], [1, 2, 3]], id: \.self) { row in
+                                GridRow {
+                                    ForEach(row, id: \.self) { digit in key("\(digit)", .digit(digit), size: whole.size) }
+                                }
+                            }
                             GridRow {
-                                ForEach(row, id: \.self) { digit in key("\(digit)", .digit(digit), size: whole.size) }
+                                key("0", .digit(0), size: whole.size)
+                                    .gridCellColumns(2)
+                                key("⌫", .backspace, size: whole.size)
+                                    .accessibilityLabel("Delete")
                             }
                         }
-                        GridRow {
-                            key("0", .digit(0), size: whole.size)
-                                .gridCellColumns(2)
-                            key("⌫", .backspace, size: whole.size)
-                                .accessibilityLabel("Delete")
-                        }
+                        .frame(width: 156)
                     }
-                    .frame(width: 156)
+                    .frame(height: 196)
                 }
                 .padding(18)
-                .frame(height: 240)
                 .background(.regularMaterial, in: .rect(cornerRadius: 16, style: .continuous))
                 .environment(\.colorScheme, .dark)
             }

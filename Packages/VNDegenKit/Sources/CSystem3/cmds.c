@@ -1094,7 +1094,7 @@ static void cmd_slash(S3 *s) {
     case 0x7f: args(s, "me", a); { const char *x = str_slot(s, a[1].v); if (x) s3_msg_text(s, x); } return;
     case 0x27: args(s, "es", a); str_set(s, a[0].v, a[1].s); return;
     case 0x28: args(s, "s", a); { char *u = s3_sjis_to_utf8(a[0].s); snprintf(s->title, sizeof s->title, "%s", u); free(u); } return;
-    case 0x29: args(s, "s", a); return;
+    case 0x29: args(s, "s", a); { char *u = s3_sjis_to_utf8(a[0].s); snprintf(s->numberTitle, sizeof s->numberTitle, "%s", u); free(u); } return; // NT: the title for NI
     case 0x2c: cmd_F(s, s3_byte(s)); return;
     case 0x23: args(s, "ees", a); { // LC x,y,file
         char *p = s3_find_file(s->gameDir, a[2].s);

@@ -176,7 +176,10 @@ final class System3Session: EngineSession {
         // The box takes the input, so the game sees every key and mouse button it holds come up, as when the menu opens.
         deliver(router.releaseAll())
         let entry = System3NumberEntry(value: Int(value), minimum: Int(minimum), maximum: Int(maximum))
-        let box = System3NumberBox(entry: entry) { [weak self] answer in self?.answerNumberBox(answer) }
+        let title = String(cString: vns3_number_title(engine))
+        let box = System3NumberBox(title: title.isEmpty ? "Enter a number" : title, entry: entry) { [weak self] answer in
+            self?.answerNumberBox(answer)
+        }
         numberBox = box
         let content = System3NumberBoxView(box: box)
         #if canImport(UIKit)
