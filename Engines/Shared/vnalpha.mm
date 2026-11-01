@@ -51,6 +51,8 @@ class Conversion {
     OpusDecoder *opus = nullptr;
     long long audio_track = 0, audio_delay = 0;
     int channels = 0, preskip = 0;
+    bool probing = true;
+    int video_packets = 0, audio_packets = 0;
     CMAudioFormatDescriptionRef audio_format = nullptr;
     AVAssetWriter *writer = nil;
     AVAssetWriterInput *input = nil;
@@ -144,12 +146,20 @@ class Conversion {
         long length = 0;
         auto track_number = mkvparser::ReadUInt(&reader, block.start, length);
         if (track_number != video_track && track_number != audio_track) return;
+        if (probing) {
+            if (track_number == video_track) ++video_packets; else ++audio_packets;
+            return;
+        }
         auto packet = bytes(block);
         if (length < 1 || packet.size() < static_cast<size_t>(length + 3) || packet[length + 2] & 6)
             throw std::runtime_error("Unsupported laced WebM video block");
         int16_t relative = static_cast<int16_t>((packet[length] << 8) | packet[length + 1]);
         packet.erase(packet.begin(), packet.begin() + length + 3);
-        if (track_number == audio_track) { audio(packet, relative); return; }
+        if (track_number == audio_track) {
+            audio(packet, relative);
+            if (--audio_packets == 0) [audio_input markAsFinished];
+            return;
+        }
         if (additional.end <= additional.start) throw std::runtime_error("Missing WebM alpha packet");
         auto yuv = color.decode(packet), mask = alpha.decode(bytes(additional));
         if (yuv->d_w != result.width || yuv->d_h != result.height || mask->d_w != yuv->d_w || mask->d_h != yuv->d_h)
@@ -187,6 +197,7 @@ class Conversion {
         CVPixelBufferRelease(buffer);
         check(accepted);
         ++result.frames;
+        if (--video_packets == 0) [input markAsFinished];
     }
     void group(Element element) {
         Element block{}, additional{};
@@ -214,7 +225,10 @@ class Conversion {
         for (auto position = start; position < end;) {
             auto element = next(position, end);
             switch (element.id) {
-            case 0x18538067: case 0x1549a966: case 0x1654ae6b: case 0xe0:
+            case 0x1654ae6b:
+                if (probing) walk(element.start, element.end, depth + 1);
+                break;
+            case 0x18538067: case 0x1549a966: case 0xe0:
                 walk(element.start, element.end, depth + 1); break;
             case 0xae:
                 track = {}; walk(element.start, element.end, depth + 1);
@@ -267,12 +281,13 @@ public:
         if (reader.Open(source)) throw std::runtime_error("Cannot open WebM");
         long long size, available;
         if (reader.Length(&size, &available)) throw std::runtime_error("Cannot read WebM length");
+        // An input can end before the other. Tell AVAssetWriter at that packet, or its interleaver waits forever.
+        walk(0, size);
+        probing = false;
         walk(0, size);
         result.duration = duration_ticks * scale / 1e9;
         if (!result.frames || result.duration <= 0) throw std::runtime_error("Missing frames or WebM duration");
         [writer endSessionAtSourceTime:CMTimeMakeWithSeconds(result.duration, 1000000000)];
-        [input markAsFinished];
-        [audio_input markAsFinished];
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
         [writer finishWritingWithCompletionHandler:^{ dispatch_semaphore_signal(done); }];
         dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
