@@ -920,14 +920,16 @@ static void cmd_U(S3 *s) {
     int k = s3_byte(s);
     Arg a[2];
     switch (k) {
-    case 'S': args(s, "ee", a); if (a[0].isVar) for (int i = 0; i < (a[1].v ? a[1].v : 1); i++) s3_push_var(s, (u16)(a[0].lv.var + i)); return;
+    case 'S': args(s, "ee", a); if (a[0].isVar) for (int i = 0; i < (a[1].v ? a[1].v : 1); i++) s3_push_lv(s, &a[0].lv, i); return;
     case 'G': args(s, "ee", a); {
-        // Pops pushes in reverse; values return to the variables they came from.
-        for (int i = 0; i < (a[1].v ? a[1].v : 1) && s->sp > 0; i++) {
+        // Pops pushes in reverse into the variables it names, as System39.exe does after an LD that left them unbound.
+        int count = a[1].v ? a[1].v : 1;
+        for (int i = 0; i < count && s->sp > 0; i++) {
             S3Frame f = s->stack[s->sp - 1];
             if (f.kind != S3_FRAME_PUSH) break;
             s->sp--;
-            s3_var_set(s, f.var, f.value);
+            if (a[0].isVar) s3_lv_set(s, &a[0].lv, count - 1 - i, f.value);
+            else s3_pop_push(s, &f);
         }
     } return;
     case 'C': args(s, "be", a); {
@@ -935,7 +937,7 @@ static void cmd_U(S3 *s) {
         if (mode == 0 || mode == 3) s->sp = 0;
         else {
             int want = mode == 1 ? S3_FRAME_LABEL : S3_FRAME_PAGE, n = a[1].v;
-            while (n > 0 && s->sp > 0) { S3Frame f = s->stack[--s->sp]; if (f.kind == S3_FRAME_PUSH) s3_var_set(s, f.var, f.value); if (f.kind == want) n--; }
+            while (n > 0 && s->sp > 0) { S3Frame f = s->stack[--s->sp]; if (f.kind == S3_FRAME_PUSH) s3_pop_push(s, &f); if (f.kind == want) n--; }
         }
     } return;
     case 'D': args(s, "e", a); if (a[0].v == 0) { s->sp = 0; s3_goto_page(s, 0, 0); } else s3_return(s, true); return;

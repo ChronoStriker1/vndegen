@@ -87,6 +87,3 @@ samples averaged 60.0 with one hitch. A DEBUG build launched with `-frameMonitor
 - Text appears all at once, one message per frame, and so it does on the PC: System 3.9 has no text speed command, and
   SYSTEM3.EXE ignores `Y 13`, the text speed that Rance 4.1 and 4.2's "Making of" credits ask for. All 8 characters
   of a line reach `TextOut` in the same millisecond under Wine with `Y 13` set to 2 and to 5.
-- Mamatoto: in the scripted tutorial's defensive battle, the Squad Formation screen offers 2 of the 5 commanders a new
-  game adds, so the demo's scripted clicks miss and it stops at the game's own end-of-script loop before the first save
-  point. Whether the runtime or the demo's timing causes it isn't known yet.

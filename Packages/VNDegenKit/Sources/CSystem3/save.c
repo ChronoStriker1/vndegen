@@ -185,7 +185,7 @@ static bool save_valid(S3 *s, const Save *sv) {
             page = stored ? stored : 65536;
             if (!page_ok(s, page, s3_le32(q + 2))) return false;
         }
-        else if (tag == 0xdd && q - start >= 7) { q -= 7; if (s3_le32(q) > 0xffff) return false; }
+        else if (tag == 0xdd && q - start >= 7) { q -= 7; if (s3_le32(q) >> 24) return false; }
         else return false;
     }
     return true;
@@ -244,7 +244,7 @@ bool s3_save_load(S3 *s, int slot) {
         u8 tag = q[-1];
         if (tag == 0xee && q - start >= 5) { q -= 5; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_LABEL, .pc = s3_le32(q) }; }
         else if (tag == 0xff && q - start >= 7) { q -= 7; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_PAGE, .page = (u16)(s3_le16(q) - 1), .pc = s3_le32(q + 2) }; }
-        else if (tag == 0xdd && q - start >= 7) { q -= 7; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_PUSH, .var = (u16)s3_le32(q), .value = s3_le16(q + 4) }; }
+        else if (tag == 0xdd && q - start >= 7) { q -= 7; frames[frameCount++] = (S3Frame){ .kind = S3_FRAME_PUSH, .var = s3_le32(q), .value = s3_le16(q + 4) }; }
         else break;
     }
     for (int i = 0; i < frameCount; i++) s->stack[s->sp++] = frames[frameCount - 1 - i];

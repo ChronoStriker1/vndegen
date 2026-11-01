@@ -120,7 +120,7 @@ typedef struct S3Frame {
     u8 kind;
     u16 page;                 // return page (LABEL/PAGE)
     u32 pc;                   // return address
-    u16 var;                  // pushed variable (PUSH)
+    u32 var;                  // where a push came from (PUSH): array page << 16 | index, page 0 the normal variables
     u16 value;                // pushed value (PUSH)
 } S3Frame;
 

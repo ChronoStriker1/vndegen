@@ -21,7 +21,8 @@ bool s3_goto_page(S3 *s, int page, u32 addr);
 void s3_label_call(S3 *s, u32 addr);
 void s3_page_call(S3 *s, int page, u32 addr);
 void s3_return(S3 *s, bool page);
-void s3_push_var(S3 *s, u16 var);
+void s3_push_lv(S3 *s, const S3LV *lv, int k);
+void s3_pop_push(S3 *s, const S3Frame *f);
 void s3_message(S3 *s, u32 index);
 
 // unitmap.c: the V commands, with their arguments' values and, for VR and VW, the variable argument

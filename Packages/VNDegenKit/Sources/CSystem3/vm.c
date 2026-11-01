@@ -189,15 +189,28 @@ static void push(S3 *s, S3Frame f) {
     s->stack[s->sp++] = f;
 }
 
-void s3_push_var(S3 *s, u16 var) {
-    push(s, (S3Frame){ .kind = S3_FRAME_PUSH, .var = var, .value = s3_var_get(s, var) });
+// US pushes a variable and the ones after it. For one DS bound to an array they are the array's next elements, wherever
+// its pointer is by the time they come back, as System39.exe's saves show.
+void s3_push_lv(S3 *s, const S3LV *lv, int k) {
+    S3LV at = *lv;
+    at.offset += k;
+    int page;
+    u32 index;
+    s3_lv_locate(s, &at, &page, &index);
+    push(s, (S3Frame){ .kind = S3_FRAME_PUSH, .var = (u32)page << 16 | (index & 0xffff), .value = s3_lv_get(s, &at, 0) });
+}
+
+void s3_pop_push(S3 *s, const S3Frame *f) {
+    u32 page = f->var >> 16, index = f->var & 0xffff;
+    if (page == 0) s->vars[index] = f->value;
+    else if (page < 256 && s->arr[page].v && index < s->arr[page].n) s->arr[page].v[index] = f->value;
 }
 
 // Pops variable pushes, then the frame of the wanted kind, and returns to it.
 static void ret(S3 *s, bool page) {
     while (s->sp > 0) {
         S3Frame f = s->stack[--s->sp];
-        if (f.kind == S3_FRAME_PUSH) { s3_var_set(s, f.var, f.value); continue; }
+        if (f.kind == S3_FRAME_PUSH) { s3_pop_push(s, &f); continue; }
         if (f.kind == S3_FRAME_TEXT) continue;
         if (f.kind == S3_FRAME_LABEL && page) continue; // a page return also drops label calls
         if (f.kind == S3_FRAME_PAGE && !page) { s->sp++; break; }
