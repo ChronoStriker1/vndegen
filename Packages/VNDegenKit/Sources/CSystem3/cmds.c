@@ -201,7 +201,7 @@ void s3_service_wait(S3 *s) {
     }
     case S3_WAIT_INPUT_POLL: {
         u32 p = s->pressedMask | keymask_now(s);
-        if (p) {
+        if (p || (s->msgSkip && !s->sys30)) {
             rnd(s, (u16)p);
             // System 3.0's K also returns the pointer, in variables 57 and 58.
             if (s->sys30) { s3_var_set(s, 57, (u16)s->mouseX); s3_var_set(s, 58, (u16)s->mouseY); }
