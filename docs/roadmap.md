@@ -48,11 +48,11 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Cheats for RPG Maker XP, VX, VX Ace and Wolf RPG Editor (0.15.0).
 - Game page screenshots in a grid with a full-screen viewer, game speed for Godot and Flash, and RPG Maker MZ alpha cutscene clips (0.16.0).
 - Cheats for AliceSoft System 3 and 4, find by value on every game's Variables tab, and TyranoScript 5.2 Electron builds (0.17.0).
-- AliceSoft System 4 games built on PartsEngine, such as Rance IX: story scenes, saves and loads, and a clear stop where a 3D scene starts (on `dev`, in the next release).
+- AliceSoft System 4 games built on PartsEngine, such as Rance IX: story scenes, saves and loads, and a clear stop where a 3D scene starts, and Artemis movies and screen effects (0.18.0).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- Artemis movies and screen effects, on `feat/artemis-media`.
+- Wolf RPG Editor 3.5 data and saves, and DxLib archive version 8, on `feat/wolf-formats`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it, and no GPL component is left:
