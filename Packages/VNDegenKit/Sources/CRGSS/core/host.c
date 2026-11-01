@@ -127,6 +127,18 @@ bool host_present(const Image *frame) {
     return go;
 }
 
+bool host_copy_frame(Image *out) {
+    pthread_mutex_lock(&lock);
+    bool has = S.frame && S.frameW > 0 && S.frameH > 0;
+    if (has) {
+        int w = S.frameW < out->w ? S.frameW : out->w, h = S.frameH < out->h ? S.frameH : out->h;
+        for (int y = 0; y < h; y++)
+            memcpy(out->px + (size_t)y * out->w, S.frame + (size_t)y * S.frameW, sizeof(Pixel) * (size_t)w);
+    }
+    pthread_mutex_unlock(&lock);
+    return has;
+}
+
 static RubyRequest *find_request(long id) {
     for (RubyRequest *r = requests; r; r = r->next) if (r->id == id) return r;
     return NULL;
@@ -271,6 +283,8 @@ int vnrgss_start(const VNRGSSLaunch *l) {
     S.carry = 0;
     S.frameRate = 60;
     S.speed = 1;
+    // The last game's picture isn't this game's last frame.
+    S.frameW = S.frameH = 0;
     // Results the last game's host never read.
     while (requests) {
         RubyRequest *r = requests;

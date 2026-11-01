@@ -24,6 +24,8 @@ void rgss_run_game(const HostLaunch *launch);
 
 // Hands a finished frame over and waits for the host to grant the next one. False when the host is stopping the game.
 bool host_present(const Image *frame);
+// Copies the last frame handed over into `out`, top left aligned, leaving the rest as it was. False when there is none.
+bool host_copy_frame(Image *out);
 // Waits for the next frame without handing one over, as a frozen screen does.
 bool host_wait_frame(void);
 bool host_wait_frame_locked(void);

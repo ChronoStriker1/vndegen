@@ -347,13 +347,15 @@ static VALUE movie_play(VALUE value) {
     vnvideo_info info;
     vnvideo_get_info(m->video, &info);
     ensure_screen();
-    // The movie draws over the last frame the game showed: the frozen screen, or the last one Graphics.update drew.
+    // The movie draws over the last frame the game showed, as it was shown, black where there is none. The frames go to
+    // the host as they are, so the game's brightness, already in that picture, doesn't dim it twice.
     if (!image_alloc(&m->frame, screen.w, screen.h)) return Qnil;
-    const Image *last = isFrozen && frozen.w == screen.w && frozen.h == screen.h ? &frozen : &screen;
-    memcpy(m->frame.px, last->px, sizeof(Pixel) * (size_t)screen.w * screen.h);
+    for (size_t i = 0; i < (size_t)screen.w * screen.h; i++) m->frame.px[i] = 0xFF000000u;
+    host_copy_frame(&m->frame);
     audio_set_movie(m->video);
     int x = (screen.w - info.width) / 2, y = (screen.h - info.height) / 2;
-    // The clock starts with the first picture, so a slow start doesn't skip the opening frames. A movie with sound keeps
+    // The clock starts with the first picture, so a slow start doesn't skip the opening frames; a movie that never shows
+    // one ends once the decoder is done. A movie with sound keeps
     // time by the sound played, so a slow decode holds the picture back with it. When the sound clock stands still for
     // two seconds of frames, as when the device plays no sound, the movie keeps time by its frames from there and
     // drops its sound itself.
@@ -361,7 +363,7 @@ static VALUE movie_play(VALUE value) {
     double clock = 0, sound = 0;
     bool started = false;
     float dropped[2048 * 2];
-    while (!vnvideo_ended(m->video, clock)) {
+    while (!vnvideo_ended(m->video, started ? clock : INFINITY)) {
         int changed = 0;
         const uint8_t *pixels = vnvideo_frame(m->video, clock, &changed);
         if (pixels && changed) {
@@ -369,12 +371,8 @@ static VALUE movie_play(VALUE value) {
             image_blt(&m->frame, x, y, &picture, (IRect){0, 0, info.width, info.height}, 255);
         }
         started = started || pixels;
-        if (host_frame_hidden()) {
-            rgss_frame_count++;
-            if (!host_wait_frame()) stop_game();
-        } else {
-            present(&m->frame);
-        }
+        rgss_frame_count++;
+        if (!(host_frame_hidden() ? host_wait_frame() : host_present(&m->frame))) stop_game();
         if (!started) continue;
         frames++;
         if (!info.audio_rate) {
