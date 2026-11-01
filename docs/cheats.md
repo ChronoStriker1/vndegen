@@ -76,7 +76,7 @@ Checked against Rookie Knight Rathi (MV 1.6.1), Mama's Secret Parent Teacher Con
 - Walk through walls uses the player's through flag, as an event's Through option does. Followers still follow, and vehicles are unchanged.
 - A plugin that replaces one of the wrapped methods after the boot scene starts, rather than when it loads, replaces the cheat with it. No library game was found doing so.
 - Variables and switches past the length of the game's System lists aren't listed, since MV's and MZ's `setValue` ignores them.
-- At 4x every displayed frame runs four engine updates, so a game whose updates cost much draws fewer frames and runs below 4x. On its map 4, No Socks RPG draws 38 frames a second at 4x on an iPad simulator and its game runs at about 2.5x. Each update adds about 3.5 ms to the one texture upload of each frame, which looks like the game's own canvas drawing landing in that upload. The Mac holds 60 at 4x when it is otherwise quiet. Rookie Knight Rathi holds 60.
+- At 4x a frame on a 60 Hz screen runs four engine updates, so a game whose updates cost much draws fewer frames and runs below 4x. On its map 4, No Socks RPG draws 38 frames a second at 4x on an iPad simulator and its game runs at about 2.5x. Each update adds about 3.5 ms to the one texture upload of each frame, which looks like the game's own canvas drawing landing in that upload. The Mac holds 60 at 4x when it is otherwise quiet. Rookie Knight Rathi holds 60.
 
 ### Frame rate
 

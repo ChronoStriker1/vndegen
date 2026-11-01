@@ -91,6 +91,8 @@
                 }
                 started = performance.now();
                 const selfMade = settings.speed > 1 && count > 1 && spent * 2 > deltaTime * 1000 / 60;
+                // A frame that draws nothing leaves no time behind for the next.
+                spent = 0;
                 return (selfMade ? 1 : count) * settings.speed;
             });
         } else if (typeof SceneManager._getTimeInMsWithoutMobileSafari === 'function') {

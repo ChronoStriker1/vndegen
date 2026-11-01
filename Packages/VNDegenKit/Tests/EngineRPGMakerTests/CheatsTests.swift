@@ -178,8 +178,10 @@ private func engine(mv: Bool = false) -> String {
     #expect(try await page.run("SceneManager.determineRepeatNumber(1)") as? Int == 4)
     // A count raised to catch up counts in full after a frame with little work of its own, as on a slow screen, and
     // once after a frame that spent its time on its own work. A frame with no update stays so.
-    #expect(try await page.run("(window.repeatCount = 2, Graphics._app.render(), SceneManager.determineRepeatNumber(2))") as? Int == 8)
-    #expect(try await page.run("(window.renderMs = 50, Graphics._app.render(), window.renderMs = 0, SceneManager.determineRepeatNumber(2))") as? Int == 4)
+    #expect(try await page.run("(window.repeatCount = 2, SceneManager.determineRepeatNumber(2), Graphics._app.render(), SceneManager.determineRepeatNumber(2))") as? Int == 8)
+    #expect(try await page.run("(window.renderMs = 50, SceneManager.determineRepeatNumber(2), Graphics._app.render(), window.renderMs = 0, SceneManager.determineRepeatNumber(2))") as? Int == 4)
+    // A frame that draws nothing doesn't count the last drawn frame's time again.
+    #expect(try await page.run("SceneManager.determineRepeatNumber(2)") as? Int == 8)
     #expect(try await page.run("(window.repeatCount = 0, SceneManager.determineRepeatNumber(1))") as? Int == 0)
 
     let cheats = page.cheats()

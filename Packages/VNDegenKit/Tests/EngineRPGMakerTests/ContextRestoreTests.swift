@@ -190,7 +190,8 @@ private let mvPage = """
         },
     };
     const renderer = {
-        view: canvas, gl, CONTEXT_UID: 0, state: { attribState: {} }, plugins: { tilemap }, removedUnder: [], madeUnder: [],
+        view: canvas, gl, CONTEXT_UID: 0, state: { attribState: {} }, plugins: { tilemap, graphics: { graphicsDataPool: ['lost buffers'] } },
+        removedUnder: [], madeUnder: [],
         filterManager: { quad: new Quad(), shaderCache: { tone: 'lost shader' }, pool: { 1: ['lost target'] } },
         _initContext() { this.madeUnder.push(this.CONTEXT_UID); this.plugins.tilemap.onContextChange(); },
     };
@@ -231,7 +232,7 @@ private let mvPage = """
         const first = {
             newQuad: renderer.filterManager.quad !== quad && renderer.filterManager.quad.attribState === renderer.state.attribState,
             shaders: Object.keys(renderer.filterManager.shaderCache).length, pool: Object.keys(renderer.filterManager.pool).length,
-            indexBuffer: tilemap.indexBuffer, indices: tilemap.indices.length,
+            indexBuffer: tilemap.indexBuffer, indices: tilemap.indices.length, pooled: renderer.plugins.graphics.graphicsDataPool.length,
         };
         // The second restore finds the plugin under the name its older versions use.
         tilemap.indexBuffer = 'lost again';
@@ -243,6 +244,7 @@ private let mvPage = """
     let values = try #require(result)
     #expect(values["newQuad"] as? Bool == true)
     #expect(values["shaders"] as? Int == 0)
+    #expect(values["pooled"] as? Int == 0)
     #expect(values["pool"] as? Int == 0)
     #expect(values["indexBuffer"] as? String == "new buffer")
     #expect(values["indices"] as? Int == 12000)

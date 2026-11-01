@@ -809,7 +809,7 @@
     // MV draws the map and windows through filters, so the map went black and the windows drew upside down. This runs
     // before PIXI's own handler on the canvas. A new CONTEXT_UID, set after PIXI has cleared its texture records under
     // the old one, makes PIXI build all of these again as it needs them. The filter manager is made only once, so its
-    // own objects are replaced here. pixi-tilemap makes its index buffer only when its indices grow, so it would go on
+    // own objects are replaced here, and the graphics renderer's pool of used buffers is emptied. pixi-tilemap makes its index buffer only when its indices grow, so it would go on
     // drawing the map with the lost one. Emptying them makes it build the buffer again when PIXI announces the context.
     function renewFilters(renderer) {
         const filters = renderer.filterManager, initContext = renderer._initContext;
@@ -823,6 +823,8 @@
             filters.shaderCache = {};
             filters.pool = {};
             // Older versions of the plugin register as tile.
+            const graphics = this.plugins && this.plugins.graphics;
+            if (graphics && graphics.graphicsDataPool) graphics.graphicsDataPool.length = 0;
             const tilemap = this.plugins && (this.plugins.tilemap || this.plugins.tile);
             if (tilemap && tilemap.indexBuffer) {
                 tilemap.indices = new Uint16Array(0);
