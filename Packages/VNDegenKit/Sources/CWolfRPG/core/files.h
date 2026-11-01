@@ -23,6 +23,8 @@ public:
     std::optional<std::vector<uint8_t>> read(const std::string &path) const;
     bool exists(const std::string &path) const;
     const std::filesystem::path &root() const { return root_; }
+    // The game's Data folder on disk, whatever the case of its name.
+    const std::filesystem::path &dataFolder() const { return data_; }
     // A loose file on disk, if the path names one.
     std::optional<std::filesystem::path> looseFile(const std::string &path) const;
     // The names of the files in a folder on disk, relative to the game folder ("" is the game folder itself), sorted.

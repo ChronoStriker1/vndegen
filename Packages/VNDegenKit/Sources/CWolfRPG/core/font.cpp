@@ -69,7 +69,7 @@ struct FontSource {
 bool findGameFont(const GameFiles &files, const std::string &want, FontSource &out) {
     if (want.empty()) return false;
     std::string key = normalized(want);
-    for (const fs::path &dir : {files.root(), files.root() / "Data", files.root() / "data"}) {
+    for (const fs::path &dir : {files.root(), files.dataFolder()}) {
         std::error_code ec;
         for (auto &entry : fs::directory_iterator(dir, ec)) {
             std::string ext = entry.path().extension().string();
