@@ -37,6 +37,8 @@ comes from.
 | RPG module methods | `Engines/RGSSRuntime/ruby/rpg1.rb`, `rpg2.rb`, `rpg3.rb` | Written from the help's descriptions of each method (BGM.last, play, exp_for_level, the scope checks, Damage#eval, and so on). Where the help's prose and its definition disagree (VX Ace's `for_all?`, `Weapon#performance`), the definition's behavior was kept. XP's RPG::Cache, RPG::Sprite and RPG::Weather follow the XP help's descriptions; the animation cell layout (pattern, x, y, zoom, angle, mirror, opacity, blend) is the layout of the games' own Animations data. |
 | Ruby 1.8 and 1.9 behavior | `Engines/RGSSRuntime/ruby/common.rb`, `patches/` | Ruby's own documentation of removed methods (`Fixnum`, `File.exists?`, `Object#taint`, `Hash#index`). XP and VX ran Ruby 1.8 (their strings carry no encoding); VX Ace ran 1.9. `ruby-marshal-bare-strings.patch` lets XP and VX saves leave out encodings as 1.8 did; `ruby-toplevel-class-variables.patch` restores 1.9's handling of class variables in a top-level `class << Module`, which Test Game 14's scripts use. |
 | Win32API | `Engines/RGSSRuntime/ruby/win32api.rb` | Microsoft's documentation of each function the test games call (the list is in `docs/rgss.md`). |
+| Movies | `CRGSS/core/rb_modules.c`, `audio.c` | The VX Ace help's Graphics.play_movie entry and its Movie Resources page (Ogg Theora from `Movies/`, centered, cut off where larger than the screen). The rest from RGSS3 under Wine, below. Decoding is VNDegen's shared `vnvideo`. |
+| Message boxes | `CRGSS/core/rb_modules.c`, `host.c`, `EngineRGSS/RGSSMessageBox.swift` | The help's msgbox and msgbox_p entries (VX Ace) and print and p (XP and VX): the arguments' to_s, or each one's inspect on its own line, returning nil. The look and the return values from RGSS3 under Wine, below. |
 | Threads, frames, the C interface | `CRGSS/core/host.c`, `game.c`, `include/vnrgss.h` | VNDegen's own design. |
 
 ## The original engine under Wine
@@ -48,6 +50,14 @@ comes from.
   engines' menus under Wine load through Continue in the Linux host. Map, position and direction match the PC saves;
   screenshots show the same scenes. Evidence in `.audit/evidence/qw-rgss-pc-saves/`.
 - **XP autotiles**, as above.
+- **Movies and message boxes.** A test project of VNDegen's own (a Game.ini, a Scripts.rvdata2 with one script section,
+  and three of the library's movies), run on RGSS301.dll from a library game under Wine and Xvfb: the movies are
+  drawn at their own size in the middle of the screen, a 576x432 movie on a 544x416 screen matching the source frame
+  cropped at its center, and the game's last frame stays around a smaller one. `Graphics.frame_count` runs on at 60 a
+  second during a movie. Return, Escape, X, Space and Z pressed during an 11 second movie didn't end it early, while the
+  same key presses closed a message box. `Movies/ya6vq-bvs2s` played the `.ogg` file of that name. `msgbox` and
+  `msgbox_p` returned nil, and msgbox_p showed each value on its own line. Evidence in
+  `.audit/evidence/rgss-movies/wine-probe/`.
 
 ## Uncertain points and how they were settled
 

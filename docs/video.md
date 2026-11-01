@@ -5,7 +5,7 @@ vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/
 - MPEG-1 video with MPEG-1 Layer II sound, through pl_mpeg.
 - Ogg Theora video, silent or with Opus sound, through libogg, libtheora, and libopus.
 
-Ogg Theora with Vorbis sound plays silent, since no library game needs its sound yet. `Engines/Shared/UPSTREAM.md` lists the libraries' versions and what was kept of each.
+Ogg Theora with Vorbis sound plays silent, since no library game needs its sound: the one library movie with a Vorbis track, Magical Girl Riru's, is silent. `Engines/Shared/UPSTREAM.md` lists the libraries' versions and what was kept of each.
 
 ## Using it
 
@@ -20,3 +20,4 @@ The Swift package links vnvideo through the `CVNVideo` target. `scripts/build.sh
 ## Engines that use it
 
 - Artemis: fullscreen movies and movies on layers. See [artemis.md](artemis.md#movies).
+- RPG Maker VX Ace: `Graphics.play_movie`. See [rgss.md](rgss.md#movies).

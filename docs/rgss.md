@@ -58,6 +58,33 @@ another thread's iPhone simulator running on the same Mac mini:
 The runtime's log gives each frame's cost every 600 frames ("timing:"): on the iPad simulator a VX map takes about
 0.7 ms in the game's scripts and 1.9 ms to compose. Simulator timing isn't iPad timing.
 
+## Movies
+
+VX Ace's Play Movie command (`Graphics.play_movie`) plays Ogg Theora movies through VNDegen's shared movie decoder
+([video.md](video.md)). As on PC, the movie sits in the middle of the screen at its own size, cut off where it is
+larger, over the last frame the game drew; the game's frame count runs on; the player can't skip it; and a name without
+an extension finds `.ogv` or `.ogg`. Its sound plays through the runtime's mixer, and a movie with sound keeps time by
+it. XP and VX have no movie command.
+
+Two library games play movies, found by scanning every XP, VX and VX Ace library game's script sections and every map,
+common event and troop for Play Movie commands and script calls:
+
+| Game | Where | Movie |
+| --- | --- | --- |
+| BLACK SOULS II, with its English patch | Lovecraft Cinema (map 274) and Winterbell (maps 354, 355, 376, 377) | `ya6vq-bvs2s.ogg`, Theora 1280x720, silent; `ノイズ .ogv`, Theora 512x384 with Opus sound |
+| Magical Girl Riru | three of Yae's finisher common events | `吹雪.ogv`, Theora 576x432 with a silent Vorbis track |
+
+Reign of the Succubus and The World A Robot Girl Dream Of ship movie files that nothing plays, and Island of Penance has
+an unused sample "movie" action in its battle script and no Movies folder.
+
+## Message boxes
+
+`msgbox` and `msgbox_p` in VX Ace, and `print` and `p` in XP and VX, show the game's message over the game, with the
+game's title and an OK button, and the game waits until the player presses it, as a Windows message box makes it wait
+on PC. A tap or click on OK, Return, Space or Escape, a controller's A or B, the touch gamepad's buttons, and the touch
+mouse close it. `msgbox_p` and `p` put each value's `inspect` on a line of its own, and all four return nil, as the help
+says and as RGSS3 under Wine showed. Every library game's scripts call them, mostly to report errors.
+
 ## Win32API
 
 The emulation covers what the test games call: FindWindow, GetSystemMetrics, SystemParametersInfo,
@@ -70,9 +97,9 @@ other call logs once and returns 0.
 
 ## Known limits
 
-- `Graphics.play_movie` does nothing: no test game plays a movie.
+- Movies with Vorbis sound play silent: the shared decoder skips Vorbis, and the one library movie with a Vorbis
+  track, Magical Girl Riru's, is silent (-91 dB throughout), so it looks and sounds as on PC.
 - F12's reset isn't available, as iPhones and iPads have no F12.
-- Message boxes (`msgbox`, and `print` and `p` in XP and VX) go to the game's log instead of stopping the game.
 - Tilemap flash data (`flash_data`) isn't drawn.
 - Blending onto a transparent bitmap, the order of a sprite's color and tone, held-key repeat timing and the
   volume curve follow common formulas, not measurements of the PC engine.

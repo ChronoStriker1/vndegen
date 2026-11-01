@@ -4,6 +4,7 @@ import FrameHost
 import Foundation
 import OSLog
 import QuartzCore
+import SwiftUI
 import VNCore
 
 nonisolated let rgssLog = Logger(subsystem: "com.chronostriker1.vndegen", category: "rgss")
@@ -34,6 +35,15 @@ final class RGSSSession: EngineSession {
     private var heldReleases: [UInt32: Task<Void, Never>] = [:]
     private let rgssCheats = RGSSCheats()
     var cheats: (any CheatSession)? { rgssCheats }
+    /// The game's message box while it is up. The game waits on it, and the player's input goes to it.
+    private var messageBox: RGSSMessageBox?
+    private var messageView: PlatformView?
+    #if canImport(UIKit)
+    private var messageController: UIHostingController<RGSSMessageBoxView>?
+    #endif
+    /// The keys that press a message box's OK button, as Return, Space and Escape do on PC. A controller's A and B, and
+    /// the touch gamepad's, arrive as Return and Escape.
+    private static let messageKeys: Set<UInt32> = [RetroKey.return, RetroKey.keypadEnter, RetroKey.space, RetroKey.escape]
 
     /// RGSS reads its input once a frame. The runtime keeps a key pressed and released between two frames down for one
     /// frame, but some games check a key on two frames in a row, so a quick tap of a touch or controller button is held
@@ -52,14 +62,18 @@ final class RGSSSession: EngineSession {
             // A key held down repeats on macOS; RGSS repeats held keys itself.
             let isRepeat = pressed && !keyboardHeld.insert(key).inserted
             if !pressed { keyboardHeld.remove(key) }
+            if messageBox != nil {
+                if pressed, !isRepeat, Self.messageKeys.contains(key) { dismissMessage() }
+                return
+            }
             router.hostKey(key, pressed: pressed, isRepeat: isRepeat).forEach(deliver)
         }
         frameView.onPointer = { [weak self] event in
-            guard let self, running else { return }
+            guard let self, running, messageBox == nil else { return }
             router.pointer(event, at: event.location).forEach(deliver)
         }
         frameView.onScroll = { [weak self] notches in
-            guard let self, running else { return }
+            guard let self, running, messageBox == nil else { return }
             deliver(.wheel(notches))
         }
     }
@@ -117,6 +131,7 @@ final class RGSSSession: EngineSession {
             finish(byGame: true)
             return
         }
+        if messageBox == nil, let text = vnrgss_message() { showMessage(String(cString: text)) }
         var width: Int32 = 0, height: Int32 = 0
         var changed = false
         if let pixels = vnrgss_frame(&width, &height, &changed), changed {
@@ -129,6 +144,56 @@ final class RGSSSession: EngineSession {
 
     private static var problem: String? { vnrgss_problem().map { String(cString: $0) } }
 
+    // MARK: Message boxes
+
+    private func showMessage(_ text: String) {
+        // The box takes the input, so the game sees every key it holds come up, as when the menu opens.
+        router.releaseAll().forEach(deliver)
+        let box = RGSSMessageBox(title: launch.game.title, text: text) { [weak self] in self?.dismissMessage() }
+        messageBox = box
+        let content = RGSSMessageBoxView(box: box)
+        #if canImport(UIKit)
+        let controller = UIHostingController(rootView: content)
+        controller.view.backgroundColor = .clear
+        messageController = controller
+        let shown: PlatformView = controller.view
+        shown.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        #else
+        let shown: PlatformView = NSHostingView(rootView: content)
+        shown.autoresizingMask = [.width, .height]
+        #endif
+        shown.frame = frameView.bounds
+        frameView.addSubview(shown)
+        messageView = shown
+        rgssLog.info("message box: \(text, privacy: .public)")
+    }
+
+    private func closeMessageView() {
+        messageBox = nil
+        messageView?.removeFromSuperview()
+        messageView = nil
+        #if canImport(UIKit)
+        messageController = nil
+        #endif
+    }
+
+    /// Closes the box, as its OK button does, and lets the game go on.
+    private func dismissMessage() {
+        guard messageBox != nil else { return }
+        closeMessageView()
+        vnrgss_dismiss_message()
+        frameView.takeFocus()
+    }
+
+    /// Whether a controller, touch gamepad, bound key or touch mouse event presses the box's OK button. The router
+    /// turns buttons into the keys the game would get; a pointer counts when it lifts over the button.
+    private func pressesOK(_ event: ControllerEvent, in box: RGSSMessageBox) -> Bool {
+        if case let .pointer(pointer) = event { return pointer.phase == .ended && box.okFrame.contains(pointer.location) }
+        return router.translate(event).contains {
+            if case let .key(code, down) = $0 { down && Self.messageKeys.contains(code) } else { false }
+        }
+    }
+
     /// Ends the session, tearing the runtime down. When the game ended itself, the hub returns to the library.
     private func finish(byGame: Bool) {
         guard running else { return }
@@ -136,6 +201,7 @@ final class RGSSSession: EngineSession {
         stopped = true
         displayLink?.invalidate()
         displayLink = nil
+        closeMessageView()
         heldReleases.values.forEach { $0.cancel() }
         heldReleases = [:]
         vnrgss_stop()
@@ -184,6 +250,10 @@ final class RGSSSession: EngineSession {
 
     /// Controller and touch gamepad buttons arrive here, and so do the hub's touch mouse and keyboard.
     func send(_ event: ControllerEvent) {
+        if let box = messageBox {
+            if pressesOK(event, in: box) { dismissMessage() }
+            return
+        }
         let frame = frameView
         router.translate(event) { frame.framePoint(fromViewNormalized: $0) }.forEach(deliver)
     }
