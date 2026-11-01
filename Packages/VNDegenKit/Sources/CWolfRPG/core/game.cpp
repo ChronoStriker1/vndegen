@@ -303,6 +303,15 @@ int32_t Game::readVar(int32_t id, const Thread &t) {
         const int parts[] = {tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec};
         return parts[id - 9000077];
     }
+    // System variables that report the engine's state (the manual's system variable list).
+    switch (id) {
+        // Parade Buster confirms a choice with a click when this reads 1, as a click does on the PC.
+        case 9000012: return message_.active || choice_.active;
+        case 9000013: return !threads_.empty();
+        case 9000020: return choice_.active ? choice_.cursor : -1;
+        case 9000031: case 9000032: return gameDat_.fps();
+        case 9000035: return hero_.moving();
+    }
     if (id >= 9000000 && id < 9100000) return id - 9000000 < int(system_.size()) ? system_[id - 9000000] : 0;
     if (id >= 1000000000) {
         const Database &db = id >= 1300000000 ? sdb_ : id >= 1100000000 ? cdb_ : udb_;
