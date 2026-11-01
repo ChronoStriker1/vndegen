@@ -10,7 +10,9 @@
 # build folders are cached in ~/Library/Caches/VNDegen/godot, with one work folder per build folder, so a change rebuilds
 # only what it touches. A build whose inputs have not changed since the last one is skipped. VNDEGEN_GODOT_SLICES picks
 # slices, such as "ios-sim mac", and VNDEGEN_GODOT_MAJORS picks engines, such as "4", for a quicker build while testing.
-set -euo pipefail
+set -Eeuo pipefail
+# Builds have stopped here with no message, so a failed command names its line.
+trap 'echo "godot-engine.sh: failed at line $LINENO" >&2' ERR
 dest=${1:?destination folder, such as build/godot}
 root=$(cd "$(dirname "$0")/.." && pwd)
 src="$root/Engines/Godot"
