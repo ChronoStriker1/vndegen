@@ -20,6 +20,16 @@ Text uses the fonts a game ships. Some games ship their message font as bitmap `
 
 Lines are spaced as the PC engine spaces them, with a body 1.2 times the font size plus the spacing the game's font settings add, so a page that runs below its message window breaks at the same line as on the PC and waits for a click.
 
+## Movies
+
+Movies play through vnvideo, the movie decoder native engines share (`Engines/Shared/vnvideo.[ch]`, described in [video.md](video.md)), which reads them through the core's file lookup, from the archives or beside them, in any case. MPEG-1 movies with MPEG-1 Layer II sound, such as the studio logos of Test Game 06, Test Game 76, and Test Game 77 and the openings and endings of Test Game 79, Test Game 80, and Test Game 81, stream from disk. Ogg Theora movies play silent or with Opus sound, as Test Game 79's title animation and scene movies and Test Game 78's prologue clips do.
+
+A fullscreen movie, which the script waits on, shows over the game. A click, Return, Space, or Escape skips it when the game lets it be skipped, and Confirm and Cancel do the same through VNDegen's buttons. A movie on a layer goes to the core as that layer's picture, frame by frame, so the game can move, fade, or filter it, and a looping one starts over at its end. A movie's clock is its sound when it has sound, so picture and sound stay together. Movie sound follows the game's music volume. The game's log, `logs/artemis.txt` in its data folder, records each movie with the frames it showed and its average and 1% low frame rate.
+
+## Screen effects
+
+Effects a game writes as HLSL, such as Test Game 78's blur, mosaic, sepia, and negative, compile at load through the core's own shader compiler to Metal, from the Direct3D 9 effect files the game ships for Windows.
+
 ## Controls
 
 Artemis games read a mouse and keyboard and no gamepad, so they start with the "Keyboard and mouse" layout. Through VNDegen's buttons, Confirm presses Return, Cancel presses Escape, Menu right clicks, which opens the game's menu or hides its message window, as the game chooses, Dash holds Control, which skips, and the page buttons turn the mouse wheel, which opens the message history and reads on. Touches act as the mouse.
@@ -28,8 +38,7 @@ Artemis games read a mouse and keyboard and no gamepad, so they start with the "
 
 VNDegen builds only what its test games need to reach their title, play, save, and load. These are left out, with the test games that hit them:
 
-- Movies don't play, and each counts as finished at once. Test Game 06, Test Game 76, and Test Game 77 skip their MPEG-1 studio logo, and Test Game 79 shows its title menu without its Ogg Theora title animation.
-- Shader effects written in HLSL don't compile, so the sepia, negative, and other screen effects that use them don't show. Test Game 78 loads them at startup.
+- Movies in other formats don't play and count as finished at once: Ogg Theora with Vorbis sound plays silent, and WMV, such as the logo of AMANATSU+, which isn't a test game, doesn't play. No test game has either.
 - The Steam functions a Steam build calls don't exist. Test Game 77 calls one at startup and carries on without it, so its Steam achievements aren't checked.
 - Only the ASCII glyphs of `.rft` bitmap fonts are drawn. Japanese text and symbols such as full-width commas and curly quotes in those games use MS Gothic, so a line with them can wrap a word earlier or later than on the PC. Test Game 79, Test Game 80, and Test Game 81 ship `.rft` fonts.
 - A game's own native dialog, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, shows as a system alert. Confirm, Return, or Space answers OK, Cancel, Escape, or E answers Cancel, and VNDegen's on-screen keyboard types into its text field.

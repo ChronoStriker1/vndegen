@@ -498,6 +498,17 @@ impl CoreRuntime {
         self.gpu.end_external_render();
     }
 
+    /// Stops the movies on a deleted layer and the layers under it, as the PC engine does, without
+    /// running their finish handlers. The host's next frame upload for one is refused, which tells it
+    /// to close that movie's decoder (VNDegen).
+    pub(super) fn stop_videos_under_layer(&mut self, deleted: &str) {
+        let ids = layers_under(deleted, self.video.video_state().video_layers.keys());
+        for id in ids {
+            self.video.stop_layer(&id);
+            self.clear_video_layer_texture(&id);
+        }
+    }
+
     fn bind_video_layer_texture(&mut self, id: &str) {
         self.compositor
             .set_layer_file(id, Some(video_layer_texture_name(id)));
@@ -799,8 +810,8 @@ impl CoreRuntime {
 
     fn apply_video_event(&mut self, event: &Event) -> bool {
         match event {
-            // TODO(video): skip=2（仅右键菜单方式跳过）目前与 1 同样按可跳过
-            // 转发给宿主；mode（Windows VMR/EVR）对 Flutter 宿主不适用，忽略。
+            // skip=1 skips on the advance keys and skip=2 on the keys [keyconfig] gives role 1;
+            // the host gets them as skip_keys (VNDegen). mode (Windows VMR/EVR) doesn't apply.
             Event::VideoPlay {
                 id,
                 file,
@@ -849,6 +860,7 @@ impl CoreRuntime {
                         return true;
                     }
                 }
+                let skip_keys = self.movie_skip_keys(*skip);
                 hm::emit(
                     Kind::VideoPlay,
                     hm::VideoPlay {
@@ -856,6 +868,7 @@ impl CoreRuntime {
                         file,
                         resolved_file: Some(&resolved_file),
                         skippable,
+                        skip_keys: &skip_keys,
                         loop_play: *loop_play,
                     },
                 );
@@ -971,9 +984,33 @@ impl CoreRuntime {
     }
 }
 
+/// The layer ids that are `deleted` or sit under it in the layer tree (VNDegen).
+fn layers_under<'a>(deleted: &str, ids: impl Iterator<Item = &'a String>) -> Vec<String> {
+    ids.filter(|id| {
+        id.strip_prefix(deleted)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
+    })
+    .cloned()
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ab_loop_file;
+    use super::{ab_loop_file, layers_under};
+
+    #[test]
+    fn deleting_a_layer_reaches_the_movies_under_it() {
+        let ids = [
+            "1.0.6".to_string(),
+            "1.0.6.bg".to_string(),
+            "1.0.60".to_string(),
+            "2".to_string(),
+        ];
+        let mut under = layers_under("1.0.6", ids.iter());
+        under.sort();
+        assert_eq!(under, ["1.0.6", "1.0.6.bg"]);
+        assert_eq!(layers_under("1", ids.iter()).len(), 3);
+    }
 
     #[test]
     fn ab_loop_naming_convention_maps_a_segment_to_b_segment() {

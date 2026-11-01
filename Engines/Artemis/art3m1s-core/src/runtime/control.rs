@@ -106,6 +106,8 @@ fn default_keymap() -> HashMap<i32, Vec<u32>> {
 
 // keyconfig 的 role 取值（docs/tag/system/keyconfig.md）
 const ROLE_ADVANCE: i32 = 0;
+/// The keys that skip a movie played with `skip=2` (VNDegen).
+const ROLE_MOVIE_SKIP: i32 = 1;
 const ROLE_HIDE_IN: i32 = 3;
 const ROLE_HIDE_OUT: i32 = 4;
 const ROLE_BACKLOG_IN: i32 = 5;
@@ -291,6 +293,18 @@ impl RuntimeControlState {
 }
 
 impl CoreRuntime {
+    /// The keys that skip a fullscreen movie with this `skip` mode: the advance keys for 1, the
+    /// movie-skip role's for 2, none for 0. Games set the role with `[keyconfig role=1]` before the
+    /// movie, so the keys are read when it starts (VNDegen).
+    pub(super) fn movie_skip_keys(&self, skip: i32) -> Vec<u32> {
+        let role = match skip {
+            1 => ROLE_ADVANCE,
+            2 => ROLE_MOVIE_SKIP,
+            _ => return Vec::new(),
+        };
+        self.control.keymap.get(&role).cloned().unwrap_or_default()
+    }
+
     pub(super) fn set_skip_mode(&mut self, enabled: bool) {
         if enabled && !self.control.skip_allowed {
             return;

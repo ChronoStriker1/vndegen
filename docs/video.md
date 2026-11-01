@@ -1,0 +1,22 @@
+# Movies in native engines
+
+vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/vnvideo.[ch]`. It plays:
+
+- MPEG-1 video with MPEG-1 Layer II sound, through pl_mpeg.
+- Ogg Theora video, silent or with Opus sound, through libogg, libtheora, and libopus.
+
+Ogg Theora with Vorbis sound plays silent, since no library game needs its sound yet. `Engines/Shared/UPSTREAM.md` lists the libraries' versions and what was kept of each.
+
+## Using it
+
+An engine opens a movie with `vnvideo_open`, passing a read callback, so the movie streams from wherever the engine finds its files: an archive, a folder, any case. The callback runs on the movie's decode thread and must be safe there. `vnvideo_get_info` gives the picture's size and frame rate and the sound's rate and channels.
+
+Each frame the engine shows, it asks `vnvideo_frame` for the frame due at its clock, as RGBA pixels. The frame stays the same until a newer one is due. `vnvideo_read_audio` hands out the sound as interleaved floats and is safe to call from an audio thread. A movie with sound should use `vnvideo_audio_time`, the seconds of sound handed out, as its clock, so a slow decode holds the picture back with the sound rather than letting them drift apart. `vnvideo_ended` says when the last frame and the last sound are out. A looping movie starts over at its end and never ends.
+
+The decode thread runs a few frames ahead and waits when its frame or sound queue is full, so a paused movie costs nothing. `vnvideo_close` stops it.
+
+The Swift package links vnvideo through the `CVNVideo` target. `scripts/build.sh test` builds `vnvideo_test.c` and runs it on the small movies in `Engines/Shared/testdata`, which were generated with FFmpeg. `vnvideo_test -play <movie>` decodes any movie as fast as it can and prints its format and decoding speed, which also works on Linux.
+
+## Engines that use it
+
+- Artemis: fullscreen movies and movies on layers. See [artemis.md](artemis.md#movies).

@@ -80,6 +80,7 @@ Packages/VNDegenKit/
   Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
   Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
   Sources/CVNMidi/        links to Engines/Shared/vnmidi.[ch], the MIDI player native engines share
+  Sources/CVNVideo/       links to Engines/Shared/vnvideo.[ch], the movie decoder native engines share, and its libraries
   Sources/HubUI/          the library, game pages, settings, and the player screen
   Sources/GameInput/      game controllers, keyboard, and the touch overlay
   Sources/ControllerUI/   controller focus ring, the on-screen keyboard, and controller scrolling
@@ -99,7 +100,7 @@ Engines/WolfRPG/          the Wolf RPG Editor runtime's Linux test host
 Engines/System3/          the System 3 runtime's Linux test host: a headless runner and an SDL player
 Engines/System4/          the System 4 runtime's Linux test host and tools; UPSTREAM.md lists the vendored libraries
 Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/,
-                          the MIDI player and SoundFonts, and the case-insensitive path lookup
+                          the MIDI player and SoundFonts, the movie decoder, and the case-insensitive path lookup
 docs/                     user and engine docs, the engine survey, release notes, and screenshots
 scripts/                  build, remote build, simulator, release, license, and runtime helpers
 project.yml               XcodeGen project definition
@@ -118,6 +119,8 @@ Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector
 An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [fonts.md](fonts.md).
 
 An engine that plays MIDI music uses vnmidi from `Engines/Shared/vnmidi.h`. It compiles `vnmidi.c`, or depends on the `CVNMidi` package target, and loads the General MIDI SoundFont from `MIDISoundFont.url`, the player's from Settings or the bundled one, with `MIDISoundFont.fallbackURL` through `vnmidi_font_load_fallback`. See [midi.md](midi.md).
+
+An engine that plays movies uses vnvideo from `Engines/Shared/vnvideo.h`, through the `CVNVideo` package target, for MPEG-1 and for Ogg Theora with Opus sound. See [video.md](video.md).
 
 ### File name case
 

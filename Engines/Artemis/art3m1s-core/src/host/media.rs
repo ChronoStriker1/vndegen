@@ -170,6 +170,9 @@ pub struct VideoPlay<'a> {
     pub file: &'a str,
     pub resolved_file: Option<&'a str>,
     pub skippable: bool,
+    /// The keys that skip a fullscreen movie, as Windows virtual-key codes: the advance keys for
+    /// `skip=1`, the keys `[keyconfig]` gives role 1 for `skip=2`, none for `skip=0` (VNDegen).
+    pub skip_keys: &'a [u32],
     #[serde(rename = "loop")]
     pub loop_play: bool,
 }
@@ -279,11 +282,13 @@ mod tests {
             file: ":mv/opening",
             resolved_file: Some("movie/opening"),
             skippable: true,
+            skip_keys: &[27, 2],
             loop_play: false,
         })
         .unwrap();
 
         assert_eq!(value["id"], "movie");
+        assert_eq!(value["skip_keys"], serde_json::json!([27, 2]));
         assert_eq!(value["file"], ":mv/opening");
         assert_eq!(value["resolved_file"], "movie/opening");
         assert_eq!(value["skippable"], true);

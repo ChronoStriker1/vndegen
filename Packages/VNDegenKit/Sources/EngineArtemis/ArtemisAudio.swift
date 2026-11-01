@@ -1,5 +1,6 @@
 import AVFoundation
 import CArtemis
+import CVNVideo
 import Foundation
 
 /// Plays the music, sound effects, and voices the core asks for in its media commands. Artemis games ship Ogg Vorbis,
@@ -18,6 +19,7 @@ final class ArtemisAudio {
     private var decoded: [String: AVAudioPCMBuffer] = [:]
     private var decodedOrder: [String] = []
     private var paused = false
+    private var movieSounds: [AVAudioSourceNode] = []
 
     /// Decoded sounds kept for reuse, such as a game's button sounds.
     private static let cacheSize = 48
@@ -113,6 +115,45 @@ final class ArtemisAudio {
         engine.stop()
     }
 
+    // MARK: Movie sound
+
+    /// A movie's sound, pulled from its decoder as the output needs it, at the music volume.
+    func attachMovieSound(rate: Double, channels: Int, decoder: MovieDecoder) -> AVAudioSourceNode? {
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: AVAudioChannelCount(channels))
+        else { return nil }
+        let node = Self.movieSoundNode(format: format, decoder: decoder)
+        engine.attach(node)
+        engine.connect(node, to: engine.mainMixerNode, format: format)
+        node.volume = volumes["bgm"] ?? 1
+        movieSounds.append(node)
+        startEngine(playing: true)
+        return node
+    }
+
+    func detachMovieSound(_ node: AVAudioSourceNode) {
+        movieSounds.removeAll { $0 === node }
+        engine.detach(node)
+    }
+
+    /// The render block runs on the audio thread, so it is made outside the main actor. It copies the decoder's
+    /// interleaved samples into the output's channels, with silence for what the decoder hasn't caught up with.
+    private nonisolated static func movieSoundNode(format: AVAudioFormat, decoder: MovieDecoder) -> AVAudioSourceNode {
+        let channels = Int(format.channelCount)
+        let scratch = MovieScratch(frames: 16384, channels: channels, decoder: decoder)
+        return AVAudioSourceNode(format: format) { _, _, frameCount, bufferList in
+            let output = UnsafeMutableAudioBufferListPointer(bufferList)
+            let want = min(Int(frameCount), scratch.frames)
+            let got = Int(vnvideo_read_audio(scratch.decoder.video, scratch.samples, want))
+            for channel in 0..<output.count {
+                guard let out = output[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
+                let source = min(channel, channels - 1)
+                for frame in 0..<got { out[frame] = scratch.samples[frame * channels + source] }
+                for frame in got..<Int(frameCount) { out[frame] = 0 }
+            }
+            return noErr
+        }
+    }
+
     // MARK: Playing
 
     private func play(_ payload: [String: Any], kind: String, id: String?, fade: Double) -> Channel? {
@@ -162,7 +203,7 @@ final class ArtemisAudio {
     /// Starts the engine when a sound plays, or on resume when one is loaded. AVAudioEngine raises an exception when
     /// started with no node connected, as on iOS when a game is resumed before its first sound.
     private func startEngine(playing: Bool? = nil) {
-        guard !paused, !engine.isRunning, playing ?? (music != nil || !sounds.isEmpty) else { return }
+        guard !paused, !engine.isRunning, playing ?? (music != nil || !sounds.isEmpty || !movieSounds.isEmpty) else { return }
         try? engine.start()
     }
 
@@ -199,6 +240,7 @@ final class ArtemisAudio {
 
     private func applyVolumes() {
         ([music].compactMap { $0 } + Array(sounds.values)).forEach(applyVolume)
+        movieSounds.forEach { $0.volume = volumes["bgm"] ?? 1 }
     }
 
     private func applyVolume(_ channel: Channel) {
@@ -269,4 +311,19 @@ final class ArtemisAudio {
     private static func milliseconds(_ value: Any?) -> Double {
         max(0, value as? Double ?? 0)
     }
+}
+
+/// The samples a movie's render block copies through, freed with the block, which keeps the decoder open.
+private nonisolated final class MovieScratch: @unchecked Sendable {
+    let frames: Int
+    let samples: UnsafeMutablePointer<Float>
+    let decoder: MovieDecoder
+
+    init(frames: Int, channels: Int, decoder: MovieDecoder) {
+        self.frames = frames
+        self.decoder = decoder
+        samples = .allocate(capacity: frames * channels)
+    }
+
+    deinit { samples.deallocate() }
 }
