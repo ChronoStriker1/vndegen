@@ -1411,7 +1411,7 @@ struct AlphaMovieHeader
     tjs_uint32 quantaization_table_size_plus_hdr_size;
     tjs_uint32 unk;
     tjs_uint32 frame_cnt;
-    tjs_uint32 unk2;
+    tjs_uint32 frame_rate_scale;
     tjs_uint32 frame_rate;
     tjs_uint16 width;
     tjs_uint16 height;
@@ -1425,7 +1425,7 @@ struct AlphaMovieHeader
         stream->ReadBuffer(&quantaization_table_size_plus_hdr_size, 4);
         stream->ReadBuffer(&unk, 4);
         stream->ReadBuffer(&frame_cnt, 4);
-        stream->ReadBuffer(&unk2, 4);
+        stream->ReadBuffer(&frame_rate_scale, 4);
         stream->ReadBuffer(&frame_rate, 4);
         stream->ReadBuffer(&width, 2);
         stream->ReadBuffer(&height, 2);
@@ -1556,6 +1556,8 @@ void tTJSNI_AlphaMovie::open(tTJSString fileName)
     _header.parseAMVHeader(filePtr);
     _numOfFrame = _header.frame_cnt;
     _FPSRate = _header.frame_rate;
+    // Clips at 29.97 frames per second store 2997 over 100.
+    _FPSScale = _header.frame_rate_scale ? _header.frame_rate_scale : 1;
     _screenWidth = _header.width;
     _screenHeight = _header.height;
 

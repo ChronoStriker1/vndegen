@@ -1,5 +1,6 @@
 #include "tjsCommHead.h"
 #include "TVPCompositor.h"
+#include "TVPSettings.h"
 
 #include <algorithm>
 #include <vector>
@@ -134,7 +135,20 @@ void TVPDepartTexture(TVPSprite* sp)
 // 统一 letterbox 计算：保持宽高比地缩放并居中（所有后端共用同一套行为）
 static void TVPCalcLetterbox(TVPSprite* sp, int winWidth, int winHeight)
 {
-    float currScale = std::min(((float)winWidth) / sp->width, ((float)winHeight) / sp->height);
+    float inner = std::min(((float)winWidth) / sp->width, ((float)winHeight) / sp->height);
+    float outer = std::max(((float)winWidth) / sp->width, ((float)winHeight) / sp->height);
+    float currScale = inner;
+    // The game fills VNDegen's window as it fills the screen in full screen on Windows, so these options apply: its
+    // Display menu sets them, and input follows through the sprite's scale and position.
+    tTJSVariant zoom;
+    if (TVPGetCommandLine(TJS_N("-fszoom"), &zoom))
+    {
+        ttstr mode(zoom);
+        if (mode == TJS_N("outer"))
+            currScale = outer;
+        else if (mode == TJS_N("no"))
+            currScale = 1;
+    }
     sp->scale = currScale;
     sp->xPos = (winWidth - currScale * sp->width) / 2.0f;
     sp->yPos = (winHeight - currScale * sp->height) / 2.0f;

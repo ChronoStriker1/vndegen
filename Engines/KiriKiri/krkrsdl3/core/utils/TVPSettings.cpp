@@ -357,6 +357,28 @@ static void TVPReadConfigFileOptions(const ttstr& exe)
         TVPAddImportantLog(ttstr(TJS_N("(info) Ignored options from the .cf file :")) + ignored);
 }
 
+// <exe>.cfu in the data folder holds what the game's own Display menu chose, in the .cf format. It ranks above the
+// .cf, as on Windows, and may also set the smoothing and draw threads the player chose.
+static void TVPReadUserConfigOptions(const ttstr& exe, const ttstr& dataFolder)
+{
+    std::string name = exe.AsStdString();
+    name = name.substr(name.rfind('/') + 1);
+    name.replace(name.size() - 4, 4, ".cfu");
+    std::ifstream file(dataFolder.AsStdString() + name);
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.empty() || line[0] == ';')
+            continue;
+        ttstr option = TVPParseCommandLineOne(ttstr("-" + line));
+        if (option.StartsWith(TJS_N("-smoothzoom=")) || option.StartsWith(TJS_N("-drawthread=")) ||
+            !TVPConfigOptionIgnored(option))
+            TVPProgramArguments.insert(TVPProgramArguments.begin(), option);
+    }
+}
+
 // A native folder path, which need not exist yet, with symbolic links resolved: the real path of its
 // deepest existing folder, then the rest. Ends in a slash. Empty for a path whose deepest existing
 // part is not a folder, such as a link to nowhere or a file.
@@ -510,6 +532,10 @@ bool TVPParseArguments(int argc, char* argv[])
     }
     TVPNativeDataPath = TVPGetLocallyAccessibleName(TVPDataPath);
     TVPAddImportantLog(TVPFormatMessage("(info) Savedata path : %1", TVPDataPath));
+    if (!TVPNativeGameExe.IsEmpty())
+        TVPReadUserConfigOptions(TVPNativeGameExe, TVPNativeDataPath);
+    // VNDegen never changes the screen's resolution. Games read this to tell whether their zoom options apply.
+    TVPSetCommandLine(TJS_N("-fsres"), TJS_N("nochange"));
 
     // set log output directory
     TVPSetLogLocation(TVPNativeDataPath);
