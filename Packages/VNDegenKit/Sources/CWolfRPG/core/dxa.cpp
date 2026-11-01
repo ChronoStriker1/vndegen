@@ -324,7 +324,12 @@ bool Archive::load(const std::vector<uint8_t> &key, std::string *error) {
 bool Archive::load8(const Header8 &h, std::string_view keyString, std::string *error) {
     keyString_ = std::string(keyString.substr(0, 63));
     key_ = h.flags & 1 ? std::vector<uint8_t>() : makeKey8(keyString_);
-    // Compressed tables run to the end of the file; nothing records their stored length.
+    // Compressed tables run to the end of the file; nothing records their stored length. The largest library archive
+    // has tables of under 1 MB, so a size past 64 MB is damage, refused before anything is allocated for it.
+    if (h.tableSize > (64u << 20)) {
+        *error = "tables too large";
+        return false;
+    }
     bool compressed = !(h.flags & 2);
     std::vector<uint8_t> head(compressed ? fileSize_ - h.tableStart : h.tableSize);
     if (!readAt(file_, h.tableStart, head.data(), head.size())) {
@@ -336,7 +341,7 @@ bool Archive::load8(const Header8 &h, std::string_view keyString, std::string *e
         auto coded = huffmanDecode(head, UINT64_MAX);
         // Checking the LZ header's size first keeps a wrong key from asking for a large buffer.
         if (!coded || coded->size() < 4 || Tables{*coded, 4}.field(0, 4) != h.tableSize ||
-            (head = dxlibDecode(coded->data(), coded->size())).size() != h.tableSize) {
+            (head = dxlibDecode(coded->data(), coded->size(), h.tableSize)).size() != h.tableSize) {
             *error = "cannot decode tables";
             return false;
         }
@@ -440,7 +445,7 @@ std::optional<std::vector<uint8_t>> Archive::read(const std::string &path) const
     // Versions 5 and 6 key each file's bytes from its unpacked size rather than its place in the archive.
     xorStream(stored.data(), stored.size(), key_, version_ >= 5 ? e.size : e.offset);
     if (e.packedSize == UINT64_MAX) return stored;
-    auto out = dxlibDecode(stored.data(), stored.size());
+    auto out = dxlibDecode(stored.data(), stored.size(), e.size);
     if (out.size() != e.size) return std::nullopt;
     return out;
 }
@@ -467,7 +472,7 @@ std::optional<std::vector<uint8_t>> Archive::read8(const Entry &e, std::vector<u
         data.insert(data.end(), ends->begin() + ptrdiff_t(k), ends->end());
     }
     if (!packed) return data;
-    auto out = dxlibDecode(data.data(), data.size());
+    auto out = dxlibDecode(data.data(), data.size(), e.size);
     if (out.size() != e.size) return std::nullopt;
     return out;
 }
@@ -480,9 +485,10 @@ std::vector<std::string> Archive::paths() const {
     return out;
 }
 
-std::vector<uint8_t> dxlibDecode(const uint8_t *src, size_t srcSize) {
+std::vector<uint8_t> dxlibDecode(const uint8_t *src, size_t srcSize, uint64_t expected) {
     if (srcSize < 9) return {};
     uint64_t size = uint32_t(src[0] | src[1] << 8 | src[2] << 16 | uint32_t(src[3]) << 24);
+    if (size != expected) return {};
     size_t end = uint32_t(src[4] | src[5] << 8 | src[6] << 16 | uint32_t(src[7]) << 24);
     uint8_t escape = src[8];
     if (end < 9 || end > srcSize) return {};

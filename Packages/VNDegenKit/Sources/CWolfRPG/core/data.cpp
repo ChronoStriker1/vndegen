@@ -70,8 +70,10 @@ std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at) {
     Reader r(data);
     r.seek(at);
     uint32_t unpacked = r.u32(), packed = r.u32();
-    // LZ4 expands at most 255 to 1, so a larger claim is damage.
-    if (uint64_t(unpacked) > uint64_t(packed) * 255 + 16) throw FormatError("bad LZ4 sizes");
+    // LZ4 expands at most 255 to 1, so a larger claim is damage. The largest real file seen unpacks to under 3 MB; the
+    // budget keeps a damaged size from reserving gigabytes.
+    constexpr uint32_t kBudget = 256u << 20;
+    if (unpacked > kBudget || uint64_t(unpacked) > uint64_t(packed) * 255 + 16) throw FormatError("bad LZ4 sizes");
     auto src = r.bytes(packed);
     std::vector<uint8_t> out(data.begin(), data.begin() + at);
     out.reserve(at + unpacked);
@@ -90,6 +92,7 @@ std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at) {
         uint8_t token = src[i++];
         size_t literals = length(token >> 4);
         if (literals > src.size() - i) throw FormatError("LZ4 literals run past the end");
+        if (literals > unpacked - (out.size() - at)) throw FormatError("LZ4 output runs past its size");
         out.insert(out.end(), src.begin() + i, src.begin() + i + literals);
         i += literals;
         if (i == src.size()) break;  // the last sequence has literals only

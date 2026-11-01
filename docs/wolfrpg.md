@@ -34,7 +34,8 @@ Editor 2 game ships.
   LZ4, and its maps have their own number of tile layers. Text is Shift-JIS in Wolf RPG Editor 2 and UTF-8 in Wolf RPG Editor 3
   games that say so. Translated games often hold bytes that aren't valid Shift-JIS; they become U+FFFD.
 - Archives: `Data.wolf`, or one `.wolf` archive per top-level data folder, as DxLib archives of versions 1 to 6 with
-  the encryption keys of Wolf RPG Editor 2. Loose files win over archives.
+  the encryption keys of Wolf RPG Editor 2, and of version 8 with the key strings of Wolf RPG Editor 2.225 and 3.x,
+  chosen by the crypt version Wolf RPG Editor 3 writes into the header. Loose files win over archives.
 - Images: PNG, JPEG and BMP (stb_image). Sound: Ogg Vorbis (stb_vorbis), MP3 (dr_mp3), WAV (dr_wav), and MIDI through
   VNDegen's shared MIDI player.
 - File names match without regard to case, through `Engines/Shared/casepath.c`.
@@ -88,11 +89,18 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 ## Known limits
 
 - A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
-  playing. The PC engine shows no saved pictures after a load either; the map's own music starts.
+  playing. Wolf RPG Editor 2 and 3.2x show no saved pictures after a load either; the map's own music starts.
 - After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and
   building labels again only once the menu has been opened and closed. Wolf RPG Editor 3.5 restores pictures from a
   save, and VNDegen neither writes pictures into saves nor restores them. Saves made and loaded within VNDegen behave
   as before.
+- DxLib archive version 7 isn't read. No library game uses it: ANGEL QUEST, once thought to, is a version 3 archive
+  with the oldest Wolf RPG Editor key, and plays.
+- Wolf RPG Editor Pro's encrypted data (basic data files whose second byte is `P`) isn't read. No library game needs
+  it: the two library games with `GamePro.exe`, The Clumsy Witch Seris and Two Beasts Or Not To Beast!, both ship their
+  data unencrypted (checked in every basic data file, loose and inside Two Beasts' version 8 archives).
+- Two Beasts Or Not To Beast! reads its version 8 archives, starts, and stops at its first-start notice, which waits
+  for a mouse click on its OK button. Mouse input and CSV import (command 251), which it uses next, are not supported.
 - Save versions 143 to 158 (Wolf RPG Editor 3.3x) aren't read: no save of those versions has been seen. Saves under 200
   bytes in the 3.5 container use another scheme that isn't read; real saves are never that small.
 - Wolf RPG Editor 3 commands not supported yet, which The Clumsy Witch Seris uses: arrays (command 255, its minimap and

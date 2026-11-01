@@ -235,7 +235,8 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 if (layer < 0) {
                     for (layer = map_->layers - 1; layer > 0 && map_->tile(layer, x, y) == 0; layer--) {}
                 }
-                v = map_->tile(layer, x, y);
+                // A Wolf RPG Editor 3.5 map may have fewer than three layers; a layer it lacks reads as empty.
+                v = layer < map_->layers ? map_->tile(layer, x, y) : 0;
                 break;
             }
             default: {  // tile tags
@@ -245,6 +246,7 @@ void Game::setVariablePlus(Thread &t, const Command &c) {
                 if (layer < 0) {
                     for (layer = map_->layers - 1; layer > 0 && map_->tile(layer, x, y) == 0; layer--) {}
                 }
+                if (layer >= map_->layers) break;
                 int32_t tv = map_->tile(layer, x, y);
                 size_t index = tv >= 100000 ? size_t(tv / 100000) : size_t(tv) + 16;
                 v = index < tags.size() ? tags[index] : 0;
