@@ -46,10 +46,25 @@ static void bandedXorAdd(uint32_t hash, uint64_t offset, uint8_t *buffer, size_t
     band(0x171, UINT64_MAX, [a = uint8_t(k * 0xca)](uint8_t &b) { b += a; });
 }
 
+// Compiled into the .exe of Cosplaying in Costalia: a 32-byte key made from the checksum and repeated through the file.
+static void xorByChecksumRing(uint32_t hash, uint64_t offset, uint8_t *buffer, size_t size)
+{
+    uint32_t x = (hash ^ 0x2f91de55) & 0x7fffffff;
+    x |= x << 31;
+    uint8_t key[32];
+    for (uint8_t &k : key) {
+        k = x;
+        x = x >> 8 | (x & ~1u) << 23;
+    }
+    for (size_t i = 0; i < size; i++)
+        buffer[i] ^= key[(offset + i) & 31];
+}
+
 static const VNKKCipher ciphers[] = {
     {"xorByChecksum", xorByChecksum},
     {"bandedXorAdd", bandedXorAdd},
     {"xorByInvertedChecksum", xorByInvertedChecksum},
+    {"xorByChecksumRing", xorByChecksumRing},
 };
 
 static const size_t maxSamples = 8;
