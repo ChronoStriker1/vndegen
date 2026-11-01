@@ -64,7 +64,7 @@ VX Ace's Play Movie command (`Graphics.play_movie`) plays Ogg Theora movies thro
 ([video.md](video.md)). As on PC, the movie sits in the middle of the screen at its own size, cut off where it is
 larger, over the last frame the game drew; the game's frame count runs on; the player can't skip it; and a name without
 an extension finds `.ogv` or `.ogg`. Its sound plays through the runtime's mixer, and a movie with sound keeps time by
-it. XP and VX have no movie command.
+it, or by its frames when no sound plays. XP and VX have no movie command.
 
 Two library games play movies, found by scanning every XP, VX and VX Ace library game's script sections and every map,
 common event and troop for Play Movie commands and script calls:
@@ -99,6 +99,8 @@ other call logs once and returns 0.
 
 - Movies with Vorbis sound play silent: the shared decoder skips Vorbis, and the one library movie with a Vorbis
   track, Magical Girl Riru's, is silent (-91 dB throughout), so it looks and sounds as on PC.
+- A message box longer than half the screen scrolls by touch, the mouse or a trackpad, but not through the iPad touch
+  mouse's pad, which takes the drag. No library game shows a message that long in normal play.
 - F12's reset isn't available, as iPhones and iPads have no F12.
 - Tilemap flash data (`flash_data`) isn't drawn.
 - Blending onto a transparent bitmap, the order of a sprite's color and tone, held-key repeat timing and the

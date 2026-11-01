@@ -347,19 +347,20 @@ static VALUE movie_play(VALUE value) {
     vnvideo_info info;
     vnvideo_get_info(m->video, &info);
     ensure_screen();
-    // What the game last drew, which shows around the movie.
-    Image back;
-    if (!image_alloc(&back, screen.w, screen.h) || !image_alloc(&m->frame, screen.w, screen.h)) {
-        image_free(&back);
-        return Qnil;
-    }
-    if (isFrozen) memcpy(back.px, frozen.px, sizeof(Pixel) * (size_t)back.w * back.h);
-    else scene_render(&back);
-    memcpy(m->frame.px, back.px, sizeof(Pixel) * (size_t)back.w * back.h);
+    // The movie draws over the last frame the game showed: the frozen screen, or the last one Graphics.update drew.
+    if (!image_alloc(&m->frame, screen.w, screen.h)) return Qnil;
+    const Image *last = isFrozen && frozen.w == screen.w && frozen.h == screen.h ? &frozen : &screen;
+    memcpy(m->frame.px, last->px, sizeof(Pixel) * (size_t)screen.w * screen.h);
     audio_set_movie(m->video);
     int x = (screen.w - info.width) / 2, y = (screen.h - info.height) / 2;
-    long frames = 0;
-    double clock = 0;
+    // The clock starts with the first picture, so a slow start doesn't skip the opening frames. A movie with sound keeps
+    // time by the sound played, so a slow decode holds the picture back with it. When the sound clock stands still for
+    // two seconds of frames, as when the device plays no sound, the movie keeps time by its frames from there and
+    // drops its sound itself.
+    long frames = 0, stalled = 0, framesFrom = -1;
+    double clock = 0, sound = 0;
+    bool started = false;
+    float dropped[2048 * 2];
     while (!vnvideo_ended(m->video, clock)) {
         int changed = 0;
         const uint8_t *pixels = vnvideo_frame(m->video, clock, &changed);
@@ -367,22 +368,47 @@ static VALUE movie_play(VALUE value) {
             Image picture = {info.width, info.height, (Pixel *)pixels};
             image_blt(&m->frame, x, y, &picture, (IRect){0, 0, info.width, info.height}, 255);
         }
+        started = started || pixels;
         if (host_frame_hidden()) {
             rgss_frame_count++;
             if (!host_wait_frame()) stop_game();
         } else {
             present(&m->frame);
         }
+        if (!started) continue;
         frames++;
-        // A movie with sound keeps time by the sound played, so a slow decode holds the picture back with it.
-        clock = info.audio_rate ? vnvideo_audio_time(m->video) : (double)frames / rgss_frame_rate;
+        if (!info.audio_rate) {
+            clock = (double)frames / rgss_frame_rate;
+            continue;
+        }
+        if (framesFrom < 0) {
+            double heard = vnvideo_audio_time(m->video);
+            if (heard > sound) {
+                sound = heard;
+                stalled = 0;
+            } else if (++stalled >= 2L * rgss_frame_rate) {
+                rgss_log("movie: no sound is playing, so the movie keeps time by its frames");
+                audio_set_movie(NULL);
+                framesFrom = frames;
+            }
+            clock = sound;
+        }
+        if (framesFrom >= 0) {
+            clock = sound + (double)(frames - framesFrom) / rgss_frame_rate;
+            double behind = clock - vnvideo_audio_time(m->video);
+            size_t due = behind > 0 ? (size_t)(behind * info.audio_rate) : 0;
+            while (due > 0) {
+                size_t got = vnvideo_read_audio(m->video, dropped, due < 2048 ? due : 2048);
+                if (!got) break;
+                due -= got;
+            }
+        }
     }
-    image_free(&back);
     rgss_log("movie ended after %ld frames, %.2f s", frames, clock);
     if (vnvideo_error(m->video)) rgss_log("movie: %s", vnvideo_error(m->video));
     // Keys pressed during the movie don't reach the game afterwards, as RGSS reads keys only when the game asks.
-    HostInput dropped;
-    host_input(&dropped);
+    HostInput ignored;
+    host_input(&ignored);
     return Qnil;
 }
 

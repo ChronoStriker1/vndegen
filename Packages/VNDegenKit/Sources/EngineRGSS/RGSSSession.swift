@@ -37,6 +37,9 @@ final class RGSSSession: EngineSession {
     var cheats: (any CheatSession)? { rgssCheats }
     /// The game's message box while it is up. The game waits on it, and the player's input goes to it.
     private var messageBox: RGSSMessageBox?
+    /// Where the hub's touch mouse or controller pointer last was, normalized over the session's view, for a click a
+    /// controller button sends there.
+    private var pointerLocation: CGPoint?
     private var messageView: PlatformView?
     #if canImport(UIKit)
     private var messageController: UIHostingController<RGSSMessageBoxView>?
@@ -147,8 +150,9 @@ final class RGSSSession: EngineSession {
     // MARK: Message boxes
 
     private func showMessage(_ text: String) {
-        // The box takes the input, so the game sees every key it holds come up, as when the menu opens.
+        // The box takes the input, so the game sees every key and mouse button it holds come up, as when the menu opens.
         router.releaseAll().forEach(deliver)
+        for button: Int32 in 0...2 { deliver(.mouseButton(button, down: false)) }
         let box = RGSSMessageBox(title: launch.game.title, text: text) { [weak self] in self?.dismissMessage() }
         messageBox = box
         let content = RGSSMessageBoxView(box: box)
@@ -186,9 +190,15 @@ final class RGSSSession: EngineSession {
     }
 
     /// Whether a controller, touch gamepad, bound key or touch mouse event presses the box's OK button. The router
-    /// turns buttons into the keys the game would get; a pointer counts when it lifts over the button.
+    /// turns buttons into the keys the game would get; a pointer, or a button bound to a click, counts when it lifts
+    /// over the button.
     private func pressesOK(_ event: ControllerEvent, in box: RGSSMessageBox) -> Bool {
-        if case let .pointer(pointer) = event { return pointer.phase == .ended && box.okFrame.contains(pointer.location) }
+        switch event {
+        case let .pointer(pointer): return pointer.phase == .ended && box.okFrame.contains(pointer.location)
+        case let .click(button, pressed):
+            return button == .primary && !pressed && pointerLocation.map(box.okFrame.contains) == true
+        default: break
+        }
         return router.translate(event).contains {
             if case let .key(code, down) = $0 { down && Self.messageKeys.contains(code) } else { false }
         }
@@ -250,6 +260,7 @@ final class RGSSSession: EngineSession {
 
     /// Controller and touch gamepad buttons arrive here, and so do the hub's touch mouse and keyboard.
     func send(_ event: ControllerEvent) {
+        if case let .pointer(pointer) = event { pointerLocation = pointer.location }
         if let box = messageBox {
             if pressesOK(event, in: box) { dismissMessage() }
             return
