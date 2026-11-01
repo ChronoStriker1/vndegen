@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
         Bitmap frame;
         uint32_t held = 0;
         int mouseX = 0, mouseY = 0;
-        bool wasTyping = false;
+        bool wasTyping = false, wasChoosing = false;
         for (int f = 1; f <= frames; f++) {
             Input in;
             // A scripted click holds the button for this frame only.
@@ -141,6 +141,10 @@ int main(int argc, char **argv) {
                 auto h = game.heroTile();
                 std::printf("frame %d: map %d hero %d,%d facing %d%s%s\n", f, game.mapId(), h[0], h[1], h[2],
                             game.message().active ? " (message)" : "", game.choice().active ? " (choice)" : "");
+            }
+            if (bool choosing = game.choice().active; choosing != wasChoosing) {
+                wasChoosing = choosing;
+                std::printf("frame %d: choice %s\n", f, choosing ? "starts" : "ends");
             }
             if (bool typing = game.textEntry().active; typing != wasTyping) {
                 wasTyping = typing;

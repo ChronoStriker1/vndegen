@@ -127,6 +127,7 @@ struct MessageState {
     int face = -1;           // face graphic from "@n" at the start of the text, or -1
     size_t shown = 0, total = 0;  // characters typed so far, and in all
     bool instant = false;
+    bool heldForChoice = false;  // stays up until the choice after it is answered
 };
 
 // The string command's keyboard mode while the player types.

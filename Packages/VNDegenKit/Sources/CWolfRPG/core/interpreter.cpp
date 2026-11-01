@@ -113,6 +113,11 @@ bool Game::step(Thread &t) {
 
         case 101:  // message: the thread resumes once the player closes the window
             showMessage(expandText(cmd.str(0), &t));
+            // A choice right after a message opens with the message still showing, as on the PC (Parade Buster).
+            if (c.pc < c.commands->size() && (*c.commands)[c.pc].code == 102) {
+                message_.heldForChoice = true;
+                return true;
+            }
             t.waitingMessage = true;
             return false;
 

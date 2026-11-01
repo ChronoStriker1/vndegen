@@ -671,11 +671,14 @@ void Game::update(const Input &input) {
             choice_.active = false;
         }
         input_.pressed &= ~(KeyConfirm | KeyCancel);
+        if (!choice_.active && message_.heldForChoice) message_.active = false;
     }
     // Messages type one character a frame. The first confirm shows the rest at once, the next closes the window.
     if (message_.active) {
         bool advance = (input_.pressed & (KeyConfirm | KeyCancel)) || (mouseText && (input_.mousePressed & MouseLeft));
-        if (message_.shown < message_.total) {
+        if (message_.heldForChoice) {
+            message_.shown = std::min(message_.shown + 1, message_.total);
+        } else if (message_.shown < message_.total) {
             if (advance) message_.shown = message_.total;
             else message_.shown++;
         } else if (advance) {
