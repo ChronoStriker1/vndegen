@@ -2500,6 +2500,15 @@ impl Interpreter {
     }
 
     fn prune_queued_wait_checkpoints_for_jump(&mut self) {
+        // A save's frame wait released when control came back into this frame
+        // belongs to the saved position, so it doesn't follow a jump away from
+        // it. A game's onLoad that unwinds its stack and jumps on would
+        // otherwise wait for a click at the jump's target (VNDegen).
+        self.engine_ctx
+            .lock()
+            .unwrap()
+            .tag_queue
+            .retain(|(_, params)| !params.contains_key(LOAD_WAIT));
         let depth = self.call_stack.len();
         self.queued_wait_checkpoints
             // A load-restored click wait is deliberately held while onLoad
@@ -3006,6 +3015,51 @@ mod tests {
             Some(Value::Int(1)),
             "the saved stop no longer holds the frame"
         );
+    }
+
+    #[test]
+    fn a_saves_frame_wait_does_not_follow_a_jump_away_from_the_frame() {
+        // As a game's onLoad: return through the save routine, then jump on,
+        // all in one Lua call.
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua()
+            .load(
+                r#"function rebuild(e)
+                    e:tag{"return"}
+                    e:tag{"jump", file="story", label="resume"}
+                end"#,
+            )
+            .exec()
+            .unwrap();
+        it.load_script(
+            "story",
+            "*main\n[@]\n[stop]\n*resume\n[var name=\"t.resumed\" data=\"1\"]\n[stop]\n",
+        )
+        .unwrap();
+        it.load_script("routine", "*load\n[calllua function=\"rebuild\"]\n[return]\n")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.restore_position(
+            "routine",
+            0,
+            vec![super::CallFrame {
+                script: "story".into(),
+                return_line: 1,
+            }],
+        )
+        .unwrap();
+        it.defer_until_return(0, vec![("@".into(), HashMap::new())]);
+
+        assert!(matches!(
+            it.run().unwrap(),
+            ExecutionResult::Wait(Event::Wait {
+                reason: WaitReason::Stop { .. }
+            })
+        ));
+        assert_eq!(it.get_variable("t.resumed"), Some(Value::Int(1)));
     }
 
     #[test]
