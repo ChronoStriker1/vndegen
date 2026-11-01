@@ -26,7 +26,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 
 ## RPG Maker MV and MZ
 
-RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, or `nw.gui` keep working. The layer also means saves land where the PC version puts them, in `save/` beside `index.html` (`www/save/*.rpgsave` for MV, `save/*.rmmzsave` for MZ), and encrypted images and audio, Effekseer effects, and WebM movies all work.
+RPG Maker MV and MZ games ship as HTML5 inside NW.js. VNDegen runs them in WebKit with a small NW.js compatibility layer, so plugins that call Node's `fs`, `path`, `util`, or `nw.gui` keep working. The layer also means saves land where the PC version puts them, in `save/` beside `index.html` (`www/save/*.rpgsave` for MV, `save/*.rmmzsave` for MZ), and encrypted images and audio, Effekseer effects, and WebM movies all work.
 
 WebKit can't decode Ogg Vorbis, so MZ uses the decoder it ships with, and MV games that ship only Ogg audio, as most do, play it through VNDegen's own Ogg decoder, the one TyranoScript uses.
 

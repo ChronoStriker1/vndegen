@@ -125,7 +125,7 @@ let package = Package(
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
-        .target(name: "EngineArtemis", dependencies: ["VNCore", "CArtemis", "CVNVideo", "FontPack"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineArtemis", dependencies: ["VNCore", "ControllerUI", "CArtemis", "CVNVideo", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),

@@ -4,6 +4,7 @@ import Foundation
 import Metal
 import OSLog
 import QuartzCore
+import SwiftUI
 import VNCore
 #if canImport(UIKit)
 import UIKit
@@ -38,8 +39,9 @@ final class ArtemisSession: EngineSession {
     private var stopped = false
     /// The last pointer position, in stage pixels, where a click lands.
     private var pointer = CGPoint.zero
-    /// The game's dialog while one is open.
-    private var prompt: Prompt?
+    /// The game's dialog while one is open, and what holds its view.
+    private var prompt: ArtemisPrompt?
+    private var promptHost: AnyObject?
     /// Keys and mouse buttons pressed while a fullscreen movie plays, whose release can skip it.
     private var moviePresses: Set<Int32> = []
     /// Pointer buttons the game has seen go down and not yet up.
@@ -81,6 +83,10 @@ final class ArtemisSession: EngineSession {
         host.onReady = { [weak self] in self?.start() }
         host.onKey = { [weak self] key, pressed, isRepeat in
             guard let self else { return }
+            if let prompt {
+                if pressed, !isRepeat { prompt.handleHostKey(key) }
+                return
+            }
             router.hostKey(key, pressed: pressed, isRepeat: isRepeat).forEach(deliver)
         }
         host.onEvent = { [weak self] event in self?.send(event) }
@@ -236,57 +242,46 @@ final class ArtemisSession: EngineSession {
 
     /// The game's own Yes/No or text dialog, which the script waits on until it is answered.
     private func showDialog(_ body: [String: Any]) {
-        let title = body["title"] as? String ?? "", message = body["message"] as? String ?? ""
-        let cancels = body["hasCancel"] as? Bool ?? false, asksText = body["textfield"] as? Bool ?? false
-        let initial = body["initialText"] as? String ?? ""
-        let answer: @MainActor (Bool, String?) -> Void = { [weak self] accepted, text in
+        let asksText = body["textfield"] as? Bool ?? false
+        let prompt = ArtemisPrompt(
+            title: body["title"] as? String ?? "", message: body["message"] as? String ?? "",
+            cancels: body["hasCancel"] as? Bool ?? false, text: asksText ? body["initialText"] as? String ?? "" : nil
+        ) { [weak self] accepted, text in
             guard let self else { return }
-            prompt = nil
+            hidePrompt()
+            host.takeFocus()
             guard let runtime else { return }
             _ = core.api.runtime_submit_dialog!(runtime, accepted ? 1 : 0, text)
         }
+        hidePrompt()
+        self.prompt = prompt
+        let content = ArtemisPromptView(prompt: prompt)
         #if canImport(UIKit)
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        if asksText { alert.addTextField { $0.text = initial } }
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in answer(true, alert?.textFields?.first?.text) })
-        if cancels { alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in answer(false, nil) }) }
-        let field = alert.textFields?.first
-        prompt = Prompt(cancels: cancels, field: field.map { field in (get: { field.text ?? "" }, set: { field.text = $0 }) }) {
-            [weak alert] accepted in
-            let text = alert?.textFields?.first?.text
-            alert?.dismiss(animated: true)
-            answer(accepted, accepted ? text : nil)
-        }
-        var presenter = host.window?.rootViewController
-        while let shown = presenter?.presentedViewController { presenter = shown }
-        presenter?.present(alert, animated: true)
+        let controller = UIHostingController(rootView: content)
+        controller.view.backgroundColor = .clear
+        let shown: UIView = controller.view
+        promptHost = controller
         #else
-        let alert = NSAlert()
-        alert.messageText = title.isEmpty ? message : title
-        if !title.isEmpty { alert.informativeText = message }
-        let field = asksText ? NSTextField(string: initial) : nil
-        field?.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
-        alert.accessoryView = field
-        alert.addButton(withTitle: "OK")
-        if cancels { alert.addButton(withTitle: "Cancel") }
-        guard let window = host.window else { return answer(alert.runModal() == .alertFirstButtonReturn, field?.stringValue) }
-        prompt = Prompt(cancels: cancels, field: field.map { field in (get: { field.stringValue }, set: { field.stringValue = $0 }) }) {
-            [weak window, weak alert] accepted in
-            guard let window, let sheet = alert?.window else { return }
-            window.endSheet(sheet, returnCode: accepted ? .alertFirstButtonReturn : .alertSecondButtonReturn)
-        }
-        alert.beginSheetModal(for: window) { response in
-            MainActor.assumeIsolated { answer(response == .alertFirstButtonReturn, field?.stringValue) }
-        }
+        let shown = NSHostingView(rootView: content)
+        promptHost = shown
         #endif
+        shown.frame = host.bounds
+        #if canImport(UIKit)
+        shown.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        #else
+        shown.autoresizingMask = [.width, .height]
+        #endif
+        host.addSubview(shown)
     }
 
-    /// A dialog the game shows, which a controller answers too: Confirm, Return, or Space presses OK, Cancel, Escape, or E
-    /// presses Cancel when the dialog has it, and VNDegen's on-screen keyboard types into its text field.
-    private struct Prompt {
-        let cancels: Bool
-        let field: (get: () -> String, set: (String) -> Void)?
-        let close: (_ accepted: Bool) -> Void
+    private func hidePrompt() {
+        prompt = nil
+        #if canImport(UIKit)
+        (promptHost as? UIViewController)?.view.removeFromSuperview()
+        #else
+        (promptHost as? NSView)?.removeFromSuperview()
+        #endif
+        promptHost = nil
     }
 
     private func open(_ url: URL) {
@@ -345,32 +340,20 @@ final class ArtemisSession: EngineSession {
     func send(_ event: ControllerEvent) {
         guard runtime != nil, !paused else { return }
         if let prompt {
-            // In the "Keyboard and mouse" layout A and B arrive as Space and E, so the keys answer too.
-            switch event {
-            case .button(.confirm, pressed: true): prompt.close(true)
-            case let .key(key, pressed: true) where key.keyCode == 13 || key.keyCode == 32: prompt.close(true)
-            case .button(.cancel, pressed: true) where prompt.cancels: prompt.close(false)
-            case let .key(key, pressed: true) where (key.keyCode == 27 || key.keyCode == 69) && prompt.cancels:
-                prompt.close(false)
-            default: break
-            }
+            prompt.handle(event)
             return
         }
         router.translate(event).forEach(deliver)
     }
 
     func type(_ typed: TypedText) {
-        guard let prompt, let field = prompt.field else {
-            for key in KeyboardKey.keys(typing: typed) {
-                send(.key(key, pressed: true))
-                send(.key(key, pressed: false))
-            }
+        if let prompt {
+            prompt.type(typed)
             return
         }
-        switch typed {
-        case let .text(text): field.set(field.get() + text)
-        case .deleteBackward: field.set(String(field.get().dropLast()))
-        case .newline: prompt.close(true)
+        for key in KeyboardKey.keys(typing: typed) {
+            send(.key(key, pressed: true))
+            send(.key(key, pressed: false))
         }
     }
 

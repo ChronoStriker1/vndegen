@@ -113,3 +113,49 @@ import VNCore
         #expect(KeyboardKey(key: "a", code: "KeyA", keyCode: 65).virtualKey == 65)
     }
 }
+
+@MainActor
+@Suite struct ArtemisPromptTests {
+    private func key(_ code: String) -> ControllerEvent {
+        .key(KeyboardKey(key: "", code: code, keyCode: 0), pressed: true)
+    }
+
+    @Test func keysFromTheKeyboardAndMouseLayoutStandForButtons() {
+        #expect(ArtemisPrompt.button(for: key("Space")) == .confirm)
+        #expect(ArtemisPrompt.button(for: key("KeyE")) == .cancel)
+        #expect(ArtemisPrompt.button(for: key("Digit3")) == .left)
+        #expect(ArtemisPrompt.button(for: key("KeyQ")) == nil)
+        #expect(ArtemisPrompt.button(for: .gamepad(.a, pressed: true)) == .confirm)
+        #expect(ArtemisPrompt.button(for: .button(.confirm, pressed: false)) == nil)
+    }
+
+    @Test func aChoiceWithoutCancelStaysOnCancel() {
+        var answers: [Bool] = []
+        let prompt = ArtemisPrompt(title: "", message: "", cancels: false, text: nil) { accepted, _ in answers.append(accepted) }
+        prompt.handle(.button(.cancel, pressed: true))
+        #expect(answers.isEmpty)
+        prompt.handle(.button(.confirm, pressed: true))
+        prompt.handle(.button(.confirm, pressed: true))
+        #expect(answers == [true])
+    }
+
+    @Test func typedTextIsTheAnswer() {
+        var answers: [String?] = []
+        let prompt = ArtemisPrompt(title: "Name", message: "", cancels: false, text: "An") { _, text in answers.append(text) }
+        prompt.type(.text("na"))
+        prompt.type(.deleteBackward)
+        prompt.handle(.button(.cancel, pressed: true))
+        #expect(answers.isEmpty)
+        prompt.type(.newline)
+        #expect(answers == ["Ann"])
+    }
+
+    @Test func cancellingAKeyboardGivesNoText() {
+        var answers: [(Bool, String?)] = []
+        let prompt = ArtemisPrompt(title: "", message: "Name", cancels: true, text: "An") { answers.append(($0, $1)) }
+        prompt.handle(key("Escape"))
+        #expect(answers.count == 1)
+        #expect(answers[0].0 == false)
+        #expect(answers[0].1 == nil)
+    }
+}
