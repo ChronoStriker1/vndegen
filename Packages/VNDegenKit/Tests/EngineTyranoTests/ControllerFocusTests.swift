@@ -137,6 +137,159 @@ private let recordActions = "window.actions = []; const run = __vndegenTyrano.bu
     #expect(try await view.evaluateJavaScript("heard") as? Int == 1)
 }
 
+/// A stand-in for a Tyrano game's Skip and Auto buttons. Its click handlers do what Tyrano's do, including ignoring a tap
+/// while the event layer is hidden and restarting Skip when it is on, and log that they ran.
+private let modesPage = """
+<html><body style="margin:0">
+<img id="skip" data-event-pm='{"role":"skip"}' style="position:absolute;left:10px;top:10px;width:80px;height:30px">
+<img id="auto" data-event-pm='{"role":"auto"}' style="position:absolute;left:100px;top:10px;width:80px;height:30px">
+<script>
+window.handled = [];
+window.orders = 0;
+window.layerDisplay = 'block';
+const stat = { is_skip: false, is_auto: false, is_wait_auto: false, is_adding_text: false, is_strong_stop: false };
+const object = (o) => Object.create(o);
+window.tyrano = { plugin: { kag: { tag: {
+    skipstart: { start() { if (stat.is_skip || stat.is_adding_text) return false; stat.is_skip = true; orders += 1; } },
+    autostart: { start() { if (stat.is_auto) return false; stat.is_auto = true; orders += 1; } },
+    autostop: { start(pm) { stat.is_auto = false; stat.is_wait_auto = false; if (pm.next !== 'false') orders += 1; } },
+} } } };
+const tags = tyrano.plugin.kag.tag;
+const master = { skipstart: object(tags.skipstart), autostart: object(tags.autostart), autostop: object(tags.autostop) };
+window.TYRANO = { kag: {
+    stat, config: { unReadTextSkip: 'false' }, variable: { sf: {} }, readyAudio() {},
+    layer: { layer_event: { css: () => layerDisplay } },
+    ftag: { startTag: (name, pm) => master[name].start(pm) },
+    key_mouse: {},
+} };
+// Tyrano's document handler for a press, which runs before the button's click. autoClickStop is on in these games.
+document.addEventListener('mousedown', () => {
+    if (stat.is_skip && !stat.is_strong_stop) { stat.is_skip = false; return; }
+    if (stat.is_auto) TYRANO.kag.ftag.startTag('autostop', { next: 'false' });
+});
+// Presses a button the way a finger or a mouse does.
+window.tap = (id) => {
+    const button = document.getElementById(id);
+    for (const type of ['mousedown', 'mouseup', 'click']) button.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+};
+for (const id of ['skip', 'auto']) document.getElementById(id).addEventListener('click', () => {
+    if (layerDisplay === 'none' && !stat.is_strong_stop) return;
+    handled.push(id);
+    stat.is_skip = false;
+    if (id === 'skip') { TYRANO.kag.ftag.startTag('autostop', { next: 'false' }); TYRANO.kag.ftag.startTag('skipstart', {}); }
+    else TYRANO.kag.ftag.startTag(stat.is_auto ? 'autostop' : 'autostart', stat.is_auto ? { next: 'false' } : {});
+});
+</script></body></html>
+"""
+
+@MainActor private func modesView() async throws -> (WKWebView, Loader) {
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: try configuration())
+    let loader = Loader()
+    await loader.load(modesPage, in: view)
+    return (view, loader)
+}
+
+/// Runs a script and returns its value as text, so assertions read the same whatever type the page gives back.
+@MainActor private func read(_ view: WKWebView, _ script: String) async throws -> String {
+    try await view.callAsyncJavaScript("return String(eval(code))", arguments: ["code": script], contentWorld: .page) as? String ?? ""
+}
+
+@MainActor @Test func skipAndAutoTurnOnWhileALineIsStillShowing() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    _ = try await read(view, "stat.is_adding_text = true; layerDisplay = 'none'; tap('skip')")
+    #expect(try await read(view, "stat.is_skip") == "true")
+    #expect(try await read(view, "orders") == "0", "the running line finishes by itself, so nothing may advance past it")
+    _ = try await read(view, "tap('auto')")
+    #expect(try await read(view, "[stat.is_auto, stat.is_skip].join()") == "true,false")
+    _ = try await read(view, "tap('auto')")
+    #expect(try await read(view, "stat.is_auto") == "false")
+    #expect(try await read(view, "handled.length") == "0")
+}
+
+@MainActor @Test func aSecondTapOnSkipTurnsItOff() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    _ = try await read(view, "tap('skip')")
+    #expect(try await read(view, "[stat.is_skip, handled.join(), orders].join()") == "true,skip,1", "a waiting game takes the tap itself")
+    _ = try await read(view, "tap('skip')")
+    #expect(try await read(view, "[stat.is_skip, handled.join(), orders].join()") == "false,skip,1")
+}
+
+@MainActor @Test func aSecondTapOnAutoTurnsItOffWithoutAdvancing() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    _ = try await read(view, "tap('auto')")
+    #expect(try await read(view, "[stat.is_auto, orders].join()") == "true,1")
+    _ = try await read(view, "tap('auto')")
+    #expect(try await read(view, "[stat.is_auto, orders].join()") == "false,1")
+}
+
+@MainActor @Test func aSecondTapTurnsAModeOffWhileALineIsStillShowing() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    _ = try await read(view, "stat.is_adding_text = true; layerDisplay = 'none'; tap('skip')")
+    #expect(try await read(view, "stat.is_skip") == "true")
+    _ = try await read(view, "tap('skip')")
+    #expect(try await read(view, "stat.is_skip") == "false")
+    _ = try await read(view, "tap('auto')")
+    #expect(try await read(view, "stat.is_auto") == "true")
+    _ = try await read(view, "tap('auto')")
+    #expect(try await read(view, "[stat.is_auto, orders].join()") == "false,0")
+}
+
+@MainActor @Test func aCanceledPressDoesNotDecideALaterActivation() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    let press = { (type: String) in "document.getElementById('auto').dispatchEvent(new MouseEvent('\(type)', { bubbles: true, cancelable: true }))" }
+    // The press never ends on the button, then Auto stops some other way, and Tyrano's focus activates it with a click alone.
+    for ending in ["", "document.body.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))"] {
+        _ = try await read(view, "tap('auto')")
+        _ = try await read(view, press("mousedown"))
+        _ = try await read(view, ending.isEmpty ? "0" : ending)
+        _ = try await read(view, "stat.is_auto = false")
+        try await Task.sleep(for: .milliseconds(50))
+        _ = try await read(view, "document.getElementById('auto').click()")
+        #expect(try await read(view, "stat.is_auto") == "true", "ending: \(ending)")
+        _ = try await read(view, "stat.is_auto = false")
+    }
+}
+
+@MainActor @Test func skipPassesUnreadTextUnlessTheGameStoredAChoice() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    // Tyrano 5.2's button sets Skip without running a tag, so the setting has to be in place before any route starts it.
+    try await waitForConfig(view, "true")
+    _ = try await read(view, "TYRANO.kag.config.unReadTextSkip = 'false'; TYRANO.kag.variable.sf._system_config_unread_text_skip = 'false'")
+    try await Task.sleep(for: .milliseconds(500))
+    #expect(try await read(view, "TYRANO.kag.config.unReadTextSkip") == "false")
+    #expect(try await read(view, "JSON.stringify(TYRANO.kag.variable.sf)") == #"{"_system_config_unread_text_skip":"false"}"#, "nothing new goes in the game's saves")
+}
+
+/// The script updates the engine's config on a timer, as the engine loads after it does.
+@MainActor private func waitForConfig(_ view: WKWebView, _ value: String) async throws {
+    let deadline = ContinuousClock.now + .seconds(5)
+    while try await read(view, "TYRANO.kag.config.unReadTextSkip") != value {
+        guard ContinuousClock.now < deadline else { Issue.record("unReadTextSkip never became \(value)"); return }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+}
+
+@MainActor @Test func theActiveModesButtonLightsUp() async throws {
+    let (view, loader) = try await modesView()
+    _ = loader
+    let lit = { (id: String) in "getComputedStyle(document.getElementById('\(id)')).filter !== 'none'" }
+    _ = try await read(view, "stat.is_auto = true")
+    try await Task.sleep(for: .milliseconds(500))
+    #expect(try await read(view, lit("auto")) == "true")
+    #expect(try await read(view, lit("skip")) == "false")
+    _ = try await read(view, "stat.is_auto = false; stat.is_skip = true")
+    try await Task.sleep(for: .milliseconds(500))
+    #expect(try await read(view, lit("auto")) == "false")
+    #expect(try await read(view, lit("skip")) == "true")
+    #expect(try await read(view, "document.getElementById('skip').className") == "", "saved layers keep their HTML as the PC build expects")
+}
+
 @Test func legacyRemapsKeepRunningTyranoActions() {
     let plugin = TyranoPlugin()
     #expect(plugin.legacyAction(for: .confirm) == .button(.confirm))

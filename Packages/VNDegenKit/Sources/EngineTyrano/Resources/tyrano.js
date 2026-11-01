@@ -120,6 +120,72 @@
         try { return JSON.parse(el.getAttribute('data-event-pm') || '{}').role || ''; } catch (e) { return ''; }
     }
 
+    // Tyrano 5.2 has setters that also update its own mode effects. Older versions only keep the flag.
+    const setSkip = (k, on) => { if (typeof k.setSkip === 'function') k.setSkip(on); else k.stat.is_skip = on; };
+    const setAuto = (k, on) => { if (typeof k.setAuto === 'function') k.setAuto(on); else k.stat.is_auto = on; };
+
+    // Tyrano ignores a tap on Skip or Auto while a line types or the game waits. A press also clears the running mode
+    // before its click arrives, so a tap on a running button would start it again. Players expect the button to answer at
+    // any moment and a second tap to turn it off, as in other visual novels, so those taps are handled here. A running line
+    // picks up the flag and finishes by itself, so nothing advances the script. A game waiting for a click takes a tap that
+    // starts a mode through the button's own handler, which also plays its sound.
+    const modeRole = (el) => { const role = el instanceof Element ? roleOf(el) : ''; return role === 'skip' || role === 'auto' ? role : ''; };
+    const runningModes = (stat) => ({ skip: stat.is_skip === true, auto: stat.is_auto === true });
+    let modesAtPress = null;
+    // Set only between a press's release and the click that release sends, which the browser delivers together. A press
+    // that never ends in a click, or a click with no press, such as Tyrano's own focus sends, leaves nothing behind here.
+    let modesBeforeClick = null;
+
+    document.addEventListener('mousedown', (event) => {
+        const k = kag();
+        modesAtPress = k && k.stat && modeRole(event.target) ? runningModes(k.stat) : null;
+    }, true);
+
+    document.addEventListener('mouseup', () => {
+        modesBeforeClick = modesAtPress;
+        modesAtPress = null;
+        setTimeout(() => { modesBeforeClick = null; }, 0);
+    }, true);
+
+    document.addEventListener('click', (event) => {
+        const k = kag(), role = modeRole(event.target);
+        const was = modesBeforeClick;
+        modesBeforeClick = null;
+        if (!k || !k.stat || !k.layer || !role) return;
+        const stat = k.stat, running = was || runningModes(stat);
+        const busy = !stat.is_strong_stop && (stat.is_adding_text || k.layer.layer_event.css('display') === 'none');
+        if (running[role]) {
+            if (role === 'skip') setSkip(k, false);
+            else k.ftag.startTag('autostop', { next: 'false' });
+        } else if (!busy) {
+            return;
+        } else if (role === 'skip') {
+            if (stat.is_auto) k.ftag.startTag('autostop', { next: 'false' });
+            k.readyAudio();
+            setSkip(k, true);
+        } else {
+            setSkip(k, false);
+            k.readyAudio();
+            setAuto(k, true);
+        }
+        event.stopPropagation();
+    }, true);
+
+    // Runs for the life of the page, because the engine loads after this script and replaces its config as it does.
+    setInterval(() => {
+        const k = kag();
+        if (!k || !k.stat) return;
+        // Most games ship with unReadTextSkip off, and then Tyrano ends Skip at the first line the player hasn't read, so
+        // the button seems dead on a first playthrough. A setting screen stores the player's choice in sf, and that choice
+        // stands. This changes only the running engine's config, so nothing reaches the game's saves.
+        const sf = k.variable && k.variable.sf;
+        if (k.config && sf && sf._system_config_unread_text_skip === undefined) k.config.unReadTextSkip = 'true';
+        // Older Tyrano shows nothing while Skip or Auto runs. The classes go on the page's root rather than on the buttons
+        // because a save stores the buttons' HTML, which then still loads on PC exactly as the game wrote it.
+        document.documentElement.classList.toggle('vndegen-skip-on', k.stat.is_skip === true);
+        document.documentElement.classList.toggle('vndegen-auto-on', k.stat.is_auto === true);
+    }, 200);
+
     // Opens the menu the game offers. Many games hide Tyrano's built-in menu with [hidemenubutton] and put their own
     // buttons on screen instead (save, load, settings, or a gear), which can mean anything, so then the focus goes to
     // them, starting at Save, and the player picks.
@@ -228,10 +294,7 @@
             if (name === 'dash') {
                 const stat = kag().stat;
                 if (pressed && !stat.is_skip) k.skip();
-                else if (!pressed && stat.is_skip) {
-                    if (typeof kag().setSkip === 'function') kag().setSkip(false);
-                    else stat.is_skip = false;
-                }
+                else if (!pressed && stat.is_skip) setSkip(kag(), false);
                 return;
             }
             // TyranoScript 5 presses its virtual mouse on ok when the mouse cursor shows, and releases it, which clicks,
@@ -294,7 +357,10 @@
     document.addEventListener('mousedown', () => { if (!firing) setFocus(null); }, true);
 
     const style = document.createElement('style');
+    // Games with their own on image for these buttons mark them button-auto-sync or button-skip-sync.
+    const modeLit = (mode) => `.vndegen-${mode}-on [data-event-pm*='"role":"${mode}"']:not(.button-${mode}-sync)`;
     style.textContent = '.vndegen-focus { outline: 3px solid #fff !important; outline-offset: 2px; ' +
-        'box-shadow: 0 0 0 6px rgba(64, 156, 255, 0.85) !important; }';
+        'box-shadow: 0 0 0 6px rgba(64, 156, 255, 0.85) !important; } ' +
+        `${modeLit('skip')}, ${modeLit('auto')} { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgb(30, 144, 255)) drop-shadow(0 0 10px rgb(30, 144, 255)); }`;
     document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
 })();
