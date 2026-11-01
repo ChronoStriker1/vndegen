@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <regex>
 
 #include "images.h"
@@ -57,7 +58,7 @@ bool Game::jumpToCase(Thread::Call &c, int indent, int caseValue) {
 }
 
 void Game::unsupported(const Command &c) {
-    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet", c.code));
+    if (unsupported_[c.code]++ == 0) log(format("command %d is not supported yet (%x)", c.code, c.arg(1)));
 }
 
 bool Game::step(Thread &t) {
@@ -665,9 +666,16 @@ void Game::setString(Thread &t, const Command &c) {
                 writeStr(target, "<NoFile>", t);
                 break;
             }
-            std::string text(bytes->begin(), bytes->end());
-            if (text.starts_with("\xEF\xBB\xBF")) writeStr(target, text.substr(3), t);
-            else writeStr(target, toUtf8(text, gameDat_.encoding), t);
+            writeStr(target, decodeTextFile(std::string(bytes->begin(), bytes->end())), t);
+            break;
+        }
+        case 0x06: {  // write the variable's text to a file, with a byte order mark as the PC's default
+            std::filesystem::path path = saveFilePath(rhs);
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            std::ofstream file(path, std::ios::binary);
+            file << "\xEF\xBB\xBF" << cur;
+            if (!file) log("cannot write " + rhs);
             break;
         }
         case 0x07: {  // the files in a folder, one name a line; <<ERROR>> for a folder packed in an archive

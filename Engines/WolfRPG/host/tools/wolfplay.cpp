@@ -106,6 +106,7 @@ int main(int argc, char **argv) {
         Bitmap frame;
         uint32_t held = 0;
         int mouseX = 0, mouseY = 0;
+        bool wasTyping = false;
         for (int f = 1; f <= frames; f++) {
             Input in;
             // A scripted click holds the button for this frame only.
@@ -141,9 +142,13 @@ int main(int argc, char **argv) {
                 std::printf("frame %d: map %d hero %d,%d facing %d%s%s\n", f, game.mapId(), h[0], h[1], h[2],
                             game.message().active ? " (message)" : "", game.choice().active ? " (choice)" : "");
             }
+            if (bool typing = game.textEntry().active; typing != wasTyping) {
+                wasTyping = typing;
+                std::printf("frame %d: text entry %s \"%s\"\n", f, typing ? "starts" : "ends", game.textEntry().text.c_str());
+            }
             if (picLists.count(f)) {
                 for (auto &[n, p] : game.pictures())
-                    std::printf("pic %d kind %d %.0f,%.0f anchor %d size %dx%d zoom %.0f/%.0f opacity %.0f \"%.50s\"\n", n, int(p.kind), p.x.value(),
+                    std::printf("pic %d kind %d blend %d rgb %.0f,%.0f,%.0f %.0f,%.0f anchor %d size %dx%d zoom %.0f/%.0f opacity %.0f \"%.50s\"\n", n, int(p.kind), p.blend, p.r.value(), p.g.value(), p.b.value(), p.x.value(),
                                 p.y.value(), p.anchor, p.imageW, p.imageH, p.zoomX.value(), p.zoomY.value(), p.opacity.value(), p.source.c_str());
             }
             auto [sa, sb] = shots.equal_range(f);

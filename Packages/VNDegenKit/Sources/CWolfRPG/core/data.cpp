@@ -47,6 +47,19 @@ bool convertCharacter(const char *bytes, size_t n, std::string &out) {
 
 // Converts Shift-JIS (code page 932) to UTF-8, one character at a time. Translated games often hold stray bytes that
 // are not valid Shift-JIS, which become U+FFFD rather than failing the whole file.
+std::string decodeTextFile(std::string raw) {
+    if (raw.starts_with("\xEF\xBB\xBF")) return raw.substr(3);
+    for (size_t i = 0; i < raw.size();) {
+        auto c = static_cast<unsigned char>(raw[i]);
+        size_t n = c < 0x80 ? 1 : (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 0;
+        if (n == 0 || i + n > raw.size()) return toUtf8(raw, Encoding::ShiftJIS);
+        for (size_t k = 1; k < n; k++)
+            if ((static_cast<unsigned char>(raw[i + k]) & 0xC0) != 0x80) return toUtf8(raw, Encoding::ShiftJIS);
+        i += n;
+    }
+    return raw;
+}
+
 std::string toUtf8(const std::string &raw, Encoding enc) {
     if (enc == Encoding::UTF8) return raw;
     std::string out;

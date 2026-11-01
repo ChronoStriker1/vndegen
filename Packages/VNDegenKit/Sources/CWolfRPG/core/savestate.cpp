@@ -704,6 +704,8 @@ void Game::writeSavedVariable(SaveFile &s, int32_t address, int32_t source, Thre
                         saveString(isStringVar(source) ? readStr(source, t) : std::to_string(x), enc);
             }
         }
+    } else if (address >= 9000100 && address <= 9000102) {
+        s.system.volumes[size_t(address - 9000100)] = x;  // Two Beasts keeps its volume settings in its system save
     } else {
         log(format("save: writing variable %d into a save is not supported", address));
     }

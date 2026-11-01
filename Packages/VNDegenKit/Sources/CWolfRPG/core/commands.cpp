@@ -77,12 +77,15 @@ void Game::databaseCommand(Thread &t, const Command &c) {
         return;
     }
     if (c.arg(2) == -3) {  // row name or id
-        if (byName & 0x02) writeVar(target, row, t);
+        // The row may be named by a string variable, which looks its text up the same way (Clumsy Witch Seris's tags).
+        if (dt && isStringVar(c.arg(1))) writeVar(target, findRow(type, readStr(c.arg(1), t)), t);
+        else if (byName & 0x02) writeVar(target, row, t);
         else writeStr(target, dt && row >= 0 ? rowName(type, row) : "", t);
         return;
     }
     if (c.arg(1) == -3) {  // field name or id
-        if (byName & 0x04) writeVar(target, field, t);
+        if (dt && isStringVar(c.arg(2))) writeVar(target, findName(dt->fieldNames, readStr(c.arg(2), t)), t);
+        else if (byName & 0x04) writeVar(target, field, t);
         else writeStr(target, dt && field >= 0 && field < int(dt->fieldNames.size()) ? dt->fieldNames[field] : "", t);
         return;
     }
@@ -440,9 +443,7 @@ void Game::csvCommand(Thread &t, const Command &c) {
         log("no CSV file " + name);
         return;
     }
-    if (text.starts_with("\xEF\xBB\xBF")) text.erase(0, 3);
-    else text = toUtf8(text, gameDat_.encoding);
-    auto rows = parseCsv(text);
+    auto rows = parseCsv(decodeTextFile(text));
     size_t numbers = 0, strings = 0;
     for (size_t f = 0; f < dt.fieldKinds.size(); f++) (dt.isString(f) ? strings : numbers)++;
     // The first row names the fields. The rest fill the rows from firstRow, as many as the command says and the file has.
