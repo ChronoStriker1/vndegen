@@ -199,7 +199,8 @@ final class ArtemisSession: EngineSession {
         case "video_play":
             // A fullscreen movie takes the input, so the game first sees every key and button it holds come up, as when
             // the menu opens. Otherwise a key held into the movie, such as Control for skipping, would stay down.
-            if body["id"] == nil, !movies.playingFullscreen, let runtime {
+            // The core sends a fullscreen movie's id as null, which arrives as NSNull.
+            if (body["id"] as? String) == nil, !movies.playingFullscreen, let runtime {
                 router.releaseAll().forEach(deliver)
                 // Touches and mouse buttons aren't counted by the router, such as the tap that started the movie.
                 for button in buttonsDown { core.api.runtime_feed_mouse_button!(runtime, UInt32(button), 0) }

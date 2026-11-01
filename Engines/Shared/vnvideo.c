@@ -196,14 +196,20 @@ static int push_audio(vnvideo *v, const float *samples, size_t frames) {
     return 1;
 }
 
-// Once the sound stream has ended, pads it with a frame's worth of silence while the picture goes on, and stops it
-// when the picture ends too. Returns 0 when the movie is closing.
+// Once the sound stream has ended, pads it with a frame's worth of silence at a time, through the end of the
+// picture's last frame, then stops it. Returns 0 when the movie is closing.
 static int pad_sound(vnvideo *v) {
-    if (!isfinite(v->video_time)) {
-        v->audio_time = INFINITY;
-        return 1;
-    }
     size_t frames = (size_t)ceil(v->info.audio_rate / v->info.fps);
+    if (!isfinite(v->video_time)) {
+        // The picture has ended: pad only up to the end of its last frame.
+        double left = v->pass_end - v->audio_time;
+        if (left <= 0) {
+            v->audio_time = INFINITY;
+            return 1;
+        }
+        size_t needed = (size_t)ceil(left * v->info.audio_rate);
+        if (needed < frames) frames = needed;
+    }
     if (frames > OPUS_MAX_FRAMES) frames = OPUS_MAX_FRAMES;
     memset(v->pcm, 0, frames * (size_t)v->info.audio_channels * sizeof(float));
     return push_audio(v, v->pcm, frames);

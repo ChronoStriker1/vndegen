@@ -30,7 +30,7 @@ static void check(int ok, const char *what) {
 }
 
 typedef struct {
-    int frames, width, height;
+    int frames, width, height, ended;
     double seconds, sound;
     uint8_t first[4];
 } result;
@@ -61,7 +61,10 @@ static int play(const char *path, int loop, double limit, result *out, vnvideo_i
     double step = 1.0 / info->fps, time = 0;
     struct timespec pause = {0, 200000};
     int idle = 0;
-    while (time < limit && !vnvideo_ended(video, time)) {
+    // Frames come on a clock that waits for each one. The end is judged on the sound clock for a movie with sound, as
+    // hosts judge it, so sound that stops short of the picture keeps the movie from ending.
+    double clock = 0;
+    while (time < limit && !(out->ended = vnvideo_ended(video, clock))) {
         int changed = 0;
         const uint8_t *frame = vnvideo_frame(video, time, &changed);
         if (frame && changed) {
@@ -82,6 +85,7 @@ static int play(const char *path, int loop, double limit, result *out, vnvideo_i
                 out->sound = fmax(out->sound, fabs(sound[i]));
         }
         time += step;
+        clock = info->audio_rate ? vnvideo_audio_time(video) : time;
         if (vnvideo_error(video)) break;
     }
     out->seconds = time;
@@ -137,17 +141,23 @@ static void builtin(const char *dir) {
     // Sound that ends long before the picture: the movie still plays to its last frame and ends.
     snprintf(path, sizeof path, "%s/short-sound.ogv", dir);
     check(play(path, 0, 10, &r, &info), "short sound opens");
-    check(r.frames >= 58 && r.seconds >= 1.95 && r.seconds < 2.5, "a movie whose sound ends early plays to its end");
+    check(r.ended && r.frames >= 58 && r.seconds >= 1.95 && r.seconds < 2.5,
+          "a movie whose sound ends early plays to its end");
+    snprintf(path, sizeof path, "%s/short-sound.mpg", dir);
+    check(play(path, 0, 10, &r, &info), "short MPEG sound opens");
+    check(r.ended && r.frames >= 56 && r.seconds >= 1.95 && r.seconds < 2.5,
+          "an MPEG-1 movie whose sound ends early plays to its end");
 
     // One picture and 8 s of sound: playback starts though the frame ring never fills, and lasts as long as the sound.
     snprintf(path, sizeof path, "%s/long-sound.ogv", dir);
     check(play(path, 0, 20, &r, &info), "long sound opens");
-    check(r.frames == 1 && r.seconds >= 7.9 && r.seconds < 8.5, "a movie whose sound outlasts its picture plays it all");
+    check(r.ended && r.frames == 1 && r.seconds >= 7.9 && r.seconds < 8.5,
+          "a movie whose sound outlasts its picture plays it all");
 
     // Repeated frames at the end still count toward the movie's length.
     snprintf(path, sizeof path, "%s/held-end.ogv", dir);
     check(play(path, 0, 10, &r, &info), "held ending opens");
-    check(r.seconds >= 0.99 && r.seconds < 1.2, "repeated last frames count toward the movie's length");
+    check(r.ended && r.seconds >= 0.99 && r.seconds < 1.2, "repeated last frames count toward the movie's length");
 
     char garbage[] = "/dev/null";
     check(!play(garbage, 0, 1, &r, &info), "an empty file is refused");
