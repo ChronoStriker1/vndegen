@@ -288,9 +288,14 @@ TextBlock TextRenderer::render(const std::string &text, const TextStyle &style, 
     block.chars = l.chars;
     // Shadows and outlines reach a pixel past the text; ruby may sit above the first line.
     int pad = block.origin;
-    int minY = 0;
-    for (auto &it : l.items) minY = std::min(minY, it.y);
-    int w = std::max(1, l.w + pad * 2 + 2), h = std::max(1, l.h - minY + pad * 2);
+    // A font whose ascent fills its size puts descenders below the last line's box, so the bitmap reaches the lowest
+    // glyph pixel; the reported size (measure) stays the layout's.
+    int minY = 0, bottom = l.h;
+    for (auto &it : l.items) {
+        minY = std::min(minY, it.y);
+        if (it.g) bottom = std::max(bottom, it.y + font(it.face).ascent(it.size) - it.g->top + it.g->h + 1);
+    }
+    int w = std::max(1, l.w + pad * 2 + 2), h = std::max(1, bottom - minY + pad * 2);
     block.bitmap = Bitmap(w, h);
     Canvas canvas(block.bitmap);
 

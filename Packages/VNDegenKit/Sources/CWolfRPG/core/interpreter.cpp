@@ -768,12 +768,15 @@ void Game::pictureCommandOne(Thread &t, const Command &c, int number) {
         p.zoomY.set(field(18, int32_t(p.zoomY.to)), over);
     }
     p.angle.set(field(10, int32_t(p.angle.to)), over);
-    // Field 12's top byte is 1 when the colour stays as it is.
+    // Field 12's top byte is 1 when the colour stays as it is. Otherwise the editor stores the colour only when it
+    // isn't 100 (WodiLib's PictureDrawBase), so a command without colour fields sets it back to 100: a game can show
+    // a picture at colour 0 and fade it in from black with a plain move.
     bool sameColor = c.args.size() > 12 && (uint32_t(c.arg(12)) >> 24) == 1;
-    if (c.args.size() > 17 && !sameColor) {
-        p.r.set(field(15, int32_t(p.r.to)), over);
-        p.g.set(field(16, int32_t(p.g.to)), over);
-        p.b.set(field(17, int32_t(p.b.to)), over);
+    if (!sameColor) {
+        bool given = c.args.size() > 17;
+        p.r.set(given ? field(15, int32_t(p.r.to)) : 100, over);
+        p.g.set(given ? field(16, int32_t(p.g.to)) : 100, over);
+        p.b.set(given ? field(17, int32_t(p.b.to)) : 100, over);
     }
 }
 
