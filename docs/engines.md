@@ -36,13 +36,15 @@ iOS can end WebKit's GPU process, which loses the page's WebGL context. MZ games
 
 MV and MZ games also have a Cheats page in the VNDegen menu, described in [controls.md](controls.md#cheats).
 
-Known limits, for WebM clips with alpha, from a scan of the movies in the library's 118 MV and MZ games and No Socks RPG on 2026-11-01:
+WebKit ignores the alpha channel of VP9 WebM clips, so a see-through clip would show as a black or white box. The first time a game plays one, VNDegen converts it in the background to HEVC with alpha, which Apple's system plays with transparency, keeps it in a cache outside the game folder, and serves it at the clip's original address, so the game and its movie plugin don't change. The clip stays hidden until it's ready, so its first play can wait, and later plays start straight away. Settings has a Clear video cache button. [video.md](video.md) has the details.
 
-- VP8 clips with alpha get no special handling. No library game has one.
-- VP9 clips in profile 2 or 3 with alpha get no special handling. No library game has one.
-- Clips under 64 pixels on a side play as WebKit plays them, without their alpha. The library's only one is `siru.webm` (50 by 200) in Trinity Dungeon, an MV game.
+Known limits for those clips, from a scan of the movies in the library's 118 MV and MZ games and No Socks RPG on 2026-11-01:
+
+- Converting uses a lot of memory while it runs: about 160 MB on a Mac and up to about 390 MB on an iPad simulator. Real iPad speed and memory haven't been measured.
+- Four games were checked through their own plugin commands: Cornelica, Holding Hands, Fallen Kunoichi, and No Socks RPG. The other seven with clips weren't played through. Five Nights with Maids and Lovey-Dovey Lockdown name no clips in their data, so they may not use them.
+- Only VP9 clips with 8-bit 4:2:0 video and Opus or no sound are converted. VP8 clips with alpha and VP9 clips in profile 2 or 3 aren't, and no library game has one.
+- `siru.webm` (50 by 200) in Trinity Dungeon is the library's only clip under 64 pixels on a side, and it hasn't been played through the converter.
 - The scan could not see inside the exe of Futanari Remedies, Succubus Farm, or Treasure Hunter Koo and the Ancient King, which keep their files there.
-- Larger clips with alpha are in progress on the `fix/alpha-clips` branch.
 
 ## TyranoScript
 
@@ -110,7 +112,7 @@ NScripter games run on VNDegen's own NScripter runtime, written in C++ for VNDeg
 
 ## Wolf RPG Editor
 
-Wolf RPG Editor games run on VNDegen's own Wolf RPG Editor runtime, written in C++ for VNDegen from the games' files, permissively licensed format notes and the original engine's behaviour, MIT licensed like the rest of the app. It draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the games' data, maps and databases, loose or packed in Wolf RPG Editor 2's encrypted `.wolf` archives, runs their event scripts, and plays Ogg, MP3, WAV and MIDI sound, MIDI through a bundled General MIDI SoundFont or one the player chooses in Settings. Text uses a font the game ships, then VNDegen's Windows font pack. Saves are the PC engine's own files in the game's `Save` folder, so Ludusavi backs them up and they move between VNDegen and a PC copy of the game. Known limits: Wolf RPG Editor 3.5's compressed data, newer archive versions, and Pro's encrypted data aren't read yet. [wolfrpg.md](wolfrpg.md) has the details.
+Wolf RPG Editor games run on VNDegen's own Wolf RPG Editor runtime, written in C++ for VNDegen from the games' files, permissively licensed format notes and the original engine's behaviour, MIT licensed like the rest of the app. It draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the games' data, maps and databases, loose or packed in `.wolf` archives, including Wolf RPG Editor 3.5's compressed data, runs their event scripts, and plays Ogg, MP3, WAV and MIDI sound, MIDI through a bundled General MIDI SoundFont or one the player chooses in Settings. Text uses a font the game ships, then VNDegen's Windows font pack. Saves are the PC engine's own files in the game's `Save` folder, so Ludusavi backs them up and they move between VNDegen and a PC copy of the game. Games take the mouse, with touch working as a mouse, and typed text. Known limits: Pro's encrypted data and DxLib archive version 7 aren't read, and no library game needs them. [wolfrpg.md](wolfrpg.md) has the details.
 
 Wolf RPG Editor games have a Cheats page too, with what each game keeps where the cheats can find it, described in [cheats.md](cheats.md#built-wolf-rpg-editor).
 

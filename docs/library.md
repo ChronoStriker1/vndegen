@@ -29,6 +29,10 @@ Known limit: on a Mac, if an added folder is moved and another folder is made at
 
 Remove from library, in a game's menu or on its page, deletes the game's folder after asking: on a Mac it goes to the Trash, and on iPhone and iPad it is deleted for good. Saves the game writes inside its own folder go with it. The saves VNDegen keeps in its own data folder for the game stay, and so do its artwork, play time, and settings, so copying the folder back restores it.
 
+## Video cache
+
+RPG Maker MV and MZ clips with transparency are converted the first time they play, and kept in a cache outside the game folder. The cache holds up to 512 MB, dropping the clips used least recently, and isn't backed up. Clear video cache in Settings empties it, and a clip then converts again the next time it plays. [engines.md](engines.md#rpg-maker-mv-and-mz) has more.
+
 ## Layouts
 
 The view button in the top bar switches the library between three layouts:
