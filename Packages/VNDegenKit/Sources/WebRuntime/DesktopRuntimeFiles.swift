@@ -18,6 +18,9 @@ nonisolated public enum DesktopRuntimeFiles {
     /// smaller. In the library renamed runtimes are 46 to 162 MB, and tools at most 27 MB.
     static let renamedRuntimeSize: Int64 = 30_000_000
 
+    /// No runtime in the library comes near this. An `.exe` this big holds more than a runtime, perhaps the game.
+    static let packedExeSize: Int64 = 250_000_000
+
     /// NW.js's `credits.html` is 870 KB to 9 MB in the library. A smaller one is the game's own page.
     static let creditsSize: Int64 = 500_000
 
@@ -47,13 +50,16 @@ nonisolated public enum DesktopRuntimeFiles {
 
     /// Adds the one large `.exe` beside the runtime's files. With two, VNDegen can't tell which is the runtime and which
     /// a game or a translation brought, so neither is listed, even under a name on the list. With one not downloaded yet,
-    /// iCloud's placeholder hides it from this count, so no `.exe` is listed at all.
+    /// iCloud's placeholder hides it from this count, so no `.exe` is listed at all. The same goes for an `.exe` too big to
+    /// be only a runtime.
     private static func withRenamedRuntime(_ names: Set<String>, _ probe: FolderProbe) -> Set<String> {
         let hidden = (try? FileManager.default.contentsOfDirectory(atPath: probe.root.path)) ?? []
-        if hidden.contains(where: { $0.hasPrefix(".") && $0.lowercased().hasSuffix(".exe.icloud") }) {
+        let executables = probe.entries.filter { !$0.contains("/") && $0.lowercased().hasSuffix(".exe") }
+        if hidden.contains(where: { $0.hasPrefix(".") && $0.lowercased().hasSuffix(".exe.icloud") })
+            || executables.contains(where: { (probe.size($0) ?? 0) >= packedExeSize }) {
             return Set(names.map { $0.lowercased() }.filter { !$0.hasSuffix(".exe") })
         }
-        let large = probe.entries.filter { !$0.contains("/") && $0.lowercased().hasSuffix(".exe") && (probe.size($0) ?? 0) >= renamedRuntimeSize }
+        let large = executables.filter { (probe.size($0) ?? 0) >= renamedRuntimeSize }
         let lowered = Set(names.map { $0.lowercased() })
         return large.count == 1 ? lowered.union(large.map { $0.lowercased() }) : lowered.subtracting(large.map { $0.lowercased() })
     }

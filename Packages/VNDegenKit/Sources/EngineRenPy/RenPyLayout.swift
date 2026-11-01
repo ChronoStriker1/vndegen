@@ -87,7 +87,7 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
     /// What VNDegen doesn't use of a PC build: the Python and platform libraries in `lib/`, since a game runs on a bundled
     /// runtime, and the launchers Ren'Py names after the game's `.py`. `renpy/`, `game/`, and the small `.py` and `.sh`
     /// launchers stay. In `lib/` only files of the kinds Ren'Py ships count, because mods and patches leave others there:
-    /// the library has pictures, `sovereign.ini`, and `.bak` files in it. `lib/` stays when its names are what tell this
+    /// the library has pictures, `sovereign.ini`, and `.bak` files in it. VNDegen loads nothing from `lib/`. `lib/` stays when its names are what tell this
     /// game's Ren'Py line apart, unless the compiled files say the same and `lib/` holds only that line, so a removal that
     /// stops partway can't change the answer.
     func engineFiles(_ probe: FolderProbe) -> EngineFileList {
@@ -113,18 +113,27 @@ nonisolated public struct RenPyLayout: Equatable, Sendable {
         }
         var trees: [String: @Sendable (String) -> Bool] = [:]
         let libraries = names("lib").filter { $0.wholeMatch(of: /(py[23]-)?(windows|linux|darwin|mac)-[a-z0-9_]+|python[23](\.\d+)?|pythonlib[23]?(\.\d+)?/) != nil }
-        let lines = Set(libraries.compactMap { Self.runtime(libraries: [$0]) })
+        // Every name that can decide the line, also those that stay.
+        let lines = Set(names("lib").compactMap { Self.runtime(libraries: [$0]) })
         if evidence != .libraries || (lines.count == 1 && Self.runtime(engineFiles: names("renpy")) == runtime) {
-            for library in libraries { trees["lib/\(library)"] = { Self.isEngineLibraryFile($0, launcher: stem) } }
+            for library in libraries {
+                let isPython = library.hasPrefix("python")
+                trees["lib/\(library)"] = { Self.isEngineLibraryFile($0, inPythonFolder: isPython, launcher: stem) }
+            }
         }
         return EngineFileList(root: self.base, files: files, trees: trees, folders: folders)
     }
 
-    /// The kinds of file Ren'Py's `lib/` folders hold, from the library's 54 games. `name` is lower case.
-    private static func isEngineLibraryFile(_ name: String, launcher: String?) -> Bool {
-        let endings = [".py", ".pyc", ".pyo", ".pyd", ".so", ".dll", ".exe", ".dylib", ".pem", ".egg", ".manifest", ".vbs"]
-        let names = ["python", "pythonw", "zsync", "zsyncmake", "empty.txt", "dynload.txt", "libwinpthread-1.txt", "py.typed"]
-        return endings.contains { name.hasSuffix($0) } || names.contains(name) || name == launcher || name.contains(".so.")
+    /// The kinds of file Ren'Py's `lib/` folders hold, from the library's 54 games. `name` is lower case. Python folders
+    /// hold Python's standard library, and the others the platform's programs and libraries.
+    private static func isEngineLibraryFile(_ name: String, inPythonFolder: Bool, launcher: String?) -> Bool {
+        if inPythonFolder {
+            return [".py", ".pyc", ".pyo", ".pem"].contains { name.hasSuffix($0) } || ["empty.txt", "py.typed"].contains(name)
+        }
+        let endings = [".so", ".pyo", ".pyd", ".dll", ".exe", ".dylib", ".egg", ".manifest", ".vbs"]
+        let names = ["python", "pythonw", "zsync", "zsyncmake", "dynload.txt", "libwinpthread-1.txt"]
+        return endings.contains { name.hasSuffix($0) } || names.contains(name) || name == launcher
+            || name.firstMatch(of: /\.so(\.\d+)+$/) != nil
     }
 
     /// Folders that may be the base directory, shallowest first and then by name: the game folder and any folder up to

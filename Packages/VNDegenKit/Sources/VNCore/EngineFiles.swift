@@ -53,6 +53,8 @@ public struct EngineFile: Hashable, Sendable {
     public let fileCount: Int
     /// `path` on disk. It differs when iCloud keeps only a placeholder for a file not downloaded yet.
     let stored: String
+    /// A folder's contents as they were listed, by name and size. A removal goes ahead only if they still match.
+    var contents = 0
 }
 
 /// What a game offers to remove, or why it can't.
@@ -133,17 +135,26 @@ nonisolated enum EngineFiles {
         return (plist["NSURLFileSizeKey"] as? NSNumber)?.int64Value ?? 0
     }
 
-    private static func folderContents(_ url: URL, iCloud: Bool) -> (size: Int64, count: Int) {
-        var size: Int64 = 0, count = 0
-        guard let items = FileManager.default.enumerator(atPath: url.path) else { return (0, 0) }
+    private static func folderContents(_ url: URL, iCloud: Bool) -> (size: Int64, count: Int, contents: Int) {
+        var size: Int64 = 0, count = 0, entries: [(String, Int64)] = []
+        guard let items = FileManager.default.enumerator(atPath: url.path) else { return (0, 0, 0) }
         for case let item as String in items {
             let path = url.appendingPathComponent(item)
-            guard let found = attributes(path.path), found.type != .typeDirectory else { continue }
+            guard let found = attributes(path.path) else { continue }
+            if found.type == .typeDirectory { entries.append((item, -1)); continue }
             let isPlaceholder = iCloud && placeholderTarget(path.lastPathComponent) != nil
-            size += isPlaceholder ? placeholderSize(path) : found.size
+            let length = isPlaceholder ? placeholderSize(path) : found.size
+            entries.append((item, length))
+            size += length
             count += 1
         }
-        return (size, count)
+        // Hasher's seed lasts as long as the process, and a plan and its removal happen in one.
+        var hasher = Hasher()
+        for (name, length) in entries.sorted(by: { $0.0 < $1.0 }) {
+            hasher.combine(name)
+            hasher.combine(length)
+        }
+        return (size, count, hasher.finalize())
     }
 
     /// True when every folder on the way from `folder` down `relative` is a real folder, not a link.
@@ -156,12 +167,11 @@ nonisolated enum EngineFiles {
         return true
     }
 
-    /// True when `url` is still what the player saw, in size and for a folder in number of files too.
+    /// True when `url` is still what the player saw: for a file its size, and for a folder every name and size in it.
     private static func unchanged(_ file: EngineFile, at url: URL, iCloud: Bool) -> Bool {
         guard let item = attributes(url.path) else { return false }
         if item.type == .typeDirectory {
-            let contents = folderContents(url, iCloud: iCloud)
-            return contents.size == file.size && contents.count == file.fileCount
+            return folderContents(url, iCloud: iCloud).contents == file.contents
         }
         return item.type == .typeRegular && (file.stored == file.path ? item.size : placeholderSize(url)) == file.size
     }
@@ -185,12 +195,12 @@ nonisolated enum EngineFiles {
                 if item.type == .typeDirectory {
                     if list.folders.contains(lower) {
                         let contents = folderContents(url, iCloud: iCloud)
-                        found.append(EngineFile(path: base + path, size: contents.size, fileCount: contents.count, stored: base + prefix + stored))
+                        found.append(EngineFile(path: base + path, size: contents.size, fileCount: contents.count, stored: base + prefix + stored, contents: contents.contents))
                     } else if list.reaches(folder: lower) {
                         let inner = visit(path)
                         if inner.all {
-                            let size = inner.found.reduce(0) { $0 + $1.size }, count = inner.found.reduce(0) { $0 + $1.fileCount }
-                            found.append(EngineFile(path: base + path, size: size, fileCount: count, stored: base + prefix + stored))
+                            let contents = folderContents(url, iCloud: iCloud)
+                            found.append(EngineFile(path: base + path, size: contents.size, fileCount: contents.count, stored: base + prefix + stored, contents: contents.contents))
                         } else {
                             found += inner.found
                             all = false
@@ -229,10 +239,11 @@ nonisolated enum EngineFiles {
         }
         #if canImport(Darwin)
         if iCloud {
-            let storedName = (file.stored as NSString).lastPathComponent
             var coordination: NSError?, failure: (any Error)?
             NSFileCoordinator().coordinate(writingItemAt: folder.appendingPathComponent(file.path), options: .forDeleting, error: &coordination) { actual in
-                do { try delete(actual.deletingLastPathComponent().appendingPathComponent(storedName)) } catch { failure = error }
+                // The coordinator may have moved the item, so its answer decides the path. A placeholder follows the name.
+                let target = file.stored == file.path ? actual : actual.deletingLastPathComponent().appendingPathComponent(".\(actual.lastPathComponent).icloud")
+                do { try delete(target) } catch { failure = error }
             }
             if let error = coordination ?? failure { throw error }
             return
@@ -241,17 +252,24 @@ nonisolated enum EngineFiles {
         try delete(folder.appendingPathComponent(file.stored))
     }
 
-    /// True when a link kept in the game folder leads into something about to go, as a game's `www` could into an app
-    /// bundle. The web engines follow such a link, so removing the bundle would take the game with it.
-    static func linkLeadsInto(_ gone: [EngineFile], entries: Set<String>, in folder: URL) -> Bool {
+    /// True when a link kept in the game folder, however deep, leads into something about to go, as a game's `www` could
+    /// into an app bundle. The web engines follow such a link, so removing the bundle would take the game with it. It reads
+    /// every kept entry's metadata and nothing else. A folder it can't walk counts as true, so nothing is offered.
+    static func linkLeadsInto(_ gone: [EngineFile], in folder: URL) -> Bool {
+        guard let items = FileManager.default.enumerator(atPath: folder.path) else { return true }
         let root = folder.resolvingSymlinksInPath().path
         let targets = gone.map { root + "/" + $0.stored }
-        return entries.contains { entry in
-            let url = folder.appendingPathComponent(entry)
-            guard attributes(url.path)?.type == .typeSymbolicLink else { return false }
-            let target = url.resolvingSymlinksInPath().path
-            return targets.contains { target == $0 || target.hasPrefix($0 + "/") }
+        let stored = Set(gone.map(\.stored))
+        for case let item as String in items {
+            if stored.contains(item) {
+                items.skipDescendants()
+                continue
+            }
+            guard items.fileAttributes?[.type] as? FileAttributeType == .typeSymbolicLink else { continue }
+            let target = folder.appendingPathComponent(item).resolvingSymlinksInPath().path
+            if targets.contains(where: { target == $0 || target.hasPrefix($0 + "/") }) { return true }
         }
+        return false
     }
 }
 
@@ -290,7 +308,7 @@ extension LibraryStore {
                 return result
             }
             for file in confirmed {
-                guard let current = plan.files.first(where: { $0.path == file.path && $0.size == file.size }) else {
+                guard let current = plan.files.first(where: { $0.path == file.path && $0.size == file.size && $0.contents == file.contents }) else {
                     result.failed.append(.init(path: file.path, reason: "It changed after VNDegen listed it."))
                     continue
                 }
@@ -330,7 +348,7 @@ extension LibraryStore {
             return !gone.contains { lower == $0 || lower.hasPrefix($0 + "/") }
         }
         guard plugin.detect(FolderProbe(root: folder, entries: kept))?.engine == game.detected?.engine,
-              !EngineFiles.linkLeadsInto(files, entries: kept, in: folder) else { return EngineFilePlan() }
+              !EngineFiles.linkLeadsInto(files, in: folder) else { return EngineFilePlan() }
         return EngineFilePlan(files: files, inICloud: place == .iCloud)
     }
 }

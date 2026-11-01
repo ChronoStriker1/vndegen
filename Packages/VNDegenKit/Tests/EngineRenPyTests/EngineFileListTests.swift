@@ -73,6 +73,29 @@ private let bothLines = "version_tuple = (7, 6, 3, vc_version)\nversion_tuple = 
     for path in kept { #expect(scratch.exists(path), "\(path)") }
 }
 
+/// Kinds of file that look like the engine's but belong to neither folder they sit in.
+@Test @MainActor func namesThatOnlyLookLikeTheEnginesStay() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("renpy/__init__.py", version8)
+    let kept = ["lib/py3-linux-x86_64/state.so.json", "lib/py3-linux-x86_64/libsteam_api.so.bak", "lib/py3-linux-x86_64/mod.py",
+                "lib/python3.9/thing.dll", "lib/python3.9/python", "game/script.rpy"]
+    for path in kept + ["lib/py3-linux-x86_64/libz.so.1", "lib/py3-linux-x86_64/libglew.so.2.1", "lib/python3.9/os.py"] { try scratch.write(path) }
+    let library = await scratch.library()
+    let plan = await library.engineFilePlan(for: scratch.id)
+    #expect(Set(plan.files.map(\.path)) == ["lib/py3-linux-x86_64/libz.so.1", "lib/py3-linux-x86_64/libglew.so.2.1", "lib/python3.9/os.py"])
+}
+
+/// A name no list would remove can still decide the line, and it stays, so `lib/` stays with it.
+@Test @MainActor func aKeptNameOfTheOtherLineLeavesLib() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("renpy/__init__.py", bothLines)
+    for path in ["renpy/__pycache__/a.pyc", "game/script.rpy", "lib/py3-windows-x86_64/python.exe", "lib/python2.7.bak/os.py"] { try scratch.write(path) }
+    let library = await scratch.library()
+    #expect(await library.engineFilePlan(for: scratch.id).files.isEmpty)
+}
+
 /// With both lines in `lib/`, removing one and failing on the other would change which runtime the game gets.
 @Test @MainActor func bothLinesInLibStayWhenLibDecidesTheLine() async throws {
     let scratch = Scratch()

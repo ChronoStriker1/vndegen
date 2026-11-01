@@ -114,6 +114,17 @@ private let mine = ["package.json", "Game_en.exe", "ym.exe", "winmm.dll", "sover
     #expect(scratch.exists("Game.exe"))
 }
 
+/// Loose data beside an `.exe` far bigger than any runtime: the game may be in the `.exe`, so it stays.
+@Test @MainActor func anExeTooBigToBeOnlyARuntimeLeavesEveryExe() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    for path in ["www/js/rpg_core.js", "www/data/System.json", "nw.pak", "nw.exe"] { try scratch.write(path) }
+    try scratch.write("Game.exe", size: 400_000_000)
+    let library = await scratch.library(.mv)
+    #expect(await library.engineFilePlan(for: scratch.id).files.map(\.path) == ["nw.pak"])
+    #expect(scratch.exists("Game.exe") && scratch.exists("nw.exe"))
+}
+
 /// iCloud hides a file not downloaded yet from the listing, so the one large `.exe` VNDegen sees may not be the only one.
 @Test @MainActor func anExeNotDownloadedLeavesEveryExe() async throws {
     let scratch = Scratch()

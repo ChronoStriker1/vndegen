@@ -149,6 +149,30 @@ private let gameID = GameID("Game")
     #expect(scratch.exists("pnacl/save.json"))
 }
 
+/// Same total size and file count, but not the same file.
+@Test func aFolderWhoseFileWasSwappedForOneOfTheSameSizeStays() throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("pnacl/a", size: 100)
+    let file = try #require(EngineFiles.files(ListPlugin().list!, in: scratch.game).first)
+    try FileManager.default.removeItem(at: scratch.game.appendingPathComponent("pnacl/a"))
+    try scratch.write("pnacl/state.json", size: 100)
+    #expect(throws: LibraryFolderError.self) { try EngineFiles.remove(file, in: scratch.game, toTrash: false, iCloud: false) }
+    #expect(scratch.exists("pnacl/state.json"))
+}
+
+/// A link deeper than detection's listing looks, or hidden from it, counts as much as one at the top.
+@Test @MainActor func aDeepKeptLinkIntoAnOfferedFolderOffersNothing() async throws {
+    let scratch = Scratch()
+    defer { try? FileManager.default.removeItem(at: scratch.base) }
+    try scratch.write("js/rmmz_core.js")
+    try scratch.write("pnacl/bg.png")
+    try FileManager.default.createDirectory(at: scratch.game.appendingPathComponent("a/b/c"), withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(at: scratch.game.appendingPathComponent("a/b/c/.bg.png"), withDestinationURL: scratch.game.appendingPathComponent("pnacl/bg.png"))
+    let library = await scratch.library()
+    #expect(await library.engineFilePlan(for: gameID).files.isEmpty)
+}
+
 /// A link kept in the game that leads into an offered bundle would lose what the link holds.
 @Test @MainActor func aKeptLinkIntoAnOfferedFolderOffersNothing() async throws {
     let scratch = Scratch()
