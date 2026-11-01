@@ -64,9 +64,17 @@ KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDeg
 
 Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives work without any per-game setting: VNDegen recognizes the common ciphers by the checksums inside the archive, and tells you when a game uses one it doesn't know. Common Windows plugins are built in, including `extrans`, `layerExDraw`, `layerExSave`, and Steam builds' `krkrsteam`.
 
-A KiriKiri game's window menu bar appears under Game commands in the VNDegen menu, described in [controls.md](controls.md#game-commands).
+AlphaMovie (`.amv`) clips play, the battle animations of the Violated Hero games.
 
-Known limits: sound effects and music stored as MP3 don't play, AlphaMovie (`.amv`) animations don't show, and a KiriKiri game that is still starting with a question on screen when the Mac logs out or shuts down doesn't save its settings from that moment. [kirikiri-spike.md](kirikiri-spike.md) records how the port was chosen.
+A KiriKiri game's window menu bar appears under Game commands in the VNDegen menu, described in [controls.md](controls.md#game-commands). In a game's own Display menu, the choice between fitting the picture inside the window, filling the window and cutting off the edges, and drawing it unscaled in the center works, as do smoothing, screen effects, the draw thread count, and the maximum frame rate, and the game's `.cfu` file keeps them for the next launch. The items that can't apply are left out: the window sizes, since VNDegen sizes the window, the display method and screen resolutions, since VNDegen draws through Metal and never changes the screen's mode, and the middle zoom, which games enable only for their own stand-in for full screen on Windows.
+
+Known limits:
+
+- Six games in the maintainer's library can't start, and say that their encryption isn't supported: OPPAI Ero App Academy, OPPAI Succubus Academy, Motto! Haramase! Honoo no Oppai Isekai Oppai Maid Gakuen!, the Bunny Gakuen and Spy Gakuen games of the same series, and Sabbat of the Witch. They install their cipher from an encrypted module inside the `.exe`. OPPAI Ero App Academy was checked by running it, and the others by reading their archives. OPPAI Academy Big, Bouncy, Booby Babes! is probably the seventh, inferred from its series, since its installer couldn't be read.
+- Sound effects and music stored as MP3 don't play. No game that could be checked needs it: a scan of the library's 60 KiriKiri games in November 2026 found no `.mp3` in any archive and no script naming one, only bonus tracks outside the game data of three games. The scan couldn't search scripts in the six games above and OPPAI Academy, and five of those six also hide their file names.
+- A KiriKiri game that is still starting with a question on screen when the Mac logs out or shuts down doesn't save its settings from that moment.
+
+[kirikiri-spike.md](kirikiri-spike.md) records how the port was chosen.
 
 ## Artemis
 
