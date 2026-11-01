@@ -323,10 +323,96 @@ static VALUE graphics_put_frame_count(VALUE self, VALUE v) { (void)self; rgss_fr
 static VALUE graphics_get_brightness(VALUE self) { (void)self; return INT2NUM(brightness); }
 static VALUE graphics_put_brightness(VALUE self, VALUE v) { (void)self; brightness = clamp255(NUM2INT(v)); return v; }
 
+// Graphics.play_movie, VX Ace's Play Movie command: plays an Ogg Theora movie over the screen and returns once it has
+// ended. As the help's Movie Resources page says, the movie sits in the middle of the screen at its own size, cut off
+// where it is larger. RGSS3 under Wine showed the rest: the last frame the game drew stays around a smaller movie, the
+// game's frame count runs on, keys don't skip it, and a name without an extension finds .ogv or .ogg.
+typedef struct {
+    uint8_t *data;
+    size_t size;
+    vnvideo *video;
+    Image frame;
+} Movie;
+
+static int64_t movie_read(void *user, uint64_t offset, void *buffer, size_t length) {
+    Movie *m = user;
+    if (offset >= m->size) return 0;
+    if (length > m->size - offset) length = m->size - offset;
+    memcpy(buffer, m->data + offset, length);
+    return (int64_t)length;
+}
+
+static VALUE movie_play(VALUE value) {
+    Movie *m = (Movie *)value;
+    vnvideo_info info;
+    vnvideo_get_info(m->video, &info);
+    ensure_screen();
+    // What the game last drew, which shows around the movie.
+    Image back;
+    if (!image_alloc(&back, screen.w, screen.h) || !image_alloc(&m->frame, screen.w, screen.h)) {
+        image_free(&back);
+        return Qnil;
+    }
+    if (isFrozen) memcpy(back.px, frozen.px, sizeof(Pixel) * (size_t)back.w * back.h);
+    else scene_render(&back);
+    memcpy(m->frame.px, back.px, sizeof(Pixel) * (size_t)back.w * back.h);
+    audio_set_movie(m->video);
+    int x = (screen.w - info.width) / 2, y = (screen.h - info.height) / 2;
+    long frames = 0;
+    double clock = 0;
+    while (!vnvideo_ended(m->video, clock)) {
+        int changed = 0;
+        const uint8_t *pixels = vnvideo_frame(m->video, clock, &changed);
+        if (pixels && changed) {
+            Image picture = {info.width, info.height, (Pixel *)pixels};
+            image_blt(&m->frame, x, y, &picture, (IRect){0, 0, info.width, info.height}, 255);
+        }
+        if (host_frame_hidden()) {
+            rgss_frame_count++;
+            if (!host_wait_frame()) stop_game();
+        } else {
+            present(&m->frame);
+        }
+        frames++;
+        // A movie with sound keeps time by the sound played, so a slow decode holds the picture back with it.
+        clock = info.audio_rate ? vnvideo_audio_time(m->video) : (double)frames / rgss_frame_rate;
+    }
+    image_free(&back);
+    rgss_log("movie ended after %ld frames, %.2f s", frames, clock);
+    if (vnvideo_error(m->video)) rgss_log("movie: %s", vnvideo_error(m->video));
+    // Keys pressed during the movie don't reach the game afterwards, as RGSS reads keys only when the game asks.
+    HostInput dropped;
+    host_input(&dropped);
+    return Qnil;
+}
+
+static VALUE movie_close(VALUE value) {
+    Movie *m = (Movie *)value;
+    audio_set_movie(NULL);
+    vnvideo_close(m->video);
+    image_free(&m->frame);
+    free(m->data);
+    return Qnil;
+}
+
 static VALUE graphics_play_movie(VALUE self, VALUE name) {
     (void)self;
-    rgss_log("Graphics.play_movie(%s): movies are not supported", StringValueCStr(name));
-    return Qnil;
+    static const char *const extensions[] = {".ogv", ".ogg", NULL};
+    const char *path = StringValueCStr(name);
+    Movie movie = {0};
+    if (!rgss_fs_read(path, extensions, &movie.data, &movie.size, NULL)) {
+        rgss_log("Graphics.play_movie(%s): no such movie", path);
+        return Qnil;
+    }
+    char error[160];
+    movie.video = vnvideo_open(movie_read, &movie, movie.size, 0, error, sizeof error);
+    if (!movie.video) {
+        rgss_log("Graphics.play_movie(%s): %s", path, error);
+        free(movie.data);
+        return Qnil;
+    }
+    rgss_log("Graphics.play_movie(%s) at frame %ld", path, rgss_frame_count);
+    return rb_ensure(movie_play, (VALUE)&movie, movie_close, (VALUE)&movie);
 }
 
 // MARK: Input
@@ -543,22 +629,35 @@ static VALUE f_rgss_stop(VALUE self) {
     return Qnil;
 }
 
-// A message box blocks the game on PC until the player closes it. Here it goes to the log.
+// A message box stops the game until the player closes it, as on PC. The host shows it; the log keeps a copy.
+static void message_box(VALUE text) {
+    char *copy = strndup(RSTRING_PTR(text), (size_t)RSTRING_LEN(text));
+    rgss_log("msgbox: %s", copy);
+    bool go = host_message_box(copy);
+    free(copy);
+    if (!go) stop_game();
+}
+
+// msgbox, and print in XP and VX: the arguments' to_s, one after another. Returns nil, as the help says.
 static VALUE f_msgbox(int argc, VALUE *argv, VALUE self) {
     (void)self;
     VALUE text = rb_str_new(NULL, 0);
     for (int i = 0; i < argc; i++) rb_str_append(text, rb_obj_as_string(argv[i]));
-    rgss_log("msgbox: %s", StringValueCStr(text));
+    message_box(text);
     return Qnil;
 }
 
+// msgbox_p, and p in XP and VX: each argument's inspect on a line of its own. Returns nil, as the help says and as
+// Ruby 1.8's p did.
 static VALUE f_msgbox_p(int argc, VALUE *argv, VALUE self) {
     (void)self;
+    VALUE text = rb_str_new(NULL, 0);
     for (int i = 0; i < argc; i++) {
-        VALUE s = rb_inspect(argv[i]);
-        rgss_log("msgbox_p: %s", StringValueCStr(s));
+        if (i > 0) rb_str_cat_cstr(text, "\n");
+        rb_str_append(text, rb_inspect(argv[i]));
     }
-    return argc == 0 ? Qnil : argc == 1 ? argv[0] : rb_ary_new_from_values(argc, argv);
+    message_box(text);
+    return Qnil;
 }
 
 void rgss_define_modules(void) {

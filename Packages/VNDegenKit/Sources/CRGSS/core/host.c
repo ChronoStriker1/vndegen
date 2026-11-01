@@ -35,6 +35,7 @@ static struct {
     bool hasProblem;
     char *pendingEval; // Ruby the Linux test host asks the game thread to run
     int speed;         // frames the game draws for each one its frame rate gives
+    char *message;     // the message box the game waits on
 } S = {.frameRate = 60, .speed = 1};
 
 // Ruby the host asked to run, in order, and what it gave once it has run.
@@ -217,6 +218,23 @@ void host_input(HostInput *out) {
     pthread_mutex_unlock(&lock);
 }
 
+bool host_message_box(const char *text) {
+    pthread_mutex_lock(&lock);
+    free(S.message);
+    S.message = strdup(text);
+    // A test host waiting for the next frame hears about the box instead.
+    pthread_cond_broadcast(&cond);
+    while (S.message && !S.stopRequested) pthread_cond_wait(&cond, &lock);
+    free(S.message);
+    S.message = NULL;
+    bool go = !S.stopRequested;
+    // The game didn't run while the box was up, so it picks up at its own pace rather than with frames owed.
+    if (S.granted > 1) S.granted = 1;
+    S.carry = 0;
+    pthread_mutex_unlock(&lock);
+    return go;
+}
+
 void host_set_problem(const char *problem) {
     pthread_mutex_lock(&lock);
     snprintf(S.problem, sizeof S.problem, "%s", problem);
@@ -305,7 +323,7 @@ int vnrgss_step(double seconds) {
         pthread_mutex_unlock(&lock);
         return 1;
     }
-    if (!S.paused) {
+    if (!S.paused && !S.message) {
         if (seconds < 0) seconds = 0;
         if (seconds > 0.25) seconds = 0.25;
         // Rounded rather than truncated: display refreshes jitter around 1/60 s, and truncating would grant no frame on
@@ -464,6 +482,21 @@ void vnrgss_stop(void) {
 
 const char *vnrgss_problem(void) { return S.hasProblem ? S.problem : NULL; }
 
+const char *vnrgss_message(void) {
+    pthread_mutex_lock(&lock);
+    const char *text = S.message;
+    pthread_mutex_unlock(&lock);
+    return text;
+}
+
+void vnrgss_dismiss_message(void) {
+    pthread_mutex_lock(&lock);
+    free(S.message);
+    S.message = NULL;
+    pthread_cond_broadcast(&cond);
+    pthread_mutex_unlock(&lock);
+}
+
 // MARK: Test host
 
 void host_test_eval(const char *code) {
@@ -498,7 +531,7 @@ bool host_test_step(int timeoutMs) {
         deadline.tv_sec++;
         deadline.tv_nsec -= 1000000000L;
     }
-    while (S.serial == before && S.running && !S.ended) {
+    while (S.serial == before && S.running && !S.ended && !S.message) {
         if (pthread_cond_timedwait(&cond, &lock, &deadline) == ETIMEDOUT) break;
     }
     bool alive = S.running && !S.ended;

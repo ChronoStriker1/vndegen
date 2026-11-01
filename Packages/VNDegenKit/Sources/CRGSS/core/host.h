@@ -34,6 +34,8 @@ void host_frame_reset(void);
 // The input state since the last call, with quick taps held down once.
 void host_input(HostInput *out);
 void host_set_problem(const char *problem);
+// Shows a message box and waits until the host dismisses it. False when the host is stopping the game.
+bool host_message_box(const char *text);
 
 // Runs Ruby for vnrgss_run_ruby on the game thread and returns its last value's to_s, or the error's message with
 // `failed` set, which the caller frees. Defined by the Ruby side (rb_modules.c).

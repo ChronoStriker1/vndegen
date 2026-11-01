@@ -66,6 +66,12 @@ long vnrgss_run_ruby(const char *ruby);
 // the game ending before it ran or before its result was read. The caller frees it. NULL while the request waits.
 char *vnrgss_ruby_result(long request, bool *failed);
 
+// The text of a message box the game is waiting on (msgbox in VX Ace, print and p in XP and VX), or NULL. The game stays
+// stopped, and vnrgss_step lets no time pass, until vnrgss_dismiss_message. The text stays valid until then or vnrgss_stop.
+const char *vnrgss_message(void);
+// Closes the message box, as its OK button does on PC, and lets the game go on.
+void vnrgss_dismiss_message(void);
+
 // Ends the game and waits for its thread to unwind. RGSS games save only when the player saves, so nothing is lost.
 void vnrgss_stop(void);
 

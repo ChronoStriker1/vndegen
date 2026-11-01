@@ -9,7 +9,7 @@
 // do, and print what it gave. KEY is a libretro key code or a
 // name: up, down, left, right, enter, esc, space, shift, or a single letter. Lines starting with # are comments.
 // Everything after --then is a second game's arguments; it starts in the same process once the first has stopped, as
-// the app starts one game after another.
+// the app starts one game after another. A message box the game shows is printed as "msgbox N: TEXT" and closed.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -195,6 +195,12 @@ static int run(int argc, char **argv) {
             else vnrgss_key(commands[i].key, commands[i].kind == 0);
         }
         if (!host_test_step(20000)) break;
+        // A message box the game shows is printed and closed at once, as if the player pressed OK.
+        const char *message = vnrgss_message();
+        if (message) {
+            printf("msgbox %ld: %s\n", frame, message);
+            vnrgss_dismiss_message();
+        }
         print_ruby_results();
         // A 60 Hz frame's worth of sound, which also keeps the mixer's decoders exercised.
         float pcm[735 * 2];

@@ -91,6 +91,16 @@ static bool paused;
 static vnmidi_font *soundFont;
 // The BGM sits out while an ME plays and picks up where it was once the ME ends.
 static bool bgmHeld;
+// Graphics.play_movie's sound, resampled to the output rate as it is pulled from the decoder.
+static struct {
+    vnvideo *video;
+    int channels;
+    double step, phase;
+    float prev[2], next[2];
+    float buffer[CHUNK * 2];
+    int bufferCount, bufferIndex;
+    bool primed;
+} movie;
 
 static float gain_for(int volume) {
     if (volume <= 0) return 0;
@@ -336,6 +346,69 @@ static bool voice_mix(Voice *v, float *out, int frames) {
     return true;
 }
 
+// MARK: Movies
+
+// The movie's next source frame, or false while the decoder has none ready.
+static bool movie_pull(float frame[2]) {
+    if (movie.bufferIndex >= movie.bufferCount) {
+        float temp[CHUNK * 2];
+        int got = (int)vnvideo_read_audio(movie.video, temp, CHUNK);
+        if (got <= 0) return false;
+        for (int i = 0; i < got; i++) {
+            movie.buffer[i * 2] = temp[i * movie.channels];
+            movie.buffer[i * 2 + 1] = temp[i * movie.channels + movie.channels - 1];
+        }
+        movie.bufferCount = got;
+        movie.bufferIndex = 0;
+    }
+    frame[0] = movie.buffer[movie.bufferIndex * 2];
+    frame[1] = movie.buffer[movie.bufferIndex * 2 + 1];
+    movie.bufferIndex++;
+    return true;
+}
+
+// Adds the movie's sound to `out`. When the decoder falls behind, the rest of this block stays silent and the movie's
+// clock, which counts the sound handed out, waits with it.
+static void movie_mix(float *out, int frames) {
+    if (!movie.primed) {
+        if (!movie_pull(movie.prev)) return;
+        movie.next[0] = movie.prev[0];
+        movie.next[1] = movie.prev[1];
+        movie.primed = true;
+    }
+    for (int i = 0; i < frames; i++) {
+        float t = (float)movie.phase;
+        out[i * 2] += movie.prev[0] + (movie.next[0] - movie.prev[0]) * t;
+        out[i * 2 + 1] += movie.prev[1] + (movie.next[1] - movie.prev[1]) * t;
+        movie.phase += movie.step;
+        while (movie.phase >= 1) {
+            float frame[2];
+            if (!movie_pull(frame)) {
+                movie.phase = 1;
+                return;
+            }
+            movie.prev[0] = movie.next[0];
+            movie.prev[1] = movie.next[1];
+            movie.next[0] = frame[0];
+            movie.next[1] = frame[1];
+            movie.phase -= 1;
+        }
+    }
+}
+
+void audio_set_movie(vnvideo *video) {
+    vnvideo_info info = {0};
+    if (video) vnvideo_get_info(video, &info);
+    pthread_mutex_lock(&lock);
+    memset(&movie, 0, sizeof movie);
+    if (video && info.audio_rate > 0 && info.audio_channels > 0) {
+        movie.video = video;
+        movie.channels = info.audio_channels;
+        movie.step = (double)info.audio_rate / AUDIO_RATE;
+    }
+    pthread_mutex_unlock(&lock);
+}
+
 // MARK: The host's side
 
 // The SoundFont the host asked for, loaded when the game first plays MIDI, on the game thread, since decoding it takes
@@ -379,6 +452,7 @@ void audio_stop(void) {
         effects[i] = NULL;
     }
     bgmHeld = false;
+    memset(&movie, 0, sizeof movie);
     pthread_mutex_unlock(&lock);
     for (int i = 0; i < 3 + MAX_SE; i++) voice_free(old[i]);
 }
@@ -399,6 +473,7 @@ void audio_render(float *out, int frames) {
             if (!voice_mix(v, out, frames) && t == TRACK_ME) bgmHeld = false;
         }
         for (int i = 0; i < MAX_SE; i++) if (effects[i]) voice_mix(effects[i], out, frames);
+        if (movie.video) movie_mix(out, frames);
     }
     pthread_mutex_unlock(&lock);
     for (int i = 0; i < frames * 2; i++) {

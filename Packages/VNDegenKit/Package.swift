@@ -74,7 +74,7 @@ let package = Package(
         // Engines/RGSSRuntime/host builds the same sources for the Linux test tools.
         .binaryTarget(name: "RGSSRuby", path: "build/RGSSRuby.xcframework"),
         .target(
-            name: "CRGSS", dependencies: ["RGSSRuby", "CVNFont", "CVNMidi"], exclude: ["third_party"],
+            name: "CRGSS", dependencies: ["RGSSRuby", "CVNFont", "CVNMidi", "CVNVideo"], exclude: ["third_party"],
             // The runtime draws every frame on the CPU, so Debug builds are optimized too, as NScripter's are.
             cSettings: [.unsafeFlags(["-O2"])],
             linkerSettings: [.linkedLibrary("z")]),

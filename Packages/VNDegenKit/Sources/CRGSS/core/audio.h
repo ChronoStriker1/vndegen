@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "vnvideo.h"
+
 enum { AUDIO_RATE = 44100 };
 
 typedef enum { TRACK_BGM, TRACK_BGS, TRACK_ME } AudioTrack;
@@ -26,5 +28,7 @@ void audio_fade_track(AudioTrack track, int ms);
 long audio_position(AudioTrack track);
 bool audio_play_se(uint8_t *data, size_t size, const char *name, int volume, int pitch);
 void audio_stop_se(void);
+// Mixes a movie's sound in with the rest until it is set back to NULL, which the game thread does before closing it.
+void audio_set_movie(vnvideo *movie);
 
 #endif
