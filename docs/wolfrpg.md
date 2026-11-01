@@ -59,6 +59,8 @@ right after a message opens with that message still showing.
 XY arrays draw as pictures through `<XY_IMAGE/...>` and `<XYN_IMAGE/...>`, The Clumsy Witch Seris's minimap, and saves of
 version 159 keep them. `<CUT/Xa-b/Yc-d>` before a file name shows part of each pattern.
 
+Map event pages hold their animation speed, move speed, move frequency and move type in that order. Characters draw from images of 3 or 5 patterns by 4 rows, or with eight-direction images (Game.dat's settings byte 1 is 8) two such blocks side by side, the diagonals in the second, as the manual's material page shows.
+
 Text uses a font file the game ships whose family name matches the one Game.dat names, then VNDegen's Windows font pack
 (`docs/fonts.md`), then Hiragino on Apple systems. `\font[n]` switches to the sub fonts Game.dat names.
 
@@ -92,6 +94,10 @@ and 72, and whether it is over a picture. System variable 73 lets it work messag
 
 When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.
 Return finishes and Backspace deletes. A controller's Confirm finishes and Cancel cancels.
+
+### ANGEL QUEST's mouse
+
+ANGEL QUEST walks the hero toward the pointer by pressing arrow keys with command 125, and blocks those keys only for 5 frames after an event ends. It's an ordinary user of command 126, not evidence about 125 getting past it. Run from the same PC save, the hero steps left and right of the throne room carpet with the pointer on both the PC engine under Wine and VNDegen.
 
 ### Commands 125 and 126
 
