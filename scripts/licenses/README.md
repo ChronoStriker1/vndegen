@@ -24,6 +24,8 @@ its own:
 - `scripts/midi-licenses.sh` writes `build/midi/licenses/` for vnmidi, the MIDI player in `Engines/Shared`: the license
   of the FluidR3Mono SoundFont the app bundles from `Engines/Shared/soundfonts/`, and those of TinySoundFont,
   TinyMidiLoader, and stb_vorbis from `Engines/Shared/third_party/`.
+- `scripts/video-licenses.sh` writes `build/video/licenses/` for vnvideo, the movie decoder in `Engines/Shared`: the
+  licenses of pl_mpeg, libogg, libtheora, and libopus from `Engines/Shared/third_party/`.
 
 `scripts/build.sh` fails when one of these folders has no notices.
 
