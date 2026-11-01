@@ -366,9 +366,11 @@
 
     // Karryn's Prison's logger and mod manager load util at startup and call promisify and inherits from it.
     const util = {
-        promisify: (fn) => (...args) => new Promise((resolve, reject) => {
-            fn(...args, (error, value) => { if (error) reject(error); else resolve(value); });
-        }),
+        promisify: (fn) => function (...args) {
+            return new Promise((resolve, reject) => {
+                fn.call(this, ...args, (error, value) => { if (error) reject(error); else resolve(value); });
+            });
+        },
         inherits: (child, parent) => { child.super_ = parent; Object.setPrototypeOf(child.prototype, parent.prototype); },
     };
 
