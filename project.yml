@@ -10,7 +10,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.21.0"
+    MARKETING_VERSION: "0.21.1"
     CURRENT_PROJECT_VERSION: "1"
 # scripts/kirikiri-engine.sh builds the engine into build/kirikiri, and does nothing when it is up to date. It is a target
 # of its own because Xcode copies the app's frameworks before any of the app target's build phases run. It runs with a
