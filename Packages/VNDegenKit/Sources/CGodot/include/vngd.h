@@ -85,6 +85,11 @@ VNGD_API void vngd_joy_axis(int axis, float value);
 // Stops the game's clock and audio. vngd_iterate does nothing while paused.
 VNGD_API void vngd_set_paused(bool paused);
 
+// Runs the game at 1 to 8 times its speed, on top of any time scale the game sets itself: Godot's own speed control,
+// which runs more physics steps of the same length and scales the time each frame advances. 1 by default and after each
+// vngd_start.
+VNGD_API void vngd_set_speed(int speed);
+
 // Asks the game to close, as the window's close button would. A game that handles the request itself, such as with
 // a confirmation, keeps running. Keep calling vngd_iterate until it returns nonzero.
 VNGD_API void vngd_request_quit(void);

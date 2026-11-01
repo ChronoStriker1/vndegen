@@ -33,6 +33,8 @@ final class GodotSession: EngineSession {
     private let requirements: GodotRequirements
     private var state = State.waiting
     private var paused = false
+    /// The Cheats page's game speed.
+    private var speed: Int
     private var router = GodotInputRouter()
     private var displayLink: CADisplayLink?
     private var quitTimer: Timer?
@@ -50,6 +52,7 @@ final class GodotSession: EngineSession {
         self.engine = engine
         self.paths = paths
         self.requirements = requirements
+        speed = launch.game.cheats?.speed ?? 1
         try paths.prepare()
         host = GodotHostView()
         view = host
@@ -115,6 +118,7 @@ final class GodotSession: EngineSession {
         }
         godotLog.info("started \(self.launch.game.id.rawValue, privacy: .public)")
         state = .running
+        engine.setSpeed(Int32(speed))
         if paused { engine.setPaused(true) }
         host.takeFocus()
         let target = FrameTarget(self)
@@ -172,6 +176,15 @@ final class GodotSession: EngineSession {
     func type(_ typed: TypedText) {
         guard case .running = state else { return }
         router.type(typed).forEach(deliver)
+    }
+
+    var cheats: (any CheatSession)? { godotCheats }
+    private lazy var godotCheats = GodotCheats { [weak self] speed in self?.setSpeed(speed) }
+
+    private func setSpeed(_ speed: Int) {
+        self.speed = speed
+        guard case .running = state else { return }
+        engine.setSpeed(Int32(speed))
     }
 
     func setPaused(_ paused: Bool) {

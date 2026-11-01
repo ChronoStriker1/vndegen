@@ -20,7 +20,7 @@ import WebKit
                                         buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
         let page = try String(contentsOf: #require(FlashPlugin.hostDirectory).appending(path: "flash-page.js"), encoding: .utf8)
         let configuration = WKWebViewConfiguration()
-        for source in [try WebGameSession.shimSource(for: game), try FlashFonts.pageScript(page)] {
+        for source in [try WebGameSession.shimSource(for: game), FlashCheats.script(try FlashFonts.pageScript(page), speed: 1)] {
             configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)

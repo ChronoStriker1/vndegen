@@ -73,6 +73,10 @@ The game page says why:
 - `VNGD_TRACE_INPUT=1` logs every input event VNDegen sends.
 - In DEBUG builds, the launch arguments `-godotFrameLog`, `-godotSnapshot`, and `-godotTraceInput` set them, since a simulator's app can't be given environment variables. Relative paths go in the game's log folder.
 
+## Game speed
+
+The Cheats page in the VNDegen menu runs a game at 2x or 4x. It is Godot's own speed control, `Engine::set_user_time_scale`, which Godot 3 gets from VNDegen's patch 06: more physics steps of the same length per frame, and that much more time for each frame's `_process`. [cheats.md](cheats.md#built-game-speed-for-godot) has the details and limits.
+
 ## Known limits
 
 - A text field taking focus doesn't open VNDegen's on-screen keyboard, as described above.

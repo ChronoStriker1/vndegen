@@ -112,6 +112,20 @@
         }) });
     }
 
+    // Game speed, from the Cheats page. Ruffle advances a movie, its frames and its ActionScript timers, by the time
+    // between the animation frames it asks for, so animation frames that tell it more time has passed run the movie
+    // faster. Every callback in one frame gets the same time, which never goes back when the speed changes.
+    const speed = { value: __VNDEGEN_FLASH_SPEED__, real: null, scaled: 0 };
+    const scaledTime = (now) => {
+        if (speed.real !== null) speed.scaled += Math.max(0, now - speed.real) * speed.value;
+        else speed.scaled = now;
+        speed.real = now;
+        return speed.scaled;
+    };
+    const nativeFrame = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => nativeFrame((now) => callback(scaledTime(now)));
+    window.__vndegenFlashSpeed = (value) => { speed.value = value; };
+
     // Flash Player writes a movie's shared objects when it quits, and most games never ask for it sooner. Ruffle writes
     // them when the page hides, so a pagehide of our own writes them whenever the game may end: when it pauses, as when
     // the VNDegen menu opens or the app leaves the screen, when the page is hidden, and before the session quits.

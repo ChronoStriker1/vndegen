@@ -122,6 +122,7 @@ bool Game::start(std::string &error) {
 
     // Archives: <stem>GA.ald for pictures, WA for sound effects, BA for music.
     std::string stem = fs::path(ainPath).stem().string();
+    codeStem_ = stem;
     auto openAld = [&](const char *kind) -> std::unique_ptr<AldArchive> {
         std::string first = findCaseless(cfg.root, stem + kind + "A.ald");
         if (first.empty()) return nullptr;
@@ -243,7 +244,8 @@ bool Game::step(int ms) {
         lostMs_ += ms - 100;
         ms = 100;
     }
-    clockMs_ += uint32_t(ms);
+    clockMs_ += uint32_t(ms) * uint32_t(speed_.load());
+    movieClockMs_ += uint32_t(ms);
     if (clockMs_ - timingLoggedAt_ >= 10000) {
         timingLoggedAt_ = clockMs_;
         Audio::Timing t = audio.takeTiming();

@@ -1,6 +1,6 @@
 # Feature request: cheats for games that aren't visual novels
 
-Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, and Wolf RPG Editor are built, see below.
+Status: approved, in progress on `feature/cheats-request`. RPG Maker MV and MZ, RPG Maker XP, VX and VX Ace, Wolf RPG Editor, and AliceSoft System 3 and 4 are built, and game speed for Godot and Flash, see below.
 
 ## Why
 
@@ -41,7 +41,7 @@ Visual novel engines (TyranoScript, Ren'Py, KiriKiri, NScripter, Artemis) don't 
 
 1. The variable and switch editor is included. A save made before editing is the undo, and the editor says so.
 2. Game speed sits with the cheats, in every engine that can do it.
-3. AliceSoft System 3 and 4 get per-game tables that say which variable holds gold, HP and the like, for the library games that have them. The variable list works for every game.
+3. AliceSoft System 3 and 4 get the variable list, and the Variables tab gets a find by value, which finds the variable that holds gold or HP in any game. System 3 games name their variables `VAR0000` and on, or not at all, so per-game tables would mean reading each game's script. System 4 gets gold for the library games whose globals name it. (Revised by the maintainer the same day: tables for System 3 were the first plan.)
 
 ## Suggested order
 
@@ -165,3 +165,75 @@ Test Game 52 on the MacBook (120 Hz display, load average about 30), 30 s at eac
 - Restore fills HP and SP to the hero's base maximum (fields 7 and 9). Equipment that raises the maximum raises it further only in the standard system's own calculation, so the restored value can be below what the status screen shows as the maximum.
 - Spare variables, string variables and the databases themselves aren't listed.
 - A standard system translated so far that its database field names changed isn't recognized, and gets the variables only.
+
+## Built: game speed for Godot
+
+Godot games keep their gold, items and party in their own scripts, each in its own way, so their Cheats page has game speed only: 1x, 2x or 4x, on the Quick tab, working from the title screen on.
+
+It is Godot's own speed control, the one the Godot editor's Game view has (`Engine::set_user_time_scale`), through `vngd_set_speed` in `vngd.h`:
+
+- It multiplies whatever time scale the game sets itself, so a game's slow motion still works, and the game reads back its own value.
+- It runs more physics steps per frame, each as long as before, so collisions and physics behave as at 1x. The most physics steps a frame may run rises with the speed, so a frame running behind still catches up.
+- Each frame's `_process` time, and so timers, tweens and animations, advance that many times as far.
+- Godot 4.7 has the control. Godot 3.6 doesn't, and `Engines/Godot/3/patches/06-user-time-scale.patch` adds the same thing to its `Engine` and main loop.
+
+Checked on CachyOS with Godot built from the pinned sources and VNDegen's patches, and a count of physics steps and game time added to the main loop for the check only, each 5 s of real time:
+
+| Game | Speed | Physics steps | Game time | Step |
+|---|---|---|---|---|
+| Barely Working (Godot 3.6) | 1x | 300 | 5.0 s | 1/60 s |
+| Barely Working (Godot 3.6) | 4x | 1,200 | 20.0 s | 1/60 s |
+| Nitz's Debt (Godot 4.7) | 1x | 300 | 5.0 s | 1/60 s |
+| Nitz's Debt (Godot 4.7) | 4x | 1,200 | 20.0 s | 1/60 s |
+
+In the Mac app, the page set Nitz's Debt to 2x and 4x and Barely Working from 2x to 4x, and each change reached the engine. A game set to 4x started at 4x after a relaunch.
+
+### Known limits
+
+- A game that counts frames rather than time in `_process`, or that times itself with `Time.get_ticks_msec()` (`OS.get_ticks_msec()` in Godot 3), runs those parts at normal speed.
+- Music and sounds play at their normal speed.
+
+## Built: game speed for Flash
+
+Ruffle has no way to reach a movie's variables from outside, so Flash games' Cheats page has game speed only: 1x, 2x or 4x, on the Quick tab.
+
+Ruffle has no speed setting either. Its web build advances a movie by the time between the animation frames it asks the page for: it runs as many of the movie's frames as fit in that time, and moves the movie's ActionScript timers on by it. `flash-page.js` wraps `requestAnimationFrame` before Ruffle loads, so each animation frame tells Ruffle that the time since the last one, times the speed, has passed. Every callback in one animation frame gets the same time, and the time never goes back when the speed changes. A page the game opens next, such as a movie a launcher page opens, starts at the same speed.
+
+Checked in the Mac app with Overthrow! The Demon Queen, a 24 fps movie, on a 60 Hz display. Over 5 s, the time the animation frames reported against the real time, and the frames Ruffle drew per second:
+
+| Speed | Animation frame time / real time | Frames Ruffle drew per second |
+|---|---|---|
+| 1x | 1.000 | 24.1 |
+| 2x | 2.000 | 47.9 |
+| 4x | 4.001 | 59.8 (the display's limit) |
+
+Set to 4x on the page while the movie ran, it measured 3.999 and 59.1.
+
+### Known limits
+
+- `getTimer()` reads the real clock, so a game that moves by the time `getTimer()` says has passed runs those parts at normal speed.
+- A timeline's streamed sound, mostly in animated scenes, holds its movie clip to the sound, which plays at normal speed. Such a scene runs at normal speed.
+- Ruffle runs at most 5 of a movie's frames per animation frame, and fewer when the movie's frames take long to run. A 60 fps movie at 4x on a 60 Hz display needs 4, and a 120 Hz display halves that.
+- Music and sounds play at their normal speed.
+
+## Built: AliceSoft System 3 and 4
+
+Both runtimes are VNDegen's own, so their Cheats pages are calls on the runtime's variables, which the games' saves keep as always.
+
+- **System 3** (`vns3.h`): the Variables tab lists the game's variables, 0 to 65,535 each, with the names `System39.ain` gives them, and game speed. Nine of the ten library games name them `VAR0000` and on, and Kichikuou Rance's fan translation names 24, none of them gold or HP. A `SYSTEM3.EXE` game (Rance 4.1 and 4.2) names none, and the tab lists the 512 variables its saves keep.
+- **System 4** (`vns4.h`): the Variables tab lists the game's globals by name: whole numbers to edit, a bool taking 0 or 1, and decimals and text to read. Gold is on the Quick tab for the library games whose globals say which one holds the party's money: `GOLD` in Rance 02, `◆金` in Sengoku Rance and `g_nPartyMoney` in Evenicle. Rance IX, which the runtime doesn't run yet, keeps its money in a structure, so it would get the variables and speed only. The VM runs on a thread of its own, so the cheats work while it waits for the host's next step, which is whenever the game isn't in the middle of a long load.
+- **Find by value**, on every engine's Variables tab: type the number the game shows, such as your gold, and the list keeps the variables that hold it. Change the number in the game, by buying something, then find the new number: the list keeps those of them that hold it, usually one. Show all clears it. The page keeps what it found while the game runs.
+- **Game speed** runs the runtime's clock that many times as fast, so its waits, fades, animations and timers pass sooner. Music plays at normal speed, and a System 4 movie keeps to its sound on a clock of its own, so it plays at normal speed too.
+
+Checked on CachyOS through the runtimes:
+
+- System 3, Kichikuou Rance (`System39.ain`) and Rance 4.1 (`SYSTEM3.EXE`): 806 and 512 variables listed, a variable set to 4,242 and one held to 65,535, and the clock running 3,840 ms for 960 ms of frames at 4x. Kichikuou Rance's save written after the change, in its own `KICHIKUSA.ASD`, loaded with the new value.
+- System 4, Rance 02 and Sengoku Rance: 218 and 107 globals listed, gold found and raised by 1,000, a bool refusing 4,242, and a global of another type refused.
+
+Checked in the app on an iPad simulator (the page and the runtime calls are the same on every device): in Kichikuou Rance, finding 24 kept the two variables holding it, and after one changed to 30, finding 30 kept that one. In Rance 02, the Quick tab showed Gold 0, +10,000 made it 10,000, and the Variables tab's search found `GOLD` at 10,000.
+
+### Known limits
+
+- Party HP, items and the like live in each game's own structures, not in single variables, and aren't offered. Find by value reaches one that is a single variable.
+- A System 4 global that is a structure, an array or a reference isn't listed.
+- In System 3, the game's clock is also where it reads the time of day, which runs that much faster too.

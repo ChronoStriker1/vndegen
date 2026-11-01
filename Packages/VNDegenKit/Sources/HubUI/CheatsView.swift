@@ -25,6 +25,7 @@ final class CheatsPage {
         case restore, keepHealthy, noEncounters, walkThrough, speed, experience
         case itemKind(CheatItem.Kind)
         case search
+        case findValue, showAll
         case item(CheatItem.ID, count: Int)
         case variable(Int)
         case toggle(Int)
@@ -41,10 +42,19 @@ final class CheatsPage {
     private(set) var status: Status?
     var query = ""
     private(set) var itemKind = CheatItem.Kind.item
+    /// What finding a value kept, which the next find narrows. The page lasts while the game runs, so the player can
+    /// change the value in the game between finds.
+    private(set) var found: Found?
     var focus = FocusRing<Target>()
     /// The keyboard a controller types a search or a value on.
     private(set) var keyboard: OnScreenKeyboard?
     private var busy = false
+
+    /// The variables that held `value` when the player last found it.
+    struct Found: Equatable {
+        let value: Int
+        let ids: Set<Int>
+    }
 
     struct Status: Equatable {
         let text: String
@@ -80,7 +90,9 @@ final class CheatsPage {
         (state?.items ?? []).filter { $0.id.kind == itemKind && matches($0.name, id: $0.id.number) }
     }
 
-    var shownVariables: [CheatVariable] { (state?.variables ?? []).filter { matches($0.name, id: $0.id) } }
+    var shownVariables: [CheatVariable] {
+        (state?.variables ?? []).filter { (found?.ids.contains($0.id) ?? true) && matches($0.name, id: $0.id) }
+    }
 
     var shownSwitches: [CheatSwitch] { (state?.switches ?? []).filter { matches($0.name, id: $0.id) } }
 
@@ -112,6 +124,7 @@ final class CheatsPage {
         case .variables:
             guard inGame else { break }
             rows.append([.search])
+            rows.append(found == nil ? [.findValue] : [.findValue, .showAll])
             rows += shownVariables.map { [.variable($0.id)] }
         case .switches:
             guard inGame else { break }
@@ -214,6 +227,11 @@ final class CheatsPage {
             itemKind = kind
             focus.target = target
         case .search: openSearch()
+        case .findValue: openFind()
+        case .showAll:
+            found = nil
+            status = nil
+            focus.target = .findValue
         case let .item(id, count):
             let name = state?.items.first { $0.id == id }?.name ?? "item"
             run(.addItem(id, count: count), done: "Added \(count) \(name)")
@@ -247,6 +265,40 @@ final class CheatsPage {
             self?.query = $0
         } onClose: { [weak self] in
             self?.keyboard = nil
+        }
+    }
+
+    /// Finding a value keeps the variables holding it. Finding again keeps those of them that hold the new value, so
+    /// after the value changes in the game, such as gold after a purchase, a second find usually leaves one.
+    func openFind() {
+        var typed = ""
+        keyboard = OnScreenKeyboard(title: found == nil ? "Find a value" : "Find the new value", text: "") {
+            typed = $0
+        } onDone: { [weak self] in
+            self?.finishFinding(typed)
+        } onClose: { [weak self] in
+            self?.keyboard = nil
+        }
+    }
+
+    private func finishFinding(_ typed: String) {
+        guard let value = Int(typed.filter { !$0.isWhitespace && $0 != "," }) else {
+            status = Status(text: "Type the whole number the game shows", isError: true)
+            return
+        }
+        find(value)
+    }
+
+    func find(_ value: Int) {
+        let holding = (state?.variables ?? []).filter { $0.value == .integer(value) }.map(\.id)
+        let ids = Set(holding).intersection(found?.ids ?? Set(holding))
+        found = Found(value: value, ids: ids)
+        query = ""
+        status = switch ids.count {
+        case 0: Status(text: "No variable holds \(value.formatted()). Show all and find again.", isError: true)
+        case 1: Status(text: "One variable holds \(value.formatted())", isError: false)
+        default: Status(text: "\(ids.count.formatted()) variables hold \(value.formatted()). Change it in the game, then find the new value.",
+                        isError: false)
         }
     }
 
@@ -505,6 +557,16 @@ struct CheatsView: View {
         } else {
             note(Self.undoNote)
             searchField
+            HStack(spacing: 6) {
+                button(page.found == nil ? "Find a value" : "Find the new value", systemImage: "scope", target: .findValue)
+                if page.found != nil {
+                    button("Show all", target: .showAll)
+                        .frame(width: 130)
+                }
+            }
+            if let found = page.found {
+                caption("Variables that held \(found.value.formatted())")
+            }
             ForEach(page.shownVariables) { variable in
                 row(target: .variable(variable.id), action: { page.select(.variable(variable.id)) }) {
                     number(variable.id)

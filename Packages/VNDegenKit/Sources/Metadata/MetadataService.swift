@@ -25,6 +25,8 @@ public struct ArtworkCandidate: Identifiable, Hashable, Sendable {
     public var source: MetadataSource
     public var url: URL
     public var thumbnail: URL?
+    /// Bytes already fetched for fingerprinting, retained by the picker until it closes.
+    public internal(set) var thumbnailData: Data?
     public var id: URL { url }
 
     public init(slot: ArtworkSlot, source: MetadataSource, url: URL, thumbnail: URL? = nil) {
@@ -275,17 +277,22 @@ public final class MetadataService {
     private func distinct(_ candidates: [ArtworkCandidate]) async -> [ArtworkCandidate] {
         guard Set(candidates.map(\.source)).count > 1 else { return candidates }
         let http = http
-        let fingerprints = await withTaskGroup(of: (Int, ImageFingerprint?).self) { group in
+        let thumbnails = await withTaskGroup(of: (Int, Data?, ImageFingerprint?).self) { group in
             for (index, candidate) in candidates.enumerated() {
-                group.addTask { (index, (try? await http.image(candidate.thumbnail ?? candidate.url)).flatMap { ImageFingerprint($0.data) }) }
+                group.addTask {
+                    let data = try? await http.image(candidate.thumbnail ?? candidate.url).data
+                    return (index, data, data.flatMap { ImageFingerprint($0) })
+                }
             }
-            var byIndex = [ImageFingerprint?](repeating: nil, count: candidates.count)
-            for await (index, fingerprint) in group { byIndex[index] = fingerprint }
+            var byIndex = [(data: Data?, fingerprint: ImageFingerprint?)](repeating: (nil, nil), count: candidates.count)
+            for await (index, data, fingerprint) in group { byIndex[index] = (data, fingerprint) }
             return byIndex
         }
         var kept: [(source: MetadataSource, fingerprint: ImageFingerprint)] = []
-        return zip(candidates, fingerprints).compactMap { candidate, fingerprint in
-            guard let fingerprint else { return candidate }
+        return zip(candidates, thumbnails).compactMap { candidate, thumbnail in
+            var candidate = candidate
+            candidate.thumbnailData = thumbnail.data
+            guard let fingerprint = thumbnail.fingerprint else { return candidate }
             guard !kept.contains(where: { $0.source != candidate.source && $0.fingerprint.matches(fingerprint) }) else { return nil }
             kept.append((candidate.source, fingerprint))
             return candidate

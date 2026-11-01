@@ -46,10 +46,12 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Cheats for RPG Maker MV and MZ (0.14.0): gold, items, party restore, settings that stay on per game, and a variable and switch editor, through the game's own objects. `docs/cheats.md` has the rest of the plan.
 - AliceSoft System 4 (0.15.0), on VNDegen's own clean-room runtime, MIT licensed, on Mac, iPhone, and iPad. Test Games 19 and 46 play, save and load on the Mac and the iPad simulator, pass the case check, and exchange saves with the PC in both directions; Test Game 56, built on PartsEngine, stops with a message. `docs/system4.md` has the known limits.
 - Cheats for RPG Maker XP, VX, VX Ace and Wolf RPG Editor (0.15.0).
+- Game page screenshots in a grid with a full-screen viewer, game speed for Godot and Flash, and RPG Maker MZ alpha cutscene clips (0.16.0).
+- Cheats for AliceSoft System 3 and 4, and find by value on every game's Variables tab (on `dev`, in the next release).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- AliceSoft System 4 games built on PartsEngine and later, on `ws/cr-system4`. Cheats game speed for Godot and Flash, on `feature/cheats-request`.
+- AliceSoft System 4 games built on PartsEngine and later, on `ws/cr-system4`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it, and no GPL component is left:
@@ -72,7 +74,8 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 12. Cleaning up a game's engine files. After a game is added, VNDegen offers to remove the bundled Windows engine files the game no longer needs to play in VNDegen, such as NW.js or Electron runtimes, Ren'Py's Windows and Linux libraries, and engine `.exe` and `.dll` files. Each engine plugin lists exactly which files it may remove. VNDegen shows the files and the space saved, and removes them only after the user confirms. Saves and the game's own data are never touched.
 13. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
 14. Last: save sync through every cloud type Ludusavi offers (Box, Dropbox, Google Drive, OneDrive, FTP, SMB, WebDAV, and a custom rclone remote), with the same settings as Ludusavi.
-15. Cheats for games that aren't visual novels: quick cheats such as gold, items, encounters and game speed, plus a variable and switch editor, through each engine's own state, so saves stay in the PC format. Proposal in `docs/cheats.md`.
+15. Cheats for games that aren't visual novels: quick cheats such as gold, items, encounters and game speed, plus a variable and switch editor, through each engine's own state, so saves stay in the PC format. Plan in `docs/cheats.md`. Done: RPG Maker MV and MZ in 0.14.0, XP, VX, VX Ace and Wolf RPG Editor in 0.15.0, Godot and Flash game speed in 0.16.0, and AliceSoft System 3 and 4 on `dev`.
+16. What released engines still lack, then their small fixes, one engine at a time: Artemis movies and screen effects, Wolf RPG Editor's newer data formats and its mouse and text input, RPG Maker XP, VX and VX Ace movies and message boxes, and AliceSoft System 3's music, message speed and transitions. Each is built only for the library games that need it.
 
 ## Runtime packages
 When a game needs a runtime package that VNDegen doesn't bundle, such as the RPG Maker RTP, the app offers to download it from its official source and install it, in addition to importing it from a folder. The `RuntimePackages` module does this: an engine describes each package with its official URL and pinned SHA-256 (`RuntimePackage` in VNCore), and the module downloads, checks, and unpacks it, with an Inno Setup reader for installers like the RPG Maker RTPs'. The RPG Maker 2000 and 2003 RTPs can use it the same way.
