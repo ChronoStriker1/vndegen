@@ -172,6 +172,16 @@ bool Game::step(Thread &t) {
                     case 0x10: ok = left != right; break;
                     case 0x20: ok = left.find(right) != std::string::npos; break;
                     case 0x30: ok = left.starts_with(right); break;
+                    case 0x40: ok = left.find(right) == std::string::npos; break;
+                    case 0x50: ok = left.ends_with(right); break;
+                    case 0x60:  // a regular expression, which takes text codes only inside << and >>
+                        try {
+                            ok = std::regex_search(left, std::regex(expandRegexCodes(rightIsVar ? right : cmd.str(i), t),
+                                                                    std::regex::ECMAScript | std::regex::multiline));
+                        } catch (const std::regex_error &) {
+                            log("bad regular expression " + right);
+                        }
+                        break;
                 }
                 if (ok) {
                     chosen = i + 1;
@@ -210,10 +220,17 @@ bool Game::step(Thread &t) {
         case 151: {  // change screen colour
             int32_t packed = cmd.arg(0);
             int frames = value(cmd.arg(1), t);
-            // The colour is three percentages packed into one value, red in the lowest byte.
-            tintR_.set(packed & 0xFF, frames);
-            tintG_.set((packed >> 8) & 0xFF, frames);
-            tintB_.set((packed >> 16) & 0xFF, frames);
+            // The colour is three percentages packed into one value, red in the lowest byte. A top byte of 1 flashes: the
+            // screen takes the colour at once, then returns to normal over the frames.
+            bool flash = (uint32_t(packed) >> 24) == 1;
+            tintR_.set(packed & 0xFF, flash ? 0 : frames);
+            tintG_.set((packed >> 8) & 0xFF, flash ? 0 : frames);
+            tintB_.set((packed >> 16) & 0xFF, flash ? 0 : frames);
+            if (flash) {
+                tintR_.set(100, frames);
+                tintG_.set(100, frames);
+                tintB_.set(100, frames);
+            }
             return true;
         }
 
@@ -318,9 +335,11 @@ bool Game::step(Thread &t) {
             return true;
         }
         case 300: {
-            int id = commonByName(cmd.str(0));
+            // The name may hold text codes, as "\\cself[5]" (Clumsy Witch Seris).
+            std::string name = expandText(cmd.str(0), &t);
+            int id = commonByName(name);
             if (id < 0) {
-                log("no common event named " + cmd.str(0));
+                log("no common event named " + name);
                 return true;
             }
             callCommon(t, id, cmd, 1);
@@ -716,22 +735,28 @@ void Game::setString(Thread &t, const Command &c) {
     }
 }
 
+// A regular expression as a game wrote it: only the parts between << and >> take text codes.
+std::string Game::expandRegexCodes(const std::string &pattern, const Thread &t) const {
+    std::string expanded;
+    for (size_t at = 0; at < pattern.size();) {
+        size_t open = pattern.find("<<", at);
+        size_t close = open == std::string::npos ? open : pattern.find(">>", open);
+        if (close == std::string::npos) {
+            expanded += pattern.substr(at);
+            break;
+        }
+        expanded += pattern.substr(at, open - at) + expandText(pattern.substr(open + 2, close - open - 2), &t);
+        at = close + 2;
+    }
+    return expanded;
+}
+
 // The third-byte group of the string command. Operation 2 runs a hidden code, written <<NAME>> before its argument.
 // Operations 5 and 6 store what a regular expression's first group catches in the variable's text: the first match, or
 // every match with a line break between. In a regular expression only the parts inside << and >> take text codes.
 void Game::extendedString(Thread &t, const Command &c, int32_t target, int op) {
     if (op == 5 || op == 6) {
-        std::string pattern = c.str(0), expanded;
-        for (size_t at = 0; at < pattern.size();) {
-            size_t open = pattern.find("<<", at);
-            size_t close = open == std::string::npos ? open : pattern.find(">>", open);
-            if (close == std::string::npos) {
-                expanded += pattern.substr(at);
-                break;
-            }
-            expanded += pattern.substr(at, open - at) + expandText(pattern.substr(open + 2, close - open - 2), &t);
-            at = close + 2;
-        }
+        std::string expanded = expandRegexCodes(c.str(0), t);
         std::string text = readStr(target, t), found;
         try {
             // Line by line, as the manual's hint on matching line breaks describes.

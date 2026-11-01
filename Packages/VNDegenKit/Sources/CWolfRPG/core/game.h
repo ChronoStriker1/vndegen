@@ -329,6 +329,7 @@ private:
     void setVariable(Thread &t, const Command &c);
     void setString(Thread &t, const Command &c);
     void extendedString(Thread &t, const Command &c, int32_t target, int op);
+    std::string expandRegexCodes(const std::string &pattern, const Thread &t) const;
     std::string hiddenCode(const std::string &name, const std::string &arg);
     void startTextEntry(Thread &t, const Command &c);
     void updateTextEntry();

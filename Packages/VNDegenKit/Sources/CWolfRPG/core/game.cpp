@@ -250,6 +250,7 @@ int32_t *Game::dbNumberCell(int32_t id) { return dbCell<int32_t>({&udb_, &cdb_, 
 std::string *Game::dbStringCell(int32_t id) { return dbCell<std::string>({&udb_, &cdb_, &sdb_}, id, true); }
 
 bool Game::isStringVar(int32_t id) const {
+    if (id >= 9100000 && id < 9200000 && (id - 9100000) % 10 == 9) return true;
     if (id >= 3000000 && id < 4000000) return true;
     if (id >= 9900000 && id < 10000000) return true;
     if (id >= 1600005 && id < 1600010) return true;
@@ -387,6 +388,11 @@ void Game::writeVar(int32_t id, int32_t v, const Thread &t) {
 }
 
 std::string Game::readStr(int32_t id, const Thread &t) const {
+    // Field 9 of a character's address is its image file.
+    if (id >= 9100000 && id < 9200000 && (id - 9100000) % 10 == 9) {
+        const Actor *a = const_cast<Game *>(this)->actorAtAddress(id, t);
+        return a ? a->chara.graphic : "";
+    }
     if (id >= 3000000 && id < 4000000) return id - 3000000 < int(strings_.size()) ? strings_[id - 3000000] : "";
     if (id >= 9900000 && id < 10000000)
         return id - 9900000 < int(systemStrings_.size()) ? systemStrings_[id - 9900000] : "";
@@ -404,6 +410,10 @@ std::string Game::readStr(int32_t id, const Thread &t) const {
 }
 
 void Game::writeStr(int32_t id, const std::string &s, const Thread &t) {
+    if (id >= 9100000 && id < 9200000 && (id - 9100000) % 10 == 9) {
+        if (Actor *a = actorAtAddress(id, t)) a->chara.graphic = s;
+        return;
+    }
     if (id >= 3000000 && id < 4000000) {
         size_t i = id - 3000000;
         if (i >= strings_.size()) strings_.resize(i + 1);

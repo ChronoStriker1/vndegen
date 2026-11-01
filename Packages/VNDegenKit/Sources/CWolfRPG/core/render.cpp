@@ -214,6 +214,7 @@ void Renderer::drawPicture(Canvas &canvas, int number, const Picture &p) {
         case 3: x -= aw; break;
         case 4: x -= aw; y -= ah; break;
         case 5: x -= aw / 2; break;
+        case 6: x -= aw / 2; y -= ah; break;
     }
     x += offsetX * zoomX;
     y += offsetY * zoomY;

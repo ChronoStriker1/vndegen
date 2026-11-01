@@ -776,6 +776,7 @@ bool Game::pictureUnderMouse(const Picture &p) const {
         case 3: x -= w; break;
         case 4: x -= w; y -= h; break;
         case 5: x -= w / 2; break;
+        case 6: x -= w / 2; y -= h; break;
     }
     return mouseX_ >= x && mouseX_ < x + w && mouseY_ >= y && mouseY_ < y + h;
 }
