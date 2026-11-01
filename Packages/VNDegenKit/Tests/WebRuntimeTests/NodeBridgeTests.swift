@@ -124,6 +124,31 @@ private func decode(_ json: String) throws -> BridgeRequest {
     #expect(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("www").path) == ["save"])
 }
 
+@Test @MainActor func tyranoFiveTwoFindsItsElectronPreload() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-studio-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = GameFolder(root: root, webRoot: "")
+    let bridge = NodeBridge(folder: folder)
+    let appPath = "/game/Game.app/Contents/Resources/app.asar"
+    let page = try PageHarness(storage: false, folder: folder, runtime: .electron(appPath: appPath)) { bridge.handle($0) }
+    try await page.load("<html><body></body></html>")
+    // What index.html, kag.js and libs.js ask for at startup, then a save the way $.setStorageFile writes one.
+    let answers = try await page.run("""
+        window.process = window.studio_api.ipcRenderer.sendSync('getProcess');
+        const fs = window.studio_api.fs;
+        fs.writeFileSync('/game/Goon_sf.sav', 'saved');
+        return [window.studio_api.ipcRenderer.sendSync('doubleCheck', {}), window.studio_api.ipcRenderer.sendSync('getAppPath', {}),
+                process.platform, process.execPath, fs.existsSync('/game/Goon_sf.sav')];
+        """) as? [Any]
+    #expect(answers?[0] as? Bool == true)
+    #expect(answers?[1] as? String == appPath)
+    #expect(answers?[2] as? String == "darwin")
+    #expect(answers?[3] as? String == "/game/index.html")
+    #expect(answers?[4] as? Bool == true)
+    #expect(try String(contentsOf: root.appendingPathComponent("Goon_sf.sav"), encoding: .utf8) == "saved")
+}
+
 @Test func binaryReadsAndWritesUseBase64() throws {
     let sandbox = try Sandbox()
     defer { sandbox.remove() }
