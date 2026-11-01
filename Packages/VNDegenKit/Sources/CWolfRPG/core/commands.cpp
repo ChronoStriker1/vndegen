@@ -915,12 +915,13 @@ void Game::partyCommand(Thread &t, const Command &c) {
         if (!n.empty() || i == 10) members.push_back(n);
     }
     int index = value(c.arg(1), t);
-    std::string graphic = (flags >> 8) & 0x10 ? readStr(c.arg(2), t) : c.str(0);
+    std::string graphic = (flags >> 8) & 0x01 ? readStr(c.arg(2), t) : c.str(0);
     switch (exec) {
         case 0:  // remove a member
             if (index >= 0 && index < int(members.size())) members.erase(members.begin() + index);
             break;
-        case 1:  // insert a member
+        case 1:  // insert a member. An erased party has no members, so the first one inserted is the hero at any index.
+            if (members.size() == 1 && members[0].empty()) members.clear();
             index = std::clamp(index, 0, int(members.size()));
             members.insert(members.begin() + index, graphic);
             break;
