@@ -93,7 +93,7 @@ scrolling turns its wheel. A game reads it through key input, the variable comma
 and 72, and whether it is over a picture. System variable 73 lets it work messages and choices.
 
 When a game waits for typed text, the hub opens its keyboard on a touch device, and a hardware keyboard types directly.
-Return finishes and Backspace deletes. A controller's Confirm finishes and Cancel cancels.
+Return finishes and Backspace deletes. A controller's Confirm finishes and Cancel cancels. Touching the game brings back a keyboard the player hid.
 
 ### ANGEL QUEST's mouse
 

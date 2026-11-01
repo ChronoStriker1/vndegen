@@ -44,6 +44,7 @@ final class WolfRPGSession: EngineSession {
         frameView.onReady = { [weak self] in self?.start() }
         frameView.onPointer = { [weak self] event in
             guard let self else { return }
+            if event.phase == .began { reopenKeyboardIfTyping() }
             deliver(router.pointer(event, at: event.location))
         }
         frameView.onScroll = { [weak self] notches in
@@ -133,6 +134,12 @@ final class WolfRPGSession: EngineSession {
         #endif
     }
 
+    /// A player who hid the keyboard while the game waits for text gets it back by touching the game.
+    private func reopenKeyboardIfTyping() {
+        guard let engine, vnwolf_wants_text(engine) else { return }
+        NotificationCenter.default.post(name: .gameWantsKeyboard, object: self, userInfo: ["wants": true])
+    }
+
     private func deliver(_ inputs: [WolfRPGInput]) {
         guard let engine else { return }
         for input in inputs {
@@ -176,6 +183,11 @@ final class WolfRPGSession: EngineSession {
             }
             if button == .confirm { deliver(router.tap(Int32(VNWOLF_KEY_RETURN))) }
             if button == .cancel { deliver(router.tap(Int32(VNWOLF_KEY_ESCAPE))) }
+        }
+        switch event {
+        case .click(_, pressed: true): reopenKeyboardIfTyping()
+        case let .pointer(pointer) where pointer.phase == .began: reopenKeyboardIfTyping()
+        default: break
         }
         let frame = frameView
         deliver(router.translate(event) { frame.framePoint(fromViewNormalized: $0) })
