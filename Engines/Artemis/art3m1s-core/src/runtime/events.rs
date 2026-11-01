@@ -550,6 +550,9 @@ impl CoreRuntime {
                 self.compositor.apply_event(event);
                 self.layer_info_dirty = true;
             }
+            if let Event::Layer(LayerEvent::Delete { id }) = event {
+                self.stop_videos_under_layer(id);
+            }
             profile.event_compositor_ns = profile
                 .event_compositor_ns
                 .saturating_add(crate::profiler::FrameProfile::elapsed(compositor_started));

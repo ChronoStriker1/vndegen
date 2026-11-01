@@ -15,12 +15,15 @@ final class ArtemisHostView: UIView {
 
     override class var layerClass: AnyClass { CAMetalLayer.self }
     var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
+    /// A fullscreen movie, over the game.
+    let movieLayer = ArtemisHostView.makeMovieLayer()
 
     init() {
         super.init(frame: .zero)
         backgroundColor = .black
         isMultipleTouchEnabled = false
         metalLayer.contentsGravity = .resizeAspect
+        metalLayer.addSublayer(movieLayer)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -33,6 +36,7 @@ final class ArtemisHostView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        CATransaction.performWithoutAnimation { movieLayer.frame = bounds }
         readyIfOnScreen()
     }
 
@@ -100,12 +104,15 @@ final class ArtemisHostView: NSView {
     private var heldModifiers: Set<UInt16> = []
 
     let metalLayer = CAMetalLayer()
+    /// A fullscreen movie, over the game.
+    let movieLayer = ArtemisHostView.makeMovieLayer()
 
     init() {
         super.init(frame: .zero)
         wantsLayer = true
         metalLayer.contentsGravity = .resizeAspect
         metalLayer.backgroundColor = NSColor.black.cgColor
+        metalLayer.addSublayer(movieLayer)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -123,6 +130,7 @@ final class ArtemisHostView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
+        CATransaction.performWithoutAnimation { movieLayer.frame = bounds }
         readyIfOnScreen()
     }
 
@@ -202,3 +210,24 @@ final class ArtemisHostView: NSView {
     ]
 }
 #endif
+
+extension ArtemisHostView {
+    /// A black layer that fits a movie's frames to the view, as the game is, and starts hidden.
+    fileprivate static func makeMovieLayer() -> CALayer {
+        let layer = CALayer()
+        layer.contentsGravity = .resizeAspect
+        layer.backgroundColor = CGColor(gray: 0, alpha: 1)
+        layer.isHidden = true
+        layer.actions = ["contents": NSNull(), "hidden": NSNull(), "bounds": NSNull(), "position": NSNull()]
+        return layer
+    }
+}
+
+extension CATransaction {
+    fileprivate static func performWithoutAnimation(_ body: () -> Void) {
+        begin()
+        setDisableActions(true)
+        body()
+        commit()
+    }
+}

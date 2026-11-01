@@ -25,6 +25,7 @@ final class ArtemisSession: EngineSession {
     private let files: ArtemisCore.Files
     private let ini: Data
     private let audio: ArtemisAudio
+    private var movies: ArtemisMovies!
     private let log: FileHandle?
     private let events: OpaquePointer
     private var runtime: OpaquePointer?
@@ -39,6 +40,10 @@ final class ArtemisSession: EngineSession {
     private var pointer = CGPoint.zero
     /// The game's dialog while one is open.
     private var prompt: Prompt?
+    /// Keys and mouse buttons pressed while a fullscreen movie plays, whose release can skip it.
+    private var moviePresses: Set<Int32> = []
+    /// Pointer buttons the game has seen go down and not yet up.
+    private var buttonsDown: Set<Int32> = []
 
     /// Whether a session's runtime is alive. The core keeps some state per process, so one game runs at a time.
     private(set) static var engineInUse = false
@@ -69,6 +74,9 @@ final class ArtemisSession: EngineSession {
         audio.onFinished = { [weak self] id in
             guard let self, let runtime else { return }
             core.api.runtime_notify_sound_finished!(runtime, id)
+        }
+        movies = ArtemisMovies(core: core, files: files, audio: audio, screen: host.movieLayer) { [weak self] line in
+            self?.writeLog(line)
         }
         host.onReady = { [weak self] in self?.start() }
         host.onKey = { [weak self] key, pressed, isRepeat in
@@ -142,8 +150,11 @@ final class ArtemisSession: EngineSession {
         let total = elapsed + carry
         let delta = UInt32(total)
         carry = total - Double(delta)
+        // New movie frames reach the core before it draws.
+        let ended = movies.advance(Double(delta), runtime: runtime, at: now)
         _ = core.api.runtime_advance_and_present!(runtime, delta)
         drainEvents()
+        ended.forEach(finishMovie)
         audio.advance(Double(delta))
         if core.api.runtime_is_exit_requested!(runtime) != 0 {
             finish()
@@ -186,21 +197,36 @@ final class ArtemisSession: EngineSession {
         let body = command["payload"] as? [String: Any] ?? [:]
         switch name {
         case "video_play":
-            // Videos don't play yet. Each ends at once, a fullscreen one and one on a layer the script waits on alike,
-            // so a title movie leaves its menu.
-            writeLog("[W] video not played: \(body["file"] as? String ?? "")")
-            guard let runtime else { break }
-            if let id = body["id"] as? String {
-                _ = id.withCString { core.api.runtime_notify_video_finished!(runtime, $0) }
-            } else {
-                core.api.runtime_notify_video_finished!(runtime, nil)
+            // A fullscreen movie takes the input, so the game first sees every key and button it holds come up, as when
+            // the menu opens. Otherwise a key held into the movie, such as Control for skipping, would stay down.
+            // The core sends a fullscreen movie's id as null, which arrives as NSNull.
+            if (body["id"] as? String) == nil, !movies.playingFullscreen, let runtime {
+                router.releaseAll().forEach(deliver)
+                // Touches and mouse buttons aren't counted by the router, such as the tap that started the movie.
+                for button in buttonsDown { core.api.runtime_feed_mouse_button!(runtime, UInt32(button), 0) }
+                buttonsDown.removeAll()
+                moviePresses.removeAll()
             }
+            // A movie that can't play ends at once, so the script waiting on it goes on.
+            if !movies.play(body) { finishMovie(body["id"] as? String) }
+        case "video_stop_all":
+            movies.stopAll()
         case "dialog_show":
             showDialog(body)
         case "openbrowser":
             if let link = body["url"] as? String, let url = URL(string: link) { open(url) }
         default:
             if name.hasPrefix("audio_") { audio.handle(name, body) }
+        }
+    }
+
+    /// Tells the core a movie ended, by its layer id, or nil for the fullscreen movie the script waits on.
+    private func finishMovie(_ id: String?) {
+        guard let runtime else { return }
+        if let id {
+            _ = id.withCString { core.api.runtime_notify_video_finished!(runtime, $0) }
+        } else {
+            core.api.runtime_notify_video_finished!(runtime, nil)
         }
     }
 
@@ -275,6 +301,20 @@ final class ArtemisSession: EngineSession {
 
     private func deliver(_ input: ArtemisInput) {
         guard let runtime else { return }
+        // A fullscreen movie takes the input. Pressing and releasing one of the keys or buttons the game skips it with
+        // skips it, and nothing reaches the game, so the release doesn't also land on the screen underneath. A press
+        // from before the movie, such as the click that started it, doesn't count.
+        if movies.playingFullscreen {
+            switch input {
+            case let .key(key, true), let .mouseButton(key, true, _), let .click(key, true):
+                moviePresses.insert(key)
+            case let .key(key, false), let .mouseButton(key, false, _), let .click(key, false):
+                if moviePresses.remove(key) != nil, movies.skip(key: key) { finishMovie(nil) }
+            case .mouseMove: break
+            }
+            return
+        }
+        moviePresses.removeAll()
         switch input {
         case let .key(key, down):
             core.api.runtime_feed_key!(runtime, UInt32(key), down ? 1 : 0)
@@ -282,6 +322,7 @@ final class ArtemisSession: EngineSession {
             movePointer(to, runtime)
         case let .mouseButton(button, down, at):
             movePointer(at, runtime)
+            if down { buttonsDown.insert(button) } else { buttonsDown.remove(button) }
             core.api.runtime_feed_mouse_button!(runtime, UInt32(button), down ? 1 : 0)
         case let .click(button, down):
             core.api.runtime_feed_mouse_button!(runtime, UInt32(button), down ? 1 : 0)
@@ -339,6 +380,7 @@ final class ArtemisSession: EngineSession {
         if paused { router.releaseAll().forEach(deliver) }
         audio.setPaused(paused)
         lastFrame = nil
+        movies.paused()
         if let runtime { core.api.runtime_notify_lifecycle!(runtime, paused ? 1 : 2) }
         if !paused { host.takeFocus() }
     }
@@ -352,6 +394,7 @@ final class ArtemisSession: EngineSession {
         stopped = true
         displayLink?.invalidate()
         displayLink = nil
+        movies.stopAll()
         audio.stopAll()
         if let runtime {
             // A game that saves on exit, through [autosave allow=1], saves now.

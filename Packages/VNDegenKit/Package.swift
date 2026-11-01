@@ -44,6 +44,18 @@ let package = Package(
         // General MIDI music for the native engines. CVNMidi's files are links to Engines/Shared/vnmidi.[ch] and the
         // libraries vnmidi.c compiles into itself. FontPack's MIDISoundFont finds the SoundFont the app bundles.
         .target(name: "CVNMidi", exclude: ["third_party"]),
+        // Movies for the native engines: MPEG-1 and Ogg Theora with Opus. CVNVideo's files are links to
+        // Engines/Shared/vnvideo.[ch] and the libraries in Engines/Shared/third_party it builds. Decoding runs on the CPU,
+        // so Debug builds are optimized too. -w keeps the unmodified libraries' warnings out; scripts/build.sh test
+        // builds vnvideo.c itself with -Werror.
+        .target(
+            name: "CVNVideo",
+            sources: ["vnvideo.c", "third_party/ogg/src", "third_party/theora/lib", "third_party/opus/celt",
+                      "third_party/opus/silk", "third_party/opus/src"],
+            cSettings: [.define("HAVE_CONFIG_H"), .headerSearchPath("third_party/ogg/include"),
+                        .headerSearchPath("third_party/theora/include"), .headerSearchPath("third_party/opus"),
+                        .headerSearchPath("third_party/opus/include"), .headerSearchPath("third_party/opus/celt"),
+                        .headerSearchPath("third_party/opus/silk"), .unsafeFlags(["-O2", "-w"])]),
         .target(name: "WebRuntime", dependencies: ["VNCore", "FontPack"], exclude: ["vorbis.wasm.LICENSE"], resources: [.process("Resources")],
                 swiftSettings: mainActorByDefault),
         .target(name: "EngineRPGMaker", dependencies: ["VNCore", "WebRuntime", "FontPack"], resources: [.process("Resources")], swiftSettings: mainActorByDefault),
@@ -113,7 +125,7 @@ let package = Package(
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
-        .target(name: "EngineArtemis", dependencies: ["VNCore", "CArtemis", "FontPack"], swiftSettings: mainActorByDefault),
+        .target(name: "EngineArtemis", dependencies: ["VNCore", "CArtemis", "CVNVideo", "FontPack"], swiftSettings: mainActorByDefault),
         .executableTarget(name: "RenPyCompat", dependencies: ["EngineRenPy", "VNCore"]),
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
