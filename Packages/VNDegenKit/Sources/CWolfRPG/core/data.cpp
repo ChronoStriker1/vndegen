@@ -66,6 +66,49 @@ std::string toUtf8(const std::string &raw, Encoding enc) {
     return out;
 }
 
+std::vector<uint8_t> unpackLz4(std::span<const uint8_t> data, size_t at, uint32_t budget) {
+    Reader r(data);
+    r.seek(at);
+    uint32_t unpacked = r.u32(), packed = r.u32();
+    // LZ4 expands at most 255 to 1, so a larger claim is damage. The largest real file seen unpacks to under 3 MB; the
+    // budget keeps a damaged size from reserving gigabytes.
+    if (unpacked > budget || uint64_t(unpacked) > uint64_t(packed) * 255 + 16) throw FormatError("bad LZ4 sizes");
+    auto src = r.bytes(packed);
+    std::vector<uint8_t> out(data.begin(), data.begin() + at);
+    out.reserve(at + unpacked);
+    size_t i = 0;
+    auto length = [&](size_t n) {
+        if (n != 15) return n;
+        uint8_t b;
+        do {
+            if (i >= src.size()) throw FormatError("LZ4 length runs past the end");
+            b = src[i++];
+            n += b;
+        } while (b == 255);
+        return n;
+    };
+    while (i < src.size()) {
+        uint8_t token = src[i++];
+        size_t literals = length(token >> 4);
+        if (literals > src.size() - i) throw FormatError("LZ4 literals run past the end");
+        if (literals > unpacked - (out.size() - at)) throw FormatError("LZ4 output runs past its size");
+        out.insert(out.end(), src.begin() + i, src.begin() + i + literals);
+        i += literals;
+        if (i == src.size()) break;  // the last sequence has literals only
+        if (src.size() - i < 2) throw FormatError("LZ4 offset runs past the end");
+        size_t offset = src[i] | src[i + 1] << 8;
+        i += 2;
+        size_t match = length(token & 0x0F) + 4;
+        if (offset == 0 || offset > out.size() - at) throw FormatError("bad LZ4 offset");
+        if (out.size() - at + match > unpacked) throw FormatError("LZ4 output runs past its size");
+        // The copy may overlap the bytes it writes, so it goes one byte at a time.
+        size_t from = out.size() - offset;
+        for (size_t k = 0; k < match; k++) out.push_back(out[from + k]);
+    }
+    if (out.size() - at != unpacked) throw FormatError("LZ4 output size differs from its header");
+    return out;
+}
+
 namespace {
 
 // Data files start with a zero byte and a magic number in which one byte is 'U' for UTF-8 files.
@@ -184,12 +227,20 @@ GameDat parseGameDat(std::span<const uint8_t> data) {
     return g;
 }
 
-std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data) {
+std::vector<CommonEvent> parseCommonEvents(std::span<const uint8_t> data, bool *wolf35) {
     Reader r(data);
     Encoding enc = readMagic(r, {0x00, 'W', 0, 0, 'O', 'L', 0, 'F', 'C', 0}, 6, "CommonEvent.dat");
-    Parser p{r, enc};
-    uint8_t version = p.r.u8();
-    if (version == 0x93 || version == 0xCC) throw FormatError("compressed CommonEvent.dat (Wolf RPG Editor 3.5) is not supported yet");
+    uint8_t version = r.u8();
+    // Wolf RPG Editor 3.5 compresses the rest of the file, and its commands end with a few bytes of their own.
+    std::vector<uint8_t> unpacked;
+    bool v35 = version == 0x93 || version == 0xCC;
+    if (wolf35) *wolf35 = v35;
+    if (v35) {
+        unpacked = unpackLz4(data, r.pos());
+        r = Reader(unpacked);
+        r.seek(11);
+    }
+    Parser p{r, enc, v35};
     uint32_t count = p.r.count(16);
     std::vector<CommonEvent> events;
     events.reserve(count);
@@ -274,8 +325,14 @@ Database parseDatabase(std::span<const uint8_t> project, std::span<const uint8_t
 
     Reader dr(dat);
     Encoding datEnc = readMagic(dr, {0x00, 'W', 0, 0, 'O', 'L', 0, 'F', 'M', 0}, 6, "database");
+    uint8_t version = dr.u8();
+    std::vector<uint8_t> unpacked;
+    if (version == 0xC4) {  // Wolf RPG Editor 3.5 compresses the rest
+        unpacked = unpackLz4(dat, dr.pos());
+        dr = Reader(unpacked);
+        dr.seek(11);
+    }
     Parser dp{dr, datEnc};
-    uint8_t version = dp.r.u8();
     uint32_t datTypes = dp.r.u32();
     if (datTypes != typeCount) throw FormatError("database type count differs between .project and .dat");
     for (auto &t : db.types) {
@@ -309,15 +366,28 @@ Map parseMap(std::span<const uint8_t> data) {
     r.expect({0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'W', 'O', 'L', 'F', 'M', 0}, "map");
     Encoding enc = r.u8() == 'U' ? Encoding::UTF8 : Encoding::ShiftJIS;
     r.skip(3);
-    r.u32();  // 0x64
-    uint8_t version = r.u8();
-    if (version >= 0x67) throw FormatError("compressed map (Wolf RPG Editor 3.5) is not supported yet");
-    Parser p{r, enc};
+    // The map version: 0x64 in Wolf RPG Editor 2 and 3, 0x65 and up in 3.5, which compresses the rest of the file.
+    // From 0x67 a map has its own number of tile layers, and its commands end with a few bytes of their own.
+    uint32_t version = r.u32();
+    r.u8();
+    std::vector<uint8_t> unpacked;
+    if (version >= 0x65) {
+        unpacked = unpackLz4(data, r.pos());
+        r = Reader(unpacked);
+        r.seek(25);
+    }
+    Parser p{r, enc, version >= 0x67};
     m.name = p.str();
     m.tileset = p.r.s32();
     m.width = p.r.s32();
     m.height = p.r.s32();
     uint32_t eventCount = p.r.u32();
+    if (version >= 0x67) {
+        p.r.u32();
+        uint32_t layers = p.r.u32();
+        if (layers < 1 || layers > 16) throw FormatError("map with " + std::to_string(layers) + " layers");
+        m.layers = int(layers);
+    }
     // The editor makes maps of at most 9999 tiles a side; anything larger is damage, as is a size the file can't hold.
     if (m.width < 0 || m.height < 0 || m.width > 9999 || m.height > 9999 ||
         size_t(m.width) * size_t(m.height) > size_t(4) << 20)

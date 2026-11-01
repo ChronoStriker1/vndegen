@@ -58,6 +58,19 @@ struct SaveCharacter {
     int32_t v8a3 = 0, v8a4 = 0;
     int32_t v8b = 0;
     int32_t v8c = 0;
+    // From version 0x9F (Wolf RPG Editor 3.5), not used by the runtime and carried over: two values after unknown4, a
+    // number for each v8a string, four lists of value pairs, then values whose presence two flags decide. Map events
+    // also carry a flag and, when it is 1, a string.
+    std::array<int32_t, 2> v9fA{};
+    std::vector<uint32_t> v8aNumbers;  // one for each of v8aStrings
+    std::vector<std::vector<std::array<int32_t, 2>>> v9fPairLists;
+    int32_t v9fB = 0, v9fFlag1 = 0;
+    std::array<int32_t, 6> v9fC{};  // when v9fFlag1 is 1
+    int32_t v9fD = 0;
+    uint8_t v9fFlag2 = 0;
+    std::array<int32_t, 8> v9fE{};  // when v9fFlag2 is not 0
+    uint8_t v9fNoteFlag = 0;        // map events only
+    SaveString v9fNote;             // map events only, when v9fNoteFlag is 1
 };
 
 // Section 1: the current map.
@@ -67,6 +80,7 @@ struct SaveMap {
     // From file version 0x69: the map's size and, unless the file stores -1 instead, its three tile layers, laid out
     // like Map::tiles.
     int32_t width = 0, height = 0;
+    int32_t layers = 3;  // stored from version 0x9F (Wolf RPG Editor 3.5), whose maps have their own layer count
     bool hasTiles = false;
     std::vector<int32_t> tiles;
     // The map's tileset: base image, autotile images (7, 15 from version 0x73, 31 from 0x8A) and the passability of
@@ -129,6 +143,24 @@ struct SaveSystem {
     std::array<uint8_t, 256> v8dBytes{};
     std::array<uint8_t, 2> v8d2{};
     int32_t v8e = 0;
+    // From version 0x9F (Wolf RPG Editor 3.5), not used by the runtime and carried over: lists of numbered strings,
+    // pairs of strings, four values, and a count with its first value (only the first is stored).
+    struct NumberedString {
+        uint32_t number = 0;
+        SaveString text;
+    };
+    int32_t v9fH = 0;                // after v108a, where v108s2 and v108b were
+    struct Entry108 {
+        uint32_t number = 0;
+        SaveString text;
+        std::array<int32_t, 4> values{};
+    };
+    std::vector<Entry108> v9f108;
+    std::vector<std::vector<NumberedString>> v9fGroups;
+    std::vector<std::array<SaveString, 2>> v9fPairs;
+    std::array<int32_t, 4> v9fValues{};
+    uint32_t v9fCount = 0;
+    int32_t v9fFirst = 0;
 };
 
 // Section 3: the variables.
@@ -141,6 +173,12 @@ struct SaveVariables {
     std::vector<SaveString> strings;                    // string variables
     std::vector<std::vector<int32_t>> commonSelf;       // common event self variables 0-99, one list per common event
     std::vector<std::vector<SaveString>> commonSelfStrings;  // common event self variables 5-9, the string ones
+    // From version 0x9F, carried over: a list of numbers, each with one byte.
+    struct NumberedByte {
+        uint32_t number = 0;
+        uint8_t value = 0;
+    };
+    std::vector<NumberedByte> v9fFlags;
 };
 
 // Section 4: the hero and the party.
@@ -176,6 +214,13 @@ struct SavePicture {
     std::array<int32_t, 5> v87{};
     std::vector<std::vector<int32_t>> v89Lists;
     std::array<int32_t, 7> v89{};
+    // From version 0x9F, carried over: six values after b, eight more in the run before v89Lists (their exact place in
+    // that run is not known; they are kept after v87), and after v89 two values and a flag, then 13 values when it is set.
+    std::array<int32_t, 6> v9fA{};
+    std::array<int32_t, 8> v9fB{};
+    std::array<int32_t, 2> v9fC{};
+    uint8_t v9fFlag = 0;
+    std::array<int32_t, 13> v9fD{};
 };
 
 struct SavePictures {
@@ -211,16 +256,30 @@ struct SaveSection7 {
     std::vector<Entry> entries;
 };
 
+// A Wolf RPG Editor 3.5 array (event command 255), from version 0x9F: rows of numbers, found by a number or a name.
+struct SaveArray {
+    int32_t key = 0;   // numbered arrays only
+    SaveString name;   // named arrays only
+    std::vector<std::vector<int32_t>> rows;
+};
+
 struct SaveFile {
     std::array<uint8_t, 20> header{};  // stored in clear: XOR seeds at 0, 3 and 9, checksum at 2
     uint8_t startMarker = 0x19;
     SaveString title;                  // u16 length
     uint16_t version = 0;
+    std::vector<SaveArray> numberedArrays, namedArrays;  // from version 0x9F
     SaveMap map;
     SaveSystem system;
     SaveVariables variables;
     SaveParty party;
     SavePictures pictures;
+    // From version 0x9F, carried over: named entries of three values, between the pictures and the CDB.
+    struct NamedValues {
+        SaveString name;
+        std::array<int32_t, 3> values{};
+    };
+    std::vector<NamedValues> v9fNamedValues;
     SaveVariableDb variableDb;  // the CDB
     SaveSection7 section7;
     uint8_t endMarker = 0x19;

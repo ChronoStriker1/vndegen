@@ -336,6 +336,7 @@ private:
     // The save this session last read or wrote. New saves copy the fields VNDegen doesn't model from it, so the PC
     // engine finds them as it left them.
     std::shared_ptr<SaveFile> saveBase_;
+    bool wolf35_ = false;  // the game's data is in Wolf RPG Editor 3.5's format
     int32_t loadedPlaySeconds_ = 0, loadedPlayFrames_ = 0;
     uint64_t frameAtLoad_ = 0;
     // --- end of savestate.cpp declarations ---
@@ -401,6 +402,7 @@ private:
     MessageState message_;
     Tween tintR_, tintG_, tintB_;
     Input input_;
+    std::array<int, 7> heldFrames_{};  // frames each Wolf key has been held, by bit of Key
     uint64_t frame_ = 0, generation_ = 0;
     std::shared_ptr<class TextRenderer> textMeasure_;  // sizes text pictures (pictureCommandOne; text.h)
     std::mt19937 rng_{12345};
