@@ -364,8 +364,16 @@
         constructor() { throw new Error('VNDegen cannot unpack zip files for the game'); }
     }
 
+    // Karryn's Prison's logger and mod manager load util at startup and call promisify and inherits from it.
+    const util = {
+        promisify: (fn) => (...args) => new Promise((resolve, reject) => {
+            fn(...args, (error, value) => { if (error) reject(error); else resolve(value); });
+        }),
+        inherits: (child, parent) => { child.super_ = parent; Object.setPrototypeOf(child.prototype, parent.prototype); },
+    };
+
     const modules = {
-        fs: fs, path: path, os: os, process: process, buffer: { Buffer: Buffer }, 'fs-extra': fsExtra, 'adm-zip': AdmZip,
+        fs: fs, path: path, os: os, process: process, util: util, buffer: { Buffer: Buffer }, 'fs-extra': fsExtra, 'adm-zip': AdmZip,
     };
     if (config.runtime === 'electron') {
         modules.electron = electron;
