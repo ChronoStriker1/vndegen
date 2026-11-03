@@ -36,8 +36,9 @@ import AppKit
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -rgss-ruby <file>        RPG Maker XP, VX and VX Ace games run the Ruby file once their scripts have loaded, through
 ///                            the runtime's vnrgss_run_ruby, and log what it gives ("rgss-ruby" in the app log)
-///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. NScripter and System 3 sessions
-///                            also log their own pacing every 10 seconds ("NSFRAMES", "S3FRAMES"), on macOS too
+///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. Sessions of the native runtimes
+///                            also log their own pacing every 10 seconds, on macOS too ("NSFRAMES", "S3FRAMES", "S4FRAMES",
+///                            "RGSSFRAMES", "WOLFFRAMES", "KKFRAMES")
 ///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
 ///   -windowSize 900x600      resizes the window before the snapshot on macOS. On iPad, in Windowed Apps or Stage Manager,
 ///                            the window takes that size the next time it is resized

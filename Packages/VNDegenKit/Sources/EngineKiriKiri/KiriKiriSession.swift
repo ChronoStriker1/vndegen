@@ -308,8 +308,46 @@ private final class FrameTarget: NSObject {
         self.session = session
     }
 
-    @objc func step() { session?.step() }
+    #if DEBUG
+    private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
+    #endif
+
+    @objc func step(_ link: CADisplayLink) {
+        session?.step()
+        #if DEBUG
+        pacing?.note(tick: link.timestamp, stepEnd: CACurrentMediaTime(), target: link.targetTimestamp - link.timestamp)
+        #endif
+    }
 }
+
+#if DEBUG
+/// With `-frameMonitor YES`, logs the engine's pacing every 10 seconds ("KKFRAMES" in the app log): display link ticks
+/// per second on average and over the slowest 1% of ticks, and the slowest step. The engine runs one frame per tick.
+private final class FramePacing {
+    private var last: CFTimeInterval?
+    private var start: CFTimeInterval = 0
+    private var intervals: [Double] = []
+    private var worstStep = 0.0
+
+    func note(tick: CFTimeInterval, stepEnd: CFTimeInterval, target: CFTimeInterval) {
+        defer { last = tick }
+        guard let last else {
+            start = tick
+            return
+        }
+        intervals.append(tick - last)
+        worstStep = max(worstStep, stepEnd - tick)
+        guard tick - start >= 10 else { return }
+        let slowest = intervals.sorted(by: >).prefix(max(1, intervals.count / 100))
+        let low = Double(slowest.count) / slowest.reduce(0, +)
+        NSLog("KKFRAMES seconds=%.1f average=%.1f low1=%.1f worstStep=%.1fms target=%.1f", tick - start,
+              Double(intervals.count) / (tick - start), low, worstStep * 1000, 1 / target)
+        intervals.removeAll(keepingCapacity: true)
+        worstStep = 0
+        start = tick
+    }
+}
+#endif
 
 /// The files a launch hands the engine. The game's data directory holds the engine's log and stands in for the
 /// Windows AppData and Documents folders.
