@@ -183,6 +183,31 @@ private func text(of response: FileResponse) async throws -> String {
     #expect(bridge.handle(.readdir(path: "/game/IMG/PICTURES")) == .value(.strings(["Actor1.png"])))
 }
 
+@Test func backslashesInARequestSeparateFolders() async throws {
+    let fm = FileManager.default
+    let root = try temporaryGame()
+    let app = try temporaryGame()
+    defer {
+        try? fm.removeItem(at: root)
+        try? fm.removeItem(at: app)
+    }
+    try fm.createDirectory(at: root.appendingPathComponent("movies/Bath"), withIntermediateDirectories: true)
+    try Data("clip".utf8).write(to: root.appendingPathComponent("movies/Bath/Clip.mp4"))
+    var folder = GameFolder(root: root, webRoot: "")
+    folder.mounts = ["/__app/": app]
+
+    let clip = folder.serve(path: "/movies/Bath\\Clip.mp4")
+    #expect(clip.headers["Content-Type"] == "video/mp4")
+    #expect(try await text(of: clip) == "clip")
+    #expect(try await text(of: folder.serve(path: "/MOVIES\\bath\\clip.MP4")) == "clip")
+    #expect(folder.read(servedPath: "/movies\\Bath\\Clip.mp4", limit: 4) == Data("clip".utf8))
+
+    // A backslash climbs no further than a slash does.
+    #expect(folder.serve(path: "/movies\\..\\..\\..\\etc\\hosts").status == 404)
+    #expect(folder.serve(path: "/__app\\..\\js\\main.js").status == 404)
+    #expect(try await text(of: folder.serve(path: "/movies\\..\\js\\main.js")) == "0123456789")
+}
+
 @Test func mountedAppFoldersAndEmbeddedFilesAreServed() async throws {
     let root = try temporaryGame()
     let app = try temporaryGame()
