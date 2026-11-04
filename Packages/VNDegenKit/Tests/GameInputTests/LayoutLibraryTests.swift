@@ -125,6 +125,22 @@ private func buttons(_ name: String, _ library: LibraryStore) throws -> ButtonMa
     #expect(reopened.shown(for: mapping) == nil)
 }
 
+@Test @MainActor func anUnreadableLayoutFileIsKeptRatherThanSavedOver() throws {
+    let paths = try makePaths()
+    let file = paths.support.appending(path: "controller-layouts.json")
+    let unreadable = Data(#"[{"id":"not a UUID"}]"#.utf8)
+    try unreadable.write(to: file)
+
+    let layouts = LayoutLibrary(paths: paths)
+    #expect(layouts.saved.isEmpty)
+    #expect(layouts.add(name: "New", mapping: ButtonMapping()) != nil)
+
+    let names = try FileManager.default.contentsOfDirectory(atPath: paths.support.path)
+    let kept = try #require(names.first { $0.hasPrefix("controller-layouts-unreadable-") })
+    #expect(try Data(contentsOf: paths.support.appending(path: kept)) == unreadable)
+    #expect(LayoutLibrary(paths: paths).saved.map(\.name) == ["New"])
+}
+
 @Test @MainActor func editingALayoutMovesOnlyTheGamesThatShowIt() async throws {
     let paths = try makePaths()
     let names = ["Shows", "Tweaked", "Follows", "Gamepad follows", "Gone"]

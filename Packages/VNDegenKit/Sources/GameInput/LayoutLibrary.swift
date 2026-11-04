@@ -32,8 +32,16 @@ public final class LayoutLibrary {
 
     public init(paths: LibraryPaths) {
         support = paths.support
-        let stored = (try? JSONDecoder().decode([Stored].self, from: Data(contentsOf: file))) ?? []
-        saved = stored.map { ControllerLayout(id: .saved($0.id), name: $0.name, mapping: ButtonMapping($0.buttons)) }
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        do {
+            let stored = try JSONDecoder().decode([Stored].self, from: Data(contentsOf: file))
+            saved = stored.map { ControllerLayout(id: .saved($0.id), name: $0.name, mapping: ButtonMapping($0.buttons)) }
+        } catch {
+            // The next save would replace a file this version can't read, such as one a newer version wrote, so it moves
+            // aside to stay recoverable.
+            let stamp = Int(Date.now.timeIntervalSince1970)
+            try? FileManager.default.moveItem(at: file, to: support.appendingPathComponent("controller-layouts-unreadable-\(stamp).json"))
+        }
     }
 
     public var all: [ControllerLayout] { ControllerLayout.builtIns + saved }

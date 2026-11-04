@@ -34,7 +34,7 @@ Effects a game writes as HLSL, such as Test Game 78's blur, mosaic, sepia, and n
 
 Artemis games read a mouse and keyboard and no gamepad, so they start with the "Keyboard and mouse" layout. Through VNDegen's buttons, Confirm presses Return, Cancel presses Escape, Menu right clicks, which opens the game's menu or hides its message window, as the game chooses, Dash holds Control, which skips, and the page buttons turn the mouse wheel, which opens the message history and reads on. Touches act as the mouse.
 
-A game's own dialog shows as a sheet over the game. Touch or the mouse answers it, and so do Confirm or Return for OK and Cancel or Escape for Cancel. A dialog that asks for text, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, opens the controller keyboard, whose A types, X deletes, and Y finishes. Its field takes a hardware keyboard, and on iPhone and iPad a tap on the field brings up the system keyboard, for characters the controller keyboard doesn't have.
+A game's own dialog shows as a sheet over the game. Touch or the mouse answers it, and so do Confirm or Return for OK and Cancel or Escape for Cancel. A dialog that asks for text, such as the name entry in Test Game 06, Test Game 76, and Test Game 77, opens the controller keyboard, whose A types, X deletes, and Y finishes. Its field takes a hardware keyboard, and on iPhone and iPad a tap on the field brings up the system keyboard, for characters the controller keyboard doesn't have. On the D-pad, a dialog reads the Keyboard and mouse layout's keys as directions, so a game whose saved buttons keep the D-pad order from before it became up 1, right 2, down 3, left 4 moves differently in dialogs until the game is reset or given a layout again.
 
 ## Known limits
 
