@@ -368,8 +368,13 @@
                 const video = args[last];
                 if (video instanceof HTMLVideoElement) {
                     // A video reloading to loop has no picture yet, and uploading it would flash black. A texture that
-                    // has never held a frame still takes the call, because PIXI goes on to update what that creates.
-                    if (restarting.has(video) && uploadedVideos.has(video)) return;
+                    // has never held a frame still takes the call, because PIXI goes on to update what that creates,
+                    // and has to see the video's real size so that it makes the texture again once there's a picture.
+                    if (restarting.has(video)) {
+                        if (uploadedVideos.has(video)) return;
+                        delete video.videoWidth;
+                        delete video.videoHeight;
+                    }
                     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) uploadedVideos.add(video);
                     args[last] = alphaSource(video);
                 }
@@ -384,7 +389,9 @@
     // game still reads and clears the property, and hears `ended` only from a video that isn't looping. Alpha clips and
     // kept frames must go on without reloading, and an MP4 seeks faster than it reloads, so at their first end they take
     // WebKit's loop.
-    const loopingVideos = new WeakSet(), hookedVideos = new WeakSet(), restarting = new WeakSet(), uploadedVideos = new WeakSet();
+    const loopingVideos = new WeakSet(), hookedVideos = new WeakSet(), restarting = new WeakSet();
+    // Videos whose texture holds a frame. A restored WebGL context has lost every texture.
+    let uploadedVideos = new WeakSet();
     const nativeLoop = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'loop');
     const nativeTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
     const reloads = (video) => {
@@ -785,6 +792,7 @@
     // Effekseer gets a new context whose effects load again. Animations that were playing end, as their effect is gone.
     let contextGeneration = 0;
     window.addEventListener('webglcontextrestored', (event) => {
+        uploadedVideos = new WeakSet();
         const graphics = window.Graphics;
         if (graphics && graphics._renderer && event.target === graphics._renderer.view) {
             renewFilters(graphics._renderer);
