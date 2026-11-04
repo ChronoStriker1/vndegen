@@ -549,10 +549,18 @@ private struct PlayerMenuView: View {
     private func segments(_ item: PlayerMenu.Item, rows: Int = 1, @ViewBuilder content: () -> some View) -> some View {
         let focused = isFocused(item)
         let shape = RoundedRectangle(cornerRadius: rows > 1 ? 21 : .infinity, style: .continuous)
+        let stroke = focused ? Color.white : Theme.stroke
+        let lineWidth: CGFloat = focused ? 2.5 : 1
         return HStack(spacing: 4) { content() }
             .padding(4)
             .background(Theme.surface, in: shape)
-            .overlay { shape.strokeBorder(focused ? .white : Theme.stroke, lineWidth: focused ? 2.5 : 1) }
+            .overlay {
+                if rows > 1 {
+                    shape.strokeBorder(stroke, lineWidth: lineWidth)
+                } else {
+                    PlainCapsule().strokeBorder(stroke, lineWidth: lineWidth)
+                }
+            }
             .scaleEffect(focused ? 1.04 : 1)
             .animation(Theme.focusAnimation, value: focused)
             .onHover { if $0 { menu.focus = item } }
