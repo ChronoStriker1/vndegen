@@ -121,9 +121,9 @@ public:
 		ERR_FAIL_NULL_V_MSG(context, ERR_UNAVAILABLE, "OpenGL is not available.");
 		CGLSetCurrentContext(context);
 		content = [CALayer layer];
-		content.anchorPoint = CGPointZero;
-		// OpenGL's rows run bottom up.
-		content.geometryFlipped = YES;
+		// A layer shows an IOSurface's first row at its top, and OpenGL's first row is the frame's bottom. geometryFlipped
+		// doesn't help: it moves sublayers and leaves the layer's own contents as they are.
+		content.transform = CATransform3DMakeScale(1, -1, 1);
 		content.contentsGravity = kCAGravityResize;
 		[p_host addSublayer:content];
 		resize(p_points, p_scale);
@@ -139,7 +139,9 @@ public:
 		gl_layer.frame = CGRectMake(0, 0, p_points.width, p_points.height);
 		gl_layer.contentsScale = p_scale;
 #else
-		content.frame = CGRectMake(0, 0, p_points.width, p_points.height);
+		// Not frame, which isn't defined on a transformed layer. The flip turns about the layer's center.
+		content.bounds = CGRectMake(0, 0, p_points.width, p_points.height);
+		content.position = CGPointMake(p_points.width / 2, p_points.height / 2);
 		content.contentsScale = p_scale;
 #endif
 		[CATransaction commit];

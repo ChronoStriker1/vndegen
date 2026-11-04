@@ -124,8 +124,8 @@ int vngd_start(const VNGDLaunch *p_launch) {
 	return 0;
 }
 
-// For VNDegen's tests on macOS, where a window snapshot can't see what the game draws: with VNGD_SNAPSHOT set to a path,
-// the frame the game drew is written there as a PNG every two seconds.
+// For VNDegen's tests on macOS: with VNGD_SNAPSHOT set to a path, the frame the game drew is written there as a PNG every
+// two seconds. It reads the game's viewport, so it doesn't show how VNDegen's window displays that frame.
 static void write_snapshot() {
 	static const String path = OS::get_singleton()->get_environment("VNGD_SNAPSHOT");
 	static uint64_t last = 0;
