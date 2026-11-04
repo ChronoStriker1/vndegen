@@ -61,6 +61,13 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Monster Girl Quest Paradox runs, looping WebM clips in RPG Maker MV and MZ and TyranoScript no longer freeze, files named with backslashes load, and hub outlines lose their vertical lines (0.22.2).
 - A controller layout library, Keyboard and mouse's D-pad matching Steam's template file, and true round ends on capsules (0.23.0).
 
+## Bugs to fix
+New bugs get a GitHub issue and a line here.
+- [#13](https://github.com/ChronoStriker1/vndegen/issues/13) Ren'Py: MalOvent 0.3 stops with a TypeError after its age prompt.
+- [#14](https://github.com/ChronoStriker1/vndegen/issues/14) Mac: the Controller layout sheet resizes under the pointer.
+- [#15](https://github.com/ChronoStriker1/vndegen/issues/15) Detection ties in Wolf, AliceSoft and NScripter depend on hash order.
+- [#16](https://github.com/ChronoStriker1/vndegen/issues/16) RPG Maker MZ: frame rate drop after alpha clips load and unload.
+
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - Nothing right now.
