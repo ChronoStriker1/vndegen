@@ -67,6 +67,7 @@ New bugs get a GitHub issue and a line here.
 - [#14](https://github.com/ChronoStriker1/vndegen/issues/14) Mac: the Controller layout sheet resizes under the pointer.
 - [#15](https://github.com/ChronoStriker1/vndegen/issues/15) Detection ties in Wolf, AliceSoft and NScripter depend on hash order.
 - [#16](https://github.com/ChronoStriker1/vndegen/issues/16) RPG Maker MZ: frame rate drop after alpha clips load and unload.
+- [#17](https://github.com/ChronoStriker1/vndegen/issues/17) Ren'Py: opening VNDegen's menu can restart a movie on the movie channel.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
