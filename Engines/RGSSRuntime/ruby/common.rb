@@ -33,12 +33,15 @@ $RGSS_SCRIPTS = []
 
 def rgss_run_scripts(path)
   require 'zlib'
-  sections = load_data(path)
-  $RGSS_SCRIPTS = sections.map { |section| section[1].to_s.dup.force_encoding(Encoding::UTF_8) }
-  sections.each_with_index do |section, index|
+  $RGSS_SCRIPTS = load_data(path)
+  $RGSS_SCRIPTS.each do |section|
+    section[1] = section[1].to_s.dup.force_encoding(Encoding::UTF_8)
     code = Zlib::Inflate.inflate(section[2]).force_encoding(Encoding::UTF_8)
-    code = rgss_compatible_source(code)
-    eval(code, TOPLEVEL_BINDING, format('{%04d}', index), 1)
+    code = code.delete_prefix("\uFEFF")
+    section[3] = rgss_compatible_source(code)
+  end
+  $RGSS_SCRIPTS.each_with_index do |section, index|
+    eval(section[3], TOPLEVEL_BINDING, format('{%04d}', index), 1)
   end
 end
 
@@ -50,17 +53,17 @@ end
 
 # "Script 'Game_Map' line 42: NoMethodError occurred." and the message, as RGSS reports an error.
 def rgss_describe_error(error)
+  message = error.message.to_s.dup.force_encoding(Encoding::UTF_8).scrub
   location = (error.backtrace || []).find { |line| line =~ /\A\{\d{4}\}:\d+/ }
   name = 'unknown'
   line = 0
   if location =~ /\A\{(\d{4})\}:(\d+)/
-    name = $RGSS_SCRIPTS[$1.to_i] || name
+    name = $RGSS_SCRIPTS.dig($1.to_i, 1) || name
     line = $2.to_i
-  elsif error.is_a?(SyntaxError) && error.message =~ /\{(\d{4})\}:(\d+)/
-    name = $RGSS_SCRIPTS[$1.to_i] || name
+  elsif error.is_a?(SyntaxError) && message =~ /\{(\d{4})\}:(\d+)/
+    name = $RGSS_SCRIPTS.dig($1.to_i, 1) || name
     line = $2.to_i
   end
-  message = error.message.to_s.dup.force_encoding(Encoding::UTF_8).scrub
   "Script '#{name}' line #{line}: #{error.class} occurred.\n\n#{message}\n#{(error.backtrace || []).first(8).join("\n")}"
 end
 
@@ -159,6 +162,9 @@ class << File
   alias_method :rgss_delete, :delete unless method_defined?(:rgss_delete)
   def delete(*paths) = rgss_delete(*paths.map { |path| RGSSFiles.relative?(path) ? Kernel.rgss_game_path(path.tr('\\', '/'), true) : path })
   alias unlink delete
+
+  alias_method :rgss_rename, :rename unless method_defined?(:rgss_rename)
+  def rename(source, destination) = rgss_rename(RGSSFiles.write_path(source), RGSSFiles.write_path(destination))
 end
 
 module FileTest
