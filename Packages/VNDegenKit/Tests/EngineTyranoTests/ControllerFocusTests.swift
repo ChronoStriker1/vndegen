@@ -296,3 +296,27 @@ for (const id of ['skip', 'auto']) document.getElementById(id).addEventListener(
     #expect(plugin.legacyAction(for: .left) == .button(.left))
     #expect(plugin.legacyAction(for: .hub) == nil)
 }
+
+@MainActor @Test func aLoopingVideoReloadsAtItsEndAndTheGameHearsEndedOnlyFromOneThatDoesNot() async throws {
+    let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 800, height: 600), configuration: try configuration())
+    let loader = Loader()
+    await loader.load(page, in: view)
+    let result = try await read(view, """
+    (() => {
+        const video = document.body.appendChild(document.createElement('video'));
+        let loads = 0, heard = 0;
+        video.load = () => { loads++; };
+        video.play = () => Promise.resolve();
+        video.addEventListener('ended', () => { heard++; });
+        const end = () => video.dispatchEvent(new Event('ended'));
+        video.loop = true;
+        end();
+        const looping = [video.loop, video.hasAttribute('loop'), loads, heard].join();
+        // The game clears the property to queue its next clip, and hears that this one ended.
+        video.loop = false;
+        end();
+        return looping + ' ' + [video.loop, loads, heard].join();
+    })()
+    """)
+    #expect(result == "true,false,1,0 false,1,1")
+}

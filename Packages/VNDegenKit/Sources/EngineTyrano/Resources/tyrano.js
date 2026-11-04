@@ -7,6 +7,24 @@
 (function () {
     'use strict';
 
+    // A looping video reloads at its end instead of using WebKit's loop. That loop's seek back to the start never
+    // finishes for a VP8 clip on an iPad simulator, which freezes the picture, and stalls about 550 ms on a Mac, where a
+    // reload stalls about 315 ms. The game still reads and clears the property to queue its next clip, and it hears
+    // `ended` only from a video that isn't looping, as it would with WebKit's loop.
+    const loopingVideos = new WeakSet();
+    Object.defineProperty(HTMLVideoElement.prototype, 'loop', {
+        configurable: true,
+        get() { return loopingVideos.has(this); },
+        set(value) { if (value) loopingVideos.add(this); else loopingVideos.delete(this); },
+    });
+    document.addEventListener('ended', (event) => {
+        const video = event.target;
+        if (!loopingVideos.has(video)) return;
+        event.stopImmediatePropagation();
+        video.load();
+        video.play().catch(() => {});
+    }, true);
+
     const kag = () => (window.TYRANO && window.TYRANO.kag) || null;
     const keys = () => (kag() && kag().key_mouse) || null;
     const hasNativeFocus = (k) => !!(k && k.util && typeof k.focus_up === 'function');
