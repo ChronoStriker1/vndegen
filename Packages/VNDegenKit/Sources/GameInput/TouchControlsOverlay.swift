@@ -123,7 +123,7 @@ private struct GamepadControls: View {
                 .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
                 .frame(width: unit * 1.2, height: unit * 0.6)
-                .background(KeyFill(shape: Capsule(), pressed: pressed))
+                .background(KeyFill(shape: Capsule(style: .circular), pressed: pressed))
         }
     }
 }
@@ -158,7 +158,7 @@ private struct Badge: View {
             .fixedSize()
             .padding(.horizontal, 5)
             .frame(minWidth: 18, minHeight: 18)
-            .background(.white.opacity(0.92), in: .capsule)
+            .background(.white.opacity(0.92), in: Capsule(style: .circular))
             .allowsHitTesting(false)
     }
 }

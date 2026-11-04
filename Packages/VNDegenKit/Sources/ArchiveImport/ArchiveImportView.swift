@@ -670,6 +670,7 @@ struct ImportButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
+        let shape = Capsule(style: .circular)
         configuration.label
             .font(.system(size: kind == .primary ? 17 : 15, weight: .bold))
             .foregroundStyle(kind == .secondary && focused ? .black : .white)
@@ -677,13 +678,13 @@ struct ImportButtonStyle: ButtonStyle {
             .frame(minHeight: kind == .primary ? 52 : 44)
             .background {
                 switch kind {
-                case .primary: Capsule().fill(ImportTheme.accent.gradient)
+                case .primary: shape.fill(ImportTheme.accent.gradient)
                 case .secondary:
-                    if focused { Capsule().fill(.white) } else { Capsule().fill(.ultraThinMaterial).overlay(Capsule().fill(.white.opacity(0.06))) }
+                    if focused { shape.fill(.white) } else { shape.fill(.ultraThinMaterial).overlay(shape.fill(.white.opacity(0.06))) }
                 }
             }
-            .overlay { Capsule().stroke(focused ? .white : ImportTheme.stroke, lineWidth: focused ? (kind == .primary ? 3 : 0) : 1) }
-            .contentShape(Capsule())
+            .overlay { shape.stroke(focused ? .white : ImportTheme.stroke, lineWidth: focused ? (kind == .primary ? 3 : 0) : 1) }
+            .contentShape(shape)
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.95 : (focused ? 1.06 : 1))
             .shadow(color: focused ? ImportTheme.accent.opacity(kind == .primary ? 0.7 : 0.35) : .clear, radius: 16)

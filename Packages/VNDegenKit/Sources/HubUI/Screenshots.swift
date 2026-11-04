@@ -167,7 +167,7 @@ struct ScreenshotViewerView: View {
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(.ultraThinMaterial, in: .capsule)
+                .background(.ultraThinMaterial, in: Capsule(style: .circular))
                 .padding(.bottom, 12)
                 .accessibilityHidden(true)
         }

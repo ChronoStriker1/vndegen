@@ -259,7 +259,7 @@ struct ArtworkEditorSheet: View {
                         .foregroundStyle(focused ? .black : .white)
                         .frame(maxWidth: .infinity, minHeight: 34)
                         .background {
-                            Capsule().fill(focused ? AnyShapeStyle(.white) : slot == selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear))
+                            Capsule(style: .circular).fill(focused ? AnyShapeStyle(.white) : slot == selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear))
                         }
                         .contentShape(.capsule)
                 }
@@ -270,8 +270,8 @@ struct ArtworkEditorSheet: View {
             }
         }
         .padding(4)
-        .background(Theme.surface, in: .capsule)
-        .overlay { PlainCapsule().strokeBorder(Theme.stroke) }
+        .background(Theme.surface, in: Capsule(style: .circular))
+        .overlay { Capsule(style: .circular).strokeBorder(Theme.stroke) }
         .animation(Theme.focusAnimation, value: nav.focus)
     }
 

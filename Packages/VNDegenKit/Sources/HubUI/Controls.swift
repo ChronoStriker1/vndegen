@@ -16,31 +16,14 @@ struct HubButton<Label: View>: View {
     }
 }
 
-/// `Capsule()` as a plain path, with the same points. SwiftUI's own capsule can stroke with short vertical lines at both
-/// ends, and so can a continuous rounded rectangle whose radius nears half its height. Use this for a capsule's outline
-/// only. Fills show no lines, and a material filling a plain path draws darker in a `-snapshot` picture.
-nonisolated struct PlainCapsule: InsettableShape {
-    private var inset: CGFloat = 0
-
-    func path(in rect: CGRect) -> Path {
-        Path(Capsule().path(in: rect.insetBy(dx: inset, dy: inset)).cgPath)
-    }
-
-    func inset(by amount: CGFloat) -> PlainCapsule {
-        var capsule = self
-        capsule.inset += amount
-        return capsule
-    }
-}
-
 struct HubButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, icon, destructive }
     let kind: Kind
     let focused: Bool
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = kind == .icon ? AnyShape(Circle()) : AnyShape(Capsule())
-        let outline = kind == .icon ? AnyShape(Circle()) : AnyShape(PlainCapsule())
+        // Circular, not the default continuous style: issue 10's lines show at a capsule's ends on real devices.
+        let shape = kind == .icon ? AnyShape(Circle()) : AnyShape(Capsule(style: .circular))
         configuration.label
             .font(.system(size: kind == .primary ? 17 : 15, weight: .bold))
             .foregroundStyle(kind == .primary || kind == .destructive ? .white : (focused ? .black : .white))
@@ -54,7 +37,7 @@ struct HubButtonStyle: ButtonStyle {
                     if focused { shape.fill(.white) } else { shape.fill(.ultraThinMaterial).overlay(shape.fill(.white.opacity(0.06))) }
                 }
             }
-            .overlay { outline.stroke(focused ? .white : Theme.stroke, lineWidth: focused ? (kind == .primary || kind == .destructive ? 3 : 0) : 1) }
+            .overlay { shape.stroke(focused ? .white : Theme.stroke, lineWidth: focused ? (kind == .primary || kind == .destructive ? 3 : 0) : 1) }
             .contentShape(shape)
             .scaleEffect(configuration.isPressed ? 0.95 : (focused ? 1.06 : 1))
             .shadow(color: focused ? Theme.accent.opacity(kind == .primary ? 0.7 : 0.35) : .clear, radius: 16)
@@ -205,7 +188,7 @@ struct Tag: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .foregroundStyle(prominent ? .white : Theme.secondaryText)
-            .background(prominent ? AnyShapeStyle(Theme.accent.opacity(0.85)) : AnyShapeStyle(Theme.surface), in: .capsule)
-            .overlay { PlainCapsule().strokeBorder(Theme.stroke, lineWidth: prominent ? 0 : 1) }
+            .background(prominent ? AnyShapeStyle(Theme.accent.opacity(0.85)) : AnyShapeStyle(Theme.surface), in: Capsule(style: .circular))
+            .overlay { Capsule(style: .circular).strokeBorder(Theme.stroke, lineWidth: prominent ? 0 : 1) }
     }
 }

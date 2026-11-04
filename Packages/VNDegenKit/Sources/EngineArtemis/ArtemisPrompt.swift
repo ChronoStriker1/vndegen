@@ -157,7 +157,7 @@ struct ArtemisPromptView: View {
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .padding(.horizontal, 6)
                     .frame(minWidth: 20, minHeight: 20)
-                    .background(.white.opacity(0.18), in: .capsule)
+                    .background(.white.opacity(0.18), in: Capsule(style: .circular))
                 Text(label).font(.system(size: 17, weight: .semibold))
             }
             .frame(maxWidth: .infinity, minHeight: 44)

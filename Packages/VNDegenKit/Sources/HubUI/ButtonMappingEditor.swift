@@ -450,8 +450,8 @@ struct ButtonMappingSheet: View {
                     .minimumScaleFactor(0.8)
                     .padding(.horizontal, 6)
                     .frame(width: 104, height: 32)
-                    .background(Theme.surface, in: .capsule)
-                    .overlay { PlainCapsule().strokeBorder(Theme.stroke) }
+                    .background(Theme.surface, in: Capsule(style: .circular))
+                    .overlay { Capsule(style: .circular).strokeBorder(Theme.stroke) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(action).font(.system(size: 16, weight: .semibold))
                     if controllersOnly {

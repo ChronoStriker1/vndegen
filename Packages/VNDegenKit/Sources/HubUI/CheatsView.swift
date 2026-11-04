@@ -457,7 +457,7 @@ struct CheatsView: View {
             }
         }
         .padding(4)
-        .background(Theme.surface, in: .capsule)
+        .background(Theme.surface, in: Capsule(style: .circular))
     }
 
     @ViewBuilder private var content: some View {
@@ -535,7 +535,7 @@ struct CheatsView: View {
                 }
             }
             .padding(4)
-            .background(Theme.surface, in: .capsule)
+            .background(Theme.surface, in: Capsule(style: .circular))
             searchField
             ForEach(page.shownItems) { item in
                 HStack(spacing: 6) {
@@ -700,7 +700,7 @@ struct CheatsView: View {
                 }
             }
             .padding(3)
-            .background(Color.black.opacity(0.35), in: .capsule)
+            .background(Color.black.opacity(0.35), in: Capsule(style: .circular))
         }
         .padding(.leading, 14)
         .padding(.trailing, 4)
@@ -733,7 +733,7 @@ struct CheatsView: View {
         let focused = showsFocus && page.isFocused(target)
         return Button { page.select(target) } label: {
             SegmentLabel(title: title, selected: selected)
-                .overlay { PlainCapsule().strokeBorder(.white, lineWidth: focused ? 2.5 : 0) }
+                .overlay { Capsule(style: .circular).strokeBorder(.white, lineWidth: focused ? 2.5 : 0) }
         }
         .buttonStyle(.plain)
         .id(target)

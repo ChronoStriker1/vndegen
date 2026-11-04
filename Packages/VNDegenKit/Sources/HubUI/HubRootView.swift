@@ -97,7 +97,7 @@ private struct LibraryContainer: View {
                     .font(.callout.weight(.semibold))
                     .padding(.horizontal, 18)
                     .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: .capsule)
+                    .background(.ultraThinMaterial, in: Capsule(style: .circular))
                     .padding(.bottom, 32)
                     .transition(.opacity)
             }

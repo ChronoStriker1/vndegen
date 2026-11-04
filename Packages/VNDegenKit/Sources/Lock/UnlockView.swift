@@ -112,7 +112,7 @@ public struct UnlockView: View {
                     .font(.headline)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 12)
-                    .background(Capsule().fill(.white.opacity(0.14)))
+                    .background(Capsule(style: .circular).fill(.white.opacity(0.14)))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
