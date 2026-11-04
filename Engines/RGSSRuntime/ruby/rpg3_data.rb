@@ -76,7 +76,7 @@ module RPG
     attr_accessor :atype_id
   end
   class AudioFile
-    def initialize
+    def initialize(name = '', volume = 100, pitch = 100)
       @name = name
       @volume = volume
       @pitch = pitch
@@ -84,7 +84,7 @@ module RPG
     attr_accessor :name, :volume, :pitch
   end
   class BaseItem::Feature
-    def initialize
+    def initialize(code = 0, data_id = 0, value = 0)
       @code = code
       @data_id = data_id
       @value = value
@@ -149,7 +149,7 @@ module RPG
     attr_accessor :kind, :data_id, :denominator
   end
   class Event
-    def initialize
+    def initialize(x, y)
       @id = 0
       @name = ''
       @x = x
@@ -205,7 +205,7 @@ module RPG
     attr_accessor :tile_id, :character_name, :character_index, :direction, :pattern
   end
   class EventCommand
-    def initialize
+    def initialize(code = 0, indent = 0, parameters = [])
       @code = code
       @indent = indent
       @parameters = parameters
@@ -239,7 +239,7 @@ module RPG
     attr_accessor :itype_id, :price, :consumable
   end
   class Map
-    def initialize
+    def initialize(width, height)
       @display_name = ''
       @tileset_id = 1
       @width = width
@@ -287,7 +287,7 @@ module RPG
     attr_accessor :name, :parent_id, :order, :expanded, :scroll_x, :scroll_y
   end
   class MoveCommand
-    def initialize
+    def initialize(code = 0, parameters = [])
       @code = code
       @parameters = parameters
     end
@@ -476,7 +476,7 @@ module RPG
     attr_accessor :type, :element_id, :formula, :variance, :critical
   end
   class UsableItem::Effect
-    def initialize
+    def initialize(code = 0, data_id = 0, value1 = 0, value2 = 0)
       @code = code
       @data_id = data_id
       @value1 = value1

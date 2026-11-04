@@ -6,7 +6,7 @@ for p in sorted(pathlib.Path(sys.argv[1]).glob('gc_rpg_*.txt')):
         d = next(i for i, l in enumerate(lines) if l.strip() in ('Definition', '定義'))
     except StopIteration:
         continue
-    stack = []; cls = sup = None; attrs = []; inits = []; in_init = False
+    stack = []; cls = sup = None; attrs = []; inits = []; in_init = False; signature = ''
     for l in lines[d+1:]:
         s = l.strip(); indent = len(l) - len(l.lstrip())
         m = re.match(r'^(module|class)\s+([\w:]+)(?:\s*<\s*(\S+))?', s)
@@ -14,7 +14,9 @@ for p in sorted(pathlib.Path(sys.argv[1]).glob('gc_rpg_*.txt')):
             while stack and stack[-1][0] >= indent: stack.pop()
             stack.append((indent, m.group(2), m.group(3)))
             continue
-        if re.match(r'^def initialize\b', s):
+        init = re.match(r'^def initialize\b(.*)', s)
+        if init:
+            signature = init.group(1)
             in_init = True
             names = [n for _, n, _ in stack]
             q = '::'.join(names)
@@ -31,4 +33,4 @@ for p in sorted(pathlib.Path(sys.argv[1]).glob('gc_rpg_*.txt')):
             for a in re.findall(kind + r'\s+(.*)', s):
                 attrs += [x.strip().lstrip(':') for x in a.split(',')]
     if cls:
-        print(f"{cls}|{sup or ''}|{','.join(attrs)}|{' ;; '.join(f'{k}={v}' for k,v in inits)}")
+        print(f"{cls}|{sup or ''}|{','.join(attrs)}|{' ;; '.join(f'{k}={v}' for k,v in inits)}|{signature}")

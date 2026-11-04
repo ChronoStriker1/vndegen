@@ -56,6 +56,10 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, MacBook | 30 | **28.6**, was 27.9 | 5.0, was 3.4 | 120 s | 2.9 | 11-03 | 972c708 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, mini | 30 | **28.9** | 5.8 | 120 s | 2.8 | 11-03 | dcea258 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | iPad simulator | 30 | 29.7, froze at its first loop before | 14.1 | 120 s | 6.2 | 11-03 | 972c708 |
+| RGSS | Monster Girl Quest Paradox, walking in the village | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 13 | 11-04 | 2f48b68 |
+| RGSS | Monster Girl Quest Paradox, battle with 5 enemies | Mac app, mini | 60 | 59.5 to 60.0 | 30.0 to 59.9 | 80 s | 7.4 | 11-04 | 2f48b68 |
+| RGSS | Monster Girl Quest Paradox, walking in the village | iPad simulator | 60 | 58.5 to 60.0 | 15.0 to 60.0 | 80 s | 12 | 11-04 | 2f48b68 |
+| RGSS | Monster Girl Quest Paradox, battle with 5 enemies | iPad simulator | 60 | 59.6 to 60.0 | 33.3 to 60.0 | 80 s | 7.6 | 11-04 | 2f48b68 |
 | RGSS, reused | Test Games 33 (VX), 55 (VX Ace), 14 (VX Ace), 37 (XP) | Mac app, mini | 60, or 120 shown at 60 | 59.7 to 60.0 | 43 to 60 | not recorded | not recorded | 10-30 | ed7a60e |
 | RGSS, reused | Test Games 33, 55, 14, 37 | iPad simulator | 60, or 120 shown at 60 | 59.4 to 60.0 | 30 to 60 | not recorded | not recorded | 10-30 | ed7a60e |
 | RGSS, reused | BLACK SOULS II, Play Movie | Mac app, MacBook, and iPad simulator | 60 | 60 | not recorded | 11 s | not recorded | 11-01 | 4a97884 |
@@ -152,9 +156,8 @@ Known limits:
 - The publisher-encrypted KiriKiri games don't run.
 - No Socks RPG at 4x is a known limit in [cheats.md](cheats.md). This check measures 1x.
 - The Legend of Arcadieu, custom HTML5 with Live2D, has no engine plugin.
-- Monster Girl Quest Paradox doesn't reach play, see below.
+- Monster Girl Quest Paradox now reaches play, after the script loading fixes in [rgss.md](rgss.md). Its battle rows use the game's largest troop, five Angel Soldiers, started by a script from a village save and held open for the timing, because the game ends that fight after about 45 s. The 15.0 low is one window of 8, and the rest are 50 or higher. No build ran during these four runs, and other threads' iPad simulators or Mac app were open during some of them.
 
 ## Found along the way
 
-- Monster Girl Quest Paradox stops before its first frame. Script section 135 starts with a UTF-8 byte order mark before `=begin`, which Ruby 3.4's `eval` rejects as a syntax error. The runtime's own error description fails on that error too, so the player sees only "The game stopped with an error."
 - Taimanin Kurenai's two movies play. The earlier `unknown encryption in video.xp3` message was a false warning: both movies are plain MPEG-1 files whose checksums match. Only an incomplete warning entry fit the encryption check's byte budget, and its made-up checksum caused the message. VNDegen now leaves such incomplete evidence unclassified instead of reporting unsupported encryption.
