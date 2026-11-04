@@ -271,7 +271,7 @@ struct ArtworkEditorSheet: View {
         }
         .padding(4)
         .background(Theme.surface, in: .capsule)
-        .overlay { Capsule().strokeBorder(Theme.stroke) }
+        .overlay { PlainCapsule().strokeBorder(Theme.stroke) }
         .animation(Theme.focusAnimation, value: nav.focus)
     }
 

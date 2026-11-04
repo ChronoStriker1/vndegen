@@ -733,7 +733,7 @@ struct CheatsView: View {
         let focused = showsFocus && page.isFocused(target)
         return Button { page.select(target) } label: {
             SegmentLabel(title: title, selected: selected)
-                .overlay { Capsule().strokeBorder(.white, lineWidth: focused ? 2.5 : 0) }
+                .overlay { PlainCapsule().strokeBorder(.white, lineWidth: focused ? 2.5 : 0) }
         }
         .buttonStyle(.plain)
         .id(target)
