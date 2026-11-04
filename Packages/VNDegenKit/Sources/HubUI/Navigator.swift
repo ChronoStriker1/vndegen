@@ -1299,7 +1299,7 @@ extension Navigator {
         let keyboard = keyboard.map { "\($0.title):\($0.focusedKey):\($0.isSecure ? "secure" : $0.text)" } ?? "none"
         var detail = ""
         if case let .mapping(editor)? = self.sheet {
-            detail = " mapping=\(editor.picking.map { "\($0)" } ?? "list"):\(editor.focus.map { "\($0)" } ?? "none")"
+            detail = " mapping=\(editor.picking.map { "\($0)" } ?? "list"):\(editor.focus.map { "\($0)" } ?? "none") translatesKeyboard=\(hub.input.translatesKeyboard)"
         }
         if case let .screenshots(viewer)? = self.sheet { detail = " screenshot=\(viewer.index)" }
         NSLog("HUBNAV route=%@ sheet=%@ focus=%@ keyboard=%@ alert=%@%@", route, sheet, focus.map { "\($0)" } ?? "none", keyboard,
