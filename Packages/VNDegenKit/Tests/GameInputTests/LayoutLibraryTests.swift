@@ -125,6 +125,37 @@ private func buttons(_ name: String, _ library: LibraryStore) throws -> ButtonMa
     #expect(reopened.shown(for: mapping) == nil)
 }
 
+@Test @MainActor func oldDpadOrderMovesOnceForAliceSoftAndArtemisOnly() async throws {
+    let paths = try makePaths()
+    let library = try await makeLibrary(paths, games: ["Alice", "Artemis", "Partial", "Kirikiri", "Gamepad follows"])
+    var oldOrder: [ControlInput: ControlAction] = [.a: .nothing]
+    for (input, digit) in [(ControlInput.up, 1), (.down, 2), (.left, 3), (.right, 4)] { oldOrder[input] = .key(.digit(digit)) }
+    var newOrder = oldOrder
+    for (input, digit) in [(ControlInput.right, 2), (.down, 3), (.left, 4)] { newOrder[input] = .key(.digit(digit)) }
+    var partial = oldOrder
+    partial[.left] = .nothing
+    let engines = ["Alice": "alicesoft", "Artemis": "artemis", "Partial": "alicesoft", "Kirikiri": "kirikiri"]
+    for (name, engine) in engines {
+        library.update(GameID(name)) {
+            $0.engineOverride = EngineID(engine)
+            $0.buttonMapping = name == "Partial" ? partial : oldOrder
+        }
+    }
+
+    ButtonMapping.moveOldDpadOrder(in: library)
+    #expect(library.game(GameID("Alice"))?.buttonMapping == newOrder)
+    #expect(library.game(GameID("Artemis"))?.buttonMapping == newOrder)
+    #expect(library.game(GameID("Partial"))?.buttonMapping == partial)
+    #expect(library.game(GameID("Kirikiri"))?.buttonMapping == oldOrder)
+    #expect(library.game(GameID("Gamepad follows"))?.buttonMapping == nil)
+
+    // A player who sets the old order afterwards keeps it, in this run and after reopening the library.
+    library.update(GameID("Alice")) { $0.buttonMapping = oldOrder }
+    ButtonMapping.moveOldDpadOrder(in: library)
+    ButtonMapping.moveOldDpadOrder(in: LibraryStore(paths: paths, engines: []))
+    #expect(LibraryStore(paths: paths, engines: []).game(GameID("Alice"))?.buttonMapping == oldOrder)
+}
+
 @Test @MainActor func anUnreadableLayoutFileIsKeptRatherThanSavedOver() throws {
     let paths = try makePaths()
     let file = paths.support.appending(path: "controller-layouts.json")

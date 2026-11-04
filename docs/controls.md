@@ -57,7 +57,7 @@ Picking a layout copies its buttons into the game, and a check marks the layout 
 
 Ren'Py applies the buttons too, except mouse movement, the wheel, and Show keyboard, since Ren'Py reads the controller itself. A remapped touch button shows what it sends, for example "Esc".
 
-Remaps saved by earlier versions, which sent actions such as Confirm, convert on first launch to what those actions sent in the game's engine, so remapped games play the same: the Return key in RPG Maker, the matching Xbox button in Ren'Py, and the same TyranoScript action in TyranoScript.
+Remaps saved by earlier versions, which sent actions such as Confirm, convert on first launch to what those actions sent in the game's engine, so remapped games play the same: the Return key in RPG Maker, the matching Xbox button in Ren'Py, and the same TyranoScript action in TyranoScript. Remaps that put Keyboard and mouse's old D-pad order, up 1, down 2, left 3, right 4, on an AliceSoft or Artemis game move to the new order once, because those engines' dialogs read the keys as directions. Other engines' saved mappings keep the order they have.
 
 ## Game commands
 

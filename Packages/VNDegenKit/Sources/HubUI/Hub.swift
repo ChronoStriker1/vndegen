@@ -43,6 +43,7 @@ public final class Hub {
         layouts = LayoutLibrary(paths: library.paths)
         ControlMethod.migrateTouchControlsSetting()
         ButtonMapping.convertLegacyMappings(in: library)
+        ButtonMapping.moveOldDpadOrder(in: library)
     }
 
     /// Rescans the games folder and the archives beside it, then looks up metadata for games that have none, without

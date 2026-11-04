@@ -78,7 +78,7 @@ samples averaged 60.0 with one hitch. A DEBUG build launched with `-frameMonitor
 - CE effects 1, 2, 5 and 24 to 54, and CD effects 1 to 3 and 5, show their result at once. No library game uses them.
 - IY 2 and 3, which set whether a click stops the text skip, are read and skipped. No library game uses them.
 - With the number box up, keys bound to controller buttons mean what the default layout's buttons do: 1 to 4 and WASD
-  step the number, and E cancels. A button bound to a digit in a custom layout therefore steps rather than types. A game whose saved buttons keep the D-pad order from before it became up 1, right 2, down 3, left 4 steps by those keys, so its down, left and right step differently here until the game is reset or given a layout again.
+  step the number, and E cancels. A button bound to a digit in a custom layout therefore steps rather than types. When Keyboard and mouse's D-pad became up 1, right 2, down 3, left 4, a saved mapping with exactly the old order, up 1, down 2, left 3, right 4, moved to the new one once, so its directions still step the right way. Any other digits on the D-pad, including the old order set again later, step by these keys.
 - A controller button let go after the number box closes, while the keyboard holds the same key, can release that
   keyboard press.
 - LE and QE files stay inside the save and game folders: absolute paths, drives and `..` are refused, and the resolved

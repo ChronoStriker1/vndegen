@@ -350,6 +350,28 @@ nonisolated extension ButtonMapping {
         }
         defaults.set(true, forKey: key)
     }
+
+    /// Moves AliceSoft and Artemis games whose stored D-pad is exactly Keyboard and mouse's old order, up 1, down 2, left
+    /// 3, right 4, to its new one, once, because their dialogs read those keys as directions. Later runs leave mappings
+    /// alone, so a player can set the old order on purpose. A file beside the library records the run, not UserDefaults,
+    /// which DEBUG and release builds share on a Mac, so a test run can't make a player's own library skip it.
+    @MainActor public static func moveOldDpadOrder(in library: LibraryStore) {
+        let marker = library.paths.support.appendingPathComponent("moved-old-dpad-order")
+        guard !FileManager.default.fileExists(atPath: marker.path) else { return }
+        let old: [ControlInput: Int] = [.up: 1, .down: 2, .left: 3, .right: 4]
+        for game in library.allGames {
+            guard let engine = game.engine, [EngineID("alicesoft"), EngineID("artemis")].contains(engine),
+                  let stored = game.buttonMapping,
+                  old.allSatisfy({ stored[$0.key] == .key(.digit($0.value)) }) else { continue }
+            library.update(game.id) {
+                for (input, digit) in [(ControlInput.right, 2), (.down, 3), (.left, 4)] {
+                    $0.buttonMapping?[input] = .key(.digit(digit))
+                }
+            }
+        }
+        try? FileManager.default.createDirectory(at: library.paths.support, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: marker.path, contents: nil)
+    }
 }
 
 nonisolated extension KeyboardKey {
