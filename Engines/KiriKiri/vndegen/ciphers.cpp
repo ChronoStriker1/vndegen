@@ -83,6 +83,7 @@ struct Sample {
     uint32_t hash;
     // The adler32 of the entry's contents without decryption, then decrypted with each scheme.
     std::array<uint32_t, 1 + std::size(ciphers)> checksums;
+    bool complete = false;
 };
 
 // Runs inflate over a compressed segment, handing each decompressed piece to add.
@@ -154,6 +155,7 @@ static Sample readSample(const tTVPXP3Archive::tArchiveItem &item, tTJSBinaryStr
     }
     // Some archives list files longer than their segments. The engine's reads end with the last
     // segment, so the sample does too.
+    sample.complete = position == item.OrgSize;
     return sample;
 }
 
@@ -230,6 +232,12 @@ const VNKKCipher *VNKKDetectCipher(const ttstr &archiveName,
             if (best)
                 SDL_Log("vnkk: %s is encrypted with %s", name.c_str(), best->name);
             return best;
+        }
+        // A truncated warning with a made-up checksum can be the only entry within the budget.
+        // Its checksum mismatch says nothing about the archive's encryption.
+        if (std::none_of(samples.begin(), samples.end(), [](const Sample &sample) { return sample.complete; })) {
+            SDL_Log("vnkk: %s has no complete sample to check for encryption", name.c_str());
+            return nullptr;
         }
         bool sameChecksum = true;
         for (const tTVPXP3Archive::tArchiveItem &item : items)
