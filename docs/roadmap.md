@@ -60,6 +60,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - The RPG Maker Cheats page loads when a game holds fractional gold (0.22.1).
 - Monster Girl Quest Paradox runs, looping WebM clips in RPG Maker MV and MZ and TyranoScript no longer freeze, files named with backslashes load, and hub outlines lose their vertical lines (0.22.2).
 - A controller layout library, Keyboard and mouse's D-pad matching Steam's template file, and true round ends on capsules (0.23.0).
+- Godot 3 upright in the Mac app, and VNDegen's menu on Ren'Py main menus that play a movie (0.23.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -68,6 +69,7 @@ New bugs get a GitHub issue and a line here.
 - [#15](https://github.com/ChronoStriker1/vndegen/issues/15) Detection ties in Wolf, AliceSoft and NScripter depend on hash order.
 - [#16](https://github.com/ChronoStriker1/vndegen/issues/16) RPG Maker MZ: frame rate drop after alpha clips load and unload.
 - [#17](https://github.com/ChronoStriker1/vndegen/issues/17) Ren'Py: opening VNDegen's menu can restart a movie on the movie channel.
+- [#18](https://github.com/ChronoStriker1/vndegen/issues/18) Godot 3: Barely Working averages about 58 fps on the Mac mini.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
