@@ -14,7 +14,7 @@
 struct VNS4Engine {
     std::unique_ptr<s4::Game> game;
     std::vector<uint8_t> frame;
-    std::string caption, problem, cheatState;
+    std::string problem, cheatState;
 };
 
 namespace {
@@ -48,7 +48,6 @@ VNS4Engine *vns4_start(const VNS4Launch *l) {
     try {
         e->game = std::make_unique<s4::Game>(cfg);
         if (!e->game->start(g_startError)) return nullptr;
-        e->caption = s4::sjis::toUtf8(e->game->vm->gameName);
     } catch (const std::exception &x) {
         g_startError = std::string("The game's files couldn't be read: ") + x.what();
         return nullptr;
@@ -98,7 +97,6 @@ const uint8_t *vns4_frame(VNS4Engine *e, int *w, int *h) {
     return e->frame.data();
 }
 
-const char *vns4_caption(VNS4Engine *e) { return e ? e->caption.c_str() : ""; }
 void vns4_audio_render(VNS4Engine *e, float *out, int frames) { if (e) e->game->audio.render(out, frames); }
 void vns4_key(VNS4Engine *e, int vk, bool down) { if (e) e->game->key(vk, down); }
 void vns4_mouse_move(VNS4Engine *e, int x, int y) { if (e) e->game->mouseMove(x, y); }

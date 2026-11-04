@@ -41,9 +41,6 @@ bool vns4_step(VNS4Engine *e, int ms);
 // The current frame: RGBA8, width * height pixels, rows packed. The pointer stays valid until the next vns4_frame.
 const uint8_t *vns4_frame(VNS4Engine *e, int *width, int *height);
 
-// The game's name from its ini, UTF-8.
-const char *vns4_caption(VNS4Engine *e);
-
 // Mixes frames stereo frames of 44.1 kHz float audio into out (interleaved). Safe on the audio thread.
 void vns4_audio_render(VNS4Engine *e, float *out, int frames);
 

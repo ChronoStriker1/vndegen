@@ -67,9 +67,6 @@ void vns3_audio(VNS3 *s3, float *out, int frames);
 // Stops the game clock and its sound while paused.
 void vns3_set_paused(VNS3 *s3, bool paused);
 
-// Asks the game to end; the next vns3_frame returns false.
-void vns3_request_quit(VNS3 *s3);
-
 // The game's window title, in UTF-8.
 const char *vns3_title(VNS3 *s3);
 

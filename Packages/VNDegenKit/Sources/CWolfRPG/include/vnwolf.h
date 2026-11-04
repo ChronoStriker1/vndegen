@@ -34,9 +34,6 @@ bool vnwolf_step(VNWolfEngine *e, int ms);
 // last call. The pointer stays valid until the next vnwolf_step.
 const uint8_t *vnwolf_frame(VNWolfEngine *e, int *width, int *height, bool *changed);
 
-// The game's title from Game.dat, UTF-8.
-const char *vnwolf_caption(VNWolfEngine *e);
-
 // Mixes frames stereo frames of 44.1 kHz float audio into out (interleaved). Safe on the audio thread.
 void vnwolf_audio_render(VNWolfEngine *e, float *out, int frames);
 

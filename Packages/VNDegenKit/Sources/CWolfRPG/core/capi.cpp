@@ -27,7 +27,7 @@ struct VNWolfEngine {
     float mouseX = 0, mouseY = 0;  // normalized over the frame
     uint32_t mouseHeld = 0, mousePressed = 0;
     int wheel = 0;
-    std::string caption, status, problem;
+    std::string status, problem;
 };
 
 namespace {
@@ -116,7 +116,6 @@ VNWolfEngine *vnwolf_start(const VNWolfLaunch *launch) {
         return nullptr;
     }
     e->renderer = std::make_unique<Renderer>(*e->game);
-    e->caption = e->game->gameDat().title;
     e->renderer->draw(e->frame);
     return e.release();
 }
@@ -166,7 +165,6 @@ const uint8_t *vnwolf_frame(VNWolfEngine *e, int *width, int *height, bool *chan
     return e->frame.px.data();
 }
 
-const char *vnwolf_caption(VNWolfEngine *e) { return e ? e->caption.c_str() : ""; }
 
 void vnwolf_audio_render(VNWolfEngine *e, float *out, int frames) {
     if (e && e->game->audio()) e->game->audio()->render(out, frames);

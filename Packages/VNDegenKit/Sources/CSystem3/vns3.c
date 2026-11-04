@@ -243,8 +243,6 @@ void vns3_set_paused(VNS3 *s3, bool paused) {
     s3_audio_pause(s, paused);
 }
 
-void vns3_request_quit(VNS3 *s3) { ((S3 *)s3)->quit = true; }
-
 const char *vns3_title(VNS3 *s3) { return ((S3 *)s3)->title; }
 
 const char *vns3_problem(VNS3 *s3) {
