@@ -48,7 +48,7 @@ Linux host and loaded in the app.
 | Test Game 33 | VX | `Game.rgss2a`, VX RTP | title, the PC saves in its folder load, map, save; the PC engine loads the save |
 | Test Game 37 | XP | `Game.rgssad`, XP RTP | title, new game, events with pictures and messages, save, load; a PC save loads in the Linux host; autotiles match the PC engine; runs at the 120 frames a second its scripts set |
 | Test Game 55 | VX Ace | unpacked, no RTP | map at 1024x768, HUD, its own menus, save and load from the menu in the app |
-| Monster Girl Quest Paradox 2.35, with its data and pictures packs | VX Ace | unpacked, no RTP | title, new game, opening, walking to the village, a battle started by a script with the game's own troop and won, menu save, autosave, Continue; on the iPad simulator, title and Continue, then title, new game, menu save and autosave with every name's case swapped |
+| Monster Girl Quest Paradox 2.35, with its data and pictures packs | VX Ace | unpacked, no RTP | title, new game, opening, walking to the village, menu save, autosave, Continue; a battle started by a script with the game's own troop and won on the Linux host, and its largest troop in the app; on the iPad simulator, a save made through the menu with every name's case swapped |
 
 Frame rates, from `-frameMonitor YES` (DEBUG builds log `RGSSFRAMES` every 10 seconds) while walking or playing, with
 another thread's iPhone simulator running on the same Mac mini:
@@ -59,6 +59,8 @@ another thread's iPhone simulator running on the same Mac mini:
 | Test Game 55, map at 1024x768 | 60 | 59.4 to 59.8, 30 to 43 | 60.0, 59.9 to 60.0 |
 | Test Game 14, minigame | 60 | 59.6 to 59.8, 33 to 43 | 59.7 to 59.8, 43 to 50 |
 | Test Game 37, intro | 120 (shown at 60) | 60.0, 60.0 | 60.0, 60.0 |
+| Monster Girl Quest Paradox, walking in the village | 60 | 58.5 to 60.0, 15 to 60 | 59.5 to 60.0, 30 to 59.9 |
+| Monster Girl Quest Paradox, battle with 5 enemies | 60 | 59.6 to 60.0, 33 to 60 | 59.5 to 60.0, 30 to 59.9 |
 
 The runtime's log gives each frame's cost every 600 frames ("timing:"): on the iPad simulator a VX map takes about
 0.7 ms in the game's scripts and 1.9 ms to compose. Simulator timing isn't iPad timing.
