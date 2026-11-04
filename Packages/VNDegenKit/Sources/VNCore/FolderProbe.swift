@@ -22,6 +22,8 @@ public struct FolderProbe: Sendable {
             for name in names where !name.hasPrefix(".") {
                 let rel = prefix.isEmpty ? name : "\(prefix)/\(name)"
                 found.insert(rel)
+                // The walk stops at the next level, so whether this is a directory no longer matters.
+                guard depth + 1 < maxDepth else { continue }
                 var isDir: ObjCBool = false
                 let url = dir.appendingPathComponent(name)
                 if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {

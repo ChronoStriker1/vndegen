@@ -117,7 +117,7 @@ An engine is a type conforming to `EnginePlugin` in `VNCore/Engine.swift`:
 - `saveLocations(folder:dataDirectory:)` tells Ludusavi sync where the engine keeps saves.
 - `engineFileList(_:)`, with `listsEngineFiles`, names the PC engine files a game can do without, for Remove engine files. It's an allowlist, and optional. List a file only after checking that nothing in VNDegen reads it, including detection, and only from what real games ship. It must not read the files it names, which may not be downloaded. `VNCore/EngineFiles.swift` does the rest, and decides there which kinds of folder are refused.
 
-Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match among all registered plugins. Then add its entry to `PluginInfo.catalog` in `HubUI/Plugins.swift`, which Settings' Plugins page reads for the engine versions it covers, what runs its games, and its license.
+Add the new plugin to the `engines` list in `App/VNDegenApp.swift`. The detector picks the most confident match, asking plugins in that order and stopping at the first certain one, so `detect(_:)` must have no side effect another plugin relies on. Then add its entry to `PluginInfo.catalog` in `HubUI/Plugins.swift`, which Settings' Plugins page reads for the engine versions it covers, what runs its games, and its license.
 
 An engine that looks fonts up by Windows name resolves them with `vnfont_resolve` from `Engines/Shared/vnfont.h`. It compiles `vnfont.c` into the engine and passes `vnfont_init` the table and folders that `FontPack.table` and `FontPack.folders` give. See [fonts.md](fonts.md).
 

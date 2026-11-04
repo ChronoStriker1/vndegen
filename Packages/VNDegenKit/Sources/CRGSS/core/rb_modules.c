@@ -458,8 +458,6 @@ static int held[BUTTON_COUNT]; // frames each button has been down, 0 when up
 static long directionOrder[10]; // when each direction went down, for dir4
 static long inputTick;
 
-HostInput *rgss_input_state(void) { return &input; }
-
 static VALUE input_update(VALUE self) {
     (void)self;
     host_input(&input);

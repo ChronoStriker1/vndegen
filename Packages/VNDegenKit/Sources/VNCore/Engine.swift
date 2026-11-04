@@ -254,6 +254,8 @@ public enum EngineDetector {
         var best: EngineMatch?
         for plugin in plugins {
             guard let match = plugin.detect(probe) else { continue }
+            // Nothing outranks a certain match and ties go to the earlier plugin, so the rest can't change the answer.
+            if match.confidence == .certain { return match }
             if best == nil || match.confidence > best!.confidence { best = match }
         }
         return best
