@@ -43,6 +43,7 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | RPG Maker MV | Karryn's Prison, battle with 4 enemies | iPad simulator | 60 | 60.0 | 50.0 | 90 s | 4.6 | 11-03 | 7a50a58 |
 | Godot | Project Hadal, title, intro and play | Mac app, MacBook | 60 | 59.9 | 40.6 | 200 s | 2.4 | 11-03 | 7a50a58 |
 | Godot | Project Hadal, title, intro and play | iPad simulator | 60 | 59.5 | 31.5 | 192 s | 4.2 | 11-03 | 7a50a58 |
+| Godot | Barely Working, title and Level 1 (Godot 3) | Mac app, Mac mini | 60 | 57.5 | 11.6 to 11.9 | 200 s | 2.9 to 5.2 | 11-04 | fc26f2f |
 | Flash | Wolf Girl With You, animated title | Mac app, MacBook | 24 | 24.0 | 19.2 | 150 s | 2.3 | 11-03 | 7a50a58 |
 | Flash | Wolf Girl With You, animated title | iPad simulator | 24 | 24.0 | 19.2 to 19.6 | 150 s | 4.9 | 11-03 | 7a50a58 |
 | KiriKiri | Sisters x Lovers, logo movie | Mac app, MacBook | 30 | 150 of 150 frames, 0 dropped | see notes | 5 s | 4.9 | 11-03 | 7a50a58 |
