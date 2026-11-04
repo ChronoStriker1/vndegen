@@ -439,7 +439,8 @@
                     if (state) seekTo(state, 0);
                     return restart(this);
                 }
-                setTimeout(() => { if (this.seeking) restart(this); }, 1000);
+                // A game that has paused the video meanwhile, as MoviePicture does to destroy one, wants it stopped.
+                setTimeout(() => { if (this.seeking && !this.paused) restart(this); }, 1000);
             }
             nativeTime.set.call(this, value);
             if (state) seekTo(state, Number(value));
