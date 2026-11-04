@@ -127,8 +127,9 @@ In MV and MZ the gap at each loop is now 34 to 125 ms on both the Mac and the si
 | Living's `18_7`, 2 s VP9, MoviePicture | 60 | 48.0, gap 517 ms | 56.6, gap 34 ms | 54.5 over 6 s, gap 500 ms | 59.5, gap 37 ms |
 | Living's `18_7`, Play Movie and MovieManager | 60 | 50.5, gap 517 ms | 59.4, gap 34 ms | 45.9, gap 517 ms | 59.5, gap 34 ms |
 | Living's `ido15_01`, 33 s VP9 with Opus, MoviePicture | 30 | 29.5, gap 568 ms | 29.9, gap 116 ms | 29.6, gap 435 ms | 29.9, gap 125 ms |
+| Cornelica's `mini_cut1`, 0.52 s 600x400 VP9, MoviePicture | 60 | not measured | not measured | 30.2, gap 518 ms | 56.8, gap 35 ms |
 
-Each figure is new video frames per second from `requestVideoFrameCallback` over 12 to 40 s, with the slowest gap. The mini's load average was 3 to 6, with another thread's app open on the Mac. Simulator timing isn't iPad timing, and no physical device has run this. On the simulator the engine held 60 fps during these clips. The Mac runs didn't log it.
+Each figure is new video frames per second from `requestVideoFrameCallback` over 12 to 40 s, with the slowest gap. The mini's load average was 3 to 6, or 7 to 13 for `mini_cut1`, with another thread's app open on the Mac. Simulator timing isn't iPad timing, and no physical device has run this. On the simulator the engine held 60 fps during these clips. The Mac runs didn't log it.
 
 An MP4 keeps WebKit's loop, because reloading made it worse: the Demon Queen game's 2560x1440 H.264 `IntroHandjob2.mp4` stopped 415 to 450 ms by reloading and 116 to 248 ms by seeking. Alpha clips, which VNDegen converts to HEVC, keep it too, along with kept frames. Fallen Kunoichi's `Disguise3`, Cornelica's `ddd`, and No Socks RPG's `loafer1` were checked on the simulator.
 

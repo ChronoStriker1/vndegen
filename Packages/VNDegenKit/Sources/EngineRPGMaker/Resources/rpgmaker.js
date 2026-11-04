@@ -367,16 +367,17 @@
                 const last = args.length - 1;
                 const video = args[last];
                 if (video instanceof HTMLVideoElement) {
-                    // A video reloading to loop has no picture yet, and uploading it would flash black. A texture that
-                    // has never held a frame still takes the call, because PIXI goes on to update what that creates,
-                    // and has to see the video's real size so that it makes the texture again once there's a picture.
-                    if (restarting.has(video)) {
-                        if (uploadedVideos.has(video)) return;
-                        delete video.videoWidth;
-                        delete video.videoHeight;
+                    if (!restarting.has(video) || video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                        args[last] = alphaSource(video);
+                    } else {
+                        // A video reloading to loop has no picture yet, and uploading it would flash black, so its
+                        // texture keeps the frame it has. PIXI counts a texture as made once it asks, so one it makes
+                        // now, whether it's new, restored or evicted, is made blank for later frames to update.
+                        if (name === 'texSubImage2D') return;
+                        const blank = args[last] = document.createElement('canvas');
+                        blank.width = video.videoWidth;
+                        blank.height = video.videoHeight;
                     }
-                    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) uploadedVideos.add(video);
-                    args[last] = alphaSource(video);
                 }
                 return upload.apply(this, args);
             };
@@ -390,8 +391,6 @@
     // kept frames must go on without reloading, and an MP4 seeks faster than it reloads, so at their first end they take
     // WebKit's loop.
     const loopingVideos = new WeakSet(), hookedVideos = new WeakSet(), restarting = new WeakSet();
-    // Videos whose texture holds a frame. A restored WebGL context has lost every texture.
-    let uploadedVideos = new WeakSet();
     const nativeLoop = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'loop');
     const nativeTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
     const reloads = (video) => {
@@ -401,12 +400,9 @@
     function restart(video) {
         const rate = video.playbackRate;
         restarting.add(video);
-        // PIXI would size the sprite to nothing while the reloading video has no size. A texture yet to hold a frame
-        // must see that size change, or it keeps what it made from the empty video.
-        if (uploadedVideos.has(video)) {
-            for (const name of ['videoWidth', 'videoHeight']) {
-                Object.defineProperty(video, name, { configurable: true, value: video[name] });
-            }
+        // PIXI would size the sprite to nothing while the reloading video has no size.
+        for (const name of ['videoWidth', 'videoHeight']) {
+            Object.defineProperty(video, name, { configurable: true, value: video[name] });
         }
         // The engine's handler plays and shows a movie once it has loaded. For a reload of one already showing, that
         // would undo a stop the game made in the meantime.
@@ -792,7 +788,6 @@
     // Effekseer gets a new context whose effects load again. Animations that were playing end, as their effect is gone.
     let contextGeneration = 0;
     window.addEventListener('webglcontextrestored', (event) => {
-        uploadedVideos = new WeakSet();
         const graphics = window.Graphics;
         if (graphics && graphics._renderer && event.target === graphics._renderer.view) {
             renewFilters(graphics._renderer);
