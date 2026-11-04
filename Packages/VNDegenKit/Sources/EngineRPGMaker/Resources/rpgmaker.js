@@ -282,7 +282,9 @@
     };
     window.__vndegen.alphaVideo = (url) => {
         url = url.split('#')[0];
-        alphaURLs.add(url);
+        // The handler writes a backslash in a clip's name as %5C, while the page's elements keep what the game wrote.
+        const names = new Set([url, url.replace(/%5C/g, '\\')]);
+        names.forEach(name => alphaURLs.add(name));
         // WebKit keeps the WebM reader selected from the URL even when the response is QuickTime.
         // A typed source selects the HEVC reader; reloading preserves the plugin's media event listeners.
         const live = new Set(document.querySelectorAll('video'));
@@ -291,9 +293,9 @@
             if (video) live.add(video); else videos.splice(i, 1);
         }
         for (const video of live) {
-            const direct = video.src.split('#')[0] === url;
-            if (!direct && (video.src || video.currentSrc && video.currentSrc.split('#')[0] !== url)) continue;
-            let source = [...video.querySelectorAll('source')].find(item => item.src.split('#')[0] === url);
+            const direct = names.has(video.src.split('#')[0]);
+            if (!direct && (video.src || video.currentSrc && !names.has(video.currentSrc.split('#')[0]))) continue;
+            let source = [...video.querySelectorAll('source')].find(item => names.has(item.src.split('#')[0]));
             if (!direct && (!source || source.type === 'video/quicktime')) continue;
             const playing = !video.paused || video.autoplay;
             if (!source) {

@@ -269,8 +269,11 @@ nonisolated extension GameFolder {
 
     /// Opens the regular file a request names: the handle to read, where its bytes start in it, its size, and its name.
     /// A web root that is an app.asar serves its members from the archive file, or from app.asar.unpacked/ beside it.
-    func open(servedPath path: String) -> (FileHandle, UInt64, Int64, String)? {
-        let path = path.isEmpty || path == "/" ? "/index.html" : path
+    func open(servedPath requested: String) -> (FileHandle, UInt64, Int64, String)? {
+        // On the PC the page is at a file:// address, where a URL parser reads a backslash as a slash. It keeps one in
+        // this custom scheme's path, as the URL standard says, so a game's `movies\Clip.mp4` arrives here as written.
+        let separated = requested.replacingOccurrences(of: "\\", with: "/")
+        let path = separated.isEmpty || separated == "/" ? "/index.html" : separated
         if let (prefix, folder) = mounts.filter({ path.hasPrefix($0.key) }).max(by: { $0.key.count < $1.key.count }) {
             return GameFolder(root: folder, webRoot: "").open(servedPath: "/" + path.dropFirst(prefix.count))
         }

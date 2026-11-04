@@ -135,6 +135,8 @@ Windows ignores case in file and folder names, so Windows games often ask for `I
 
 Each looks a name up as written first and reads a folder's listing only when that misses, so games that use the right case pay nothing.
 
+Windows also reads a backslash as a folder separator, and so does a URL parser on a game's `file://` page on the PC. WebKit keeps a backslash in a `vndegen://` path, as the URL standard says for a custom scheme, so `GameFolder` reads one as a slash when it opens a served path, before it confines the path and matches its case. The web engines' Node layer doesn't do this: `fs` and `path` there follow POSIX, and no game in the library's scan passes them a backslash.
+
 Before a new engine plugin or a change to one ships, it passes the case check on its test games. `scripts/case-check.sh setup` copies each game into a library on a case-sensitive disk image with every name's case swapped. Each game must reach its title, start, save, and load there, on the Mac app and on an iPad simulator, both started with `-libraryRoot` on that library. The script's header has the commands.
 
 ### Frame rate
