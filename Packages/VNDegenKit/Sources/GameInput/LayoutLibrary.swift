@@ -39,8 +39,7 @@ public final class LayoutLibrary {
         } catch {
             // The next save would replace a file this version can't read, such as one a newer version wrote, so it moves
             // aside to stay recoverable.
-            let stamp = Int(Date.now.timeIntervalSince1970)
-            try? FileManager.default.moveItem(at: file, to: support.appendingPathComponent("controller-layouts-unreadable-\(stamp).json"))
+            try? FileManager.default.moveItem(at: file, to: support.appendingPathComponent("controller-layouts-unreadable-\(UUID()).json"))
         }
     }
 
