@@ -52,6 +52,7 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | Ren'Py | Give an imp a chance!, main menu movie, 1080p VP8 | Mac app, MacBook | 60 | 59.9 to 60.1 | 32.6 to 38.9 | 110 s | 2.2 | 11-03 | 7a50a58 |
 | Ren'Py | Give an imp a chance!, main menu movie, 1080p VP8 | iPad simulator | 60 | 59.3 to 60.0 | 26.3 to 44.0 | 110 s | 4.2 | 11-03 | 7a50a58 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, MacBook | 30 | **28.6**, was 27.9 | 5.0, was 3.4 | 120 s | 2.9 | 11-03 | 972c708 |
+| TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, mini | 30 | **28.9** | 5.8 | 120 s | 2.8 | 11-03 | dcea258 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | iPad simulator | 30 | 29.7, froze at its first loop before | 14.1 | 120 s | 6.2 | 11-03 | 972c708 |
 | RGSS, reused | Test Games 33 (VX), 55 (VX Ace), 14 (VX Ace), 37 (XP) | Mac app, mini | 60, or 120 shown at 60 | 59.7 to 60.0 | 43 to 60 | not recorded | not recorded | 10-30 | ed7a60e |
 | RGSS, reused | Test Games 33, 55, 14, 37 | iPad simulator | 60, or 120 shown at 60 | 59.4 to 60.0 | 30 to 60 | not recorded | not recorded | 10-30 | ed7a60e |
@@ -114,7 +115,7 @@ This is the game's own setting. Its MultiTweaks plugin ships with "General frame
 
 This one was VNDegen's to fix. WebKit's own loop seeks to the start at the clip's end. For this 1536x1152 VP8 clip, that seek never finished on the iPad simulator: `seeking` fired, `seeked` didn't, and the picture stayed frozen on the first frame. A blob of the same file did the same, so VNDegen's URL handler isn't the cause. On the Mac the picture stopped for 500 to 600 ms each loop.
 
-`tyrano.js` now loops a video by reloading it at its end. The simulator plays on at 29.7 fps with a slowest gap of about 130 ms. The Mac's gap is about 317 ms, once per loop, which is WebKit loading the file again, and with this 10 s clip it leaves the average at 28.6. A second video element loaded ahead could shorten it, but that's more than this check's fix, so it stays as a known limit.
+`tyrano.js` now loops a video by reloading it at its end. The simulator plays on at 29.7 fps with a slowest gap of about 130 ms. The Mac's gap is 300 to 317 ms, once per loop, which is WebKit loading the file again, and with this 10 s clip it leaves the average at 28.6 to 28.9. A second video element loaded ahead could shorten it, but that's more than this check's fix, so it stays as a known limit.
 
 An alpha clip that VNDegen converts to HEVC loops fine with WebKit's own loop on the simulator: Fallen Kunoichi's 3 s `Disguise3.webm` was checked over 30 s. The freeze wasn't tried on RPG Maker MV or MZ clips that aren't converted and are too long or too large for the kept-frame path. A scan of the library's MV and MZ games found 470 clips over 10 s, so they may have it too.
 
