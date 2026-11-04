@@ -80,6 +80,8 @@ KiriKiri games run on krkrsdl3, an SDL3 port of the KiriKiri engine, which VNDeg
 
 Movies play, in the formats KiriKiri games ship: MPEG-1 and MPEG-2, WMV, and H.264 and HEVC, which decode in hardware. Encrypted archives work without any per-game setting: VNDegen recognizes the common ciphers by the checksums inside the archive, and tells you when a game uses one it doesn't know. Common Windows plugins are built in, including `extrans`, `layerExDraw`, `layerExSave`, and Steam builds' `krkrsteam`.
 
+Taimanin Kurenai's movies are plain MPEG-1 files. Its archive also has a warning entry with an incorrect length and checksum. When the movies exceed the encryption check's byte budget, that incomplete warning no longer causes an unsupported-encryption report.
+
 AlphaMovie (`.amv`) clips play, the battle animations of the Violated Hero games.
 
 A KiriKiri game's window menu bar appears under Game commands in the VNDegen menu, described in [controls.md](controls.md#game-commands). In a game's own Display menu, the choice between fitting the picture inside the window, filling the window and cutting off the edges, and drawing it unscaled in the center works, as do smoothing, screen effects, the draw thread count, and the maximum frame rate, and the game's `.cfu` file keeps them for the next launch. The items that can't apply are left out: the window sizes, since VNDegen sizes the window, the display method and screen resolutions, since VNDegen draws through Metal and never changes the screen's mode, and the middle zoom, which games enable only for their own stand-in for full screen on Windows.
