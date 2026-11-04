@@ -111,13 +111,35 @@ The run without `caffeinate -d` wasn't done. The display wasn't what changed the
 
 This is the game's own setting. Its MultiTweaks plugin ships with "General frame skip" at 6, which draws 5 of every 6 frames, "Battle frame skip" at 3, and "Effekseer frame skip" at 2. With the general skip turned off from a script, the same map draws 60.0 fps with a 1% low of 52.6 on the Mac and 55.6 on the simulator. The 1% low of 28.6 with the skip on is the skipped frame's gap, and clips make no difference. Nothing to fix.
 
-### TyranoScript's looping clips
+### Looping clips in TyranoScript, RPG Maker MV and MZ
 
-This one was VNDegen's to fix. WebKit's own loop seeks to the start at the clip's end. For this 1536x1152 VP8 clip, that seek never finished on the iPad simulator: `seeking` fired, `seeked` didn't, and the picture stayed frozen on the first frame. A blob of the same file did the same, so VNDegen's URL handler isn't the cause. On the Mac the picture stopped for 500 to 600 ms each loop.
+These were VNDegen's to fix. On the iPad simulator no seek ever finishes in a WebM with Vorbis sound: `seeking` fires, `seeked` doesn't, and the picture stays on its frame. Pausing first or seeking again doesn't help, and only a reload gets it moving. It's the sound, not the picture: Living with the Absolute Bustiest College Girl!'s VP8 `ido5_01.webm` hangs, the same video with its sound removed loops, and a VP9 clip given that Vorbis track hangs. A blob of the Jingai Seitairoku clip did the same, so VNDegen's URL handler isn't the cause. On a Mac those seeks finish, but every WebM loop stops for 500 to 535 ms, and on the simulator every WebM without Vorbis stops for 485 to 517 ms.
 
-`tyrano.js` now loops a video by reloading it at its end. The simulator plays on at 29.7 fps with a slowest gap of about 130 ms. The Mac's gap is 300 to 317 ms, once per loop, which is WebKit loading the file again, and with this 10 s clip it leaves the average at 28.6 to 28.9. A second video element loaded ahead could shorten it, but that's more than this check's fix, so it stays as a known limit.
+`tyrano.js` and `rpgmaker.js` now loop a WebM by reloading it at its end. In Jingai Seitairoku the simulator plays on at 29.7 fps with a slowest gap of about 130 ms. The Mac's gap there is 300 to 317 ms, once per loop, and with this 10 s clip it leaves the average at 28.6 to 28.9. A second video element loaded ahead could shorten it, but that's more than this check's fix, so it stays as a known limit.
 
-An alpha clip that VNDegen converts to HEVC loops fine with WebKit's own loop on the simulator: Fallen Kunoichi's 3 s `Disguise3.webm` was checked over 30 s. The freeze wasn't tried on RPG Maker MV or MZ clips that aren't converted and are too long or too large for the kept-frame path. A scan of the library's MV and MZ games found 470 clips over 10 s, so they may have it too.
+In MV and MZ the gap at each loop is now 34 to 125 ms on both the Mac and the simulator, shown in the table below. `rpgmaker.js` holds the last frame on the texture during the reload, so nothing flashes. It also keeps the clip's speed. A seek to 0 while a WebM plays also reloads, because MoviePicture makes that seek as each clip starts, so its Vorbis clips froze on their first frames before the loop was ever reached. Any other seek still stuck after a second restarts the clip from the start.
+
+| Clip, 1440x810 WebM unless noted | Clip fps | Mac before | Mac after | Simulator before | Simulator after |
+| --- | --- | --- | --- | --- | --- |
+| Living's `ido5_03`, 1.5 s VP8 with Vorbis, MoviePicture | 30 | 22.4, gap 535 ms | 28.3, gap 116 ms | not measured on this clip | 29.3, gap 67 ms |
+| Living's `ido5_01`, the same kind | 30 | not measured | not measured | froze at about 0.18 s | 29.4, gap 69 ms |
+| Living's `18_2`, 2 s VP9 with Opus, at 0.81 speed, MoviePicture | 48.6 | 40.2, gap 501 ms | 47.3, gap 100 ms | 40.0, gap 500 ms | 47.0, gap 111 ms |
+| Living's `18_7`, 2 s VP9, MoviePicture | 60 | 48.0, gap 517 ms | 56.6, gap 34 ms | 54.5 over 6 s, gap 500 ms | 59.5, gap 37 ms |
+| Living's `18_7`, Play Movie and MovieManager | 60 | 50.5, gap 517 ms | 59.4, gap 34 ms | 45.9, gap 517 ms | 59.5, gap 34 ms |
+| Living's `ido15_01`, 33 s VP9 with Opus, MoviePicture | 30 | 29.5, gap 568 ms | 29.9, gap 116 ms | 29.6, gap 435 ms | 29.9, gap 125 ms |
+
+Each figure is new video frames per second from `requestVideoFrameCallback` over 12 to 40 s, with the slowest gap. The mini's load average was 3 to 6, with another thread's app open on the Mac. Simulator timing isn't iPad timing, and no physical device has run this. On the simulator the engine held 60 fps during these clips. The Mac runs didn't log it.
+
+An MP4 keeps WebKit's loop, because reloading made it worse: the Demon Queen game's 2560x1440 H.264 `IntroHandjob2.mp4` stopped 415 to 450 ms by reloading and 116 to 248 ms by seeking. Alpha clips, which VNDegen converts to HEVC, keep it too, along with kept frames. Fallen Kunoichi's `Disguise3`, Cornelica's `ddd`, and No Socks RPG's `loafer1` were checked on the simulator.
+
+A scan of the library's 118 MV and MZ games found 4,325 clips in 28 of them. 470 are over 10 s, as an earlier scan counted, but length was the wrong measure: 1,146 clips are ones the games ask to loop, once 257 MP4 copies that sit beside a WebM and don't play here are set aside, and 852 of those, in 10 games, took WebKit's loop. 827 of the 852 are VP9 clips of 2 s or less. Only 7 looped clips have Vorbis sound, 6 in Living and 1 in Welcome to the Monmusu Park, and 16 Vorbis clips play through MoviePicture at all. The scan reads event commands, so it misses clips a script names at run time, and 3 games packed into an exe couldn't be read.
+
+Known limits:
+
+- A seek to anywhere but 0 can't work in a Vorbis WebM on the simulator, so after a second the clip restarts from its start. Returning to a map whose MoviePicture clip saved its position does this.
+- HENTAI CAVEMAN skips a Vorbis movie by seeking to its end. By the rule above it should play again from the start and then end, rather than skip. This wasn't tried.
+- A paused Vorbis WebM that seeks still hangs, and so does a finished, non-looping one that the game plays again, which is a seek inside WebKit.
+- A seek still unfinished after a second counts as hung, so one that slow on a loaded machine would restart its clip.
 
 ## One line each
 

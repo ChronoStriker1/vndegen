@@ -225,3 +225,52 @@ private let setUp = """
     #expect(values["frames"] as? [Int] == [3, 3, 0])
     #expect(values["kept"] as? Bool == true)
 }
+
+@Test @MainActor func aLoopingWebMReloadsAtItsEndWhileAlphaClipsAndMP4sKeepWebKitsLoop() async throws {
+    let values = try await runWithVideo("""
+        const make = (url) => {
+            const clip = document.createElement('video');
+            Object.defineProperty(clip, 'currentSrc', { value: url });
+            Object.defineProperty(clip, 'paused', { value: false });
+            Object.assign(clip, { loads: 0, heard: 0 });
+            // As the real load does, this puts the speed back to the default.
+            clip.load = () => { clip.loads++; clip.playbackRate = 1; };
+            clip.addEventListener('ended', () => { clip.heard++; });
+            return clip;
+        };
+        const end = (clip) => clip.dispatchEvent(new Event('ended'));
+        const state = (clip) => [clip.loop, clip.hasAttribute('loop'), clip.loads, clip.heard].join();
+
+        const webm = make('vndegen://game/movies/clip.webm');
+        webm.loop = true;
+        webm.playbackRate = 0.8;
+        end(webm);
+        const reloaded = state(webm), speed = webm.playbackRate;
+        // The game clears the property to end the clip, and hears that it ended.
+        webm.loop = false;
+        end(webm);
+        const cleared = state(webm);
+
+        const mp4 = make('vndegen://game/movies/clip.mp4');
+        mp4.loop = true;
+        end(mp4);
+        // Plugins that set the property on every frame leave WebKit's loop running.
+        mp4.loop = true;
+
+        window.__vndegen.alphaVideo('vndegen://game/movies/alpha.webm');
+        const alpha = make('vndegen://game/movies/alpha.webm');
+        alpha.loop = true;
+        end(alpha);
+
+        // MoviePicture seeks to 0 as a clip starts, a seek that never finishes in a WebM with Vorbis sound.
+        const seeking = make('vndegen://game/movies/seek.webm');
+        seeking.currentTime = 0;
+        return { reloaded, speed, cleared, mp4: state(mp4), alpha: state(alpha), seek: seeking.loads };
+        """)
+    #expect(values["reloaded"] as? String == "true,false,1,0")
+    #expect(values["speed"] as? Double == 0.8)
+    #expect(values["cleared"] as? String == "false,false,1,1")
+    #expect(values["mp4"] as? String == "true,true,0,0")
+    #expect(values["alpha"] as? String == "true,true,0,0")
+    #expect(values["seek"] as? Int == 1)
+}

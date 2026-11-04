@@ -46,13 +46,15 @@ Known limits for those clips, from a scan of the movies in the library's 118 MV 
 - `siru.webm` (50 by 200) in Trinity Dungeon is the library's only clip under 64 pixels on a side, and it hasn't been played through the converter.
 - The scan could not see inside the exe of Futanari Remedies, Succubus Farm, or Treasure Hunter Koo and the Ancient King, which keep their files there.
 
+Other looping WebM clips reload at their end rather than use WebKit's loop, which stops about 500 ms at each turn and never finishes on an iPad simulator for a WebM with Vorbis sound. Alpha clips and MP4s keep WebKit's loop. [frame-rate.md](frame-rate.md#looping-clips-in-tyranoscript-rpg-maker-mv-and-mz) has the numbers and known limits.
+
 ## TyranoScript
 
 TyranoScript games run on the same WebKit host. Their saves stay in the game folder as on PC, except for builds that save to browser storage, which VNDegen keeps per game. iOS cannot play Ogg, so VNDegen decodes Ogg Vorbis inside the game's page with libvorbis compiled to WebAssembly, the first time each track plays. Electron builds of TyranoScript 5.2 and later, which reach Node through the `window.studio_api` their preload script sets up, get the same modules from VNDegen.
 
 The Skip and Auto buttons a game draws work at any moment, including while a line types or the game waits, and light up while they run. A second tap turns them off. Skip also passes unread text, unless a game's own setting screen has stored the player's choice. On PC, most of these games end Skip at the first unread line. This changes only the running engine, so saves stay compatible.
 
-A looping video reloads at its end instead of using WebKit's own loop, whose seek to the start never finished for a VP8 clip on an iPad simulator. On a Mac the picture holds for about 315 ms at each loop. [frame-rate.md](frame-rate.md#tyranoscripts-looping-clips) has the numbers.
+A looping video reloads at its end instead of using WebKit's own loop, whose seek to the start never finishes on an iPad simulator for a WebM with Vorbis sound. On a Mac the picture holds for about 315 ms at each loop. [frame-rate.md](frame-rate.md#looping-clips-in-tyranoscript-rpg-maker-mv-and-mz) has the numbers.
 
 ## Ren'Py
 
