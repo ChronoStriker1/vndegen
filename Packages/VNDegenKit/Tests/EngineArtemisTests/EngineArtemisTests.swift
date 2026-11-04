@@ -123,7 +123,7 @@ import VNCore
     @Test func keysFromTheKeyboardAndMouseLayoutStandForButtons() {
         #expect(ArtemisPrompt.button(for: key("Space")) == .confirm)
         #expect(ArtemisPrompt.button(for: key("KeyE")) == .cancel)
-        #expect(ArtemisPrompt.button(for: key("Digit3")) == .left)
+        #expect(ArtemisPrompt.button(for: key("Digit3")) == .down)
         #expect(ArtemisPrompt.button(for: key("KeyQ")) == nil)
         #expect(ArtemisPrompt.button(for: .gamepad(.a, pressed: true)) == .confirm)
         #expect(ArtemisPrompt.button(for: .button(.confirm, pressed: false)) == nil)

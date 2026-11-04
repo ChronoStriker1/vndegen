@@ -1,5 +1,6 @@
 import SwiftUI
 import VNCore
+import ControllerUI
 import GameInput
 
 extension ControlMethod {
@@ -125,57 +126,42 @@ extension MouseStyle {
     var other: MouseStyle { self == .touch ? .cursor : .touch }
 }
 
-/// The button mapping editor's state: pick a button, then pick what it does. Touch, pointer, and controller drive the
-/// same state, in the hub's game page and in a running game's menu. Changes save to the game as they are made.
+extension ControllerLayout.ID {
+    var systemImage: String {
+        switch self {
+        case .keyboardAndMouse: "desktopcomputer"
+        case .mouse: "computermouse"
+        case .rpgMaker: "keyboard"
+        case .gamepad: "gamecontroller"
+        case .saved: "person.crop.circle"
+        }
+    }
+}
+
+/// The controller layout sheet's state: pick a layout, or pick a button and then what it does. Touch, pointer, and
+/// controller drive the same state, in the hub's game page and in a running game's menu. Changes save as they are made,
+/// to the game, or to the saved layout being edited and the games that show it.
 @MainActor
 @Observable
 final class ButtonMappingEditor: Identifiable {
     enum Target: Hashable {
         case input(ControlInput)
-        /// Applies a whole layout, such as `ButtonMapping.rpgMaker`.
-        case apply(Layout)
+        /// Copies a layout's buttons into the game.
+        case apply(ControllerLayout.ID)
+        /// Saves the game's buttons as a new layout.
+        case saveNew
         /// Puts back the layout the game's engine starts with.
         case reset
+        /// Opens a saved layout, so changes go to it rather than the game.
+        case edit(ControllerLayout.ID)
+        case rename
+        /// Asks before deleting the layout being edited.
+        case delete
+        case confirmDelete
+        case cancelDelete
         /// Turns a whole stick into mouse movement, or back into a stick.
         case stick(Stick)
         case action(ControlAction)
-    }
-
-    /// The layouts the top of the button list applies.
-    enum Layout: CaseIterable {
-        case keyboardAndMouse, mouse, rpgMaker, gamepad
-
-        var mapping: ButtonMapping {
-            switch self {
-            case .keyboardAndMouse: .keyboardAndMouse
-            case .mouse: .mouse
-            case .rpgMaker: .rpgMaker
-            case .gamepad: ButtonMapping()
-            }
-        }
-
-        var title: String {
-            switch self {
-            case .keyboardAndMouse: "Keyboard and mouse"
-            case .mouse: "Mouse"
-            case .rpgMaker: "RPG Maker controls"
-            case .gamepad: "Xbox gamepad"
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .keyboardAndMouse: "desktopcomputer"
-            case .mouse: "computermouse"
-            case .rpgMaker: "keyboard"
-            case .gamepad: "gamecontroller"
-            }
-        }
-
-        /// The layout's name for a game's button mapping, or nil when it is none of them.
-        static func named(_ mapping: ButtonMapping) -> Layout? {
-            allCases.first { $0.mapping == mapping }
-        }
     }
 
     struct Section {
@@ -195,6 +181,12 @@ final class ButtonMappingEditor: Identifiable {
 
     let gameID: GameID
     private let library: LibraryStore
+    let layouts: LayoutLibrary
+    /// The saved layout changes go to. Nil while they go to the game.
+    private(set) var editing: ControllerLayout.ID?
+    private(set) var confirmingDelete = false
+    /// The keyboard a new layout's name is typed on. Finishing it saves the name.
+    private(set) var keyboard: OnScreenKeyboard?
     /// The button whose action is being picked. Nil while the list of buttons shows.
     private(set) var picking: ControlInput?
     private var target: Target?
@@ -203,12 +195,26 @@ final class ButtonMappingEditor: Identifiable {
     /// Set by the sheet from its width, so the focus rows match the grids it draws.
     var width: CGFloat = 360
 
-    init(library: LibraryStore, gameID: GameID) {
+    init(library: LibraryStore, layouts: LayoutLibrary, gameID: GameID) {
         self.library = library
+        self.layouts = layouts
         self.gameID = gameID
     }
 
-    var mapping: ButtonMapping { ButtonMapping(stored: library.game(gameID)?.buttonMapping, default: defaultLayout) }
+    /// The buttons being edited: the saved layout's, or the game's.
+    var mapping: ButtonMapping { editedLayout?.mapping ?? gameMapping }
+
+    var editedLayout: ControllerLayout? { editing.flatMap(layouts.layout) }
+
+    private var gameMapping: ButtonMapping {
+        ButtonMapping(stored: library.game(gameID)?.buttonMapping, default: defaultLayout)
+    }
+
+    /// The layout the game shows, which the list marks.
+    var currentLayout: ControllerLayout? { layouts.shown(for: gameMapping) }
+
+    /// What the button list marks as changed against: the Xbox layout in a saved layout, the engine's in a game.
+    var baseline: ButtonMapping { editing == nil ? defaultLayout : ButtonMapping() }
 
     /// What the game's engine starts its games with.
     var defaultLayout: ButtonMapping {
@@ -225,9 +231,6 @@ final class ButtonMappingEditor: Identifiable {
         columns(minWidth: section.minWidth)
     }
 
-    /// The layout buttons sit in a grid as wide as the sheet.
-    var layoutColumns: Int { columns(minWidth: 180) }
-
     private func columns(minWidth: CGFloat) -> Int {
         max(1, Int((width + Self.spacing) / (minWidth + Self.spacing)))
     }
@@ -236,12 +239,17 @@ final class ButtonMappingEditor: Identifiable {
         groups().flatMap(\.self)
     }
 
-    /// The rows in groups that the shoulder buttons jump between: the layouts and the buttons, or each kind of action.
+    /// The rows in groups that the shoulder buttons jump between: the layouts and the buttons, a saved layout's commands
+    /// and its buttons, or each kind of action.
     private func groups() -> [[[Target]]] {
-        guard picking != nil else {
-            return [Self.chunked(Layout.allCases.map(Target.apply), layoutColumns) + [[.reset]], Self.inputRows.map { [$0] }]
+        if confirmingDelete { return [[[.confirmDelete, .cancelDelete]]] }
+        if picking != nil { return Self.sections.map { Self.chunked($0.actions.map(Target.action), columns($0)) } }
+        let buttons = Self.inputRows.map { [$0] }
+        if editing != nil { return [[[.rename, .delete]], buttons] }
+        let layoutRows = layouts.all.map { layout -> [Target] in
+            if case .saved = layout.id { [.apply(layout.id), .edit(layout.id)] } else { [.apply(layout.id)] }
         }
-        return Self.sections.map { Self.chunked($0.actions.map(Target.action), columns($0)) }
+        return [layoutRows + [[.saveNew], [.reset]], buttons]
     }
 
     private static func chunked(_ targets: [Target], _ columns: Int) -> [[Target]] {
@@ -251,7 +259,15 @@ final class ButtonMappingEditor: Identifiable {
     /// The focused target, or the default when the stored one is not on screen.
     var focus: Target? {
         let rows = rows()
-        let fallback: Target = picking.map { .action(mapping.action(for: $0)) } ?? .input(ControlInput.allCases[0])
+        let fallback: Target = if confirmingDelete {
+            .cancelDelete
+        } else if let picking {
+            .action(mapping.action(for: picking))
+        } else if editing == nil, let currentLayout {
+            .apply(currentLayout.id)
+        } else {
+            .input(ControlInput.allCases[0])
+        }
         for candidate in [target, fallback] {
             if let candidate, rows.contains(where: { $0.contains(candidate) }) { return candidate }
         }
@@ -260,8 +276,8 @@ final class ButtonMappingEditor: Identifiable {
 
     func isFocused(_ candidate: Target) -> Bool { showsFocus && focus == candidate }
 
-    /// Directions move focus, confirm activates it, and cancel leaves the action list. Returns false for buttons it does
-    /// not use, so the caller can close the editor on cancel from the button list.
+    /// Directions move focus, confirm activates it, and cancel steps back to the layout list. Returns false for buttons it
+    /// does not use, so the caller can close the editor on cancel from the layout list.
     func handle(_ button: VirtualButton) -> Bool {
         switch button {
         case .up, .down, .left, .right:
@@ -274,8 +290,15 @@ final class ButtonMappingEditor: Identifiable {
             if let focus { activate(focus) }
             return true
         case .cancel:
-            guard picking != nil else { return false }
-            closePicker()
+            if confirmingDelete {
+                activate(.cancelDelete)
+            } else if picking != nil {
+                closePicker()
+            } else if editing != nil {
+                stopEditing()
+            } else {
+                return false
+            }
             return true
         case .pageUp, .pageDown:
             showsFocus = true
@@ -306,6 +329,23 @@ final class ButtonMappingEditor: Identifiable {
         picking = nil
     }
 
+    func stopEditing() {
+        target = editing.map(Target.edit)
+        editing = nil
+    }
+
+    /// Asks for a name on the keyboard. A blank name saves nothing, and closing the keyboard keeps things as they were.
+    private func openKeyboard(title: String, text: String, onDone: @escaping (String) -> Void) {
+        var typed = text
+        keyboard = OnScreenKeyboard(title: title, text: text) {
+            typed = $0
+        } onDone: {
+            onDone(typed)
+        } onClose: { [weak self] in
+            self?.keyboard = nil
+        }
+    }
+
     private func move(_ button: VirtualButton) {
         let rows = rows()
         guard let focus, let r = rows.firstIndex(where: { $0.contains(focus) }), let c = rows[r].firstIndex(of: focus) else { return }
@@ -319,8 +359,12 @@ final class ButtonMappingEditor: Identifiable {
     }
 
     private func save(_ mapping: ButtonMapping) {
-        let stored = mapping.stored(default: defaultLayout)
-        library.update(gameID) { $0.buttonMapping = stored }
+        if let editing {
+            layouts.update(editing, mapping: mapping, in: library)
+        } else {
+            let stored = mapping.stored(default: defaultLayout)
+            library.update(gameID) { $0.buttonMapping = stored }
+        }
     }
 
     private func activate(_ candidate: Target) {
@@ -328,10 +372,36 @@ final class ButtonMappingEditor: Identifiable {
         case let .input(input):
             picking = input
             target = nil
-        case let .apply(layout):
-            save(layout.mapping)
+        case let .apply(id):
+            if let layout = layouts.layout(id) { save(layout.mapping) }
+        case .saveNew:
+            let mapping = gameMapping
+            guard layouts.shown(for: mapping) == nil else { return }
+            openKeyboard(title: "Layout name", text: "") { [weak self] name in
+                guard let self, let id = layouts.add(name: name, mapping: mapping) else { return }
+                target = .apply(id)
+            }
         case .reset:
             save(defaultLayout)
+        case let .edit(id):
+            editing = id
+            target = nil
+        case .rename:
+            guard let editedLayout else { return }
+            openKeyboard(title: "Layout name", text: editedLayout.name) { [weak self] name in
+                self?.layouts.rename(editedLayout.id, to: name)
+            }
+        case .delete:
+            confirmingDelete = true
+            target = nil
+        case .confirmDelete:
+            if let editing { layouts.delete(editing) }
+            confirmingDelete = false
+            editing = nil
+            target = nil
+        case .cancelDelete:
+            confirmingDelete = false
+            target = .delete
         case let .stick(stick):
             var mapping = mapping
             mapping.setStick(stick, movesPointer: !mapping.movesPointer(stick))
@@ -354,12 +424,21 @@ struct ButtonMappingSheet: View {
     var onClose: (() -> Void)?
 
     var body: some View {
-        let title = hub.library.game(editor.gameID).map(hub.displayTitle) ?? ""
-        SheetScaffold(title: editor.picking.map { "Map \($0.title)" } ?? "Button mapping", subtitle: title, onClose: onClose) {
+        let game = hub.library.game(editor.gameID).map(hub.displayTitle) ?? ""
+        let title = editor.picking.map { "Map \($0.title)" } ?? (editor.editing == nil ? "Controller layout" : "Edit layout")
+        SheetScaffold(title: title, subtitle: editor.editedLayout?.name ?? game, onClose: onClose) {
             ScrollViewReader { proxy in
                 ScrollView {
                     Group {
-                        if let input = editor.picking { picker(for: input) } else { inputList }
+                        if editor.confirmingDelete {
+                            deleteQuestion
+                        } else if let input = editor.picking {
+                            picker(for: input)
+                        } else if editor.editing != nil {
+                            layoutEditor
+                        } else {
+                            layoutList
+                        }
                     }
                     .padding(.horizontal, 22)
                     .padding(.bottom, 22)
@@ -371,70 +450,142 @@ struct ButtonMappingSheet: View {
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width - 44 } action: { editor.width = $0 }
         }
+        .onScreenKeyboard(editor.keyboard)
+        // Typing on the keyboard reaches its text field rather than moving focus, as in the hub's other sheets.
+        .onChange(of: editor.keyboard != nil) { _, typing in hub.input.translatesKeyboard = !typing }
+        // A swipe can close the sheet under the keyboard.
+        .onDisappear { if editor.keyboard != nil { hub.input.translatesKeyboard = true } }
         .presentationDetents([.large])
         #if os(macOS)
         .frame(minWidth: 520, minHeight: 560)
         #endif
     }
 
-    private var inputList: some View {
+    /// Every layout, with the game's marked, then what the game's buttons do.
+    private var layoutList: some View {
         let mapping = editor.mapping, defaultLayout = editor.defaultLayout
+        let current = editor.currentLayout
         return VStack(alignment: .leading, spacing: 8) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: ButtonMappingEditor.spacing),
-                                     count: editor.layoutColumns),
-                      spacing: ButtonMappingEditor.spacing) {
-                ForEach(ButtonMappingEditor.Layout.allCases, id: \.self) { layout in
-                    let target = ButtonMappingEditor.Target.apply(layout)
-                    Button { editor.select(target) } label: {
-                        Label(layout.title, systemImage: layout.systemImage)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(target)))
-                    .disabled(mapping == layout.mapping)
-                    .id(target)
-                }
+            SectionLabel(text: "Layouts")
+            ForEach(editor.layouts.all) { layout in
+                layoutRow(layout, current: layout.id == current?.id)
             }
-            Button { editor.select(.reset) } label: {
-                Label("Reset to \(ButtonMappingEditor.Layout.named(defaultLayout)?.title ?? "the default")", systemImage: "arrow.counterclockwise")
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(.reset)))
-            .disabled(mapping == defaultLayout)
-            .id(ButtonMappingEditor.Target.reset)
-            .padding(.bottom, 8)
-            ForEach(ButtonMappingEditor.inputRows, id: \.self) { target in
-                switch target {
-                case let .input(input):
-                    row(target, name: input.title, action: mapping.action(for: input).title,
-                        controllersOnly: !input.isOnTouchGamepad,
-                        changed: mapping.action(for: input) != defaultLayout.action(for: input))
-                case let .stick(stick):
-                    let isStick = stick.directions.allSatisfy { mapping.action(for: $0) == .gamepad($0) }
-                    row(target, name: stick.title,
-                        action: mapping.movesPointer(stick) ? "Mouse movement" : isStick ? "Stick" : "Set by direction",
-                        controllersOnly: true, detail: mapping.movesPointer(stick) ? "Use as a stick" : "Use as mouse movement")
-                default:
-                    EmptyView()
-                }
-            }
-            Text(footnote(defaultLayout))
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.tertiaryText)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
+            actionButton(.saveNew, title: "Save as new layout", systemImage: "plus")
+                .disabled(current != nil)
+                .padding(.top, 8)
+            actionButton(.reset, title: "Reset to \(editor.layouts.shown(for: defaultLayout)?.name ?? "the default")",
+                         systemImage: "arrow.counterclockwise")
+                .disabled(mapping == defaultLayout)
+                .padding(.bottom, 8)
+            SectionLabel(text: "Buttons")
+            buttonRows(mapping)
+            note(footnote(defaultLayout))
         }
         .animation(Theme.focusAnimation, value: editor.focus)
+    }
+
+    /// A saved layout's name and buttons, which change every game showing it.
+    private var layoutEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button { editor.stopEditing() } label: { Label("All layouts", systemImage: "chevron.left") }
+                .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+            note("Changes here also change every game that shows this layout, not only this game. A game you changed since picking the layout keeps its own buttons.")
+                .padding(.bottom, 6)
+            HStack(spacing: ButtonMappingEditor.spacing) {
+                actionButton(.rename, title: "Rename", systemImage: "pencil")
+                actionButton(.delete, title: "Delete", systemImage: "trash")
+            }
+            .padding(.bottom, 8)
+            SectionLabel(text: "Buttons")
+            buttonRows(editor.mapping)
+        }
+        .animation(Theme.focusAnimation, value: editor.focus)
+    }
+
+    private var deleteQuestion: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Delete \(editor.editedLayout?.name ?? "this layout")?").font(.system(size: 17, weight: .bold))
+            note("Games using it keep their buttons.")
+            HStack(spacing: ButtonMappingEditor.spacing) {
+                actionButton(.confirmDelete, title: "Delete", systemImage: "trash")
+                actionButton(.cancelDelete, title: "Cancel", systemImage: "xmark")
+            }
+        }
+        .animation(Theme.focusAnimation, value: editor.focus)
+    }
+
+    /// A layout to pick, with an Edit button when it is one the player saved.
+    private func layoutRow(_ layout: ControllerLayout, current: Bool) -> some View {
+        let target = ButtonMappingEditor.Target.apply(layout.id)
+        return HStack(spacing: ButtonMappingEditor.spacing) {
+            Button { editor.select(target) } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: layout.id.systemImage).frame(width: 26)
+                    Text(layout.name).font(.system(size: 16, weight: .semibold)).lineLimit(1)
+                    Spacer()
+                    if current { Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent) }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(rowFill(target), in: .rect(cornerRadius: 14, style: .continuous))
+                .overlay { rowStroke(target) }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(current ? .isSelected : [])
+            .id(target)
+            if case .saved = layout.id {
+                let edit = ButtonMappingEditor.Target.edit(layout.id)
+                Button("Edit") { editor.select(edit) }
+                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(edit)))
+                    .id(edit)
+            }
+        }
+    }
+
+    private func actionButton(_ target: ButtonMappingEditor.Target, title: String, systemImage: String) -> some View {
+        Button { editor.select(target) } label: {
+            Label(title, systemImage: systemImage)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(HubButtonStyle(kind: .secondary, focused: editor.isFocused(target)))
+        .id(target)
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.tertiaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 14)
+    }
+
+    private func buttonRows(_ mapping: ButtonMapping) -> some View {
+        let baseline = editor.baseline
+        return ForEach(ButtonMappingEditor.inputRows, id: \.self) { target in
+            switch target {
+            case let .input(input):
+                row(target, name: input.title, action: mapping.action(for: input).title,
+                    controllersOnly: !input.isOnTouchGamepad,
+                    changed: mapping.action(for: input) != baseline.action(for: input))
+            case let .stick(stick):
+                let isStick = stick.directions.allSatisfy { mapping.action(for: $0) == .gamepad($0) }
+                row(target, name: stick.title,
+                    action: mapping.movesPointer(stick) ? "Mouse movement" : isStick ? "Stick" : "Set by direction",
+                    controllersOnly: true, detail: mapping.movesPointer(stick) ? "Use as a stick" : "Use as mouse movement")
+            default:
+                EmptyView()
+            }
+        }
     }
 
     private func footnote(_ defaultLayout: ButtonMapping) -> String {
         let start = defaultLayout == .keyboardAndMouse
             ? "This game's engine reads no gamepad, so its games start with Keyboard and mouse, the layout of Steam's template of that name: the left stick is WASD, the right stick moves the pointer, RT and R3 click, LT right clicks, LB and RB turn the wheel, and the other buttons press keys. Mouse puts the pointer on both sticks and the mouse buttons on A and X."
             : "Every button sends the same Xbox controller button unless you change it, and the game reads it as a gamepad."
-        return start + " Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation, so a change here never stops a controller from working them. LB and RB jump between groups."
+        return start + " Picking a layout copies its buttons into this game, and changing a button changes only this game until you save it as a new layout. Home on a controller, the house button on the touch gamepad, and the backtick key always open the VNDegen menu. The library and the VNDegen menu keep their own navigation, so a change here never stops a controller from working them. LB and RB jump between groups."
     }
 
     /// A button, or a whole stick, with what it does. A stick's row switches it between moving the pointer and being a

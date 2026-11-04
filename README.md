@@ -23,7 +23,7 @@ The games run unmodified. VNDegen does not convert or repack them, and their sav
 - **Engine detection.** VNDegen recognizes each game by its files and shows which file identified it. You can assign an engine by hand. [Engines](docs/engines.md)
 - **Artwork and metadata** from Steam, SteamGridDB, IGDB, and VNDB, and any art slot can be replaced. [Library](docs/library.md#artwork-and-metadata)
 - **Three library layouts**, Header list, Capsule rows, and Featured, that fit iPhone portrait and landscape, iPhone Duo, iPad full screen or in a window, and Mac windows of any size. [Layouts](#layouts-on-each-device)
-- **Touch, mouse and keyboard, and controllers** drive the hub and the games, with a per-game button mapping. [Controls](docs/controls.md)
+- **Touch, mouse and keyboard, and controllers** drive the hub and the games, with a library of controller layouts you can pick per game, edit, and add to. [Controls](docs/controls.md)
 - **More than one games folder**, such as an external drive or a server, and archives unpack straight into the library. [Library](docs/library.md#adding-games)
 - **Game menu.** A long press, a right click, or X on a controller opens Play, Change artwork, Hide, Remove, and more. [Library](docs/library.md#the-game-menu)
 - **Remove engine files.** RPG Maker MV and MZ, TyranoScript, and Ren'Py games can drop the PC engine files they don't need in VNDegen, about 88 to 295 MB a game on average. The game won't run on a PC from that folder afterwards. [Library](docs/library.md#removing-engine-files)
@@ -127,7 +127,7 @@ Games marked Hide leave the library until it is unlocked with Face ID, Touch ID,
 
 ## Controls
 
-In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad, such as KiriKiri, TyranoScript, Flash, and Artemis, start with Steam's Keyboard and Mouse layout instead. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
+In a game, every button from the touch gamepad or a real controller reaches the game as an Xbox controller button, read by the game's own gamepad support. Engines that read no gamepad, such as KiriKiri, TyranoScript, Flash, Artemis, AliceSoft, and NScripter, start with Steam's Keyboard and Mouse layout instead. Each game has its own control method (Automatic, Touch gamepad, Mouse, or Controller) and its own button mapping, where any button can send another button, a key, a click, the mouse wheel, or mouse movement.
 
 | In the library and the VNDegen menu | Controller | Keyboard |
 |---|---|---|
@@ -139,7 +139,7 @@ In a game, every button from the touch gamepad or a real controller reaches the 
 | Previous and next page | LB and RB | Q and E, or Page Up and Page Down |
 | Open the VNDegen menu in a game | Home, and View while the menu is open | Backtick (`` ` ``) |
 
-A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. [docs/controls.md](docs/controls.md) has every layout, the mapping editor, and each engine's keys.
+A controller's Home button, the touch gamepad's house button, the small menu button in the corner, and the backtick always open the VNDegen menu, so a mapping cannot lock you out. [docs/controls.md](docs/controls.md) has every layout, the controller layout sheet, and each engine's keys.
 
 <p align="center">
   <img src="docs/screenshots/no-socks-rpg-iphone.jpg" width="820" alt="No Socks RPG, an RPG Maker MZ game, running in landscape on iPhone with its in-game menu open, loaded from a Steam save">
@@ -154,7 +154,7 @@ A controller's Home button, the touch gamepad's house button, the small menu but
 ## Documentation
 
 - [library.md](docs/library.md): adding games, library folders, layouts, hidden games, and metadata sources
-- [controls.md](docs/controls.md): control methods, layouts, button mapping, a game's dialogs, and Game commands
+- [controls.md](docs/controls.md): control methods, controller layouts, a game's dialogs, and Game commands
 - [cheats.md](docs/cheats.md): what the Cheats page does in each engine
 - [engines.md](docs/engines.md): each engine's detection, runtime, saves, and known limits, with more in [rgss.md](docs/rgss.md), [artemis.md](docs/artemis.md), [wolfrpg.md](docs/wolfrpg.md), [system3.md](docs/system3.md), [system4.md](docs/system4.md), [nscripter.md](docs/nscripter.md), [godot.md](docs/godot.md), and [flash.md](docs/flash.md)
 - [video.md](docs/video.md): movie decoding and the see-through clip converter

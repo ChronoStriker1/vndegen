@@ -89,14 +89,14 @@ final class System3NumberBox {
     }
 
     /// A key a controller or touch gamepad button is bound to. Under the Keyboard and mouse layout, the one AliceSoft
-    /// games start with, the D-pad is 1 to 4, the left stick WASD, A Space and B E, so those mean what the buttons do
-    /// rather than what the keys type.
+    /// games start with, the D-pad is 1 up, 2 right, 3 down, and 4 left, the left stick WASD, A Space and B E, so those
+    /// mean what the buttons do rather than what the keys type.
     func press(boundKey key: Int) {
         switch key {
         case 0x31, 0x57: press(.step(1))
-        case 0x32, 0x53: press(.step(-1))
-        case 0x33, 0x41: press(.step(-10))
-        case 0x34, 0x44: press(.step(10))
+        case 0x33, 0x53: press(.step(-1))
+        case 0x34, 0x41: press(.step(-10))
+        case 0x32, 0x44: press(.step(10))
         case 0x45: press(.cancel)
         default: press(virtualKey: Int32(key))
         }

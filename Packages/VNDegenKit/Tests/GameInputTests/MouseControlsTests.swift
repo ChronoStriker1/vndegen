@@ -14,7 +14,7 @@ import VNCore
         .l3: key("Shift", "ShiftLeft", 16), .r3: .click(.primary),
         .rightStickUp: .mouseMove(.up), .rightStickDown: .mouseMove(.down),
         .rightStickLeft: .mouseMove(.left), .rightStickRight: .mouseMove(.right),
-        .up: key("1", "Digit1", 49), .down: key("2", "Digit2", 50), .left: key("3", "Digit3", 51), .right: key("4", "Digit4", 52),
+        .up: key("1", "Digit1", 49), .right: key("2", "Digit2", 50), .down: key("3", "Digit3", 51), .left: key("4", "Digit4", 52),
         .a: key(" ", "Space", 32), .b: key("e", "KeyE", 69), .x: key("r", "KeyR", 82), .y: key("f", "KeyF", 70),
     ]
     #expect(ButtonMapping.keyboardAndMouse.overrides == expected)

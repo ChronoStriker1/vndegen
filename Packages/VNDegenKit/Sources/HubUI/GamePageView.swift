@@ -287,7 +287,7 @@ private struct CheatsSection: View {
     }
 }
 
-/// The game's control method on a touch device, its button mapping, and the buttons that change them.
+/// The game's control method on a touch device, its controller layout, and the buttons that change them.
 private struct ControlsSection: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
@@ -313,9 +313,9 @@ private struct ControlsSection: View {
             }
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Button mapping")
+                    Text("Controller layout")
                         .font(.system(size: 17, weight: .bold))
-                    Text(ButtonMappingEditor.Layout.named(mapping)?.title
+                    Text(hub.layouts.shown(for: mapping)?.name
                          ?? (remapped == 1 ? "1 button remapped" : "\(remapped) buttons remapped"))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.secondaryText)

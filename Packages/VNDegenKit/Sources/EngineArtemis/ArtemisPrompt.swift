@@ -66,8 +66,8 @@ final class ArtemisPrompt {
     }
 
     /// The button a press stands for. Artemis games start with the "Keyboard and mouse" layout, whose buttons arrive as
-    /// keys and the wheel: A, B, X, and Y are Space, E, R, and F, the D-pad is 1 to 4, the left stick is WASD, Menu is
-    /// Escape, and LB and RB turn the wheel.
+    /// keys and the wheel: A, B, X, and Y are Space, E, R, and F, the D-pad is 1 up, 2 right, 3 down, and 4 left, the left
+    /// stick is WASD, Menu is Escape, and LB and RB turn the wheel.
     nonisolated static func button(for event: ControllerEvent) -> VirtualButton? {
         switch event {
         case let .button(button, pressed: true): button
@@ -80,7 +80,7 @@ final class ArtemisPrompt {
 
     nonisolated private static let keyButtons: [String: VirtualButton] = [
         "Enter": .confirm, "Space": .confirm, "Escape": .cancel, "KeyE": .cancel, "KeyR": .dash, "KeyF": .menu,
-        "Digit1": .up, "Digit2": .down, "Digit3": .left, "Digit4": .right,
+        "Digit1": .up, "Digit2": .right, "Digit3": .down, "Digit4": .left,
         "KeyW": .up, "KeyS": .down, "KeyA": .left, "KeyD": .right,
     ]
 }

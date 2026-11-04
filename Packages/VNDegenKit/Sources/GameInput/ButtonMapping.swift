@@ -67,8 +67,8 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
 
     /// Steam's Keyboard and Mouse controller template, which engines with no gamepad support start with. LB and RB turn
     /// the wheel down and up, LT right clicks and RT clicks, View is Tab and Menu Escape, the left stick is WASD and
-    /// pressing it is Shift, the right stick moves the pointer and pressing it clicks, the D-pad is 1 to 4, and A, B, X,
-    /// and Y are Space, E, R, and F.
+    /// pressing it is Shift, the right stick moves the pointer and pressing it clicks, the D-pad is 1 up, 2 right, 3 down,
+    /// and 4 left, and A, B, X, and Y are Space, E, R, and F.
     public static let keyboardAndMouse: ButtonMapping = {
         var mapping = ButtonMapping()
         let actions: [ControlInput: ControlAction] = [
@@ -76,7 +76,7 @@ nonisolated public struct ButtonMapping: Equatable, Sendable {
             .view: .key(.tab), .menu: .key(.escape), .l3: .key(.shift), .r3: .click(.primary),
             .leftStickUp: .key(.letter("W")), .leftStickDown: .key(.letter("S")),
             .leftStickLeft: .key(.letter("A")), .leftStickRight: .key(.letter("D")),
-            .up: .key(.digit(1)), .down: .key(.digit(2)), .left: .key(.digit(3)), .right: .key(.digit(4)),
+            .up: .key(.digit(1)), .right: .key(.digit(2)), .down: .key(.digit(3)), .left: .key(.digit(4)),
             .a: .key(.space), .b: .key(.letter("E")), .x: .key(.letter("R")), .y: .key(.letter("F")),
         ]
         for (input, action) in actions { mapping.set(action, for: input) }

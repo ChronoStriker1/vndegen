@@ -186,6 +186,10 @@ struct PlayerView: View {
         }
         guard case let .button(button, pressed: true) = event else { return }
         if let mappingEditor {
+            if let keyboard = mappingEditor.keyboard {
+                keyboard.handle(button)
+                return
+            }
             if !mappingEditor.handle(button), button == .cancel || button == .hub { self.mappingEditor = nil }
             return
         }
@@ -315,7 +319,7 @@ struct PlayerView: View {
 
     private func openMapping() {
         guard let id = game?.id else { return }
-        mappingEditor = ButtonMappingEditor(library: hub.library, gameID: id)
+        mappingEditor = ButtonMappingEditor(library: hub.library, layouts: hub.layouts, gameID: id)
     }
 
     /// The game reads the keyboard itself and wants raw presses through its own button mapping. The menu and the unlock
@@ -497,7 +501,7 @@ private struct PlayerMenuView: View {
             if items.contains(.method) { methods }
             if items.contains(.controllerMouse) { controllerMouse }
             if items.contains(.mouseStyle), let style = method.mouse { mouseStyles(style) }
-            Button(action: onMapping) { Label("Button mapping", systemImage: "slider.horizontal.3").frame(minWidth: buttonWidth) }
+            Button(action: onMapping) { Label("Controller layout", systemImage: "slider.horizontal.3").frame(minWidth: buttonWidth) }
                 .buttonStyle(HubButtonStyle(kind: .secondary, focused: isFocused(.mapping)))
                 .onHover { if $0 { menu.focus = .mapping } }
         }

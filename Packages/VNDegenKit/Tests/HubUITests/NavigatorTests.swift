@@ -102,6 +102,21 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
+@Test func theNavigatorSendsButtonsToTheLayoutNameKeyboard() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.hub.library.update(id) { $0.buttonMapping = [.a: .nothing] }
+    nav.activate(.pageMapping)
+    guard case let .mapping(editor)? = nav.sheet else { Issue.record("no mapping sheet"); return }
+    editor.select(.saveNew)
+    #expect(nav.keyboard === editor.keyboard && editor.keyboard != nil)
+    press(nav, .confirm, .menu)
+    #expect(nav.hub.layouts.saved.map(\.name) == ["q"])
+    #expect(editor.keyboard == nil)
+    press(nav, .cancel)
+    #expect(nav.sheet == nil)
+}
+
+@MainActor
 @Test func theMappingEditorResetsJumpsGroupsAndStillWorksWithEveryButtonMappedToNothing() async throws {
     let (nav, id) = try await makeNavigator()
     let library = nav.hub.library

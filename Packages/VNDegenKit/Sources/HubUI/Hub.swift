@@ -21,6 +21,7 @@ public final class Hub {
     public let input: InputHub
     public let lock: LockService
     public let saveSync: SaveSyncService
+    public let layouts: LayoutLibrary
     public private(set) var screen: Screen = .library
     /// Archives copied into VNDegen's folder, listed under Ready to import.
     public private(set) var localArchives: [LocalArchive] = []
@@ -39,6 +40,7 @@ public final class Hub {
         self.input = input
         self.lock = lock
         self.saveSync = saveSync
+        layouts = LayoutLibrary(paths: library.paths)
         ControlMethod.migrateTouchControlsSetting()
         ButtonMapping.convertLegacyMappings(in: library)
     }

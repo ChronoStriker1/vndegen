@@ -43,7 +43,7 @@ import VNCore
     let box = System3NumberBox(title: "", entry: System3NumberEntry(value: 7, minimum: 1, maximum: 99)) { answers.append($0) }
     box.press(boundKey: 0x31) // D-pad up
     #expect(box.entry.value == 8)
-    box.press(boundKey: 0x34) // D-pad right
+    box.press(boundKey: 0x32) // D-pad right
     #expect(box.entry.value == 18)
     box.press(boundKey: 0x20) // A
     #expect(answers == [18])

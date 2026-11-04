@@ -575,7 +575,7 @@ final class Navigator {
         case .pageVariant: if let id = pageGameID { sheet = .variant(id) }
         case .pageOrientation: if let id = pageGameID { sheet = .orientation(id) }
         case .pageControls: if let id = pageGameID, offersControlMethod(id) { sheet = .controlMethod(id) }
-        case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, gameID: id)) }
+        case .pageMapping: if let id = pageGameID { sheet = .mapping(ButtonMappingEditor(library: hub.library, layouts: hub.layouts, gameID: id)) }
         case .pageLock: if let id = pageGameID { perform(.hide, on: id) }
         case let .gameAction(action):
             guard case let .gameMenu(id) = sheet else { return }
@@ -1148,6 +1148,7 @@ final class Navigator {
         case let .saves(model)?: model.keyboard
         case .settingsPage(.saves)?: saveSettings.keyboard
         case .settingsPage(.metadata)?: metadataSettings.keyboard
+        case let .mapping(editor)?: editor.keyboard
         default: nil
         }
     }
