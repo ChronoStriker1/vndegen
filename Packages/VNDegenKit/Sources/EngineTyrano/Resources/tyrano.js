@@ -10,12 +10,16 @@
     // A looping video reloads at its end instead of using WebKit's loop. That loop's seek back to the start never
     // finishes for a VP8 clip on an iPad simulator, which freezes the picture, and stalls about 550 ms on a Mac, where a
     // reload stalls about 315 ms. The game still reads and clears the property to queue its next clip, and it hears
-    // `ended` only from a video that isn't looping, as it would with WebKit's loop.
+    // `ended` only from a video that isn't looping, as it would with WebKit's loop. A video written with a `loop`
+    // attribute keeps WebKit's loop until the game sets the property, which then takes the attribute away.
     const loopingVideos = new WeakSet();
     Object.defineProperty(HTMLVideoElement.prototype, 'loop', {
         configurable: true,
-        get() { return loopingVideos.has(this); },
-        set(value) { if (value) loopingVideos.add(this); else loopingVideos.delete(this); },
+        get() { return loopingVideos.has(this) || this.hasAttribute('loop'); },
+        set(value) {
+            this.removeAttribute('loop');
+            if (value) loopingVideos.add(this); else loopingVideos.delete(this);
+        },
     });
     document.addEventListener('ended', (event) => {
         const video = event.target;

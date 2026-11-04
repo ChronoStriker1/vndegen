@@ -6,7 +6,12 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 
 - Platform says which machine ran it. "Mac app, MacBook" is an M5 Max with a 120 Hz display, and "Mac app, mini" is an M4 with a 4K display at 60 Hz. "iPad simulator" is an iPad Pro 13-inch simulator on the mini unless the row says otherwise. Simulator timing is not iPad timing.
 - Average and 1% low are frames a second. A range covers the windows of that run.
-- For web engines the numbers are frames the page drew, from the DEBUG input script's `fps` step. "Engine" in a row is `Graphics.frameCount` per second, the game's own update rate.
+- Each engine's numbers come from its own source:
+  - RPG Maker MV and MZ and Flash: frames drawn to the canvas, from the DEBUG input script's `fps` step. "Engine" in a row is `Graphics.frameCount` per second, the game's own update rate.
+  - TyranoScript: new video frames from `requestVideoFrameCallback`, in a script in the input script's `js` step, because the `fps` step counts WebGL drawing and a Tyrano video has none.
+  - Ren'Py: new movie frames from `renpy.display.video.get_movie_texture`, by a probe `.rpy` placed in a scratch copy of the game, because Ren'Py also redraws between them.
+  - KiriKiri: display refreshes from `-frameMonitor`'s `KKFRAMES` line, and a movie's frames from the `movie:` lines in the game's log.
+  - Godot: `-godotFrameLog`. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
 - Reused rows come from earlier threads' records. They stand because no later change touched their drawing path. Commit is `not recorded` where the record gives none, and the same goes for load.
 
