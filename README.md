@@ -111,7 +111,7 @@ VNDegen rescans on launch, on pull to refresh, and when you return to the app. [
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/vndegen-menu.jpg" width="400" alt="The VNDegen menu over Lilipalace, an NScripter game, on iPad: Resume, Game commands, Quit to library, the control methods, and Button mapping">
+  <img src="docs/screenshots/vndegen-menu.jpg" width="400" alt="The VNDegen menu over Lilipalace, an NScripter game, on iPad: Resume, Game commands, Quit to library, the control methods, and Controller layout">
   <img src="docs/screenshots/game-commands.jpg" width="400" alt="Game commands for Lilipalace on iPad: the game's own Skip, Skip Setting, and Text Speed menu items">
   <br><sub>iPad: the VNDegen menu and its Game commands</sub>
 </p>
