@@ -13,6 +13,15 @@ private struct FakePlugin: EnginePlugin {
     func makeSession(_ launch: GameLaunch) throws -> any EngineSession { fatalError() }
 }
 
+private struct NeverAskedPlugin: EnginePlugin {
+    var descriptor: EngineDescriptor { EngineDescriptor(id: EngineID("never"), displayName: "never", shortName: "never", platforms: [.macOS]) }
+    func detect(_ probe: FolderProbe) -> EngineMatch? {
+        Issue.record("asked after a certain match")
+        return nil
+    }
+    func makeSession(_ launch: GameLaunch) throws -> any EngineSession { fatalError() }
+}
+
 private func makeTempLibrary() throws -> LibraryPaths {
     let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     return LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
@@ -33,6 +42,23 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
         FakePlugin(id: "mv", marker: "www/js/rpg_core.js", confidence: .certain),
     ]
     #expect(EngineDetector.detect(probe, using: plugins)?.engine == EngineID("mv"))
+    // A plugin after a certain match can't change the answer, so it isn't asked. It can be slow on a large folder.
+    #expect(EngineDetector.detect(probe, using: plugins + [NeverAskedPlugin()])?.engine == EngineID("mv"))
+}
+
+@Test func folderScanListsEveryLevelToItsDepthAndNothingHidden() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("a/b/c/d"), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("empty"), withIntermediateDirectories: true)
+    try Data().write(to: root.appendingPathComponent("a/.hidden"))
+    try Data().write(to: root.appendingPathComponent("a/b/file"))
+    try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("a/dangling").path, withDestinationPath: "/nonexistent")
+    #expect(FolderProbe(scanning: root, maxDepth: 0).entries == [])
+    #expect(FolderProbe(scanning: root, maxDepth: 1).entries == ["a", "empty"])
+    #expect(FolderProbe(scanning: root, maxDepth: 2).entries == ["a", "empty", "a/b", "a/dangling"])
+    #expect(FolderProbe(scanning: root, maxDepth: 3).entries == ["a", "empty", "a/b", "a/dangling", "a/b/c", "a/b/file"])
+    #expect(FolderProbe(scanning: root, maxDepth: 4).entries == ["a", "empty", "a/b", "a/dangling", "a/b/c", "a/b/file", "a/b/c/d"])
 }
 
 @Test @MainActor func libraryDetectsGamesAndKeepsUserChangesAcrossRestarts() async throws {
