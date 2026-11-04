@@ -162,7 +162,7 @@ struct OnScreenKeyboardView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
                 .frame(minWidth: 20, minHeight: 20)
-                .background(.white.opacity(0.18), in: .capsule)
+                .background(.white.opacity(0.18), in: Capsule(style: .circular))
             Text(action)
         }
         .fixedSize()

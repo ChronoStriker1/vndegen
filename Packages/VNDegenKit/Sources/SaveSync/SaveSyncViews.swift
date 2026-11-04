@@ -732,7 +732,7 @@ struct BackupRow: View {
                             .font(.caption2.weight(.bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
-                            .background(.tint, in: .capsule)
+                            .background(.tint, in: Capsule(style: .circular))
                     }
                 }
                 Text(detail).font(.caption).foregroundStyle(.secondary)

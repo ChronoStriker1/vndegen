@@ -73,7 +73,7 @@ private struct ArchiveCard: View {
                     .fixedSize()
                     .padding(.horizontal, 14)
                     .frame(minHeight: 36)
-                    .background(Theme.accent.gradient, in: .capsule)
+                    .background(Theme.accent.gradient, in: Capsule(style: .circular))
             }
             .padding(12)
             .frame(width: width)

@@ -552,19 +552,13 @@ private struct PlayerMenuView: View {
     /// A capsule of segments that takes focus as one item. Two rows round their corners as one row's ends are.
     private func segments(_ item: PlayerMenu.Item, rows: Int = 1, @ViewBuilder content: () -> some View) -> some View {
         let focused = isFocused(item)
-        let shape = RoundedRectangle(cornerRadius: rows > 1 ? 21 : .infinity, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: rows > 1 ? 21 : .infinity, style: .circular)
         let stroke = focused ? Color.white : Theme.stroke
         let lineWidth: CGFloat = focused ? 2.5 : 1
         return HStack(spacing: 4) { content() }
             .padding(4)
             .background(Theme.surface, in: shape)
-            .overlay {
-                if rows > 1 {
-                    shape.strokeBorder(stroke, lineWidth: lineWidth)
-                } else {
-                    PlainCapsule().strokeBorder(stroke, lineWidth: lineWidth)
-                }
-            }
+            .overlay { shape.strokeBorder(stroke, lineWidth: lineWidth) }
             .scaleEffect(focused ? 1.04 : 1)
             .animation(Theme.focusAnimation, value: focused)
             .onHover { if $0 { menu.focus = item } }
@@ -595,7 +589,7 @@ struct SegmentLabel: View {
             .fixedSize()
             .padding(.horizontal, 12)
             .frame(minHeight: 34)
-            .background { Capsule().fill(selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear)) }
+            .background { Capsule(style: .circular).fill(selected ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.clear)) }
             .contentShape(.capsule)
     }
 }

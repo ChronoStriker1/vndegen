@@ -54,7 +54,7 @@ struct RGSSMessageBoxView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         // The only button, so a controller's A or B, Return, Space or Escape presses it. The ring says so.
-                        .overlay { Capsule().strokeBorder(.white.opacity(0.85), lineWidth: 2).padding(-4) }
+                        .overlay { Capsule(style: .circular).strokeBorder(.white.opacity(0.85), lineWidth: 2).padding(-4) }
                         .keyboardShortcut(.defaultAction)
                         .accessibilityHint("Closes the game's message and lets it go on")
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frame in
