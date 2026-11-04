@@ -140,6 +140,7 @@ Known limits:
 - HENTAI CAVEMAN skips a Vorbis movie by seeking to its end. By the rule above it should play again from the start and then end, rather than skip. This wasn't tried.
 - A paused Vorbis WebM that seeks still hangs, and so does a finished, non-looping one that the game plays again, which is a seek inside WebKit.
 - A seek still unfinished after a second counts as hung, so one that slow on a loaded machine would restart its clip.
+- A short MZ WebM with Vorbis sound that ends with its kept frames only part done takes WebKit's loop and hangs. The picture still plays from the kept frames if they complete, but its sound stops. No library game loops such a clip.
 
 ## One line each
 

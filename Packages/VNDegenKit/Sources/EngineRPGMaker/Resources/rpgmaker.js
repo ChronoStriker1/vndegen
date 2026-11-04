@@ -392,10 +392,15 @@
                 Object.defineProperty(video, name, { configurable: true, value: video[name] });
             }
         }
+        // The engine's handler plays and shows a movie once it has loaded. For a reload of one already showing, that
+        // would undo a stop the game made in the meantime.
+        const onLoaded = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? video.onloadeddata : null;
+        if (onLoaded) video.onloadeddata = null;
         video.addEventListener('loadeddata', () => {
             restarting.delete(video);
             delete video.videoWidth;
             delete video.videoHeight;
+            if (onLoaded && !video.onloadeddata) video.onloadeddata = onLoaded;
         }, { once: true });
         video.load();
         video.playbackRate = rate;
@@ -408,7 +413,11 @@
         if (!loopingVideos.has(video)) return;
         event.stopImmediatePropagation();
         const state = watchedVideos.get(video);
-        if (reloads(video) && (!state || state.mode === 'native')) return restart(video);
+        // Keeping frames goes on over WebKit's loop only if it has begun. One that missed the first frame reloads.
+        const keeps = state && state.mode !== 'native' && (state.mode !== 'keeping' || state.frames.length > 0);
+        if (reloads(video) && !keeps) return restart(video);
+        // A new source in this element decides again.
+        video.addEventListener('emptied', () => video.removeAttribute('loop'), { once: true });
         nativeLoop.set.call(video, true);
         nativeTime.set.call(video, 0);
         playAfterReload(video);
