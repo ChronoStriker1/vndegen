@@ -10,6 +10,8 @@ Cold conversion can add substantial resident memory to the native app. A single 
 
 The cache lives under the app's Caches directory, is excluded from backups, and evicts the least recently used movies before exceeding 512 MiB. Settings has a Clear video cache button. The old WebCodecs alpha pre-decode path is removed. The short opaque-loop smoothing path retains its separate frame budget.
 
+Other looping WebMs reload at their end rather than use WebKit's loop, which stops about 500 ms at each turn and on an iPad simulator never finishes for a WebM with Vorbis sound. Alpha clips, kept frames, and MP4s keep WebKit's loop. See [frame-rate.md](frame-rate.md#looping-clips-in-tyranoscript-rpg-maker-mv-and-mz).
+
 vnvideo is the movie decoder VNDegen's native engines share, in `Engines/Shared/vnvideo.[ch]`. It plays:
 
 - MPEG-1 video with MPEG-1 Layer II sound, through pl_mpeg.

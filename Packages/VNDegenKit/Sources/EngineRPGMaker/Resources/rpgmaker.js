@@ -267,6 +267,7 @@
     const playVideo = HTMLMediaElement.prototype.play;
     // The internal reload aborts an earlier play(). Its caller must await the replacement playback.
     HTMLMediaElement.prototype.play = function (...args) {
+        stoppedVideos.delete(this);
         const before = alphaPlays.get(this);
         return playVideo.apply(this, args).catch(error => {
             const replacement = alphaPlays.get(this);
@@ -274,6 +275,19 @@
             throw error;
         });
     };
+    // A video at its end is already paused when its `ended` event is on the way, so a game that stops it in that gap,
+    // as MoviePicture does to destroy a clip, changes nothing the event could show. This records it.
+    const stoppedVideos = new WeakSet();
+    const pauseVideo = HTMLMediaElement.prototype.pause;
+    HTMLMediaElement.prototype.pause = function (...args) {
+        stoppedVideos.add(this);
+        return pauseVideo.apply(this, args);
+    };
+    function playAfterReload(video) {
+        const replacement = playVideo.call(video);
+        alphaPlays.set(video, replacement);
+        replacement.catch(() => {});
+    }
     const createElement = document.createElement;
     document.createElement = function (...args) {
         const element = createElement.apply(this, args);
@@ -282,7 +296,9 @@
     };
     window.__vndegen.alphaVideo = (url) => {
         url = url.split('#')[0];
-        alphaURLs.add(url);
+        // The handler writes a backslash in a clip's name as %5C, while the page's elements keep what the game wrote.
+        const names = new Set([url, url.replace(/%5C/g, '\\')]);
+        names.forEach(name => alphaURLs.add(name));
         // WebKit keeps the WebM reader selected from the URL even when the response is QuickTime.
         // A typed source selects the HEVC reader; reloading preserves the plugin's media event listeners.
         const live = new Set(document.querySelectorAll('video'));
@@ -291,9 +307,9 @@
             if (video) live.add(video); else videos.splice(i, 1);
         }
         for (const video of live) {
-            const direct = video.src.split('#')[0] === url;
-            if (!direct && (video.src || video.currentSrc && video.currentSrc.split('#')[0] !== url)) continue;
-            let source = [...video.querySelectorAll('source')].find(item => item.src.split('#')[0] === url);
+            const direct = names.has(video.src.split('#')[0]);
+            if (!direct && (video.src || video.currentSrc && !names.has(video.currentSrc.split('#')[0]))) continue;
+            let source = [...video.querySelectorAll('source')].find(item => names.has(item.src.split('#')[0]));
             if (!direct && (!source || source.type === 'video/quicktime')) continue;
             const playing = !video.paused || video.autoplay;
             if (!source) {
@@ -304,17 +320,15 @@
             source.type = 'video/quicktime';
             if (direct) video.removeAttribute('src');
             video.load();
-            if (playing) {
-                const replacement = playVideo.call(video);
-                alphaPlays.set(video, replacement);
-                replacement.catch(() => {});
-            }
+            if (playing) playAfterReload(video);
         }
     };
     const loadingVideoStyle = document.createElement('style');
     loadingVideoStyle.textContent = 'video[data-vndegen-loading] { visibility: hidden !important; }';
     document.addEventListener('loadstart', (event) => {
         if (!(event.target instanceof HTMLVideoElement)) return;
+        // A looping video that restarts keeps showing its last frame.
+        if (restarting.has(event.target)) return;
         if (!loadingVideoStyle.isConnected) document.documentElement.appendChild(loadingVideoStyle);
         event.target.setAttribute('data-vndegen-loading', '');
     }, true);
@@ -353,11 +367,114 @@
             const upload = Context.prototype[name];
             Context.prototype[name] = function (...args) {
                 const last = args.length - 1;
-                if (args[last] instanceof HTMLVideoElement) args[last] = alphaSource(args[last]);
+                const video = args[last];
+                if (video instanceof HTMLVideoElement) {
+                    if (!restarting.has(video) || video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                        args[last] = alphaSource(video);
+                    } else {
+                        // A video reloading to loop has no picture yet, and uploading it would flash black, so its
+                        // texture keeps the frame it has. PIXI counts a texture as made once it asks, so one it makes
+                        // now, whether it's new, restored or evicted, is made blank for later frames to update.
+                        if (name === 'texSubImage2D') return;
+                        const blank = args[last] = document.createElement('canvas');
+                        blank.width = video.videoWidth;
+                        blank.height = video.videoHeight;
+                    }
+                }
                 return upload.apply(this, args);
             };
         }
     }
+
+    // A looping WebM reloads at its end instead of using WebKit's loop, as in tyrano.js. On an iPad simulator a seek in a
+    // WebM with Vorbis sound never finishes, whatever its video codec, and only a reload gets the picture moving again.
+    // Other WebMs seek back but show nothing new for about 500 ms at each turn, which a reload cuts to about 100 ms. A
+    // game still reads and clears the property, and hears `ended` only from a video that isn't looping. Alpha clips and
+    // kept frames must go on without reloading, and an MP4 seeks faster than it reloads, so at their first end they take
+    // WebKit's loop.
+    const loopingVideos = new WeakSet(), hookedVideos = new WeakSet(), restarting = new WeakSet();
+    const nativeLoop = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'loop');
+    const nativeTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
+    const reloads = (video) => {
+        const url = video.currentSrc.split('#')[0];
+        return /\.webm$/i.test(url) && !alphaURLs.has(url);
+    };
+    function restart(video) {
+        const rate = video.playbackRate;
+        restarting.add(video);
+        // PIXI would size the sprite to nothing while the reloading video has no size.
+        for (const name of ['videoWidth', 'videoHeight']) {
+            Object.defineProperty(video, name, { configurable: true, value: video[name] });
+        }
+        // The engine's handler plays and shows a movie once it has loaded. For a reload of one already showing, that
+        // would undo a stop the game made in the meantime.
+        const onLoaded = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? video.onloadeddata : null;
+        if (onLoaded) video.onloadeddata = null;
+        video.addEventListener('loadeddata', () => {
+            restarting.delete(video);
+            delete video.videoWidth;
+            delete video.videoHeight;
+            if (onLoaded && !video.onloadeddata) video.onloadeddata = onLoaded;
+        }, { once: true });
+        // The game may stop the video before the `play` event below arrives. PIXI 4 would then start updating the
+        // texture of a clip that has been destroyed, and the error would stop the game.
+        video.addEventListener('play', (event) => {
+            if (video.paused) event.stopImmediatePropagation();
+        }, { capture: true, once: true });
+        video.load();
+        video.playbackRate = rate;
+        playAfterReload(video);
+    }
+    // A capture listener runs first on the video itself, so the game's own listeners don't hear this end. It has to be
+    // on the video because picture plugins never add theirs to the page, and the event wouldn't reach the document.
+    function loopAtEnd(event) {
+        const video = event.target;
+        if (!loopingVideos.has(video)) return;
+        event.stopImmediatePropagation();
+        if (stoppedVideos.has(video)) return;
+        const state = watchedVideos.get(video);
+        // Keeping frames goes on over WebKit's loop only if it has begun. One that missed the first frame reloads.
+        const keeps = state && state.mode !== 'native' && (state.mode !== 'keeping' || state.frames.length > 0);
+        if (reloads(video) && !keeps) return restart(video);
+        // A new source in this element decides again.
+        video.addEventListener('emptied', () => video.removeAttribute('loop'), { once: true });
+        nativeLoop.set.call(video, true);
+        nativeTime.set.call(video, 0);
+        playAfterReload(video);
+    }
+    Object.defineProperty(HTMLVideoElement.prototype, 'loop', {
+        configurable: true,
+        get() { return loopingVideos.has(this) || this.hasAttribute('loop'); },
+        set(value) {
+            // Some plugins set this on every frame, which must leave WebKit's loop running where loopAtEnd started it.
+            if (value && loopingVideos.has(this)) return;
+            this.removeAttribute('loop');
+            if (!value) return loopingVideos.delete(this);
+            loopingVideos.add(this);
+            if (hookedVideos.has(this)) return;
+            hookedVideos.add(this);
+            this.addEventListener('ended', loopAtEnd, true);
+        },
+    });
+    // The game's own seeks hang the same way. MoviePicture seeks to 0 as each clip starts. A seek to 0 while playing
+    // reloads, and any other restarts the clip if it hasn't finished in a second, since no seek can work in such a file.
+    Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+        ...nativeTime,
+        set(value) {
+            const state = watchedVideos.get(this);
+            const kept = state && (state.mode === 'kept' || state.mode === 'ready');
+            if (this instanceof HTMLVideoElement && !this.paused && !kept && reloads(this)) {
+                if (Number(value) === 0) {
+                    if (state) seekTo(state, 0);
+                    return restart(this);
+                }
+                // A game that has paused the video meanwhile, as MoviePicture does to destroy one, wants it stopped.
+                setTimeout(() => { if (this.seeking && !this.paused) restart(this); }, 1000);
+            }
+            nativeTime.set.call(this, value);
+            if (state) seekTo(state, Number(value));
+        },
+    });
 
     // Short looping videos, mostly animated GIFs converted to WebM for picture plugins such as PKD_VPlayer. WebKit takes
     // such a video's length as its last frame's start plus a guess, not the length the file states, so it ends the loop
@@ -399,17 +516,6 @@
             videoStates.delete(this);
             return dispose.apply(this, arguments);
         };
-        // The game seeks through currentTime. WebKit's own loop seek does not, and cannot be told apart in its events.
-        const currentTime = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime');
-        if (!currentTime || !currentTime.set) return;
-        Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
-            ...currentTime,
-            set(value) {
-                currentTime.set.call(this, value);
-                const state = watchedVideos.get(this);
-                if (state) seekTo(state, Number(value));
-            },
-        });
     }
 
     // What the texture should show now: a count of the frames the video has presented, or which kept frame is due.

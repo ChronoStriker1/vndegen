@@ -16,6 +16,10 @@ on Mac, iPhone and iPad. [rgss-cleanroom.md](rgss-cleanroom.md) says where each 
 - `Engines/RGSSRuntime/ruby` holds the Ruby VNDegen adds to every game: the RPG module of each version, Ruby 1.8
   and 1.9 compatibility, relative file paths, and the Win32API emulation. `tools/embed.py` turns them into
   `CRGSS/core/prelude.c`.
+- `rgss_run_scripts` in `common.rb` loads the game's script sections. A section's leading UTF-8 byte order mark is
+  skipped, because Ruby 3.4 rejects one before `=begin`, and `$RGSS_SCRIPTS` keeps each section's ID, name, compressed
+  bytes and source, as scripts that read their own sections expect. A script error names its section, line and Ruby's
+  message, and text that isn't valid UTF-8 can't break that report.
 - Ruby starts once per process. Between games, the runtime removes everything the last game added: its classes,
   constants and globals, its threads, and its changes to Ruby's own classes.
 
@@ -23,8 +27,8 @@ on Mac, iPhone and iPad. [rgss-cleanroom.md](rgss-cleanroom.md) says where each 
 
 The game's folder is the working directory, as on PC. Reads look in the game's save folder in VNDegen's data
 directory, then the game folder, then its archive (`Game.rgssad`, `Game.rgss2a`, `Game.rgss3a`), then the RTPs Game.ini
-names, whatever case the game uses. Writes go to the save folder, so the game folder is never written to. Saves
-copied in with a PC game still load.
+names, whatever case the game uses. Writes go to the save folder, and so do both names of a `File.rename`, so the game
+folder is never written to. Saves copied in with a PC game still load.
 
 Saves are the PC engine's format: Ruby's Marshal format, with XP's and VX's strings written without encodings as Ruby
 1.8 wrote them. PC saves from XP, VX and VX Ace load in VNDegen, and VNDegen's VX and VX Ace saves load in the PC engine.
@@ -44,6 +48,7 @@ Linux host and loaded in the app.
 | Test Game 33 | VX | `Game.rgss2a`, VX RTP | title, the PC saves in its folder load, map, save; the PC engine loads the save |
 | Test Game 37 | XP | `Game.rgssad`, XP RTP | title, new game, events with pictures and messages, save, load; a PC save loads in the Linux host; autotiles match the PC engine; runs at the 120 frames a second its scripts set |
 | Test Game 55 | VX Ace | unpacked, no RTP | map at 1024x768, HUD, its own menus, save and load from the menu in the app |
+| Monster Girl Quest Paradox 2.35, with its data and pictures packs | VX Ace | unpacked, no RTP | title, new game, opening, walking to the village, menu save, autosave, Continue; a battle started by a script with the game's own troop and won on the Linux host, and its largest troop in the app; on the iPad simulator, a save made through the menu with every name's case swapped |
 
 Frame rates, from `-frameMonitor YES` (DEBUG builds log `RGSSFRAMES` every 10 seconds) while walking or playing, with
 another thread's iPhone simulator running on the same Mac mini:
@@ -54,6 +59,8 @@ another thread's iPhone simulator running on the same Mac mini:
 | Test Game 55, map at 1024x768 | 60 | 59.4 to 59.8, 30 to 43 | 60.0, 59.9 to 60.0 |
 | Test Game 14, minigame | 60 | 59.6 to 59.8, 33 to 43 | 59.7 to 59.8, 43 to 50 |
 | Test Game 37, intro | 120 (shown at 60) | 60.0, 60.0 | 60.0, 60.0 |
+| Monster Girl Quest Paradox, walking in the village | 60 | 58.5 to 60.0, 15 to 60 | 59.5 to 60.0, 30 to 59.9 |
+| Monster Girl Quest Paradox, battle with 5 enemies | 60 | 59.6 to 60.0, 33 to 60 | 59.5 to 60.0, 30 to 59.9 |
 
 The runtime's log gives each frame's cost every 600 frames ("timing:"): on the iPad simulator a VX map takes about
 0.7 ms in the game's scripts and 1.9 ms to compose. Simulator timing isn't iPad timing.
@@ -95,6 +102,9 @@ WritePrivateProfileString, MultiByteToWideChar, WideCharToMultiByte, AllocConsol
 Window calls act on one window the size of the screen. Settings a game writes to its ini last until it ends. Any
 other call logs once and returns 0.
 
+Monster Girl Quest Paradox also calls `WFExit.dll` to catch closing the window and F12, and GDI+ to write a picture of
+the screen beside each save. Neither is emulated, so those calls log once and return 0.
+
 ## Known limits
 
 - Movies with Vorbis sound play silent: the shared decoder skips Vorbis, and the one library movie with a Vorbis
@@ -108,3 +118,5 @@ other call logs once and returns 0.
 - A module a game includes into one of Ruby's own classes stays included for the next game in the same session,
   because Ruby can't remove it.
 - A script that loops without calling `Graphics.update` can't be stopped; the app moves on after 5 seconds.
+- Monster Girl Quest Paradox's save list shows a black box where the PC game shows a picture of the screen, because the
+  game draws that picture through GDI+. Saves and loads work without it.

@@ -225,3 +225,85 @@ private let setUp = """
     #expect(values["frames"] as? [Int] == [3, 3, 0])
     #expect(values["kept"] as? Bool == true)
 }
+
+@Test @MainActor func aLoopingWebMReloadsAtItsEndWhileAlphaClipsAndMP4sKeepWebKitsLoop() async throws {
+    let values = try await runWithVideo("""
+        const make = (url) => {
+            const clip = document.createElement('video');
+            Object.defineProperty(clip, 'currentSrc', { value: url });
+            Object.defineProperty(clip, 'paused', { value: false });
+            Object.defineProperty(clip, 'readyState', { value: 4 });
+            Object.assign(clip, { loads: 0, heard: 0 });
+            // As the real load does, this puts the speed back to the default.
+            clip.load = () => { clip.loads++; clip.playbackRate = 1; };
+            clip.addEventListener('ended', () => { clip.heard++; });
+            return clip;
+        };
+        const end = (clip) => clip.dispatchEvent(new Event('ended'));
+        const state = (clip) => [clip.loop, clip.hasAttribute('loop'), clip.loads, clip.heard].join();
+
+        const webm = make('vndegen://game/movies/clip.webm');
+        let engineLoads = 0;
+        webm.onloadeddata = () => { engineLoads++; };
+        webm.loop = true;
+        webm.playbackRate = 0.8;
+        end(webm);
+        const reloaded = state(webm), speed = webm.playbackRate;
+        // The engine's handler stays out of this reload, which a game may stop, and comes back for the next source.
+        webm.dispatchEvent(new Event('loadeddata'));
+        const engineHeardReload = engineLoads;
+        webm.dispatchEvent(new Event('loadeddata'));
+        const engineHeardNext = engineLoads;
+        // The game clears the property to end the clip, and hears that it ended.
+        webm.loop = false;
+        end(webm);
+        const cleared = state(webm);
+
+        // A game that stops a clip at its very end, with the event on the way, doesn't get it back.
+        const stopped = make('vndegen://game/movies/stopped.webm');
+        stopped.loop = true;
+        stopped.pause();
+        end(stopped);
+        const stoppedState = state(stopped);
+
+        const mp4 = make('vndegen://game/movies/clip.mp4');
+        mp4.loop = true;
+        end(mp4);
+        // Plugins that set the property on every frame leave WebKit's loop running.
+        mp4.loop = true;
+        const mp4State = state(mp4);
+        // A new source in the same element decides again, and a WebM there gets to reload.
+        mp4.dispatchEvent(new Event('emptied'));
+        const sourceChanged = state(mp4);
+
+        // A clip the kept-frame path is watching, whose first frame it missed, has nothing to go on with.
+        const missed = make('vndegen://game/movies/missed.webm');
+        new PIXI.BaseTexture(new PIXI.resources.VideoResource(missed)).update();
+        missed.loop = true;
+        end(missed);
+
+        window.__vndegen.alphaVideo('vndegen://game/movies/alpha.webm');
+        const alpha = make('vndegen://game/movies/alpha.webm');
+        alpha.loop = true;
+        end(alpha);
+
+        // MoviePicture seeks to 0 as a clip starts, a seek that never finishes in a WebM with Vorbis sound.
+        const seeking = make('vndegen://game/movies/seek.webm');
+        seeking.currentTime = 0;
+        return {
+            reloaded, speed, cleared, engineHeardReload, engineHeardNext, mp4: mp4State, sourceChanged,
+            stopped: stoppedState, missed: state(missed), alpha: state(alpha), seek: seeking.loads,
+        };
+        """)
+    #expect(values["reloaded"] as? String == "true,false,1,0")
+    #expect(values["speed"] as? Double == 0.8)
+    #expect(values["cleared"] as? String == "false,false,1,1")
+    #expect(values["engineHeardReload"] as? Int == 0)
+    #expect(values["engineHeardNext"] as? Int == 1)
+    #expect(values["mp4"] as? String == "true,true,0,0")
+    #expect(values["sourceChanged"] as? String == "true,false,0,0")
+    #expect(values["stopped"] as? String == "true,false,0,0")
+    #expect(values["missed"] as? String == "true,false,1,0")
+    #expect(values["alpha"] as? String == "true,true,0,0")
+    #expect(values["seek"] as? Int == 1)
+}
