@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.23.1",
+          "buildVersion": "1172",
+          "date": "2026-11-04T23:58:25Z",
+          "localizedDescription": "Godot 3 games no longer draw upside down in the Mac app, and VNDegen's menu appears on Ren'Py main menus that play a movie.\n\n## Downloads\n\n- `VNDegen-0.23.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.23.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- Godot 3, Mac app: games no longer draw upside down, and clicks land on what's drawn. Before, a click only worked at the mirrored point. Tried on Barely Working and Eronest. iPhone, iPad, and Godot 4 are unchanged.\n- Ren'Py, on iPhone, iPad, and Mac: VNDegen's menu now appears on main menus that play a movie, such as Give an Imp a Chance!'s. Before, the game's buttons vanished and the menu stayed invisible, though it still took input. The menu shows on black there, like other main menus, and the movie keeps playing behind it.\n\n## Known limits\n\n- Ren'Py: opening the menu can restart a movie in a game that puts its movie on the `movie` channel by hand, in issue 17. No library game is known to do this, and the library hasn't been scanned.\n- Ren'Py: a game that starts that channel while the menu is already open still gets the invisible menu.\n\n## What wasn't tested\n\n- Nobody looked at the Mac's physical display for the Godot 3 fix. Both kinds of capture and real clicks agree it's right. Live window resizing, moving a window between displays, and Eronest's pointer input weren't tried.\n- No physical device was used for the Ren'Py fix. On the Mac it was opened by a key posted inside Ren'Py, and Quit to library wasn't tried there after the fix. Other Ren'Py games were checked on an iPad simulator, and no movie plays in them, so the new line never ran there.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.23.1/VNDegen-0.23.1.ipa",
+          "size": 122667971,
+          "sha256": "89f63a2d8efac1f781b80957dcfdf35fd019251e05dde863a7c1ce3c6cacbe82",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.23.0",
           "buildVersion": "1163",
           "date": "2026-11-04T22:23:38Z",
