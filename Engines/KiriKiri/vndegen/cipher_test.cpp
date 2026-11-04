@@ -469,6 +469,23 @@ static int runTests()
     check(placeholder && readsPlain(placeholder, entries), "an archive with one checksum on every entry reads back unchanged");
     check(vnkk_problem() == nullptr, "no problem is recorded for supported archives");
 
+    // Movie archives can contain only large movies and a warning whose listed length and checksum
+    // are made up. Its incomplete bytes cannot establish that the movies use an unknown cipher.
+    {
+        SyntheticArchive archive;
+        Bytes warning(157, 'w');
+        std::vector<tTVPXP3Archive::tArchiveItem> items = {
+            indexItem("warning.txt", 0x689792e4, archive.Add(warning), 910, 910, false),
+            indexItem("opening.mpg", 0xb4acdfbc, archive.Reserve(128 << 20), 128 << 20, 128 << 20, false),
+            indexItem("ending.mpg", 0x389adf27, archive.Reserve(128 << 20), 128 << 20, 128 << 20, false),
+        };
+        items[0].Segments[0].OrgSize = items[0].Segments[0].ArcSize = warning.size();
+        check(VNKKDetectCipher(ttstr("file://./movies.xp3"), items, &archive) == nullptr,
+              "an incomplete warning does not select a movie archive's cipher");
+        check(vnkk_problem() == nullptr, "an incomplete warning alone does not report unknown encryption");
+        check(archive.bytesRead == warning.size(), "the movie archive keeps detection within its byte budget");
+    }
+
     tTVPXP3Archive *unknown = openArchive(path("unknown.xp3"));
     check(unknown && cipherName(unknown) == "plain", "an unknown scheme opens without decryption");
     check(vnkk_problem() != nullptr, "an unknown scheme records a problem for the player");

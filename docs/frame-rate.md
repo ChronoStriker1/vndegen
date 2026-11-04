@@ -49,6 +49,8 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | KiriKiri | Sisters x Lovers, logo movie | iPad simulator | 30 | 150 of 150 frames, 0 dropped | see notes | 5 s | 4.5 | 11-03 | 7a50a58 |
 | KiriKiri | Violated Hero IV's `iris_s.amv`, from a test script | Mac app, MacBook | 30 clip, 120 display | 120.0 display, a clip frame each tick | 120.0 | 60 s | 2.8 | 11-03 | 7a50a58 |
 | KiriKiri | Violated Hero IV's `iris_s.amv`, from a test script | iPad simulator | 30 clip, 60 display | 60.0 display, a clip frame each tick | 60.0 | 60 s | 3.3 | 11-03 | 7a50a58 |
+| KiriKiri | Taimanin Kurenai, opening and ending movies, from a test script | Mac app, mini | 30 | 3096 of 3096 and 3000 of 3000 frames, 0 dropped | see notes | 103 s and 100 s | 35 | 11-04 | 0b1e1d5 |
+| KiriKiri | Taimanin Kurenai, opening and ending movies, from a test script | iPad simulator | 30 | 3096 of 3096 and 3000 of 3000 frames, 0 dropped | see notes | 103 s and 100 s | 25 | 11-04 | 0b1e1d5 |
 | Ren'Py | Give an imp a chance!, main menu movie, 1080p VP8 | Mac app, MacBook | 60 | 59.9 to 60.1 | 32.6 to 38.9 | 110 s | 2.2 | 11-03 | 7a50a58 |
 | Ren'Py | Give an imp a chance!, main menu movie, 1080p VP8 | iPad simulator | 60 | 59.3 to 60.0 | 26.3 to 44.0 | 110 s | 4.2 | 11-03 | 7a50a58 |
 | TyranoScript | Jingai Seitairoku, looping 1536x1152 VP8 clip | Mac app, MacBook | 30 | **28.6**, was 27.9 | 5.0, was 3.4 | 120 s | 2.9 | 11-03 | 972c708 |
@@ -84,6 +86,7 @@ On the MacBook's 120 Hz display a 60 fps game reads correctly: WebKit's page run
 - Wolf Girl With You: its title is a full-screen animation of a character and moving shadows. Whether a few taps entered play isn't known, so its heaviest scenes may not be covered.
 - Fallen Kunoichi: the map measured is the one the game calls its title screen, with 14 pictures, because the game skips the usual title. Its story maps weren't reached.
 - KiriKiri: Violated Hero IV's title needs clicks on buttons, and its battles weren't reached. A script plays the game's clip through the same plugin instead, and draws a clip frame each tick, 2 to 4 times the clip's 30 fps, so it asks more than the game does. It isn't the game's scene. The movie log gives frames shown and dropped but no 1% low, and the 5 s logo plays while the game is still loading: the display's own 1% low over that first 10 s window was 58.9 on the Mac and 20.8 on the simulator.
+- KiriKiri: Taimanin Kurenai's movies are plain 1024x768 MPEG-1 at 30 fps. A test script calls the game's own `sysmovie` for both, on a case-sensitive volume with the case of 39 names swapped, so play didn't reach them through the story. The movie log gives no 1% low. The Mac's display held 60.0 with a 1% low of 59.8 to 59.9 through both movies. The simulator run had no `-frameMonitor`. Other threads' work had the mini at a high load, and no frame dropped.
 - The MacBook's simulator rows started at a load of 11 to 30, while the simulator's test runner started.
 
 ## Shortfalls and their causes
@@ -151,7 +154,7 @@ Known limits:
 - The Legend of Arcadieu, custom HTML5 with Live2D, has no engine plugin.
 - Monster Girl Quest Paradox doesn't reach play, see below.
 
-## Found along the way, not fixed here
+## Found along the way
 
 - Monster Girl Quest Paradox stops before its first frame. Script section 135 starts with a UTF-8 byte order mark before `=begin`, which Ruby 3.4's `eval` rejects as a syntax error. The runtime's own error description fails on that error too, so the player sees only "The game stopped with an error."
-- Taimanin Kurenai's log says `unknown encryption in video.xp3`, so its 2 movies can't play.
+- Taimanin Kurenai's two movies play. The earlier `unknown encryption in video.xp3` message was a false warning: both movies are plain MPEG-1 files whose checksums match. Only an incomplete warning entry fit the encryption check's byte budget, and its made-up checksum caused the message. VNDegen now leaves such incomplete evidence unclassified instead of reporting unsupported encryption.
