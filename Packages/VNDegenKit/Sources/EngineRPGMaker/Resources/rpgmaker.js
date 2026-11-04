@@ -267,12 +267,21 @@
     const playVideo = HTMLMediaElement.prototype.play;
     // The internal reload aborts an earlier play(). Its caller must await the replacement playback.
     HTMLMediaElement.prototype.play = function (...args) {
+        stoppedVideos.delete(this);
         const before = alphaPlays.get(this);
         return playVideo.apply(this, args).catch(error => {
             const replacement = alphaPlays.get(this);
             if (error.name === 'AbortError' && replacement && replacement !== before) return replacement;
             throw error;
         });
+    };
+    // A video at its end is already paused when its `ended` event is on the way, so a game that stops it in that gap,
+    // as MoviePicture does to destroy a clip, changes nothing the event could show. This records it.
+    const stoppedVideos = new WeakSet();
+    const pauseVideo = HTMLMediaElement.prototype.pause;
+    HTMLMediaElement.prototype.pause = function (...args) {
+        stoppedVideos.add(this);
+        return pauseVideo.apply(this, args);
     };
     function playAfterReload(video) {
         const replacement = playVideo.call(video);
@@ -402,6 +411,11 @@
             delete video.videoHeight;
             if (onLoaded && !video.onloadeddata) video.onloadeddata = onLoaded;
         }, { once: true });
+        // The game may stop the video before the `play` event below arrives. PIXI 4 would then start updating the
+        // texture of a clip that has been destroyed, and the error would stop the game.
+        video.addEventListener('play', (event) => {
+            if (video.paused) event.stopImmediatePropagation();
+        }, { capture: true, once: true });
         video.load();
         video.playbackRate = rate;
         playAfterReload(video);
@@ -412,6 +426,7 @@
         const video = event.target;
         if (!loopingVideos.has(video)) return;
         event.stopImmediatePropagation();
+        if (stoppedVideos.has(video)) return;
         const state = watchedVideos.get(video);
         // Keeping frames goes on over WebKit's loop only if it has begun. One that missed the first frame reloads.
         const keeps = state && state.mode !== 'native' && (state.mode !== 'keeping' || state.frames.length > 0);

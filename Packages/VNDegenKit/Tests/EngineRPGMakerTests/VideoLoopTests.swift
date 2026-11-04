@@ -259,6 +259,13 @@ private let setUp = """
         end(webm);
         const cleared = state(webm);
 
+        // A game that stops a clip at its very end, with the event on the way, doesn't get it back.
+        const stopped = make('vndegen://game/movies/stopped.webm');
+        stopped.loop = true;
+        stopped.pause();
+        end(stopped);
+        const stoppedState = state(stopped);
+
         const mp4 = make('vndegen://game/movies/clip.mp4');
         mp4.loop = true;
         end(mp4);
@@ -285,7 +292,7 @@ private let setUp = """
         seeking.currentTime = 0;
         return {
             reloaded, speed, cleared, engineHeardReload, engineHeardNext, mp4: mp4State, sourceChanged,
-            missed: state(missed), alpha: state(alpha), seek: seeking.loads,
+            stopped: stoppedState, missed: state(missed), alpha: state(alpha), seek: seeking.loads,
         };
         """)
     #expect(values["reloaded"] as? String == "true,false,1,0")
@@ -295,6 +302,7 @@ private let setUp = """
     #expect(values["engineHeardNext"] as? Int == 1)
     #expect(values["mp4"] as? String == "true,true,0,0")
     #expect(values["sourceChanged"] as? String == "true,false,0,0")
+    #expect(values["stopped"] as? String == "true,false,0,0")
     #expect(values["missed"] as? String == "true,false,1,0")
     #expect(values["alpha"] as? String == "true,true,0,0")
     #expect(values["seek"] as? Int == 1)
