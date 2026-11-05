@@ -1,7 +1,7 @@
 // Runs a game headless: steps the clock, clicks through text, writes a PNG of chosen moments, and renders the sound.
 // usage: nekorun <game folder> [--out dir] [--every n] [--click ms] [--max ms] [--dt ms] [--jump script node]
 //                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
-//                [--script file]: lines of `ms click x y`, `ms move x y` or `ms shot name`, with x and y in canvas pixels
+//                [--slow ms] [--script file]: lines of `ms click x y`, `ms move x y` or `ms shot name`, with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
 #include <chrono>
@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     std::string out, wav, jumpScript;
+    double slowReport = 0;
     int every = 0, clickMs = 300, maxMs = 3600 * 1000, dt = 16, jumpNode = 0, period = 0, nextBeat = 0, chooseIndex = 0;
     std::vector<int> shots;
     std::vector<std::string> presses;
@@ -42,6 +43,7 @@ int main(int argc, char **argv) {
         else if (a == "--max") maxMs = std::atoi(next());
         else if (a == "--dt") dt = std::atoi(next());
         else if (a == "--wav") wav = next();
+        else if (a == "--slow") slowReport = std::atof(next());
         else if (a == "--press") presses.push_back(next());
         else if (a == "--script") {
             FILE *f = std::fopen(next(), "r");
@@ -126,6 +128,7 @@ int main(int argc, char **argv) {
             totalDraw += ms;
             slowest = std::max(slowest, ms);
         }
+        if (slowReport > 0 && ms > slowReport) std::printf("slow frame %.1f ms at %.1f s: %s\n", ms, elapsed / 1000.0, vnneko_debug_status(e));
         while (shotIndex < int(shots.size()) && elapsed >= shots[size_t(shotIndex)]) {
             if (!out.empty()) {
                 char name[64];

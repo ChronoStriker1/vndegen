@@ -2024,10 +2024,15 @@ void Engine::updateChoice() {
 
 bool Engine::jump(const std::string &script, int node) {
     auto target = loadScript(script);
-    if (!target || !target->node(node)) return false;
+    // A negative node starts the script from its top.
+    if (!target || (node >= 0 && !target->node(node))) return false;
     const Node *n = target->first();
     scene_ = {target, n};
     waiting_ = Waiting::None;
+    if (node < 0) {
+        screen_ = nullptr;
+        return true;
+    }
     bool wasSkip = skip_;
     skip_ = true;
     for (int guard = 0; guard < 2000000 && scene_.node && scene_.node->id != node; guard++) {

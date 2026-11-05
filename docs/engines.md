@@ -144,6 +144,7 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - Unlocked pictures and music are read from and written to the PC's `cfg.sav`, so they move with a backup. The PC's Config settings don't: VNDegen keeps its own.
 - Config changes text speed, auto speed, what the right button does, the confirmation questions, volumes, and the music screen's volume, and in The Alchemist the window's opacity. Options that have no meaning here or aren't built, such as resolution, effects and read-only skip, are shown as disabled. Config's moving preview picture is still.
 - A save's lock and comment are shown but can't be set. The bar's Arrange button isn't there, and neither is Graphics' choice of Original or Arrange art.
+- The noise effect one scene of The Alchemist asks for isn't drawn.
 - Menu backgrounds that change on the PC stay the same here. The little help pictures that come up on hover aren't drawn, and neither is the "Do not show again" box on a confirmation.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
