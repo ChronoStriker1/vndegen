@@ -48,6 +48,8 @@ struct Animation {
     int64_t begunMs = 0;
     bool repeat = false;
     int periodMs = 0;
+    bool hasPivot = false;
+    int pivotX = -1, pivotY = -1;  // the point a named `scale` keeps still, -1 for the middle
 };
 
 struct Sprite {
