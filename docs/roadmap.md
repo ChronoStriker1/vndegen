@@ -61,6 +61,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Monster Girl Quest Paradox runs, looping WebM clips in RPG Maker MV and MZ and TyranoScript no longer freeze, files named with backslashes load, and hub outlines lose their vertical lines (0.22.2).
 - A controller layout library, Keyboard and mouse's D-pad matching Steam's template file, and true round ends on capsules (0.23.0).
 - Godot 3 upright in the Mac app, and VNDegen's menu on Ren'Py main menus that play a movie (0.23.1).
+- MalOvent runs, the Mac's Controller layout sheet keeps one size, and Wolf RPG Editor detection finds games in an extra folder (0.23.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -71,6 +72,7 @@ New bugs get a GitHub issue and a line here.
 - [#25](https://github.com/ChronoStriker1/vndegen/issues/25) Ren'Py: Countryside Cumsluts crashes on its first line, calling os.startfile.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
 - [#27](https://github.com/ChronoStriker1/vndegen/issues/27) Detection: a game two wrapper folders deep isn't found.
+- [#28](https://github.com/ChronoStriker1/vndegen/issues/28) Wolf RPG Editor: Succubus Prison is stuck on its title screen.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
