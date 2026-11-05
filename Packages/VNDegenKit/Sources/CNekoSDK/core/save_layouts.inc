@@ -27,3 +27,13 @@ const SaveLayout kMother3 = {
     7510, {{819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1041, "3c"}, {6668, "68"}, {7478, "ffffffff"}},
     12,  // a text record is 4 bytes shorter in this engine
 };
+const SaveLayout kTsumaGibo = {
+    -136,  // the extra bytes of this engine's sprite record over the oldest layout seen
+    {},
+    {{16, "ff00050000d002"}, {119, "803f"}, {139, "803f"}, {159, "803f"}, {179, "803f"}, {247, "803f0000803f"}, {262, "01"}},
+    {{119, "803f"}, {139, "803f"}, {159, "803f"}, {179, "803f"}, {245, "cdcc8c3fcdcc8c3f8002000068010000ff"}, {265, "010a"}},
+    {{116, "ffffffff64"}},
+    96, -1, {{2, "ffffffff0000f041"}, {72, "ffffffff"}},
+    7510, {{9, "68"}, {819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1041, "3c"}, {6668, "68"}, {7478, "ffffffff"}},
+    12,  // the bytes of a text record after its strings
+};

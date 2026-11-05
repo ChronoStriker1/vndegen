@@ -113,6 +113,10 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Files
+
+A folder such as `scr` or `cfg` beside the archives outranks them. Test Game 93 keeps its English in them: the same line shows in English on PC and in Japanese from `scr.pak`. An archive named with a number, such as `cg2.pak`, adds to the folder of that name without the number, because scripts name its pictures under `cg\\`. Under Wine these games' Gothic font falls back to one narrower than the runtime's, so the PC's text there looks smaller than it would on Windows.
+
 ## GOOD Timing
 
 From Test Game 88 under Wine, its manual, and PC saves compared. `cfg` files under `gt/cfg` list groups of scripts. Opcode 153 names one and opcode 154 marks where Ejaculate lands. The save's tail holds, after the scene name: a state at byte 819 that's -1 when off, 0 in the scene and a small number inside the extra scripts; the count twice at 823; the first counted text's node at 831; the marker's node at 835; then two strings, the scene and the config. The marker's first parameter was 12 and the count started 12 text nodes before it. Saves taken with Extend on and off differ only in the time and play counters, so it isn't saved, and it stays on across a load. Pressing Ejaculate before the marker plays the `Ejaculate` script and goes on after the marker; pressing it in the extra scripts goes straight there, because that save's backlog has no line of the script.

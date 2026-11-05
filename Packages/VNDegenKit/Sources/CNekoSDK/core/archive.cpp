@@ -1,5 +1,7 @@
 #include "archive.h"
 
+#include <cctype>
+
 #include <dirent.h>
 #include <sys/stat.h>
 #include <zlib.h>
@@ -101,6 +103,8 @@ void Files::add(const std::string &path, Source source) {
     if (source.priority >= slot.priority) slot = std::move(source);
 }
 
+constexpr int kLooseFolderPriority = 1000;
+
 void Files::indexArchive(const std::string &file, const std::string &folder, int priority) {
     std::ifstream f(file, std::ios::binary);
     char magic[14];
@@ -182,10 +186,16 @@ bool Files::open(const std::string &root) {
     for (const auto &item : found) {
         int patch = patchNumber(item.stem);
         if (item.folder) {
+            // Beside the archives, cfg, scr and the like outrank them: a fan translation's changes sit there, and the PC
+            // game shows them. Above any patch, which came first.
             if (patch >= 0) indexFolder(root + "/" + item.name, "", patch * 2 + 2);
+            else indexFolder(root + "/" + item.name, item.stem, kLooseFolderPriority);
             continue;
         }
-        indexArchive(root + "/" + item.name, patch >= 0 ? "sys" : item.stem, patch >= 0 ? patch * 2 + 1 : 0);
+        // A second archive of a kind, such as cg2 or sc2, holds more of the same folder.
+        std::string folder = item.stem;
+        while (patch < 0 && folder.size() > 1 && std::isdigit(static_cast<unsigned char>(folder.back()))) folder.pop_back();
+        indexArchive(root + "/" + item.name, patch >= 0 ? "sys" : folder, patch >= 0 ? patch * 2 + 1 : 0);
     }
     return !archives_.empty();
 }

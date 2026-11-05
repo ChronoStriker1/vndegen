@@ -41,6 +41,14 @@ constexpr float kShakeMs = 300, kShakePixelsX = 24, kShakePixelsY = 28;
 
 int field(const std::vector<std::string> &line, size_t index) { return index < line.size() ? std::atoi(line[index].c_str()) : 0; }
 bool inRect(int x, int y, int left, int top, int w, int h) { return x >= left && y >= top && x < left + w && y < top + h; }
+// A flipbook's picture: the first one's name with its last three digits counting up.
+std::string flipPicture(const std::string &first, int index) {
+    size_t dot = first.rfind('.');
+    if (dot == std::string::npos || dot < 3) return first;
+    char digits[8];
+    std::snprintf(digits, sizeof digits, "%03d", index);
+    return first.substr(0, dot - 3) + digits + first.substr(dot);
+}
 std::string nameInFolder(const std::string &folder, const std::string &name);
 std::string matchCase(const std::string &base, const std::string &relative);
 
@@ -1326,8 +1334,7 @@ void Engine::restoreSave(const SaveData &d) {
         s.corner = s.image && saved.anchorX == 0 && saved.anchorY == 0;
         if (saved.flipFrame >= 0) {
             resumeFlipbook(s);
-            s.flipLoop = true;
-            if (s.flipCount > 0) s.flipBegun = now_ - int64_t(saved.flipFrame) * s.flipMs;
+            restoreFlipbookModes(s, saved.slot, saved.flipFrame, {d.scene, d.gtScene});
         }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
@@ -2081,7 +2088,9 @@ bool Engine::step(int ms) {
     advanceFlipbooks();
     for (auto &[slot, splash] : splashes_) {
         auto gone = [this](const Droplet &d) { return now_ - d.bornMs >= d.lifeMs; };
-        splash.droplets.erase(std::remove_if(splash.droplets.begin(), splash.droplets.end(), gone), splash.droplets.end());
+        auto end = std::remove_if(splash.droplets.begin(), splash.droplets.end(), gone);
+        if (end != splash.droplets.end()) dirty_ = true;
+        splash.droplets.erase(end, splash.droplets.end());
     }
 
     if (transitioning_ && (skip_ || skipToggle_ || now_ >= transitionStart_ + transitionMs_)) {
@@ -2323,17 +2332,6 @@ const char *Engine::debugStatus() {
 
 // MARK: Commands
 
-namespace {
-// A flipbook's picture: the first one's name with its last three digits counting up.
-std::string flipPicture(const std::string &first, int index) {
-    size_t dot = first.rfind('.');
-    if (dot == std::string::npos || dot < 3) return first;
-    char digits[8];
-    std::snprintf(digits, sizeof digits, "%03d", index);
-    return first.substr(0, dot - 3) + digits + first.substr(dot);
-}
-}  // namespace
-
 // Parameters: the slot, reversed, x, y, scale x and y in thousandths, then whether scaling keeps the middle in place, and
 // parameter 14 repeats it. Position is the unscaled picture's top left, as a value of 480, 270 for a 320 by 180 picture
 // in a 1280 by 720 game centres it.
@@ -2355,7 +2353,31 @@ void Engine::startFlipbook(const Node &n) {
     s.flipReverse = p[1] != 0;
     resumeFlipbook(s);
     if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
+    else if (s.flipReverse) {
+        s.flipShown = s.flipCount - 1;
+        if (ImageRef last = images_->get(flipPicture(s.path, s.flipShown))) s.image = last;
+    }
     back_[p[0]] = s;
+}
+
+// A save holds the picture a flipbook is on but not how it plays, so the script's command for it says. Without one, it
+// repeats, as nearly all of them do.
+void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::vector<std::string> &scenes) {
+    if (!s.flipCount) return;
+    s.flipLoop = true;
+    for (const std::string &name : scenes) {
+        auto script = name.empty() ? nullptr : loadScript(name);
+        if (!script) continue;
+        for (const Node &n : script->nodes)
+            if (n.opcode == 121 && n.p[0] == slot && normalizedPath(n.s[1]) == normalizedPath(s.path)) {
+                s.flipLoop = n.p[14] != 0;
+                s.flipReverse = n.p[1] != 0;
+            }
+    }
+    int step = s.flipReverse ? s.flipCount - 1 - frame : frame;
+    s.flipBegun = now_ - int64_t(std::max(step, 0)) * s.flipMs;
+    s.flipShown = std::clamp(frame, 0, s.flipCount - 1);
+    if (ImageRef image = images_->get(flipPicture(s.path, s.flipShown))) s.image = image;
 }
 
 void Engine::resumeFlipbook(Sprite &s) {
@@ -2485,34 +2507,35 @@ void Engine::gtEjaculate() {
     scene_ = {gt_.main, marker ? gt_.main->node(marker->next) : nullptr};
 }
 
+bool Engine::gtBackToStory() {
+    gt_.active = false;
+    gt_.extending = false;
+    gt_.ejaculating = false;
+    if (!gt_.main) return false;
+    const Node *marker = gt_.main->node(gt_.marker);
+    scene_ = {gt_.main, marker ? gt_.main->node(marker->next) : nullptr};
+    return true;
+}
+
 // A script of GOOD Timing's has ended. Groups play whole, and which comes next looks random on the PC, without one twice
 // running. Docs/engines.md lists that as a guess.
 bool Engine::gtNextScript() {
-    if (gt_.ejaculating) {
-        gt_.ejaculating = false;
-        const Node *marker = gt_.main ? gt_.main->node(gt_.marker) : nullptr;
-        scene_ = {gt_.main, marker ? gt_.main->node(marker->next) : nullptr};
-        return true;
-    }
+    if (gt_.ejaculating) return gtBackToStory();
     if (!gt_.extending) return false;
     gt_.played++;
     if (gt_.group >= 0 && size_t(gt_.index + 1) < gt_.groups[gt_.group].size()) {
         gt_.index++;
     } else {
-        int next = gt_.group < 0 ? 0 : (gt_.group + 1 + std::rand() % 2) % 3;
-        if (gt_.groups[next].empty()) next = 0;
-        if (gt_.groups[next].empty()) {
-            gt_.extending = false;
-            return false;
-        }
-        gt_.group = next;
+        std::vector<int> open;
+        for (int group = 0; group < 3; group++)
+            if (!gt_.groups[group].empty() && group != gt_.group) open.push_back(group);
+        if (open.empty() && gt_.group >= 0) open.push_back(gt_.group);
+        if (open.empty()) return gtBackToStory();
+        gt_.group = gt_.group < 0 ? open[0] : open[size_t(std::rand()) % open.size()];
         gt_.index = 0;
     }
     auto script = loadScript(gt_.groups[gt_.group][size_t(gt_.index)]);
-    if (!script) {
-        gt_.extending = false;
-        return false;
-    }
+    if (!script) return gtBackToStory();
     scene_ = {script, script->first()};
     return true;
 }
@@ -2952,7 +2975,8 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
-        ImageRef image = radius > 0 ? images_->blurred(s.path, radius) : s.image;
+        std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
+        ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
         // The position is the unscaled picture's top left, and it scales about its middle unless the sprite says the corner.
         float halfW = float(s.image->w) * (s.corner ? v.scaleX : 1) * 0.5f, halfH = float(s.image->h) * (s.corner ? v.scaleY : 1) * 0.5f;
         drawImage(out, image ? *image : *s.image, halfW + v.x + dx, halfH + v.y + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);

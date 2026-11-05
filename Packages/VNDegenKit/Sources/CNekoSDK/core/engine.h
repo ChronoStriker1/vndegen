@@ -161,6 +161,7 @@ private:
     void startFlipbook(const Node &n);
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
+    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::vector<std::string> &scenes);
     std::map<std::string, std::pair<int, int>> flipbooks_;
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
@@ -190,6 +191,7 @@ private:
     void gtReachMarker(const Node &n);
     void gtEjaculate();
     bool gtNextScript();
+    bool gtBackToStory();
     void composeGtCount(Canvas &out);
     size_t configStringLength() const;
     int nextTrack(int direction);
