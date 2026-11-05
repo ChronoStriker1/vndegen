@@ -2863,6 +2863,8 @@ void Engine::loadImage(const Node &n) {
         s.y = float(n.p[2] + (placed ? (height_ - image->h) / 2 : 0));
         s.scaleX = s.scaleY = 1;
         s.anchorX = s.anchorY = -1;
+        s.rotation = 0;
+        s.alpha = 1;
         s.changes.clear();
         s.looping = false;
     }
