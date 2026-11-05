@@ -71,6 +71,9 @@ New bugs get a GitHub issue and a line here.
 - [#30](https://github.com/ChronoStriker1/vndegen/issues/30) KiriKiri: Violated Hero IV (Partial E) isn't found three wrappers deep.
 - [#31](https://github.com/ChronoStriker1/vndegen/issues/31) TyranoScript: Butterfly Affection logs a 404 for button_menu.png.
 - [#32](https://github.com/ChronoStriker1/vndegen/issues/32) Ludusavi: registry data is dropped from backups.
+- [#33](https://github.com/ChronoStriker1/vndegen/issues/33) Wolf RPG Editor: Succubus Prison's new game stays on its save slot screen.
+- [#34](https://github.com/ChronoStriker1/vndegen/issues/34) RPG Maker: Command-Q does nothing in Karryn's Prison.
+- [#35](https://github.com/ChronoStriker1/vndegen/issues/35) Ren'Py: scripted mouse clicks don't press buttons on the Mac.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
