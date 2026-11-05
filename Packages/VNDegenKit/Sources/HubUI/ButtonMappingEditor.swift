@@ -468,6 +468,10 @@ struct ButtonMappingSheet: View {
                 .onChange(of: Step(editor)) {
                     if let focus = editor.focus { proxy.scrollTo(focus, anchor: .center) }
                 }
+                // The first press reveals the ring without moving focus, and focus can be below the sheet's fold.
+                .onChange(of: editor.showsFocus) { _, shows in
+                    if shows, let focus = editor.focus { withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) } }
+                }
                 #endif
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width - 44 } action: { editor.width = $0 }
