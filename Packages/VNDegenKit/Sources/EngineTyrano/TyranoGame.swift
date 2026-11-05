@@ -37,8 +37,9 @@ nonisolated extension TyranoGame {
         if TyranoGame(folder: folder) != nil { return folder }
         let probe = FolderProbe(scanning: folder)
         let wrappers = probe.entries.compactMap { entry -> String? in
+            // The folders a web root starts with, since the listing can stop above `resources/app`.
             let lower = entry.lowercased()
-            guard let web = (["/tyrano"] + webRoots.filter { !$0.isEmpty }.map { "/\($0)" }).first(where: { lower.hasSuffix($0) }) else { return nil }
+            guard let web = ["/tyrano", "/resources", "/package.nw"].first(where: { lower.hasSuffix($0) }) else { return nil }
             return String(entry.dropLast(web.count))
         }
         let depth = { (path: String) in path.split(separator: "/").count }
