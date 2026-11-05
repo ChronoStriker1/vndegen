@@ -92,6 +92,11 @@ import renpy  # noqa: E402
 
 renpy.macapp = True
 
+# Windows-only, and a screen can name it just to build a button's action, so a missing one stops the game at that screen,
+# as in Countryside Cumsluts. There's no desktop folder to open here, so a press does nothing.
+if not hasattr(os, "startfile"):
+    os.startfile = lambda *args, **kwargs: None
+
 if sys.version_info >= (3, 12):
     import importlib.util
 
@@ -116,11 +121,6 @@ if sys.version_info >= (3, 12):
 
     import functools
     import random
-
-    # Windows-only, and a screen can name it just to build a button's action, so a missing one stops the game at that
-    # screen, as in Countryside Cumsluts. There's no desktop folder to open here, so a press does nothing.
-    if not hasattr(os, "startfile"):
-        os.startfile = lambda *args, **kwargs: None
 
     # Python 3.12 made randrange and randint reject whole-number floats, which Python 2 and Python 3.9, the language of
     # Ren'Py 8.3 and older, accept. Sizes from Ren'Py's renders are floats, so games pass them, such as MalOvent's
