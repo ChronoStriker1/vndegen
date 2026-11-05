@@ -20,10 +20,11 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
     }
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
-        guard let root = TyranoGame.gameFolder(in: probe.root), let game = TyranoGame(folder: root) else { return nil }
+        guard let root = TyranoGame.gameFolder(in: probe.root, probe: probe), let game = TyranoGame(folder: root) else { return nil }
         let wrapper = String(root.path.dropFirst(probe.root.path.count)).drop { $0 == "/" }
         let evidence = [String(wrapper), game.webRoot, TyranoGame.engineFile].filter { !$0.isEmpty }.joined(separator: "/")
-        return EngineMatch(engine: descriptor.id, confidence: .certain, version: game.version, evidence: evidence)
+        // Inside wrapper folders it's only likely, so a copy of the engine in a subfolder can't take another engine's game.
+        return EngineMatch(engine: descriptor.id, confidence: wrapper.isEmpty ? .certain : .likely, version: game.version, evidence: evidence)
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {

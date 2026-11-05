@@ -8,19 +8,24 @@ extension GameFolder {
     /// otherwise www/. A game inside wrapper folders gets its own folder as the root, so it sees the same tree and working
     /// directory as anywhere else.
     nonisolated init(rpgMakerGameAt root: URL) {
+        if let folder = Self.rpgMakerFolder(at: root) {
+            self = folder
+        } else if let layout = RPGMakerLayout(FolderProbe(scanning: root)), !layout.root.isEmpty,
+                  let folder = Self.rpgMakerFolder(at: root.appendingPathComponent(layout.root, isDirectory: true)) {
+            self = folder
+        } else {
+            self = GameFolder(root: root, webRoot: "")
+        }
+    }
+
+    /// The game whose engine core is directly under `root`, in js/ or www/js/.
+    private nonisolated static func rpgMakerFolder(at root: URL) -> GameFolder? {
         let top = GameFolder(root: root, webRoot: "")
         let hasCore = { (dir: String) in
-            ["rmmz_core.js", "rpg_core.js"].contains { top.resolve(virtualPath: "\(dir)/js/\($0)").map(Self.isFile) ?? false }
+            ["rmmz_core.js", "rpg_core.js"].contains { top.resolve(virtualPath: "\(dir)/js/\($0)").map(isFile) ?? false }
         }
-        if hasCore(Self.virtualRoot) {
-            self = top
-        } else if hasCore("\(Self.virtualRoot)/www") {
-            self = GameFolder(root: root, webRoot: "www")
-        } else if let layout = RPGMakerLayout(FolderProbe(scanning: root)) {
-            self = GameFolder(rpgMakerGameAt: root.appendingPathComponent(layout.root, isDirectory: true))
-        } else {
-            self = top
-        }
+        if hasCore(virtualRoot) { return top }
+        return hasCore("\(virtualRoot)/www") ? GameFolder(root: root, webRoot: "www") : nil
     }
 
     /// Where NW.js builds save: `save/` beside index.html. Early MV cores (1.2.0 in the library) build the folder from

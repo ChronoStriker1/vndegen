@@ -113,6 +113,7 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     let one = try game(["Game/tyrano/plugins/kag/kag.js": kag450, "Game/data/system/Config.tjs": config, "Game/package.json": "{}"])
     defer { try? FileManager.default.removeItem(at: one) }
     #expect(detect(one)?.evidence == "Game/tyrano/plugins/kag/kag.js")
+    #expect(detect(one)?.confidence == .likely)
     let saves = try #require(TyranoPlugin().saveLocations(folder: one, dataDirectory: one).first)
     #expect(saves.directory.standardizedFileURL == one.appendingPathComponent("Game", isDirectory: true).standardizedFileURL)
 

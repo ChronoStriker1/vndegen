@@ -10,16 +10,18 @@ nonisolated struct RPGMakerLayout: Equatable, Sendable {
     /// The engine core, relative to the game folder.
     var evidence: String
 
-    /// The game holding one of `cores`, shallowest first, so a game wins over a copy of the engine in a folder below it.
-    init?(_ probe: FolderProbe, cores: [String] = ["rmmz_core.js", "rpg_core.js"]) {
-        guard let core = (Self.listed(probe, cores) + Self.deeper(probe, cores)).min(by: Self.shallower) else { return nil }
+    /// The game holding an engine core, shallowest first, so a game wins over a copy of the engine in a folder below it.
+    init?(_ probe: FolderProbe) {
+        guard let core = (Self.listed(probe) + Self.deeper(probe)).min(by: Self.shallower) else { return nil }
         let parts = core.split(separator: "/").dropLast(2)
         root = (parts.last?.lowercased() == "www" ? parts.dropLast() : parts).joined(separator: "/")
         evidence = core
     }
 
+    private static let cores = ["rmmz_core.js", "rpg_core.js"]
+
     /// Cores the listing shows, in a `js` folder up to two folders down.
-    private static func listed(_ probe: FolderProbe, _ cores: [String]) -> [String] {
+    private static func listed(_ probe: FolderProbe) -> [String] {
         probe.entries.filter { entry in
             let parts = entry.lowercased().split(separator: "/")
             return parts.count >= 2 && parts[parts.count - 2] == "js" && cores.contains(String(parts[parts.count - 1]))
@@ -29,7 +31,7 @@ nonisolated struct RPGMakerLayout: Equatable, Sendable {
     /// Cores past the listing's three levels. Every `js` and `www` folder it reaches gets a look. So does every other
     /// folder at its last level when the listing is short, as a wrapper holds little besides the game. A long one is
     /// another engine's game, which shouldn't pay for this at each refresh.
-    private static func deeper(_ probe: FolderProbe, _ cores: [String]) -> [String] {
+    private static func deeper(_ probe: FolderProbe) -> [String] {
         let deepest = probe.entries.filter { $0.split(separator: "/").count == 3 }
         var found: [String] = []
         for folder in deepest {

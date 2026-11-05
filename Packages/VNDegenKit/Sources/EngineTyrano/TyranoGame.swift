@@ -33,9 +33,9 @@ nonisolated extension TyranoGame {
     /// The folder holding the game: `folder`, or a wrapper in it whose web root the listing shows, shallowest first. An
     /// archive with two folders above the game, or a readme beside it, keeps a wrapper when it's imported. The game gets
     /// its own folder as the root, so it sees the same tree and saves beside its executable as anywhere else.
-    static func gameFolder(in folder: URL) -> URL? {
+    static func gameFolder(in folder: URL, probe: FolderProbe? = nil) -> URL? {
         if TyranoGame(folder: folder) != nil { return folder }
-        let probe = FolderProbe(scanning: folder)
+        let probe = probe ?? FolderProbe(scanning: folder)
         let wrappers = probe.entries.compactMap { entry -> String? in
             // The folders a web root starts with, since the listing can stop above `resources/app`.
             let lower = entry.lowercased()
