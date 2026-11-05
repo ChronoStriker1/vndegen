@@ -177,6 +177,7 @@ private:
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
+    bool fullWidthPlate() const;
     int cardsPerPage() const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;

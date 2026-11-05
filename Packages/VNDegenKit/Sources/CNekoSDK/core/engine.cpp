@@ -328,6 +328,9 @@ void Engine::startStory() {
         waiting_ = Waiting::Ended;
         return;
     }
+    // A new run has no scene of its own yet, so a save before its first names none.
+    lastScene_.clear();
+    flowCallId_ = 0;
     stack_.push_back({flow, flow->first()});
     log("story from %s", first.c_str());
     dirty_ = true;
@@ -1003,6 +1006,9 @@ void Engine::openGalleryCell(int index) {
         scene_ = {};
         back_.clear();
         front_.clear();
+        // A new run has no scene of its own yet, so a save before its first names none.
+        lastScene_.clear();
+        flowCallId_ = 0;
         stack_.push_back({flow, flow->first()});
         replaying_ = true;
         waiting_ = Waiting::None;
@@ -1809,12 +1815,16 @@ void Engine::composeScreen(Canvas &out) {
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
-    if (buttonPlate_ && buttonPlate_->w >= width_) return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= plateY_);
+    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= plateY_);
     return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
+// A plate as wide as the screen carries both rows of buttons, and comes up with the pointer on it, as in Test Game 85.
+bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= width_; }
+
 bool Engine::underButtonsShown() const {
-    return buttonPlate_ && buttonPlate_->w < width_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
+    if (fullWidthPlate()) return innerButtonsShown();
+    return buttonPlate_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
 void Engine::composeMessageButtons(Canvas &out) {
@@ -1833,11 +1843,11 @@ void Engine::composeMessageButtons(Canvas &out) {
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     if (innerButtonsShown()) {
-        if (buttonPlate_ && buttonPlate_->w >= width_) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+        if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : messageButtons_.inner) drawButton(out, b, state(b));
     }
     if (!underButtonsShown()) return;
-    drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    if (!fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
     for (const Button &b : messageButtons_.under) drawButton(out, b, state(b));
 }
 
