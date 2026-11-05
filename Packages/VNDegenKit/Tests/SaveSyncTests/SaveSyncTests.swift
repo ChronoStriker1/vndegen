@@ -463,6 +463,9 @@ private let realSample = fm.homeDirectoryForCurrentUser.appendingPathComponent("
 
 // MARK: - Registry data
 
+private let validReg = "Windows Registry Editor Version 5.00\r\n\r\n[HKEY_CURRENT_USER\\Software\\Test]\r\n\"Save\"=dword:00000001\r\n"
+private let newerReg = "Windows Registry Editor Version 5.00\r\n\r\n[HKEY_CURRENT_USER\\Software\\Test]\r\n\"Save\"=dword:00000002\r\n"
+
 /// A store holding a Windows PC's backup of the game, with registry data in `backup-1`.
 private func storeWithRegistry(children: [DifferentialBackup] = []) throws -> (store: LudusaviStore, gameDir: URL, locations: [SaveLocation]) {
     let base = try temporaryDirectory()
@@ -471,7 +474,7 @@ private func storeWithRegistry(children: [DifferentialBackup] = []) throws -> (s
     let locations = try makeGame(in: base, saves: ["file1.rmmzsave": "mine"])
     try fm.createDirectory(at: gameDir.appendingPathComponent("backup-1/drive-0" + deckSave), withIntermediateDirectories: true)
     try Data("pc".utf8).write(to: gameDir.appendingPathComponent("backup-1/drive-0" + deckSave + "file1.rmmzsave"))
-    try Data("registry".utf8).write(to: gameDir.appendingPathComponent("backup-1/registry.reg"))
+    try Data(validReg.utf8).write(to: gameDir.appendingPathComponent("backup-1/registry.reg"))
     var mapping = LudusaviMapping(name: "G", drives: ["drive-0": ""])
     mapping.backups = [FullBackup(name: "backup-1", when: Timestamp.epoch, os: "windows", locked: false,
                                   files: [deckSave + "file1.rmmzsave": FileEntry(hash: sha1("pc"), size: 2)],
@@ -503,21 +506,21 @@ private extension LudusaviStore {
     #expect(!report.isDifferential && report.pruned == ["backup-1"])
     let mapping = try store.mapping("G")
     #expect(mapping.backups.map(\.name) == [name] && mapping.backups[0].registryHash == "full")
-    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data("registry".utf8))
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data(validReg.utf8))
 }
 
 @Test func aDifferentialRepeatsTheLatestDifferentialsRegistry() throws {
     let older = DifferentialBackup(name: "backup-2-diff", when: Timestamp.epoch, locked: false, files: [:], registry: .init(hash: "newer"))
     let (store, gameDir, locations) = try storeWithRegistry(children: [older])
     try fm.createDirectory(at: gameDir.appendingPathComponent("backup-2-diff"), withIntermediateDirectories: true)
-    try Data("newer".utf8).write(to: gameDir.appendingPathComponent("backup-2-diff/registry.yaml"))
+    try Data(newerReg.utf8).write(to: gameDir.appendingPathComponent("backup-2-diff/registry.reg"))
     // Each differential stands on the full backup alone, so the older one can leave without taking the registry along.
     let report = try store.backUpG(locations, Retention(full: 1, differential: 1))
     let name = try #require(report.backup)
     #expect(report.isDifferential && report.pruned == ["backup-2-diff"])
     let mapping = try store.mapping("G")
     #expect(mapping.backups[0].children.map(\.name) == [name] && mapping.backups[0].children[0].registry == .init(hash: "newer"))
-    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.yaml")) == Data("newer".utf8))
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data(newerReg.utf8))
 }
 
 @Test func aRegistryTheLatestBackupDroppedStaysDropped() throws {
@@ -548,11 +551,22 @@ private extension LudusaviStore {
     let (store, gameDir, locations) = try storeWithRegistry(children: [older])
     let name = try #require(try store.backUpG(locations, Retention(full: 2, differential: 0)).backup)
     #expect(try store.mapping("G").backups.last?.registryHash == "full")
-    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data("registry".utf8))
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data(validReg.utf8))
 
     let (kept, _, keptLocations) = try storeWithRegistry(children: [older])
     _ = try kept.backUpG(keptLocations, Retention(full: 1, differential: 2))
     #expect(try kept.mapping("G").backups[0].children.last?.registry == nil)
+}
+
+@Test func aDifferentialsUnreadableRegistryFallsBackToTheFullBackups() throws {
+    // Ludusavi reads neither of the differential's files, so it restores the full backup's, which must survive pruning.
+    let older = DifferentialBackup(name: "backup-2-diff", when: Timestamp.epoch, locked: false, files: [:], registry: .init(hash: "bad"))
+    let (store, gameDir, locations) = try storeWithRegistry(children: [older])
+    try fm.createDirectory(at: gameDir.appendingPathComponent("backup-2-diff"), withIntermediateDirectories: true)
+    try Data([255]).write(to: gameDir.appendingPathComponent("backup-2-diff/registry.reg"))
+    let name = try #require(try store.backUpG(locations, Retention(full: 1, differential: 0)).backup)
+    #expect(try store.mapping("G").backups.map(\.registryHash) == ["full"])
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data(validReg.utf8))
 }
 
 @Test func bothRegistryFormatsCarryForward() throws {
@@ -560,7 +574,7 @@ private extension LudusaviStore {
     let (store, gameDir, locations) = try storeWithRegistry()
     try Data("yaml".utf8).write(to: gameDir.appendingPathComponent("backup-1/registry.yaml"))
     let name = try #require(try store.backUpG(locations, Retention(full: 1, differential: 0)).backup)
-    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data("registry".utf8))
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data(validReg.utf8))
     #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.yaml")) == Data("yaml".utf8))
 }
 

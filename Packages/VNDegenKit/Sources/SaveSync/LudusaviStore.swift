@@ -336,7 +336,7 @@ public struct LudusaviStore: Sendable {
 
     /// The registry data a restore of the latest backup applies on Windows, found as Ludusavi's `registry_content` finds
     /// it: the latest differential's file, else nothing when that differential drops the registry, else the full backup's.
-    /// Nil when Ludusavi would restore none, such as a recorded hash whose file is missing.
+    /// Nil when Ludusavi would restore none, such as a recorded hash whose file is missing or can't be read.
     static func latestRegistry(_ mapping: LudusaviMapping, in gameDir: URL) -> StoredRegistry? {
         guard let full = mapping.backups.last else { return nil }
         func stored(_ hash: String?, in backup: String) -> StoredRegistry? {
@@ -345,13 +345,25 @@ public struct LudusaviStore: Sendable {
             if backup.hasSuffix(".zip") { return StoredRegistry(hash: hash, backup: backup, files: []) }
             let folder = backup == "." ? gameDir : gameDir.appendingPathComponent(backup, isDirectory: true)
             let files = registryFiles.filter { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
-            return files.isEmpty ? nil : StoredRegistry(hash: hash, backup: backup, files: files)
+            guard files.contains(where: { readable($0, in: folder) }) else { return nil }
+            return StoredRegistry(hash: hash, backup: backup, files: files)
         }
         if let diff = full.children.last, let override = diff.registry {
             if let found = stored(override.hash, in: diff.name) { return found }
             if override.hash == nil { return nil }
         }
         return stored(full.registryHash, in: full.name)
+    }
+
+    /// Whether Ludusavi could read the registry file `name` in `folder`: it reads the file as UTF-8, and a `.reg` file
+    /// must start with a header regedit writes. A file that fails this isn't the one a restore uses, so a damaged
+    /// differential's file never replaces the full backup's good one. YAML files are only checked to be UTF-8 text.
+    static func readable(_ name: String, in folder: URL) -> Bool {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)), !data.isEmpty,
+              let text = String(data: data, encoding: .utf8) else { return false }
+        guard name.hasSuffix(".reg") else { return true }
+        let first = text.drop { $0 == "\u{FEFF}" }.prefix { !$0.isNewline }.trimmingCharacters(in: .whitespaces)
+        return first == "Windows Registry Editor Version 5.00" || first == "REGEDIT4"
     }
 
     /// Copies `registry`'s files into `backupDir` as they are, both formats when there are two, since Ludusavi reads the

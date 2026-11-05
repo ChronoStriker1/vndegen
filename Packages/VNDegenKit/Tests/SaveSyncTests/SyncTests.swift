@@ -537,7 +537,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
     mapping.backups = [FullBackup(name: ".", when: Timestamp.epoch, os: "windows", locked: false,
                                   files: [save: FileEntry(hash: sha1("pc"), size: 2)], registryHash: "reghash", children: [])]
     try await setup.server.write(Data("pc".utf8), to: "\(setup.game)/drive-C/Games/NoSocksRPG/save/file1.rmmzsave")
-    try await setup.server.write(Data("Windows Registry Editor".utf8), to: "\(setup.game)/registry.reg")
+    try await setup.server.write(Data("Windows Registry Editor Version 5.00\r\n".utf8), to: "\(setup.game)/registry.reg")
     try await setup.server.write(Data(mapping.yamlString().utf8), to: setup.mappingPath)
     await setup.service.refresh()
 
@@ -546,7 +546,7 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
     let name = try #require(report.backup)
     #expect(!report.isDifferential)
     #expect(try await setup.serverMapping().backups.map(\.registryHash) == ["reghash"])
-    #expect(try await setup.server.read("\(setup.game)/\(name)/registry.reg") == Data("Windows Registry Editor".utf8))
+    #expect(try await setup.server.read("\(setup.game)/\(name)/registry.reg") == Data("Windows Registry Editor Version 5.00\r\n".utf8))
 }
 
 extension SaveSyncService {
