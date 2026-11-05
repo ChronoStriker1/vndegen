@@ -62,18 +62,18 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - A controller layout library, Keyboard and mouse's D-pad matching Steam's template file, and true round ends on capsules (0.23.0).
 - Godot 3 upright in the Mac app, and VNDegen's menu on Ren'Py main menus that play a movie (0.23.1).
 - MalOvent runs, the Mac's Controller layout sheet keeps one size, and Wolf RPG Editor detection finds games in an extra folder (0.23.2).
+- RPG Maker and TyranoScript games inside wrapper folders are found, Command-Q works with a sheet open, and Succubus Prison reaches its opening (0.23.3).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
 - [#29](https://github.com/ChronoStriker1/vndegen/issues/29) Wolf RPG Editor: Succubus Prison's message window shows a faint second edge.
 - [#30](https://github.com/ChronoStriker1/vndegen/issues/30) KiriKiri: Violated Hero IV (Partial E) isn't found three wrappers deep.
 - [#31](https://github.com/ChronoStriker1/vndegen/issues/31) TyranoScript: Butterfly Affection logs a 404 for button_menu.png.
 - [#32](https://github.com/ChronoStriker1/vndegen/issues/32) Ludusavi: registry data is dropped from backups.
-- [#33](https://github.com/ChronoStriker1/vndegen/issues/33) Wolf RPG Editor: Succubus Prison's new game stays on its save slot screen.
 - [#34](https://github.com/ChronoStriker1/vndegen/issues/34) RPG Maker: Command-Q does nothing in Karryn's Prison.
 - [#35](https://github.com/ChronoStriker1/vndegen/issues/35) Ren'Py: scripted mouse clicks don't press buttons on the Mac.
+- [#36](https://github.com/ChronoStriker1/vndegen/issues/36) renpy-hook-test.sh fails falsely under Apple's /bin/bash.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
