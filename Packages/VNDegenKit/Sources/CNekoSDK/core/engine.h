@@ -151,6 +151,9 @@ private:
     void foldFinishedChanges(Sprite &s);
     void composeScene(Canvas &out, const Sprites &sprites);
     void composeMessage(Canvas &out);
+    void markRect(int &x, int &y, int &w, int &h) const;
+    bool markShowing() const;
+    void drawMark(Canvas &out);
     void compose();
     void layoutText(const std::string &utf8Name, const std::string &utf8Text);
     void drawGlyphRun(Canvas &out);
@@ -167,7 +170,8 @@ private:
 
     int width_ = 1280, height_ = 720, fps_ = 60;
     Canvas canvas_, from_, previous_;
-    bool dirty_ = true, frameChanged_ = false;
+    bool dirty_ = true, frameChanged_ = false, markSaved_ = false;
+    std::vector<uint8_t> underMark_;
     int64_t now_ = 0;
     bool paused_ = false, skip_ = false;
 

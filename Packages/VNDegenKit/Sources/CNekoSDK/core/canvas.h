@@ -1,6 +1,7 @@
 // The frame the runtime composites on the CPU: RGBA8, opaque.
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "image.h"
@@ -16,7 +17,14 @@ struct Canvas {
         px.assign(size_t(w) * h * 4, 0);
     }
     void clear();
+    // Copies a rectangle to or from `saved`, clipped to the canvas, so a small overlay can be redrawn alone.
+    void saveRect(int x, int y, int w, int h, std::vector<uint8_t> &saved) const;
+    void restoreRect(int x, int y, int w, int h, const std::vector<uint8_t> &saved);
 };
+
+// Runs body(row0, row1) over ranges that cover 0..rows, across the CPU's cores when `pixels` is enough to be worth it. Each
+// range is a separate set of rows, so bodies that write only their own rows don't overlap. Returns when all have finished.
+void forRows(int rows, size_t pixels, const std::function<void(int, int)> &body);
 
 // Draws `image` with its centre at (cx, cy), scaled and rotated (radians, clockwise on screen) about its centre.
 void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha);

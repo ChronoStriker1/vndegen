@@ -1002,7 +1002,6 @@ void Engine::foldFinishedChanges(Sprite &s) {
 
 bool Engine::anythingMoves() const {
     if (transitioning_ || shakeType_ || flashMs_ || blur_) return true;
-    if (waiting_ == Waiting::Click && textDone_ && waitMark_) return true;
     if (now_ - windowShownAt_ < kWindowSlideMs) return true;
     for (const auto &[slot, s] : front_) {
         if (s.looping) return true;
@@ -1057,7 +1056,8 @@ void Engine::compose() {
             const int soft = 32;
             int threshold = int(progress * float(255 + soft)) - soft;
             bool reverse = transitionType_ == 2;
-            for (int y = 0; y < canvas_.h; y++) {
+            forRows(canvas_.h, size_t(canvas_.w) * canvas_.h, [&](int row0, int row1) {
+            for (int y = row0; y < row1; y++) {
                 const uint8_t *r = rule.rgba.data() + size_t(y * rule.h / canvas_.h) * rule.w * 4;
                 uint8_t *d = canvas_.px.data() + size_t(y) * canvas_.w * 4;
                 const uint8_t *f = from_.px.data() + size_t(y) * canvas_.w * 4;
@@ -1071,6 +1071,7 @@ void Engine::compose() {
                     d[2] = uint8_t(d[2] + (((f[2] - d[2]) * keep) >> 8));
                 }
             }
+            });
         } else {
             blendFrame(canvas_, from_, 256 - int(progress * 256));
             // Types 40 and 53 to 55 blur both pictures most at the middle of the crossfade, as the PC game's footage shows.
@@ -1122,16 +1123,42 @@ void Engine::composeMessage(Canvas &out) {
     }
     drawGlyphRun(out);
     composeMessageButtons(out);
-    if (waiting_ == Waiting::Click && textDone_ && waitMark_) {
-        // One picture turns; several are the cells of a sheet, stepped through at the same speed.
-        float turns = float(now_ - textStart_) / 1000 * markSpeed_;
-        if (markPatterns_ == 1) {
-            drawImage(out, *waitMark_, float(markX_) + waitMark_->w * 0.5f, float(markY_) + waitMark_->h * 0.5f, 1, 1, turns * 2 * kPi, 1);
-        } else {
-            int cell = waitMark_->w / markPatterns_;
-            int index = int(turns * float(markPatterns_)) % markPatterns_;
-            drawPart(out, *waitMark_, markX_, markY_, index * cell, 0, cell, waitMark_->h, 1);
-        }
+}
+
+// The rectangle the wait mark can touch at any angle.
+void Engine::markRect(int &x, int &y, int &w, int &h) const {
+    int cell = markPatterns_ > 1 ? waitMark_->w / markPatterns_ : waitMark_->w;
+    if (markPatterns_ > 1) {
+        x = markX_;
+        y = markY_;
+        w = cell;
+        h = waitMark_->h;
+        return;
+    }
+    int side = int(std::ceil(std::hypot(float(waitMark_->w), float(waitMark_->h)))) + 2;
+    x = markX_ + waitMark_->w / 2 - side / 2;
+    y = markY_ + waitMark_->h / 2 - side / 2;
+    w = side;
+    h = side;
+}
+
+bool Engine::markShowing() const {
+    return !screen_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
+}
+
+// The mark is the last thing drawn, over a copy of what's beneath it, so a tick where only the mark moved redraws just
+// that: the composed scene stands. Text waits are most of a game, and a full 1080p compose took 12 ms on the mini's
+// iPad simulator every tick for a mark about 30 pixels across.
+void Engine::drawMark(Canvas &out) {
+    if (!markShowing()) return;
+    // One picture turns; several are the cells of a sheet, stepped through at the same speed.
+    float turns = float(now_ - textStart_) / 1000 * markSpeed_;
+    if (markPatterns_ == 1) {
+        drawImage(out, *waitMark_, float(markX_) + waitMark_->w * 0.5f, float(markY_) + waitMark_->h * 0.5f, 1, 1, turns * 2 * kPi, 1);
+    } else {
+        int cell = waitMark_->w / markPatterns_;
+        int index = int(turns * float(markPatterns_)) % markPatterns_;
+        drawPart(out, *waitMark_, markX_, markY_, index * cell, 0, cell, waitMark_->h, 1);
     }
 }
 
@@ -1232,9 +1259,25 @@ void Engine::drawGlyphRun(Canvas &out) {
 }
 
 const uint8_t *Engine::frame(int &w, int &h, bool &changed) {
+    int mx = 0, my = 0, mw = 0, mh = 0;
     if (dirty_) {
         compose();
         dirty_ = false;
+        markSaved_ = false;
+        frameChanged_ = true;
+    }
+    if (markShowing()) {
+        markRect(mx, my, mw, mh);
+        if (markSaved_) canvas_.restoreRect(mx, my, mw, mh, underMark_);
+        else canvas_.saveRect(mx, my, mw, mh, underMark_);
+        markSaved_ = true;
+        drawMark(canvas_);
+        frameChanged_ = true;
+    } else if (markSaved_) {
+        // The story moved on with nothing else to redraw, so take the mark off.
+        markRect(mx, my, mw, mh);
+        canvas_.restoreRect(mx, my, mw, mh, underMark_);
+        markSaved_ = false;
         frameChanged_ = true;
     }
     w = canvas_.w;
