@@ -107,6 +107,21 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
     #expect(location.relativePath(data.path + "/localStorage/web_sf.value") == "web_sf.value")
 }
 
+@Test func findsAGameInsideWrapperFolders() throws {
+    // As Butterfly Affection imports: an NW.js build one folder down, with saves beside its executable.
+    let config = ";projectID = wrapped\n;configSave = file\n"
+    let one = try game(["Game/tyrano/plugins/kag/kag.js": kag450, "Game/data/system/Config.tjs": config, "Game/package.json": "{}"])
+    defer { try? FileManager.default.removeItem(at: one) }
+    #expect(detect(one)?.evidence == "Game/tyrano/plugins/kag/kag.js")
+    #expect(detect(one)?.confidence == .likely)
+    let saves = try #require(TyranoPlugin().saveLocations(folder: one, dataDirectory: one).first)
+    #expect(saves.directory.standardizedFileURL == one.appendingPathComponent("Game", isDirectory: true).standardizedFileURL)
+
+    let two = try game(["A/B/resources/app/tyrano/plugins/kag/kag.js": kag520])
+    defer { try? FileManager.default.removeItem(at: two) }
+    #expect(detect(two)?.evidence == "A/B/resources/app/tyrano/plugins/kag/kag.js")
+}
+
 @Test func otherFoldersAreNotTyrano() throws {
     let root = try game(["js/rmmz_core.js": "", "index.html": "<html>", "tyrano/readme.txt": ""])
     defer { try? FileManager.default.removeItem(at: root) }

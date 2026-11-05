@@ -31,7 +31,9 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         for root in ["", "www/"] where probe.contains("\(root)js/\(core)") {
             return EngineMatch(engine: descriptor.id, confidence: .certain, evidence: "\(root)js/\(core)")
         }
-        return nil
+        // Inside wrapper folders it's only likely, so a copy of the engine in a subfolder can't take another engine's game.
+        guard let layout = RPGMakerLayout(probe), layout.evidence.lowercased().hasSuffix("/\(core)") else { return nil }
+        return EngineMatch(engine: descriptor.id, confidence: .likely, evidence: layout.evidence)
     }
 
     /// Runs the game in the shared web host.

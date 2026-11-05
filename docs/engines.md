@@ -8,9 +8,9 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 
 | Engine | Detected by | Platforms |
 |---|---|---|
-| [RPG Maker MZ](#rpg-maker-mv-and-mz) | `js/rmmz_core.js` | Mac, iPhone, iPad |
-| [RPG Maker MV](#rpg-maker-mv-and-mz) | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
-| [TyranoScript and TyranoBuilder](#tyranoscript) | `tyrano/plugins/kag/kag.js` at the top of the game, or in an NW.js (`package.nw`) or Electron (`resources/app`, also inside `app.asar`) build | Mac, iPhone, iPad |
+| [RPG Maker MZ](#rpg-maker-mv-and-mz) | `js/rmmz_core.js`, also inside up to three wrapper folders, as a likely match | Mac, iPhone, iPad |
+| [RPG Maker MV](#rpg-maker-mv-and-mz) | `js/rpg_core.js` or `www/js/rpg_core.js`, also inside up to three wrapper folders, as a likely match | Mac, iPhone, iPad |
+| [TyranoScript and TyranoBuilder](#tyranoscript) | `tyrano/plugins/kag/kag.js` at the top of the game, or in an NW.js (`package.nw`) or Electron (`resources/app`, also inside `app.asar`) build, also inside up to two wrapper folders, as a likely match | Mac, iPhone, iPad |
 | [Ren'Py 6.99 to 8](#renpy) | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
 | [RPG Maker XP, VX, and VX Ace](#rpg-maker-xp-vx-and-vx-ace) | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac, iPhone, iPad |
 | [KiriKiri 2 and KiriKiri Z](#kirikiri) | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |
@@ -65,7 +65,7 @@ Ren'Py games run on Ren'Py's own engine. The Mac app bundles two official Ren'Py
 
 On iPhone and iPad, Ren'Py 8.5.3 is built into the app and every Ren'Py game runs on it, inside VNDegen's window. Ren'Py 7 and 6.99 games run on it too, with fixes VNDegen applies in memory, such as dividing integers the Python 2 way in the game's own code. 15 of the 16 Ren'Py 7 games in the maintainer's library reached their main menu this way, and VNDegen ships that list. The page of a Ren'Py 7 game says whether it is known to work and, once it has run, whether it reached its main menu on this device. On Mac the game page's Ren'Py runtime option runs a game on the other runtime.
 
-Ren'Py 8.5.3 runs Python 3.12, and games built on Ren'Py 8.3 or older were written for Python 3.9, so on every platform VNDegen also lets `random.randrange` and `random.randint` take whole-number floats again, as those versions did.
+Ren'Py 8.5.3 runs Python 3.12, and games built on Ren'Py 8.3 or older were written for Python 3.9, so on every platform VNDegen also lets `random.randrange` and `random.randint` take whole-number floats again, as those versions did. `os.startfile`, which exists only on Windows, is there and does nothing, for games that name it in a screen, such as Countryside Cumsluts.
 
 Ren'Py can't load saves made by a newer Ren'Py. VNDegen runs each game on the newest Ren'Py of its line, so saves made here may not load in the game's PC version, and the game's Saves page warns before a Ludusavi backup when that applies. VNDegen on other devices loads them. The exception is a Mac, which runs Ren'Py 7 games on Ren'Py 7.8.7, so it loads a Ren'Py 7 game's saves from an iPhone or iPad only once that game's Ren'Py runtime option is set to Ren'Py 8.5.3. A Ren'Py 7 game's persistent data, such as unlocked gallery images, is written so its PC version loads it.
 

@@ -309,8 +309,9 @@ void Renderer::drawChoices(Canvas &canvas) {
     float bottom = game_.screenHeight() * 0.87f;
     if (game_.message().active) bottom = game_.screenHeight() - (lineH * 4 + pad * 4);
     RectF box{x, bottom - h, w, h};
-    // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement.
-    if (int top = game_.choiceTop(); top >= 0) box.y = float(top);
+    // System variable 4 moves the choice window's top to a given height; -1 leaves Wolf's own placement. A game with a
+    // picture menu hides the window by moving it far off the screen, as Succubus Prison's title does with -1000.
+    if (int top = game_.choiceTop(); top != -1) box.y = float(top);
     game_.setChoiceBox(box.x + pad, box.y + pad, w - pad * 2, lineH);
     drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.9f);
     BitmapPtr cursor = images_.get(game_.cursorSkin());

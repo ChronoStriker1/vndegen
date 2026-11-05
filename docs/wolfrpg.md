@@ -161,7 +161,10 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - Saves of versions before 159 have no arrays. A Wolf RPG Editor 3.5 game that started from an older save loses its arrays when saved in VNDegen. The Clumsy Witch Seris, the one library game with arrays, writes version 159.
 - Command 222 can't write key settings (system variables 52 to 57) into a save, which The Clumsy Witch Seris's configuration tries: they aren't kept between sessions.
 - Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
-  variables other than the choice window's top may place them differently.
+  variables other than the choice window's top may place them differently. A top of -1 means the default, and any other
+  value counts, so Succubus Prison's -1000 hides the choices behind its picture menu. Not compared with the PC: this
+  game's `Game.exe` stops with a buffer overrun under Wine, and Parade Buster's crashes on its data. The manual and the
+  game's own event comments are the evidence.
 - Picture commands with a start delay run at once, and the delay reset command does nothing. The standard systems
   repeat their slide-in moves with delays of 3 and 5 frames toward the same place, so the result looks the same.
 - Free-form pictures (the four-corner flag) draw as plain rectangles. Only Test Game 02's developer debug tool uses

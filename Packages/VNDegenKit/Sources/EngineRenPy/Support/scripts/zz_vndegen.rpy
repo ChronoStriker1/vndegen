@@ -369,11 +369,13 @@ init 999 python in _vndegen:
 
         config.periodic_callbacks.append(probe_step)
 
+# Sizes follow the game's own height, as the menu's text does. These are what a 1080-line game gets. A 2160-line game like
+# MalOvent has text twice as large, which fixed sizes would leave no wider than its buttons' minimum.
 style _vndegen_frame:
     xalign 0.5
     yalign 0.5
-    xpadding 48
-    ypadding 36
+    xpadding (config.screen_height * 48 // 1080)
+    ypadding (config.screen_height * 36 // 1080)
     background Solid("#14141ce8")
 
 style _vndegen_text:
@@ -384,9 +386,9 @@ style _vndegen_text:
 
 style _vndegen_button:
     xalign 0.5
-    xminimum 360
-    xpadding 24
-    ypadding 12
+    xminimum (config.screen_height * 360 // 1080)
+    xpadding (config.screen_height * 24 // 1080)
+    ypadding (config.screen_height * 12 // 1080)
     background Solid("#ffffff1a")
     hover_background Solid("#ff4080")
 
@@ -413,10 +415,10 @@ screen _vndegen_menu(quick=False, can_save=False, can_load=False):
     frame:
         style "_vndegen_frame"
         has vbox
-        spacing 16
+        spacing (config.screen_height * 16 // 1080)
 
         text "VNDegen" style "_vndegen_text" size (config.screen_height // 18) bold True
-        null height 8
+        null height (config.screen_height * 8 // 1080)
         textbutton "Resume" action Return(False) style "_vndegen_button" text_style "_vndegen_button_text" text_size (config.screen_height // 30)
         if quick:
             textbutton "Quick save" action If(can_save, Return("quicksave")) style "_vndegen_button" text_style "_vndegen_button_text" text_size (config.screen_height // 30)

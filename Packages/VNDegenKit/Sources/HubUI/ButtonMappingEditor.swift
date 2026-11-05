@@ -423,7 +423,6 @@ struct ButtonMappingSheet: View {
     /// Defaults to closing the navigator's sheet.
     var onClose: (() -> Void)?
 
-    #if os(macOS)
     /// Which of the sheet's steps shows.
     private struct Step: Equatable {
         let editing: ControllerLayout.ID?
@@ -436,7 +435,6 @@ struct ButtonMappingSheet: View {
             confirmingDelete = editor.confirmingDelete
         }
     }
-    #endif
 
     var body: some View {
         let game = hub.library.game(editor.gameID).map(hub.displayTitle) ?? ""
@@ -462,17 +460,15 @@ struct ButtonMappingSheet: View {
                     guard editor.showsFocus, let focus else { return }
                     withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
                 }
-                #if os(macOS)
                 // The scroll view keeps its offset in a sheet of one size, which would open Edit below its Rename and
                 // Delete, so each step opens at its focus.
                 .onChange(of: Step(editor)) {
                     if let focus = editor.focus { proxy.scrollTo(focus, anchor: .center) }
                 }
-                // The first press reveals the ring without moving focus, and focus can be below the sheet's fold.
+                // The first press reveals the ring without moving focus, and focus can be scrolled away.
                 .onChange(of: editor.showsFocus) { _, shows in
                     if shows, let focus = editor.focus { withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) } }
                 }
-                #endif
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width - 44 } action: { editor.width = $0 }
         }

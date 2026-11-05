@@ -287,8 +287,9 @@ int32_t Game::systemNumber(int i) const {
         return parts[i - 77];
     }
     switch (i) {
-        // Parade Buster confirms a choice with a click when this reads 1, as a click does on the PC.
-        case 12: return message_.active || choice_.active;
+        // Only while text shows, as the manual says. Choices with no message read 0, so a game that draws its own message
+        // window from this keeps it hidden behind a picture menu, as Succubus Prison's title does.
+        case 12: return message_.active;
         case 13: return !threads_.empty();
         case 20: return choice_.active ? choice_.cursor : -1;
         case 31: case 32: return gameDat_.fps();
