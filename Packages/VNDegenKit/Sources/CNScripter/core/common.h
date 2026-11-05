@@ -56,6 +56,9 @@ std::string fromUtf8(std::string_view s);
 // True when s is valid UTF-8 that isn't plain ASCII, the test for an on-disk name that needs converting.
 bool looksUtf8(std::string_view s);
 
+// Digits and minus signs made full width (itoa2, prnum), in the script's encoding.
+std::string fullWidthDigits(std::string_view s);
+
 // ASCII letters lowered, leaving the bytes of multi-byte characters alone.
 std::string lowerAscii(std::string_view s);
 // A file name as the runtime compares them: lowercase, '\' separators, no leading "./" or separator.

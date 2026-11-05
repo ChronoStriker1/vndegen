@@ -264,18 +264,6 @@ void cmdTrig(E &e, const std::string &name) {
     e.setVar(v, int(std::lround(r * 1000)));
 }
 
-// itoa2's digits and minus sign, full width, in the script's encoding.
-std::string fullWidthDigits(const std::string &s) {
-    static const char *const digits[] = {"０", "１", "２", "３", "４", "５", "６", "７", "８", "９"};
-    std::string out;
-    for (char c : s) {
-        if (c >= '0' && c <= '9') out += fromUtf8(digits[c - '0']);
-        else if (c == '-') out += fromUtf8("－");
-        else out += c;
-    }
-    return out;
-}
-
 void cmdItoa(E &e, const std::string &name) {
     E::VarRef v = e.readVar();
     e.readComma();

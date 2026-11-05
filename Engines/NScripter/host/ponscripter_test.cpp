@@ -40,6 +40,12 @@ static void encodingHelpers() {
     assert(vnns::charLen(sjis, 1) == 2 && vnns::lowerAscii(sjis) == "a\x93\xfa\x82\x60");
     assert(vnns::toUtf8(sjis) == "A\xE6\x97\xA5\xEF\xBC\xA1");
     assert(vnns::completeLength(sjis.substr(0, 2)) == 1);
+    // itoa2's and prnum's full-width digits, in each encoding.
+    assert(vnns::fullWidthDigits("-12") == "\x81\x7c\x82\x50\x82\x51");
+    {
+        EncodingScope scope(TextEncoding::Utf8);
+        assert(vnns::fullWidthDigits("-12") == "\uFF0D\uFF11\uFF12");
+    }
 }
 
 // Writes an .nsa archive of one entry stored as NBZ (compression 4), as the Umineko games store their bitmaps.

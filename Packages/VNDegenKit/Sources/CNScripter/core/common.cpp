@@ -213,6 +213,17 @@ std::string fromUtf8(std::string_view s) {
     return textEncoding() == TextEncoding::ShiftJis ? utf8ToSjis(s) : std::string(s);
 }
 
+std::string fullWidthDigits(std::string_view s) {
+    static const char *const digits[] = {"０", "１", "２", "３", "４", "５", "６", "７", "８", "９"};
+    std::string out;
+    for (char c : s) {
+        if (c >= '0' && c <= '9') out += fromUtf8(digits[c - '0']);
+        else if (c == '-') out += fromUtf8("－");
+        else out += c;
+    }
+    return out;
+}
+
 std::string lowerAscii(std::string_view s) {
     std::string out(s);
     for (size_t i = 0; i < out.size();) {

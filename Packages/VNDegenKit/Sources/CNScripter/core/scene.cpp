@@ -463,14 +463,7 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
     for (const Scene::Prnum &p : s.prnums)
         if (p.on) {
             // prnum draws its number in full-width digits, w x h per character.
-            std::string digits;
-            for (char c : std::to_string(p.value)) {
-                if (c == '-') digits += "\x81\x7c";
-                else {
-                    digits += char(0x82);
-                    digits += char(0x4F + (c - '0'));
-                }
-            }
+            std::string digits = fullWidthDigits(std::to_string(p.value));
             drawGlyphs(out, digits, p.x, p.y, p.w, p.h, 0, p.color, win_.bold, win_.shadow, 0, 0);
         }
     if (effectsOnScene) {
