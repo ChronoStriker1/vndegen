@@ -40,6 +40,8 @@ void vnneko_audio_render(VNNekoEngine *e, float *out, int frames);
 // The player's input. x and y are normalized over the frame, 0 to 1. Buttons are 0 left, 1 right, 2 middle.
 void vnneko_mouse_move(VNNekoEngine *e, float x, float y);
 void vnneko_mouse_button(VNNekoEngine *e, int button, bool down);
+// A notch of the wheel is positive away from the player.
+void vnneko_mouse_wheel(VNNekoEngine *e, int notches);
 // Runs through text and waits for as long as it's on, as holding Ctrl does.
 void vnneko_set_skip(VNNekoEngine *e, bool on);
 

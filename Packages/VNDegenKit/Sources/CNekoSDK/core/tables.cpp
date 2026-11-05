@@ -86,6 +86,14 @@ button nav_title obj\e003_000.bmp 1190 341 9 5 6
 button nav_quit obj\e003_000.bmp 1190 382 9 5 7
 button back obj\e003_000.bmp 1190 464 9 5 8
 
+screen log
+rows obj\m000_000.bmp 77 124 165 4 160 12
+button log_close obj\m003_000.bmp 1232 22 5 5 0
+button log_top obj\m003_000.bmp 1180 34 5 5 1
+button log_up obj\m003_000.bmp 1180 68 5 5 2
+button log_down obj\m003_000.bmp 1180 622 5 5 3
+button log_bottom obj\m003_000.bmp 1180 656 5 5 4
+
 screen dialog
 pic obj\i000_000.bmp 0 197 1 8 0 0
 button yes obj\b003_000.bmp 435 330 2 5 0

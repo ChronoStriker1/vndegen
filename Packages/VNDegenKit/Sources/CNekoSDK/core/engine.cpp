@@ -22,6 +22,10 @@ constexpr int kKindBgm = 0, kKindSe = 1, kKindVoice = 2;
 constexpr int kWindowSlideMs = 200;
 // How long each character of text takes to fade in, measured from the PC game's footage.
 constexpr int kCharFadeMs = 160;
+// How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
+constexpr int kLogDim = 182;
+// How long Auto waits after the text and voice are done.
+constexpr int kAutoDelayMs = 1000;
 constexpr float kPi = 3.14159265f;
 constexpr float kShakeMs = 300, kShakePixelsX = 24, kShakePixelsY = 28;
 
@@ -148,6 +152,13 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     shadowR_ = config_.number("MsgShadowColorR");
     shadowG_ = config_.number("MsgShadowColorG");
     shadowB_ = config_.number("MsgShadowColorB");
+    // The backlog's "shadow" colour fills its letters in the PC game, and its plain colour frames them.
+    logTextR_ = config_.number("MsgLogShadowColorR", 255);
+    logTextG_ = config_.number("MsgLogShadowColorG", 128);
+    logTextB_ = config_.number("MsgLogShadowColorB");
+    logFrameR_ = config_.number("MsgLogColorR");
+    logFrameG_ = config_.number("MsgLogColorG");
+    logFrameB_ = config_.number("MsgLogColorB");
 
     // What a game's exe draws on its own, which no data file names.
     folder_ = normalizedPath(config_.text("UserDataDirectory"));
@@ -167,7 +178,8 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
         windowOpacity_ = 0;
     }
 
-    buttonPlate_ = images_->get(config_.text("MsgWinButtonPlateFilename"));
+    if (config_.number("MsgWinButtonPlateDisable") == 0) buttonPlate_ = images_->get(config_.text("MsgWinButtonPlateFilename"));
+    barTop_ = bars_.size() > 1 ? barY_[1] : height_ - 102;
     plateX_ = config_.number("MsgWinButtonPlatePosX");
     plateY_ = config_.number("MsgWinButtonPlatePosY");
     plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
@@ -246,6 +258,34 @@ void Engine::runAction(const std::string &action) {
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
+    if (action == "LogMode") { openLog(); return; }
+    if (action == "Voice") {
+        if (!currentText_.voice.empty()) {
+            if (voicePlayer_) audio_.stop(voicePlayer_);
+            if (Bytes data = files_.read(currentText_.voice)) {
+                voicePlayer_ = audio_.open(data);
+                if (voicePlayer_) {
+                    audio_.setLoops(voicePlayer_, 1);
+                    audio_.play(voicePlayer_);
+                }
+            }
+        }
+        return;
+    }
+    if (action == "QuickSave") {
+        noteThumbnail();
+        openDialog(4, [this] { saveToSlot(0); });
+        return;
+    }
+    if (action == "QuickLoad" || action == "quickload") {
+        if (slotInfo(0).exists) openDialog(5, [this] { loadFromSlot(0); });
+        return;
+    }
+    if (action == "log_close") { closeLog(); return; }
+    if (action == "log_up") { scrollLog(1); return; }
+    if (action == "log_down") { scrollLog(-1); return; }
+    if (action == "log_top") { scrollLog(int(backlog_.size())); return; }
+    if (action == "log_bottom") { scrollLog(-int(backlog_.size())); return; }
     if (action == "back") {
         if (returnTo_.empty()) closeScreen();
         else openScreen(returnTo_);
@@ -261,6 +301,37 @@ void Engine::runAction(const std::string &action) {
     if (action == "nav_title") { runAction("Title"); return; }
     if (action == "nav_quit") { runAction("quit"); return; }
     warnOnce("Button not built yet: " + action);
+}
+
+void Engine::openLog() {
+    if (backlog_.empty() || !screens_.count("log")) return;
+    // The frame behind the log has no message on it.
+    bool hidden = windowHiddenByPlayer_;
+    windowHiddenByPlayer_ = true;
+    compose();
+    windowHiddenByPlayer_ = hidden;
+    logBase_ = canvas_;
+    logTop_ = 0;
+    logOpen_ = true;
+    dirty_ = true;
+}
+
+void Engine::closeLog() {
+    logOpen_ = false;
+    dirty_ = true;
+}
+
+void Engine::scrollLog(int lines) {
+    int top = std::clamp(logTop_ + lines, 0, std::max(0, int(backlog_.size()) - 1));
+    if (top == logTop_ && lines < 0) closeLog();  // past the newest line, as the PC does
+    logTop_ = top;
+    dirty_ = true;
+}
+
+void Engine::mouseWheel(int notches) {
+    if (screen_ || dialogOpen_) return;
+    if (logOpen_) scrollLog(notches);
+    else if (notches > 0) openLog();
 }
 
 // MARK: Saves
@@ -639,18 +710,57 @@ void Engine::composeScreen(Canvas &out) {
     if (dialogOpen_) composeDialog(out);
 }
 
-// `under` buttons come up with their plate when the pointer's at the bottom of the screen; `inner` ones stay with the text.
+// `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
+// along it, as Test Game 97 does. A game with no plate keeps its buttons up all the time.
+bool Engine::innerButtonsShown() const {
+    if (!buttonPlate_) return true;
+    return pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= plateX_ + buttonPlate_->w;
+}
+
+bool Engine::underButtonsShown() const {
+    return buttonPlate_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
+}
+
 void Engine::composeMessageButtons(Canvas &out) {
     auto state = [&](const Button &b) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_);
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
-    for (const Button &b : messageButtons_.inner) drawButton(out, b, state(b));
-    bool atBottom = pointerSeen_ && pointerY_ >= plateY_;
-    if (!atBottom) return;
-    if (buttonPlate_) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    if (innerButtonsShown())
+        for (const Button &b : messageButtons_.inner) drawButton(out, b, state(b));
+    if (!underButtonsShown()) return;
+    drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
     for (const Button &b : messageButtons_.under) drawButton(out, b, state(b));
+}
+
+// The backlog: the story's frame, dimmed, with a page of the last lines, oldest at the top.
+void Engine::composeLog(Canvas &out) {
+    tintFrame(out, 0, 0, 0, kLogDim);
+    const Screen *log = screens_.count("log") ? &screens_.at("log") : nullptr;
+    if (!log) return;
+    for (const Button &b : log->buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
+    const auto *rows = log->setting("rows");
+    if (!rows || rows->size() < 7) return;
+    ImageRef rule = images_->get((*rows)[0]);
+    int ruleX = std::atoi((*rows)[1].c_str()), ruleY = std::atoi((*rows)[2].c_str()), step = std::atoi((*rows)[3].c_str());
+    int count = std::atoi((*rows)[4].c_str()), textX = std::atoi((*rows)[5].c_str()), textY = std::atoi((*rows)[6].c_str());
+    int lastRow = std::min(count, int(backlog_.size()) - logTop_);
+    int ascent = fontAscent(fontFace_, fontSize_);
+    for (int row = 0; row < lastRow; row++) {
+        // Row 0 is the oldest on the page: the backlog runs newest first.
+        const SavedText &t = backlog_[size_t(logTop_ + lastRow - 1 - row)];
+        int y = ruleY + row * step;
+        if (rule) drawPart(out, *rule, ruleX, y, 0, 0, rule->w, rule->h, 1);
+        std::string text = sjis::toUtf8(t.text);
+        std::string name = sjis::toUtf8(t.name);
+        std::vector<Glyph> glyphs;
+        layoutRun(name, nameY_ == textY_ ? textX - (textX_ - nameX_) : textX, y + textY + ascent, nameY_ == textY_, glyphs);
+        drawGlyphs(out, glyphs, logTextR_, logTextG_, logTextB_, logFrameR_, logFrameG_, logFrameB_);
+        glyphs.clear();
+        layoutRun(text, textX, y + textY + ascent, false, glyphs);
+        drawGlyphs(out, glyphs, logTextR_, logTextG_, logTextB_, logFrameR_, logFrameG_, logFrameB_);
+    }
 }
 
 std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
@@ -667,7 +777,7 @@ std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
         complain("Unreadable script " + path);
         return nullptr;
     }
-    script->name = key;
+    script->name = path;
     scripts_[key] = script;
     return script;
 }
@@ -958,15 +1068,15 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
-    if (screen_) return waiting_ != Waiting::Ended;
+    if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
 
-    if (transitioning_ && (skip_ || now_ >= transitionStart_ + transitionMs_)) {
+    if (transitioning_ && (skip_ || skipToggle_ || now_ >= transitionStart_ + transitionMs_)) {
         transitioning_ = false;
         ruleImage_ = nullptr;
         dirty_ = true;
     }
-    if (waiting_ == Waiting::Time && (skip_ || now_ >= waitUntil_)) waiting_ = Waiting::None;
+    if (waiting_ == Waiting::Time && (skip_ || skipToggle_ || now_ >= waitUntil_)) waiting_ = Waiting::None;
 
     if (!textDone_) {
         // The last character has finished fading in.
@@ -974,7 +1084,17 @@ bool Engine::step(int ms) {
         if (skip_ || now_ - textStart_ >= int64_t(textGlyphs_.size()) * charMs_ + kCharFadeMs) textDone_ = true;
     }
     bool skipping = skip_ || skipToggle_;
-    if (waiting_ == Waiting::Click && (clicked_ || skipping)) {
+    // Auto moves on a moment after the text and any voice have finished.
+    bool autoNext = false;
+    if (autoMode_ && waiting_ == Waiting::Click && textDone_) {
+        bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
+        if (voiceGoing) autoReadyAt_ = -1;
+        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + kAutoDelayMs;
+        else if (now_ >= autoReadyAt_) autoNext = true;
+    } else {
+        autoReadyAt_ = -1;
+    }
+    if (waiting_ == Waiting::Click && (clicked_ || skipping || autoNext)) {
         clicked_ = false;
         if (!textDone_ && !skipping) {
             // The first click finishes the text; the next one moves on.
@@ -1016,7 +1136,37 @@ void Engine::mouseMove(float x, float y) {
 }
 
 void Engine::mouseButton(int button, bool down) {
-    if (button != 0 || !down) return;
+    if (!down) return;
+    if (button == 1) {
+        // The right button steps back: out of the log or a menu, else hides or shows the window.
+        if (dialogOpen_) {
+            dialogOpen_ = false;
+            dialogYes_ = nullptr;
+            dirty_ = true;
+        } else if (logOpen_) {
+            closeLog();
+        } else if (screen_) {
+            if (screen_->name != "title") runAction("back");
+        } else if (windowShown_) {
+            windowHiddenByPlayer_ = !windowHiddenByPlayer_;
+            dirty_ = true;
+        }
+        return;
+    }
+    if (button != 0) return;
+    if (windowHiddenByPlayer_) {
+        windowHiddenByPlayer_ = false;
+        dirty_ = true;
+        return;
+    }
+    if (logOpen_ && !dialogOpen_) {
+        Screen &log = screens_.at("log");
+        if (Button *b = buttonAt(pointerX_, pointerY_, log.buttons)) {
+            std::string action = b->action;
+            runAction(action);
+        }
+        return;
+    }
     if (dialogOpen_) {
         Screen &dialog = screens_.at("dialog");
         if (Button *b = buttonAt(pointerX_, pointerY_, dialog.buttons)) {
@@ -1045,18 +1195,18 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (windowShown_) {
-        if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
-            std::string action = b->action;
-            runAction(action);
-            return;
-        }
-        if (pointerY_ >= plateY_) {
+        if (innerButtonsShown())
+            if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
+                std::string action = b->action;
+                runAction(action);
+                return;
+            }
+        if (underButtonsShown())
             if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.under)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
             }
-        }
     }
     if (waiting_ == Waiting::Choice) {
         updateChoice();
@@ -1474,6 +1624,12 @@ void Engine::compose() {
         composeScreen(canvas_);
         return;
     }
+    if (logOpen_) {
+        canvas_ = logBase_;
+        composeLog(canvas_);
+        if (dialogOpen_) composeDialog(canvas_);
+        return;
+    }
     composeScene(canvas_, front_);
 
     if (transitioning_) {
@@ -1529,6 +1685,7 @@ void Engine::compose() {
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
     composeMessage(canvas_);
+    if (dialogOpen_) composeDialog(canvas_);
 
     if (waiting_ == Waiting::Choice && choiceSheet_) {
         if (choiceBack_) drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
@@ -1540,7 +1697,7 @@ void Engine::compose() {
 }
 
 void Engine::composeMessage(Canvas &out) {
-    if (!windowShown_) return;
+    if (!windowShown_ || windowHiddenByPlayer_) return;
     if (windowImage_) {
         int y = windowY_;
         if (windowShowType_ == 2) {
@@ -1571,7 +1728,7 @@ void Engine::markRect(int &x, int &y, int &w, int &h) const {
 }
 
 bool Engine::markShowing() const {
-    return !screen_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
+    return !screen_ && !logOpen_ && !dialogOpen_ && !windowHiddenByPlayer_ && windowShown_ && waitMark_ && waiting_ == Waiting::Click && textDone_;
 }
 
 // The mark is the last thing drawn, over a copy of what's beneath it, so a tick where only the mark moved redraws just
@@ -1590,33 +1747,11 @@ void Engine::drawMark(Canvas &out) {
     }
 }
 
-void Engine::layoutText(const std::string &name, const std::string &text) {
-    nameGlyphs_.clear();
-    textGlyphs_.clear();
+// Lays out a line or lines of UTF-8 from a pen position. `endsThere` lays a name out to end at x rather than start there.
+void Engine::layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out) {
     int lineHeight = fontSize_ + lineInterval_ + 4;
-    int ascent = fontAscent(fontFace_, fontSize_);
-    auto decode = [](const std::string &s, size_t &i) -> uint32_t {
-        auto c = static_cast<unsigned char>(s[i]);
-        int extra = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
-        uint32_t cp = extra == 0 ? c : extra == 1 ? c & 0x1F : extra == 2 ? c & 0x0F : c & 0x07;
-        for (int k = 1; k <= extra && i + k < s.size(); k++) cp = cp << 6 | (static_cast<unsigned char>(s[i + k]) & 0x3F);
-        i += size_t(extra) + 1;
-        return cp;
-    };
-    int penX = 0;
-    for (size_t i = 0; i < name.size();) {
-        uint32_t cp = decode(name, i);
-        GlyphImage g;
-        if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
-        nameGlyphs_.push_back({penX, nameY_ + ascent, cp, false});
-        penX += g.advance;
-    }
-    // A name to the left of the text, on its line, ends at its position. One on a line of its own starts there.
-    int nameShift = nameY_ == textY_ ? nameX_ - penX : nameX_;
-    for (Glyph &g : nameGlyphs_) g.x += nameShift;
-    penX = textX_;
-    int penY = textY_ + ascent;
-    int used = 0;
+    size_t first = out.size();
+    int penX = x, penY = y, used = 0;
     bool italic = false;
     for (size_t i = 0; i < text.size();) {
         // `|i` starts italics and `^i` ends them.
@@ -1625,63 +1760,86 @@ void Engine::layoutText(const std::string &name, const std::string &text) {
             i += 2;
             continue;
         }
-        uint32_t cp = decode(text, i);
+        auto c = static_cast<unsigned char>(text[i]);
+        int extra = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
+        uint32_t cp = extra == 0 ? c : extra == 1 ? c & 0x1F : extra == 2 ? c & 0x0F : c & 0x07;
+        for (int k = 1; k <= extra && i + k < text.size(); k++) cp = cp << 6 | (static_cast<unsigned char>(text[i + k]) & 0x3F);
+        i += size_t(extra) + 1;
         if (cp == '\r') continue;
         int units = cp < 0x100 ? 1 : 2;
         if (cp == '\n' || used + units > maxChars_) {
-            penX = textX_;
+            penX = x;
             penY += lineHeight;
             used = 0;
             if (cp == '\n') continue;
         }
         GlyphImage g;
         if (!glyph(fontFace_, cp, fontSize_, false, g)) continue;
-        textGlyphs_.push_back({penX, penY, cp, italic});
+        out.push_back({penX, penY, cp, italic});
         penX += g.advance;
         used += units;
     }
+    if (endsThere) {
+        int width = penX - x;
+        for (size_t i = first; i < out.size(); i++) out[i].x -= width;
+    }
 }
 
-void Engine::drawGlyphRun(Canvas &out) {
+void Engine::layoutText(const std::string &name, const std::string &text) {
+    nameGlyphs_.clear();
+    textGlyphs_.clear();
+    int ascent = fontAscent(fontFace_, fontSize_);
+    // A name to the left of the text, on its line, ends at its position. One on a line of its own starts there.
+    layoutRun(name, nameX_, nameY_ + ascent, nameY_ == textY_, nameGlyphs_);
+    layoutRun(text, textX_, textY_ + ascent, false, textGlyphs_);
+}
+
+void Engine::drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb) {
+    if (alpha <= 0) return;
     // init.ini's font types: 1 a shadow, 2 a thin frame, 9 both, 13 a wide frame, 17 a wider one.
     int frame = fontType_ == 17 ? 3 : fontType_ == 13 ? 2 : (fontType_ == 2 || fontType_ == 9) ? 1 : 0;
     bool shadow = fontType_ == 1 || fontType_ == 9;
-    auto draw = [&](const Glyph &g, int passes, int alpha) {
-        if (alpha <= 0) return;
-        GlyphImage image;
-        if (!glyph(fontFace_, g.codepoint, fontSize_, false, image) || image.w <= 0 || image.h <= 0) return;
-        std::vector<uint8_t> slanted;
-        const uint8_t *coverage = image.coverage.data();
-        int w = image.w;
-        if (g.italic) {
-            // Windows slants a face it has no italics for by about a fifth of the height.
-            int lean = image.h / 5 + 1;
-            w = image.w + lean;
-            slanted.assign(size_t(w) * image.h, 0);
-            for (int y = 0; y < image.h; y++) {
-                int shift = (image.h - 1 - y) / 5;
-                std::memcpy(&slanted[size_t(y) * w + shift], &image.coverage[size_t(y) * image.w], size_t(image.w));
-            }
-            coverage = slanted.data();
+    GlyphImage image;
+    if (!glyph(fontFace_, g.codepoint, fontSize_, false, image) || image.w <= 0 || image.h <= 0) return;
+    std::vector<uint8_t> slanted;
+    const uint8_t *coverage = image.coverage.data();
+    int w = image.w;
+    if (g.italic) {
+        // Windows slants a face it has no italics for by about a fifth of the height.
+        int lean = image.h / 5 + 1;
+        w = image.w + lean;
+        slanted.assign(size_t(w) * image.h, 0);
+        for (int y = 0; y < image.h; y++) {
+            int shift = (image.h - 1 - y) / 5;
+            std::memcpy(&slanted[size_t(y) * w + shift], &image.coverage[size_t(y) * image.w], size_t(image.w));
         }
-        int x = g.x + image.left, y = g.y - image.top;
-        if (passes == 0) {
-            if (shadow) drawCoverage(out, coverage, w, image.h, x + 2, y + 2, shadowR_, shadowG_, shadowB_, alpha);
-            for (int dy = -frame; frame && dy <= frame; dy++)
-                for (int dx = -frame; dx <= frame; dx++)
-                    if (dx * dx + dy * dy <= frame * frame + 1) drawCoverage(out, coverage, w, image.h, x + dx, y + dy, shadowR_, shadowG_, shadowB_, alpha);
-        } else {
-            drawCoverage(out, coverage, w, image.h, x, y, textR_, textG_, textB_, alpha);
-        }
-    };
+        coverage = slanted.data();
+    }
+    int x = g.x + image.left, y = g.y - image.top;
+    if (pass == 0) {
+        if (shadow) drawCoverage(out, coverage, w, image.h, x + 2, y + 2, fr, fg, fb, alpha);
+        for (int dy = -frame; frame && dy <= frame; dy++)
+            for (int dx = -frame; dx <= frame; dx++)
+                if (dx * dx + dy * dy <= frame * frame + 1) drawCoverage(out, coverage, w, image.h, x + dx, y + dy, fr, fg, fb, alpha);
+    } else {
+        drawCoverage(out, coverage, w, image.h, x, y, r, gr, b, alpha);
+    }
+}
+
+void Engine::drawGlyphs(Canvas &out, const std::vector<Glyph> &glyphs, int r, int g, int b, int fr, int fg, int fb) {
+    for (int pass = 0; pass < 2; pass++)
+        for (const Glyph &glyph : glyphs) drawGlyph(out, glyph, pass, 256, r, g, b, fr, fg, fb);
+}
+
+void Engine::drawGlyphRun(Canvas &out) {
     // Frames first, so a neighbouring glyph's frame never covers a letter.
     for (int pass = 0; pass < 2; pass++) {
         // The name is there at once; the text's characters each fade in, one after another.
-        for (const Glyph &g : nameGlyphs_) draw(g, pass, 256);
+        for (const Glyph &g : nameGlyphs_) drawGlyph(out, g, pass, 256, textR_, textG_, textB_, shadowR_, shadowG_, shadowB_);
         int index = 0;
         for (const Glyph &g : textGlyphs_) {
             int64_t since = now_ - textStart_ - int64_t(index++) * charMs_;
-            draw(g, pass, textDone_ ? 256 : int(std::clamp<int64_t>(since * 256 / kCharFadeMs, 0, 256)));
+            drawGlyph(out, g, pass, textDone_ ? 256 : int(std::clamp<int64_t>(since * 256 / kCharFadeMs, 0, 256)), textR_, textG_, textB_, shadowR_, shadowG_, shadowB_);
         }
     }
 }

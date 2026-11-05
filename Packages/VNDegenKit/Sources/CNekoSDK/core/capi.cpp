@@ -30,6 +30,7 @@ const uint8_t *vnneko_frame(VNNekoEngine *e, int *width, int *height, bool *chan
 void vnneko_audio_render(VNNekoEngine *e, float *out, int frames) { e->engine.audio().render(out, frames); }
 void vnneko_mouse_move(VNNekoEngine *e, float x, float y) { e->engine.mouseMove(x, y); }
 void vnneko_mouse_button(VNNekoEngine *e, int button, bool down) { e->engine.mouseButton(button, down); }
+void vnneko_mouse_wheel(VNNekoEngine *e, int notches) { e->engine.mouseWheel(notches); }
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
 void vnneko_stop(VNNekoEngine *e) { delete e; }

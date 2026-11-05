@@ -89,6 +89,7 @@ public:
     int choiceCount() const { return waiting_ == Waiting::Choice ? choiceCount_ : -1; }
     void choose(int index);
     void mouseButton(int button, bool down);
+    void mouseWheel(int notches);
     void setSkip(bool on) { skip_ = on; }
     bool inMenu() const { return screen_ != nullptr; }
     // For test hosts: presses a menu button by its action, as a click on it does.
@@ -145,6 +146,12 @@ private:
     void startStory();
     void composeScreen(Canvas &out);
     void composeMessageButtons(Canvas &out);
+    bool innerButtonsShown() const;
+    bool underButtonsShown() const;
+    void openLog();
+    void closeLog();
+    void scrollLog(int lines);
+    void composeLog(Canvas &out);
     Button *buttonAt(int x, int y, std::vector<Button> &buttons);
 
     // Commands.
@@ -178,6 +185,9 @@ private:
     void drawMark(Canvas &out);
     void compose();
     void layoutText(const std::string &utf8Name, const std::string &utf8Text);
+    void layoutRun(const std::string &text, int x, int y, bool endsThere, std::vector<Glyph> &out);
+    void drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, int gr, int b, int fr, int fg, int fb);
+    void drawGlyphs(Canvas &out, const std::vector<Glyph> &glyphs, int r, int g, int b, int fr, int fg, int fb);
     void drawGlyphRun(Canvas &out);
     bool anythingMoves() const;
 
@@ -269,6 +279,12 @@ private:
     bool autoMode_ = false, skipToggle_ = false, windowHiddenByPlayer_ = false;
     std::string titleBgm_;
     int titleMusic_ = 0;
+    int barTop_ = 0;
+    int64_t autoReadyAt_ = -1;
+    bool logOpen_ = false;
+    int logTop_ = 0;
+    Canvas logBase_;
+    int logTextR_ = 255, logTextG_ = 128, logTextB_ = 0, logFrameR_ = 0, logFrameG_ = 0, logFrameB_ = 0;
 
     // The message window.
     bool windowShown_ = false;
