@@ -36,6 +36,13 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(layout.root == "Game")
 }
 
+/// Hash order would find the sorted first of these only 1 time in 26.
+@Test func aTieGoesToTheFirstInSortedOrder() throws {
+    let roots = (UInt8(ascii: "a")...UInt8(ascii: "z")).map { String(UnicodeScalar($0)) }
+    let layout = try #require(NScripterLayout(probe(roots.map { "\($0)/nscript.dat" })))
+    #expect(layout.root == "a" && layout.evidence == "a/nscript.dat")
+}
+
 @Test func nScripterGamesStartWithTheKeyboardAndMouseLayout() {
     #expect(NScripterPlugin().defaultControls == .keyboardAndMouse)
 }

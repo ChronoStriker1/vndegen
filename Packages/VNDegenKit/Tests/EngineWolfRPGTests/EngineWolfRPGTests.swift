@@ -36,6 +36,16 @@ import VNCore
         #expect(WolfRPGLayout(probe(["Data.wolf"]))?.confidence == .likely)
     }
 
+    /// Hash order would find the sorted first of these only 1 time in 26.
+    @Test func aTieGoesToTheFirstInSortedOrder() throws {
+        let roots = (UInt8(ascii: "a")...UInt8(ascii: "z")).map { String(UnicodeScalar($0)) }
+        let layout = try #require(WolfRPGLayout(probe(Set(roots.flatMap { ["\($0)/Game.exe", "\($0)/Data.wolf"] }))))
+        #expect(layout.root == "a" && layout.evidence == "a/Data.wolf")
+        let evidence = try #require(WolfRPGLayout(probe(["Game.exe", "Data", "Data.wolf", "Data/BasicData", "Data/BasicData.wolf",
+                                                         "GuruguruSMF4.dll"])))
+        #expect(evidence.evidence == "Data.wolf")
+    }
+
     @Test func ignoresOtherGames() {
         #expect(WolfRPGLayout(probe(["Game.exe", "data", "data/Map001.rvdata2", "Game.ini"])) == nil)
     }

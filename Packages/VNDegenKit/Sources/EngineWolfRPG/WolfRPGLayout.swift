@@ -12,7 +12,8 @@ nonisolated struct WolfRPGLayout: Equatable, Sendable {
 
     init?(_ probe: FolderProbe) {
         var best: WolfRPGLayout?
-        for entry in probe.entries {
+        // Sorted, because a tie keeps the first found and a Set's order changes per launch.
+        for entry in probe.entries.sorted() {
             let lower = entry.lowercased()
             let parts = lower.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
             // The game's data: Data.wolf, or the Data/BasicData folder, or Data/BasicData.wolf. A game two folders down

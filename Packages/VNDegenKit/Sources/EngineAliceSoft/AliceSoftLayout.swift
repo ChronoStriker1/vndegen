@@ -21,7 +21,8 @@ nonisolated struct AliceSoftLayout: Equatable, Sendable {
 
     init?(_ probe: FolderProbe) {
         var best: AliceSoftLayout?
-        for entry in probe.entries {
+        // Sorted, because a tie keeps the first found and a Set's order changes per launch.
+        for entry in probe.entries.sorted() {
             let parts = entry.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
             guard let name = parts.last?.lowercased(), parts.count <= 3 else { continue }
             let folder = parts.dropLast().joined(separator: "/")
