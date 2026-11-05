@@ -370,7 +370,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "System") { barPinned_ = !barPinned_; return; }
     if (action == "LogMode") { openLog(); return; }
     if (action == "Voice") {
-        if (!currentText_.voice.empty()) {
+        if (!currentText_.voice.empty() && voiceAllowed(currentText_.voice)) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = 0;
             if (Bytes data = files_.read(currentText_.voice)) {
@@ -399,7 +399,7 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "cfg_defaults") {
-        settings_ = defaultSettings();
+        settings_ = startingSettings();
         applySettings();
         return;
     }
@@ -670,6 +670,15 @@ void Engine::loadGalleries() {
         sceneEntries_.push_back(e);
     }
     tracks_ = lines("cfg\\sound_view.ini");
+    // `#type N`, then how the names of that type's voice files start, then `##`. Types from 50 are the background voices
+    // of the character 50 below.
+    int voiceType = -1;
+    for (const std::string &line : lines("cfg\\voice_type.ini")) {
+        if (line.rfind("#type", 0) == 0) voiceType = std::atoi(line.c_str() + 5);
+        else if (line == "##") voiceType = -1;
+        else if (voiceType >= 0) voiceTypes_.emplace_back(normalizedPath(fields(line)[0]), voiceType);
+    }
+    std::stable_sort(voiceTypes_.begin(), voiceTypes_.end(), [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_seen.txt");
         std::string line;
@@ -859,6 +868,22 @@ void Engine::openGalleryCell(int index) {
 
 // MARK: Settings
 
+std::map<std::string, int> Engine::startingSettings() const {
+    std::map<std::string, int> out = defaultSettings();
+    for (const auto &[start, type] : voiceTypes_) out["voice" + std::to_string(type % 50)] = 1;
+    return out;
+}
+
+// A voice plays while its speaker's Individual Voices box is checked, and a background voice while its character's is.
+// The PC's own sound under Wine shows an unchecked speaker's lines and background voice don't play.
+bool Engine::voiceAllowed(const std::string &voice) const {
+    std::string name = normalizedPath(voice);
+    name = name.substr(name.find_last_of('\\') + 1);
+    for (const auto &[start, type] : voiceTypes_)
+        if (name.rfind(start, 0) == 0) return setting("voice" + std::to_string(type % 50)) != 0;
+    return true;
+}
+
 int Engine::setting(const std::string &name) const {
     auto it = settings_.find(name);
     return it == settings_.end() ? 0 : it->second;
@@ -879,7 +904,7 @@ void Engine::applySettings() {
 }
 
 void Engine::loadSettings() {
-    settings_ = defaultSettings();
+    settings_ = startingSettings();
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_settings.txt");
         std::string name;
@@ -2443,7 +2468,7 @@ void Engine::showText(const Node &n) {
     textCount_++;
     waiting_ = Waiting::Click;
     dirty_ = true;
-    if (!n.s[3].empty() && !skip_) {
+    if (!n.s[3].empty() && !skip_ && voiceAllowed(n.s[3])) {
         if (Bytes data = files_.read(n.s[3])) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = audio_.open(data);
@@ -2469,6 +2494,7 @@ void Engine::playSound(const Node &n, int kind) {
         channels.erase(old);
     }
     if (skip_ && kind != kKindBgm && p[4] != 0) return;
+    if (kind == kKindVoice && !voiceAllowed(n.s[1])) return;
     Bytes data = files_.read(n.s[1]);
     if (!data) {
         complain("Missing sound " + n.s[1]);

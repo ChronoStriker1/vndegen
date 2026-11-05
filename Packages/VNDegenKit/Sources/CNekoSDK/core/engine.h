@@ -186,11 +186,17 @@ private:
 
     // Settings, by the names the menu tables use, kept in a small file of VNDegen's beside the saves.
     void loadSettings();
+    // What Config starts at for this game: the shared defaults, and every Individual Voices box checked.
+    std::map<std::string, int> startingSettings() const;
+    // Whether the player's Individual Voices settings let this voice file play.
+    bool voiceAllowed(const std::string &voice) const;
     void saveSettings();
     void applySettings();
     int setting(const std::string &name) const;
     void changeSetting(const std::string &name, int value);
     std::map<std::string, int> settings_, settingsWhenOpened_;
+    // voice_type.ini: how a voice file's name starts, lowercase, and the type of who speaks it, the longest starts first.
+    std::vector<std::pair<std::string, int>> voiceTypes_;
     void composeSettingsWidgets(Canvas &out);
     bool pressSettingsWidget(int x, int y, bool dragging);
     bool leftHeld_ = false;
