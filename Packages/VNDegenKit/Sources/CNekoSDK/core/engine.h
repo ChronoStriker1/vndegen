@@ -172,6 +172,7 @@ private:
     struct FlipModes { std::string path; bool loop, reverse; };
     std::map<int, FlipModes> flipModesAt(const SaveData &d);
     void takeScaleAnchor(Sprite &s, const Node &n);
+    void anchorOf(const Sprite &s, int &x, int &y) const;
     int cardsPerPage() const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;

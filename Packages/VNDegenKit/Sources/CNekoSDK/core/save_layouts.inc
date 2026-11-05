@@ -48,3 +48,14 @@ const SaveLayout kFunbagFantasy = {
     12,  // the bytes of a text record after its strings
     13,  // where the first record holds the screen size
 };
+const SaveLayout kFunbag4 = {
+    57,  // the extra bytes of this engine's sprite record over the oldest layout seen
+    {},
+    {{16, "ff00050000d002"}, {125, "ffffffff"}, {149, "f4010000dc0500001e"}, {161, "0a"}, {165, "3c"}, {181, "65"}, {189, "40"}, {197, "dc05"}, {209, "ffffffff"}, {281, "65"}, {285, "3c"}, {289, "78"}, {293, "1e"}, {297, "3c"}, {308, "803f"}, {328, "803f"}, {348, "803f"}, {368, "803f"}, {440, "803f0000803f"}, {455, "01"}},
+    {{125, "ffffffff"}, {149, "f4010000dc0500001e"}, {161, "0a"}, {165, "3c"}, {181, "65"}, {189, "40"}, {197, "dc05"}, {209, "ffffffff"}, {281, "65"}, {285, "3c"}, {289, "78"}, {293, "1e"}, {297, "3c"}, {308, "803f"}, {328, "803f"}, {348, "803f"}, {368, "803f"}, {420, "c84200002043"}, {440, "c03f0000c03f8002000068010000ff"}, {492, "01"}},
+    {{116, "ffffffff64"}, {125, "0a"}, {130, "c8"}, {140, "a0400a"}, {156, "a0400a"}},
+    120, 22, {{2, "ffffffff"}, {12, "a040"}, {20, "a040"}, {30, "ffffffff"}, {84, "ffffffff"}, {112, "ffffffff"}},
+    7538, {{9, "68"}, {819, "ffffffff"}, {893, "ffffffff"}, {921, "ffffffff"}, {975, "ffffffff"}, {1003, "ffffffff"}, {1037, "04"}, {1069, "3c"}, {6696, "68"}, {7506, "ffffffff"}},
+    16,  // the bytes of a text record after its strings
+    17,  // where the first record holds the screen size
+};

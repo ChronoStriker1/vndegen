@@ -220,6 +220,7 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     barTop_ = bars_.size() > 1 ? barY_[1] : height_ - 102;
     plateX_ = config_.number("MsgWinButtonPlatePosX");
     plateY_ = config_.number("MsgWinButtonPlatePosY");
+    if (buttonPlate_ && buttonPlate_->w >= width_) barTop_ = plateY_;
     plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
     if (Bytes ini = files_.read(config_.text("MsgButtonDeclFilename", "cfg\\msg_button.ini"))) messageButtons_ = parseMessageButtons(*ini, *images_);
     titleBgm_ = config_.text("TitleBGM");
@@ -920,6 +921,8 @@ void Engine::composeGallery(Canvas &out) {
     for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
         int cx = std::atoi(it->second[0].c_str()), cy = std::atoi(it->second[1].c_str());
         int found = galleryEntry(index);
+        // Test Game 85 leaves out the cards past a tab's last entry.
+        if (found < 0 && screen_->settings.count("cellhide")) continue;
         size_t entry = found < 0 ? entries.size() : size_t(found);
         bool unlocked = false;
         if (entry < entries.size()) {
@@ -965,7 +968,7 @@ void Engine::composeGallery(Canvas &out) {
                     drawPart(out, *sheetOfTen, at + w, y, value % 10 * w, 0, w, sheetOfTen->h, 1);
                 };
                 two(have, x);
-                drawPart(out, *slash, cx + field(*counts, 4), y - 1, 0, 0, slash->w, slash->h, 1);
+                drawPart(out, *slash, cx + field(*counts, 4), y + (counts->size() >= 7 ? field(*counts, 6) : -1), 0, 0, slash->w, slash->h, 1);
                 two(all, cx + field(*counts, 5));
             }
         }
@@ -1666,6 +1669,11 @@ void Engine::composeSlots(Canvas &out) {
                 mark(slash, 10);
                 x = drawNumber(dateDigits, info.date[2], 2, x, y, dateColumns);
                 x += offset("dategap", 0);
+                // Test Game 85 has the time on a line of its own.
+                if (screen_->setting("timeat")) {
+                    x = cx + offset("timeat", 0);
+                    y = cy + offset("timeat", 1);
+                }
                 x = drawNumber(dateDigits, info.date[3], 2, x, y, dateColumns);
                 mark(colon, 11);
                 x = drawNumber(dateDigits, info.date[4], 2, x, y, dateColumns);
@@ -1686,6 +1694,10 @@ void Engine::composeSlots(Canvas &out) {
                 mark(slash, 10);
                 dashes(2);
                 x += offset("dategap", 0);
+                if (screen_->setting("timeat")) {
+                    x = cx + offset("timeat", 0);
+                    y = cy + offset("timeat", 1);
+                }
                 dashes(2);
                 mark(colon, 11);
                 dashes(2);
@@ -1745,7 +1757,8 @@ Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
 
 void Engine::composeScreen(Canvas &out) {
     out.clear();
-    for (const Picture &p : screen_->pictures) drawPicture(out, p);
+    for (const Picture &p : screen_->pictures)
+        if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p);
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
@@ -1792,11 +1805,13 @@ void Engine::composeScreen(Canvas &out) {
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
+    // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
+    if (buttonPlate_ && buttonPlate_->w >= width_) return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= plateY_);
     return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
 bool Engine::underButtonsShown() const {
-    return buttonPlate_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
+    return buttonPlate_ && buttonPlate_->w < width_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
 void Engine::composeMessageButtons(Canvas &out) {
@@ -1814,8 +1829,10 @@ void Engine::composeMessageButtons(Canvas &out) {
         if (b.action == "EXpress") on = setting("express") == 0;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
-    if (innerButtonsShown())
+    if (innerButtonsShown()) {
+        if (buttonPlate_ && buttonPlate_->w >= width_) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
         for (const Button &b : messageButtons_.inner) drawButton(out, b, state(b));
+    }
     if (!underButtonsShown()) return;
     drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
     for (const Button &b : messageButtons_.under) drawButton(out, b, state(b));
@@ -2874,6 +2891,22 @@ void Engine::loadImage(const Node &n) {
 }
 
 // Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
+// The point a scale keeps still: a running named animation's pivot, or a restored animation's while it runs, else the
+// sprite's own anchor, which neither changes.
+void Engine::anchorOf(const Sprite &s, int &x, int &y) const {
+    x = s.anchorX;
+    y = s.anchorY;
+    for (const Animation &a : s.changes)
+        if (a.hasPivot) {
+            x = a.pivotX;
+            y = a.pivotY;
+        }
+    if (s.looping && s.loop.hasPivot) {
+        x = s.loop.pivotX;
+        y = s.loop.pivotY;
+    }
+}
+
 void Engine::takeScaleAnchor(Sprite &s, const Node &n) {
     s.anchorX = n.p[8] ? -1 : n.p[6];
     s.anchorY = n.p[9] ? -1 : n.p[7];
@@ -2885,7 +2918,10 @@ void Engine::transform(const Node &n) {
     auto it = back_.find(p[3]);
     if (it == back_.end()) return;
     Sprite &s = it->second;
-    SpriteView was = view(s);
+    // Where the timed changes have it, without a named animation, which goes on adding its own part afterwards.
+    Sprite base = s;
+    base.looping = false;
+    SpriteView was = view(base);
     s.changes.clear();
     if (p[16]) {
         // Parameter 0 makes it a move from where the sprite is, as it does for a change over time.
@@ -3016,10 +3052,6 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
 void Engine::namedAnimation(Sprite &s, const Node &n) {
     foldFinishedChanges(s);
     Animation a = parseAnimation(n.s[1], s);
-    if (a.hasPivot) {
-        s.anchorX = a.pivotX;
-        s.anchorY = a.pivotY;
-    }
     a.repeat = n.p[1] != 0;
     s.loop = std::move(a);
     s.looping = true;
@@ -3254,7 +3286,9 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
         ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
         // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
-        float w = float(s.image->w), h = float(s.image->h), anchorX = s.anchorX < 0 ? w * 0.5f : float(s.anchorX), anchorY = s.anchorY < 0 ? h * 0.5f : float(s.anchorY);
+        int pivotX, pivotY;
+        anchorOf(s, pivotX, pivotY);
+        float w = float(s.image->w), h = float(s.image->h), anchorX = pivotX < 0 ? w * 0.5f : float(pivotX), anchorY = pivotY < 0 ? h * 0.5f : float(pivotY);
         float middleX = v.x + anchorX + (w * 0.5f - anchorX) * v.scaleX, middleY = v.y + anchorY + (h * 0.5f - anchorY) * v.scaleY;
         std::vector<int> shifts;
         if (s.waveOn) {

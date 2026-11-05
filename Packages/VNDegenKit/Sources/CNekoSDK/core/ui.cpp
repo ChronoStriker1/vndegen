@@ -84,6 +84,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             }
             // `alpha N` of 256, at the end of the line.
             if (w.size() >= 6 && w[w.size() - 2] == "alpha") p.alpha = float(number(w.back())) / 256;
+            // `tab N` shows it only on that tab of a gallery.
+            if (w.size() >= 6 && w[w.size() - 2] == "tab") p.tab = number(w.back());
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {
             Button b;

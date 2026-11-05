@@ -35,8 +35,9 @@ def walk(SH,RX):
         recs.append((slot,F,Lan,b[F:F+0x1b5+E],b[F+0x1bd+E+Lan:q]))
     if recs[0][0]!=-999999 or not all(-1<r[0]<100000 for r in recs[1:]): return None
     return recs,q
-for SH in range(-160,129):
-    for RX in (0,)+tuple(range(-80,81)):
+# The first record the same size as the rest comes first: an offset for it alone can pass by chance at a wrong size.
+for RX in (0,)+tuple(range(-80,81)):
+    for SH in range(-160,201):
         try: got=walk(SH,RX)
         except struct.error: got=None
         if got: found=(SH,RX); recs,q=got; break
