@@ -197,7 +197,12 @@ void Audio::start(int h) {
     p.playing = true;
     p.paused = false;
 }
-void Audio::retire(int h) { WITH(h); it->second->retired = true; }
+void Audio::retire(int h) {
+    WITH(h);
+    // A paused player's fade never finishes, so there's nothing to wait for.
+    if (it->second->paused) players_.erase(it);
+    else it->second->retired = true;
+}
 void Audio::stop(int h) { WITH(h); it->second->playing = false; }
 void Audio::pause(int h, bool v) { WITH(h); it->second->paused = v; }
 bool Audio::playing(int h) { WITH(h) false; return it->second->playing; }

@@ -244,6 +244,7 @@ void Engine::openScreen(const std::string &name) {
             if (titleMusic_) {
                 audio_.setLoops(titleMusic_, 0);
                 audio_.play(titleMusic_);
+                holdMusic();
             }
         }
     }
@@ -1113,12 +1114,14 @@ SaveData Engine::captureSave() {
         int64_t oldest = s.looping ? loopBegun : now_;
         for (const Animation &a : s.changes) oldest = std::min(oldest, a.begunMs);
         auto frames = [this](int64_t ms) { return int(ms * fps_ / 1000); };
+        // A parsed length is its frames in whole ms, rounded down, so rounding up gives the same frames back.
+        auto framesOf = [this](int64_t ms) { return int((ms * fps_ + 999) / 1000); };
         auto writeTracks = [&](const Animation &a, int64_t begun) {
             for (const Track &t : a.tracks) {
                 const char *name = t.property == Track::X ? (t.relative ? "relative_pos_x" : "pos_x") : t.property == Track::Y ? (t.relative ? "relative_pos_y" : "pos_y") : t.property == Track::ScaleX ? "scale_x" : t.property == Track::ScaleY ? "scale_y" : t.property == Track::Alpha ? "alpha" : "rotate";
-                int length = frames(t.lengthMs);
+                int length = framesOf(t.lengthMs);
                 char line[128];
-                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), frames(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), framesOf(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
                 out.animation += line;
             }
         };
