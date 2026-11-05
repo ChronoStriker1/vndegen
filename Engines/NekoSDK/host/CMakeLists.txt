@@ -24,7 +24,7 @@ target_link_libraries(nekosdk PUBLIC ZLIB::ZLIB PkgConfig::FREETYPE pthread)
 # Tools write PNGs with stb_image_write, from the Wolf runtime's copy of stb.
 target_include_directories(nekosdk PUBLIC ${RUNTIME}/../CWolfRPG/third_party)
 
-foreach(tool nekocheck nekorun)
+foreach(tool nekocheck nekorun nekosave)
   add_executable(${tool} tools/${tool}.cpp)
   target_link_libraries(${tool} PRIVATE nekosdk)
 endforeach()
