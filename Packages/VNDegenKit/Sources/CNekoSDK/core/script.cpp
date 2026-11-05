@@ -18,6 +18,7 @@ uint32_t rd32(const uint8_t *p) {
 bool parseScript(const uint8_t *data, size_t size, Script &out, size_t *trailing) {
     out.nodes.clear();
     out.byId.clear();
+    out.duplicateIds.clear();
     if (size < sizeof kMagic + 4 || std::memcmp(data, kMagic, sizeof kMagic)) return false;
     size_t pos = sizeof kMagic;
     uint32_t count = rd32(data + pos);
@@ -54,7 +55,9 @@ bool parseScript(const uint8_t *data, size_t size, Script &out, size_t *trailing
                 if (data[i]) text.push_back(char(data[i]));
             pos = end;
         }
-        out.byId[node.id] = int(n);
+        // Test Game 95 has one script with two nodes of the same number, and the PC follows the first: the second points at
+        // itself, so keeping that one would hold the game on its line for ever.
+        if (!out.byId.emplace(node.id, int(n)).second) out.duplicateIds.push_back(node.id);
     }
     if (trailing) *trailing = size - pos;
     return true;

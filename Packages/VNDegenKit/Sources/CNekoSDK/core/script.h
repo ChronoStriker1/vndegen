@@ -21,6 +21,7 @@ struct Script {
     std::string name;
     std::vector<Node> nodes;
     std::unordered_map<int, int> byId;
+    std::vector<int> duplicateIds;  // numbers more than one node has; the first of them is the one followed
     const Node *node(int id) const {
         auto it = byId.find(id);
         return it == byId.end() ? nullptr : &nodes[size_t(it->second)];
