@@ -16,6 +16,7 @@
 #include "canvas.h"
 #include "image.h"
 #include "script.h"
+#include "ui.h"
 
 namespace neko {
 
@@ -86,6 +87,9 @@ public:
     void choose(int index);
     void mouseButton(int button, bool down);
     void setSkip(bool on) { skip_ = on; }
+    bool inMenu() const { return screen_ != nullptr; }
+    // For test hosts: presses a menu button by its action, as a click on it does.
+    bool pressAction(const std::string &action);
     void setPaused(bool paused);
 
     const char *problem() const { return problem_.empty() ? nullptr : problem_.c_str(); }
@@ -112,6 +116,15 @@ private:
     void runFlow(const Node &n);
     void advance();
     bool flowActive() const { return !stack_.empty(); }
+
+    // Menus.
+    void openScreen(const std::string &name);
+    void closeScreen();
+    void runAction(const std::string &action);
+    void startStory();
+    void composeScreen(Canvas &out);
+    void composeMessageButtons(Canvas &out);
+    Button *buttonAt(int x, int y, std::vector<Button> &buttons);
 
     // Commands.
     void beginChoice(const Node &n);
@@ -195,6 +208,20 @@ private:
     bool blur_ = false, blurEnding_ = false, previousValid_ = false;
     int blurAmount_ = 0, blurEndMs_ = 0;
     int64_t blurEndStart_ = 0;
+
+    // Menus, and the message window's buttons.
+    std::map<std::string, Screen> screens_;
+    Screen *screen_ = nullptr;
+    std::string folder_;
+    MessageButtons messageButtons_;
+    ImageRef buttonPlate_;
+    int plateX_ = 0, plateY_ = 0, plateHiddenY_ = 0;
+    int pointerX_ = 0, pointerY_ = 0;
+    bool pointerSeen_ = false;
+    std::string pressed_;
+    bool autoMode_ = false, skipToggle_ = false, windowHiddenByPlayer_ = false;
+    std::string titleBgm_;
+    int titleMusic_ = 0;
 
     // The message window.
     bool windowShown_ = false;

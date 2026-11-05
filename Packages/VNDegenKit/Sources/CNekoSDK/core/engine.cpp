@@ -8,6 +8,7 @@
 
 #include "font.h"
 #include "sjis.h"
+#include "tables.h"
 
 namespace neko {
 namespace {
@@ -145,23 +146,129 @@ bool Engine::start(const std::string &root, const std::string &logPath, const st
     shadowB_ = config_.number("MsgShadowColorB");
 
     // What a game's exe draws on its own, which no data file names.
-    std::string folder = normalizedPath(config_.text("UserDataDirectory"));
-    if (folder == "waffle\\x2019_retry") {
+    folder_ = normalizedPath(config_.text("UserDataDirectory"));
+    if (folder_ == "waffle\\x2019_retry") {
         bars_ = {images_->get("obj\\l000_000.bmp"), images_->get("obj\\l000_001.bmp")};
         barY_ = {0, 618};
         // The PC game shows no dimming from its message window here, at its Config defaults and at 90.
         windowOpacity_ = 0;
     }
 
+    buttonPlate_ = images_->get(config_.text("MsgWinButtonPlateFilename"));
+    plateX_ = config_.number("MsgWinButtonPlatePosX");
+    plateY_ = config_.number("MsgWinButtonPlatePosY");
+    plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
+    if (Bytes ini = files_.read(config_.text("MsgButtonDeclFilename", "cfg\\msg_button.ini"))) messageButtons_ = parseMessageButtons(*ini, *images_);
+    titleBgm_ = config_.text("TitleBGM");
+
+    if (const char *table = menuTable(folder_))
+        screens_ = parseScreens(table, *images_, [this](const std::string &what) { warnOnce(what); });
+    log("started: %dx%d, %d scripts in scr, %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus");
+    if (screens_.count("title")) openScreen("title");
+    else startStory();
+    return true;
+}
+
+// MARK: Menus
+
+void Engine::openScreen(const std::string &name) {
+    auto it = screens_.find(name);
+    if (it == screens_.end()) {
+        warnOnce("No menu table for " + name);
+        return;
+    }
+    screen_ = &it->second;
+    pressed_.clear();
+    dirty_ = true;
+    if (name == "title" && !titleBgm_.empty() && !titleMusic_) {
+        if (Bytes data = files_.read(titleBgm_)) {
+            titleMusic_ = audio_.open(data);
+            if (titleMusic_) {
+                audio_.setLoops(titleMusic_, 0);
+                audio_.play(titleMusic_);
+            }
+        }
+    }
+}
+
+void Engine::closeScreen() {
+    screen_ = nullptr;
+    dirty_ = true;
+}
+
+void Engine::startStory() {
+    if (titleMusic_) {
+        audio_.fade(titleMusic_, 500, 0, true);
+        titleMusic_ = 0;
+    }
+    screen_ = nullptr;
+    stack_.clear();
+    scene_ = {};
+    back_.clear();
+    front_.clear();
+    scenario_.clear();
+    waiting_ = Waiting::None;
     std::string first = config_.text("FirstFlow");
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
-        error = "This game has no flow script to start from.";
-        return false;
+        complain("This game has no flow script to start from.");
+        waiting_ = Waiting::Ended;
+        return;
     }
     stack_.push_back({flow, flow->first()});
-    log("started: %dx%d, first flow %s, %d scripts in scr", width_, height_, first.c_str(), int(files_.list("scr").size()));
-    return true;
+    log("story from %s", first.c_str());
+    dirty_ = true;
+}
+
+void Engine::runAction(const std::string &action) {
+    log("action %s", action.c_str());
+    if (action == "start") startStory();
+    else if (action == "quit" || action == "Exit") { waiting_ = Waiting::Ended; }
+    else if (action == "Skip") skipToggle_ = !skipToggle_;
+    else if (action == "Auto") autoMode_ = !autoMode_;
+    else if (action == "HideWin") windowHiddenByPlayer_ = true;
+    else warnOnce("Button not built yet: " + action);
+    dirty_ = true;
+}
+
+bool Engine::pressAction(const std::string &action) {
+    if (!screen_) return false;
+    for (const Button &b : screen_->buttons)
+        if (b.action == action) {
+            std::string copy = action;
+            runAction(copy);
+            return true;
+        }
+    return false;
+}
+
+Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
+    for (Button &b : buttons)
+        if (b.contains(x, y)) return &b;
+    return nullptr;
+}
+
+void Engine::composeScreen(Canvas &out) {
+    out.clear();
+    for (const Picture &p : screen_->pictures) drawPicture(out, p);
+    for (Button &b : screen_->buttons) {
+        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
+        drawButton(out, b, over ? StateHover : StateNormal);
+    }
+}
+
+// `under` buttons come up with their plate when the pointer's at the bottom of the screen; `inner` ones stay with the text.
+void Engine::composeMessageButtons(Canvas &out) {
+    auto state = [&](const Button &b) {
+        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
+        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_);
+        return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
+    };
+    for (const Button &b : messageButtons_.inner) drawButton(out, b, state(b));
+    bool atBottom = pointerSeen_ && pointerY_ >= plateY_;
+    if (!atBottom) return;
+    if (buttonPlate_) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
+    for (const Button &b : messageButtons_.under) drawButton(out, b, state(b));
 }
 
 std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
@@ -240,8 +347,8 @@ void Engine::runFlow(const Node &n) {
     case 3:
         beginChoice(n);
         break;
-    case 4:  // `next` when the first option was chosen, the other target when not
-        flow.node = flow.script->node(choiceResult_ == 0 ? n.next : n.otherwise);
+    case 4:  // the other target for the option shown first, `next` for the second: a save the PC wrote after the first
+        flow.node = flow.script->node(choiceResult_ == 0 ? n.otherwise : n.next);
         break;
     case 5: {  // a condition on a variable: `next` when it holds
         int left = variableValue(n.p[0], n.p[1]), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
@@ -467,6 +574,7 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
+    if (screen_) return waiting_ != Waiting::Ended;
     now_ += ms;
 
     if (transitioning_ && (skip_ || now_ >= transitionStart_ + transitionMs_)) {
@@ -481,9 +589,10 @@ bool Engine::step(int ms) {
         dirty_ = true;
         if (skip_ || now_ - textStart_ >= int64_t(textGlyphs_.size()) * charMs_ + kCharFadeMs) textDone_ = true;
     }
-    if (waiting_ == Waiting::Click && (clicked_ || skip_)) {
+    bool skipping = skip_ || skipToggle_;
+    if (waiting_ == Waiting::Click && (clicked_ || skipping)) {
         clicked_ = false;
-        if (!textDone_ && !skip_) {
+        if (!textDone_ && !skipping) {
             // The first click finishes the text; the next one moves on.
             textDone_ = true;
             dirty_ = true;
@@ -515,10 +624,36 @@ void Engine::mouseMove(float x, float y) {
     mouseX_ = x;
     mouseY_ = y;
     mouseMoved_ = true;
+    int px = int(x * float(width_)), py = int(y * float(height_));
+    if (px != pointerX_ || py != pointerY_ || !pointerSeen_) dirty_ = true;
+    pointerX_ = px;
+    pointerY_ = py;
+    pointerSeen_ = true;
 }
 
 void Engine::mouseButton(int button, bool down) {
     if (button != 0 || !down) return;
+    if (screen_) {
+        if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
+            std::string action = b->action;
+            runAction(action);
+        }
+        return;
+    }
+    if (windowShown_) {
+        if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
+            std::string action = b->action;
+            runAction(action);
+            return;
+        }
+        if (pointerY_ >= plateY_) {
+            if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.under)) {
+                std::string action = b->action;
+                runAction(action);
+                return;
+            }
+        }
+    }
     if (waiting_ == Waiting::Choice) {
         updateChoice();
         if (choiceHover_ >= 0) choose(choiceHover_);
@@ -908,6 +1043,10 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
 }
 
 void Engine::compose() {
+    if (screen_) {
+        composeScreen(canvas_);
+        return;
+    }
     composeScene(canvas_, front_);
 
     if (transitioning_) {
@@ -982,6 +1121,7 @@ void Engine::composeMessage(Canvas &out) {
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
     drawGlyphRun(out);
+    composeMessageButtons(out);
     if (waiting_ == Waiting::Click && textDone_ && waitMark_) {
         // One picture turns; several are the cells of a sheet, stepped through at the same speed.
         float turns = float(now_ - textStart_) / 1000 * markSpeed_;

@@ -1,6 +1,6 @@
 // Runs a game headless: steps the clock, clicks through text, writes a PNG of chosen moments, and renders the sound.
 // usage: nekorun <game folder> [--out dir] [--every n] [--click ms] [--max ms] [--dt ms] [--jump script node]
-//                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index]
+//                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
 #include <chrono>
@@ -29,6 +29,7 @@ int main(int argc, char **argv) {
     std::string out, wav, jumpScript;
     int every = 0, clickMs = 300, maxMs = 3600 * 1000, dt = 16, jumpNode = 0, period = 0, nextBeat = 0, chooseIndex = 0;
     std::vector<int> shots;
+    std::vector<std::string> presses;
     for (int i = 2; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&] { return i + 1 < argc ? argv[++i] : ""; };
@@ -38,6 +39,7 @@ int main(int argc, char **argv) {
         else if (a == "--max") maxMs = std::atoi(next());
         else if (a == "--dt") dt = std::atoi(next());
         else if (a == "--wav") wav = next();
+        else if (a == "--press") presses.push_back(next());
         else if (a == "--choose") chooseIndex = std::atoi(next());
         else if (a == "--period") { period = std::atoi(next()); nextBeat = period; }
         else if (a == "--jump") { jumpScript = next(); jumpNode = std::atoi(next()); }
@@ -57,6 +59,8 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "did not start: %s\n", vnneko_start_error());
         return 1;
     }
+    for (const std::string &action : presses)
+        if (!vnneko_debug_press(e, action.c_str())) std::fprintf(stderr, "no button %s\n", action.c_str());
     if (!jumpScript.empty() && !vnneko_debug_jump(e, jumpScript.c_str(), jumpNode)) {
         std::fprintf(stderr, "no such node\n");
         return 1;
