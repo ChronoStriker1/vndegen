@@ -20,6 +20,8 @@ namespace neko {
 namespace {
 
 constexpr int kKindBgm = 0, kKindSe = 1, kKindVoice = 2;
+// A group kept at no volume, for voices whose speaker the player has unchecked while they play.
+constexpr int kMutedVoices = 4;
 // How long the message window takes to slide in, read from the PC game's footage.
 constexpr int kWindowSlideMs = 200;
 // How long each character of text takes to fade in, measured from the PC game's footage.
@@ -376,6 +378,7 @@ void Engine::runAction(const std::string &action) {
             if (Bytes data = files_.read(currentText_.voice)) {
                 voicePlayer_ = audio_.open(data);
                 if (voicePlayer_) {
+                    voiceFiles_[voicePlayer_] = currentText_.voice;
                     audio_.setGroup(voicePlayer_, kKindVoice);
                     audio_.setLoops(voicePlayer_, 1);
                     audio_.play(voicePlayer_);
@@ -889,6 +892,21 @@ int Engine::setting(const std::string &name) const {
     return it == settings_.end() ? 0 : it->second;
 }
 
+// Voices already playing follow the Individual Voices boxes too: one whose speaker is unchecked goes quiet, and plays on
+// if the box is checked again or Undo puts it back.
+void Engine::applyVoiceChoices() {
+    std::map<int, std::string> playing;
+    auto follow = [&](int player) {
+        auto file = voiceFiles_.find(player);
+        if (!player || file == voiceFiles_.end()) return;
+        audio_.setGroup(player, voiceAllowed(file->second) ? kKindVoice : kMutedVoices);
+        playing.insert(*file);
+    };
+    follow(voicePlayer_);
+    for (const auto &[channel, player] : voice_) follow(player);
+    voiceFiles_ = std::move(playing);
+}
+
 void Engine::applySettings() {
     int master = setting("mute_master") ? 0 : setting("master");
     auto loud = [&](const char *name, const std::string &mute) { return setting(mute) ? 0 : setting(name) * master / 100; };
@@ -896,6 +914,8 @@ void Engine::applySettings() {
     audio_.setGroupVolume(1, loud("se", "mute_se"));
     audio_.setGroupVolume(2, loud("voice", "mute_voice"));
     audio_.setGroupVolume(3, setting("music") * master / 100);
+    audio_.setGroupVolume(kMutedVoices, 0);
+    applyVoiceChoices();
     static const int kCharMs[] = {40, 20, 8, 0};
     charMs_ = kCharMs[std::clamp(setting("text"), 0, 3)];
     static const int kAutoPercent[] = {200, 100, 50, 0};
@@ -2473,6 +2493,7 @@ void Engine::showText(const Node &n) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = audio_.open(data);
             if (voicePlayer_) {
+                voiceFiles_[voicePlayer_] = n.s[3];
                 audio_.setGroup(voicePlayer_, kKindVoice);
                 audio_.setLoops(voicePlayer_, 1);
                 audio_.start(voicePlayer_);
@@ -2513,6 +2534,7 @@ void Engine::playSound(const Node &n, int kind) {
     if (fade > 0) audio_.fade(player, fade, volume, false);
     audio_.start(player);
     channels[channel] = player;
+    if (kind == kKindVoice) voiceFiles_[player] = n.s[1];
     if (kind == kKindBgm) noteSeen(n.s[1]);
     if (kind == kKindBgm) bgmNow_[channel] = {n.s[1], volume, p[2]};
     if (kind == kKindSe && p[4] == 0) seNow_[channel] = {n.s[1], volume, p[2]};
