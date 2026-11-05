@@ -1108,8 +1108,11 @@ SaveData Engine::captureSave() {
         out.y = s.y;
         out.scaleX = s.scaleX;
         out.scaleY = s.scaleY;
-        out.anchorX = s.anchorX < 0 ? s.image->w / 2 : s.anchorX;
-        out.anchorY = s.anchorY < 0 ? s.image->h / 2 : s.anchorY;
+        // The anchor being drawn with, since a saved animation keeps no pivot of its own.
+        int anchorX, anchorY;
+        anchorOf(s, anchorX, anchorY);
+        out.anchorX = anchorX < 0 ? s.image->w / 2 : anchorX;
+        out.anchorY = anchorY < 0 ? s.image->h / 2 : anchorY;
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
@@ -2394,6 +2397,11 @@ void Engine::abortChange(int slot) {
         s.scaleY = v.scaleY;
         s.rotation = v.rotation;
         s.alpha = v.alpha;
+        for (const Animation &change : s.changes)
+            if (change.hasPivot) {
+                s.anchorX = change.pivotX;
+                s.anchorY = change.pivotY;
+            }
         s.changes.clear();
     }
 }
@@ -2545,6 +2553,11 @@ void Engine::foldFinishedChanges(Sprite &s) {
         s.scaleY = v.scaleY;
         s.rotation = v.rotation;
         s.alpha = v.alpha;
+        // A finished change's pivot stays with the scale it leaves behind.
+        if (s.changes.front().hasPivot) {
+            s.anchorX = s.changes.front().pivotX;
+            s.anchorY = s.changes.front().pivotY;
+        }
         s.changes.erase(s.changes.begin());
     }
 }
