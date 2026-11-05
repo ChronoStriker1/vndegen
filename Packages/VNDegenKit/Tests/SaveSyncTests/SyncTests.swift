@@ -526,6 +526,29 @@ private func lockKeepingSizeAndTime(_ url: URL, backup name: String) throws {
     try await setup.expectStoreIsWhole()
 }
 
+/// A Windows PC's Ludusavi backs up registry data beside a backup's files. VNDegen can't read or restore it, but its backups
+/// must carry it, or Ludusavi on the PC would restore the latest backup without it.
+@MainActor
+@Test func aSoloBackupsRegistryComesDownAndMovesIntoTheNextFullBackup() async throws {
+    let setup = try await Setup()
+    setup.service.manualRetention = Retention(full: 1, differential: 0)
+    var mapping = LudusaviMapping(name: setup.game, drives: ["drive-C": "C:"])
+    let save = "C:/Games/NoSocksRPG/save/file1.rmmzsave"
+    mapping.backups = [FullBackup(name: ".", when: Timestamp.epoch, os: "windows", locked: false,
+                                  files: [save: FileEntry(hash: sha1("pc"), size: 2)], registryHash: "reghash", children: [])]
+    try await setup.server.write(Data("pc".utf8), to: "\(setup.game)/drive-C/Games/NoSocksRPG/save/file1.rmmzsave")
+    try await setup.server.write(Data("Windows Registry Editor".utf8), to: "\(setup.game)/registry.reg")
+    try await setup.server.write(Data(mapping.yamlString().utf8), to: setup.mappingPath)
+    await setup.service.refresh()
+
+    try write(["file1.rmmzsave": "mine"], to: setup.locations[0])
+    let report = try await setup.service.checkedBackUp(setup.id)
+    let name = try #require(report.backup)
+    #expect(!report.isDifferential)
+    #expect(try await setup.serverMapping().backups.map(\.registryHash) == ["reghash"])
+    #expect(try await setup.server.read("\(setup.game)/\(name)/registry.reg") == Data("Windows Registry Editor".utf8))
+}
+
 extension SaveSyncService {
     /// A backup on top of what a status check just saw, as automatic backup and the game page do.
     func checkedBackUp(_ id: GameID) async throws -> BackupReport {

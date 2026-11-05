@@ -12,6 +12,8 @@ public struct LudusaviStore: Sendable {
 
     static let mappingFile = "mapping.yaml"
     static let previousMappingFile = "mapping.yaml.vndegen-previous"
+    /// A backup's registry data, in the order Ludusavi looks for them.
+    static let registryFiles = ["registry.reg", "registry.yaml"]
 
     public func mapping(_ folder: String) throws -> LudusaviMapping {
         let url = root.appendingPathComponent(folder).appendingPathComponent(Self.mappingFile)
@@ -223,6 +225,9 @@ public struct LudusaviStore: Sendable {
     /// Ludusavi's `forget_excess_backups` does. Nil infers the limits from the folder and never deletes.
     ///
     /// `device` ends the new folder's name, so two devices backing up in the same second never pick the same folder.
+    ///
+    /// Registry data from a Windows PC's backup carries forward like any other file VNDegen doesn't manage. VNDegen can't
+    /// read it, so the next backup holds what the latest one held. Ludusavi on Linux or a Mac instead records it as dropped.
     public func backUp(folder: String?, title: String, game: GameID, locations: [SaveLocation], retention: Retention?,
                        pcFolders: [Int: String] = [:], now: Date = .now, device: String? = nil, os: String, comment: String?) throws -> BackupReport {
         let local = try Self.localSaves(locations)
@@ -273,6 +278,12 @@ public struct LudusaviStore: Sendable {
         let fm = FileManager.default
         var pruned: [String] = []
         do {
+            // A differential inherits only from its full backup, so a registry an earlier differential holds comes along.
+            let previousOverride = full?.children.last?.registry
+            let registry = mapping.latestRegistry
+            if let registry, !differential || previousOverride?.hash != nil {
+                try Self.copyRegistry(registry, in: gameDir, to: backupDir)
+            }
             for (path, source) in copies {
                 guard let drive = LudusaviMapping.splitDrive(path)?.0 else { throw SaveSyncError.unsupportedPath(path) }
                 if !mapping.drives.values.contains(drive) { mapping.drives[LudusaviMapping.driveFolderName(drive)] = drive }
@@ -295,11 +306,11 @@ public struct LudusaviStore: Sendable {
             if differential {
                 mapping.backups[mapping.backups.count - 1].children.append(DifferentialBackup(
                     name: name, when: when, os: os, comment: comment, locked: false, semantics: nil, files: diffFiles,
-                    registry: full?.registryHash == nil ? nil : .init(hash: nil)))
+                    registry: previousOverride))
             } else {
                 mapping.backups.append(FullBackup(
                     name: name, when: when, os: os, comment: comment, locked: false, semantics: nil,
-                    files: copies.mapValues(\.entry), registryHash: nil, children: []))
+                    files: copies.mapValues(\.entry), registryHash: registry?.hash, children: []))
             }
             if let retention { pruned = mapping.forgetExcessBackups(retention) }
             try writeMapping(mapping, to: mappingURL, expecting: original)
@@ -311,6 +322,18 @@ public struct LudusaviStore: Sendable {
         for folder in pruned { try? fm.removeItem(at: gameDir.appendingPathComponent(folder)) }
         return BackupReport(backup: name, isDifferential: differential, filesWritten: copies.count, paths: paths.origin, pruned: pruned,
                             saves: saves)
+    }
+
+    /// Copies `registry`'s file into `backupDir` as it is. Its recorded hash can't check the copy: Ludusavi hashes its own
+    /// serialization, and that has changed between versions.
+    private static func copyRegistry(_ registry: StoredRegistry, in gameDir: URL, to backupDir: URL) throws {
+        if registry.backup.hasSuffix(".zip") { throw SaveSyncError.zipBackup(registry.backup) }
+        let folder = registry.backup == "." ? gameDir : gameDir.appendingPathComponent(registry.backup, isDirectory: true)
+        let fm = FileManager.default
+        guard let name = registryFiles.first(where: { fm.fileExists(atPath: folder.appendingPathComponent($0).path) }) else {
+            throw SaveSyncError.unreadable(folder.appendingPathComponent(registryFiles[0]).path)
+        }
+        try fm.copyItem(at: folder.appendingPathComponent(name), to: backupDir.appendingPathComponent(name))
     }
 
     /// Keeps the previous mapping.yaml beside the new one until the new one is written and reads back correctly.
