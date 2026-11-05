@@ -24,10 +24,28 @@ constexpr int kWindowSlideMs = 200;
 constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
 constexpr int kLogDim = 182;
+// Eight cards to a page and ten pages of saves, and then the Q-Save page.
+constexpr int kFirstQuickSlot = 81, kLastQuickSlot = 88;
+// cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
+constexpr size_t kCgFlagsAt = 48022, kCgFlagRow = 40, kCgFlagsPerRow = 10, kTrackFlagsAt = 100022;
 // How long Auto waits after the text and voice are done.
 constexpr int kAutoDelayMs = 1000;
 constexpr float kPi = 3.14159265f;
 constexpr float kShakeMs = 300, kShakePixelsX = 24, kShakePixelsY = 28;
+
+int field(const std::vector<std::string> &line, size_t index) { return index < line.size() ? std::atoi(line[index].c_str()) : 0; }
+bool inRect(int x, int y, int left, int top, int w, int h) { return x >= left && y >= top && x < left + w && y < top + h; }
+
+// What Config shows before the player changes anything, which is what the PC's shows.
+const std::map<std::string, int> &defaultSettings() {
+    static const std::map<std::string, int> defaults = {
+        {"master", 100}, {"bgm", 80}, {"se", 80}, {"voice", 80},
+        {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0},
+        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60},
+        {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
+    };
+    return defaults;
+}
 
 std::string trim(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
@@ -153,12 +171,12 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     shadowG_ = config_.number("MsgShadowColorG");
     shadowB_ = config_.number("MsgShadowColorB");
     // The backlog's "shadow" colour fills its letters in the PC game, and its plain colour frames them.
-    logTextR_ = config_.number("MsgLogShadowColorR", 255);
-    logTextG_ = config_.number("MsgLogShadowColorG", 128);
-    logTextB_ = config_.number("MsgLogShadowColorB");
-    logFrameR_ = config_.number("MsgLogColorR");
-    logFrameG_ = config_.number("MsgLogColorG");
-    logFrameB_ = config_.number("MsgLogColorB");
+    logFrameR_ = config_.number("MsgLogShadowColorR", 255);
+    logFrameG_ = config_.number("MsgLogShadowColorG", 128);
+    logFrameB_ = config_.number("MsgLogShadowColorB");
+    logTextR_ = config_.number("MsgLogColorR");
+    logTextG_ = config_.number("MsgLogColorG");
+    logTextB_ = config_.number("MsgLogColorB");
 
     // What a game's exe draws on its own, which no data file names.
     folder_ = normalizedPath(config_.text("UserDataDirectory"));
@@ -176,6 +194,7 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
         barY_ = {0, 618};
         // The PC game shows no dimming from its message window here, at its Config defaults and at 90.
         windowOpacity_ = 0;
+        windowAlwaysClear_ = true;
     }
 
     if (config_.number("MsgWinButtonPlateDisable") == 0) buttonPlate_ = images_->get(config_.text("MsgWinButtonPlateFilename"));
@@ -296,20 +315,34 @@ void Engine::runAction(const std::string &action) {
     if (action == "start_prologue") { storyFlowKey_ = "FirstFlow"; startStory(); return; }
     if (action == "start_main") { storyFlowKey_ = "MainFlow"; startStory(); return; }
     if (action.rfind("track", 0) == 0) {
-        size_t index = size_t(std::atoi(action.c_str() + 5));
-        if (index < tracks_.size() && seen(tracks_[index])) {
-            if (trackPlayer_) audio_.stop(trackPlayer_);
-            if (Bytes data = files_.read(tracks_[index])) {
-                trackPlayer_ = audio_.open(data);
-                if (trackPlayer_) {
-                    audio_.setGroup(trackPlayer_, 0);
-                    audio_.setLoops(trackPlayer_, 0);
-                    audio_.play(trackPlayer_);
-                }
-            }
+        playTrack(std::atoi(action.c_str() + 5));
+        return;
+    }
+    if (action == "music_stop") { stopTrack(); return; }
+    if (action == "music_pause") {
+        if (trackPlayer_) {
+            trackPaused_ = !trackPaused_;
+            audio_.pause(trackPlayer_, trackPaused_);
         }
         return;
     }
+    if (action == "music_play") {
+        if (trackPlayer_ && trackPaused_) {
+            trackPaused_ = false;
+            audio_.pause(trackPlayer_, false);
+        } else if (!trackPlayer_) {
+            playTrack(currentTrack_ < 0 ? nextTrack(1) : currentTrack_);
+        }
+        return;
+    }
+    if (action == "music_next") { playTrack(nextTrack(1)); return; }
+    if (action == "music_prev") { playTrack(nextTrack(-1)); return; }
+    if (action == "music_repeat") {
+        trackRepeat_ = !trackRepeat_;
+        if (trackPlayer_) audio_.setLoops(trackPlayer_, trackRepeat_ ? 0 : 1);
+        return;
+    }
+    if (action == "music_shuffle") { trackShuffle_ = !trackShuffle_; return; }
     if (action.rfind("tab", 0) == 0) {
         std::string keep = returnTo_;
         openScreen("config" + action.substr(3));
@@ -321,6 +354,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
+    if (action == "System") { barPinned_ = !barPinned_; return; }
     if (action == "LogMode") { openLog(); return; }
     if (action == "Voice") {
         if (!currentText_.voice.empty()) {
@@ -337,13 +371,29 @@ void Engine::runAction(const std::string &action) {
     }
     if (action == "QuickSave") {
         noteThumbnail();
-        openDialog(4, [this] { saveToSlot(0); });
+        // Each session starts at the first of the Q-Save page's cards and moves along one a save, as the PC does.
+        openDialog(4, [this] {
+            saveToSlot(nextQuickSlot_);
+            nextQuickSlot_ = nextQuickSlot_ == kLastQuickSlot ? kFirstQuickSlot : nextQuickSlot_ + 1;
+        });
         return;
     }
     if (action == "QuickLoad" || action == "quickload") {
-        if (slotInfo(0).exists) openDialog(5, [this] { loadFromSlot(0); });
+        int newest = newestQuickSlot();
+        if (newest) openDialog(5, [this, newest] { loadFromSlot(newest); });
         return;
     }
+    if (action == "cfg_defaults") {
+        settings_ = defaultSettings();
+        applySettings();
+        return;
+    }
+    if (action == "cfg_undo") {
+        settings_ = settingsWhenOpened_;
+        applySettings();
+        return;
+    }
+    if (action == "cfg_apply") { runAction("back"); return; }
     if (action == "log_close") { closeLog(); return; }
     if (action == "log_up") { scrollLog(1); return; }
     if (action == "log_down") { scrollLog(-1); return; }
@@ -351,10 +401,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "log_bottom") { scrollLog(-int(backlog_.size())); return; }
     if (action == "back") {
         viewingImage_ = false;
-        if (trackPlayer_) {
-            audio_.stop(trackPlayer_);
-            trackPlayer_ = 0;
-        }
+        stopTrack();
         saveSettings();
         if (returnTo_.empty()) closeScreen();
         else {
@@ -375,7 +422,11 @@ void Engine::runAction(const std::string &action) {
     };
     if (action == "nav_save" || action == "Save") { go("save"); return; }
     if (action == "nav_load" || action == "Load" || action == "load") { go("load"); return; }
-    if (action == "nav_config" || action == "Config" || action == "config") { go("config"); return; }
+    if (action == "nav_config" || action == "Config" || action == "config") {
+        if (!screen_ || screen_->name.rfind("config", 0) != 0) settingsWhenOpened_ = settings_;
+        go("config");
+        return;
+    }
     if (action == "nav_cg" || action == "cg") { go("cg"); return; }
     if (action == "nav_scene" || action == "scene") { go("scene"); return; }
     if (action == "nav_music" || action == "music") { go("music"); return; }
@@ -434,6 +485,15 @@ bool Engine::moveFocus(int dx, int dy) {
             for (int c = 0; sheet && c < std::atoi((*grid)[6].c_str()); c++)
                 for (int r = 0; r < std::atoi((*grid)[5].c_str()); r++) spots.push_back({x0 + c * gx + sheet->w / 2, y0 + r * gy + sheet->h / 10});
         }
+        auto addWidgets = [&](const char *kind, size_t at) {
+            for (auto [it, end] = screen_->settings.equal_range(kind); it != end; ++it) {
+                ImageRef widget = it->second.size() > at + 4 ? images_->get(it->second[at]) : nullptr;
+                if (widget) spots.push_back({field(it->second, at + 1) + widget->w / field(it->second, at + 3) / 2, field(it->second, at + 2) + widget->h / field(it->second, at + 4) / 2});
+            }
+        };
+        addWidgets("radio", 2);
+        addWidgets("check", 1);
+        addWidgets("step", 2);
         const auto *size = screen_->setting("cellsize");
         if (size && size->size() >= 2)
             for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it)
@@ -569,6 +629,42 @@ void Engine::loadGalleries() {
     }
 }
 
+// The next track the player has heard, going either way along the list, or any of them on shuffle. -1 when there's none.
+int Engine::nextTrack(int direction) {
+    std::vector<int> heard;
+    for (int i = 0; i < int(tracks_.size()); i++)
+        if (seen(tracks_[size_t(i)])) heard.push_back(i);
+    if (heard.empty()) return -1;
+    if (trackShuffle_) return heard[size_t(std::rand()) % heard.size()];
+    if (currentTrack_ < 0) return direction > 0 ? heard.front() : heard.back();
+    auto at = std::lower_bound(heard.begin(), heard.end(), currentTrack_);
+    if (direction > 0) {
+        if (at != heard.end() && *at == currentTrack_) ++at;
+        return at == heard.end() ? heard.front() : *at;
+    }
+    return at == heard.begin() ? heard.back() : *(at - 1);
+}
+
+void Engine::stopTrack() {
+    if (trackPlayer_) audio_.stop(trackPlayer_);
+    trackPlayer_ = 0;
+    trackPaused_ = false;
+}
+
+void Engine::playTrack(int index) {
+    if (index < 0 || size_t(index) >= tracks_.size() || !seen(tracks_[size_t(index)])) return;
+    stopTrack();
+    Bytes data = files_.read(tracks_[size_t(index)]);
+    if (!data) return;
+    trackPlayer_ = audio_.open(data);
+    if (!trackPlayer_) return;
+    currentTrack_ = index;
+    // Its own group, for the music screen's own volume.
+    audio_.setGroup(trackPlayer_, 3);
+    audio_.setLoops(trackPlayer_, trackRepeat_ ? 0 : 1);
+    audio_.play(trackPlayer_);
+}
+
 void Engine::noteSeen(const std::string &path) {
     if (path.empty()) return;
     std::string key = normalizedPath(path);
@@ -588,6 +684,7 @@ void Engine::saveSeen() {
     for (const auto &[path, on] : seen_)
         if (on) text += path + "\n";
     writeWhole(saveDir_ + "/vndegen_seen.txt", std::vector<uint8_t>(text.begin(), text.end()));
+    saveGlobals();
     seenChanged_ = false;
 }
 
@@ -635,6 +732,33 @@ void Engine::composeGallery(Canvas &out) {
         }
         if (unlocked)
             if (ImageRef thumb = images_->get(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
+        // A card's number, faint on a locked card in some games, and how many of a CG's pictures have been seen.
+        const auto *lockedAlpha = screen_->setting("celllocked");
+        float faint = unlocked || !lockedAlpha ? 1 : float(field(*lockedAlpha, 0)) / 100;
+        if (const auto *label = screen_->setting("celllabel"); label && label->size() >= 3)
+            if (ImageRef no = images_->get((*label)[0])) drawPart(out, *no, cx + field(*label, 1), cy + field(*label, 2), 0, 0, no->w, no->h, faint);
+        if (const auto *digits = screen_->setting("celldigits"); digits && digits->size() >= 5)
+            if (ImageRef sheetOfTen = images_->get((*digits)[0])) {
+                int w = sheetOfTen->w / 10, count = field(*digits, 3), step = field(*digits, 4), value = int(entry) + 1;
+                for (int i = count - 1; i >= 0; i--, value /= 10)
+                    drawPart(out, *sheetOfTen, cx + field(*digits, 1) + i * step, cy + field(*digits, 2), value % 10 * w, 0, w, sheetOfTen->h, faint);
+            }
+        const auto *counts = screen_->setting("cellcount");
+        if (unlocked && counts && counts->size() >= 6 && screen_->name == "cg") {
+            ImageRef sheetOfTen = images_->get((*counts)[0]), slash = images_->get((*counts)[1]);
+            const auto &pictures = entries[entry].images;
+            int have = int(std::count_if(pictures.begin(), pictures.end(), [&](const std::string &p) { return seen(p); })), all = int(pictures.size());
+            if (sheetOfTen && slash) {
+                int w = sheetOfTen->w / 10, x = cx + field(*counts, 2), y = cy + field(*counts, 3);
+                auto two = [&](int value, int at) {
+                    drawPart(out, *sheetOfTen, at, y, value / 10 % 10 * w, 0, w, sheetOfTen->h, 1);
+                    drawPart(out, *sheetOfTen, at + w, y, value % 10 * w, 0, w, sheetOfTen->h, 1);
+                };
+                two(have, x);
+                drawPart(out, *slash, cx + field(*counts, 4), y - 1, 0, 0, slash->w, slash->h, 1);
+                two(all, cx + field(*counts, 5));
+            }
+        }
     }
 }
 
@@ -672,77 +796,119 @@ void Engine::openGalleryCell(int index) {
 
 // MARK: Settings
 
-void Engine::applyVolumes() {
-    audio_.setGroupVolume(0, bgmVolume_ * masterVolume_ / 100);
-    audio_.setGroupVolume(1, seVolume_ * masterVolume_ / 100);
-    audio_.setGroupVolume(2, voiceVolume_ * masterVolume_ / 100);
-    charMs_ = textSpeed_ == 0 ? 40 : textSpeed_ == 1 ? 20 : textSpeed_ == 2 ? 8 : 0;
+int Engine::setting(const std::string &name) const {
+    auto it = settings_.find(name);
+    return it == settings_.end() ? 0 : it->second;
+}
+
+void Engine::applySettings() {
+    int master = setting("mute_master") ? 0 : setting("master");
+    auto loud = [&](const char *name, const std::string &mute) { return setting(mute) ? 0 : setting(name) * master / 100; };
+    audio_.setGroupVolume(0, loud("bgm", "mute_bgm"));
+    audio_.setGroupVolume(1, loud("se", "mute_se"));
+    audio_.setGroupVolume(2, loud("voice", "mute_voice"));
+    audio_.setGroupVolume(3, setting("music") * master / 100);
+    static const int kCharMs[] = {40, 20, 8, 0};
+    charMs_ = kCharMs[std::clamp(setting("text"), 0, 3)];
+    static const int kAutoPercent[] = {200, 100, 50, 0};
+    autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
+    if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
 }
 
 void Engine::loadSettings() {
+    settings_ = defaultSettings();
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_settings.txt");
-        f >> masterVolume_ >> bgmVolume_ >> seVolume_ >> voiceVolume_ >> textSpeed_;
+        std::string name;
+        int value;
+        while (f >> name >> value)
+            if (settings_.count(name)) settings_[name] = value;
     }
-    applyVolumes();
+    applySettings();
 }
 
 void Engine::saveSettings() {
     if (saveDir_.empty() || !makeFolders(saveDir_)) return;
-    std::string text = std::to_string(masterVolume_) + " " + std::to_string(bgmVolume_) + " " + std::to_string(seVolume_) + " " + std::to_string(voiceVolume_) + " " + std::to_string(textSpeed_) + "\n";
+    std::string text;
+    for (const auto &[name, value] : settings_) text += name + " " + std::to_string(value) + "\n";
     writeWhole(saveDir_ + "/vndegen_settings.txt", std::vector<uint8_t>(text.begin(), text.end()));
 }
 
-// Table lines: `slider NAME FILLPATH X Y` and `radio NAME VALUE PATH X Y COLS ROWS COL`.
-void Engine::composeSettingsWidgets(Canvas &out) {
-    auto value = [&](const std::string &name) {
-        return name == "master" ? masterVolume_ : name == "bgm" ? bgmVolume_ : name == "se" ? seVolume_ : name == "voice" ? voiceVolume_ : name == "text" ? textSpeed_ : 0;
-    };
-    for (auto it = screen_->settings.lower_bound("slider"); it != screen_->settings.upper_bound("slider"); ++it) {
-        const auto &f = it->second;
-        if (f.size() < 4) continue;
-        ImageRef fill = images_->get(f[1]);
-        if (fill) drawPart(out, *fill, std::atoi(f[2].c_str()), std::atoi(f[3].c_str()), 0, 0, fill->w * value(f[0]) / 100, fill->h, 1);
-    }
-    for (auto it = screen_->settings.lower_bound("radio"); it != screen_->settings.upper_bound("radio"); ++it) {
-        const auto &f = it->second;
-        if (f.size() < 8) continue;
-        ImageRef sheet = images_->get(f[2]);
-        if (!sheet) continue;
-        int cols = std::atoi(f[5].c_str()), rows = std::atoi(f[6].c_str()), col = std::atoi(f[7].c_str()), w = sheet->w / cols, h = sheet->h / rows;
-        bool on = value(f[0]) == std::atoi(f[1].c_str());
-        drawPart(out, *sheet, std::atoi(f[3].c_str()), std::atoi(f[4].c_str()), col * w, (on ? 2 : 0) * h, w, h, 1);
-    }
+void Engine::changeSetting(const std::string &name, int value) {
+    settings_[name] = value;
+    applySettings();
+    dirty_ = true;
 }
 
-bool Engine::pressSettingsWidget(int x, int y, bool) {
-    auto set = [&](const std::string &name, int v) {
-        (name == "master" ? masterVolume_ : name == "bgm" ? bgmVolume_ : name == "se" ? seVolume_ : name == "voice" ? voiceVolume_ : textSpeed_) = v;
-        applyVolumes();
-        saveSettings();
-        dirty_ = true;
+// Table lines: `slider NAME FILL X Y`, `number NAME DIGITS X Y`, `bar FILL X Y PERCENT` for one that can't change,
+// `radio NAME VALUE SHEET X Y COLS ROWS COL`, `check NAME SHEET X Y COLS ROWS COL` and `step NAME DELTA SHEET X Y COLS ROWS COL`.
+// Sheets run normal, hover, selected, selected and hovered, as the PC's do.
+void Engine::composeSettingsWidgets(Canvas &out) {
+    auto lines = [&](const char *kind) { return screen_->settings.equal_range(kind); };
+    auto cell = [&](const std::vector<std::string> &f, size_t at, bool on) {
+        ImageRef sheet = images_->get(f[at]);
+        if (!sheet) return;
+        int x = field(f, at + 1), y = field(f, at + 2), w = sheet->w / field(f, at + 3), h = sheet->h / field(f, at + 4);
+        bool over = pointerSeen_ && !dialogOpen_ && inRect(pointerX_, pointerY_, x, y, w, h);
+        drawPart(out, *sheet, x, y, field(f, at + 5) * w, (on ? 2 : 0) * h + (over ? h : 0), w, h, 1);
     };
-    for (auto it = screen_->settings.lower_bound("slider"); it != screen_->settings.upper_bound("slider"); ++it) {
+    for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
-        if (f.size() < 4) continue;
-        ImageRef fill = images_->get(f[1]);
-        int sx = std::atoi(f[2].c_str()), sy = std::atoi(f[3].c_str());
-        if (fill && x >= sx && x < sx + fill->w && y >= sy && y < sy + fill->h) {
-            set(f[0], std::clamp((x - sx) * 100 / std::max(1, fill->w), 0, 100));
+        if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
+            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, fill->w * setting(f[0]) / 100, fill->h, 1);
+    }
+    for (auto [it, end] = lines("bar"); it != end; ++it) {
+        const auto &f = it->second;
+        if (ImageRef fill = f.size() >= 4 ? images_->get(f[0]) : nullptr)
+            drawPart(out, *fill, field(f, 1), field(f, 2), 0, 0, fill->w * field(f, 3) / 100, fill->h, 1);
+    }
+    for (auto [it, end] = lines("number"); it != end; ++it) {
+        const auto &f = it->second;
+        ImageRef digits = f.size() >= 4 ? images_->get(f[1]) : nullptr;
+        if (!digits) continue;
+        int w = digits->w / 10, value = setting(f[0]);
+        for (int i = 2; i >= 0; i--, value /= 10) drawPart(out, *digits, field(f, 2) + i * w, field(f, 3), value % 10 * w, 0, w, digits->h, 1);
+    }
+    for (auto [it, end] = lines("radio"); it != end; ++it)
+        if (it->second.size() >= 8) cell(it->second, 2, setting(it->second[0]) == field(it->second, 1));
+    for (auto [it, end] = lines("check"); it != end; ++it)
+        if (it->second.size() >= 7) cell(it->second, 1, setting(it->second[0]) != 0);
+    for (auto [it, end] = lines("step"); it != end; ++it)
+        if (it->second.size() >= 8) cell(it->second, 2, false);
+}
+
+bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
+    auto lines = [&](const char *kind) { return screen_->settings.equal_range(kind); };
+    auto within = [&](const std::vector<std::string> &f, size_t at) {
+        ImageRef sheet = images_->get(f[at]);
+        return sheet && inRect(x, y, field(f, at + 1), field(f, at + 2), sheet->w / field(f, at + 3), sheet->h / field(f, at + 4));
+    };
+    for (auto [it, end] = lines("slider"); it != end; ++it) {
+        const auto &f = it->second;
+        ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr;
+        // A held press keeps following the finger along the bar, past its ends.
+        int left = field(f, 2), top = field(f, 3);
+        if (fill && y >= top && y < top + fill->h && x >= left - (dragging ? 40 : 0) && x < left + fill->w + (dragging ? 40 : 0)) {
+            changeSetting(f[0], std::clamp((x - left) * 100 / std::max(1, fill->w - 1), 0, 100));
             return true;
         }
     }
-    for (auto it = screen_->settings.lower_bound("radio"); it != screen_->settings.upper_bound("radio"); ++it) {
-        const auto &f = it->second;
-        if (f.size() < 8) continue;
-        ImageRef sheet = images_->get(f[2]);
-        if (!sheet) continue;
-        int w = sheet->w / std::atoi(f[5].c_str()), h = sheet->h / std::atoi(f[6].c_str()), rx = std::atoi(f[3].c_str()), ry = std::atoi(f[4].c_str());
-        if (x >= rx && y >= ry && x < rx + w && y < ry + h) {
-            set(f[0], std::atoi(f[1].c_str()));
+    if (dragging) return false;
+    for (auto [it, end] = lines("radio"); it != end; ++it)
+        if (it->second.size() >= 8 && within(it->second, 2)) {
+            changeSetting(it->second[0], field(it->second, 1));
             return true;
         }
-    }
+    for (auto [it, end] = lines("check"); it != end; ++it)
+        if (it->second.size() >= 7 && within(it->second, 1)) {
+            changeSetting(it->second[0], setting(it->second[0]) ? 0 : 1);
+            return true;
+        }
+    for (auto [it, end] = lines("step"); it != end; ++it)
+        if (it->second.size() >= 8 && within(it->second, 2)) {
+            changeSetting(it->second[0], std::clamp(setting(it->second[0]) + field(it->second, 1), 0, 100));
+            return true;
+        }
     return false;
 }
 
@@ -764,6 +930,17 @@ void Engine::loadGlobals() {
         std::memcpy(&v, &configFile_[4000 + size_t(i) * 4], 4);
         if (v) globals_[i] = v;
     }
+    // A PC's backup carries what's been unlocked there, which the galleries show here too.
+    auto flag = [&](size_t at) {
+        int32_t v = 0;
+        if (at + 4 <= configFile_.size()) std::memcpy(&v, &configFile_[at], 4);
+        return v != 0;
+    };
+    for (size_t e = 0; e < cgEntries_.size(); e++)
+        for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
+            if (flag(kCgFlagsAt + e * kCgFlagRow + p * 4)) seen_[normalizedPath(cgEntries_[e].images[p])] = true;
+    for (size_t i = 0; i < tracks_.size(); i++)
+        if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
 }
 
 void Engine::saveGlobals() {
@@ -775,6 +952,15 @@ void Engine::saveGlobals() {
         int32_t v = it == globals_.end() ? 0 : it->second;
         std::memcpy(&configFile_[4000 + size_t(i) * 4], &v, 4);
     }
+    auto setFlag = [&](size_t at) {
+        const int32_t on = 1;
+        if (at + 4 <= configFile_.size()) std::memcpy(&configFile_[at], &on, 4);
+    };
+    for (size_t e = 0; e < cgEntries_.size(); e++)
+        for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
+            if (seen(cgEntries_[e].images[p])) setFlag(kCgFlagsAt + e * kCgFlagRow + p * 4);
+    for (size_t i = 0; i < tracks_.size(); i++)
+        if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
     auto packed = packEntry(configFile_);
     if (!packed.empty()) writeWhole(saveDir_ + "/cfg.sav", packed);
 }
@@ -910,6 +1096,27 @@ bool Engine::saveToSlot(int slot) {
     return true;
 }
 
+int Engine::newestQuickSlot() {
+    int newest = 0;
+    const int *newestDate = nullptr;
+    for (int slot = kFirstQuickSlot; slot <= kLastQuickSlot; slot++) {
+        const SlotInfo &info = slotInfo(slot);
+        if (info.exists && (!newestDate || std::lexicographical_compare(newestDate, newestDate + 6, info.date, info.date + 6))) {
+            newest = slot;
+            newestDate = info.date;
+        }
+    }
+    return newest;
+}
+
+void Engine::deleteSlot(int slot) {
+    std::remove(savePath(slot, "sav").c_str());
+    std::remove(savePath(slot, "bmp").c_str());
+    slots_.erase(slot);
+    log("deleted slot %d", slot);
+    dirty_ = true;
+}
+
 bool Engine::loadFromSlot(int slot) {
     if (!layout_) return false;
     auto packed = readWhole(savePath(slot, "sav"));
@@ -997,6 +1204,24 @@ void Engine::restoreSave(const SaveData &d) {
 
 // The table's `slots` line: the sheet, then x, y, the step across and down, and rows per column. The `slot*` lines give
 // where each part sits within a card.
+// Where a slot's card sits on the current page.
+bool Engine::cardAt(int slot, int &x, int &y) const {
+    const auto *grid = screen_ ? screen_->setting("slots") : nullptr;
+    if (!grid || grid->size() < 7 || slot < 1) return false;
+    int perColumn = field(*grid, 5), columns = field(*grid, 6), index = (slot - 1) % (perColumn * columns);
+    x = field(*grid, 1) + index / perColumn * field(*grid, 3);
+    y = field(*grid, 2) + index % perColumn * field(*grid, 4);
+    return true;
+}
+
+bool Engine::overCardDelete(int slot, int x, int y) const {
+    const auto *line = screen_ ? screen_->setting("slotdelete") : nullptr;
+    int cx, cy;
+    if (!line || line->size() < 3 || !cardAt(slot, cx, cy)) return false;
+    ImageRef button = images_->get((*line)[0]);
+    return button && inRect(x, y, cx + field(*line, 1), cy + field(*line, 2), button->w, button->h / 5);
+}
+
 int Engine::slotAt(int x, int y) const {
     const auto *grid = screen_ ? screen_->setting("slots") : nullptr;
     if (!grid || grid->size() < 7) return -1;
@@ -1048,7 +1273,19 @@ void Engine::composeSlots(Canvas &out) {
             int row = loading && !info.exists ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
             drawPart(out, *sheet, cx, cy, 0, row * cardH, sheet->w, cardH, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
-            drawNumber(digits, slot, 2, cx + offset("slotdigits", 1), cy + offset("slotdigits", 2));
+            // The Q-Save page numbers its cards from 1 again.
+            drawNumber(digits, slot >= kFirstQuickSlot ? slot - kFirstQuickSlot + 1 : slot, 2, cx + offset("slotdigits", 1), cy + offset("slotdigits", 2));
+            if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
+                // The PC keeps a card's lock somewhere its save files don't show, so it stays off here.
+                int h = lock->h / 5;
+                drawPart(out, *lock, cx + offset("slotlock", 1), cy + offset("slotlock", 2), 0, int(StateDisabled) * h, lock->w, h, 1);
+            }
+            if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
+                int h = del->h / 5;
+                bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
+                int shown = !info.exists ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
+                drawPart(out, *del, cx + offset("slotdelete", 1), cy + offset("slotdelete", 2), 0, shown * h, del->w, h, 1);
+            }
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m) {
@@ -1068,12 +1305,31 @@ void Engine::composeSlots(Canvas &out) {
                 x = drawNumber(dateDigits, info.date[4], 2, x, y);
                 mark(colon);
                 x = drawNumber(dateDigits, info.date[5], 2, x, y);
+            } else if (dash && dateDigits) {
+                int w = dateDigits->w / 10;
+                auto dashes = [&](int count) {
+                    for (int i = 0; i < count; i++) drawPart(out, *dash, x + i * w, y, 0, 0, dash->w, dash->h, 1);
+                    x += count * w;
+                };
+                dashes(4);
+                mark(slash);
+                dashes(2);
+                mark(slash);
+                dashes(2);
+                x += offset("dategap", 0);
+                dashes(2);
+                mark(colon);
+                dashes(2);
+                mark(colon);
+                dashes(2);
             }
         }
 }
 
 void Engine::openDialog(int question, const std::function<void()> &yes) {
-    if (!screens_.count("dialog")) {
+    // The questions in the order of the game's sheet of them, and the Config setting that turns each off.
+    static const char *const kConfirmSetting[] = {"confirm_saveload", "confirm_saveload", "confirm_overwrite", "confirm_delete", "confirm_quick", "confirm_quick", "confirm_title", "confirm_exit"};
+    if (!screens_.count("dialog") || !setting(kConfirmSetting[question])) {
         yes();
         return;
     }
@@ -1118,7 +1374,7 @@ void Engine::composeScreen(Canvas &out) {
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
-    if (screen_->settings.count("slider") || screen_->settings.count("radio")) composeSettingsWidgets(out);
+    composeSettingsWidgets(out);
     bool fromTitle = returnTo_ == "title";
     for (Button &b : screen_->buttons) {
         if (b.action.rfind("track", 0) == 0) {
@@ -1127,8 +1383,16 @@ void Engine::composeScreen(Canvas &out) {
         }
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
-        if (b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_)) state = over ? StateSelectedHover : StateSelected;
+        bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) ||
+                       (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
+        if (current) state = over ? StateSelectedHover : StateSelected;
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
+        if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
+        if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
+        bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
+                       (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_);
+        if (musicOn) state = over ? StateSelectedHover : StateSelected;
+        if (b.action == "music_pause" && !trackPlayer_) state = StateDisabled;
         drawButton(out, b, state);
     }
     if (dialogOpen_) composeDialog(out);
@@ -1137,7 +1401,7 @@ void Engine::composeScreen(Canvas &out) {
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
-    return pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0);
+    return barPinned_ || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
 bool Engine::underButtonsShown() const {
@@ -1147,7 +1411,8 @@ bool Engine::underButtonsShown() const {
 void Engine::composeMessageButtons(Canvas &out) {
     auto state = [&](const Button &b) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
-        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_);
+        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_);
+        if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     if (innerButtonsShown())
@@ -1159,9 +1424,25 @@ void Engine::composeMessageButtons(Canvas &out) {
 
 // The backlog: the story's frame, dimmed, with a page of the last lines, oldest at the top.
 void Engine::composeLog(Canvas &out) {
-    tintFrame(out, 0, 0, 0, kLogDim);
     const Screen *log = screens_.count("log") ? &screens_.at("log") : nullptr;
+    const auto *dim = log ? log->setting("dim") : nullptr;
+    tintFrame(out, 0, 0, 0, dim ? field(*dim, 0) : kLogDim);
     if (!log) return;
+    for (const Picture &p : log->pictures) drawPicture(out, p);
+    // `scroll TOP MIDDLE BOTTOM X Y HEIGHT`, a thumb in three parts, which sits at the bottom on the newest lines.
+    if (const auto *scroll = log->setting("scroll"); scroll && scroll->size() >= 6 && !backlog_.empty()) {
+        ImageRef top = images_->get((*scroll)[0]), middle = images_->get((*scroll)[1]), bottom = images_->get((*scroll)[2]);
+        if (top && middle && bottom) {
+            int x = field(*scroll, 3), trackY = field(*scroll, 4), trackH = field(*scroll, 5), total = int(backlog_.size());
+            const auto *rows = log->setting("rows");
+            int shown = std::min(rows ? field(*rows, 4) : 1, total);
+            int thumbH = std::max(top->h + bottom->h, trackH * shown / total);
+            int y = trackY + (trackH - thumbH) * (total - shown - std::min(logTop_, total - shown)) / std::max(1, total - shown);
+            drawPart(out, *top, x, y, 0, 0, top->w, top->h, 1);
+            for (int my = y + top->h; my < y + thumbH - bottom->h; my += middle->h) drawPart(out, *middle, x, my, 0, 0, middle->w, std::min(middle->h, y + thumbH - bottom->h - my), 1);
+            drawPart(out, *bottom, x, y + thumbH - bottom->h, 0, 0, bottom->w, bottom->h, 1);
+        }
+    }
     for (const Button &b : log->buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
     const auto *rows = log->setting("rows");
     if (!rows || rows->size() < 7) return;
@@ -1178,7 +1459,9 @@ void Engine::composeLog(Canvas &out) {
         std::string text = sjis::toUtf8(t.text);
         std::string name = sjis::toUtf8(t.name);
         std::vector<Glyph> glyphs;
-        layoutRun(name, nameY_ == textY_ ? textX - (textX_ - nameX_) : textX, y + textY + ascent, nameY_ == textY_, glyphs);
+        // A name beside the text hangs to its left, and one above sits as far above it as in the message window.
+        bool beside = nameY_ == textY_;
+        layoutRun(name, beside ? textX - (textX_ - nameX_) : textX, y + textY + ascent + (beside ? 0 : nameY_ - textY_), beside, glyphs);
         drawGlyphs(out, glyphs, logTextR_, logTextG_, logTextB_, logFrameR_, logFrameG_, logFrameB_);
         glyphs.clear();
         layoutRun(text, textX, y + textY + ascent, false, glyphs);
@@ -1552,7 +1835,7 @@ bool Engine::step(int ms) {
     if (autoMode_ && waiting_ == Waiting::Click && textDone_) {
         bool voiceGoing = voicePlayer_ && audio_.playing(voicePlayer_);
         if (voiceGoing) autoReadyAt_ = -1;
-        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + kAutoDelayMs;
+        else if (autoReadyAt_ < 0) autoReadyAt_ = now_ + autoDelayMs_;
         else if (now_ >= autoReadyAt_) autoNext = true;
     } else {
         autoReadyAt_ = -1;
@@ -1577,6 +1860,10 @@ bool Engine::step(int ms) {
     prefetchAhead();
     innerWereShown_ = innerButtonsShown();
     underWereShown_ = underButtonsShown();
+    if (trackPlayer_ && !trackPaused_ && !audio_.playing(trackPlayer_)) {
+        playTrack(nextTrack(1));
+        dirty_ = true;
+    }
 
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set) foldFinishedChanges(s);
@@ -1599,9 +1886,11 @@ void Engine::mouseMove(float x, float y) {
     pointerX_ = px;
     pointerY_ = py;
     pointerSeen_ = true;
+    if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) pressSettingsWidget(px, py, true);
 }
 
 void Engine::mouseButton(int button, bool down) {
+    if (button == 0) leftHeld_ = down;
     if (!down) return;
     if (button == 1) {
         // The right button steps back: out of the log or a menu, else hides or shows the window.
@@ -1613,9 +1902,12 @@ void Engine::mouseButton(int button, bool down) {
             closeLog();
         } else if (screen_) {
             if (screen_->name != "title") runAction("back");
-        } else if (windowShown_) {
+        } else if (windowHiddenByPlayer_ || (windowShown_ && setting("rightclick") == 0)) {
             windowHiddenByPlayer_ = !windowHiddenByPlayer_;
             dirty_ = true;
+        } else if (windowShown_) {
+            static const char *const kRightClick[] = {"HideWin", "Skip", "Config", "Save", "Load"};
+            runAction(kRightClick[std::clamp(setting("rightclick"), 0, 4)]);
         }
         return;
     }
@@ -1666,6 +1958,10 @@ void Engine::mouseButton(int button, bool down) {
         }
         int slot = slotAt(pointerX_, pointerY_);
         if (slot < 0) return;
+        if (overCardDelete(slot, pointerX_, pointerY_)) {
+            if (slotInfo(slot).exists) openDialog(3, [this, slot] { deleteSlot(slot); });
+            return;
+        }
         if (screen_->name == "save") {
             bool overwrite = slotInfo(slot).exists;
             openDialog(overwrite ? 2 : 0, [this, slot] { saveToSlot(slot); dirty_ = true; });

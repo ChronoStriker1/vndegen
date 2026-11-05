@@ -128,6 +128,12 @@ private:
     std::string savePath(int slot, const char *extension) const;
     bool saveToSlot(int slot);
     bool loadFromSlot(int slot);
+    void deleteSlot(int slot);
+    bool cardAt(int slot, int &x, int &y) const;
+    bool overCardDelete(int slot, int x, int y) const;
+    int newestQuickSlot();
+    int nextQuickSlot_ = 81;
+    bool barPinned_ = false;
     SaveData captureSave();
     void restoreSave(const SaveData &data);
     void noteThumbnail();
@@ -147,6 +153,11 @@ private:
     void noteSeen(const std::string &path);
     bool seen(const std::string &path) const;
     void saveSeen();
+    int nextTrack(int direction);
+    void playTrack(int index);
+    void stopTrack();
+    int currentTrack_ = -1;
+    bool trackPaused_ = false, trackRepeat_ = false, trackShuffle_ = false;
     void composeGallery(Canvas &out);
     int galleryCellAt(int x, int y) const;
     void openGalleryCell(int index);
@@ -165,14 +176,18 @@ private:
     bool replaying_ = false;
     int trackPlayer_ = 0;
 
-    // Settings: volumes out of 100, kept in a small file of VNDegen's beside the saves.
+    // Settings, by the names the menu tables use, kept in a small file of VNDegen's beside the saves.
     void loadSettings();
     void saveSettings();
-    void applyVolumes();
-    int masterVolume_ = 100, bgmVolume_ = 80, seVolume_ = 80, voiceVolume_ = 80;
-    int textSpeed_ = 1;
+    void applySettings();
+    int setting(const std::string &name) const;
+    void changeSetting(const std::string &name, int value);
+    std::map<std::string, int> settings_, settingsWhenOpened_;
     void composeSettingsWidgets(Canvas &out);
     bool pressSettingsWidget(int x, int y, bool dragging);
+    bool leftHeld_ = false;
+    int autoDelayMs_ = 0;
+    bool windowAlwaysClear_ = false;
 
     std::vector<int> globalMacros_, scenarioMacros_;
     std::string storyFlowKey_ = "FirstFlow";
