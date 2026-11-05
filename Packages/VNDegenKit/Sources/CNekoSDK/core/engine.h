@@ -402,6 +402,7 @@ private:
     };
     std::map<int, Playing> bgmNow_, seNow_;
     bool dialogOpen_ = false;
+    std::string dialogOpener_;  // the action of the menu button whose question is open
     int dialogQuestion_ = 0, dialogHover_ = -1;
     std::function<void()> dialogYes_;
 

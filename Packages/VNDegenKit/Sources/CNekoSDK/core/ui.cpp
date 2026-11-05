@@ -45,12 +45,12 @@ void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
     drawPart(out, *p.image, p.x, p.y, p.column * w, p.row * h, w, h, p.alpha);
 }
 
-void drawButton(Canvas &out, const Button &b, ButtonState state) {
+void drawButton(Canvas &out, const Button &b, ButtonState state, bool withHelp) {
     if (!b.sheet) return;
     int row = state == StateNormal ? b.normalRow : state == StateHover ? b.hoverRow : int(state);
     row = std::min(row, b.rows - 1);
     drawPart(out, *b.sheet, b.x, b.y, b.column * b.cellW(), row * b.cellH(), b.cellW(), b.cellH(), 1);
-    if (state == StateHover || state == StateSelectedHover) {
+    if (withHelp || state == StateHover || state == StateSelectedHover) {
         if (b.help) {
             int w = b.help->w / b.helpCols, h = b.help->h / b.helpRows;
             drawPart(out, *b.help, b.helpX, b.helpY, b.helpColumn * w, b.helpRow * h, w, h, 1);

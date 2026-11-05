@@ -43,7 +43,8 @@ struct Picture {
 
 // `towardX` and `towardY` are where the pointer is, from -1 at the screen's left or top edge to 1 at the other.
 void drawPicture(Canvas &out, const Picture &p, float towardX = 0, float towardY = 0);
-void drawButton(Canvas &out, const Button &b, ButtonState state);
+// `withHelp` shows the button's help whatever its state, as for the button whose question is open.
+void drawButton(Canvas &out, const Button &b, ButtonState state, bool withHelp = false);
 
 // A menu screen from a game's table: pictures and buttons, drawn in order, and where the screen's own parts go.
 struct Screen {

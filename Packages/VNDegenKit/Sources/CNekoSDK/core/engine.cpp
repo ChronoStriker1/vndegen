@@ -1751,7 +1751,9 @@ void Engine::openDialog(int question, const std::function<void()> &yes) {
 // The table's dialog screen: a band, one row of a sheet of questions, and yes and no.
 void Engine::composeDialog(Canvas &out) {
     const Screen &dialog = screens_.at("dialog");
-    tintFrame(out, 0, 0, 0, 128);
+    // `dim N` of 256 darkens what's behind; Test Game 84's questions don't.
+    const auto *dim = dialog.setting("dim");
+    tintFrame(out, 0, 0, 0, dim && !dim->empty() ? field(*dim, 0) : 128);
     // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, and fixed art besides.
     int question = 0;
     bool separate = dialog.settings.count("question") != 0;
@@ -1897,6 +1899,11 @@ void Engine::composeScreen(Canvas &out) {
         bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
                        (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
+        // `askerlit`: the button that asked a question stays lit, with its help, until it's answered, as in Test Game 84.
+        if (dialogOpen_ && b.action == dialogOpener_ && screen_->setting("askerlit")) {
+            drawButton(out, b, StateSelected, true);
+            continue;
+        }
         if (b.action == "music_pause" && !trackPlayer_) state = StateDisabled;
         // The current page's button sits higher in Test Game 84.
         if (const auto *lift = screen_->setting("pagelift"); lift && current && b.action.rfind("page", 0) == 0) {
@@ -2563,6 +2570,7 @@ void Engine::mouseButton(int button, bool down) {
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
             if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);
+            if (dialogOpen_) dialogOpener_ = action;
             return;
         }
         if (viewingImage_) {
