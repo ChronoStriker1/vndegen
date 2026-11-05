@@ -76,6 +76,13 @@ import VNCore
         #expect(WolfRPGLayout(scanning: root) == nil)
     }
 
+    /// Data.wolf three folders down, with no Game.exe beside it, could be anything.
+    @Test func aDeepFolderNeedsItsExe() throws {
+        let root = try folder(["Outer/Inner/sys/Data.wolf", "Outer/Inner/sys/readme.txt"])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(WolfRPGLayout(scanning: root) == nil)
+    }
+
     @Test func ignoresOtherGames() {
         #expect(WolfRPGLayout(probe(["Game.exe", "data", "data/Map001.rvdata2", "Game.ini"])) == nil)
     }

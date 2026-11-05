@@ -20,7 +20,8 @@ The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one 
 | Ren'Py | 10 | 11.6 | Shipped |
 | GameMaker | 8 | 6.2 | Not a target |
 | RPG Maker MZ | 7 | 14.6 | Shipped |
-| NScripter | 7 | 10.2 | Shipped |
+| NScripter | 5 | 3.3 | Shipped |
+| Ponscripter | 2 | 6.9 | Not detected, see `docs/nscripter.md` |
 | Unreal | 6 | 21.1 | Not a target |
 | Custom native | 5 | 38.4 | Not a target |
 | TyranoScript | 4 | 9.9 | Shipped |
@@ -32,7 +33,7 @@ The per-game data is in [engine-survey-games.tsv](engine-survey-games.tsv), one 
 | Unknown | 11 | 72.3 | |
 
 Details that matter for the shipped engines follow.
-- NScripter grows from 6 games to 13. The new ones are Tsukihime, four Umineko releases (two of them, the Question and Answer Arcs, turned out to be Ponscripter, which the runtime doesn't run, see `docs/nscripter.md`), Mizuiro (a disc image inside a zip), and Lilitales. Lilitales uses `.ns2` archives and NSLua (`system.lua`, `nslua.dll`), which the runtime supports.
+- NScripter grows from 6 games to 11. The new ones are Tsukihime, two Umineko releases, Mizuiro (a disc image inside a zip), and Lilitales. The other two Umineko releases, the Question and Answer Arcs, are Ponscripter, which the runtime doesn't run (`docs/nscripter.md`). Lilitales uses `.ns2` archives and NSLua (`system.lua`, `nslua.dll`), which the runtime supports.
 - Three TyranoScript games are Electron apps with the game in `resources/app.asar`, a web root the plugin already checks. Punishment NyanNyan is an old NW.js build with the game packed into its exe. All four are identified from Tyrano save file names (`*_tyrano_data.sav`, `*_sf.sav`), because the scripts sit inside the packed app.
 - Lust Arcanum is a Godot C# game (`GodotSharp.dll`), which the Godot plugin does not run. Train45 ships the GodotSteam extension (`libgodotsteam.windows.template_release.x86_64.dll`), which VNDegen's Godot replaces with its own `Steam` class.
 - Evenicle is a System 4 game (`Evenicle.ain`) and a test candidate for the clean-room System 4 runtime.

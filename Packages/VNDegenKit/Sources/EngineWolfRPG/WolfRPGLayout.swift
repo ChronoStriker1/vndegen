@@ -17,15 +17,23 @@ nonisolated struct WolfRPGLayout: Equatable, Sendable {
 
     /// `probe`'s game, or one three folders down, past the library's listing, such as Succubus Prison's
     /// `Succubus Prison/Succ Prison/sys` extracted with its outer folder kept. A wrapper holds little besides the game, so
-    /// its listing is short. A long one is another engine's game, which shouldn't pay for a deeper scan at each refresh.
+    /// its listing is short. A long one is another engine's game, which shouldn't pay for this at each refresh. Only a
+    /// folder holding Game.exe adds its names, so a short listing over a large game of another engine stays short.
     init?(deepening probe: FolderProbe) {
         if let layout = WolfRPGLayout(probe) {
             self = layout
-        } else if probe.entries.count <= 200 {
-            self.init(FolderProbe(scanning: probe.root, maxDepth: 4))
-        } else {
-            return nil
+            return
         }
+        guard probe.entries.count <= 200 else { return nil }
+        var entries = probe.entries
+        for folder in probe.entries where folder.split(separator: "/").count == 3 {
+            let path = probe.root.appendingPathComponent(folder).path
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
+            guard names.contains(where: { ["game.exe", "gamepro.exe"].contains($0.lowercased()) }) else { continue }
+            entries.formUnion(names.filter { !$0.hasPrefix(".") }.map { "\(folder)/\($0)" })
+        }
+        guard entries.count > probe.entries.count else { return nil }
+        self.init(FolderProbe(root: probe.root, entries: entries))
     }
 
     init?(_ probe: FolderProbe) {
