@@ -37,9 +37,12 @@ struct Picture {
     float alpha = 1;
     int tab = -1;  // a gallery's art for one of its tabs, or -1 for all of them
     int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
+    // How far, in pixels, the picture moves against the pointer when it's at the screen's edge, across and down.
+    float followX = 0, followY = 0;
 };
 
-void drawPicture(Canvas &out, const Picture &p);
+// `towardX` and `towardY` are where the pointer is, from -1 at the screen's left or top edge to 1 at the other.
+void drawPicture(Canvas &out, const Picture &p, float towardX = 0, float towardY = 0);
 void drawButton(Canvas &out, const Button &b, ButtonState state);
 
 // A menu screen from a game's table: pictures and buttons, drawn in order, and where the screen's own parts go.
@@ -55,7 +58,7 @@ struct Screen {
     }
 };
 
-// Reads a game's menu table. Lines: `screen NAME`, `pic PATH X Y [COLS ROWS COL ROW]`,
+// Reads a game's menu table. Lines: `screen NAME`, `pic PATH X Y [COLS ROWS COL ROW] [alpha N] [tab N] [stage N] [follow X Y]`,
 // `button ACTION PATH X Y COLS ROWS COL [toggle] [help PATH X Y COLS ROWS COL ROW]`, and any other line a setting of the
 // screen it's in.
 std::map<std::string, Screen> parseScreens(const char *table, Images &images, const std::function<void(const std::string &)> &warn);

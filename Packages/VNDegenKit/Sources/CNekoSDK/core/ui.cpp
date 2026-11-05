@@ -1,5 +1,6 @@
 #include "ui.h"
 
+#include <cctype>
 #include <cstdlib>
 #include <sstream>
 
@@ -34,8 +35,12 @@ bool pair(const std::string &s, int &a, int &b) {
 
 }  // namespace
 
-void drawPicture(Canvas &out, const Picture &p) {
+void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
     if (!p.image) return;
+    if (p.followX != 0 || p.followY != 0) {
+        drawShifted(out, *p.image, float(p.x) - p.followX * towardX, float(p.y) - p.followY * towardY, p.alpha);
+        return;
+    }
     int w = p.image->w / std::max(1, p.cols), h = p.image->h / std::max(1, p.rows);
     drawPart(out, *p.image, p.x, p.y, p.column * w, p.row * h, w, h, p.alpha);
 }
@@ -76,17 +81,25 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             p.image = image(w[1]);
             p.x = number(w[2]);
             p.y = number(w[3]);
-            if (w.size() >= 8) {
+            size_t at = 4;
+            if (w.size() >= 8 && (std::isdigit(uint8_t(w[4][0])) || w[4][0] == '-')) {
                 p.cols = number(w[4]);
                 p.rows = number(w[5]);
                 p.column = number(w[6]);
                 p.row = number(w[7]);
+                at = 8;
             }
-            // `alpha N` of 256, at the end of the line.
-            if (w.size() >= 6 && w[w.size() - 2] == "alpha") p.alpha = float(number(w.back())) / 256;
-            // `tab N` shows it only on that tab of a gallery.
-            if (w.size() >= 6 && w[w.size() - 2] == "tab") p.tab = number(w.back());
-            if (w.size() >= 6 && w[w.size() - 2] == "stage") p.stage = number(w.back());
+            for (; at + 1 < w.size(); at += 2) {
+                const std::string &key = w[at], &value = w[at + 1];
+                if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256
+                else if (key == "tab") p.tab = number(value);              // only on that tab of a gallery
+                else if (key == "stage") p.stage = number(value);
+                else if (key == "follow" && at + 2 < w.size()) {
+                    p.followX = std::strtof(value.c_str(), nullptr);
+                    p.followY = std::strtof(w[at + 2].c_str(), nullptr);
+                    at++;
+                }
+            }
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {
             Button b;

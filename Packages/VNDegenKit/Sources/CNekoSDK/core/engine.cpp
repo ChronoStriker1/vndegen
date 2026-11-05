@@ -1771,6 +1771,11 @@ Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
 // growing rightward, the top right downward, the bottom right leftward and the bottom left upward, with a quadratic ease
 // out, and then the stage 2 pictures and the buttons fade in. From Test Game 84 under Wine: the reveal fits 0.52 seconds
 // within 4 pixels over six launches, and the fade runs from 0.92 to 1.93 seconds.
+void Engine::pointerToward(float &x, float &y) const {
+    x = pointerSeen_ ? std::clamp(mouseX_ * 2 - 1, -1.0f, 1.0f) : 0;
+    y = pointerSeen_ ? std::clamp(mouseY_ * 2 - 1, -1.0f, 1.0f) : 0;
+}
+
 bool Engine::composeTitleOpening(Canvas &out) {
     const auto *line = screen_->setting("opening");
     if (openingFrom_ < 0 || !line || line->size() < 3) return false;
@@ -1780,11 +1785,13 @@ bool Engine::composeTitleOpening(Canvas &out) {
         openingFrom_ = -1;
         return false;
     }
+    float towardX, towardY;
+    pointerToward(towardX, towardY);
     auto layer = [&](Canvas &c, int upTo, bool buttons) {
         c.resize(out.w, out.h);
         c.clear();
         for (const Picture &p : screen_->pictures)
-            if (p.stage <= upTo) drawPicture(c, p);
+            if (p.stage <= upTo) drawPicture(c, p, towardX, towardY);
         if (buttons)
             for (Button &b : screen_->buttons) drawButton(c, b, StateNormal);
     };
@@ -1812,8 +1819,10 @@ bool Engine::composeTitleOpening(Canvas &out) {
 void Engine::composeScreen(Canvas &out) {
     if (composeTitleOpening(out)) return;
     out.clear();
+    float towardX, towardY;
+    pointerToward(towardX, towardY);
     for (const Picture &p : screen_->pictures)
-        if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p);
+        if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p, towardX, towardY);
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;

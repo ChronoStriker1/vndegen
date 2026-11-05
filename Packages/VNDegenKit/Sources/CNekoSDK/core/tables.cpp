@@ -1644,20 +1644,19 @@ const char kFunbagFantasy[] = R"(
 screen title
 opening 520 920 1010
 pic obj\b201_000.bmp 0 0 stage 1
-pic obj\b201_002.bmp -61 -41 stage 1
-pic obj\b202_002.bmp 361 -41 stage 1
-pic obj\b203_000.bmp 0 0 stage 1
+pic obj\b201_002.bmp -60 -40 stage 1 follow 1 1.5
+pic obj\b202_002.bmp 362 -40 stage 1 follow 0.625 1
 pic obj\b000_001.bmp 0 0 stage 1
 pic obj\b000_002.bmp 0 603
 pic obj\b003_000.bmp 617 408 stage 2
-button start obj\b004_000.bmp 23 120 10 5 0
-button load obj\b004_000.bmp 23 160 10 5 1
-button quickload obj\b004_000.bmp 23 200 10 5 2
-button cg obj\b004_000.bmp 23 240 10 5 3
-button scene obj\b004_000.bmp 23 280 10 5 4
-button music obj\b004_000.bmp 23 320 10 5 5
-button config obj\b004_000.bmp 23 360 10 5 6
-button quit obj\b004_000.bmp 23 559 10 5 9
+button start obj\b004_000.bmp 23 119 10 5 0 help obj\b005_000.bmp 23 86 1 1 0 0
+button load obj\b004_000.bmp 23 159 10 5 1 help obj\b005_001.bmp 23 126 1 1 0 0
+button quickload obj\b004_000.bmp 23 199 10 5 2 help obj\b005_002.bmp 23 166 1 1 0 0
+button cg obj\b004_000.bmp 23 239 10 5 3 help obj\b005_003.bmp 23 206 1 1 0 0
+button scene obj\b004_000.bmp 23 279 10 5 4 help obj\b005_004.bmp 23 246 1 1 0 0
+button music obj\b004_000.bmp 23 319 10 5 5 help obj\b005_005.bmp 23 286 1 1 0 0
+button config obj\b004_000.bmp 23 359 10 5 6 help obj\b005_006.bmp 23 326 1 1 0 0
+button quit obj\b004_000.bmp 23 559 10 5 9 help obj\b005_009.bmp 23 526 1 1 0 0
 
 screen load
 pic obj\e001_000.bmp 0 0
@@ -2036,20 +2035,20 @@ screen start
 after 0
 flow MainFlow1
 pic obj\b201_000.bmp 0 0
-pic obj\b201_002.bmp -61 -41
-pic obj\b202_002.bmp 361 -41
-pic obj\b203_000.bmp 0 0
+pic obj\b201_002.bmp -60 -40 follow 1 1.5
+pic obj\b202_002.bmp 362 -40 follow 0.625 1
 pic obj\b000_001.bmp 0 0
 pic obj\b000_002.bmp 0 603
 pic obj\b003_000.bmp 617 408
-pic obj\b004_000.bmp 23 120 10 5 0 0
-pic obj\b004_000.bmp 23 160 10 5 1 0
-pic obj\b004_000.bmp 23 200 10 5 2 0
-pic obj\b004_000.bmp 23 240 10 5 3 0
-pic obj\b004_000.bmp 23 280 10 5 4 0
-pic obj\b004_000.bmp 23 320 10 5 5 0
-pic obj\b004_000.bmp 23 360 10 5 6 0
+pic obj\b004_000.bmp 23 119 10 5 0 2
+pic obj\b004_000.bmp 23 159 10 5 1 0
+pic obj\b004_000.bmp 23 199 10 5 2 0
+pic obj\b004_000.bmp 23 239 10 5 3 0
+pic obj\b004_000.bmp 23 279 10 5 4 0
+pic obj\b004_000.bmp 23 319 10 5 5 0
+pic obj\b004_000.bmp 23 359 10 5 6 0
 pic obj\b004_000.bmp 23 559 10 5 9 0
+pic obj\b005_000.bmp 23 86
 pic obj\b010_000.bmp 243 118
 button start_prologue obj\b010_001.bmp 434 283 2 5 0
 button start_main obj\b010_001.bmp 437 362 2 5 1
