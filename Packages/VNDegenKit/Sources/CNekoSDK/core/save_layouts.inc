@@ -37,3 +37,13 @@ const SaveLayout kTsumaGibo = {
     7510, {{9, "68"}, {819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1041, "3c"}, {6668, "68"}, {7478, "ffffffff"}},
     12,  // the bytes of a text record after its strings
 };
+const SaveLayout kFunbagFantasy = {
+    -140,  // the extra bytes of this engine's sprite record over the oldest layout seen
+    {},
+    {{12, "ff00050000d002"}, {115, "803f"}, {135, "803f"}, {155, "803f"}, {175, "803f"}, {243, "803f0000803f"}, {258, "01"}},
+    {{115, "803f"}, {135, "803f"}, {155, "803f"}, {175, "803f"}, {241, "cdcc8c3fcdcc8c3f8002000068010000ff"}},
+    {{116, "ffffffff64"}},
+    96, -1, {{2, "ffffffff0000f041"}, {72, "ffffffff"}},
+    7510, {{819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1041, "3c"}, {6668, "68"}, {7478, "ffffffff"}},
+    12,  // the bytes of a text record after its strings
+};

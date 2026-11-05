@@ -1,6 +1,7 @@
 // Reads saves the PC game wrote and writes them back, to test the save reader and writer against the real thing.
 // usage: nekosave <user data folder, such as waffle\alchemy> <save file>...
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -38,6 +39,10 @@ int main(int argc, char **argv) {
             }
         std::printf("%s: flow %s #%d, scene %s #%d, %d sprites, %d log lines, %d sounds; %zu bytes, written %zu, %zu differ, first at 0x%zx\n", argv[a], data.flow.c_str(),
                     data.flowNode, data.scene.c_str(), data.node, int(data.sprites.size()), int(data.backlog.size()), int(data.sounds.size()), plain.size(), again.size(), differ, first);
+        // With NEKOSAVE_SPRITES set, each sprite's place, which is how to learn what a load command's position modes mean.
+        if (std::getenv("NEKOSAVE_SPRITES"))
+            for (const SavedSprite &sprite : data.sprites)
+                std::printf("  slot %d %s at %.1f, %.1f scale %.3f, %.3f anchor %d, %d alpha %d wave %d change %d frames [%s] end %.1f, %.1f scale %.3f\n", sprite.slot, sprite.path.c_str(), sprite.x, sprite.y, sprite.scaleX, sprite.scaleY, sprite.anchorX, sprite.anchorY, sprite.alpha, sprite.waveOn, sprite.animated, sprite.animationFrames, sprite.animation.c_str(), sprite.endX, sprite.endY, sprite.endScaleX);
         for (size_t i = first, shown = 0; first != size_t(-1) && i < std::min(plain.size(), again.size()) && shown < 12; i++)
             if (plain[i] != again[i]) {
                 std::printf("  0x%zx: PC %02x, written %02x\n", i, plain[i], again[i]);

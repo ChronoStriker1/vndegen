@@ -105,19 +105,33 @@ void Files::add(const std::string &path, Source source) {
 
 constexpr int kLooseFolderPriority = 1000;
 
+static bool isArchiveName(const std::string &low) { return low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0; }
+
 void Files::indexArchive(const std::string &file, const std::string &folder, int priority) {
     std::ifstream f(file, std::ios::binary);
     char magic[14];
-    if (!f.read(magic, 14) || std::memcmp(magic, "NEKOPACK4A", 10)) return;
-    uint32_t indexSize;
-    std::memcpy(&indexSize, magic + 10, 4);
+    if (!f.read(magic, 14) || std::memcmp(magic, "NEKOPACK4", 9)) return;
+    // An `A` archive gives its index's size. An `S` archive holds one file and goes straight into that one entry: the
+    // name's length, the name, then its place and size.
+    uint32_t field;
+    std::memcpy(&field, magic + 10, 4);
+    uint64_t indexStart, indexBytes;
+    if (magic[9] == 'A') {
+        indexStart = 14;
+        indexBytes = field;
+    } else if (magic[9] == 'S') {
+        indexStart = 10;
+        indexBytes = uint64_t(field) + 12;
+    } else {
+        return;
+    }
     // The index can't be bigger than the file, which a damaged header might claim.
     f.seekg(0, std::ios::end);
     auto fileSize = uint64_t(f.tellg());
-    if (uint64_t(indexSize) + 14 > fileSize) return;
-    std::vector<uint8_t> index(indexSize);
-    f.seekg(14);
-    if (!f.read(reinterpret_cast<char *>(index.data()), indexSize)) return;
+    if (indexBytes + indexStart > fileSize) return;
+    std::vector<uint8_t> index(indexBytes);
+    f.seekg(std::streamoff(indexStart));
+    if (!f.read(reinterpret_cast<char *>(index.data()), std::streamsize(indexBytes))) return;
     int archive = int(archives_.size());
     archives_.push_back(file);
     size_t pos = 0;
@@ -154,6 +168,9 @@ void Files::indexFolder(const std::string &dir, const std::string &prefix, int p
         if (stat(full.c_str(), &st)) continue;
         if (S_ISDIR(st.st_mode)) {
             indexFolder(full, rel, priority);
+        } else if (!prefix.empty() && isArchiveName(lower(name))) {
+            // Funbag Fantasy 3 keeps 892 more pictures in `sc` beside sc.pak, one small archive to a picture.
+            indexArchive(full, prefix, priority);
         } else {
             Source source;
             source.priority = priority;
@@ -178,7 +195,7 @@ bool Files::open(const std::string &root) {
         if (stat((root + "/" + name).c_str(), &st)) continue;
         std::string low = lower(name);
         if (S_ISDIR(st.st_mode)) found.push_back({name, low, true});
-        else if (low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0) found.push_back({name, low.substr(0, low.size() - 4), false});
+        else if (isArchiveName(low)) found.push_back({name, low.substr(0, low.size() - 4), false});
     }
     closedir(d);
     // A patch's archive and folder outrank the base archives, later patches outrank earlier ones, and a folder outranks

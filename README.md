@@ -77,7 +77,7 @@ The view button in the top bar switches between Header list, Capsule rows, and F
 | Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
 | AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |
 | AliceSoft System 4 | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe` | Mac, iPhone, iPad | [system4.md](docs/system4.md) |
-| NekoSDK (2 games so far) | `cfg.pak` beside `scr.pak` | Mac, iPhone, iPad | [engines.md](docs/engines.md#nekosdk) |
+| NekoSDK (5 games so far) | `cfg.pak` beside `scr.pak` | Mac, iPhone, iPad | [engines.md](docs/engines.md#nekosdk) |
 
 [docs/engines.md](docs/engines.md) has the exact detection rules and how each engine runs, saves, and what it can't do yet. Some RPG Maker XP, VX, and VX Ace games need the RTP, which VNDegen downloads from the RPG Maker website when you ask. [docs/engine-survey.md](docs/engine-survey.md) covers other engines and how each could be supported.
 

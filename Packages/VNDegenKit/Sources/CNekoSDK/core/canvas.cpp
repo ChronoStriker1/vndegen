@@ -142,10 +142,10 @@ void drawPart(Canvas &dst, const Image &image, int x, int y, int partX, int part
     });
 }
 
-void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha) {
+void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha, const std::vector<int> *rowShift) {
     if (alpha <= 0 || sx == 0 || sy == 0 || image.w == 0 || image.h == 0) return;
     float halfW = image.w * 0.5f, halfH = image.h * 0.5f;
-    if (radians == 0 && sx == 1 && sy == 1) {
+    if (!rowShift && radians == 0 && sx == 1 && sy == 1) {
         float left = cx - halfW, top = cy - halfH;
         if (left == std::floor(left) && top == std::floor(top)) {
             drawPart(dst, image, int(left), int(top), 0, 0, image.w, image.h, alpha);
@@ -155,7 +155,10 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
     // The screen rectangle that holds the transformed image.
     float c = std::cos(radians), s = std::sin(radians);
     float ex = std::abs(halfW * sx * c) + std::abs(halfH * sy * s), ey = std::abs(halfW * sx * s) + std::abs(halfH * sy * c);
-    int x0 = std::max(0, int(std::floor(cx - ex))), x1 = std::min(dst.w, int(std::ceil(cx + ex)) + 1);
+    int margin = 0;
+    if (rowShift)
+        for (int shift : *rowShift) margin = std::max(margin, std::abs(shift));
+    int x0 = std::max(0, int(std::floor(cx - ex)) - margin), x1 = std::min(dst.w, int(std::ceil(cx + ex)) + 1 + margin);
     int y0 = std::max(0, int(std::floor(cy - ey))), y1 = std::min(dst.h, int(std::ceil(cy + ey)) + 1);
     if (x0 >= x1 || y0 >= y1) return;
     // Each destination pixel's source position, in 16.16 fixed point, stepping along the row. Sampling points sit half
@@ -169,7 +172,7 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
     bool solid = image.opaque && a256 >= 256;
     forRows(y1 - y0, size_t(x1 - x0) * (y1 - y0), [&](int row0, int row1) {
         for (int y = y0 + row0; y < y0 + row1; y++) {
-            float rx = x0 + 0.5f - cx, ry = y + 0.5f - cy;
+            float rx = x0 + 0.5f - cx - (rowShift ? float((*rowShift)[size_t(y)]) : 0.0f), ry = y + 0.5f - cy;
             // Double precision would cost more than it gains: a row is at most a few thousand pixels of steps under 1.
             int32_t u = int32_t((rx * dux + ry * duy + halfW - 0.5f) * kOne), v = int32_t((rx * dvx + ry * dvy + halfH - 0.5f) * kOne);
             int32_t stepU = int32_t(dux * kOne), stepV = int32_t(dvx * kOne);

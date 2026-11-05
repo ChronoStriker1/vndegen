@@ -113,13 +113,23 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Placing and scaling pictures
+
+Parameter 0 of the image load command places a picture: 1 to 5 put its middle at 50, 30, 70, 10 and 90 percent of the width and halfway down, and parameters 1 and 2 add to that. 0 leaves the slot's place alone. The PC's saved sprite places, compared with the commands and the pictures' sizes in Test Games 84 and 88, match exactly, with C's division toward zero. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match. Frames from Test Game 84's PC game and the runtime then differ only by the text font.
+
+The ripple command, 98, shifts rows sideways. On PC at parameters 2, 2 and 10 a burst of screenshots fits a wave of about 10 pixels each way, 260 rows long, that takes 3.9 seconds to pass upward.
+
 ## Files
 
 A folder such as `scr` or `cfg` beside the archives outranks them. Test Game 93 keeps its English in them: the same line shows in English on PC and in Japanese from `scr.pak`. An archive named with a number, such as `cg2.pak`, adds to the folder of that name without the number, because scripts name its pictures under `cg\\`. Under Wine these games' Gothic font falls back to one narrower than the runtime's, so the PC's text there looks smaller than it would on Windows.
 
+Funbag Fantasy 3 if keeps 892 more pictures in an `sc` folder beside `sc.pak`, one to a file. Each is a `NEKOPACK4S` archive: the same entry as an `A` archive's index, with no index size before it. Its file name is the picture's name with the extension written as character codes, `97108112` for `alp`, which the runtime doesn't need since the entry names it. Its scripts name voices as `voice\\x.ogg` and, on 1,464 lines, as a bare `x`. The audio from the PC game under Wine shows both kinds play.
+
 ## GOOD Timing
 
 From Test Game 88 under Wine, its manual, and PC saves compared. `cfg` files under `gt/cfg` list groups of scripts. Opcode 153 names one and opcode 154 marks where Ejaculate lands. The save's tail holds, after the scene name: a state at byte 819 that's -1 when off, 0 in the scene and a small number inside the extra scripts; the count twice at 823; the first counted text's node at 831; the marker's node at 835; then two strings, the scene and the config. The marker's first parameter was 12 and the count started 12 text nodes before it. Saves taken with Extend on and off differ only in the time and play counters, so it isn't saved, and it stays on across a load. Pressing Ejaculate before the marker plays the `Ejaculate` script and goes on after the marker; pressing it in the extra scripts goes straight there, because that save's backlog has no line of the script.
+
+A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the middle field of its line: every flag set in three PC games' files is such a number, and those numbers don't track the entries, so a flag is 4 bytes at 48000 plus that number times 4. A sprite record holds a ripple at 0x1A6 before the layout's adjustment, a byte that's 1 when on and three ints, the command's parameters 1, 2 and 3.
 
 A flipbook's sprite record has 0 in its second byte and its current picture where other records have 0. A splash's record has no picture and 35 more bytes. Test Game 88's text records are 4 bytes shorter than Test Game 97's.
 

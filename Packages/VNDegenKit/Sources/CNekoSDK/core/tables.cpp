@@ -1634,11 +1634,450 @@ run 2160 1 1
 
 }  // namespace
 
+const char kFunbagFantasy[] = R"(
+screen title
+pic obj\b201_000.bmp 0 0
+pic obj\b201_002.bmp -61 -41
+pic obj\b202_002.bmp 361 -41
+pic obj\b203_000.bmp 0 0
+pic obj\b000_001.bmp 0 0
+pic obj\b000_002.bmp 0 603
+pic obj\b003_000.bmp 617 408
+button start obj\b004_000.bmp 23 120 10 5 0
+button load obj\b004_000.bmp 23 160 10 5 1
+button quickload obj\b004_000.bmp 23 200 10 5 2
+button cg obj\b004_000.bmp 23 240 10 5 3
+button scene obj\b004_000.bmp 23 280 10 5 4
+button music obj\b004_000.bmp 23 320 10 5 5
+button config obj\b004_000.bmp 23 360 10 5 6
+button quit obj\b004_000.bmp 23 559 10 5 9
+
+screen load
+pic obj\e001_000.bmp 0 0
+slots obj\e002_000.bmp 44 93 162 140 4 5 1 20
+slotrows 1
+slotthumb 9 20
+slotempty obj\d004_000.bmp 50 52
+slotframe obj\d021_000.bmp 7 18
+slotdigits obj\d005_000.bmp 15 6 3
+datedigits obj\d008_000.bmp 68 107 12
+slotlock obj\d006_000.bmp 10 101
+slotdelete obj\d007_000.bmp 28 106
+dategap 2
+slotquick obj\d010_000.bmp
+pagelift 8
+button page0 obj\d009_000.bmp 470 661 11 5 0
+button page1 obj\d009_000.bmp 509 661 11 5 1
+button page2 obj\d009_000.bmp 548 661 11 5 2
+button page3 obj\d009_000.bmp 587 661 11 5 3
+button page4 obj\d009_000.bmp 626 661 11 5 4
+button page5 obj\d009_000.bmp 665 661 11 5 5
+button page6 obj\d009_000.bmp 704 661 11 5 6
+button page7 obj\d009_000.bmp 743 661 11 5 7
+button page8 obj\d009_000.bmp 782 661 11 5 8
+button page9 obj\d009_000.bmp 821 661 11 5 9
+button page10 obj\d009_000.bmp 860 661 11 5 10
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+
+screen save
+pic obj\d001_000.bmp 0 0
+slots obj\d002_000.bmp 44 93 162 140 4 5 1 20
+slotrows 1
+slotthumb 9 20
+slotempty obj\d004_000.bmp 50 52
+slotframe obj\d021_000.bmp 7 18
+slotdigits obj\d005_000.bmp 15 6 3
+datedigits obj\d008_000.bmp 68 107 12
+slotlock obj\d006_000.bmp 10 101
+slotdelete obj\d007_000.bmp 28 106
+dategap 2
+slotquick obj\d010_000.bmp
+pagelift 8
+button page0 obj\d009_000.bmp 470 661 11 5 0
+button page1 obj\d009_000.bmp 509 661 11 5 1
+button page2 obj\d009_000.bmp 548 661 11 5 2
+button page3 obj\d009_000.bmp 587 661 11 5 3
+button page4 obj\d009_000.bmp 626 661 11 5 4
+button page5 obj\d009_000.bmp 665 661 11 5 5
+button page6 obj\d009_000.bmp 704 661 11 5 6
+button page7 obj\d009_000.bmp 743 661 11 5 7
+button page8 obj\d009_000.bmp 782 661 11 5 8
+button page9 obj\d009_000.bmp 821 661 11 5 9
+button page10 obj\d009_000.bmp 860 661 11 5 10
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+
+screen cg
+pic obj\f001_000.bmp 0 0
+cellcard obj\f002_000.bmp
+cellempty obj\d003_000.bmp -2 -2
+cellframe obj\d021_000.bmp 7 18
+cellsize 159 135
+cellthumb 9 20
+cell 44 93
+cell 206 93
+cell 368 93
+cell 530 93
+cell 692 93
+cell 64 233
+cell 226 233
+cell 388 233
+cell 550 233
+celldigits obj\d005_000.bmp 15 6 3 7
+gallerytabs
+pagelift 8
+button page0 obj\d009_000.bmp 369 47 11 5 0
+button page1 obj\d009_000.bmp 408 47 11 5 1
+button page2 obj\d009_000.bmp 447 47 11 5 2
+button gtab0 obj\f004_000.bmp 20 662 9 5 0
+button gtab1 obj\f004_000.bmp 118 662 9 5 1
+button gtab2 obj\f004_000.bmp 216 662 9 5 2
+button gtab3 obj\f004_000.bmp 314 662 9 5 3
+button gtab4 obj\f004_000.bmp 412 662 9 5 4
+button gtab5 obj\f004_000.bmp 510 662 9 5 5
+button gtab6 obj\f004_000.bmp 608 662 9 5 6
+button gtab7 obj\f004_000.bmp 706 662 9 5 7
+button gtab8 obj\f004_000.bmp 804 662 9 5 8
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+
+screen scene
+pic obj\g001_000.bmp 0 0
+cellcard obj\g002_000.bmp
+cellempty obj\d003_000.bmp -2 -2
+cellframe obj\d021_000.bmp 7 18
+cellsize 159 135
+cellthumb 9 20
+cell 44 93
+cell 206 93
+cell 368 93
+cell 530 93
+cell 692 93
+cell 64 233
+cell 226 233
+cell 388 233
+cell 550 233
+celldigits obj\d005_000.bmp 15 6 3 7
+gallerytabs
+pagelift 8
+button page0 obj\d009_000.bmp 369 47 11 5 0
+button page1 obj\d009_000.bmp 408 47 11 5 1
+button page2 obj\d009_000.bmp 447 47 11 5 2
+button gtab0 obj\f004_000.bmp 20 662 9 5 0
+button gtab1 obj\f004_000.bmp 118 662 9 5 1
+button gtab2 obj\f004_000.bmp 216 662 9 5 2
+button gtab3 obj\f004_000.bmp 314 662 9 5 3
+button gtab4 obj\f004_000.bmp 412 662 9 5 4
+button gtab5 obj\f004_000.bmp 510 662 9 5 5
+button gtab6 obj\f004_000.bmp 608 662 9 5 6
+button gtab7 obj\f004_000.bmp 706 662 9 5 7
+button gtab8 obj\f004_000.bmp 804 662 9 5 8
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+
+screen music
+pic obj\h001_000.bmp 0 0
+cellcard obj\h002_000.bmp
+cellempty obj\d003_000.bmp -2 -2
+celltitle 9 38
+cellframe obj\d021_000.bmp 7 18
+cellsize 159 135
+cell 44 93
+cell 206 93
+cell 368 93
+cell 530 93
+cell 692 93
+cell 64 233
+cell 226 233
+cell 388 233
+cell 550 233
+cell 712 233
+cell 84 373
+cell 246 373
+cell 408 373
+cell 570 373
+cell 732 373
+button page0 obj\d009_000.bmp 810 520 11 5 0
+button page1 obj\d009_000.bmp 849 520 11 5 1
+slider music obj\h009_001.bmp 590 598
+tracktime obj\h007_000.bmp 132 635 780 635
+trackseek obj\h008_000.bmp 205 650
+button music_prev obj\h005_000.bmp 122 590 5 5 0
+button music_toggle obj\h005_000.bmp 211 590 5 5 2
+button music_stop obj\h005_000.bmp 300 590 5 5 3
+button music_next obj\h005_000.bmp 388 590 5 5 4
+pic obj\h006_000.bmp 482 590 3 5 0 0
+button music_repeat obj\h006_000.bmp 513 590 3 5 1
+button music_shuffle obj\h006_000.bmp 544 590 3 5 2
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+
+screen config
+pic obj\c000_000.bmp 0 0
+pic obj\c003_000.bmp 24 397
+pic obj\c003_001.bmp 24 568 alpha 60
+pic obj\c003_002.bmp 24 568
+button tab obj\c002_000.bmp 326 70 3 5 0
+button tab2 obj\c002_000.bmp 444 70 3 5 1
+button tab3 obj\c002_000.bmp 562 70 3 5 2
+button cfg_defaults obj\c001_000.bmp 680 11 3 5 0
+button cfg_undo obj\c001_000.bmp 785 38 3 5 1
+button cfg_apply obj\c001_000.bmp 890 65 3 5 2
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+pic obj\c005_000.bmp 132 127 2 5 0 4
+pic obj\c005_000.bmp 239 127 2 5 1 4
+pic obj\c005_001.bmp 132 164 6 5 0 4
+pic obj\c005_001.bmp 239 164 6 5 1 4
+pic obj\c005_001.bmp 346 164 6 5 2 4
+pic obj\c005_001.bmp 132 192 6 5 3 4
+pic obj\c005_001.bmp 239 192 6 5 4 4
+pic obj\c005_001.bmp 346 192 6 5 5 4
+pic obj\c005_002.bmp 27 247 2 5 0 4
+pic obj\c005_002.bmp 97 247 2 5 1 4
+pic obj\c005_002.bmp 180 247 2 5 0 4
+pic obj\c005_002.bmp 250 247 2 5 1 4
+pic obj\c005_002.bmp 333 247 2 5 0 4
+pic obj\c005_002.bmp 403 247 2 5 1 4
+pic obj\c005_002.bmp 487 391 2 5 0 4
+pic obj\c005_002.bmp 557 391 2 5 1 4
+slider opacity obj\c005_003.bmp 119 326
+number opacity obj\c005_005.bmp 343 294
+step opacity -1 obj\c005_004.bmp 88 328 2 5 0
+step opacity 1 obj\c005_004.bmp 392 328 2 5 1
+check confirm_saveload obj\c005_006.bmp 499 149 8 5 0
+check confirm_overwrite obj\c005_006.bmp 499 175 8 5 1
+check confirm_delete obj\c005_006.bmp 499 201 8 5 2
+check confirm_quick obj\c005_006.bmp 499 227 8 5 3
+check confirm_title obj\c005_006.bmp 499 253 8 5 4
+check confirm_exit obj\c005_006.bmp 499 279 8 5 5
+pic obj\c005_006.bmp 499 305 8 5 6 4
+pic obj\c005_006.bmp 499 331 8 5 7 4
+
+screen config2
+pic obj\c000_001.bmp 0 0
+pic obj\c003_000.bmp 24 397
+pic obj\c003_001.bmp 24 568 alpha 60
+pic obj\c003_002.bmp 24 568
+button tab obj\c002_000.bmp 326 70 3 5 0
+button tab2 obj\c002_000.bmp 444 70 3 5 1
+button tab3 obj\c002_000.bmp 562 70 3 5 2
+button cfg_defaults obj\c001_000.bmp 680 11 3 5 0
+button cfg_undo obj\c001_000.bmp 785 38 3 5 1
+button cfg_apply obj\c001_000.bmp 890 65 3 5 2
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+radio text 0 obj\c006_000.bmp 39 155 4 5 0
+radio auto 0 obj\c006_000.bmp 39 222 4 5 0
+radio text 1 obj\c006_000.bmp 115 155 4 5 1
+radio auto 1 obj\c006_000.bmp 115 222 4 5 1
+radio text 2 obj\c006_000.bmp 191 155 4 5 2
+radio auto 2 obj\c006_000.bmp 191 222 4 5 2
+radio text 3 obj\c006_000.bmp 267 155 4 5 3
+radio auto 3 obj\c006_000.bmp 267 222 4 5 3
+pic obj\c006_001.bmp 520 145 2 5 0 4
+pic obj\c006_001.bmp 591 145 2 5 1 2
+pic obj\c006_002.bmp 718 145 2 5 0 4
+pic obj\c006_002.bmp 790 145 2 5 1 4
+radio rightclick 0 obj\c006_003.bmp 601 182 5 5 0
+radio rightclick 1 obj\c006_003.bmp 707 182 5 5 1
+radio rightclick 2 obj\c006_003.bmp 813 182 5 5 2
+radio rightclick 3 obj\c006_003.bmp 601 211 5 5 3
+radio rightclick 4 obj\c006_003.bmp 707 211 5 5 4
+pic obj\c005_002.bmp 520 265 2 5 0 4
+pic obj\c005_002.bmp 591 265 2 5 1 4
+pic obj\c005_002.bmp 718 265 2 5 0 4
+pic obj\c005_002.bmp 790 265 2 5 1 4
+bar obj\c005_003.bmp 119 313 50
+number delay obj\c005_005.bmp 343 281
+pic obj\c005_004.bmp 88 315 2 5 0 4
+pic obj\c005_004.bmp 392 315 2 5 1 4
+
+screen config3
+pic obj\c000_002.bmp 0 0
+pic obj\c003_000.bmp 24 397
+pic obj\c003_001.bmp 24 568 alpha 60
+pic obj\c003_002.bmp 24 568
+button tab obj\c002_000.bmp 326 70 3 5 0
+button tab2 obj\c002_000.bmp 444 70 3 5 1
+button tab3 obj\c002_000.bmp 562 70 3 5 2
+button cfg_defaults obj\c001_000.bmp 680 11 3 5 0
+button cfg_undo obj\c001_000.bmp 785 38 3 5 1
+button cfg_apply obj\c001_000.bmp 890 65 3 5 2
+button nav_save obj\c010_020.bmp 1047 85 10 5 0
+button nav_load obj\c010_020.bmp 1042 121 10 5 1
+button nav_cg obj\c010_020.bmp 1037 157 10 5 2
+button nav_scene obj\c010_020.bmp 1032 193 10 5 3
+button nav_music obj\c010_020.bmp 1027 229 10 5 4
+button nav_config obj\c010_020.bmp 1022 265 10 5 5
+button nav_title obj\c010_020.bmp 1017 301 10 5 7
+button nav_quit obj\c010_020.bmp 1012 337 10 5 8
+button back obj\c010_020.bmp 978 629 10 5 9
+slider master obj\c005_003.bmp 119 168
+number master obj\c005_005.bmp 338 135
+step master -1 obj\c005_004.bmp 97 170 2 5 0
+step master 1 obj\c005_004.bmp 401 170 2 5 1
+check mute_master obj\c007_002.bmp 387 135 1 5 0
+pic obj\c007_001.bmp 431 135 1 5 0 4
+bar obj\c005_003.bmp 581 168 80
+pic obj\c005_004.bmp 559 170 2 5 0 4
+pic obj\c005_004.bmp 863 170 2 5 1 4
+pic obj\c007_002.bmp 849 135 1 5 0 4
+pic obj\c007_001.bmp 893 135 1 5 0 4
+slider bgm obj\c005_003.bmp 119 256
+number bgm obj\c005_005.bmp 338 223
+step bgm -1 obj\c005_004.bmp 97 258 2 5 0
+step bgm 1 obj\c005_004.bmp 401 258 2 5 1
+check mute_bgm obj\c007_002.bmp 387 223 1 5 0
+pic obj\c007_001.bmp 431 223 1 5 0 4
+slider voice obj\c005_003.bmp 581 256
+number voice obj\c005_005.bmp 800 223
+step voice -1 obj\c005_004.bmp 559 258 2 5 0
+step voice 1 obj\c005_004.bmp 863 258 2 5 1
+check mute_voice obj\c007_002.bmp 849 223 1 5 0
+pic obj\c007_001.bmp 893 223 1 5 0 4
+slider se obj\c005_003.bmp 119 344
+number se obj\c005_005.bmp 338 311
+step se -1 obj\c005_004.bmp 97 346 2 5 0
+step se 1 obj\c005_004.bmp 401 346 2 5 1
+check mute_se obj\c007_002.bmp 387 311 1 5 0
+pic obj\c007_001.bmp 431 311 1 5 0 4
+bar obj\c005_003.bmp 581 344 80
+pic obj\c005_004.bmp 559 346 2 5 0 4
+pic obj\c005_004.bmp 863 346 2 5 1 4
+pic obj\c007_002.bmp 849 311 1 5 0 4
+pic obj\c007_001.bmp 893 311 1 5 0 4
+pic obj\c005_002.bmp 506 414 2 5 0 4
+pic obj\c005_002.bmp 576 414 2 5 1 4
+pic obj\c007_000.bmp 700 414 1 5 0 4
+
+screen log
+dim 200
+pic obj\r000_001.bmp 1157 11
+scroll obj\r000_002.bmp obj\r000_003.bmp obj\r000_004.bmp 1175 100 520
+rows obj\r000_000.bmp 77 69 165 4 140 47
+button log_close obj\r002_000.bmp 1231 14 1 5 0
+button log_top obj\r001_000.bmp 1172 28 4 5 0
+button log_up obj\r001_000.bmp 1172 65 4 5 1
+button log_down obj\r001_000.bmp 1172 624 4 5 2
+button log_bottom obj\r001_000.bmp 1172 661 4 5 3
+
+screen dialog
+question obj\m000_000.bmp 243 118
+question obj\m000_001.bmp 243 118
+question obj\m000_002.bmp 243 118
+question obj\m000_003.bmp 243 118
+question obj\m000_004.bmp 243 118
+question obj\m000_005.bmp 243 118
+question obj\m000_006.bmp 243 118
+question obj\m000_007.bmp 243 118
+pic obj\m002_000.bmp 539 481 1 5 0 0
+button yes obj\a003_001.bmp 492 333 2 5 0
+button no obj\a003_001.bmp 715 324 2 5 1
+
+screen start
+after 0
+flow MainFlow1
+pic obj\b010_000.bmp 243 118
+button start_prologue obj\b010_001.bmp 434 283 2 5 0
+button start_main obj\b010_001.bmp 437 362 2 5 1
+
+screen choice
+framefor 2 obj\k001_000.bmp 243 118
+framefor 5 obj\k002_000.bmp 243 25
+placefor 2 283 79 340 3
+placefor 5 129 78 328 6
+
+screen defaults
+quickslots 201 220
+default bar_always 1
+default delay 100
+
+screen cfgsav
+run 4 2 1
+run 16 2 50
+run 24 1 60
+run 36 1 100
+run 40 1 1
+run 48 1 2
+run 52 1 1
+run 76 1 1
+run 108 1 1
+run 116 1 60
+run 120 1 1
+run 168 1 1
+run 244 1 32
+run 280 1 9
+run 324 2 1
+run 340 1 1
+run 348 1 1
+run 360 6 1
+run 400 100 1
+run 848 1 1
+run 852 1 480
+run 860 1 1
+run 2000 1 100
+run 2004 8 80
+run 2120 9 1
+run 2160 1 1
+)";
+
 const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\x2019_retry") return kChristmas;
     if (folder == "waffle\\alchemy") return kAlchemist;
     if (folder == "waffle\\mother3") return kMother3;
     if (folder == "waffle\\tmgb") return kTsumaGibo;
+    if (folder == "waffle\\funbagfantasy3") return kFunbagFantasy;
     return nullptr;
 }
 

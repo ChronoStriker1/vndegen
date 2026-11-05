@@ -104,6 +104,7 @@ Engines/WolfRPG/          the Wolf RPG Editor runtime's Linux test host
 Engines/System3/          the System 3 runtime's Linux test host: a headless runner and an SDL player
 Engines/System4/          the System 4 runtime's Linux test host and tools; UPSTREAM.md lists the vendored libraries
 Engines/NekoSDK/          the NekoSDK runtime's Linux test host and tools
+scripts/nekosdk/          laygen.py, which reads a PC save and prints a game's save layout
 Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/,
                           the MIDI player and SoundFonts, the movie decoder, and the case-insensitive path lookup
 docs/                     user and engine docs, the engine survey, release notes, and screenshots

@@ -61,10 +61,14 @@ struct Sprite {
     std::vector<Animation> changes;
     Animation loop;
     bool looping = false;
-    // A flipbook: numbered pictures shown in turn. `corner` scales from the top left and not the middle.
+    // The point in the picture a scale keeps in place, or -1 for its middle.
+    int anchorX = -1, anchorY = -1;
+    // A flipbook: numbered pictures shown in turn.
     int flipCount = 0, flipMs = 25, flipShown = 0;
     int64_t flipBegun = 0;
-    bool flipLoop = false, flipReverse = false, corner = false;
+    bool flipLoop = false, flipReverse = false;
+    bool waveOn = false;
+    int waveSpeed = 0, waveRows = 0, waveSize = 0;
 };
 
 struct SpriteView {
@@ -136,7 +140,7 @@ private:
     bool cardAt(int slot, int &x, int &y) const;
     bool overCardDelete(int slot, int x, int y) const;
     int newestQuickSlot();
-    int nextQuickSlot_ = 81;
+    int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();
     void restoreSave(const SaveData &data);
@@ -163,6 +167,13 @@ private:
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
     std::map<int, FlipModes> flipModesAt(const SaveData &d);
+    void takeScaleAnchor(Sprite &s, const Node &n);
+    int cardsPerPage() const;
+    void cardPlace(int index, int &x, int &y) const;
+    std::string mainFlowKey() const;
+    bool galleryPageExists(int page) const;
+    void composeTrackCards(Canvas &out);
+    void composeTrackTime(Canvas &out);
     void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots);
     std::map<std::string, std::pair<int, int>> flipbooks_;
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
@@ -209,9 +220,10 @@ private:
         int page = 0;
         std::string thumbnail, flow, key, bgm;
         std::vector<std::string> images;
+    std::vector<int> imageIds;
     };
     std::vector<GalleryEntry> cgEntries_, sceneEntries_;
-    std::vector<std::string> tracks_;
+    std::vector<std::string> tracks_, trackTitles_;
     std::unordered_map<std::string, bool> seen_;
     bool seenChanged_ = false;
     std::vector<std::string> viewing_;
@@ -263,7 +275,7 @@ private:
     // Commands.
     void beginChoice(const Node &n);
     void updateChoice();
-    void choicePlace(int &x, int &top, int &step) const;
+    void choicePlace(int &x, int &top, int &step, int &slant) const;
     int variableValue(int scope, int index) const;
     int variableNumber(int scope, int index) const;
     void endStory(const std::string &screen);

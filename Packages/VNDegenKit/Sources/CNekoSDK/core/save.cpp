@@ -30,7 +30,7 @@ namespace {
 
 // Where the fields sit, from the end of a record's two path strings. A newer engine adds `recordExtra` bytes before them.
 constexpr int kRecordX = 0x169, kRecordScale = 0x17D, kRecordAnchor = 0x185, kRecordAlpha = 0x18D, kRecordAnimated = 0x1B3;
-constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192;
+constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0x192, kRecordWave = 0x1A6;
 constexpr size_t kSplashExtra = 35;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
@@ -146,6 +146,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\alchemy") return &kAlchemist;
     if (folder == "waffle\\mother3") return &kMother3;
     if (folder == "waffle\\tmgb") return &kTsumaGibo;
+    if (folder == "waffle\\funbagfantasy3") return &kFunbagFantasy;
     return nullptr;
 }
 
@@ -197,6 +198,10 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.alpha = r.i32At(f + kRecordAlpha + extra);
         s.blurOn = plain[f + kRecordBlurOn + extra] != 0;
         s.blur = r.i32At(f + kRecordBlur + extra);
+        s.waveOn = plain[f + kRecordWave + extra] != 0;
+        s.waveSpeed = r.i32At(f + kRecordWave + 1 + extra);
+        s.waveRows = r.i32At(f + kRecordWave + 5 + extra);
+        s.waveSize = r.i32At(f + kRecordWave + 9 + extra);
         s.animated = f + kRecordAnimated + extra < plain.size() && plain[f + kRecordAnimated + extra] != 0;
         r.at = f + kRecordAnimationAt + extra;
         s.animationFrames = r.i32();
@@ -308,6 +313,10 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(f + kRecordAlpha + extra, s.alpha);
         w.b[f + kRecordBlurOn + extra] = s.blurOn ? 1 : 0;
         w.setI32(f + kRecordBlur + extra, s.blur);
+        w.b[f + kRecordWave + extra] = s.waveOn ? 1 : 0;
+        w.setI32(f + kRecordWave + 1 + extra, s.waveSpeed);
+        w.setI32(f + kRecordWave + 5 + extra, s.waveRows);
+        w.setI32(f + kRecordWave + 9 + extra, s.waveSize);
         w.b[f + kRecordAnimated + extra] = s.animated ? 1 : 0;
         w.i32(s.animationFrames);
         w.str(s.animation);

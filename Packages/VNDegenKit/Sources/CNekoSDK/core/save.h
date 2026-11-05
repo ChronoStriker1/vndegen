@@ -17,6 +17,8 @@ struct SavedSprite {
     int anchorX = 0, anchorY = 0, alpha = 256;
     bool blurOn = false;
     int blur = 0;
+    bool waveOn = false;
+    int waveSpeed = 0, waveRows = 0, waveSize = 0;
     bool animated = false;
     int animationFrames = 0;  // how far into the animation
     std::string animation;    // lines such as `relative_pos_x,-200,0,2400,linear`

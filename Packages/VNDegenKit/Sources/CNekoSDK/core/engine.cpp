@@ -29,11 +29,13 @@ constexpr int kCharFadeMs = 160;
 // How far the backlog dims the frame behind it, from the PC game's footage: about 0.29 of the brightness.
 constexpr int kLogDim = 182;
 // Eight cards to a page and ten pages of saves, and then the Q-Save page.
-constexpr int kFirstQuickSlot = 81, kLastQuickSlot = 88;
+
+// Scripts name a voice `voice\\x.ogg`, or in places in Test Game 84 just `x`, which plays all the same on the PC.
+static std::string voicePath(const std::string &name) { return name.find('\\') == std::string::npos ? "voice\\" + name + ".ogg" : name; }
 constexpr int kCountEdgeR = 200, kCountEdgeG = 30, kCountEdgeB = 30;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
 // They sit after a string at byte 44020, so they move with its length.
-constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kCgFlagRow = 40, kCgFlagsPerRow = 10, kTrackFlagsAt = 100000;
+constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kTrackFlagsAt = 100000;
 // How long Auto waits after the text and voice are done.
 constexpr int kAutoDelayMs = 1000;
 constexpr float kPi = 3.14159265f;
@@ -224,6 +226,11 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
 
     if (const char *table = menuTable(folder_))
         screens_ = parseScreens(table, *images_, [this](const std::string &what) { warnOnce(what); });
+    if (auto it = screens_.find("defaults"); it != screens_.end())
+        if (const auto *quick = it->second.setting("quickslots"); quick && quick->size() >= 2) {
+            firstQuickSlot_ = nextQuickSlot_ = field(*quick, 0);
+            lastQuickSlot_ = field(*quick, 1);
+        }
     log("started: %dx%d, %d scripts in scr, %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus");
     loadGalleries();
     loadGlobals();
@@ -325,21 +332,31 @@ void Engine::startStory() {
     dirty_ = true;
 }
 
+// The key in init.ini of the story past the prologue. Test Game 84's table names its own.
+std::string Engine::mainFlowKey() const {
+    auto it = screens_.find("start");
+    const auto *flow = it == screens_.end() ? nullptr : it->second.setting("flow");
+    return flow && !flow->empty() ? (*flow)[0] : "MainFlow";
+}
+
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
     if (action == "start") {
         // Past the prologue a game may offer to skip it, when its table has that question.
-        if (screens_.count("start") && !config_.text("MainFlow").empty() && variableValue(0, 1)) {
-            openScreen("start");
-            return;
+        if (auto it = screens_.find("start"); it != screens_.end()) {
+            const auto *after = it->second.setting("after");
+            if (!config_.text(mainFlowKey()).empty() && variableValue(0, after ? field(*after, 0) : 1)) {
+                openScreen("start");
+                return;
+            }
         }
         storyFlowKey_ = "FirstFlow";
         startStory();
         return;
     }
     if (action == "start_prologue") { storyFlowKey_ = "FirstFlow"; startStory(); return; }
-    if (action == "start_main") { storyFlowKey_ = "MainFlow"; startStory(); return; }
+    if (action == "start_main") { storyFlowKey_ = mainFlowKey(); startStory(); return; }
     if (action.rfind("track", 0) == 0) {
         playTrack(std::atoi(action.c_str() + 5));
         return;
@@ -359,6 +376,11 @@ void Engine::runAction(const std::string &action) {
         } else if (!trackPlayer_) {
             playTrack(currentTrack_ < 0 ? nextTrack(1) : currentTrack_);
         }
+        return;
+    }
+    // One button for both, in Test Game 84. It shows what pressing it would do.
+    if (action == "music_toggle") {
+        runAction(trackPlayer_ && !trackPaused_ ? "music_pause" : "music_play");
         return;
     }
     if (action == "music_next") { playTrack(nextTrack(1)); return; }
@@ -401,7 +423,7 @@ void Engine::runAction(const std::string &action) {
         if (!currentText_.voice.empty()) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = 0;
-            if (Bytes data = files_.read(currentText_.voice)) {
+            if (Bytes data = files_.read(voicePath(currentText_.voice))) {
                 voicePlayer_ = audio_.open(data);
                 if (voicePlayer_) {
                     audio_.setGroup(voicePlayer_, kKindVoice);
@@ -417,7 +439,7 @@ void Engine::runAction(const std::string &action) {
         // Each session starts at the first of the Q-Save page's cards and moves along one a save, as the PC does.
         openDialog(4, [this] {
             saveToSlot(nextQuickSlot_);
-            nextQuickSlot_ = nextQuickSlot_ == kLastQuickSlot ? kFirstQuickSlot : nextQuickSlot_ + 1;
+            nextQuickSlot_ = nextQuickSlot_ == lastQuickSlot_ ? firstQuickSlot_ : nextQuickSlot_ + 1;
         });
         return;
     }
@@ -459,7 +481,10 @@ void Engine::runAction(const std::string &action) {
         }
         return;
     }
-    if (action.rfind("page", 0) == 0) { page_ = std::atoi(action.c_str() + 4); return; }
+    if (action.rfind("page", 0) == 0) {
+        if (galleryPageExists(std::atoi(action.c_str() + 4))) page_ = std::atoi(action.c_str() + 4);
+        return;
+    }
     // Moving between menus keeps where Back returns to.
     auto go = [&](const char *name) {
         noteThumbnail();
@@ -522,16 +547,20 @@ bool Engine::moveFocus(int dx, int dy) {
         addButtons(screens_.at("log").buttons);
     } else if (waiting_ == Waiting::Choice && choiceSheet_) {
         int cellH = choiceSheet_->h / 5, x, top, step;
-        choicePlace(x, top, step);
+        int slant;
+        choicePlace(x, top, step, slant);
         for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, top + i * step + cellH / 2});
     } else if (screen_) {
         addButtons(screen_->buttons);
-        const auto *grid = screen_->setting("slots");
-        if (grid && grid->size() >= 7) {
-            ImageRef sheet = images_->get((*grid)[0]);
-            int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), gx = std::atoi((*grid)[3].c_str()), gy = std::atoi((*grid)[4].c_str());
-            for (int c = 0; sheet && c < std::atoi((*grid)[6].c_str()); c++)
-                for (int r = 0; r < std::atoi((*grid)[5].c_str()); r++) spots.push_back({x0 + c * gx + sheet->w / 2, y0 + r * gy + sheet->h / 10});
+        if (int perPage = cardsPerPage()) {
+            if (ImageRef sheet = images_->get((*screen_->setting("slots"))[0])) {
+                const auto *rows = screen_->setting("slotrows");
+                for (int i = 0; i < perPage; i++) {
+                    int cx, cy;
+                    cardPlace(i, cx, cy);
+                    spots.push_back({cx + sheet->w / 2, cy + sheet->h / (rows ? field(*rows, 0) : 5) / 2});
+                }
+            }
         }
         auto addWidgets = [&](const char *kind, size_t at) {
             for (auto [it, end] = screen_->settings.equal_range(kind); it != end; ++it) {
@@ -685,7 +714,10 @@ void Engine::loadGalleries() {
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
-            if (parts.size() >= 3) cgEntries_.back().images.push_back(parts[2]);
+            if (parts.size() >= 3) {
+                cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
+                cgEntries_.back().images.push_back(parts[2]);
+            }
         }
     }
     // `page thumbnail 0 0 flow key,0,0`.
@@ -699,7 +731,13 @@ void Engine::loadGalleries() {
         e.key = split(f[5], ',')[0];
         sceneEntries_.push_back(e);
     }
-    tracks_ = lines("cfg\\sound_view.ini");
+    // A track's file, then in Test Game 84 the picture of its title.
+    for (const std::string &line : lines("cfg\\sound_view.ini")) {
+        auto f = fields(line);
+        if (f.empty()) continue;
+        tracks_.push_back(f[0]);
+        trackTitles_.push_back(f.size() > 1 ? f[1] : "");
+    }
     for (const std::string &line : lines("cfg\\change_texture_list.ini")) {
         std::istringstream in(line);
         std::string plain, styled;
@@ -792,7 +830,7 @@ void Engine::saveSeen() {
 }
 
 int Engine::galleryCellAt(int x, int y) const {
-    if (!screen_ || (screen_->name != "cg" && screen_->name != "scene")) return -1;
+    if (!screen_ || (screen_->name != "cg" && screen_->name != "scene" && screen_->name != "music")) return -1;
     const auto *size = screen_->setting("cellsize");
     if (!size || size->size() < 2) return -1;
     int w = std::atoi((*size)[0].c_str()), h = std::atoi((*size)[1].c_str());
@@ -813,6 +851,54 @@ int Engine::galleryEntry(int cell) const {
     for (int i = 0; i < int(entries.size()); i++)
         if (entries[size_t(i)].page == galleryTab_ && wanted-- == 0) return i;
     return -1;
+}
+
+// How many pages a character's gallery tab fills. The buttons for pages past those aren't there.
+bool Engine::galleryPageExists(int page) const {
+    if (!screen_ || (screen_->name != "cg" && screen_->name != "scene") || !screen_->settings.count("gallerytabs")) return true;
+    const auto &entries = screen_->name == "cg" ? cgEntries_ : sceneEntries_;
+    int count = int(std::count_if(entries.begin(), entries.end(), [&](const GalleryEntry &e) { return e.page == galleryTab_; }));
+    return page == 0 || page * int(screen_->settings.count("cell")) < count;
+}
+
+// Test Game 84 lists its music as cards: a card and a title for a track that's been heard, a blank card for one that hasn't.
+void Engine::composeTrackCards(Canvas &out) {
+    if (screen_->name != "music" || !screen_->settings.count("cell")) return;
+    const auto *card = screen_->setting("cellcard"), *blank = screen_->setting("cellempty"), *title = screen_->setting("celltitle"), *frame = screen_->setting("cellframe");
+    ImageRef cardArt = card && !card->empty() ? images_->get((*card)[0]) : nullptr, blankArt = blank && blank->size() >= 3 ? images_->get((*blank)[0]) : nullptr;
+    ImageRef frameArt = frame && frame->size() >= 3 ? images_->get((*frame)[0]) : nullptr;
+    int perPage = int(screen_->settings.count("cell")), index = 0;
+    int hovered = pointerSeen_ ? galleryCellAt(pointerX_, pointerY_) : -1;
+    for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
+        int cx = field(it->second, 0), cy = field(it->second, 1), track = page_ * perPage + index;
+        bool heard = track < int(tracks_.size()) && seen(tracks_[size_t(track)]);
+        if (!heard) {
+            if (blankArt) drawPart(out, *blankArt, cx + field(*blank, 1), cy + field(*blank, 2), 0, 0, blankArt->w, blankArt->h, 1);
+            continue;
+        }
+        if (cardArt) drawPart(out, *cardArt, cx, cy, 0, 0, cardArt->w, cardArt->h, 1);
+        if (ImageRef name = title && title->size() >= 2 ? images_->get(trackTitles_[size_t(track)]) : nullptr) drawPart(out, *name, cx + field(*title, 0), cy + field(*title, 1), 0, 0, name->w, name->h, 1);
+        bool playing = track == currentTrack_ && trackPlayer_;
+        if (frameArt && frameArt->h >= 5 && (playing || index == hovered)) drawPart(out, *frameArt, cx + field(*frame, 1), cy + field(*frame, 2), 0, (playing ? 2 : 1) * (frameArt->h / 5), frameArt->w, frameArt->h / 5, 1);
+    }
+}
+
+// `tracktime DIGITS X Y X2 Y2` where the time played and the length go, and `trackseek FILL X Y` how far through it is.
+void Engine::composeTrackTime(Canvas &out) {
+    if (screen_->name != "music") return;
+    const auto *times = screen_->setting("tracktime");
+    int64_t at = trackPlayer_ ? audio_.positionMs(trackPlayer_) : 0, all = trackPlayer_ ? audio_.lengthMs(trackPlayer_) : 0;
+    if (ImageRef digits = times && times->size() >= 5 ? images_->get((*times)[0]) : nullptr) {
+        int w = digits->w / 11;
+        auto clock = [&](int64_t ms, int x, int y) {
+            int seconds = int(ms / 1000), shown[5] = {seconds / 600 % 10, seconds / 60 % 10, 10, seconds / 10 % 6, seconds % 10};
+            for (int i = 0; i < 5; i++) drawPart(out, *digits, x + i * w, y, shown[i] * w, 0, w, digits->h, 1);
+        };
+        clock(at, field(*times, 1), field(*times, 2));
+        clock(all, field(*times, 3), field(*times, 4));
+    }
+    const auto *seek = screen_->setting("trackseek");
+    if (ImageRef fill = seek && seek->size() >= 3 && all > 0 ? images_->get((*seek)[0]) : nullptr) drawPart(out, *fill, field(*seek, 1), field(*seek, 2), 0, 0, int(fill->w * std::min(at, all) / all), fill->h, 1);
 }
 
 void Engine::composeGallery(Canvas &out) {
@@ -844,8 +930,17 @@ void Engine::composeGallery(Canvas &out) {
             int row = !unlocked ? int(StateDisabled) : index == hovered ? int(StateHover) : int(StateNormal);
             drawPart(out, *sheet, cx, cy, 0, row * h, sheet->w, h, 1);
         }
+        // Or a plain card with a blank one for what's locked, and a frame for the hovered one, as in Test Game 84.
+        const auto *card = screen_->setting("cellcard"), *blank = screen_->setting("cellempty"), *frame = screen_->setting("cellframe");
+        if (entry < entries.size() && unlocked && card && !card->empty()) {
+            if (ImageRef art = images_->get((*card)[0])) drawPart(out, *art, cx, cy, 0, 0, art->w, art->h, 1);
+        } else if (entry < entries.size() && blank && blank->size() >= 3) {
+            if (ImageRef art = images_->get((*blank)[0])) drawPart(out, *art, cx + field(*blank, 1), cy + field(*blank, 2), 0, 0, art->w, art->h, 1);
+        }
         if (unlocked)
             if (ImageRef thumb = images_->get(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
+        if (unlocked && index == hovered && frame && frame->size() >= 3)
+            if (ImageRef art = images_->get((*frame)[0]); art && art->h >= 5) drawPart(out, *art, cx + field(*frame, 1), cy + field(*frame, 2), 0, art->h / 5, art->w, art->h / 5, 1);
         // A card's number, faint on a locked card in some games, and how many of a CG's pictures have been seen.
         const auto *lockedAlpha = screen_->setting("celllocked");
         float faint = unlocked || !lockedAlpha ? 1 : float(field(*lockedAlpha, 0)) / 100;
@@ -1065,9 +1160,10 @@ void Engine::loadGlobals() {
         if (at + moved + 4 <= configFile_.size()) std::memcpy(&v, &configFile_[at + moved], 4);
         return v != 0;
     };
-    for (size_t e = 0; e < cgEntries_.size(); e++)
-        for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
-            if (flag(kCgFlagsAt + e * kCgFlagRow + p * 4)) seen_[normalizedPath(cgEntries_[e].images[p])] = true;
+    // A picture's flag goes by its number in cg_view.ini, which needn't run in step with the entries.
+    for (const GalleryEntry &e : cgEntries_)
+        for (size_t p = 0; p < e.images.size(); p++)
+            if (flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
 }
@@ -1101,9 +1197,9 @@ void Engine::saveGlobals() {
         const int32_t on = 1;
         if (at + moved + 4 <= configFile_.size()) std::memcpy(&configFile_[at + moved], &on, 4);
     };
-    for (size_t e = 0; e < cgEntries_.size(); e++)
-        for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
-            if (seen(cgEntries_[e].images[p])) setFlag(kCgFlagsAt + e * kCgFlagRow + p * 4);
+    for (const GalleryEntry &e : cgEntries_)
+        for (size_t p = 0; p < e.images.size(); p++)
+            if (seen(e.images[p])) setFlag(kCgFlagsAt + size_t(e.imageIds[p]) * 4);
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
     auto packed = packEntry(configFile_);
@@ -1170,11 +1266,15 @@ SaveData Engine::captureSave() {
         out.y = s.y;
         out.scaleX = s.scaleX;
         out.scaleY = s.scaleY;
-        out.anchorX = s.corner ? 0 : s.image->w / 2;
-        out.anchorY = s.corner ? 0 : s.image->h / 2;
+        out.anchorX = s.anchorX < 0 ? s.image->w / 2 : s.anchorX;
+        out.anchorY = s.anchorY < 0 ? s.image->h / 2 : s.anchorY;
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
+        out.waveOn = s.waveOn;
+        out.waveSpeed = s.waveSpeed;
+        out.waveRows = s.waveRows;
+        out.waveSize = s.waveSize;
         // Every change as a line of text from the oldest one's start, as the PC writes them. A named animation goes in
         // the same text from the start of its current cycle: a load plays what's left of it once, and a repeating one
         // stops there.
@@ -1262,7 +1362,7 @@ bool Engine::saveToSlot(int slot) {
 int Engine::newestQuickSlot() {
     int newest = 0;
     const int *newestDate = nullptr;
-    for (int slot = kFirstQuickSlot; slot <= kLastQuickSlot; slot++) {
+    for (int slot = firstQuickSlot_; slot <= lastQuickSlot_; slot++) {
         const SlotInfo &info = slotInfo(slot);
         if (info.exists && (!newestDate || std::lexicographical_compare(newestDate, newestDate + 6, info.date, info.date + 6))) {
             newest = slot;
@@ -1317,7 +1417,9 @@ void Engine::restoreSave(const SaveData &d) {
     flowCallId_ = d.flowNode;
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
-        stack_.push_back({flow, call ? flow->node(call->next) : flow->first()});
+        // A save made while a choice waits names the choice, and the choice is asked again.
+        bool atChoice = call && (call->opcode == 3 || call->opcode == 20);
+        stack_.push_back({flow, atChoice ? call : call ? flow->node(call->next) : flow->first()});
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d);
     for (const SavedSprite &saved : d.sprites) {
@@ -1332,7 +1434,14 @@ void Engine::restoreSave(const SaveData &d) {
         s.alpha = float(saved.alpha) / 256;
         s.blurAmount = saved.blur;
         s.blurOn = saved.blurOn;
-        s.corner = s.image && saved.anchorX == 0 && saved.anchorY == 0;
+        s.waveOn = saved.waveOn;
+        s.waveSpeed = saved.waveSpeed;
+        s.waveRows = saved.waveRows;
+        s.waveSize = saved.waveSize;
+        if (s.image) {
+            s.anchorX = saved.anchorX;
+            s.anchorY = saved.anchorY;
+        }
         if (saved.flipFrame >= 0) {
             resumeFlipbook(s);
             restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes);
@@ -1415,15 +1524,29 @@ void Engine::restoreSave(const SaveData &d) {
     dirty_ = true;
 }
 
-// The table's `slots` line: the sheet, then x, y, the step across and down, and rows per column. The `slot*` lines give
-// where each part sits within a card.
+// The table's `slots` line: the sheet, then x, y, the step across and down, rows per column and columns. Cards number down
+// each column unless an `across` of 1 follows, and each row can sit further right than the one above by a last number. The
+// `slot*` lines give where each part sits within a card.
+int Engine::cardsPerPage() const {
+    const auto *grid = screen_ ? screen_->setting("slots") : nullptr;
+    return grid && grid->size() >= 7 ? field(*grid, 5) * field(*grid, 6) : 0;
+}
+
+// Where the card at this place on a page sits.
+void Engine::cardPlace(int index, int &x, int &y) const {
+    const auto &grid = *screen_->setting("slots");
+    int perColumn = field(grid, 5), columns = field(grid, 6);
+    bool across = grid.size() >= 8 && field(grid, 7);
+    int column = across ? index % columns : index / perColumn, row = across ? index / columns : index % perColumn;
+    x = field(grid, 1) + column * field(grid, 3) + row * (grid.size() >= 9 ? field(grid, 8) : 0);
+    y = field(grid, 2) + row * field(grid, 4);
+}
+
 // Where a slot's card sits on the current page.
 bool Engine::cardAt(int slot, int &x, int &y) const {
-    const auto *grid = screen_ ? screen_->setting("slots") : nullptr;
-    if (!grid || grid->size() < 7 || slot < 1) return false;
-    int perColumn = field(*grid, 5), columns = field(*grid, 6), index = (slot - 1) % (perColumn * columns);
-    x = field(*grid, 1) + index / perColumn * field(*grid, 3);
-    y = field(*grid, 2) + index % perColumn * field(*grid, 4);
+    int perPage = cardsPerPage();
+    if (!perPage || slot < 1) return false;
+    cardPlace((slot - 1) % perPage, x, y);
     return true;
 }
 
@@ -1436,29 +1559,27 @@ bool Engine::overCardDelete(int slot, int x, int y) const {
 }
 
 int Engine::slotAt(int x, int y) const {
-    const auto *grid = screen_ ? screen_->setting("slots") : nullptr;
-    if (!grid || grid->size() < 7) return -1;
-    int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), dx = std::atoi((*grid)[3].c_str()), dy = std::atoi((*grid)[4].c_str());
-    int perColumn = std::atoi((*grid)[5].c_str()), columns = std::atoi((*grid)[6].c_str());
-    ImageRef sheet = images_->get((*grid)[0]);
+    int perPage = cardsPerPage();
+    if (!perPage) return -1;
+    ImageRef sheet = images_->get((*screen_->setting("slots"))[0]);
     if (!sheet) return -1;
-    int w = sheet->w, h = sheet->h / 5;
-    for (int c = 0; c < columns; c++)
-        for (int r = 0; r < perColumn; r++) {
-            int cx = x0 + c * dx, cy = y0 + r * dy;
-            if (x >= cx && y >= cy && x < cx + w && y < cy + h) return page_ * perColumn * columns + c * perColumn + r + 1;
-        }
+    const auto *rows = screen_->setting("slotrows");
+    int w = sheet->w, h = sheet->h / (rows ? field(*rows, 0) : 5);
+    for (int i = 0; i < perPage; i++) {
+        int cx, cy;
+        cardPlace(i, cx, cy);
+        if (x >= cx && y >= cy && x < cx + w && y < cy + h) return page_ * perPage + i + 1;
+    }
     return -1;
 }
 
 void Engine::composeSlots(Canvas &out) {
-    const auto *grid = screen_->setting("slots");
-    if (!grid || grid->size() < 7) return;
-    int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), dx = std::atoi((*grid)[3].c_str()), dy = std::atoi((*grid)[4].c_str());
-    int perColumn = std::atoi((*grid)[5].c_str()), columns = std::atoi((*grid)[6].c_str());
-    ImageRef sheet = images_->get((*grid)[0]);
+    int perPage = cardsPerPage();
+    if (!perPage) return;
+    ImageRef sheet = images_->get((*screen_->setting("slots"))[0]);
     if (!sheet) return;
-    int cardH = sheet->h / 5;
+    const auto *cardRows = screen_->setting("slotrows");
+    int cardH = sheet->h / (cardRows ? field(*cardRows, 0) : 5);
     auto offset = [&](const char *key, int index) {
         const auto *line = screen_->setting(key);
         return line && int(line->size()) > index ? std::atoi((*line)[size_t(index)].c_str()) : 0;
@@ -1466,11 +1587,14 @@ void Engine::composeSlots(Canvas &out) {
     auto picture = [&](const char *key) { const auto *line = screen_->setting(key); return line && !line->empty() ? images_->get((*line)[0]) : nullptr; };
     ImageRef digits = picture("slotdigits"), dateDigits = picture("datedigits"), noLabel = picture("slotlabel");
     ImageRef slash = picture("dateslash"), colon = picture("datecolon"), dash = picture("datedash");
+    ImageRef frame = picture("slotframe"), empty = picture("slotempty");
+    // A date sheet of 12 holds its slash and colon after the digits. The number shows how many digits a card number has.
+    int dateColumns = offset("datedigits", 3) ? offset("datedigits", 3) : 10, numberDigits = offset("slotdigits", 3) ? offset("slotdigits", 3) : 2;
     bool loading = screen_->name == "load";
     int hovered = pointerSeen_ ? slotAt(pointerX_, pointerY_) : -1;
-    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y) {
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y, int cells = 10) {
         if (!sheetOfTen) return x;
-        int w = sheetOfTen->w / 10;
+        int w = sheetOfTen->w / cells;
         for (int i = count - 1; i >= 0; i--) {
             int digit = value % 10;
             value /= 10;
@@ -1478,17 +1602,26 @@ void Engine::composeSlots(Canvas &out) {
         }
         return x + count * w;
     };
-    for (int c = 0; c < columns; c++)
-        for (int r = 0; r < perColumn; r++) {
-            int slot = page_ * perColumn * columns + c * perColumn + r + 1;
+    for (int index = 0; index < perPage; index++) {
+            int slot = page_ * perPage + index + 1;
             SlotInfo &info = slotInfo(slot);
-            int cx = x0 + c * dx, cy = y0 + r * dy;
+            int cx, cy;
+            cardPlace(index, cx, cy);
             int row = loading && !info.exists ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
-            drawPart(out, *sheet, cx, cy, 0, row * cardH, sheet->w, cardH, 1);
+            drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, 1);
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
+            else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
+            if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
             // The Q-Save page numbers its cards from 1 again.
-            drawNumber(digits, slot >= kFirstQuickSlot ? slot - kFirstQuickSlot + 1 : slot, 2, cx + offset("slotdigits", 1), cy + offset("slotdigits", 2));
+            // Test Game 84's cards there read Q01.
+            ImageRef quickMark = slot >= firstQuickSlot_ ? picture("slotquick") : nullptr;
+            int numberX = cx + offset("slotdigits", 1);
+            if (quickMark) {
+                drawPart(out, *quickMark, numberX, cy + offset("slotdigits", 2), 0, 0, quickMark->w, quickMark->h, 1);
+                numberX += quickMark->w;
+            }
+            drawNumber(digits, slot >= firstQuickSlot_ ? slot - firstQuickSlot_ + 1 : slot, quickMark ? numberDigits - 1 : numberDigits, numberX, cy + offset("slotdigits", 2));
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -1501,23 +1634,32 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *lock, cx + offset("slotlock", 1), cy + offset("slotlock", 2), 0, (info.exists ? int(StateNormal) : int(StateDisabled)) * h, lock->w, h, 1);
             }
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
-            auto mark = [&](const ImageRef &m) {
-                if (!m) return;
-                drawPart(out, *m, x, y, 0, 0, m->w, m->h, 1);
-                x += m->w;
+            auto mark = [&](const ImageRef &m, int cellInSheet) {
+                if (m) {
+                    drawPart(out, *m, x, y, 0, 0, m->w, m->h, 1);
+                    x += m->w;
+                } else if (dateDigits && dateColumns > 10) {
+                    int w = dateDigits->w / dateColumns;
+                    drawPart(out, *dateDigits, x, y, cellInSheet * w, 0, w, dateDigits->h, 1);
+                    // The slash and colon are thin, and the PC's digits close up around them.
+                    x += w - 2;
+                }
             };
             if (info.exists) {
-                x = drawNumber(dateDigits, info.date[0], 4, x, y);
-                mark(slash);
-                x = drawNumber(dateDigits, info.date[1], 2, x, y);
-                mark(slash);
-                x = drawNumber(dateDigits, info.date[2], 2, x, y);
+                x = drawNumber(dateDigits, info.date[0], 4, x, y, dateColumns);
+                mark(slash, 10);
+                x = drawNumber(dateDigits, info.date[1], 2, x, y, dateColumns);
+                mark(slash, 10);
+                x = drawNumber(dateDigits, info.date[2], 2, x, y, dateColumns);
                 x += offset("dategap", 0);
-                x = drawNumber(dateDigits, info.date[3], 2, x, y);
-                mark(colon);
-                x = drawNumber(dateDigits, info.date[4], 2, x, y);
-                mark(colon);
-                x = drawNumber(dateDigits, info.date[5], 2, x, y);
+                x = drawNumber(dateDigits, info.date[3], 2, x, y, dateColumns);
+                mark(colon, 11);
+                x = drawNumber(dateDigits, info.date[4], 2, x, y, dateColumns);
+                // Test Game 84's dates stop at the minute.
+                if (dateColumns == 10) {
+                    mark(colon, 11);
+                    x = drawNumber(dateDigits, info.date[5], 2, x, y);
+                }
             } else if (dash && dateDigits) {
                 int w = dateDigits->w / 10;
                 auto dashes = [&](int count) {
@@ -1525,18 +1667,18 @@ void Engine::composeSlots(Canvas &out) {
                     x += count * w;
                 };
                 dashes(4);
-                mark(slash);
+                mark(slash, 10);
                 dashes(2);
-                mark(slash);
+                mark(slash, 10);
                 dashes(2);
                 x += offset("dategap", 0);
                 dashes(2);
-                mark(colon);
+                mark(colon, 11);
                 dashes(2);
-                mark(colon);
+                mark(colon, 11);
                 dashes(2);
             }
-        }
+    }
 }
 
 void Engine::openDialog(int question, const std::function<void()> &yes) {
@@ -1556,9 +1698,15 @@ void Engine::openDialog(int question, const std::function<void()> &yes) {
 void Engine::composeDialog(Canvas &out) {
     const Screen &dialog = screens_.at("dialog");
     tintFrame(out, 0, 0, 0, 128);
+    // Test Game 84 has a picture to a question, in `question` lines in the sheet's order, and fixed art besides.
+    int question = 0;
+    bool separate = dialog.settings.count("question") != 0;
+    for (auto [it, end] = dialog.settings.equal_range("question"); it != end; ++it, question++)
+        if (question == dialogQuestion_ && it->second.size() >= 3)
+            if (ImageRef picture = images_->get(it->second[0])) drawPart(out, *picture, field(it->second, 1), field(it->second, 2), 0, 0, picture->w, picture->h, 1);
     for (const Picture &p : dialog.pictures) {
         Picture shown = p;
-        if (p.rows > 1) shown.row = dialogQuestion_;
+        if (p.rows > 1 && !separate) shown.row = dialogQuestion_;
         drawPicture(out, shown);
     }
     for (const Button &b : dialog.buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
@@ -1587,6 +1735,8 @@ void Engine::composeScreen(Canvas &out) {
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
+    composeTrackCards(out);
+    composeTrackTime(out);
     composeSettingsWidgets(out);
     bool fromTitle = returnTo_ == "title";
     for (Button &b : screen_->buttons) {
@@ -1594,6 +1744,7 @@ void Engine::composeScreen(Canvas &out) {
             size_t index = size_t(std::atoi(b.action.c_str() + 5));
             if (index >= tracks_.size() || !seen(tracks_[index])) continue;
         }
+        if (b.action.rfind("page", 0) == 0 && !galleryPageExists(std::atoi(b.action.c_str() + 4))) continue;
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
         bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
@@ -1606,6 +1757,19 @@ void Engine::composeScreen(Canvas &out) {
                        (b.action == "music_repeat" && trackRepeat_) || (b.action == "music_shuffle" && trackShuffle_);
         if (musicOn) state = over ? StateSelectedHover : StateSelected;
         if (b.action == "music_pause" && !trackPlayer_) state = StateDisabled;
+        // The current page's button sits higher in Test Game 84.
+        if (const auto *lift = screen_->setting("pagelift"); lift && current && b.action.rfind("page", 0) == 0) {
+            Button raised = b;
+            raised.y -= field(*lift, 0);
+            drawButton(out, raised, state);
+            continue;
+        }
+        if (b.action == "music_toggle") {
+            Button shown = b;
+            shown.column = trackPlayer_ && !trackPaused_ ? 1 : 2;
+            drawButton(out, shown, state);
+            continue;
+        }
         drawButton(out, b, state);
     }
     if (dialogOpen_) composeDialog(out);
@@ -1626,6 +1790,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_);
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
+        if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
         if (b.action == "Ejaculation" && !gt_.active) return StateDisabled;
         if (b.action == "Extension") {
             if (!gt_.active || gt_.extending) return StateDisabled;
@@ -1797,10 +1962,12 @@ void Engine::runFlow(const Node &n) {
         if (replaying_) endStory("scene");
         break;
     case 3:
+    case 20:  // the same in a replay
         beginChoice(n);
         break;
-    case 4:  // the other target for the option shown first, `next` for the second: a save the PC wrote after the first
-        flow.node = flow.script->node(choiceResult_ == 0 ? n.otherwise : n.next);
+    case 4:  // the other target when the option in parameter 0 was chosen, `next` otherwise: a save the PC wrote after the first
+    case 21:
+        flow.node = flow.script->node(choiceResult_ == (n.opcode == 4 ? n.p[0] : 0) ? n.otherwise : n.next);
         break;
     case 5: {  // a condition on a variable: `next` when it holds
         int left = variableValue(n.p[0], n.p[1]), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
@@ -1850,7 +2017,8 @@ void Engine::beginChoice(const Node &n) {
         choiceResult_ = 0;
         return;
     }
-    choiceCount_ = std::max(1, n.p[1]);
+    // A replay's choice gives no count. The one seen, in Test Game 84, has two options.
+    choiceCount_ = n.opcode == 20 ? 2 : std::max(1, n.p[1]);
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
     waiting_ = Waiting::Choice;
@@ -2009,6 +2177,16 @@ void Engine::runScene(const Node &n) {
         blurEnding_ = true;
         blurEndMs_ = std::max(1, p[0]);
         blurEndStart_ = now_;
+        break;
+    case 98:  // a ripple on a slot: speed, length, size
+    case 99:  // and off
+        for (auto *set : {&back_, &front_})
+            if (auto it = set->find(p[0]); it != set->end()) {
+                it->second.waveOn = n.opcode == 98;
+                it->second.waveSpeed = p[1];
+                it->second.waveRows = p[2];
+                it->second.waveSize = p[3];
+            }
         break;
     case 116:  // drives an external accessory, which VNDegen doesn't have
         break;
@@ -2227,7 +2405,8 @@ void Engine::mouseButton(int button, bool down) {
         }
         int cell = galleryCellAt(pointerX_, pointerY_);
         if (cell >= 0) {
-            openGalleryCell(cell);
+            if (screen_->name == "music") playTrack(page_ * int(screen_->settings.count("cell")) + cell);
+            else openGalleryCell(cell);
             return;
         }
         int slot = slotAt(pointerX_, pointerY_);
@@ -2269,27 +2448,39 @@ void Engine::mouseButton(int button, bool down) {
 }
 
 // The table's `choice` screen gives where options start and the step between them. Without one they stack in the middle.
-void Engine::choicePlace(int &x, int &top, int &step) const {
+void Engine::choicePlace(int &x, int &top, int &step, int &slant) const {
+    slant = 0;
     int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
     x = (width_ - cellW) / 2;
     top = (height_ - cellH * choiceCount_) / 2;
     step = cellH;
     auto it = screens_.find("choice");
-    const auto *place = it == screens_.end() ? nullptr : it->second.setting("place");
-    if (place && place->size() >= 2) {
-        top = std::atoi((*place)[0].c_str());
-        step = std::atoi((*place)[1].c_str());
+    if (it == screens_.end()) return;
+    if (const auto *place = it->second.setting("place"); place && place->size() >= 2) {
+        top = field(*place, 0);
+        step = field(*place, 1);
     }
+    // `placefor COUNT TOP STEP X SLANT` for a choice of that many options, each further right than the last, as Test Game
+    // 84's tilted frames have it.
+    for (auto [line, end] = it->second.settings.equal_range("placefor"); line != end; ++line)
+        if (line->second.size() >= 3 && field(line->second, 0) == choiceCount_) {
+            top = field(line->second, 1);
+            step = field(line->second, 2);
+            if (line->second.size() >= 5) {
+                x = field(line->second, 3);
+                slant = field(line->second, 4);
+            }
+        }
 }
 
 void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
-    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step;
-    choicePlace(x, top, step);
+    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step, slant;
+    choicePlace(x, top, step, slant);
     int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
     int hover = -1;
     for (int i = 0; i < choiceCount_; i++)
-        if (px >= x && px < x + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;
+        if (px >= x + i * slant && px < x + i * slant + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;
     if (hover != choiceHover_) {
         choiceHover_ = hover;
         dirty_ = true;
@@ -2349,7 +2540,7 @@ void Engine::startFlipbook(const Node &n) {
     s.y = float(p[3]);
     s.scaleX = float(p[4]) / 1000;
     s.scaleY = float(p[5]) / 1000;
-    s.corner = !p[8];
+    s.anchorX = s.anchorY = p[8] ? -1 : 0;
     s.flipLoop = p[14] != 0;
     s.flipReverse = p[1] != 0;
     resumeFlipbook(s);
@@ -2363,25 +2554,29 @@ void Engine::startFlipbook(const Node &n) {
 
 // A save holds the picture a flipbook is on but not how it plays. Walking the scene to the saved place finds the command
 // that started each one, following moves between slots: the scene with GOOD Timing's marker up to it, then the script the
-// save is in. A flipbook found nowhere repeats, as nearly all of them do.
+// save is in. A walk that never reaches its place, as when a patch took that node away, says nothing, and a flipbook found
+// nowhere repeats, as nearly all of them do.
 std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d) {
     std::map<int, FlipModes> slots;
     auto walk = [&](const std::string &name, int stopAt) {
         auto script = name.empty() ? nullptr : loadScript(name);
         if (!script) return;
+        std::map<int, FlipModes> walked = slots;
         const Node *n = script->first();
-        for (size_t guard = 0; n && n->id != stopAt && guard < script->nodes.size(); guard++, n = script->node(n->next)) {
-            if (n->opcode == 121) slots[n->p[0]] = {n->s[1], n->p[14] != 0, n->p[1] != 0};
-            else if (n->opcode == 17) slots.erase(n->p[0]);
-            else if (n->opcode == 22) slots.clear();
+        size_t guard = 0;
+        for (; n && n->id != stopAt && guard < script->nodes.size(); guard++, n = script->node(n->next)) {
+            if (n->opcode == 121) walked[n->p[0]] = {n->s[1], n->p[14] != 0, n->p[1] != 0};
+            else if (n->opcode == 17) walked.erase(n->p[0]);
+            else if (n->opcode == 22) walked.clear();
             else if (n->opcode == 120) {
-                auto it = slots.find(n->p[0]);
-                if (it == slots.end()) continue;
+                auto it = walked.find(n->p[0]);
+                if (it == walked.end()) continue;
                 FlipModes moved = it->second;
-                slots.erase(it);
-                slots[n->p[1]] = moved;
+                walked.erase(it);
+                walked[n->p[1]] = moved;
             }
         }
+        if (n ? n->id == stopAt : stopAt == 0) slots = std::move(walked);
     };
     if (!d.gtScene.empty() && normalizedPath(d.gtScene) != normalizedPath(d.scene)) walk(d.gtScene, d.gtMarker);
     walk(d.scene, d.node);
@@ -2412,6 +2607,8 @@ void Engine::resumeFlipbook(Sprite &s) {
 }
 
 void Engine::advanceFlipbooks() {
+    for (const auto &[slot, s] : front_)
+        if (s.waveOn) dirty_ = true;
     std::vector<std::pair<std::string, int>> ahead;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set) {
@@ -2632,11 +2829,24 @@ void Engine::loadImage(const Node &n) {
         return;
     }
     Sprite &s = back_[slot];
-    // A load keeps the slot's position and scale, so a difference image lands where the last one was.
+    // Parameter 0 places the picture with its middle at a fraction of the width and halfway down, and parameters 1 and 2
+    // move it from there, as the sprite places in the PC game's saves show. 0 keeps the slot's position and scale, so a
+    // difference image lands where the last one was.
+    if (n.p[0] >= 1 && n.p[0] <= 5) {
+        static const int kTenthsAcross[] = {5, 3, 7, 1, 9};
+        s.x = float((width_ * kTenthsAcross[n.p[0] - 1] / 5 - image->w) / 2 + n.p[1]);
+        s.y = float((height_ - image->h) / 2 + n.p[2]);
+    }
     s.image = image;
     s.path = n.s[1];
     s.flipCount = 0;
-    s.corner = false;
+    s.anchorX = s.anchorY = -1;
+}
+
+// Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
+void Engine::takeScaleAnchor(Sprite &s, const Node &n) {
+    s.anchorX = n.p[8] ? -1 : n.p[6];
+    s.anchorY = n.p[9] ? -1 : n.p[7];
 }
 
 // Parameters 16 to 19 say which of position, scale, rotation and alpha the command changes.
@@ -2653,6 +2863,7 @@ void Engine::transform(const Node &n) {
     if (p[17]) {
         s.scaleX = float(p[4]) / 1000;
         s.scaleY = float(p[5]) / 1000;
+        takeScaleAnchor(s, n);
     }
     if (p[19]) s.alpha = float(p[15]) / 256;
     // A background kept soft behind a character, when parameter 21 turns it on: the PC game draws sharp with 20 alone.
@@ -2700,6 +2911,7 @@ void Engine::changeOverTime(Sprite &s, const Node &n) {
         }
     }
     if (p[17]) {
+        takeScaleAnchor(s, n);
         add(Track::ScaleX, false, current.scaleX, float(p[4]) / 1000);
         add(Track::ScaleY, false, current.scaleY, float(p[5]) / 1000);
     }
@@ -2840,7 +3052,7 @@ void Engine::showText(const Node &n) {
     waiting_ = Waiting::Click;
     dirty_ = true;
     if (!n.s[3].empty() && !skip_) {
-        if (Bytes data = files_.read(n.s[3])) {
+        if (Bytes data = files_.read(voicePath(n.s[3]))) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = audio_.open(data);
             if (voicePlayer_) {
@@ -2999,9 +3211,18 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
         std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
         ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
-        // The position is the unscaled picture's top left, and it scales about its middle unless the sprite says the corner.
-        float halfW = float(s.image->w) * (s.corner ? v.scaleX : 1) * 0.5f, halfH = float(s.image->h) * (s.corner ? v.scaleY : 1) * 0.5f;
-        drawImage(out, image ? *image : *s.image, halfW + v.x + dx, halfH + v.y + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
+        // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
+        float w = float(s.image->w), h = float(s.image->h), anchorX = s.anchorX < 0 ? w * 0.5f : float(s.anchorX), anchorY = s.anchorY < 0 ? h * 0.5f : float(s.anchorY);
+        float middleX = v.x + anchorX + (w * 0.5f - anchorX) * v.scaleX, middleY = v.y + anchorY + (h * 0.5f - anchorY) * v.scaleY;
+        std::vector<int> shifts;
+        if (s.waveOn) {
+            // A sideways ripple travelling up the screen. PC footage at 2, 2 and 10 gives 10 pixels each way, 260 rows to
+            // a wave and 3.9 seconds to pass. How the first two parameters scale is a guess: the game's other use is rare.
+            shifts.resize(size_t(out.h));
+            float rows = 520.0f / float(std::max(1, s.waveRows)), ms = 7800.0f / float(std::max(1, s.waveSpeed));
+            for (int y = 0; y < out.h; y++) shifts[size_t(y)] = int(std::lround(float(s.waveSize) * std::sin(2 * kPi * (float(y) / rows + float(now_) / ms))));
+        }
+        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr);
     }
     composeSplashes(out, drawnTo, INT_MAX);
 }
@@ -3078,13 +3299,16 @@ void Engine::compose() {
         auto table = screens_.find("choice");
         if (table != screens_.end()) {
             for (const Picture &p : table->second.pictures) drawPicture(canvas_, p);
+            for (auto [line, end] = table->second.settings.equal_range("framefor"); line != end; ++line)
+                if (line->second.size() >= 4 && field(line->second, 0) == choiceCount_)
+                    if (ImageRef frame = images_->get(line->second[1])) drawPart(canvas_, *frame, field(line->second, 2), field(line->second, 3), 0, 0, frame->w, frame->h, 1);
         } else if (choiceBack_) {
             drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
         }
-        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step;
-        choicePlace(x, top, step);
+        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step, slant;
+        choicePlace(x, top, step, slant);
         for (int i = 0; i < choiceCount_; i++)
-            drawPart(canvas_, *choiceSheet_, x, top + i * step, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+            drawPart(canvas_, *choiceSheet_, x + i * slant, top + i * step, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
     }
 }
 
