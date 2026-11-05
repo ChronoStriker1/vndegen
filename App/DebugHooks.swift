@@ -112,9 +112,7 @@ enum DebugHooks {
         #if os(macOS)
         var quitToken: Int32 = 0
         notify_register_dispatch("\(prefix).app.quit", &quitToken, .main) { _ in
-            // From the run loop, as Command-Q's key event arrives. AppKit waits for the reply to a quit inside
-            // `terminate`, and called from this block it would hold the main queue, where the reply comes from.
-            RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { NSApp.terminate(nil) } }
+            MainActor.assumeIsolated { MacAppDelegate.quit() }
         }
         var snapshotToken: Int32 = 0
         notify_register_dispatch("\(prefix).app.snapshot", &snapshotToken, .main) { _ in

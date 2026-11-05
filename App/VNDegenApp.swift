@@ -64,6 +64,22 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// Command-Q and the Quit menu item. AppKit refuses to quit while a window has a sheet, with only a beep, so each sheet
+    /// closes first, as Escape closes it. SwiftUI takes a moment to take one down, and a sheet that stays leaves the quit
+    /// refused.
+    static func quit() {
+        Task {
+            for _ in 0..<50 {
+                guard let sheet = NSApp.windows.lazy.compactMap(\.attachedSheet).first else { break }
+                sheet.cancelOperation(nil)
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            // From the run loop, as a menu item's action runs. AppKit waits for the reply to a quit inside `terminate`, and
+            // called from this task it would hold the main queue, where the reply comes from.
+            RunLoop.main.perform(inModes: [.common]) { MainActor.assumeIsolated { NSApp.terminate(nil) } }
+        }
+    }
+
     /// Quitting by closing the window, Command-Q, or logging out ends a running game first so its play time is recorded
     /// and it writes its saves, then waits for automatic backups.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -127,6 +143,11 @@ struct VNDegenApp: App {
         Window("VNDegen", id: "main") { root }
             .windowStyle(.hiddenTitleBar)
             .defaultSize(width: 1280, height: 800)
+            .commands {
+                CommandGroup(replacing: .appTermination) {
+                    Button("Quit VNDegen", action: MacAppDelegate.quit).keyboardShortcut("q")
+                }
+            }
         #elseif DEBUG
         WindowGroup { SimulatedWindow { root } }
         #else
