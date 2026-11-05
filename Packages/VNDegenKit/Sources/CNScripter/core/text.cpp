@@ -9,15 +9,6 @@
 namespace vnns {
 
 namespace {
-uint32_t parseHexColor(std::string_view s) {
-    if (!s.empty() && s[0] == '#') s.remove_prefix(1);
-    unsigned v = 0;
-    for (size_t i = 0; i < 6 && i < s.size(); i++) {
-        char c = s[i];
-        v = v << 4 | unsigned(isdigit(uint8_t(c)) ? c - '0' : (tolower(c) - 'a' + 10) & 15);
-    }
-    return rgba(int(v >> 16 & 255), int(v >> 8 & 255), int(v & 255));
-}
 bool isHex6(const std::string &t, size_t p) {
     for (size_t i = 0; i < 6; i++)
         if (p + i >= t.size() || !isxdigit(uint8_t(t[p + i]))) return false;
@@ -165,7 +156,7 @@ void Engine::showWindow() {
             windowShown_ = true;
             effect_.from = std::move(from);
             effect_.e = windowEffect_;
-            effect_.mask = windowEffect_.mask.empty() ? nullptr : loadFileImage(windowEffect_.mask);
+            effect_.mask = windowEffect_.mask.empty() ? nullptr : loadMask(windowEffect_.mask);
             effect_.start = now_;
             effect_.active = true;
             wait_ = WaitKind::Effect;
@@ -407,7 +398,11 @@ void Engine::textStep() {
         // ~tags~ set the face and style of the text that follows. An unclosed one is drawn as it stands.
         size_t close = t.find('~', p + 1);
         if (close != std::string::npos && close < t.find('\n', p)) {
-            if (!textHiddenByLang()) applyPonsTag(ponsStyle_, std::string_view(t).substr(p + 1, close - p - 1));
+            if (!textHiddenByLang()) {
+                applyPonsTag(ponsStyle_, std::string_view(t).substr(p + 1, close - p - 1));
+                // gettext keeps tags, so a backlog drawn with logsp shows the page's styles (measured on the PC).
+                pageText_ += t.substr(p, close - p + 1);
+            }
             p = close + 1;
             return;
         }
@@ -571,6 +566,8 @@ void Engine::textStep() {
     if (ponscripter_) ch = ponsChar(t, p, &n);
     p += n;
     if (textHiddenByLang()) return;
+    // Outside carets, the PC engine draws no half-width space.
+    if (ponscripter_ && !caretText_ && ch == " ") return;
     if (ch == " " && ponsText()) {
         // Ponscripter breaks a line before a word that won't fit, and the space at the break isn't drawn.
         size_t nl = t.find('\n', p);

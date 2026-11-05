@@ -1,6 +1,7 @@
 #include "gfx.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -128,6 +129,16 @@ Image halveImage(const Image &src) {
             out.row(y)[x] = sum[0] / 4 | (sum[1] / 4) << 8 | (sum[2] / 4) << 16 | (sum[3] / 4) << 24;
         }
     return out;
+}
+
+uint32_t parseHexColor(std::string_view s) {
+    if (!s.empty() && s[0] == '#') s.remove_prefix(1);
+    unsigned v = 0;
+    for (size_t i = 0; i < 6 && i < s.size(); i++) {
+        char c = s[i];
+        v = v << 4 | unsigned(isdigit(uint8_t(c)) ? c - '0' : (tolower(c) - 'a' + 10) & 15);
+    }
+    return rgba(int(v >> 16 & 255), int(v >> 8 & 255), int(v & 255));
 }
 
 }  // namespace vnns

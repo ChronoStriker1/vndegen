@@ -247,15 +247,15 @@ void Engine::drawPonsText(Image &out) {
 }
 
 ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, const std::vector<uint32_t> &colors,
-                                  bool shadow, int &cells) {
+                                  bool shadow, int &cells, int wrap) {
     // Lay the string out once, then draw it in each colour. Each glyph hangs from its own face's ascent.
     struct Placed {
         const PonsFace::Glyph *g;
-        int x, ascent;
+        int x, y, ascent;
     };
     std::vector<Placed> glyphs;
     PonsStyle style;
-    int pen = 0, height = 0;
+    int pen = 0, height = 0, widest = 0, lineTop = 0;
     auto ascentOf = [px](PonsFace *f) { return px % 2 ? f->ascent(px) : 2 * f->ascent(px / 2); };
     for (size_t i = 0; i < text.size();) {
         if (text[i] == '^') {
@@ -276,12 +276,17 @@ ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, co
         PonsFace *face = ponsFace(style.face());
         if (!face) continue;
         const PonsFace::Glyph &g = face->glyph(decodeChar(ch, 0, &n), px);
-        glyphs.push_back({&g, pen, ascentOf(face)});
+        if (wrap > 0 && pen > 0 && pen + g.advance > wrap) {
+            pen = 0;
+            lineTop += face->height(px) + 2 * win_.py;
+        }
+        glyphs.push_back({&g, pen, lineTop, ascentOf(face)});
         pen += g.advance + pitch;
-        height = std::max(height, face->height(px));
+        widest = std::max(widest, pen);
+        height = std::max(height, lineTop + face->height(px));
     }
     // Even sizes, so each cell halves to whole pixels.
-    int w2 = (std::max(2, pen) + 1) & ~1, h2 = (std::max(2, height + (shadow ? shadeY_ : 0)) + 1) & ~1;
+    int w2 = (std::max(2, widest) + 1) & ~1, h2 = (std::max(2, height + (shadow ? shadeY_ : 0)) + 1) & ~1;
     cells = std::max(1, int(colors.size()));
     Image doubled(w2 * cells, h2);
     for (int c = 0; c < cells; c++)
@@ -289,7 +294,7 @@ ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, co
             for (int pass = shadow ? 0 : 1; pass < 2; pass++) {
                 uint32_t color = pass == 0 ? rgba(0, 0, 0) : colors[size_t(c)];
                 int gx = c * w2 + p.x + p.g->left + (pass == 0 ? shadeX_ : 0);
-                int gy = p.ascent - p.g->top + (pass == 0 ? shadeY_ : 0);
+                int gy = p.y + p.ascent - p.g->top + (pass == 0 ? shadeY_ : 0);
                 for (int y = 0; y < p.g->h; y++) {
                     if (gy + y < 0 || gy + y >= h2) continue;
                     uint32_t *row = doubled.row(gy + y);

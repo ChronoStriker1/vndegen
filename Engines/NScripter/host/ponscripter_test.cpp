@@ -167,7 +167,8 @@ static void layout() {
     const auto &page = engine.page_;
     assert(page.size() >= 2 && page[0].x2 == 20 && page[0].y2 == 40 + ascent && page[0].x == 10);
     assert(page[1].x2 == 20 + regular.glyph('H', px).advance && page[1].x == page[1].x2 / 2);
-    assert(engine.pageText_.rfind("Hi \u2019a\u2019 \u201Cb\u201D B end", 0) == 0);
+    // The page's text, as gettext gives it, keeps the tags (as the PC engine's does) for a backlog to draw.
+    assert(engine.pageText_.rfind("Hi \u2019a\u2019 \u201Cb\u201D ~b~B~b~ end", 0) == 0);
     for (const vnns::TextChar &c : page) assert(c.face == (c.ch == "B" ? 2 : 0) && c.shadow);
     // The paragraph: br's half line below the first line's end, then lines that break between words.
     size_t first = 0;
@@ -189,8 +190,52 @@ static void layout() {
     fs::remove_all(dir);
 }
 
+// The commands the games add or use from NScripter's direct drawing: tachistate, endroll, drawsp and draw, logsp, and
+// effect masks given as image tags.
+static void commands() {
+    char temp[] = "/tmp/vnns-ponscripter-commands-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directory(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    writeNbzArchive(dir / "arc.nsa", "pic\\test.bmp", testBitmap());
+    std::ofstream(dir / "0.utf") << "*define\nnsa\ngame\n*start\nbg #000000,1\n"
+                                    "tachistate %1,%2,%3\nld l,\":c;pic\\test.bmp\",1\ntachistate %4,%5,%6\n"
+                                    "lsp 1,\":c;pic\\test.bmp\",600,0\nprint 1\n"
+                                    "btndef \"pic\\test.bmp\"\nresettimer\nendroll 0,0,4,1,0,0,4,1,2,1000,1\ngettimer %7\n"
+                                    "drawclear\ndrawsp 1,0,255,10,10\ndraw\nlogsp 7,\"ab\",20,40\nclick\n"
+                                    "effect 5,18,800,\":c;pic\\test.bmp\"\nbg #FFFFFF,5\nend\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    assert(engine.step(16));
+    assert(engine.getNumVar(1) == 0 && engine.getNumVar(2) == 0 && engine.getNumVar(3) == 0);
+    assert(engine.getNumVar(4) == 1 && engine.getNumVar(5) == 0 && engine.getNumVar(6) == 0);
+    // endroll waits a pixel's time per pixel, a tenth of its speed in ms, and a click doesn't end it.
+    assert(engine.wait_ == vnns::WaitKind::Timer && engine.endRoll_.on);
+    engine.mouseButton(1, true);
+    engine.mouseButton(1, false);
+    for (int i = 0; i < 4; i++) engine.step(16);
+    assert(engine.wait_ == vnns::WaitKind::Timer);
+    for (int i = 0; i < 6; i++) engine.step(16);
+    assert(engine.getNumVar(7) >= 100 && engine.getNumVar(7) < 140);
+    // draw shows the drawsp picture: the sprite's red top-left pixel at (10, 10), black around it.
+    assert(engine.bltState_ == 1 && engine.bltLayer_.row(10)[10] == vnns::rgba(255, 0, 0));
+    assert(engine.bltLayer_.row(9)[10] == vnns::rgba(0, 0, 0));
+    // logsp's position is on the doubled screen.
+    assert(engine.scene_.sp[7].visible && engine.scene_.sp[7].x == 10 && engine.scene_.sp[7].y == 20);
+    // A mask given as an image tag is the file after the tag.
+    engine.mouseButton(1, true);
+    engine.mouseButton(1, false);
+    for (int i = 0; i < 3; i++) engine.step(16);
+    assert(engine.effect_.active && engine.effect_.mask);
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
     layout();
+    commands();
 }

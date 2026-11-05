@@ -2,6 +2,8 @@
 // script (0.utf) holding the text in two languages, each line marked with langjp or langen. Everything here was
 // settled as a black box, with lab scripts run on the games' own engine under Wine; docs/nscripter-cleanroom.md lists
 // what each lab showed.
+#include <algorithm>
+
 #include "engine.h"
 
 namespace vnns {
@@ -42,14 +44,117 @@ void cmdRendering(E &e, const std::string &) {
 
 // steamsetachieve "name": a Steam achievement, which VNDegen has no place for.
 void cmdSteamAchievement(E &e, const std::string &) { logf("Steam achievement %s", e.readStr().c_str()); }
+
+// tachistate %l,%c,%r: 1 for each standing image (left, centre, right) on screen, else 0. The games read it to draw
+// them again after switching sprite sets.
+void cmdTachiState(E &e, const std::string &) {
+    for (int i = 0; i < 3; i++) {
+        if (i) e.readComma();
+        const Sprite &s = e.scene_.ld[size_t(i)];
+        e.setVar(e.readVar(), s.loaded && s.visible ? 1 : 0);
+    }
+}
+
+// endroll dx,dy,dw,dh,sx,sy,sw,sh,mode,speed,distance: a credits roll. The btndef image's rectangle (sx, sy, sw, sh)
+// is drawn into (dx, dy, dw, dh), moving up a pixel every speed / 10 ms until it has moved distance pixels; the script
+// waits that long, and a click doesn't cut it short. The games use mode 2 only, the one measured.
+void cmdEndRoll(E &e, const std::string &) {
+    int64_t v[11];
+    for (int i = 0; i < 11; i++) {
+        if (i) e.readComma();
+        v[i] = e.readInt();
+    }
+    if (v[8] != 2) logf("endroll mode %lld isn't measured; it scrolls as mode 2", static_cast<long long>(v[8]));
+    E::EndRoll &r = e.endRoll_;
+    std::copy(v, v + 8, r.rect);
+    r.distance = int(std::clamp<int64_t>(v[10], 0, 1 << 20));
+    r.msPerPixel = std::clamp<int64_t>(v[9], 1, 100000) / 10.0;
+    r.start = e.now_;
+    r.on = true;
+    e.stepEndRoll();
+    e.waitTimer(int(r.distance * r.msPerPixel), false);
+}
+
+// drawclear: the draw picture becomes black.
+void cmdDrawClear(E &e, const std::string &) { e.drawBuffer_ = Image(e.width(), e.height(), rgba(0, 0, 0)); }
+
+// drawsp n,cell,alpha,x,y: draws sprite n's cell onto the draw picture, its top left at (x, y), whether or not the
+// sprite is shown. A cell past the sprite's last draws its whole image, as on the PC.
+void cmdDrawSp(E &e, const std::string &) {
+    int v[5];
+    for (int i = 0; i < 5; i++) {
+        if (i) e.readComma();
+        v[i] = e.readInt();
+    }
+    if (e.drawBuffer_.empty()) e.drawBuffer_ = Image(e.width(), e.height(), rgba(0, 0, 0));
+    const Sprite *s = e.spriteRef(v[0]);
+    if (!s || !s->img.image) return;
+    const Image &img = *s->img.image;
+    int cells = std::max(1, s->img.cells), cw = s->img.cellWidth;
+    int sx = v[1] >= 0 && v[1] < cells ? v[1] * cw : 0, w = v[1] >= 0 && v[1] < cells ? cw : img.w;
+    blit(e.drawBuffer_, img, v[3], v[4], sx, 0, w, img.h, std::clamp(v[2], 0, 255));
+}
+
+// draw: the draw picture goes on the screen, over the scene, until the scene is next brought up to date.
+void cmdDraw(E &e, const std::string &) {
+    if (e.drawBuffer_.empty()) e.drawBuffer_ = Image(e.width(), e.height(), rgba(0, 0, 0));
+    e.bltLayer_ = e.drawBuffer_;
+    e.bltState_ = 1;
+    e.composeFrame();
+}
+
+// logsp n,text,x,y[,colour...]: a sprite of a page's text, as getlog or gettext gave it, for a backlog screen. In
+// Ponscripter its position is on the doubled screen, it breaks at any character to fit the window's width, and the
+// page's line breaks are dropped (measured on the PC engine).
+void cmdLogSp(E &e, const std::string &) {
+    int n = e.readInt();
+    e.readComma();
+    std::string text = e.readStr();
+    e.readComma();
+    int x = e.readInt();
+    e.readComma();
+    int y = e.readInt();
+    std::vector<uint32_t> colors;
+    while (e.readComma()) colors.push_back(parseHexColor(e.readStr()));
+    if (colors.empty()) colors.push_back(rgba(255, 255, 255));
+    if (colors.size() > 64) colors.resize(64);
+    text.erase(std::remove(text.begin(), text.end(), '\n'), text.end());
+    Sprite *s = e.spriteRef(n);
+    if (!s) return;
+    int cells = 1;
+    ImageRef img = e.renderPonsString(text, 2 * e.win_.fh, 0, colors, e.win_.shadow, cells, 2 * e.win_.cols * e.win_.fw);
+    *s = Sprite();
+    s->img.image = img;
+    s->img.cells = cells;
+    s->img.cellWidth = img->w / cells;
+    s->img.loop = 3;
+    s->loaded = s->visible = true;
+    s->x = x / 2;
+    s->y = y / 2;
+    e.sceneDirty_ = true;
+}
 }  // namespace
+
+void Engine::stepEndRoll() {
+    EndRoll &r = endRoll_;
+    int moved = int(std::min<double>(r.distance, double(now_ - r.start) / r.msPerPixel));
+    int64_t v[8];
+    std::copy(r.rect, r.rect + 8, v);
+    v[5] += moved;
+    bltLayer_ = Image(width(), height(), 0);
+    bltState_ = 1;
+    bltRect(v);
+    if (moved >= r.distance) r.on = false;
+}
 
 const std::unordered_map<std::string, CommandFn> &ponscripterCommandTable() {
     static const std::unordered_map<std::string, CommandFn> table = {
         {"langen", cmdLang},          {"langjp", cmdLang},       {"langall", cmdLang},
         {"showlangen", cmdShowLang},  {"showlangjp", cmdShowLang}, {"getreadlang", cmdGetReadLang},
         {"language", cmdLanguage},    {"h_mapfont", cmdMapFont}, {"h_rendering", cmdRendering},
-        {"steamsetachieve", cmdSteamAchievement},
+        {"steamsetachieve", cmdSteamAchievement}, {"tachistate", cmdTachiState}, {"endroll", cmdEndRoll},
+        {"drawclear", cmdDrawClear},  {"drawsp", cmdDrawSp},     {"draw", cmdDraw},
+        {"logsp", cmdLogSp},
     };
     return table;
 }

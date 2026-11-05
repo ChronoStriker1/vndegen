@@ -44,6 +44,9 @@ inline uint32_t scalePx(uint32_t p, uint32_t a) {
     ga = ((ga + ((ga >> 8) & 0x00FF00FF)) >> 8) & 0x00FF00FF;
     return rb | ga << 8;
 }
+// "#RRGGBB" (the # optional) as an opaque pixel.
+uint32_t parseHexColor(std::string_view s);
+
 // Half the size, rounded up: each pixel the average of a 2x2 block, a pixel past an odd edge counting as transparent.
 // Ponscripter's ":b" images, measured on its engine.
 Image halveImage(const Image &src);

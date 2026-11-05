@@ -295,7 +295,7 @@ void Engine::printWithEffect(const Effect &e) {
         drawBltLayer(to);
         if (!startDllEffect(to)) effect_.e.type = 10;
     } else if (!e.mask.empty()) {
-        effect_.mask = loadFileImage(e.mask);
+        effect_.mask = loadMask(e.mask);
     }
     effect_.start = now_;
     effect_.active = true;
@@ -1031,21 +1031,27 @@ void cmdBlt(E &e, const std::string &) {
         if (i) e.readComma();
         v[i] = e.readInt();
     }
+    e.bltRect(v);
+}
+
+}  // namespace
+
+void Engine::bltRect(const int64_t v[8]) {
     // blt copies the image as it is (a Windows BitBlt), so the default transparency mode doesn't apply to it; an image
     // the script tagged itself keeps its tag.
-    const std::string &tag = e.btnImage_.tag;
+    const std::string &tag = btnImage_.tag;
     if (tag.empty()) return;
     std::string opaque = tag[0] == ':' ? tag : ":c;" + tag;
-    if (e.bltSource_.tag != opaque && !e.loadImage(opaque, e.bltSource_)) return;
-    if (!e.bltSource_.image) return;
-    const Image &src = *e.bltSource_.image;
+    if (bltSource_.tag != opaque && !loadImage(opaque, bltSource_)) return;
+    if (!bltSource_.image) return;
+    const Image &src = *bltSource_.image;
     int64_t dx = v[0], dy = v[1], dw = v[2], dh = v[3], sx = v[4], sy = v[5], sw = v[6], sh = v[7];
     if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) return;
-    if (e.bltState_ == 0) {
-        e.bltLayer_ = Image(e.width(), e.height(), 0);
-        e.bltState_ = 1;
+    if (bltState_ == 0) {
+        bltLayer_ = Image(width(), height(), 0);
+        bltState_ = 1;
     }
-    Image &dst = e.bltLayer_;
+    Image &dst = bltLayer_;
     // In 64 bits: a script's rectangle may be anywhere, and only the part on screen and in the image is drawn.
     int64_t y0 = std::max<int64_t>(0, dy), y1 = std::min<int64_t>(dst.h, dy + dh);
     int64_t x0 = std::max<int64_t>(0, dx), x1 = std::min<int64_t>(dst.w, dx + dw);
@@ -1059,8 +1065,10 @@ void cmdBlt(E &e, const std::string &) {
             if (tx >= 0 && tx < src.w) row[x] = over(row[x], srow[tx]);
         }
     }
-    e.composeFrame();
+    composeFrame();
 }
+
+namespace {
 
 // ofscpy (or ofscopy): blt's drawing becomes the offscreen image, so the next plain print shows it too.
 void cmdOfscpy(E &e, const std::string &) {

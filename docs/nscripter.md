@@ -97,7 +97,20 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
   and `...` stay as written, and there are no ligatures.
 - String sprites (`:s`) and `select` items are laid out the same way. A size in an `:s` tag (`:s/16,16,0;`) is the em
   and the character pitch on the doubled screen, so `/30,30,0` is 15 pixels; only the height and the pitch count.
-- A Ponscripter text line may open with a full-width space, which is drawn, where NScripter would skip it.
+- A Ponscripter text line may open with a full-width space, which is drawn, where NScripter would skip it. Outside
+  carets, a half-width space isn't drawn.
+- `gettext` keeps a page's `~tags~`, and `logsp n,text,x,y,colours` draws such a page as a sprite for the games' own
+  backlog: its position is on the doubled screen, it breaks at any character to fit the window's width, the page's
+  line breaks are dropped, and the tags style it.
+- `endroll` scrolls the `btndef` image for the end-of-episode credits: its eleven arguments are the screen rectangle,
+  the image rectangle, a mode (the games use 2), the time per pixel in tenths of a millisecond, and the distance in
+  pixels. The script waits until it has scrolled, and a click doesn't cut it short; the image stays on screen, as
+  `blt` drawing does, until the scene is next brought up to date.
+- `drawclear`, `drawsp` and `draw`, NScripter's direct drawing, build a picture of sprites that `draw` puts on the
+  screen in the same way; one tea party's credits animate with them.
+- `tachistate` reads whether each standing image (left, centre, right) is on screen.
+- An effect's mask may be an image tag (`":c;Bmp\Efe\left.bmp"`), as the games write them; the file after the tag
+  is the mask.
 - `h_rendering` (no hinting, whole pixels) is read; it is what the runtime does.
 - Images tagged `:b` (`:b;`, `:bc;`, `:ba/2,0,3;`, ...) are drawn at half their size, rounded up, each pixel the
   average of a 2x2 block with a pixel past an odd edge counting as transparent. The games' menus and buttons are drawn
@@ -241,7 +254,10 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
 - MIDI music (`play "song.mid"`) isn't played; no test game has any.
 - Ponscripter: glyph edges differ from the PC's by a few levels of grey, stb_truetype's antialiasing against
   FreeType's; layout is the same pixel for pixel in every lab. Only the `~i~`, `~b~` and `~cN~` tags are read, the
-  ones the games use. The window's character pitch isn't added to proportional text (the games' is 0). Saves aren't
+  ones the games use. The window's character pitch isn't added to proportional text (the games' is 0). `logsp` reads
+  tags in any string, where the PC engine reads them only in a page that `gettext` gave; one backlog line in a lab
+  broke a character later than the PC's. `endroll`'s other modes aren't measured. `len` and `mid` count bytes, as in
+  NScripter; the games don't use them, and the PC engine wasn't checked. Saves aren't
   the PC engine's files. An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.

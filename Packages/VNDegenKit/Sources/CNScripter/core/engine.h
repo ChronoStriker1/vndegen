@@ -312,6 +312,13 @@ public:
         return loadImage(!tag.empty() && tag[0] == ':' ? tag : ":c;" + tag, out);
     }
     ImageRef loadFileImage(const std::string &file, bool *hasAlpha = nullptr);
+    // An effect's mask file. The Umineko games write theirs as image tags (":c;Bmp\Efe\left.bmp"), which their engine
+    // reads as the file after the tag; in NScripter the string is the file name.
+    ImageRef loadMask(const std::string &spec) {
+        size_t semi = spec.find(';');
+        bool tagged = ponscripter_ && !spec.empty() && spec[0] == ':' && semi != std::string::npos;
+        return loadFileImage(tagged ? spec.substr(semi + 1) : spec);
+    }
     std::unordered_map<std::string, ImageRef> imageCache_;
     std::vector<std::string> imageCacheOrder_;
     std::unordered_set<std::string> imageAlpha_;  // cached images that have an alpha channel
@@ -346,6 +353,9 @@ public:
     Image bltLayer_;
     LoadedImage bltSource_;  // the btndef image, loaded without its transparency for blt
     int bltState_ = 0;  // 0 none, 1 drawn, 2 drawn and ofscpy has run
+    // Draws the btndef image's rectangle (sx, sy, sw, sh), scaled to (dx, dy, dw, dh), into the blt layer: v holds
+    // the eight in that order, as blt takes them.
+    void bltRect(const int64_t v[8]);
     void clearBlt() {
         bltState_ = 0;
         bltLayer_ = Image();
@@ -420,6 +430,18 @@ public:
     TextEncoding encoding() const { return ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis; }
     bool textHiddenByLang() const { return ponscripter_ && textLang_ >= 0 && textLang_ != shownLang_; }
     std::map<int, std::string> fontFiles_;  // h_mapfont: the game's font files, by face number
+    // endroll: the btndef image scrolls up through a rectangle, a pixel every msPerPixel, for distance pixels, while
+    // the script waits. Drawn into the blt layer each step.
+    struct EndRoll {
+        bool on = false;
+        int64_t start = 0;
+        int64_t rect[8] = {};
+        int distance = 0;
+        double msPerPixel = 1;
+    } endRoll_;
+    void stepEndRoll();
+    // drawclear, drawsp and draw build a picture of their own, which draw puts on the screen as blt does.
+    Image drawBuffer_;
 
     // Ponscripter's proportional text (ponstext.cpp). Positions are in pixels of a screen twice the game's size, where
     // the engine draws; the text is halved onto the frame.
@@ -461,10 +483,10 @@ public:
         std::vector<Placed> placed;
     } ponsLayer_;
     void drawPonsText(Image &out);
-    // A ":s" string sprite's text, laid out on one line with an em of px and pitch pixels between characters on the
-    // doubled screen, and halved, one cell per colour.
+    // A ":s" string sprite's text, laid out with an em of px and pitch pixels between characters on the doubled
+    // screen, and halved, one cell per colour. With a wrap width, a character that would pass it starts a line.
     ImageRef renderPonsString(const std::string &text, int px, int pitch, const std::vector<uint32_t> &colors, bool shadow,
-                              int &cells);
+                              int &cells, int wrap = 0);
     void noteTextLineStart();      // savepoint and read-text bookkeeping at the head of a text line
     bool textBtnOff_ = false;
     int textBtnStart_ = 1;

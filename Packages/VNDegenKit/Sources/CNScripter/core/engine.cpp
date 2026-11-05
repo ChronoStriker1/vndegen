@@ -270,6 +270,7 @@ bool Engine::step(int ms) {
         Bytes data;
         if (readSound(loopBgmTail_, data)) audio_.play(AudioMixer::kBgm, std::move(data), true, volBgm_);
     }
+    if (endRoll_.on) stepEndRoll();
     processWait();
     animateSprites();
     tickLayers();

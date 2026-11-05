@@ -329,6 +329,12 @@ void Engine::drawSystemUi(Image &out) {
         while (start <= text.size()) {
             size_t nl = text.find('\n', start);
             std::string line = text.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
+            // A Ponscripter page keeps its ~tags~ for the game's own backlog; this one draws without them.
+            for (size_t open; ponscripter_ && (open = line.find('~')) != std::string::npos;) {
+                size_t close = line.find('~', open + 1);
+                if (close == std::string::npos) break;
+                line.erase(open, close - open + 1);
+            }
             drawGlyphs(out, line, x, y, win_.fw, win_.fh, win_.px, rgba(0xFF, 0xFF, 0x88), win_.bold, true, 0, 0);
             y += win_.fh + win_.py;
             if (nl == std::string::npos) break;
