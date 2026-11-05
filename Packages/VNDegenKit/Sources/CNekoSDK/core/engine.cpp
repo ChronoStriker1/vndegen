@@ -1329,7 +1329,8 @@ SaveData Engine::captureSave() {
     };
     soundsOf(bgmNow_, bgm_, 0);
     soundsOf(seNow_, se_, 60);
-    d.scene = scene_.script ? scene_.script->name : "";
+    // Between scenes the PC's save still names the last one, and it won't ask a choice from a save that doesn't.
+    d.scene = scene_.script ? scene_.script->name : lastScene_;
     d.gtConfig = gt_.config;
     if (gt_.active || gt_.ejaculating) {
         d.gtState = gt_.extending ? std::max(1, gt_.played) : 0;
@@ -1419,9 +1420,16 @@ void Engine::restoreSave(const SaveData &d) {
     bool atChoice = false;
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
-        // A save made while a choice waits names the choice, and the choice is asked again.
-        atChoice = call && (call->opcode == 3 || call->opcode == 20);
-        stack_.push_back({flow, atChoice ? call : call ? flow->node(call->next) : flow->first()});
+        // The PC's save made while a choice waits names the choice, and it's asked again. Ours names the scene before, which
+        // is what the PC itself needs to ask it, and a finished scene with a choice next means the same here.
+        const Node *after = call ? flow->node(call->next) : nullptr;
+        bool namesChoice = call && (call->opcode == 3 || call->opcode == 20), choiceNext = after && d.node == 0 && (after->opcode == 3 || after->opcode == 20);
+        atChoice = namesChoice || choiceNext;
+        // Back to the scene before, so that saving again here writes what the PC can ask the choice from.
+        if (namesChoice)
+            for (const Node &candidate : flow->nodes)
+                if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
+        stack_.push_back({flow, namesChoice ? call : call ? after : flow->first()});
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d);
     for (const SavedSprite &saved : d.sprites) {
@@ -1476,6 +1484,7 @@ void Engine::restoreSave(const SaveData &d) {
     }
     auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
+    lastScene_ = d.scene;
     // The PC's saves don't hold Extend: two saves differing only in it match. It stays as it was across a load.
     bool extendWas = gt_.extend;
     gt_ = {};
@@ -1949,6 +1958,7 @@ void Engine::runFlow(const Node &n) {
         auto script = loadScript(n.s[1]);
         if (script && script->first()) {
             scene_ = {script, script->first()};
+            lastScene_ = script->name;
             flowCallId_ = n.id;
             noteSeen(n.s[1]);
             log("scene %s", script->name.c_str());
@@ -2832,18 +2842,27 @@ void Engine::loadImage(const Node &n) {
         return;
     }
     Sprite &s = back_[slot];
-    // Parameter 0 places the picture with its middle at a fraction of the width and halfway down, and parameters 1 and 2
-    // move it from there, as the sprite places in the PC game's saves show. 0 keeps the slot's position and scale, so a
-    // difference image lands where the last one was.
+    // Parameter 0 places the picture: centred, or with its middle 256 or 512 to the left or right of centre, and parameters
+    // 1 and 2 move it from there. It also resets the scale, as the sprite places in the PC game's saves show, at both 1280
+    // and 1920 wide. 0 keeps the slot's position and scale, so a difference image lands where the last one was.
     if (n.p[0] >= 1 && n.p[0] <= 5) {
-        static const int kTenthsAcross[] = {5, 3, 7, 1, 9};
-        s.x = float((width_ * kTenthsAcross[n.p[0] - 1] / 5 - image->w) / 2 + n.p[1]);
+        static const int kFromCentre[] = {0, -256, 256, -512, 512};
+        s.x = float((width_ - image->w) / 2 + kFromCentre[n.p[0] - 1] + n.p[1]);
         s.y = float((height_ - image->h) / 2 + n.p[2]);
+        s.scaleX = s.scaleY = 1;
+        s.anchorX = s.anchorY = -1;
+        s.changes.clear();
+    } else if (n.p[5]) {
+        // Parameter 5 starts the slot afresh: Test Game 95 moves a background 1000 up, loads the next with this set, and
+        // the PC's save has it back at 0, 0.
+        s.x = s.y = 0;
+        s.scaleX = s.scaleY = 1;
+        s.anchorX = s.anchorY = -1;
+        s.changes.clear();
     }
     s.image = image;
     s.path = n.s[1];
     s.flipCount = 0;
-    s.anchorX = s.anchorY = -1;
 }
 
 // Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
@@ -2860,8 +2879,9 @@ void Engine::transform(const Node &n) {
     Sprite &s = it->second;
     s.changes.clear();
     if (p[16]) {
-        s.x = float(p[1]);
-        s.y = float(p[2]);
+        // Parameter 0 makes it a move from where the sprite is, as it does for a change over time.
+        s.x = float(p[1]) + (p[0] == 1 ? s.x : 0);
+        s.y = float(p[2]) + (p[0] == 1 ? s.y : 0);
     }
     if (p[17]) {
         s.scaleX = float(p[4]) / 1000;

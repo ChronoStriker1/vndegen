@@ -140,6 +140,7 @@ private:
     bool cardAt(int slot, int &x, int &y) const;
     bool overCardDelete(int slot, int x, int y) const;
     int newestQuickSlot();
+    std::string lastScene_;
     int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();

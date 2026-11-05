@@ -103,7 +103,7 @@ scene.
   recording's steps along such a move fall in even amounts, which is a quadratic easing out.
 - Parameters 16 to 19 of opcodes 18 and 25 say which of position, scale, rotation and alpha change: a command with a scale
   in 4 and 5 but no 17 left the background at scale 2.00 in a fit of the recording.
-- A sprite's centre sits at the screen's centre plus its x and y, and scale is about the centre: fits of the recording give
+- On full-screen art, a sprite's position is the screen's top left plus its x and y, and scale is about the centre: fits of the recording give
   an offset of 0 at the expected scales.
 - A timed change runs at once on what's on screen, as well as on the sprite waiting for the next update.
 - A name on the same line as the text ends at `MsgNamePosX`. Test Game 97's name is right-aligned there.
@@ -115,7 +115,7 @@ scene.
 
 ## Placing and scaling pictures
 
-Parameter 0 of the image load command places a picture: 1 to 5 put its middle at 50, 30, 70, 10 and 90 percent of the width and halfway down, and parameters 1 and 2 add to that. 0 leaves the slot's place alone. The PC's saved sprite places, compared with the commands and the pictures' sizes in Test Games 84 and 88, match exactly, with C's division toward zero. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match. Frames from Test Game 84's PC game and the runtime then differ only by the text font.
+A sprite's x and y are the top left of the unscaled picture. Parameter 0 of the image load command places a picture: 1 centres it, 2 and 3 put its middle 256 to the left and right of centre, 4 and 5 put it 512 away, and parameters 1 and 2 add to that. It always sits halfway down, and the scale goes back to 1. 0 leaves the slot's place and scale alone, unless parameter 5 is set, which starts the slot afresh at 0, 0. Parameter 0 of the set-position command, 18, makes its position a move from where the sprite is, as it does for command 25. These were checked by replaying scenes to the node each PC save names and comparing the sprite places the PC saved, in Test Games 84, 93, 95 and 97, at 1280 and 1920 wide, with C's division toward zero. Sprites kept from an earlier scene can't be checked that way. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match.
 
 The ripple command, 98, shifts rows sideways. On PC at parameters 2, 2 and 10 a burst of screenshots fits a wave of about 10 pixels each way, 260 rows long, that takes 3.9 seconds to pass upward.
 
@@ -130,6 +130,8 @@ Funbag Fantasy 3 if keeps 892 more pictures in an `sc` folder beside `sc.pak`, o
 From Test Game 88 under Wine, its manual, and PC saves compared. `cfg` files under `gt/cfg` list groups of scripts. Opcode 153 names one and opcode 154 marks where Ejaculate lands. The save's tail holds, after the scene name: a state at byte 819 that's -1 when off, 0 in the scene and a small number inside the extra scripts; the count twice at 823; the first counted text's node at 831; the marker's node at 835; then two strings, the scene and the config. The marker's first parameter was 12 and the count started 12 text nodes before it. Saves taken with Extend on and off differ only in the time and play counters, so it isn't saved, and it stays on across a load. Pressing Ejaculate before the marker plays the `Ejaculate` script and goes on after the marker; pressing it in the extra scripts goes straight there, because that save's backlog has no line of the script.
 
 A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the middle field of its line: every flag set in three PC games' files is such a number, and those numbers don't track the entries, so a flag is 4 bytes at 48000 plus that number times 4. A sprite record holds a ripple at 0x1A6 before the layout's adjustment, a byte that's 1 when on and three ints, the command's parameters 1, 2 and 3.
+
+The block after the sprite records holds a count at byte 22 and that many sprite numbers after the block's fixed part, in every game seen. The PC's save made at a choice names the choice as its flow node. Its later blocks also hold state the runtime doesn't write, and a save of ours naming the choice makes the PC run past it, so ours names the scene before, and the PC then asks the choice itself.
 
 A flipbook's sprite record has 0 in its second byte and its current picture where other records have 0. A splash's record has no picture and 35 more bytes. Test Game 88's text records are 4 bytes shorter than Test Game 97's.
 
