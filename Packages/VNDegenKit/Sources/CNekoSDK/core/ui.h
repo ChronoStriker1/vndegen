@@ -20,6 +20,7 @@ struct Button {
     ImageRef sheet;
     int x = 0, y = 0;      // where the cell draws
     int cols = 1, rows = 5, column = 0;
+    int normalRow = 0, hoverRow = 1;
     bool toggle = false;   // stays down until pressed again
     bool always = false;   // reacts even when `disabled` asks otherwise
     ImageRef help;         // shown while hovered

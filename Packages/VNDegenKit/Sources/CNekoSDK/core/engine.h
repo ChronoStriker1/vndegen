@@ -139,6 +139,46 @@ private:
     void composeDialog(Canvas &out);
     void openDialog(int question, const std::function<void()> &yes);
 
+    // Galleries.
+    void loadGalleries();
+    void noteSeen(const std::string &path);
+    bool seen(const std::string &path) const;
+    void saveSeen();
+    void composeGallery(Canvas &out);
+    int galleryCellAt(int x, int y) const;
+    void openGalleryCell(int index);
+    struct GalleryEntry {
+        int page = 0;
+        std::string thumbnail, flow, key, bgm;
+        std::vector<std::string> images;
+    };
+    std::vector<GalleryEntry> cgEntries_, sceneEntries_;
+    std::vector<std::string> tracks_;
+    std::unordered_map<std::string, bool> seen_;
+    bool seenChanged_ = false;
+    std::vector<std::string> viewing_;
+    size_t viewingIndex_ = 0;
+    bool viewingImage_ = false;
+    bool replaying_ = false;
+    int trackPlayer_ = 0;
+
+    // Settings: volumes out of 100, kept in a small file of VNDegen's beside the saves.
+    void loadSettings();
+    void saveSettings();
+    void applyVolumes();
+    int masterVolume_ = 100, bgmVolume_ = 80, seVolume_ = 80, voiceVolume_ = 80;
+    int textSpeed_ = 1;
+    void composeSettingsWidgets(Canvas &out);
+    bool pressSettingsWidget(int x, int y, bool dragging);
+
+    std::vector<int> globalMacros_, scenarioMacros_;
+    std::string storyFlowKey_ = "FirstFlow";
+
+    // Global variables, in the PC's cfg.sav.
+    void loadGlobals();
+    void saveGlobals();
+    std::vector<uint8_t> configFile_;
+
     // Menus.
     void openScreen(const std::string &name);
     void closeScreen();
@@ -158,6 +198,8 @@ private:
     void beginChoice(const Node &n);
     void updateChoice();
     int variableValue(int scope, int index) const;
+    int variableNumber(int scope, int index) const;
+    void endStory(const std::string &screen);
     void loadImage(const Node &n);
     void transform(const Node &n);
     void transformOverTime(const Node &n);

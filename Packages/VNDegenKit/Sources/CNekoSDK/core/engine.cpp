@@ -189,6 +189,9 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     if (const char *table = menuTable(folder_))
         screens_ = parseScreens(table, *images_, [this](const std::string &what) { warnOnce(what); });
     log("started: %dx%d, %d scripts in scr, %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus");
+    loadGalleries();
+    loadGlobals();
+    loadSettings();
     if (screens_.count("title")) openScreen("title");
     else startStory();
     return true;
@@ -209,6 +212,7 @@ void Engine::openScreen(const std::string &name) {
     screen_ = &it->second;
     pressed_.clear();
     dirty_ = true;
+    page_ = 0;
     if (name == "title" && !titleBgm_.empty() && !titleMusic_) {
         if (Bytes data = files_.read(titleBgm_)) {
             titleMusic_ = audio_.open(data);
@@ -225,6 +229,30 @@ void Engine::closeScreen() {
     dirty_ = true;
 }
 
+// Back from the story to a menu, with its sound and sprites cleared.
+void Engine::endStory(const std::string &screen) {
+    stopKind(kKindBgm, 500);
+    stopKind(kKindSe, 500);
+    stopKind(kKindVoice, 0);
+    if (voicePlayer_) {
+        audio_.stop(voicePlayer_);
+        voicePlayer_ = 0;
+    }
+    stack_.clear();
+    scene_ = {};
+    back_.clear();
+    front_.clear();
+    windowShown_ = false;
+    replaying_ = false;
+    waiting_ = Waiting::None;
+    saveSeen();
+    saveGlobals();
+    returnTo_ = screen == "scene" ? "title" : "";
+    screen_ = nullptr;
+    openScreen(screen);
+    if (screen == "scene") returnTo_ = "title";
+}
+
 void Engine::startStory() {
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -236,8 +264,11 @@ void Engine::startStory() {
     back_.clear();
     front_.clear();
     scenario_.clear();
+    backlog_.clear();
+    choiceImage_.clear();
+    replaying_ = false;
     waiting_ = Waiting::None;
-    std::string first = config_.text("FirstFlow");
+    std::string first = config_.text(storyFlowKey_.c_str());
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
         complain("This game has no flow script to start from.");
@@ -252,7 +283,39 @@ void Engine::startStory() {
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
-    if (action == "start") { startStory(); return; }
+    if (action == "start") {
+        // Past the prologue a game may offer to skip it, when its table has that question.
+        if (screens_.count("start") && !config_.text("MainFlow").empty() && variableValue(0, 1)) {
+            openScreen("start");
+            return;
+        }
+        storyFlowKey_ = "FirstFlow";
+        startStory();
+        return;
+    }
+    if (action == "start_prologue") { storyFlowKey_ = "FirstFlow"; startStory(); return; }
+    if (action == "start_main") { storyFlowKey_ = "MainFlow"; startStory(); return; }
+    if (action.rfind("track", 0) == 0) {
+        size_t index = size_t(std::atoi(action.c_str() + 5));
+        if (index < tracks_.size() && seen(tracks_[index])) {
+            if (trackPlayer_) audio_.stop(trackPlayer_);
+            if (Bytes data = files_.read(tracks_[index])) {
+                trackPlayer_ = audio_.open(data);
+                if (trackPlayer_) {
+                    audio_.setGroup(trackPlayer_, 0);
+                    audio_.setLoops(trackPlayer_, 0);
+                    audio_.play(trackPlayer_);
+                }
+            }
+        }
+        return;
+    }
+    if (action.rfind("tab", 0) == 0) {
+        std::string keep = returnTo_;
+        openScreen("config" + action.substr(3));
+        returnTo_ = keep;
+        return;
+    }
     if (action == "quit" || action == "Exit") { openDialog(7, [this] { waiting_ = Waiting::Ended; }); return; }
     if (action == "Title") { openDialog(6, [this] { screen_ = nullptr; openScreen("title"); }); return; }
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
@@ -287,17 +350,35 @@ void Engine::runAction(const std::string &action) {
     if (action == "log_top") { scrollLog(int(backlog_.size())); return; }
     if (action == "log_bottom") { scrollLog(-int(backlog_.size())); return; }
     if (action == "back") {
+        viewingImage_ = false;
+        if (trackPlayer_) {
+            audio_.stop(trackPlayer_);
+            trackPlayer_ = 0;
+        }
+        saveSettings();
         if (returnTo_.empty()) closeScreen();
-        else openScreen(returnTo_);
+        else {
+            std::string to = returnTo_;
+            screen_ = nullptr;
+            openScreen(to);
+        }
         return;
     }
     if (action.rfind("page", 0) == 0) { page_ = std::atoi(action.c_str() + 4); return; }
-    if (action == "nav_save" || action == "Save") { noteThumbnail(); openScreen("save"); return; }
-    if (action == "nav_load" || action == "Load" || action == "load") { noteThumbnail(); openScreen("load"); return; }
-    if (action == "nav_config" || action == "Config" || action == "config") { noteThumbnail(); openScreen("config"); return; }
-    if (action == "nav_cg" || action == "cg") { openScreen("cg"); return; }
-    if (action == "nav_scene" || action == "scene") { openScreen("scene"); return; }
-    if (action == "nav_music" || action == "music") { openScreen("music"); return; }
+    // Moving between menus keeps where Back returns to.
+    auto go = [&](const char *name) {
+        noteThumbnail();
+        std::string keep = returnTo_;
+        bool within = screen_ != nullptr && screen_->name != "title";
+        openScreen(name);
+        if (within) returnTo_ = keep;
+    };
+    if (action == "nav_save" || action == "Save") { go("save"); return; }
+    if (action == "nav_load" || action == "Load" || action == "load") { go("load"); return; }
+    if (action == "nav_config" || action == "Config" || action == "config") { go("config"); return; }
+    if (action == "nav_cg" || action == "cg") { go("cg"); return; }
+    if (action == "nav_scene" || action == "scene") { go("scene"); return; }
+    if (action == "nav_music" || action == "music") { go("music"); return; }
     if (action == "nav_title") { runAction("Title"); return; }
     if (action == "nav_quit") { runAction("quit"); return; }
     warnOnce("Button not built yet: " + action);
@@ -334,14 +415,6 @@ void Engine::mouseWheel(int notches) {
     else if (notches > 0) openLog();
 }
 
-// MARK: Saves
-
-std::string Engine::savePath(int slot, const char *extension) const {
-    char name[32];
-    std::snprintf(name, sizeof name, "/save%03d.%s", slot, extension);
-    return saveDir_ + name;
-}
-
 namespace {
 
 bool makeFolders(const std::string &path) {
@@ -369,6 +442,297 @@ bool writeWhole(const std::string &path, const std::vector<uint8_t> &data) {
 }
 
 }  // namespace
+
+// MARK: Galleries
+
+void Engine::loadGalleries() {
+    if (Bytes data = files_.read(config_.text("MacroList", "cfg\\macrolist.ini"))) {
+        std::vector<int> *list = nullptr;
+        for (const std::string &raw : split(sjis::toUtf8(std::string(data->begin(), data->end())), '\n')) {
+            std::string line = trim(raw.substr(0, raw.find("//")));
+            if (line.rfind("#p", 0) == 0) list = line.find("Global") != std::string::npos ? &globalMacros_ : &scenarioMacros_;
+            else if (line == "##") list = nullptr;
+            else if (list && !line.empty()) {
+                size_t gap = line.find_first_of(" \t");
+                if (gap != std::string::npos) list->push_back(std::atoi(line.c_str() + gap));
+            }
+        }
+    }
+    auto lines = [&](const char *path) {
+        std::vector<std::string> out;
+        Bytes data = files_.read(path);
+        if (!data) return out;
+        for (const std::string &raw : split(sjis::toUtf8(std::string(data->begin(), data->end())), '\n')) {
+            std::string line = trim(raw.substr(0, raw.find("//")));
+            if (!line.empty()) out.push_back(line);
+        }
+        return out;
+    };
+    auto fields = [](const std::string &line) {
+        std::vector<std::string> out;
+        std::string word;
+        for (char c : line + " ") {
+            if (c == ' ' || c == '\t') {
+                if (!word.empty()) out.push_back(word);
+                word.clear();
+            } else {
+                word += c;
+            }
+        }
+        return out;
+    };
+    // `#p page thumbnail 0 bgm [flow]`, then `0,n,picture` lines, then `##`.
+    for (const std::string &line : lines("cfg\\cg_view.ini")) {
+        auto f = fields(line);
+        if (f.empty()) continue;
+        if (f[0] == "#p" && f.size() >= 3) {
+            GalleryEntry e;
+            e.page = std::atoi(f[1].c_str());
+            e.thumbnail = f[2];
+            if (f.size() > 4) e.bgm = f[4];
+            cgEntries_.push_back(e);
+        } else if (f[0] != "##" && !cgEntries_.empty()) {
+            auto parts = split(f[0], ',');
+            if (parts.size() >= 3) cgEntries_.back().images.push_back(parts[2]);
+        }
+    }
+    // `page thumbnail 0 0 flow key,0,0`.
+    for (const std::string &line : lines("cfg\\play_view.ini")) {
+        auto f = fields(line);
+        if (f.size() < 6) continue;
+        GalleryEntry e;
+        e.page = std::atoi(f[0].c_str());
+        e.thumbnail = f[1];
+        e.flow = f[4];
+        e.key = split(f[5], ',')[0];
+        sceneEntries_.push_back(e);
+    }
+    tracks_ = lines("cfg\\sound_view.ini");
+    if (!saveDir_.empty()) {
+        std::ifstream f(saveDir_ + "/vndegen_seen.txt");
+        std::string line;
+        while (std::getline(f, line))
+            if (!line.empty()) seen_[line] = true;
+    }
+}
+
+void Engine::noteSeen(const std::string &path) {
+    if (path.empty()) return;
+    std::string key = normalizedPath(path);
+    if (seen_[key]) return;
+    seen_[key] = true;
+    seenChanged_ = true;
+}
+
+bool Engine::seen(const std::string &path) const {
+    auto it = seen_.find(normalizedPath(path));
+    return it != seen_.end() && it->second;
+}
+
+void Engine::saveSeen() {
+    if (!seenChanged_ || saveDir_.empty() || !makeFolders(saveDir_)) return;
+    std::string text;
+    for (const auto &[path, on] : seen_)
+        if (on) text += path + "\n";
+    writeWhole(saveDir_ + "/vndegen_seen.txt", std::vector<uint8_t>(text.begin(), text.end()));
+    seenChanged_ = false;
+}
+
+int Engine::galleryCellAt(int x, int y) const {
+    if (!screen_ || (screen_->name != "cg" && screen_->name != "scene")) return -1;
+    const auto *size = screen_->setting("cellsize");
+    if (!size || size->size() < 2) return -1;
+    int w = std::atoi((*size)[0].c_str()), h = std::atoi((*size)[1].c_str());
+    int index = 0;
+    for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
+        int cx = std::atoi(it->second[0].c_str()), cy = std::atoi(it->second[1].c_str());
+        if (x >= cx && y >= cy && x < cx + w && y < cy + h) return index;
+    }
+    return -1;
+}
+
+// Cells run in the file's order, a page at a time. Cells not unlocked yet stay locked, as the PC's do.
+void Engine::composeGallery(Canvas &out) {
+    if (viewingImage_) {
+        out.clear();
+        if (ImageRef image = images_->get(viewing_[viewingIndex_])) drawImage(out, *image, out.w * 0.5f, out.h * 0.5f, float(out.w) / float(image->w), float(out.w) / float(image->w), 0, 1);
+        return;
+    }
+    if (screen_->name != "cg" && screen_->name != "scene") return;
+    const auto *sheetName = screen_->setting("cellsheet");
+    ImageRef sheet = sheetName && !sheetName->empty() ? images_->get((*sheetName)[0]) : nullptr;
+    const auto *inset = screen_->setting("cellthumb");
+    int dx = inset && inset->size() >= 2 ? std::atoi((*inset)[0].c_str()) : 0, dy = inset && inset->size() >= 2 ? std::atoi((*inset)[1].c_str()) : 0;
+    const auto &entries = screen_->name == "cg" ? cgEntries_ : sceneEntries_;
+    int index = 0;
+    int hovered = pointerSeen_ ? galleryCellAt(pointerX_, pointerY_) : -1;
+    int perPage = int(screen_->settings.count("cell"));
+    for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
+        int cx = std::atoi(it->second[0].c_str()), cy = std::atoi(it->second[1].c_str());
+        size_t entry = size_t(page_ * perPage + index);
+        bool unlocked = false;
+        if (entry < entries.size()) {
+            const GalleryEntry &e = entries[entry];
+            unlocked = screen_->name == "scene" ? seen(e.key) : std::any_of(e.images.begin(), e.images.end(), [&](const std::string &p) { return seen(p); });
+        }
+        if (sheet) {
+            int h = sheet->h / 5;
+            int row = !unlocked ? int(StateDisabled) : index == hovered ? int(StateHover) : int(StateNormal);
+            drawPart(out, *sheet, cx, cy, 0, row * h, sheet->w, h, 1);
+        }
+        if (unlocked)
+            if (ImageRef thumb = images_->get(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
+    }
+}
+
+void Engine::openGalleryCell(int index) {
+    int perPage = int(screen_->settings.count("cell"));
+    size_t entry = size_t(page_ * perPage + index);
+    if (screen_->name == "cg") {
+        if (entry >= cgEntries_.size()) return;
+        viewing_.clear();
+        for (const std::string &p : cgEntries_[entry].images)
+            if (seen(p)) viewing_.push_back(p);
+        if (viewing_.empty()) return;
+        viewingIndex_ = 0;
+        viewingImage_ = true;
+        dirty_ = true;
+    } else if (entry < sceneEntries_.size() && seen(sceneEntries_[entry].key)) {
+        // A replay runs its own flow, and ending it comes back here.
+        auto flow = loadScript(sceneEntries_[entry].flow);
+        if (!flow || !flow->first()) return;
+        if (titleMusic_) {
+            audio_.fade(titleMusic_, 500, 0, true);
+            titleMusic_ = 0;
+        }
+        screen_ = nullptr;
+        stack_.clear();
+        scene_ = {};
+        back_.clear();
+        front_.clear();
+        stack_.push_back({flow, flow->first()});
+        replaying_ = true;
+        waiting_ = Waiting::None;
+        dirty_ = true;
+    }
+}
+
+// MARK: Settings
+
+void Engine::applyVolumes() {
+    audio_.setGroupVolume(0, bgmVolume_ * masterVolume_ / 100);
+    audio_.setGroupVolume(1, seVolume_ * masterVolume_ / 100);
+    audio_.setGroupVolume(2, voiceVolume_ * masterVolume_ / 100);
+    charMs_ = textSpeed_ == 0 ? 40 : textSpeed_ == 1 ? 20 : textSpeed_ == 2 ? 8 : 0;
+}
+
+void Engine::loadSettings() {
+    if (!saveDir_.empty()) {
+        std::ifstream f(saveDir_ + "/vndegen_settings.txt");
+        f >> masterVolume_ >> bgmVolume_ >> seVolume_ >> voiceVolume_ >> textSpeed_;
+    }
+    applyVolumes();
+}
+
+void Engine::saveSettings() {
+    if (saveDir_.empty() || !makeFolders(saveDir_)) return;
+    std::string text = std::to_string(masterVolume_) + " " + std::to_string(bgmVolume_) + " " + std::to_string(seVolume_) + " " + std::to_string(voiceVolume_) + " " + std::to_string(textSpeed_) + "\n";
+    writeWhole(saveDir_ + "/vndegen_settings.txt", std::vector<uint8_t>(text.begin(), text.end()));
+}
+
+// Table lines: `slider NAME FILLPATH X Y` and `radio NAME VALUE PATH X Y COLS ROWS COL`.
+void Engine::composeSettingsWidgets(Canvas &out) {
+    auto value = [&](const std::string &name) {
+        return name == "master" ? masterVolume_ : name == "bgm" ? bgmVolume_ : name == "se" ? seVolume_ : name == "voice" ? voiceVolume_ : name == "text" ? textSpeed_ : 0;
+    };
+    for (auto it = screen_->settings.lower_bound("slider"); it != screen_->settings.upper_bound("slider"); ++it) {
+        const auto &f = it->second;
+        if (f.size() < 4) continue;
+        ImageRef fill = images_->get(f[1]);
+        if (fill) drawPart(out, *fill, std::atoi(f[2].c_str()), std::atoi(f[3].c_str()), 0, 0, fill->w * value(f[0]) / 100, fill->h, 1);
+    }
+    for (auto it = screen_->settings.lower_bound("radio"); it != screen_->settings.upper_bound("radio"); ++it) {
+        const auto &f = it->second;
+        if (f.size() < 8) continue;
+        ImageRef sheet = images_->get(f[2]);
+        if (!sheet) continue;
+        int cols = std::atoi(f[5].c_str()), rows = std::atoi(f[6].c_str()), col = std::atoi(f[7].c_str()), w = sheet->w / cols, h = sheet->h / rows;
+        bool on = value(f[0]) == std::atoi(f[1].c_str());
+        drawPart(out, *sheet, std::atoi(f[3].c_str()), std::atoi(f[4].c_str()), col * w, (on ? 2 : 0) * h, w, h, 1);
+    }
+}
+
+bool Engine::pressSettingsWidget(int x, int y, bool) {
+    auto set = [&](const std::string &name, int v) {
+        (name == "master" ? masterVolume_ : name == "bgm" ? bgmVolume_ : name == "se" ? seVolume_ : name == "voice" ? voiceVolume_ : textSpeed_) = v;
+        applyVolumes();
+        saveSettings();
+        dirty_ = true;
+    };
+    for (auto it = screen_->settings.lower_bound("slider"); it != screen_->settings.upper_bound("slider"); ++it) {
+        const auto &f = it->second;
+        if (f.size() < 4) continue;
+        ImageRef fill = images_->get(f[1]);
+        int sx = std::atoi(f[2].c_str()), sy = std::atoi(f[3].c_str());
+        if (fill && x >= sx && x < sx + fill->w && y >= sy && y < sy + fill->h) {
+            set(f[0], std::clamp((x - sx) * 100 / std::max(1, fill->w), 0, 100));
+            return true;
+        }
+    }
+    for (auto it = screen_->settings.lower_bound("radio"); it != screen_->settings.upper_bound("radio"); ++it) {
+        const auto &f = it->second;
+        if (f.size() < 8) continue;
+        ImageRef sheet = images_->get(f[2]);
+        if (!sheet) continue;
+        int w = sheet->w / std::atoi(f[5].c_str()), h = sheet->h / std::atoi(f[6].c_str()), rx = std::atoi(f[3].c_str()), ry = std::atoi(f[4].c_str());
+        if (x >= rx && y >= ry && x < rx + w && y < ry + h) {
+            set(f[0], std::atoi(f[1].c_str()));
+            return true;
+        }
+    }
+    return false;
+}
+
+// MARK: Global variables
+
+// cfg.sav holds the game's settings, then its 10,000 global variables at byte 4000: a save of Test Game 95's has 1 at its
+// macro GLB_PROLOGUE_OVER's number, 1000, after the prologue. VNDegen keeps the rest of the file as it found it.
+void Engine::loadGlobals() {
+    if (saveDir_.empty()) return;
+    auto packed = readWhole(saveDir_ + "/cfg.sav");
+    if (packed.empty()) return;
+    configFile_ = unpackEntry(packed.data(), packed.size());
+    if (configFile_.size() < 44000) {
+        configFile_.clear();
+        return;
+    }
+    for (int i = 0; i < 10000; i++) {
+        int32_t v;
+        std::memcpy(&v, &configFile_[4000 + size_t(i) * 4], 4);
+        if (v) globals_[i] = v;
+    }
+}
+
+void Engine::saveGlobals() {
+    if (saveDir_.empty() || !makeFolders(saveDir_)) return;
+    // A game with no file of the PC's yet gets a blank one of its size, with the PC game's own settings left at zero.
+    if (configFile_.empty()) configFile_.assign(104022, 0);
+    for (int i = 0; i < 10000; i++) {
+        auto it = globals_.find(i);
+        int32_t v = it == globals_.end() ? 0 : it->second;
+        std::memcpy(&configFile_[4000 + size_t(i) * 4], &v, 4);
+    }
+    auto packed = packEntry(configFile_);
+    if (!packed.empty()) writeWhole(saveDir_ + "/cfg.sav", packed);
+}
+
+// MARK: Saves
+
+std::string Engine::savePath(int slot, const char *extension) const {
+    char name[32];
+    std::snprintf(name, sizeof name, "/save%03d.%s", slot, extension);
+    return saveDir_ + name;
+}
 
 void Engine::noteThumbnail() {
     if (screen_) return;
@@ -699,8 +1063,15 @@ void Engine::composeScreen(Canvas &out) {
     out.clear();
     for (const Picture &p : screen_->pictures) drawPicture(out, p);
     composeSlots(out);
+    composeGallery(out);
+    if (viewingImage_) return;
+    if (screen_->settings.count("slider") || screen_->settings.count("radio")) composeSettingsWidgets(out);
     bool fromTitle = returnTo_ == "title";
     for (Button &b : screen_->buttons) {
+        if (b.action.rfind("track", 0) == 0) {
+            size_t index = size_t(std::atoi(b.action.c_str() + 5));
+            if (index >= tracks_.size() || !seen(tracks_[index])) continue;
+        }
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
         if (b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_)) state = over ? StateSelectedHover : StateSelected;
@@ -829,6 +1200,7 @@ void Engine::runFlow(const Node &n) {
         if (script && script->first()) {
             scene_ = {script, script->first()};
             flowCallId_ = n.id;
+            noteSeen(n.s[1]);
             log("scene %s", script->name.c_str());
         }
         break;
@@ -836,6 +1208,11 @@ void Engine::runFlow(const Node &n) {
     case 2:  // the end of the story, which goes back to the title
         log("flow end: %s", sjis::toUtf8(n.s[0]).c_str());
         flow.node = nullptr;
+        if (screens_.count("title")) endStory("title");
+        break;
+    case 22:  // the end of a replay, which goes back to the scene gallery
+        flow.node = nullptr;
+        if (replaying_) endStory("scene");
         break;
     case 3:
         beginChoice(n);
@@ -852,9 +1229,11 @@ void Engine::runFlow(const Node &n) {
     }
     case 6: {  // set or step a variable: scope, index, operation (0 set, 1 add one), value
         auto &table = n.p[0] == 1 ? scenario_ : globals_;
-        if (n.p[3] == 1) table[n.p[1]]++;
-        else table[n.p[1]] = n.p[5];
-        log("variable %d:%d = %d", n.p[0], n.p[1], table[n.p[1]]);
+        int number = variableNumber(n.p[0], n.p[1]);
+        if (n.p[3] == 1) table[number]++;
+        else table[number] = n.p[5];
+        log("variable %d:%d = %d", n.p[0], number, table[number]);
+        if (n.p[0] != 1) saveGlobals();
         break;
     }
     case 31: {  // go on in another flow script
@@ -869,9 +1248,15 @@ void Engine::runFlow(const Node &n) {
     }
 }
 
+// Scripts name a variable by its place in macrolist.ini's list, and saves keep it by the number the list gives it.
+int Engine::variableNumber(int scope, int index) const {
+    const auto &list = scope == 1 ? scenarioMacros_ : globalMacros_;
+    return index >= 0 && index < int(list.size()) ? list[size_t(index)] : index;
+}
+
 int Engine::variableValue(int scope, int index) const {
     const auto &table = scope == 1 ? scenario_ : globals_;
-    auto it = table.find(index);
+    auto it = table.find(variableNumber(scope, index));
     return it == table.end() ? 0 : it->second;
 }
 
@@ -1184,6 +1569,20 @@ void Engine::mouseButton(int button, bool down) {
             if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);
             return;
         }
+        if (viewingImage_) {
+            if (++viewingIndex_ >= viewing_.size()) viewingImage_ = false;
+            dirty_ = true;
+            return;
+        }
+        if (screen_->name == "config" || screen_->name == "config2" || screen_->name == "config3") {
+            pressSettingsWidget(pointerX_, pointerY_, false);
+            return;
+        }
+        int cell = galleryCellAt(pointerX_, pointerY_);
+        if (cell >= 0) {
+            openGalleryCell(cell);
+            return;
+        }
         int slot = slotAt(pointerX_, pointerY_);
         if (slot < 0) return;
         if (screen_->name == "save") {
@@ -1263,6 +1662,7 @@ const char *Engine::debugStatus() {
 
 void Engine::loadImage(const Node &n) {
     int slot = n.p[3];
+    noteSeen(n.s[1]);
     ImageRef image = images_->get(n.s[1]);
     if (!image) {
         complain("Missing image " + n.s[1]);
@@ -1511,6 +1911,8 @@ void Engine::playSound(const Node &n, int kind) {
     if (fade > 0) audio_.fade(player, fade, volume, false);
     audio_.play(player);
     channels[channel] = player;
+    audio_.setGroup(player, kind);
+    if (kind == kKindBgm) noteSeen(n.s[1]);
     if (kind == kKindBgm) bgmNow_[channel] = {n.s[1], volume, p[2]};
     if (kind == kKindSe && p[4] == 0) seNow_[channel] = {n.s[1], volume, p[2]};
 }

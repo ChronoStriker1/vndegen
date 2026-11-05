@@ -42,7 +42,8 @@ void drawPicture(Canvas &out, const Picture &p) {
 
 void drawButton(Canvas &out, const Button &b, ButtonState state) {
     if (!b.sheet) return;
-    int row = std::min(int(state), b.rows - 1);
+    int row = state == StateNormal ? b.normalRow : state == StateHover ? b.hoverRow : int(state);
+    row = std::min(row, b.rows - 1);
     drawPart(out, *b.sheet, b.x, b.y, b.column * b.cellW(), row * b.cellH(), b.cellW(), b.cellH(), 1);
     if (state == StateHover || state == StateSelectedHover) {
         if (b.help) {
@@ -81,6 +82,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 p.column = number(w[6]);
                 p.row = number(w[7]);
             }
+            // `alpha N` of 256, at the end of the line.
+            if (w.size() >= 6 && w[w.size() - 2] == "alpha") p.alpha = float(number(w.back())) / 256;
             screen->pictures.push_back(p);
         } else if (w[0] == "button" && w.size() >= 8) {
             Button b;
@@ -93,6 +96,10 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             b.column = number(w[7]);
             for (size_t i = 8; i < w.size(); i++) {
                 if (w[i] == "toggle") b.toggle = true;
+                if (w[i] == "swap") {  // this sheet's first row is the hovered look
+                    b.normalRow = 1;
+                    b.hoverRow = 0;
+                }
                 if (w[i] == "help" && i + 7 < w.size()) {
                     b.help = image(w[i + 1]);
                     b.helpX = number(w[i + 2]);
