@@ -90,6 +90,9 @@ bool Game::startNewGame(std::string *error) {
         system_[118] = gameDat_.tileSize();
         system_[119] = w == 320 && h == 240 ? 2 : 1;
     }
+    // System variables 1 and 2 place a message's text, and -1 means the default place. The PC's starting value isn't
+    // known; -1 keeps the text of a game that never sets them where the runtime always put it, not at the top left.
+    system_[1] = system_[2] = -1;
     strings_.assign(std::max<size_t>(rows(SysStringVarNames), 100), "");
     systemStrings_.assign(std::max<size_t>(rows(SysSystemStrings), 100), "");
     int maxCommon = 0;
