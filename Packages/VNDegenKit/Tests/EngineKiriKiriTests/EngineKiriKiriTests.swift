@@ -67,6 +67,26 @@ private let xp3 = Data([0x58, 0x50, 0x33, 0x0D, 0x0A, 0x20, 0x0A, 0x1A, 0x8B, 0x
     #expect(saves.first?.directory.standardizedFileURL.path == copied.appendingPathComponent("outer/inner/savedata").standardizedFileURL.path)
 }
 
+@Test func detectsAGameThreeFoldersDown() throws {
+    // Violated Hero IV (Partial E) as imported: three wrapper folders, then the game with an unpacked data folder.
+    let unpacked = try folder(["Violated Hero 4/127GRJ132/vh4/game.exe": Data(), "Violated Hero 4/127GRJ132/vh4/bgimage.xp3": xp3,
+                               "Violated Hero 4/127GRJ132/vh4/data/startup.tjs": Data(), "readme.txt": Data()])
+    #expect(KiriKiriPlugin().detect(FolderProbe(scanning: unpacked))?.evidence == "Violated Hero 4/127GRJ132/vh4/data/startup.tjs")
+    #expect(KiriKiriLayout(scanning: unpacked) == KiriKiriLayout(root: "Violated Hero 4/127GRJ132/vh4",
+                                                                 data: .folder("Violated Hero 4/127GRJ132/vh4/data")))
+    let archived = try folder(["a/b/Game/Game.exe": Data(), "a/b/Game/Data.xp3": xp3])
+    #expect(KiriKiriPlugin().detect(FolderProbe(scanning: archived))?.evidence == "a/b/Game/Data.xp3")
+}
+
+@Test func aLongListingIsNotSearchedPastItsLastLevel() throws {
+    var files = ["a/b/Game/game.exe": Data(), "a/b/Game/data.xp3": xp3]
+    for n in 0..<200 { files["other/file\(n).png"] = Data() }
+    let root = try folder(files)
+    #expect(KiriKiriPlugin().detect(FolderProbe(scanning: root)) == nil)
+    // Launching lists the folder the same way, so a game detection can't find doesn't start either.
+    #expect(KiriKiriLayout(scanning: root) == nil)
+}
+
 @Test func prefersTheDataArchiveOverTheDataFolder() {
     let listing = probe(["game.exe", "data.xp3", "data/startup.tjs"])
     #expect(KiriKiriLayout(listing)?.data == .archive("data.xp3"))

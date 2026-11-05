@@ -99,6 +99,9 @@ for runtime in 8 7; do
   for _ in $(seq 120); do [ -f "$probe/ready.png" ] || ! kill -0 "$pid" 2>/dev/null && break; sleep 0.5; done
   [ -f "$probe/ready.png" ] || { fail "the game did not reach its first line"; kill -KILL "$pid" 2>/dev/null; continue; }
   touch "$work/signal-$runtime"
+  # Apple's /bin/bash compares times in whole seconds with -nt, so the quit waits for the next second. Otherwise data
+  # written in the same second as the signal file would count as not written.
+  sleep 1
   kill -TERM "$pid"
   for _ in $(seq 20); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done
   if kill -0 "$pid" 2>/dev/null; then

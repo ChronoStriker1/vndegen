@@ -86,8 +86,11 @@ struct RemoteStore: Sendable {
             if let diff = full.children.first(where: { $0.name == backup }) { names = [full.name, diff.name] }
         }
         guard !names.isEmpty else { throw SaveSyncError.noBackups }
-        // A full backup named `.` keeps its files in drive folders at the top of the game folder.
-        let rules = names.map { "/\(Self.glob(folder))/\($0 == "." ? "drive-*" : Self.glob($0))/**" }
+        // A full backup named `.` keeps its files in drive folders at the top of the game folder, and its registry data there too.
+        let rules = names.flatMap { name in
+            name == "." ? ["/\(Self.glob(folder))/drive-*/**"] + LudusaviStore.registryFiles.map { "/\(Self.glob(folder))/\($0)" }
+                : ["/\(Self.glob(folder))/\(Self.glob(name))/**"]
+        }
         try await call("sync/sync", ["srcFs": root, "dstFs": mirror.path, "_filter": ["IncludeRule": rules]])
     }
 

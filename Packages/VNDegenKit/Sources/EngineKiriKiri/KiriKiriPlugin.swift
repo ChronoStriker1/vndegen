@@ -15,8 +15,7 @@ nonisolated public struct KiriKiriPlugin: EnginePlugin {
     }
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
-        let layout = KiriKiriLayout.needsDeeperListing(probe) ? KiriKiriLayout(scanning: probe.root) : KiriKiriLayout(probe)
-        guard let layout else { return nil }
+        guard let layout = KiriKiriLayout(deepening: probe) else { return nil }
         return EngineMatch(engine: descriptor.id, confidence: .certain, evidence: layout.evidence)
     }
 

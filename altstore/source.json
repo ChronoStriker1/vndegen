@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.24.1",
+          "buildVersion": "1258",
+          "date": "2026-11-05T20:06:49Z",
+          "localizedDescription": "Ludusavi backups keep a Windows PC's registry data, Wolf RPG Editor message windows draw like the PC's, and Violated Hero IV (Partial E) is found.\n\n## Downloads\n\n- `VNDegen-0.24.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.24.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- Ludusavi: a backup VNDegen writes now keeps the registry data a Windows PC's backup holds, so Ludusavi on the PC can still restore it. Before, it was marked as dropped and then lost once old backups were pruned. No engine VNDegen runs keeps saves in the registry, so this only protects what a PC put there.\n- Wolf RPG Editor: message windows no longer show a faint second edge, as in Succubus Prison and Drain Dungeon. The game's own window and portraits show as on the PC, and VNDegen draws only the text.\n- KiriKiri: Violated Hero IV (Partial E) is found inside its three wrapper folders.\n\n## Known limits\n\n- VNDegen doesn't restore registry data on a Mac, iPhone, or iPad. It only carries it forward in the backup.\n- Wolf RPG Editor: a game that never sets where its message text goes, loaded from an old save, shows its text at the top left.\n\n## What wasn't tested\n\n- No physical device was used. A Windows registry restore from a VNDegen backup wasn't tried. Ludusavi 0.31.0 on Linux read VNDegen's backups.\n- The Wolf change was checked in the Mac app and on Linux, and compared with the PC engine under Wine for two games. An iPhone or iPad simulator wasn't run for it.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.24.1/VNDegen-0.24.1.ipa",
+          "size": 122933447,
+          "sha256": "9e7e449b7e884d5d105584356b7764c06d34bc0b53bcf18130ac893a59044448",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.24.0",
           "buildVersion": "1245",
           "date": "2026-11-05T19:30:25Z",

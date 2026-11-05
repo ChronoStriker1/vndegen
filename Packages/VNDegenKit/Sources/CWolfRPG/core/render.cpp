@@ -260,23 +260,14 @@ void Renderer::drawMessage(Canvas &canvas) {
     const MessageState &m = game_.message();
     if (!m.active) return;
     TextStyle style = baseTextStyle(game_);
+    // The engine draws only the text; the game's own common event draws the window behind it. A box at the bottom of the
+    // screen places the text where a game leaves system variables 1 and 2 at -1, and the pause icon, as before.
     float pad = std::max(8.0f, game_.screenHeight() / 48.0f);
     float h = float(text_.lineHeight(style) * 4) + pad * 2;
     RectF box{pad, game_.screenHeight() - h - pad, game_.screenWidth() - pad * 2, h};
-    drawWindow(canvas, *images_.get(game_.windowSkin()), box, 0.85f);
-
-    float textX = box.x + pad * 1.5f;
-    if (m.face >= 0) {
-        BitmapPtr face = images_.get(game_.faceGraphic(m.face));
-        if (!face->empty()) {
-            float fh = std::min(float(face->h), box.h - pad * 2);
-            float fw = face->w * fh / face->h;
-            canvas.draw(*face, {0, 0, face->w, face->h}, {box.x + pad, box.y + pad, fw, fh});
-            textX = box.x + pad * 2 + fw;
-        }
-    }
+    float textX = m.x == -1 ? box.x + pad * 1.5f : float(m.x), textY = m.y == -1 ? box.y + pad : float(m.y);
     TextBlock block = text_.render(m.text, style, m.shown);
-    canvas.draw(block.bitmap, textX - block.origin, box.y + pad - block.origin);
+    canvas.draw(block.bitmap, textX - block.origin, textY - block.origin);
 
     // The pause icon waits at the bottom of the window once the text is all out.
     if (m.shown >= m.total) {
