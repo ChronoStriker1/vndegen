@@ -36,6 +36,7 @@ struct Picture {
     int cols = 1, rows = 1, column = 0, row = 0;
     float alpha = 1;
     int tab = -1;  // a gallery's art for one of its tabs, or -1 for all of them
+    int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
 };
 
 void drawPicture(Canvas &out, const Picture &p);

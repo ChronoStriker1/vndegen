@@ -1642,13 +1642,14 @@ run 2160 1 1
 
 const char kFunbagFantasy[] = R"(
 screen title
-pic obj\b201_000.bmp 0 0
-pic obj\b201_002.bmp -61 -41
-pic obj\b202_002.bmp 361 -41
-pic obj\b203_000.bmp 0 0
-pic obj\b000_001.bmp 0 0
+opening 520 920 1010
+pic obj\b201_000.bmp 0 0 stage 1
+pic obj\b201_002.bmp -61 -41 stage 1
+pic obj\b202_002.bmp 361 -41 stage 1
+pic obj\b203_000.bmp 0 0 stage 1
+pic obj\b000_001.bmp 0 0 stage 1
 pic obj\b000_002.bmp 0 603
-pic obj\b003_000.bmp 617 408
+pic obj\b003_000.bmp 617 408 stage 2
 button start obj\b004_000.bmp 23 120 10 5 0
 button load obj\b004_000.bmp 23 160 10 5 1
 button quickload obj\b004_000.bmp 23 200 10 5 2

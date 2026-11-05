@@ -250,6 +250,9 @@ void Engine::openScreen(const std::string &name) {
         return;
     }
     bool fromStory = !screen_ && name != "title";
+    // Test Game 84's title opens with its art revealed in four tiles and its menu fading in, when the game starts or the
+    // story returns to it. From another menu it's simply there.
+    openingFrom_ = name == "title" && !screen_ && it->second.setting("opening") ? screenMs_ : -1;
     if (fromStory) returnTo_.clear();
     else if (screen_ && screen_->name == "title") returnTo_ = "title";
     else if (name == "title") returnTo_.clear();
@@ -1764,7 +1767,50 @@ Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
     return nullptr;
 }
 
+// `opening TILE_MS FADE_FROM FADE_MS`: each quarter of the screen shows the stage 1 art from its outer edge, the top left
+// growing rightward, the top right downward, the bottom right leftward and the bottom left upward, with a quadratic ease
+// out, and then the stage 2 pictures and the buttons fade in. From Test Game 84 under Wine: the reveal fits 0.52 seconds
+// within 4 pixels over six launches, and the fade runs from 0.92 to 1.93 seconds.
+bool Engine::composeTitleOpening(Canvas &out) {
+    const auto *line = screen_->setting("opening");
+    if (openingFrom_ < 0 || !line || line->size() < 3) return false;
+    int64_t t = screenMs_ - openingFrom_;
+    int tileMs = std::max(1, field(*line, 0)), fadeFrom = field(*line, 1), fadeMs = std::max(1, field(*line, 2));
+    if (t >= fadeFrom + fadeMs) {
+        openingFrom_ = -1;
+        return false;
+    }
+    auto layer = [&](Canvas &c, int upTo, bool buttons) {
+        c.resize(out.w, out.h);
+        c.clear();
+        for (const Picture &p : screen_->pictures)
+            if (p.stage <= upTo) drawPicture(c, p);
+        if (buttons)
+            for (Button &b : screen_->buttons) drawButton(c, b, StateNormal);
+    };
+    Canvas none, art, all;
+    layer(none, 0, false);
+    layer(art, 1, false);
+    layer(all, 2, true);
+    float k = std::clamp(float(t) / float(tileMs), 0.0f, 1.0f), shown = 1 - (1 - k) * (1 - k);
+    int fade = int(std::clamp(float(t - fadeFrom) / float(fadeMs), 0.0f, 1.0f) * 256);
+    if (fade > 0) blendFrame(art, all, fade);
+    out = none;
+    int halfW = out.w / 2, halfH = out.h / 2;
+    int across = int(float(halfW) * shown), down = int(float(halfH) * shown);
+    auto copy = [&](int x0, int y0, int x1, int y1) {
+        for (int y = std::max(0, y0); y < std::min(out.h, y1); y++)
+            if (x1 > x0) std::memcpy(&out.px[(size_t(y) * out.w + x0) * 4], &art.px[(size_t(y) * out.w + x0) * 4], size_t(x1 - x0) * 4);
+    };
+    copy(0, 0, across, halfH);
+    copy(halfW, 0, out.w, down);
+    copy(out.w - across, halfH, out.w, out.h);
+    copy(0, out.h - down, halfW, out.h);
+    return true;
+}
+
 void Engine::composeScreen(Canvas &out) {
+    if (composeTitleOpening(out)) return;
     out.clear();
     for (const Picture &p : screen_->pictures)
         if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p);
@@ -2316,6 +2362,10 @@ bool Engine::step(int ms) {
             dirty_ = true;
         }
     }
+    if (screen_) {
+        screenMs_ += ms;
+        if (openingFrom_ >= 0) dirty_ = true;
+    }
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
     advanceFlipbooks();
@@ -2397,6 +2447,12 @@ void Engine::mouseMove(float x, float y) {
 
 void Engine::mouseButton(int button, bool down) {
     if (button == 0) leftHeld_ = down;
+    // A click during the title's opening ends it and does nothing more.
+    if (down && openingFrom_ >= 0 && screen_ && screen_->name == "title") {
+        openingFrom_ = -1;
+        dirty_ = true;
+        return;
+    }
     if (!down) return;
     if (button == 1) {
         // The right button steps back: out of the log or a menu, else hides or shows the window.

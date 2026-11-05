@@ -127,6 +127,10 @@ Test Games 84 and 85 play short sword and hit effects as flipbooks of pictures w
 
 Command 95, light particles, names `parts\\000_000_042.bmp` in Test Games 84 and 89, and neither game has that picture. The PC game shows no particles in 84 over ten seconds of captures after the command, so there's nothing to draw.
 
+## Test Game 84's title
+
+When the game starts, each quarter of the screen shows the title art from its outer edge: top left growing rightward, top right downward, bottom right leftward and bottom left upward, all with the same quadratic ease out over 0.52 seconds. Fitted over six launches captured under Wine at staggered phases, within 4 pixels. The menu and logo then fade in from 0.92 to 1.93 seconds. The PC's tiles also show translucent copies of the art moving at other speeds, which the runtime leaves out. After that, the title's layers follow the pointer: the background, the characters' shadow and glow silhouettes and the light streaks shift by different amounts as it moves, while the characters themselves stay within a pixel.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.

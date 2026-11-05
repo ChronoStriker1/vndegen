@@ -145,6 +145,7 @@ private:
     bool overCardDelete(int slot, int x, int y) const;
     int newestQuickSlot();
     std::string lastScene_;
+    int64_t screenMs_ = 0, openingFrom_ = -1;  // a menu's own clock, and when the title's opening began
     std::unordered_map<std::string, bool> paintedOnBlack_;
     int64_t trackQuarterShown_ = -1;
     int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
@@ -178,6 +179,7 @@ private:
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
     bool fullWidthPlate() const;
+    bool composeTitleOpening(Canvas &out);
     int cardsPerPage() const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;
