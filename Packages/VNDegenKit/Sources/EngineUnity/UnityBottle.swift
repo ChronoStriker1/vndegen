@@ -104,18 +104,31 @@ nonisolated struct UnityBottle: Equatable, Sendable {
                     environment: environment)
     }
 
-    /// Runs `exe` from `workdir`, waiting until it exits, as `wine` does by default. Wine's menu builder is off, so a
-    /// game can't add launchers to the Mac's Applications folder. The `wine` script drops `WINEDLLOVERRIDES` from the
-    /// environment, so this is the only way to set it.
+    /// Runs `exe` from `workdir`, waiting until it exits, as `wine` does by default. The game goes as the first plain
+    /// argument, which `wine` turns into a Windows path on Z:. `--cx-app` would look for it inside the bottle's C: drive.
+    /// Wine's menu builder is off, so a game can't add launchers to the Mac's Applications folder. The `wine` script drops
+    /// `WINEDLLOVERRIDES` from the environment, so `--dll` is the only way to set it.
     func run(_ exe: URL, workdir: URL, arguments: [String] = [], environment: [String: String]) throws -> Command {
-        try command(.wine, ["--dll", "winemenubuilder.exe=d", "--workdir", workdir.path, "--cx-app", exe.path] + arguments,
+        try command(.wine, ["--dll", "winemenubuilder.exe=d", "--workdir", workdir.path, exe.path] + arguments,
                     environment: environment)
     }
 
     /// Asks the game to close as its window's close button does. Wine's `taskkill` without `/f` posts `WM_CLOSE`, so
     /// Unity quits normally and writes its PlayerPrefs.
     func close(_ exeName: String, environment: [String: String]) throws -> Command {
-        try command(.wine, ["--cx-app", "taskkill.exe", "/im", exeName], environment: environment)
+        try builtin(["taskkill", "/im", exeName], environment: environment)
+    }
+
+    /// One of Wine's own programs, such as regedit, which aren't files in the bottle for `--cx-app` to find. With
+    /// `--no-convert`, `wine` leaves options such as `/S` alone instead of taking them for Mac paths, so file arguments
+    /// go as `windowsPath` gives them.
+    private func builtin(_ arguments: [String], environment: [String: String]) throws -> Command {
+        try command(.wine, ["--no-convert"] + arguments, environment: environment)
+    }
+
+    /// A Mac path as Wine sees it on the Z: drive.
+    static func windowsPath(_ url: URL) -> String {
+        "Z:" + url.standardizedFileURL.path.replacingOccurrences(of: "/", with: "\\")
     }
 
     /// Stops every Wine process in this bottle. The `wine` script sets `WINEPREFIX` from the bottle path it was given,
@@ -126,12 +139,12 @@ nonisolated struct UnityBottle: Equatable, Sendable {
 
     /// Wine's regedit, importing `file` into the bottle.
     func importRegistry(_ file: URL, environment: [String: String]) throws -> Command {
-        try command(.wine, ["--cx-app", "regedit.exe", "/S", file.path], environment: environment)
+        try builtin(["regedit", "/S", Self.windowsPath(file)], environment: environment)
     }
 
     /// Wine's regedit, writing `key` and its subkeys to `file`.
     func exportRegistry(_ key: String, to file: URL, environment: [String: String]) throws -> Command {
-        try command(.wine, ["--cx-app", "regedit.exe", "/E", file.path, key], environment: environment)
+        try builtin(["regedit", "/E", Self.windowsPath(file), key], environment: environment)
     }
 
     // MARK: Hardening

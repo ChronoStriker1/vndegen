@@ -67,17 +67,31 @@ nonisolated public struct UnityPlugin: EnginePlugin {
         #if os(macOS)
         let layout = UnityLayout(scanning: folder)
         guard let layout, let info = UnityAppInfo(folder: folder, layout: layout) else { return [] }
-        let directory = switch Self.route(layout, folder: folder, dataDirectory: dataDirectory) {
-        case .macApp:
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
-                .appendingPathComponent(info.company, isDirectory: true).appendingPathComponent(info.product, isDirectory: true)
+        switch Self.route(layout, folder: folder, dataDirectory: dataDirectory) {
+        case let .macApp(app):
+            // A Mac build keeps `persistentDataPath` under its bundle identifier, as SiNiSistar 2's log shows, and under
+            // company and product only without one.
+            let support = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
+            let bundle = Self.bundleIdentifier(app)
+            let directory = bundle.map { support.appendingPathComponent($0, isDirectory: true) }
+                ?? support.appendingPathComponent(info.company, isDirectory: true).appendingPathComponent(info.product, isDirectory: true)
+            return [SaveLocation(directory: directory) { info.relativePath($0, macBundle: bundle) }]
         case .crossOver:
-            UnityBottle(folder: bottles, tools: URL(fileURLWithPath: "/")).persistentData(info)
+            let directory = UnityBottle(folder: bottles, tools: URL(fileURLWithPath: "/")).persistentData(info)
+            return [SaveLocation(directory: directory) { info.relativePath($0) }]
         }
-        return [SaveLocation(directory: directory) { info.relativePath($0) }]
         #else
         return []
         #endif
+    }
+
+    /// The app's `CFBundleIdentifier`, when it's usable as one folder name.
+    static func bundleIdentifier(_ app: URL) -> String? {
+        let plist = app.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plist),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let id = info["CFBundleIdentifier"] as? String, UnityAppInfo.isUsable(id) else { return nil }
+        return id
     }
 
     /// The Windows version's PlayerPrefs, under `HKEY_CURRENT_USER\Software\<company>\<product>` in the bottle, kept in

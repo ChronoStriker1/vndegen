@@ -224,8 +224,11 @@ struct Wordmark: View {
 
 private struct HeroStage: View {
     @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     let game: Game?
+    /// What the engine calls Play for the game, such as "Play in CrossOver", as on its page. Nil is "Play".
+    @State private var playLabel: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.isShort ? 10 : 16) {
@@ -243,8 +246,9 @@ private struct HeroStage: View {
                     }
                     HStack(spacing: 12) {
                         HubButton(target: .play, kind: .primary) {
-                            Label("Play", systemImage: "play.fill")
+                            Label(playLabel ?? "Play", systemImage: "play.fill").lineLimit(1)
                         }
+                        .accessibilityLabel(playLabel ?? "Play")
                         HubButton(target: .details, kind: .secondary) {
                             Label("Details", systemImage: "info.circle")
                         }
@@ -252,6 +256,13 @@ private struct HeroStage: View {
                 }
                 .id(game.id)
                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 18)), removal: .opacity))
+                // Read off the main thread, as the game page reads it.
+                .task(id: "\(game.id.rawValue)|\(game.engine?.rawValue ?? "")|\(nav.variantRevision)") {
+                    playLabel = nil
+                    let plugin = hub.library.plugin(for: game.engine)
+                    let folder = hub.library.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
+                    playLabel = await Task.detached { [game] in plugin?.playLabel(for: game, folder: folder, dataDirectory: data) }.value
+                }
             }
         }
         .animation(Theme.heroAnimation, value: game?.id)

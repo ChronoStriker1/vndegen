@@ -29,6 +29,11 @@ import VNCore
         #expect(info.relativePath("C:/Users/pc/AppData/LocalLow/Studio/Other/save1.dat") == nil)
         #expect(info.relativePath("C:/Users/pc/AppData/LocalLow/Studio/My Game/../x") == nil)
         #expect(info.relativePath("C:/Users/pc/AppData/LocalLow/Studio/My Game/") == nil)
+        // The player's own logs and caches aren't saves.
+        for file in ["Player.log", "Player-prev.log", "output_log.txt", "Unity/Analytics/config"] {
+            #expect(info.relativePath("C:/Users/pc/AppData/LocalLow/Studio/My Game/\(file)") == nil)
+        }
+        #expect(info.relativePath("C:/Users/pc/AppData/LocalLow/Studio/My Game/saves/Player.log") == "saves/Player.log")
     }
 
     @Test func readsAppInfoWhateverItsCase() throws {
@@ -79,6 +84,10 @@ import VNCore
         for command in commands.dropFirst(2) { #expect(command.arguments[4] == "--no-update") }
         #expect(commands[4].arguments.suffix(3) == ["--ux-app", "wineserver", "-k"])
         #expect(commands[2].arguments.contains("winemenubuilder.exe=d"))
+        #expect(commands[2].arguments.last == "/games/G/Game.exe" && !commands[2].arguments.contains("--cx-app"))
+        #expect(Array(commands[3].arguments.suffix(4)) == ["--no-convert", "taskkill", "/im", "Game.exe"])
+        #expect(Array(commands[5].arguments.suffix(4)) == ["--no-convert", "regedit", "/S", #"Z:\tmp\a.reg"#])
+        #expect(Array(commands[6].arguments.suffix(5)) == ["--no-convert", "regedit", "/E", #"Z:\tmp\b.reg"#, #"HKEY_CURRENT_USER\Software\S\G"#])
     }
 
     @Test func refusesABottleOutsideItsOwnFolder() throws {
@@ -147,22 +156,46 @@ import VNCore
 
 @MainActor
 @Suite struct UnityPlayerPrefsTests {
-    /// The import deletes the game's key, then writes it, and touches nothing else.
-    @Test func importReplacesOnlyTheGamesKey() throws {
+    /// The import writes the game's key alone: the file's values, and deletions of the values the file lacks. It never
+    /// deletes the key, which would take its subkeys along.
+    @Test func importChangesOnlyTheGamesValues() throws {
         let key = #"HKEY_CURRENT_USER\Software\Studio\Game"#
-        let text = UnityCrossOverSession.importText(key: key, values: ["b": .dword(2), "a": .binary([1, 0])])
+        let text = UnityCrossOverSession.importText(key: key, values: ["b": .dword(2), "a": .binary([1, 0])],
+                                                    removing: ["A", "old", "z\"q"])
         #expect(text == """
             Windows Registry Editor Version 5.00
-
-            [-\(key)]
 
             [\(key)]
             "a"=hex:01,00
             "b"=dword:00000002
+            "old"=-
+            "z\\"q"=-
 
             """)
-        let keyLines = text.split(separator: "\n").filter { $0.hasPrefix("[") }
-        #expect(keyLines == ["[-\(key)]", "[\(key)]"])
+        #expect(text.split(separator: "\n").filter { $0.hasPrefix("[") } == ["[\(key)]"])
+        let parsed = try RegistryData(reg: text)
+        #expect(parsed.keys.keys.sorted() == [key] && parsed.values(of: key) == ["a": .binary([1, 0]), "b": .dword(2)])
+    }
+}
+
+@MainActor
+@Suite struct UnityMacAppTests {
+    /// An app from a zip made on Windows has no execute bits. Only its main executable gets them.
+    @Test func restoresTheExecuteBitOfTheMainExecutable() throws {
+        let fm = FileManager.default
+        let app = fm.temporaryDirectory.appending(path: "mac-\(UUID().uuidString)/Game.app")
+        defer { try? fm.removeItem(at: app.deletingLastPathComponent()) }
+        try fm.createDirectory(at: app.appending(path: "Contents/MacOS"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: app.appending(path: "Contents/Frameworks"), withIntermediateDirectories: true)
+        let plist: NSDictionary = ["CFBundleExecutable": "Game"]
+        plist.write(to: app.appending(path: "Contents/Info.plist"), atomically: true)
+        for path in ["Contents/MacOS/Game", "Contents/Frameworks/UnityPlayer.dylib"] {
+            try Data().write(to: app.appending(path: path))
+            try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: app.appending(path: path).path)
+        }
+        try UnityMacAppSession.makeRunnable(app)
+        #expect(fm.isExecutableFile(atPath: app.appending(path: "Contents/MacOS/Game").path))
+        #expect(!fm.isExecutableFile(atPath: app.appending(path: "Contents/Frameworks/UnityPlayer.dylib").path))
     }
 }
 
@@ -177,6 +210,8 @@ import VNCore
         try Data().write(to: folder.appending(path: "WIN/Game.exe"))
         try fm.createDirectory(at: folder.appending(path: "MAC/Game.app/Contents/Resources/Data"), withIntermediateDirectories: true)
         try Data().write(to: folder.appending(path: "MAC/Game.app/Contents/Resources/Data/globalgamemanagers"))
+        let plist: NSDictionary = ["CFBundleIdentifier": "com.Studio.Game", "CFBundleExecutable": "Game"]
+        plist.write(to: folder.appending(path: "MAC/Game.app/Contents/Info.plist"), atomically: true)
         return folder
     }
 
@@ -189,7 +224,10 @@ import VNCore
         #expect(plugin.playLabel(for: game, folder: folder, dataDirectory: data) == "Open Mac version")
         #expect(plugin.registrySave(folder: folder, dataDirectory: data) == nil)
         let macSaves = try #require(plugin.saveLocations(folder: folder, dataDirectory: data).first)
-        #expect(macSaves.directory.path.hasSuffix("/Library/Application Support/Studio/Game"))
+        #expect(macSaves.directory.path.hasSuffix("/Library/Application Support/com.Studio.Game"))
+        // A PC backup's saves and a Mac's land in the same place.
+        #expect(macSaves.relativePath("C:/Users/pc/AppData/LocalLow/Studio/Game/SaveData/s1.dat") == "SaveData/s1.dat")
+        #expect(macSaves.relativePath("/Users/me/Library/Application Support/com.studio.game/SaveData/s1.dat") == "SaveData/s1.dat")
         #expect(plugin.variants(for: game, folder: folder, dataDirectory: data)?.selected == nil)
 
         try plugin.selectVariant("crossover", for: game, dataDirectory: data)

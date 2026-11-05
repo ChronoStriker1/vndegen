@@ -80,7 +80,7 @@ extension RegistryData {
         return String(data: data, encoding: .utf8)
     }
 
-    static func escape(_ text: String) -> String {
+    public static func escape(_ text: String) -> String {
         text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 

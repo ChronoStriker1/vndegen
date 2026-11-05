@@ -116,6 +116,7 @@ final class UnityCrossOverSession: UnityExternalSession {
                 try process.run()
                 game = process
                 unityLog.info("started \(self.launch.game.id.rawValue, privacy: .public) in CrossOver, pid \(process.processIdentifier)")
+                Task { await self.bringGameForward() }
             } catch {
                 process.terminationHandler = nil
                 unityLog.error("starting CrossOver failed: \(error.localizedDescription, privacy: .public)")
@@ -140,8 +141,9 @@ final class UnityCrossOverSession: UnityExternalSession {
         try Data().write(to: bottle.readyMarker)
     }
 
-    /// Puts the game's PlayerPrefs from its file into the bottle: its key is deleted first, then written from the file,
-    /// so no value the file lacks stays behind and no other key changes. A file holding any other key is not imported.
+    /// Puts the game's PlayerPrefs from its file into the bottle: the file's values, and a deletion for each value the
+    /// bottle holds under that key that the file lacks. Its subkeys and every other key stay as they are. A file holding
+    /// any other key is not imported.
     private func importPrefs() async throws {
         guard let prefs, let data = try? Data(contentsOf: prefs.file) else { return }
         let file = try RegistryData(reg: data)
@@ -149,43 +151,79 @@ final class UnityCrossOverSession: UnityExternalSession {
             unityLog.error("not importing \(prefs.file.path, privacy: .public): it holds another key")
             return
         }
-        let text = Self.importText(key: prefs.key, values: values)
+        let current = await bottleValues(prefs.key) ?? [:]
+        let text = Self.importText(key: prefs.key, values: values, removing: Set(current.keys))
         let staged = launch.dataDirectory.appendingPathComponent("PlayerPrefs-import.reg")
         try RegistryData.utf16File(text).write(to: staged, options: .atomic)
         defer { try? FileManager.default.removeItem(at: staged) }
         try await Self.run(bottle.importRegistry(staged, environment: environment), "applying the game's settings")
     }
 
-    /// `[-key]`, then `key` with `values`.
-    static func importText(key: String, values: [String: RegistryValue]) -> String {
+    /// `key` with `values`, and `"name"=-` for each of `removing` that `values` lacks, compared without case.
+    static func importText(key: String, values: [String: RegistryValue], removing: Set<String>) -> String {
         var data = RegistryData()
         data.setValues(values, of: key)
-        let written = data.regText
-        let header = RegistryData.regedit5Header + "\n\n"
-        return header + "[-\(key)]\n\n" + written.dropFirst(header.count)
+        var text = data.regText
+        let kept = Set(values.keys.map { $0.lowercased() })
+        let gone = removing.filter { !kept.contains($0.lowercased()) }
+            .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+        if !gone.isEmpty {
+            text.removeLast()
+            text += gone.map { "\n\"\(RegistryData.escape($0))\"=-" }.joined() + "\n"
+        }
+        return text
+    }
+
+    /// The values the bottle holds under `key`, not its subkeys'. Nil when the key isn't there or regedit fails.
+    private func bottleValues(_ key: String) async -> [String: RegistryValue]? {
+        let staged = launch.dataDirectory.appendingPathComponent("PlayerPrefs-export.reg")
+        defer { try? FileManager.default.removeItem(at: staged) }
+        try? FileManager.default.removeItem(at: staged)
+        guard (try? await Self.run(bottle.exportRegistry(key, to: staged, environment: environment), "reading the game's settings")) != nil,
+              let data = try? Data(contentsOf: staged) else { return nil }
+        return (try? RegistryData(reg: data))?.values(of: key)
     }
 
     /// Reads the game's key back out of the bottle after it quits and keeps its own values, not its subkeys', in the
     /// file save sync backs up. Nothing changes when the game wrote none.
     private func exportPrefs() async throws {
-        guard let prefs else { return }
-        let staged = launch.dataDirectory.appendingPathComponent("PlayerPrefs-export.reg")
-        defer { try? FileManager.default.removeItem(at: staged) }
-        try? FileManager.default.removeItem(at: staged)
         // regedit fails when the key doesn't exist, which is a game that never saved its PlayerPrefs.
-        guard (try? await Self.run(bottle.exportRegistry(prefs.key, to: staged, environment: environment), "reading the game's settings")) != nil,
-              let values = try RegistryData(reg: Data(contentsOf: staged)).values(of: prefs.key)
-        else { return }
+        guard let prefs, let values = await bottleValues(prefs.key) else { return }
         var file = RegistryData()
         file.setValues(values, of: prefs.key)
         try FileManager.default.createDirectory(at: prefs.file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(file.regText.utf8).write(to: prefs.file, options: .atomic)
     }
 
+    /// macOS doesn't let a new app take the focus from VNDegen, so VNDegen hands it over once the game's window app is
+    /// up, which takes Wine a few seconds.
+    private func bringGameForward() async {
+        for _ in 0..<120 {
+            guard let game, game.isRunning, !ending else { return }
+            if gameApp() != nil {
+                showGame()
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+    }
+
     override func showGame() {
-        guard let game, game.isRunning, let app = Self.gameApp(under: game.processIdentifier) else { return }
+        guard let game, game.isRunning, let app = gameApp() else { return }
         NSApp.yieldActivation(to: app)
         app.activate()
+    }
+
+    /// The app Wine made for the game's window. Wine starts it through LaunchServices, so it isn't a child of the `wine`
+    /// process VNDegen ran. It is the regular app whose `WINEPREFIX` is VNDegen's bottle, preferring the one named after
+    /// the game's exe over Wine's own helpers such as explorer.exe.
+    private func gameApp() -> NSRunningApplication? {
+        let prefix = "WINEPREFIX=" + UnityBottle.resolved(bottle.path)
+        let ours = NSWorkspace.shared.runningApplications.filter { app in
+            app.activationPolicy == .regular && !app.isTerminated && Self.environment(of: app.processIdentifier).contains(prefix)
+        }
+        let name = exe.lastPathComponent.lowercased()
+        return ours.first { ($0.localizedName ?? "").lowercased() == name } ?? ours.first
     }
 
     /// Closes the game as its close button does, then stops every Wine process in the bottle if it's still running after
@@ -263,25 +301,18 @@ final class UnityCrossOverSession: UnityExternalSession {
         return try? FileHandle(forWritingTo: url)
     }
 
-    /// The app Wine made for the game's window: a running app started below `pid`, the `wine` script VNDegen ran.
-    static func gameApp(under pid: pid_t) -> NSRunningApplication? {
-        NSWorkspace.shared.runningApplications.first { app in
-            var current = app.processIdentifier
-            for _ in 0..<16 {
-                guard current > 1 else { return false }
-                if current == pid { return true }
-                current = parent(of: current)
-            }
-            return false
-        }
-    }
-
-    private static func parent(of pid: pid_t) -> pid_t {
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
-        var name = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
-        guard sysctl(&name, 4, &info, &size, nil, 0) == 0, size > 0 else { return 0 }
-        return info.kp_eproc.e_ppid
+    /// The environment of a process of the same user, from `KERN_PROCARGS2`: the argument count, the executable path,
+    /// the arguments, then the environment, each ending in a null.
+    static func environment(of pid: pid_t) -> [String] {
+        var name = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&name, 3, nil, &size, nil, 0) == 0, size > 4 else { return [] }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&name, 3, &buffer, &size, nil, 0) == 0, size > 4 else { return [] }
+        let argc = buffer.withUnsafeBytes { Int($0.loadUnaligned(as: Int32.self)) }
+        let strings = buffer[4..<size].split(separator: 0, omittingEmptySubsequences: true).map { String(decoding: $0, as: UTF8.self) }
+        // The executable path, then the arguments.
+        return Array(strings.dropFirst(1 + argc))
     }
 }
 
@@ -297,6 +328,7 @@ final class UnityMacAppSession: UnityExternalSession {
     }
 
     private func run() async throws {
+        try Self.makeRunnable(app)
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         configuration.activates = true
@@ -313,6 +345,21 @@ final class UnityMacAppSession: UnityExternalSession {
             if ended?.processIdentifier == pid { break }
         }
         unityLog.info("\(self.app.lastPathComponent, privacy: .public) quit")
+    }
+
+    /// A Mac version unpacked from an archive made on Windows, such as SiNiSistar 2's zip, has lost its execute bits,
+    /// and macOS won't open it. The app's main executable gets them back, as an unzip on a Mac would have kept them.
+    /// The code signature doesn't cover file modes, so it stays valid.
+    static func makeRunnable(_ app: URL) throws {
+        let plist = app.appendingPathComponent("Contents/Info.plist")
+        guard let info = NSDictionary(contentsOf: plist), let name = info["CFBundleExecutable"] as? String,
+              !name.contains("/") else { return }
+        let executable = app.appendingPathComponent("Contents/MacOS", isDirectory: true).appendingPathComponent(name)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: executable.path), !fm.isExecutableFile(atPath: executable.path) else { return }
+        let mode = (try fm.attributesOfItem(atPath: executable.path)[.posixPermissions] as? NSNumber)?.int16Value ?? 0o644
+        try fm.setAttributes([.posixPermissions: NSNumber(value: mode | 0o111)], ofItemAtPath: executable.path)
+        unityLog.info("made \(executable.lastPathComponent, privacy: .public) executable")
     }
 
     override func showGame() {

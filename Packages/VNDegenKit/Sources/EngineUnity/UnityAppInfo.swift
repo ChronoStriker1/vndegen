@@ -36,23 +36,31 @@ nonisolated struct UnityAppInfo: Equatable, Sendable {
             && !name.unicodeScalars.contains { "\\/[]".unicodeScalars.contains($0) || $0.properties.generalCategory == .control }
     }
 
+    /// The Unity player's logs at the top of `persistentDataPath`.
+    static let playerFiles: Set<String> = ["player.log", "player-prev.log", "output_log.txt"]
+
     /// The only registry key VNDegen ever moves for this game.
     var playerPrefsKey: String { #"HKEY_CURRENT_USER\Software\"# + company + "\\" + product }
 
     /// The rest of a backup's path after `AppData/LocalLow/<company>/<product>/` from Windows, Proton or a CrossOver
-    /// bottle, or after `Library/Application Support/<company>/<product>/` from a Mac build, compared without case. Nil
-    /// for any other path, and for one that could leave the folder.
-    func relativePath(_ path: String) -> String? {
+    /// bottle, or after `Library/Application Support/<company>/<product>/` or, with `macBundle`, the
+    /// `Library/Application Support/<bundle identifier>/` a Mac build uses, compared without case. Nil for any other
+    /// path, for one that could leave the folder, and for what the Unity player itself keeps there: its logs, which
+    /// change at every launch, and its `Unity` folder of caches.
+    func relativePath(_ path: String, macBundle: String? = nil) -> String? {
         let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         let lower = parts.map { $0.lowercased() }
         let company = company.lowercased(), product = product.lowercased()
-        for prefix in [["appdata", "locallow"], ["library", "application support"]] {
-            let wanted = prefix + [company, product]
+        var folders = [["appdata", "locallow", company, product], ["library", "application support", company, product]]
+        if let macBundle { folders.append(["library", "application support", macBundle.lowercased()]) }
+        for wanted in folders {
             guard lower.count > wanted.count,
                   let start = (0...(lower.count - wanted.count)).last(where: { Array(lower[$0..<($0 + wanted.count)]) == wanted })
             else { continue }
             let rest = parts[(start + wanted.count)...]
-            return rest.contains { ["", ".", ".."].contains($0) } ? nil : rest.joined(separator: "/")
+            guard !rest.contains(where: { ["", ".", ".."].contains($0) }), let first = rest.first?.lowercased(),
+                  !Self.playerFiles.contains(first), !(first == "unity" && rest.count > 1) else { return nil }
+            return rest.joined(separator: "/")
         }
         return nil
     }

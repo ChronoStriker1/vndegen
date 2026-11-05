@@ -1,6 +1,6 @@
 # Unity feasibility study
 
-Roadmap item 10. **Decided 2026-11-05:** VNDegen detects Unity games and says on their page why it can't run them (option 1, done). Option 2's half-day proof ran, with its results under [Option 2 proof](#option-2-proof). Options 3 and 4 aren't being done.
+Roadmap item 10. **Decided 2026-11-05:** VNDegen detects Unity games (option 1, done), and on a Mac opens them outside VNDegen, through the game's own Mac version or the player's CrossOver (option 2, built: see [Mac launcher](#mac-launcher)). iPhone and iPad keep the page's explanation. Options 3 and 4 aren't being done.
 
 This study classifies the library's Unity games from their files, weighs each way of running them, and ends with options for the maintainer. No engine was built. It ran on Linux, reading metadata and assemblies only. It decoded no game art, ran no game code, and used no Unity runtime.
 
@@ -280,6 +280,41 @@ What broke or needs work:
 What's left out of every option: Unity's own players (terms, shaders), x86 on iOS (no JIT), rebuilding games (legal and fragile), and a Naninovel-only player (it duplicates the engine and doesn't carry over).
 
 Option 4 has one advantage unirecomp-tool lacked: the real game runs under Wine on the Linux machine, so its behavior can be compared directly. That helps, and doesn't change the scale.
+
+### Mac launcher
+
+Built 2026-11-05 on option 2. On a Mac, Play on a Unity game opens it outside VNDegen. The hub window shows that it's running, with Show game, and the session ends when the game quits, so play time, the hub's Quit to library, and the save backup after a session work as for other games. The game runs in its own window, so VNDegen's overlay, controller mapping and cheats don't reach it.
+
+- **Its own Mac version** when the game ships one, such as SiNiSistar 2's `MAC/SiNiSistar2.app`. The button reads Open Mac version, and the page's Run with option can pick CrossOver instead. An app unpacked from an archive made on Windows has lost its execute bits, so VNDegen gives the main executable its own back before opening it. The code signature doesn't cover file modes. Its saves are in `~/Library/Application Support/<bundle identifier>`, where SiNiSistar 2's own log puts `persistentDataPath`. Its PlayerPrefs, in a preferences file, aren't synced.
+- **The Windows version through the player's CrossOver** otherwise. The button reads Play in CrossOver. VNDegen finds CrossOver by its bundle identifier, `com.codeweavers.CrossOver`, which CrossOver Preview shares, and checks for Rosetta. Without either, the page says what to install. VNDegen ships no Wine.
+
+**One bottle, never the player's.** VNDegen makes `<Application Support>/VNDegen/Unity/Bottles/VNDegen` on the first Play (35 seconds on the MacBook), from CrossOver's `win10_64` template. Every CrossOver call names it by absolute path with `--scope private`, because a bare name follows `CX_BOTTLE_PATH`, which a player's CrossOver.conf can set in its `[EnvironmentVariables]` over the environment VNDegen passes (read in CrossOver's CXBottle.pm, and shown live: a bare name reached a decoy bottle, the absolute path never did). VNDegen refuses any command whose bottle doesn't resolve into its own Bottles folder, or whose folder is inside CrossOver's own. CrossOver's Application Support, its preferences and `~/Applications/CrossOver` were the same before and after setup and every run. Before each launch, VNDegen updates the bottle with `--update-only` and then:
+
+- replaces the Windows user's folders, which CrossOver links to the Mac's Desktop, Documents, Downloads and so on, with folders of the bottle's, each holding a file so Wine can't put the link back, and removes every drive but C: and Z:, Z: being how Wine reaches the game's folder;
+- copies the Mac's own core fonts (Arial, Times New Roman, Courier New, Verdana, Georgia, Tahoma, Trebuchet MS, Comic Sans MS and Impact, from `/System/Library/Fonts/Supplemental`) into `C:\Windows\Fonts`, which brought back Demon Wants Have Fun!'s menu text;
+- runs every later call with `--no-update`, and the game with Wine's menu builder off, so nothing lands in `~/Applications/CrossOver`.
+
+A shipped game can reach the network, as on a PC, and the page says so. Test builds block it with `-unityNoNetwork YES`, which runs every CrossOver process under `sandbox-exec`. The game, Wine's launcher and `wineserver` were checked to be sandboxed.
+
+**Starting and ending.** The game is `wine`'s first plain argument, which `wine` turns into a Z: path. Wine starts the game's window app through LaunchServices, so macOS keeps VNDegen in front. VNDegen finds the app whose `WINEPREFIX` is its bottle and hands it the focus, which took 4 to 10 seconds. Quit to library runs Wine's `taskkill` without `/f`, which closes the game as its close button does (2 to 4 seconds in the checks), then stops the bottle's `wineserver` after 10 seconds if the game is still running.
+
+**Saves and PlayerPrefs.** Saves sync from the bottle's `AppData/LocalLow/<company>/<product>`, named in `<Game>_Data/app.info`. Backups from Windows, Proton and a Mac build map to it, and the Unity player's own logs and `Unity` cache folder there are left out. PlayerPrefs move with Ludusavi's registry data through VNCore's `RegistrySave`: only `HKEY_CURRENT_USER\Software\<company>\<product>`, and only that key's own values. Before a launch, VNDegen writes the values from `PlayerPrefs.reg` in the game's data directory into the bottle with Wine's regedit, deleting the values the file lacks, never the key, so its subkeys and every other key stay. After the game quits it reads them back. A backup writes them into the backup's `registry.reg` as Ludusavi does, with every other key unchanged and Ludusavi's hash. A restore takes them from `registry.reg`, or from an older backup's `registry.yaml`, and its Undo covers them. Demon Wants Have Fun! opened at the width its restored PlayerPrefs set, and Hospital Seduction in the window size they set.
+
+**Checked on the MacBook (CrossOver Preview 27.0.0).**
+
+| Game | Ran | Notes |
+|---|---|---|
+| Demon Wants Have Fun! (Mono x64) | Title, then Start game by a click | Menu text draws with the copied fonts. Closing its window ended the session. |
+| Hospital Seduction (IL2CPP) | Title, new game, story by clicks and Return | Full screen by default, where the story scene fills the window. |
+| Super Mamono Sisters (Mono x86) | Title | Its own Quit Game ended the session. |
+| SiNiSistar 2 (Mac version) | Title | Notarized. Needed its execute bit back. |
+
+The proof's two caveats:
+
+- **Clicks** work. The proof's clicks failed because they were posted at the HID event tap while another app's system dialog covered the button. Clicks posted at the session tap pressed buttons in both games.
+- **Hospital Seduction's top-left scene** happens when the game runs in a window smaller than the display, such as 1280 by 720: its story scene fills only the top left. Turning CrossOver's high resolution mode (`RetinaMode`) on in VNDegen's bottle halved the window's size in points and drew the scene the same way, so it isn't a setting VNDegen can fix. The game starts full screen, where the scene is right. Video in Hospital Seduction and Succubus Showdown's window size weren't checked again.
+
+Not checked: a backup and restore against a real Ludusavi share from the app (the store's tests cover the registry rules), a player without CrossOver or Rosetta (the page and Play text are in the code and tests), free Wine builds, and the Mac mini.
 
 ### Recommendation
 

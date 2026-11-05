@@ -28,7 +28,7 @@ Each game then finds its Ludusavi game by itself: by the Steam app ID in its met
 - **Before a game starts**, VNDegen asks when another device backed up newer saves, or when the saves changed both here and on the server.
 - **Automatic backup** when a game closes is available and off by default. It skips a game whose saves changed in both places and leaves the choice to you.
 
-A backup from a Windows PC can hold registry data beside its files. No engine VNDegen runs keeps saves in the registry, so a restore here leaves that data out. VNDegen's own backups carry it forward, so Ludusavi on the PC still restores it from the latest backup.
+A backup from a Windows PC can hold registry data beside its files. VNDegen's own backups carry it forward, so Ludusavi on the PC still restores it from the latest backup. Unity games on a Mac that run through CrossOver keep their PlayerPrefs, often their settings and sometimes their progress, in the registry under `HKEY_CURRENT_USER\Software\<company>\<product>`. For those games alone, a restore applies that one key's values from the backup, and a backup writes them back into the backup's `registry.reg` as Ludusavi writes it, with every other key it holds unchanged. VNDegen never applies any other registry data.
 
 Ludusavi on a PC that syncs its backup folder with rclone sees VNDegen's backups as changes in the cloud. When Ludusavi asks, choose to download them.
 
