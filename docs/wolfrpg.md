@@ -132,6 +132,10 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 
 ## Known limits
 
+- The deeper look at detection lists each third-level folder once to find `Game.exe`, whatever else that folder holds.
+  A short listing with no Wolf game that reaches this plugin pays for that at each library refresh. It's bounded at 200
+  listings, and the time hasn't been measured. The largest case in the library's listing is Livestream: Escape from Hotel
+  Izanami, an unrecognized game, with 25 entries in the listing and 5,178 names one level down.
 - A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
   playing. Wolf RPG Editor 2 and 3.2x show no saved pictures after a load either; the map's own music starts.
 - After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and
