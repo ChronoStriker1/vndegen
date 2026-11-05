@@ -33,16 +33,39 @@ nonisolated public struct KiriKiriLayout: Equatable, Sendable {
         }
     }
 
-    /// Lists `folder` deep enough for an unpacked game two folders down, `outer/inner/data/startup.tjs`, a level deeper
-    /// than `FolderProbe(scanning:)` goes by default.
+    /// Lists `folder` and finds its game, looking deeper when it needs to.
     public init?(scanning folder: URL) {
-        self.init(FolderProbe(scanning: folder, maxDepth: 4))
+        self.init(deepening: FolderProbe(scanning: folder))
     }
 
-    /// Whether `probe` holds a `data` folder two folders down, whose `startup.tjs` the library's three-level listing
-    /// leaves out. Such a folder needs `init(scanning:)`.
-    static func needsDeeperListing(_ probe: FolderProbe) -> Bool {
-        probe.entries.contains { $0.split(separator: "/").count == 3 && name($0).lowercased() == "data" }
+    /// `probe`'s game, also where the library's three-level listing ends inside it. A `data` folder at the listing's last
+    /// level adds its `startup.tjs`, for an unpacked game two folders down, `outer/inner/data/startup.tjs`. A short
+    /// listing also has each folder at its last level looked into, for a game three folders down, such as Violated Hero
+    /// IV's `Violated Hero 4/127GRJ132/vh4`. Only a folder holding `data.xp3`, an `.exe` or a `data` folder adds its
+    /// names. A wrapper holds little besides the game, so its listing is short. A long one is another engine's game,
+    /// which shouldn't pay for this at each refresh.
+    init?(deepening probe: FolderProbe) {
+        let fm = FileManager.default
+        func startup(in data: String) -> String? {
+            let path = FileCase.spelling(of: "\(data)/startup.tjs", in: probe.root)
+            return fm.fileExists(atPath: probe.root.appendingPathComponent(path).path) ? path : nil
+        }
+        var entries = probe.entries
+        for folder in probe.entries.sorted() where folder.split(separator: "/").count == 3 {
+            if Self.name(folder).lowercased() == "data" {
+                if let script = startup(in: folder) { entries.insert(script) }
+                continue
+            }
+            guard probe.entries.count <= 200,
+                  let names = try? fm.contentsOfDirectory(atPath: probe.root.appendingPathComponent(folder).path),
+                  names.contains(where: { ["data.xp3", "data"].contains($0.lowercased()) || $0.lowercased().hasSuffix(".exe") })
+            else { continue }
+            for name in names where !name.hasPrefix(".") {
+                entries.insert("\(folder)/\(name)")
+                if name.lowercased() == "data", let script = startup(in: "\(folder)/\(name)") { entries.insert(script) }
+            }
+        }
+        self.init(FolderProbe(root: probe.root, entries: entries))
     }
 
     /// The shallowest root wins. Within a root, `data.xp3` wins over `data/`, which wins over an embedded archive.
