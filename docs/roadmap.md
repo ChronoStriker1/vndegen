@@ -68,8 +68,6 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
-- [#31](https://github.com/ChronoStriker1/vndegen/issues/31) TyranoScript: Butterfly Affection logs a 404 for button_menu.png.
-- [#34](https://github.com/ChronoStriker1/vndegen/issues/34) RPG Maker: Command-Q does nothing in Karryn's Prison.
 - [#35](https://github.com/ChronoStriker1/vndegen/issues/35) Ren'Py: scripted mouse clicks don't press buttons on the Mac.
 
 ## In progress
