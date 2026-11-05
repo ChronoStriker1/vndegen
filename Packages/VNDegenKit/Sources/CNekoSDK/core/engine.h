@@ -448,6 +448,9 @@ private:
     bool textDone_ = false;
     int voicePlayer_ = 0;
     std::map<int, int> bgm_, se_, voice_;
+    // The file each playing voice came from, so unchecking its speaker in Individual Voices silences it at once.
+    std::map<int, std::string> voiceFiles_;
+    void applyVoiceChoices();
 };
 
 }  // namespace neko
