@@ -2187,20 +2187,14 @@ void Engine::loadImage(const Node &n) {
         return;
     }
     Sprite &s = back_[slot];
-    // Parameter 0 places the picture: centred, or with its middle 256 or 512 to the left or right of centre, and parameters
-    // 1 and 2 move it from there. It also resets the scale, as the sprite places in the PC game's saves show, at both 1280
-    // and 1920 wide. 0 keeps the slot's position and scale, so a difference image lands where the last one was.
-    if (n.p[0] >= 1 && n.p[0] <= 5) {
+    // Command 15 starts the slot afresh, and 23, a difference image, lands where the last one was. Parameter 0 of 15 places
+    // the picture: centred, or with its middle 256 or 512 to the left or right of centre, and parameters 1 and 2 move it
+    // from there. Replaying scenes to the sprite places in the PC game's saves shows this, at 1280 and 1920 wide.
+    if (n.opcode == 15) {
         static const int kFromCentre[] = {0, -256, 256, -512, 512};
-        s.x = float((width_ - image->w) / 2 + kFromCentre[n.p[0] - 1] + n.p[1]);
-        s.y = float((height_ - image->h) / 2 + n.p[2]);
-        s.scaleX = s.scaleY = 1;
-        s.anchorX = s.anchorY = -1;
-        s.changes.clear();
-    } else if (n.p[5]) {
-        // Parameter 5 starts the slot afresh: Test Game 95 moves a background 1000 up, loads the next with this set, and
-        // the PC's save has it back at 0, 0.
-        s.x = s.y = 0;
+        bool placed = n.p[0] >= 1 && n.p[0] <= 5;
+        s.x = float(n.p[1] + (placed ? (width_ - image->w) / 2 + kFromCentre[n.p[0] - 1] : 0));
+        s.y = float(n.p[2] + (placed ? (height_ - image->h) / 2 : 0));
         s.scaleX = s.scaleY = 1;
         s.anchorX = s.anchorY = -1;
         s.changes.clear();
