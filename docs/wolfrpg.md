@@ -168,8 +168,10 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - Saves of versions before 159 have no arrays. A Wolf RPG Editor 3.5 game that started from an older save loses its arrays when saved in VNDegen. The Clumsy Witch Seris, the one library game with arrays, writes version 159.
 - Command 222 can't write key settings (system variables 52 to 57) into a save, which The Clumsy Witch Seris's configuration tries: they aren't kept between sessions.
 - A message's text goes to a place of VNDegen's own, near the bottom left, when a game leaves system variables 1 and 2
-  at -1, since the PC's default place isn't known. So does the pause icon, whatever system variables 5 and 6 say. Drain
-  Dungeon, ANGEL QUEST, Milky Quest and Succubus Prison all set 1 and 2.
+  at -1, since the PC's default place isn't known. A new game starts them at -1. So does the pause icon, whatever system
+  variables 5 and 6 say. Drain Dungeon, ANGEL QUEST, Milky Quest and Succubus Prison all set 1 and 2. A game that never
+  sets them, loaded from a save in which they are 0, such as one an earlier VNDegen made, shows its text at the top left,
+  since a save can't tell such a 0 from one the game set.
 - Choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system variables other
   than the choice window's top may place them differently. A top of -1 means the default, and any other value counts,
   so Succubus Prison's -1000 hides the choices behind its picture menu. Not compared with the PC: this
