@@ -1,0 +1,165 @@
+#include "image.h"
+
+#include <algorithm>
+#include <cstring>
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#define STBI_ONLY_PNG
+#define STBI_NO_STDIO
+#include "../third_party/stb/stb_image.h"
+
+namespace neko {
+namespace {
+
+constexpr size_t kCacheBytes = 256u * 1024 * 1024;
+
+int32_t rd32(const uint8_t *p) {
+    int32_t v;
+    std::memcpy(&v, p, 4);
+    return v;
+}
+
+bool decodeBmp(const std::vector<uint8_t> &d, Image &out) {
+    if (d.size() < 54) return false;
+    int32_t offset = rd32(&d[10]), w = rd32(&d[18]), h = rd32(&d[22]);
+    int bits = d[28] | d[29] << 8;
+    if (rd32(&d[30]) != 0 || (bits != 24 && bits != 32) || w <= 0 || h == 0 || offset < 54) return false;
+    bool bottomUp = h > 0;
+    h = std::abs(h);
+    size_t stride = (size_t(w) * (bits / 8) + 3) & ~size_t(3);
+    if (size_t(offset) + stride * size_t(h) > d.size()) return false;
+    out.w = w;
+    out.h = h;
+    out.rgba.resize(size_t(w) * h * 4);
+    for (int y = 0; y < h; y++) {
+        const uint8_t *src = d.data() + offset + stride * size_t(bottomUp ? h - 1 - y : y);
+        uint8_t *dst = out.rgba.data() + size_t(y) * w * 4;
+        if (bits == 24) {
+            for (int x = 0; x < w; x++, src += 3, dst += 4) {
+                dst[0] = src[2];
+                dst[1] = src[1];
+                dst[2] = src[0];
+                dst[3] = 255;
+            }
+        } else {
+            for (int x = 0; x < w; x++, src += 4, dst += 4) {
+                dst[0] = src[2];
+                dst[1] = src[1];
+                dst[2] = src[0];
+                dst[3] = 255;
+            }
+        }
+    }
+    return true;
+}
+
+// One byte per pixel, top row first. Row padding is rare but real: some files round each row up to 4 bytes.
+void applyAlpha(const std::vector<uint8_t> &alp, Image &image) {
+    size_t w = size_t(image.w), h = size_t(image.h);
+    size_t stride = alp.size() == w * h ? w : (w + 3) & ~size_t(3);
+    if (alp.size() < stride * h) return;
+    for (size_t y = 0; y < h; y++) {
+        const uint8_t *src = alp.data() + y * stride;
+        uint8_t *dst = image.rgba.data() + y * w * 4 + 3;
+        for (size_t x = 0; x < w; x++, dst += 4) *dst = src[x];
+    }
+    image.opaque = false;
+}
+
+std::string withExtension(const std::string &path, const char *extension) {
+    auto dot = path.rfind('.');
+    return (dot == std::string::npos ? path : path.substr(0, dot)) + extension;
+}
+
+}  // namespace
+
+ImageRef Images::decode(const std::string &path) const {
+    Bytes data = files_.read(path);
+    if (!data || data->size() < 8) return nullptr;
+    auto image = std::make_shared<Image>();
+    if ((*data)[0] == 'B' && (*data)[1] == 'M') {
+        if (!decodeBmp(*data, *image)) return nullptr;
+    } else if (!std::memcmp(data->data(), "\x89PNG", 4)) {
+        int w = 0, h = 0, n = 0;
+        uint8_t *px = stbi_load_from_memory(data->data(), int(data->size()), &w, &h, &n, 4);
+        if (!px) return nullptr;
+        image->w = w;
+        image->h = h;
+        image->rgba.assign(px, px + size_t(w) * h * 4);
+        image->opaque = n != 2 && n != 4;
+        stbi_image_free(px);
+    } else {
+        return nullptr;
+    }
+    if (Bytes alp = files_.read(withExtension(path, ".alp"))) applyAlpha(*alp, *image);
+    return image;
+}
+
+namespace {
+
+// Three passes of a box blur each way, which is close to a Gaussian.
+void boxBlur(Image &image, int radius) {
+    int w = image.w, h = image.h, r = std::max(1, radius);
+    std::vector<uint8_t> line(size_t(std::max(w, h)) * 4);
+    auto run = [&](uint8_t *start, int count, ptrdiff_t stride) {
+        int sum[4] = {0, 0, 0, 0};
+        for (int i = 0; i < count; i++) std::memcpy(&line[size_t(i) * 4], start + i * stride, 4);
+        auto at = [&](int i) { return &line[size_t(std::clamp(i, 0, count - 1)) * 4]; };
+        for (int i = -r; i <= r; i++)
+            for (int k = 0; k < 4; k++) sum[k] += at(i)[k];
+        int size = 2 * r + 1;
+        for (int i = 0; i < count; i++) {
+            uint8_t *d = start + i * stride;
+            for (int k = 0; k < 4; k++) {
+                d[k] = uint8_t(sum[k] / size);
+                sum[k] += at(i + r + 1)[k] - at(i - r)[k];
+            }
+        }
+    };
+    for (int pass = 0; pass < 3; pass++) {
+        for (int y = 0; y < h; y++) run(image.rgba.data() + size_t(y) * w * 4, w, 4);
+        for (int x = 0; x < w; x++) run(image.rgba.data() + size_t(x) * 4, h, ptrdiff_t(w) * 4);
+    }
+}
+
+}  // namespace
+
+ImageRef Images::remember(const std::string &key, ImageRef image) {
+    recent_.emplace_front(key, image);
+    byPath_[key] = recent_.begin();
+    held_ += image->bytes();
+    while (held_ > kCacheBytes && recent_.size() > 1) {
+        held_ -= recent_.back().second->bytes();
+        byPath_.erase(recent_.back().first);
+        recent_.pop_back();
+    }
+    return image;
+}
+
+ImageRef Images::get(const std::string &path) {
+    std::string key = normalizedPath(path);
+    auto it = byPath_.find(key);
+    if (it != byPath_.end()) {
+        recent_.splice(recent_.begin(), recent_, it->second);
+        return it->second->second;
+    }
+    ImageRef image = decode(path);
+    return image ? remember(key, image) : nullptr;
+}
+
+ImageRef Images::blurred(const std::string &path, int radius) {
+    std::string key = normalizedPath(path) + "#" + std::to_string(radius);
+    auto it = byPath_.find(key);
+    if (it != byPath_.end()) {
+        recent_.splice(recent_.begin(), recent_, it->second);
+        return it->second->second;
+    }
+    ImageRef source = get(path);
+    if (!source) return nullptr;
+    auto image = std::make_shared<Image>(*source);
+    boxBlur(*image, radius);
+    return remember(key, image);
+}
+
+}  // namespace neko
