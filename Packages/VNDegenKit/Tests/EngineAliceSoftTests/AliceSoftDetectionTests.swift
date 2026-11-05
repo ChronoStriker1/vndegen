@@ -21,6 +21,13 @@ import VNCore
         #expect(l.system == .system39)
     }
 
+    /// Hash order would find the sorted first of these only 1 time in 26.
+    @Test func aTieGoesToTheFirstInSortedOrder() throws {
+        let roots = (UInt8(ascii: "a")...UInt8(ascii: "z")).map { String(UnicodeScalar($0)) }
+        let l = try #require(layout(roots.flatMap { ["\($0)/\($0).ain", "\($0)/System40.ini"] }))
+        #expect(l.root == "a" && l.evidence == "a/a.ain")
+    }
+
     @Test func system39AinAloneIsNotAGame() {
         #expect(layout(["System39.ain"]) == nil)
     }

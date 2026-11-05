@@ -20,7 +20,8 @@ nonisolated struct NScripterLayout: Equatable, Sendable {
             folders[folder, default: []].insert(parts.last!.lowercased())
         }
         var best: NScripterLayout?
-        for (folder, names) in folders {
+        // Sorted, because a tie keeps the first found and a Dictionary's order changes per launch.
+        for (folder, names) in folders.sorted(by: { $0.key < $1.key }) {
             guard let found = Self.match(names) else { continue }
             let candidate = NScripterLayout(root: folder, evidence: folder.isEmpty ? found.file : "\(folder)/\(found.file)",
                                             confidence: found.confidence)
