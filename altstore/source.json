@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.23.3",
+          "buildVersion": "1211",
+          "date": "2026-11-05T18:34:18Z",
+          "localizedDescription": "RPG Maker and TyranoScript games inside wrapper folders are now found, about 30 more from the library this was checked on, and Command-Q works while a sheet is open on the Mac.\n\n## Downloads\n\n- `VNDegen-0.23.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.23.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- RPG Maker MV and MZ, and TyranoScript: a game that keeps a wrapper folder after import, because of a readme beside its folder or two folders above it, is now found and runs. It shows as a likely match.\n- Mac: Command-Q and the Quit menu item now work while a sheet is open. They close the sheet and quit. Before, they did nothing.\n- Ren'Py: Countryside Cumsluts no longer stops on its first line. Games get a stand-in for the Windows-only `os.startfile`.\n- Ren'Py: VNDegen's menu buttons keep their full width on high-resolution games such as MalOvent.\n- Wolf RPG Editor: Succubus Prison's title shows its own menu instead of a placeholder box, and a new game goes on to its opening. After saving on its save screen, cancel to move on, which is how the game's screen works.\n- iPhone and iPad: each Controller layout step opens at its focused item, and the first controller press scrolls to the focus ring.\n\n## Known limits\n\n- The first backup of a wrapped game can record a save path that a restore on a PC might not use, if there's no existing save path to go by.\n- Remove engine files isn't offered for wrapped RPG Maker and TyranoScript games, so their runtime stays.\n- Mac: logging out, restarting, or Dock Quit with a sheet open is probably still blocked, as before. Close the sheet first.\n\n## What wasn't tested\n\n- No physical device was used. The Quit fix was checked in a debug build, and this release's build is its first run in a release configuration.\n- Countryside Cumsluts was only run on Linux with no network, because the game contacts its developer's server. It wasn't run in the app.\n- Succubus Prison has no PC comparison, because it doesn't run under Wine. Continue from the title was checked on Linux only.\n- A fresh game save on a case-sensitive volume for a wrapped game, and a real launch of a TyranoScript game with a wrapper in the Mac app.\n- Five small boxes reading 0 beside Succubus Prison's \"Don't skip\" choice weren't compared with the PC.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.23.3/VNDegen-0.23.3.ipa",
+          "size": 122698326,
+          "sha256": "8950b67b440950e6a864b4778fe2dcda29d8fcaf346d4702b38c1ed8f795e8e3",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.23.2",
           "buildVersion": "1192",
           "date": "2026-11-05T02:27:53Z",
