@@ -94,6 +94,16 @@ opening showed 6806 of 6810 frames, 29.98 a second, its sound never ran dry, and
 median 1% low of 60. Sengoku Rance's battle on the iPad simulator averaged 59.2 fps over 200 s while other builds
 pushed the Mac mini's load average to about 80, with a median 1% low of 37.
 
+The host copies and uploads the frame on every display refresh, even when the game showed no new frame since the
+last one. Skipping those copies was tried and measured on 2026-11-05, in the Mac app on a MacBook Pro with a 120 Hz
+display, where between a quarter and a half of the refreshes bring a new frame (load average 2 to 6, nothing else
+running, 20 s phases alternating the two ways in the same scene). It saved nothing: the app's CPU time was 31.7 to
+33.4% of a core copying every refresh and 34.0 to 36.5% skipping in Rance 02's opening movie, 35.0% and 37.8% in
+Sengoku Rance's, and 18.5% and 17.3% on Sengoku Rance's still warning screen. On a still story scene the main
+thread spent about 0.6 to 1.3 ms a refresh on the copy and upload against 0.18 ms when skipping, apparently most of
+it waiting on the GPU rather than using the CPU, and pacing was the same both ways (120 refreshes a second, 1% low
+120). So the copy stays.
+
 ## Known limits
 
 - Rance IX's 3D scenes (SealEngine and MarmotModelEngine), which include its battles and maps, don't run. The game
