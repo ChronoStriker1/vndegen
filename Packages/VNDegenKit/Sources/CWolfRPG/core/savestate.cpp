@@ -435,6 +435,8 @@ bool Game::saveSlot(int slot, std::string *error) {
     }
     SaveFile f = snapshot();
     if (!writeSave(saveFilePath(slotFile(slot)), f, error)) return false;
+    // System variable 25 is the last slot saved or loaded. Succubus Prison's new game won't start until it reads non-zero.
+    if (system_.size() > 25) system_[25] = slot;
     saveBase_ = std::make_shared<SaveFile>(std::move(f));
     return true;
 }
