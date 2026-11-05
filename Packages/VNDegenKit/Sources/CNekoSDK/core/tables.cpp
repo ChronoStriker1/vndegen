@@ -1828,8 +1828,8 @@ cell 570 373
 cell 732 373
 button page0 obj\d009_000.bmp 810 520 11 5 0
 button page1 obj\d009_000.bmp 849 520 11 5 1
-slider music obj\h009_001.bmp 590 598
-tracktime obj\h007_000.bmp 132 635 780 635
+slider music obj\h009_001.bmp 622 598
+tracktime obj\h007_000.bmp 130 635 780 635 10
 trackseek obj\h008_000.bmp 205 650
 button music_prev obj\h005_000.bmp 122 590 5 5 0
 button music_toggle obj\h005_000.bmp 211 590 5 5 2
@@ -2028,6 +2028,21 @@ button no obj\a003_001.bmp 715 324 2 5 1
 screen start
 after 0
 flow MainFlow1
+pic obj\b201_000.bmp 0 0
+pic obj\b201_002.bmp -61 -41
+pic obj\b202_002.bmp 361 -41
+pic obj\b203_000.bmp 0 0
+pic obj\b000_001.bmp 0 0
+pic obj\b000_002.bmp 0 603
+pic obj\b003_000.bmp 617 408
+pic obj\b004_000.bmp 23 120 10 5 0 0
+pic obj\b004_000.bmp 23 160 10 5 1 0
+pic obj\b004_000.bmp 23 200 10 5 2 0
+pic obj\b004_000.bmp 23 240 10 5 3 0
+pic obj\b004_000.bmp 23 280 10 5 4 0
+pic obj\b004_000.bmp 23 320 10 5 5 0
+pic obj\b004_000.bmp 23 360 10 5 6 0
+pic obj\b004_000.bmp 23 559 10 5 9 0
 pic obj\b010_000.bmp 243 118
 button start_prologue obj\b010_001.bmp 434 283 2 5 0
 button start_main obj\b010_001.bmp 437 362 2 5 1

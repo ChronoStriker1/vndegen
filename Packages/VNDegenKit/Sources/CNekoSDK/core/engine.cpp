@@ -883,16 +883,17 @@ void Engine::composeTrackCards(Canvas &out) {
     }
 }
 
-// `tracktime DIGITS X Y X2 Y2` where the time played and the length go, and `trackseek FILL X Y` how far through it is.
+// `tracktime DIGITS X Y X2 Y2 STEP` where the time played and the length go, with the digits STEP apart since the PC's
+// overlap their cells, and `trackseek FILL X Y` how far through it is.
 void Engine::composeTrackTime(Canvas &out) {
     if (screen_->name != "music") return;
     const auto *times = screen_->setting("tracktime");
     int64_t at = trackPlayer_ ? audio_.positionMs(trackPlayer_) : 0, all = trackPlayer_ ? audio_.lengthMs(trackPlayer_) : 0;
-    if (ImageRef digits = times && times->size() >= 5 ? images_->get((*times)[0]) : nullptr) {
-        int w = digits->w / 11;
+    if (ImageRef digits = times && times->size() >= 6 ? images_->get((*times)[0]) : nullptr) {
+        int w = digits->w / 11, step = field(*times, 5);
         auto clock = [&](int64_t ms, int x, int y) {
             int seconds = int(ms / 1000), shown[5] = {seconds / 600 % 10, seconds / 60 % 10, 10, seconds / 10 % 6, seconds % 10};
-            for (int i = 0; i < 5; i++) drawPart(out, *digits, x + i * w, y, shown[i] * w, 0, w, digits->h, 1);
+            for (int i = 0; i < 5; i++) drawPart(out, *digits, x + i * step, y, shown[i] * w, 0, w, digits->h, 1);
         };
         clock(at, field(*times, 1), field(*times, 2));
         clock(all, field(*times, 3), field(*times, 4));
@@ -1415,10 +1416,11 @@ void Engine::restoreSave(const SaveData &d) {
     scenario_ = d.variables;
     choiceImage_ = d.choiceImage;
     flowCallId_ = d.flowNode;
+    bool atChoice = false;
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
         // A save made while a choice waits names the choice, and the choice is asked again.
-        bool atChoice = call && (call->opcode == 3 || call->opcode == 20);
+        atChoice = call && (call->opcode == 3 || call->opcode == 20);
         stack_.push_back({flow, atChoice ? call : call ? flow->node(call->next) : flow->first()});
     }
     std::map<int, FlipModes> flipModes = flipModesAt(d);
@@ -1517,10 +1519,11 @@ void Engine::restoreSave(const SaveData &d) {
     }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    layoutText(sjis::toUtf8(d.current.name), sjis::toUtf8(d.current.text));
+    // The PC shows the choice in an empty window, with nothing to click through first.
+    layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
-    waiting_ = Waiting::Click;
+    waiting_ = atChoice ? Waiting::None : Waiting::Click;
     dirty_ = true;
 }
 
