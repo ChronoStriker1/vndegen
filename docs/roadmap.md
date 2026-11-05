@@ -65,11 +65,13 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#13](https://github.com/ChronoStriker1/vndegen/issues/13) Ren'Py: MalOvent 0.3 stops with a TypeError after its age prompt.
-- [#14](https://github.com/ChronoStriker1/vndegen/issues/14) Mac: the Controller layout sheet resizes under the pointer.
-- [#15](https://github.com/ChronoStriker1/vndegen/issues/15) Detection ties in Wolf, AliceSoft and NScripter depend on hash order.
 - [#16](https://github.com/ChronoStriker1/vndegen/issues/16) RPG Maker MZ: frame rate drop after alpha clips load and unload.
 - [#17](https://github.com/ChronoStriker1/vndegen/issues/17) Ren'Py: opening VNDegen's menu can restart a movie on the movie channel.
 - [#18](https://github.com/ChronoStriker1/vndegen/issues/18) Godot 3: Barely Working averages about 58 fps on the Mac mini.
+- [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
+- [#20](https://github.com/ChronoStriker1/vndegen/issues/20) iPhone and iPad: Controller layout sheet can open a step scrolled away, with an offscreen focus ring.
+- [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
+- [#22](https://github.com/ChronoStriker1/vndegen/issues/22) Detection: 7 survey titles match no engine in a listing check.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
