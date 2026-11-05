@@ -14,12 +14,12 @@ nonisolated public struct WolfRPGPlugin: EnginePlugin {
     }
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
-        guard let layout = WolfRPGLayout(probe) else { return nil }
+        guard let layout = WolfRPGLayout(deepening: probe) else { return nil }
         return EngineMatch(engine: descriptor.id, confidence: layout.confidence, evidence: layout.evidence)
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
-        guard let layout = WolfRPGLayout(FolderProbe(scanning: launch.folder)) else { throw WolfRPGError.notWolfRPG }
+        guard let layout = WolfRPGLayout(scanning: launch.folder) else { throw WolfRPGError.notWolfRPG }
         return WolfRPGSession(launch, root: layout.url(in: launch.folder))
     }
 

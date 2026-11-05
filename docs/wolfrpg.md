@@ -21,10 +21,13 @@ of the runtime's own keeps music decoded ahead. Everything runs in the app's pro
 
 ## Detection
 
-A game is Wolf RPG Editor when a folder at the top of the game folder, or up to two folders down, holds `Data.wolf`,
-`Data/BasicData`, or `Data/BasicData.wolf`, beside `Game.exe` (or `GamePro.exe`) for certainty. A game deeper than the
-folder listing reaches is found by `Game.exe` beside `Data` and `GuruguruSMF4.dll`, the MIDI player every Wolf RPG
-Editor 2 game ships.
+A game is Wolf RPG Editor when a folder at the top of the game folder, or up to three folders down, holds `Data.wolf`,
+`Data/BasicData`, or `Data/BasicData.wolf`, beside `Game.exe` (or `GamePro.exe`) for certainty. A game two folders
+down whose data the folder listing doesn't reach is found by `Game.exe` beside `Data` and `GuruguruSMF4.dll`, the MIDI
+player every Wolf RPG Editor 2 game ships. When a short listing shows no game, detection looks one level deeper, for `Game.exe` or `GamePro.exe`
+three folders down inside wrapper folders, such as Succubus Prison's `sys` folder when its outer folder is kept. A folder
+with more than 200 entries in the listing doesn't get that deeper look, so other engines' games don't pay for it at each
+library refresh.
 
 ## What the runtime reads
 
@@ -129,6 +132,10 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 
 ## Known limits
 
+- The deeper look at detection lists each third-level folder once to find `Game.exe`, whatever else that folder holds.
+  A short listing with no Wolf game that reaches this plugin pays for that at each library refresh. It's bounded at 200
+  listings, and the time hasn't been measured. The largest case in the library's listing is Livestream: Escape from Hotel
+  Izanami, an unrecognized game, with 25 entries in the listing and 5,178 names one level down.
 - A load restores variables, the map and the characters, but not pictures, the screen tint, or which music was
   playing. Wolf RPG Editor 2 and 3.2x show no saved pictures after a load either; the map's own music starts.
 - After a save moves between VNDegen and the PC in either direction, The Clumsy Witch Seris shows its HUD, minimap and

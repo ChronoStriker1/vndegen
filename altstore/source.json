@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.23.2",
+          "buildVersion": "1192",
+          "date": "2026-11-05T02:27:53Z",
+          "localizedDescription": "MalOvent now runs, the Mac's Controller layout sheet keeps one size, and a Wolf RPG Editor game kept inside an extra folder is found.\n\n## Downloads\n\n- `VNDegen-0.23.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.23.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- Ren'Py: MalOvent no longer stops with a TypeError when its main menu first draws. Games built for Ren'Py 8.3 or older can pass whole-number floats to `random.randrange` again.\n- Ren'Py: opening VNDegen's menu no longer restarts a movie that keeps playing behind it, in a game that sets its movies up that way.\n- Mac: the Controller layout sheet keeps one size through its steps, so buttons stay under the pointer, and each step opens at its focused item.\n- Wolf RPG Editor, AliceSoft, and NScripter: a folder holding tied candidates gives the same answer at every launch.\n- Wolf RPG Editor: a game three folders deep, inside an extra folder, is now found, such as Succubus Prison with its outer folder kept.\n\n## Known limits\n\n- Succubus Prison is found and starts, but it's stuck on its title screen for now, in issue 28. Its menu shows placeholder labels and doesn't start a game.\n- Both Umineko Arcs are Ponscripter games, which VNDegen doesn't run, so they aren't detected, in issue 26.\n- Looking for a Wolf RPG Editor game in extra folders lists each third-level folder once, up to 200, at each library refresh, for a folder with no other game found.\n\n## What wasn't tested\n\n- No physical device was used. The Mac sheet wasn't tried in a small window, and the Ren'Py and Wolf changes were tried on the Mac app and, for Ren'Py, an iPad simulator.\n- Ren'Py on the Mac: the menu was opened by a key posted inside Ren'Py, not a real key press.\n- Three archives couldn't be listed for the detection comparison: HENTAI EATER, Summer Clover, and プリンセスディフェンダー.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.23.2/VNDegen-0.23.2.ipa",
+          "size": 122678365,
+          "sha256": "fbc602721693c9640c27b25cd8e21618486681b6a10fe4c40714478b545903dc",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.23.1",
           "buildVersion": "1172",
           "date": "2026-11-04T23:58:25Z",
