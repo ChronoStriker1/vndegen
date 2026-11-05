@@ -2206,6 +2206,22 @@ void Engine::loadImage(const Node &n) {
 }
 
 // Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
+// The point a scale keeps still: a running named animation's pivot, or a restored animation's while it runs, else the
+// sprite's own anchor, which neither changes.
+void Engine::anchorOf(const Sprite &s, int &x, int &y) const {
+    x = s.anchorX;
+    y = s.anchorY;
+    for (const Animation &a : s.changes)
+        if (a.hasPivot) {
+            x = a.pivotX;
+            y = a.pivotY;
+        }
+    if (s.looping && s.loop.hasPivot) {
+        x = s.loop.pivotX;
+        y = s.loop.pivotY;
+    }
+}
+
 void Engine::takeScaleAnchor(Sprite &s, const Node &n) {
     s.anchorX = n.p[8] ? -1 : n.p[6];
     s.anchorY = n.p[9] ? -1 : n.p[7];
@@ -2217,7 +2233,10 @@ void Engine::transform(const Node &n) {
     auto it = back_.find(p[3]);
     if (it == back_.end()) return;
     Sprite &s = it->second;
-    SpriteView was = view(s);
+    // Where the timed changes have it, without a named animation, which goes on adding its own part afterwards.
+    Sprite base = s;
+    base.looping = false;
+    SpriteView was = view(base);
     s.changes.clear();
     if (p[16]) {
         // Parameter 0 makes it a move from where the sprite is, as it does for a change over time.
@@ -2348,10 +2367,6 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
 void Engine::namedAnimation(Sprite &s, const Node &n) {
     foldFinishedChanges(s);
     Animation a = parseAnimation(n.s[1], s);
-    if (a.hasPivot) {
-        s.anchorX = a.pivotX;
-        s.anchorY = a.pivotY;
-    }
     a.repeat = n.p[1] != 0;
     s.loop = std::move(a);
     s.looping = true;
@@ -2574,7 +2589,9 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
         ImageRef image = radius > 0 ? images_->blurred(s.path, radius) : s.image;
         // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
-        float w = float(s.image->w), h = float(s.image->h), anchorX = s.anchorX < 0 ? w * 0.5f : float(s.anchorX), anchorY = s.anchorY < 0 ? h * 0.5f : float(s.anchorY);
+        int pivotX, pivotY;
+        anchorOf(s, pivotX, pivotY);
+        float w = float(s.image->w), h = float(s.image->h), anchorX = pivotX < 0 ? w * 0.5f : float(pivotX), anchorY = pivotY < 0 ? h * 0.5f : float(pivotY);
         float middleX = v.x + anchorX + (w * 0.5f - anchorX) * v.scaleX, middleY = v.y + anchorY + (h * 0.5f - anchorY) * v.scaleY;
         drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
     }

@@ -231,6 +231,7 @@ private:
     void transform(const Node &n);
     void transformOverTime(const Node &n);
     void takeScaleAnchor(Sprite &s, const Node &n);
+    void anchorOf(const Sprite &s, int &x, int &y) const;
     void changeOverTime(Sprite &s, const Node &n);
     void startNamedAnimation(const Node &n);
     void namedAnimation(Sprite &s, const Node &n);
