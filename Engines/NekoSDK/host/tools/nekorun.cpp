@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
             }
         }
         int count = vnneko_debug_text_count(e);
-        if (vnneko_debug_choice_count(e) > 0) vnneko_debug_choose(e, chooseIndex);
+        if (chooseIndex >= 0 && vnneko_debug_choice_count(e) > 0) vnneko_debug_choose(e, chooseIndex);
         if (period && elapsed >= nextBeat) {
             nextBeat += period;
             vnneko_mouse_button(e, 0, true);

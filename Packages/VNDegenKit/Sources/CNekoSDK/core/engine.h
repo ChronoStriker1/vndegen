@@ -55,6 +55,8 @@ struct Sprite {
     std::string path;
     float x = 0, y = 0, scaleX = 1, scaleY = 1, rotation = 0, alpha = 1;
     int blurAmount = 0;
+    // The point in the picture a scale keeps in place, or -1 for its middle.
+    int anchorX = -1, anchorY = -1;
     bool blurOn = false;
     // Timed changes run side by side until each finishes, when it folds into the values above. The named animation
     // runs over them all until it's stopped.
@@ -132,6 +134,7 @@ private:
     bool cardAt(int slot, int &x, int &y) const;
     bool overCardDelete(int slot, int x, int y) const;
     int newestQuickSlot();
+    std::string lastScene_;
     int nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();
@@ -167,6 +170,7 @@ private:
         int page = 0;
         std::string thumbnail, flow, key, bgm;
         std::vector<std::string> images;
+        std::vector<int> imageIds;
     };
     std::vector<GalleryEntry> cgEntries_, sceneEntries_;
     std::vector<std::string> tracks_;
@@ -224,6 +228,7 @@ private:
     void loadImage(const Node &n);
     void transform(const Node &n);
     void transformOverTime(const Node &n);
+    void takeScaleAnchor(Sprite &s, const Node &n);
     void changeOverTime(Sprite &s, const Node &n);
     void startNamedAnimation(const Node &n);
     void namedAnimation(Sprite &s, const Node &n);

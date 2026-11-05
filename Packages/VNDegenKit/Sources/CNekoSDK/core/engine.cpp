@@ -30,7 +30,7 @@ constexpr int kLogDim = 182;
 constexpr int kFirstQuickSlot = 81, kLastQuickSlot = 88;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
 // They sit after a string at byte 44020, so they move with its length.
-constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kCgFlagRow = 40, kCgFlagsPerRow = 10, kTrackFlagsAt = 100000;
+constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kTrackFlagsAt = 100000;
 // How long Auto waits after the text and voice are done.
 constexpr int kAutoDelayMs = 1000;
 constexpr float kPi = 3.14159265f;
@@ -652,7 +652,10 @@ void Engine::loadGalleries() {
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
-            if (parts.size() >= 3) cgEntries_.back().images.push_back(parts[2]);
+            if (parts.size() >= 3) {
+                cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
+                cgEntries_.back().images.push_back(parts[2]);
+            }
         }
     }
     // `page thumbnail 0 0 flow key,0,0`.
@@ -974,6 +977,9 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
 
 // MARK: Global variables
 
+// A damaged cg_view.ini's number mustn't reach past the flags, which end where the tracks' begin.
+static bool validCgId(int id) { return id >= 0 && size_t(id) < (kTrackFlagsAt - kCgFlagsAt) / 4; }
+
 // cfg.sav holds the game's settings, then its 10,000 global variables at byte 4000: a save of Test Game 95's has 1 at its
 // macro GLB_PROLOGUE_OVER's number, 1000, after the prologue. VNDegen keeps the rest of the file as it found it.
 void Engine::loadGlobals() {
@@ -997,9 +1003,10 @@ void Engine::loadGlobals() {
         if (at + moved + 4 <= configFile_.size()) std::memcpy(&v, &configFile_[at + moved], 4);
         return v != 0;
     };
-    for (size_t e = 0; e < cgEntries_.size(); e++)
-        for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
-            if (flag(kCgFlagsAt + e * kCgFlagRow + p * 4)) seen_[normalizedPath(cgEntries_[e].images[p])] = true;
+    // A picture's flag goes by its number in cg_view.ini, which needn't run in step with the entries.
+    for (const GalleryEntry &e : cgEntries_)
+        for (size_t p = 0; p < e.images.size(); p++)
+            if (validCgId(e.imageIds[p]) && flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
 }
@@ -1033,9 +1040,9 @@ void Engine::saveGlobals() {
         const int32_t on = 1;
         if (at + moved + 4 <= configFile_.size()) std::memcpy(&configFile_[at + moved], &on, 4);
     };
-    for (size_t e = 0; e < cgEntries_.size(); e++)
-        for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
-            if (seen(cgEntries_[e].images[p])) setFlag(kCgFlagsAt + e * kCgFlagRow + p * 4);
+    for (const GalleryEntry &e : cgEntries_)
+        for (size_t p = 0; p < e.images.size(); p++)
+            if (validCgId(e.imageIds[p]) && seen(e.images[p])) setFlag(kCgFlagsAt + size_t(e.imageIds[p]) * 4);
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
     auto packed = packEntry(configFile_);
@@ -1101,8 +1108,8 @@ SaveData Engine::captureSave() {
         out.y = s.y;
         out.scaleX = s.scaleX;
         out.scaleY = s.scaleY;
-        out.anchorX = s.image->w / 2;
-        out.anchorY = s.image->h / 2;
+        out.anchorX = s.anchorX < 0 ? s.image->w / 2 : s.anchorX;
+        out.anchorY = s.anchorY < 0 ? s.image->h / 2 : s.anchorY;
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
@@ -1159,7 +1166,8 @@ SaveData Engine::captureSave() {
     };
     soundsOf(bgmNow_, bgm_, 0);
     soundsOf(seNow_, se_, 60);
-    d.scene = scene_.script ? scene_.script->name : "";
+    // Between scenes the PC's save still names the last one, and it won't ask a choice from a save that doesn't.
+    d.scene = scene_.script ? scene_.script->name : lastScene_;
     d.node = scene_.node ? scene_.node->id : 0;
     return d;
 }
@@ -1238,9 +1246,19 @@ void Engine::restoreSave(const SaveData &d) {
     scenario_ = d.variables;
     choiceImage_ = d.choiceImage;
     flowCallId_ = d.flowNode;
+    bool atChoice = false;
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
-        stack_.push_back({flow, call ? flow->node(call->next) : flow->first()});
+        // The PC's save made while a choice waits names the choice, and it's asked again. Ours names the scene before, which
+        // is what the PC itself needs to ask it, and a finished scene with a choice next means the same here.
+        const Node *after = call ? flow->node(call->next) : nullptr;
+        bool namesChoice = call && call->opcode == 3, choiceNext = after && d.node == 0 && after->opcode == 3;
+        atChoice = namesChoice || choiceNext;
+        // Back to the scene before, so that saving again here writes what the PC can ask the choice from.
+        if (namesChoice)
+            for (const Node &candidate : flow->nodes)
+                if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
+        stack_.push_back({flow, namesChoice ? call : call ? after : flow->first()});
     }
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
@@ -1254,6 +1272,10 @@ void Engine::restoreSave(const SaveData &d) {
         s.alpha = float(saved.alpha) / 256;
         s.blurAmount = saved.blur;
         s.blurOn = saved.blurOn;
+        if (s.image) {
+            s.anchorX = saved.anchorX;
+            s.anchorY = saved.anchorY;
+        }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
             a.begunMs = now_ - int64_t(saved.animationFrames) * 1000 / std::max(1, fps_);
@@ -1282,12 +1304,14 @@ void Engine::restoreSave(const SaveData &d) {
     }
     auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
+    lastScene_ = d.scene;
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
-    layoutText(sjis::toUtf8(d.current.name), sjis::toUtf8(d.current.text));
+    // The PC shows the choice in an empty window, with nothing to click through first.
+    layoutText(atChoice ? "" : sjis::toUtf8(d.current.name), atChoice ? "" : sjis::toUtf8(d.current.text));
     textStart_ = now_;
     textDone_ = true;
-    waiting_ = Waiting::Click;
+    waiting_ = atChoice ? Waiting::None : Waiting::Click;
     dirty_ = true;
 }
 
@@ -1649,6 +1673,7 @@ void Engine::runFlow(const Node &n) {
         auto script = loadScript(n.s[1]);
         if (script && script->first()) {
             scene_ = {script, script->first()};
+            lastScene_ = script->name;
             flowCallId_ = n.id;
             noteSeen(n.s[1]);
             log("scene %s", script->name.c_str());
@@ -2161,9 +2186,32 @@ void Engine::loadImage(const Node &n) {
         return;
     }
     Sprite &s = back_[slot];
-    // A load keeps the slot's position and scale, so a difference image lands where the last one was.
+    // Parameter 0 places the picture: centred, or with its middle 256 or 512 to the left or right of centre, and parameters
+    // 1 and 2 move it from there. It also resets the scale, as the sprite places in the PC game's saves show, at both 1280
+    // and 1920 wide. 0 keeps the slot's position and scale, so a difference image lands where the last one was.
+    if (n.p[0] >= 1 && n.p[0] <= 5) {
+        static const int kFromCentre[] = {0, -256, 256, -512, 512};
+        s.x = float((width_ - image->w) / 2 + kFromCentre[n.p[0] - 1] + n.p[1]);
+        s.y = float((height_ - image->h) / 2 + n.p[2]);
+        s.scaleX = s.scaleY = 1;
+        s.anchorX = s.anchorY = -1;
+        s.changes.clear();
+    } else if (n.p[5]) {
+        // Parameter 5 starts the slot afresh: Test Game 95 moves a background 1000 up, loads the next with this set, and
+        // the PC's save has it back at 0, 0.
+        s.x = s.y = 0;
+        s.scaleX = s.scaleY = 1;
+        s.anchorX = s.anchorY = -1;
+        s.changes.clear();
+    }
     s.image = image;
     s.path = n.s[1];
+}
+
+// Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
+void Engine::takeScaleAnchor(Sprite &s, const Node &n) {
+    s.anchorX = n.p[8] ? -1 : n.p[6];
+    s.anchorY = n.p[9] ? -1 : n.p[7];
 }
 
 // Parameters 16 to 19 say which of position, scale, rotation and alpha the command changes.
@@ -2174,12 +2222,14 @@ void Engine::transform(const Node &n) {
     Sprite &s = it->second;
     s.changes.clear();
     if (p[16]) {
-        s.x = float(p[1]);
-        s.y = float(p[2]);
+        // Parameter 0 makes it a move from where the sprite is, as it does for a change over time.
+        s.x = float(p[1]) + (p[0] == 1 ? s.x : 0);
+        s.y = float(p[2]) + (p[0] == 1 ? s.y : 0);
     }
     if (p[17]) {
         s.scaleX = float(p[4]) / 1000;
         s.scaleY = float(p[5]) / 1000;
+        takeScaleAnchor(s, n);
     }
     if (p[19]) s.alpha = float(p[15]) / 256;
     // A background kept soft behind a character, when parameter 21 turns it on: the PC game draws sharp with 20 alone.
@@ -2227,6 +2277,7 @@ void Engine::changeOverTime(Sprite &s, const Node &n) {
         }
     }
     if (p[17]) {
+        takeScaleAnchor(s, n);
         add(Track::ScaleX, false, current.scaleX, float(p[4]) / 1000);
         add(Track::ScaleY, false, current.scaleY, float(p[5]) / 1000);
     }
@@ -2514,7 +2565,10 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
         ImageRef image = radius > 0 ? images_->blurred(s.path, radius) : s.image;
-        drawImage(out, image ? *image : *s.image, out.w * 0.5f + v.x + dx, out.h * 0.5f + v.y + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
+        // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
+        float w = float(s.image->w), h = float(s.image->h), anchorX = s.anchorX < 0 ? w * 0.5f : float(s.anchorX), anchorY = s.anchorY < 0 ? h * 0.5f : float(s.anchorY);
+        float middleX = v.x + anchorX + (w * 0.5f - anchorX) * v.scaleX, middleY = v.y + anchorY + (h * 0.5f - anchorY) * v.scaleY;
+        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
     }
 }
 

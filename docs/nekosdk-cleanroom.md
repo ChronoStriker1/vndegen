@@ -103,7 +103,7 @@ scene.
   recording's steps along such a move fall in even amounts, which is a quadratic easing out.
 - Parameters 16 to 19 of opcodes 18 and 25 say which of position, scale, rotation and alpha change: a command with a scale
   in 4 and 5 but no 17 left the background at scale 2.00 in a fit of the recording.
-- A sprite's centre sits at the screen's centre plus its x and y, and scale is about the centre: fits of the recording give
+- On full-screen art, a sprite's position is the screen's top left plus its x and y, and scale is about the centre: fits of the recording give
   an offset of 0 at the expected scales.
 - A timed change runs at once on what's on screen, as well as on the sprite waiting for the next update.
 - A name on the same line as the text ends at `MsgNamePosX`. Test Game 97's name is right-aligned there.
@@ -112,6 +112,14 @@ scene.
   Its message window image darkens nothing in the PC game, at the Config default of 100 or at 90.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
+
+## Placing and scaling pictures
+
+A sprite's x and y are the top left of the unscaled picture. Parameter 0 of the image load command places a picture: 1 centres it, 2 and 3 put its middle 256 to the left and right of centre, 4 and 5 put it 512 away, and parameters 1 and 2 add to that. It always sits halfway down, and the scale goes back to 1. 0 leaves the slot's place and scale alone, unless parameter 5 is set, which starts the slot afresh at 0, 0. Parameter 0 of the set-position command, 18, makes its position a move from where the sprite is, as it does for command 25. These were checked by replaying scenes to the node each PC save names and comparing the sprite places the PC saved, in Test Games 84, 93, 95 and 97, at 1280 and 1920 wide, with C's division toward zero. Sprites kept from an earlier scene can't be checked that way. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match.
+
+A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the middle field of its line, so a flag is 4 bytes at 48000 plus that number times 4. Every flag set in the PC files of Test Games 84, 88 and 93 is such a number, and those numbers don't track the entries.
+
+The block after the sprite records holds a count at byte 22 and that many sprite numbers after the block's fixed part. The PC's save made at a choice names the choice as its flow node. Its later blocks also hold state the runtime doesn't write, and a save of ours naming the choice makes the PC run past it, so ours names the scene before, and the PC then asks the choice itself.
 
 ## Menus
 
