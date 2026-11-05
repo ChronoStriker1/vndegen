@@ -66,7 +66,6 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
-- [#20](https://github.com/ChronoStriker1/vndegen/issues/20) iPhone and iPad: Controller layout sheet can open a step scrolled away, with an offscreen focus ring.
 - [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
 
