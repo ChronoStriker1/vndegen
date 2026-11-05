@@ -69,7 +69,6 @@ New bugs get a GitHub issue and a line here.
 - [#20](https://github.com/ChronoStriker1/vndegen/issues/20) iPhone and iPad: Controller layout sheet can open a step scrolled away, with an offscreen focus ring.
 - [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
 - [#23](https://github.com/ChronoStriker1/vndegen/issues/23) Ren'Py: VNDegen's menu buttons shrink to their text width in MalOvent.
-- [#25](https://github.com/ChronoStriker1/vndegen/issues/25) Ren'Py: Countryside Cumsluts crashes on its first line, calling os.startfile.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
 - [#28](https://github.com/ChronoStriker1/vndegen/issues/28) Wolf RPG Editor: Succubus Prison is stuck on its title screen.
 
