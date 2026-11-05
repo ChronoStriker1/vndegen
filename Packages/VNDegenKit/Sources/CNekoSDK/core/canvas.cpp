@@ -142,10 +142,19 @@ void drawPart(Canvas &dst, const Image &image, int x, int y, int partX, int part
     });
 }
 
-void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha, const std::vector<int> *rowShift) {
+void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, float sy, float radians, float alpha, const std::vector<int> *rowShift, bool additive) {
     if (alpha <= 0 || sx == 0 || sy == 0 || image.w == 0 || image.h == 0) return;
     float halfW = image.w * 0.5f, halfH = image.h * 0.5f;
-    if (!rowShift && radians == 0 && sx == 1 && sy == 1) {
+    auto put = [additive](uint8_t *d, int r, int g, int b, int a) {
+        if (!additive) {
+            blendPixel(d, r, g, b, a);
+            return;
+        }
+        d[0] = uint8_t(std::min(255, d[0] + ((r * a) >> 8)));
+        d[1] = uint8_t(std::min(255, d[1] + ((g * a) >> 8)));
+        d[2] = uint8_t(std::min(255, d[2] + ((b * a) >> 8)));
+    };
+    if (!rowShift && !additive && radians == 0 && sx == 1 && sy == 1) {
         float left = cx - halfW, top = cy - halfH;
         if (left == std::floor(left) && top == std::floor(top)) {
             drawPart(dst, image, int(left), int(top), 0, 0, image.w, image.h, alpha);
@@ -186,7 +195,7 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
                 if (!bilinear) {
                     int a = (p[3] * a256) >> 8;
                     a += a >> 7;
-                    blendPixel(d, p[0], p[1], p[2], a);
+                    put(d, p[0], p[1], p[2], a);
                     continue;
                 }
                 int fu = (ux >> 8) & 255, fv = (vy >> 8) & 255;
@@ -206,7 +215,7 @@ void drawImage(Canvas &dst, const Image &image, float cx, float cy, float sx, fl
                 int sa = image.opaque ? 255 : (p[3] * w00 + pr[3] * w10 + pd[3] * w01 + pdr[3] * w11) >> 16;
                 int a = (sa * a256) >> 8;
                 a += a >> 7;
-                blendPixel(d, r, g, b, a);
+                put(d, r, g, b, a);
             }
         }
     });

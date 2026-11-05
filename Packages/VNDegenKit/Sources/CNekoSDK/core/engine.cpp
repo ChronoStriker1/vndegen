@@ -2635,6 +2635,11 @@ void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map
         s.flipLoop = it->second.loop;
         s.flipReverse = it->second.reverse;
     }
+    if (!s.flipLoop && frame >= s.flipCount) {
+        s.flipBegun = now_ - int64_t(s.flipCount) * s.flipMs;
+        s.flipShown = s.flipCount;
+        return;
+    }
     int step = s.flipReverse ? s.flipCount - 1 - frame : frame;
     s.flipBegun = now_ - int64_t(std::max(step, 0)) * s.flipMs;
     s.flipShown = std::clamp(frame, 0, s.flipCount - 1);
@@ -2648,6 +2653,26 @@ void Engine::resumeFlipbook(Sprite &s) {
     s.flipMs = it->second.second;
     s.flipBegun = now_;
     s.flipShown = 0;
+    s.additive = paintedOnBlack(s.path);
+}
+
+// Effect flipbooks in Test Games 84 and 85 have no alpha and are nearly all black, and the PC game draws them over the
+// scene without darkening it, so their light adds. The CG flipbooks of other games, also without alpha, are under 10%
+// black against the effects' 89% and more.
+bool Engine::paintedOnBlack(const std::string &path) {
+    auto key = normalizedPath(path);
+    if (auto it = paintedOnBlack_.find(key); it != paintedOnBlack_.end()) return it->second;
+    bool dark = false;
+    if (ImageRef first = images_->get(flipPicture(path, 0)); first && first->opaque && !first->rgba.empty()) {
+        size_t black = 0, all = first->rgba.size() / 4;
+        for (size_t i = 0; i < all; i++) {
+            const uint8_t *p = &first->rgba[i * 4];
+            if (p[0] < 16 && p[1] < 16 && p[2] < 16) black++;
+        }
+        dark = black * 10 > all * 8;
+    }
+    paintedOnBlack_[key] = dark;
+    return dark;
 }
 
 void Engine::advanceFlipbooks() {
@@ -2658,8 +2683,17 @@ void Engine::advanceFlipbooks() {
         for (auto &[slot, s] : *set) {
             if (s.flipCount < 2) continue;
             int64_t step = (now_ - s.flipBegun) / s.flipMs;
-            int index = s.flipLoop ? int(step % s.flipCount) : int(std::min<int64_t>(step, s.flipCount - 1));
-            if (s.flipReverse) index = s.flipCount - 1 - index;
+            // Past its last picture a flipbook that doesn't repeat shows nothing: the PC game's saves hold it at a picture
+            // beyond its count, and its effects leave no trace once they've played.
+            int index = s.flipLoop ? int(step % s.flipCount) : int(std::min<int64_t>(step, s.flipCount));
+            if (s.flipReverse && index < s.flipCount) index = s.flipCount - 1 - index;
+            if (!s.flipLoop && index >= s.flipCount) {
+                if (s.flipShown != s.flipCount) {
+                    s.flipShown = s.flipCount;
+                    if (set == &front_) dirty_ = true;
+                }
+                continue;
+            }
             if (index == s.flipShown) continue;
             s.flipShown = index;
             if (ImageRef next = images_->get(flipPicture(s.path, index))) s.image = next;
@@ -3296,6 +3330,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
+        if (s.flipCount && s.flipShown >= s.flipCount) continue;
         std::string shown = s.flipCount ? flipPicture(s.path, s.flipShown) : shownPath(s.path);
         ImageRef image = radius > 0 ? images_->blurred(shown, radius) : s.image;
         // The position is the unscaled picture's top left, and it scales about its anchor, its middle unless told otherwise.
@@ -3311,7 +3346,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             float rows = 520.0f / float(std::max(1, s.waveRows)), ms = 7800.0f / float(std::max(1, s.waveSpeed));
             for (int y = 0; y < out.h; y++) shifts[size_t(y)] = int(std::lround(float(s.waveSize) * std::sin(2 * kPi * (float(y) / rows + float(now_) / ms))));
         }
-        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr);
+        drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
     }
     composeSplashes(out, drawnTo, INT_MAX);
 }

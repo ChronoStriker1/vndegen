@@ -113,6 +113,16 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Files a script names that the game doesn't have
+
+Test Game 84's scripts name two sounds, `se\\512.ogg` and `se\\se_686.ogg`, and a flipbook, `anime\\_ef_000_011_000.bmp`, that aren't in its archives, and once load an image with no name. The PC game, from a test save just before `se_686.ogg`, shows no message and goes on to the same next line as the runtime, which skips such files and logs them. The nameless load is just after the scene clears every slot, so nothing shows there either way.
+
+## Fog and effect flipbooks
+
+Test Game 84's one fog command, 80, changes nothing on the PC game: frames from before it and for 20 seconds after match to the pixel, and the frame a few lines later matches the runtime's, which draws no fog. The exe's fog is Direct3D's, which doesn't touch the game's flat pictures.
+
+Test Games 84 and 85 play short sword and hit effects as flipbooks of pictures with no alpha, over 89% black. Drawn opaque they'd black out the scene, which the PC game never shows, so the runtime adds them. CG flipbooks without alpha in other games are under 10% black and stay opaque. A flipbook that doesn't repeat shows nothing once it's past its last picture: 88's PC saves hold one at picture 23 of 20, and after 84's reverse slash ends no trace of its brightest picture is left in the PC's frame. The blend itself during the effect's 0.13 seconds is inferred, since screenshots under Wine can't catch it.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.

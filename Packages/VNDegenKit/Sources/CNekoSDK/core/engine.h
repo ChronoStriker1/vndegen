@@ -70,6 +70,8 @@ struct Sprite {
     int64_t flipBegun = 0;
     bool flipLoop = false, flipReverse = false;
     bool waveOn = false;
+    // An effect painted on black, which the PC game adds to the picture.
+    bool additive = false;
     int waveSpeed = 0, waveRows = 0, waveSize = 0;
 };
 
@@ -143,6 +145,7 @@ private:
     bool overCardDelete(int slot, int x, int y) const;
     int newestQuickSlot();
     std::string lastScene_;
+    std::unordered_map<std::string, bool> paintedOnBlack_;
     int64_t trackQuarterShown_ = -1;
     int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
@@ -173,6 +176,7 @@ private:
     std::map<int, FlipModes> flipModesAt(const SaveData &d);
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
+    bool paintedOnBlack(const std::string &path);
     int cardsPerPage() const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;
