@@ -65,6 +65,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - RPG Maker and TyranoScript games inside wrapper folders are found, Command-Q works with a sheet open, and Succubus Prison reaches its opening (0.23.3).
 - NekoSDK, on VNDegen's own runtime, for The Alchemist & His Battle-Scarred Homunculus and Yarinaoshi no Christmas, with saves that move to and from a PC (0.24.0).
 - Ludusavi backups keep a PC's registry data, Wolf RPG Editor message windows draw like the PC's, and Violated Hero IV (Partial E) is found (0.24.1).
+- Unity games recognized with a page that explains why they can't run, and Individual Voices in the two NekoSDK games (0.24.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
