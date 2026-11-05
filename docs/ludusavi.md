@@ -28,6 +28,8 @@ Each game then finds its Ludusavi game by itself: by the Steam app ID in its met
 - **Before a game starts**, VNDegen asks when another device backed up newer saves, or when the saves changed both here and on the server.
 - **Automatic backup** when a game closes is available and off by default. It skips a game whose saves changed in both places and leaves the choice to you.
 
+A backup from a Windows PC can hold registry data beside its files. No engine VNDegen runs keeps saves in the registry, so a restore here leaves that data out. VNDegen's own backups carry it forward, so Ludusavi on the PC still restores it from the latest backup.
+
 Ludusavi on a PC that syncs its backup folder with rclone sees VNDegen's backups as changes in the cloud. When Ludusavi asks, choose to download them.
 
 Where each engine keeps its saves, and which saves Ludusavi's manifest covers, is in [engines.md](engines.md).

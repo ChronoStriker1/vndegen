@@ -134,7 +134,7 @@ struct ChoiceState {
 struct MessageState {
     bool active = false;
     std::string text;        // without a leading face code
-    int face = -1;           // face graphic from "@n" at the start of the text, or -1
+    int x = -1, y = -1;      // the text's top left from system variables 1 and 2 when shown; -1 for the default place
     size_t shown = 0, total = 0;  // characters typed so far, and in all
     bool instant = false;
     bool heldForChoice = false;  // stays up until the choice after it is answered
@@ -272,7 +272,6 @@ public:
     std::string cursorSkin() const;
     std::string pauseIcon() const;
     int pauseIconFrames() const;
-    std::string faceGraphic(int n) const;
     int choiceTop() const { return system_.size() > 4 ? system_[4] : -1; }
     std::string systemString(int i) const;
     int32_t systemNumber(int i) const;

@@ -12,6 +12,8 @@ public struct LudusaviStore: Sendable {
 
     static let mappingFile = "mapping.yaml"
     static let previousMappingFile = "mapping.yaml.vndegen-previous"
+    /// A backup's registry data, in the order Ludusavi looks for them.
+    static let registryFiles = ["registry.reg", "registry.yaml"]
 
     public func mapping(_ folder: String) throws -> LudusaviMapping {
         let url = root.appendingPathComponent(folder).appendingPathComponent(Self.mappingFile)
@@ -223,6 +225,9 @@ public struct LudusaviStore: Sendable {
     /// Ludusavi's `forget_excess_backups` does. Nil infers the limits from the folder and never deletes.
     ///
     /// `device` ends the new folder's name, so two devices backing up in the same second never pick the same folder.
+    ///
+    /// Registry data from a Windows PC's backup carries forward like any other file VNDegen doesn't manage. VNDegen can't
+    /// read it, so the next backup holds what the latest one held. Ludusavi on Linux or a Mac instead records it as dropped.
     public func backUp(folder: String?, title: String, game: GameID, locations: [SaveLocation], retention: Retention?,
                        pcFolders: [Int: String] = [:], now: Date = .now, device: String? = nil, os: String, comment: String?) throws -> BackupReport {
         let local = try Self.localSaves(locations)
@@ -273,6 +278,15 @@ public struct LudusaviStore: Sendable {
         let fm = FileManager.default
         var pruned: [String] = []
         do {
+            // A differential inherits only from its full backup, so a registry an earlier differential holds comes along.
+            let previousDiff = full?.children.last
+            let registry = Self.latestRegistry(mapping, in: gameDir)
+            let fromDiff = registry != nil && registry?.backup == previousDiff?.name
+            let override: DifferentialBackup.RegistryOverride? = fromDiff ? .init(hash: registry?.hash)
+                : previousDiff?.registry?.hash == nil ? previousDiff?.registry : nil
+            if let registry, !differential || fromDiff {
+                try Self.copyRegistry(registry, in: gameDir, to: backupDir)
+            }
             for (path, source) in copies {
                 guard let drive = LudusaviMapping.splitDrive(path)?.0 else { throw SaveSyncError.unsupportedPath(path) }
                 if !mapping.drives.values.contains(drive) { mapping.drives[LudusaviMapping.driveFolderName(drive)] = drive }
@@ -295,11 +309,11 @@ public struct LudusaviStore: Sendable {
             if differential {
                 mapping.backups[mapping.backups.count - 1].children.append(DifferentialBackup(
                     name: name, when: when, os: os, comment: comment, locked: false, semantics: nil, files: diffFiles,
-                    registry: full?.registryHash == nil ? nil : .init(hash: nil)))
+                    registry: override))
             } else {
                 mapping.backups.append(FullBackup(
                     name: name, when: when, os: os, comment: comment, locked: false, semantics: nil,
-                    files: copies.mapValues(\.entry), registryHash: nil, children: []))
+                    files: copies.mapValues(\.entry), registryHash: registry?.hash, children: []))
             }
             if let retention { pruned = mapping.forgetExcessBackups(retention) }
             try writeMapping(mapping, to: mappingURL, expecting: original)
@@ -311,6 +325,56 @@ public struct LudusaviStore: Sendable {
         for folder in pruned { try? fm.removeItem(at: gameDir.appendingPathComponent(folder)) }
         return BackupReport(backup: name, isDifferential: differential, filesWritten: copies.count, paths: paths.origin, pruned: pruned,
                             saves: saves)
+    }
+
+    /// Registry data a backup holds: its hash, the backup folder its files are in, and which of `registryFiles` are there.
+    struct StoredRegistry: Equatable {
+        var hash: String
+        var backup: String
+        var files: [String]
+    }
+
+    /// The registry data a restore of the latest backup applies on Windows, found as Ludusavi's `registry_content` finds
+    /// it: the latest differential's file, else nothing when that differential drops the registry, else the full backup's.
+    /// Nil when Ludusavi would restore none, such as a recorded hash whose file is missing or can't be read.
+    static func latestRegistry(_ mapping: LudusaviMapping, in gameDir: URL) -> StoredRegistry? {
+        guard let full = mapping.backups.last else { return nil }
+        func stored(_ hash: String?, in backup: String) -> StoredRegistry? {
+            guard let hash else { return nil }
+            // Ludusavi looks inside a zip backup. VNDegen can't, so it takes the registry to be there.
+            if backup.hasSuffix(".zip") { return StoredRegistry(hash: hash, backup: backup, files: []) }
+            let folder = backup == "." ? gameDir : gameDir.appendingPathComponent(backup, isDirectory: true)
+            let files = registryFiles.filter { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+            guard files.contains(where: { readable($0, in: folder) }) else { return nil }
+            return StoredRegistry(hash: hash, backup: backup, files: files)
+        }
+        if let diff = full.children.last, let override = diff.registry {
+            if let found = stored(override.hash, in: diff.name) { return found }
+            if override.hash == nil { return nil }
+        }
+        return stored(full.registryHash, in: full.name)
+    }
+
+    /// Whether Ludusavi could read the registry file `name` in `folder`: it reads the file as UTF-8, and a `.reg` file
+    /// must start with a header regedit writes. A file that fails this isn't the one a restore uses, so a damaged
+    /// differential's file never replaces the full backup's good one. YAML files are only checked to be UTF-8 text.
+    static func readable(_ name: String, in folder: URL) -> Bool {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)), !data.isEmpty,
+              let text = String(data: data, encoding: .utf8) else { return false }
+        guard name.hasSuffix(".reg") else { return true }
+        let first = text.drop { $0 == "\u{FEFF}" }.prefix { !$0.isNewline }.trimmingCharacters(in: .whitespaces)
+        return first == "Windows Registry Editor Version 5.00" || first == "REGEDIT4"
+    }
+
+    /// Copies `registry`'s files into `backupDir` as they are, both formats when there are two, since Ludusavi reads the
+    /// first that parses. Its recorded hash can't check a copy: Ludusavi hashes its own serialization, which has changed
+    /// between versions.
+    private static func copyRegistry(_ registry: StoredRegistry, in gameDir: URL, to backupDir: URL) throws {
+        if registry.backup.hasSuffix(".zip") { throw SaveSyncError.zipBackup(registry.backup) }
+        let folder = registry.backup == "." ? gameDir : gameDir.appendingPathComponent(registry.backup, isDirectory: true)
+        for name in registry.files {
+            try FileManager.default.copyItem(at: folder.appendingPathComponent(name), to: backupDir.appendingPathComponent(name))
+        }
     }
 
     /// Keeps the previous mapping.yaml beside the new one until the new one is written and reads back correctly.

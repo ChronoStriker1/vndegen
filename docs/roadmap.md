@@ -64,17 +64,11 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - MalOvent runs, the Mac's Controller layout sheet keeps one size, and Wolf RPG Editor detection finds games in an extra folder (0.23.2).
 - RPG Maker and TyranoScript games inside wrapper folders are found, Command-Q works with a sheet open, and Succubus Prison reaches its opening (0.23.3).
 - NekoSDK, on VNDegen's own runtime, for The Alchemist & His Battle-Scarred Homunculus and Yarinaoshi no Christmas, with saves that move to and from a PC (0.24.0).
+- Ludusavi backups keep a PC's registry data, Wolf RPG Editor message windows draw like the PC's, and Violated Hero IV (Partial E) is found (0.24.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
-- [#29](https://github.com/ChronoStriker1/vndegen/issues/29) Wolf RPG Editor: Succubus Prison's message window shows a faint second edge.
-- [#30](https://github.com/ChronoStriker1/vndegen/issues/30) KiriKiri: Violated Hero IV (Partial E) isn't found three wrappers deep.
-- [#31](https://github.com/ChronoStriker1/vndegen/issues/31) TyranoScript: Butterfly Affection logs a 404 for button_menu.png.
-- [#32](https://github.com/ChronoStriker1/vndegen/issues/32) Ludusavi: registry data is dropped from backups.
-- [#34](https://github.com/ChronoStriker1/vndegen/issues/34) RPG Maker: Command-Q does nothing in Karryn's Prison.
-- [#35](https://github.com/ChronoStriker1/vndegen/issues/35) Ren'Py: scripted mouse clicks don't press buttons on the Mac.
-- [#36](https://github.com/ChronoStriker1/vndegen/issues/36) renpy-hook-test.sh fails falsely under Apple's /bin/bash.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

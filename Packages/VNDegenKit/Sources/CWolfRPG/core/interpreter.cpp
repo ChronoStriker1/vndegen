@@ -601,17 +601,23 @@ void Game::setVariable(Thread &t, const Command &c) {
     }
 }
 
-// A message starting with "@n" shows face graphic n beside it; the code's line is not text.
+// A message starting with "@n" puts n in system variable 0, the face graphic number; the code's line is not text. The
+// engine draws no message window or face: as the manual's message page says, a game's common events draw them, reading
+// system variables 0 and 12. The text goes where system variables 1 and 2 say when the message starts, and system string
+// 25 keeps it, which a game that hides the engine's text (Milky Quest puts it at y 600) shows in a picture of its own.
 void Game::showMessage(std::string text) {
     message_ = MessageState{};
+    message_.x = systemNumber(1);
+    message_.y = systemNumber(2);
     if (text.size() > 1 && text[0] == '@' && std::isdigit(static_cast<unsigned char>(text[1]))) {
         size_t end = 1;
         while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) end++;
-        message_.face = std::atoi(text.c_str() + 1);
+        if (!system_.empty()) system_[0] = std::atoi(text.c_str() + 1);
         if (end < text.size() && text[end] == '\r') end++;
         if (end < text.size() && text[end] == '\n') end++;
         text.erase(0, end);
     }
+    if (systemStrings_.size() > 25) systemStrings_[25] = text;
     message_.text = std::move(text);
     message_.total = visibleChars(message_.text);
     message_.active = true;
