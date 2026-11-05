@@ -630,8 +630,8 @@ TurretGirls	general-engine	Unity		TurretGirls/UnityPlayer.dll	1429	archived; IL2
 Two Beasts Or Not To Beast!	rpg-maker-family	Wolf RPG Editor		VNDB release engine field	3166	installed+archive; engine from VNDB release engine field
 Umineko no Naku Koro ni Hane	vn-engine	NScripter		Umineko no Naku Koro ni Hane/arc.nsa	371	archived
 Umineko no Naku Koro ni Tsubasa	vn-engine	NScripter		Umineko no Naku Koro ni Tsubasa/arc.nsa	903	archived
-Umineko When They Cry_ Answer Arcs	vn-engine	NScripter		Umineko When They Cry - Answer Arcs/arc.nsa	4102	archived
-Umineko When They Cry_ Question Arcs	vn-engine	NScripter		Umineko When They Cry - Question Arcs/arc.nsa	2770	archived
+Umineko When They Cry_ Answer Arcs	vn-engine	Ponscripter		Umineko When They Cry - Answer Arcs/0.utf	4102	archived
+Umineko When They Cry_ Question Arcs	vn-engine	Ponscripter		Umineko When They Cry - Question Arcs/0.utf	2770	archived
 Umineko_ Golden Fantasia	custom	custom		Umineko Golden Fantasia/Ougon.exe	2297	archived; no known engine signature; data in FILES/*.LZR
 Undercity of Sin	rpg-maker-family	RPG Maker MV		www/js/rpg_core.js	2087	installed; encrypted assets; NW.js wrapper
 Unison_corD	unknown	unknown			2255	archived; no known signature; main exe Unison_corD_1.06_EN/Unison_corD_EN.exe

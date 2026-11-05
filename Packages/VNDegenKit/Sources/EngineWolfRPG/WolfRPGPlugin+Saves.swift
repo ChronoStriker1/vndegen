@@ -5,7 +5,7 @@ extension WolfRPGPlugin {
     /// Wolf RPG Editor saves in the Save folder beside Game.exe on every platform, and the runtime does the same, so a PC
     /// backup restores into the folder the game reads.
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
-        guard let layout = WolfRPGLayout(FolderProbe(scanning: folder)) else { return [] }
+        guard let layout = WolfRPGLayout(scanning: folder) else { return [] }
         let root = layout.url(in: folder)
         // The folder as it is on disk, matched without regard to case as the runtime matches it.
         let directory = FileCase.resolve("Save", in: root)

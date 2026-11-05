@@ -46,6 +46,36 @@ import VNCore
         #expect(evidence.evidence == "Data.wolf")
     }
 
+    /// A real folder, because only a scan can see past the listing's three levels.
+    private func folder(_ files: [String]) throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        for file in files {
+            let url = root.appendingPathComponent(file)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data().write(to: url)
+        }
+        return root
+    }
+
+    @Test func findsAGameThreeFoldersDown() throws {
+        let root = try folder(["Outer/Inner/hspext.dll", "Outer/Inner/sys/Game.exe", "Outer/Inner/sys/Data/BasicData.wolf",
+                               "Outer/Inner/sys/GuruguruSMF4.dll",
+                               // A bonus game, deeper still, doesn't win over the game itself.
+                               "Outer/Inner/Bonus/Extra/Game.exe", "Outer/Inner/Bonus/Extra/Data.wolf"])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(WolfRPGLayout(FolderProbe(scanning: root)) == nil)
+        let layout = try #require(WolfRPGLayout(scanning: root))
+        #expect(layout.root == "Outer/Inner/sys" && layout.evidence == "Outer/Inner/sys/GuruguruSMF4.dll" && layout.confidence == .certain)
+        #expect(WolfRPGLayout(deepening: FolderProbe(scanning: root)) == layout)
+    }
+
+    @Test func aLongListingIsNotScannedDeeper() throws {
+        let filler = (0..<201).map { "Outer/Inner/file\($0).png" }
+        let root = try folder(filler + ["Outer/Inner/sys/Game.exe", "Outer/Inner/sys/Data.wolf"])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(WolfRPGLayout(scanning: root) == nil)
+    }
+
     @Test func ignoresOtherGames() {
         #expect(WolfRPGLayout(probe(["Game.exe", "data", "data/Map001.rvdata2", "Game.ini"])) == nil)
     }

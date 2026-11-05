@@ -69,7 +69,6 @@ New bugs get a GitHub issue and a line here.
 - [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
 - [#20](https://github.com/ChronoStriker1/vndegen/issues/20) iPhone and iPad: Controller layout sheet can open a step scrolled away, with an offscreen focus ring.
 - [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
-- [#22](https://github.com/ChronoStriker1/vndegen/issues/22) Detection: 7 survey titles match no engine in a listing check.
 - [#23](https://github.com/ChronoStriker1/vndegen/issues/23) Ren'Py: VNDegen's menu buttons shrink to their text width in MalOvent.
 - [#24](https://github.com/ChronoStriker1/vndegen/issues/24) Ren'Py: bundled websocket package uses inspect.getargspec, removed in Python 3.11.
 

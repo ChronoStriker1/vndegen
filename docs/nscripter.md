@@ -33,6 +33,12 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
 `0.txt` or `00.txt` beside an archive (`.nsa`, `.ns2`, `.sar`) or one of NScripter's own files (`envdata`,
 `nslua.dll`, `nsogg2.dll`, `nspng.dll`). A numbered text script alone isn't enough, since `0.txt` could be anything.
 
+Ponscripter games aren't detected, because the runtime can't run them. The Umineko When They Cry Question and Answer Arcs
+(`0.utf`, `arc.nsa`, and `Umineko1to4` or `Umineko5to8` built on Ponscripter) are the library's two. Their script is UTF-8
+with Ponscripter's text markup and commands, and their archives use a compression type the runtime doesn't read. Given the
+Question Arcs' script as `0.txt`, the Linux host stopped at the first menu with no images. The original Japanese
+releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are detected.
+
 ## What the runtime reads
 
 - Scripts: `0.txt` .. `99.txt` or `00.txt` .. `99.txt` joined in order, else `nscript.dat` (each byte XOR 0x84).

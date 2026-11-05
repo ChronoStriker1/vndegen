@@ -21,10 +21,13 @@ of the runtime's own keeps music decoded ahead. Everything runs in the app's pro
 
 ## Detection
 
-A game is Wolf RPG Editor when a folder at the top of the game folder, or up to two folders down, holds `Data.wolf`,
-`Data/BasicData`, or `Data/BasicData.wolf`, beside `Game.exe` (or `GamePro.exe`) for certainty. A game deeper than the
-folder listing reaches is found by `Game.exe` beside `Data` and `GuruguruSMF4.dll`, the MIDI player every Wolf RPG
-Editor 2 game ships.
+A game is Wolf RPG Editor when a folder at the top of the game folder, or up to three folders down, holds `Data.wolf`,
+`Data/BasicData`, or `Data/BasicData.wolf`, beside `Game.exe` (or `GamePro.exe`) for certainty. A game two folders
+down whose data the folder listing doesn't reach is found by `Game.exe` beside `Data` and `GuruguruSMF4.dll`, the MIDI
+player every Wolf RPG Editor 2 game ships. When a short listing shows no game, detection looks one level deeper, for a game
+three folders down inside wrapper folders, such as Succubus Prison's `sys` folder when its outer folder is kept. A folder
+with more than 200 entries in the listing doesn't get that deeper look, so other engines' games don't pay for it at each
+library refresh.
 
 ## What the runtime reads
 
