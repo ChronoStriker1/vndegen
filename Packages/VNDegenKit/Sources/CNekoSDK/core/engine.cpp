@@ -409,6 +409,59 @@ void Engine::scrollLog(int lines) {
     dirty_ = true;
 }
 
+bool Engine::moveFocus(int dx, int dy) {
+    // Every control on screen, as the rectangle a press lands in.
+    struct Spot { int x, y; };
+    std::vector<Spot> spots;
+    auto addButtons = [&](const std::vector<Button> &buttons) {
+        for (const Button &b : buttons)
+            if (b.sheet) spots.push_back({b.x + b.cellW() / 2, b.y + b.cellH() / 2});
+    };
+    if (dialogOpen_) {
+        addButtons(screens_.at("dialog").buttons);
+    } else if (logOpen_) {
+        addButtons(screens_.at("log").buttons);
+    } else if (waiting_ == Waiting::Choice && choiceSheet_) {
+        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
+        for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, (height_ - cellH * choiceCount_) / 2 + i * cellH + cellH / 2});
+        (void)cellW;
+    } else if (screen_) {
+        addButtons(screen_->buttons);
+        const auto *grid = screen_->setting("slots");
+        if (grid && grid->size() >= 7) {
+            ImageRef sheet = images_->get((*grid)[0]);
+            int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), gx = std::atoi((*grid)[3].c_str()), gy = std::atoi((*grid)[4].c_str());
+            for (int c = 0; sheet && c < std::atoi((*grid)[6].c_str()); c++)
+                for (int r = 0; r < std::atoi((*grid)[5].c_str()); r++) spots.push_back({x0 + c * gx + sheet->w / 2, y0 + r * gy + sheet->h / 10});
+        }
+        const auto *size = screen_->setting("cellsize");
+        if (size && size->size() >= 2)
+            for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it)
+                spots.push_back({std::atoi(it->second[0].c_str()) + std::atoi((*size)[0].c_str()) / 2, std::atoi(it->second[1].c_str()) + std::atoi((*size)[1].c_str()) / 2});
+    } else {
+        return false;
+    }
+    if (spots.empty()) return false;
+    int fromX = pointerSeen_ ? pointerX_ : width_ / 2, fromY = pointerSeen_ ? pointerY_ : height_ / 2;
+    const Spot *best = nullptr;
+    long bestScore = 0;
+    for (const Spot &s : spots) {
+        int ax = s.x - fromX, ay = s.y - fromY;
+        int along = ax * dx + ay * dy;
+        if (along <= 0) continue;
+        // Straight ahead counts for far more than off to the side.
+        int across = std::abs(ax * dy) + std::abs(ay * dx);
+        long score = long(along) + long(across) * 3;
+        if (!best || score < bestScore) {
+            best = &s;
+            bestScore = score;
+        }
+    }
+    if (!best) return true;
+    mouseMove((float(best->x) + 0.5f) / float(width_), (float(best->y) + 0.5f) / float(height_));
+    return true;
+}
+
 void Engine::mouseWheel(int notches) {
     if (screen_ || dialogOpen_) return;
     if (logOpen_) scrollLog(notches);
@@ -1155,6 +1208,32 @@ std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
 
 // MARK: The interpreter
 
+// Looks ahead along the scene for the next few pictures. A branch-free walk, which is what scene scripts are.
+void Engine::prefetchAhead() {
+    if (!scene_.node || scene_.node == prefetchedFrom_) return;
+    prefetchedFrom_ = scene_.node;
+    std::vector<std::pair<std::string, int>> wanted;
+    std::map<int, std::string> inSlot;
+    const Node *n = scene_.node;
+    for (int steps = 0; n && steps < 120 && wanted.size() < 6; steps++) {
+        if (n->opcode == 15 || n->opcode == 23) {
+            wanted.emplace_back(n->s[1], 0);
+            inSlot[n->p[3]] = n->s[1];
+        } else if (n->opcode == 18 && n->p[21]) {
+            // A blur is slower than the unpacking, so it comes ready too.
+            auto it = inSlot.find(n->p[3]);
+            std::string path = it != inSlot.end() ? it->second : "";
+            if (path.empty()) {
+                auto now = back_.find(n->p[3]);
+                if (now != back_.end()) path = now->second.path;
+            }
+            if (!path.empty()) wanted.emplace_back(path, (n->p[20] + 4) / 8);
+        }
+        n = scene_.script->node(n->next);
+    }
+    if (!wanted.empty()) images_->prefetch(wanted);
+}
+
 void Engine::advance() {
     Frame &frame = scene_.node ? scene_ : stack_.back();
     frame.node = frame.script->node(frame.node->next);
@@ -1163,7 +1242,7 @@ void Engine::advance() {
 void Engine::run() {
     // Bounded so a script that loops without waiting can't hang the app. No library script comes near it in one step.
     for (int guard = 0; guard < 200000; guard++) {
-        if (waiting_ != Waiting::None) return;
+        if (waiting_ != Waiting::None || screen_) return;
         if (scene_.node) {
             const Node &n = *scene_.node;
             runScene(n);
@@ -1496,6 +1575,9 @@ bool Engine::step(int ms) {
         updateChoice();
     }
     run();
+    prefetchAhead();
+    innerWereShown_ = innerButtonsShown();
+    underWereShown_ = underButtonsShown();
 
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set) foldFinishedChanges(s);
@@ -1594,13 +1676,15 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (windowShown_) {
-        if (innerButtonsShown())
+        // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
+        if (buttonPlate_ && pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_) return;
+        if (innerWereShown_ || !buttonPlate_)
             if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
             }
-        if (underButtonsShown())
+        if (underWereShown_)
             if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.under)) {
                 std::string action = b->action;
                 runAction(action);

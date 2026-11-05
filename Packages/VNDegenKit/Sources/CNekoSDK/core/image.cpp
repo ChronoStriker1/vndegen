@@ -180,28 +180,92 @@ ImageRef Images::remember(const std::string &key, ImageRef image) {
     return image;
 }
 
+Images::~Images() {
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        stopping_ = true;
+    }
+    wake_.notify_all();
+    if (worker_.joinable()) worker_.join();
+}
+
+static std::string blurKey(const std::string &key, int radius) { return radius > 0 ? key + "#" + std::to_string(radius) : key; }
+
+void Images::prefetch(const std::vector<std::pair<std::string, int>> &wanted) {
+    {
+        std::lock_guard<std::mutex> lock(mu_);
+        queue_.clear();
+        for (const auto &[path, radius] : wanted) {
+            std::string key = blurKey(normalizedPath(path), radius);
+            if (!byPath_.count(key) && key != decoding_) queue_.emplace_back(path, radius);
+        }
+        if (!worker_.joinable()) worker_ = std::thread([this] { work(); });
+    }
+    wake_.notify_all();
+}
+
+void Images::work() {
+    std::unique_lock<std::mutex> lock(mu_);
+    while (true) {
+        wake_.wait(lock, [this] { return stopping_ || !queue_.empty(); });
+        if (stopping_) return;
+        auto [path, radius] = queue_.front();
+        queue_.pop_front();
+        std::string base = normalizedPath(path), key = blurKey(base, radius);
+        if (byPath_.count(key)) continue;
+        decoding_ = key;
+        ImageRef source;
+        if (radius > 0) {
+            auto it = byPath_.find(base);
+            if (it != byPath_.end()) source = it->second->second;
+        }
+        lock.unlock();
+        if (!source) source = decode(path);
+        ImageRef image = source;
+        if (source && radius > 0) {
+            auto blurred = std::make_shared<Image>(*source);
+            boxBlur(*blurred, radius);
+            image = blurred;
+        }
+        lock.lock();
+        decoding_.clear();
+        if (image) remember(key, image);
+        done_.notify_all();
+    }
+}
+
 ImageRef Images::get(const std::string &path) {
     std::string key = normalizedPath(path);
+    std::unique_lock<std::mutex> lock(mu_);
+    done_.wait(lock, [&] { return decoding_ != key; });
     auto it = byPath_.find(key);
     if (it != byPath_.end()) {
         recent_.splice(recent_.begin(), recent_, it->second);
         return it->second->second;
     }
+    lock.unlock();
     ImageRef image = decode(path);
-    return image ? remember(key, image) : nullptr;
+    if (!image) return nullptr;
+    lock.lock();
+    return remember(key, image);
 }
 
 ImageRef Images::blurred(const std::string &path, int radius) {
-    std::string key = normalizedPath(path) + "#" + std::to_string(radius);
-    auto it = byPath_.find(key);
-    if (it != byPath_.end()) {
-        recent_.splice(recent_.begin(), recent_, it->second);
-        return it->second->second;
+    std::string key = blurKey(normalizedPath(path), radius);
+    {
+        std::unique_lock<std::mutex> lock(mu_);
+        done_.wait(lock, [&] { return decoding_ != key; });
+        auto it = byPath_.find(key);
+        if (it != byPath_.end()) {
+            recent_.splice(recent_.begin(), recent_, it->second);
+            return it->second->second;
+        }
     }
     ImageRef source = get(path);
     if (!source) return nullptr;
     auto image = std::make_shared<Image>(*source);
     boxBlur(*image, radius);
+    std::lock_guard<std::mutex> lock(mu_);
     return remember(key, image);
 }
 

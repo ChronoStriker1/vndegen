@@ -90,6 +90,8 @@ public:
     void choose(int index);
     void mouseButton(int button, bool down);
     void mouseWheel(int notches);
+    // Moves the pointer to the nearest control that way, for a controller or arrow keys. False when there is none here.
+    bool moveFocus(int dx, int dy);
     void setSkip(bool on) { skip_ = on; }
     bool inMenu() const { return screen_ != nullptr; }
     // For test hosts: presses a menu button by its action, as a click on it does.
@@ -119,6 +121,7 @@ private:
     void runScene(const Node &n);
     void runFlow(const Node &n);
     void advance();
+    void prefetchAhead();
     bool flowActive() const { return !stack_.empty(); }
 
     // Saves.
@@ -318,6 +321,8 @@ private:
     int pointerX_ = 0, pointerY_ = 0;
     bool pointerSeen_ = false;
     std::string pressed_;
+    const Node *prefetchedFrom_ = nullptr;
+    bool innerWereShown_ = false, underWereShown_ = false;
     bool autoMode_ = false, skipToggle_ = false, windowHiddenByPlayer_ = false;
     std::string titleBgm_;
     int titleMusic_ = 0;

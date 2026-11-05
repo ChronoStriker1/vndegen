@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <string>
 
 #include "engine.h"
+#include "tables.h"
 #include "vnneko.h"
 
 using neko::Engine;
@@ -31,6 +33,29 @@ void vnneko_audio_render(VNNekoEngine *e, float *out, int frames) { e->engine.au
 void vnneko_mouse_move(VNNekoEngine *e, float x, float y) { e->engine.mouseMove(x, y); }
 void vnneko_mouse_button(VNNekoEngine *e, int button, bool down) { e->engine.mouseButton(button, down); }
 void vnneko_mouse_wheel(VNNekoEngine *e, int notches) { e->engine.mouseWheel(notches); }
+bool vnneko_move_focus(VNNekoEngine *e, int dx, int dy) { return e->engine.moveFocus(dx, dy); }
+const char *vnneko_user_data_directory(const char *gameRoot) {
+    static std::string answer;
+    answer.clear();
+    neko::Files files;
+    if (!files.open(gameRoot)) return nullptr;
+    neko::Bytes init = files.read("cfg\\init.ini");
+    if (!init) return nullptr;
+    neko::Config config;
+    config.parse(*init);
+    answer = config.text("UserDataDirectory");
+    std::replace(answer.begin(), answer.end(), '\\', '/');
+    return answer.c_str();
+}
+bool vnneko_is_supported(const char *gameRoot) {
+    neko::Files files;
+    if (!files.open(gameRoot)) return false;
+    neko::Bytes init = files.read("cfg\\init.ini");
+    if (!init) return false;
+    neko::Config config;
+    config.parse(*init);
+    return neko::menuTable(neko::normalizedPath(config.text("UserDataDirectory"))) != nullptr;
+}
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
 void vnneko_stop(VNNekoEngine *e) { delete e; }

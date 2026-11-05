@@ -27,6 +27,8 @@ final class NekoSDKSession: EngineSession {
     #if DEBUG
     private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing(tag: "NEKOFRAMES") : nil
     #endif
+    private var scrolledNotches = 0.0
+    private var scrolledPoints = 0.0
     private var paused = false
     private var stopped = false
     private var stopWaiters: [CheckedContinuation<Void, Never>] = []
@@ -37,6 +39,16 @@ final class NekoSDKSession: EngineSession {
         view = frameView
         frameView.onReady = { [weak self] in self?.start() }
         frameView.onPointer = { [weak self] event in self?.pointer(event, at: event.location) }
+        frameView.onScroll = { [weak self] notches in
+            guard let self, let engine else { return }
+            // A trackpad reports fractions of a notch, which add up over a slow scroll.
+            scrolledNotches += notches
+            let whole = Int(scrolledNotches)
+            guard whole != 0 else { return }
+            scrolledNotches -= Double(whole)
+            vnneko_mouse_wheel(engine, Int32(whole))
+        }
+        frameView.onKey = { [weak self] usage, pressed, _ in self?.hostKey(usage, pressed) }
     }
 
     private func start() {
@@ -47,8 +59,10 @@ final class NekoSDKSession: EngineSession {
         // The Windows font pack is already set up app-wide (FontPack), so the runtime is given no folder of its own.
         let started: OpaquePointer? = root.path.withCString { rootPath in
             logURL.path.withCString { logPath in
-                var settings = VNNekoLaunch(gameRoot: rootPath, logPath: logPath, fontDir: nil)
-                return vnneko_start(&settings)
+                launch.dataDirectory.path.withCString { dataPath in
+                    var settings = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: logPath, fontDir: nil)
+                    return vnneko_start(&settings)
+                }
             }
         }
         guard let started else {
@@ -141,18 +155,48 @@ final class NekoSDKSession: EngineSession {
             vnneko_mouse_button(engine, button == .primary ? 0 : 1, pressed)
         case let .pointer(pointer):
             self.pointer(pointer, at: frameView.framePoint(fromViewNormalized: pointer.location))
-        case .key, .scroll:
+        case let .scroll(dy):
+            scrolledPoints += dy
+            let notches = Int(scrolledPoints / 40)
+            guard notches != 0 else { return }
+            scrolledPoints -= Double(notches) * 40
+            // Content scrolling down is the wheel turned toward the player.
+            vnneko_mouse_wheel(engine, Int32(-notches))
+        case .key:
             break
         }
     }
 
-    /// Confirm clicks and Dash skips while held. Menus' keys come with the menus.
+    /// Confirm clicks where the pointer is, Cancel is the right button, Dash skips while held, the direction pad moves
+    /// between a menu's controls, and page up and down turn the wheel, which opens and scrolls the backlog.
     private func control(_ button: VirtualButton, _ pressed: Bool) {
         guard let engine else { return }
         switch button {
         case .confirm: vnneko_mouse_button(engine, 0, pressed)
-        case .cancel: vnneko_mouse_button(engine, 1, pressed)
+        case .cancel, .menu: vnneko_mouse_button(engine, 1, pressed)
         case .dash: vnneko_set_skip(engine, pressed)
+        case .up: if pressed { _ = vnneko_move_focus(engine, 0, -1) }
+        case .down: if pressed { _ = vnneko_move_focus(engine, 0, 1) }
+        case .left: if pressed { _ = vnneko_move_focus(engine, -1, 0) }
+        case .right: if pressed { _ = vnneko_move_focus(engine, 1, 0) }
+        case .pageUp: if pressed { vnneko_mouse_wheel(engine, 1) }
+        case .pageDown: if pressed { vnneko_mouse_wheel(engine, -1) }
+        case .hub: break
+        }
+    }
+
+    /// A hardware keyboard: Return and Space click, Escape is the right button, Ctrl skips while held, and the arrows move.
+    private func hostKey(_ usage: Int, _ pressed: Bool) {
+        switch usage {
+        case 40, 88, 44: control(.confirm, pressed)
+        case 41: control(.cancel, pressed)
+        case 224, 228: control(.dash, pressed)
+        case 79: control(.right, pressed)
+        case 80: control(.left, pressed)
+        case 81: control(.down, pressed)
+        case 82: control(.up, pressed)
+        case 75: control(.pageUp, pressed)
+        case 78: control(.pageDown, pressed)
         default: break
         }
     }
