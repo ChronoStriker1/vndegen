@@ -199,7 +199,6 @@ std::string Game::pauseIcon() const { return dbString(sdb_, SysWindows, 0, 0); }
 
 int Game::pauseIconFrames() const { return std::max(1, dbNumber(sdb_, SysWindows, 0, 1)); }
 
-std::string Game::faceGraphic(int n) const { return dbString(sdb_, SysFaces, n, 0); }
 
 std::array<uint8_t, 3> Game::textColor(int i) const {
     if (i <= 0 || i >= int(sdb_.types.size() > SysTextColors ? sdb_.types[SysTextColors].rows.size() : 0))

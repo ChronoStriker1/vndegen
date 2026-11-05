@@ -8,6 +8,7 @@
 //   wolfplay <game folder> --type 300:Ann --key 310:128   (types text into a text entry, then presses Enter)
 //   wolfplay <game folder> --draw 1000-2000   (draws every frame in that range and reports the time per frame)
 //   wolfplay <game folder> --pics 200   (lists the pictures shown at that frame)
+//   wolfplay <game folder> --sys 200   (lists the message and choice system variables at that frame)
 //   wolfplay <game folder> --rclick 210:640,480 --wheel 220:-1 --key 230:144   (a keyboard key by Wolf's code)
 #include "game.h"
 #include "render.h"
@@ -50,6 +51,7 @@ int main(int argc, char **argv) {
     std::multimap<int, MouseAt> mouse;
     std::multimap<int, int> wheels, keyCodes;
     std::set<int> picLists;
+    std::set<int> sysLists;
     int drawFrom = 0, drawTo = -1;
     std::multimap<int, std::string> typed;
     for (int i = 2; i + 1 < argc; i += 2) {
@@ -81,6 +83,7 @@ int main(int argc, char **argv) {
         else if (opt == "--type" && colon != std::string::npos) typed.emplace(std::atoi(val.c_str()), val.substr(colon + 1));
         else if (opt == "--draw") std::sscanf(val.c_str(), "%d-%d", &drawFrom, &drawTo);
         else if (opt == "--pics") picLists.insert(std::atoi(val.c_str()));
+        else if (opt == "--sys") sysLists.insert(std::atoi(val.c_str()));
         else if (opt == "--wheel" && colon != std::string::npos)
             wheels.emplace(std::atoi(val.c_str()), std::atoi(val.c_str() + colon + 1));
         else if (opt == "--key" && colon != std::string::npos)
@@ -161,6 +164,11 @@ int main(int argc, char **argv) {
                 for (auto &[n, p] : game.pictures())
                     std::printf("pic %d kind %d blend %d rgb %.0f,%.0f,%.0f %.0f,%.0f anchor %d size %dx%d zoom %.0f/%.0f opacity %.0f \"%.50s\"\n", n, int(p.kind), p.blend, p.r.value(), p.g.value(), p.b.value(), p.x.value(),
                                 p.y.value(), p.anchor, p.imageW, p.imageH, p.zoomX.value(), p.zoomY.value(), p.opacity.value(), p.source.c_str());
+            }
+            if (sysLists.count(f)) {
+                std::printf("frame %d sys:", f);
+                for (int i : {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12}) std::printf(" %d=%d", i, game.systemNumber(i));
+                std::printf("\n");
             }
             if (f >= drawFrom && f <= drawTo) {
                 auto start = std::chrono::steady_clock::now();

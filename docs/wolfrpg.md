@@ -64,6 +64,13 @@ version 159 keep them. `<CUT/Xa-b/Yc-d>` before a file name shows part of each p
 
 Map event pages hold their animation speed, move speed, move frequency and move type in that order. Characters draw from images of 3 or 5 patterns by 4 rows, or with eight-direction images (Game.dat's settings byte 1 is 8) two such blocks side by side, the diagonals in the second, as the manual's material page shows.
 
+A message draws only its text, at the top left that system variables 1 and 2 give when it starts, as on the PC. The
+engine has no message window or face of its own: the manual's message page says a game's common events draw them, and
+the standard systems' message window event does, reading the face number that `@n` at the start of a message puts in
+system variable 0. System string 25 keeps the last message, which Milky Quest shows in a text picture of its own after
+it moves the engine's text off the screen. Up to 0.23.3 the runtime drew a window and face of its own over the game's,
+which showed as a faint second window edge in Succubus Prison and Drain Dungeon.
+
 Text uses a font file the game ships whose family name matches the one Game.dat names, then VNDegen's Windows font pack
 (`docs/fonts.md`), then Hiragino on Apple systems. `\font[n]` switches to the sub fonts Game.dat names.
 
@@ -160,9 +167,12 @@ Wolf RPG Editor 3.5 game with no save of its own gets version 159 saves, as Wolf
 - Command 126 turning off one keyboard key stops event commands reading that key, but its basic key still works when it maps to one. The runtime gets basic keys from the host without knowing which key caused them. Library games turn off Control, Print Screen, S and the keyboard as a whole, none of which this touches.
 - Saves of versions before 159 have no arrays. A Wolf RPG Editor 3.5 game that started from an older save loses its arrays when saved in VNDegen. The Clumsy Witch Seris, the one library game with arrays, writes version 159.
 - Command 222 can't write key settings (system variables 52 to 57) into a save, which The Clumsy Witch Seris's configuration tries: they aren't kept between sessions.
-- Message and choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system
-  variables other than the choice window's top may place them differently. A top of -1 means the default, and any other
-  value counts, so Succubus Prison's -1000 hides the choices behind its picture menu. Not compared with the PC: this
+- A message's text goes to a place of VNDegen's own, near the bottom left, when a game leaves system variables 1 and 2
+  at -1, since the PC's default place isn't known. So does the pause icon, whatever system variables 5 and 6 say. Drain
+  Dungeon, ANGEL QUEST, Milky Quest and Succubus Prison all set 1 and 2.
+- Choice window positions follow Wolf RPG Editor 2's defaults; games that move them through system variables other
+  than the choice window's top may place them differently. A top of -1 means the default, and any other value counts,
+  so Succubus Prison's -1000 hides the choices behind its picture menu. Not compared with the PC: this
   game's `Game.exe` stops with a buffer overrun under Wine, and Parade Buster's crashes on its data. The manual and the
   game's own event comments are the evidence.
 - Picture commands with a start delay run at once, and the delay reset command does nothing. The standard systems
