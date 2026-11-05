@@ -1138,6 +1138,9 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
 
 // MARK: Global variables
 
+// A damaged cg_view.ini's number mustn't reach past the flags, which end where the tracks' begin.
+static bool validCgId(int id) { return id >= 0 && size_t(id) < (kTrackFlagsAt - kCgFlagsAt) / 4; }
+
 // cfg.sav holds the game's settings, then its 10,000 global variables at byte 4000: a save of Test Game 95's has 1 at its
 // macro GLB_PROLOGUE_OVER's number, 1000, after the prologue. VNDegen keeps the rest of the file as it found it.
 void Engine::loadGlobals() {
@@ -1164,7 +1167,7 @@ void Engine::loadGlobals() {
     // A picture's flag goes by its number in cg_view.ini, which needn't run in step with the entries.
     for (const GalleryEntry &e : cgEntries_)
         for (size_t p = 0; p < e.images.size(); p++)
-            if (flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
+            if (validCgId(e.imageIds[p]) && flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
 }
@@ -1200,7 +1203,7 @@ void Engine::saveGlobals() {
     };
     for (const GalleryEntry &e : cgEntries_)
         for (size_t p = 0; p < e.images.size(); p++)
-            if (seen(e.images[p])) setFlag(kCgFlagsAt + size_t(e.imageIds[p]) * 4);
+            if (validCgId(e.imageIds[p]) && seen(e.images[p])) setFlag(kCgFlagsAt + size_t(e.imageIds[p]) * 4);
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
     auto packed = packEntry(configFile_);
@@ -2274,6 +2277,14 @@ bool Engine::step(int ms) {
         if (next < 0) stopTrack();
         else playTrack(next);
         dirty_ = true;
+    }
+    // A menu only redraws when something changes, and the music screen's clock and bar change as a track plays.
+    if (screen_ && trackPlayer_ && !trackPaused_ && screen_->settings.count("tracktime")) {
+        int64_t quarter = audio_.positionMs(trackPlayer_) / 250;
+        if (quarter != trackQuarterShown_) {
+            trackQuarterShown_ = quarter;
+            dirty_ = true;
+        }
     }
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;

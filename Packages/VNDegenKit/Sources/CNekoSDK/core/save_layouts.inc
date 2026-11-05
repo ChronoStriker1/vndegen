@@ -46,4 +46,5 @@ const SaveLayout kFunbagFantasy = {
     96, 22, {{2, "ffffffff0000f041"}, {72, "ffffffff"}},
     7510, {{819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1041, "3c"}, {6668, "68"}, {7478, "ffffffff"}},
     12,  // the bytes of a text record after its strings
+    13,  // where the first record holds the screen size
 };

@@ -22,6 +22,7 @@ struct SaveLayout {
     int tailSize;
     std::vector<Patch> tail;
     int textTail = 16;  // the bytes of a text record after its strings
+    int rootSizeAt = 0x11;  // where the first record holds the screen size
 };
 
 namespace {
@@ -217,8 +218,8 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         if (s.path.empty() && s.slot != -999999) r.skip(kSplashExtra);
         else if (s.slot != -999999) out.sprites.push_back(s);
         else {
-            out.width = r.i32At(f + 0x11);
-            out.height = r.i32At(f + 0x15);
+            out.width = r.i32At(f + size_t(layout.rootSizeAt));
+            out.height = r.i32At(f + size_t(layout.rootSizeAt) + 4);
         }
     }
     size_t afterStart = r.at;
@@ -301,8 +302,8 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         size_t f = w.zeros(size_t(kRecordAnimationAt) + extra);
         apply(root ? layout.rootHead : layout.spriteHead, &w.b[f]);
         if (root) {
-            w.setI32(f + 0x11, d.width);
-            w.setI32(f + 0x15, d.height);
+            w.setI32(f + size_t(layout.rootSizeAt), d.width);
+            w.setI32(f + size_t(layout.rootSizeAt) + 4, d.height);
         }
         w.setF32(f + kRecordX + extra, s.x);
         w.setF32(f + kRecordX + 4 + extra, s.y);
