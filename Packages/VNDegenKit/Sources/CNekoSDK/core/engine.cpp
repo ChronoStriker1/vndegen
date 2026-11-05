@@ -1,6 +1,7 @@
 #include "engine.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstdarg>
 #include <cstring>
@@ -8,6 +9,7 @@
 #include <cerrno>
 #include <ctime>
 #include <iterator>
+#include <sstream>
 #include <dirent.h>
 #include <strings.h>
 #include <sys/stat.h>
@@ -28,6 +30,7 @@ constexpr int kCharFadeMs = 160;
 constexpr int kLogDim = 182;
 // Eight cards to a page and ten pages of saves, and then the Q-Save page.
 constexpr int kFirstQuickSlot = 81, kLastQuickSlot = 88;
+constexpr int kCountEdgeR = 200, kCountEdgeG = 30, kCountEdgeB = 30;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
 // They sit after a string at byte 44020, so they move with its length.
 constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kCgFlagRow = 40, kCgFlagsPerRow = 10, kTrackFlagsAt = 100000;
@@ -46,7 +49,7 @@ const std::map<std::string, int> &defaultSettings() {
     static const std::map<std::string, int> defaults = {
         {"master", 100}, {"bgm", 80}, {"se", 80}, {"voice", 80},
         {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0},
-        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60},
+        {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0},
         {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
     };
     return defaults;
@@ -268,6 +271,8 @@ void Engine::endStory(const std::string &screen) {
     skipToggle_ = false;
     autoMode_ = false;
     windowHiddenByPlayer_ = false;
+    gt_ = {};
+    splashes_.clear();
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -368,6 +373,21 @@ void Engine::runAction(const std::string &action) {
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
     if (action == "System") { barPinned_ = !barPinned_; return; }
+    if (action == "EXpress") {
+        changeSetting("express", setting("express") ? 0 : 1);
+        saveSettings();
+        return;
+    }
+    if (action == "Ejaculation") { gtEjaculate(); return; }
+    if (action == "Extension") {
+        if (gt_.active && !gt_.extending) gt_.extend = !gt_.extend;
+        return;
+    }
+    if (action == "GOODTiming") {
+        changeSetting("gt_off", setting("gt_off") ? 0 : 1);
+        saveSettings();
+        return;
+    }
     if (action == "LogMode") { openLog(); return; }
     if (action == "Voice") {
         if (!currentText_.voice.empty()) {
@@ -398,8 +418,13 @@ void Engine::runAction(const std::string &action) {
         if (newest) openDialog(5, [this, newest] { loadFromSlot(newest); });
         return;
     }
+    if (action.rfind("gtab", 0) == 0) {
+        galleryTab_ = std::atoi(action.c_str() + 4);
+        page_ = 0;
+        return;
+    }
     if (action == "cfg_defaults") {
-        settings_ = defaultSettings();
+        settings_ = startingSettings();
         applySettings();
         return;
     }
@@ -667,6 +692,18 @@ void Engine::loadGalleries() {
         sceneEntries_.push_back(e);
     }
     tracks_ = lines("cfg\\sound_view.ini");
+    for (const std::string &line : lines("cfg\\change_texture_list.ini")) {
+        std::istringstream in(line);
+        std::string plain, styled;
+        if (in >> plain >> styled && styled.find('.') != std::string::npos) plainArt_[normalizedPath(styled)] = plain;
+    }
+    // `#anime PICTURES FIRST MS`. Each number is read as ms because an effect of 39 pictures at 16 lasts 0.6 s that way.
+    for (const std::string &line : lines("cfg\\anime_cfg.ini")) {
+        std::istringstream in(line);
+        std::string word, path;
+        int count = 0, ms = 0;
+        if (in >> word >> count >> path >> ms && word == "#anime" && count > 0 && ms > 0) flipbooks_[normalizedPath(path)] = {count, ms};
+    }
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_seen.txt");
         std::string line;
@@ -760,6 +797,16 @@ int Engine::galleryCellAt(int x, int y) const {
 }
 
 // Cells run in the file's order, a page at a time. Cells not unlocked yet stay locked, as the PC's do.
+int Engine::galleryEntry(int cell) const {
+    const auto &entries = screen_->name == "cg" ? cgEntries_ : sceneEntries_;
+    int perPage = int(screen_->settings.count("cell"));
+    int wanted = page_ * perPage + cell;
+    if (!screen_->settings.count("gallerytabs")) return wanted < int(entries.size()) ? wanted : -1;
+    for (int i = 0; i < int(entries.size()); i++)
+        if (entries[size_t(i)].page == galleryTab_ && wanted-- == 0) return i;
+    return -1;
+}
+
 void Engine::composeGallery(Canvas &out) {
     if (viewingImage_) {
         out.clear();
@@ -777,7 +824,8 @@ void Engine::composeGallery(Canvas &out) {
     int perPage = int(screen_->settings.count("cell"));
     for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
         int cx = std::atoi(it->second[0].c_str()), cy = std::atoi(it->second[1].c_str());
-        size_t entry = size_t(page_ * perPage + index);
+        int found = galleryEntry(index);
+        size_t entry = found < 0 ? entries.size() : size_t(found);
         bool unlocked = false;
         if (entry < entries.size()) {
             const GalleryEntry &e = entries[entry];
@@ -797,7 +845,7 @@ void Engine::composeGallery(Canvas &out) {
             if (ImageRef no = images_->get((*label)[0])) drawPart(out, *no, cx + field(*label, 1), cy + field(*label, 2), 0, 0, no->w, no->h, faint);
         if (const auto *digits = screen_->setting("celldigits"); digits && digits->size() >= 5)
             if (ImageRef sheetOfTen = images_->get((*digits)[0])) {
-                int w = sheetOfTen->w / 10, count = field(*digits, 3), step = field(*digits, 4), value = int(entry) + 1;
+                int w = sheetOfTen->w / 10, count = field(*digits, 3), step = field(*digits, 4), value = page_ * perPage + index + 1;
                 for (int i = count - 1; i >= 0; i--, value /= 10)
                     drawPart(out, *sheetOfTen, cx + field(*digits, 1) + i * step, cy + field(*digits, 2), value % 10 * w, 0, w, sheetOfTen->h, faint);
             }
@@ -821,8 +869,9 @@ void Engine::composeGallery(Canvas &out) {
 }
 
 void Engine::openGalleryCell(int index) {
-    int perPage = int(screen_->settings.count("cell"));
-    size_t entry = size_t(page_ * perPage + index);
+    int found = galleryEntry(index);
+    if (found < 0) return;
+    size_t entry = size_t(found);
     if (screen_->name == "cg") {
         if (entry >= cgEntries_.size()) return;
         viewing_.clear();
@@ -861,6 +910,16 @@ int Engine::setting(const std::string &name) const {
     return it == settings_.end() ? 0 : it->second;
 }
 
+// What Config starts from, with any a game's table changes.
+std::map<std::string, int> Engine::startingSettings() const {
+    std::map<std::string, int> out = defaultSettings();
+    auto table = screens_.find("defaults");
+    if (table != screens_.end())
+        for (auto [it, end] = table->second.settings.equal_range("default"); it != end; ++it)
+            if (it->second.size() >= 2) out[it->second[0]] = field(it->second, 1);
+    return out;
+}
+
 void Engine::applySettings() {
     int master = setting("mute_master") ? 0 : setting("master");
     auto loud = [&](const char *name, const std::string &mute) { return setting(mute) ? 0 : setting(name) * master / 100; };
@@ -873,16 +932,17 @@ void Engine::applySettings() {
     static const int kAutoPercent[] = {200, 100, 50, 0};
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
+    applyArtSwitch();
 }
 
 void Engine::loadSettings() {
-    settings_ = defaultSettings();
+    settings_ = startingSettings();
     if (!saveDir_.empty()) {
         std::ifstream f(saveDir_ + "/vndegen_settings.txt");
         std::string name;
         int value;
         while (f >> name >> value)
-            if (settings_.count(name)) settings_[name] = value;
+            settings_[name] = value;
     }
     applySettings();
 }
@@ -1097,12 +1157,13 @@ SaveData Engine::captureSave() {
         SavedSprite out;
         out.slot = slot;
         out.path = s.path;
+        if (s.flipCount > 0) out.flipFrame = s.flipShown;
         out.x = s.x;
         out.y = s.y;
         out.scaleX = s.scaleX;
         out.scaleY = s.scaleY;
-        out.anchorX = s.image->w / 2;
-        out.anchorY = s.image->h / 2;
+        out.anchorX = s.corner ? 0 : s.image->w / 2;
+        out.anchorY = s.corner ? 0 : s.image->h / 2;
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
@@ -1160,6 +1221,14 @@ SaveData Engine::captureSave() {
     soundsOf(bgmNow_, bgm_, 0);
     soundsOf(seNow_, se_, 60);
     d.scene = scene_.script ? scene_.script->name : "";
+    d.gtConfig = gt_.config;
+    if (gt_.active || gt_.ejaculating) {
+        d.gtState = gt_.extending ? std::max(1, gt_.played) : 0;
+        d.gtCount = gt_.count;
+        d.gtStartNode = gt_.count > 0 && int(gt_.texts.size()) >= gt_.count ? gt_.texts[gt_.texts.size() - size_t(gt_.count)] : 0;
+        d.gtMarker = gt_.marker;
+        d.gtScene = gt_.main ? gt_.main->name : "";
+    }
     d.node = scene_.node ? scene_.node->id : 0;
     return d;
 }
@@ -1245,7 +1314,7 @@ void Engine::restoreSave(const SaveData &d) {
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         s.path = saved.path;
-        s.image = images_->get(saved.path);
+        s.image = images_->get(shownPath(saved.path));
         if (!s.image) warnOnce("A save names a missing picture: " + saved.path);
         s.x = saved.x;
         s.y = saved.y;
@@ -1254,6 +1323,12 @@ void Engine::restoreSave(const SaveData &d) {
         s.alpha = float(saved.alpha) / 256;
         s.blurAmount = saved.blur;
         s.blurOn = saved.blurOn;
+        s.corner = s.image && saved.anchorX == 0 && saved.anchorY == 0;
+        if (saved.flipFrame >= 0) {
+            resumeFlipbook(s);
+            s.flipLoop = true;
+            if (s.flipCount > 0) s.flipBegun = now_ - int64_t(saved.flipFrame) * s.flipMs;
+        }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
             a.begunMs = now_ - int64_t(saved.animationFrames) * 1000 / std::max(1, fps_);
@@ -1282,6 +1357,47 @@ void Engine::restoreSave(const SaveData &d) {
     }
     auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
     scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
+    // The PC's saves don't hold Extend: two saves differing only in it match. It stays as it was across a load.
+    bool extendWas = gt_.extend;
+    gt_ = {};
+    gt_.extend = extendWas;
+    if (!d.gtConfig.empty() && readGtConfig(d.gtConfig) && d.gtState >= 0 && !d.gtScene.empty()) {
+        gt_.main = loadScript(d.gtScene);
+        if (gt_.main) {
+            gt_.marker = d.gtMarker;
+            gt_.count = d.gtCount;
+            gtMeasure(*gt_.main, gt_.marker);
+            gt_.active = true;
+            // Inside one of its scripts, the script says which part it's in.
+            bool inMain = normalizedPath(d.scene) == normalizedPath(d.gtScene);
+            if (!inMain && !gt_.ejaculate.empty() && normalizedPath(d.scene) == normalizedPath(gt_.ejaculate[0])) {
+                gt_.active = false;
+                gt_.ejaculating = true;
+            } else if (!inMain) {
+                gt_.extending = true;
+                gt_.played = d.gtState;
+                for (int group = 0; group < 3; group++)
+                    for (size_t i = 0; i < gt_.groups[group].size(); i++)
+                        if (normalizedPath(gt_.groups[group][i]) == normalizedPath(d.scene)) {
+                            gt_.group = group;
+                            gt_.index = int(i);
+                        }
+            }
+            const Node *resumeAt = scene_.node;
+            if (inMain && gt_.count > 0 && resumeAt) {
+                // The text on screen is the one before the node the save holds.
+                const Node *n = gt_.main->first();
+                int textId = 0;
+                for (size_t guard = 0; n && n != resumeAt && guard < gt_.main->nodes.size(); guard++) {
+                    if (n->opcode == 5) textId = n->id;
+                    n = gt_.main->node(n->next);
+                }
+                auto at = std::find(gt_.texts.begin(), gt_.texts.end(), textId);
+                int left = at == gt_.texts.end() ? 0 : int(gt_.texts.end() - at);
+                gt_.shownCount = left <= gt_.count ? left : 0;
+            }
+        }
+    }
     windowShown_ = d.windowShown;
     windowShownAt_ = -100000;
     layoutText(sjis::toUtf8(d.current.name), sjis::toUtf8(d.current.text));
@@ -1472,7 +1588,7 @@ void Engine::composeScreen(Canvas &out) {
         }
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
-        bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) ||
+        bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
         if (current) state = over ? StateSelectedHover : StateSelected;
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
@@ -1490,7 +1606,7 @@ void Engine::composeScreen(Canvas &out) {
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
-    return barPinned_ || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
+    return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
 bool Engine::underButtonsShown() const {
@@ -1502,6 +1618,13 @@ void Engine::composeMessageButtons(Canvas &out) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_);
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
+        if (b.action == "Ejaculation" && !gt_.active) return StateDisabled;
+        if (b.action == "Extension") {
+            if (!gt_.active || gt_.extending) return StateDisabled;
+            on = gt_.extend;
+        }
+        if (b.action == "GOODTiming") on = setting("gt_off") != 0;
+        if (b.action == "EXpress") on = setting("express") == 0;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     if (innerButtonsShown())
@@ -1620,6 +1743,7 @@ void Engine::run() {
             if (scene_.node == &n) advance();
             continue;
         }
+        if (gtNextScript()) continue;
         scene_ = {};
         if (stack_.empty() || !stack_.back().node) {
             if (!stack_.empty()) stack_.pop_back();
@@ -1880,6 +2004,48 @@ void Engine::runScene(const Node &n) {
         break;
     case 116:  // drives an external accessory, which VNDegen doesn't have
         break;
+    case 121:
+        startFlipbook(n);
+        break;
+    case 34:  // a music channel moves left or right
+        if (auto it = bgm_.find(p[0]); it != bgm_.end()) audio_.setPan(it->second, p[1], p[2]);
+        break;
+    case 43:  // every voice stops
+        stopKind(kKindVoice, p[0]);
+        break;
+    case 44:
+        changeVolume(kKindVoice, p[0], p[1], p[2]);
+        break;
+    case 60:  // a replay from the gallery goes the other way here, to the scene's end
+        if (replaying_) scene_.node = scene_.script->node(n.otherwise);
+        break;
+    case 89: {  // a line for the backlog that isn't shown
+        SavedText line;
+        line.name = n.s[1];
+        line.text = n.s[2];
+        backlog_.insert(backlog_.begin(), line);
+        if (backlog_.size() > 60) backlog_.pop_back();
+        break;
+    }
+    case 200: {
+        Splash &splash = splashes_[p[0]];
+        splash.image = images_->get(n.s[1]);
+        splash.cap = std::max(1, p[5]);
+        splash.minLife = std::max(1, p[10]);
+        splash.maxLife = std::max(splash.minLife, p[11]);
+        splash.speed = p[12];
+        splash.droplets.clear();
+        break;
+    }
+    case 201:
+        splashBurst(n);
+        break;
+    case 153:
+        gtBegin(n);
+        break;
+    case 154:
+        gtReachMarker(n);
+        break;
     case 120: {  // a sprite moves to another slot
         for (auto *set : {&back_, &front_}) {
             auto it = set->find(p[0]);
@@ -1912,6 +2078,11 @@ bool Engine::step(int ms) {
     }
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
+    advanceFlipbooks();
+    for (auto &[slot, splash] : splashes_) {
+        auto gone = [this](const Droplet &d) { return now_ - d.bornMs >= d.lifeMs; };
+        splash.droplets.erase(std::remove_if(splash.droplets.begin(), splash.droplets.end(), gone), splash.droplets.end());
+    }
 
     if (transitioning_ && (skip_ || skipToggle_ || now_ >= transitionStart_ + transitionMs_)) {
         transitioning_ = false;
@@ -2065,7 +2236,7 @@ void Engine::mouseButton(int button, bool down) {
     }
     if (windowShown_) {
         // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
-        if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_) return;
+        if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
         if (innerWereShown_)
             if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
                 std::string action = b->action;
@@ -2152,10 +2323,265 @@ const char *Engine::debugStatus() {
 
 // MARK: Commands
 
+namespace {
+// A flipbook's picture: the first one's name with its last three digits counting up.
+std::string flipPicture(const std::string &first, int index) {
+    size_t dot = first.rfind('.');
+    if (dot == std::string::npos || dot < 3) return first;
+    char digits[8];
+    std::snprintf(digits, sizeof digits, "%03d", index);
+    return first.substr(0, dot - 3) + digits + first.substr(dot);
+}
+}  // namespace
+
+// Parameters: the slot, reversed, x, y, scale x and y in thousandths, then whether scaling keeps the middle in place, and
+// parameter 14 repeats it. Position is the unscaled picture's top left, as a value of 480, 270 for a 320 by 180 picture
+// in a 1280 by 720 game centres it.
+void Engine::startFlipbook(const Node &n) {
+    const auto &p = n.p;
+    Sprite s;
+    s.path = n.s[1];
+    s.image = images_->get(n.s[1]);
+    if (!s.image) {
+        complain("Missing image " + n.s[1]);
+        return;
+    }
+    s.x = float(p[2]);
+    s.y = float(p[3]);
+    s.scaleX = float(p[4]) / 1000;
+    s.scaleY = float(p[5]) / 1000;
+    s.corner = !p[8];
+    s.flipLoop = p[14] != 0;
+    s.flipReverse = p[1] != 0;
+    resumeFlipbook(s);
+    if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
+    back_[p[0]] = s;
+}
+
+void Engine::resumeFlipbook(Sprite &s) {
+    auto it = flipbooks_.find(normalizedPath(s.path));
+    if (it == flipbooks_.end()) return;
+    s.flipCount = it->second.first;
+    s.flipMs = it->second.second;
+    s.flipBegun = now_;
+    s.flipShown = 0;
+}
+
+void Engine::advanceFlipbooks() {
+    std::vector<std::pair<std::string, int>> ahead;
+    for (auto *set : {&back_, &front_})
+        for (auto &[slot, s] : *set) {
+            if (s.flipCount < 2) continue;
+            int64_t step = (now_ - s.flipBegun) / s.flipMs;
+            int index = s.flipLoop ? int(step % s.flipCount) : int(std::min<int64_t>(step, s.flipCount - 1));
+            if (s.flipReverse) index = s.flipCount - 1 - index;
+            if (index == s.flipShown) continue;
+            s.flipShown = index;
+            if (ImageRef next = images_->get(flipPicture(s.path, index))) s.image = next;
+            if (set == &front_) dirty_ = true;
+            for (int more = 1; more <= 3; more++) ahead.push_back({flipPicture(s.path, (index + more) % s.flipCount), 0});
+        }
+    if (!ahead.empty()) images_->prefetch(ahead);
+}
+
+bool Engine::readGtConfig(const std::string &path) {
+    Bytes data = files_.read(path);
+    if (!data) {
+        complain("Missing GOOD Timing config " + path);
+        return false;
+    }
+    gt_.extension.clear();
+    gt_.ejaculate.clear();
+    for (auto &group : gt_.groups) group.clear();
+    gt_.config = path;
+    std::vector<std::string> *into = nullptr;
+    for (const std::string &raw : split(sjis::toUtf8(std::string(data->begin(), data->end())), '\n')) {
+        std::string line = trim(raw.substr(0, raw.find("//")));
+        if (line.empty() || line == "##") continue;
+        if (line[0] == '#') {
+            into = line == "#Extension" ? &gt_.extension : line == "#Ejaculate" ? &gt_.ejaculate : line == "#GroupA" ? &gt_.groups[0]
+                : line == "#GroupB" ? &gt_.groups[1] : line == "#GroupC" ? &gt_.groups[2] : nullptr;
+            continue;
+        }
+        std::istringstream in(line);
+        std::string file;
+        while (into && in >> file) into->push_back(file);
+    }
+    return true;
+}
+
+// The count at the marker runs over its last texts, so it needs them listed.
+void Engine::gtMeasure(const Script &script, int marker) {
+    gt_.texts.clear();
+    const Node *n = script.first();
+    for (size_t guard = 0; n && n->id != marker && guard < script.nodes.size(); guard++) {
+        if (n->opcode == 5) gt_.texts.push_back(n->id);
+        n = script.node(n->next);
+    }
+}
+
+void Engine::gtBegin(const Node &n) {
+    if (!readGtConfig(n.s[1]) || !scene_.script) return;
+    const Node *marker = &n;
+    for (size_t guard = 0; marker && marker->opcode != 154 && guard < scene_.script->nodes.size(); guard++) marker = scene_.script->node(marker->next);
+    if (!marker || marker->opcode != 154) {
+        warnOnce("A GOOD Timing scene has no marker.");
+        return;
+    }
+    gt_.active = true;
+    gt_.extend = false;
+    gt_.extending = false;
+    gt_.ejaculating = false;
+    gt_.main = scene_.script;
+    gt_.marker = marker->id;
+    gt_.count = marker->p[0];
+    gt_.group = -1;
+    gt_.index = 0;
+    gt_.played = 0;
+    gt_.shownCount = 0;
+    gtMeasure(*scene_.script, marker->id);
+    dirty_ = true;
+}
+
+void Engine::gtReachMarker(const Node &) {
+    gt_.shownCount = 0;
+    dirty_ = true;
+    if (!gt_.active) return;
+    if (!gt_.extend) {
+        gt_.active = false;
+        return;
+    }
+    gt_.extending = true;
+    gt_.group = -1;
+    gt_.index = -1;
+    if (!gt_.extension.empty()) {
+        if (auto script = loadScript(gt_.extension[0])) scene_ = {script, script->first()};
+    } else {
+        gtNextScript();
+    }
+}
+
+void Engine::gtEjaculate() {
+    if (!gt_.active || !gt_.main) return;
+    if (voicePlayer_) {
+        audio_.close(voicePlayer_);
+        voicePlayer_ = 0;
+    }
+    gt_.active = false;
+    gt_.shownCount = 0;
+    waiting_ = Waiting::None;
+    textDone_ = true;
+    dirty_ = true;
+    const Node *marker = gt_.main->node(gt_.marker);
+    // Past the marker the story's art is already at its end, and the PC goes straight on. Saves show it skips this script.
+    if (!gt_.extending && !gt_.ejaculate.empty()) {
+        if (auto script = loadScript(gt_.ejaculate[0])) {
+            gt_.ejaculating = true;
+            scene_ = {script, script->first()};
+            return;
+        }
+    }
+    gt_.extending = false;
+    scene_ = {gt_.main, marker ? gt_.main->node(marker->next) : nullptr};
+}
+
+// A script of GOOD Timing's has ended. Groups play whole, and which comes next looks random on the PC, without one twice
+// running. Docs/engines.md lists that as a guess.
+bool Engine::gtNextScript() {
+    if (gt_.ejaculating) {
+        gt_.ejaculating = false;
+        const Node *marker = gt_.main ? gt_.main->node(gt_.marker) : nullptr;
+        scene_ = {gt_.main, marker ? gt_.main->node(marker->next) : nullptr};
+        return true;
+    }
+    if (!gt_.extending) return false;
+    gt_.played++;
+    if (gt_.group >= 0 && size_t(gt_.index + 1) < gt_.groups[gt_.group].size()) {
+        gt_.index++;
+    } else {
+        int next = gt_.group < 0 ? 0 : (gt_.group + 1 + std::rand() % 2) % 3;
+        if (gt_.groups[next].empty()) next = 0;
+        if (gt_.groups[next].empty()) {
+            gt_.extending = false;
+            return false;
+        }
+        gt_.group = next;
+        gt_.index = 0;
+    }
+    auto script = loadScript(gt_.groups[gt_.group][size_t(gt_.index)]);
+    if (!script) {
+        gt_.extending = false;
+        return false;
+    }
+    scene_ = {script, script->first()};
+    return true;
+}
+
+// `gtcount HEART X Y UNITS X Y TENS X Y` in the table's `gt` screen: the heart and the two digits on it.
+void Engine::composeGtCount(Canvas &out) {
+    if (gt_.shownCount <= 0 || setting("gt_off")) return;
+    auto table = screens_.find("gt");
+    const auto *f = table == screens_.end() ? nullptr : table->second.setting("gtcount");
+    if (!f || f->size() < 9) return;
+    ImageRef heart = images_->get((*f)[0]), units = images_->get((*f)[3]), tens = images_->get((*f)[6]);
+    if (heart) drawPart(out, *heart, field(*f, 1), field(*f, 2), 0, 0, heart->w, heart->h, 1);
+    if (units) {
+        int w = units->w / 10;
+        drawPart(out, *units, field(*f, 4), field(*f, 5), gt_.shownCount % 10 * w, 0, w, units->h, 1);
+    }
+    if (tens) {
+        int w = tens->w / 2;
+        drawPart(out, *tens, field(*f, 7), field(*f, 8), std::min(gt_.shownCount / 10, 1) * w, 0, w, tens->h, 1);
+    }
+}
+
+std::string Engine::shownPath(const std::string &path) const {
+    if (setting("express")) return path;
+    auto it = plainArt_.find(normalizedPath(path));
+    return it == plainArt_.end() ? path : it->second;
+}
+
+void Engine::applyArtSwitch() {
+    if (plainArt_.empty()) return;
+    for (auto *set : {&back_, &front_})
+        for (auto &[slot, s] : *set)
+            if (!s.path.empty() && !s.flipCount)
+                if (ImageRef image = images_->get(shownPath(s.path))) s.image = image;
+    dirty_ = true;
+}
+
+// Parameters 3 and 4 say where it bursts and 5 how many fly from there.
+void Engine::splashBurst(const Node &n) {
+    auto it = splashes_.find(n.p[0]);
+    if (it == splashes_.end() || !it->second.image) return;
+    Splash &splash = it->second;
+    if (skip_ || skipToggle_) return;
+    int burst = std::clamp(n.p[5] * 4, 1, splash.cap);
+    for (int i = 0; i < burst && int(splash.droplets.size()) < splash.cap; i++) {
+        float angle = float(std::rand() % 360) * kPi / 180;
+        float speed = float(splash.speed) * float(40 + std::rand() % 100) / 100;
+        int life = splash.minLife + std::rand() % (splash.maxLife - splash.minLife + 1);
+        splash.droplets.push_back({float(n.p[3]), float(n.p[4]), std::cos(angle) * speed, std::sin(angle) * speed, float(50 + std::rand() % 100) / 100, int(now_), life});
+    }
+    dirty_ = true;
+}
+
+void Engine::composeSplashes(Canvas &out, int fromSlot, int toSlot) {
+    for (auto &[slot, splash] : splashes_) {
+        if (slot < fromSlot || slot >= toSlot || !splash.image) continue;
+        for (const Droplet &d : splash.droplets) {
+            float age = float(now_ - d.bornMs) / 1000;
+            float life = float(now_ - d.bornMs) / float(d.lifeMs);
+            if (life >= 1) continue;
+            drawImage(out, *splash.image, d.x + d.vx * age, d.y + d.vy * age + 500 * age * age, d.scale, d.scale, 0, 1 - life);
+        }
+    }
+}
+
 void Engine::loadImage(const Node &n) {
     int slot = n.p[3];
     noteSeen(n.s[1]);
-    ImageRef image = images_->get(n.s[1]);
+    ImageRef image = images_->get(shownPath(n.s[1]));
     if (!image) {
         complain("Missing image " + n.s[1]);
         return;
@@ -2164,6 +2590,8 @@ void Engine::loadImage(const Node &n) {
     // A load keeps the slot's position and scale, so a difference image lands where the last one was.
     s.image = image;
     s.path = n.s[1];
+    s.flipCount = 0;
+    s.corner = false;
 }
 
 // Parameters 16 to 19 say which of position, scale, rotation and alpha the command changes.
@@ -2344,6 +2772,11 @@ void Engine::screenUpdate(const Node &n) {
 
 void Engine::showText(const Node &n) {
     // What the PC keeps of it: its saves hold the text on screen and the last 60 lines, newest first.
+    if (gt_.active && !gt_.extending && gt_.count > 0) {
+        auto at = std::find(gt_.texts.begin(), gt_.texts.end(), n.id);
+        int left = at == gt_.texts.end() ? 0 : int(gt_.texts.end() - at);
+        gt_.shownCount = left <= gt_.count ? left : 0;
+    }
     currentText_ = {};
     currentText_.tag = n.s[3].empty() ? -10 : 0;
     currentText_.name = n.s[1];
@@ -2477,10 +2910,13 @@ void Engine::foldFinishedChanges(Sprite &s) {
 
 bool Engine::anythingMoves() const {
     if (transitioning_ || shakeType_ || flashMs_ || blur_) return true;
+    for (const auto &[slot, splash] : splashes_)
+        if (!splash.droplets.empty()) return true;
     if (now_ - windowShownAt_ < kWindowSlideMs) return true;
     for (const auto &[slot, s] : front_) {
         if (s.looping) return true;
         if (!s.changes.empty()) return true;
+        if (s.flipCount > 1 && (s.flipLoop || now_ - s.flipBegun < int64_t(s.flipCount) * s.flipMs)) return true;
     }
     return false;
 }
@@ -2507,15 +2943,21 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
             if (type != 4) shakeY = -wave * kShakePixelsY * float(out.w) / 1280;
         }
     }
+    int drawnTo = INT_MIN;
     for (const auto &[slot, s] : sprites) {
         if (!s.image) continue;
+        composeSplashes(out, drawnTo, slot);
+        drawnTo = slot;
         SpriteView v = view(s);
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
         // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
         int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
         ImageRef image = radius > 0 ? images_->blurred(s.path, radius) : s.image;
-        drawImage(out, image ? *image : *s.image, out.w * 0.5f + v.x + dx, out.h * 0.5f + v.y + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
+        // The position is the unscaled picture's top left, and it scales about its middle unless the sprite says the corner.
+        float halfW = float(s.image->w) * (s.corner ? v.scaleX : 1) * 0.5f, halfH = float(s.image->h) * (s.corner ? v.scaleY : 1) * 0.5f;
+        drawImage(out, image ? *image : *s.image, halfW + v.x + dx, halfH + v.y + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
     }
+    composeSplashes(out, drawnTo, INT_MAX);
 }
 
 void Engine::compose() {
@@ -2611,6 +3053,7 @@ void Engine::composeMessage(Canvas &out) {
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
     drawGlyphRun(out);
+    composeGtCount(out);
     composeMessageButtons(out);
 }
 
@@ -2739,6 +3182,9 @@ void Engine::drawGlyphRun(Canvas &out) {
     // Frames first, so a neighbouring glyph's frame never covers a letter.
     for (int pass = 0; pass < 2; pass++) {
         // The name is there at once; the text's characters each fade in, one after another.
+        // The last lines before the marker have a red edge, which Config can turn off.
+        bool counting = gt_.shownCount > 0 && setting("count_color") && !setting("gt_off");
+        int shadowR_ = counting ? kCountEdgeR : this->shadowR_, shadowG_ = counting ? kCountEdgeG : this->shadowG_, shadowB_ = counting ? kCountEdgeB : this->shadowB_;
         for (const Glyph &g : nameGlyphs_) drawGlyph(out, g, pass, 256, textR_, textG_, textB_, shadowR_, shadowG_, shadowB_);
         int index = 0;
         for (const Glyph &g : textGlyphs_) {

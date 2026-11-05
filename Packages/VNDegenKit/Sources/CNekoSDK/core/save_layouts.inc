@@ -17,3 +17,13 @@ const SaveLayout kAlchemist = {
     120, 22, {{2, "f0"}, {9, "42"}, {13, "c0"}, {20, "4040"}, {30, "ffffffff"}, {84, "ffffffff"}, {112, "ffffffff"}},
     7538, {{819, "ffffffff"}, {893, "ffffffff"}, {921, "ffffffff"}, {975, "ffffffff"}, {1003, "ffffffff"}, {1037, "04"}, {1069, "3c"}, {6696, "68"}, {7506, "ffffffff"}},
 };
+const SaveLayout kMother3 = {
+    -84,  // the extra bytes of this engine's sprite record over the oldest layout seen
+    {},
+    {{16, "ff200300005802"}, {125, "ffffffff"}, {149, "f4010000dc0500001e"}, {161, "0a"}, {165, "3c"}, {171, "803f"}, {191, "803f"}, {211, "803f"}, {231, "803f"}, {299, "803f0000803f"}, {314, "01"}},
+    {{125, "ffffffff"}, {149, "f4010000dc0500001e"}, {161, "0a"}, {165, "3c"}, {171, "803f"}, {191, "803f"}, {211, "803f"}, {231, "803f"}, {299, "803f0000803f"}, {313, "ff"}},
+    {{116, "ffffffff64"}},
+    96, -1, {{2, "ffffffff0000f041"}, {13, "40"}, {21, "40"}, {72, "ffffffff"}},
+    7510, {{819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1041, "3c"}, {6668, "68"}, {7478, "ffffffff"}},
+    12,  // a text record is 4 bytes shorter in this engine
+};

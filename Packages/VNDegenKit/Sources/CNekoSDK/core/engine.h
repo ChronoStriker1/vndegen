@@ -61,6 +61,10 @@ struct Sprite {
     std::vector<Animation> changes;
     Animation loop;
     bool looping = false;
+    // A flipbook: numbered pictures shown in turn. `corner` scales from the top left and not the middle.
+    int flipCount = 0, flipMs = 25, flipShown = 0;
+    int64_t flipBegun = 0;
+    bool flipLoop = false, flipReverse = false, corner = false;
 };
 
 struct SpriteView {
@@ -153,6 +157,40 @@ private:
     void noteSeen(const std::string &path);
     bool seen(const std::string &path) const;
     void saveSeen();
+    // Flipbooks, and what anime_cfg.ini gives each: its pictures and the ms each shows.
+    void startFlipbook(const Node &n);
+    void advanceFlipbooks();
+    void resumeFlipbook(Sprite &s);
+    std::map<std::string, std::pair<int, int>> flipbooks_;
+    // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
+    // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
+    struct GoodTiming {
+        bool active = false, extend = false, extending = false, ejaculating = false;
+        std::shared_ptr<Script> main;
+        int marker = 0, count = 0, group = -1, index = 0, played = 0, shownCount = 0;
+        std::string config;
+        std::vector<int> texts;  // the text nodes before the marker
+        std::vector<std::string> extension, ejaculate;
+        std::vector<std::string> groups[3];
+    } gt_;
+    // change_texture_list.ini's pairs: with Config's art switch off, the second picture of a pair shows as the first.
+    std::map<std::string, std::string> plainArt_;
+    std::string shownPath(const std::string &path) const;
+    void applyArtSwitch();
+    // Splash effects: droplets a burst throws out, at a slot's place in the draw order. Their motion is a guess from
+    // the commands' numbers and the look of the PC game.
+    struct Droplet { float x, y, vx, vy, scale; int bornMs, lifeMs; };
+    struct Splash { ImageRef image; int perBurstScale = 1000, gravity = 0, minLife = 500, maxLife = 1000, speed = 300, cap = 100; std::vector<Droplet> droplets; };
+    std::map<int, Splash> splashes_;
+    void splashBurst(const Node &n);
+    void composeSplashes(Canvas &out, int fromSlot, int toSlot);
+    bool readGtConfig(const std::string &path);
+    void gtMeasure(const Script &script, int marker);
+    void gtBegin(const Node &n);
+    void gtReachMarker(const Node &n);
+    void gtEjaculate();
+    bool gtNextScript();
+    void composeGtCount(Canvas &out);
     size_t configStringLength() const;
     int nextTrack(int direction);
     void playTrack(int index);
@@ -182,6 +220,10 @@ private:
     void loadSettings();
     void saveSettings();
     void applySettings();
+    std::map<std::string, int> startingSettings() const;
+    int galleryTab_ = 0;
+    // A cell's entry, or -1. A game with tabs lists only the tab's entries.
+    int galleryEntry(int cell) const;
     int setting(const std::string &name) const;
     void changeSetting(const std::string &name, int value);
     std::map<std::string, int> settings_, settingsWhenOpened_;

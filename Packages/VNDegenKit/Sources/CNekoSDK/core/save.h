@@ -11,6 +11,7 @@ namespace neko {
 
 struct SavedSprite {
     int slot = 0;
+    int flipFrame = -1;  // the picture a flipbook is on, or -1 for an ordinary sprite
     std::string path, nextPath;
     float x = 0, y = 0, scaleX = 1, scaleY = 1;
     int anchorX = 0, anchorY = 0, alpha = 256;
@@ -51,6 +52,9 @@ struct SaveData {
     std::vector<SavedSound> sounds;
     std::string scene;
     int node = 0;
+    // The GOOD Timing system: -1 when it's off, the scene holding its marker, and its config.
+    int gtState = -1, gtCount = 0, gtStartNode = 0, gtMarker = 0;
+    std::string gtScene, gtConfig;
 };
 
 struct SaveLayout;
