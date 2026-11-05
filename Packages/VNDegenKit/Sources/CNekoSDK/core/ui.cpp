@@ -1,0 +1,170 @@
+#include "ui.h"
+
+#include <cstdlib>
+#include <sstream>
+
+#include "sjis.h"
+
+namespace neko {
+namespace {
+
+std::vector<std::string> words(const std::string &line) {
+    std::vector<std::string> out;
+    std::istringstream in(line);
+    std::string word;
+    while (in >> word) out.push_back(word);
+    return out;
+}
+
+int number(const std::string &s) { return std::atoi(s.c_str()); }
+
+std::string withoutComment(const std::string &line) {
+    auto at = line.find("//");
+    return at == std::string::npos ? line : line.substr(0, at);
+}
+
+// `56,690` into two numbers.
+bool pair(const std::string &s, int &a, int &b) {
+    auto comma = s.find(',');
+    if (comma == std::string::npos) return false;
+    a = number(s.substr(0, comma));
+    b = number(s.substr(comma + 1));
+    return true;
+}
+
+}  // namespace
+
+void drawPicture(Canvas &out, const Picture &p) {
+    if (!p.image) return;
+    int w = p.image->w / std::max(1, p.cols), h = p.image->h / std::max(1, p.rows);
+    drawPart(out, *p.image, p.x, p.y, p.column * w, p.row * h, w, h, p.alpha);
+}
+
+void drawButton(Canvas &out, const Button &b, ButtonState state) {
+    if (!b.sheet) return;
+    int row = state == StateNormal ? b.normalRow : state == StateHover ? b.hoverRow : int(state);
+    row = std::min(row, b.rows - 1);
+    drawPart(out, *b.sheet, b.x, b.y, b.column * b.cellW(), row * b.cellH(), b.cellW(), b.cellH(), 1);
+    if (state == StateHover || state == StateSelectedHover) {
+        if (b.help) {
+            int w = b.help->w / b.helpCols, h = b.help->h / b.helpRows;
+            drawPart(out, *b.help, b.helpX, b.helpY, b.helpColumn * w, b.helpRow * h, w, h, 1);
+        }
+    }
+}
+
+std::map<std::string, Screen> parseScreens(const char *table, Images &images, const std::function<void(const std::string &)> &warn) {
+    std::map<std::string, Screen> screens;
+    Screen *screen = nullptr;
+    std::istringstream in(table);
+    std::string line;
+    auto image = [&](const std::string &path) {
+        ImageRef ref = images.get(path);
+        if (!ref) warn("Menu table names a missing picture: " + path);
+        return ref;
+    };
+    while (std::getline(in, line)) {
+        auto w = words(line);
+        if (w.empty() || w[0][0] == '#') continue;
+        if (w[0] == "screen" && w.size() >= 2) {
+            screen = &screens[w[1]];
+            screen->name = w[1];
+        } else if (!screen) {
+            continue;
+        } else if (w[0] == "pic" && w.size() >= 4) {
+            Picture p;
+            p.image = image(w[1]);
+            p.x = number(w[2]);
+            p.y = number(w[3]);
+            if (w.size() >= 8) {
+                p.cols = number(w[4]);
+                p.rows = number(w[5]);
+                p.column = number(w[6]);
+                p.row = number(w[7]);
+            }
+            // `alpha N` of 256, at the end of the line.
+            if (w.size() >= 6 && w[w.size() - 2] == "alpha") p.alpha = float(number(w.back())) / 256;
+            screen->pictures.push_back(p);
+        } else if (w[0] == "button" && w.size() >= 8) {
+            Button b;
+            b.action = w[1];
+            b.sheet = image(w[2]);
+            b.x = number(w[3]);
+            b.y = number(w[4]);
+            b.cols = number(w[5]);
+            b.rows = number(w[6]);
+            b.column = number(w[7]);
+            for (size_t i = 8; i < w.size(); i++) {
+                if (w[i] == "toggle") b.toggle = true;
+                if (w[i] == "swap") {  // this sheet's first row is the hovered look
+                    b.normalRow = 1;
+                    b.hoverRow = 0;
+                }
+                if (w[i] == "help" && i + 7 < w.size()) {
+                    b.help = image(w[i + 1]);
+                    b.helpX = number(w[i + 2]);
+                    b.helpY = number(w[i + 3]);
+                    b.helpCols = number(w[i + 4]);
+                    b.helpRows = number(w[i + 5]);
+                    b.helpColumn = number(w[i + 6]);
+                    b.helpRow = number(w[i + 7]);
+                    i += 7;
+                }
+            }
+            screen->buttons.push_back(b);
+        } else {
+            screen->settings.emplace(w[0], std::vector<std::string>(w.begin() + 1, w.end()));
+        }
+    }
+    return screens;
+}
+
+MessageButtons parseMessageButtons(const std::vector<uint8_t> &ini, Images &images) {
+    MessageButtons out;
+    std::string text = sjis::toUtf8(std::string(ini.begin(), ini.end()));
+    std::istringstream in(text);
+    std::string line;
+    std::vector<std::string> fields;
+    std::string group, action;
+    auto finish = [&] {
+        // File, type, position, sheet size, five cell positions, help file, help position, help size, help cell, help style.
+        if (fields.size() < 12 || action.empty()) return;
+        Button b;
+        b.action = action;
+        b.sheet = images.get(fields[0]);
+        if (!b.sheet) return;
+        b.toggle = number(fields[1]) == 2;
+        pair(fields[2], b.x, b.y);
+        pair(fields[3], b.cols, b.rows);
+        int row = 0;
+        pair(fields[4], b.column, row);
+        // A patched file could give anything here, and drawing divides by these.
+        if (b.cols <= 0 || b.rows <= 0 || b.column < 0 || b.column >= b.cols) return;
+        b.help = images.get(fields[9]);
+        pair(fields[10], b.helpX, b.helpY);
+        if (fields.size() > 12) {
+            pair(fields[11], b.helpCols, b.helpRows);
+            pair(fields[12], b.helpColumn, b.helpRow);
+        }
+        if (b.helpCols <= 0 || b.helpRows <= 0 || b.helpColumn < 0 || b.helpRow < 0 || b.helpColumn >= b.helpCols || b.helpRow >= b.helpRows) b.help = nullptr;
+        (group == "under" ? out.under : out.inner).push_back(b);
+    };
+    while (std::getline(in, line)) {
+        auto w = words(withoutComment(line));
+        if (w.empty()) continue;
+        if (w[0] == "##") {
+            finish();
+            fields.clear();
+            action.clear();
+        } else if (w[0][0] == '#') {
+            group = w[0].substr(1);
+            action = w.size() > 1 ? w[1] : "";
+            fields.clear();
+        } else if (!action.empty()) {
+            fields.push_back(w[0]);
+        }
+    }
+    return out;
+}
+
+}  // namespace neko

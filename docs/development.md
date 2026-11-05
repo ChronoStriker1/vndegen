@@ -77,6 +77,8 @@ Packages/VNDegenKit/
   Sources/EngineAliceSoft/ AliceSoft System 3 and 4: detection, save locations, input, and both sessions
   Sources/CSystem3/       VNDegen's System 3 runtime in C, with vns3.h, its C interface
   Sources/CSystem4/       VNDegen's AliceSoft System 4 runtime in C++, with vns4.h, its C interface
+  Sources/EngineNekoSDK/  NekoSDK: detection, save locations, input, and the in-process session
+  Sources/CNekoSDK/       VNDegen's NekoSDK runtime in C++, with vnneko.h, its C interface, and each game's menu table
   Sources/RuntimePackages/ downloading, checking, and unpacking runtime packages such as the RTPs, with an Inno Setup reader
   Sources/FontPack/       the Windows font substitutes: the Swift API, and the Chinese and Korean font downloads
   Sources/CVNFont/        links to Engines/Shared/vnfont.[ch], the table reader every engine shares
@@ -101,6 +103,7 @@ Engines/NScripter/        the NScripter runtime's Linux test host and tools
 Engines/WolfRPG/          the Wolf RPG Editor runtime's Linux test host
 Engines/System3/          the System 3 runtime's Linux test host: a headless runner and an SDL player
 Engines/System4/          the System 4 runtime's Linux test host and tools; UPSTREAM.md lists the vendored libraries
+Engines/NekoSDK/          the NekoSDK runtime's Linux test host and tools
 Engines/Shared/           code and data every engine shares: the font table reader and the bundled fonts in fonts/,
                           the MIDI player and SoundFonts, the movie decoder, and the case-insensitive path lookup
 docs/                     user and engine docs, the engine survey, release notes, and screenshots

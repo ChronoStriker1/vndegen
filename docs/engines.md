@@ -21,6 +21,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [Wolf RPG Editor 2 and 3](#wolf-rpg-editor) | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf`, up to two folders down. `Game.exe` or `GamePro.exe` beside it makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 4](#alicesoft-system-4) | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe`, up to two folders down | Mac, iPhone, iPad |
+| [NekoSDK](#nekosdk) | `cfg.pak` beside `scr.pak`, up to two folders down | Mac, iPhone, iPad |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
 
@@ -134,3 +135,18 @@ AliceSoft's System 3 games run on VNDegen's own System 3 runtime, written in C f
 ## AliceSoft System 4
 
 AliceSoft's System 4 games run on VNDegen's own System 4 runtime, written in C++ for VNDegen from AliceSoft's System 4.0 SDK, the games' files and the PC engine's observable behaviour, MIT licensed like the rest of the app. It runs the games' compiled code on its own virtual machine, draws on the CPU and shows its frames through Metal inside VNDegen's window. It reads the games' `.ald` and `.afa` archives, `.ex` data files and their QNT, AJP, PMS and WebP pictures, plays Ogg and WAV sound and the MPEG-1 movies, and draws text with the game's own `.fnl` font library where it has one, then VNDegen's Windows font pack. Saves are the PC engine's own files in the game's `SaveData` folder, checked against saves the PC games wrote: a save moves between VNDegen and a PC copy of the game in both directions, and Ludusavi backs them up. Known limits: Rance IX, built on PartsEngine, plays its story scenes but not its 3D battles and maps, where it stops with a message, and its saves move to and from the PC without the scene's pictures; its game page notes the 3D. [system4.md](system4.md) has the details and the known limits. The Cheats page in the VNDegen menu edits the game's globals, adds gold in the games whose globals name it, and runs the game at 2x or 4x speed, described in [cheats.md](cheats.md#built-alicesoft-system-3-and-4).
+
+## NekoSDK
+
+NekoSDK games run on VNDegen's own NekoSDK runtime, written in C++ for VNDegen from the games' files and the PC game's observable behaviour, MIT licensed like the rest of the app. No other runtime for these games exists. It runs their story scripts, flow scripts with choices and variables, draws on the CPU and shows its frames through Metal inside VNDegen's window, and plays Ogg voices, music and sound effects. Two games play so far, The Alchemist & His Battle-Scarred Homunculus and Yarinaoshi no Christmas. The other 14 NekoSDK games in the library are detected and say on their page that they can't run yet.
+
+A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a table for each game, drawn from the game's own art. Saves are the PC engine's own files, under `AppData/Roaming` in the game's data folder as on Windows, so they move between VNDegen and a PC copy of the game. Known limits:
+
+- Unlocked pictures and music are read from and written to the PC's `cfg.sav`, so they move with a backup. The PC's Config settings don't: VNDegen keeps its own.
+- Config changes text speed, auto speed, what the right button does, the confirmation questions, volumes, and the music screen's volume, and in The Alchemist the window's opacity. Options that have no meaning here or aren't built, such as resolution, effects and read-only skip, are shown as disabled. Config's moving preview picture is still.
+- A save's lock can't be set, and its comment and the "NEW" mark on the latest save aren't there. The bar's Arrange button isn't there, and neither is Graphics' choice of Original or Arrange art.
+- The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
+- Yarinaoshi no Christmas's Manual and Version info buttons aren't there.
+- Menu backgrounds that change on the PC stay the same here. The help pictures that come up on hover on menu screens aren't drawn, and neither is the "Do not show again" box on a confirmation.
+
+[nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.

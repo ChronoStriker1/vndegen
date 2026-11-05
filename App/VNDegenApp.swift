@@ -9,6 +9,7 @@ import EngineRGSS
 import EngineArtemis
 import EngineGodot
 import EngineNScripter
+import EngineNekoSDK
 import EngineWolfRPG
 import EngineAliceSoft
 import FontPack
@@ -33,6 +34,7 @@ let engines: [any EnginePlugin] = {
         NScripterPlugin(),
         WolfRPGPlugin(),
         AliceSoftPlugin(),
+        NekoSDKPlugin(),
     ]
     // RTPs the player installed, kept once for every game.
     let runtimes = RuntimePackageStore(root: libraryPaths.runtimesDirectory)

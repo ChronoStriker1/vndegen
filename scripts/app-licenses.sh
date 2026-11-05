@@ -29,4 +29,5 @@ cp "$kit/Sources/CSystem3/third_party/LICENSE-stb_truetype.txt" "$out.part/stb_t
 cp "$kit/Sources/CSystem3/third_party/LICENSE-dr_mp3.txt" "$out.part/dr_mp3 (AliceSoft System 3 CD music).txt"
 cp "$kit/Sources/CSystem4/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (System 4 images and Ogg).txt"
 cp "$kit/Sources/CSystem4/third_party/pl_mpeg/LICENSE" "$out.part/pl_mpeg (System 4 movies).txt"
+cp "$kit/Sources/CNekoSDK/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (NekoSDK images and Ogg).txt"
 rm -rf "$out" && mv "$out.part" "$out"
