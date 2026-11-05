@@ -101,7 +101,7 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
   carets, a half-width space isn't drawn.
 - `gettext` keeps a page's `~tags~`, and `logsp n,text,x,y,colours` draws such a page as a sprite for the games' own
   backlog: its position is on the doubled screen, it breaks at any character to fit the window's width, the page's
-  line breaks are dropped, and the tags style it.
+  line breaks are dropped, and the tags style it. Like `strsp`'s, the sprite isn't brought back by loading a save.
 - `endroll` scrolls the `btndef` image for the end-of-episode credits: its eleven arguments are the screen rectangle,
   the image rectangle, a mode (the games use 2), the time per pixel in tenths of a millisecond, and the distance in
   pixels. The script waits until it has scrolled, and a click doesn't cut it short; the image stays on screen, as

@@ -248,6 +248,8 @@ void Engine::drawPonsText(Image &out) {
 
 ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, const std::vector<uint32_t> &colors,
                                   bool shadow, int &cells, int wrap) {
+    px = std::clamp(px, 1, 1024);
+    pitch = std::clamp(pitch, -px, 1024);
     // Lay the string out once, then draw it in each colour. Each glyph hangs from its own face's ascent.
     struct Placed {
         const PonsFace::Glyph *g;
@@ -285,9 +287,10 @@ ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, co
         widest = std::max(widest, pen);
         height = std::max(height, lineTop + face->height(px));
     }
-    // Even sizes, so each cell halves to whole pixels.
-    int w2 = (std::max(2, widest) + 1) & ~1, h2 = (std::max(2, height + (shadow ? shadeY_ : 0)) + 1) & ~1;
-    cells = std::max(1, int(colors.size()));
+    // Even sizes, so each cell halves to whole pixels. At most 16384 x 16384 a cell, and 64M doubled pixels in all,
+    // whatever a script asks for.
+    int w2 = (std::clamp(widest, 2, 16384) + 1) & ~1, h2 = (std::clamp(height + (shadow ? shadeY_ : 0), 2, 16384) + 1) & ~1;
+    cells = int(std::clamp<int64_t>(int64_t(colors.size()), 1, std::max<int64_t>(1, (int64_t(1) << 26) / (int64_t(w2) * h2))));
     Image doubled(w2 * cells, h2);
     for (int c = 0; c < cells; c++)
         for (const Placed &p : glyphs) {

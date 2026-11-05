@@ -233,9 +233,51 @@ static void commands() {
     fs::remove_all(dir);
 }
 
+// endroll's wait and scroll end on the same whole millisecond, the scroll moves a pixel per speed / 10 ms, and a roll
+// whose blt drawing is dropped stops. A logsp with an absurd font size stays a bounded image.
+static void endRollAndBounds() {
+    char temp[] = "/tmp/vnns-ponscripter-roll-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directory(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    writeNbzArchive(dir / "arc.nsa", "pic.bmp", testBitmap());
+    std::ofstream(dir / "0.utf") << "*define\nnsa\ngame\n*start\nbtndef \"pic.bmp\"\n"
+                                    "endroll 0,0,4,1,0,0,4,1,2,19,1\nclick\n"
+                                    "endroll 0,0,4,1,0,0,4,1,2,1000,1\nclick\n"
+                                    "setwindow 0,0,10,10,1073741824,1073741824,0,0,0,0,0,#000000,0,0,639,479\n"
+                                    "logsp 1,\"a\",0,0\nclick\nend\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    auto click = [&] {
+        engine.mouseButton(1, true);
+        engine.mouseButton(1, false);
+    };
+    // 1 pixel at 1.9 ms takes 2 ms, rounded up; the top row shows until then, the bottom row after.
+    assert(engine.step(1) && engine.endRoll_.on && engine.endRoll_.end - engine.endRoll_.start == 2);
+    assert(engine.bltLayer_.row(0)[0] == vnns::rgba(255, 0, 0));
+    assert(engine.step(1) && engine.wait_ == vnns::WaitKind::Timer);
+    assert(engine.step(1) && !engine.endRoll_.on && engine.wait_ == vnns::WaitKind::Click);
+    assert(engine.bltLayer_.row(0)[0] == vnns::rgba(0, 0, 0));
+    click();
+    assert(engine.step(1) && engine.endRoll_.on);
+    engine.clearBlt();  // as a load or a reset does
+    assert(!engine.endRoll_.on);
+    for (int i = 0; i < 10; i++) engine.step(16);
+    assert(engine.bltState_ == 0);
+    click();
+    for (int i = 0; i < 10; i++) engine.step(16);
+    const vnns::Sprite &s = engine.scene_.sp[1];
+    assert(s.loaded && s.img.image && s.img.image->w <= 8192 && s.img.image->h <= 8192 && s.alpha == 255);
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
     layout();
     commands();
+    endRollAndBounds();
 }

@@ -3,6 +3,7 @@
 // settled as a black box, with lab scripts run on the games' own engine under Wine; docs/nscripter-cleanroom.md lists
 // what each lab showed.
 #include <algorithm>
+#include <cstdint>
 
 #include "engine.h"
 
@@ -67,12 +68,18 @@ void cmdEndRoll(E &e, const std::string &) {
     if (v[8] != 2) logf("endroll mode %lld isn't measured; it scrolls as mode 2", static_cast<long long>(v[8]));
     E::EndRoll &r = e.endRoll_;
     std::copy(v, v + 8, r.rect);
-    r.distance = int(std::clamp<int64_t>(v[10], 0, 1 << 20));
-    r.msPerPixel = std::clamp<int64_t>(v[9], 1, 100000) / 10.0;
+    r.distance = std::clamp<int64_t>(v[10], 0, 1 << 20);
+    r.speed = std::clamp<int64_t>(v[9], 1, 100000);
     r.start = e.now_;
+    // The wait and the scroll end together, at the whole millisecond the last pixel is reached.
+    int64_t duration = (r.distance * r.speed + 9) / 10;
+    r.end = r.start + duration;
     r.on = true;
+    if (duration > 0) {
+        e.waitTimer(int(std::min<int64_t>(duration, INT32_MAX)), false);
+        e.waitUntil_ = r.end;
+    }
     e.stepEndRoll();
-    e.waitTimer(int(r.distance * r.msPerPixel), false);
 }
 
 // drawclear: the draw picture becomes black.
@@ -122,8 +129,12 @@ void cmdLogSp(E &e, const std::string &) {
     Sprite *s = e.spriteRef(n);
     if (!s) return;
     int cells = 1;
-    ImageRef img = e.renderPonsString(text, 2 * e.win_.fh, 0, colors, e.win_.shadow, cells, 2 * e.win_.cols * e.win_.fw);
+    // Sizes past any screen are a broken script; keep them small enough to draw.
+    int fh = std::clamp(e.win_.fh, 1, 512), width = std::clamp(e.win_.cols * e.win_.fw, 1, 8192);
+    ImageRef img = e.renderPonsString(text, 2 * fh, 0, colors, e.win_.shadow, cells, 2 * width);
     *s = Sprite();
+    // Like strsp's, a logsp sprite saves with no tag and alpha 255, so it doesn't come back on load.
+    s->alpha = 255;
     s->img.image = img;
     s->img.cells = cells;
     s->img.cellWidth = img->w / cells;
@@ -137,7 +148,12 @@ void cmdLogSp(E &e, const std::string &) {
 
 void Engine::stepEndRoll() {
     EndRoll &r = endRoll_;
-    int moved = int(std::min<double>(r.distance, double(now_ - r.start) / r.msPerPixel));
+    // A roll whose wait ended early (a trap, a load) stops where it is.
+    if (r.end > r.start && (wait_ != WaitKind::Timer || waitUntil_ != r.end)) {
+        r.on = false;
+        return;
+    }
+    int64_t moved = now_ >= r.end ? r.distance : std::min(r.distance, (now_ - r.start) * 10 / r.speed);
     int64_t v[8];
     std::copy(r.rect, r.rect + 8, v);
     v[5] += moved;

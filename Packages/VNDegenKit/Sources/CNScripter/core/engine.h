@@ -357,6 +357,7 @@ public:
     // the eight in that order, as blt takes them.
     void bltRect(const int64_t v[8]);
     void clearBlt() {
+        endRoll_.on = false;  // a credits roll draws into the blt layer; whatever drops that ends the roll
         bltState_ = 0;
         bltLayer_ = Image();
     }
@@ -430,14 +431,13 @@ public:
     TextEncoding encoding() const { return ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis; }
     bool textHiddenByLang() const { return ponscripter_ && textLang_ >= 0 && textLang_ != shownLang_; }
     std::map<int, std::string> fontFiles_;  // h_mapfont: the game's font files, by face number
-    // endroll: the btndef image scrolls up through a rectangle, a pixel every msPerPixel, for distance pixels, while
-    // the script waits. Drawn into the blt layer each step.
+    // endroll: the btndef image scrolls up through a rectangle, a pixel every speed / 10 ms, for distance pixels,
+    // while the script waits until end. Drawn into the blt layer each step; it stops early if that wait ends early.
     struct EndRoll {
         bool on = false;
-        int64_t start = 0;
+        int64_t start = 0, end = 0;
         int64_t rect[8] = {};
-        int distance = 0;
-        double msPerPixel = 1;
+        int64_t distance = 0, speed = 1;
     } endRoll_;
     void stepEndRoll();
     // drawclear, drawsp and draw build a picture of their own, which draw puts on the screen as blt does.
