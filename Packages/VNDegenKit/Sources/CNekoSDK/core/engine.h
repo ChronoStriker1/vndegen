@@ -81,6 +81,9 @@ public:
     Audio &audio() { return audio_; }
 
     void mouseMove(float x, float y);
+    // For test hosts: the choice on screen, or -1, and picking one.
+    int choiceCount() const { return waiting_ == Waiting::Choice ? choiceCount_ : -1; }
+    void choose(int index);
     void mouseButton(int button, bool down);
     void setSkip(bool on) { skip_ = on; }
     void setPaused(bool paused);
@@ -92,7 +95,7 @@ public:
     bool jump(const std::string &script, int node);
 
 private:
-    enum class Waiting { None, Time, Click, Ended };
+    enum class Waiting { None, Time, Click, Choice, Ended };
     struct Frame {
         std::shared_ptr<Script> script;
         const Node *node = nullptr;
@@ -111,6 +114,9 @@ private:
     bool flowActive() const { return !stack_.empty(); }
 
     // Commands.
+    void beginChoice(const Node &n);
+    void updateChoice();
+    int variableValue(int scope, int index) const;
     void loadImage(const Node &n);
     void transform(const Node &n);
     void transformOverTime(const Node &n);
@@ -124,6 +130,8 @@ private:
     void playSound(const Node &n, int kind);
     void stopChannel(int kind, int channel, int ms);
     void stopKind(int kind, int ms);
+    std::map<int, int> &channelsOf(int kind) { return kind == 0 ? bgm_ : kind == 1 ? se_ : voice_; }
+    void changeVolume(int kind, int channel, int volume, int ms);
 
     // Drawing.
     SpriteView view(const Sprite &s) const;
@@ -166,10 +174,22 @@ private:
     int64_t transitionStart_ = 0;
     bool transitioning_ = false;
 
+    // The story's variables: global ones (saved with the settings) and the scenario's (saved with a save).
+    std::map<int, int> globals_, scenario_;
+
+    // A choice: a sheet with one column per option and one row per state (normal, hovered, chosen, ...).
+    ImageRef choiceSheet_, choiceBack_;
+    int choiceCount_ = 0, choiceHover_ = -1, choiceResult_ = 0;
+    float mouseX_ = 0, mouseY_ = 0;
+    bool mouseMoved_ = false;
+
     // Effects.
     int shakeType_ = 0, shakeLock_ = 1 << 30;
     int64_t shakeStart_ = 0, shakeStopAt_ = -1;
     int shakeStopMs_ = 0;
+    // A shake that goes on until it's stopped: the amplitudes in pixels and periods in ms each way.
+    bool shakeSustained_ = false;
+    float shakeAmpX_ = 0, shakeAmpY_ = 0, shakePeriodX_ = 1, shakePeriodY_ = 1;
     int flashMs_ = 0, flashR_ = 0, flashG_ = 0, flashB_ = 0;
     int64_t flashStart_ = 0;
     bool blur_ = false, blurEnding_ = false, previousValid_ = false;

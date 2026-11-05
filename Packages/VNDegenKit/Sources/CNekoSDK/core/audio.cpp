@@ -101,6 +101,8 @@ struct Audio::Player {
     float fadeFrom = 1, fadeTo = 1;
     int64_t fadeLen = 0, fadePos = 0;
     bool fadeStop = false;
+    float pan = 0, panFrom = 0, panTo = 0;  // -1..1
+    int64_t panLen = 0, panPos = 0;
     int loops = 1;                // 0 forever
     int played = 0;
     int64_t loopStart = 0, loopEnd = 0;
@@ -206,6 +208,20 @@ void Audio::fade(int h, int ms, int volume, bool stop) {
 }
 bool Audio::fading(int h) { WITH(h) false; return it->second->fadeLen > 0 && it->second->playing; }
 void Audio::stopFade(int h) { WITH(h); it->second->fadeLen = 0; }
+void Audio::setPan(int h, int pan, int ms) {
+    WITH(h);
+    auto &p = *it->second;
+    float to = std::clamp(pan, -100, 100) / 100.0f;
+    if (ms <= 0) {
+        p.pan = to;
+        p.panLen = 0;
+        return;
+    }
+    p.panFrom = p.pan;
+    p.panTo = to;
+    p.panLen = int64_t(ms) * kRate / 1000;
+    p.panPos = 0;
+}
 void Audio::setLoops(int h, int count) { WITH(h); it->second->loops = std::max(0, count); }
 int Audio::loops(int h) { WITH(h) 0; return it->second->loops; }
 void Audio::setLoopPoints(int h, int64_t s, int64_t e) { WITH(h); it->second->loopStart = s; it->second->loopEnd = e; }
@@ -270,9 +286,14 @@ void Audio::renderMix(float *out, int frames) {
             }
             float l, r;
             if (!p.next(l, r)) { p.playing = false; break; }
+            if (p.panLen > 0) {
+                p.panPos++;
+                p.pan = p.panFrom + (p.panTo - p.panFrom) * float(p.panPos) / float(p.panLen);
+                if (p.panPos >= p.panLen) p.panLen = 0;
+            }
             float v = p.volume * group;
-            out[i * 2] += l * v;
-            out[i * 2 + 1] += r * v;
+            out[i * 2] += l * v * std::min(1.0f, 1.0f - p.pan);
+            out[i * 2 + 1] += r * v * std::min(1.0f, 1.0f + p.pan);
         }
     }
     if (stream_) {

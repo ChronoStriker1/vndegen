@@ -22,7 +22,8 @@ bool parseScript(const uint8_t *data, size_t size, Script &out, size_t *trailing
     size_t pos = sizeof kMagic;
     uint32_t count = rd32(data + pos);
     pos += 4;
-    // A node's fixed part: id, colour tag, editor position, opcode, 32 parameters, next, 64 reserved bytes.
+    // A node's fixed part: id, colour tag, editor position, opcode, 32 parameters, next, then 64 bytes whose first int is
+    // a branch's other target.
     constexpr size_t kFixed = 16 + 128 + 4 + 64;
     if (count > size / kFixed) return false;
     out.nodes.resize(count);
@@ -33,6 +34,7 @@ bool parseScript(const uint8_t *data, size_t size, Script &out, size_t *trailing
         node.opcode = int(rd32(data + pos + 12));
         std::memcpy(node.p.data(), data + pos + 16, 128);
         node.next = int(rd32(data + pos + 144));
+        node.otherwise = int(rd32(data + pos + 148));
         pos += kFixed;
         for (auto &text : node.s) {
             if (pos + 4 > size) return false;

@@ -91,8 +91,8 @@ scene.
 
 - Parameter 20 of opcode 18 blurs a sprite. Its radius is a fit to one frame's sharpness, and parameter 21 isn't read.
 - The curve of a negative length, the flash's parameters 4 to 10, and motion blur's strength.
-- Named animations (opcode 19): their lengths are taken as milliseconds, and a save shows a timed change written in the
-  same text form, so they may be frames too. No recording has reached one yet.
+- Named animations (opcode 19): their lengths are taken as frames, because a save holds a timed change written in the same
+  text form. A recording that reached them was too coarse to confirm it.
 - `loop:0` repeating for ever is read from a street ambience and from `loop:1` on one-shot effects.
 - `pos:` on sound commands isn't applied. Its values look like pan.
 - What a load's parameter 0 means. A load keeps the slot's position and scale.

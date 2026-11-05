@@ -56,6 +56,9 @@ const char *vnneko_debug_status(VNNekoEngine *e);
 // For test hosts: whether the game waits for a click now, and how many text boxes it has shown.
 bool vnneko_debug_waiting_for_click(VNNekoEngine *e);
 int vnneko_debug_text_count(VNNekoEngine *e);
+// For test hosts: the options of the choice on screen, or -1, and picking one.
+int vnneko_debug_choice_count(VNNekoEngine *e);
+void vnneko_debug_choose(VNNekoEngine *e, int index);
 // For test hosts: starts this scene script and runs it without waiting up to the node. False when it's not there.
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 

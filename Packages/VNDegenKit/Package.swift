@@ -21,6 +21,7 @@ let package = Package(
         .library(name: "FrameHost", targets: ["FrameHost"]),
         .library(name: "EngineWolfRPG", targets: ["EngineWolfRPG"]),
         .library(name: "EngineAliceSoft", targets: ["EngineAliceSoft"]),
+        .library(name: "EngineNekoSDK", targets: ["EngineNekoSDK"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -129,6 +130,16 @@ let package = Package(
         // sources for the Linux test tools. It draws every frame on the CPU, so Debug builds are optimized too.
         .target(name: "CSystem3", dependencies: ["CVNFont", "CVNMidi"], exclude: ["third_party"], cSettings: [.unsafeFlags(["-O2"])]),
         .target(name: "EngineAliceSoft", dependencies: ["VNCore", "CSystem3", "CSystem4", "FrameHost", "FontPack"], swiftSettings: mainActorByDefault),
+        // NekoSDK's runtime, VNDegen's own clean-room work (docs/nekosdk-cleanroom.md). C++20 with a C interface,
+        // include/vnneko.h. Engines/NekoSDK/host builds the same sources for the Linux test tools. It draws every frame on
+        // the CPU, so Debug builds are optimized too.
+        .target(
+            name: "CNekoSDK", dependencies: ["CVNFont"], exclude: ["third_party"],
+            cSettings: [.unsafeFlags(["-O2"])], cxxSettings: [.unsafeFlags(["-std=c++20", "-O2"])],
+            linkerSettings: [.linkedLibrary("z"),
+                             .linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
+                             .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
+        .target(name: "EngineNekoSDK", dependencies: ["VNCore", "CNekoSDK", "FrameHost"], swiftSettings: mainActorByDefault),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
@@ -176,6 +187,7 @@ let package = Package(
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
+        .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ],
     cxxLanguageStandard: .cxx17

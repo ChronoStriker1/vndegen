@@ -113,14 +113,15 @@ bool Engine::start(const std::string &root, const std::string &logPath, const st
     setFontPackDir(fontDir);
 
     fps_ = config_.number("FPS", 60);
-    width_ = config_.number("WindowWidth", 1280);
-    height_ = config_.number("WindowHeight", 720);
-    canvas_.resize(width_, height_);
-    canvas_.clear();
-
     windowImage_ = images_->get(config_.text("MsgWinFilename"));
     windowX_ = config_.number("MsgWinPosX");
     windowY_ = config_.number("MsgWinPosY");
+    width_ = config_.number("WindowWidth", 1280);
+    // Test Game 95 says 1020 but draws on 1080: its message window and buttons reach the bottom of that.
+    height_ = std::max(config_.number("WindowHeight", 720), windowImage_ ? windowY_ + windowImage_->h : 0);
+    canvas_.resize(width_, height_);
+    canvas_.clear();
+
     windowShowType_ = config_.number("MsgWinShowType");
     waitMark_ = images_->get(config_.text("MsgWaitMarkFilename"));
     markX_ = config_.number("MsgWaitMarkPosX");
@@ -219,8 +220,10 @@ void Engine::run() {
 }
 
 void Engine::runFlow(const Node &n) {
+    Frame &flow = stack_.back();
     switch (n.opcode) {
-    case 0:  // the start marker
+    case 0:   // the start marker
+    case 43:  // a debug print
         break;
     case 1: {  // call a scene
         auto script = loadScript(n.s[1]);
@@ -232,14 +235,69 @@ void Engine::runFlow(const Node &n) {
     }
     case 2:  // the end of the story, which goes back to the title
         log("flow end: %s", sjis::toUtf8(n.s[0]).c_str());
-        stack_.back().node = nullptr;
+        flow.node = nullptr;
         break;
-    case 43:  // a debug print
+    case 3:
+        beginChoice(n);
         break;
+    case 4:  // `next` when the first option was chosen, the other target when not
+        flow.node = flow.script->node(choiceResult_ == 0 ? n.next : n.otherwise);
+        break;
+    case 5: {  // a condition on a variable: `next` when it holds
+        int left = variableValue(n.p[0], n.p[1]), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
+        // Only `<=`, 2, is read from a script's own words so far. The others follow the order such lists usually have.
+        bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
+        flow.node = flow.script->node(holds ? n.next : n.otherwise);
+        break;
+    }
+    case 6: {  // set or step a variable: scope, index, operation (0 set, 1 add one), value
+        auto &table = n.p[0] == 1 ? scenario_ : globals_;
+        if (n.p[3] == 1) table[n.p[1]]++;
+        else table[n.p[1]] = n.p[5];
+        log("variable %d:%d = %d", n.p[0], n.p[1], table[n.p[1]]);
+        break;
+    }
+    case 31: {  // go on in another flow script
+        auto next = loadScript(n.s[1]);
+        flow.script = next;
+        flow.node = next ? next->first() : nullptr;
+        break;
+    }
     default:
         warnOnce("flow opcode " + std::to_string(n.opcode) + " isn't built: " + sjis::toUtf8(n.s[0]));
         break;
     }
+}
+
+int Engine::variableValue(int scope, int index) const {
+    const auto &table = scope == 1 ? scenario_ : globals_;
+    auto it = table.find(index);
+    return it == table.end() ? 0 : it->second;
+}
+
+void Engine::beginChoice(const Node &n) {
+    choiceSheet_ = images_->get(n.s[1]);
+    if (!choiceSheet_) {
+        complain("Missing choice " + n.s[1]);
+        choiceResult_ = 0;
+        return;
+    }
+    choiceCount_ = std::max(1, n.p[1]);
+    choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
+    choiceHover_ = -1;
+    waiting_ = Waiting::Choice;
+    dirty_ = true;
+    log("choice %s, %d options", n.s[1].c_str(), choiceCount_);
+}
+
+void Engine::choose(int index) {
+    if (waiting_ != Waiting::Choice) return;
+    choiceResult_ = index;
+    log("chose %d", index);
+    choiceSheet_ = nullptr;
+    choiceBack_ = nullptr;
+    waiting_ = Waiting::None;
+    dirty_ = true;
 }
 
 void Engine::runScene(const Node &n) {
@@ -293,6 +351,15 @@ void Engine::runScene(const Node &n) {
     case 30:
         playSound(n, kKindBgm);
         break;
+    case 31:
+        stopChannel(kKindBgm, p[0], p[1]);
+        break;
+    case 32:
+        stopKind(kKindBgm, p[1]);
+        break;
+    case 33:
+        changeVolume(kKindBgm, p[0], p[1], p[2]);
+        break;
     case 35:
         playSound(n, kKindSe);
         break;
@@ -302,6 +369,14 @@ void Engine::runScene(const Node &n) {
     case 37:
         stopKind(kKindSe, p[1]);
         break;
+    case 38:
+        changeVolume(kKindSe, p[0], p[1], p[2]);
+        break;
+    case 39: {  // move a sound effect left or right
+        auto it = se_.find(p[0]);
+        if (it != se_.end()) audio_.setPan(it->second, p[1], p[2]);
+        break;
+    }
     case 40:
         stopKind(kKindBgm, p[1]);
         stopKind(kKindSe, p[1]);
@@ -321,8 +396,33 @@ void Engine::runScene(const Node &n) {
         flashStart_ = now_;
         dirty_ = true;
         break;
+    case 51:  // noise over the screen, and its end: not drawn yet
+    case 52:
+        warnOnce("noise isn't drawn yet");
+        break;
     case 53:  // shake the screen
         shakeType_ = p[0];
+        shakeSustained_ = false;
+        shakeStart_ = now_;
+        shakeStopAt_ = -1;
+        break;
+    case 55:  // a hand-held camera's sway, until stopped: up and down, then sideways, each with a period in frames
+        shakeType_ = p[0];
+        shakeSustained_ = true;
+        shakeAmpY_ = float(p[1]);
+        shakePeriodY_ = float(std::max(1, p[2])) * 1000 / float(std::max(1, fps_));
+        shakeAmpX_ = float(p[3]);
+        shakePeriodX_ = float(std::max(1, p[4])) * 1000 / float(std::max(1, fps_));
+        shakeStart_ = now_;
+        shakeStopAt_ = -1;
+        break;
+    case 115:  // walking: a shake with a small amplitude and step on each axis, until stopped
+        shakeType_ = p[0];
+        shakeSustained_ = true;
+        shakeAmpY_ = float(p[1]);
+        shakePeriodY_ = float(std::max(1, p[2])) * 100;
+        shakeAmpX_ = float(p[3]);
+        shakePeriodX_ = float(std::max(1, p[2])) * 200;
         shakeStart_ = now_;
         shakeStopAt_ = -1;
         break;
@@ -344,6 +444,15 @@ void Engine::runScene(const Node &n) {
         break;
     case 116:  // drives an external accessory, which VNDegen doesn't have
         break;
+    case 120: {  // a sprite moves to another slot
+        for (auto *set : {&back_, &front_}) {
+            auto it = set->find(p[0]);
+            if (it == set->end()) continue;
+            (*set)[p[1]] = std::move(it->second);
+            set->erase(p[0]);
+        }
+        break;
+    }
     case 140:  // slots from this one up don't shake
         shakeLock_ = std::atoi(n.s[1].c_str());
         break;
@@ -384,6 +493,10 @@ bool Engine::step(int ms) {
         }
     }
     clicked_ = false;
+    if (mouseMoved_) {
+        mouseMoved_ = false;
+        updateChoice();
+    }
     run();
 
     for (auto *set : {&back_, &front_})
@@ -398,10 +511,33 @@ void Engine::setPaused(bool paused) {
         for (auto &[channel, player] : *channels) audio_.pause(player, paused);
 }
 
-void Engine::mouseMove(float, float) {}
+void Engine::mouseMove(float x, float y) {
+    mouseX_ = x;
+    mouseY_ = y;
+    mouseMoved_ = true;
+}
 
 void Engine::mouseButton(int button, bool down) {
-    if (button == 0 && down) clicked_ = true;
+    if (button != 0 || !down) return;
+    if (waiting_ == Waiting::Choice) {
+        updateChoice();
+        if (choiceHover_ >= 0) choose(choiceHover_);
+        return;
+    }
+    clicked_ = true;
+}
+
+// Options stack around the middle of the screen. Where the PC game puts them is still to be measured.
+void Engine::updateChoice() {
+    if (waiting_ != Waiting::Choice || !choiceSheet_) return;
+    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
+    int x = (width_ - cellW) / 2, top = (height_ - cellH * choiceCount_) / 2;
+    int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
+    int hover = px >= x && px < x + cellW && py >= top && py < top + cellH * choiceCount_ ? (py - top) / cellH : -1;
+    if (hover != choiceHover_) {
+        choiceHover_ = hover;
+        dirty_ = true;
+    }
 }
 
 bool Engine::jump(const std::string &script, int node) {
@@ -428,7 +564,7 @@ bool Engine::jump(const std::string &script, int node) {
 
 const char *Engine::debugStatus() {
     char buffer[256];
-    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : "ended";
+    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : "ended";
     std::snprintf(buffer, sizeof buffer, "%s #%d %s t=%lld", scene_.script ? scene_.script->name.c_str() : "(flow)", scene_.node ? scene_.node->id : -1, waiting, (long long)now_);
     status_ = buffer;
     return status_.c_str();
@@ -540,7 +676,9 @@ void Engine::namedAnimation(Sprite &s, const Node &n) {
         if (parts.size() < 5) { warnOnce("animation line not read: " + line); continue; }
         const std::string &name = parts[0];
         float value = float(std::atof(parts[1].c_str()));
-        int start = std::atoi(parts[parts.size() - 3].c_str()), length = std::atoi(parts[parts.size() - 2].c_str());
+        // In frames, as a timed change's are: the PC game's save writes a timed change in this same form.
+        int start = std::atoi(parts[parts.size() - 3].c_str()) * 1000 / std::max(1, fps_);
+        int length = std::atoi(parts[parts.size() - 2].c_str()) * 1000 / std::max(1, fps_);
         Track t;
         t.startMs = start;
         t.lengthMs = length;
@@ -661,11 +799,18 @@ void Engine::playSound(const Node &n, int kind) {
         return;
     }
     audio_.setLoops(player, kind == kKindBgm ? 0 : p[4]);
+    if (p[2]) audio_.setPan(player, p[2], 0);
     int fade = p[3], volume = p[1];
     audio_.fade(player, 0, fade > 0 ? 0 : volume, false);
     if (fade > 0) audio_.fade(player, fade, volume, false);
     audio_.play(player);
     channels[channel] = player;
+}
+
+void Engine::changeVolume(int kind, int channel, int volume, int ms) {
+    auto &channels = channelsOf(kind);
+    auto it = channels.find(channel);
+    if (it != channels.end()) audio_.fade(it->second, std::max(ms, 0), volume, false);
 }
 
 void Engine::stopChannel(int kind, int channel, int ms) {
@@ -736,15 +881,21 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
     if (shakeType_) {
         // A burst about 300 ms long that dies away, from the PC game's footage. Type 4 moves sideways; type 8 both ways.
         float t = float(now_ - shakeStart_);
-        float decay = 1 - t / kShakeMs;
+        float decay = shakeSustained_ ? 1 : 1 - t / kShakeMs;
         if (shakeStopAt_ >= 0) decay = std::min(decay, shakeStopMs_ > 0 ? 1 - float(now_ - shakeStopAt_) / float(shakeStopMs_) : 0);
+        int type = shakeType_;
         if (decay <= 0) {
             decay = 0;
             shakeType_ = 0;
         }
-        float wave = std::cos(t / 1000 * 2 * kPi * 7.5f) * decay;
-        shakeX = wave * kShakePixelsX * float(out.w) / 1280;
-        if (shakeType_ != 4) shakeY = -wave * kShakePixelsY * float(out.w) / 1280;
+        if (shakeSustained_) {
+            shakeX = std::sin(t / shakePeriodX_ * 2 * kPi) * shakeAmpX_ * decay;
+            shakeY = std::sin(t / shakePeriodY_ * 2 * kPi) * shakeAmpY_ * decay;
+        } else {
+            float wave = std::cos(t / 1000 * 2 * kPi * 7.5f) * decay;
+            shakeX = wave * kShakePixelsX * float(out.w) / 1280;
+            if (type != 4) shakeY = -wave * kShakePixelsY * float(out.w) / 1280;
+        }
     }
     for (const auto &[slot, s] : sprites) {
         if (!s.image) continue;
@@ -809,6 +960,14 @@ void Engine::compose() {
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
     composeMessage(canvas_);
+
+    if (waiting_ == Waiting::Choice && choiceSheet_) {
+        if (choiceBack_) drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
+        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
+        int x = (width_ - cellW) / 2, top = (height_ - cellH * choiceCount_) / 2;
+        for (int i = 0; i < choiceCount_; i++)
+            drawPart(canvas_, *choiceSheet_, x, top + i * cellH, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+    }
 }
 
 void Engine::composeMessage(Canvas &out) {

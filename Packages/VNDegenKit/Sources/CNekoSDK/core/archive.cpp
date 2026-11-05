@@ -132,7 +132,10 @@ void Files::indexArchive(const std::string &file, const std::string &folder, int
         source.size = rd32(&index[pos + 4]) ^ uint32_t(key);
         pos += 8;
         if (uint64_t(source.offset) + source.size > fileSize) continue;
-        add(hasFolder(name) ? name : folder + "\\" + name, std::move(source));
+        // Entries with folders of their own: `cfg\\x.ini` in a patch names that path, and `rain\\x.ogg` in `se.pak` names
+        // `se\\rain\\x.ogg`. A script could mean either, so both find it.
+        if (hasFolder(name)) add(name, source);
+        add(folder + "\\" + name, std::move(source));
     }
 }
 

@@ -29,6 +29,8 @@ public:
     void fade(int h, int ms, int volume, bool stop);
     bool fading(int h);
     void stopFade(int h);
+    // Moves the sound left or right over ms: -100 is all left, 100 all right.
+    void setPan(int h, int pan, int ms);
     void setLoops(int h, int count);  // 0 loops forever, n plays n times
     int loops(int h);
     // Loop points in samples; end 0 is the end of the data.

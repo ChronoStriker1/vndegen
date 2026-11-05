@@ -12,6 +12,7 @@ struct Node {
     int id = 0;
     int opcode = 0;
     int next = 0;
+    int otherwise = 0;  // a branch's other target
     std::array<int32_t, 32> p{};
     std::array<std::string, 33> s;  // CP932, without NULs
 };
