@@ -927,7 +927,7 @@ pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 0
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 13 32
+cellthumb 8 26
 cell 303 82
 cell 303 245
 cell 303 408
@@ -960,7 +960,7 @@ pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 1
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 13 32
+cellthumb 8 26
 cell 303 82
 cell 303 245
 cell 303 408
@@ -1329,7 +1329,7 @@ pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 0
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 13 32
+cellthumb 8 26
 cell 279 82
 cell 478 82
 cell 677 82
@@ -1341,6 +1341,7 @@ cell 478 408
 cell 677 408
 celllabel obj\e008_000.bmp 10 15
 celldigits obj\e008_001.bmp 38 10 3 14
+cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
 gallerytabs
 button page0 obj\e006_000.bmp 280 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
@@ -1362,7 +1363,7 @@ pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 1
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 13 32
+cellthumb 8 26
 cell 279 82
 cell 478 82
 cell 677 82
@@ -1374,6 +1375,7 @@ cell 478 408
 cell 677 408
 celllabel obj\e008_000.bmp 10 15
 celldigits obj\e008_001.bmp 38 10 3 14
+cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
 gallerytabs
 button page0 obj\e006_000.bmp 280 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
@@ -1584,6 +1586,11 @@ pic obj\i000_000.bmp 414 173 1 8 0 0
 button yes obj\b003_000.bmp 449 268 2 5 0
 button no obj\b003_000.bmp 449 350 2 5 1
 pic obj\b002_000.bmp 414 440
+
+screen choice
+pic obj\b001_000.bmp 0 130
+pic obj\n000_000.bmp 414 173
+place 263 90
 
 screen start
 pic obj\d005_000.bmp 390 150
