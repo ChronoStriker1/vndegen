@@ -72,13 +72,17 @@ int Engine::ponsLineWidth2() const {
     return 2 * int(std::clamp<int64_t>(int64_t(win_.cols) * win_.fw, 1, 8192));
 }
 
+int Engine::ponsIndent2() const {
+    return 2 * int(std::clamp<int64_t>(int64_t(indent_) * (int64_t(win_.fw) + win_.px), 0, 8192));
+}
+
 int Engine::ponsLineHeight2() {
     PonsFace *f = ponsFace(ponsStyle_.face());
     return (f ? f->height(2 * ponsSize()) : 2 * ponsSize()) + 2 * std::clamp(win_.py, -512, 512);
 }
 
 void Engine::ponsNewLine() {
-    penX2_ = 2 * indent_ * fullAdvance();
+    penX2_ = ponsIndent2();
     penY2_ += ponsLineHeight2();
     penX_ = penX2_ / 2;
     penY_ = penY2_ / 2;
@@ -88,7 +92,7 @@ void Engine::ponsNewLine() {
 void Engine::ponsBreakParagraph() {
     PonsFace *f = ponsFace(ponsStyle_.face());
     int height = f ? f->height(2 * ponsSize()) : 2 * ponsSize();
-    penX2_ = 2 * indent_ * fullAdvance();
+    penX2_ = ponsIndent2();
     penY2_ += (height + 1) / 2 + 2 * std::clamp(win_.py, -512, 512);
     penX_ = penX2_ / 2;
     penY_ = penY2_ / 2;
@@ -106,7 +110,7 @@ void Engine::ponsPutChar(const std::string &ch) {
     int lineWidth = ponsLineWidth2();
     // A character that won't fit starts a line, unless it's one that may not start a line (kinsoku), which hangs past
     // the edge. Words break at spaces before this, so this is a word wider than the line, or Japanese text.
-    if (penX2_ + advance > lineWidth && penX2_ > 2 * indent_ * fullAdvance() && kinsokuStart_.find(ch) == std::string::npos)
+    if (penX2_ + advance > lineWidth && penX2_ > ponsIndent2() && kinsokuStart_.find(ch) == std::string::npos)
         ponsNewLine();
     TextChar c;
     c.ch = ch;
@@ -131,13 +135,14 @@ void Engine::ponsPutChar(const std::string &ch) {
     sceneDirty_ = true;
 }
 
-int Engine::ponsWordWidth(std::string_view t, size_t p) {
+int Engine::ponsWordWidth(std::string_view t, size_t p, bool literal) {
     PonsStyle style = ponsStyle_;
     int px = 2 * ponsSize(), width = 0;
     while (p < t.size()) {
         char c = t[p];
-        if (c == ' ' || c == '\n' || c == '@' || c == '\\' || (c == '/' && p + 1 < t.size() && t[p + 1] == '\n')) break;
-        if (c == '^' || c == '_') {
+        if (c == ' ' || c == '\n') break;
+        if (!literal && (c == '@' || c == '\\' || (c == '/' && p + 1 < t.size() && t[p + 1] == '\n'))) break;
+        if (c == '^' || (c == '_' && !literal)) {
             p++;
             continue;
         }
@@ -149,17 +154,19 @@ int Engine::ponsWordWidth(std::string_view t, size_t p) {
                 continue;
             }
         }
-        if (c == '#' && p + 7 <= t.size() &&
+        // A text line's colours, and !sd, !sN, !dN and !wN, read as the text step reads them. A string putString puts
+        // has only carets and tags for markup.
+        if (!literal && c == '#' && p + 7 <= t.size() &&
             std::all_of(t.begin() + long(p) + 1, t.begin() + long(p) + 7, [](char h) { return isxdigit(uint8_t(h)); })) {
             p += 7;
             continue;
         }
-        // !sd, and !sN, !dN, !wN: speeds and waits, as the text step reads them.
-        if (c == '!' && p + 2 < t.size() && tolower(uint8_t(t[p + 1])) == 's' && tolower(uint8_t(t[p + 2])) == 'd') {
+        if (!literal && c == '!' && p + 2 < t.size() && tolower(uint8_t(t[p + 1])) == 's' &&
+            tolower(uint8_t(t[p + 2])) == 'd') {
             p += 3;
             continue;
         }
-        if (c == '!' && p + 2 < t.size() && strchr("sdwSDW", t[p + 1]) && isdigit(uint8_t(t[p + 2]))) {
+        if (!literal && c == '!' && p + 2 < t.size() && strchr("sdwSDW", t[p + 1]) && isdigit(uint8_t(t[p + 2]))) {
             p += 2;
             while (p < t.size() && isdigit(uint8_t(t[p]))) p++;
             continue;
@@ -175,9 +182,9 @@ int Engine::ponsWordWidth(std::string_view t, size_t p) {
     return width;
 }
 
-bool Engine::ponsWrapsBefore(std::string_view t, size_t p) {
+bool Engine::ponsWrapsBefore(std::string_view t, size_t p, bool literal) {
     size_t nl = t.find('\n', p);
-    int width = ponsWordWidth(t.substr(0, nl == std::string_view::npos ? t.size() : nl), p);
+    int width = ponsWordWidth(t.substr(0, nl == std::string_view::npos ? t.size() : nl), p, literal);
     int space = ponsFace(ponsStyle_.face())->glyph(' ', 2 * ponsSize())->advance;
     return width > 0 && penX2_ + space + width > ponsLineWidth2() && penX2_ > 0;
 }
@@ -206,7 +213,7 @@ void Engine::putString(const std::string &s) {
         std::string ch = ponsChar(s, i, &used);
         i += used;
         // Words break between lines as a text line's do.
-        if (ch == " " && ponsText() && ponsWrapsBefore(s, i)) {
+        if (ch == " " && ponsText() && ponsWrapsBefore(s, i, true)) {
             newLine();
             continue;
         }
@@ -316,7 +323,8 @@ ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, co
     }
     // Even sizes, so each cell halves to whole pixels. At most 8192 x 4096 a cell, and 16M doubled pixels (64 MB) in
     // all, whatever a script asks for: the cells past that budget are dropped, as NScripter's string sprites do.
-    int w2 = (std::clamp(widest, 2, 8192) + 1) & ~1, h2 = (std::clamp(height + (shadow ? shadeY_ : 0), 2, 4096) + 1) & ~1;
+    int w2 = (std::clamp(widest, 2, 8192) + 1) & ~1;
+    int h2 = (std::clamp(height + (shadow ? shadeY_ : 0), 2, std::min(4096, (1 << 24) / w2) & ~1) + 1) & ~1;
     cells = int(std::clamp<int64_t>(int64_t(colors.size()), 1, std::max<int64_t>(1, (int64_t(1) << 24) / (int64_t(w2) * h2))));
     Image doubled(w2 * cells, h2);
     for (int c = 0; c < cells; c++)

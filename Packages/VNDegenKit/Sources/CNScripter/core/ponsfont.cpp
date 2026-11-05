@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <string>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
@@ -22,7 +23,10 @@ struct PonsFace::Impl {
 PonsFace::PonsFace() : impl_(std::make_unique<Impl>()) {}
 PonsFace::~PonsFace() = default;
 
-// The font's table directory (the first font of a collection) lies in the file, and so does every table it lists.
+// stb_truetype reads a font's tables without checking their lengths, so before it sees a game's file: the table
+// directory (the first font of a collection) and every table it lists lie in the file, the tables stb reads hold what
+// it reads from them (head, hhea, maxp, hmtx, cmap and its subtables, loca), and every loca entry points inside glyf.
+// A CFF font's outlines stb reads with bounds of its own.
 static bool tablesInside(const Bytes &d) {
     if (d.size() < 12) return false;
     uint64_t at = 0;
@@ -31,11 +35,50 @@ static bool tablesInside(const Bytes &d) {
         at = be32(&d[12]);
         if (at + 12 > d.size()) return false;
     }
-    uint64_t tables = be16(&d[at + 4]);
-    if (at + 12 + tables * 16 > d.size()) return false;
-    for (uint64_t t = 0; t < tables; t++) {
+    uint64_t count = be16(&d[at + 4]);
+    if (at + 12 + count * 16 > d.size()) return false;
+    struct Table {
+        const uint8_t *p = nullptr;
+        uint64_t size = 0;
+    };
+    std::map<std::string, Table> tables;
+    for (uint64_t t = 0; t < count; t++) {
         const uint8_t *rec = &d[at + 12 + t * 16];
-        if (uint64_t(be32(rec + 8)) + be32(rec + 12) > d.size()) return false;
+        uint64_t off = be32(rec + 8), size = be32(rec + 12);
+        if (off + size > d.size()) return false;
+        tables[std::string(reinterpret_cast<const char *>(rec), 4)] = {d.data() + off, size};
+    }
+    auto has = [&](const char *tag, uint64_t least) { return tables.count(tag) && tables[tag].size >= least; };
+    if (!has("head", 54) || !has("hhea", 36) || !has("maxp", 6) || !has("cmap", 4)) return false;
+    uint64_t glyphs = be16(tables["maxp"].p + 4), metrics = be16(tables["hhea"].p + 34);
+    if (metrics == 0 || metrics > glyphs) return false;
+    if (!has("hmtx", metrics * 4 + (glyphs - metrics) * 2)) return false;
+    const Table &cmap = tables["cmap"];
+    uint64_t subtables = be16(cmap.p + 2);
+    if (4 + subtables * 8 > cmap.size) return false;
+    for (uint64_t i = 0; i < subtables; i++) {
+        uint64_t off = be32(cmap.p + 4 + i * 8 + 4);
+        if (off + 8 > cmap.size) return false;
+        const uint8_t *sub = cmap.p + off;
+        uint16_t format = be16(sub);
+        // Formats 8 to 13 keep a 32-bit length after a reserved field, 14 right after the format, the rest 16 bits.
+        uint64_t length = format == 14 ? be32(sub + 2) : format >= 8 ? be32(sub + 4) : be16(sub + 2);
+        if (off + length > cmap.size) return false;
+        if (format == 4 && (length < 14 || 16 + uint64_t(be16(sub + 6)) * 4 > length)) return false;
+        if ((format == 12 || format == 13) && (length < 16 || 16 + uint64_t(be32(sub + 12)) * 12 > length)) return false;
+        if (format == 6 && (length < 10 || 10 + uint64_t(be16(sub + 8)) * 2 > length)) return false;
+        if (format == 0 && length < 262) return false;
+    }
+    if (tables.count("glyf")) {
+        bool longLoca = be16(tables["head"].p + 50) != 0;
+        if (!has("loca", (glyphs + 1) * (longLoca ? 4 : 2))) return false;
+        const uint8_t *loca = tables["loca"].p;
+        for (uint64_t g = 0; g <= glyphs; g++) {
+            uint64_t off = longLoca ? be32(loca + g * 4) : uint64_t(be16(loca + g * 2)) * 2;
+            if (off > tables["glyf"].size) return false;
+        }
+    } else if (!tables.count("CFF ")) {
+        return false;
     }
     return true;
 }
@@ -66,6 +109,7 @@ std::shared_ptr<const PonsFace::Glyph> PonsFace::glyph(uint32_t cp, int px) {
     Glyph &g = *made;
     const stbtt_fontinfo *f = &impl_->info;
     int index = stbtt_FindGlyphIndex(f, int(cp));
+    if (index < 0 || index >= f->numGlyphs) index = 0;  // a broken cmap's index past the font's glyphs
     float scale = stbtt_ScaleForMappingEmToPixels(f, float(px));
     int advance = 0, lsb = 0;
     stbtt_GetGlyphHMetrics(f, index, &advance, &lsb);

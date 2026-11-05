@@ -359,6 +359,65 @@ static void reviewCases() {
     fs::remove_all(dir);
 }
 
+// Review round 2: a font whose required tables are empty isn't read; one string sprite cell keeps to the pixel
+// budget; a string's lookahead reads it as putString does; indentation can't overflow; a wrapped choice is chosen by
+// any of its lines.
+static void reviewRound2() {
+    char temp[] = "/tmp/vnns-ponscripter-round2-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directories(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    {
+        // Six tables, each empty, at the end of the file.
+        vnns::Bytes f = {0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0};
+        for (const char *tag : {"cmap", "glyf", "head", "hhea", "hmtx", "loca"}) {
+            f.insert(f.end(), tag, tag + 4);
+            f.insert(f.end(), {0, 0, 0, 0, 0, 0, 0, 108, 0, 0, 0, 0});
+        }
+        vnns::PonsFace face;
+        assert(f.size() == 108 && !face.load(f));
+    }
+    std::ofstream(dir / "0.utf") << "*define\ngame\n*start\n"
+                                    "setwindow 10,10,4,10,23,23,0,2,0,0,0,#000000,0,0,639,479\n"
+                                    "select \"^Hi mmmm^\",*a,\"^Two^\",*b\n*a\n*b\n"
+                                    "puttext \"Hi !s0dog\"\nclick\n"
+                                    "setwindow 0,0,8,10,512,512,0,0,0,0,0,#000000,0,0,639,479\n"
+                                    "logsp 1,\"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH\",0,0\n"
+                                    "setwindow 0,0,8,10,2147483647,23,1,0,0,0,0,#000000,0,0,639,479\nindent 1\n"
+                                    "puttext \"A\"\nclick\nend\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    engine.step(16);
+    assert(engine.wait_ == vnns::WaitKind::Select);
+    // "mmmm" wrapped to the second line; a click there picks the first choice.
+    int secondRow = -1;
+    for (const vnns::TextChar &c : engine.page_)
+        if (c.ch == "m") secondRow = c.y + 5;
+    assert(secondRow > engine.page_[0].y + 5);
+    engine.mouseMove(14, secondRow);
+    engine.step(16);
+    assert(engine.selectHover_ == 0 && engine.page_[3].color == engine.selectColor(true));
+    engine.mouseButton(1, true);
+    engine.mouseButton(1, false);
+    for (int i = 0; i < 10; i++) engine.step(16);
+    // puttext measured "!s0dog" as it puts it, so the whole word went to the next line.
+    int bang = -1, g = -1;
+    for (const vnns::TextChar &c : engine.page_) {
+        if (c.ch == "!") bang = c.y2;
+        if (c.ch == "g") g = c.y2;
+    }
+    assert(bang > 0 && bang == g && bang > engine.page_[0].y2);
+    engine.mouseButton(1, true);
+    engine.mouseButton(1, false);
+    for (int i = 0; i < 10; i++) engine.step(16);
+    const vnns::Sprite &s = engine.scene_.sp[1];
+    assert(s.img.image && int64_t(s.img.image->w) * s.img.image->h <= (int64_t(1) << 22));
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -366,4 +425,5 @@ int main() {
     commands();
     endRollAndBounds();
     reviewCases();
+    reviewRound2();
 }

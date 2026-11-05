@@ -469,14 +469,16 @@ public:
     void resetPen();
     int ponsSize() const;
     int ponsLineWidth2() const;
+    int ponsIndent2() const;
     int ponsLineHeight2();
     void ponsPutChar(const std::string &ch);
     void ponsNewLine();
     void ponsBreakParagraph();  // br
     // The width on the doubled screen of the word starting at t[p], up to a space, wait or line end, skipping markup.
-    int ponsWordWidth(std::string_view t, size_t p);
+    // literal: t is a string putString puts (only carets and tags are markup), not a text line.
+    int ponsWordWidth(std::string_view t, size_t p, bool literal = false);
     // Whether the word after the space before t[p] won't fit on the line, so the line breaks there.
-    bool ponsWrapsBefore(std::string_view t, size_t p);
+    bool ponsWrapsBefore(std::string_view t, size_t p, bool literal = false);
     // Puts a string's characters, reading its carets, ~tags~ and quotes (select items, text buttons, puttext).
     void putString(const std::string &s);
     struct PonsLayer {
@@ -584,6 +586,9 @@ public:
     Cursor selectReturn_;
     size_t selectFirst_ = 0;
     std::vector<int> selectRows_;
+    // Ponscripter: each choice's characters on the page and the bottom of its last line, since a choice may wrap.
+    std::vector<std::pair<size_t, size_t>> selectChars_;
+    std::vector<int> selectBottoms_;
     int selectHover_ = -1;
     bool keyboardSelect_ = false;
     void drawSystemUi(Image &out);
