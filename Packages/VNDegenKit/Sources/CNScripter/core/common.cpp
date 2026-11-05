@@ -102,6 +102,13 @@ static uint32_t utf8Next(std::string_view s, size_t &i, bool *ok) {
         }
         cp = cp << 6 | (uint8_t(s[i + k]) & 0x3F);
     }
+    // Overlong forms, surrogates and values past U+10FFFF aren't characters.
+    static const uint32_t least[4] = {0, 0x80, 0x800, 0x10000};
+    if (cp < least[n] || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF) {
+        *ok = false;
+        i++;
+        return 0;
+    }
     i += n + 1;
     return cp;
 }
@@ -152,11 +159,11 @@ static std::string utf8ToSjis(std::string_view s) {
 size_t charLen(std::string_view s, size_t i) {
     uint8_t c = uint8_t(s[i]);
     if (textEncoding() == TextEncoding::ShiftJis) return (sjisLead(c) && i + 1 < s.size()) ? 2 : 1;
-    size_t n = c < 0x80 ? 1 : (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 1;
-    if (i + n > s.size()) return 1;
-    for (size_t k = 1; k < n; k++)
-        if ((uint8_t(s[i + k]) & 0xC0) != 0x80) return 1;
-    return n;
+    // A malformed sequence counts one byte at a time, as decodeChar reads it.
+    size_t at = i;
+    bool ok = true;
+    utf8Next(s, at, &ok);
+    return ok ? at - i : 1;
 }
 
 uint32_t decodeChar(std::string_view s, size_t i, size_t *len) {

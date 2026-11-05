@@ -236,6 +236,14 @@ void Engine::serializeState(Bytes &out) {
     w.i(width_ / 2);
     w.i(width_ * 3 / 4);
     w.i(underline_);
+    // A Ponscripter game's saves are VNDegen's own, so they also keep the text state a page replays from: the line's
+    // language, the language shown, and the style.
+    if (ponscripter_) {
+        w.i(textLang_);
+        w.i(shownLang_);
+        w.i(ponsStyle_.base);
+        w.i((ponsStyle_.italic ? 1 : 0) | (ponsStyle_.bold ? 2 : 0));
+    }
 }
 
 // The message history as it is now, then the savepoint's script position.
@@ -470,6 +478,16 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     r.i();
     r.i();  // standing image centres follow from the screen width
     underline_ = r.i();
+    int textLang = -1, shownLang = shownLang_;
+    PonsStyle style;
+    if (ponscripter_) {
+        textLang = r.i();
+        shownLang = r.i();
+        style.base = r.i();
+        int flags = r.i();
+        style.italic = flags & 1;
+        style.bold = flags & 2;
+    }
     size_t historyAt = r.p;
     std::vector<std::string> log(r.count());
     for (auto &p : log) p = r.s();
@@ -496,6 +514,10 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     if (!btndef.empty()) loadImage(btndef, btnImage_);
     log_ = std::move(log);
     logTags_ = std::move(tags);
+    textLang_ = textLang;
+    shownLang_ = shownLang;
+    ponsStyle_ = style;
+    caretText_ = false;
     page_.clear();
     pageText_.clear();
     resetPen();

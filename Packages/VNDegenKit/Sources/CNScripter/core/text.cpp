@@ -293,6 +293,24 @@ bool Engine::beginTextLine() {
     return true;
 }
 
+// After a character of a text line: a clickstr character waits for a click unless a wait follows anyway. True when it
+// waits.
+bool Engine::textClickStr(const std::string &ch) {
+    const std::string &t = script_.text();
+    size_t p = cur_.pos;
+    bool hit = !ignoreClickStr_ && !clickStr_.empty() && !isHalfWidth(ch, 0) && clickStr_.find(ch) != std::string::npos;
+    ignoreClickStr_ = false;
+    if (!hit) return false;
+    char next = p < t.size() ? t[p] : '\n';
+    if (next == '@' || next == '\\') return false;
+    int row = penY_ / std::max(1, win_.fh + win_.py);
+    bool page = row >= win_.rows - clickStrLines_;
+    if (page) pendingPageClear_ = true;
+    textFast_ = false;
+    textClickWait(page);
+    return true;
+}
+
 void Engine::textClickWait(bool page) {
     showWindow();
     composeFrame();
@@ -304,6 +322,9 @@ void Engine::textClickWait(bool page) {
         f.line = cur_.line;
         f.stmt = cur_.stmt;
         f.resumeText = true;
+        f.caret = caretText_;
+        f.textLang = textLang_;
+        f.style = ponsStyle_;
         stack_.push_back(f);
         inTextLine_ = false;
         if (!jumpToLabel(textGosub_)) {
@@ -359,6 +380,9 @@ void Engine::textStep() {
             f.line = cur_.line;
             f.stmt = cur_.stmt;
             f.resumeText = true;
+            f.caret = caretText_;
+            f.textLang = textLang_;
+            f.style = ponsStyle_;
             stack_.push_back(f);
             inTextLine_ = false;
             if (!jumpToLabel(preTextGosub_)) {
@@ -504,6 +528,10 @@ void Engine::textStep() {
     if (c == '<' && !textBtnOff_ && !caretText_) {
         // <N text> or <text>: a text button.
         size_t end = t.find('>', p);
+        if (end != std::string::npos && t.find('\n', p) > end && textHiddenByLang()) {
+            p = end + 1;  // a button in the language not shown isn't made
+            return;
+        }
         if (end != std::string::npos && t.find('\n', p) > end) {
             p++;
             int number = -1;
@@ -528,6 +556,10 @@ void Engine::textStep() {
     if (c == '(' && rubyOn_ && !caretText_) {
         // (base/ruby)
         size_t slash = t.find('/', p), close = t.find(')', p), nl = t.find('\n', p);
+        if (slash < close && close < nl && textHiddenByLang()) {
+            p = close + 1;
+            return;
+        }
         if (slash < close && close < nl) {
             std::string base = t.substr(p + 1, slash - p - 1), ruby = t.substr(slash + 1, close - slash - 1);
             p = close + 1;
@@ -565,18 +597,17 @@ void Engine::textStep() {
     std::string ch = t.substr(p, n);
     if (ponscripter_) ch = ponsChar(t, p, &n);
     p += n;
-    if (textHiddenByLang()) return;
+    if (textHiddenByLang()) {
+        // Text of the language not shown isn't drawn, but its waits run, a clickstr character's too.
+        textClickStr(ch);
+        return;
+    }
     // Outside carets, the PC engine draws no half-width space.
     if (ponscripter_ && !caretText_ && ch == " ") return;
-    if (ch == " " && ponsText()) {
+    if (ch == " " && ponsText() && ponsWrapsBefore(t, p)) {
         // Ponscripter breaks a line before a word that won't fit, and the space at the break isn't drawn.
-        size_t nl = t.find('\n', p);
-        int width = ponsWordWidth(std::string_view(t).substr(0, nl == std::string::npos ? t.size() : nl), p);
-        int space = ponsFace(ponsStyle_.face())->glyph(' ', 2 * win_.fh).advance;
-        if (width > 0 && penX2_ + space + width > 2 * win_.cols * win_.fw && penX2_ > 0) {
-            newLine();
-            return;
-        }
+        newLine();
+        return;
     }
     if (((english_ && cfg_.englishWordWrap) || halfWidthText_) && ch == " ") {
         // Word wrap (the option Test Game 98's patched engine needs): break before a word that won't fit.
@@ -594,19 +625,7 @@ void Engine::textStep() {
         }
     }
     putChar(ch);
-    bool clickStrHit = !ignoreClickStr_ && !clickStr_.empty() && !isHalfWidth(ch, 0) && clickStr_.find(ch) != std::string::npos;
-    ignoreClickStr_ = false;
-    if (clickStrHit) {
-        char next = p < t.size() ? t[p] : '\n';
-        if (next != '@' && next != '\\') {
-            int row = penY_ / std::max(1, win_.fh + win_.py);
-            bool page = row >= win_.rows - clickStrLines_;
-            if (page) pendingPageClear_ = true;
-            textFast_ = false;
-            textClickWait(page);
-            return;
-        }
-    }
+    if (textClickStr(ch)) return;
     if (!textFast_ && !skipMode_ && !ctrlSkip() && textSpeed_ > 0) {
         wait_ = WaitKind::Text;
         waitUntil_ = now_ + textSpeed_;

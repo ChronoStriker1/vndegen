@@ -65,9 +65,16 @@ void Engine::resetPen() {
     penX2_ = penY2_ = 0;
 }
 
+// The window's font size and width, bounded: sizes past any screen are a broken script, and doubling them mustn't
+// overflow.
+int Engine::ponsSize() const { return std::clamp(win_.fh, 1, 512); }
+int Engine::ponsLineWidth2() const {
+    return 2 * int(std::clamp<int64_t>(int64_t(win_.cols) * win_.fw, 1, 8192));
+}
+
 int Engine::ponsLineHeight2() {
     PonsFace *f = ponsFace(ponsStyle_.face());
-    return (f ? f->height(2 * win_.fh) : 2 * win_.fh) + 2 * win_.py;
+    return (f ? f->height(2 * ponsSize()) : 2 * ponsSize()) + 2 * std::clamp(win_.py, -512, 512);
 }
 
 void Engine::ponsNewLine() {
@@ -80,9 +87,9 @@ void Engine::ponsNewLine() {
 
 void Engine::ponsBreakParagraph() {
     PonsFace *f = ponsFace(ponsStyle_.face());
-    int height = f ? f->height(2 * win_.fh) : 2 * win_.fh;
+    int height = f ? f->height(2 * ponsSize()) : 2 * ponsSize();
     penX2_ = 2 * indent_ * fullAdvance();
-    penY2_ += (height + 1) / 2 + 2 * win_.py;
+    penY2_ += (height + 1) / 2 + 2 * std::clamp(win_.py, -512, 512);
     penX_ = penX2_ / 2;
     penY_ = penY2_ / 2;
     pageText_ += '\n';
@@ -94,9 +101,9 @@ void Engine::ponsPutChar(const std::string &ch) {
     PonsFace *face = ponsFace(faceNo);
     size_t n;
     uint32_t cp = decodeChar(ch, 0, &n);
-    int px = 2 * win_.fh;
-    int advance = face->glyph(cp, px).advance;
-    int lineWidth = 2 * win_.cols * win_.fw;
+    int px = 2 * ponsSize();
+    int advance = face->glyph(cp, px)->advance;
+    int lineWidth = ponsLineWidth2();
     // A character that won't fit starts a line, unless it's one that may not start a line (kinsoku), which hangs past
     // the edge. Words break at spaces before this, so this is a word wider than the line, or Japanese text.
     if (penX2_ + advance > lineWidth && penX2_ > 2 * indent_ * fullAdvance() && kinsokuStart_.find(ch) == std::string::npos)
@@ -105,7 +112,8 @@ void Engine::ponsPutChar(const std::string &ch) {
     c.ch = ch;
     c.face = faceNo;
     c.x2 = 2 * win_.tx + penX2_;
-    c.y2 = 2 * win_.ty + penY2_ + 2 * face->ascent(win_.fh);
+    c.y2 = 2 * win_.ty + penY2_ + 2 * face->ascent(ponsSize());
+    c.px2 = px;
     c.x = c.x2 / 2;
     c.y = win_.ty + penY2_ / 2;
     c.w = (advance + 1) / 2;
@@ -125,7 +133,7 @@ void Engine::ponsPutChar(const std::string &ch) {
 
 int Engine::ponsWordWidth(std::string_view t, size_t p) {
     PonsStyle style = ponsStyle_;
-    int px = 2 * win_.fh, width = 0;
+    int px = 2 * ponsSize(), width = 0;
     while (p < t.size()) {
         char c = t[p];
         if (c == ' ' || c == '\n' || c == '@' || c == '\\' || (c == '/' && p + 1 < t.size() && t[p + 1] == '\n')) break;
@@ -146,9 +154,14 @@ int Engine::ponsWordWidth(std::string_view t, size_t p) {
             p += 7;
             continue;
         }
-        if (c == '!' && p + 2 < t.size() && strchr("sdwSDW", t[p + 1]) && (isdigit(uint8_t(t[p + 2])) || t[p + 2] == 'd')) {
+        // !sd, and !sN, !dN, !wN: speeds and waits, as the text step reads them.
+        if (c == '!' && p + 2 < t.size() && tolower(uint8_t(t[p + 1])) == 's' && tolower(uint8_t(t[p + 2])) == 'd') {
+            p += 3;
+            continue;
+        }
+        if (c == '!' && p + 2 < t.size() && strchr("sdwSDW", t[p + 1]) && isdigit(uint8_t(t[p + 2]))) {
             p += 2;
-            while (p < t.size() && (isdigit(uint8_t(t[p])) || t[p] == 'd')) p++;
+            while (p < t.size() && isdigit(uint8_t(t[p]))) p++;
             continue;
         }
         size_t used;
@@ -157,9 +170,16 @@ int Engine::ponsWordWidth(std::string_view t, size_t p) {
         PonsFace *face = ponsFace(style.face());
         if (!face) break;
         size_t n;
-        width += face->glyph(decodeChar(ch, 0, &n), px).advance;
+        width += face->glyph(decodeChar(ch, 0, &n), px)->advance;
     }
     return width;
+}
+
+bool Engine::ponsWrapsBefore(std::string_view t, size_t p) {
+    size_t nl = t.find('\n', p);
+    int width = ponsWordWidth(t.substr(0, nl == std::string_view::npos ? t.size() : nl), p);
+    int space = ponsFace(ponsStyle_.face())->glyph(' ', 2 * ponsSize())->advance;
+    return width > 0 && penX2_ + space + width > ponsLineWidth2() && penX2_ > 0;
 }
 
 void Engine::putString(const std::string &s) {
@@ -185,6 +205,11 @@ void Engine::putString(const std::string &s) {
         size_t used;
         std::string ch = ponsChar(s, i, &used);
         i += used;
+        // Words break between lines as a text line's do.
+        if (ch == " " && ponsText() && ponsWrapsBefore(s, i)) {
+            newLine();
+            continue;
+        }
         putChar(ch);
     }
     ponsStyle_ = saved;
@@ -196,7 +221,8 @@ void Engine::drawPonsText(Image &out) {
     PonsLayer &l = ponsLayer_;
     std::vector<PonsLayer::Placed> now;
     for (const TextChar &c : page_)
-        if (c.face >= 0 && c.gaiji.empty()) now.push_back({c.ch, c.face, c.x2, c.y2, c.color, c.shadow});
+        if (c.face >= 0 && c.gaiji.empty())
+            now.push_back({c.ch, c.face, c.px2, c.x2, c.y2, c.color, c.shadow, shadeX_, shadeY_});
     bool grows = now.size() >= l.placed.size() && std::equal(l.placed.begin(), l.placed.end(), now.begin());
     if (l.frame.w != out.w || l.frame.h != out.h || !grows) {
         l.doubled = Image(out.w * 2, out.h * 2);
@@ -226,7 +252,8 @@ void Engine::drawPonsText(Image &out) {
         PonsFace *face = ponsFace(c.face);
         if (!face) continue;
         size_t n;
-        const PonsFace::Glyph &g = face->glyph(decodeChar(c.ch, 0, &n), 2 * win_.fh);
+        std::shared_ptr<const PonsFace::Glyph> held = face->glyph(decodeChar(c.ch, 0, &n), c.px);
+        const PonsFace::Glyph &g = *held;
         if (g.w == 0) continue;
         if (c.shadow) draw(g, c.x2 + g.left + shadeX_, c.y2 - g.top + shadeY_, rgba(0, 0, 0));
         draw(g, c.x2 + g.left, c.y2 - g.top, c.color);
@@ -252,7 +279,7 @@ ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, co
     pitch = std::clamp(pitch, -px, 1024);
     // Lay the string out once, then draw it in each colour. Each glyph hangs from its own face's ascent.
     struct Placed {
-        const PonsFace::Glyph *g;
+        std::shared_ptr<const PonsFace::Glyph> g;
         int x, y, ascent;
     };
     std::vector<Placed> glyphs;
@@ -277,20 +304,20 @@ ImageRef Engine::renderPonsString(const std::string &text, int px, int pitch, co
         i += used;
         PonsFace *face = ponsFace(style.face());
         if (!face) continue;
-        const PonsFace::Glyph &g = face->glyph(decodeChar(ch, 0, &n), px);
-        if (wrap > 0 && pen > 0 && pen + g.advance > wrap) {
+        std::shared_ptr<const PonsFace::Glyph> g = face->glyph(decodeChar(ch, 0, &n), px);
+        if (wrap > 0 && pen > 0 && pen + g->advance > wrap) {
             pen = 0;
-            lineTop += face->height(px) + 2 * win_.py;
+            lineTop += face->height(px) + 2 * std::clamp(win_.py, -512, 512);
         }
-        glyphs.push_back({&g, pen, lineTop, ascentOf(face)});
-        pen += g.advance + pitch;
+        glyphs.push_back({g, pen, lineTop, ascentOf(face)});
+        pen += g->advance + pitch;
         widest = std::max(widest, pen);
         height = std::max(height, lineTop + face->height(px));
     }
-    // Even sizes, so each cell halves to whole pixels. At most 16384 x 16384 a cell, and 64M doubled pixels in all,
-    // whatever a script asks for.
-    int w2 = (std::clamp(widest, 2, 16384) + 1) & ~1, h2 = (std::clamp(height + (shadow ? shadeY_ : 0), 2, 16384) + 1) & ~1;
-    cells = int(std::clamp<int64_t>(int64_t(colors.size()), 1, std::max<int64_t>(1, (int64_t(1) << 26) / (int64_t(w2) * h2))));
+    // Even sizes, so each cell halves to whole pixels. At most 8192 x 4096 a cell, and 16M doubled pixels (64 MB) in
+    // all, whatever a script asks for: the cells past that budget are dropped, as NScripter's string sprites do.
+    int w2 = (std::clamp(widest, 2, 8192) + 1) & ~1, h2 = (std::clamp(height + (shadow ? shadeY_ : 0), 2, 4096) + 1) & ~1;
+    cells = int(std::clamp<int64_t>(int64_t(colors.size()), 1, std::max<int64_t>(1, (int64_t(1) << 24) / (int64_t(w2) * h2))));
     Image doubled(w2 * cells, h2);
     for (int c = 0; c < cells; c++)
         for (const Placed &p : glyphs) {

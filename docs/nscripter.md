@@ -75,8 +75,8 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
 
 - Languages. The script holds each line in Japanese and English: `langjp` and `langen` set the language of the text
   that follows, until the next of them, and `langall` makes it every language's. `showlangen` and `showlangjp` choose
-  the language shown, English until either runs. Text of the other language isn't drawn and leaves no line break, but
-  its click and page waits still run; the games' textgosub routine skips them by reading `getreadlang` (-1 for every
+  the language shown, English until either runs. Text of the other language isn't drawn, makes no text buttons or
+  ruby, applies no `~tags~` and leaves no line break, but its click, page and `clickstr` waits still run; the games' textgosub routine skips them by reading `getreadlang` (-1 for every
   language, 0 English, 1 Japanese). `language english` is read and ignored: it changed nothing in any lab.
 - English text sits between carets, `^...^`. Inside them `@`, `\`, `#rrggbb`, `!sd`, `!sN`, `!dN`, `!wN` and `_` work
   as in any text line, while `$`, `%`, `{`, `<`, `(` and `[` are plain characters. A text line whose last character is
@@ -118,8 +118,11 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
   NScripter would keep its alpha.
 - `steamsetachieve` logs the achievement and does nothing more.
 - Saves: the PC engine keeps its saves in a `saves` folder, in a format of its own. The runtime keeps its own, in
-  NScripter's format, in `vndegen-saves`, so they never replace a PC save a player copied in, and Ludusavi syncs none
-  of them.
+  NScripter's format with the text line's language, the language shown and the style added, in `vndegen-saves`,
+  whatever `savedir` says, so they never replace a PC save a player copied in, and Ludusavi syncs none of them.
+- A textgosub or pretextgosub routine may draw text of its own; the line it interrupted goes on with its carets,
+  language and style as they were. (Inferred: the games' routine draws none.)
+- Malformed UTF-8 (overlong forms, surrogates, values past U+10FFFF) reads a byte at a time, as U+FFFD.
 
 ## English word wrap
 

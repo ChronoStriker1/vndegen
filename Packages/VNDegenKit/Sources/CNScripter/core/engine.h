@@ -124,6 +124,7 @@ struct TextChar {
     // Ponscripter text, drawn at twice the screen's resolution: the face, and the pen's x and the baseline's y on that
     // doubled screen. face is -1 for NScripter's fixed cells.
     int face = -1, x2 = 0, y2 = 0;
+    int px2 = 0;  // the em it was laid out at, on the doubled screen
     bool shadow = false;
 };
 
@@ -261,6 +262,13 @@ public:
     void errorf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     int quietErrors_ = 0;  // while above 0, errorf logs nothing
 
+    // Ponscripter's text style. ~cN~ picks face N, plain; ~i~ and ~b~ toggle italic and bold, which add 1 and 2 to it. A
+    // style lasts from line to line until a tag changes it.
+    struct PonsStyle {
+        int base = 0;
+        bool italic = false, bold = false;
+        int face() const { return base + (italic ? 1 : 0) + (bold ? 2 : 0); }
+    };
     struct Frame {
         enum Kind { Gosub, For, TextGosub } kind = Gosub;
         size_t pos = 0;  // return position, or the loop body's start
@@ -271,6 +279,10 @@ public:
         bool hasParams = false;
         // textgosub calls resume text output afterwards
         bool resumeText = false;
+        // Ponscripter: the text line's caret, language and style, which the routine's own text may change.
+        bool caret = false;
+        int textLang = -1;
+        PonsStyle style;
     };
     std::vector<Frame> stack_;
 
@@ -447,13 +459,7 @@ public:
     // the engine draws; the text is halved onto the frame.
     std::map<int, std::unique_ptr<PonsFace>> ponsFaces_;  // loaded on first use; null when the file can't be read
     PonsFace *ponsFace(int n);
-    // ~cN~ picks face N, plain; ~i~ and ~b~ toggle italic and bold, which add 1 and 2 to it. A style lasts from line to
-    // line until a tag changes it.
-    struct PonsStyle {
-        int base = 0;
-        bool italic = false, bold = false;
-        int face() const { return base + (italic ? 1 : 0) + (bold ? 2 : 0); }
-    } ponsStyle_;
+    PonsStyle ponsStyle_;
     static void applyPonsTag(PonsStyle &style, std::string_view tag);
     // The character at t[p] as Ponscripter draws it: ` and ' become curly quotes, `` and '' double ones. Returns the
     // character, and its length in the script in *used.
@@ -461,23 +467,30 @@ public:
     bool ponsText() { return ponscripter_ && ponsFace(ponsStyle_.face()); }
     int penX2_ = 0, penY2_ = 0;  // the pen on the doubled screen, from the text origin
     void resetPen();
+    int ponsSize() const;
+    int ponsLineWidth2() const;
     int ponsLineHeight2();
     void ponsPutChar(const std::string &ch);
     void ponsNewLine();
     void ponsBreakParagraph();  // br
     // The width on the doubled screen of the word starting at t[p], up to a space, wait or line end, skipping markup.
     int ponsWordWidth(std::string_view t, size_t p);
+    // Whether the word after the space before t[p] won't fit on the line, so the line breaks there.
+    bool ponsWrapsBefore(std::string_view t, size_t p);
     // Puts a string's characters, reading its carets, ~tags~ and quotes (select items, text buttons, puttext).
     void putString(const std::string &s);
     struct PonsLayer {
         Image doubled, frame;  // the page's text on the doubled screen, and halved
+        // Everything a character's pixels depend on, so a cached page is drawn again when any of it changes.
         struct Placed {
             std::string ch;
-            int face, x2, y2;
+            int face, px, x2, y2;
             uint32_t color;
             bool shadow;
+            int shadeX, shadeY;
             bool operator==(const Placed &o) const {
-                return ch == o.ch && face == o.face && x2 == o.x2 && y2 == o.y2 && color == o.color && shadow == o.shadow;
+                return ch == o.ch && face == o.face && px == o.px && x2 == o.x2 && y2 == o.y2 && color == o.color &&
+                       shadow == o.shadow && shadeX == o.shadeX && shadeY == o.shadeY;
             }
         };
         std::vector<Placed> placed;
@@ -518,6 +531,7 @@ public:
     int halfAdvance() const;
     int fullAdvance() const;
     void textClickWait(bool page);
+    bool textClickStr(const std::string &ch);
     // setcursor / abssetcursor: the click-wait cursors (0 click, 1 page), shown during the built-in click waits.
     struct ClickCursor {
         Sprite sprite;

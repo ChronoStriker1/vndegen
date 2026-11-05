@@ -19,7 +19,8 @@ public:
     PonsFace(const PonsFace &) = delete;
     PonsFace &operator=(const PonsFace &) = delete;
 
-    // Takes the font file's bytes. False when they aren't a font stb_truetype reads.
+    // Takes the font file's bytes. False when they aren't a font stb_truetype reads, or its table directory points
+    // past the end of the file (stb_truetype reads tables without checking their length).
     bool load(Bytes data);
 
     struct Glyph {
@@ -29,8 +30,8 @@ public:
         std::vector<uint8_t> coverage;  // w * h
     };
     // The glyph for cp at an em of px pixels. A character the font lacks gets the font's missing-glyph shape, as the
-    // engine draws it; there is no fallback font.
-    const Glyph &glyph(uint32_t cp, int px);
+    // engine draws it; there is no fallback font. Shared, so a glyph a caller holds outlives the cache trimming itself.
+    std::shared_ptr<const Glyph> glyph(uint32_t cp, int px);
     // hhea ascender, and the height from ascender to descender plus the line gap, at an em of px pixels, rounded up.
     int ascent(int px) const;
     int height(int px) const;

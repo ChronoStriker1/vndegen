@@ -57,6 +57,11 @@ void cmdDefsub(E &e, const std::string &) {
 
 void cmdSaveDir(E &e, const std::string &) {
     std::string d = e.readStr();
+    // A Ponscripter game's saves are VNDegen's own and stay in their own folder, never the PC's.
+    if (e.ponscripter_) {
+        logf("savedir %s: a Ponscripter game's saves stay in vndegen-saves", toUtf8(d).c_str());
+        return;
+    }
     e.saveDir_ = d;
 }
 
@@ -742,7 +747,12 @@ bool Engine::returnFromSub(const std::string &label) {
     cur_.stmt = f.stmt;
     if (f.hasParams) skipStatement();  // arguments getparam didn't read
     jumps_++;
-    if (f.resumeText) inTextLine_ = true;
+    if (f.resumeText) {
+        inTextLine_ = true;
+        caretText_ = f.caret;
+        textLang_ = f.textLang;
+        ponsStyle_ = f.style;
+    }
     return true;
 }
 

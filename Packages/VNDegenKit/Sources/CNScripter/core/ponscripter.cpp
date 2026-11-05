@@ -129,9 +129,7 @@ void cmdLogSp(E &e, const std::string &) {
     Sprite *s = e.spriteRef(n);
     if (!s) return;
     int cells = 1;
-    // Sizes past any screen are a broken script; keep them small enough to draw.
-    int fh = std::clamp(e.win_.fh, 1, 512), width = std::clamp(e.win_.cols * e.win_.fw, 1, 8192);
-    ImageRef img = e.renderPonsString(text, 2 * fh, 0, colors, e.win_.shadow, cells, 2 * width);
+    ImageRef img = e.renderPonsString(text, 2 * e.ponsSize(), 0, colors, e.win_.shadow, cells, e.ponsLineWidth2());
     *s = Sprite();
     // Like strsp's, a logsp sprite saves with no tag and alpha 255, so it doesn't come back on load.
     s->alpha = 255;

@@ -29,6 +29,10 @@ static void encodingHelpers() {
         assert(vnns::isWideSpace("\xE3\x80\x80", 0));
         assert(vnns::toUtf8(utf) == utf && vnns::fromUtf8(utf) == utf);
         assert(vnns::lowerAscii("AB\xE6\x97\xA5") == "ab\xE6\x97\xA5");
+        // Surrogates, values past U+10FFFF and overlong forms aren't characters: one byte at a time, U+FFFD.
+        for (const char *bad : {"\xED\xA0\x80", "\xF4\x90\x80\x80", "\xC0\x80", "\xE0\x80\x80"}) {
+            assert(vnns::charLen(bad, 0) == 1 && vnns::decodeChar(bad, 0, &n) == 0xFFFD && n == 1);
+        }
     }
     // Shift-JIS is untouched: a lead byte and its trail byte, which may be an ASCII letter, are one character.
     const std::string sjis = "A\x93\xfa\x82\x60";  // A, U+65E5, U+FF21
@@ -166,7 +170,7 @@ static void layout() {
     // 'H' at the text origin on the doubled screen; 'i' a whole-pixel advance on; the baseline the ascent below.
     const auto &page = engine.page_;
     assert(page.size() >= 2 && page[0].x2 == 20 && page[0].y2 == 40 + ascent && page[0].x == 10);
-    assert(page[1].x2 == 20 + regular.glyph('H', px).advance && page[1].x == page[1].x2 / 2);
+    assert(page[1].x2 == 20 + regular.glyph('H', px)->advance && page[1].x == page[1].x2 / 2);
     // The page's text, as gettext gives it, keeps the tags (as the PC engine's does) for a backlog to draw.
     assert(engine.pageText_.rfind("Hi \u2019a\u2019 \u201Cb\u201D ~b~B~b~ end", 0) == 0);
     for (const vnns::TextChar &c : page) assert(c.face == (c.ch == "B" ? 2 : 0) && c.shadow);
@@ -181,11 +185,11 @@ static void layout() {
         assert(page[i].ch == page[i + 1].ch);  // a word's first letter
         lines++;
     }
-    for (const vnns::TextChar &c : page) assert(c.x2 + regular.glyph(c.ch[0], px).advance <= 20 + 2 * 10 * 23);
+    for (const vnns::TextChar &c : page) assert(c.x2 + regular.glyph(c.ch[0], px)->advance <= 20 + 2 * 10 * 23);
     assert(lines >= 2);
     // A string sprite's size is its em on the doubled screen, its pitch added per character, halved.
     const vnns::Sprite &s = engine.scene_.sp[5];
-    int width2 = regular.glyph('A', 30).advance + regular.glyph('B', 30).advance + 2;
+    int width2 = regular.glyph('A', 30)->advance + regular.glyph('B', 30)->advance + 2;
     assert(s.img.cellWidth == ((width2 + 1) & ~1) / 2);
     fs::remove_all(dir);
 }
@@ -274,10 +278,86 @@ static void endRollAndBounds() {
     fs::remove_all(dir);
 }
 
+// The review cases: saves keep a Ponscripter line's language and style, savedir can't move saves into the PC's folder,
+// hidden text makes no buttons or ruby but keeps clickstr waits, a textgosub keeps the line's carets, select items
+// break between words, !s0 isn't read into a word, and a font file that ends early isn't read.
+static void reviewCases() {
+    char temp[] = "/tmp/vnns-ponscripter-review-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directories(dir / "fonts");
+    fs::create_directories(dir / "saves");
+    std::ofstream(dir / "saves" / "save1.dat") << "the PC's save";
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Bold.ttf", dir / "fonts" / "face2.ttf");
+    std::ofstream(dir / "fonts" / "face5.ttf", std::ios::binary).write("\x00\x01\x00\x00", 4);
+    auto run = [&](const std::string &script, const auto &check) {
+        std::ofstream(dir / "0.utf") << script;
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        engine.step(16);
+        check(engine);
+    };
+    auto click = [](vnns::Engine &engine) {
+        engine.mouseButton(1, true);
+        engine.mouseButton(1, false);
+        for (int i = 0; i < 20; i++) engine.step(16);
+    };
+    // Hidden text makes no button or ruby, and its clickstr character still waits. A save there keeps the line's
+    // language and style, and goes to VNDegen's folder whatever savedir says.
+    run("*define\nsavedir \"saves\"\nclickstr \"\u3002\",0\ngame\n*start\nrubyon\n"
+        "langjp<1 hidden>(\u65E5/\u306B)\u3002\u3053@\nlangjp\n^hidden^@\nlangen\n^~b~shown^@\nend\n",
+        [&](vnns::Engine &engine) {
+            assert(engine.textButtons_.empty() && engine.page_.empty() && engine.wait_ == vnns::WaitKind::Click);
+            click(engine);
+            click(engine);  // at ^hidden^@
+            assert(engine.wait_ == vnns::WaitKind::Click && engine.page_.empty() && engine.textLang_ == 1);
+            assert(engine.saveGame(1, "") && fs::exists(dir / "vndegen-saves" / "save1.dat"));
+            std::string pc;
+            std::getline(std::ifstream(dir / "saves" / "save1.dat"), pc);
+            assert(pc == "the PC's save");
+            click(engine);  // on to the English line, in bold
+            assert(engine.textLang_ == 0 && !engine.page_.empty() && engine.ponsStyle_.bold);
+            assert(engine.loadGame(1) && engine.textLang_ == 1 && !engine.ponsStyle_.bold);
+            for (int i = 0; i < 20; i++) engine.step(16);
+            assert(engine.page_.empty() && engine.wait_ == vnns::WaitKind::Click);  // the hidden line again
+            click(engine);
+            assert(engine.ponsStyle_.bold && engine.page_[0].face == 2);  // ~b~ applied once, not toggled back
+        });
+    // A textgosub routine that draws caret text of its own leaves the line's carets as they were.
+    run("*define\ntextgosub *tg\ngame\n*tg\n^x^\nclick\nreturn\n*start\nmov $5,\"VALUE\"\n^A@ $5^@\nend\n",
+        [&](vnns::Engine &engine) {
+            for (int i = 0; i < 20; i++) engine.step(16);
+            click(engine);
+            assert(engine.pageText_.find("$5") != std::string::npos && engine.pageText_.find("VALUE") == std::string::npos);
+        });
+    // A face file that ends early isn't read; text in it falls back to fixed cells.
+    run("*define\ngame\n*start\n^~c5~X^@\nend\n", [&](vnns::Engine &engine) {
+        assert(engine.ponsFace(5) == nullptr && engine.ponsFace(0) != nullptr);
+    });
+    // A select item breaks between words, and !s0 doesn't eat the word after it.
+    run("*define\ngame\n*start\nsetwindow 0,0,4,10,23,23,0,2,0,0,0,#000000,0,0,639,479\n^HiHiii !s0dog^@\nend\n",
+        [&](vnns::Engine &engine) {
+            for (int i = 0; i < 20; i++) engine.step(16);
+            int row = engine.page_[0].y2;
+            for (const vnns::TextChar &c : engine.page_)
+                if (c.ch == "d" || c.ch == "o" || c.ch == "g") assert(c.y2 > row);
+            engine.clearPage();
+            engine.putString("Hi mmmm");
+            int mRow = -1;
+            for (const vnns::TextChar &c : engine.page_)
+                if (c.ch == "m") assert(mRow < 0 ? (mRow = c.y2) > engine.page_[0].y2 : c.y2 == mRow);
+        });
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
     layout();
     commands();
     endRollAndBounds();
+    reviewCases();
 }

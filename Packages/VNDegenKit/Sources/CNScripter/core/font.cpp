@@ -36,6 +36,7 @@ struct FaceFile {
     int face = 0;
 };
 
+#if __APPLE__
 bool resolveFace(const std::string &sjisName, FaceFile &out) {
     vnfont_match m;
     std::string name = toUtf8(sjisName);
@@ -47,7 +48,6 @@ bool resolveFace(const std::string &sjisName, FaceFile &out) {
     return true;
 }
 
-#if __APPLE__
 // CoreText with the font pack's face (Ume Gothic for MS Gothic), then Hiragino for characters it lacks, then the
 // system's fallback. Glyphs are scaled horizontally to the cell, as Windows does when a font is created with a width,
 // and sit on MS Gothic's baseline (86% of the cell height down).
