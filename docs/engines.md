@@ -22,6 +22,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 4](#alicesoft-system-4) | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe`, up to two folders down | Mac, iPhone, iPad |
 | [NekoSDK](#nekosdk) | `cfg.pak` beside `scr.pak`, up to two folders down | Mac, iPhone, iPad |
+| [Unity](#unity), detected only | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down. `Game.exe` or `UnityPlayer.dll` beside it makes the match certain | None. The game's page says why |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
 
@@ -149,3 +150,11 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - Menu backgrounds that change on the PC stay the same here. The help pictures that come up on hover on menu screens aren't drawn, and neither is the "Do not show again" box on a confirmation.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
+
+## Unity
+
+VNDegen can't run Unity games, and recognizes them so their page says so plainly instead of leaving them with no engine. Unity's terms don't let another app include its player, and a Windows game's code and shaders are built for Windows, so running them would take a new engine of VNDegen's own, which [unity.md](unity.md) found isn't worth building now. Play stays unavailable on every device, and Unity can't be picked by hand for another game.
+
+A game's page names the Unity version, read from the first bytes of its data file, and whether its code ships as .NET assemblies (Mono, `Game_Data/Managed`) or compiled for Windows (IL2CPP, `GameAssembly.dll` or `Game_Data/il2cpp_data`). When the game also ships its own Mac build, a `.app` whose `Contents/Resources/Data` holds Unity's data files, as SiNiSistar 2 does, the page says so, and on a Mac that it can be opened from the game's folder.
+
+The Unity plugin is asked last, so a folder another engine matches as strongly keeps that engine. In a scan of the library's 728 folders and archives on 2026-11-05, 121 Unity games went from no engine to Unity and no game changed from another engine. Her New Memory, a Ren'Py game that ships a Unity tool for Steam Workshop, stays Ren'Py.
