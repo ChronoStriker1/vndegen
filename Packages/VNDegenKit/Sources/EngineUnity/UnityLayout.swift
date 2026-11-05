@@ -75,6 +75,15 @@ nonisolated struct UnityLayout: Equatable, Sendable {
         self = best
     }
 
+    /// The player's exe, named after the data folder as Unity names it, whatever case it has on disk. Nil when it isn't
+    /// there.
+    func exe(in folder: URL) -> URL? {
+        let dataName = dataFolder.split(separator: "/").last.map(String.init) ?? dataFolder
+        let name = String(dataName.dropLast(5)) + ".exe"
+        let url = FileCase.resolve(root.isEmpty ? name : root + "/" + name, in: folder)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
     /// How many folders down the player is.
     private var depth: Int { root.split(separator: "/").count }
 

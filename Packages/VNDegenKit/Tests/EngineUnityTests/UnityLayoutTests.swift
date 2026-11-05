@@ -120,9 +120,9 @@ import VNCore
         #expect(UnityLayout.version(probe, evidence: "missing") == nil)
     }
 
-    @Test func pluginExplainsAndRunsNowhere() throws {
-        let plugin = UnityPlugin()
-        #expect(plugin.descriptor.platforms.isEmpty)
+    @Test func pluginRunsOnlyOnTheMac() throws {
+        let plugin = UnityPlugin(bottles: FileManager.default.temporaryDirectory.appending(path: "bottles-\(UUID().uuidString)"))
+        #expect(plugin.descriptor.platforms == [.macOS])
         let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder.appending(path: "Game_Data/il2cpp_data"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -132,8 +132,9 @@ import VNCore
         #expect(match?.engine == .unity)
         #expect(match?.confidence == .likely)
         let note = plugin.compatibilityNote(for: Game(id: GameID("g"), title: "G"), folder: folder, dataDirectory: folder)
-        #expect(note?.hasPrefix("VNDegen can't run Unity games.") == true)
-        #expect(note?.contains("IL2CPP") == true)
+        #expect(note?.contains("CrossOver") == true)
+        // Whether CrossOver is installed decides the rest of the note. With it, the note names the backend.
+        #expect(plugin.playLabel(for: Game(id: GameID("g"), title: "G"), folder: folder, dataDirectory: folder) == "Play in CrossOver")
     }
 }
 

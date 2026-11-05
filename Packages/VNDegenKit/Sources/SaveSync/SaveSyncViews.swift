@@ -456,7 +456,7 @@ public final class GameSavesModel {
 
     private func restore(_ name: String) async throws {
         let report = try await service.restore(game, backup: name)
-        status = Status(text: "Restored \(report.restored.count) saves.", isError: false)
+        status = Status(text: GameSavesView.describe(report), isError: false)
         await refreshSync()
         await loadPreview()
     }
@@ -639,6 +639,13 @@ public struct GameSavesView: View {
     }
 
     private static func count(_ n: Int) -> String { n == 1 ? "1 save" : "\(n) saves" }
+
+    /// "Restored 3 saves and the game's registry settings."
+    static func describe(_ report: RestoreReport) -> String {
+        guard report.restoredRegistry else { return "Restored \(report.restored.count) saves." }
+        return report.restored.isEmpty ? "Restored the game's registry settings."
+            : "Restored \(count(report.restored.count)) and the game's registry settings."
+    }
 
     @ViewBuilder private var actions: some View {
         Section {

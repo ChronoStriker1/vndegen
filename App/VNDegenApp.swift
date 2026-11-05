@@ -42,9 +42,9 @@ let engines: [any EnginePlugin] = {
     for flavor in [RGSSPlugin.Flavor.vxAce, .vx, .xp] {
         engines.append(RGSSPlugin(flavor) { runtimes.installedFolder(for: $0) })
     }
-    // Last, and never more than a likely match, so any other engine that matches a folder keeps it. Unity only explains
-    // why its games can't run.
-    engines.append(UnityPlugin())
+    // Last, and never more than a likely match, so any other engine that matches a folder keeps it. On a Mac, Unity games
+    // open outside VNDegen, through CrossOver in a bottle kept with the library's support files.
+    engines.append(UnityPlugin(bottles: libraryPaths.support.appendingPathComponent("Unity/Bottles", isDirectory: true)))
     // The Windows font substitutes every engine reads: the bundled fonts, and the Chinese and Korean ones the player
     // downloaded. Settings configures it again after a download.
     FontPack.configure { runtimes.installedFolder(for: $0) }

@@ -81,9 +81,14 @@ public protocol EnginePlugin: Sendable {
     @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession
     /// Where this engine keeps a game's saves on this device. Save sync uses it to restore and back up.
     func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation]
+    /// Registry values the game's Windows version keeps, such as a Unity game's PlayerPrefs, which save sync moves with
+    /// its backups. Nil for games that keep nothing there.
+    func registrySave(folder: URL, dataDirectory: URL) -> RegistrySave?
     /// What the game page says about how a game runs on this device, such as whether it is known to work. Nil when
     /// there is nothing to say.
     func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String?
+    /// What the game page's Play button says for this game, such as "Open Mac version". Nil keeps "Play".
+    func playLabel(for game: Game, folder: URL, dataDirectory: URL) -> String?
     /// Shown before VNDegen backs up a game's saves to Ludusavi, such as when the game's PC version can't load saves
     /// made here. Nil when there is nothing to warn about.
     func backupWarning(for game: Game, dataDirectory: URL) -> String?
@@ -116,7 +121,9 @@ public protocol EnginePlugin: Sendable {
 
 extension EnginePlugin {
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] { [] }
+    public func registrySave(folder: URL, dataDirectory: URL) -> RegistrySave? { nil }
     public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? { nil }
+    public func playLabel(for game: Game, folder: URL, dataDirectory: URL) -> String? { nil }
     public func backupWarning(for game: Game, dataDirectory: URL) -> String? { nil }
     public func variants(for game: Game, dataDirectory: URL) -> EngineVariants? { nil }
     public func variants(for game: Game, folder: URL, dataDirectory: URL) -> EngineVariants? {
@@ -171,6 +178,21 @@ public struct SaveLocation: Sendable {
     public init(directory: URL, relativePath: @escaping @Sendable (String) -> String?) {
         self.directory = directory
         self.relativePath = relativePath
+    }
+}
+
+/// Registry values a game keeps on Windows, such as a Unity game's PlayerPrefs.
+public struct RegistrySave: Sendable, Equatable {
+    /// Such as `HKEY_CURRENT_USER\Software\<company>\<product>`. Only this key's own values move, never its subkeys or
+    /// any other key.
+    public let key: String
+    /// A regedit 5 file on this device that holds that key's values. The engine applies it before a launch and rewrites
+    /// it after.
+    public let file: URL
+
+    public init(key: String, file: URL) {
+        self.key = key
+        self.file = file
     }
 }
 

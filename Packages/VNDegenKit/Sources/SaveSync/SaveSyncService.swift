@@ -403,14 +403,14 @@ public final class SaveSyncService {
     /// What restoring `backup` would change here. Reads only VNDegen's copy of the mapping, so call `backups` first.
     public func preview(_ id: GameID, backup: String) async throws -> RestorePreview {
         guard let match = match(for: id) else { throw SaveSyncError.noBackups }
-        let locations = try saveLocations(id), store = LudusaviStore(root: mirror)
-        return try await serialized { try store.preview(folder: match.folder, backup: backup, locations: locations) }
+        let locations = try saveLocations(id), registry = registrySave(id), store = LudusaviStore(root: mirror)
+        return try await serialized { try store.preview(folder: match.folder, backup: backup, locations: locations, registry: registry) }
     }
 
     /// Restores `backup`, or the latest when nil. Brings the backup down from the server first.
     public func restore(_ id: GameID, backup: String?) async throws -> RestoreReport {
         guard let server = settings.server, let match = match(for: id) else { throw SaveSyncError.notSetUp }
-        let locations = try saveLocations(id)
+        let locations = try saveLocations(id), registry = registrySave(id)
         let snapshot = snapshotURL(id)
         try FileManager.default.createDirectory(at: snapshot.deletingLastPathComponent(), withIntermediateDirectories: true)
         let (report, synced) = try await withStore(server) { store in
@@ -419,9 +419,10 @@ public final class SaveSyncService {
             // A download that finished after a cancel still reports success, so the saves here change only if the
             // restore itself was not cancelled.
             try Task.checkCancellation()
-            let report = try store.local.restore(folder: match.folder, backup: backup, locations: locations, snapshot: snapshot)
+            let report = try store.local.restore(folder: match.folder, backup: backup, locations: locations, registry: registry,
+                                                 snapshot: snapshot)
             let latest = try store.local.mapping(match.folder).summaries.last?.revision
-            return (report, SyncRecord(folder: match.folder, latest: latest, saves: try LudusaviStore.localHashes(locations)))
+            return (report, SyncRecord(folder: match.folder, latest: latest, saves: try LudusaviStore.localHashes(locations, registry: registry)))
         }
         record(synced, for: id)
         log.info("restored \(report.restored.count) saves of \(id.rawValue) from \(report.backup)")
@@ -433,9 +434,9 @@ public final class SaveSyncService {
     }
 
     public func undoRestore(_ id: GameID) async throws {
-        let locations = try saveLocations(id)
+        let locations = try saveLocations(id), registry = registrySave(id)
         let snapshot = snapshotURL(id)
-        try await serialized { try LudusaviStore.undoRestore(locations: locations, snapshot: snapshot) }
+        try await serialized { try LudusaviStore.undoRestore(locations: locations, registry: registry, snapshot: snapshot) }
     }
 
     /// Adds a backup of the saves here to the server, on top of `judged`, the server state a status check saw. Refuses
@@ -450,7 +451,7 @@ public final class SaveSyncService {
     /// and temporary mapping, and only before its mapping goes up.
     public func backUp(_ id: GameID, judged: ServerRevision) async throws -> BackupReport {
         guard let server = settings.server, let match = match(for: id), library.game(id) != nil else { throw SaveSyncError.notSetUp }
-        let locations = try saveLocations(id)
+        let locations = try saveLocations(id), registry = registrySave(id)
         let retention = configRetention ?? manualRetention, os = Self.os, comment = Self.comment
         let pcFolders = pcFolders(id, match: match, locations: locations)
         let now = clock(), device = deviceID, afterLocalBackup = afterLocalBackup
@@ -462,8 +463,9 @@ public final class SaveSyncService {
                 try await store.fetch(folder, backup: nil)
             }
             let mappingURL = store.mirror.appendingPathComponent(folder).appendingPathComponent(LudusaviStore.mappingFile)
-            let report = try store.local.backUp(folder: folder, title: match.title, game: id, locations: locations, retention: retention,
-                                                pcFolders: pcFolders, now: now, device: device, os: os, comment: comment)
+            let report = try store.local.backUp(folder: folder, title: match.title, game: id, locations: locations, registry: registry,
+                                                retention: retention, pcFolders: pcFolders, now: now, device: device, os: os,
+                                                comment: comment)
             afterLocalBackup?()
             let saves = report.saves
             guard let name = report.backup else {
@@ -531,11 +533,15 @@ public final class SaveSyncService {
     /// `status`, with the server state it judged, for a backup that must start from that state.
     public func check(_ id: GameID) async throws -> SyncCheck {
         guard let server = settings.server, let match = match(for: id) else { throw SaveSyncError.notSetUp }
-        let locations = try saveLocations(id), previous = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0 : nil }
+        let locations = try saveLocations(id), registry = registrySave(id), previous = settings.synced[id.rawValue].flatMap { $0.folder == match.folder ? $0 : nil }
         let (check, inSync) = try await withStore(server) { store -> (SyncCheck, SyncRecord?) in
             let revision = ServerRevision(mapping: try await store.refreshGame(match.folder))
-            let local = try LudusaviStore.localHashes(locations)
-            guard let latest = try? store.local.latestHashes(folder: match.folder, locations: locations),
+            // The registry's values are only in its files, which the mapping can't stand in for as it does for saves.
+            if registry != nil, revision.mapping != nil {
+                do { try await store.fetch(match.folder, backup: nil, registryOnly: true) } catch SaveSyncError.noBackups {}
+            }
+            let local = try LudusaviStore.localHashes(locations, registry: registry)
+            guard let latest = try? store.local.latestHashes(folder: match.folder, locations: locations, registry: registry),
                   let summary = try store.local.mapping(match.folder).summaries.last else {
                 return (SyncCheck(status: .noBackups, revision: revision), nil)
             }
@@ -687,6 +693,12 @@ public final class SaveSyncService {
     private func record(_ record: SyncRecord, for id: GameID) {
         settings.synced[id.rawValue] = record
         saveSettings()
+    }
+
+    /// The registry values the game keeps, which only engines for Windows games that use the registry name.
+    private func registrySave(_ id: GameID) -> RegistrySave? {
+        guard library.unavailableReason(id) == nil, let plugin = library.plugin(for: library.game(id)?.engine) else { return nil }
+        return plugin.registrySave(folder: library.folder(for: id), dataDirectory: library.paths.dataDirectory(for: id))
     }
 
     private func saveLocations(_ id: GameID) throws -> [SaveLocation] {
