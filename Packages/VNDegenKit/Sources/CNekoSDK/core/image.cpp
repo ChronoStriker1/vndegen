@@ -236,6 +236,8 @@ void Images::work() {
 
 ImageRef Images::get(const std::string &path) {
     std::string key = normalizedPath(path);
+    // An empty name would wait for ever: decoding_ is empty while the worker has nothing to do.
+    if (key.empty()) return nullptr;
     std::unique_lock<std::mutex> lock(mu_);
     done_.wait(lock, [&] { return decoding_ != key; });
     auto it = byPath_.find(key);
