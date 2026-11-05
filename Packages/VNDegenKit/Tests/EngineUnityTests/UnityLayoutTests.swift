@@ -16,7 +16,7 @@ import VNCore
                             "Game_Data/Managed", "Game_Data/Managed/Assembly-CSharp.dll"])
         #expect(found?.root == "")
         #expect(found?.evidence == "Game_Data/globalgamemanagers")
-        #expect(found?.confidence == .certain)
+        #expect(found?.confidence == .likely)
         #expect(found?.backend == .mono)
         #expect(found?.macApp == nil)
     }
@@ -33,13 +33,13 @@ import VNCore
         let found = layout(["A", "A/B", "A/B/Old.exe", "A/B/Old_Data"], deeper: ["A/B/Old_Data": ["mainData", "Managed"]])
         #expect(found?.root == "A/B")
         #expect(found?.evidence == "A/B/Old_Data/mainData")
-        #expect(found?.confidence == .certain)
+        #expect(found?.confidence == .likely)
         #expect(found?.backend == .mono)
     }
 
-    @Test func isOnlyLikelyWithoutThePlayer() {
+    @Test func isOnlyWeakWithoutThePlayer() {
         let found = layout(["Game_Data", "Game_Data/globalgamemanagers"])
-        #expect(found?.confidence == .likely)
+        #expect(found?.confidence == .weak)
         #expect(found?.backend == nil)
     }
 
@@ -47,6 +47,13 @@ import VNCore
         #expect(layout(["Game.exe", "Game_Data", "Game_Data/readme.txt"]) == nil)
         #expect(layout(["Game.exe", "UnityPlayer.dll"]) == nil)
         #expect(layout(["Save_Data", "Save_Data/file1.sav"]) == nil)
+    }
+
+    /// A wrapped RPG Maker game is only a likely match, and ties go to the engine asked first.
+    @Test func neverOutranksAnotherEnginesMatch() {
+        let found = layout(["Release", "Release/js", "Release/js/rpg_core.js", "Release/Tool.exe", "Release/Tool_Data",
+                            "Release/Tool_Data/globalgamemanagers"])
+        #expect(found.map { $0.confidence <= .likely } == true)
     }
 
     @Test func prefersTheGameWithItsPlayerAndThenTheShallowest() {
@@ -60,7 +67,8 @@ import VNCore
 
     @Test func findsTheMacBuildBesideIt() {
         let found = layout(["Game.exe", "Game_Data", "Game_Data/globalgamemanagers", "Game.app", "Game.app/Contents"],
-                           deeper: ["Game.app/Contents/Resources/Data": ["globalgamemanagers", "Managed"]])
+                           deeper: ["Game.app/Contents": ["Resources"], "Game.app/Contents/Resources": ["Data"],
+                                    "Game.app/Contents/Resources/Data": ["globalgamemanagers", "Managed"]])
         #expect(found?.macApp == "Game.app")
         let other = layout(["Game.exe", "Game_Data", "Game_Data/globalgamemanagers", "Other.app", "Other.app/Contents"])
         #expect(other?.macApp == nil)
@@ -70,9 +78,15 @@ import VNCore
     @Test func findsTheMacBuildInASiblingFolder() {
         let found = layout(["WIN", "WIN/Game.exe", "WIN/Game_Data", "WIN/Game_Data/globalgamemanagers", "MAC", "MAC/Game.app",
                             "MAC/Game.app/Contents"],
-                           deeper: ["MAC/Game.app/Contents/Resources/Data": ["globalgamemanagers"]])
+                           deeper: ["MAC/Game.app/Contents": ["Resources"], "MAC/Game.app/Contents/Resources": ["Data"],
+                                    "MAC/Game.app/Contents/Resources/Data": ["globalgamemanagers"]])
         #expect(found?.root == "WIN")
         #expect(found?.macApp == "MAC/Game.app")
+        let lower = layout(["WIN", "WIN/Game.exe", "WIN/Game_Data", "WIN/Game_Data/globalgamemanagers", "MAC", "MAC/Game.app",
+                            "MAC/Game.app/contents"],
+                           deeper: ["MAC/Game.app/contents": ["resources"], "MAC/Game.app/contents/resources": ["DATA"],
+                                    "MAC/Game.app/contents/resources/DATA": ["GlobalGameManagers"]])
+        #expect(lower?.macApp == "MAC/Game.app")
     }
 
     @Test func readsTheVersionFromEveryHeader() throws {
@@ -89,6 +103,10 @@ import VNCore
         let probe = FolderProbe(scanning: folder)
         #expect(UnityLayout.version(probe, evidence: "globalgamemanagers") == "2019.4.40f1")
         #expect(UnityLayout.version(probe, evidence: "data.unity3d") == "6000.0.50f1")
+        // Unity China adds a release suffix.
+        try Data(Array("UnityFS".utf8) + [0, 0, 0, 0, 8] + Array("5.x.x".utf8) + [0] + Array("2021.3.21f1c1".utf8) + [0])
+            .write(to: folder.appending(path: "china.unity3d"))
+        #expect(UnityLayout.version(FolderProbe(scanning: folder), evidence: "china.unity3d") == "2021.3.21f1c1")
         #expect(UnityLayout.version(probe, evidence: "missing") == nil)
     }
 
@@ -102,7 +120,7 @@ import VNCore
         try Data().write(to: folder.appending(path: "Game.exe"))
         let match = plugin.detect(FolderProbe(scanning: folder))
         #expect(match?.engine == .unity)
-        #expect(match?.confidence == .certain)
+        #expect(match?.confidence == .likely)
         let note = plugin.compatibilityNote(for: Game(id: GameID("g"), title: "G"), folder: folder, dataDirectory: folder)
         #expect(note?.hasPrefix("VNDegen can't run Unity games.") == true)
         #expect(note?.contains("IL2CPP") == true)

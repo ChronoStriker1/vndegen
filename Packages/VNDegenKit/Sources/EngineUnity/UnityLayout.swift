@@ -18,6 +18,8 @@ nonisolated struct UnityLayout: Equatable, Sendable {
     var dataFolder: String
     /// The file that identified the game, relative to the game folder.
     var evidence: String
+    /// Never more than likely, so another engine that matches the folder keeps it: an RPG Maker game in a wrapper folder
+    /// is only likely, and may ship a Unity tool beside it. Likely when the player is beside the data, weak otherwise.
     var confidence: DetectionConfidence
     var backend: Backend?
     /// A Mac build the game ships beside the Windows one, such as `SiNiSistar2.app`, relative to the game folder.
@@ -44,7 +46,7 @@ nonisolated struct UnityLayout: Equatable, Sendable {
             let parts = entry.split(separator: "/").map(String.init)
             guard let name = parts.last, name.count > 5, name.lowercased().hasSuffix("_data"), parts.count <= 3 else { continue }
             let root = parts.dropLast().joined(separator: "/")
-            if let current = best, current.root.count <= root.count, current.confidence == .certain { continue }
+            if let current = best, current.root.count <= root.count, current.confidence == .likely { continue }
             // The probe lists three levels, so a data folder two folders down shows without its contents.
             let contents = list(entry)
             let data = Self.dataFiles.lazy.compactMap { file in contents.first { $0.lowercased() == file } }.first
@@ -61,7 +63,7 @@ nonisolated struct UnityLayout: Equatable, Sendable {
                 nil
             }
             let candidate = UnityLayout(root: root, dataFolder: entry, evidence: "\(entry)/\(data)",
-                                        confidence: player ? .certain : .likely, backend: backend, macApp: nil)
+                                        confidence: player ? .likely : .weak, backend: backend, macApp: nil)
             if let current = best {
                 if candidate.confidence < current.confidence { continue }
                 if candidate.confidence == current.confidence, candidate.root.count >= current.root.count { continue }
@@ -94,19 +96,27 @@ nonisolated struct UnityLayout: Equatable, Sendable {
     }
 
     /// A Unity Mac build anywhere in the listing, such as SiNiSistar 2's `MAC/SiNiSistar2.app` beside its `WIN` folder.
-    /// `Game.app/Contents/Resources/Data` holds the same data files as the Windows build's data folder.
+    /// `Game.app/Contents/Resources/Data` holds the same data files as the Windows build's data folder. Each folder is
+    /// matched whatever its case, as a copy on a disk that minds case may have it otherwise.
     private static func macApp(_ probe: FolderProbe, list: (String) -> [String]) -> String? {
         let apps = probe.entries.filter { $0.lowercased().hasSuffix(".app") }
             .sorted { ($0.split(separator: "/").count, $0) < ($1.split(separator: "/").count, $1) }
-        return apps.first { app in list("\(app)/Contents/Resources/Data").contains { dataFiles.contains($0.lowercased()) } }
+        return apps.first { app in
+            var path = app
+            for folder in ["contents", "resources", "data"] {
+                guard let name = list(path).first(where: { $0.lowercased() == folder }) else { return false }
+                path += "/\(name)"
+            }
+            return list(path).contains { dataFiles.contains($0.lowercased()) }
+        }
     }
 
-    /// The Unity version the data file's header names, such as `2022.3.62f2`. Every format puts it in the first bytes:
+    /// The Unity version the data file's header names, such as `2022.3.62f2`, or `2021.3.21f1c1` from Unity China. Every format puts it in the first bytes:
     /// serialized files after their header, and packed `data.unity3d` bundles after `UnityFS` and the format version.
     static func version(_ probe: FolderProbe, evidence: String) -> String? {
         guard let head = probe.read(evidence, limit: 128) else { return nil }
         let text = String(decoding: head.map { (0x20..<0x7f).contains($0) ? $0 : 0x20 }, as: UTF8.self)
-        guard let match = text.firstMatch(of: /\b\d{1,4}\.\d{1,2}\.\d{1,2}[abfpx]\d{1,3}\b/) else { return nil }
+        guard let match = text.firstMatch(of: /\b\d{1,4}\.\d{1,2}\.\d{1,2}[abfpx]\d{1,3}(?:c\d{1,2})?\b/) else { return nil }
         return String(match.output)
     }
 }

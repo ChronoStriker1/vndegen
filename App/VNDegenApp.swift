@@ -42,7 +42,8 @@ let engines: [any EnginePlugin] = {
     for flavor in [RGSSPlugin.Flavor.vxAce, .vx, .xp] {
         engines.append(RGSSPlugin(flavor) { runtimes.installedFolder(for: $0) })
     }
-    // Last, so another engine's match as strong as Unity's keeps the folder. Unity only explains why its games can't run.
+    // Last, and never more than a likely match, so any other engine that matches a folder keeps it. Unity only explains
+    // why its games can't run.
     engines.append(UnityPlugin())
     // The Windows font substitutes every engine reads: the bundled fonts, and the Chinese and Korean ones the player
     // downloaded. Settings configures it again after a download.
