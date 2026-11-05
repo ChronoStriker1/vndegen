@@ -3350,11 +3350,14 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         float middleX = v.x + anchorX + (w * 0.5f - anchorX) * v.scaleX, middleY = v.y + anchorY + (h * 0.5f - anchorY) * v.scaleY;
         std::vector<int> shifts;
         if (s.waveOn) {
-            // A sideways ripple travelling up the screen. PC footage at 2, 2 and 10 gives 10 pixels each way, 260 rows to
-            // a wave and 3.9 seconds to pass. How the first two parameters scale is a guess: the game's other use is rare.
+            // A sideways ripple travelling up the screen, in the picture's own pixels, so it grows with the sprite's scale.
+            // Parameter 3 is how far each way, 520 over parameter 2 the rows to a wave, and 7.8 seconds over parameter 1
+            // the time a wave takes to pass. Fitted to PC footage at 2, 2, 10 on a sprite at scale 1 and at 1, 3, 15 on
+            // one at 1.5.
             shifts.resize(size_t(out.h));
-            float rows = 520.0f / float(std::max(1, s.waveRows)), ms = 7800.0f / float(std::max(1, s.waveSpeed));
-            for (int y = 0; y < out.h; y++) shifts[size_t(y)] = int(std::lround(float(s.waveSize) * std::sin(2 * kPi * (float(y) / rows + float(now_) / ms))));
+            float rows = 520.0f / float(std::max(1, s.waveRows)) * std::abs(v.scaleY), ms = 7800.0f / float(std::max(1, s.waveSpeed));
+            float size = float(s.waveSize) * std::abs(v.scaleX);
+            for (int y = 0; y < out.h; y++) shifts[size_t(y)] = int(std::lround(size * std::sin(2 * kPi * (float(y) / rows + float(now_) / ms))));
         }
         drawImage(out, image ? *image : *s.image, middleX + dx, middleY + dy, v.scaleX, v.scaleY, v.rotation, v.alpha, s.waveOn ? &shifts : nullptr, s.additive);
     }

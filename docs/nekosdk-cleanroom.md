@@ -123,6 +123,10 @@ Test Game 84's one fog command, 80, changes nothing on the PC game: frames from 
 
 Test Games 84 and 85 play short sword and hit effects as flipbooks of pictures with no alpha, over 89% black. Drawn opaque they'd black out the scene, which the PC game never shows, so the runtime adds them. CG flipbooks without alpha in other games are under 10% black and stay opaque. A flipbook that doesn't repeat shows nothing once it's past its last picture: 88's PC saves hold one at picture 23 of 20, and after 84's reverse slash ends no trace of its brightest picture is left in the PC's frame. The blend itself during the effect's 0.13 seconds is inferred, since screenshots under Wine can't catch it.
 
+## Particles
+
+Command 95, light particles, names `parts\\000_000_042.bmp` in Test Games 84 and 89, and neither game has that picture. The PC game shows no particles in 84 over ten seconds of captures after the command, so there's nothing to draw.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.
@@ -131,7 +135,7 @@ One script of Test Game 95 has two nodes numbered 1125. The first ends the scene
 
 A sprite's x and y are the top left of the unscaled picture. Parameter 0 of the image load command places a picture: 1 centres it, 2 and 3 put its middle 256 to the left and right of centre, 4 and 5 put it 512 away, and parameters 1 and 2 add to that. It always sits halfway down. Every load with command 15 starts the slot afresh, at 0, 0 and scale 1 with parameter 0 at 0, and with full alpha, which Test Game 93's saves show. The rotation going back too is assumed. Command 23, a difference image, keeps the slot's place, scale and alpha. Parameter 0 of the set-position command, 18, makes its position a move from where the sprite is, as it does for command 25. These were checked by replaying scenes to the node each PC save names and comparing the sprite places the PC saved, in Test Games 84, 93, 95 and 97, at 1280 and 1920 wide, with C's division toward zero. Three sprites in a save of Test Game 88 inside a GOOD Timing script don't fit, and those are unexplained. Sprites kept from an earlier scene can't be checked that way. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match.
 
-The ripple command, 98, shifts rows sideways. On PC at parameters 2, 2 and 10 a burst of screenshots fits a wave of about 10 pixels each way, 260 rows long, that takes 3.9 seconds to pass upward.
+The ripple command, 98, shifts rows sideways, in the picture's own pixels, so it scales with the sprite: parameter 3 pixels each way, 520 over parameter 2 rows to a wave, and 7.8 seconds over parameter 1 for a wave to pass upward. Bursts of PC screenshots fit it at 2, 2 and 10 on a sprite at scale 1 (10 pixels, 260 rows, 3.9 seconds), and at 1, 3 and 15 on a half-transparent background at scale 1.5, where the unscaled rule fits more than twice as badly.
 
 ## Files
 
