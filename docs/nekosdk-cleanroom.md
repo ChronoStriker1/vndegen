@@ -72,7 +72,7 @@ Inside is a stream of fields, mostly zero. `Engines/NekoSDK/host/tools/nekosave.
 | 10,000 ints: the scenario's variables | The last 40,000 bytes before the sprite count | `macrolist.ini` names 110 and 4000. A save after a choice that raises the counter holds 1 at 110 |
 | Sprite count, then 40 bytes, then records | | The root record has slot -999999 and the window's size |
 
-A sprite record is a slot, two picture paths, then fixed fields: a matrix, x and y, scale, the anchor (half the picture's size), alpha out of 256, whether blur is on and its amount, whether an animation runs, how many frames in, its text, then the sprite's end state. Test Game 95's record has 69 more bytes than Test Game 97's and Test Game 82's first fields agree with the older layout.
+A sprite record is a slot, two picture paths, then fixed fields: a matrix, x and y, scale, the anchor (the point a scale keeps still, which the section on placing pictures covers), alpha out of 256, whether blur is on and its amount, whether an animation runs, how many frames in, its text, then the sprite's end state. Test Game 95's record has 69 more bytes than Test Game 97's and Test Game 82's first fields agree with the older layout.
 
 After the records come the text on screen and the last 60 lines of the backlog, newest first, then 243 sound channel records (60 of music, then sound effects), each a playing flag, path, volume, pan and position in seconds as a double. Then the scene script's name and the node to run next.
 
@@ -80,7 +80,7 @@ After the records come the text on screen and the last 60 lines of the backlog, 
 
 `cfg.sav` holds the PC's settings, with the 10,000 global variables at byte 4000 (a macro of 1000 sits at byte 8000 after the prologue). The runtime keeps the rest of the file as it found it. `read.sav` isn't read or written, so PC read marks don't carry over. Config's settings are kept in a small file of VNDegen's, so they don't move to or from a PC.
 
-The same file keeps what's been unlocked, read by comparing PC files with what the PC's galleries show: a row of 40 bytes for each entry in `cg_view.ini` from byte 48000, an int for each of its pictures, and an int for each track in `sound_view.ini` from byte 100000. Both move by the length of a string at byte 44020 that names a scene: a file the PC has just made has none and is 104,000 bytes, and one with a 22-character name has its tables 22 bytes later. Test Game 95's file with 5, 4 and 7 pictures seen in its first three entries, and its 10 tracks heard of 15, gives those numbers, and Test Game 97's file agrees on the tracks. A CG row in Test Game 97 is assumed to match.
+The same file keeps what's been unlocked, read by comparing PC files with what the PC's galleries show: an int at byte 48000 plus 4 times each picture's number in `cg_view.ini`, and an int for each track in `sound_view.ini` from byte 100000. Both move by the length of a string at byte 44020 that names a scene: a file the PC has just made has none and is 104,000 bytes, and one with a 22-character name has its tables 22 bytes later. Test Game 95's file with 5, 4 and 7 pictures seen in its first three entries, and its 10 tracks heard of 15, gives those numbers, and Test Game 97's file agrees on the tracks. A CG row in Test Game 97 is assumed to match.
 
 When no `cfg.sav` exists the runtime writes the values the PC game wrote on a first run under Wine, listed in `tables.cpp`, because a file of zeros sets the PC game's volumes to 0 and turns its confirmations off.
 

@@ -1250,15 +1250,14 @@ void Engine::restoreSave(const SaveData &d) {
     if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
         const Node *call = flow->node(d.flowNode);
         // The PC's save made while a choice waits names the choice, and it's asked again. Ours names the scene before, which
-        // is what the PC itself needs to ask it, and a finished scene with a choice next means the same here.
-        const Node *after = call ? flow->node(call->next) : nullptr;
-        bool namesChoice = call && call->opcode == 3, choiceNext = after && d.node == 0 && after->opcode == 3;
-        atChoice = namesChoice || choiceNext;
+        // is what the PC itself needs to ask it: there, as on the PC, the last line shows and a click brings the choice.
+        bool namesChoice = call && call->opcode == 3;
+        atChoice = namesChoice;
+        stack_.push_back({flow, namesChoice ? call : call ? flow->node(call->next) : flow->first()});
         // Back to the scene before, so that saving again here writes what the PC can ask the choice from.
         if (namesChoice)
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
-        stack_.push_back({flow, namesChoice ? call : call ? after : flow->first()});
     }
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
@@ -2198,6 +2197,7 @@ void Engine::loadImage(const Node &n) {
         s.scaleX = s.scaleY = 1;
         s.anchorX = s.anchorY = -1;
         s.changes.clear();
+        s.looping = false;
     }
     s.image = image;
     s.path = n.s[1];
@@ -2215,11 +2215,12 @@ void Engine::transform(const Node &n) {
     auto it = back_.find(p[3]);
     if (it == back_.end()) return;
     Sprite &s = it->second;
+    SpriteView was = view(s);
     s.changes.clear();
     if (p[16]) {
         // Parameter 0 makes it a move from where the sprite is, as it does for a change over time.
-        s.x = float(p[1]) + (p[0] == 1 ? s.x : 0);
-        s.y = float(p[2]) + (p[0] == 1 ? s.y : 0);
+        s.x = float(p[1]) + (p[0] == 1 ? was.x : 0);
+        s.y = float(p[2]) + (p[0] == 1 ? was.y : 0);
     }
     if (p[17]) {
         s.scaleX = float(p[4]) / 1000;
@@ -2323,6 +2324,12 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         else if (name == "pos_x") { push(Track::X, false, lastX, value); lastX = value; }
         else if (name == "pos_y") { push(Track::Y, false, lastY, value); lastY = value; }
         else if (name == "scale") {
+            // `scale,value,x,y,start,length,easing`, where x and y are `center` or a point in the picture.
+            if (parts.size() >= 7) {
+                a.hasPivot = true;
+                a.pivotX = parts[2] == "center" ? -1 : std::atoi(parts[2].c_str());
+                a.pivotY = parts[3] == "center" ? -1 : std::atoi(parts[3].c_str());
+            }
             push(Track::ScaleX, false, lastScaleX, value);
             push(Track::ScaleY, false, lastScaleY, value);
             lastScaleX = lastScaleY = value;
@@ -2339,6 +2346,10 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
 void Engine::namedAnimation(Sprite &s, const Node &n) {
     foldFinishedChanges(s);
     Animation a = parseAnimation(n.s[1], s);
+    if (a.hasPivot) {
+        s.anchorX = a.pivotX;
+        s.anchorY = a.pivotY;
+    }
     a.repeat = n.p[1] != 0;
     s.loop = std::move(a);
     s.looping = true;
