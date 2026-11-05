@@ -256,6 +256,7 @@ void Engine::closeScreen() {
 
 // Back from the story to a menu, with its sound and sprites cleared.
 void Engine::endStory(const std::string &screen) {
+    stopTrack();  // first, since a held player's fade would never finish
     stopKind(kKindBgm, 500);
     stopKind(kKindSe, 500);
     stopKind(kKindVoice, 0);
@@ -282,6 +283,7 @@ void Engine::endStory(const std::string &screen) {
 }
 
 void Engine::startStory() {
+    stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
         audio_.retire(titleMusic_);
@@ -688,10 +690,11 @@ int Engine::nextTrack(int direction) {
     return at == heard.begin() ? heard.back() : *(at - 1);
 }
 
-// The title's or the story's music waits while the player plays.
-void Engine::pauseMusicForTrack(bool paused) {
-    if (titleMusic_) audio_.pause(titleMusic_, paused);
-    for (auto &[channel, player] : bgm_) audio_.pause(player, paused);
+// The title's or the story's music waits while the player plays, and while the host has the game paused.
+void Engine::holdMusic() {
+    bool hold = paused_ || trackPlayer_;
+    if (titleMusic_) audio_.pause(titleMusic_, hold);
+    for (auto &[channel, player] : bgm_) audio_.pause(player, hold);
 }
 
 void Engine::stopTrack() {
@@ -699,17 +702,19 @@ void Engine::stopTrack() {
     audio_.close(trackPlayer_);
     trackPlayer_ = 0;
     trackPaused_ = false;
-    pauseMusicForTrack(false);
+    holdMusic();
 }
 
 void Engine::playTrack(int index) {
     if (index < 0 || size_t(index) >= tracks_.size() || !seen(tracks_[size_t(index)])) return;
-    stopTrack();
+    // Straight to the next track, with the other music still held.
+    if (trackPlayer_) audio_.close(trackPlayer_);
+    trackPlayer_ = 0;
+    trackPaused_ = false;
     Bytes data = files_.read(tracks_[size_t(index)]);
-    if (!data) return;
-    trackPlayer_ = audio_.open(data);
+    trackPlayer_ = data ? audio_.open(data) : 0;
+    holdMusic();
     if (!trackPlayer_) return;
-    pauseMusicForTrack(true);
     currentTrack_ = index;
     // Its own group, for the music screen's own volume.
     audio_.setGroup(trackPlayer_, 3);
@@ -827,6 +832,7 @@ void Engine::openGalleryCell(int index) {
         viewingImage_ = true;
         dirty_ = true;
     } else if (entry < sceneEntries_.size() && seen(sceneEntries_[entry].key)) {
+        stopTrack();
         // A replay runs its own flow, and ending it comes back here.
         auto flow = loadScript(sceneEntries_[entry].flow);
         if (!flow || !flow->first()) return;
@@ -1099,24 +1105,25 @@ SaveData Engine::captureSave() {
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
-        // Every change as a line of text from the oldest one's start, as the PC writes them.
-        int64_t oldest = s.changes.empty() ? now_ : s.changes.front().begunMs;
+        // Every change as a line of text from the oldest one's start, as the PC writes them. A named animation goes in
+        // the same text from the start of its current cycle: a load plays what's left of it once, and a repeating one
+        // stops there.
+        int64_t loopBegun = s.loop.begunMs;
+        if (s.looping && s.loop.repeat && s.loop.periodMs > 0) loopBegun = now_ - (now_ - s.loop.begunMs) % s.loop.periodMs;
+        int64_t oldest = s.looping ? loopBegun : now_;
         for (const Animation &a : s.changes) oldest = std::min(oldest, a.begunMs);
         auto frames = [this](int64_t ms) { return int(ms * fps_ / 1000); };
-        for (const Animation &a : s.changes) {
+        auto writeTracks = [&](const Animation &a, int64_t begun) {
             for (const Track &t : a.tracks) {
                 const char *name = t.property == Track::X ? (t.relative ? "relative_pos_x" : "pos_x") : t.property == Track::Y ? (t.relative ? "relative_pos_y" : "pos_y") : t.property == Track::ScaleX ? "scale_x" : t.property == Track::ScaleY ? "scale_y" : t.property == Track::Alpha ? "alpha" : "rotate";
                 int length = frames(t.lengthMs);
                 char line[128];
-                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), frames(t.startMs + (a.begunMs - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), frames(t.startMs + (begun - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
                 out.animation += line;
             }
-        }
-        // A named animation goes in the same text. A load plays what's left of it once, and a repeating one stops there.
-        if (s.looping) {
-            out.animation += s.loopText;
-            oldest = s.changes.empty() ? s.loop.begunMs : std::min(oldest, s.loop.begunMs);
-        }
+        };
+        for (const Animation &a : s.changes) writeTracks(a, a.begunMs);
+        if (s.looping) writeTracks(s.loop, loopBegun);
         out.animated = !out.animation.empty();
         out.animationFrames = out.animated ? frames(now_ - oldest) : 0;
         // Where it ends up.
@@ -1208,6 +1215,7 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d) {
+    stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
     stopKind(kKindVoice, 0);
@@ -1353,11 +1361,6 @@ void Engine::composeSlots(Canvas &out) {
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
             // The Q-Save page numbers its cards from 1 again.
             drawNumber(digits, slot >= kFirstQuickSlot ? slot - kFirstQuickSlot + 1 : slot, 2, cx + offset("slotdigits", 1), cy + offset("slotdigits", 2));
-            if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
-                // The PC keeps a card's lock somewhere its save files don't show, so it stays off here.
-                int h = lock->h / 5;
-                drawPart(out, *lock, cx + offset("slotlock", 1), cy + offset("slotlock", 2), 0, int(StateDisabled) * h, lock->w, h, 1);
-            }
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
@@ -1365,6 +1368,11 @@ void Engine::composeSlots(Canvas &out) {
                 drawPart(out, *del, cx + offset("slotdelete", 1), cy + offset("slotdelete", 2), 0, shown * h, del->w, h, 1);
             }
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
+            // A lock can't be set here, so a card with a save shows it open, over the thumbnail as the PC does.
+            if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
+                int h = lock->h / 5;
+                drawPart(out, *lock, cx + offset("slotlock", 1), cy + offset("slotlock", 2), 0, (info.exists ? int(StateNormal) : int(StateDisabled)) * h, lock->w, h, 1);
+            }
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m) {
                 if (!m) return;
@@ -1954,8 +1962,9 @@ bool Engine::step(int ms) {
 
 void Engine::setPaused(bool paused) {
     paused_ = paused;
-    for (auto *channels : {&bgm_, &se_, &voice_})
+    for (auto *channels : {&se_, &voice_})
         for (auto &[channel, player] : *channels) audio_.pause(player, paused);
+    holdMusic();
 }
 
 void Engine::mouseMove(float x, float y) {
@@ -2236,7 +2245,7 @@ void Engine::startNamedAnimation(const Node &n) {
 Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
     Animation a;
     a.begunMs = now_;
-    float lastScaleX = s.scaleX, lastScaleY = s.scaleY, lastX = s.x, lastY = s.y, lastAlpha = s.alpha;
+    float lastScaleX = s.scaleX, lastScaleY = s.scaleY, lastX = s.x, lastY = s.y, lastAlpha = s.alpha, lastRotation = s.rotation;
     for (std::string line : split(text, '\n')) {
         line = trim(line);
         if (line.empty()) continue;
@@ -2272,6 +2281,7 @@ Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
         else if (name == "scale_x") { push(Track::ScaleX, false, lastScaleX, value); lastScaleX = value; }
         else if (name == "scale_y") { push(Track::ScaleY, false, lastScaleY, value); lastScaleY = value; }
         else if (name == "alpha") { push(Track::Alpha, false, lastAlpha, value); lastAlpha = value; }
+        else if (name == "rotate") { push(Track::Rotation, false, lastRotation, value); lastRotation = value; }
         else warnOnce("animation property not read: " + name);
     }
     return a;
@@ -2282,7 +2292,6 @@ void Engine::namedAnimation(Sprite &s, const Node &n) {
     Animation a = parseAnimation(n.s[1], s);
     a.repeat = n.p[1] != 0;
     s.loop = std::move(a);
-    s.loopText = n.s[1];
     s.looping = true;
 }
 

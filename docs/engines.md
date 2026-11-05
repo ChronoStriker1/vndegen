@@ -146,6 +146,6 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - A save's lock and comment are shown but can't be set. The bar's Arrange button isn't there, and neither is Graphics' choice of Original or Arrange art.
 - The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
 - Yarinaoshi no Christmas's Manual and Version info buttons aren't there.
-- Menu backgrounds that change on the PC stay the same here. The little help pictures that come up on hover aren't drawn, and neither is the "Do not show again" box on a confirmation.
+- Menu backgrounds that change on the PC stay the same here. The help pictures that come up on hover on menu screens aren't drawn, and neither is the "Do not show again" box on a confirmation.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.

@@ -146,6 +146,7 @@ MessageButtons parseMessageButtons(const std::vector<uint8_t> &ini, Images &imag
             pair(fields[11], b.helpCols, b.helpRows);
             pair(fields[12], b.helpColumn, b.helpRow);
         }
+        if (b.helpCols <= 0 || b.helpRows <= 0 || b.helpColumn < 0 || b.helpRow < 0 || b.helpColumn >= b.helpCols || b.helpRow >= b.helpRows) b.help = nullptr;
         (group == "under" ? out.under : out.inner).push_back(b);
     };
     while (std::getline(in, line)) {
