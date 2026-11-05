@@ -403,7 +403,9 @@ screen _vndegen_menu(quick=False, can_save=False, can_load=False):
     # Ren'Py draws nothing but the video while the "movie" channel plays with no Movie displayable claiming that channel.
     # Opening this menu clears the game's screens, and the Movie of a main menu like Give an Imp a Chance!'s goes with
     # them, so this one keeps Ren'Py drawing the screen. It's the engine's class, because a game can replace store.Movie.
-    if renpy.music.get_playing("movie"):
+    # A Movie that itself plays this channel can survive on another layer, and it needs no help: showing a second Movie
+    # on the channel would make Ren'Py restart its video.
+    if renpy.music.get_playing("movie") and "movie" not in renpy.display.video.last_channel_movie:
         add renpy.display.video.Movie(size=(1, 1)) alpha 0.0
 
     add Solid("#0000008c")

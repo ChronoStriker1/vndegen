@@ -423,6 +423,21 @@ struct ButtonMappingSheet: View {
     /// Defaults to closing the navigator's sheet.
     var onClose: (() -> Void)?
 
+    #if os(macOS)
+    /// Which of the sheet's steps shows.
+    private struct Step: Equatable {
+        let editing: ControllerLayout.ID?
+        let picking: ControlInput?
+        let confirmingDelete: Bool
+
+        init(_ editor: ButtonMappingEditor) {
+            editing = editor.editing
+            picking = editor.picking
+            confirmingDelete = editor.confirmingDelete
+        }
+    }
+    #endif
+
     var body: some View {
         let game = hub.library.game(editor.gameID).map(hub.displayTitle) ?? ""
         let title = editor.picking.map { "Map \($0.title)" } ?? (editor.editing == nil ? "Controller layout" : "Edit layout")
@@ -447,6 +462,17 @@ struct ButtonMappingSheet: View {
                     guard editor.showsFocus, let focus else { return }
                     withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
                 }
+                #if os(macOS)
+                // The scroll view keeps its offset in a sheet of one size, which would open Edit below its Rename and
+                // Delete, so each step opens at its focus.
+                .onChange(of: Step(editor)) {
+                    if let focus = editor.focus { proxy.scrollTo(focus, anchor: .center) }
+                }
+                // The first press reveals the ring without moving focus, and focus can be below the sheet's fold.
+                .onChange(of: editor.showsFocus) { _, shows in
+                    if shows, let focus = editor.focus { withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) } }
+                }
+                #endif
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width - 44 } action: { editor.width = $0 }
         }
@@ -457,7 +483,9 @@ struct ButtonMappingSheet: View {
         .onDisappear { if editor.keyboard != nil { hub.input.translatesKeyboard = true } }
         .presentationDetents([.large])
         #if os(macOS)
-        .frame(minWidth: 520, minHeight: 560)
+        // A Mac sheet takes its content's ideal size, which for a scroll view is everything inside it. Without one set
+        // here, the sheet would resize between steps and move its buttons from under the pointer.
+        .frame(minWidth: 520, idealWidth: 520, minHeight: 560, idealHeight: 560)
         #endif
     }
 

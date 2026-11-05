@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Runs on a Mac. Checks three things zz_vndegen.rpy does, on both bundled runtimes, with a small Ren'Py project written to
-# a temporary folder:
+# Runs on a Mac. Checks these things zz_vndegen.rpy and launcher.py do, on both bundled runtimes, with a small Ren'Py
+# project written to a temporary folder:
 # - SIGTERM, which VNDegen sends when the player quits from the hub or quits VNDegen, quits the game without Ren'Py's
 #   quit prompt, after an autosave and with the persistent data written;
 # - a stick direction remapped to a key releases that key when the stick reverses straight to the other direction;
-# - a button remapped to another Xbox button gets that button's Ren'Py bindings, and View keeps Ren'Py's own.
+# - a button remapped to another Xbox button gets that button's Ren'Py bindings, and View keeps Ren'Py's own;
+# - random.randrange takes a whole-number float, as Python 2 and 3.9 did and 3.12 doesn't.
 # It also checks launcher.py's filecase.py: the project sits on a case-sensitive APFS disk image, in a Game/ folder, and
 # the game reads and writes files in another case than they have on disk.
 #   scripts/renpy-hook-test.sh [--keep]
@@ -72,6 +73,7 @@ label main_menu:
     return
 
 label start:
+    $ open(os.path.join(os.environ["VNDEGEN_DATA"], "randrange.txt"), "w").write("%r\n" % (renpy.random.Random(1).randrange(1081.0) < 1081 and __import__("random").randrange(1081.0) < 1081,))
     $ bindings = config.pad_bindings
     $ open(os.path.join(os.environ["VNDEGEN_DATA"], "bindings.txt"), "w").write("%r\n" % (bindings["pad_b_press"] == bindings["pad_a_press"] and "vndegen_menu" not in bindings.get("pad_back_press", [])))
     "Line one."
@@ -110,6 +112,7 @@ for runtime in 8 7; do
   keys=$(tr '\n' ' ' < "$data/keys.txt" 2>/dev/null || true)
   [ "$keys" = "down w up w down s up s " ] || fail "stick reversal posted '$keys', expected 'down w up w down s up s '"
   [ "$(cat "$data/bindings.txt" 2>/dev/null)" = True ] || fail "B did not get A's bindings, or View opens the VNDegen menu"
+  [ "$(cat "$data/randrange.txt" 2>/dev/null)" = True ] || fail "randrange rejected a whole-number float"
   [ "$(cat "$data/case.txt" 2>/dev/null)" = True ] || fail "file name case checks gave $(cat "$data/case.txt" 2>/dev/null)"
   rm -f "$base/Game/Images/Runtime.txt"
   echo "Ren'Py $runtime: exit $status, saves: $(ls "$data/saves" | tr '\n' ' '), keys: $keys"
