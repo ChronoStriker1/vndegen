@@ -8,7 +8,7 @@
 namespace vnns {
 
 namespace {
-std::string sjis(const char *utf8) { return utf8ToSjis(utf8); }
+std::string sjis(const char *utf8) { return fromUtf8(utf8); }
 }  // namespace
 
 void Engine::openUi(SystemUi ui) {
@@ -160,7 +160,7 @@ std::string Engine::windowMenuItemsJson(size_t &next, int level) const {
         }
         if (out.size() > 1) out += ',';
         out += "{\"id\":\"" + std::to_string(id) + "\",\"title\":";
-        appendJsonString(out, sjisToUtf8(item.text));
+        appendJsonString(out, toUtf8(item.text));
         out += checked ? ",\"checked\":true" : ",\"checked\":false";
         out += f && f->mark != MenuMark::None ? ",\"radio\":true" : ",\"radio\":false";
         out += ",\"enabled\":true,\"items\":" + children + "}";
@@ -259,7 +259,7 @@ void Engine::drawDialog(Image &out, SystemUi &ui) {
     const uint32_t face = rgba(0xF5, 0xF5, 0xF5), ink = rgba(0, 0, 0);
     auto textWidth = [&](const std::string &str) {
         int w = 0;
-        for (size_t i = 0; i < str.size(); i += sjisCharLen(str, i)) w += sjisCharLen(str, i) == 1 ? fw / 2 : fw;
+        for (size_t i = 0; i < str.size(); i += charLen(str, i)) w += isHalfWidth(str, i) ? fw / 2 : fw;
         return w;
     };
     auto button = [&](int x, int y, int w, int h, const std::string &label, bool focused) {
@@ -280,10 +280,10 @@ void Engine::drawDialog(Image &out, SystemUi &ui) {
         auto fit = [&](std::string str, int width, bool keepEnd) {
             while (!str.empty() && textWidth(str) > width) {
                 if (keepEnd) {
-                    str.erase(0, sjisCharLen(str, 0));
+                    str.erase(0, charLen(str, 0));
                 } else {
                     size_t last = 0;
-                    for (size_t i = 0; i < str.size(); i += sjisCharLen(str, i)) last = i;
+                    for (size_t i = 0; i < str.size(); i += charLen(str, i)) last = i;
                     str.erase(last);
                 }
             }
@@ -346,7 +346,7 @@ void Engine::drawSystemUi(Image &out) {
     int boxW = 0;
     auto textWidth = [&](const std::string &s) {
         int w = 0;
-        for (size_t i = 0; i < s.size(); i += sjisCharLen(s, i)) w += sjisCharLen(s, i) == 1 ? fw / 2 : fw;
+        for (size_t i = 0; i < s.size(); i += charLen(s, i)) w += isHalfWidth(s, i) ? fw / 2 : fw;
         return w;
     };
     for (auto &s : ui.items) boxW = std::max(boxW, textWidth(s));
@@ -355,10 +355,10 @@ void Engine::drawSystemUi(Image &out) {
     auto fit = [&](std::string s, bool keepEnd) {
         while (textWidth(s) > boxW - 48) {
             if (keepEnd) {
-                s.erase(0, sjisCharLen(s, 0));
+                s.erase(0, charLen(s, 0));
             } else {
                 size_t last = 0;
-                for (size_t i = 0; i < s.size(); i += sjisCharLen(s, i)) last = i;
+                for (size_t i = 0; i < s.size(); i += charLen(s, i)) last = i;
                 s.erase(last);
             }
         }
@@ -397,13 +397,13 @@ void Engine::pollSystemUi() {
     SystemUi &ui = *ui_;
     if (ui.kind == SystemUi::TextInput) {
         for (size_t i = 0; i < typed_.size();) {
-            size_t n = sjisCharLen(typed_, i);
+            size_t n = charLen(typed_, i);
             unsigned char c = uint8_t(typed_[i]);
             if (n == 1 && c < 0x20) {
                 if (c == '\b' && !ui.input.empty()) {
                     // Remove the last character, one or two bytes.
                     size_t last = 0;
-                    for (size_t k = 0; k < ui.input.size(); k += sjisCharLen(ui.input, k)) last = k;
+                    for (size_t k = 0; k < ui.input.size(); k += charLen(ui.input, k)) last = k;
                     ui.input.erase(last);
                 } else if (c == '\r' || c == '\n') {
                     typed_.clear();
@@ -417,10 +417,7 @@ void Engine::pollSystemUi() {
         }
         typed_.clear();
         // A byte-counted mid can leave half a character at the end, which would take the cursor as its second byte.
-        size_t last = 0;
-        for (size_t i = 0; i < ui.input.size(); i += sjisCharLen(ui.input, i)) last = i;
-        bool half = !ui.input.empty() && last == ui.input.size() - 1 && sjisLead(uint8_t(ui.input[last]));
-        ui.items = {ui.input.substr(0, half ? last : ui.input.size()) + "_"};
+        ui.items = {ui.input.substr(0, completeLength(ui.input)) + "_"};
         sceneDirty_ = true;
         if (in_.click && !ui.buttons.empty()) {
             const auto &b = ui.buttons[0];
@@ -435,7 +432,7 @@ void Engine::pollSystemUi() {
                 return;
             } else if (k == VNNS_KEY_BACKSPACE && !ui.input.empty()) {
                 size_t last = 0;
-                for (size_t q = 0; q < ui.input.size(); q += sjisCharLen(ui.input, q)) last = q;
+                for (size_t q = 0; q < ui.input.size(); q += charLen(ui.input, q)) last = q;
                 ui.input.erase(last);
             }
         return;

@@ -38,7 +38,7 @@ struct FaceFile {
 
 bool resolveFace(const std::string &sjisName, FaceFile &out) {
     vnfont_match m;
-    std::string name = sjisToUtf8(sjisName);
+    std::string name = toUtf8(sjisName);
     if (name.empty() || !vnfont_resolve(name.c_str(), 0, 0, &m)) {
         if (!vnfont_resolve("MS Gothic", 0, 0, &m)) return false;
     }

@@ -30,8 +30,8 @@ void Engine::skipSpaces() {
     const std::string &t = script_.text();
     while (cur_.pos < t.size() && (t[cur_.pos] == ' ' || t[cur_.pos] == '\t')) cur_.pos++;
     // A full-width space also separates arguments in some scripts.
-    while (cur_.pos + 1 < t.size() && uint8_t(t[cur_.pos]) == 0x81 && uint8_t(t[cur_.pos + 1]) == 0x40) {
-        cur_.pos += 2;
+    while (isWideSpace(t, cur_.pos)) {
+        cur_.pos += charLen(t, cur_.pos);
         while (cur_.pos < t.size() && (t[cur_.pos] == ' ' || t[cur_.pos] == '\t')) cur_.pos++;
     }
 }
@@ -56,7 +56,7 @@ std::string Engine::readWord() {
     const std::string &t = script_.text();
     size_t start = cur_.pos;
     while (cur_.pos < t.size() && isIdentChar(t[cur_.pos])) cur_.pos++;
-    return sjisLower(std::string_view(t).substr(start, cur_.pos - start));
+    return lowerAscii(std::string_view(t).substr(start, cur_.pos - start));
 }
 
 void Engine::jumpToLine(int line) {
@@ -282,7 +282,7 @@ struct ExprParser {
             e.cur_.pos++;
             size_t start = e.cur_.pos;
             while (e.cur_.pos < t.size() && t[e.cur_.pos] != c && t[e.cur_.pos] != '\n')
-                e.cur_.pos += sjisCharLen(t, e.cur_.pos);
+                e.cur_.pos += charLen(t, e.cur_.pos);
             std::string s = t.substr(start, e.cur_.pos - start);
             if (peek() == c) e.cur_.pos++;
             return s;
@@ -488,7 +488,7 @@ bool Engine::readCondition() {
 
 void Engine::skipToLineEnd() {
     const std::string &t = script_.text();
-    while (cur_.pos < t.size() && t[cur_.pos] != '\n') cur_.pos += sjisCharLen(t, cur_.pos);
+    while (cur_.pos < t.size() && t[cur_.pos] != '\n') cur_.pos += charLen(t, cur_.pos);
 }
 
 // Skips the rest of the current statement, respecting strings in double quotes or backquotes.
@@ -505,7 +505,7 @@ void Engine::skipStatement() {
         } else if (c == ':' || c == ';') {
             return;
         }
-        cur_.pos += sjisCharLen(t, cur_.pos);
+        cur_.pos += charLen(t, cur_.pos);
     }
 }
 
@@ -570,7 +570,8 @@ void Engine::executeStatement() {
         std::string word = readWord();
         // v123 / dv123 / mv123 voice shortcuts carry their number in the name.
         bool known = commandTable().count(word) || defsubs_.count(word) || luaCommands_.count(word) ||
-                     (word[0] == '_' && commandTable().count(word.substr(1)));
+                     (word[0] == '_' && commandTable().count(word.substr(1))) ||
+                     (ponscripter_ && ponscripterCommandTable().count(word));
         if (!known) {
             size_t d = 0;
             while (d < word.size() && isalpha(uint8_t(word[d]))) d++;
@@ -626,6 +627,8 @@ void Engine::executeCommand(const std::string &name) {
     CommandFn fn = nullptr;
     if (it != commandTable().end()) {
         fn = it->second;
+    } else if (auto pons = ponscripterCommandTable().find(n); ponscripter_ && pons != ponscripterCommandTable().end()) {
+        fn = pons->second;
     } else {
         // v123, dv123, mv123
         size_t d = 0;

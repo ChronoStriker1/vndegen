@@ -1,7 +1,7 @@
 # NScripter runtime: clean-room provenance
 
 VNDegen's NScripter runtime was written without ONScripter or any of its forks (Ogapee's ONScripter, ONScripter-jh,
-ONScripter-EN, OnscripterYuri, PONScripter), which are GPL. Nobody working on it opened, searched or asked about their
+ONScripter-EN, OnscripterYuri, PONScripter and its forks), which are GPL. Nobody working on it opened, searched or asked about their
 source, or the VNDegen branch that once ported one. This file lists, for each part, where its knowledge came from.
 
 ## Sources
@@ -30,9 +30,15 @@ source, or the VNDegen branch that once ported one. This file lists, for each pa
 - **The stock cursor bitmaps** in `nscrdoc.zip` (`デフォルトのカーソルファイル`), as plain files to compare LZSS
   archive entries against.
 - **bzip2**, the system library, for NBZ sounds.
+- **The Umineko When They Cry games' own Ponscripter engine** (`Umineko1to4.exe`, "Ponscripter 20160615 (NScr 2.81)"),
+  run as a black box under Wine with networking off, on lab scripts of our own written as `0.utf` in a scratch folder
+  beside the game's fonts. The screen was captured 1:1 (a 712 x 534 virtual screen puts the 640 x 480 game at 36,27).
+  The games' scripts and archives showed which commands and formats matter. The engine's list of command names was
+  read from the binary's strings, to know which names it defines; nothing else in the binary was looked at.
 
 Not used: the English "NScripter API reference" hosted inside an ONScripter project's website, though it is prose,
-because of where it lives. GARbro (MIT) was opened to check its NScripter archive support, but its decompression code
+because of where it lives. For the same reason, Ponscripter's own documentation, which lives in the GPL project, wasn't
+read, nor was the repository a comment in one game's script names. GARbro (MIT) was opened to check its NScripter archive support, but its decompression code
 says it comes from ONScripter-EN, so only its license header and a list of names were seen, and it was deleted.
 
 ## By part
@@ -72,6 +78,14 @@ says it comes from ONScripter-EN, so only its license header and a list of names
 | NSLua | The notes: `system.lua` loads at start; `luasub` binds `NSCOM_name`; `luacall` binds `NSCALL_name`; the `NSPop*`, `NSGet*`/`NSSet*`, `NSExec`, `NSGoto`/`NSGosub`/`NSReturn`, sprite, sound, mouse, key and timer functions, `NSLuaAnimationInterval`/`Mode` and `NSTimer`. Checked by running the two games' `system.lua` files: battle data tables, a target marker that `NSCALL_animation` flashes, and a mod's label hooks with `NSCALL_reset`, `NSCALL_save` and `NSCALL_load` |
 | `MSpDraw.dll` messages | Its manual: `draw/n,tag,cx,cy,alpha,rot,zoomx,zoomy,slope,steps,dcx,dcy,dalpha,drot,dzoomx,dzoomy,dslope,acx,acy,delay`, `set/n,name=value,...,time=count`, `clear/n,...` or `clear/all`, and the `+`/`-` blending suffix of the tag. One game's opening sequence (a scrolling map, a logo tilting in, a spear rising with an additive glow) runs on it |
 | `blt` and `ofscpy` | `追加命令一覧.txt`: blt's eight arguments (screen rectangle, then the btndef image's rectangle, scaled to fit), drawn straight to the screen and not saved; ofscpy moves that drawing to the offscreen image so an effect or print can follow. One game's ending credits roll scrolls a 350 x 3444 image this way. Drawn opaque, since it's a straight copy, into a layer over the committed scene and under the built-in menus, so hiding the text window or opening a menu redraws around it; a load or reset drops it. Checked on that roll and lab scripts |
+| Ponscripter scripts | The Umineko games: `0.utf`, UTF-8 with CRLF line ends, its first line `;value2500`; the archives and fonts beside it |
+| `.nsa` compression type 4 | The Umineko games' archives: every one of 2,913 type 4 entries is a 4-byte big-endian size and a bzip2 stream of a BMP of exactly that size, the layout of NBZ sounds |
+| Ponscripter's carets | Black box: lab lines with each control inside `^...^`. `@`, `\`, `#rrggbb`, `!sd`, `!sN`, `!dN`, `!wN` and `_` act; `$5`, `%5`, `{}`, `<>`, `[]` and a mid-line `/` are drawn as they stand; an unclosed `~` blanks the whole line |
+| Ponscripter's line ends | Black box: a line ending in `^` runs on into the next line's text; one ending in `@`, `!sd` or Japanese text breaks the line; `/` and `\` act as in NScripter |
+| `langen`, `langjp`, `langall`, `showlangen`, `showlangjp` | Black box: a bare `langjp` hides the lines after it under `showlangen` until `langen` or `langall`; with neither `showlang` command, English shows; a hidden line's `@` took a real click (xdotool) before the shown line appeared |
+| `getreadlang` | Black box: -1 at start and after `langall`, 0 after `langen`, 1 after `langjp`. The games' textgosub routine compares it with the language the player chose |
+| `language` | Black box: `language english` and `language japanese` showed the same lines |
+| `:b` images | Black box: an image of known pixels with each tag. `:b` halves it, rounding up (101 x 51 became 51 x 26); a 1-pixel checker averaged to its mean (box filter, not nearest); one opaque red pixel among three transparent ones gave (63,0,0) over black, so the average is of premultiplied pixels, and the odd edge divides by four too. `:b` keeps a PNG's alpha; `:c` drew it opaque, its colour as if over black |
 | `getini` values | Windows' `GetPrivateProfileString`, as a mod's `list.ini` relies on: spaces around the key and value are dropped, and a matching pair of quotes around the value |
 
 ## Open questions and how they were settled

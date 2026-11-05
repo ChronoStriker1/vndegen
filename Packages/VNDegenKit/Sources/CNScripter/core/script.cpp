@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <dirent.h>
+#include <strings.h>
 
 #include "fs.h"
 
@@ -12,11 +14,11 @@ bool Script::load(FileSystem &fs, std::string *error) {
     Bytes raw;
     std::string joined;
     // 0.txt takes priority over nscript.dat. Numbered files join in numeric order, 0.txt style or 00.txt style.
-    auto joinNumbered = [&](bool twoDigit) {
+    auto joinNumbered = [&](bool twoDigit, const char *ext) {
         bool any = false;
         for (int i = 0; i < 100; i++) {
-            char name[8];
-            snprintf(name, sizeof name, twoDigit ? "%02d.txt" : "%d.txt", i);
+            char name[16];
+            snprintf(name, sizeof name, twoDigit ? "%02d.%s" : "%d.%s", i, ext);
             if (!fs.read(name, raw)) continue;
             any = true;
             joined.append(reinterpret_cast<const char *>(raw.data()), raw.size());
@@ -24,16 +26,21 @@ bool Script::load(FileSystem &fs, std::string *error) {
         }
         return any;
     };
-    if (fs.exists("0.txt")) {
-        joinNumbered(false);
+    // Ponscripter's 0.utf comes first: such a game may also carry a 0.txt for other engines.
+    if (fs.exists("0.utf")) {
+        joinNumbered(false, "utf");
+    } else if (fs.exists("00.utf")) {
+        joinNumbered(true, "utf");
+    } else if (fs.exists("0.txt")) {
+        joinNumbered(false, "txt");
     } else if (fs.exists("00.txt")) {
-        joinNumbered(true);
+        joinNumbered(true, "txt");
     } else if (fs.read("nscript.dat", raw)) {
         fromDat_ = true;
         joined.resize(raw.size());
         for (size_t i = 0; i < raw.size(); i++) joined[i] = char(raw[i] ^ 0x84);
     } else {
-        if (error) *error = "The game has no 0.txt, 00.txt or nscript.dat script.";
+        if (error) *error = "The game has no 0.txt, 00.txt, nscript.dat or 0.utf script.";
         return false;
     }
     text_.reserve(joined.size());
@@ -54,8 +61,8 @@ bool Script::load(FileSystem &fs, std::string *error) {
         size_t start = ++p;
         while (p < text_.size() && text_[p] != '\n' && text_[p] != ' ' && text_[p] != '\t' && text_[p] != ';' &&
                text_[p] != ':')
-            p += sjisCharLen(text_, p);
-        std::string name = sjisLower(std::string_view(text_).substr(start, p - start));
+            p += charLen(text_, p);
+        std::string name = lowerAscii(std::string_view(text_).substr(start, p - start));
         if (labels_.count(name)) continue;
         labels_.emplace(name, int(labelNames_.size()));
         labelNames_.push_back(name);
@@ -68,7 +75,7 @@ bool Script::load(FileSystem &fs, std::string *error) {
 // The first line may set the screen and variable counts: ";mode800", ";value500", ";mode800,value600", or the newer
 // ";$V2000G1000S800,600L10000" (letters in any case).
 void Script::parseSettings() {
-    std::string first = sjisLower(std::string_view(text_).substr(0, text_.find('\n')));
+    std::string first = lowerAscii(std::string_view(text_).substr(0, text_.find('\n')));
     if (first.empty() || first[0] != ';') return;
     if (first.size() > 1 && first[1] == '$') {
         size_t p = 2;
@@ -110,6 +117,16 @@ void Script::parseSettings() {
     if (int v = at("value"); v >= 0) settings_.globalBorder = v;
 }
 
+bool Script::isPonscripter(const std::string &root) {
+    DIR *d = opendir(root.c_str());
+    if (!d) return false;
+    bool found = false;
+    while (dirent *e = readdir(d))
+        if (!strcasecmp(e->d_name, "0.utf") || !strcasecmp(e->d_name, "00.utf")) found = true;
+    closedir(d);
+    return found;
+}
+
 int Script::lineAt(size_t offset) const {
     auto it = std::upper_bound(lineStarts_.begin(), lineStarts_.end(), offset);
     return int(it - lineStarts_.begin()) - 1;
@@ -117,7 +134,7 @@ int Script::lineAt(size_t offset) const {
 
 int Script::labelIndex(std::string_view name) const {
     if (!name.empty() && name[0] == '*') name.remove_prefix(1);
-    auto it = labels_.find(sjisLower(name));
+    auto it = labels_.find(lowerAscii(name));
     return it == labels_.end() ? -1 : it->second;
 }
 

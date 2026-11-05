@@ -8,7 +8,7 @@ namespace vnns {
 
 bool Engine::readSound(const std::string &name, Bytes &out) {
     if (!fs_.read(name, out)) {
-        errorf("sound %s not found", sjisToUtf8(name).c_str());
+        errorf("sound %s not found", toUtf8(name).c_str());
         return false;
     }
     // A sound the game's nbzplgin.dll would unpack (voices stored as .nbz).
@@ -54,7 +54,7 @@ void Engine::playBgm(const std::string &spec, bool loop) {
     Bytes data;
     if (!readSound(name, data)) return;
     if (!audio_.play(AudioMixer::kBgm, std::move(data), loop, volBgm_, bgmFadeIn_, loopStart))
-        errorf("music %s could not be played", sjisToUtf8(name).c_str());
+        errorf("music %s could not be played", toUtf8(name).c_str());
 }
 
 void Engine::playSound(int channel, const std::string &name, bool loop) {

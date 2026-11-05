@@ -113,4 +113,21 @@ bool decodeImage(const Bytes &data, Image &out, bool *hasAlpha) {
     return true;
 }
 
+Image halveImage(const Image &src) {
+    Image out((src.w + 1) / 2, (src.h + 1) / 2);
+    for (int y = 0; y < out.h; y++)
+        for (int x = 0; x < out.w; x++) {
+            uint32_t sum[4] = {0, 0, 0, 0};
+            for (int dy = 0; dy < 2; dy++)
+                for (int dx = 0; dx < 2; dx++) {
+                    int sx = 2 * x + dx, sy = 2 * y + dy;
+                    if (sx >= src.w || sy >= src.h) continue;
+                    uint32_t p = src.row(sy)[sx];
+                    for (int c = 0; c < 4; c++) sum[c] += p >> (8 * c) & 255;
+                }
+            out.row(y)[x] = sum[0] / 4 | (sum[1] / 4) << 8 | (sum[2] / 4) << 16 | (sum[3] / 4) << 24;
+        }
+    return out;
+}
+
 }  // namespace vnns

@@ -259,18 +259,14 @@ void cmdTrig(E &e, const std::string &name) {
     e.setVar(v, int(std::lround(r * 1000)));
 }
 
+// itoa2's digits and minus sign, full width, in the script's encoding.
 std::string fullWidthDigits(const std::string &s) {
+    static const char *const digits[] = {"０", "１", "２", "３", "４", "５", "６", "７", "８", "９"};
     std::string out;
     for (char c : s) {
-        if (c >= '0' && c <= '9') {
-            out += char(0x82);
-            out += char(0x4F + (c - '0'));
-        } else if (c == '-') {
-            out += char(0x81);
-            out += char(0x7C);
-        } else {
-            out += c;
-        }
+        if (c >= '0' && c <= '9') out += fromUtf8(digits[c - '0']);
+        else if (c == '-') out += fromUtf8("－");
+        else out += c;
     }
     return out;
 }
@@ -323,7 +319,7 @@ void cmdSplit(E &e, const std::string &) {
             start = ++i;
             continue;
         }
-        i += sjisCharLen(s, i);
+        i += charLen(s, i);
     }
     size_t k = 0;
     while (e.readComma()) {
@@ -437,9 +433,9 @@ void cmdGetIni(E &e, const std::string &) {
     e.readComma();
     std::string file = e.readStr();
     e.readComma();
-    std::string section = sjisLower(e.readStr());
+    std::string section = lowerAscii(e.readStr());
     e.readComma();
-    std::string key = sjisLower(e.readStr());
+    std::string key = lowerAscii(e.readStr());
     Bytes data;
     std::string result;
     if (e.fs_.read(file, data)) {
@@ -457,10 +453,10 @@ void cmdGetIni(E &e, const std::string &) {
             };
             line = trim(line);
             if (line.size() > 1 && line[0] == '[') {
-                cur = sjisLower(line.substr(1, line.find(']') - 1));
+                cur = lowerAscii(line.substr(1, line.find(']') - 1));
             } else if (cur == section) {
                 size_t eq = line.find('=');
-                if (eq != std::string::npos && sjisLower(trim(line.substr(0, eq))) == key) {
+                if (eq != std::string::npos && lowerAscii(trim(line.substr(0, eq))) == key) {
                     result = trim(line.substr(eq + 1));
                     // Windows drops a matching pair of quotes around the value.
                     if (result.size() >= 2 && (result.front() == '"' || result.front() == '\'') && result.back() == result.front())

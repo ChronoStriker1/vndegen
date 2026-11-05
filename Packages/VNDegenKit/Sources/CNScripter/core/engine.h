@@ -405,6 +405,16 @@ public:
     bool ignoreClickStr_ = false;
     bool clickCursorPage_ = false;
     std::vector<std::string> pendingChars_;  // characters of a variable being shown
+    // Ponscripter (ponscripter.cpp, docs/nscripter.md). Settled as a black box on the Umineko games' own engine.
+    bool ponscripter_ = false;
+    bool caretText_ = false;  // inside ^...^ on a text line: English text, where $, %, {, <, ( and [ are plain
+    // The language of the text that follows (langen 0, langjp 1, langall or none -1), and the one shown (showlangen,
+    // showlangjp). Text of another language isn't drawn, but its waits run.
+    int textLang_ = -1;
+    int shownLang_ = 0;
+    TextEncoding encoding() const { return ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis; }
+    bool textHiddenByLang() const { return ponscripter_ && textLang_ >= 0 && textLang_ != shownLang_; }
+    std::map<int, std::string> fontFiles_;  // h_mapfont: the game's font files, by face number
     void noteTextLineStart();      // savepoint and read-text bookkeeping at the head of a text line
     bool textBtnOff_ = false;
     int textBtnStart_ = 1;
@@ -430,7 +440,7 @@ public:
     void showWindow();
     void drawWindow(Image &out);
     bool glyphFor(uint32_t cp, int w, int h, bool bold, const Glyph *&out);
-    void drawGlyphs(Image &out, const std::string &sjis, int x, int y, int fw, int fh, int pitchX, uint32_t color,
+    void drawGlyphs(Image &out, const std::string &str, int x, int y, int fw, int fh, int pitchX, uint32_t color,
                     bool bold, bool shadow, int maxCols, int pitchY, bool aa = true);
     ImageRef renderStringImage(const std::string &spec, int &cells);
     int halfAdvance() const;
@@ -684,6 +694,8 @@ public:
 using CommandFn = void (*)(Engine &, const std::string &name);
 // Every command, by lowercase name. Defined across the command files.
 const std::unordered_map<std::string, CommandFn> &commandTable();
+// Ponscripter's own commands, known only in a Ponscripter game, so an NScripter game's script reads as before.
+const std::unordered_map<std::string, CommandFn> &ponscripterCommandTable();
 void registerCommands(std::unordered_map<std::string, CommandFn> &table);
 
 }  // namespace vnns

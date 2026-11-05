@@ -44,6 +44,10 @@ inline uint32_t scalePx(uint32_t p, uint32_t a) {
     ga = ((ga + ((ga >> 8) & 0x00FF00FF)) >> 8) & 0x00FF00FF;
     return rb | ga << 8;
 }
+// Half the size, rounded up: each pixel the average of a 2x2 block, a pixel past an odd edge counting as transparent.
+// Ponscripter's ":b" images, measured on its engine.
+Image halveImage(const Image &src);
+
 // Source-over for premultiplied pixels.
 inline uint32_t over(uint32_t dst, uint32_t src) {
     uint32_t sa = src >> 24;

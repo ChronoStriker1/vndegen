@@ -31,6 +31,47 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(NScripterPlugin().detect(probe(["Game/00.TXT", "Game/ARC.NSA"]))?.confidence == .certain)
 }
 
+/// Ponscripter games, the Umineko When They Cry Arcs, have a UTF-8 script, 0.utf, beside their archives.
+@Test func ponscripterGamesAreDetectedByTheirUtf8Script() {
+    let match = NScripterPlugin().detect(probe(["Umineko/0.utf", "Umineko/arc.nsa", "Umineko/Umineko1to4.exe"]))
+    #expect(match?.confidence == .certain && match?.evidence == "Umineko/0.utf" && match?.version == "Ponscripter")
+    #expect(NScripterPlugin().detect(probe(["0.utf", "readme.txt"])) == nil)
+    #expect(NScripterPlugin().detect(probe(["Game/nscript.dat"]))?.version == nil)
+}
+
+/// The runtime's saves for a Ponscripter game aren't the PC engine's format, so none of them sync.
+@Test func ponscripterSavesStayOutOfSync() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir.appendingPathComponent("saves"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    try Data("*define\ngame\n".utf8).write(to: dir.appendingPathComponent("0.utf"))
+    try Data().write(to: dir.appendingPathComponent("arc.nsa"))
+    #expect(NScripterPlugin().saveLocations(folder: dir, dataDirectory: dir).isEmpty)
+}
+
+/// A Shift-JIS NScripter game and a UTF-8 Ponscripter game run side by side, each read in its own encoding.
+@Test func nScripterAndPonscripterGamesRunAtOnce() throws {
+    let sjis = try #require("*define\ncaption \"日本語\"\ngame\n*start\nclick\nend\n".data(using: .shiftJIS))
+    // runScript writes its script to 0.txt; the Shift-JIS file given in its place replaces it.
+    let (nscripter, nsDir) = try runScript("", files: ["0.txt": sjis])
+    defer { vnns_stop(nscripter); try? FileManager.default.removeItem(at: nsDir) }
+    let ponsDir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: ponsDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: ponsDir) }
+    try Data("*define\ncaption \"日本語\"\ngame\n*start\nlangen^Hello^@\nend\n".utf8)
+        .write(to: ponsDir.appendingPathComponent("0.utf"))
+    let ponscripter = try #require(ponsDir.path.withCString { root in
+        var launch = VNNSLaunch(gameRoot: root, logPath: nil, englishWordWrap: false)
+        return vnns_start(&launch)
+    })
+    defer { vnns_stop(ponscripter) }
+    for _ in 0..<3 {
+        #expect(vnns_step(nscripter, 16) && vnns_step(ponscripter, 16))
+        #expect(String(cString: vnns_caption(nscripter)) == "日本語")
+        #expect(String(cString: vnns_caption(ponscripter)) == "日本語")
+    }
+}
+
 @Test func theShallowestScriptFolderWins() throws {
     let layout = try #require(NScripterLayout(probe(["Game/nscript.dat", "Game/mod/Other/nscript.dat"])))
     #expect(layout.root == "Game")

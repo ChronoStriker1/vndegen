@@ -28,7 +28,7 @@ int Engine::hitButton(int x, int y) {
     }
     // Text buttons in the window.
     for (const TextChar &c : page_)
-        if (c.link >= 0 && x >= c.x && y >= c.y && x < c.x + (c.ch.size() == 1 ? halfAdvance() : fullAdvance()) &&
+        if (c.link >= 0 && x >= c.x && y >= c.y && x < c.x + (isHalfWidth(c.ch, 0) ? halfAdvance() : fullAdvance()) &&
             y < c.y + c.h)
             for (size_t i = 0; i < buttons_.size(); i++)
                 if (buttons_[i].kind == Button::TextLink && buttons_[i].number == c.link) return int(i);
@@ -605,7 +605,7 @@ void Engine::startSelect(SelectMode mode) {
         uint32_t saved = textColor_;
         textColor_ = selectColor(false);
         for (size_t i = 0; i < text.size();) {
-            size_t n = sjisCharLen(text, i);
+            size_t n = charLen(text, i);
             putChar(text.substr(i, n));
             i += n;
         }

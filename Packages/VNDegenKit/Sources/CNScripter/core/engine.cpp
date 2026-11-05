@@ -52,13 +52,21 @@ static bool hasWordWrapPatch(const std::string &exePath) {
 }
 
 bool Engine::start(std::string *error) {
+    ponscripter_ = Script::isPonscripter(cfg_.gameRoot);
+    setTextEncoding(ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis);
+    if (ponscripter_) {
+        logf("Ponscripter game: the script is UTF-8");
+        // The PC engine keeps its saves in saves/, in a format of its own. VNDegen's are NScripter's, so they go in a
+        // folder of their own and never replace a PC save a player copied or synced in.
+        saveDir_ = "vndegen-saves";
+    }
     if (!fs_.open(cfg_.gameRoot)) {
         if (error) *error = "The game folder can't be read.";
         return false;
     }
     if (!cfg_.englishWordWrap)
         for (const std::string &rel : fs_.topLevelFiles()) {
-            std::string low = sjisLower(rel);
+            std::string low = lowerAscii(rel);
             if (low.size() > 4 && low.compare(low.size() - 4, 4, ".exe") == 0 && hasWordWrapPatch(fs_.root() + "/" + rel)) {
                 cfg_.englishWordWrap = true;
                 logf("%s has the word-wrap patch: English text breaks between words", rel.c_str());
@@ -282,7 +290,7 @@ std::string Engine::debugStatus() const {
     static const char *names[] = {"running", "timer", "click", "text", "effect", "button", "select", "quake", "movie", "dialog"};
     std::string line = script_.text().substr(script_.lineStart(cur_.line),
                                              script_.text().find('\n', script_.lineStart(cur_.line)) - script_.lineStart(cur_.line));
-    return "line " + std::to_string(cur_.line + 1) + " (" + names[int(wait_)] + "): " + sjisToUtf8(line);
+    return "line " + std::to_string(cur_.line + 1) + " (" + names[int(wait_)] + "): " + toUtf8(line);
 }
 
 // ---- input ----
@@ -316,6 +324,6 @@ void Engine::key(int code, bool down) {
     }
 }
 
-void Engine::typeText(const std::string &utf8) { typed_ += utf8ToSjis(utf8); }
+void Engine::typeText(const std::string &utf8) { typed_ += fromUtf8(utf8); }
 
 }  // namespace vnns

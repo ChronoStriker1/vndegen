@@ -1,6 +1,7 @@
-// The game's script: 0.txt .. 99.txt joined in order, or 00.txt .. 99.txt, else nscript.dat (each byte XOR 0x84).
-// Kept as Shift-JIS bytes with carriage returns removed, with an index of line starts and labels. Saves record script
-// positions as line numbers, so lines count exactly as in the PC engine.
+// The game's script: 0.txt .. 99.txt joined in order, or 00.txt .. 99.txt, else nscript.dat (each byte XOR 0x84); a
+// Ponscripter game's 0.utf .. 99.utf or 00.utf .. 99.utf. Kept as the script's bytes (Shift-JIS, or UTF-8 for
+// Ponscripter) with carriage returns removed, with an index of line starts and labels. Saves record script positions
+// as line numbers, so lines count exactly as in the PC engine.
 #pragma once
 
 #include <string>
@@ -23,6 +24,9 @@ struct ScriptSettings {
 class Script {
 public:
     bool load(FileSystem &fs, std::string *error);
+    // Whether a folder holds a Ponscripter script (0.utf or 00.utf), which is UTF-8. Checked before anything reads the
+    // game's file names, since they compare in the script's encoding.
+    static bool isPonscripter(const std::string &root);
 
     const std::string &text() const { return exec_.empty() ? text_ : exec_.back(); }
     // NSExec runs one statement given as text: until the matching endExec, the parser reads that text in place of

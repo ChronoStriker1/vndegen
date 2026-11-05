@@ -350,7 +350,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         const std::string &t = script_.text();
         size_t stmtStart = script_.lineStart(f.line);
         char quote = 0;
-        for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(t, p)) {
+        for (size_t p = stmtStart; p < f.pos; p += charLen(t, p)) {
             if (quote) {
                 if (t[p] == quote) quote = 0;
                 continue;
@@ -702,7 +702,7 @@ void Engine::loadGlobals() {
     }
     if (labelLogOn_) {
         readLog("NScrllog.dat", [&](const std::string &n) {
-            int idx = script_.labelIndex(sjisLower(n));
+            int idx = script_.labelIndex(lowerAscii(n));
             if (idx >= 0) noteLabelVisited(idx);
         });
         noteLabelVisited(script_.labelIndex("define"));
@@ -739,8 +739,8 @@ bool Engine::isRead(size_t pos) const {
 }
 
 static std::string upperAscii(std::string s) {
-    for (size_t i = 0; i < s.size(); i += sjisCharLen(s, i))
-        if (sjisCharLen(s, i) == 1) s[i] = char(toupper(uint8_t(s[i])));
+    for (size_t i = 0; i < s.size(); i += charLen(s, i))
+        if (charLen(s, i) == 1) s[i] = char(toupper(uint8_t(s[i])));
     return s;
 }
 

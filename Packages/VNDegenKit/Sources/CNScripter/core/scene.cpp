@@ -44,11 +44,11 @@ ImageRef Engine::loadFileImage(const std::string &file, bool *hasAlpha) {
     } else {
         Bytes data;
         if (!fs_.read(file, data)) {
-            errorf("image %s not found", sjisToUtf8(file).c_str());
+            errorf("image %s not found", toUtf8(file).c_str());
             return nullptr;
         }
         if (!decodeImage(data, img, &alpha)) {
-            errorf("image %s could not be decoded", sjisToUtf8(file).c_str());
+            errorf("image %s could not be decoded", toUtf8(file).c_str());
             return nullptr;
         }
     }
@@ -85,6 +85,7 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     std::string maskFile, file = tag;
     uint32_t keyColor = 0;
     bool keyByColor = false;
+    bool halfSize = false, explicitCopy = false;
     if (!tag.empty() && tag[0] == ':') {
         size_t semi = std::string::npos;
         // String sprites have no file part; everything after the settings is text.
@@ -99,10 +100,17 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
             return true;
         }
         size_t p = 1;
+        // Ponscripter's ":b" in front of the mode letter draws the image at half its size: the Umineko games' menus
+        // and buttons are drawn at twice the screen's resolution.
+        if (ponscripter_ && p < tag.size() && (tag[p] == 'b' || tag[p] == 'B')) {
+            halfSize = true;
+            p++;
+        }
         if (p < tag.size()) {
             char m = char(tolower(uint8_t(tag[p])));
             if (m == 'a' || m == 'l' || m == 'r' || m == 'c') {
                 mode = std::string(1, m);
+                explicitCopy = m == 'c';
                 p++;
             } else if (m == 'm') {
                 mode = "m";
@@ -155,7 +163,9 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     bool ownAlpha = false;
     ImageRef base = loadFileImage(file, &ownAlpha);
     if (!base) return false;
-    // An image with an alpha channel of its own (a PNG) keeps it, whatever transparency the tag names.
+    // An image with an alpha channel of its own (a PNG) keeps it, whatever transparency the tag names. Ponscripter's
+    // ":c" is the exception: it draws the image opaque, as if over black.
+    bool dropAlpha = ownAlpha && ponscripter_ && explicitCopy;
     if (ownAlpha) mode = "c";
     if (fileLogOn_) noteFileUsed(file);
     Image img = *base;
@@ -194,6 +204,9 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
                 if (p == key) p = 0;
         }
     }
+    if (dropAlpha)
+        for (uint32_t &p : img.px) p |= 0xFF000000u;
+    if (halfSize) img = halveImage(img);
     out.image = std::make_shared<const Image>(std::move(img));
     out.cellWidth = out.image->w / cells;
     return true;
@@ -543,7 +556,7 @@ using E = Engine;
 void cmdBg(E &e, const std::string &) {
     e.skipSpaces();
     std::string s = e.readStr();
-    std::string low = sjisLower(s);
+    std::string low = lowerAscii(s);
     e.scene_.bgTag = s;
     e.scene_.bg = LoadedImage();
     if (low == "black") {
@@ -770,7 +783,7 @@ void cmdSpWait(E &e, const std::string &) {
 void cmdMonocro(E &e, const std::string &) {
     e.skipSpaces();
     std::string s = e.readStr();
-    if (sjisLower(s) == "off") {
+    if (lowerAscii(s) == "off") {
         e.scene_.monocro = false;
         return;
     }
@@ -795,7 +808,7 @@ void cmdQuake(E &e, const std::string &name) {
 }
 
 void cmdHumanOrder(E &e, const std::string &) {
-    e.humanOrder_ = sjisLower(e.readStr());
+    e.humanOrder_ = lowerAscii(e.readStr());
     Effect ef;
     e.readEffectArgs(ef);
     e.printWithEffect(ef);

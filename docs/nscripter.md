@@ -1,7 +1,8 @@
 # NScripter
 
 VNDegen runs NScripter games on its own NScripter runtime, written for VNDegen and MIT licensed like the rest of the
-app. It replaces ONScripter, which is GPL. How it was written, and from which sources, is in
+app. It replaces ONScripter, which is GPL. The same runtime runs Ponscripter games, NScripter's dialect with UTF-8
+scripts, in a mode of its own (see Ponscripter below). How it was written, and from which sources, is in
 `docs/nscripter-cleanroom.md`.
 
 ## Layout
@@ -33,20 +34,21 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
 `0.txt` or `00.txt` beside an archive (`.nsa`, `.ns2`, `.sar`) or one of NScripter's own files (`envdata`,
 `nslua.dll`, `nsogg2.dll`, `nspng.dll`). A numbered text script alone isn't enough, since `0.txt` could be anything.
 
-Ponscripter games aren't detected, because the runtime can't run them. The Umineko When They Cry Question and Answer Arcs
-(`0.utf`, `arc.nsa`, and `Umineko1to4` or `Umineko5to8` built on Ponscripter) are the library's two. Their script is UTF-8
-with Ponscripter's text markup and commands, and their archives use a compression type the runtime doesn't read. Given the
-Question Arcs' script as `0.txt`, the Linux host stopped at the first menu with no images. The original Japanese
-releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are detected.
+A Ponscripter game has `0.utf` (or `00.utf`) beside its archives, and is detected the same way; the library shows it as
+NScripter, version Ponscripter. The Umineko When They Cry Question and Answer Arcs are the library's two. The original
+Japanese releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are ordinary NScripter games.
+Umineko: Golden Fantasia is neither: it is a fighting game on an engine of its own (Direct3D 9), and isn't supported.
 
 ## What the runtime reads
 
 - Scripts: `0.txt` .. `99.txt` or `00.txt` .. `99.txt` joined in order, else `nscript.dat` (each byte XOR 0x84).
-  `0.txt` wins over `nscript.dat`, as on Windows. The first line may set the screen size and variable counts
+  `0.txt` wins over `nscript.dat`, as on Windows. Ponscripter's `0.utf` .. `99.utf` (or `00.utf` ..) come before all
+  of them. The first line may set the screen size and variable counts
   (`;mode800`, `;value500`, `;$V2000G1000S800,600L10000`).
 - Files, in the order NScripter searches: loose files in the game folder; then `.ns2` archives, highest number first;
   then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`. Archive entries stored plain, with the
-  packer's SPB bitmap compression, or with its LZSS compression (type 2) are read. Names match without regard to case, as on
+  packer's SPB bitmap compression, with its LZSS compression (type 2), or as NBZ (type 4, a bzip2 stream, which the
+  Ponscripter games use for their bitmaps) are read. Names match without regard to case, as on
   Windows: loose files through an index of the folder made at start, archive members by their lowercased names, and
   files the game writes later (saves, screenshots) through `casepath_resolve` from `Engines/Shared/casepath.c`. All
   six test games pass the case check (title, play, save and load with every name's case swapped) on the Mac app and
@@ -62,6 +64,33 @@ releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are 
 - `blt` copies part of the `btndef` image straight onto the screen, scaled to the rectangle it names, past the scene;
   a game's ending credits roll scrolls that way. The drawing stays until the scene is next committed, or the commit
   after that once `ofscpy` has run, as the manual describes.
+
+## Ponscripter
+
+Ponscripter is NScripter with UTF-8 scripts and proportional English text. The runtime runs a game in its Ponscripter
+mode when the game's folder has `0.utf`; script text, file names and string variables are then UTF-8 bytes where they
+would be Shift-JIS, so byte-counted commands (`len`, `mid`) count UTF-8 bytes. The mode's commands are known only to
+Ponscripter games, so an NScripter game reads exactly as before. Everything below was settled as a black box on the
+Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
+
+- Languages. The script holds each line in Japanese and English: `langjp` and `langen` set the language of the text
+  that follows, until the next of them, and `langall` makes it every language's. `showlangen` and `showlangjp` choose
+  the language shown, English until either runs. Text of the other language isn't drawn and leaves no line break, but
+  its click and page waits still run; the games' textgosub routine skips them by reading `getreadlang` (-1 for every
+  language, 0 English, 1 Japanese). `language english` is read and ignored: it changed nothing in any lab.
+- English text sits between carets, `^...^`. Inside them `@`, `\`, `#rrggbb`, `!sd`, `!sN`, `!dN`, `!wN` and `_` work
+  as in any text line, while `$`, `%`, `{`, `<`, `(` and `[` are plain characters. A text line whose last character is
+  the closing caret doesn't end the line on screen, so a sentence can run on over several script lines.
+- `~...~` tags set the text's font and style.
+- `h_mapfont n,"file"` maps face n to one of the game's font files; `h_rendering` sets how glyphs are drawn.
+- Images tagged `:b` (`:b;`, `:bc;`, `:ba/2,0,3;`, ...) are drawn at half their size, rounded up, each pixel the
+  average of a 2x2 block with a pixel past an odd edge counting as transparent. The games' menus and buttons are drawn
+  at twice the screen's resolution this way. `:c` draws a PNG with an alpha channel opaque, as if over black, where
+  NScripter would keep its alpha.
+- `steamsetachieve` logs the achievement and does nothing more.
+- Saves: the PC engine keeps its saves in a `saves` folder, in a format of its own. The runtime keeps its own, in
+  NScripter's format, in `vndegen-saves`, so they never replace a PC save a player copied in, and Ludusavi syncs none
+  of them.
 
 ## English word wrap
 
@@ -194,7 +223,9 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   `lngtwave.dll/vwi` and `trvswave.dll/h` are drawn; others crossfade.
 - CD audio plays only from files in the game's `CD` folder; a disc isn't read.
 - MIDI music (`play "song.mid"`) isn't played; no test game has any.
-- `.nsa` compression type 4 isn't read; no test game uses it.
+- Ponscripter: English text is drawn in fixed cells, as NScripter draws it, not with the game's proportional fonts;
+  `~...~` tags are read and ignored, and `h_mapfont` and `h_rendering` are recorded but not used yet. Saves aren't the
+  PC engine's files. An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`

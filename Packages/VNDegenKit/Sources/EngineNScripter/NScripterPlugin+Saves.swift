@@ -6,6 +6,9 @@ extension NScripterPlugin {
     /// every platform. The runtime does the same, so a PC backup restores into the folder the game reads.
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let layout = NScripterLayout(FolderProbe(scanning: folder)) else { return [] }
+        // A Ponscripter game's PC saves are in a format the runtime doesn't write yet. Its own go to vndegen-saves and
+        // stay out of sync, so they never land in a PC backup.
+        if layout.ponscripter { return [] }
         let root = layout.url(in: folder)
         guard let saveDir = Self.saveDirectory(root) else {
             return [SaveLocation(directory: root) { path in Self.engineFileName(path) }]

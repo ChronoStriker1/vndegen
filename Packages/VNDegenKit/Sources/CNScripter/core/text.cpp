@@ -65,17 +65,17 @@ static void drawCoverage(Image &out, const Glyph &g, int x, int y, uint32_t colo
     }
 }
 
-// Draws Shift-JIS text on one line from (x, y), each character in its cell. Returns nothing; layout is fixed-pitch.
-void Engine::drawGlyphs(Image &out, const std::string &sjis, int x, int y, int fw, int fh, int pitchX, uint32_t color,
+// Draws text on one line from (x, y), each character in its cell. Returns nothing; layout is fixed-pitch.
+void Engine::drawGlyphs(Image &out, const std::string &str, int x, int y, int fw, int fh, int pitchX, uint32_t color,
                         bool bold, bool shadow, int, int, bool) {
     int px = x;
-    for (size_t i = 0; i < sjis.size();) {
+    // Part of a character, as a byte-counted mid leaves at the end of a string, draws nothing.
+    std::string_view text(str.data(), completeLength(str));
+    for (size_t i = 0; i < text.size();) {
         size_t n;
-        uint32_t cp = sjisDecode(sjis, i, &n);
+        bool half = isHalfWidth(text, i);
+        uint32_t cp = decodeChar(text, i, &n);
         i += n;
-        // Half a character, as a byte-counted mid leaves at the end of a string, draws nothing.
-        if (i == sjis.size() && n == 1 && sjisLead(uint8_t(sjis[i - 1]))) break;
-        bool half = n == 1;
         int cw = half ? fw / 2 : fw;
         // A backquote marks half-width text in one game's strings (its save names, say); it isn't drawn.
         if (cp == '`') continue;
@@ -128,8 +128,8 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     std::string text = spec.substr(p);
     int64_t advance = 0;
     for (size_t i = 0; i < text.size();) {
-        size_t n = sjisCharLen(text, i);
-        advance += n == 1 ? (fw + pitch) / 2 : fw + pitch;
+        size_t n = charLen(text, i);
+        advance += isHalfWidth(text, i) ? (fw + pitch) / 2 : fw + pitch;
         i += n;
     }
     int width = int(std::clamp<int64_t>(advance, 1, 8192));
@@ -245,12 +245,12 @@ void Engine::newLine() {
 
 void Engine::putChar(const std::string &ch, bool isRuby) {
     showWindow();
-    bool half = ch.size() == 1;
+    bool half = isHalfWidth(ch, 0);
     int adv = half ? halfAdvance() : fullAdvance();
     int lineWidth = win_.cols * fullAdvance();
     if (penX_ + adv > lineWidth && penX_ > indent_ * fullAdvance()) {
         // Line-start kinsoku characters hang past the edge instead of starting a line.
-        if (kinsokuStart_.find(ch) == std::string::npos || ch.size() == 1) newLine();
+        if (kinsokuStart_.find(ch) == std::string::npos || half) newLine();
     }
     TextChar c;
     c.ch = ch;
@@ -277,6 +277,7 @@ bool Engine::beginTextLine() {
     lineHadText_ = false;
     noNewlineAtEnd_ = false;
     halfWidthText_ = false;
+    caretText_ = false;
     // A page wait's clear happens as the next page starts, before that page's head becomes the savepoint.
     if (pendingPageClear_) {
         clearPage();
@@ -371,7 +372,10 @@ void Engine::textStep() {
             if (!textGosub_.empty()) return;
             return;
         }
-        if (!noNewlineAtEnd_ && lineHadText_) newLine();
+        // In Ponscripter, a line whose last character is the caret closing its English text doesn't end the line on
+        // screen, and a line in the language not shown leaves no mark at all.
+        bool ponsJoin = ponscripter_ && (textHiddenByLang() || (p > 0 && t[p - 1] == '^'));
+        if (!noNewlineAtEnd_ && lineHadText_ && !ponsJoin) newLine();
         p++;
         cur_.line++;
         cur_.stmt = 0;
@@ -379,6 +383,20 @@ void Engine::textStep() {
         return;
     }
     lineHadText_ = true;
+    if (ponscripter_ && c == '^') {
+        p++;
+        caretText_ = !caretText_;
+        return;
+    }
+    if (ponscripter_ && c == '~') {
+        // ~tags~ set the font and style of the text that follows, which fixed-cell text doesn't have, so they're
+        // skipped. An unclosed one is drawn as it stands.
+        size_t close = t.find('~', p + 1);
+        if (close != std::string::npos && close < t.find('\n', p)) {
+            p = close + 1;
+            return;
+        }
+    }
     if (c == '@' || c == '\\') {
         p++;
         bool page = c == '\\';
@@ -439,17 +457,18 @@ void Engine::textStep() {
         }
         return;
     }
-    if (c == '$' || c == '%') {
+    if ((c == '$' || c == '%') && !caretText_) {
         VarRef v = readVar();
+        if (textHiddenByLang()) return;
         std::string s = v.kind == VarRef::Str ? strVar(v.index) : std::to_string(getNumVar(v.index));
         for (size_t i = 0; i < s.size();) {
-            size_t n = sjisCharLen(s, i);
+            size_t n = charLen(s, i);
             pendingChars_.push_back(s.substr(i, n));
             i += n;
         }
         return;
     }
-    if (c == '{') {
+    if (c == '{' && !caretText_) {
         // {var,value,var,value...} assigns as the text is shown.
         p++;
         while (peek() != '}' && peek() != '\n') {
@@ -459,20 +478,20 @@ void Engine::textStep() {
             if (v.kind == VarRef::Str) {
                 // The value runs to the next comma or brace, unquoted.
                 size_t start = p;
-                while (p < t.size() && t[p] != ',' && t[p] != '}' && t[p] != '\n') p += sjisCharLen(t, p);
+                while (p < t.size() && t[p] != ',' && t[p] != '}' && t[p] != '\n') p += charLen(t, p);
                 setVar(v, t.substr(start, p - start));
             } else {
                 setVar(v, readInt());
             }
             readComma();
             if (p == before) {  // not an assignment: skip to the brace rather than read it again
-                while (peek() != '}' && peek() != '\n') p += sjisCharLen(t, p);
+                while (peek() != '}' && peek() != '\n') p += charLen(t, p);
             }
         }
         if (peek() == '}') p++;
         return;
     }
-    if (c == '<' && !textBtnOff_) {
+    if (c == '<' && !textBtnOff_ && !caretText_) {
         // <N text> or <text>: a text button.
         size_t end = t.find('>', p);
         if (end != std::string::npos && t.find('\n', p) > end) {
@@ -491,7 +510,7 @@ void Engine::textStep() {
             textColor_ = linkColor_[0];
             size_t first = page_.size();
             for (size_t i = 0; i < text.size();) {
-                size_t n = sjisCharLen(text, i);
+                size_t n = charLen(text, i);
                 putChar(text.substr(i, n));
                 i += n;
             }
@@ -500,7 +519,7 @@ void Engine::textStep() {
             return;
         }
     }
-    if (c == '(' && rubyOn_) {
+    if (c == '(' && rubyOn_ && !caretText_) {
         // (base/ruby)
         size_t slash = t.find('/', p), close = t.find(')', p), nl = t.find('\n', p);
         if (slash < close && close < nl) {
@@ -508,18 +527,18 @@ void Engine::textStep() {
             p = close + 1;
             int startX = penX_;
             for (size_t i = 0; i < base.size();) {
-                size_t n = sjisCharLen(base, i);
+                size_t n = charLen(base, i);
                 putChar(base.substr(i, n));
                 i += n;
             }
             // Ruby is centred over the base, in its own smaller cells above the line.
             int baseW = penX_ - startX;
             int rubyCount = 0;
-            for (size_t i = 0; i < ruby.size(); i += sjisCharLen(ruby, i)) rubyCount++;
+            for (size_t i = 0; i < ruby.size(); i += charLen(ruby, i)) rubyCount++;
             int rx = win_.tx + startX + (baseW - rubyCount * rubyW_) / 2;
             int ry = win_.ty + penY_;
             for (size_t i = 0; i < ruby.size();) {
-                size_t n = sjisCharLen(ruby, i);
+                size_t n = charLen(ruby, i);
                 TextChar rc;
                 rc.ch = ruby.substr(i, n);
                 rc.x = rx;
@@ -536,16 +555,17 @@ void Engine::textStep() {
         }
     }
     // An ordinary character.
-    size_t n = sjisCharLen(t, p);
+    size_t n = charLen(t, p);
     std::string ch = t.substr(p, n);
     p += n;
+    if (textHiddenByLang()) return;
     if (((english_ && cfg_.englishWordWrap) || halfWidthText_) && ch == " ") {
         // Word wrap (the option Test Game 98's patched engine needs): break before a word that won't fit.
         size_t q = p;
         int w = 0;
         while (q < t.size() && t[q] != ' ' && t[q] != '\n' && t[q] != '@' && t[q] != '\\' && t[q] != '|' && t[q] != '`') {
-            size_t m = sjisCharLen(t, q);
-            w += m == 1 ? halfAdvance() : fullAdvance();
+            size_t m = charLen(t, q);
+            w += isHalfWidth(t, q) ? halfAdvance() : fullAdvance();
             q += m;
         }
         int lineWidth = win_.cols * fullAdvance();
@@ -555,7 +575,7 @@ void Engine::textStep() {
         }
     }
     putChar(ch);
-    bool clickStrHit = !ignoreClickStr_ && !clickStr_.empty() && n == 2 && clickStr_.find(ch) != std::string::npos;
+    bool clickStrHit = !ignoreClickStr_ && !clickStr_.empty() && !isHalfWidth(ch, 0) && clickStr_.find(ch) != std::string::npos;
     ignoreClickStr_ = false;
     if (clickStrHit) {
         char next = p < t.size() ? t[p] : '\n';
@@ -702,7 +722,7 @@ void cmdPutText(E &e, const std::string &) {
     bool noBreak = !s.empty() && s.back() == '/';
     if (noBreak) s.pop_back();
     for (size_t i = 0; i < s.size();) {
-        size_t n = sjisCharLen(s, i);
+        size_t n = charLen(s, i);
         e.putChar(s.substr(i, n));
         i += n;
     }
@@ -819,7 +839,7 @@ void cmdGetTag(E &e, const std::string &) {
             start = ++i;
             continue;
         }
-        i += sjisCharLen(tag, i);
+        i += charLen(tag, i);
     }
     size_t k = 0;
     do {
@@ -880,7 +900,7 @@ void cmdStrSp(E &e, const std::string &name) {
     std::vector<std::string> lines(1);
     int col = 0;
     for (size_t i = 0; i < text.size();) {
-        size_t k = sjisCharLen(text, i);
+        size_t k = charLen(text, i);
         std::string ch = text.substr(i, k);
         i += k;
         if (ch == "\\") {
@@ -888,7 +908,7 @@ void cmdStrSp(E &e, const std::string &name) {
             col = 0;
             continue;
         }
-        int adv = k == 1 ? 1 : 2;
+        int adv = isHalfWidth(ch, 0) ? 1 : 2;
         if (col + adv > cols * 2) {
             lines.emplace_back();
             col = 0;
