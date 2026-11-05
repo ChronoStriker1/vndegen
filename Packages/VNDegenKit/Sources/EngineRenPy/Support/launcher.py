@@ -114,6 +114,27 @@ if sys.version_info >= (3, 12):
     if not any(type(finder).__name__ == "LegacyFinders" for finder in sys.meta_path):
         sys.meta_path.insert(0, LegacyFinders())
 
+    import functools
+    import random
+
+    # Python 3.12 made randrange and randint reject whole-number floats, which Python 2 and Python 3.9, the language of
+    # Ren'Py 8.3 and older, accept. Sizes from Ren'Py's renders are floats, so games pass them, such as MalOvent's
+    # glitch effect on its main menu. Other floats keep failing, as they did on those versions.
+    if not hasattr(random.Random.randrange, "__wrapped__"):
+        plain_randrange = random.Random.randrange
+
+        def whole(value):
+            return int(value) if isinstance(value, float) and value.is_integer() else value
+
+        # It keeps the original's name, because a save that holds this method records it by name.
+        @functools.wraps(plain_randrange)
+        def randrange(self, start, stop=None, step=1):
+            return plain_randrange(self, whole(start), whole(stop), whole(step))
+
+        random.Random.randrange = randrange
+        # The module's own random.randrange is a method of its hidden instance, bound when the module loaded.
+        random.randrange = random.randrange.__self__.randrange
+
 
 def use_python2_division():
     """
