@@ -26,11 +26,11 @@ char Engine::peek() const {
     return cur_.pos < t.size() ? t[cur_.pos] : '\n';
 }
 
-void Engine::skipSpaces() {
+void Engine::skipSpaces(bool wide) {
     const std::string &t = script_.text();
     while (cur_.pos < t.size() && (t[cur_.pos] == ' ' || t[cur_.pos] == '\t')) cur_.pos++;
     // A full-width space also separates arguments in some scripts.
-    while (isWideSpace(t, cur_.pos)) {
+    while (wide && isWideSpace(t, cur_.pos)) {
         cur_.pos += charLen(t, cur_.pos);
         while (cur_.pos < t.size() && (t[cur_.pos] == ' ' || t[cur_.pos] == '\t')) cur_.pos++;
     }
@@ -531,7 +531,8 @@ void Engine::executeStatement() {
         textStep();
         return;
     }
-    skipSpaces();
+    // A Ponscripter text line may open with a full-width space, which the PC engine draws.
+    skipSpaces(!ponscripter_);
     char c = peek();
     if (c == '\n') {
         // Read-text marks cover the newline of each line passed in sequence.

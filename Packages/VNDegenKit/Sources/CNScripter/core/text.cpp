@@ -97,7 +97,8 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     int pitch = spFont_.set ? spFont_.px : win_.px;
     bool bold = spFont_.set ? spFont_.bold : win_.bold, shadow = spFont_.set ? spFont_.shadow : win_.shadow;
     size_t p = 0;
-    if (p < spec.size() && spec[p] == '/') {
+    bool sized = p < spec.size() && spec[p] == '/';
+    if (sized) {
         p++;
         // fw,fh,pitch[,mode...]: later settings exist in newer engines; the first four are what this draws.
         int vals[4] = {fw, fh, pitch, 0};
@@ -126,6 +127,11 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     }
     if (colors.empty()) colors.push_back(rgba(255, 255, 255));
     std::string text = spec.substr(p);
+    if (ponscripter_ && ponsFace(0)) {
+        if (colors.size() > 64) colors.resize(64);  // more colour cells than any button has are a broken script
+        // A size the tag gives is the em on Ponscripter's doubled screen; the window's is the em on the game's.
+        return renderPonsString(text, sized ? fh : 2 * fh, sized ? pitch : 2 * pitch, colors, shadow, cells);
+    }
     int64_t advance = 0;
     for (size_t i = 0; i < text.size();) {
         size_t n = charLen(text, i);
@@ -178,7 +184,9 @@ void Engine::drawWindow(Image &out) {
     }
     if (textHidden_) return;
     drawClickCursor(out);
+    if (ponscripter_) drawPonsText(out);
     for (const TextChar &c : page_) {
+        if (c.face >= 0 && c.gaiji.empty()) continue;
         if (!c.gaiji.empty()) {
             if (ImageRef img = loadFileImage(c.gaiji)) blit(out, *img, c.x, c.y, 0, 0, img->w, img->h);
             continue;
@@ -232,18 +240,25 @@ void Engine::clearPage() {
     page_.clear();
     pageText_.clear();
     textButtons_.clear();
-    penX_ = 0;
-    penY_ = 0;
+    resetPen();
     sceneDirty_ = true;
 }
 
 void Engine::newLine() {
+    if (ponsText()) {
+        ponsNewLine();
+        return;
+    }
     penX_ = indent_ * fullAdvance();
     penY_ += win_.fh + win_.py;
     pageText_ += '\n';
 }
 
 void Engine::putChar(const std::string &ch, bool isRuby) {
+    if (ponsText() && !isRuby) {
+        ponsPutChar(ch);
+        return;
+    }
     showWindow();
     bool half = isHalfWidth(ch, 0);
     int adv = half ? halfAdvance() : fullAdvance();
@@ -389,10 +404,10 @@ void Engine::textStep() {
         return;
     }
     if (ponscripter_ && c == '~') {
-        // ~tags~ set the font and style of the text that follows, which fixed-cell text doesn't have, so they're
-        // skipped. An unclosed one is drawn as it stands.
+        // ~tags~ set the face and style of the text that follows. An unclosed one is drawn as it stands.
         size_t close = t.find('~', p + 1);
         if (close != std::string::npos && close < t.find('\n', p)) {
+            if (!textHiddenByLang()) applyPonsTag(ponsStyle_, std::string_view(t).substr(p + 1, close - p - 1));
             p = close + 1;
             return;
         }
@@ -443,7 +458,7 @@ void Engine::textStep() {
     // One game's English script, written for a patched engine, opens its text lines with a backquote: the text is
     // half-width English, broken between words, and each '|' inside it is a short pause the player can click past.
     // Settled from that script alone; no engine was available to check it against.
-    if (c == '`') {
+    if (c == '`' && !ponscripter_) {
         p++;
         halfWidthText_ = !halfWidthText_;
         return;
@@ -509,11 +524,7 @@ void Engine::textStep() {
             uint32_t saved = textColor_;
             textColor_ = linkColor_[0];
             size_t first = page_.size();
-            for (size_t i = 0; i < text.size();) {
-                size_t n = charLen(text, i);
-                putChar(text.substr(i, n));
-                i += n;
-            }
+            putString(text);
             for (size_t i = first; i < page_.size(); i++) page_[i].link = number;
             textColor_ = saved;
             return;
@@ -557,8 +568,19 @@ void Engine::textStep() {
     // An ordinary character.
     size_t n = charLen(t, p);
     std::string ch = t.substr(p, n);
+    if (ponscripter_) ch = ponsChar(t, p, &n);
     p += n;
     if (textHiddenByLang()) return;
+    if (ch == " " && ponsText()) {
+        // Ponscripter breaks a line before a word that won't fit, and the space at the break isn't drawn.
+        size_t nl = t.find('\n', p);
+        int width = ponsWordWidth(std::string_view(t).substr(0, nl == std::string::npos ? t.size() : nl), p);
+        int space = ponsFace(ponsStyle_.face())->glyph(' ', 2 * win_.fh).advance;
+        if (width > 0 && penX2_ + space + width > 2 * win_.cols * win_.fw && penX2_ > 0) {
+            newLine();
+            return;
+        }
+    }
     if (((english_ && cfg_.englishWordWrap) || halfWidthText_) && ch == " ") {
         // Word wrap (the option Test Game 98's patched engine needs): break before a word that won't fit.
         size_t q = p;
@@ -664,7 +686,7 @@ void cmdSetWindow(E &e, const std::string &name) {
     }
     e.page_.clear();
     e.pageText_.clear();
-    e.penX_ = e.penY_ = 0;
+    e.resetPen();
     e.windowShown_ = false;
     e.sceneDirty_ = true;
 }
@@ -672,7 +694,7 @@ void cmdSetWindow(E &e, const std::string &name) {
 void cmdTextClear(E &e, const std::string &) {
     e.page_.clear();
     e.pageText_.clear();
-    e.penX_ = e.penY_ = 0;
+    e.resetPen();
     e.sceneDirty_ = true;
 }
 
@@ -705,7 +727,9 @@ void cmdDefaultSpeed(E &e, const std::string &) {
 
 void cmdBr(E &e, const std::string &) {
     e.showWindow();
-    e.newLine();
+    // Ponscripter's br starts a paragraph half a line down.
+    if (e.ponsText()) e.ponsBreakParagraph();
+    else e.newLine();
     e.sceneDirty_ = true;
 }
 
@@ -715,17 +739,15 @@ void cmdLocate(E &e, const std::string &) {
     int y = e.readInt();
     e.penX_ = x * e.halfAdvance();
     e.penY_ = y * (e.win_.fh + e.win_.py);
+    e.penX2_ = 2 * e.penX_;
+    e.penY2_ = 2 * e.penY_;
 }
 
 void cmdPutText(E &e, const std::string &) {
     std::string s = e.readStr();
     bool noBreak = !s.empty() && s.back() == '/';
     if (noBreak) s.pop_back();
-    for (size_t i = 0; i < s.size();) {
-        size_t n = charLen(s, i);
-        e.putChar(s.substr(i, n));
-        i += n;
-    }
+    e.putString(s);
     if (!noBreak) e.newLine();
     e.sceneDirty_ = true;
 }

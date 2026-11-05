@@ -1,5 +1,5 @@
 // Ponscripter checks on the Linux host: the UTF-8 helpers, a 0.utf game's languages and English text, NBZ archive
-// entries, and ":b" images. The behaviour each checks was measured on the Umineko games' engine
+// entries, ":b" images, and proportional text. The behaviour each checks was measured on the Umineko games' engine
 // (docs/nscripter-cleanroom.md).
 #include <bzlib.h>
 
@@ -140,7 +140,57 @@ static void runGame() {
     fs::remove_all(dir);
 }
 
+// Proportional text, with a font from the font pack standing in for a game's: positions on the doubled screen, quote
+// substitution, faces from ~tags~, word wrap, paragraph breaks and string sprites follow the measured rules.
+static void layout() {
+    char temp[] = "/tmp/vnns-ponscripter-layout-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directory(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "regular.ttf");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Bold.ttf", dir / "fonts" / "face2.ttf");
+    std::ofstream(dir / "0.utf") << "*define\nh_mapfont 0, \"fonts/regular.ttf\"\ngame\n*start\n"
+                                    "setwindow 10,20,10,20,23,23,0,2,0,0,1,#ffffff,0,0,639,479\nshadedistance 3,3\nautoclick 50\n"
+                                    "lsp 5,\":s/30,30,1;#FFFFFF^AB^\",0,0\n"
+                                    "^Hi 'a' ``b'' ~b~B~b~ end^@\nbr\n"
+                                    "^mmmm oooo pppp qqqq rrrr ssss tttt uuuu vvvv wwww xxxx^@\nwait 100000\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    for (int i = 0; i < 200; i++) engine.step(16);
+    vnns::PonsFace regular;
+    vnns::Bytes data;
+    assert(vnns::readFile((dir / "fonts" / "regular.ttf").string(), data) && regular.load(data));
+    const int px = 46, ascent = 2 * regular.ascent(23), lineHeight = regular.height(px) + 4;
+    // 'H' at the text origin on the doubled screen; 'i' a whole-pixel advance on; the baseline the ascent below.
+    const auto &page = engine.page_;
+    assert(page.size() >= 2 && page[0].x2 == 20 && page[0].y2 == 40 + ascent && page[0].x == 10);
+    assert(page[1].x2 == 20 + regular.glyph('H', px).advance && page[1].x == page[1].x2 / 2);
+    assert(engine.pageText_.rfind("Hi \u2019a\u2019 \u201Cb\u201D B end", 0) == 0);
+    for (const vnns::TextChar &c : page) assert(c.face == (c.ch == "B" ? 2 : 0) && c.shadow);
+    // The paragraph: br's half line below the first line's end, then lines that break between words.
+    size_t first = 0;
+    while (page[first].ch != "m") first++;
+    assert(page[first].y2 == page[0].y2 + lineHeight + (regular.height(px) + 1) / 2 + 4);
+    int lines = 1;
+    for (size_t i = first + 1; i < page.size(); i++) {
+        if (page[i].y2 == page[i - 1].y2) continue;
+        assert(page[i].y2 == page[i - 1].y2 + lineHeight && page[i].x2 == 20 && page[i - 1].ch != " ");
+        assert(page[i].ch == page[i + 1].ch);  // a word's first letter
+        lines++;
+    }
+    for (const vnns::TextChar &c : page) assert(c.x2 + regular.glyph(c.ch[0], px).advance <= 20 + 2 * 10 * 23);
+    assert(lines >= 2);
+    // A string sprite's size is its em on the doubled screen, its pitch added per character, halved.
+    const vnns::Sprite &s = engine.scene_.sp[5];
+    int width2 = regular.glyph('A', 30).advance + regular.glyph('B', 30).advance + 2;
+    assert(s.img.cellWidth == ((width2 + 1) & ~1) / 2);
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
+    layout();
 }

@@ -22,7 +22,7 @@ the runtime's own keeps each playing sound 0.75 s ahead in a ring buffer, so the
 and a slow decode can't make it miss its deadline or hold up the game. Everything runs in the app's process, with no
 JIT, on Mac, iPhone and iPad.
 
-Third-party code: stb_image (PNG, JPEG, BMP), stb_vorbis (Ogg Vorbis), dr_mp3 (MP3), pl_mpeg (MPEG-1 movies with
+Third-party code: stb_image (PNG, JPEG, BMP), stb_vorbis (Ogg Vorbis), stb_truetype (Ponscripter's fonts), dr_mp3 (MP3), pl_mpeg (MPEG-1 movies with
 MP2 sound) and Lua 5.1 (NSLua scripts), all MIT, MIT No Attribution or public domain, listed in
 `Engines/NScripter/UPSTREAM.md`, plus the system's bzip2 library for NBZ sounds. Text is drawn with the font pack's substitutes
 (`docs/fonts.md`): MS Gothic, NScripter's default, is Ume Gothic, a script's `font` or `defaultfont` name goes through
@@ -81,8 +81,24 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
 - English text sits between carets, `^...^`. Inside them `@`, `\`, `#rrggbb`, `!sd`, `!sN`, `!dN`, `!wN` and `_` work
   as in any text line, while `$`, `%`, `{`, `<`, `(` and `[` are plain characters. A text line whose last character is
   the closing caret doesn't end the line on screen, so a sentence can run on over several script lines.
-- `~...~` tags set the text's font and style.
-- `h_mapfont n,"file"` maps face n to one of the game's font files; `h_rendering` sets how glyphs are drawn.
+- Text is drawn in the game's own fonts: `h_mapfont n,"file"` names face n's file, and a face it doesn't name is
+  `fonts/face<n>.ttf`. `~cN~` picks face N, plain; `~i~` and `~b~` toggle italic and bold, which add 1 and 2 to the
+  face number, so `~ib~` in a game whose faces 1 to 3 are its bold font draws bold. A style lasts from line to line
+  until a tag changes it. There's no fallback font: a character the face lacks draws as its missing-glyph shape.
+- Layout follows the PC engine, which draws on a screen twice the game's size and halves it. Each glyph is rasterized
+  (stb_truetype, no hinting) at twice the window's font size and placed at whole pixels of that doubled screen, the
+  pen moving by the glyph's advance there, rounded down; there is no kerning, though the fonts carry some. The baseline
+  is the font's ascender below the line's top (at the game's size, rounded up), lines are the font's height plus the
+  window's line spacing apart (at the doubled size, rounded up), and `br` moves down half a line plus the spacing to
+  start a paragraph. A word that won't fit starts a line, and the space before it isn't drawn; Japanese text breaks
+  at any character, with NScripter's line-start kinsoku. The shadow is `shadedistance` pixels of the doubled screen
+  (3 is a pixel and a half), and setwindow's bold flag changes nothing, as on the PC.
+- `'` and `` ` `` are drawn as curly single quotes (U+2019, U+2018), `''` and ``` `` ``` as double ones. `"`, `--`
+  and `...` stay as written, and there are no ligatures.
+- String sprites (`:s`) and `select` items are laid out the same way. A size in an `:s` tag (`:s/16,16,0;`) is the em
+  and the character pitch on the doubled screen, so `/30,30,0` is 15 pixels; only the height and the pitch count.
+- A Ponscripter text line may open with a full-width space, which is drawn, where NScripter would skip it.
+- `h_rendering` (no hinting, whole pixels) is read; it is what the runtime does.
 - Images tagged `:b` (`:b;`, `:bc;`, `:ba/2,0,3;`, ...) are drawn at half their size, rounded up, each pixel the
   average of a 2x2 block with a pixel past an odd edge counting as transparent. The games' menus and buttons are drawn
   at twice the screen's resolution this way. `:c` draws a PNG with an alpha channel opaque, as if over black, where
@@ -223,9 +239,10 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   `lngtwave.dll/vwi` and `trvswave.dll/h` are drawn; others crossfade.
 - CD audio plays only from files in the game's `CD` folder; a disc isn't read.
 - MIDI music (`play "song.mid"`) isn't played; no test game has any.
-- Ponscripter: English text is drawn in fixed cells, as NScripter draws it, not with the game's proportional fonts;
-  `~...~` tags are read and ignored, and `h_mapfont` and `h_rendering` are recorded but not used yet. Saves aren't the
-  PC engine's files. An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
+- Ponscripter: glyph edges differ from the PC's by a few levels of grey, stb_truetype's antialiasing against
+  FreeType's; layout is the same pixel for pixel in every lab. Only the `~i~`, `~b~` and `~cN~` tags are read, the
+  ones the games use. The window's character pitch isn't added to proportional text (the games' is 0). Saves aren't
+  the PC engine's files. An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`

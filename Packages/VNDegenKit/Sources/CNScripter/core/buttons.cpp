@@ -604,11 +604,7 @@ void Engine::startSelect(SelectMode mode) {
         selectRows_.push_back(penY_);
         uint32_t saved = textColor_;
         textColor_ = selectColor(false);
-        for (size_t i = 0; i < text.size();) {
-            size_t n = charLen(text, i);
-            putChar(text.substr(i, n));
-            i += n;
-        }
+        putString(text);
         textColor_ = saved;
         newLine();
     }

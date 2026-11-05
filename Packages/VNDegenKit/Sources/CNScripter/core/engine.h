@@ -22,6 +22,7 @@
 #include "font.h"
 #include "fs.h"
 #include "gfx.h"
+#include "ponsfont.h"
 #include "script.h"
 
 struct lua_State;
@@ -113,13 +114,17 @@ struct Effect {
 };
 
 struct TextChar {
-    std::string ch;  // one Shift-JIS character
+    std::string ch;  // one character, in the script's encoding
     int x, y;        // top-left, screen pixels
     uint32_t color;
     int w, h;
     bool ruby = false;
     std::string gaiji;  // NSFont gaiji: an image drawn in place of the character
     int link = -1;      // text button number
+    // Ponscripter text, drawn at twice the screen's resolution: the face, and the pen's x and the baseline's y on that
+    // doubled screen. face is -1 for NScripter's fixed cells.
+    int face = -1, x2 = 0, y2 = 0;
+    bool shadow = false;
 };
 
 struct Button {
@@ -219,7 +224,7 @@ public:
     bool defineMode_ = true;
     void jumpToLine(int line);
     bool jumpToLabel(std::string_view label);
-    void skipSpaces();
+    void skipSpaces(bool wide = true);  // wide: full-width spaces too
     char peek() const;
     bool atStatementEnd() const;
     bool readComma();  // consumes a ',' if present
@@ -415,6 +420,51 @@ public:
     TextEncoding encoding() const { return ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis; }
     bool textHiddenByLang() const { return ponscripter_ && textLang_ >= 0 && textLang_ != shownLang_; }
     std::map<int, std::string> fontFiles_;  // h_mapfont: the game's font files, by face number
+
+    // Ponscripter's proportional text (ponstext.cpp). Positions are in pixels of a screen twice the game's size, where
+    // the engine draws; the text is halved onto the frame.
+    std::map<int, std::unique_ptr<PonsFace>> ponsFaces_;  // loaded on first use; null when the file can't be read
+    PonsFace *ponsFace(int n);
+    // ~cN~ picks face N, plain; ~i~ and ~b~ toggle italic and bold, which add 1 and 2 to it. A style lasts from line to
+    // line until a tag changes it.
+    struct PonsStyle {
+        int base = 0;
+        bool italic = false, bold = false;
+        int face() const { return base + (italic ? 1 : 0) + (bold ? 2 : 0); }
+    } ponsStyle_;
+    static void applyPonsTag(PonsStyle &style, std::string_view tag);
+    // The character at t[p] as Ponscripter draws it: ` and ' become curly quotes, `` and '' double ones. Returns the
+    // character, and its length in the script in *used.
+    static std::string ponsChar(std::string_view t, size_t p, size_t *used);
+    bool ponsText() { return ponscripter_ && ponsFace(ponsStyle_.face()); }
+    int penX2_ = 0, penY2_ = 0;  // the pen on the doubled screen, from the text origin
+    void resetPen();
+    int ponsLineHeight2();
+    void ponsPutChar(const std::string &ch);
+    void ponsNewLine();
+    void ponsBreakParagraph();  // br
+    // The width on the doubled screen of the word starting at t[p], up to a space, wait or line end, skipping markup.
+    int ponsWordWidth(std::string_view t, size_t p);
+    // Puts a string's characters, reading its carets, ~tags~ and quotes (select items, text buttons, puttext).
+    void putString(const std::string &s);
+    struct PonsLayer {
+        Image doubled, frame;  // the page's text on the doubled screen, and halved
+        struct Placed {
+            std::string ch;
+            int face, x2, y2;
+            uint32_t color;
+            bool shadow;
+            bool operator==(const Placed &o) const {
+                return ch == o.ch && face == o.face && x2 == o.x2 && y2 == o.y2 && color == o.color && shadow == o.shadow;
+            }
+        };
+        std::vector<Placed> placed;
+    } ponsLayer_;
+    void drawPonsText(Image &out);
+    // A ":s" string sprite's text, laid out on one line with an em of px and pitch pixels between characters on the
+    // doubled screen, and halved, one cell per colour.
+    ImageRef renderPonsString(const std::string &text, int px, int pitch, const std::vector<uint32_t> &colors, bool shadow,
+                              int &cells);
     void noteTextLineStart();      // savepoint and read-text bookkeeping at the head of a text line
     bool textBtnOff_ = false;
     int textBtnStart_ = 1;

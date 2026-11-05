@@ -498,7 +498,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     logTags_ = std::move(tags);
     page_.clear();
     pageText_.clear();
-    penX_ = penY_ = 0;
+    resetPen();
     windowShown_ = windowUp;
     stack_ = std::move(frames);
     buttons_.clear();
