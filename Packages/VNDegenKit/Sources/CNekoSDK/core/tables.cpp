@@ -2145,10 +2145,11 @@ run 2160 1 1
 
 const char kFunbag4[] = R"(
 screen title
+askerlit
 pic obj\c000_000.bmp 0 0
-pic obj\d000_000.bmp 371 0
-pic obj\d001_000.bmp 0 0
 pic obj\c000_001.bmp 0 0
+pic obj\d000_000.bmp 435 0
+pic obj\d001_000.bmp 0 0
 pic obj\c000_002.bmp 0 660
 pic obj\d004_000.bmp 568 687
 button start obj\d003_000.bmp 58 355 6 5 0
@@ -2534,6 +2535,30 @@ pic obj\h010_000.bmp 439 588 2 5 1 4
 pic obj\h024_000.bmp 449 553 1 5 0 4
 pic obj\h008_000.bmp 587 179 2 5 0 4
 pic obj\h008_000.bmp 668 179 2 5 1 4
+check voice0 obj\h022_000.bmp 569 250 8 5 0 0 2 4 1
+check voice1 obj\h022_000.bmp 569 304 8 5 1 0 2 4 1
+check voice2 obj\h022_000.bmp 569 358 8 5 2 0 2 4 1
+check voice3 obj\h022_000.bmp 569 412 8 5 3 0 2 4 1
+check voice4 obj\h022_000.bmp 569 466 8 5 4 0 2 4 1
+check voice5 obj\h022_000.bmp 569 520 8 5 5 0 2 4 1
+check voice6 obj\h022_000.bmp 569 574 8 5 6 0 2 4 1
+check voice7 obj\h022_000.bmp 569 628 8 5 7 0 2 4 1
+check voice8 obj\h022_001.bmp 735 250 8 5 0 0 2 4 1
+check voice9 obj\h022_001.bmp 735 304 8 5 1 0 2 4 1
+check voice10 obj\h022_001.bmp 735 358 8 5 2 0 2 4 1
+check voice11 obj\h022_001.bmp 735 412 8 5 3 0 2 4 1
+check voice12 obj\h022_001.bmp 735 466 8 5 4 0 2 4 1
+check voice13 obj\h022_001.bmp 735 520 8 5 5 0 2 4 1
+check voice14 obj\h022_001.bmp 735 574 8 5 6 0 2 4 1
+check voice15 obj\h022_001.bmp 735 628 8 5 7 0 2 4 1
+check voice16 obj\h022_002.bmp 901 250 8 5 0 0 2 4 1
+check voice17 obj\h022_002.bmp 901 304 8 5 1 0 2 4 1
+check voice18 obj\h022_002.bmp 901 358 8 5 2 0 2 4 1
+check voice19 obj\h022_002.bmp 901 412 8 5 3 0 2 4 1
+check voice20 obj\h022_002.bmp 901 466 8 5 4 0 2 4 1
+check voice21 obj\h022_002.bmp 901 520 8 5 5 0 2 4 1
+check voice22 obj\h022_002.bmp 901 574 8 5 6 0 2 4 1
+check voice23 obj\h022_002.bmp 901 628 8 5 7 0 2 4 1
 
 screen log
 pic obj\m001_000.bmp 1172 28
@@ -2547,6 +2572,7 @@ button log_down obj\m003_000.bmp 1180 626 4 5 2
 button log_bottom obj\m003_000.bmp 1180 659 4 5 3
 
 screen dialog
+dim 0
 pic obj\b001_000.bmp 0 174
 pic obj\i000_000.bmp 346 220 1 8 0 0
 button yes obj\b003_000.bmp 424 320 2 5 0
@@ -2560,6 +2586,11 @@ placefor 2 290 89 414 0
 
 screen defaults
 default opacity 60
+voicejoint 25 22 23
+voicejoint 26 16 17 18
+voicejoint 27 1 2
+voicejoint 28 3 4
+voicejoint 29 0 3 4
 
 screen cfgsav
 run 4 2 1

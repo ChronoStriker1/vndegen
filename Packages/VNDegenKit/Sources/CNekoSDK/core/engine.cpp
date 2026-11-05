@@ -1087,16 +1087,19 @@ void Engine::changeSetting(const std::string &name, int value) {
 }
 
 // Table lines: `slider NAME FILL X Y`, `number NAME DIGITS X Y`, `bar FILL X Y PERCENT` for one that can't change,
-// `radio NAME VALUE SHEET X Y COLS ROWS COL`, `check NAME SHEET X Y COLS ROWS COL` and `step NAME DELTA SHEET X Y COLS ROWS COL`.
+// `radio NAME VALUE SHEET X Y COLS ROWS COL`, `check NAME SHEET X Y COLS ROWS COL [ON ONHOVER OFF OFFHOVER]` and
+// `step NAME DELTA SHEET X Y COLS ROWS COL`.
 // Sheets run normal, hover, selected, selected and hovered, as the PC's do.
 void Engine::composeSettingsWidgets(Canvas &out) {
     auto lines = [&](const char *kind) { return screen_->settings.equal_range(kind); };
-    auto cell = [&](const std::vector<std::string> &f, size_t at, bool on) {
+    // `rows` gives the sheet's rows for on, on and hovered, off, and off and hovered, when they aren't in the usual order.
+    auto cell = [&](const std::vector<std::string> &f, size_t at, bool on, const int *rows = nullptr) {
         ImageRef sheet = images_->get(f[at]);
         if (!sheet) return;
         int x = field(f, at + 1), y = field(f, at + 2), w = sheet->w / field(f, at + 3), h = sheet->h / field(f, at + 4);
         bool over = pointerSeen_ && !dialogOpen_ && inRect(pointerX_, pointerY_, x, y, w, h);
-        drawPart(out, *sheet, x, y, field(f, at + 5) * w, (on ? 2 : 0) * h + (over ? h : 0), w, h, 1);
+        int row = rows ? rows[(on ? 0 : 2) + (over ? 1 : 0)] : (on ? 2 : 0) + (over ? 1 : 0);
+        drawPart(out, *sheet, x, y, field(f, at + 5) * w, row * h, w, h, 1);
     };
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
@@ -1117,8 +1120,13 @@ void Engine::composeSettingsWidgets(Canvas &out) {
     }
     for (auto [it, end] = lines("radio"); it != end; ++it)
         if (it->second.size() >= 8) cell(it->second, 2, setting(it->second[0]) == field(it->second, 1));
-    for (auto [it, end] = lines("check"); it != end; ++it)
-        if (it->second.size() >= 7) cell(it->second, 1, setting(it->second[0]) != 0);
+    for (auto [it, end] = lines("check"); it != end; ++it) {
+        const auto &f = it->second;
+        if (f.size() < 7) continue;
+        // `check NAME SHEET X Y COLS ROWS COL ON ONHOVER OFF OFFHOVER`, as Test Game 85's voice cards are.
+        const int rows[4] = {field(f, 7), field(f, 8), field(f, 9), field(f, 10)};
+        cell(f, 1, setting(f[0]) != 0, f.size() >= 11 ? rows : nullptr);
+    }
     for (auto [it, end] = lines("step"); it != end; ++it)
         if (it->second.size() >= 8) cell(it->second, 2, false);
 }
