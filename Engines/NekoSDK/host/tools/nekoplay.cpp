@@ -57,8 +57,14 @@ int main(int argc, char **argv) {
             if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) running = false;
             if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_LCTRL) vnneko_set_skip(e, true);
             if (event.type == SDL_EVENT_KEY_UP && event.key.key == SDLK_LCTRL) vnneko_set_skip(e, false);
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) vnneko_mouse_button(e, event.button.button - 1, true);
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) vnneko_mouse_button(e, event.button.button - 1, false);
+            SDL_ConvertEventToRenderCoordinates(renderer, &event);
+            if (event.type == SDL_EVENT_MOUSE_MOTION) vnneko_mouse_move(e, event.motion.x / float(w), event.motion.y / float(h));
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                vnneko_mouse_move(e, event.button.x / float(w), event.button.y / float(h));
+                // SDL numbers left, middle, right, and the runtime left, right.
+                int button = event.button.button == SDL_BUTTON_LEFT ? 0 : event.button.button == SDL_BUTTON_RIGHT ? 1 : -1;
+                if (button >= 0) vnneko_mouse_button(e, button, event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+            }
         }
         Uint64 now = SDL_GetTicks();
         if (!vnneko_step(e, int(now - last))) running = false;

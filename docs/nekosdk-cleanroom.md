@@ -80,7 +80,9 @@ After the records come the text on screen and the last 60 lines of the backlog, 
 
 `cfg.sav` holds the PC's settings, with the 10,000 global variables at byte 4000 (a macro of 1000 sits at byte 8000 after the prologue). The runtime keeps the rest of the file as it found it. `read.sav` isn't read or written, so PC read marks don't carry over. Config's settings are kept in a small file of VNDegen's, so they don't move to or from a PC.
 
-The same file keeps what's been unlocked, read by comparing PC files with what the PC's galleries show: a row of 40 bytes for each entry in `cg_view.ini` from byte 48022, an int for each of its pictures, and an int for each track in `sound_view.ini` from byte 100022. Test Game 95's file with 5, 4 and 7 pictures seen in its first three entries, and its 10 tracks heard of 15, gives those numbers.
+The same file keeps what's been unlocked, read by comparing PC files with what the PC's galleries show: a row of 40 bytes for each entry in `cg_view.ini` from byte 48000, an int for each of its pictures, and an int for each track in `sound_view.ini` from byte 100000. Both move by the length of a string at byte 44020 that names a scene: a file the PC has just made has none and is 104,000 bytes, and one with a 22-character name has its tables 22 bytes later. Test Game 95's file with 5, 4 and 7 pictures seen in its first three entries, and its 10 tracks heard of 15, gives those numbers, and Test Game 97's file agrees on the tracks. A CG row in Test Game 97 is assumed to match.
+
+When no `cfg.sav` exists the runtime writes the values the PC game wrote on a first run under Wine, listed in `tables.cpp`, because a file of zeros sets the PC game's volumes to 0 and turns its confirmations off.
 
 Quick saves are ordinary saves in slots 81 to 88, which the Q-Save page after the ten pages of eight shows. Under Wine a session's first quick save overwrote slot 81 and its second went to slot 82. That a page's eight fill and then wrap is assumed, and so is quick load taking the newest. A click on a card's lock changed no file while the game ran, so the runtime doesn't set it.
 

@@ -365,6 +365,35 @@ button log_top obj\m003_000.bmp 1180 34 5 5 1
 button log_up obj\m003_000.bmp 1180 68 5 5 2
 button log_down obj\m003_000.bmp 1180 622 5 5 3
 button log_bottom obj\m003_000.bmp 1180 656 5 5 4
+
+screen cfgsav
+run 4 2 1
+run 16 2 50
+run 24 1 100
+run 36 1 100
+run 40 1 1
+run 48 1 2
+run 52 1 1
+run 76 1 1
+run 108 1 1
+run 116 1 60
+run 120 1 1
+run 168 1 1
+run 244 1 32
+run 280 1 9
+run 324 2 1
+run 340 1 1
+run 348 1 1
+run 360 6 1
+run 400 100 1
+run 848 1 1
+run 852 1 480
+run 860 1 1
+run 1996 1 1
+run 2000 1 100
+run 2004 8 80
+run 2120 9 1
+run 2160 1 1
 )";
 
 // Test Game 95.
@@ -767,6 +796,36 @@ button log_top obj\m003_000.bmp 1770 51 4 5 0
 button log_up obj\m003_000.bmp 1770 102 4 5 1
 button log_down obj\m003_000.bmp 1770 930 4 5 2
 button log_bottom obj\m003_000.bmp 1770 980 4 5 3
+
+screen cfgsav
+run 4 2 1
+run 16 2 50
+run 24 1 60
+run 36 1 100
+run 40 1 1
+run 48 1 2
+run 52 1 1
+run 76 1 1
+run 108 1 1
+run 116 1 60
+run 120 1 1
+run 168 1 1
+run 200 1 1
+run 212 1 1
+run 244 1 32
+run 280 1 9
+run 340 1 1
+run 348 1 1
+run 360 6 1
+run 400 100 1
+run 848 1 1
+run 852 1 480
+run 860 1 1
+run 1996 1 1
+run 2000 1 100
+run 2004 8 80
+run 2120 9 1
+run 2160 1 1
 )";
 
 }  // namespace

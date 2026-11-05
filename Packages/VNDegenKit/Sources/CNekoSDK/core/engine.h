@@ -61,6 +61,7 @@ struct Sprite {
     std::vector<Animation> changes;
     Animation loop;
     bool looping = false;
+    std::string loopText;  // the named animation as the script gives it, which a save holds
 };
 
 struct SpriteView {
@@ -153,9 +154,11 @@ private:
     void noteSeen(const std::string &path);
     bool seen(const std::string &path) const;
     void saveSeen();
+    size_t configStringLength() const;
     int nextTrack(int direction);
     void playTrack(int index);
     void stopTrack();
+    void pauseMusicForTrack(bool paused);
     int currentTrack_ = -1;
     bool trackPaused_ = false, trackRepeat_ = false, trackShuffle_ = false;
     void composeGallery(Canvas &out);

@@ -95,6 +95,7 @@ struct WavDecoder : Decoder {
 }  // namespace
 
 struct Audio::Player {
+    bool retired = false;
     std::unique_ptr<Decoder> dec;
     bool playing = false, paused = false;
     float volume = 1.0f;          // 0..1
@@ -168,6 +169,8 @@ int Audio::open(std::shared_ptr<const std::vector<uint8_t>> data) {
     auto p = std::make_unique<Player>();
     p->dec = std::move(d);
     std::lock_guard<std::mutex> lock(mu_);
+    for (auto i = players_.begin(); i != players_.end();)
+        i = i->second->retired && !i->second->playing ? players_.erase(i) : std::next(i);
     int h = next_++;
     players_[h] = std::move(p);
     return h;
@@ -186,6 +189,15 @@ void Audio::play(int h) {
     p.paused = false;
     if (p.fadeLen == 0) p.volume = 1.0f;
 }
+void Audio::start(int h) {
+    WITH(h);
+    auto &p = *it->second;
+    p.played = 0;
+    p.primed = false;
+    p.playing = true;
+    p.paused = false;
+}
+void Audio::retire(int h) { WITH(h); it->second->retired = true; }
 void Audio::stop(int h) { WITH(h); it->second->playing = false; }
 void Audio::pause(int h, bool v) { WITH(h); it->second->paused = v; }
 bool Audio::playing(int h) { WITH(h) false; return it->second->playing; }

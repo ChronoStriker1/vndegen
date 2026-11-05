@@ -20,7 +20,11 @@ public:
     // Makes a player for the file's bytes. Returns 0 when the data can't be decoded.
     int open(std::shared_ptr<const std::vector<uint8_t>> data);
     void close(int h);
+    // Closes the player once it has stopped, for one left to fade out.
+    void retire(int h);
     void play(int h);
+    // Like play, keeping the position and volume already set.
+    void start(int h);
     void stop(int h);
     void pause(int h, bool paused);
     bool playing(int h);

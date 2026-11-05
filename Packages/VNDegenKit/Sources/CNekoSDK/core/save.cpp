@@ -175,6 +175,11 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.path = r.str();
         s.nextPath = r.str();
         size_t f = r.at;
+        // The whole fixed part, so one cut short is caught here and not read past the end below.
+        if (!r.ok || f + kRecordAnimationAt + extra + 4 > plain.size()) {
+            r.ok = false;
+            break;
+        }
         s.x = r.f32At(f + kRecordX + extra);
         s.y = r.f32At(f + kRecordX + 4 + extra);
         s.scaleX = r.f32At(f + kRecordScale + extra);

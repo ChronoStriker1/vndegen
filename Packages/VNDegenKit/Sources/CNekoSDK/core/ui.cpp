@@ -138,6 +138,8 @@ MessageButtons parseMessageButtons(const std::vector<uint8_t> &ini, Images &imag
         pair(fields[3], b.cols, b.rows);
         int row = 0;
         pair(fields[4], b.column, row);
+        // A patched file could give anything here, and drawing divides by these.
+        if (b.cols <= 0 || b.rows <= 0 || b.column < 0 || b.column >= b.cols) return;
         b.help = images.get(fields[9]);
         pair(fields[10], b.helpX, b.helpY);
         if (fields.size() > 12) {

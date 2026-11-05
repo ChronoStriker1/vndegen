@@ -8,6 +8,8 @@
 #include <cerrno>
 #include <ctime>
 #include <iterator>
+#include <dirent.h>
+#include <strings.h>
 #include <sys/stat.h>
 
 #include "font.h"
@@ -27,7 +29,8 @@ constexpr int kLogDim = 182;
 // Eight cards to a page and ten pages of saves, and then the Q-Save page.
 constexpr int kFirstQuickSlot = 81, kLastQuickSlot = 88;
 // cfg.sav's tables of what's been unlocked: a row of ints for each CG, a picture to an int, and an int for each track.
-constexpr size_t kCgFlagsAt = 48022, kCgFlagRow = 40, kCgFlagsPerRow = 10, kTrackFlagsAt = 100022;
+// They sit after a string at byte 44020, so they move with its length.
+constexpr size_t kConfigSize = 104000, kConfigStringAt = 44020, kCgFlagsAt = 48000, kCgFlagRow = 40, kCgFlagsPerRow = 10, kTrackFlagsAt = 100000;
 // How long Auto waits after the text and voice are done.
 constexpr int kAutoDelayMs = 1000;
 constexpr float kPi = 3.14159265f;
@@ -35,6 +38,8 @@ constexpr float kShakeMs = 300, kShakePixelsX = 24, kShakePixelsY = 28;
 
 int field(const std::vector<std::string> &line, size_t index) { return index < line.size() ? std::atoi(line[index].c_str()) : 0; }
 bool inRect(int x, int y, int left, int top, int w, int h) { return x >= left && y >= top && x < left + w && y < top + h; }
+std::string nameInFolder(const std::string &folder, const std::string &name);
+std::string matchCase(const std::string &base, const std::string &relative);
 
 // What Config shows before the player changes anything, which is what the PC's shows.
 const std::map<std::string, int> &defaultSettings() {
@@ -100,6 +105,7 @@ int Config::number(const std::string &key, int fallback) const {
 // MARK: Start and stop
 
 Engine::~Engine() {
+    saveSeen();
     if (log_ && log_ != stderr) std::fclose(log_);
 }
 
@@ -187,7 +193,7 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     if (!dataDir.empty()) {
         std::string relative = config_.text("UserDataDirectory");
         std::replace(relative.begin(), relative.end(), '\\', '/');
-        saveDir_ = dataDir + "/AppData/Roaming/" + relative + "/save";
+        saveDir_ = matchCase(dataDir, "AppData/Roaming/" + relative + "/save");
     }
     if (folder_ == "waffle\\x2019_retry") {
         bars_ = {images_->get("obj\\l000_000.bmp"), images_->get("obj\\l000_001.bmp")};
@@ -254,9 +260,12 @@ void Engine::endStory(const std::string &screen) {
     stopKind(kKindSe, 500);
     stopKind(kKindVoice, 0);
     if (voicePlayer_) {
-        audio_.stop(voicePlayer_);
+        audio_.close(voicePlayer_);
         voicePlayer_ = 0;
     }
+    skipToggle_ = false;
+    autoMode_ = false;
+    windowHiddenByPlayer_ = false;
     stack_.clear();
     scene_ = {};
     back_.clear();
@@ -275,6 +284,7 @@ void Engine::endStory(const std::string &screen) {
 void Engine::startStory() {
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
+        audio_.retire(titleMusic_);
         titleMusic_ = 0;
     }
     screen_ = nullptr;
@@ -350,7 +360,7 @@ void Engine::runAction(const std::string &action) {
         return;
     }
     if (action == "quit" || action == "Exit") { openDialog(7, [this] { waiting_ = Waiting::Ended; }); return; }
-    if (action == "Title") { openDialog(6, [this] { screen_ = nullptr; openScreen("title"); }); return; }
+    if (action == "Title") { openDialog(6, [this] { endStory("title"); }); return; }
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
@@ -358,10 +368,12 @@ void Engine::runAction(const std::string &action) {
     if (action == "LogMode") { openLog(); return; }
     if (action == "Voice") {
         if (!currentText_.voice.empty()) {
-            if (voicePlayer_) audio_.stop(voicePlayer_);
+            if (voicePlayer_) audio_.close(voicePlayer_);
+            voicePlayer_ = 0;
             if (Bytes data = files_.read(currentText_.voice)) {
                 voicePlayer_ = audio_.open(data);
                 if (voicePlayer_) {
+                    audio_.setGroup(voicePlayer_, kKindVoice);
                     audio_.setLoops(voicePlayer_, 1);
                     audio_.play(voicePlayer_);
                 }
@@ -539,6 +551,30 @@ bool makeFolders(const std::string &path) {
     return mkdir(path.c_str(), 0777) == 0 || errno == EEXIST;
 }
 
+// The name in the folder that matches apart from case, or the name as given. A backup restored from a PC can hold
+// CFG.SAV where the game asks for cfg.sav, and an iPad's disk tells them apart.
+std::string nameInFolder(const std::string &folder, const std::string &name) {
+    struct stat info;
+    if (stat((folder + "/" + name).c_str(), &info) == 0) return name;
+    DIR *dir = opendir(folder.c_str());
+    if (!dir) return name;
+    std::string found = name;
+    while (dirent *entry = readdir(dir))
+        if (strcasecmp(entry->d_name, name.c_str()) == 0) {
+            found = entry->d_name;
+            break;
+        }
+    closedir(dir);
+    return found;
+}
+
+std::string matchCase(const std::string &base, const std::string &relative) {
+    std::string path = base;
+    for (const std::string &part : split(relative, '/'))
+        if (!part.empty()) path += "/" + nameInFolder(path, part);
+    return path;
+}
+
 std::vector<uint8_t> readWhole(const std::string &path) {
     std::ifstream f(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(f), {}};
@@ -549,7 +585,14 @@ bool writeWhole(const std::string &path, const std::vector<uint8_t> &data) {
     std::string temporary = path + ".part";
     {
         std::ofstream f(temporary, std::ios::binary | std::ios::trunc);
-        if (!f.write(reinterpret_cast<const char *>(data.data()), std::streamsize(data.size()))) return false;
+        f.write(reinterpret_cast<const char *>(data.data()), std::streamsize(data.size()));
+        // A small file stays in the stream's buffer until here, so a full disk only shows now.
+        f.flush();
+        f.close();
+        if (!f) {
+            std::remove(temporary.c_str());
+            return false;
+        }
     }
     return std::rename(temporary.c_str(), path.c_str()) == 0;
 }
@@ -645,10 +688,18 @@ int Engine::nextTrack(int direction) {
     return at == heard.begin() ? heard.back() : *(at - 1);
 }
 
+// The title's or the story's music waits while the player plays.
+void Engine::pauseMusicForTrack(bool paused) {
+    if (titleMusic_) audio_.pause(titleMusic_, paused);
+    for (auto &[channel, player] : bgm_) audio_.pause(player, paused);
+}
+
 void Engine::stopTrack() {
-    if (trackPlayer_) audio_.stop(trackPlayer_);
+    if (!trackPlayer_) return;
+    audio_.close(trackPlayer_);
     trackPlayer_ = 0;
     trackPaused_ = false;
+    pauseMusicForTrack(false);
 }
 
 void Engine::playTrack(int index) {
@@ -658,6 +709,7 @@ void Engine::playTrack(int index) {
     if (!data) return;
     trackPlayer_ = audio_.open(data);
     if (!trackPlayer_) return;
+    pauseMusicForTrack(true);
     currentTrack_ = index;
     // Its own group, for the music screen's own volume.
     audio_.setGroup(trackPlayer_, 3);
@@ -684,6 +736,7 @@ void Engine::saveSeen() {
     for (const auto &[path, on] : seen_)
         if (on) text += path + "\n";
     writeWhole(saveDir_ + "/vndegen_seen.txt", std::vector<uint8_t>(text.begin(), text.end()));
+    saveGlobals();
     seenChanged_ = false;
 }
 
@@ -779,6 +832,7 @@ void Engine::openGalleryCell(int index) {
         if (!flow || !flow->first()) return;
         if (titleMusic_) {
             audio_.fade(titleMusic_, 500, 0, true);
+            audio_.retire(titleMusic_);
             titleMusic_ = 0;
         }
         screen_ = nullptr;
@@ -917,7 +971,7 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
 // macro GLB_PROLOGUE_OVER's number, 1000, after the prologue. VNDegen keeps the rest of the file as it found it.
 void Engine::loadGlobals() {
     if (saveDir_.empty()) return;
-    auto packed = readWhole(saveDir_ + "/cfg.sav");
+    auto packed = readWhole(saveDir_ + "/" + nameInFolder(saveDir_, "cfg.sav"));
     if (packed.empty()) return;
     configFile_ = unpackEntry(packed.data(), packed.size());
     if (configFile_.size() < 44000) {
@@ -930,9 +984,10 @@ void Engine::loadGlobals() {
         if (v) globals_[i] = v;
     }
     // A PC's backup carries what's been unlocked there, which the galleries show here too.
+    size_t moved = configStringLength();
     auto flag = [&](size_t at) {
         int32_t v = 0;
-        if (at + 4 <= configFile_.size()) std::memcpy(&v, &configFile_[at], 4);
+        if (at + moved + 4 <= configFile_.size()) std::memcpy(&v, &configFile_[at + moved], 4);
         return v != 0;
     };
     for (size_t e = 0; e < cgEntries_.size(); e++)
@@ -942,18 +997,34 @@ void Engine::loadGlobals() {
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
 }
 
+size_t Engine::configStringLength() const {
+    int32_t length = 0;
+    if (kConfigStringAt + 4 <= configFile_.size()) std::memcpy(&length, &configFile_[kConfigStringAt], 4);
+    return length > 0 && kConfigStringAt + 4 + size_t(length) <= configFile_.size() ? size_t(length) : 0;
+}
+
 void Engine::saveGlobals() {
     if (saveDir_.empty() || !makeFolders(saveDir_)) return;
-    // A game with no file of the PC's yet gets a blank one of its size, with the PC game's own settings left at zero.
-    if (configFile_.empty()) configFile_.assign(104022, 0);
+    // A game with no file of the PC's yet gets what the PC writes on its first run. Zeros there would set the PC game's
+    // volumes to nothing when the saves move to a PC.
+    if (configFile_.empty()) {
+        configFile_.assign(kConfigSize, 0);
+        auto table = screens_.find("cfgsav");
+        if (table != screens_.end())
+            for (auto [it, end] = table->second.settings.equal_range("run"); it != end; ++it) {
+                int32_t value = field(it->second, 2);
+                for (int i = 0; i < field(it->second, 1); i++) std::memcpy(&configFile_[size_t(field(it->second, 0)) + size_t(i) * 4], &value, 4);
+            }
+    }
     for (int i = 0; i < 10000; i++) {
         auto it = globals_.find(i);
         int32_t v = it == globals_.end() ? 0 : it->second;
         std::memcpy(&configFile_[4000 + size_t(i) * 4], &v, 4);
     }
+    size_t moved = configStringLength();
     auto setFlag = [&](size_t at) {
         const int32_t on = 1;
-        if (at + 4 <= configFile_.size()) std::memcpy(&configFile_[at], &on, 4);
+        if (at + moved + 4 <= configFile_.size()) std::memcpy(&configFile_[at + moved], &on, 4);
     };
     for (size_t e = 0; e < cgEntries_.size(); e++)
         for (size_t p = 0; p < cgEntries_[e].images.size() && p < kCgFlagsPerRow; p++)
@@ -961,15 +1032,15 @@ void Engine::saveGlobals() {
     for (size_t i = 0; i < tracks_.size(); i++)
         if (seen(tracks_[i])) setFlag(kTrackFlagsAt + i * 4);
     auto packed = packEntry(configFile_);
-    if (!packed.empty()) writeWhole(saveDir_ + "/cfg.sav", packed);
+    if (!packed.empty()) writeWhole(saveDir_ + "/" + nameInFolder(saveDir_, "cfg.sav"), packed);
 }
 
 // MARK: Saves
 
 std::string Engine::savePath(int slot, const char *extension) const {
     char name[32];
-    std::snprintf(name, sizeof name, "/save%03d.%s", slot, extension);
-    return saveDir_ + name;
+    std::snprintf(name, sizeof name, "save%03d.%s", slot, extension);
+    return saveDir_ + "/" + nameInFolder(saveDir_, name);
 }
 
 void Engine::noteThumbnail() {
@@ -1041,6 +1112,11 @@ SaveData Engine::captureSave() {
                 out.animation += line;
             }
         }
+        // A named animation goes in the same text. A load plays what's left of it once, and a repeating one stops there.
+        if (s.looping) {
+            out.animation += s.loopText;
+            oldest = s.changes.empty() ? s.loop.begunMs : std::min(oldest, s.loop.begunMs);
+        }
         out.animated = !out.animation.empty();
         out.animationFrames = out.animated ? frames(now_ - oldest) : 0;
         // Where it ends up.
@@ -1090,6 +1166,7 @@ bool Engine::saveToSlot(int slot) {
         return false;
     }
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
+    saveSeen();
     slots_.erase(slot);
     log("saved slot %d at %s #%d", slot, data.scene.c_str(), data.node);
     return true;
@@ -1136,6 +1213,7 @@ void Engine::restoreSave(const SaveData &d) {
     stopKind(kKindVoice, 0);
     if (titleMusic_) {
         audio_.fade(titleMusic_, 300, 0, true);
+        audio_.retire(titleMusic_);
         titleMusic_ = 0;
     }
     screen_ = nullptr;
@@ -1182,11 +1260,12 @@ void Engine::restoreSave(const SaveData &d) {
         Bytes data = files_.read(sound.path);
         int player = data ? audio_.open(data) : 0;
         if (!player) continue;
+        audio_.setGroup(player, kind);
         audio_.setLoops(player, 0);
         audio_.fade(player, 0, sound.volume, false);
         if (sound.pan) audio_.setPan(player, sound.pan, 0);
         audio_.seekMs(player, int64_t(sound.seconds * 1000));
-        audio_.play(player);
+        audio_.start(player);
         channelsOf(kind)[channel] = player;
         (kind == kKindBgm ? bgmNow_ : seNow_)[channel] = {sound.path, sound.volume, sound.pan};
     }
@@ -1813,6 +1892,13 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
+    // The player's track ending comes first, since its screen is a menu.
+    if (trackPlayer_ && !trackPaused_ && !audio_.playing(trackPlayer_)) {
+        int next = nextTrack(1);
+        if (next < 0) stopTrack();
+        else playTrack(next);
+        dirty_ = true;
+    }
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
 
@@ -1846,7 +1932,7 @@ bool Engine::step(int ms) {
             textDone_ = true;
             dirty_ = true;
         } else {
-            if (voicePlayer_) { audio_.stop(voicePlayer_); voicePlayer_ = 0; }
+            if (voicePlayer_) { audio_.close(voicePlayer_); voicePlayer_ = 0; }
             waiting_ = Waiting::None;
         }
     }
@@ -1859,10 +1945,6 @@ bool Engine::step(int ms) {
     prefetchAhead();
     innerWereShown_ = innerButtonsShown();
     underWereShown_ = underButtonsShown();
-    if (trackPlayer_ && !trackPaused_ && !audio_.playing(trackPlayer_)) {
-        playTrack(nextTrack(1));
-        dirty_ = true;
-    }
 
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set) foldFinishedChanges(s);
@@ -2200,6 +2282,7 @@ void Engine::namedAnimation(Sprite &s, const Node &n) {
     Animation a = parseAnimation(n.s[1], s);
     a.repeat = n.p[1] != 0;
     s.loop = std::move(a);
+    s.loopText = n.s[1];
     s.looping = true;
 }
 
@@ -2268,12 +2351,12 @@ void Engine::showText(const Node &n) {
     dirty_ = true;
     if (!n.s[3].empty() && !skip_) {
         if (Bytes data = files_.read(n.s[3])) {
-            if (voicePlayer_) audio_.stop(voicePlayer_);
+            if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = audio_.open(data);
             if (voicePlayer_) {
+                audio_.setGroup(voicePlayer_, kKindVoice);
                 audio_.setLoops(voicePlayer_, 1);
-                audio_.fade(voicePlayer_, 0, 100, false);
-                audio_.play(voicePlayer_);
+                audio_.start(voicePlayer_);
             }
         } else {
             complain("Missing voice " + n.s[3]);
@@ -2305,11 +2388,11 @@ void Engine::playSound(const Node &n, int kind) {
     audio_.setLoops(player, kind == kKindBgm ? 0 : p[4]);
     if (p[2]) audio_.setPan(player, p[2], 0);
     int fade = p[3], volume = p[1];
+    audio_.setGroup(player, kind);
     audio_.fade(player, 0, fade > 0 ? 0 : volume, false);
     if (fade > 0) audio_.fade(player, fade, volume, false);
-    audio_.play(player);
+    audio_.start(player);
     channels[channel] = player;
-    audio_.setGroup(player, kind);
     if (kind == kKindBgm) noteSeen(n.s[1]);
     if (kind == kKindBgm) bgmNow_[channel] = {n.s[1], volume, p[2]};
     if (kind == kKindSe && p[4] == 0) seNow_[channel] = {n.s[1], volume, p[2]};
@@ -2328,12 +2411,16 @@ void Engine::stopChannel(int kind, int channel, int ms) {
     auto it = channels.find(channel);
     if (it == channels.end()) return;
     audio_.fade(it->second, std::max(ms, 0), 0, true);
+    audio_.retire(it->second);
     channels.erase(it);
 }
 
 void Engine::stopKind(int kind, int ms) {
     std::map<int, int> &channels = kind == kKindBgm ? bgm_ : kind == kKindSe ? se_ : voice_;
-    for (auto &[channel, player] : channels) audio_.fade(player, std::max(ms, 0), 0, true);
+    for (auto &[channel, player] : channels) {
+        audio_.fade(player, std::max(ms, 0), 0, true);
+        audio_.retire(player);
+    }
     channels.clear();
     if (kind == kKindBgm) bgmNow_.clear();
     if (kind == kKindSe) seNow_.clear();
