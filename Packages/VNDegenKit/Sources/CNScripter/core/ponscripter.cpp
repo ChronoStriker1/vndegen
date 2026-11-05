@@ -74,6 +74,7 @@ void cmdEndRoll(E &e, const std::string &) {
     // The wait and the scroll end together, at the whole millisecond the last pixel is reached.
     int64_t duration = (r.distance * r.speed + 9) / 10;
     r.end = r.start + duration;
+    r.pos = e.cur_.pos;
     r.on = true;
     if (duration > 0) {
         e.waitTimer(int(std::min<int64_t>(duration, INT32_MAX)), false);
@@ -146,8 +147,12 @@ void cmdLogSp(E &e, const std::string &) {
 
 void Engine::stepEndRoll() {
     EndRoll &r = endRoll_;
-    // A roll whose wait ended early (a trap, a load) stops where it is.
-    if (r.end > r.start && (wait_ != WaitKind::Timer || waitUntil_ != r.end)) {
+    // A roll whose wait ended early (a trap, a load) stops where it is. A dialog a callback opens over it keeps the
+    // roll's wait to put back, and the roll goes on.
+    bool ours = cur_.pos == r.pos && ((wait_ == WaitKind::Timer && waitUntil_ == r.end) ||
+                                      (wait_ == WaitKind::Dialog && ui_ && ui_->prevWait == WaitKind::Timer &&
+                                       ui_->prevWaitUntil == r.end));
+    if (r.end > r.start && !ours) {
         r.on = false;
         return;
     }

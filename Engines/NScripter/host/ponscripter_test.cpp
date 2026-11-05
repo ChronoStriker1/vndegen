@@ -418,6 +418,32 @@ static void reviewRound2() {
     fs::remove_all(dir);
 }
 
+// A dialog a Lua callback opens during a credits roll keeps the roll's wait to put back, and the roll finishes.
+static void endRollUnderDialog() {
+    char temp[] = "/tmp/vnns-ponscripter-dialog-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    writeNbzArchive(dir / "arc.nsa", "pic.bmp", testBitmap());
+    std::ofstream(dir / "system.lua") << "NSLuaAnimationInterval(1)\nNSLuaAnimationMode(true)\n"
+                                         "function NSCALL_animation()\n  if NSGetIntValue(50)==1 then\n"
+                                         "    NSSetIntValue(50,2)\n    NSExec('yesnobox %51,\"hello\"')\n  end\n"
+                                         "  return false\nend\n";
+    std::ofstream(dir / "0.utf") << "*define\nnsa\nluacall animation\ngame\n*start\nbg #112233,1\n"
+                                    "btndef \"pic.bmp\"\nmov %50,1\nendroll 0,0,4,1,0,0,4,1,2,1000,10\nclick\nend\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    for (int i = 0; i < 5; i++) engine.step(16);
+    assert(engine.ui_ && engine.endRoll_.on);
+    engine.key(VNNS_KEY_RETURN, true);
+    engine.key(VNNS_KEY_RETURN, false);
+    for (int i = 0; i < 100; i++) engine.step(16);
+    assert(!engine.ui_ && !engine.endRoll_.on && engine.wait_ == vnns::WaitKind::Click);
+    assert(engine.bltLayer_.row(0)[0] != vnns::rgba(255, 0, 0));  // scrolled past the red top row
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -426,4 +452,5 @@ int main() {
     endRollAndBounds();
     reviewCases();
     reviewRound2();
+    endRollUnderDialog();
 }

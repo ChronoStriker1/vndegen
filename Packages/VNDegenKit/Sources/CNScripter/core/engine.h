@@ -448,6 +448,7 @@ public:
     struct EndRoll {
         bool on = false;
         int64_t start = 0, end = 0;
+        size_t pos = 0;  // where the script resumes after it, so a timer of the same length elsewhere isn't taken for it
         int64_t rect[8] = {};
         int64_t distance = 0, speed = 1;
     } endRoll_;
