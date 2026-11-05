@@ -94,12 +94,6 @@ struct StoredFile: Equatable, Sendable {
     var backup: String
 }
 
-/// Registry data a backup holds, and the backup folder its file lives in.
-struct StoredRegistry: Equatable, Sendable {
-    var hash: String
-    var backup: String
-}
-
 extension LudusaviMapping {
     /// Every backup, oldest first. Each full backup comes before its differentials.
     public var summaries: [BackupSummary] {
@@ -138,15 +132,6 @@ extension LudusaviMapping {
             }
         }
         return files
-    }
-
-    /// The registry data a restore of the latest backup applies on Windows, as Ludusavi's `registry_content` picks it.
-    var latestRegistry: StoredRegistry? {
-        guard let full = backups.last else { return nil }
-        guard let diff = full.children.last, let override = diff.registry else {
-            return full.registryHash.map { StoredRegistry(hash: $0, backup: full.name) }
-        }
-        return override.hash.map { StoredRegistry(hash: $0, backup: diff.name) }
     }
 
     /// Ludusavi's `forget_excess_backups`: drops the oldest unlocked backups beyond `retention`'s limits. A full backup

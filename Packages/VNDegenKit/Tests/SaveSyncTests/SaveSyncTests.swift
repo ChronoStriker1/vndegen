@@ -533,12 +533,35 @@ private extension LudusaviStore {
     #expect(try kept.mapping("G").backups[0].children.last?.registry == .init(hash: nil))
 }
 
-@Test func aBackupStopsWhenItCantCarryTheRegistry() throws {
+@Test func aRegistryWhoseFileIsMissingIsNotCarried() throws {
+    // Ludusavi restores no registry when the file a hash names is missing, and doesn't stop on it, so neither does a backup.
     let (store, gameDir, locations) = try storeWithRegistry()
     try fm.removeItem(at: gameDir.appendingPathComponent("backup-1/registry.reg"))
-    let before = try tree(gameDir)
-    #expect(throws: SaveSyncError.self) { try store.backUpG(locations, Retention(full: 2, differential: 0)) }
-    #expect(try tree(gameDir) == before)
+    let name = try #require(try store.backUpG(locations, Retention(full: 2, differential: 0)).backup)
+    #expect(try store.mapping("G").backups.map(\.registryHash) == ["full", nil])
+    #expect(!fm.fileExists(atPath: gameDir.appendingPathComponent("\(name)/registry.reg").path))
+}
+
+@Test func aDifferentialWithoutItsRegistryFileFallsBackToTheFullBackups() throws {
+    // As Ludusavi's registry_content reads it: the differential names a registry it doesn't hold, so the full backup's applies.
+    let older = DifferentialBackup(name: "backup-2-diff", when: Timestamp.epoch, locked: false, files: [:], registry: .init(hash: "lost"))
+    let (store, gameDir, locations) = try storeWithRegistry(children: [older])
+    let name = try #require(try store.backUpG(locations, Retention(full: 2, differential: 0)).backup)
+    #expect(try store.mapping("G").backups.last?.registryHash == "full")
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data("registry".utf8))
+
+    let (kept, _, keptLocations) = try storeWithRegistry(children: [older])
+    _ = try kept.backUpG(keptLocations, Retention(full: 1, differential: 2))
+    #expect(try kept.mapping("G").backups[0].children.last?.registry == nil)
+}
+
+@Test func bothRegistryFormatsCarryForward() throws {
+    // Ludusavi reads the first that parses, so a damaged registry.reg beside a good registry.yaml still restores.
+    let (store, gameDir, locations) = try storeWithRegistry()
+    try Data("yaml".utf8).write(to: gameDir.appendingPathComponent("backup-1/registry.yaml"))
+    let name = try #require(try store.backUpG(locations, Retention(full: 1, differential: 0)).backup)
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.reg")) == Data("registry".utf8))
+    #expect(try Data(contentsOf: gameDir.appendingPathComponent("\(name)/registry.yaml")) == Data("yaml".utf8))
 }
 
 // MARK: - Settings
