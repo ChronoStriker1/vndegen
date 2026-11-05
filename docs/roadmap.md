@@ -62,18 +62,23 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - A controller layout library, Keyboard and mouse's D-pad matching Steam's template file, and true round ends on capsules (0.23.0).
 - Godot 3 upright in the Mac app, and VNDegen's menu on Ren'Py main menus that play a movie (0.23.1).
 - MalOvent runs, the Mac's Controller layout sheet keeps one size, and Wolf RPG Editor detection finds games in an extra folder (0.23.2).
+- RPG Maker and TyranoScript games inside wrapper folders are found, Command-Q works with a sheet open, and Succubus Prison reaches its opening (0.23.3).
+- NekoSDK, on VNDegen's own runtime, for The Alchemist & His Battle-Scarred Homunculus and Yarinaoshi no Christmas, with saves that move to and from a PC (0.24.0).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
 - [#29](https://github.com/ChronoStriker1/vndegen/issues/29) Wolf RPG Editor: Succubus Prison's message window shows a faint second edge.
 - [#30](https://github.com/ChronoStriker1/vndegen/issues/30) KiriKiri: Violated Hero IV (Partial E) isn't found three wrappers deep.
 - [#31](https://github.com/ChronoStriker1/vndegen/issues/31) TyranoScript: Butterfly Affection logs a 404 for button_menu.png.
+- [#32](https://github.com/ChronoStriker1/vndegen/issues/32) Ludusavi: registry data is dropped from backups.
+- [#34](https://github.com/ChronoStriker1/vndegen/issues/34) RPG Maker: Command-Q does nothing in Karryn's Prison.
+- [#35](https://github.com/ChronoStriker1/vndegen/issues/35) Ren'Py: scripted mouse clicks don't press buttons on the Mac.
+- [#36](https://github.com/ChronoStriker1/vndegen/issues/36) renpy-hook-test.sh fails falsely under Apple's /bin/bash.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk`: Test Games 97 and 95 play on Linux and the iPad simulator, and wait for Mac app checks before their first release.
+- NekoSDK stage 3, on `feat/nekosdk-stage3`: Test Games 84, 85, 88, 89, 92, 93 and 94, with movies through the app's FFmpeg. The other six games come after it.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
@@ -90,8 +95,8 @@ VNDegen should stay free to distribute and may be sold on the App Store later. R
 6. Wolf RPG Editor, on VNDegen's own runtime. Shipped in 0.11.0.
 7. Flash, through Ruffle (MIT or Apache-2.0) in the web view the RPG Maker MV/MZ and TyranoScript plugins already use. 14 library games. Shipped in 0.7.0.
 8. Godot, on Godot 3.6.3 for 3.x games and 4.7.2 for 4.x games. Shipped in 0.9.0.
-9. NekoSDK, in progress on `feat/nekosdk`. No runtime or reimplementation exists, so this is a reimplementation from the game files. A feasibility test on branch `ws/nekosdk` (`docs/nekosdk.md` there) found that every game's archives and story scripts parse, but each game's title, save, config and gallery screens, and in 6 games the story order, are compiled into its exe. It estimated 10 to 14 weeks for the 10 games whose story order is data, with VNDegen-style menus. 16 library games, 45 GB.
-10. Unity. Before any work, decide with the maintainer whether it is feasible and how to proceed, including converting games to run natively on ARM. IL2CPP games are compiled x86 code. Mono games carry their game code as portable .NET assemblies, but run on Unity's x86 Windows player. 60 library games: 44 Mono, 10 IL2CPP, and 6 not yet checked.
+9. NekoSDK, on VNDegen's own runtime. Its first two games shipped in 0.24.0, and the rest are in progress. No runtime or reimplementation exists, so this is a reimplementation from the game files. A feasibility test on branch `ws/nekosdk` (`docs/nekosdk.md` there) found that every game's archives and story scripts parse, but each game's title, save, config and gallery screens, and in 6 games the story order, are compiled into its exe. It estimated 10 to 14 weeks for the 10 games whose story order is data, with VNDegen-style menus. 16 library games, 45 GB.
+10. Unity. Before any work, decide with the maintainer whether it is feasible and how to proceed, including converting games to run natively on ARM. IL2CPP games are compiled x86 code. Mono games carry their game code as portable .NET assemblies, but run on Unity's x86 Windows player. 123 library folders: 95 Mono, 23 IL2CPP, and 3 unread installers, with 2 left out. [unity.md](unity.md) has the feasibility study and options, for the maintainer to decide on.
 11. After the engine plugins: installing a game from its installer. VNDegen would extract the game files from the installer into a folder an engine plugin can run, rather than running the installer. The approach is to be agreed with the maintainer when this starts.
 12. Cleaning up a game's engine files. After a game is added, VNDegen offers to remove the bundled Windows engine files the game no longer needs to play in VNDegen, such as NW.js or Electron runtimes, Ren'Py's Windows and Linux libraries, and engine `.exe` and `.dll` files. Each engine plugin lists exactly which files it may remove. VNDegen shows the files and the space saved, and removes them only after the user confirms. Saves and the game's own data are never touched. Shipped in 0.22.0 for RPG Maker MV and MZ, TyranoScript, and Ren'Py. The other engines list nothing.
 13. Before any App Store release: the LGPL libraries. Ren'Py's FFmpeg, FriBidi and parts of pygame_sdl2, and KiriKiri's FFmpeg, which NekoSDK will also use for WMV movies, are linked statically today, which LGPL allows only while users can relink them. Either ship them as separate frameworks that can be replaced, as Ren'Py's own App Store games do, or replace them with Apple's frameworks and permissive code. Decide with the maintainer when an App Store release is planned.
