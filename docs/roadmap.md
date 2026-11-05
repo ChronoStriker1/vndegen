@@ -66,8 +66,10 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
-- [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
+- [#29](https://github.com/ChronoStriker1/vndegen/issues/29) Wolf RPG Editor: Succubus Prison's message window shows a faint second edge.
+- [#30](https://github.com/ChronoStriker1/vndegen/issues/30) KiriKiri: Violated Hero IV (Partial E) isn't found three wrappers deep.
+- [#31](https://github.com/ChronoStriker1/vndegen/issues/31) TyranoScript: Butterfly Affection logs a 404 for button_menu.png.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
