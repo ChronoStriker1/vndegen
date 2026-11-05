@@ -1,6 +1,7 @@
 // Runs a game headless: steps the clock, clicks through text, writes a PNG of chosen moments, and renders the sound.
 // usage: nekorun <game folder> [--out dir] [--every n] [--click ms] [--max ms] [--dt ms] [--jump script node]
 //                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
+//                [--script file]: lines of `ms click x y`, `ms move x y` or `ms shot name`, with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
 #include <chrono>
@@ -30,6 +31,8 @@ int main(int argc, char **argv) {
     int every = 0, clickMs = 300, maxMs = 3600 * 1000, dt = 16, jumpNode = 0, period = 0, nextBeat = 0, chooseIndex = 0;
     std::vector<int> shots;
     std::vector<std::string> presses;
+    struct Step { int ms; std::string what; int x, y; std::string name; };
+    std::vector<Step> steps;
     for (int i = 2; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&] { return i + 1 < argc ? argv[++i] : ""; };
@@ -40,6 +43,21 @@ int main(int argc, char **argv) {
         else if (a == "--dt") dt = std::atoi(next());
         else if (a == "--wav") wav = next();
         else if (a == "--press") presses.push_back(next());
+        else if (a == "--script") {
+            FILE *f = std::fopen(next(), "r");
+            char line[256];
+            while (f && std::fgets(line, sizeof line, f)) {
+                Step s{};
+                char what[32] = "", name[128] = "";
+                int n = std::sscanf(line, "%d %31s %127s %d", &s.ms, what, name, &s.y);
+                if (n < 2) continue;
+                s.what = what;
+                if (s.what == "shot") s.name = name;
+                else s.x = std::atoi(name);
+                steps.push_back(s);
+            }
+            if (f) std::fclose(f);
+        }
         else if (a == "--choose") chooseIndex = std::atoi(next());
         else if (a == "--period") { period = std::atoi(next()); nextBeat = period; }
         else if (a == "--jump") { jumpScript = next(); jumpNode = std::atoi(next()); }
@@ -53,7 +71,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    VNNekoLaunch launch{argv[1], nullptr, NEKO_FONTS_DIR};
+    VNNekoLaunch launch{argv[1], std::getenv("NEKO_DATA"), nullptr, NEKO_FONTS_DIR};
     VNNekoEngine *e = vnneko_start(&launch);
     if (!e) {
         std::fprintf(stderr, "did not start: %s\n", vnneko_start_error());
@@ -115,6 +133,21 @@ int main(int argc, char **argv) {
                 writePng(out + name, px, w, h);
             }
             shotIndex++;
+        }
+        static size_t stepIndex = 0;
+        while (stepIndex < steps.size() && elapsed >= steps[stepIndex].ms) {
+            const Step &s = steps[stepIndex++];
+            if (s.what == "shot") {
+                vnneko_step(e, 0);
+                const uint8_t *now = vnneko_frame(e, &w, &h, &changed);
+                writePng(out + "/" + s.name, now, w, h);
+            } else {
+                vnneko_mouse_move(e, float(s.x + 0.5) / float(w), float(s.y + 0.5) / float(h));
+                if (s.what == "click") {
+                    vnneko_mouse_button(e, 0, true);
+                    vnneko_mouse_button(e, 0, false);
+                }
+            }
         }
         int count = vnneko_debug_text_count(e);
         if (vnneko_debug_choice_count(e) > 0) vnneko_debug_choose(e, chooseIndex);

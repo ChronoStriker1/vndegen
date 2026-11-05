@@ -74,6 +74,49 @@ std::string withExtension(const std::string &path, const char *extension) {
 
 }  // namespace
 
+ImageRef decodeBmpBytes(const std::vector<uint8_t> &data) {
+    auto image = std::make_shared<Image>();
+    if (data.size() < 54 || data[0] != 'B' || data[1] != 'M' || !decodeBmp(data, *image)) return nullptr;
+    return image;
+}
+
+std::vector<uint8_t> encodeThumbnail(const uint8_t *rgba, int frameW, int frameH, int w, int h) {
+    int stride = (w * 3 + 3) & ~3;
+    uint32_t pixels = uint32_t(stride) * h, total = pixels + 54;
+    std::vector<uint8_t> out(total, 0);
+    out[0] = 'B';
+    out[1] = 'M';
+    std::memcpy(&out[2], &total, 4);
+    out[10] = 54;
+    out[14] = 40;
+    std::memcpy(&out[18], &w, 4);
+    std::memcpy(&out[22], &h, 4);
+    out[26] = 1;
+    out[28] = 24;
+    std::memcpy(&out[34], &pixels, 4);
+    // Each thumbnail pixel averages the block of the frame under it.
+    for (int y = 0; y < h; y++) {
+        uint8_t *row = &out[54 + size_t(h - 1 - y) * stride];
+        int y0 = y * frameH / h, y1 = std::max(y0 + 1, (y + 1) * frameH / h);
+        for (int x = 0; x < w; x++) {
+            int x0 = x * frameW / w, x1 = std::max(x0 + 1, (x + 1) * frameW / w);
+            int r = 0, g = 0, b = 0, n = 0;
+            for (int yy = y0; yy < y1; yy++) {
+                const uint8_t *p = rgba + (size_t(yy) * frameW + x0) * 4;
+                for (int xx = x0; xx < x1; xx++, p += 4, n++) {
+                    r += p[0];
+                    g += p[1];
+                    b += p[2];
+                }
+            }
+            row[x * 3] = uint8_t(b / n);
+            row[x * 3 + 1] = uint8_t(g / n);
+            row[x * 3 + 2] = uint8_t(r / n);
+        }
+    }
+    return out;
+}
+
 ImageRef Images::decode(const std::string &path) const {
     Bytes data = files_.read(path);
     if (!data || data->size() < 8) return nullptr;

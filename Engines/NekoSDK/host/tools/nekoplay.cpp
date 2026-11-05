@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "usage: nekoplay <game folder> [script node]\n");
         return 2;
     }
-    VNNekoLaunch launch{argv[1], nullptr, NEKO_FONTS_DIR};
+    VNNekoLaunch launch{argv[1], std::getenv("NEKO_DATA"), nullptr, NEKO_FONTS_DIR};
     VNNekoEngine *e = vnneko_start(&launch);
     if (!e) {
         std::fprintf(stderr, "did not start: %s\n", vnneko_start_error());

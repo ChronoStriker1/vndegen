@@ -5,6 +5,10 @@
 #include <cstdarg>
 #include <cstring>
 #include <fstream>
+#include <cerrno>
+#include <ctime>
+#include <iterator>
+#include <sys/stat.h>
 
 #include "font.h"
 #include "sjis.h"
@@ -97,7 +101,7 @@ void Engine::complain(const std::string &what) {
     warnOnce(what);
 }
 
-bool Engine::start(const std::string &root, const std::string &logPath, const std::string &fontDir, std::string &error) {
+bool Engine::start(const std::string &root, const std::string &dataDir, const std::string &logPath, const std::string &fontDir, std::string &error) {
     log_ = logPath.empty() ? stderr : std::fopen(logPath.c_str(), "a");
     if (!log_) log_ = stderr;
     if (!files_.open(root)) {
@@ -147,6 +151,15 @@ bool Engine::start(const std::string &root, const std::string &logPath, const st
 
     // What a game's exe draws on its own, which no data file names.
     folder_ = normalizedPath(config_.text("UserDataDirectory"));
+    layout_ = saveLayout(folder_);
+    thumbW_ = config_.number("SaveSmallImageSizeW", 160);
+    thumbH_ = config_.number("SaveSmallImageSizeH", 90);
+    // Where Windows keeps them, under the data folder, so a backup from a PC restores to the same place.
+    if (!dataDir.empty()) {
+        std::string relative = config_.text("UserDataDirectory");
+        std::replace(relative.begin(), relative.end(), '\\', '/');
+        saveDir_ = dataDir + "/AppData/Roaming/" + relative + "/save";
+    }
     if (folder_ == "waffle\\x2019_retry") {
         bars_ = {images_->get("obj\\l000_000.bmp"), images_->get("obj\\l000_001.bmp")};
         barY_ = {0, 618};
@@ -177,6 +190,10 @@ void Engine::openScreen(const std::string &name) {
         warnOnce("No menu table for " + name);
         return;
     }
+    bool fromStory = !screen_ && name != "title";
+    if (fromStory) returnTo_.clear();
+    else if (screen_ && screen_->name == "title") returnTo_ = "title";
+    else if (name == "title") returnTo_.clear();
     screen_ = &it->second;
     pressed_.clear();
     dirty_ = true;
@@ -222,13 +239,372 @@ void Engine::startStory() {
 
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
-    if (action == "start") startStory();
-    else if (action == "quit" || action == "Exit") { waiting_ = Waiting::Ended; }
-    else if (action == "Skip") skipToggle_ = !skipToggle_;
-    else if (action == "Auto") autoMode_ = !autoMode_;
-    else if (action == "HideWin") windowHiddenByPlayer_ = true;
-    else warnOnce("Button not built yet: " + action);
     dirty_ = true;
+    if (action == "start") { startStory(); return; }
+    if (action == "quit" || action == "Exit") { openDialog(7, [this] { waiting_ = Waiting::Ended; }); return; }
+    if (action == "Title") { openDialog(6, [this] { screen_ = nullptr; openScreen("title"); }); return; }
+    if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
+    if (action == "Auto") { autoMode_ = !autoMode_; return; }
+    if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
+    if (action == "back") {
+        if (returnTo_.empty()) closeScreen();
+        else openScreen(returnTo_);
+        return;
+    }
+    if (action.rfind("page", 0) == 0) { page_ = std::atoi(action.c_str() + 4); return; }
+    if (action == "nav_save" || action == "Save") { noteThumbnail(); openScreen("save"); return; }
+    if (action == "nav_load" || action == "Load" || action == "load") { noteThumbnail(); openScreen("load"); return; }
+    if (action == "nav_config" || action == "Config" || action == "config") { noteThumbnail(); openScreen("config"); return; }
+    if (action == "nav_cg" || action == "cg") { openScreen("cg"); return; }
+    if (action == "nav_scene" || action == "scene") { openScreen("scene"); return; }
+    if (action == "nav_music" || action == "music") { openScreen("music"); return; }
+    if (action == "nav_title") { runAction("Title"); return; }
+    if (action == "nav_quit") { runAction("quit"); return; }
+    warnOnce("Button not built yet: " + action);
+}
+
+// MARK: Saves
+
+std::string Engine::savePath(int slot, const char *extension) const {
+    char name[32];
+    std::snprintf(name, sizeof name, "/save%03d.%s", slot, extension);
+    return saveDir_ + name;
+}
+
+namespace {
+
+bool makeFolders(const std::string &path) {
+    for (size_t at = 1; at < path.size(); at++) {
+        if (path[at] != '/') continue;
+        std::string part = path.substr(0, at);
+        if (mkdir(part.c_str(), 0777) != 0 && errno != EEXIST) return false;
+    }
+    return mkdir(path.c_str(), 0777) == 0 || errno == EEXIST;
+}
+
+std::vector<uint8_t> readWhole(const std::string &path) {
+    std::ifstream f(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(f), {}};
+}
+
+// Written beside the target and renamed over it, so a crash can't leave half a save.
+bool writeWhole(const std::string &path, const std::vector<uint8_t> &data) {
+    std::string temporary = path + ".part";
+    {
+        std::ofstream f(temporary, std::ios::binary | std::ios::trunc);
+        if (!f.write(reinterpret_cast<const char *>(data.data()), std::streamsize(data.size()))) return false;
+    }
+    return std::rename(temporary.c_str(), path.c_str()) == 0;
+}
+
+}  // namespace
+
+void Engine::noteThumbnail() {
+    if (screen_) return;
+    if (dirty_) compose();
+    thumbnail_ = encodeThumbnail(canvas_.px.data(), canvas_.w, canvas_.h, thumbW_, thumbH_);
+    dirty_ = true;
+}
+
+Engine::SlotInfo &Engine::slotInfo(int slot) {
+    auto found = slots_.find(slot);
+    if (found != slots_.end()) return found->second;
+    SlotInfo &info = slots_[slot];
+    if (saveDir_.empty() || !layout_) return info;
+    auto packed = readWhole(savePath(slot, "sav"));
+    if (packed.empty()) return info;
+    auto plain = unpackEntry(packed.data(), packed.size());
+    SaveData data;
+    if (plain.empty() || !parseSave(plain, *layout_, data)) return info;
+    info.exists = true;
+    std::copy(std::begin(data.date), std::end(data.date), info.date);
+    auto bmp = readWhole(savePath(slot, "bmp"));
+    if (!bmp.empty()) info.thumbnail = decodeBmpBytes(bmp);
+    return info;
+}
+
+SaveData Engine::captureSave() {
+    SaveData d;
+    std::time_t now = std::time(nullptr);
+    std::tm local{};
+    localtime_r(&now, &local);
+    d.date[0] = local.tm_year + 1900;
+    d.date[1] = local.tm_mon + 1;
+    d.date[2] = local.tm_mday;
+    d.date[3] = local.tm_hour;
+    d.date[4] = local.tm_min;
+    d.date[5] = local.tm_sec;
+    d.flow = stack_.empty() ? "" : stack_.back().script->name;
+    d.flowNode = flowCallId_;
+    d.choiceImage = choiceImage_;
+    d.dateFlag = choiceImage_.empty() ? 0 : 1;
+    d.variables = scenario_;
+    d.width = canvas_.w;
+    d.height = canvas_.h;
+    for (const auto &[slot, s] : front_) {
+        if (!s.image) continue;
+        SavedSprite out;
+        out.slot = slot;
+        out.path = s.path;
+        out.x = s.x;
+        out.y = s.y;
+        out.scaleX = s.scaleX;
+        out.scaleY = s.scaleY;
+        out.anchorX = s.image->w / 2;
+        out.anchorY = s.image->h / 2;
+        out.alpha = int(s.alpha * 256 + 0.5f);
+        out.blur = s.blurAmount;
+        out.blurOn = s.blurOn;
+        // Every change as a line of text from the oldest one's start, as the PC writes them.
+        int64_t oldest = s.changes.empty() ? now_ : s.changes.front().begunMs;
+        for (const Animation &a : s.changes) oldest = std::min(oldest, a.begunMs);
+        auto frames = [this](int64_t ms) { return int(ms * fps_ / 1000); };
+        for (const Animation &a : s.changes) {
+            for (const Track &t : a.tracks) {
+                const char *name = t.property == Track::X ? (t.relative ? "relative_pos_x" : "pos_x") : t.property == Track::Y ? (t.relative ? "relative_pos_y" : "pos_y") : t.property == Track::ScaleX ? "scale_x" : t.property == Track::ScaleY ? "scale_y" : t.property == Track::Alpha ? "alpha" : "rotate";
+                int length = frames(t.lengthMs);
+                char line[128];
+                std::snprintf(line, sizeof line, "%s,%g,%d,%d,%s\n", name, double(t.relative ? t.to - t.from : t.to), frames(t.startMs + (a.begunMs - oldest)), t.easeOut ? -length : length, t.easeOut ? "quadratic" : "linear");
+                out.animation += line;
+            }
+        }
+        out.animated = !out.animation.empty();
+        out.animationFrames = out.animated ? frames(now_ - oldest) : 0;
+        // Where it ends up.
+        Sprite last = s;
+        for (Animation &a : last.changes) a.begunMs = -1000000000;
+        last.looping = false;
+        SpriteView end = view(last);
+        out.endX = end.x;
+        out.endY = end.y;
+        out.endScaleX = end.scaleX;
+        out.endScaleY = end.scaleY;
+        out.endAlpha = int(end.alpha * 256 + 0.5f);
+        d.sprites.push_back(out);
+    }
+    d.windowShown = windowShown_;
+    d.current = currentText_;
+    d.backlog = backlog_;
+    auto soundsOf = [&](const std::map<int, Playing> &table, const std::map<int, int> &players, int base) {
+        for (const auto &[channel, playing] : table) {
+            SavedSound sound;
+            sound.index = base + channel;
+            sound.path = playing.path;
+            sound.volume = playing.volume;
+            sound.pan = playing.pan;
+            auto player = players.find(channel);
+            sound.playing = player != players.end();
+            if (sound.playing) sound.seconds = double(audio_.positionMs(player->second)) / 1000;
+            d.sounds.push_back(sound);
+        }
+    };
+    soundsOf(bgmNow_, bgm_, 0);
+    soundsOf(seNow_, se_, 60);
+    d.scene = scene_.script ? scene_.script->name : "";
+    d.node = scene_.node ? scene_.node->id : 0;
+    return d;
+}
+
+bool Engine::saveToSlot(int slot) {
+    if (!layout_ || saveDir_.empty() || !makeFolders(saveDir_)) {
+        complain("Saves aren't available for this game.");
+        return false;
+    }
+    SaveData data = captureSave();
+    auto packed = packEntry(buildSave(data, *layout_));
+    if (packed.empty() || !writeWhole(savePath(slot, "sav"), packed)) {
+        complain("The save couldn't be written.");
+        return false;
+    }
+    if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
+    slots_.erase(slot);
+    log("saved slot %d at %s #%d", slot, data.scene.c_str(), data.node);
+    return true;
+}
+
+bool Engine::loadFromSlot(int slot) {
+    if (!layout_) return false;
+    auto packed = readWhole(savePath(slot, "sav"));
+    auto plain = packed.empty() ? packed : unpackEntry(packed.data(), packed.size());
+    SaveData data;
+    if (plain.empty() || !parseSave(plain, *layout_, data)) {
+        complain("That save couldn't be read.");
+        return false;
+    }
+    restoreSave(data);
+    log("loaded slot %d at %s #%d", slot, data.scene.c_str(), data.node);
+    return true;
+}
+
+void Engine::restoreSave(const SaveData &d) {
+    stopKind(kKindBgm, 300);
+    stopKind(kKindSe, 300);
+    stopKind(kKindVoice, 0);
+    if (titleMusic_) {
+        audio_.fade(titleMusic_, 300, 0, true);
+        titleMusic_ = 0;
+    }
+    screen_ = nullptr;
+    stack_.clear();
+    back_.clear();
+    front_.clear();
+    transitioning_ = false;
+    shakeType_ = 0;
+    flashMs_ = 0;
+    blur_ = false;
+    scenario_ = d.variables;
+    choiceImage_ = d.choiceImage;
+    flowCallId_ = d.flowNode;
+    if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
+        const Node *call = flow->node(d.flowNode);
+        stack_.push_back({flow, call ? flow->node(call->next) : flow->first()});
+    }
+    for (const SavedSprite &saved : d.sprites) {
+        Sprite s;
+        s.path = saved.path;
+        s.image = images_->get(saved.path);
+        if (!s.image) warnOnce("A save names a missing picture: " + saved.path);
+        s.x = saved.x;
+        s.y = saved.y;
+        s.scaleX = saved.scaleX;
+        s.scaleY = saved.scaleY;
+        s.alpha = float(saved.alpha) / 256;
+        s.blurAmount = saved.blur;
+        s.blurOn = saved.blurOn;
+        if (!saved.animation.empty()) {
+            Animation a = parseAnimation(saved.animation, s);
+            a.begunMs = now_ - int64_t(saved.animationFrames) * 1000 / std::max(1, fps_);
+            s.changes.push_back(std::move(a));
+        }
+        front_[saved.slot] = s;
+    }
+    back_ = front_;
+    backlog_ = d.backlog;
+    currentText_ = d.current;
+    for (const SavedSound &sound : d.sounds) {
+        if (!sound.playing) continue;
+        int kind = sound.index < 60 ? kKindBgm : kKindSe;
+        int channel = sound.index < 60 ? sound.index : sound.index - 60;
+        Bytes data = files_.read(sound.path);
+        int player = data ? audio_.open(data) : 0;
+        if (!player) continue;
+        audio_.setLoops(player, 0);
+        audio_.fade(player, 0, sound.volume, false);
+        if (sound.pan) audio_.setPan(player, sound.pan, 0);
+        audio_.seekMs(player, int64_t(sound.seconds * 1000));
+        audio_.play(player);
+        channelsOf(kind)[channel] = player;
+        (kind == kKindBgm ? bgmNow_ : seNow_)[channel] = {sound.path, sound.volume, sound.pan};
+    }
+    auto script = d.scene.empty() ? nullptr : loadScript(d.scene);
+    scene_ = script ? Frame{script, script->node(d.node)} : Frame{};
+    windowShown_ = d.windowShown;
+    windowShownAt_ = -100000;
+    layoutText(sjis::toUtf8(d.current.name), sjis::toUtf8(d.current.text));
+    textStart_ = now_;
+    textDone_ = true;
+    waiting_ = Waiting::Click;
+    dirty_ = true;
+}
+
+// The table's `slots` line: the sheet, then x, y, the step across and down, and rows per column. The `slot*` lines give
+// where each part sits within a card.
+int Engine::slotAt(int x, int y) const {
+    const auto *grid = screen_ ? screen_->setting("slots") : nullptr;
+    if (!grid || grid->size() < 7) return -1;
+    int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), dx = std::atoi((*grid)[3].c_str()), dy = std::atoi((*grid)[4].c_str());
+    int perColumn = std::atoi((*grid)[5].c_str()), columns = std::atoi((*grid)[6].c_str());
+    ImageRef sheet = images_->get((*grid)[0]);
+    if (!sheet) return -1;
+    int w = sheet->w, h = sheet->h / 5;
+    for (int c = 0; c < columns; c++)
+        for (int r = 0; r < perColumn; r++) {
+            int cx = x0 + c * dx, cy = y0 + r * dy;
+            if (x >= cx && y >= cy && x < cx + w && y < cy + h) return page_ * perColumn * columns + c * perColumn + r + 1;
+        }
+    return -1;
+}
+
+void Engine::composeSlots(Canvas &out) {
+    const auto *grid = screen_->setting("slots");
+    if (!grid || grid->size() < 7) return;
+    int x0 = std::atoi((*grid)[1].c_str()), y0 = std::atoi((*grid)[2].c_str()), dx = std::atoi((*grid)[3].c_str()), dy = std::atoi((*grid)[4].c_str());
+    int perColumn = std::atoi((*grid)[5].c_str()), columns = std::atoi((*grid)[6].c_str());
+    ImageRef sheet = images_->get((*grid)[0]);
+    if (!sheet) return;
+    int cardH = sheet->h / 5;
+    auto offset = [&](const char *key, int index) {
+        const auto *line = screen_->setting(key);
+        return line && int(line->size()) > index ? std::atoi((*line)[size_t(index)].c_str()) : 0;
+    };
+    auto picture = [&](const char *key) { const auto *line = screen_->setting(key); return line && !line->empty() ? images_->get((*line)[0]) : nullptr; };
+    ImageRef digits = picture("slotdigits"), dateDigits = picture("datedigits"), noLabel = picture("slotlabel");
+    ImageRef slash = picture("dateslash"), colon = picture("datecolon"), dash = picture("datedash");
+    bool loading = screen_->name == "load";
+    int hovered = pointerSeen_ ? slotAt(pointerX_, pointerY_) : -1;
+    auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y) {
+        if (!sheetOfTen) return x;
+        int w = sheetOfTen->w / 10;
+        for (int i = count - 1; i >= 0; i--) {
+            int digit = value % 10;
+            value /= 10;
+            drawPart(out, *sheetOfTen, x + i * w, y, digit * w, 0, w, sheetOfTen->h, 1);
+        }
+        return x + count * w;
+    };
+    for (int c = 0; c < columns; c++)
+        for (int r = 0; r < perColumn; r++) {
+            int slot = page_ * perColumn * columns + c * perColumn + r + 1;
+            SlotInfo &info = slotInfo(slot);
+            int cx = x0 + c * dx, cy = y0 + r * dy;
+            int row = loading && !info.exists ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
+            drawPart(out, *sheet, cx, cy, 0, row * cardH, sheet->w, cardH, 1);
+            if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
+            drawNumber(digits, slot, 2, cx + offset("slotdigits", 1), cy + offset("slotdigits", 2));
+            if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
+            int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
+            auto mark = [&](const ImageRef &m) {
+                if (!m) return;
+                drawPart(out, *m, x, y, 0, 0, m->w, m->h, 1);
+                x += m->w;
+            };
+            if (info.exists) {
+                x = drawNumber(dateDigits, info.date[0], 4, x, y);
+                mark(slash);
+                x = drawNumber(dateDigits, info.date[1], 2, x, y);
+                mark(slash);
+                x = drawNumber(dateDigits, info.date[2], 2, x, y);
+                x += offset("dategap", 0);
+                x = drawNumber(dateDigits, info.date[3], 2, x, y);
+                mark(colon);
+                x = drawNumber(dateDigits, info.date[4], 2, x, y);
+                mark(colon);
+                x = drawNumber(dateDigits, info.date[5], 2, x, y);
+            }
+        }
+}
+
+void Engine::openDialog(int question, const std::function<void()> &yes) {
+    if (!screens_.count("dialog")) {
+        yes();
+        return;
+    }
+    dialogOpen_ = true;
+    dialogQuestion_ = question;
+    dialogYes_ = yes;
+    dirty_ = true;
+}
+
+// The table's dialog screen: a band, one row of a sheet of questions, and yes and no.
+void Engine::composeDialog(Canvas &out) {
+    const Screen &dialog = screens_.at("dialog");
+    tintFrame(out, 0, 0, 0, 128);
+    for (const Picture &p : dialog.pictures) {
+        Picture shown = p;
+        if (p.rows > 1) shown.row = dialogQuestion_;
+        drawPicture(out, shown);
+    }
+    for (const Button &b : dialog.buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
 }
 
 bool Engine::pressAction(const std::string &action) {
@@ -251,10 +627,16 @@ Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
 void Engine::composeScreen(Canvas &out) {
     out.clear();
     for (const Picture &p : screen_->pictures) drawPicture(out, p);
+    composeSlots(out);
+    bool fromTitle = returnTo_ == "title";
     for (Button &b : screen_->buttons) {
-        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
-        drawButton(out, b, over ? StateHover : StateNormal);
+        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
+        ButtonState state = over ? StateHover : StateNormal;
+        if (b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_)) state = over ? StateSelectedHover : StateSelected;
+        if (b.action == "nav_save" && fromTitle) state = StateDisabled;
+        drawButton(out, b, state);
     }
+    if (dialogOpen_) composeDialog(out);
 }
 
 // `under` buttons come up with their plate when the pointer's at the bottom of the screen; `inner` ones stay with the text.
@@ -336,6 +718,7 @@ void Engine::runFlow(const Node &n) {
         auto script = loadScript(n.s[1]);
         if (script && script->first()) {
             scene_ = {script, script->first()};
+            flowCallId_ = n.id;
             log("scene %s", script->name.c_str());
         }
         break;
@@ -384,6 +767,7 @@ int Engine::variableValue(int scope, int index) const {
 
 void Engine::beginChoice(const Node &n) {
     choiceSheet_ = images_->get(n.s[1]);
+    choiceImage_ = n.s[1];
     if (!choiceSheet_) {
         complain("Missing choice " + n.s[1]);
         choiceResult_ = 0;
@@ -633,10 +1017,30 @@ void Engine::mouseMove(float x, float y) {
 
 void Engine::mouseButton(int button, bool down) {
     if (button != 0 || !down) return;
+    if (dialogOpen_) {
+        Screen &dialog = screens_.at("dialog");
+        if (Button *b = buttonAt(pointerX_, pointerY_, dialog.buttons)) {
+            dialogOpen_ = false;
+            dirty_ = true;
+            auto yes = dialogYes_;
+            dialogYes_ = nullptr;
+            if (b->action == "yes" && yes) yes();
+        }
+        return;
+    }
     if (screen_) {
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
-            runAction(action);
+            if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);
+            return;
+        }
+        int slot = slotAt(pointerX_, pointerY_);
+        if (slot < 0) return;
+        if (screen_->name == "save") {
+            bool overwrite = slotInfo(slot).exists;
+            openDialog(overwrite ? 2 : 0, [this, slot] { saveToSlot(slot); dirty_ = true; });
+        } else if (screen_->name == "load" && slotInfo(slot).exists) {
+            openDialog(1, [this, slot] { loadFromSlot(slot); });
         }
         return;
     }
@@ -736,9 +1140,9 @@ void Engine::transform(const Node &n) {
         s.scaleY = float(p[5]) / 1000;
     }
     if (p[19]) s.alpha = float(p[15]) / 256;
-    // A background kept soft behind a character. Parameter 20 is 10 or 20 in the scenes the PC game shows blurred; about
-    // an eighth of it as a radius gives the sharpness of its footage.
-    s.blur = (p[20] + 4) / 8;
+    // A background kept soft behind a character, when parameter 21 turns it on: the PC game draws sharp with 20 alone.
+    s.blurAmount = p[20];
+    s.blurOn = p[21] != 0;
 }
 
 void Engine::transformOverTime(const Node &n) {
@@ -799,25 +1203,25 @@ void Engine::startNamedAnimation(const Node &n) {
     if (auto waiting = back_.find(n.p[0]); waiting != back_.end()) namedAnimation(waiting->second, n);
 }
 
-void Engine::namedAnimation(Sprite &s, const Node &n) {
-    foldFinishedChanges(s);
+Animation Engine::parseAnimation(const std::string &text, const Sprite &s) {
     Animation a;
     a.begunMs = now_;
-    a.repeat = n.p[1] != 0;
-    float lastScaleX = s.scaleX, lastScaleY = s.scaleY, lastX = s.x, lastY = s.y;
-    for (std::string line : split(n.s[1], '\n')) {
+    float lastScaleX = s.scaleX, lastScaleY = s.scaleY, lastX = s.x, lastY = s.y, lastAlpha = s.alpha;
+    for (std::string line : split(text, '\n')) {
         line = trim(line);
         if (line.empty()) continue;
         auto parts = split(line, ',');
-        if (parts.size() < 5) { warnOnce("animation line not read: " + line); continue; }
+        if (parts.size() < 4) { warnOnce("animation line not read: " + line); continue; }
         const std::string &name = parts[0];
         float value = float(std::atof(parts[1].c_str()));
-        // In frames, as a timed change's are: the PC game's save writes a timed change in this same form.
+        // In frames, as a timed change's are. A negative length is `quadratic`, which eases out.
+        int frames = std::atoi(parts[parts.size() - 2].c_str());
         int start = std::atoi(parts[parts.size() - 3].c_str()) * 1000 / std::max(1, fps_);
-        int length = std::atoi(parts[parts.size() - 2].c_str()) * 1000 / std::max(1, fps_);
+        int length = std::abs(frames) * 1000 / std::max(1, fps_);
         Track t;
         t.startMs = start;
         t.lengthMs = length;
+        t.easeOut = frames < 0 || parts.back() == "quadratic";
         a.periodMs = std::max(a.periodMs, start + length);
         auto push = [&](Track::Property property, bool relative, float from, float to) {
             t.property = property;
@@ -837,8 +1241,16 @@ void Engine::namedAnimation(Sprite &s, const Node &n) {
         }
         else if (name == "scale_x") { push(Track::ScaleX, false, lastScaleX, value); lastScaleX = value; }
         else if (name == "scale_y") { push(Track::ScaleY, false, lastScaleY, value); lastScaleY = value; }
+        else if (name == "alpha") { push(Track::Alpha, false, lastAlpha, value); lastAlpha = value; }
         else warnOnce("animation property not read: " + name);
     }
+    return a;
+}
+
+void Engine::namedAnimation(Sprite &s, const Node &n) {
+    foldFinishedChanges(s);
+    Animation a = parseAnimation(n.s[1], s);
+    a.repeat = n.p[1] != 0;
     s.loop = std::move(a);
     s.looping = true;
 }
@@ -888,6 +1300,14 @@ void Engine::screenUpdate(const Node &n) {
 }
 
 void Engine::showText(const Node &n) {
+    // What the PC keeps of it: its saves hold the text on screen and the last 60 lines, newest first.
+    currentText_ = {};
+    currentText_.tag = n.s[3].empty() ? -10 : 0;
+    currentText_.name = n.s[1];
+    currentText_.text = n.s[2];
+    currentText_.voice = n.s[3];
+    backlog_.insert(backlog_.begin(), currentText_);
+    if (backlog_.size() > 60) backlog_.pop_back();
     if (!windowShown_) {
         windowShown_ = true;
         windowShownAt_ = now_;
@@ -941,6 +1361,8 @@ void Engine::playSound(const Node &n, int kind) {
     if (fade > 0) audio_.fade(player, fade, volume, false);
     audio_.play(player);
     channels[channel] = player;
+    if (kind == kKindBgm) bgmNow_[channel] = {n.s[1], volume, p[2]};
+    if (kind == kKindSe && p[4] == 0) seNow_[channel] = {n.s[1], volume, p[2]};
 }
 
 void Engine::changeVolume(int kind, int channel, int volume, int ms) {
@@ -951,6 +1373,8 @@ void Engine::changeVolume(int kind, int channel, int volume, int ms) {
 
 void Engine::stopChannel(int kind, int channel, int ms) {
     std::map<int, int> &channels = kind == kKindBgm ? bgm_ : kind == kKindSe ? se_ : voice_;
+    if (kind == kKindBgm) bgmNow_.erase(channel);
+    if (kind == kKindSe) seNow_.erase(channel);
     auto it = channels.find(channel);
     if (it == channels.end()) return;
     audio_.fade(it->second, std::max(ms, 0), 0, true);
@@ -961,6 +1385,8 @@ void Engine::stopKind(int kind, int ms) {
     std::map<int, int> &channels = kind == kKindBgm ? bgm_ : kind == kKindSe ? se_ : voice_;
     for (auto &[channel, player] : channels) audio_.fade(player, std::max(ms, 0), 0, true);
     channels.clear();
+    if (kind == kKindBgm) bgmNow_.clear();
+    if (kind == kKindSe) seNow_.clear();
 }
 
 // MARK: Drawing
@@ -1036,7 +1462,9 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
         if (!s.image) continue;
         SpriteView v = view(s);
         float dx = slot < shakeLock_ ? shakeX : 0, dy = slot < shakeLock_ ? shakeY : 0;
-        ImageRef image = s.blur > 0 ? images_->blurred(s.path, s.blur) : s.image;
+        // About an eighth of the amount as a radius gives the sharpness of the PC game's footage.
+        int radius = s.blurOn ? (s.blurAmount + 4) / 8 : 0;
+        ImageRef image = radius > 0 ? images_->blurred(s.path, radius) : s.image;
         drawImage(out, image ? *image : *s.image, out.w * 0.5f + v.x + dx, out.h * 0.5f + v.y + dy, v.scaleX, v.scaleY, v.rotation, v.alpha);
     }
 }

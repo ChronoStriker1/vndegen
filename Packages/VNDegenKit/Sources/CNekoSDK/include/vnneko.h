@@ -18,6 +18,7 @@ typedef struct VNNekoEngine VNNekoEngine;
 
 typedef struct VNNekoLaunch {
     const char *gameRoot;  // folder holding the game's .pak archives
+    const char *dataDir;   // the game's data folder, where saves go, under AppData/Roaming as on Windows
     const char *logPath;   // file the runtime's log is appended to; NULL logs to stderr
     const char *fontDir;   // folder holding the Windows font pack's fonts.tsv
 } VNNekoLaunch;

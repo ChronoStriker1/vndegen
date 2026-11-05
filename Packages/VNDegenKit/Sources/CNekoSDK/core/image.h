@@ -19,6 +19,11 @@ struct Image {
 };
 using ImageRef = std::shared_ptr<const Image>;
 
+// A BMP from anywhere, such as a save's thumbnail. Null when it can't be read.
+ImageRef decodeBmpBytes(const std::vector<uint8_t> &data);
+// A 24-bit BMP of an RGBA frame, shrunk to w by h, as the PC game writes a save's thumbnail.
+std::vector<uint8_t> encodeThumbnail(const uint8_t *rgba, int frameW, int frameH, int w, int h);
+
 // Decoded pictures, most recently used kept. Scripts load the same backgrounds and bars over and over.
 class Images {
 public:

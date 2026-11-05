@@ -5,6 +5,7 @@
 #pragma once
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -15,6 +16,7 @@
 #include "audio.h"
 #include "canvas.h"
 #include "image.h"
+#include "save.h"
 #include "script.h"
 #include "ui.h"
 
@@ -52,7 +54,8 @@ struct Sprite {
     ImageRef image;
     std::string path;
     float x = 0, y = 0, scaleX = 1, scaleY = 1, rotation = 0, alpha = 1;
-    int blur = 0;
+    int blurAmount = 0;
+    bool blurOn = false;
     // Timed changes run side by side until each finishes, when it folds into the values above. The named animation
     // runs over them all until it's stopped.
     std::vector<Animation> changes;
@@ -74,7 +77,7 @@ struct Glyph {
 
 class Engine {
 public:
-    bool start(const std::string &root, const std::string &logPath, const std::string &fontDir, std::string &error);
+    bool start(const std::string &root, const std::string &dataDir, const std::string &logPath, const std::string &fontDir, std::string &error);
     ~Engine();
 
     bool step(int ms);
@@ -117,6 +120,24 @@ private:
     void advance();
     bool flowActive() const { return !stack_.empty(); }
 
+    // Saves.
+    std::string savePath(int slot, const char *extension) const;
+    bool saveToSlot(int slot);
+    bool loadFromSlot(int slot);
+    SaveData captureSave();
+    void restoreSave(const SaveData &data);
+    void noteThumbnail();
+    struct SlotInfo {
+        bool exists = false;
+        int date[6] = {};
+        ImageRef thumbnail;
+    };
+    SlotInfo &slotInfo(int slot);
+    void composeSlots(Canvas &out);
+    int slotAt(int x, int y) const;
+    void composeDialog(Canvas &out);
+    void openDialog(int question, const std::function<void()> &yes);
+
     // Menus.
     void openScreen(const std::string &name);
     void closeScreen();
@@ -136,6 +157,7 @@ private:
     void changeOverTime(Sprite &s, const Node &n);
     void startNamedAnimation(const Node &n);
     void namedAnimation(Sprite &s, const Node &n);
+    Animation parseAnimation(const std::string &text, const Sprite &s);
     void stopNamedAnimation(int slot);
     void abortChange(int slot);
     void screenUpdate(const Node &n);
@@ -212,6 +234,27 @@ private:
     bool blur_ = false, blurEnding_ = false, previousValid_ = false;
     int blurAmount_ = 0, blurEndMs_ = 0;
     int64_t blurEndStart_ = 0;
+
+    // Saves. `thumbnail_` is the last story frame, taken when a menu opens over it.
+    const SaveLayout *layout_ = nullptr;
+    std::string saveDir_;
+    std::map<int, SlotInfo> slots_;
+    std::vector<uint8_t> thumbnail_;
+    int thumbW_ = 160, thumbH_ = 90;
+    int page_ = 0;
+    std::string returnTo_;
+    int flowCallId_ = 0;
+    std::string choiceImage_;
+    std::vector<SavedText> backlog_;
+    SavedText currentText_;
+    struct Playing {
+        std::string path;
+        int volume = 0, pan = 0;
+    };
+    std::map<int, Playing> bgmNow_, seNow_;
+    bool dialogOpen_ = false;
+    int dialogQuestion_ = 0, dialogHover_ = -1;
+    std::function<void()> dialogYes_;
 
     // Menus, and the message window's buttons.
     std::map<std::string, Screen> screens_;

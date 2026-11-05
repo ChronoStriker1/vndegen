@@ -16,7 +16,7 @@ extern "C" {
 VNNekoEngine *vnneko_start(const VNNekoLaunch *launch) {
     auto e = std::make_unique<VNNekoEngine>();
     startError.clear();
-    if (!e->engine.start(launch->gameRoot, launch->logPath ? launch->logPath : "", launch->fontDir ? launch->fontDir : "", startError)) return nullptr;
+    if (!e->engine.start(launch->gameRoot, launch->dataDir ? launch->dataDir : "", launch->logPath ? launch->logPath : "", launch->fontDir ? launch->fontDir : "", startError)) return nullptr;
     return e.release();
 }
 const char *vnneko_start_error(void) { return startError.c_str(); }
