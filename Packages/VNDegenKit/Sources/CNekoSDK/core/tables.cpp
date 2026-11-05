@@ -354,7 +354,7 @@ pic obj\h024_000.bmp 479 485 1 5 0 4
 pic obj\h023_000.bmp 532 484 1 5 0 4
 pic obj\h008_000.bmp 617 112 2 5 0 4
 pic obj\h008_000.bmp 698 112 2 5 1 4
-pic obj\h022_000.bmp 600 198 1 5 0 4
+check voice0 obj\h022_000.bmp 600 198 1 5 0
 
 screen log
 pic obj\m001_000.bmp 1185 110
@@ -782,9 +782,9 @@ pic obj\h024_000.bmp 656 886 1 5 0 4
 pic obj\h023_000.bmp 746 884 1 5 0 0
 pic obj\h008_000.bmp 889 238 2 5 0 4
 pic obj\h008_000.bmp 1007 238 2 5 1 4
-pic obj\h022_000.bmp 919 868 3 5 0 4
-pic obj\h022_000.bmp 1206 959 3 5 1 4
-pic obj\h022_000.bmp 1383 959 3 5 2 4
+check voice0 obj\h022_000.bmp 919 868 4 5 0
+check voice2 obj\h022_000.bmp 1207 955 4 5 2
+check voice3 obj\h022_000.bmp 1384 955 4 5 3
 
 screen log
 dim 216
