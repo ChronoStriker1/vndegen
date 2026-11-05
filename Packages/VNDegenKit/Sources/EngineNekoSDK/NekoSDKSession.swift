@@ -79,6 +79,9 @@ final class NekoSDKSession: EngineSession {
         let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
         lastTimestamp = now
         guard !paused else { return }
+        #if DEBUG
+        let began = CACurrentMediaTime()
+        #endif
         if !vnneko_step(engine, Int32(min(max(ms, 0), 100))) {
             finish(byGame: true)
             return
@@ -89,7 +92,9 @@ final class NekoSDKSession: EngineSession {
             frameView.present(pixels, width: Int(w), height: Int(h))
         }
         #if DEBUG
-        pacing?.note(tick: now, presented: changed, stepEnd: CACurrentMediaTime(), target: link.targetTimestamp - link.timestamp)
+        let ended = CACurrentMediaTime()
+        pacing?.note(tick: now, presented: changed, stepEnd: ended, target: link.targetTimestamp - link.timestamp, workTime: ended - began,
+                     progress: "text=\(vnneko_debug_text_count(engine))")
         #endif
     }
 

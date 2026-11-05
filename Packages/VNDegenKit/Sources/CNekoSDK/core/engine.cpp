@@ -42,7 +42,7 @@ float progressOf(const Track &t, int ms) {
     float linear = float(ms - t.startMs) / float(t.lengthMs);
     if (!t.easeOut) return linear;
     float left = 1 - linear;
-    return 1 - left * left * left;
+    return 1 - left * left;
 }
 
 }  // namespace
@@ -614,7 +614,8 @@ void Engine::transformOverTime(const Node &n) {
 }
 
 // Parameter 0 makes a move relative. Parameter 24 is the delay and 25 the length, both in frames at the game's FPS: the
-// PC game's save shows a change of 2400 at 2140 about 36 seconds in. A negative length eases out, by the footage.
+// PC game's save shows a change of 2400 at 2140 about 36 seconds in. A negative length is what that save calls
+// `quadratic`, which eases out: the footage's steps fall in even amounts.
 void Engine::changeOverTime(Sprite &s, const Node &n) {
     const auto &p = n.p;
     foldFinishedChanges(s);

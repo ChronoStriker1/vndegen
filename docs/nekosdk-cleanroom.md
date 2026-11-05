@@ -74,7 +74,8 @@ scene.
   2400 holds 2140. Parameter 0 makes a move relative.
 - Timed changes on one sprite run side by side. A character sprite given a relative -400 over 20 frames and then -100 from
   frame 20 over 180 frames sat at +80 and +48 on the way down and at 0 afterwards, by a masked fit of the recording.
-- A negative length eases out. The cubic curve is a fit to one move, sampled at 15 fps.
+- A negative length is `quadratic`: a save holds a change of -120 written as `relative_pos_y,120,0,-120,quadratic`, and the
+  recording's steps along such a move fall in even amounts, which is a quadratic easing out.
 - Parameters 16 to 19 of opcodes 18 and 25 say which of position, scale, rotation and alpha change: a command with a scale
   in 4 and 5 but no 17 left the background at scale 2.00 in a fit of the recording.
 - A sprite's centre sits at the screen's centre plus its x and y, and scale is about the centre: fits of the recording give
@@ -90,7 +91,7 @@ scene.
 ## Readings not yet checked
 
 - Parameter 20 of opcode 18 blurs a sprite. Its radius is a fit to one frame's sharpness, and parameter 21 isn't read.
-- The curve of a negative length, the flash's parameters 4 to 10, and motion blur's strength.
+- The flash's parameters 4 to 10, and motion blur's strength.
 - Named animations (opcode 19): their lengths are taken as frames, because a save holds a timed change written in the same
   text form. A recording that reached them was too coarse to confirm it.
 - `loop:0` repeating for ever is read from a street ambience and from `loop:1` on one-shot effects.
