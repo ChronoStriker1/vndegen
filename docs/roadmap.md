@@ -70,6 +70,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
+- [#37](https://github.com/ChronoStriker1/vndegen/issues/37) NScripter: a wrapped select choice only responds on its first line.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
