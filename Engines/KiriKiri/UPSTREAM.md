@@ -26,7 +26,7 @@ VNDegen's movie decoder, `vndegen/movie_decoder.cpp`, uses FFmpeg 8.1.2. vcpkg b
 ```
 --disable-everything --disable-network
 --enable-demuxer=mpegps,mpegvideo,asf,mov
---enable-decoder=mpeg1video,mpeg2video,mp1,mp2,mp3,wmv1,wmv2,wmv3,vc1,wmav1,wmav2,h264,hevc,aac
+--enable-decoder=mpeg1video,mpeg2video,mp1,mp2,mp3,wmv1,wmv2,wmv3,vc1,wmav1,wmav2,wmapro,wmalossless,h264,hevc,aac
 --enable-parser=mpegvideo,mpegaudio,vc1,h264,hevc,aac
 --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox
 ```
