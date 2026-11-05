@@ -200,6 +200,7 @@ private:
     // Commands.
     void beginChoice(const Node &n);
     void updateChoice();
+    void choicePlace(int &x, int &top, int &step) const;
     int variableValue(int scope, int index) const;
     int variableNumber(int scope, int index) const;
     void endStory(const std::string &screen);

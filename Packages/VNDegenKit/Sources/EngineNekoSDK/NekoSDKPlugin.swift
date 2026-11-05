@@ -26,6 +26,9 @@ nonisolated public struct NekoSDKPlugin: EnginePlugin {
         return NekoSDKSession(launch, root: root)
     }
 
+    /// The player taps and clicks the game's own message window and menus, so no touch gamepad covers them.
+    public var readsTouches: Bool { true }
+
     /// NekoSDK games keep their menus in their exes, so VNDegen holds a table for each. Until it has one, the game can't run.
     public func compatibilityNote(for game: Game, folder: URL, dataDirectory: URL) -> String? {
         guard let layout = NekoSDKLayout(FolderProbe(scanning: folder)), !vnneko_is_supported(layout.url(in: folder).path) else { return nil }

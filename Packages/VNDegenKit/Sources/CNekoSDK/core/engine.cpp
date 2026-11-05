@@ -422,9 +422,9 @@ bool Engine::moveFocus(int dx, int dy) {
     } else if (logOpen_) {
         addButtons(screens_.at("log").buttons);
     } else if (waiting_ == Waiting::Choice && choiceSheet_) {
-        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
-        for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, (height_ - cellH * choiceCount_) / 2 + i * cellH + cellH / 2});
-        (void)cellW;
+        int cellH = choiceSheet_->h / 5, x, top, step;
+        choicePlace(x, top, step);
+        for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, top + i * step + cellH / 2});
     } else if (screen_) {
         addButtons(screen_->buttons);
         const auto *grid = screen_->setting("slots");
@@ -1135,10 +1135,9 @@ void Engine::composeScreen(Canvas &out) {
 }
 
 // `under` buttons come up with their plate when the pointer's at the left of the bar, and `inner` ones when it's anywhere else
-// along it, as Test Game 97 does. A game with no plate keeps its buttons up all the time.
+// along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
-    if (!buttonPlate_) return true;
-    return pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= plateX_ + buttonPlate_->w;
+    return pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0);
 }
 
 bool Engine::underButtonsShown() const {
@@ -1677,8 +1676,8 @@ void Engine::mouseButton(int button, bool down) {
     }
     if (windowShown_) {
         // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
-        if (buttonPlate_ && pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_) return;
-        if (innerWereShown_ || !buttonPlate_)
+        if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_) return;
+        if (innerWereShown_)
             if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
                 std::string action = b->action;
                 runAction(action);
@@ -1699,13 +1698,28 @@ void Engine::mouseButton(int button, bool down) {
     clicked_ = true;
 }
 
-// Options stack around the middle of the screen. Where the PC game puts them is still to be measured.
+// The table's `choice` screen gives where options start and the step between them. Without one they stack in the middle.
+void Engine::choicePlace(int &x, int &top, int &step) const {
+    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
+    x = (width_ - cellW) / 2;
+    top = (height_ - cellH * choiceCount_) / 2;
+    step = cellH;
+    auto it = screens_.find("choice");
+    const auto *place = it == screens_.end() ? nullptr : it->second.setting("place");
+    if (place && place->size() >= 2) {
+        top = std::atoi((*place)[0].c_str());
+        step = std::atoi((*place)[1].c_str());
+    }
+}
+
 void Engine::updateChoice() {
     if (waiting_ != Waiting::Choice || !choiceSheet_) return;
-    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
-    int x = (width_ - cellW) / 2, top = (height_ - cellH * choiceCount_) / 2;
+    int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step;
+    choicePlace(x, top, step);
     int px = int(mouseX_ * float(width_)), py = int(mouseY_ * float(height_));
-    int hover = px >= x && px < x + cellW && py >= top && py < top + cellH * choiceCount_ ? (py - top) / cellH : -1;
+    int hover = -1;
+    for (int i = 0; i < choiceCount_; i++)
+        if (px >= x && px < x + cellW && py >= top + i * step && py < top + i * step + cellH) hover = i;
     if (hover != choiceHover_) {
         choiceHover_ = hover;
         dirty_ = true;
@@ -2174,11 +2188,16 @@ void Engine::compose() {
     if (dialogOpen_) composeDialog(canvas_);
 
     if (waiting_ == Waiting::Choice && choiceSheet_) {
-        if (choiceBack_) drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
-        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5;
-        int x = (width_ - cellW) / 2, top = (height_ - cellH * choiceCount_) / 2;
+        auto table = screens_.find("choice");
+        if (table != screens_.end()) {
+            for (const Picture &p : table->second.pictures) drawPicture(canvas_, p);
+        } else if (choiceBack_) {
+            drawPart(canvas_, *choiceBack_, 0, (height_ - choiceBack_->h) / 2, 0, 0, choiceBack_->w, choiceBack_->h, 1);
+        }
+        int cellW = choiceSheet_->w / choiceCount_, cellH = choiceSheet_->h / 5, x, top, step;
+        choicePlace(x, top, step);
         for (int i = 0; i < choiceCount_; i++)
-            drawPart(canvas_, *choiceSheet_, x, top + i * cellH, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+            drawPart(canvas_, *choiceSheet_, x, top + i * step, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
     }
 }
 

@@ -58,8 +58,27 @@ the editor wrote the same value twice, once as text and once as a number, so the
 
 ## Saves
 
-A `.sav` uses the archive entry container: the first 4 bytes XORed with the rolling key the archive uses, a zlib stream,
-and the unpacked size in the last 4 bytes. This was found by testing the archive's scheme on saves the PC game wrote.
+A `.sav` uses the archive entry container: the first 4 bytes XORed with the rolling key the archive uses, a zlib stream, and the unpacked size in the last 4 bytes. This was found by testing the archive's scheme on saves the PC game wrote.
+
+Inside is a stream of fields, mostly zero. `Engines/NekoSDK/host/tools/nekosave.cpp` reads a save and writes it back. Test Game 97's saves come back with at most 4 bytes different in about 140,000, and Test Game 95's with 9 or more. Those bytes are state the runtime doesn't use, on the last sprite record.
+
+| Field | Where | How it was settled |
+|---|---|---|
+| A first byte of 1, then 204 zeros | Start | All saves |
+| Flow script name, u32 length and bytes | 0xCD | Read from the file. An older game with no flow scripts has length 0 |
+| 4,196 bytes, a choice picture's name, then 39,596 bytes | | Test Game 95's saves after a choice hold the picture named by its choice command |
+| Date and time as six ints, in 400 bytes | | The save screen shows them |
+| 1, then the flow node of the scene call | | Test Game 95's node 6 and 12 match the scenes each save resumes |
+| 10,000 ints: the scenario's variables | The last 40,000 bytes before the sprite count | `macrolist.ini` names 110 and 4000. A save after a choice that raises the counter holds 1 at 110 |
+| Sprite count, then 40 bytes, then records | | The root record has slot -999999 and the window's size |
+
+A sprite record is a slot, two picture paths, then fixed fields: a matrix, x and y, scale, the anchor (half the picture's size), alpha out of 256, whether blur is on and its amount, whether an animation runs, how many frames in, its text, then the sprite's end state. Test Game 95's record has 69 more bytes than Test Game 97's and Test Game 82's first fields agree with the older layout.
+
+After the records come the text on screen and the last 60 lines of the backlog, newest first, then 243 sound channel records (60 of music, then sound effects), each a playing flag, path, volume, pan and position in seconds as a double. Then the scene script's name and the node to run next.
+
+**Checked both ways on Test Game 97 under Wine:** a save the PC wrote loads in the runtime, shows the same text, and moves on to the next line. A save the runtime wrote appears on the PC's load screen with its date and thumbnail, loads, shows the same text, and moves on. Test Game 95's saves load in the runtime. A save the runtime writes for Test Game 95 hasn't been loaded on its PC copy yet.
+
+`cfg.sav` holds the PC's settings, with the 10,000 global variables at byte 4000 (a macro of 1000 sits at byte 8000 after the prologue). The runtime keeps the rest of the file as it found it. `read.sav` isn't read or written, so PC read marks don't carry over. Volumes and text speed are kept in a small file of VNDegen's, and what the galleries unlock is kept in another, so those don't move to or from a PC either.
 
 ## Meanings settled by comparison with the PC game
 
@@ -88,9 +107,13 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Menus
+
+The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.
+
 ## Readings not yet checked
 
-- Parameter 20 of opcode 18 blurs a sprite. Its radius is a fit to one frame's sharpness, and parameter 21 isn't read.
+- Parameter 20 of opcode 18 is a blur that parameter 21 turns on: the PC game draws sharp with 20 alone. The radius is a fit to one frame's sharpness.
 - The flash's parameters 4 to 10, and motion blur's strength.
 - Named animations (opcode 19): their lengths are taken as frames, because a save holds a timed change written in the same
   text form. A recording that reached them was too coarse to confirm it.

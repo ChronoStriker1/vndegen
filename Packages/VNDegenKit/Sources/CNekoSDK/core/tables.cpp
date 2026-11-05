@@ -439,6 +439,11 @@ pic obj\i000_000.bmp 660 380 1 8 0 0
 button yes obj\b003_000.bmp 720 476 2 5 0
 button no obj\b003_000.bmp 1005 476 2 5 1
 
+screen choice
+pic obj\n000_000.bmp 0 259
+pic obj\n001_000.bmp 785 335
+place 413 132
+
 screen start
 pic obj\d007_000.bmp 0 0
 pic obj\d007_001.bmp 0 342
