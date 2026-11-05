@@ -8,9 +8,9 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 
 | Engine | Detected by | Platforms |
 |---|---|---|
-| [RPG Maker MZ](#rpg-maker-mv-and-mz) | `js/rmmz_core.js` | Mac, iPhone, iPad |
-| [RPG Maker MV](#rpg-maker-mv-and-mz) | `js/rpg_core.js` or `www/js/rpg_core.js` | Mac, iPhone, iPad |
-| [TyranoScript and TyranoBuilder](#tyranoscript) | `tyrano/plugins/kag/kag.js` at the top of the game, or in an NW.js (`package.nw`) or Electron (`resources/app`, also inside `app.asar`) build | Mac, iPhone, iPad |
+| [RPG Maker MZ](#rpg-maker-mv-and-mz) | `js/rmmz_core.js`, also inside up to three wrapper folders | Mac, iPhone, iPad |
+| [RPG Maker MV](#rpg-maker-mv-and-mz) | `js/rpg_core.js` or `www/js/rpg_core.js`, also inside up to three wrapper folders | Mac, iPhone, iPad |
+| [TyranoScript and TyranoBuilder](#tyranoscript) | `tyrano/plugins/kag/kag.js` at the top of the game, or in an NW.js (`package.nw`) or Electron (`resources/app`, also inside `app.asar`) build, also inside up to two wrapper folders | Mac, iPhone, iPad |
 | [Ren'Py 6.99 to 8](#renpy) | `renpy/` beside a `game/` folder holding `.rpy`, `.rpyc`, or `.rpa` files, also one or two folders down | Mac, iPhone, iPad |
 | [RPG Maker XP, VX, and VX Ace](#rpg-maker-xp-vx-and-vx-ace) | `Game.ini` beside `Game.rgssad`, `Game.rgss2a`, or `Game.rgss3a`, or beside `Data/Scripts.rxdata`, `.rvdata`, or `.rvdata2`, also one or two folders down | Mac, iPhone, iPad |
 | [KiriKiri 2 and KiriKiri Z](#kirikiri) | `data.xp3`, a `data/` folder holding `startup.tjs`, or an archive appended to the game's `.exe`, beside the `.exe` and up to two folders down | Mac, iPhone, iPad |

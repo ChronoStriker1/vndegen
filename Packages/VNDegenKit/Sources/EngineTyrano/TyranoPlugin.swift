@@ -20,18 +20,19 @@ nonisolated public struct TyranoPlugin: EnginePlugin {
     }
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
-        guard let game = TyranoGame(folder: probe.root) else { return nil }
-        let evidence = game.webRoot.isEmpty ? TyranoGame.engineFile : "\(game.webRoot)/\(TyranoGame.engineFile)"
+        guard let root = TyranoGame.gameFolder(in: probe.root), let game = TyranoGame(folder: root) else { return nil }
+        let wrapper = String(root.path.dropFirst(probe.root.path.count)).drop { $0 == "/" }
+        let evidence = [String(wrapper), game.webRoot, TyranoGame.engineFile].filter { !$0.isEmpty }.joined(separator: "/")
         return EngineMatch(engine: descriptor.id, confidence: .certain, version: game.version, evidence: evidence)
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {
-        guard let game = TyranoGame(folder: launch.folder) else { throw TyranoError.notTyrano }
+        guard let root = TyranoGame.gameFolder(in: launch.folder), let game = TyranoGame(folder: root) else { throw TyranoError.notTyrano }
         guard let url = Bundle.module.url(forResource: "tyrano", withExtension: "js") else { throw TyranoError.scriptMissing }
-        let folder = GameFolder(root: launch.folder, webRoot: game.webRoot)
+        let folder = GameFolder(root: root, webRoot: game.webRoot)
         let storage = WebStorage(directory: Self.storageDirectory(launch.dataDirectory))
         do {
-            try Self.adoptSaveKey(of: game, folder: launch.folder, storage: storage)
+            try Self.adoptSaveKey(of: game, folder: root, storage: storage)
         } catch {
             tyranoLog.error("could not update the save key: \(error.localizedDescription, privacy: .public)")
         }

@@ -8,10 +8,10 @@ extension TyranoPlugin {
     /// it goes with the saves, so another VNDegen device can open them. Games that save to localStorage keep it in the
     /// app's data directory, where only other VNDegen devices can use it.
     public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
-        guard let game = TyranoGame(folder: folder) else { return [] }
+        guard let root = TyranoGame.gameFolder(in: folder), let game = TyranoGame(folder: root) else { return [] }
         let storage = Self.storageDirectory(dataDirectory)
         if game.savesToFiles {
-            let files = SaveLocation(directory: folder) { Self.saveFileName($0, projectID: game.projectID) }
+            let files = SaveLocation(directory: root) { Self.saveFileName($0, projectID: game.projectID) }
             guard game.packaging == .electron else { return [files] }
             let keyFile = WebStorage.fileName(for: Self.saveKeyName(projectID: game.projectID))
             return [files, SaveLocation(directory: storage) { Self.storageFileName($0) == keyFile ? keyFile : nil }]

@@ -31,7 +31,7 @@ nonisolated public struct RPGMakerPlugin: EnginePlugin {
         for root in ["", "www/"] where probe.contains("\(root)js/\(core)") {
             return EngineMatch(engine: descriptor.id, confidence: .certain, evidence: "\(root)js/\(core)")
         }
-        return nil
+        return RPGMakerLayout(probe, cores: [core]).map { EngineMatch(engine: descriptor.id, confidence: .certain, evidence: $0.evidence) }
     }
 
     /// Runs the game in the shared web host.

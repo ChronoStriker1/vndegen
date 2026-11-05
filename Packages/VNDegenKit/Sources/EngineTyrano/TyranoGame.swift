@@ -1,4 +1,5 @@
 import Foundation
+import VNCore
 import WebRuntime
 
 /// What a TyranoScript game folder holds: where its web root is, which desktop runtime its PC build ships in, and how it
@@ -29,6 +30,23 @@ nonisolated struct TyranoGame: Equatable, Sendable {
 }
 
 nonisolated extension TyranoGame {
+    /// The folder holding the game: `folder`, or a wrapper in it whose web root the listing shows, shallowest first. An
+    /// archive with two folders above the game, or a readme beside it, keeps a wrapper when it's imported. The game gets
+    /// its own folder as the root, so it sees the same tree and saves beside its executable as anywhere else.
+    static func gameFolder(in folder: URL) -> URL? {
+        if TyranoGame(folder: folder) != nil { return folder }
+        let probe = FolderProbe(scanning: folder)
+        let wrappers = probe.entries.compactMap { entry -> String? in
+            let lower = entry.lowercased()
+            guard let web = (["/tyrano"] + webRoots.filter { !$0.isEmpty }.map { "/\($0)" }).first(where: { lower.hasSuffix($0) }) else { return nil }
+            return String(entry.dropLast(web.count))
+        }
+        let depth = { (path: String) in path.split(separator: "/").count }
+        return Set(wrappers).sorted { (depth($0), $0) < (depth($1), $1) }
+            .map { folder.appendingPathComponent($0, isDirectory: true) }
+            .first { TyranoGame(folder: $0) != nil }
+    }
+
     init?(folder: URL) {
         guard let (webRoot, web) = Self.webRoots.lazy
             .map({ ($0, GameFolder(root: folder, webRoot: $0)) })
