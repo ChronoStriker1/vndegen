@@ -49,11 +49,16 @@ import VNCore
         #expect(layout(["Save_Data", "Save_Data/file1.sav"]) == nil)
     }
 
-    /// A wrapped RPG Maker game is only a likely match, and ties go to the engine asked first.
-    @Test func neverOutranksAnotherEnginesMatch() {
-        let found = layout(["Release", "Release/js", "Release/js/rpg_core.js", "Release/Tool.exe", "Release/Tool_Data",
-                            "Release/Tool_Data/globalgamemanagers"])
-        #expect(found.map { $0.confidence <= .likely } == true)
+    /// A wrapped RPG Maker game is only a likely match. Unity, asked last, must not take it for a Unity tool beside it.
+    @Test func neverOutranksAnotherEnginesMatch() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder.appending(path: "Release/Tool_Data"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data().write(to: folder.appending(path: "Release/Tool_Data/globalgamemanagers"))
+        try Data().write(to: folder.appending(path: "Release/Tool.exe"))
+        let probe = FolderProbe(scanning: folder)
+        #expect(EngineDetector.detect(probe, using: [UnityPlugin()])?.engine == .unity)
+        #expect(EngineDetector.detect(probe, using: [LikelyPlugin(), UnityPlugin()])?.engine == LikelyPlugin.id)
     }
 
     @Test func prefersTheGameWithItsPlayerAndThenTheShallowest() {
@@ -63,6 +68,11 @@ import VNCore
         let shallow = layout(["Game.exe", "Game_Data", "Game_Data/globalgamemanagers",
                               "Demo", "Demo/Demo.exe", "Demo/Demo_Data", "Demo/Demo_Data/globalgamemanagers"])
         #expect(shallow?.root == "")
+        // Shallowest by folders, not by the length of the path.
+        let byDepth = layout(["WindowsBuild", "WindowsBuild/Game.exe", "WindowsBuild/Game_Data", "WindowsBuild/Game_Data/globalgamemanagers",
+                              "Extras", "Extras/Tool", "Extras/Tool/Tool.exe", "Extras/Tool/Tool_Data"],
+                             deeper: ["Extras/Tool/Tool_Data": ["globalgamemanagers"]])
+        #expect(byDepth?.root == "WindowsBuild")
     }
 
     @Test func findsTheMacBuildBesideIt() {
@@ -125,4 +135,12 @@ import VNCore
         #expect(note?.hasPrefix("VNDegen can't run Unity games.") == true)
         #expect(note?.contains("IL2CPP") == true)
     }
+}
+
+/// Another engine's likely match, such as RPG Maker's for a game inside a wrapper folder.
+private struct LikelyPlugin: EnginePlugin {
+    static let id = EngineID("likely")
+    var descriptor: EngineDescriptor { EngineDescriptor(id: Self.id, displayName: "Likely", shortName: "Likely", platforms: [.macOS, .iOS]) }
+    func detect(_ probe: FolderProbe) -> EngineMatch? { EngineMatch(engine: Self.id, confidence: .likely, evidence: "Release") }
+    @MainActor func makeSession(_ launch: GameLaunch) throws -> any EngineSession { throw UnityError.cantRun }
 }

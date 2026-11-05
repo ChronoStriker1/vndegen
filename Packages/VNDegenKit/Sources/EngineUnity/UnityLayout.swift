@@ -46,7 +46,7 @@ nonisolated struct UnityLayout: Equatable, Sendable {
             let parts = entry.split(separator: "/").map(String.init)
             guard let name = parts.last, name.count > 5, name.lowercased().hasSuffix("_data"), parts.count <= 3 else { continue }
             let root = parts.dropLast().joined(separator: "/")
-            if let current = best, current.root.count <= root.count, current.confidence == .likely { continue }
+            if let current = best, current.depth <= parts.count - 1, current.confidence == .likely { continue }
             // The probe lists three levels, so a data folder two folders down shows without its contents.
             let contents = list(entry)
             let data = Self.dataFiles.lazy.compactMap { file in contents.first { $0.lowercased() == file } }.first
@@ -66,7 +66,7 @@ nonisolated struct UnityLayout: Equatable, Sendable {
                                         confidence: player ? .likely : .weak, backend: backend, macApp: nil)
             if let current = best {
                 if candidate.confidence < current.confidence { continue }
-                if candidate.confidence == current.confidence, candidate.root.count >= current.root.count { continue }
+                if candidate.confidence == current.confidence, candidate.depth >= current.depth { continue }
             }
             best = candidate
         }
@@ -74,6 +74,9 @@ nonisolated struct UnityLayout: Equatable, Sendable {
         best.macApp = Self.macApp(probe, list: list)
         self = best
     }
+
+    /// How many folders down the player is.
+    private var depth: Int { root.split(separator: "/").count }
 
     private init(root: String, dataFolder: String, evidence: String, confidence: DetectionConfidence, backend: Backend?, macApp: String?) {
         self.root = root
