@@ -113,6 +113,10 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Two nodes with one number
+
+One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.
+
 ## Placing and scaling pictures
 
 A sprite's x and y are the top left of the unscaled picture. Parameter 0 of the image load command places a picture: 1 centres it, 2 and 3 put its middle 256 to the left and right of centre, 4 and 5 put it 512 away, and parameters 1 and 2 add to that. It always sits halfway down, and the scale goes back to 1. 0 leaves the slot's place and scale alone, unless parameter 5 is set, which starts the slot afresh at 0, 0. Parameter 0 of the set-position command, 18, makes its position a move from where the sprite is, as it does for command 25. These were checked by replaying scenes to the node each PC save names and comparing the sprite places the PC saved, in Test Games 84, 93, 95 and 97, at 1280 and 1920 wide, with C's division toward zero. Sprites kept from an earlier scene can't be checked that way. Scaling keeps a point of the picture still: parameters 6 and 7 of the scaling commands name it, and 8 and 9 say the middle instead, on each axis. The saved anchors match.

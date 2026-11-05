@@ -1,5 +1,6 @@
 // Checks the script reader against a game's own bytes: every script must parse to its last byte, every `next` must name
-// a node, and the numbers a node shows in its readable first string must equal its parameters.
+// a node, no two nodes in a script may share a number, and the numbers a node shows in its readable first string must equal
+// its parameters.
 // usage: nekocheck <game folder>...
 #include <cstdio>
 #include <cstdlib>
@@ -23,8 +24,28 @@ bool field(const std::string &s, const char *key, long &out) {
 }
 
 struct Totals {
-    long scripts = 0, nodes = 0, badParse = 0, trailing = 0, badNext = 0, compared = 0, differ = 0;
+    long scripts = 0, nodes = 0, badParse = 0, trailing = 0, badNext = 0, compared = 0, differ = 0, duplicates = 0, known = 0;
 };
+
+// Two nodes sharing a number are a fault in the game's script, and each one needs checking against the PC game before it's
+// listed here. Test Game 95's second node 1125 points at itself, and the PC follows the first, which ends the scene.
+struct KnownDuplicate {
+    const char *game, *script;
+    int id;
+};
+const KnownDuplicate kKnownDuplicates[] = {{"waffle\\alchemy", "scr\\ep_004_000_000.txt", 1125}};
+
+// The game's name for its save folder, from init.ini, which is what tells one game's scripts from another's.
+std::string gameKey(const Files &files) {
+    Bytes ini = files.read("cfg\\init.ini");
+    if (!ini) return "";
+    std::string text(ini->begin(), ini->end());
+    auto at = text.find("UserDataDirectory");
+    if (at == std::string::npos) return "";
+    at = text.find_first_not_of(" \t", at + std::strlen("UserDataDirectory"));
+    auto end = at == std::string::npos ? at : text.find_first_of(" \t\r\n", at);
+    return at == std::string::npos ? "" : normalizedPath(text.substr(at, end - at));
+}
 
 void compare(const Node &n, const char *key, int value, Totals &t, const std::string &script) {
     long shown;
@@ -47,9 +68,12 @@ int main(int argc, char **argv) {
             continue;
         }
         Totals t;
+        const std::string key = gameKey(files);
         for (const char *folder : {"scr", "flow", "gt"}) {
             for (const std::string &path : files.list(folder)) {
                 if (path.size() < 4 || path.compare(path.size() - 4, 4, ".txt")) continue;
+                // GOOD Timing's lists of scripts, which are plain text and not scripts.
+                if (path.rfind("gt\\cfg\\", 0) == 0) continue;
                 Bytes data = files.read(path);
                 Script script;
                 size_t trailing = 0;
@@ -60,7 +84,14 @@ int main(int argc, char **argv) {
                     continue;
                 }
                 if (trailing) t.trailing++;
-                std::map<int, int> ids;
+                for (int id : script.duplicateIds) {
+                    bool known = false;
+                    for (const KnownDuplicate &k : kKnownDuplicates)
+                        known = known || (key == normalizedPath(k.game) && path == normalizedPath(k.script) && id == k.id);
+                    if (known) t.known++;
+                    else t.duplicates++;
+                    std::printf("  two nodes numbered %d%s: %s\n", id, known ? " (known, the PC follows the first)" : "", path.c_str());
+                }
                 for (const Node &n : script.nodes) {
                     t.nodes++;
                     if (n.next != 0 && !script.node(n.next)) t.badNext++;
@@ -99,6 +130,8 @@ int main(int argc, char **argv) {
         all.trailing += t.trailing;
         all.badNext += t.badNext;
         all.differ += t.differ;
+        all.duplicates += t.duplicates;
+        std::printf("%s: new duplicate node numbers %ld, known %ld\n", argv[a], t.duplicates, t.known);
     }
-    return all.badParse || all.trailing || all.badNext || all.differ ? 1 : 0;
+    return all.badParse || all.trailing || all.badNext || all.differ || all.duplicates ? 1 : 0;
 }

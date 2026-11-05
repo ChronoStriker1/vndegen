@@ -1884,6 +1884,7 @@ std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
         return nullptr;
     }
     script->name = path;
+    for (int id : script->duplicateIds) warnOnce(path + " has two nodes numbered " + std::to_string(id) + ", and the first is followed");
     scripts_[key] = script;
     return script;
 }
