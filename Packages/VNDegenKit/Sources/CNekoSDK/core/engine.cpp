@@ -684,7 +684,6 @@ void Engine::saveSeen() {
     for (const auto &[path, on] : seen_)
         if (on) text += path + "\n";
     writeWhole(saveDir_ + "/vndegen_seen.txt", std::vector<uint8_t>(text.begin(), text.end()));
-    saveGlobals();
     seenChanged_ = false;
 }
 
