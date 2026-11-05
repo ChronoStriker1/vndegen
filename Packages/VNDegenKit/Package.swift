@@ -22,6 +22,7 @@ let package = Package(
         .library(name: "EngineWolfRPG", targets: ["EngineWolfRPG"]),
         .library(name: "EngineAliceSoft", targets: ["EngineAliceSoft"]),
         .library(name: "EngineNekoSDK", targets: ["EngineNekoSDK"]),
+        .library(name: "EngineUnity", targets: ["EngineUnity"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -140,6 +141,8 @@ let package = Package(
                              .linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         .target(name: "EngineNekoSDK", dependencies: ["VNCore", "CNekoSDK", "FrameHost"], swiftSettings: mainActorByDefault),
+        // Recognizes Unity games so their page can say why they can't run. It runs none (docs/unity.md).
+        .target(name: "EngineUnity", dependencies: ["VNCore"], swiftSettings: mainActorByDefault),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
@@ -188,6 +191,7 @@ let package = Package(
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
         .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK"]),
+        .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ],
     cxxLanguageStandard: .cxx17

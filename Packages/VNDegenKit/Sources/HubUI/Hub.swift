@@ -87,7 +87,9 @@ public final class Hub {
             return
         }
         guard plugin.descriptor.platforms.contains(.current) else {
-            launchError = "\(plugin.descriptor.displayName) does not run on this device yet."
+            launchError = plugin.descriptor.platforms.isEmpty
+                ? "VNDegen can't run \(plugin.descriptor.displayName) games. The game's page says why."
+                : "\(plugin.descriptor.displayName) does not run on this device yet."
             return
         }
         do {
