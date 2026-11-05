@@ -1319,6 +1319,7 @@ void Engine::restoreSave(const SaveData &d) {
         const Node *call = flow->node(d.flowNode);
         stack_.push_back({flow, call ? flow->node(call->next) : flow->first()});
     }
+    std::map<int, FlipModes> flipModes = flipModesAt(d);
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         s.path = saved.path;
@@ -1334,7 +1335,7 @@ void Engine::restoreSave(const SaveData &d) {
         s.corner = s.image && saved.anchorX == 0 && saved.anchorY == 0;
         if (saved.flipFrame >= 0) {
             resumeFlipbook(s);
-            restoreFlipbookModes(s, saved.slot, saved.flipFrame, {d.scene, d.gtScene});
+            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes);
         }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
@@ -1484,6 +1485,7 @@ void Engine::composeSlots(Canvas &out) {
             int cx = x0 + c * dx, cy = y0 + r * dy;
             int row = loading && !info.exists ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
             drawPart(out, *sheet, cx, cy, 0, row * cardH, sheet->w, cardH, 1);
+            if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
             // The Q-Save page numbers its cards from 1 again.
             drawNumber(digits, slot >= kFirstQuickSlot ? slot - kFirstQuickSlot + 1 : slot, 2, cx + offset("slotdigits", 1), cy + offset("slotdigits", 2));
@@ -1493,7 +1495,6 @@ void Engine::composeSlots(Canvas &out) {
                 int shown = !info.exists ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
                 drawPart(out, *del, cx + offset("slotdelete", 1), cy + offset("slotdelete", 2), 0, shown * h, del->w, h, 1);
             }
-            if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             // A lock can't be set here, so a card with a save shows it open, over the thumbnail as the PC does.
             if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
                 int h = lock->h / 5;
@@ -2360,19 +2361,40 @@ void Engine::startFlipbook(const Node &n) {
     back_[p[0]] = s;
 }
 
-// A save holds the picture a flipbook is on but not how it plays, so the script's command for it says. Without one, it
-// repeats, as nearly all of them do.
-void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::vector<std::string> &scenes) {
+// A save holds the picture a flipbook is on but not how it plays. Walking the scene to the saved place finds the command
+// that started each one, following moves between slots: the scene with GOOD Timing's marker up to it, then the script the
+// save is in. A flipbook found nowhere repeats, as nearly all of them do.
+std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d) {
+    std::map<int, FlipModes> slots;
+    auto walk = [&](const std::string &name, int stopAt) {
+        auto script = name.empty() ? nullptr : loadScript(name);
+        if (!script) return;
+        const Node *n = script->first();
+        for (size_t guard = 0; n && n->id != stopAt && guard < script->nodes.size(); guard++, n = script->node(n->next)) {
+            if (n->opcode == 121) slots[n->p[0]] = {n->s[1], n->p[14] != 0, n->p[1] != 0};
+            else if (n->opcode == 17) slots.erase(n->p[0]);
+            else if (n->opcode == 22) slots.clear();
+            else if (n->opcode == 120) {
+                auto it = slots.find(n->p[0]);
+                if (it == slots.end()) continue;
+                FlipModes moved = it->second;
+                slots.erase(it);
+                slots[n->p[1]] = moved;
+            }
+        }
+    };
+    if (!d.gtScene.empty() && normalizedPath(d.gtScene) != normalizedPath(d.scene)) walk(d.gtScene, d.gtMarker);
+    walk(d.scene, d.node);
+    return slots;
+}
+
+void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots) {
     if (!s.flipCount) return;
     s.flipLoop = true;
-    for (const std::string &name : scenes) {
-        auto script = name.empty() ? nullptr : loadScript(name);
-        if (!script) continue;
-        for (const Node &n : script->nodes)
-            if (n.opcode == 121 && n.p[0] == slot && normalizedPath(n.s[1]) == normalizedPath(s.path)) {
-                s.flipLoop = n.p[14] != 0;
-                s.flipReverse = n.p[1] != 0;
-            }
+    auto it = slots.find(slot);
+    if (it != slots.end() && normalizedPath(it->second.path) == normalizedPath(s.path)) {
+        s.flipLoop = it->second.loop;
+        s.flipReverse = it->second.reverse;
     }
     int step = s.flipReverse ? s.flipCount - 1 - frame : frame;
     s.flipBegun = now_ - int64_t(std::max(step, 0)) * s.flipMs;

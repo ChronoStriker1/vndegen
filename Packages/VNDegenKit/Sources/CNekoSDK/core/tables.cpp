@@ -854,7 +854,7 @@ pic obj\e002_000.bmp 0 0 1 2 0 1
 slots obj\e007_000.bmp 26 104 546 136 4 2
 slotlabel obj\e008_000.bmp 9 16
 slotdigits obj\e008_001.bmp 37 9
-slotthumb 12 32
+slotthumb 8 11
 datedigits obj\e009_000.bmp 193 58
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
@@ -882,7 +882,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen save
 pic obj\e000_000.bmp 0 0
@@ -891,7 +891,7 @@ pic obj\e002_000.bmp 0 0 1 2 0 0
 slots obj\e007_000.bmp 26 104 546 136 4 2
 slotlabel obj\e008_000.bmp 9 16
 slotdigits obj\e008_001.bmp 37 9
-slotthumb 12 32
+slotthumb 8 11
 datedigits obj\e009_000.bmp 193 58
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
@@ -919,7 +919,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen cg
 pic obj\f000_000.bmp 0 0
@@ -952,7 +952,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen scene
 pic obj\f000_000.bmp 0 0
@@ -985,7 +985,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen music
 pic obj\g000_000.bmp 0 0
@@ -1023,7 +1023,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen config
 pic obj\h000_000.bmp 0 0
@@ -1045,7 +1045,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 pic obj\h006_000.bmp 172 93 2 5 0 4
 pic obj\h006_000.bmp 294 93 2 5 1 4
 pic obj\h007_000.bmp 172 133 6 5 0 4
@@ -1097,7 +1097,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 radio text 0 obj\h016_000.bmp 64 122 4 5 0
 radio auto 0 obj\h016_000.bmp 64 200 4 5 0
 radio text 1 obj\h016_000.bmp 186 122 4 5 1
@@ -1145,7 +1145,7 @@ pic obj\e004_000.bmp 1152 303 10 5 5 0
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
-button nav_back obj\e004_000.bmp 1152 513 10 5 9
+button back obj\e004_000.bmp 1152 513 10 5 9
 slider master obj\h009_000.bmp 154 128
 number master obj\h011_000.bmp 415 100
 step master -1 obj\h010_000.bmp 119 130 2 5 0
@@ -1258,7 +1258,7 @@ pic obj\e002_000.bmp 0 0 1 2 0 1
 slots obj\e007_000.bmp 26 104 546 136 4 2
 slotlabel obj\e008_000.bmp 9 16
 slotdigits obj\e008_001.bmp 37 9
-slotthumb 12 32
+slotthumb 8 11
 datedigits obj\e009_000.bmp 193 58
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
@@ -1285,7 +1285,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen save
 pic obj\e000_000.bmp 0 0
@@ -1294,7 +1294,7 @@ pic obj\e002_000.bmp 0 0 1 2 0 0
 slots obj\e007_000.bmp 26 104 546 136 4 2
 slotlabel obj\e008_000.bmp 9 16
 slotdigits obj\e008_001.bmp 37 9
-slotthumb 12 32
+slotthumb 8 11
 datedigits obj\e009_000.bmp 193 58
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
@@ -1321,7 +1321,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen cg
 pic obj\f000_000.bmp 0 0
@@ -1354,7 +1354,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen scene
 pic obj\f000_000.bmp 0 0
@@ -1387,7 +1387,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen music
 pic obj\g000_000.bmp 0 0
@@ -1419,7 +1419,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen config
 pic obj\h000_000.bmp 0 0
@@ -1440,7 +1440,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 pic obj\h006_000.bmp 172 93 2 5 0 4
 pic obj\h006_000.bmp 294 93 2 5 1 4
 pic obj\h007_000.bmp 172 133 6 5 0 4
@@ -1489,7 +1489,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 radio text 0 obj\h016_000.bmp 64 122 4 5 0
 radio auto 0 obj\h016_000.bmp 64 200 4 5 0
 radio text 1 obj\h016_000.bmp 186 122 4 5 1
@@ -1536,7 +1536,7 @@ button nav_music obj\e004_000.bmp 1152 261 9 5 4
 button nav_config obj\e004_000.bmp 1152 303 9 5 5
 button nav_title obj\e004_000.bmp 1152 345 9 5 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button nav_back obj\e004_000.bmp 1152 469 9 5 8
+button back obj\e004_000.bmp 1152 469 9 5 8
 slider master obj\h009_000.bmp 154 128
 number master obj\h011_000.bmp 415 100
 step master -1 obj\h010_000.bmp 119 130 2 5 0
