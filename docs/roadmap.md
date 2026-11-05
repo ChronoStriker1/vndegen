@@ -71,7 +71,8 @@ New bugs get a GitHub issue and a line here.
 - [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
 - [#22](https://github.com/ChronoStriker1/vndegen/issues/22) Detection: 7 survey titles match no engine in a listing check.
 - [#23](https://github.com/ChronoStriker1/vndegen/issues/23) Ren'Py: VNDegen's menu buttons shrink to their text width in MalOvent.
-- [#24](https://github.com/ChronoStriker1/vndegen/issues/24) Ren'Py: bundled websocket package uses inspect.getargspec, removed in Python 3.11.
+- [#25](https://github.com/ChronoStriker1/vndegen/issues/25) Ren'Py: Countryside Cumsluts crashes on its first line, calling os.startfile.
+- [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
