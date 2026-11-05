@@ -427,7 +427,7 @@ void Engine::runAction(const std::string &action) {
     }
     if (action == "LogMode") { openLog(); return; }
     if (action == "Voice") {
-        if (!currentText_.voice.empty()) {
+        if (!currentText_.voice.empty() && voiceAllowed(currentText_.voice)) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = 0;
             if (Bytes data = files_.read(voicePath(currentText_.voice))) {
@@ -750,6 +750,15 @@ void Engine::loadGalleries() {
         std::string plain, styled;
         if (in >> plain >> styled && styled.find('.') != std::string::npos) plainArt_[normalizedPath(styled)] = plain;
     }
+    // `#type N`, then how the names of that type's voice files start, then `##`. Types from 50 are the background voices
+    // of the character 50 below.
+    int voiceType = -1;
+    for (const std::string &line : lines("cfg\\voice_type.ini")) {
+        if (line.rfind("#type", 0) == 0) voiceType = std::atoi(line.c_str() + 5);
+        else if (line == "##") voiceType = -1;
+        else if (voiceType >= 0) voiceTypes_.emplace_back(normalizedPath(fields(line)[0]), voiceType);
+    }
+    std::stable_sort(voiceTypes_.begin(), voiceTypes_.end(), [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
     // `#anime PICTURES FIRST MS`. Each number is read as ms because an effect of 39 pictures at 16 lasts 0.6 s that way.
     for (const std::string &line : lines("cfg\\anime_cfg.ini")) {
         std::istringstream in(line);
@@ -1029,6 +1038,7 @@ int Engine::setting(const std::string &name) const {
 // What Config starts from, with any a game's table changes.
 std::map<std::string, int> Engine::startingSettings() const {
     std::map<std::string, int> out = defaultSettings();
+    for (const auto &[start, type] : voiceTypes_) out["voice" + std::to_string(type % 50)] = 1;
     auto table = screens_.find("defaults");
     if (table != screens_.end())
         for (auto [it, end] = table->second.settings.equal_range("default"); it != end; ++it)
@@ -1137,7 +1147,13 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
         }
     for (auto [it, end] = lines("check"); it != end; ++it)
         if (it->second.size() >= 7 && within(it->second, 1)) {
-            changeSetting(it->second[0], setting(it->second[0]) ? 0 : 1);
+            const std::string &name = it->second[0];
+            int value = setting(name) ? 0 : 1;
+            changeSetting(name, value);
+            // `group NAME SETTING...`: a box such as All Women sets its own and each of those to its new state.
+            for (auto [g, gEnd] = lines("group"); g != gEnd; ++g)
+                if (!g->second.empty() && g->second[0] == name)
+                    for (size_t i = 1; i < g->second.size(); i++) changeSetting(g->second[i], value);
             return true;
         }
     for (auto [it, end] = lines("step"); it != end; ++it)
@@ -1776,6 +1792,26 @@ void Engine::pointerToward(float &x, float &y) const {
     y = pointerSeen_ ? std::clamp(mouseY_ * 2 - 1, -1.0f, 1.0f) : 0;
 }
 
+// A voice plays while its speaker's Individual Voices box is checked. A voice of several speakers, listed in the table as
+// `voicejoint TYPE SPEAKER...`, plays only while all of theirs are, which the PC's cfg.sav shows for Test Game 84.
+bool Engine::voiceAllowed(const std::string &voice) const {
+    std::string name = normalizedPath(voice);
+    name = name.substr(name.find_last_of('\\') + 1);
+    for (const auto &[start, type] : voiceTypes_) {
+        if (name.rfind(start, 0) != 0) continue;
+        int who = type % 50;
+        if (auto table = screens_.find("defaults"); table != screens_.end())
+            for (auto [it, end] = table->second.settings.equal_range("voicejoint"); it != end; ++it)
+                if (!it->second.empty() && field(it->second, 0) == who) {
+                    for (size_t i = 1; i < it->second.size(); i++)
+                        if (!setting("voice" + it->second[i])) return false;
+                    return true;
+                }
+        return setting("voice" + std::to_string(who)) != 0;
+    }
+    return true;
+}
+
 bool Engine::composeTitleOpening(Canvas &out) {
     const auto *line = screen_->setting("opening");
     if (openingFrom_ < 0 || !line || line->size() < 3) return false;
@@ -1819,6 +1855,20 @@ bool Engine::composeTitleOpening(Canvas &out) {
 void Engine::composeScreen(Canvas &out) {
     if (composeTitleOpening(out)) return;
     out.clear();
+    // `over SCREEN DIM`: a panel such as Test Game 84's Individual Voices draws on that screen, darkened by DIM of 256,
+    // whose own buttons don't light up under the pointer.
+    if (const auto *over = screen_->setting("over"); over && over->size() >= 2) {
+        if (auto under = screens_.find((*over)[0]); under != screens_.end() && &under->second != screen_) {
+            Screen *panel = screen_;
+            bool seen = pointerSeen_;
+            screen_ = &under->second;
+            pointerSeen_ = false;
+            composeScreen(out);
+            screen_ = panel;
+            pointerSeen_ = seen;
+            tintFrame(out, 0, 0, 0, field(*over, 1));
+        }
+    }
     float towardX, towardY;
     pointerToward(towardX, towardY);
     for (const Picture &p : screen_->pictures)
@@ -2472,7 +2522,9 @@ void Engine::mouseButton(int button, bool down) {
         } else if (logOpen_) {
             closeLog();
         } else if (screen_) {
-            if (screen_->name != "title") runAction("back");
+            // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
+            if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
+            else if (screen_->name != "title") runAction("back");
         } else if (windowHiddenByPlayer_ || (windowShown_ && setting("rightclick") == 0)) {
             windowHiddenByPlayer_ = !windowHiddenByPlayer_;
             dirty_ = true;
@@ -2518,7 +2570,7 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
             return;
         }
-        if (screen_->name == "config" || screen_->name == "config2" || screen_->name == "config3") {
+        if (screen_->name.rfind("config", 0) == 0) {
             pressSettingsWidget(pointerX_, pointerY_, false);
             return;
         }
@@ -2613,10 +2665,8 @@ bool Engine::jump(const std::string &script, int node) {
     const Node *n = target->first();
     scene_ = {target, n};
     waiting_ = Waiting::None;
-    if (node < 0) {
-        screen_ = nullptr;
-        return true;
-    }
+    screen_ = nullptr;
+    if (node < 0) return true;
     bool wasSkip = skip_;
     skip_ = true;
     for (int guard = 0; guard < 2000000 && scene_.node && scene_.node->id != node; guard++) {
@@ -3242,7 +3292,7 @@ void Engine::showText(const Node &n) {
     textCount_++;
     waiting_ = Waiting::Click;
     dirty_ = true;
-    if (!n.s[3].empty() && !skip_) {
+    if (!n.s[3].empty() && !skip_ && voiceAllowed(n.s[3])) {
         if (Bytes data = files_.read(voicePath(n.s[3]))) {
             if (voicePlayer_) audio_.close(voicePlayer_);
             voicePlayer_ = audio_.open(data);
@@ -3268,6 +3318,7 @@ void Engine::playSound(const Node &n, int kind) {
         channels.erase(old);
     }
     if (skip_ && kind != kKindBgm && p[4] != 0) return;
+    if (kind == kKindVoice && !voiceAllowed(n.s[1])) return;
     Bytes data = files_.read(n.s[1]);
     if (!data) {
         complain("Missing sound " + n.s[1]);

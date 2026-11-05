@@ -182,6 +182,8 @@ private:
     bool composeTitleOpening(Canvas &out);
     // Where the pointer is, from -1 at the screen's left or top edge to 1 at the other, or the middle before it's been seen.
     void pointerToward(float &x, float &y) const;
+    // Whether the player's Individual Voices settings let this voice file play.
+    bool voiceAllowed(const std::string &voice) const;
     int cardsPerPage() const;
     void cardPlace(int index, int &x, int &y) const;
     std::string mainFlowKey() const;
@@ -257,6 +259,8 @@ private:
     int setting(const std::string &name) const;
     void changeSetting(const std::string &name, int value);
     std::map<std::string, int> settings_, settingsWhenOpened_;
+    // voice_type.ini: how a voice file's name starts, lowercase, and the type of who speaks it, the longest starts first.
+    std::vector<std::pair<std::string, int>> voiceTypes_;
     void composeSettingsWidgets(Canvas &out);
     bool pressSettingsWidget(int x, int y, bool dragging);
     bool leftHeld_ = false;

@@ -2005,7 +2005,41 @@ pic obj\c007_002.bmp 849 311 1 5 0 4
 pic obj\c007_001.bmp 893 311 1 5 0 4
 pic obj\c005_002.bmp 506 414 2 5 0 4
 pic obj\c005_002.bmp 576 414 2 5 1 4
-pic obj\c007_000.bmp 700 414 1 5 0 4
+button tabvoices obj\c007_000.bmp 700 414 1 5 0
+
+screen configvoices
+over config3 154
+cancel tab3
+pic obj\c030_000.bmp 243 118
+check voice0 obj\c030_001.bmp 426 172 1 5 0
+check voice1 obj\c030_002.bmp 427 198 1 5 0
+check voice2 obj\c030_003.bmp 428 224 1 5 0
+check voice3 obj\c030_004.bmp 429 252 1 5 0
+check voice4 obj\c030_005.bmp 431 280 1 5 0
+check voice5 obj\c030_006.bmp 431 306 1 5 0
+check voice6 obj\c030_007.bmp 432 332 1 5 0
+check voice7 obj\c030_008.bmp 433 360 1 5 0
+check voice8 obj\c030_009.bmp 434 391 1 5 0
+check voice9 obj\c030_010.bmp 435 417 1 5 0
+check voice10 obj\c030_011.bmp 436 443 1 5 0
+check voice11 obj\c030_012.bmp 438 499 1 5 0
+check voice13 obj\c030_014.bmp 646 164 1 5 0
+check voice14 obj\c030_015.bmp 647 190 1 5 0
+check voice15 obj\c030_016.bmp 648 216 1 5 0
+check voice16 obj\c030_017.bmp 649 242 1 5 0
+check voice17 obj\c030_018.bmp 650 268 1 5 0
+check voice18 obj\c030_019.bmp 651 294 1 5 0
+check voice19 obj\c030_020.bmp 652 322 1 5 0
+check voice20 obj\c030_021.bmp 653 348 1 5 0
+check voice21 obj\c030_022.bmp 654 376 1 5 0
+check voice22 obj\c030_023.bmp 655 407 1 5 0
+check voice23 obj\c030_024.bmp 656 438 1 5 0
+check voice24 obj\c030_025.bmp 658 500 1 5 0
+check voice_women obj\c030_013.bmp 439 527 1 5 0
+group voice_women voice0 voice1 voice2 voice3 voice4 voice5 voice6 voice7 voice8 voice9 voice10 voice11
+check voice_men obj\c030_026.bmp 659 528 1 5 0
+group voice_men voice13 voice14 voice15 voice16 voice17 voice18 voice19 voice20 voice21 voice22 voice23 voice24
+button tab3 obj\r002_000.bmp 945 147 1 5 0
 
 screen log
 dim 200
@@ -2060,6 +2094,20 @@ placefor 2 283 79 340 3
 placefor 5 129 78 328 6
 
 screen defaults
+default voice_women 1
+default voice_men 1
+voicejoint 30 5 6
+voicejoint 31 11 24
+voicejoint 32 4 5 6 8 7
+voicejoint 33 9 17 3
+voicejoint 34 5 6 8 7
+voicejoint 35 0 10 1
+voicejoint 36 9 7 8
+voicejoint 37 4 5 6
+voicejoint 38 7 8
+voicejoint 39 9 10
+voicejoint 40 1 0
+voicejoint 41 4 8
 quickslots 201 220
 default bar_always 1
 default delay 100
