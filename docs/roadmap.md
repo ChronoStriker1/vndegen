@@ -64,8 +64,6 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
-- [#16](https://github.com/ChronoStriker1/vndegen/issues/16) RPG Maker MZ: frame rate drop after alpha clips load and unload.
-- [#18](https://github.com/ChronoStriker1/vndegen/issues/18) Godot 3: Barely Working averages about 58 fps on the Mac mini.
 - [#19](https://github.com/ChronoStriker1/vndegen/issues/19) Mac: the app.quit debug hook doesn't quit while a sheet is open.
 - [#20](https://github.com/ChronoStriker1/vndegen/issues/20) iPhone and iPad: Controller layout sheet can open a step scrolled away, with an offscreen focus ring.
 - [#21](https://github.com/ChronoStriker1/vndegen/issues/21) Mac: Controller layout sheet rows are narrower than its width assumes.
@@ -73,6 +71,7 @@ New bugs get a GitHub issue and a line here.
 - [#23](https://github.com/ChronoStriker1/vndegen/issues/23) Ren'Py: VNDegen's menu buttons shrink to their text width in MalOvent.
 - [#25](https://github.com/ChronoStriker1/vndegen/issues/25) Ren'Py: Countryside Cumsluts crashes on its first line, calling os.startfile.
 - [#26](https://github.com/ChronoStriker1/vndegen/issues/26) Ponscripter games aren't supported: both Umineko Arcs.
+- [#27](https://github.com/ChronoStriker1/vndegen/issues/27) Detection: a game two wrapper folders deep isn't found.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

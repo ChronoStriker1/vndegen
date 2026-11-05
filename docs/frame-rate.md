@@ -11,7 +11,7 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
   - TyranoScript: new video frames from `requestVideoFrameCallback`, in a script in the input script's `js` step, because the `fps` step counts WebGL drawing and a Tyrano video has none.
   - Ren'Py: new movie frames from `renpy.display.video.get_movie_texture`, by a probe `.rpy` placed in a scratch copy of the game, because Ren'Py also redraws between them.
   - KiriKiri: display refreshes from `-frameMonitor`'s `KKFRAMES` line, and a movie's frames from the `movie:` lines in the game's log.
-  - Godot: `-godotFrameLog`. The native runtimes log their own pacing with `-frameMonitor`.
+  - Godot: `-godotFrameLog`, without `-godotSnapshot`. The snapshot writes a PNG on the main thread every 2 s, which stalls the game for about 80 to 90 ms each time. It took Barely Working from 59.9 to 57.5 and Project Hadal from 59.4 to 56.9, with seconds alternating between 54 to 56 and 60 to 61 frames. The native runtimes log their own pacing with `-frameMonitor`.
 - Load is the load average at the start of the run. The MacBook's runs had nothing else of ours running. The mini's simulator runs also had the simulator's own processes and agent-device's runner.
 - Reused rows come from earlier threads' records. They stand because no later change touched their drawing path. Commit is `not recorded` where the record gives none, and the same goes for load.
 
@@ -37,13 +37,16 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | RPG Maker MZ | Fallen Kunoichi, same map, game's frame skip off | iPad simulator | 60 | 60.0 | 55.6 | 30 s | 4.7 | 11-03 | 7a50a58 |
 | RPG Maker MZ | Fallen Kunoichi, same map, 1080p clip | iPad simulator | 50 drawn, engine 60 | 50.0, engine 60.0 | 28.6 | 30 s | 4.7 | 11-03 | 7a50a58 |
 | RPG Maker MZ | Fallen Kunoichi, battle | iPad simulator | 30 to 40 drawn, engine 60 | 38.2, engine 60.0 | 25.0 | 30 s | 4.7 | 11-03 | 7a50a58 |
+| RPG Maker MZ | Demon Queen game, 1080p `DQPMBathing.mp4` after two alpha clips loaded and unloaded, 5 runs | Mac app, Mac mini | 30 clip, 60 page | clip 28.7 to 29.5, page 60.1 to 60.2 | clip 10.9 to 14.9, page 43.5 to 45.5 | 70 s each | 2.5 to 4.0 | 11-04 | 9e0a10f |
 | RPG Maker MV | Karryn's Prison, Mode Select map | Mac app, MacBook | 60 | 60.0 | 45.5 to 47.6 | 90 s | 1.9 | 11-03 | 7a50a58 |
 | RPG Maker MV | Karryn's Prison, battle with 4 enemies | Mac app, MacBook | 60 | 60.0 | 50.0 | 90 s | 1.9 | 11-03 | 7a50a58 |
 | RPG Maker MV | Karryn's Prison, Mode Select map | iPad simulator | 60 | 60.0 | 55.6 | 90 s | 4.6 | 11-03 | 7a50a58 |
 | RPG Maker MV | Karryn's Prison, battle with 4 enemies | iPad simulator | 60 | 60.0 | 50.0 | 90 s | 4.6 | 11-03 | 7a50a58 |
 | Godot | Project Hadal, title, intro and play | Mac app, MacBook | 60 | 59.9 | 40.6 | 200 s | 2.4 | 11-03 | 7a50a58 |
 | Godot | Project Hadal, title, intro and play | iPad simulator | 60 | 59.5 | 31.5 | 192 s | 4.2 | 11-03 | 7a50a58 |
-| Godot | Barely Working, title and Level 1 (Godot 3) | Mac app, Mac mini | 60 | 57.5 | 11.6 to 11.9 | 200 s | 2.9 to 5.2 | 11-04 | fc26f2f |
+| Godot | Barely Working, title and Level 1 (Godot 3) | Mac app, Mac mini | 60 | 59.9, Level 1 60.0 | 43.1 to 43.6 | 202 s | 2.2 to 7.9 | 11-04 | 9e0a10f |
+| Godot | Sexual Sealing Dungeon: Eronest, opening with no input (Godot 3) | Mac app, Mac mini | 60 | 59.9 | 44.0 | 101 s | 2.8 | 11-04 | 9e0a10f |
+| Godot | Project Hadal, opening with no input | Mac app, Mac mini | 60 | 59.4 | 29.6 | 101 s | 3.0 | 11-04 | 9e0a10f |
 | Flash | Wolf Girl With You, animated title | Mac app, MacBook | 24 | 24.0 | 19.2 | 150 s | 2.3 | 11-03 | 7a50a58 |
 | Flash | Wolf Girl With You, animated title | iPad simulator | 24 | 24.0 | 19.2 to 19.6 | 150 s | 4.9 | 11-03 | 7a50a58 |
 | KiriKiri | Sisters x Lovers, logo movie | Mac app, MacBook | 30 | 150 of 150 frames, 0 dropped | see notes | 5 s | 4.9 | 11-03 | 7a50a58 |
