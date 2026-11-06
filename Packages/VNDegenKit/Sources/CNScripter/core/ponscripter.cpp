@@ -74,12 +74,12 @@ void cmdEndRoll(E &e, const std::string &) {
     // The wait and the scroll end together, at the whole millisecond the last pixel is reached.
     int64_t duration = (r.distance * r.speed + 9) / 10;
     r.end = r.start + duration;
-    r.pos = e.cur_.pos;
     r.on = true;
     if (duration > 0) {
         e.waitTimer(int(std::min<int64_t>(duration, INT32_MAX)), false);
         e.waitUntil_ = r.end;
     }
+    r.wait = e.timerWaits_;
     e.stepEndRoll();
 }
 
@@ -147,9 +147,10 @@ void cmdLogSp(E &e, const std::string &) {
 
 void Engine::stepEndRoll() {
     EndRoll &r = endRoll_;
-    // A roll whose wait ended early (a trap, a load) stops where it is. A dialog a callback opens over it keeps the
-    // roll's wait to put back, and the roll goes on.
-    bool ours = cur_.pos == r.pos && ((wait_ == WaitKind::Timer && waitUntil_ == r.end) ||
+    // A roll whose wait ended early (a trap, a load) stops where it is, even when a later timer ends at the same time. A
+    // dialog a callback opens over it keeps the roll's wait to put back, and the roll goes on. The wait is told by its
+    // count rather than the script position, which NSExec moves.
+    bool ours = timerWaits_ == r.wait && ((wait_ == WaitKind::Timer && waitUntil_ == r.end) ||
                                       (wait_ == WaitKind::Dialog && ui_ && ui_->prevWait == WaitKind::Timer &&
                                        ui_->prevWaitUntil == r.end));
     if (r.end > r.start && !ours) {

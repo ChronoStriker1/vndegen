@@ -391,6 +391,9 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                 std::string name = builtin ? word.substr(1) : word;
                 if (!builtin && defsubs_.count(name)) {
                     f.hasParams = cur_.pos <= f.pos;
+                    // The call's arguments start after the spaces that follow its name; getparam moved past some.
+                    skipSpaces();
+                    f.paramsRead = f.hasParams && f.pos > cur_.pos;
                     break;
                 }
                 if (name != "if" && name != "notif") break;

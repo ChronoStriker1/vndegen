@@ -648,6 +648,9 @@ void Engine::executeCommand(const std::string &name) {
     if (jumps_ != jumps || continueLine_ || ended_) return;
     skipSpaces();
     if (!atStatementEnd()) {
+        // Ponscripter starts the next statement at a word after the arguments, without a colon: the Umineko games
+        // write "for %tmp = 100 to 200 : csp %tmp next" (measured on the PC engine).
+        if (ponscripter_ && isIdentStart(peek())) return;
         errorf("%s: unexpected text after the arguments", n.c_str());
         skipStatement();
     }

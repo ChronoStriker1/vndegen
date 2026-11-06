@@ -417,6 +417,7 @@ void cmdGetParam(E &e, const std::string &) {
             e.cur_ = caller;
         }
     }
+    if (e.cur_.pos != frame->pos) frame->paramsRead = true;
     frame->pos = e.cur_.pos;
     e.cur_ = mine;
 }
@@ -733,7 +734,13 @@ bool Engine::returnFromSub(const std::string &label) {
     cur_.pos = f.pos;
     cur_.line = f.line;
     cur_.stmt = f.stmt;
-    if (f.hasParams) skipStatement();  // arguments getparam didn't read
+    if (f.hasParams) {
+        // Skip the arguments getparam didn't read. In Ponscripter a word after the arguments it read starts the next
+        // statement, as it does after a built-in command: the Umineko games redefine csp and write "csp %tmp next".
+        skipSpaces();
+        bool word = isalpha(uint8_t(peek())) || peek() == '_';
+        if (!(ponscripter_ && f.paramsRead && word)) skipStatement();
+    }
     jumps_++;
     if (f.resumeText) {
         inTextLine_ = true;

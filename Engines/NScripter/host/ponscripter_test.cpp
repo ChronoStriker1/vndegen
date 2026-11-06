@@ -444,6 +444,49 @@ static void endRollUnderDialog() {
     fs::remove_all(dir);
 }
 
+// Third review round: an endroll a Lua command starts through NSExec, a redefined csp before next, and lines holding
+// only tags or !sd.
+static void reviewRound3() {
+    char temp[] = "/tmp/vnns-ponscripter-round3-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directories(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    writeNbzArchive(dir / "arc.nsa", "pic.bmp", testBitmap());
+    std::ofstream(dir / "system.lua") << "function NSCOM_credits()\n  NSExec('endroll 0,0,4,1,0,0,4,1,2,1000,10')\nend\n";
+    // The Umineko games redefine csp and write "for %tmp = 100 to r_used_lsp : csp %tmp next".
+    std::ofstream(dir / "0.utf") << "*define\nnsa\nluasub credits\ndefsub csp\ngame\n"
+                                    "*csp\ngetparam %1\nadd %2,1\n_csp %1\nreturn\n"
+                                    "*start\nfor %3 = 1 to 5 : csp %3 next\n"
+                                    "setwindow 10,10,20,10,23,23,0,2,0,0,0,#000000,0,0,639,479\n"
+                                    "langen^aa^@\nlangen!sd\nlangen~c0~\nlangjp日本\nlangen^bb^@\nlangen^cc^@\n"
+                                    "bg #112233,1\nbtndef \"pic.bmp\"\ncredits\nclick\nend\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    engine.step(16);
+    assert(engine.getNumVar(2) == 5);
+    for (int i = 0; i < 3; i++) {
+        assert(engine.wait_ == vnns::WaitKind::Click);
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+        for (int j = 0; j < 30; j++) engine.step(16);
+    }
+    std::map<std::string, int> rows;
+    for (const vnns::TextChar &c : engine.page_) rows[c.ch] = c.y2;
+    assert(rows.count("a") && rows.count("b") && rows.count("c"));
+    assert(rows["b"] - rows["a"] == rows["c"] - rows["b"] && rows["b"] > rows["a"]);
+    // The roll started through NSExec keeps scrolling to its end.
+    assert(engine.endRoll_.on);
+    for (int i = 0; i < 20; i++) engine.step(16);
+    assert(engine.endRoll_.on);
+    for (int i = 0; i < 60; i++) engine.step(16);
+    assert(!engine.endRoll_.on && engine.wait_ == vnns::WaitKind::Click);
+    assert(engine.bltLayer_.row(0)[0] != vnns::rgba(255, 0, 0));  // scrolled past the red top row
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -453,4 +496,5 @@ int main() {
     reviewCases();
     reviewRound2();
     endRollUnderDialog();
+    reviewRound3();
 }

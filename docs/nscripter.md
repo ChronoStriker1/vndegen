@@ -262,6 +262,8 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   broke a character later than the PC's. `endroll`'s other modes aren't measured. `len` and `mid` count bytes, as in
   NScripter; the games don't use them, and the PC engine wasn't checked. Saves aren't
   the PC engine's files. An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
+  Without a textgosub, the PC engine's `\` waits without clearing the page; the runtime clears it, as NScripter does.
+  The games always set one.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`

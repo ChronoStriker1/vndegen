@@ -246,6 +246,7 @@ void Engine::newLine() {
 }
 
 void Engine::putChar(const std::string &ch, bool isRuby) {
+    if (ponscripter_) lineHadText_ = true;
     if (ponsText() && !isRuby) {
         ponsPutChar(ch);
         return;
@@ -412,7 +413,9 @@ void Engine::textStep() {
         textFast_ = false;
         return;
     }
-    lineHadText_ = true;
+    // A Ponscripter line ends the line on screen only once it has drawn a character, so a line of tags or of !sd alone
+    // leaves no mark (measured on the PC); putChar notes it.
+    if (!ponscripter_) lineHadText_ = true;
     if (ponscripter_ && c == '^') {
         p++;
         caretText_ = !caretText_;

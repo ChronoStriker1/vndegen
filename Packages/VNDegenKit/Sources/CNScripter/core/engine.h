@@ -277,6 +277,7 @@ public:
         // A defsub call returns to the arguments it hasn't read yet, as the PC engine does (and saves): getparam reads
         // them from pos and moves it on, and return skips any left.
         bool hasParams = false;
+        bool paramsRead = false;  // getparam has read some of them
         // textgosub calls resume text output afterwards
         bool resumeText = false;
         // Ponscripter: the text line's caret, language and style, which the routine's own text may change.
@@ -448,7 +449,7 @@ public:
     struct EndRoll {
         bool on = false;
         int64_t start = 0, end = 0;
-        size_t pos = 0;  // where the script resumes after it, so a timer of the same length elsewhere isn't taken for it
+        uint64_t wait = 0;  // the timer wait it started, so a later one with the same end isn't taken for it
         int64_t rect[8] = {};
         int64_t distance = 0, speed = 1;
     } endRoll_;
@@ -620,6 +621,8 @@ public:
     int64_t wallMs() const;
     WaitKind wait_ = WaitKind::None;
     int64_t waitUntil_ = 0;
+    // Counts timer waits, so the command that started one can tell it from a later wait with the same end.
+    uint64_t timerWaits_ = 0;
     int64_t waitStart_ = 0;
     bool paused_ = false;
     bool checkTrap();

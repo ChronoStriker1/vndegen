@@ -142,6 +142,7 @@ void Engine::waitTimer(int ms, bool skippable) {
     if (ms <= 0) return;
     wait_ = WaitKind::Timer;
     waitUntil_ = now_ + ms;
+    timerWaits_++;
     waitSkippable_ = skippable;
 }
 
