@@ -22,6 +22,7 @@ public actor AlphaVideoCache {
     public func clear() throws {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
         cleaned = false
+        opaqueLogged.removeAll()
     }
 
     private func directory() throws {
@@ -77,7 +78,7 @@ public actor AlphaVideoCache {
         switch vnalpha_inspect(source, &error, Int32(error.count)) {
         case 1: break
         case 0:
-            if opaqueLogged.insert(path).inserted {
+            if opaqueLogged.insert(folder.root.path + "\u{0}" + path).inserted {
                 log.notice("alpha video \(name, privacy: .public): no alpha track, served as WebM")
             }
             return nil
