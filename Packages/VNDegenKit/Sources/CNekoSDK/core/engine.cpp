@@ -2194,6 +2194,15 @@ void Engine::composeScreen(Canvas &out) {
         }
         drawButton(out, b, state);
     }
+    // `hover X0 Y0 X1 Y1 PICTURE X Y`: a line of help shown while the pointer is over that part of the screen, such as a
+    // settings group in Config, as the PC games show them.
+    if (pointerSeen_ && !dialogOpen_)
+        for (auto [it, end] = screen_->settings.equal_range("hover"); it != end; ++it) {
+            const auto &f = it->second;
+            if (f.size() < 7 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
+            if (ImageRef help = images_->get(f[4])) drawPart(out, *help, field(f, 5), field(f, 6), 0, 0, help->w, help->h, 1);
+            break;
+        }
     if (dialogOpen_) composeDialog(out);
 }
 
