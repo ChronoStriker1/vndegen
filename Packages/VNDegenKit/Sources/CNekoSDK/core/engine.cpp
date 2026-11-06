@@ -1283,6 +1283,8 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d) {
+    // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit.
+    replaying_ = false;
     stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
