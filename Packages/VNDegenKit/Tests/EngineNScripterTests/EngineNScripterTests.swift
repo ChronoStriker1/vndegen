@@ -55,6 +55,7 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(map("C:/Steam/Umineko/saves/GLOBAL.SAV") == "GLOBAL.SAV")
     #expect(map("C:/Steam/Umineko/saves/envdata") == "envdata")
     #expect(map("C:/Steam/Umineko/saves/screenshot/ss3.bmp") == "screenshot/ss3.bmp")
+    #expect(map("C:/Steam/Umineko/SAVES/SCREENSHOT/ss3.bmp") == "SCREENSHOT/ss3.bmp")
     #expect(map(dir.path + "/vndegen-saves/save1.dat") == "save1.dat")
     #expect(map(dir.path + "/vndegen-saves/vndegen-text-speed.dat") == nil)
     #expect(map("C:/Steam/Umineko/save1.dat") == nil)

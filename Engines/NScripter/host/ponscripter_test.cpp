@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <tuple>
 
 #include "engine.h"
 
@@ -719,6 +720,115 @@ static void reviewRound3Followups() {
     fs::remove_all(dir);
 }
 
+// Landing 4's review: forged and hostile saves fail to load and leave the game as it was; huge windows don't overflow;
+// a page begun before textgosub is installed is still its head; hidden linepage waits keep the page; allsphide leaves
+// the PC's field alone; a user command after another command without a colon loads with its arguments.
+static void reviewLanding4() {
+    char temp[] = "/tmp/vnns-ponscripter-landing4-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directories(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    auto start = [&](const std::string &script) {
+        std::ofstream(dir / "0.utf") << script;
+        auto engine = std::make_unique<vnns::Engine>(vnns::Engine::Config{root, root});
+        std::string error;
+        assert(engine->start(&error));
+        for (int i = 0; i < 20; i++) engine->step(16);
+        return engine;
+    };
+    auto click = [](vnns::Engine &engine) {
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+        for (int i = 0; i < 20; i++) engine.step(16);
+    };
+    fs::path save1 = dir / "vndegen-saves" / "save1.dat";
+    auto readSave = [&]() {
+        vnns::Bytes b;
+        assert(vnns::readFile(save1.string(), b));
+        return b;
+    };
+    auto writeSave = [&](const vnns::Bytes &b) {
+        std::ofstream(save1, std::ios::binary).write(reinterpret_cast<const char *>(b.data()), std::streamsize(b.size()));
+    };
+
+    // A user command after another command's arguments, without a colon, inside a for loop.
+    std::string take = "*define\ndefsub take\ngame\n*start\nfor %1=1 to 3 : mov %2,10 take %2 next\nclick\nend\n"
+                       "*take\nif %1 = 2 saveon : savegame 1\ngetparam %10\nadd %3,%10\nreturn\n";
+    {
+        auto engine = start(take);
+        assert(engine->wait_ == vnns::WaitKind::Click && engine->getNumVar(3) == 30);
+        assert(engine->loadGame(1));
+        for (int i = 0; i < 20; i++) engine->step(16);
+        assert(engine->wait_ == vnns::WaitKind::Click && engine->getNumVar(3) == 30);  // 10 at the save, then passes 2, 3
+    }
+
+    // A gosub frame's offset: find the frame (0, offset) right after the count -1, and patch it.
+    std::string sub = "*define\ngame\n*start\nmov %5,5\ngosub *sub\nclick\nend\n*sub\nsavegame 1\nclick\nreturn\n"
+                      "if " + std::string(400, '(') + "1" + std::string(400, ')') + " = 1 mov %5,6\n";
+    auto patched = [&](int count, int kind, int offset) {
+        auto engine = start(sub);
+        vnns::Bytes b = readSave();
+        std::string script = sub;
+        int32_t ret = int32_t(script.find("gosub *sub") + 10);
+        for (size_t p = 0; p + 12 <= b.size(); p++)
+            if (int32_t(vnns::le32(&b[p])) == -1 && vnns::le32(&b[p + 4]) == 0 && int32_t(vnns::le32(&b[p + 8])) == ret) {
+                auto put = [&](size_t at, int32_t v) { for (int k = 0; k < 4; k++) b[at + size_t(k)] = uint8_t(uint32_t(v) >> (8 * k)); };
+                put(p, count);
+                put(p + 4, kind);
+                put(p + 8, offset);
+                writeSave(b);
+                return engine;
+            }
+        assert(false);
+        return engine;
+    };
+    int deepIf = int(sub.find("if (") + 3);
+    for (auto [count, kind, offset] : std::vector<std::tuple<int, int, int>>{
+             {-1, 0, deepIf}, {1, 0, 10}, {-1, 900, 10}, {-1, 0, 2147483647}, {-1, 0, -5}}) {
+        auto engine = patched(count, kind, offset);
+        int before = engine->getNumVar(5);
+        int tx = engine->win_.tx;
+        assert(!engine->loadGame(1));
+        assert(engine->getNumVar(5) == before && engine->win_.tx == tx && !engine->ended_);
+    }
+
+    // Huge window values neither overflow when saved nor when text is drawn after loading (the sanitizer build).
+    {
+        auto engine = start("*define\ngame\n*start\nsetwindow 2147483647,0,2147483647,5,2147483647,20,2147483647,0,0,0,0,"
+                            "#000000,0,0,639,479\nsavegame 1\nlangen^ABCDEFGHIJK^@\nend\n");
+        assert(engine->loadGame(1));
+        for (int i = 0; i < 20; i++) engine->step(16);
+    }
+
+    // A page begun before textgosub is installed is the head a later save resumes from.
+    {
+        auto engine = start("*define\ngame\n*pt\nsaveon\nreturn\n*tg\nsaveoff\nclick\nsavegame 1\ntexec\nreturn\n*start\n"
+                            "langen^A^@\npretextgosub *pt\ntextgosub *tg\nlangen^B^@\nend\n");
+        click(*engine);
+        click(*engine);
+        assert(engine->savepointLine_ == 12);  // langen^A^@
+    }
+
+    // linepage: the page wait of a line in the language not shown keeps what the page shows.
+    {
+        auto engine = start("*define\ngame\n*tg\nclick\ntexec\nreturn\n*start\nlinepage\ntextgosub *tg\nputtext \"keep\"\n"
+                            "langjp\u65E5\u672C\nlangen^more^@\nend\n");
+        click(*engine);  // past the hidden line's wait and its texec, on to "more"
+        assert(engine->wait_ == vnns::WaitKind::Click && engine->pageText_.find("keep") != std::string::npos);
+    }
+
+    // allsphide changes nothing in a save but its position.
+    {
+        auto engine = start("*define\ngame\n*start\nsavegame 1\nallsphide\nsavegame 2\nend\n");
+        vnns::Bytes a = readSave(), b;
+        assert(vnns::readFile((dir / "vndegen-saves" / "save2.dat").string(), b));
+        assert(a.size() == b.size() && std::equal(a.begin(), a.end() - 11, b.begin()));
+    }
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -733,4 +843,5 @@ int main() {
     brokenFonts();
     saveFormats();
     reviewRound3Followups();
+    reviewLanding4();
 }

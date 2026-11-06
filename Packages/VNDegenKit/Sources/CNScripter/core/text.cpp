@@ -398,9 +398,9 @@ void Engine::textStep() {
     if (c == '\n') {
         inTextLine_ = false;
         if (linePage_ && !noNewlineAtEnd_) {
-            // linepage: each text line ends in a page wait.
+            // linepage: each text line ends in a page wait; in the language not shown it keeps the page, as \ does.
             noNewlineAtEnd_ = true;
-            textClickWait(true);
+            textClickWait(!textHiddenByLang());
             if (!textGosub_.empty()) return;
             return;
         }

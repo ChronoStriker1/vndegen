@@ -115,11 +115,13 @@ void Engine::ponsPutChar(const std::string &ch) {
     TextChar c;
     c.ch = ch;
     c.face = faceNo;
-    c.x2 = 2 * win_.tx + penX2_;
-    c.y2 = 2 * win_.ty + penY2_ + 2 * face->ascent(ponsSize());
+    // The origin is bounded as sizes are, so a script's or a save's huge one can't overflow the doubled positions.
+    int tx = std::clamp(win_.tx, -8192, 8192), ty = std::clamp(win_.ty, -8192, 8192);
+    c.x2 = 2 * tx + penX2_;
+    c.y2 = 2 * ty + penY2_ + 2 * face->ascent(ponsSize());
     c.px2 = px;
     c.x = c.x2 / 2;
-    c.y = win_.ty + penY2_ / 2;
+    c.y = ty + penY2_ / 2;
     c.w = (advance + 1) / 2;
     c.h = (ponsLineHeight2() + 1) / 2;
     c.color = textColor_;

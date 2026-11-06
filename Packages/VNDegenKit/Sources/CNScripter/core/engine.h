@@ -110,6 +110,7 @@ struct SaveExtras {
     // The PC Ponscripter format's own fields, of unknown meaning: always these in the saves measured.
     int pnsHead[3] = {1, 1, 0};
     int pnsWindow = 0;
+    int pnsAllSp = 0;  // where NScripter keeps allsphide
     uint32_t pnsColor = 0xFFFFFFFF;  // where NScripter keeps the text color; textcolor doesn't change it
     int pnsTail[10] = {};
 };

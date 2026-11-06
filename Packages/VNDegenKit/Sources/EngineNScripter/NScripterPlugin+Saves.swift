@@ -23,15 +23,18 @@ extension NScripterPlugin {
     }
 
     /// `…/saves/save1.dat` maps to `save1.dat`, and the thumbnails the Umineko games write, `…/saves/screenshot/ss1.bmp`,
-    /// to `screenshot/ss1.bmp`; the same files in `vndegen-saves` map the same way. The PC engine's files are
-    /// `saveN.dat`, `global.sav` and `envdata`. VNDegen's own preference file there isn't a save.
+    /// to `screenshot/ss1.bmp`, the folder spelled as the path spells it; the same files in `vndegen-saves` map the same
+    /// way. The PC engine's files are `saveN.dat`, `global.sav` and `envdata`. VNDegen's own preference file there
+    /// isn't a save.
     nonisolated static func ponscripterSavePath(_ path: String) -> String? {
         let parts = path.split(separator: "/").map(String.init)
         guard let name = parts.last else { return nil }
         let lower = name.lowercased()
         let folder = { (back: Int) in parts.count > back ? parts[parts.count - 1 - back].lowercased() : "" }
         let isSaveFolder = { (name: String) in name == "saves" || name == "vndegen-saves" }
-        if folder(1) == "screenshot", isSaveFolder(folder(2)), lower.hasSuffix(".bmp") { return "screenshot/" + name }
+        if folder(1) == "screenshot", isSaveFolder(folder(2)), lower.hasSuffix(".bmp") {
+            return parts[parts.count - 2] + "/" + name
+        }
         guard isSaveFolder(folder(1)) else { return nil }
         if ["global.sav", "envdata"].contains(lower) { return name }
         guard lower.hasPrefix("save"), lower.hasSuffix(".dat") else { return nil }

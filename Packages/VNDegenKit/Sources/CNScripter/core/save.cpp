@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cstring>
 #include <ctime>
+#include <exception>
 
 #include "engine.h"
 
@@ -31,6 +32,12 @@ struct Writer {
 static int doubled(int v) { return int(uint32_t(v) * 2u); }
 static int halved(int v) { return int((int64_t(v) - (v < 0 ? 1 : 0)) / 2); }
 static int clampInt(int64_t v) { return int(std::clamp<int64_t>(v, INT32_MIN, INT32_MAX)); }
+// The PC Ponscripter engine's text area along one side, doubled: cells of the font size and twice the pitch. In
+// floating point, since a script's sizes can make the product overflow any integer.
+static int textAreaSize(int cells, int size, int pitch) {
+    double v = double(cells) * 2 * (double(size) + 2 * double(pitch));
+    return int(std::clamp(v, double(INT32_MIN), double(INT32_MAX)));
+}
 
 struct Reader {
     const Bytes &d;
@@ -98,14 +105,15 @@ void Engine::freezeSavepoint(bool atTextHead) {
 void Engine::noteStatementStart(bool text) {
     stmtStart_ = cur_;
     if (defineMode_ || !text) return;
+    // Every Ponscripter page's head is kept, so a textgosub installed mid-page still saves from it.
+    if (ponscripter_ && !pageHeadTaken_) {
+        pageHead_.clear();
+        serializeState(pageHead_);
+        pageHeadLine_ = cur_.line;
+        pageHeadStmt_ = cur_.stmt;
+        pageHeadTaken_ = true;
+    }
     if (ponsSaves()) {
-        if (!pageHeadTaken_) {
-            pageHead_.clear();
-            serializeState(pageHead_);
-            pageHeadLine_ = cur_.line;
-            pageHeadStmt_ = cur_.stmt;
-            pageHeadTaken_ = true;
-        }
         // Before the first text, saves follow the statement that saves, as in NScripter.
         if (savepointLive_ || (saveOn_ && !preTextGosub_.empty())) {
             savepoint_ = pageHead_;
@@ -156,8 +164,8 @@ void Engine::serializeState(Bytes &out) {
         // spacing, all doubled. The font width isn't kept; Ponscripter's is its height.
         w.i(doubled(win_.tx));
         w.i(doubled(win_.ty));
-        w.i(clampInt(int64_t(win_.cols) * 2 * (int64_t(win_.fw) + 2 * int64_t(win_.px))));
-        w.i(clampInt(int64_t(win_.rows) * 2 * (int64_t(win_.fh) + 2 * int64_t(win_.py))));
+        w.i(textAreaSize(win_.cols, win_.fw, win_.px));
+        w.i(textAreaSize(win_.rows, win_.fh, win_.py));
         w.i(doubled(win_.fh));
         w.i(x.pnsWindow);
         w.i(doubled(win_.px));
@@ -255,7 +263,7 @@ void Engine::serializeState(Bytes &out) {
         w.i(int(rgbOf(p.color)));
     }
     w.i(x.qInt1);
-    w.i(scene_.allSpHidden ? 1 : 0);
+    w.i(pns ? x.pnsAllSp : scene_.allSpHidden ? 1 : 0);  // allsphide leaves the PC Ponscripter engine's alone
     w.i(x.qInt2);
     w.s(btnImage_.tag);
     for (int idx : arrayOrder_)
@@ -416,19 +424,25 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     std::vector<Frame> frames;
     if (pns) {
-        // Minus the number of frames, then each outermost first: 1 for a for loop, else a gosub.
+        // Minus the number of frames, then each outermost first: 1 for a for loop, 0 for a gosub.
         int64_t n = -int64_t(r.i());
-        for (int64_t k = 0; k < n && !r.bad && r.p < data.size(); k++) {
+        bool malformed = n < 0;
+        for (int64_t k = 0; k < n && !r.bad && !malformed; k++) {
             Frame f;
-            bool loop = r.i() == 1;
-            f.pos = size_t(std::max(r.i(), 0));
-            if (loop) {
+            int kind = r.i(), at = r.i();
+            malformed = (kind != 0 && kind != 1) || at < 0 || size_t(at) > script_.text().size();
+            f.pos = size_t(std::max(at, 0));
+            if (kind == 1) {
                 f.kind = Frame::For;
                 f.var = r.i();
                 f.to = r.i();
                 f.step = r.i();
             }
             frames.push_back(f);
+        }
+        if (malformed || r.bad) {
+            if (error) *error = "the save's call stack is malformed";
+            return false;
         }
     } else {
         int n = r.i();
@@ -574,7 +588,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         p.color = pxOf(uint32_t(r.i()));
     }
     x.qInt1 = r.i();
-    sc.allSpHidden = r.i() != 0;
+    if (pns) x.pnsAllSp = r.i();
+    else sc.allSpHidden = r.i() != 0;
     x.qInt2 = r.i();
     std::string btndef = r.s();
     for (int idx : arrayOrder_)
@@ -764,7 +779,13 @@ bool Engine::loadGame(int slot) {
     auto fileLog = fileLog_;  // images loaded on the way count as seen
     auto fileLogOrder = fileLogOrder_;
     std::string error;
-    if (!restoreState(data, &error)) {
+    bool restored = false;
+    try {
+        restored = restoreState(data, &error);
+    } catch (const std::exception &ex) {  // a forged save's nesting, met while finding a call's command
+        error = ex.what();
+    }
+    if (!restored) {
         logf("save %d: %s", slot, error.c_str());
         win_ = std::move(win);
         windowEffect_ = std::move(windowEffect);
