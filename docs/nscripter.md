@@ -119,7 +119,10 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
 - `steamsetachieve` logs the achievement and does nothing more.
 - Saves are the PC Ponscripter engine's own files, `saveN.dat`, `global.sav` and the thumbnails the games write in
   `screenshot\`. The runtime keeps them in `vndegen-saves`, whatever `savedir` says, never in the game's `saves` folder,
-  which Steam may sync; a PC backup's `saves` files restore there, and saves move both ways. The format is NScripter's
+  which Steam may sync; a PC backup's `saves` files restore there, and saves move both ways. The first time a game
+  runs with no save slot of VNDegen's own, the PC's `saveN.dat`, `global.sav`, `envdata` and `screenshot\*.bmp` are
+  copied from its `saves` folder into `vndegen-saves`, never replacing a file there; `saves` is only read, and a note
+  left in `vndegen-saves` keeps the copy to once. The format is NScripter's
   after a `PNS` header, with positions on the doubled screen, the window as a text area in doubled pixels, sprites'
   shown flags with bit 1 set, call stack records of its own, no ruby settings and no message history. The PC engine
   keeps neither the text line's language nor the style, so a page replays from its head, whose lines name their

@@ -66,6 +66,7 @@ bool Engine::start(std::string *error) {
         if (error) *error = "The game folder can't be read.";
         return false;
     }
+    if (ponscripter_) importPcSaves();
     if (!cfg_.englishWordWrap)
         for (const std::string &rel : fs_.topLevelFiles()) {
             std::string low = lowerAscii(rel);

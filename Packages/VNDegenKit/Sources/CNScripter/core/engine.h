@@ -728,6 +728,7 @@ public:
     bool loadGame(int slot);
     std::string savePath(int slot) const;
     void loadGlobals();
+    void importPcSaves();
     // gloval.sav's contents: each global variable as an int32 and a NUL-terminated string.
     Bytes globalsFile() const;
     Bytes globalsOnDisk_;  // what gloval.sav holds, as far as the engine knows

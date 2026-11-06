@@ -9,6 +9,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <sstream>
 #include <tuple>
@@ -930,6 +931,87 @@ static void reviewLanding4Round3() {
     fs::remove_all(dir);
 }
 
+// The PC engine's saves come over once, copied: the first run with no slot of VNDegen's own copies saveN.dat,
+// global.sav, envdata and screenshot\*.bmp from the game's saves folder, which stays exactly as it was, and never
+// replaces a file VNDegen has.
+static void importPcSaves() {
+    char temp[] = "/tmp/vnns-ponscripter-import-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root), pc = dir / "Saves", own = dir / "vndegen-saves";
+    auto put = [](const fs::path &p, const std::string &text) {
+        fs::create_directories(p.parent_path());
+        std::ofstream(p, std::ios::binary) << text;
+    };
+    auto read = [](const fs::path &p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), {});
+    };
+    auto snapshot = [&](const fs::path &d) {
+        std::map<std::string, std::string> files;
+        if (fs::exists(d))
+            for (const auto &e : fs::recursive_directory_iterator(d))
+                if (e.is_regular_file()) files[fs::relative(e.path(), d).string()] = read(e.path());
+        return files;
+    };
+    auto start = [&]() {
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+    };
+    std::ofstream(dir / "0.utf") << "*define\ngame\n*start\nsavegame 1\nend\n";
+    // A save of the runtime's own, written as the PC engine writes it, stands for a PC save.
+    {
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 5; i++) engine.step(16);
+    }
+    std::string pcSave = read(own / "save1.dat");
+    fs::remove_all(own);
+    put(pc / "SAVE1.DAT", pcSave);
+    put(pc / "save12.dat", "twelve");
+    put(pc / "global.sav", "globals");
+    put(pc / "envdata", "env");
+    put(pc / "screenshot" / "ss1.bmp", "shot");
+    put(pc / "screenshot" / "notes.txt", "no");
+    put(pc / "save.dat", "no");
+    put(pc / "savex.dat", "no");
+    put(pc / "readme.txt", "no");
+    put(pc / "old" / "save3.dat", "no");
+    auto before = snapshot(pc);
+    start();
+    assert(snapshot(pc) == before);  // copied, never moved or changed
+    auto copied = snapshot(own);
+    assert(copied.size() == 6 && copied["SAVE1.DAT"] == pcSave && copied["save12.dat"] == "twelve" &&
+           copied["global.sav"] == "globals" && copied["envdata"] == "env" && copied["screenshot/ss1.bmp"] == "shot" &&
+           copied.count("vndegen-imported-pc-saves.txt"));
+    // The imported save loads.
+    {
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        engine.step(16);
+        assert(engine.loadGame(1));
+    }
+    // Once only: with VNDegen's slots gone, its note still keeps the PC's from coming back.
+    fs::remove(own / "SAVE1.DAT");
+    fs::remove(own / "save12.dat");
+    start();
+    assert(!fs::exists(own / "SAVE1.DAT") && !fs::exists(own / "save12.dat"));
+    // A slot of VNDegen's own stops it, note or not; without slots, a global.sav of VNDegen's isn't replaced.
+    fs::remove_all(own);
+    put(own / "save4.dat", "mine");
+    start();
+    assert(snapshot(own).size() == 1);
+    fs::remove_all(own);
+    put(own / "global.sav", "my globals");
+    start();
+    assert(read(own / "global.sav") == "my globals" && read(own / "SAVE1.DAT") == pcSave);
+    assert(snapshot(pc) == before);
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -947,4 +1029,5 @@ int main() {
     reviewLanding4();
     reviewLanding4Round2();
     reviewLanding4Round3();
+    importPcSaves();
 }

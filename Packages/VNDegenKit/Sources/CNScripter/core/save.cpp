@@ -1,6 +1,7 @@
 // Save files, in the PC engine's formats, so saves move between VNDegen and Windows both ways. NScripter 2.95 to 3.04
 // all write the same layout ("format 2"). docs/nscripter-cleanroom.md says how it was worked out; field names below
 // follow what each field was seen to hold. Integers are little-endian int32; strings are Shift-JIS, NUL-terminated.
+#include <dirent.h>
 #include <sys/stat.h>
 
 #include <algorithm>
@@ -895,6 +896,66 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 }
 
 // ---- system data: global variables, the file and label logs, read text ----
+
+// A Ponscripter game copied from a PC brings its saves in the PC engine's saves folder, which VNDegen reads but never
+// writes. The first time the game runs with no save slot of VNDegen's own, they're copied into VNDegen's folder:
+// saveN.dat, global.sav, envdata and screenshot\*.bmp, the set the save sync restores, each only where VNDegen has no
+// file of that name. A note left in VNDegen's folder keeps it to once.
+void Engine::importPcSaves() {
+    static const char *kNote = "vndegen-imported-pc-saves.txt";
+    struct Entry {
+        std::string name;
+        bool folder;
+    };
+    auto list = [](const std::string &dir) {
+        std::vector<Entry> out;
+        DIR *d = opendir(dir.c_str());
+        if (!d) return out;
+        while (dirent *e = readdir(d)) {
+            std::string name = e->d_name;
+            struct stat st;
+            if (name == "." || name == ".." || stat((dir + "/" + name).c_str(), &st) != 0) continue;
+            if (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) out.push_back({name, S_ISDIR(st.st_mode)});
+        }
+        closedir(d);
+        return out;
+    };
+    auto slot = [](const std::string &name) {
+        std::string low = lowerAscii(name);
+        if (low.size() <= 8 || low.compare(0, 4, "save") != 0 || low.compare(low.size() - 4, 4, ".dat") != 0) return false;
+        return std::all_of(low.begin() + 4, low.end() - 4, [](char c) { return c >= '0' && c <= '9'; });
+    };
+    std::string own = fs_.hostPath(saveDir_);
+    for (const Entry &e : list(own))
+        if (!e.folder && (slot(e.name) || lowerAscii(e.name) == kNote)) return;
+    std::string pc;
+    for (const Entry &e : list(fs_.root()))
+        if (e.folder && lowerAscii(e.name) == "saves") pc = fs_.root() + "/" + e.name;
+    if (pc.empty()) return;
+    int copied = 0;
+    auto copy = [&](const std::string &from, const std::string &name) {
+        std::string to = saveFilePath(name);
+        struct stat st;
+        Bytes data;
+        if (stat(to.c_str(), &st) == 0 || stat(from.c_str(), &st) != 0 || st.st_size > (64 << 20)) return;
+        if (readFile(from, data) && fs_.write(to, data.data(), data.size())) copied++;
+    };
+    for (const Entry &e : list(pc)) {
+        std::string low = lowerAscii(e.name);
+        if (!e.folder && (slot(e.name) || low == "global.sav" || low == "envdata")) copy(pc + "/" + e.name, e.name);
+        if (e.folder && low == "screenshot")
+            for (const Entry &shot : list(pc + "/" + e.name)) {
+                std::string shotLow = lowerAscii(shot.name);
+                if (!shot.folder && shotLow.size() > 4 && shotLow.compare(shotLow.size() - 4, 4, ".bmp") == 0)
+                    copy(pc + "/" + e.name + "/" + shot.name, e.name + "\\" + shot.name);
+            }
+    }
+    if (!copied) return;
+    std::string note =
+        "Copied " + std::to_string(copied) + " files from the game's saves folder, which stays as it was.\n";
+    fs_.write(saveFilePath(kNote), note.data(), note.size());
+    logf("copied %d files from the PC engine's saves folder into %s", copied, saveDir_.c_str());
+}
 
 // The global variables' file: NScripter's gloval.sav, the PC Ponscripter engine's global.sav, the same inside.
 std::string Engine::globalsName() const { return ponscripter_ ? "global.sav" : "gloval.sav"; }
