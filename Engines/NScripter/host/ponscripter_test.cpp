@@ -883,6 +883,53 @@ static void reviewLanding4Round2() {
     fs::remove_all(dir);
 }
 
+// Landing 4's second re-check: VNDegen's saves keep a record of their calls beside them (saveN.dat.calls), so a save
+// inside a user command loads as it ran even when the script can't tell which command it is: an argument with the
+// command's own name, or a command that jumped to another label before saving. A save without the record, as from the
+// PC, falls back to working it out, which gets the same-name argument right.
+static void reviewLanding4Round3() {
+    char temp[] = "/tmp/vnns-ponscripter-landing4c-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root), record = dir / "vndegen-saves" / "save1.dat.calls";
+    auto run = [&](const std::string &script, int mode) {  // 0 straight through, 1 loaded with the record, 2 without
+        std::ofstream(dir / "0.utf") << script;
+        fs::remove_all(dir / "vndegen-saves");
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 20; i++) engine.step(16);
+        assert(engine.wait_ == vnns::WaitKind::Click && fs::exists(record));
+        if (mode == 2) fs::remove(record);
+        if (mode) {
+            assert(engine.loadGame(1));
+            for (int i = 0; i < 20; i++) engine.step(16);
+        }
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+        for (int i = 0; i < 20; i++) engine.step(16);
+        return std::make_pair(engine.getNumVar(1), engine.getNumVar(9));
+    };
+    std::string tail = "\nclick\nend\n";
+    std::string sameName = "*define\ndefsub foo\nnumalias foo,7\ngame\n*start\nfoo foo mov %9,9" + tail +
+                           "*foo\ngetparam %1\nsaveon\nsavegame 1\nclick\nreturn\n";
+    std::string gotoChain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
+                            "*foo\ngetparam %1\nreturn\n*bar\ngoto *elsewhere\n*elsewhere\nsaveon\nsavegame 1\nclick\nreturn\n";
+    std::string jumpfChain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
+                             "*foo\ngetparam %1\nreturn\n*bar\njumpf\n*elsewhere\n~\nsaveon\nsavegame 1\nclick\nreturn\n";
+    std::string gotoAlias = "*define\ndefsub foo\ndefsub bar\nnumalias bar,7\ngame\n*start\nfoo bar mov %9,9" + tail +
+                            "*foo\ngetparam %1\ngoto *bar\n*bar\nsaveon\nsavegame 1\nclick\nreturn\n";
+    for (const std::string &script : {sameName, gotoChain, jumpfChain, gotoAlias}) assert(run(script, 1) == run(script, 0));
+    assert(run(sameName, 2) == run(sameName, 0));
+    // The cases the first re-check found, without the record too.
+    std::string alias = "*define\ndefsub foo\ndefsub bar\nnumalias bar,7\ngame\n*start\nmov %8,8 foo bar mov %9,9" + tail +
+                        "*foo\ngetparam %1\nsaveon\nsavegame 1\nclick\nreturn\n*bar\nreturn\n";
+    std::string chain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
+                        "*foo\ngetparam %1\nreturn\n*bar\nsaveon\nsavegame 1\nclick\nreturn\n";
+    for (const std::string &script : {alias, chain}) assert(run(script, 2) == run(script, 0));
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -899,4 +946,5 @@ int main() {
     reviewRound3Followups();
     reviewLanding4();
     reviewLanding4Round2();
+    reviewLanding4Round3();
 }

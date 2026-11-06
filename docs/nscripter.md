@@ -123,7 +123,11 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
   after a `PNS` header, with positions on the doubled screen, the window as a text area in doubled pixels, sprites'
   shown flags with bit 1 set, call stack records of its own, no ruby settings and no message history. The PC engine
   keeps neither the text line's language nor the style, so a page replays from its head, whose lines name their
-  language. A sprite `csp` clears also moves to (-500, -500), as on the PC. The PC loads the runtime's save of the
+  language. A call frame in the PC format holds only its return offset; which user command it belongs to is worked
+  out from the script on load (the name whose label holds where the call was, else the statement's head). VNDegen's
+  own saves keep that beside them, in `saveN.dat.calls`, which stays local and isn't synced, so they always load as
+  they ran; a PC save whose user command jumped to another label before saving, or whose arguments include another
+  user command's name, may not. A sprite `csp` clears also moves to (-500, -500), as on the PC. The PC loads the runtime's save of the
   Question Arcs' first page to a screen identical to its own load, and the runtime loads the PC's.
 - A textgosub or pretextgosub routine may draw text of its own; the line it interrupted goes on with its carets,
   language and style as they were. (Inferred: the games' routine draws none.)

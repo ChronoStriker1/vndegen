@@ -688,6 +688,11 @@ public:
     // saveon is in effect: to the state at the head of the page, the first text line since the page was cleared.
     // saveon and saveoff only turn that on and off (measured on the PC).
     Bytes pageHead_;
+    // For each call frame a Ponscripter save holds, whether it is a user command's (1) and whether getparam has read
+    // its arguments (2): the PC format leaves them to be worked out from the script, which can't always tell. Kept with
+    // each saved state and written beside the save; loadedCalls_ is the record of the save being loaded.
+    std::vector<uint8_t> callFlags() const;
+    std::vector<uint8_t> savepointCalls_, pageHeadCalls_, loadedCalls_;
     int pageHeadLine_ = 0, pageHeadStmt_ = 0;
     bool pageHeadTaken_ = false;
     bool ponsSaves() const { return ponscripter_ && !textGosub_.empty(); }

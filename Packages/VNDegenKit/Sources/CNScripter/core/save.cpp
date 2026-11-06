@@ -94,6 +94,7 @@ void Engine::freezeSavepoint(bool atTextHead) {
     (void)atTextHead;
     savepoint_.clear();
     serializeState(savepoint_);
+    savepointCalls_ = callFlags();
     savepointLine_ = stmtStart_.line;
     savepointStmt_ = stmtStart_.stmt;
     savepointLive_ = false;
@@ -109,6 +110,7 @@ void Engine::noteStatementStart(bool text) {
     if (ponscripter_ && !pageHeadTaken_) {
         pageHead_.clear();
         serializeState(pageHead_);
+        pageHeadCalls_ = callFlags();
         pageHeadLine_ = cur_.line;
         pageHeadStmt_ = cur_.stmt;
         pageHeadTaken_ = true;
@@ -117,6 +119,7 @@ void Engine::noteStatementStart(bool text) {
         // Before the first text, saves follow the statement that saves, as in NScripter.
         if (savepointLive_ || (saveOn_ && !preTextGosub_.empty())) {
             savepoint_ = pageHead_;
+            savepointCalls_ = pageHeadCalls_;
             savepointLine_ = pageHeadLine_;
             savepointStmt_ = pageHeadStmt_;
             savepointLive_ = false;
@@ -649,7 +652,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                     size_t end = std::max(cur_.pos, p + 1);
                     if ((before == ' ' || before == '\t') && end <= f.pos && defsubs_.count(word)) {
                         last = end;
-                        if (word == callee) named = end;
+                        if (word == callee && named == std::string::npos) named = end;
                     }
                     p = end;
                 }
@@ -666,6 +669,11 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         int inner = k + 1 < frames.size() ? script_.lineAt(std::min(frames[k + 1].pos, script_.text().size()))
                                           : std::clamp(line, 0, script_.lineCount() - 1);
         finishFrame(frames[k], inner);
+        // A save VNDegen wrote keeps beside it which calls are user commands', so it needn't be worked out.
+        if (pns && loadedCalls_.size() == frames.size() && frames[k].kind == Frame::Gosub) {
+            frames[k].hasParams = loadedCalls_[k] & 1;
+            frames[k].paramsRead = loadedCalls_[k] & 2;
+        }
     }
 
     // Commit: the scene, sound, text and the script position. A movie playing now belongs to the game left behind.
@@ -735,6 +743,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
             savepoint_[at] = 255;
             savepoint_[at + 1] = savepoint_[at + 2] = savepoint_[at + 3] = 0;
         }
+    savepointCalls_ = callFlags();
     savepointLine_ = line;
     savepointStmt_ = stmt;
     savepointLive_ = false;
@@ -742,6 +751,21 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
 }
 
 // ---- save slots ----
+
+std::vector<uint8_t> Engine::callFlags() const {
+    std::vector<uint8_t> flags;
+    for (const Frame &f : stack_)
+        if (f.kind != Frame::TextGosub) flags.push_back(uint8_t((f.hasParams ? 1 : 0) | (f.paramsRead ? 2 : 0)));
+    return flags;
+}
+
+// The record of a save's calls beside it, saveN.dat.calls: "VNDCALLS", the save's FNV-1a hash, then a byte per frame.
+// Another save in the slot, one synced or copied in from a PC, doesn't match the hash, and its calls are worked out.
+static uint64_t fnv1a(const Bytes &data) {
+    uint64_t h = 1469598103934665603ull;
+    for (uint8_t b : data) h = (h ^ b) * 1099511628211ull;
+    return h;
+}
 
 std::string Engine::saveFilePath(const std::string &file) const { return fs_.hostPath(joinPath(saveDir_, file)); }
 
@@ -771,6 +795,14 @@ bool Engine::saveGame(int slot, const std::string &note) {
         logf("could not write %s", path.c_str());
         return false;
     }
+    if (ponscripter_) {
+        std::vector<uint8_t> flags = savepointLive_ ? callFlags() : savepointCalls_;
+        Bytes record = {'V', 'N', 'D', 'C', 'A', 'L', 'L', 'S'};
+        uint64_t h = fnv1a(data);
+        for (int k = 0; k < 8; k++) record.push_back(uint8_t(h >> (8 * k)));
+        record.insert(record.end(), flags.begin(), flags.end());
+        fs_.write(path + ".calls", record.data(), record.size());
+    }
     saveSystemData();
     return true;
 }
@@ -792,6 +824,14 @@ bool Engine::loadGame(int slot) {
     bool rmode = rmode_, eraseOnEffect = eraseOnEffect_, rubyOn = rubyOn_;
     auto fileLog = fileLog_;  // images loaded on the way count as seen
     auto fileLogOrder = fileLogOrder_;
+    loadedCalls_.clear();
+    Bytes record;
+    if (ponscripter_ && readFile(savePath(slot) + ".calls", record) && record.size() >= 16 &&
+        memcmp(record.data(), "VNDCALLS", 8) == 0) {
+        uint64_t h = 0;
+        for (int k = 0; k < 8; k++) h |= uint64_t(record[8 + size_t(k)]) << (8 * k);
+        if (h == fnv1a(data)) loadedCalls_.assign(record.begin() + 16, record.end());
+    }
     std::string error;
     bool restored = false;
     try {
@@ -799,6 +839,7 @@ bool Engine::loadGame(int slot) {
     } catch (const std::exception &ex) {  // a forged save's nesting, met while finding a call's command
         error = ex.what();
     }
+    loadedCalls_.clear();
     if (!restored) {
         logf("save %d: %s", slot, error.c_str());
         win_ = std::move(win);
