@@ -24,29 +24,49 @@ typealias TouchPress = (ControlInput?, _ pressed: Bool) -> Void
 /// mode moves the virtual mouse's pointer, which a controller's sticks can move too, and sends pointer events. Both have a Home button that opens the VNDegen menu. The modes
 /// without an overlay draw nothing.
 /// Place it in a `ZStack` over the session view. The gamepad controls keep to the safe area, while the cursor surface covers
-/// the full screen like the session view, so its normalized pointer locations match the game's.
+/// the full screen. The cursor's pointer moves over the game's view: the full screen like the surface, or `gameFrame`.
 public struct TouchControlsOverlay: View {
     let mode: TouchControlsMode
     let mapping: ButtonMapping
     let input: InputHub
+    /// The game's view in the global coordinate space when it shares the screen with the controls rather than filling it,
+    /// as on a phone held upright. The controls then keep below it, so none of them covers the game.
+    let gameFrame: CGRect?
     @State private var taps = 0
 
-    public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub) {
+    public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub, gameFrame: CGRect? = nil) {
         self.mode = mode
         self.mapping = mapping
         self.input = input
+        self.gameFrame = gameFrame
     }
+
+    /// The height `mode`'s controls take below the game in a portrait screen `width` wide, above the safe area's bottom
+    /// inset: the whole gamepad, or the cursor's Home button, since its trackpad covers the screen.
+    public static func portraitControlsHeight(_ mode: TouchControlsMode, width: CGFloat) -> CGFloat {
+        let unit = unit(for: width)
+        return switch mode {
+        case .gamepad: GamepadControls.height(unit: unit)
+        case .cursor: unit * 0.62 + 16
+        case .direct, .off: 0
+        }
+    }
+
+    /// The size the controls are built from, for an overlay whose shorter side is `side` long.
+    private static func unit(for side: CGFloat) -> CGFloat { min(max(side / 6.2, 54), 76) }
 
     public var body: some View {
         GeometryReader { geometry in
-            let unit = min(max(min(geometry.size.width, geometry.size.height) / 6.2, 54), 76)
+            let unit = Self.unit(for: min(geometry.size.width, geometry.size.height))
+            // How far down the overlay the controls may start: below the game, when it sits above them.
+            let top = gameFrame.map { max(0, $0.maxY - geometry.frame(in: .global).minY) } ?? 0
             switch mode {
-            case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press)
+            case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press).padding(.top, top)
             case .cursor:
                 ZStack(alignment: .topTrailing) {
-                    MouseControls(mouse: input.mouse, send: sendPointer)
+                    MouseControls(mouse: input.mouse, gameFrame: gameFrame, send: sendPointer)
                     HomeButton(size: unit * 0.62, press: press)
-                        .padding(.top, 8)
+                        .padding(.top, top + 8)
                         .padding(.trailing, 16)
                 }
             case .direct, .off: EmptyView()
@@ -85,6 +105,13 @@ private struct GamepadControls: View {
     let unit: CGFloat
     let mapping: ButtonMapping
     let press: TouchPress
+
+    /// The rows' heights, the spacing after the spacer and between the rows, and the bottom padding, as `body` lays them
+    /// out.
+    static func height(unit: CGFloat) -> CGFloat {
+        let triggers = 0.6, bumpers = 0.62, sticks = 1 + 0.82 * 2
+        return unit * (triggers + bumpers + sticks + 0.28 * 3 + 0.25)
+    }
 
     var body: some View {
         VStack(spacing: unit * 0.28) {
@@ -464,17 +491,22 @@ private struct RoundKey: View {
 
 private struct MouseControls: View {
     let mouse: VirtualMouse
+    /// The game's view in the global space, when it doesn't fill the screen as this surface does.
+    let gameFrame: CGRect?
     let send: (ControllerEvent) -> Void
 
     private var cursor: CGPoint { mouse.location }
 
     var body: some View {
         GeometryReader { geometry in
+            let surface = geometry.frame(in: .global)
+            let game = gameFrame ?? surface
             ZStack(alignment: .topLeading) {
                 #if canImport(UIKit)
-                TrackpadSurface(handle: handle)
+                TrackpadSurface(gameSize: game.size, handle: handle)
                 #endif
-                PointerArrow(location: cursor, size: geometry.size)
+                PointerArrow(location: cursor, size: game.size)
+                    .offset(x: game.minX - surface.minX, y: game.minY - surface.minY)
             }
         }
         .ignoresSafeArea()
@@ -519,6 +551,9 @@ import UIKit
 
 /// SwiftUI has no two-finger tap, so the trackpad uses UIKit recognizers.
 private struct TrackpadSurface: UIViewRepresentable {
+    /// The game view's size. Moves are fractions of it, so the pointer travels the same distance on screen whatever the
+    /// game's share of the surface.
+    let gameSize: CGSize
     let handle: (TrackpadGesture) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -547,16 +582,18 @@ private struct TrackpadSurface: UIViewRepresentable {
 
     func updateUIView(_ view: UIView, context: Context) {
         context.coordinator.handle = handle
+        context.coordinator.gameSize = gameSize
     }
 
     final class Coordinator: NSObject {
         static let sensitivity: CGFloat = 1.6
         var handle: (TrackpadGesture) -> Void = { _ in }
+        var gameSize = CGSize.zero
         private var last: CGPoint = .zero
 
-        private func normalized(_ x: CGFloat, _ y: CGFloat, in view: UIView?) -> CGVector {
-            guard let size = view?.bounds.size, size.width > 0, size.height > 0 else { return .zero }
-            return CGVector(dx: x / size.width * Self.sensitivity, dy: y / size.height * Self.sensitivity)
+        private func normalized(_ x: CGFloat, _ y: CGFloat) -> CGVector {
+            guard gameSize.width > 0, gameSize.height > 0 else { return .zero }
+            return CGVector(dx: x / gameSize.width * Self.sensitivity, dy: y / gameSize.height * Self.sensitivity)
         }
 
         // Pans read the translation on every state with one, so a short flick that goes straight from began to ended still counts.
@@ -566,14 +603,14 @@ private struct TrackpadSurface: UIViewRepresentable {
             guard Self.moving.contains(recognizer.state) else { return }
             let translation = recognizer.translation(in: recognizer.view)
             recognizer.setTranslation(.zero, in: recognizer.view)
-            handle(.move(normalized(translation.x, translation.y, in: recognizer.view)))
+            handle(.move(normalized(translation.x, translation.y)))
         }
 
         @objc func hold(_ recognizer: UILongPressGestureRecognizer) {
             let point = recognizer.location(in: recognizer.view)
             switch recognizer.state {
             case .began: handle(.press(.began))
-            case .changed: handle(.drag(normalized(point.x - last.x, point.y - last.y, in: recognizer.view)))
+            case .changed: handle(.drag(normalized(point.x - last.x, point.y - last.y)))
             case .ended: handle(.press(.ended))
             case .cancelled, .failed: handle(.press(.cancelled))
             default: break

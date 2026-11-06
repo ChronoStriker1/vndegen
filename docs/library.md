@@ -56,11 +56,12 @@ RPG Maker MV and MZ clips with transparency are converted the first time they pl
 
 ## Layouts
 
-The view button in the top bar switches the library between three layouts:
+The view button in the top bar steps the library through four layouts:
 
-- **Header list** stacks each game's wide header art, in as many columns as the screen allows.
-- **Capsule rows** shows shelves of large portrait capsules.
 - **Featured** puts the focused game's hero art, logo, and Play button above the shelves.
+- **Capsule rows** shows shelves of large portrait capsules.
+- **Header list** stacks each game's wide header art, in as many columns as the screen allows.
+- **Grid** shows every game's capsule in a dense grid, three to a row on iPhone and more on wider screens, with the number of games beside All games.
 
 iPhone starts on Header list, iPad on Capsule rows, and Mac on Featured, and each device remembers its choice.
 
