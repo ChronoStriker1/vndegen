@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// The one CrossOver bottle VNDegen makes, keeps, and runs Unity games in, `<Bottles>/VNDegen` in VNDegen's own
@@ -215,3 +216,4 @@ nonisolated struct UnityBottle: Equatable, Sendable {
         }
     }
 }
+#endif
