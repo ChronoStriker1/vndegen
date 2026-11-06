@@ -223,11 +223,25 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     // The header list leaves out Recently played, which would repeat the top of All games.
     nav.layout = .headers
     #expect(nav.rows().map(\.id) == ["bar", "all-0"])
+    // The bar has one button for the library's view. The grid that once had a button of its own is a layout now.
+    #expect(nav.rows().first?.items == [.addGame, .layoutButton, .lockButton, .settingsButton])
+    nav.setFocus(.layoutButton)
+    press(nav, .confirm)
+    #expect(nav.layout == .grid)
+    // The grid leaves out Recently played too, and lays its shelves out in rows of the grid's columns.
+    #expect(nav.rows().map(\.id) == ["bar", "all-0"])
+    press(nav, .down)
+    #expect(nav.focus == .tile(.all, id))
     nav.setFocus(.layoutButton)
     press(nav, .confirm)
     #expect(nav.layout == .featured)
     #expect(nav.focus == .layoutButton)
     #expect(UserDefaults.standard.string(forKey: LibraryLayout.storageKey) == LibraryLayout.featured.rawValue)
+}
+
+/// A layout stored by an earlier version must still load, so the raw values never change.
+@Test func storedLibraryLayoutsKeepTheirRawValues() {
+    #expect(LibraryLayout.allCases.map(\.rawValue) == ["featured", "capsules", "headers", "grid"])
 }
 
 @MainActor

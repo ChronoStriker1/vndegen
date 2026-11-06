@@ -80,8 +80,6 @@ private struct LibraryContainer: View {
                 } else {
                     LibraryHomeView().transition(.opacity)
                 }
-            case .grid:
-                LibraryGridView().transition(.opacity.combined(with: .scale(scale: 1.03)))
             case let .game(id):
                 if let game = hub.library.game(id) {
                     GamePageView(game: game).transition(.opacity.combined(with: .scale(scale: 1.03)))

@@ -22,7 +22,6 @@ import UIKit
 @Observable
 final class Navigator {
     enum Route: Hashable {
-        case grid
         case game(GameID)
         case settings
     }
@@ -108,14 +107,13 @@ final class Navigator {
     }
 
     enum Target: Hashable {
-        case addGame, layoutButton, gridButton, lockButton, settingsButton
+        case addGame, layoutButton, lockButton, settingsButton
         /// An archive under Ready to import, by its first volume.
         case importArchive(URL)
         case openFolder, rescan
         /// Hero buttons. They act on `heroGame`.
         case play, details
         case tile(Shelf, GameID)
-        case gridTile(GameID)
         case back
         case pagePlay, pageArtwork, pageMetadata, pageSaves, pageLock, pageShowFolder, pageEngineFiles, pageRemove, pageEngine, pageVariant, pageOrientation, pageControls, pageMapping
         /// A screenshot in the game page's grid, by its index in the game's screenshots, and the button under the grid
@@ -209,7 +207,7 @@ final class Navigator {
     private(set) var focus: Target?
     /// The game shown in the home hero: the last game whose tile had focus.
     private var heroID: GameID?
-    /// Set by the grid view from its width.
+    /// Set by the home screen's grid layout from its width.
     var gridColumns = 4
     var layout = LibraryLayout.setting {
         didSet { UserDefaults.standard.set(layout.rawValue, forKey: LibraryLayout.storageKey) }
@@ -274,9 +272,9 @@ final class Navigator {
 
     var shelves: [(shelf: Shelf, games: [Game])] {
         let visible = visibleGames
-        // The header list stacks every game, so Recently played would only repeat the top of All games, which already
-        // lists the last played first.
-        let recent = layout == .headers ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        // The header list and the grid show every game, so Recently played would only repeat the top of All games,
+        // which already lists the last played first.
+        let recent = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
         let all: [(Shelf, [Game])] = [
             (.recent, recent),
             (.all, visible.filter { !$0.isLocked }),
@@ -321,20 +319,18 @@ final class Navigator {
                     + archives.map { Row(id: "\($0)", items: [$0]) }
                     + [Row(id: "empty-add", items: [.addGame]), Row(id: "empty-folder", items: [.openFolder, .rescan])]
             }
-            var rows = [Row(id: "bar", items: [.addGame, .layoutButton, .gridButton, .lockButton, .settingsButton])]
+            var rows = [Row(id: "bar", items: [.addGame, .layoutButton, .lockButton, .settingsButton])]
             if layout == .featured, heroGame != nil { rows.append(Row(id: "hero", items: [.play, .details])) }
             if !archives.isEmpty { rows.append(Row(id: Self.archivesRowID, items: archives)) }
             for (shelf, games) in shelves {
                 let tiles = games.map { Target.tile(shelf, $0.id) }
-                if layout == .headers {
-                    rows += Self.gridRows(shelf.rawValue, tiles, columns: headerColumns)
-                } else {
-                    rows.append(Row(id: shelf.rawValue, items: tiles))
+                switch layout {
+                case .headers: rows += Self.gridRows(shelf.rawValue, tiles, columns: headerColumns)
+                case .grid: rows += Self.gridRows(shelf.rawValue, tiles, columns: gridColumns)
+                case .featured, .capsules: rows.append(Row(id: shelf.rawValue, items: tiles))
                 }
             }
             return rows
-        case .grid:
-            return [Row(id: "grid-back", items: [.back])] + Self.gridRows("grid", visibleGames.map { .gridTile($0.id) }, columns: gridColumns)
         case .game:
             // Orientation only matters on a touch device, and the control method only where it changes something.
             let orientation = Platform.current == .iOS ? [Row(id: "page-orientation", items: [.pageOrientation])] : []
@@ -445,7 +441,6 @@ final class Navigator {
                 return .tile(shelf.shelf, game.id)
             }
             return rows().first?.items.first
-        case .grid: return visibleGames.first.map { .gridTile($0.id) } ?? .back
         case .game: return .pagePlay
         case .settings: return .back
         }
@@ -494,7 +489,7 @@ final class Navigator {
     func setFocus(_ target: Target?) {
         focus = target
         switch target {
-        case let .tile(_, id), let .gridTile(id): heroID = id
+        case let .tile(_, id): heroID = id
         default: break
         }
     }
@@ -505,7 +500,7 @@ final class Navigator {
     /// Screens scroll to keep focus in view only when a controller or the keyboard moved it. Scrolling under a hovering
     /// pointer or a touch user's finger would fight them.
     private(set) var focusMovedByController = false
-    /// A target the home screen or the grid scrolls into view once, whatever the input. The screen clears it when it scrolls.
+    /// A target the home screen scrolls into view once, whatever the input. The screen clears it when it scrolls.
     var revealRequest: Target?
     /// Set once a controller, the keyboard, or the pointer has moved focus. Until then focus follows the library as it loads.
     @ObservationIgnored private var steered = false
@@ -542,12 +537,11 @@ final class Navigator {
         case .rescan: rescan()
         case .controlMethod, .controllerMouse, .mouseStyle, .playOrientation: stepSetting(target, by: 1)
         case .layoutButton: layout = layout.next
-        case .gridButton: push(.grid)
         case .settingsButton: push(.settings)
         case .lockButton: toggleLibraryLock()
         case .play: if let game = heroGame { play(game.id) }
         case .details: if let game = heroGame { push(.game(game.id)) }
-        case let .tile(_, id), let .gridTile(id): push(.game(id))
+        case let .tile(_, id): push(.game(id))
         case .back: back()
         case .pagePlay: if let id = pageGameID { perform(.play, on: id) }
         case .pageArtwork: if let id = pageGameID { perform(.artwork, on: id) }
@@ -993,7 +987,7 @@ final class Navigator {
         if case let .game(id) = leaving, let tile = rows().lazy.flatMap(\.items).first(where: { $0.gameID == id }) {
             setFocus(tile)
         } else {
-            setFocus(leaving == .grid ? .gridButton : leaving == .settings ? .settingsButton : defaultFocus)
+            setFocus(leaving == .settings ? .settingsButton : defaultFocus)
         }
     }
 
@@ -1282,7 +1276,7 @@ extension ArchiveImportModel.Button {
 extension Navigator.Target {
     var gameID: GameID? {
         switch self {
-        case let .tile(_, id), let .gridTile(id): id
+        case let .tile(_, id): id
         default: nil
         }
     }

@@ -4,6 +4,7 @@ import UIKit
 #endif
 
 /// How the home screen draws the library. The top bar's view button steps through them, and each device keeps its own.
+/// The stored raw values must not change, so a player's choice still loads after an update.
 enum LibraryLayout: String, CaseIterable {
     /// The focused game's hero, logo, and Play button above shelves of capsules.
     case featured
@@ -11,6 +12,8 @@ enum LibraryLayout: String, CaseIterable {
     case capsules
     /// Header art stacked in a list, in as many columns as the width allows.
     case headers
+    /// Every game's capsule in a dense grid, as many to a row as fit. It replaced a separate All games screen.
+    case grid
 
     static let storageKey = "libraryLayout"
 
@@ -37,6 +40,7 @@ enum LibraryLayout: String, CaseIterable {
         case .featured: "Featured"
         case .capsules: "Capsule rows"
         case .headers: "Header list"
+        case .grid: "Grid"
         }
     }
 
@@ -45,6 +49,7 @@ enum LibraryLayout: String, CaseIterable {
         case .featured: "play.rectangle.fill"
         case .capsules: "rectangle.split.3x1.fill"
         case .headers: "rectangle.grid.1x2.fill"
+        case .grid: "square.grid.3x3.fill"
         }
     }
 }
