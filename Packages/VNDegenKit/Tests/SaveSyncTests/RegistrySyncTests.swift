@@ -152,16 +152,58 @@ import VNCore
         #expect(text == "Windows Registry Editor Version 5.00\n\n[\(Self.key)]\n\"a\"=dword:00000001\n")
     }
 
-    /// When the backup's registry can't be read, its values can't be merged, so it carries forward as it was.
-    @Test func anUnreadableRegistryIsCarriedNotReplaced() throws {
-        let setup = try Self.setup(registryFile: "registry.yaml")
-        try Data("not a mapping".utf8).write(to: setup.gameDir.appendingPathComponent("backup-1/registry.yaml"))
-        try LudusaviStore.writeLocalRegistry(["a": .dword(1)], to: setup.save)
-        try write(["file1.rmmzsave": "mine"], to: setup.locations[0])
-        let name = try #require(try backUp(setup, Retention(full: 2, differential: 0)).backup)
-        #expect(try String(contentsOf: setup.gameDir.appendingPathComponent("\(name)/registry.yaml"), encoding: .utf8) == "not a mapping")
-        #expect(!fm.fileExists(atPath: setup.gameDir.appendingPathComponent("\(name)/registry.reg").path))
-        #expect(try setup.store.mapping("G").backups.last?.registryHash == Self.ludusaviHash)
+    /// When the registry the latest backup records can't be read, its values can't be merged. The backup must not
+    /// replace it with one holding the game's key alone.
+    @Test func anUnreadableRegistryIsNeverReplaced() throws {
+        for (name, content) in [("registry.reg", "garbage, not a regedit file"), ("registry.yaml", "not a mapping")] {
+            let setup = try Self.setup(registryFile: name)
+            try Data(content.utf8).write(to: setup.gameDir.appendingPathComponent("backup-1/\(name)"))
+            try LudusaviStore.writeLocalRegistry(["a": .dword(1)], to: setup.save)
+            try write(["file1.rmmzsave": "mine"], to: setup.locations[0])
+            let backup = try #require(try backUp(setup, Retention(full: 2, differential: 0)).backup)
+            #expect(!fm.fileExists(atPath: setup.gameDir.appendingPathComponent("\(backup)/registry.reg").path))
+            #expect(try setup.store.mapping("G").backups.last?.registryHash == nil)
+        }
+    }
+
+    /// A game that cleared its PlayerPrefs backs up an empty key, so a restore doesn't bring the old values back.
+    @Test func clearedValuesReplaceTheBackups() throws {
+        let setup = try Self.setup()
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        try LudusaviStore.writeLocalRegistry([:], to: setup.save)
+        #expect(try backUp(setup, Retention(full: 2, differential: 0)).backup != nil)
+        try LudusaviStore.writeLocalRegistry(["stale": .dword(1)], to: setup.save)
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        #expect(try LudusaviStore.localRegistryValues(setup.save) == [:])
+    }
+
+    /// Undo reads everything first: a saved PlayerPrefs file it can't read stops it before anything changes.
+    @Test func undoStopsWhenTheSavedFileCantBeRead() throws {
+        let setup = try Self.setup()
+        try LudusaviStore.writeLocalRegistry(["mine": .dword(1)], to: setup.save)
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        let current = try Data(contentsOf: setup.save.file)
+        let saved = setup.snapshot.appendingPathComponent("registry/\(setup.save.file.lastPathComponent)")
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: saved.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: saved.path) }
+        #expect(throws: SaveSyncError.unreadable(saved.path)) {
+            try LudusaviStore.undoRestore(locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        }
+        #expect(try Data(contentsOf: setup.save.file) == current)
+        #expect(fm.fileExists(atPath: setup.snapshot.path))
+    }
+
+    /// As Ludusavi reads it: a differential's registry YAML that doesn't parse gives way to the full backup's.
+    @Test func aDifferentialsBadYAMLFallsBackToTheFullBackups() throws {
+        let setup = try Self.setup()
+        var mapping = try setup.store.mapping("G")
+        mapping.backups[0].children = [DifferentialBackup(name: "backup-2-diff", when: Timestamp.epoch, locked: false, files: [:],
+                                                          registry: .init(hash: "bad"))]
+        try Data(mapping.yamlString().utf8).write(to: setup.gameDir.appendingPathComponent("mapping.yaml"))
+        try fm.createDirectory(at: setup.gameDir.appendingPathComponent("backup-2-diff"), withIntermediateDirectories: true)
+        try Data("not a mapping".utf8).write(to: setup.gameDir.appendingPathComponent("backup-2-diff/registry.yaml"))
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        #expect(try LudusaviStore.localRegistryValues(setup.save) == (try Self.fixtureData()).values(of: Self.key))
     }
 
     /// The file here may hold the game's key alone, so nothing else can reach a backup through it.

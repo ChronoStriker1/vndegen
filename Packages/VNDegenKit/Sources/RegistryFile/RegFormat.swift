@@ -49,13 +49,15 @@ extension RegistryData {
         flush()
     }
 
-    /// The text Ludusavi writes as `registry.reg`, which its hash covers.
+    /// The text Ludusavi writes as `registry.reg`, which its hash covers. A key or value name holding a line break is
+    /// left out: regedit has no way to write one, and written as is it would start a section of its own, such as a key
+    /// a PlayerPrefs import must never touch.
     public var regText: String {
         var parts = [Self.regedit5Header]
-        for (key, values) in keys.sortedByUTF8 {
+        for (key, values) in keys.sortedByUTF8 where !Self.breaksLine(key) {
             parts.append("\n\n")
             var lines = ["[\(key)]"]
-            for (name, value) in values.sortedByUTF8 {
+            for (name, value) in values.sortedByUTF8 where !Self.breaksLine(name) {
                 let quoted = "\"\(Self.escape(name))\""
                 lines.append("\(quoted)=\(Self.serialize(value, offset: quoted.utf8.count + 1))")
             }
@@ -78,6 +80,10 @@ extension RegistryData {
         if bytes.starts(with: [0xFF, 0xFE]) { return String(data: data.dropFirst(2), encoding: .utf16LittleEndian) }
         if bytes.starts(with: [0xFE, 0xFF]) { return String(data: data.dropFirst(2), encoding: .utf16BigEndian) }
         return String(data: data, encoding: .utf8)
+    }
+
+    static func breaksLine(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0 == "\n" || $0 == "\r" }
     }
 
     public static func escape(_ text: String) -> String {

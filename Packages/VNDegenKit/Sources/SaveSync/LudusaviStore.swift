@@ -198,11 +198,17 @@ public struct LudusaviStore: Sendable {
         let fm = FileManager.default
         guard fm.fileExists(atPath: snapshot.path) else { throw SaveSyncError.noSnapshot }
         guard isComplete(snapshot: snapshot) else { throw SaveSyncError.incompleteSnapshot }
+        // Read before anything changes. A saved file that can't be read stops the undo, and only a missing one means
+        // there was none.
         let savedRegistry = snapshot.appendingPathComponent(snapshotRegistryFolder, isDirectory: true)
-        let registryBack: Data?? = if let registry, fm.fileExists(atPath: savedRegistry.path) {
-            .some(try? Data(contentsOf: savedRegistry.appendingPathComponent(registry.file.lastPathComponent)))
-        } else {
-            nil
+        var registryBack: Data??
+        if let registry, fm.fileExists(atPath: savedRegistry.path) {
+            let saved = savedRegistry.appendingPathComponent(registry.file.lastPathComponent)
+            if fm.fileExists(atPath: saved.path) {
+                do { registryBack = .some(try Data(contentsOf: saved)) } catch { throw SaveSyncError.unreadable(saved.path) }
+            } else {
+                registryBack = .some(nil)
+            }
         }
         let plans = try locations.enumerated().map { index, location in
             let saved = snapshot.appendingPathComponent(String(index), isDirectory: true)
@@ -290,7 +296,8 @@ public struct LudusaviStore: Sendable {
                        retention: Retention?, pcFolders: [Int: String] = [:], now: Date = .now, device: String? = nil, os: String,
                        comment: String?) throws -> BackupReport {
         let local = try Self.localSaves(locations)
-        let localRegistry = try registry.flatMap { try Self.localRegistryValues($0) }.flatMap { $0.isEmpty ? nil : $0 }
+        // A file with no values is a game that cleared its PlayerPrefs, which replaces what the backup holds.
+        let localRegistry = try registry.flatMap { try Self.localRegistryValues($0) }
         guard !local.isEmpty || localRegistry != nil else { throw SaveSyncError.noLocalSaves }
 
         let folder = folder ?? LudusaviMapping.escapeFolderName(title)
@@ -315,8 +322,15 @@ public struct LudusaviStore: Sendable {
         var newRegistry: String?
         if let registry, let localRegistry {
             saves[Self.registryHashKey] = Self.registryHash(localRegistry, key: registry.key)
-            // No registry yet starts an empty one. One that can't be read stays nil and is carried forward.
-            let base: RegistryData? = if let held = Self.latestRegistry(mapping, in: gameDir) { Self.registryData(held, in: gameDir) } else { RegistryData() }
+            // No registry yet starts an empty one. One the latest backup records but that can't be read, such as a damaged
+            // file or a zip, is left as the carry-forward below leaves it, and the values wait for a later backup.
+            let base: RegistryData? = if let held = Self.latestRegistry(mapping, in: gameDir) {
+                Self.registryData(held, in: gameDir)
+            } else if Self.recordsRegistry(mapping) {
+                nil
+            } else {
+                RegistryData()
+            }
             if var base, base.values(of: registry.key) != localRegistry {
                 base.setValues(localRegistry, of: registry.key)
                 newRegistry = base.regText
@@ -443,7 +457,9 @@ public struct LudusaviStore: Sendable {
     static func readable(_ name: String, in folder: URL) -> Bool {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)), !data.isEmpty,
               let text = String(data: data, encoding: .utf8) else { return false }
-        guard name.hasSuffix(".reg") else { return true }
+        // Ludusavi deserializes the YAML, so one that doesn't parse is skipped and a differential's falls back to the
+        // full backup's.
+        guard name.hasSuffix(".reg") else { return (try? registryData(yaml: text)) != nil }
         let first = text.drop { $0 == "\u{FEFF}" }.prefix { !$0.isNewline }.trimmingCharacters(in: .whitespaces)
         return first == "Windows Registry Editor Version 5.00" || first == "REGEDIT4"
     }

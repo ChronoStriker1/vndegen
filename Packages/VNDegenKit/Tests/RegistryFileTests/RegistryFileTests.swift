@@ -130,6 +130,23 @@ import Testing
         #expect(data.values(of: #"HKEY_CURRENT_USER\Software\A"#) == ["s": .raw(kind: 2, bytes: [0x25, 0x41, 0x25, 0])])
     }
 
+    /// A name with a line break, which Wine's `\n` escape can produce, must not open a section of its own.
+    @Test func leavesOutNamesThatWouldBreakALine() throws {
+        let text = """
+            Windows Registry Editor Version 5.00
+
+            [HKEY_CURRENT_USER\\Software\\S\\G]
+            "a\\n\\n[HKEY_CURRENT_USER]\\nb"=dword:00000001
+            "z"=dword:00000002
+
+            """
+        let data = try RegistryData(reg: text)
+        #expect(data.keys.count == 1)
+        let written = data.regText
+        #expect(written == "Windows Registry Editor Version 5.00\n\n[HKEY_CURRENT_USER\\Software\\S\\G]\n\"z\"=dword:00000002\n")
+        #expect(try RegistryData(reg: written).keys.keys.sorted() == [#"HKEY_CURRENT_USER\Software\S\G"#])
+    }
+
     @Test func writesUTF16WithAByteOrderMark() {
         #expect(RegistryData.utf16File("Aあ") == Data([0xFF, 0xFE, 0x41, 0x00, 0x42, 0x30]))
     }

@@ -69,7 +69,7 @@ import VNCore
         let commands = try [
             bottle.create(environment: inherited), bottle.update(environment: inherited),
             bottle.run(exe, workdir: exe.deletingLastPathComponent(), environment: inherited),
-            bottle.close("Game.exe", environment: inherited), bottle.killAll(environment: inherited),
+            bottle.close("Game.exe", environment: inherited), bottle.close("Game.exe", force: true, environment: inherited),
             bottle.importRegistry(URL(fileURLWithPath: "/tmp/a.reg"), environment: inherited),
             bottle.exportRegistry(#"HKEY_CURRENT_USER\Software\S\G"#, to: URL(fileURLWithPath: "/tmp/b.reg"), environment: inherited),
         ]
@@ -82,7 +82,7 @@ import VNCore
         #expect(commands[0].executable.lastPathComponent == "cxbottle" && !commands[0].arguments.contains("--no-update"))
         #expect(commands[1].arguments[4] == "--update-only")
         for command in commands.dropFirst(2) { #expect(command.arguments[4] == "--no-update") }
-        #expect(commands[4].arguments.suffix(3) == ["--ux-app", "wineserver", "-k"])
+        #expect(Array(commands[4].arguments.suffix(5)) == ["--no-convert", "taskkill", "/f", "/im", "Game.exe"])
         #expect(commands[2].arguments.contains("winemenubuilder.exe=d"))
         #expect(commands[2].arguments.last == "/games/G/Game.exe" && !commands[2].arguments.contains("--cx-app"))
         #expect(Array(commands[3].arguments.suffix(4)) == ["--no-convert", "taskkill", "/im", "Game.exe"])
@@ -99,12 +99,43 @@ import VNCore
         try FileManager.default.createSymbolicLink(at: folder.appending(path: "VNDegen"), withDestinationURL: theirs)
         let bottle = UnityBottle(folder: folder, tools: Self.tools)
         #expect(throws: UnityBottle.Refusal.self) { try bottle.checkOwnBottle() }
-        #expect(throws: UnityBottle.Refusal.self) { try bottle.killAll(environment: [:]) }
+        #expect(throws: UnityBottle.Refusal.self) { try bottle.close("Game.exe", environment: [:]) }
         #expect(throws: UnityBottle.Refusal.self) { try bottle.harden() }
 
         let crossOver = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Application Support/CrossOver/Bottles")
         #expect(throws: UnityBottle.Refusal.self) { try UnityBottle(folder: crossOver, tools: Self.tools).checkOwnBottle() }
         #expect(throws: Never.self) { try UnityBottle(folder: base.appending(path: "Fresh"), tools: Self.tools).checkOwnBottle() }
+    }
+
+    /// A bottle of VNDegen's own whose C: drive or registry file links into another bottle is refused too, and so is
+    /// save sync's folder there.
+    @Test func refusesLinksOutOfTheBottle() throws {
+        let fm = FileManager.default
+        let base = try Self.scratch()
+        let theirs = base.appending(path: "Steam")
+        try fm.createDirectory(at: theirs.appending(path: "drive_c/users/crossover/AppData/LocalLow/Studio/Game"), withIntermediateDirectories: true)
+        try Data().write(to: theirs.appending(path: "user.reg"))
+        for part in ["drive_c", "user.reg"] {
+            let folder = base.appending(path: "Bottles-\(part)")
+            let bottle = UnityBottle(folder: folder, tools: Self.tools)
+            try fm.createDirectory(at: bottle.path, withIntermediateDirectories: true)
+            try fm.createSymbolicLink(at: bottle.path.appending(path: part), withDestinationURL: theirs.appending(path: part))
+            #expect(throws: UnityBottle.Refusal.self) { try bottle.checkOwnBottle() }
+            #expect(throws: UnityBottle.Refusal.self) { try bottle.installFonts(from: base) }
+            if part == "drive_c" {
+                let game = try UnityRouteTests.game()
+                defer { try? fm.removeItem(at: game) }
+                let data = game.appending(path: "data")
+                try UnityPlugin(bottles: folder).selectVariant("crossover", for: Game(id: GameID("g"), title: "G"), dataDirectory: data)
+                #expect(UnityPlugin(bottles: folder).saveLocations(folder: game, dataDirectory: data).isEmpty)
+            }
+        }
+        // A link inside that stays in the bottle is fine.
+        let folder = base.appending(path: "Bottles-ok")
+        let bottle = UnityBottle(folder: folder, tools: Self.tools)
+        try fm.createDirectory(at: bottle.path.appending(path: "real_c"), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(atPath: bottle.path.appending(path: "drive_c").path, withDestinationPath: "real_c")
+        #expect(throws: Never.self) { try bottle.checkOwnBottle() }
     }
 
     /// The user folders CrossOver links to the Mac's own become the bottle's, and only C: and Z: stay.
@@ -201,7 +232,7 @@ import VNCore
 
 @Suite struct UnityRouteTests {
     /// A folder with a Windows build and a Mac build beside it, as SiNiSistar 2 ships.
-    private static func game() throws -> URL {
+    static func game() throws -> URL {
         let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
         let fm = FileManager.default
         try fm.createDirectory(at: folder.appending(path: "WIN/Game_Data"), withIntermediateDirectories: true)

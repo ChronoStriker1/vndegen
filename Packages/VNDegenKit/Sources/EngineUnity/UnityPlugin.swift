@@ -77,7 +77,11 @@ nonisolated public struct UnityPlugin: EnginePlugin {
                 ?? support.appendingPathComponent(info.company, isDirectory: true).appendingPathComponent(info.product, isDirectory: true)
             return [SaveLocation(directory: directory) { info.relativePath($0, macBundle: bundle) }]
         case .crossOver:
-            let directory = UnityBottle(folder: bottles, tools: URL(fileURLWithPath: "/")).persistentData(info)
+            // Save sync reads and writes here, so it gets the same refusal as a launch: nothing in a bottle VNDegen
+            // didn't make, or through a link out of its own.
+            let bottle = UnityBottle(folder: bottles, tools: URL(fileURLWithPath: "/"))
+            let directory = bottle.persistentData(info)
+            guard (try? bottle.checkOwnBottle()) != nil, (try? bottle.checkInside(directory)) != nil else { return [] }
             return [SaveLocation(directory: directory) { info.relativePath($0) }]
         }
         #else

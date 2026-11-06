@@ -25,6 +25,16 @@ extension LudusaviStore {
         return nil
     }
 
+    /// True when the latest backup records registry data, whether or not its files can be read, as `latestRegistry`
+    /// would look for it.
+    static func recordsRegistry(_ mapping: LudusaviMapping) -> Bool {
+        guard let full = mapping.backups.last else { return false }
+        // A differential that drops the registry records none. One that names a hash records one, and so does a full
+        // backup with a hash, which a differential without an override inherits.
+        if let override = full.children.last?.registry { return override.hash != nil }
+        return full.registryHash != nil
+    }
+
     /// What a backup holds, read as Ludusavi reads it: the first of `registryFiles` that parses. Nil when none does, or
     /// the backup is a zip.
     static func registryData(_ stored: StoredRegistry, in gameDir: URL) -> RegistryData? {

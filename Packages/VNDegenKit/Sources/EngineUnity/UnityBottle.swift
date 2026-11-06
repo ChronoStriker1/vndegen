@@ -66,7 +66,8 @@ nonisolated struct UnityBottle: Equatable, Sendable {
     }
 
     /// Fails closed: the bottle must be `<folder>/VNDegen` after every link is followed, the folder must not be inside
-    /// CrossOver's own Application Support, and the bottle itself must not be a link.
+    /// CrossOver's own Application Support, the bottle itself must not be a link, and neither may the parts of it Wine
+    /// and VNDegen write: C:, the registry files and the drive folder.
     func checkOwnBottle() throws {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let crossOver = Self.resolved(home.appendingPathComponent("Library/Application Support/CrossOver", isDirectory: true))
@@ -75,6 +76,14 @@ nonisolated struct UnityBottle: Equatable, Sendable {
         guard !isLink, Self.resolved(path) == ownFolder + "/" + Self.name,
               ownFolder != crossOver, !ownFolder.hasPrefix(crossOver + "/")
         else { throw Refusal.outsideOwnFolder(path.path) }
+        for part in ["drive_c", "dosdevices", "system.reg", "user.reg", "userdef.reg", "cxbottle.conf"] {
+            try checkInside(path.appendingPathComponent(part))
+        }
+    }
+
+    /// Throws unless `url`, with every link followed, is inside the bottle.
+    func checkInside(_ url: URL) throws {
+        guard Self.resolved(url).hasPrefix(Self.resolved(path) + "/") else { throw Refusal.outsideOwnFolder(url.path) }
     }
 
     /// The path with every link followed, as far as it exists, then the parts that don't exist yet. POSIX `realpath`,
@@ -114,9 +123,10 @@ nonisolated struct UnityBottle: Equatable, Sendable {
     }
 
     /// Asks the game to close as its window's close button does. Wine's `taskkill` without `/f` posts `WM_CLOSE`, so
-    /// Unity quits normally and writes its PlayerPrefs.
-    func close(_ exeName: String, environment: [String: String]) throws -> Command {
-        try builtin(["taskkill", "/im", exeName], environment: environment)
+    /// Unity quits normally and writes its PlayerPrefs. With `force`, it ends the game's process. Either reaches only
+    /// processes of that exe, never another game running in the bottle.
+    func close(_ exeName: String, force: Bool = false, environment: [String: String]) throws -> Command {
+        try builtin(["taskkill"] + (force ? ["/f"] : []) + ["/im", exeName], environment: environment)
     }
 
     /// One of Wine's own programs, such as regedit, which aren't files in the bottle for `--cx-app` to find. With
@@ -129,12 +139,6 @@ nonisolated struct UnityBottle: Equatable, Sendable {
     /// A Mac path as Wine sees it on the Z: drive.
     static func windowsPath(_ url: URL) -> String {
         "Z:" + url.standardizedFileURL.path.replacingOccurrences(of: "/", with: "\\")
-    }
-
-    /// Stops every Wine process in this bottle. The `wine` script sets `WINEPREFIX` from the bottle path it was given,
-    /// and `command` passes no other, so this reaches VNDegen's bottle alone.
-    func killAll(environment: [String: String]) throws -> Command {
-        try command(.wine, ["--ux-app", "wineserver", "-k"], environment: environment)
     }
 
     /// Wine's regedit, importing `file` into the bottle.
@@ -165,6 +169,7 @@ nonisolated struct UnityBottle: Equatable, Sendable {
         let fm = FileManager.default
         let bottle = Self.resolved(path)
         for base in [userFolder, driveC.appendingPathComponent("users/Public", isDirectory: true)] {
+            try checkInside(base)
             for name in (try? fm.contentsOfDirectory(atPath: base.path)) ?? [] {
                 let item = base.appendingPathComponent(name)
                 guard let target = try? fm.destinationOfSymbolicLink(atPath: item.path) else { continue }
@@ -189,7 +194,9 @@ nonisolated struct UnityBottle: Equatable, Sendable {
         try checkOwnBottle()
         let fm = FileManager.default
         let fonts = driveC.appendingPathComponent("windows/Fonts", isDirectory: true)
+        try checkInside(fonts)
         try fm.createDirectory(at: fonts, withIntermediateDirectories: true)
+        try checkInside(fonts)
         let names = (try? fm.contentsOfDirectory(atPath: source.path)) ?? []
         for name in names.sorted() where Self.isCoreFont(name) {
             let target = fonts.appendingPathComponent(name)

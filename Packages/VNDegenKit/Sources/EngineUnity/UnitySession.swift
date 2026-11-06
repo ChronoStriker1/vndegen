@@ -226,8 +226,8 @@ final class UnityCrossOverSession: UnityExternalSession {
         return ours.first { ($0.localizedName ?? "").lowercased() == name } ?? ours.first
     }
 
-    /// Closes the game as its close button does, then stops every Wine process in the bottle if it's still running after
-    /// `quitTimeout`.
+    /// Closes the game as its close button does, then ends its process if it's still running after `quitTimeout`.
+    /// Both reach this game's exe alone, so another Unity game the player started meanwhile keeps running.
     override func stopGame() {
         guard let game, game.isRunning else { return }
         let exeName = exe.lastPathComponent, bottle = bottle, environment = environment
@@ -235,8 +235,8 @@ final class UnityCrossOverSession: UnityExternalSession {
             try? await Self.run(bottle.close(exeName, environment: environment), "closing the game")
             try? await Task.sleep(for: Self.quitTimeout)
             guard game.isRunning else { return }
-            unityLog.error("\(self.launch.game.id.rawValue, privacy: .public) didn't quit in time, stopping its bottle")
-            try? await Self.run(bottle.killAll(environment: environment), "stopping the bottle")
+            unityLog.error("\(self.launch.game.id.rawValue, privacy: .public) didn't quit in time, ending it")
+            try? await Self.run(bottle.close(exeName, force: true, environment: environment), "ending the game")
         }
     }
 
@@ -334,32 +334,45 @@ final class UnityMacAppSession: UnityExternalSession {
         configuration.activates = true
         let running = try await NSWorkspace.shared.openApplication(at: app, configuration: configuration)
         self.running = running
-        host.setMessage("\(launch.game.title) is running in its own Mac version.", showsGame: true)
         unityLog.info("opened \(self.app.lastPathComponent, privacy: .public), pid \(running.processIdentifier)")
-        guard !running.isTerminated else { return }
-        let center = NSWorkspace.shared.notificationCenter
-        let pid = running.processIdentifier
-        let stream = center.notifications(named: NSWorkspace.didTerminateApplicationNotification)
-        for await note in stream {
-            let ended = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            if ended?.processIdentifier == pid { break }
+        if ending {
+            // The hub ended the session while the app was opening, before `stopGame` could reach it.
+            stopGame()
+        } else {
+            host.setMessage("\(launch.game.title) is running in its own Mac version.", showsGame: true)
         }
+        await Self.waitForExit(of: running)
         unityLog.info("\(self.app.lastPathComponent, privacy: .public) quit")
     }
 
-    /// A Mac version unpacked from an archive made on Windows, such as SiNiSistar 2's zip, has lost its execute bits,
-    /// and macOS won't open it. The app's main executable gets them back, as an unzip on a Mac would have kept them.
-    /// The code signature doesn't cover file modes, so it stays valid.
-    static func makeRunnable(_ app: URL) throws {
-        let plist = app.appendingPathComponent("Contents/Info.plist")
-        guard let info = NSDictionary(contentsOf: plist), let name = info["CFBundleExecutable"] as? String,
-              !name.contains("/") else { return }
-        let executable = app.appendingPathComponent("Contents/MacOS", isDirectory: true).appendingPathComponent(name)
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: executable.path), !fm.isExecutableFile(atPath: executable.path) else { return }
-        let mode = (try fm.attributesOfItem(atPath: executable.path)[.posixPermissions] as? NSNumber)?.int16Value ?? 0o644
-        try fm.setAttributes([.posixPermissions: NSNumber(value: mode | 0o111)], ofItemAtPath: executable.path)
-        unityLog.info("made \(executable.lastPathComponent, privacy: .public) executable")
+    /// Returns once `app` has quit. The observer is in place before `isTerminated` is read, so a quit between the two
+    /// isn't missed.
+    private static func waitForExit(of app: NSRunningApplication) async {
+        let pid = app.processIdentifier
+        let center = NSWorkspace.shared.notificationCenter
+        let waiter = ExitWaiter()
+        let observer = center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { note in
+            let ended = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard ended?.processIdentifier == pid else { return }
+            MainActor.assumeIsolated { waiter.finish() }
+        }
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            waiter.continuation = done
+            if app.isTerminated || waiter.finished { waiter.finish() }
+        }
+        center.removeObserver(observer)
+    }
+
+    /// Resumes the wait once, whether the quit was seen before the wait began or after.
+    private final class ExitWaiter {
+        var continuation: CheckedContinuation<Void, Never>?
+        var finished = false
+
+        func finish() {
+            finished = true
+            continuation?.resume()
+            continuation = nil
+        }
     }
 
     override func showGame() {
@@ -377,6 +390,22 @@ final class UnityMacAppSession: UnityExternalSession {
             if !running.isTerminated { running.forceTerminate() }
         }
     }
+
+    /// A Mac version unpacked from an archive made on Windows, such as SiNiSistar 2's zip, has lost its execute bits,
+    /// and macOS won't open it. The app's main executable gets them back, as an unzip on a Mac would have kept them.
+    /// The code signature doesn't cover file modes, so it stays valid.
+    static func makeRunnable(_ app: URL) throws {
+        let plist = app.appendingPathComponent("Contents/Info.plist")
+        guard let info = NSDictionary(contentsOf: plist), let name = info["CFBundleExecutable"] as? String,
+              !name.contains("/") else { return }
+        let executable = app.appendingPathComponent("Contents/MacOS", isDirectory: true).appendingPathComponent(name)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: executable.path), !fm.isExecutableFile(atPath: executable.path) else { return }
+        let mode = (try fm.attributesOfItem(atPath: executable.path)[.posixPermissions] as? NSNumber)?.int16Value ?? 0o644
+        try fm.setAttributes([.posixPermissions: NSNumber(value: mode | 0o111)], ofItemAtPath: executable.path)
+        unityLog.info("made \(executable.lastPathComponent, privacy: .public) executable")
+    }
+
 }
 
 /// What the hub window shows while its game runs in its own window: a line saying so and a button that brings the game
