@@ -307,10 +307,18 @@ void Engine::endStory(const std::string &screen) {
     waiting_ = Waiting::None;
     saveSeen();
     saveGlobals();
-    returnTo_ = screen == "scene" ? "title" : "";
+    // A replay started from the CG viewer comes back to it, at the picture it left.
+    bool toViewer = replayFromViewer_ && screen == "scene";
+    replayFromViewer_ = false;
+    std::string to = toViewer ? "cg" : screen;
+    returnTo_ = to == "scene" || to == "cg" ? "title" : "";
     screen_ = nullptr;
-    openScreen(screen);
-    if (screen == "scene") returnTo_ = "title";
+    openScreen(to);
+    if (to == "scene" || to == "cg") returnTo_ = "title";
+    if (toViewer && viewEntry_ < cgEntries_.size() && viewImage_ < cgEntries_[viewEntry_].images.size()) {
+        closeViewer();
+        viewerShow(viewEntry_, viewImage_);
+    }
 }
 
 void Engine::startStory() {
@@ -721,7 +729,7 @@ void Engine::loadGalleries() {
         }
         return out;
     };
-    // `#p page thumbnail 0 bgm [flow]`, then `0,n,picture` lines, then `##`.
+    // `#p page thumbnail 0 bgm flow`, then `0,n,picture` lines, then `##`.
     for (const std::string &line : lines("cfg\\cg_view.ini")) {
         auto f = fields(line);
         if (f.empty()) continue;
@@ -730,6 +738,7 @@ void Engine::loadGalleries() {
             e.page = std::atoi(f[1].c_str());
             e.thumbnail = f[2];
             if (f.size() > 4) e.bgm = f[4];
+            if (f.size() > 5) e.flow = f[5];  // the replay of the scene it's from
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
@@ -934,6 +943,7 @@ void Engine::composeGallery(Canvas &out) {
     if (viewingImage_) {
         out.clear();
         if (ImageRef image = images_->get(viewing_[viewingIndex_])) drawImage(out, *image, out.w * 0.5f, out.h * 0.5f, float(out.w) / float(image->w), float(out.w) / float(image->w), 0, 1);
+        composeViewer(out);
         return;
     }
     if (screen_->name != "cg" && screen_->name != "scene") return;
@@ -985,17 +995,23 @@ void Engine::composeGallery(Canvas &out) {
             }
         const auto *counts = screen_->setting("cellcount");
         if (unlocked && counts && counts->size() >= 6 && screen_->name == "cg") {
-            ImageRef sheetOfTen = images_->get((*counts)[0]), slash = images_->get((*counts)[1]);
+            // `cellcount DIGITS SLASH X Y SLASHX TOTALX [SLASHY] [CELLS]`. A SLASH of `-` is the digit sheet's cell after 9, as
+            // in Test Game 84, whose sheet of CELLS also holds a colon.
+            bool slashInSheet = (*counts)[1] == "-";
+            ImageRef sheetOfTen = images_->get((*counts)[0]), slash = slashInSheet ? nullptr : images_->get((*counts)[1]);
             const auto &pictures = entries[entry].images;
             int have = int(std::count_if(pictures.begin(), pictures.end(), [&](const std::string &p) { return seen(p); })), all = int(pictures.size());
-            if (sheetOfTen && slash) {
-                int w = sheetOfTen->w / 10, x = cx + field(*counts, 2), y = cy + field(*counts, 3);
+            if (sheetOfTen && (slash || slashInSheet)) {
+                int cells = slashInSheet && counts->size() >= 8 ? std::max(11, field(*counts, 7)) : slashInSheet ? 11 : 10;
+                int w = sheetOfTen->w / cells, x = cx + field(*counts, 2), y = cy + field(*counts, 3);
                 auto two = [&](int value, int at) {
                     drawPart(out, *sheetOfTen, at, y, value / 10 % 10 * w, 0, w, sheetOfTen->h, 1);
                     drawPart(out, *sheetOfTen, at + w, y, value % 10 * w, 0, w, sheetOfTen->h, 1);
                 };
                 two(have, x);
-                drawPart(out, *slash, cx + field(*counts, 4), y + (counts->size() >= 7 ? field(*counts, 6) : -1), 0, 0, slash->w, slash->h, 1);
+                int slashY = y + (counts->size() >= 7 ? field(*counts, 6) : slashInSheet ? 0 : -1);
+                if (slashInSheet) drawPart(out, *sheetOfTen, cx + field(*counts, 4), slashY, 10 * w, 0, w, sheetOfTen->h, 1);
+                else drawPart(out, *slash, cx + field(*counts, 4), slashY, 0, 0, slash->w, slash->h, 1);
                 two(all, cx + field(*counts, 5));
             }
         }
@@ -1008,6 +1024,17 @@ void Engine::openGalleryCell(int index) {
     size_t entry = size_t(found);
     if (screen_->name == "cg") {
         if (entry >= cgEntries_.size()) return;
+        if (viewerPanel()) {
+            const auto &images = cgEntries_[entry].images;
+            for (size_t i = 0; i < images.size(); i++)
+                if (seen(images[i])) {
+                    viewPanelHidden_ = false;
+                    viewAuto_ = false;
+                    viewerShow(entry, i);
+                    return;
+                }
+            return;
+        }
         viewing_.clear();
         for (const std::string &p : cgEntries_[entry].images)
             if (seen(p)) viewing_.push_back(p);
@@ -1016,27 +1043,199 @@ void Engine::openGalleryCell(int index) {
         viewingImage_ = true;
         dirty_ = true;
     } else if (entry < sceneEntries_.size() && seen(sceneEntries_[entry].key)) {
-        stopTrack();
-        // A replay runs its own flow, and ending it comes back here.
-        auto flow = loadScript(sceneEntries_[entry].flow);
-        if (!flow || !flow->first()) return;
-        if (titleMusic_) {
-            audio_.fade(titleMusic_, 500, 0, true);
-            audio_.retire(titleMusic_);
-            titleMusic_ = 0;
+        startReplay(sceneEntries_[entry]);
+    }
+}
+
+void Engine::startReplay(const GalleryEntry &scene) {
+    // A replay runs its own flow, and ending it comes back to the gallery it started from.
+    auto flow = loadScript(scene.flow);
+    if (!flow || !flow->first()) return;
+    stopTrack();
+    if (titleMusic_) {
+        audio_.fade(titleMusic_, 500, 0, true);
+        audio_.retire(titleMusic_);
+        titleMusic_ = 0;
+    }
+    screen_ = nullptr;
+    viewingImage_ = false;
+    viewAuto_ = false;
+    stack_.clear();
+    scene_ = {};
+    back_.clear();
+    front_.clear();
+    // A new run has no scene of its own yet, so a save before its first names none.
+    lastScene_.clear();
+    flowCallId_ = 0;
+    stack_.push_back({flow, flow->first()});
+    replaying_ = true;
+    waiting_ = Waiting::None;
+    dirty_ = true;
+}
+
+// MARK: CG viewer
+
+// Test Game 84's viewer, measured under Wine: the panel's buttons step through the pictures of an entry and wrap,
+// step between entries with a picture unlocked, across the gallery's tabs and wrapping at the ends, and Auto moves to the
+// next unlocked picture every 8 seconds. A right click hides or shows the panel, and a click on the picture does nothing.
+bool Engine::viewerPanel() const { return screen_ && screen_->name == "cg" && screen_->setting("viewer"); }
+
+void Engine::viewerShow(size_t entry, size_t image) {
+    viewEntry_ = entry;
+    viewImage_ = image;
+    viewAutoFrom_ = screenMs_;
+    viewing_ = {cgEntries_[entry].images[image]};
+    viewingIndex_ = 0;
+    viewingImage_ = true;
+    dirty_ = true;
+}
+
+void Engine::viewerVariant(int direction) {
+    const auto &images = cgEntries_[viewEntry_].images;
+    int n = int(images.size());
+    for (int k = 1; k < n; k++) {
+        int i = ((int(viewImage_) + direction * k) % n + n) % n;
+        if (seen(images[size_t(i)])) {
+            viewerShow(viewEntry_, size_t(i));
+            return;
         }
-        screen_ = nullptr;
-        stack_.clear();
-        scene_ = {};
-        back_.clear();
-        front_.clear();
-        // A new run has no scene of its own yet, so a save before its first names none.
-        lastScene_.clear();
-        flowCallId_ = 0;
-        stack_.push_back({flow, flow->first()});
-        replaying_ = true;
-        waiting_ = Waiting::None;
+    }
+}
+
+void Engine::viewerCg(int direction) {
+    int n = int(cgEntries_.size());
+    for (int k = 1; k <= n; k++) {
+        size_t e = size_t(((int(viewEntry_) + direction * k) % n + n) % n);
+        const auto &images = cgEntries_[e].images;
+        int first = -1, last = -1;
+        for (int i = 0; i < int(images.size()); i++)
+            if (seen(images[size_t(i)])) {
+                if (first < 0) first = i;
+                last = i;
+            }
+        if (first < 0) continue;
+        // Going back into another tab lands on that entry's last picture, and within a tab on its first.
+        bool fromEnd = direction < 0 && cgEntries_[e].page != cgEntries_[viewEntry_].page;
+        viewerShow(e, size_t(fromEnd ? last : first));
+        return;
+    }
+}
+
+void Engine::viewerAdvance() {
+    const auto &images = cgEntries_[viewEntry_].images;
+    for (size_t i = viewImage_ + 1; i < images.size(); i++)
+        if (seen(images[i])) {
+            viewerShow(viewEntry_, i);
+            return;
+        }
+    viewerCg(1);
+    viewAutoFrom_ = screenMs_;
+}
+
+// Return goes back to the gallery at the tab and page of the picture shown.
+void Engine::closeViewer() {
+    viewingImage_ = false;
+    viewAuto_ = false;
+    const GalleryEntry &e = cgEntries_[viewEntry_];
+    if (screen_ && screen_->settings.count("gallerytabs")) {
+        galleryTab_ = e.page;
+        int before = int(std::count_if(cgEntries_.begin(), cgEntries_.begin() + std::ptrdiff_t(viewEntry_), [&](const GalleryEntry &o) { return o.page == e.page; }));
+        page_ = before / std::max(1, int(screen_->settings.count("cell")));
+    }
+    dirty_ = true;
+}
+
+// Replay the scene shows only while that scene is unlocked in the Scene gallery.
+const Engine::GalleryEntry *Engine::viewerScene() const {
+    const std::string &flow = cgEntries_[viewEntry_].flow;
+    if (flow.empty()) return nullptr;
+    for (const GalleryEntry &scene : sceneEntries_)
+        if (normalizedPath(scene.flow) == normalizedPath(flow) && seen(scene.key)) return &scene;
+    return nullptr;
+}
+
+// `viewer PANEL X Y`, `viewerbutton ACTION SHEET X Y` with five rows to a sheet, `viewerdigits SHEET X Y STEP SLASHX
+// SLASHY TOTALX TOTALY` with 0 to 9 and a slash, and `viewerauto EVERY FILL` in ms.
+void Engine::composeViewer(Canvas &out) {
+    if (!viewerPanel() || viewPanelHidden_) return;
+    const auto *panel = screen_->setting("viewer");
+    if (ImageRef art = panel->size() >= 3 ? images_->get((*panel)[0]) : nullptr) drawPart(out, *art, field(*panel, 1), field(*panel, 2), 0, 0, art->w, art->h, 1);
+    for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it) {
+        const auto &f = it->second;
+        ImageRef sheet = f.size() >= 4 ? images_->get(f[1]) : nullptr;
+        if (!sheet || (f[0] == "replay" && !viewerScene())) continue;
+        int x = field(f, 2), y = field(f, 3), w = sheet->w, h = sheet->h / 5;
+        bool over = pointerSeen_ && inRect(pointerX_, pointerY_, x, y, w, h);
+        if (f[0] != "auto" || !viewAuto_) {
+            drawPart(out, *sheet, x, y, 0, over ? h : 0, w, h, 1);
+            continue;
+        }
+        // While Auto runs, its button fills from the right with the selected look as the next picture nears. The rest is
+        // the hovered look tinted toward red, 100 of 256.
+        const auto *timing = screen_->setting("viewerauto");
+        int fillMs = timing && timing->size() >= 2 ? std::max(1, field(*timing, 1)) : 7200;
+        int left = w, right = 0;
+        for (int cx = 0; cx < w; cx++)
+            for (int cy = 0; cy < h; cy++)
+                if (sheet->rgba[(size_t(2 * h + cy) * size_t(w) + size_t(cx)) * 4 + 3] >= 250) {  // the button's face, not its soft edge
+                    left = std::min(left, cx);
+                    right = std::max(right, cx + 1);
+                    break;
+                }
+        float done = std::clamp(float(screenMs_ - viewAutoFrom_) / float(fillMs), 0.0f, 1.0f);
+        int split = std::max(0, right - int(float(right - left) * done + 0.5f));
+        drawPart(out, *sheet, x, y, 0, 3 * h, split, h, 1);
+        for (int cy = 0; cy < h && y + cy < out.h; cy++)
+            for (int cx = 0; cx < split && x + cx < out.w; cx++) {
+                int a = sheet->rgba[(size_t(3 * h + cy) * size_t(w) + size_t(cx)) * 4 + 3];
+                if (!a || x + cx < 0 || y + cy < 0) continue;
+                uint8_t *d = &out.px[(size_t(y + cy) * size_t(out.w) + size_t(x + cx)) * 4];
+                int k = 100 * a / 255;
+                d[0] = uint8_t(d[0] + ((255 - d[0]) * k >> 8));
+                d[1] = uint8_t(d[1] - (d[1] * k >> 8));
+                d[2] = uint8_t(d[2] - (d[2] * k >> 8));
+            }
+        drawPart(out, *sheet, x + split, y, split, 2 * h, w - split, h, 1);
+    }
+    const auto *digits = screen_->setting("viewerdigits");
+    ImageRef sheet = digits && digits->size() >= 8 ? images_->get((*digits)[0]) : nullptr;
+    if (!sheet) return;
+    int cw = sheet->w / 11, step = field(*digits, 3);
+    auto two = [&](int value, int x, int y) {
+        drawPart(out, *sheet, x, y, value / 10 % 10 * cw, 0, cw, sheet->h, 1);
+        drawPart(out, *sheet, x + step, y, value % 10 * cw, 0, cw, sheet->h, 1);
+    };
+    two(int(viewImage_) + 1, field(*digits, 1), field(*digits, 2));
+    drawPart(out, *sheet, field(*digits, 4), field(*digits, 5), 10 * cw, 0, cw, sheet->h, 1);
+    two(int(cgEntries_[viewEntry_].images.size()), field(*digits, 6), field(*digits, 7));
+}
+
+void Engine::pressViewer(int x, int y) {
+    if (viewPanelHidden_) return;
+    for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it) {
+        const auto &f = it->second;
+        ImageRef sheet = f.size() >= 4 ? images_->get(f[1]) : nullptr;
+        if (!sheet || !inRect(x, y, field(f, 2), field(f, 3), sheet->w, sheet->h / 5)) continue;
+        const std::string &action = f[0];
+        if (action == "replay") {
+            if (const GalleryEntry *scene = viewerScene()) {
+                replayFromViewer_ = true;
+                startReplay(*scene);
+            }
+        } else if (action == "prevcg" || action == "nextcg") {
+            viewerCg(action == "nextcg" ? 1 : -1);
+        } else if (action == "prevvar" || action == "nextvar") {
+            viewerVariant(action == "nextvar" ? 1 : -1);
+        } else if (action == "auto") {
+            viewAuto_ = !viewAuto_;
+            viewAutoFrom_ = screenMs_;
+        } else if (action == "return") {
+            closeViewer();
+        } else if (action == "hide") {
+            viewPanelHidden_ = true;
+        }
         dirty_ = true;
+        return;
     }
 }
 
@@ -2468,6 +2667,11 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         if (openingFrom_ >= 0) dirty_ = true;
+        if (viewingImage_ && viewAuto_ && viewerPanel()) {
+            dirty_ = true;
+            const auto *timing = screen_->setting("viewerauto");
+            if (screenMs_ - viewAutoFrom_ >= (timing && !timing->empty() ? field(*timing, 0) : 8000)) viewerAdvance();
+        }
     }
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
@@ -2565,6 +2769,9 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
         } else if (logOpen_) {
             closeLog();
+        } else if (screen_ && viewingImage_ && viewerPanel()) {
+            viewPanelHidden_ = !viewPanelHidden_;
+            dirty_ = true;
         } else if (screen_) {
             // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
             if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
@@ -2604,6 +2811,10 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (screen_) {
+        if (viewingImage_ && viewerPanel()) {
+            pressViewer(pointerX_, pointerY_);
+            return;
+        }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
             if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);

@@ -246,6 +246,22 @@ private:
     size_t viewingIndex_ = 0;
     bool viewingImage_ = false;
     bool replaying_ = false;
+    // Test Game 84's CG viewer panel, from the cg screen's `viewer` lines: the entry and picture shown, counted among all
+    // of the entry's pictures, whether the player has hidden the panel, and Auto. A replay started from it comes back to it.
+    size_t viewEntry_ = 0, viewImage_ = 0;
+    bool viewPanelHidden_ = false, viewAuto_ = false;
+    int64_t viewAutoFrom_ = 0;
+    bool replayFromViewer_ = false;
+    bool viewerPanel() const;
+    void viewerShow(size_t entry, size_t image);
+    void viewerVariant(int direction);
+    void viewerCg(int direction);
+    void viewerAdvance();
+    void closeViewer();
+    const GalleryEntry *viewerScene() const;
+    void composeViewer(Canvas &out);
+    void pressViewer(int x, int y);
+    void startReplay(const GalleryEntry &scene);
     int trackPlayer_ = 0;
 
     // Settings, by the names the menu tables use, kept in a small file of VNDegen's beside the saves.

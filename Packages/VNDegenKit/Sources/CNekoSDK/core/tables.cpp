@@ -1740,7 +1740,9 @@ cellcard obj\f002_000.bmp
 cellempty obj\d003_000.bmp -2 -2
 cellframe obj\d021_000.bmp 7 18
 cellsize 159 135
-cellthumb 9 20
+cellthumb 9 30
+cellhide
+cellcount obj\d008_000.bmp - 120 119 132 138 0 12
 cell 44 93
 cell 206 93
 cell 368 93
@@ -1750,7 +1752,18 @@ cell 64 233
 cell 226 233
 cell 388 233
 cell 550 233
-celldigits obj\d005_000.bmp 15 6 3 7
+cell 712 233
+cell 84 373
+cell 246 373
+cell 408 373
+cell 570 373
+cell 732 373
+cell 104 513
+cell 266 513
+cell 428 513
+cell 590 513
+cell 752 513
+celldigits obj\d005_000.bmp 8 11 3 7
 gallerytabs
 pagelift 8
 button page0 obj\d009_000.bmp 369 47 11 5 0
@@ -1774,6 +1787,17 @@ button nav_config obj\c010_020.bmp 1022 265 10 5 5
 button nav_title obj\c010_020.bmp 1017 301 10 5 7
 button nav_quit obj\c010_020.bmp 1012 337 10 5 8
 button back obj\c010_020.bmp 978 629 10 5 9
+viewer obj\n000_000.bmp 627 594
+viewerbutton replay obj\n001_003.bmp 645 658
+viewerbutton prevcg obj\n001_004.bmp 717 658
+viewerbutton prevvar obj\n001_005.bmp 781 658
+viewerbutton nextvar obj\n001_006.bmp 947 658
+viewerbutton nextcg obj\n001_007.bmp 1013 658
+viewerbutton auto obj\n001_008.bmp 1081 658
+viewerbutton return obj\n001_009.bmp 1151 658
+viewerbutton hide obj\n001_010.bmp 1225 604
+viewerdigits obj\n003_000.bmp 854 643 17 884 653 896 663
+viewerauto 8000 7200
 
 screen scene
 pic obj\g001_000.bmp 0 0
@@ -1781,7 +1805,8 @@ cellcard obj\g002_000.bmp
 cellempty obj\d003_000.bmp -2 -2
 cellframe obj\d021_000.bmp 7 18
 cellsize 159 135
-cellthumb 9 20
+cellthumb 9 30
+cellhide
 cell 44 93
 cell 206 93
 cell 368 93
@@ -1791,7 +1816,18 @@ cell 64 233
 cell 226 233
 cell 388 233
 cell 550 233
-celldigits obj\d005_000.bmp 15 6 3 7
+cell 712 233
+cell 84 373
+cell 246 373
+cell 408 373
+cell 570 373
+cell 732 373
+cell 104 513
+cell 266 513
+cell 428 513
+cell 590 513
+cell 752 513
+celldigits obj\d005_000.bmp 8 11 3 7
 gallerytabs
 pagelift 8
 button page0 obj\d009_000.bmp 369 47 11 5 0

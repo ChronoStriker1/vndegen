@@ -141,6 +141,10 @@ Once the opening ends, the title is three layers: the background at 0, 0, and th
 
 A replay from the Scene gallery uses the bar `MsgButtonPlayViewDeclFilename` names in `init.ini`, `cfg\msg_button_playview.ini`, in place of the usual one. In every game seen it differs only in Exit's help picture, which says the gallery ends rather than the game. Under Wine, Test Game 84's Exit in a replay goes straight back to the Scene Library, with no question.
 
+## Test Game 84's CG viewer
+
+Measured under Wine. A picture opens with a panel over its bottom right: Replay the scene, previous and next CG, previous and next variant, a count, Auto, Return, and a button that hides the panel. A right click hides or shows it, and a click on the picture does nothing. The count is the picture's place among all of its entry's pictures, locked ones too. The variant buttons step through the entry's unlocked pictures and wrap. The CG buttons step between entries with a picture unlocked, across the gallery's tabs and wrapping at the ends. Next lands on an entry's first unlocked picture, and so does Previous within a tab, but Previous into another tab lands on its last, in all five cases tried. Auto moves to the next unlocked picture every 8 seconds, and its button fills from the right over 7.2 seconds with its selected look, the rest being its hovered look tinted 100 of 256 toward red. Replay shows only while the picture's scene is unlocked in the Scene gallery, and leaving the replay comes back to the viewer at that picture. Return goes to the gallery's tab and page for the picture. The gallery itself has 20 cards to a page, each unlocked one with a count of its pictures, and none past a tab's last entry.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.

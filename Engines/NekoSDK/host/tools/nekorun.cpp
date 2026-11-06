@@ -1,7 +1,7 @@
 // Runs a game headless: steps the clock, clicks through text, writes a PNG of chosen moments, and renders the sound.
 // usage: nekorun <game folder> [--out dir] [--every n] [--click ms] [--max ms] [--dt ms] [--jump script node]
 //                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
-//                [--slow ms] [--script file]: lines of `ms click x y`, `ms move x y` or `ms shot name`, with x and y in canvas pixels
+//                [--slow ms] [--script file]: lines of `ms click x y`, `ms rclick x y`, `ms move x y` or `ms shot name`, with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
 #include <chrono>
@@ -146,9 +146,10 @@ int main(int argc, char **argv) {
                 writePng(out + "/" + s.name, now, w, h);
             } else {
                 vnneko_mouse_move(e, float(s.x + 0.5) / float(w), float(s.y + 0.5) / float(h));
-                if (s.what == "click") {
-                    vnneko_mouse_button(e, 0, true);
-                    vnneko_mouse_button(e, 0, false);
+                if (s.what == "click" || s.what == "rclick") {
+                    int button = s.what == "rclick" ? 1 : 0;
+                    vnneko_mouse_button(e, button, true);
+                    vnneko_mouse_button(e, button, false);
                 }
             }
         }
