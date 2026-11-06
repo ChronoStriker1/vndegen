@@ -680,6 +680,45 @@ static void saveFormats() {
     }
 }
 
+// After the third review round: a save inside a user command called after another command without a colon loads with
+// its arguments, and a line of ruby alone ends its line.
+static void reviewRound3Followups() {
+    char temp[] = "/tmp/vnns-ponscripter-round3b-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directories(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    std::ofstream(dir / "0.utf") << "*define\ndefsub foo\ngame\n*start\nmov %8,8 foo 7 mov %9,9\nclick\nend\n"
+                                    "*foo\nsaveon\nsavegame 1\nclick\ngetparam %1\nreturn\n";
+    auto run = [&](bool load) {
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 5; i++) engine.step(16);
+        assert(engine.wait_ == vnns::WaitKind::Click);
+        if (load) {
+            assert(engine.loadGame(1));
+            for (int i = 0; i < 5; i++) engine.step(16);
+        }
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+        for (int i = 0; i < 5; i++) engine.step(16);
+        assert(engine.getNumVar(1) == 7 && engine.getNumVar(9) == 9);
+    };
+    run(false);
+    run(true);
+    std::ofstream(dir / "0.utf") << "*define\ngame\n*start\nrubyon\nlangen(/r)\nlangen^b^@\nend\n";
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    for (int i = 0; i < 30; i++) engine.step(16);
+    int rubyY = -1, bY = -1;
+    for (const vnns::TextChar &c : engine.page_) (c.ruby ? rubyY : bY) = c.ruby ? c.y : c.y2;
+    assert(rubyY >= 0 && bY > 2 * rubyY + 2 * engine.win_.fh);  // b on the next line
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -693,4 +732,5 @@ int main() {
     savepoints();
     brokenFonts();
     saveFormats();
+    reviewRound3Followups();
 }

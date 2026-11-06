@@ -489,19 +489,53 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                 }
             } restore{*this, cur_};
             cur_ = Cursor{stmtStart, f.line, f.stmt};
+            // The call's arguments start after the spaces that follow its name; getparam moved past some.
+            auto userCommand = [&]() {
+                f.hasParams = cur_.pos <= f.pos;
+                skipSpaces();
+                f.paramsRead = f.hasParams && f.pos > cur_.pos;
+            };
+            bool found = false;
             for (;;) {
                 std::string word = readWord();
                 bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
                 std::string name = builtin ? word.substr(1) : word;
                 if (!builtin && defsubs_.count(name)) {
-                    f.hasParams = cur_.pos <= f.pos;
-                    // The call's arguments start after the spaces that follow its name; getparam moved past some.
-                    skipSpaces();
-                    f.paramsRead = f.hasParams && f.pos > cur_.pos;
+                    userCommand();
+                    found = true;
                     break;
                 }
                 if (name != "if" && name != "notif") break;
                 readCondition();
+            }
+            // In Ponscripter a word after a command's arguments starts the next command, without a colon, so the user
+            // command may stand later: the last of its names before the return position, outside strings and not a
+            // variable's or label's name.
+            if (!found && ponscripter_) {
+                size_t call = std::string::npos;
+                char quote = 0;
+                for (size_t p = stmtStart; p < f.pos;) {
+                    char c = t[p];
+                    if (quote || c == '"' || c == '`') {
+                        quote = quote ? (c == quote ? 0 : quote) : c;
+                        p += charLen(t, p);
+                        continue;
+                    }
+                    if (!(isalpha(uint8_t(c)) || c == '_')) {
+                        p += charLen(t, p);
+                        continue;
+                    }
+                    char before = p > stmtStart ? t[p - 1] : ' ';
+                    cur_.pos = p;
+                    std::string word = readWord();
+                    size_t end = std::max(cur_.pos, p + 1);
+                    if ((before == ' ' || before == '\t') && end <= f.pos && defsubs_.count(word)) call = end;
+                    p = end;
+                }
+                if (call != std::string::npos) {
+                    cur_.pos = call;
+                    userCommand();
+                }
             }
         }
     }

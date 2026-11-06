@@ -592,6 +592,7 @@ void Engine::textStep() {
                 rc.h = rubyH_;
                 rc.ruby = true;
                 page_.push_back(rc);
+                if (ponscripter_) lineHadText_ = true;  // drawn, so the line ends on screen
                 rx += rubyW_;
                 i += n;
             }
