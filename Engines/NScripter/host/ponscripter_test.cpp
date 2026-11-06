@@ -932,7 +932,7 @@ static void reviewLanding4Round3() {
     {
         std::ofstream(dir / "0.utf") << "*define\ngame\n*start\nmov %1,1\nsavegame 1\nmov %1,2\nclick\nend\n";
         fs::remove_all(dir / "vndegen-saves");
-        fs::create_directories(record);  // a folder where the record would go
+        fs::create_directories(fs::path(record.string() + ".new"));  // a folder where the record would go
         vnns::Engine engine({root, root});
         std::string error;
         assert(engine.start(&error));
@@ -940,6 +940,13 @@ static void reviewLanding4Round3() {
         assert(engine.wait_ == vnns::WaitKind::Click && !fs::exists(dir / "vndegen-saves" / "save1.dat"));
         assert(!engine.saveGame(2, "") || fs::exists(dir / "vndegen-saves" / "save2.dat.calls"));
     }
+    // A plain gosub after a user command that has returned, on a line inside another user command's routine: the save
+    // inside the gosub's routine loads as it ran, without the record too.
+    std::string gosubAfter = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 7 mov %9,9" + tail +
+                             "*foo\nmov %8,8 bar 1 gosub *sub\nreturn\n*bar\ngetparam %2\nreturn\n"
+                             "*sub\nsaveon\nsavegame 1\nclick\ngetparam %1\nreturn\n";
+    auto straight = run(gosubAfter, 0);
+    assert(straight.first == 7 && straight.second == 9 && run(gosubAfter, 1) == straight && run(gosubAfter, 2) == straight);
     fs::remove_all(dir);
 }
 
@@ -1020,6 +1027,37 @@ static void importPcSaves() {
     put(own / "global.sav", "my globals");
     start();
     assert(read(own / "global.sav") == "my globals" && read(own / "SAVE1.DAT") == pcSave);
+    assert(snapshot(pc) == before);
+    // A link to nowhere of a file's name is VNDegen's file: it isn't replaced.
+    fs::remove_all(own);
+    fs::create_directories(own);
+    fs::create_symlink("missing-global", own / "GLOBAL.SAV");
+    start();
+    assert(fs::is_symlink(own / "GLOBAL.SAV") && !fs::exists(own / "global.sav") && read(own / "SAVE1.DAT") == pcSave);
+    // VNDegen's folder as a link into the PC's saves: nothing is written there.
+    fs::remove_all(own);
+    fs::create_directories(pc / "child");
+    fs::create_directory_symlink(pc / "child", own);
+    start();
+    assert(fs::is_empty(pc / "child"));
+    fs::remove(own);
+    fs::remove(pc / "child");
+    before = snapshot(pc);
+    // A VNDegen folder that can't be listed stops it, as a slot in it would.
+    fs::create_directories(own);
+    put(own / "save99.dat", "mine");
+    fs::permissions(own, fs::perms::owner_write | fs::perms::owner_exec);
+    start();
+    fs::permissions(own, fs::perms::owner_all);
+    assert(snapshot(own).size() == 1);
+    // A PC file that can't be read now: nothing is copied and no note left, so a later run copies them all.
+    fs::remove_all(own);
+    fs::permissions(pc / "save12.dat", fs::perms::none);
+    start();
+    fs::permissions(pc / "save12.dat", fs::perms::owner_read | fs::perms::owner_write);
+    assert(!fs::exists(own) || snapshot(own).empty());
+    start();
+    assert(read(own / "save12.dat") == "twelve" && read(own / "SAVE1.DAT") == pcSave);
     assert(snapshot(pc) == before);
     fs::remove_all(dir);
 }

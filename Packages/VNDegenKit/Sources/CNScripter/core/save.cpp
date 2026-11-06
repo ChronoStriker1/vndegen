@@ -5,7 +5,9 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
+#include <climits>
 #include <cstring>
 #include <ctime>
 #include <exception>
@@ -367,7 +369,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         x.pnsWindow = r.i();
         win_.px = halved(r.i());
         win_.py = halved(r.i());
-        int64_t cell = 2 * (int64_t(win_.fw) + 2 * int64_t(win_.px)), line = 2 * (int64_t(win_.fh) + 2 * int64_t(win_.py));
+        int64_t cell = 2 * (int64_t(win_.fw) + 2 * int64_t(win_.px));
+        int64_t line = 2 * (int64_t(win_.fh) + 2 * int64_t(win_.py));
         win_.cols = cell > 0 ? clampInt(width / cell) : 0;
         win_.rows = line > 0 ? clampInt(height / line) : 0;
     } else {
@@ -634,7 +637,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
             // innermost), else the statement's head as NScripter reads it, else the last.
             if (ponscripter_) {
                 std::string callee(script_.labelAt(innerLine));
-                size_t last = std::string::npos, named = std::string::npos;
+                size_t last = std::string::npos, named = std::string::npos, lastGosub = std::string::npos;
                 char quote = 0;
                 for (size_t p = stmtStart; p < f.pos;) {
                     char c = t[p];
@@ -655,10 +658,14 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                         last = end;
                         if (word == callee && named == std::string::npos) named = end;
                     }
+                    if (end <= f.pos && (word == "gosub" || word == "_gosub")) lastGosub = end;
                     p = end;
                 }
                 if (named != std::string::npos) call = named;
                 else if (call == std::string::npos) call = last;
+                // A gosub after the user command's name made the call: the frame is that gosub's, with no arguments.
+                if (lastGosub != std::string::npos && (call == std::string::npos || lastGosub > call))
+                    call = std::string::npos;
             }
             if (call != std::string::npos) {
                 cur_.pos = call;
@@ -792,23 +799,29 @@ bool Engine::saveGame(int slot, const std::string &note) {
         data.push_back('*');
     }
     std::string path = savePath(slot);
-    // A Ponscripter save's call record goes first: if it can't be written, the save fails and the slot keeps its
-    // previous save, whose own record then no longer matches and is ignored.
+    // A Ponscripter save's call record is written first, beside the old one: if it can't be, the save fails. It takes
+    // the old one's place only once the save is written, so a save that fails leaves the slot's save and record as
+    // they were.
+    std::string record = path + ".calls", pending = record + ".new";
     if (ponscripter_) {
         std::vector<uint8_t> flags = savepointLive_ ? callFlags() : savepointCalls_;
-        Bytes record = {'V', 'N', 'D', 'C', 'A', 'L', 'L', 'S'};
+        Bytes bytes = {'V', 'N', 'D', 'C', 'A', 'L', 'L', 'S'};
         uint64_t h = fnv1a(data);
-        for (int k = 0; k < 8; k++) record.push_back(uint8_t(h >> (8 * k)));
-        record.insert(record.end(), flags.begin(), flags.end());
-        if (!fs_.write(path + ".calls", record.data(), record.size())) {
-            logf("could not write %s.calls", path.c_str());
+        for (int k = 0; k < 8; k++) bytes.push_back(uint8_t(h >> (8 * k)));
+        bytes.insert(bytes.end(), flags.begin(), flags.end());
+        if (!fs_.write(pending, bytes.data(), bytes.size())) {
+            logf("could not write %s", pending.c_str());
             return false;
         }
     }
     if (!fs_.write(path, data.data(), data.size())) {
         logf("could not write %s", path.c_str());
+        if (ponscripter_) remove(pending.c_str());
         return false;
     }
+    // If the record can't take its place, it stays as .new, where a load finds it too.
+    if (ponscripter_ && rename(pending.c_str(), record.c_str()) != 0)
+        logf("could not move %s into place", pending.c_str());
     saveSystemData();
     return true;
 }
@@ -831,9 +844,12 @@ bool Engine::loadGame(int slot) {
     auto fileLog = fileLog_;  // images loaded on the way count as seen
     auto fileLogOrder = fileLogOrder_;
     loadedCalls_.clear();
-    Bytes record;
-    if (ponscripter_ && readFile(savePath(slot) + ".calls", record) && record.size() >= 16 &&
-        memcmp(record.data(), "VNDCALLS", 8) == 0) {
+    // The save's call record: the one in place, or one a save left beside it.
+    for (const char *suffix : {".calls", ".calls.new"}) {
+        Bytes record;
+        if (!ponscripter_ || !loadedCalls_.empty() || !readFile(savePath(slot) + suffix, record) ||
+            record.size() < 16 || memcmp(record.data(), "VNDCALLS", 8) != 0)
+            continue;
         uint64_t h = 0;
         for (int k = 0; k < 8; k++) h |= uint64_t(record[8 + size_t(k)]) << (8 * k);
         if (h == fnv1a(data)) loadedCalls_.assign(record.begin() + 16, record.end());
@@ -905,17 +921,22 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 // A Ponscripter game copied from a PC brings its saves in the PC engine's saves folder, which VNDegen reads but never
 // writes. The first time the game runs with no save slot of VNDegen's own, they're copied into VNDegen's folder:
 // saveN.dat, global.sav, envdata and screenshot\*.bmp, the set the save sync restores, each only where VNDegen has no
-// file of that name. A note left in VNDegen's folder keeps it to once.
+// file of that name. It's all or nothing: every file is read before any is written, and a write that fails takes back
+// the files this run made, so a later run tries again. A note left in VNDegen's folder keeps it to once.
 void Engine::importPcSaves() {
     static const char *kNote = "vndegen-imported-pc-saves.txt";
     struct Entry {
         std::string name;
         bool folder;
     };
-    auto list = [](const std::string &dir) {
+    // A folder's plain files and folders; failed is set when the folder exists but can't be listed.
+    auto list = [](const std::string &dir, bool &failed) {
         std::vector<Entry> out;
         DIR *d = opendir(dir.c_str());
-        if (!d) return out;
+        if (!d) {
+            failed = errno != ENOENT;
+            return out;
+        }
         while (dirent *e = readdir(d)) {
             std::string name = e->d_name;
             struct stat st;
@@ -927,39 +948,76 @@ void Engine::importPcSaves() {
     };
     auto slot = [](const std::string &name) {
         std::string low = lowerAscii(name);
-        if (low.size() <= 8 || low.compare(0, 4, "save") != 0 || low.compare(low.size() - 4, 4, ".dat") != 0) return false;
+        if (low.size() <= 8 || low.compare(0, 4, "save") != 0 || low.compare(low.size() - 4, 4, ".dat") != 0)
+            return false;
         return std::all_of(low.begin() + 4, low.end() - 4, [](char c) { return c >= '0' && c <= '9'; });
     };
+    bool failed = false;
     std::string own = fs_.hostPath(saveDir_);
-    for (const Entry &e : list(own))
-        if (!e.folder && (slot(e.name) || lowerAscii(e.name) == kNote)) return;
+    // Any entry of a slot's or the note's name stops it, whatever it is; so does a folder that can't be read.
+    if (DIR *d = opendir(own.c_str())) {
+        while (dirent *e = readdir(d))
+            if (slot(e->d_name) || lowerAscii(e->d_name) == kNote) failed = true;
+        closedir(d);
+    } else if (errno != ENOENT) {
+        failed = true;
+    }
+    if (failed) return;
     std::string pc;
-    for (const Entry &e : list(fs_.root()))
+    for (const Entry &e : list(fs_.root(), failed))
         if (e.folder && lowerAscii(e.name) == "saves") pc = fs_.root() + "/" + e.name;
-    if (pc.empty()) return;
-    int copied = 0;
-    auto copy = [&](const std::string &from, const std::string &name) {
+    char real[PATH_MAX];
+    if (pc.empty() || !realpath(pc.c_str(), real)) return;
+    std::string realPc = real;
+    // Nothing is written inside the PC's saves folder, even through a link where VNDegen's folder would be.
+    auto insidePc = [&](const std::string &path) {
+        std::string dir = path.substr(0, path.rfind('/'));
+        struct stat st;
+        while (dir.size() > 1 && lstat(dir.c_str(), &st) != 0) dir.erase(dir.rfind('/'));
+        std::string at = realpath(dir.c_str(), real) ? std::string(real) : realPc;
+        return at == realPc || at.compare(0, realPc.size() + 1, realPc + "/") == 0;
+    };
+    struct Copy {
+        std::string from, to;
+        Bytes data;
+    };
+    std::vector<Copy> copies;
+    auto plan = [&](const std::string &from, const std::string &name) {
         std::string to = saveFilePath(name);
         struct stat st;
-        Bytes data;
-        if (stat(to.c_str(), &st) == 0 || stat(from.c_str(), &st) != 0 || st.st_size > (64 << 20)) return;
-        if (readFile(from, data) && fs_.write(to, data.data(), data.size())) copied++;
+        if (lstat(to.c_str(), &st) == 0) return;  // VNDegen has one of that name, even a link to nowhere
+        if (stat(from.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > (64 << 20)) return;
+        copies.push_back({from, to, {}});
     };
-    for (const Entry &e : list(pc)) {
+    for (const Entry &e : list(pc, failed)) {
         std::string low = lowerAscii(e.name);
-        if (!e.folder && (slot(e.name) || low == "global.sav" || low == "envdata")) copy(pc + "/" + e.name, e.name);
+        if (!e.folder && (slot(e.name) || low == "global.sav" || low == "envdata")) plan(pc + "/" + e.name, e.name);
         if (e.folder && low == "screenshot")
-            for (const Entry &shot : list(pc + "/" + e.name)) {
+            for (const Entry &shot : list(pc + "/" + e.name, failed)) {
                 std::string shotLow = lowerAscii(shot.name);
                 if (!shot.folder && shotLow.size() > 4 && shotLow.compare(shotLow.size() - 4, 4, ".bmp") == 0)
-                    copy(pc + "/" + e.name + "/" + shot.name, e.name + "\\" + shot.name);
+                    plan(pc + "/" + e.name + "/" + shot.name, e.name + "\\" + shot.name);
             }
     }
-    if (!copied) return;
+    if (failed || copies.empty()) return;
+    for (Copy &c : copies)
+        if (insidePc(c.to) || !readFile(c.from, c.data)) {
+            logf("the PC engine's saves can't all be copied now (%s); VNDegen tries again next time", c.from.c_str());
+            return;
+        }
+    std::vector<std::string> made;
+    for (const Copy &c : copies) {
+        if (!fs_.write(c.to, c.data.data(), c.data.size())) {
+            logf("could not write %s; the PC engine's saves copied so far are taken back", c.to.c_str());
+            for (const std::string &path : made) remove(path.c_str());
+            return;
+        }
+        made.push_back(c.to);
+    }
     std::string note =
-        "Copied " + std::to_string(copied) + " files from the game's saves folder, which stays as it was.\n";
+        "Copied " + std::to_string(made.size()) + " files from the game's saves folder, which stays as it was.\n";
     fs_.write(saveFilePath(kNote), note.data(), note.size());
-    logf("copied %d files from the PC engine's saves folder into %s", copied, saveDir_.c_str());
+    logf("copied %zu files from the PC engine's saves folder into %s", made.size(), saveDir_.c_str());
 }
 
 // The global variables' file: NScripter's gloval.sav, the PC Ponscripter engine's global.sav, the same inside.
