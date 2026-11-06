@@ -275,8 +275,8 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   writes the default window in the doubled form, where the PC engine writes its own default values (the games set a
   window first). A save without its `saveN.dat.calls` record has its calls worked out from the script: a PC save, and a
   VNDegen save synced to another device, since the record stays on the device that wrote it. There, a save made
-  inside a user command that jumped to another label before saving, or whose arguments include another user
-  command's name, may load as if it were a different call. An unclosed `~` tag is drawn as it stands, where the PC
+  inside a user command that jumped to another label before saving, whose arguments include another user command's
+  name, or that is the second call to the same command in one statement, may load as if it were a different call. An unclosed `~` tag is drawn as it stands, where the PC
   engine drops the line.
   Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
   that saved; the runtime clears the page and keeps NScripter's savepoints there. The games always set one. With a

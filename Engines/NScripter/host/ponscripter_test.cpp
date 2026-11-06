@@ -928,6 +928,18 @@ static void reviewLanding4Round3() {
     std::string chain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
                         "*foo\ngetparam %1\nreturn\n*bar\nsaveon\nsavegame 1\nclick\nreturn\n";
     for (const std::string &script : {alias, chain}) assert(run(script, 2) == run(script, 0));
+    // A record that can't be written fails the save, before its .dat: the slot keeps the save it had.
+    {
+        std::ofstream(dir / "0.utf") << "*define\ngame\n*start\nmov %1,1\nsavegame 1\nmov %1,2\nclick\nend\n";
+        fs::remove_all(dir / "vndegen-saves");
+        fs::create_directories(record);  // a folder where the record would go
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 20; i++) engine.step(16);
+        assert(engine.wait_ == vnns::WaitKind::Click && !fs::exists(dir / "vndegen-saves" / "save1.dat"));
+        assert(!engine.saveGame(2, "") || fs::exists(dir / "vndegen-saves" / "save2.dat.calls"));
+    }
     fs::remove_all(dir);
 }
 

@@ -792,17 +792,22 @@ bool Engine::saveGame(int slot, const std::string &note) {
         data.push_back('*');
     }
     std::string path = savePath(slot);
-    if (!fs_.write(path, data.data(), data.size())) {
-        logf("could not write %s", path.c_str());
-        return false;
-    }
+    // A Ponscripter save's call record goes first: if it can't be written, the save fails and the slot keeps its
+    // previous save, whose own record then no longer matches and is ignored.
     if (ponscripter_) {
         std::vector<uint8_t> flags = savepointLive_ ? callFlags() : savepointCalls_;
         Bytes record = {'V', 'N', 'D', 'C', 'A', 'L', 'L', 'S'};
         uint64_t h = fnv1a(data);
         for (int k = 0; k < 8; k++) record.push_back(uint8_t(h >> (8 * k)));
         record.insert(record.end(), flags.begin(), flags.end());
-        fs_.write(path + ".calls", record.data(), record.size());
+        if (!fs_.write(path + ".calls", record.data(), record.size())) {
+            logf("could not write %s.calls", path.c_str());
+            return false;
+        }
+    }
+    if (!fs_.write(path, data.data(), data.size())) {
+        logf("could not write %s", path.c_str());
+        return false;
     }
     saveSystemData();
     return true;
