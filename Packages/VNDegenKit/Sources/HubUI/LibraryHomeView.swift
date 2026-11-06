@@ -22,7 +22,7 @@ struct LibraryHomeView: View {
             switch layout {
             case .featured: HeroBackdrop(game: hero)
             case .capsules: HeroBackdrop(game: hero, sharp: false)
-            case .headers: Theme.background.ignoresSafeArea()
+            case .headers, .grid: Theme.background.ignoresSafeArea()
             }
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
@@ -38,9 +38,10 @@ struct LibraryHomeView: View {
                             ReadyToImportRow(archives: hub.localArchives)
                         }
                         ForEach(nav.shelves, id: \.shelf) { shelf in
-                            if layout == .headers {
-                                HeaderShelf(shelf: shelf.shelf, games: shelf.games)
-                            } else {
+                            switch layout {
+                            case .headers: HeaderShelf(shelf: shelf.shelf, games: shelf.games)
+                            case .grid: GridShelf(shelf: shelf.shelf, games: shelf.games)
+                            case .featured, .capsules:
                                 ShelfRow(shelf: shelf.shelf, games: shelf.games,
                                          tileWidth: layout == .capsules ? metrics.largeTileWidth : metrics.tileWidth)
                             }
@@ -74,6 +75,7 @@ struct LibraryHomeView: View {
         }
         .animation(.smooth(duration: 0.3), value: layout)
         .onChange(of: metrics.headerColumns, initial: true) { _, columns in nav.headerColumns = columns }
+        .onChange(of: metrics.gridColumns, initial: true) { _, columns in nav.gridColumns = columns }
         .overlay(alignment: .top) { TopBar() }
     }
 
@@ -83,7 +85,7 @@ struct LibraryHomeView: View {
         case .importArchive?: Navigator.archivesRowID
         default: nil
         }
-        if layout == .headers, case .tile? = focus {
+        if layout == .headers || layout == .grid, case .tile? = focus {
             proxy.scrollTo(focus, anchor: .center)
         } else if let row {
             // Nested scroll views: scroll the page to the row, then the row to the focused item.
@@ -147,7 +149,7 @@ struct TopBar: View {
     @Environment(\.hubMetrics) private var metrics
 
     /// Icon buttons in the bar over a library with games. The empty library shows only Lock and Settings.
-    static let libraryButtons = 5
+    static let libraryButtons = 4
 
     /// How far the bar over a library with games moves down to clear window controls it can't fit beside.
     static func lowered(_ metrics: HubMetrics) -> CGFloat {
@@ -174,8 +176,6 @@ struct TopBar: View {
                 HubButton(target: .layoutButton, kind: .icon) { Image(systemName: nav.layout.systemImage) }
                     .accessibilityLabel("Library view")
                     .accessibilityValue(nav.layout.title)
-                HubButton(target: .gridButton, kind: .icon) { Image(systemName: "square.grid.2x2.fill") }
-                    .accessibilityLabel("All games")
             }
             HubButton(target: .lockButton, kind: .icon) {
                 Image(systemName: hub.lock.isUnlocked ? "lock.open.fill" : "lock.fill")
@@ -224,8 +224,11 @@ struct Wordmark: View {
 
 private struct HeroStage: View {
     @Environment(Hub.self) private var hub
+    @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     let game: Game?
+    /// What the engine calls Play for the game, such as "Play in CrossOver", as on its page. Nil is "Play".
+    @State private var playLabel: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.isShort ? 10 : 16) {
@@ -243,8 +246,9 @@ private struct HeroStage: View {
                     }
                     HStack(spacing: 12) {
                         HubButton(target: .play, kind: .primary) {
-                            Label("Play", systemImage: "play.fill")
+                            Label(playLabel ?? "Play", systemImage: "play.fill").lineLimit(1)
                         }
+                        .accessibilityLabel(playLabel ?? "Play")
                         HubButton(target: .details, kind: .secondary) {
                             Label("Details", systemImage: "info.circle")
                         }
@@ -252,6 +256,13 @@ private struct HeroStage: View {
                 }
                 .id(game.id)
                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(x: 18)), removal: .opacity))
+                // Read off the main thread, as the game page reads it.
+                .task(id: "\(game.id.rawValue)|\(game.engine?.rawValue ?? "")|\(nav.variantRevision)") {
+                    playLabel = nil
+                    let plugin = hub.library.plugin(for: game.engine)
+                    let folder = hub.library.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
+                    playLabel = await Task.detached { [game] in plugin?.playLabel(for: game, folder: folder, dataDirectory: data) }.value
+                }
             }
         }
         .animation(Theme.heroAnimation, value: game?.id)
@@ -338,6 +349,38 @@ private struct HeaderShelf: View {
         .padding(.trailing, metrics.trailing)
         // With its padding the grid is as wide as the screen, wider than the safe area the scroll view is first offered.
         // A rigid width there would widen the whole screen, top bar included.
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        .id(shelf.rawValue)
+    }
+}
+
+/// A shelf as a dense grid of capsules, for the grid layout. The All games shelf shows how many games it holds.
+private struct GridShelf: View {
+    @Environment(\.hubMetrics) private var metrics
+    let shelf: Navigator.Shelf
+    let games: [Game]
+
+    var body: some View {
+        let width = metrics.gridTileWidth
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                SectionLabel(text: shelf.title, systemImage: shelf == .hidden ? "lock.open.fill" : nil)
+                if shelf == .all {
+                    Text("\(games.count)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.tertiaryText)
+                }
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(width), spacing: metrics.tileSpacing), count: metrics.gridColumns),
+                      alignment: .leading, spacing: metrics.tileSpacing + 8) {
+                ForEach(games) { game in
+                    GameTile(game: game, target: .tile(shelf, game.id), width: width)
+                }
+            }
+        }
+        .padding(.leading, metrics.leading)
+        .padding(.trailing, metrics.trailing)
+        // As in the header list, a rigid width here would widen the whole screen.
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .id(shelf.rawValue)
     }

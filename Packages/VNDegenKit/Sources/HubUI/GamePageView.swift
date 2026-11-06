@@ -7,6 +7,8 @@ struct GamePageView: View {
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     let game: Game
+    /// What the engine calls Play for this game, such as "Play in CrossOver". Nil is "Play".
+    @State private var playLabel: String?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -15,6 +17,13 @@ struct GamePageView: View {
                     banner.id("banner")
                     VStack(alignment: .leading, spacing: 28) {
                         actions
+                            // Read off the main thread, as the engine section reads its note, since it can list the
+                            // game's folder. It follows the engine choice and the engine's options.
+                            .task(id: "\(game.engine?.rawValue ?? "")|\(nav.variantRevision)") {
+                                let plugin = hub.library.plugin(for: game.engine)
+                                let folder = hub.library.folder(for: game.id), data = hub.library.paths.dataDirectory(for: game.id)
+                                playLabel = await Task.detached { [game] in plugin?.playLabel(for: game, folder: folder, dataDirectory: data) }.value
+                            }
                         RuntimeSection(game: game)
                         if metrics.isCompact {
                             VStack(alignment: .leading, spacing: 28) {
@@ -120,7 +129,9 @@ struct GamePageView: View {
     }
 
     private var playButton: some View {
-        HubButton(target: .pagePlay, kind: .primary) { Label("Play", systemImage: "play.fill") }
+        let title = playLabel ?? "Play"
+        return HubButton(target: .pagePlay, kind: .primary) { Label(title, systemImage: "play.fill").lineLimit(1) }
+            .accessibilityLabel(title)
     }
 
     @ViewBuilder

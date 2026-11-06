@@ -17,16 +17,20 @@ struct PlayerView: View {
     /// Whether the menu or the unlock screen has input rather than the game. Nil until the view first takes input.
     @State private var navigating: Bool?
     @State private var needsRotation = false
+    /// The game view's frame in the global space, for touch controls that keep below it.
+    @State private var gameFrame = CGRect.zero
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.hubMetrics) private var metrics
 
     var body: some View {
         ZStack {
             SessionViewHost(session: session)
-                .ignoresSafeArea()
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { gameFrame = $0 }
+                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop))
             if !menu.isOpen, !isCovered, !session.drawsOwnMenu {
+                // The same frame as the game's view, so its normalized locations match the game's.
                 PointerView(mouse: hub.input.mouse, drawsArrow: overlayMode != .cursor)
-                    .ignoresSafeArea()
+                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop))
             }
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
@@ -47,10 +51,18 @@ struct PlayerView: View {
                     .ignoresSafeArea()
             }
             if let overlayMode, overlayMode.hasOverlay {
-                // In a short iPad window the gamepad's top row would reach the window's controls. The cursor's pad maps
-                // to the whole game view, so it keeps the full height, and its Home button sits in the other corner.
-                TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input)
+                // In a short iPad window the gamepad's top row would reach the window's controls. The cursor's pad covers
+                // the whole screen, so it keeps the full height, and its Home button sits in the other corner.
+                TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input,
+                                     gameFrame: gamePaneHeight == nil ? nil : gameFrame)
                     .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
+                    // Below the game, a side inset's camera is up beside the game, so the gamepad keeps the safe area's
+                    // width but sits in the middle of the screen. The cursor's pad keeps the whole screen. The on-screen
+                    // keyboard covers the controls rather than pushing them up over the game.
+                    .padding(.horizontal, gamePaneHeight == nil || overlayMode != .gamepad ? 0
+                             : (metrics.insets.leading + metrics.insets.trailing) / 2)
+                    .ignoresSafeArea(gamePaneHeight == nil ? [] : .container, edges: .horizontal)
+                    .ignoresSafeArea(gamePaneHeight == nil ? [] : .keyboard)
             }
             if hub.input.mouse.showsKeyboard, !menu.isOpen, !isCovered {
                 KeyboardBridge(session: session) { hub.input.mouse.hideKeyboard() }
@@ -146,15 +158,37 @@ struct PlayerView: View {
 
     private var mapping: ButtonMapping { game.map { ButtonMapping(for: $0, in: hub.library) } ?? ButtonMapping() }
 
-    /// What touches do in the game. Nil while the menu or the unlock screen covers it, and on a Mac, which has no touch screen.
-    private var overlayMode: TouchControlsMode? {
+    /// What touches do in the game under its control method. Nil for a game that reads touches itself, and on a Mac,
+    /// which has no touch screen.
+    private var touchMode: TouchControlsMode? {
         #if os(iOS)
-        guard !menu.isOpen, !isCovered, !session.drawsOwnMenu else { return nil }
+        guard !session.drawsOwnMenu else { return nil }
         return method.touchControls(lastInput: hub.input.lastInputKind, controllerConnected: !hub.input.controllerNames.isEmpty)
         #else
         return nil
         #endif
     }
+
+    /// What touches do in the game now. Nil while the menu or the unlock screen covers it.
+    private var overlayMode: TouchControlsMode? { menu.isOpen || isCovered ? nil : touchMode }
+
+    /// The game's height when it sits at the top of a portrait screen or window, above touch controls that would otherwise
+    /// cover it. Nil when it fills the screen, as in landscape, and when the controls would leave the game no room.
+    /// The hub doesn't know the game's shape, so the pane is at most 4:3, which a 4:3 game fills and a wider one fills
+    /// across. It follows the control method rather than the menu, so opening the menu leaves the game where it is.
+    private var gamePaneHeight: CGFloat? {
+        guard let touchMode, touchMode.hasOverlay, metrics.fullHeight > metrics.fullWidth else { return nil }
+        // From the full height and an allowance for the Home indicator, because the on-screen keyboard changes the
+        // bottom inset and shouldn't move the game.
+        let controls = TouchControlsOverlay.portraitControlsHeight(touchMode, width: metrics.size.width) + 34
+        let height = min(metrics.fullWidth * 0.75, metrics.fullHeight - gamePaneTop - controls)
+        return height > 0 ? height : nil
+    }
+
+    /// Where the game starts when it sits above the controls: below the camera housing. The iPhone Duo's inner display
+    /// holds its camera in a side inset rather than the top one, near the top, within a square as tall as the inset is
+    /// wide, so the game starts below that square.
+    private var gamePaneTop: CGFloat { max(metrics.insets.top, metrics.insets.leading, metrics.insets.trailing) }
 
     private var title: String { game.map(hub.displayTitle) ?? "" }
 
@@ -639,6 +673,21 @@ private struct RotateHint: View {
         .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
         .accessibilityElement(children: .combine)
         .allowsHitTesting(false)
+    }
+}
+
+/// Places the game's view: full screen, or `height` tall at the top, below the camera housing, when it sits above the touch
+/// controls. The engine keeps the game's aspect ratio inside the view either way.
+private struct GamePane: ViewModifier {
+    let height: CGFloat?
+    let top: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .frame(height: height)
+            .padding(.top, height == nil ? 0 : top)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea()
     }
 }
 

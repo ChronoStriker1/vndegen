@@ -1,0 +1,120 @@
+---
+HKEY_CURRENT_USER:
+  "Software\\Studio\\Game":
+    "":
+      sz: default
+    LongSave_h99:
+      binary:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+        - 18
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 26
+        - 27
+        - 28
+        - 29
+        - 30
+        - 31
+        - 32
+        - 33
+        - 34
+        - 35
+        - 36
+        - 37
+        - 38
+        - 39
+        - 40
+        - 41
+        - 42
+        - 43
+        - 44
+        - 45
+        - 46
+        - 47
+        - 48
+        - 49
+        - 50
+        - 51
+        - 52
+        - 53
+        - 54
+        - 55
+        - 56
+        - 57
+        - 58
+        - 59
+        - 60
+    PlayerName_h1:
+      binary:
+        - 227
+        - 130
+        - 162
+        - 227
+        - 130
+        - 164
+        - 0
+    Screenmanager Resolution Width_h182942802:
+      dword: 1280
+    "quote\"and\\slash":
+      sz: "a \"quoted\" C:\\path"
+    unity.player_session_count_h922449978:
+      binary:
+        - 49
+        - 51
+        - 0
+    volume_h3343231:
+      qword: 4607182418800017408
+  "Software\\Studio\\Game\\Sub":
+    inner:
+      dword: 7
+  "Software\\Studio\\Other":
+    expand:
+      expandSz: "%USERPROFILE%\\x"
+    multi:
+      multiSz: "one\ntwo"
+    newline:
+      sz: "line1\nline2"
+    rawdword:
+      raw:
+        kind: dword
+        data:
+          - 1
+          - 0
+          - 0
+          - 0
+    rawnone:
+      raw:
+        kind: none
+        data:
+          - 9
+          - 8
+  "Software\\スタジオ\\ゲーム":
+    名前:
+      sz: 値
+HKEY_LOCAL_MACHINE:
+  "Software\\Studio":
+    Installed:
+      dword: 1
+

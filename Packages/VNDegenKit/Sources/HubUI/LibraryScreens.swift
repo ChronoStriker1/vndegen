@@ -13,7 +13,7 @@ import UIKit
 import AppKit
 #endif
 
-/// Header shared by the grid and settings screens: back button and a title.
+/// The settings screen's header: back button and a title.
 private struct ScreenHeader: View {
     @Environment(\.hubMetrics) private var metrics
     let title: String
@@ -35,51 +35,6 @@ private struct ScreenHeader: View {
         #if os(macOS)
         .padding(.top, 18)
         #endif
-    }
-}
-
-struct LibraryGridView: View {
-    @Environment(Navigator.self) private var nav
-    @Environment(\.hubMetrics) private var metrics
-
-    var body: some View {
-        let games = nav.visibleGames
-        let spacing = metrics.tileSpacing
-        let available = metrics.fullWidth - 2 * max(metrics.insets.leading, metrics.insets.trailing) - metrics.padding * 2
-        let target = metrics.isCompact ? (available - spacing * 2) / 3 : metrics.tileWidth
-        let columns = max(2, Int((available + spacing) / (target + spacing)))
-        // Stretch tiles so each row runs edge to edge instead of leaving a ragged gap on the right.
-        let tile = (available - spacing * CGFloat(columns - 1)) / CGFloat(columns)
-        VStack(alignment: .leading, spacing: 8) {
-            ScreenHeader(title: "All games", detail: "\(games.count)")
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(tile), spacing: metrics.tileSpacing), count: columns),
-                              alignment: .leading, spacing: metrics.tileSpacing + 8) {
-                        ForEach(games) { game in
-                            GameTile(game: game, target: .gridTile(game.id), width: tile)
-                        }
-                    }
-                    .padding(.horizontal, metrics.padding)
-                    .padding(.vertical, 18)
-                }
-                .scrollIndicators(.hidden)
-                .onChange(of: nav.focus) { _, focus in
-                    guard nav.focusMovedByController else { return }
-                    if let focus, focus.gameID != nil {
-                        withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
-                    }
-                }
-                .onChange(of: nav.revealRequest) { _, target in
-                    guard let target else { return }
-                    nav.revealRequest = nil
-                    withAnimation(Theme.focusAnimation) { proxy.scrollTo(target, anchor: .center) }
-                }
-            }
-        }
-        .onChange(of: columns, initial: true) { _, columns in nav.gridColumns = columns }
-        .balancedHorizontalSafeArea(metrics)
-        .background { Theme.background.ignoresSafeArea() }
     }
 }
 

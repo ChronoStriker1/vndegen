@@ -82,6 +82,18 @@ struct HubMetrics: Equatable {
         return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
     }
 
+    /// Columns in the grid layout: three on a phone, and on wider screens as many capsules of the shelves' size as fit.
+    var gridColumns: Int {
+        let available = size.width - padding * 2
+        let target = isCompact ? (available - tileSpacing * 2) / 3 : tileWidth
+        return max(2, Int((available + tileSpacing) / (target + tileSpacing)))
+    }
+    /// Stretched so each row runs edge to edge rather than leaving a ragged gap on the right.
+    var gridTileWidth: CGFloat {
+        let columns = CGFloat(gridColumns)
+        return (size.width - padding * 2 - tileSpacing * (columns - 1)) / columns
+    }
+
     /// Columns in a game page's screenshot grid `width` wide: two on a phone held upright, and more as the width allows,
     /// so the tiles grow with the window between steps.
     func screenshotColumns(in width: CGFloat) -> Int {

@@ -22,6 +22,7 @@ Web-based engines render through WebGL on Metal. Ren'Py and Godot 3 render throu
 | [AliceSoft System 3.0 to 3.9](#alicesoft-system-3) | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT`, up to two folders down. `SYSTEM3.EXE` beside `ADISK.DAT` makes the match certain | Mac, iPhone, iPad |
 | [AliceSoft System 4](#alicesoft-system-4) | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe`, up to two folders down | Mac, iPhone, iPad |
 | [NekoSDK](#nekosdk) | `cfg.pak` beside `scr.pak`, up to two folders down | Mac, iPhone, iPad |
+| [Unity](#unity), opened outside VNDegen | `Game_Data` holding `globalgamemanagers`, `mainData`, or `data.unity3d`, up to two folders down, as a likely match when `Game.exe` or `UnityPlayer.dll` is beside it and a weak one otherwise | Mac only, through the game's own Mac version or the player's CrossOver. iPhone and iPad: the game's page says why not |
 
 [engine-survey.md](engine-survey.md) covers which other engines are common and how each could be supported. [development.md](development.md#adding-an-engine) describes how to add one.
 
@@ -153,3 +154,11 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - Menu backgrounds that change on the PC stay the same here. The help pictures that come up on hover on menu screens aren't drawn, except on Funbag Fantasy 3 if's title, and neither is the "Do not show again" box on a confirmation.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
+
+## Unity
+
+VNDegen has no Unity engine of its own. Unity's terms don't let another app include its player, and a Windows game's code and shaders are built for Windows, so running them inside VNDegen would take a new engine, which [unity.md](unity.md) found isn't worth building now. On a Mac, Play opens the game outside VNDegen instead: its own Mac version when it ships one (Open Mac version), otherwise the Windows version through the player's own CrossOver, in one bottle VNDegen keeps apart from the player's bottles (Play in CrossOver). Saves sync from the game's `persistentDataPath`, and its PlayerPrefs with Ludusavi's registry data. [unity.md](unity.md#mac-launcher) has how it works and what was checked. On iPhone and iPad, Play stays unavailable and the page says why.
+
+A game's page names the Unity version, read from the first bytes of its data file, including Unity China's versions such as `2021.3.21f1c1`, and whether its code ships as .NET assemblies (Mono, `Game_Data/Managed`) or compiled for Windows (IL2CPP, `GameAssembly.dll` or `Game_Data/il2cpp_data`). It also finds a Mac build the game ships, a `.app` whose `Contents/Resources/Data` holds Unity's data files, in any case, as SiNiSistar 2 does.
+
+A Unity match is never more than likely and the Unity plugin is asked last, so any other engine that matches a folder keeps it. That matters for games such as an RPG Maker game in a wrapper folder, only a likely match, that ships a Unity tool beside it. In a scan of the library's 728 folders and archives on 2026-11-05, 121 Unity games went from no engine to Unity and no game changed from another engine. Her New Memory, a Ren'Py game that ships a Unity tool for Steam Workshop, stays Ren'Py.

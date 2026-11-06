@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import RegistryFile
 import VNCore
 
 /// A Ludusavi backup folder: one subfolder per game, each with a mapping.yaml. VNDegen keeps a partial copy of the
@@ -28,12 +29,15 @@ public struct LudusaviStore: Sendable {
 
     // MARK: Restore
 
-    /// Copies the files of `backup` (nil for the latest) that belong to `locations` into place. Snapshots the current
-    /// local saves into `snapshot` first, so `undoRestore` can put them back. Checks every file's hash before writing.
-    public func restore(folder: String, backup: String?, locations: [SaveLocation], snapshot: URL) throws -> RestoreReport {
+    /// Copies the files of `backup` (nil for the latest) that belong to `locations` into place, and `registry`'s values
+    /// when the backup holds them. Snapshots the current local saves into `snapshot` first, so `undoRestore` can put them
+    /// back. Checks every file's hash before writing.
+    public func restore(folder: String, backup: String?, locations: [SaveLocation], registry: RegistrySave? = nil,
+                        snapshot: URL) throws -> RestoreReport {
         let mapping = try mapping(folder)
-        let plan = try Self.restorePlan(mapping, backup: backup, locations: locations)
         let gameDir = root.appendingPathComponent(folder, isDirectory: true)
+        let values = registry.flatMap { Self.backupRegistryValues(mapping, backup: backup, save: $0, in: gameDir) }
+        let plan = try Self.restorePlan(mapping, backup: backup, locations: locations, registry: values)
 
         var contents: [(URL, Data)] = []
         for item in plan.items {
@@ -50,14 +54,15 @@ public struct LudusaviStore: Sendable {
             contents.append((target, data))
         }
 
-        try Self.takeSnapshot(of: locations, to: snapshot)
+        try Self.takeSnapshot(of: locations, registry: registry, to: snapshot)
         let fm = FileManager.default
         for (target, data) in contents {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: target, options: .atomic)
         }
+        if let registry, let values = plan.registry { try Self.writeLocalRegistry(values, to: registry) }
         return RestoreReport(backup: backup ?? mapping.summaries.last?.name ?? "", restored: plan.items.map(\.relative).sorted(),
-                             skipped: plan.skipped)
+                             skipped: plan.skipped, restoredRegistry: plan.registry != nil)
     }
 
     /// The saves a restore of `backup` (nil for the latest) writes. A save the backup holds under more than one path
@@ -76,12 +81,16 @@ public struct LudusaviStore: Sendable {
         var items: [Item]
         /// Paths in the backup that are not saves this engine keeps.
         var skipped: [String]
+        /// The game's registry values the backup holds, when it keeps any.
+        var registry: [String: RegistryValue]?
     }
 
-    static func restorePlan(_ mapping: LudusaviMapping, backup: String?, locations: [SaveLocation]) throws -> RestorePlan {
+    /// `registry` is what the backup holds for the game's registry key, which `backupRegistryValues` reads.
+    static func restorePlan(_ mapping: LudusaviMapping, backup: String?, locations: [SaveLocation],
+                            registry: [String: RegistryValue]? = nil) throws -> RestorePlan {
         guard let files = mapping.effectiveFiles(backup) else { throw SaveSyncError.noBackups }
         let recorded = RecordedPaths(files.keys, locations: locations)
-        var plan = RestorePlan(items: [], skipped: [])
+        var plan = RestorePlan(items: [], skipped: [], registry: registry)
         var planned: [String: Int] = [:]
         // Names this plan writes, and their folders, by location and lowercased path, so a later name that differs only
         // in case lands on the same file or folder, as on Windows, even where nothing exists yet.
@@ -123,14 +132,17 @@ public struct LudusaviStore: Sendable {
             planned[item.key] = plan.items.count
             plan.items.append(item)
         }
-        guard !plan.items.isEmpty else { throw SaveSyncError.nothingToRestore(plan.skipped.count) }
+        guard !plan.items.isEmpty || plan.registry != nil else { throw SaveSyncError.nothingToRestore(plan.skipped.count) }
         return plan
     }
 
     /// What restoring `backup` would change, without changing anything.
-    public func preview(folder: String, backup: String?, locations: [SaveLocation]) throws -> RestorePreview {
-        let plan = try Self.restorePlan(mapping(folder), backup: backup, locations: locations)
-        let local = try Self.localHashes(locations)
+    public func preview(folder: String, backup: String?, locations: [SaveLocation], registry: RegistrySave? = nil) throws -> RestorePreview {
+        let mapping = try mapping(folder)
+        let gameDir = root.appendingPathComponent(folder, isDirectory: true)
+        let values = registry.flatMap { Self.backupRegistryValues(mapping, backup: backup, save: $0, in: gameDir) }
+        let plan = try Self.restorePlan(mapping, backup: backup, locations: locations, registry: values)
+        let local = try Self.localHashes(locations, registry: registry)
         var preview = RestorePreview()
         for item in plan.items {
             switch local[item.key] {
@@ -139,34 +151,76 @@ public struct LudusaviStore: Sendable {
             default: preview.replaced.append(item.relative)
             }
         }
+        if let registry, let values = plan.registry {
+            switch local[Self.registryHashKey] {
+            case nil: preview.added.append(RestorePreview.registryName)
+            case Self.registryHash(values, key: registry.key)?: preview.unchanged.append(RestorePreview.registryName)
+            default: preview.replaced.append(RestorePreview.registryName)
+            }
+        }
         let restored = Set(plan.items.map(\.key))
         preview.kept = try Self.localSaves(locations).filter { !restored.contains("\($0.location):\($0.relative)") }.map(\.relative).sorted()
+        if plan.registry == nil, local[Self.registryHashKey] != nil { preview.kept.append(RestorePreview.registryName) }
         return preview
     }
 
-    /// Each local save's SHA-1, keyed `location:relative`.
-    static func localHashes(_ locations: [SaveLocation]) throws -> [String: String] {
-        Dictionary(uniqueKeysWithValues: try localSaves(locations).map { save in
+    /// Each local save's SHA-1, keyed `location:relative`, and the registry values' under `registryHashKey` when the
+    /// game has a file of them here.
+    static func localHashes(_ locations: [SaveLocation], registry: RegistrySave? = nil) throws -> [String: String] {
+        var hashes = Dictionary(uniqueKeysWithValues: try localSaves(locations).map { save in
             let data: Data
             do { data = try Data(contentsOf: save.url) } catch { throw SaveSyncError.unreadable(save.url.path) }
             return ("\(save.location):\(save.relative)", sha1(data))
         })
+        if let registry, let values = try localRegistryValues(registry) { hashes[registryHashKey] = registryHash(values, key: registry.key) }
+        return hashes
     }
 
     /// The saves of the latest backup that this device would restore, keyed like `localHashes`. Equal to
     /// `localHashes` when the device already has exactly what the backup holds.
-    func latestHashes(folder: String, locations: [SaveLocation]) throws -> (backup: String, hashes: [String: String])? {
+    func latestHashes(folder: String, locations: [SaveLocation], registry: RegistrySave? = nil) throws -> (backup: String, hashes: [String: String])? {
         let mapping = try mapping(folder)
-        guard let latest = mapping.summaries.last, let plan = try? Self.restorePlan(mapping, backup: nil, locations: locations) else { return nil }
-        return (latest.name, Dictionary(uniqueKeysWithValues: plan.items.map { ($0.key, $0.stored.entry.hash) }))
+        let gameDir = root.appendingPathComponent(folder, isDirectory: true)
+        let values = registry.flatMap { Self.backupRegistryValues(mapping, backup: nil, save: $0, in: gameDir) }
+        guard let latest = mapping.summaries.last,
+              let plan = try? Self.restorePlan(mapping, backup: nil, locations: locations, registry: values) else { return nil }
+        var hashes = Dictionary(uniqueKeysWithValues: plan.items.map { ($0.key, $0.stored.entry.hash) })
+        if let registry, let values { hashes[Self.registryHashKey] = Self.registryHash(values, key: registry.key) }
+        return (latest.name, hashes)
     }
 
     /// Puts the saves from the last restore's snapshot back, removing saves the snapshot did not have. Reads every
     /// folder before changing anything, so a folder that can't be read stops the undo with no save touched.
-    public static func undoRestore(locations: [SaveLocation], snapshot: URL) throws {
+    ///
+    /// The registry file comes back too, or goes when the snapshot recorded that there was none. A snapshot taken without
+    /// `registry` leaves it alone.
+    public static func undoRestore(locations: [SaveLocation], registry: RegistrySave? = nil, snapshot: URL) throws {
         let fm = FileManager.default
         guard fm.fileExists(atPath: snapshot.path) else { throw SaveSyncError.noSnapshot }
         guard isComplete(snapshot: snapshot) else { throw SaveSyncError.incompleteSnapshot }
+        // A snapshot from before VNDegen recorded its folders has none, and undoes as it always did.
+        let foldersFile = snapshot.appendingPathComponent(snapshotFoldersFile)
+        if fm.fileExists(atPath: foldersFile.path) {
+            let recorded = try String(contentsOf: foldersFile, encoding: .utf8)
+            guard recorded == locations.map(\.directory.standardizedFileURL.path).joined(separator: "\n") else {
+                throw SaveSyncError.snapshotForOtherFolders
+            }
+        }
+        // Read before anything changes. A saved file that can't be read stops the undo, and only a missing one means
+        // there was none.
+        let savedRegistry = snapshot.appendingPathComponent(snapshotRegistryFolder, isDirectory: true)
+        var registryBack: Data??
+        if let registry, fm.fileExists(atPath: savedRegistry.path) {
+            // Listed rather than probed, since a folder that can't be searched hides a file as well as a missing one.
+            let names: [String]
+            do { names = try fm.contentsOfDirectory(atPath: savedRegistry.path) } catch { throw SaveSyncError.unreadable(savedRegistry.path) }
+            let saved = savedRegistry.appendingPathComponent(registry.file.lastPathComponent)
+            if names.contains(registry.file.lastPathComponent) {
+                do { registryBack = .some(try Data(contentsOf: saved)) } catch { throw SaveSyncError.unreadable(saved.path) }
+            } else {
+                registryBack = .some(nil)
+            }
+        }
         let plans = try locations.enumerated().map { index, location in
             let saved = snapshot.appendingPathComponent(String(index), isDirectory: true)
             guard fm.fileExists(atPath: saved.path) else { throw SaveSyncError.incompleteSnapshot }
@@ -184,6 +238,14 @@ public struct LudusaviStore: Sendable {
                 try fm.removeItem(at: save.url)
             }
         }
+        if let registry, let registryBack {
+            if let data = registryBack {
+                try fm.createDirectory(at: registry.file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: registry.file, options: .atomic)
+            } else if fm.fileExists(atPath: registry.file.path) {
+                try fm.removeItem(at: registry.file)
+            }
+        }
         try fm.removeItem(at: snapshot)
     }
 
@@ -194,8 +256,14 @@ public struct LudusaviStore: Sendable {
     }
 
     static let snapshotCompleteFile = "complete"
+    /// The save folders a snapshot was taken of, one path a line, so an undo never puts it into other ones, such as
+    /// after a game switched how it runs.
+    static let snapshotFoldersFile = "folders"
+    /// Holds a copy of the registry file, or nothing when there was none. Location folders are numbered, so this name
+    /// never meets one.
+    static let snapshotRegistryFolder = "registry"
 
-    static func takeSnapshot(of locations: [SaveLocation], to snapshot: URL) throws {
+    static func takeSnapshot(of locations: [SaveLocation], registry: RegistrySave? = nil, to snapshot: URL) throws {
         let fm = FileManager.default
         let staging = snapshot.deletingLastPathComponent().appendingPathComponent(snapshot.lastPathComponent + ".new")
         try? fm.removeItem(at: staging)
@@ -208,6 +276,15 @@ public struct LudusaviStore: Sendable {
                 try fm.copyItem(at: save.url, to: target)
             }
         }
+        if let registry {
+            let dir = staging.appendingPathComponent(snapshotRegistryFolder, isDirectory: true)
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            if fm.fileExists(atPath: registry.file.path) {
+                try fm.copyItem(at: registry.file, to: dir.appendingPathComponent(registry.file.lastPathComponent))
+            }
+        }
+        try Data(locations.map(\.directory.standardizedFileURL.path).joined(separator: "\n").utf8)
+            .write(to: staging.appendingPathComponent(snapshotFoldersFile))
         try Data().write(to: staging.appendingPathComponent(snapshotCompleteFile))
         try? fm.removeItem(at: snapshot)
         try fm.moveItem(at: staging, to: snapshot)
@@ -226,12 +303,18 @@ public struct LudusaviStore: Sendable {
     ///
     /// `device` ends the new folder's name, so two devices backing up in the same second never pick the same folder.
     ///
-    /// Registry data from a Windows PC's backup carries forward like any other file VNDegen doesn't manage. VNDegen can't
-    /// read it, so the next backup holds what the latest one held. Ludusavi on Linux or a Mac instead records it as dropped.
-    public func backUp(folder: String?, title: String, game: GameID, locations: [SaveLocation], retention: Retention?,
-                       pcFolders: [Int: String] = [:], now: Date = .now, device: String? = nil, os: String, comment: String?) throws -> BackupReport {
+    /// Registry data from a Windows PC's backup carries forward like any other file VNDegen doesn't manage, so the next
+    /// backup holds what the latest one held. Ludusavi on Linux or a Mac instead records it as dropped. A game with a
+    /// `registry` file here changes only its own key: the new backup holds the latest registry with that key's values
+    /// replaced by the file's, written as Ludusavi writes `registry.reg`. When the backup's registry can't be read, as in
+    /// a zip, it carries forward and the file's values wait for a later backup.
+    public func backUp(folder: String?, title: String, game: GameID, locations: [SaveLocation], registry: RegistrySave? = nil,
+                       retention: Retention?, pcFolders: [Int: String] = [:], now: Date = .now, device: String? = nil, os: String,
+                       comment: String?) throws -> BackupReport {
         let local = try Self.localSaves(locations)
-        guard !local.isEmpty else { throw SaveSyncError.noLocalSaves }
+        // A file with no values is a game that cleared its PlayerPrefs, which replaces what the backup holds.
+        let localRegistry = try registry.flatMap { try Self.localRegistryValues($0) }
+        guard !local.isEmpty || localRegistry != nil else { throw SaveSyncError.noLocalSaves }
 
         let folder = folder ?? LudusaviMapping.escapeFolderName(title)
         let gameDir = root.appendingPathComponent(folder, isDirectory: true)
@@ -252,7 +335,24 @@ public struct LudusaviStore: Sendable {
             state[path] = .local(save.url, FileEntry(hash: hash, size: UInt64(data.count)))
             saves["\(save.location):\(save.relative)"] = hash
         }
-        if !latest.isEmpty, state.mapValues(\.entry) == latest.mapValues(\.entry) {
+        var newRegistry: String?
+        if let registry, let localRegistry {
+            saves[Self.registryHashKey] = Self.registryHash(localRegistry, key: registry.key)
+            // No registry yet starts an empty one. One the latest backup records but that can't be read, such as a damaged
+            // file or a zip, is left as the carry-forward below leaves it, and the values wait for a later backup.
+            let base: RegistryData? = if let held = Self.latestRegistry(mapping, in: gameDir) {
+                Self.registryData(held, in: gameDir)
+            } else if Self.recordsRegistry(mapping) {
+                nil
+            } else {
+                RegistryData()
+            }
+            if var base, base.values(of: registry.key) != localRegistry {
+                base.setValues(localRegistry, of: registry.key)
+                newRegistry = base.regText
+            }
+        }
+        if !mapping.backups.isEmpty, newRegistry == nil, state.mapValues(\.entry) == latest.mapValues(\.entry) {
             return BackupReport(backup: nil, isDifferential: false, filesWritten: 0, paths: paths.origin, pruned: [], saves: saves)
         }
 
@@ -280,12 +380,22 @@ public struct LudusaviStore: Sendable {
         do {
             // A differential inherits only from its full backup, so a registry an earlier differential holds comes along.
             let previousDiff = full?.children.last
-            let registry = Self.latestRegistry(mapping, in: gameDir)
-            let fromDiff = registry != nil && registry?.backup == previousDiff?.name
-            let override: DifferentialBackup.RegistryOverride? = fromDiff ? .init(hash: registry?.hash)
-                : previousDiff?.registry?.hash == nil ? previousDiff?.registry : nil
-            if let registry, !differential || fromDiff {
-                try Self.copyRegistry(registry, in: gameDir, to: backupDir)
+            let carried = Self.latestRegistry(mapping, in: gameDir) ?? Self.unreadableRegistry(mapping, in: gameDir)
+            let registryHash: String?
+            let override: DifferentialBackup.RegistryOverride?
+            if let newRegistry {
+                let text = Data(newRegistry.utf8)
+                try fm.createDirectory(at: backupDir, withIntermediateDirectories: true)
+                try text.write(to: backupDir.appendingPathComponent("registry.reg"))
+                registryHash = Self.sha1(text)
+                override = .init(hash: registryHash)
+            } else {
+                let fromDiff = carried != nil && carried?.backup == previousDiff?.name
+                override = fromDiff ? .init(hash: carried?.hash) : previousDiff?.registry?.hash == nil ? previousDiff?.registry : nil
+                if let carried, !differential || fromDiff {
+                    try Self.copyRegistry(carried, in: gameDir, to: backupDir)
+                }
+                registryHash = carried?.hash
             }
             for (path, source) in copies {
                 guard let drive = LudusaviMapping.splitDrive(path)?.0 else { throw SaveSyncError.unsupportedPath(path) }
@@ -313,7 +423,7 @@ public struct LudusaviStore: Sendable {
             } else {
                 mapping.backups.append(FullBackup(
                     name: name, when: when, os: os, comment: comment, locked: false, semantics: nil,
-                    files: copies.mapValues(\.entry), registryHash: registry?.hash, children: []))
+                    files: copies.mapValues(\.entry), registryHash: registryHash, children: []))
             }
             if let retention { pruned = mapping.forgetExcessBackups(retention) }
             try writeMapping(mapping, to: mappingURL, expecting: original)
@@ -339,20 +449,22 @@ public struct LudusaviStore: Sendable {
     /// Nil when Ludusavi would restore none, such as a recorded hash whose file is missing or can't be read.
     static func latestRegistry(_ mapping: LudusaviMapping, in gameDir: URL) -> StoredRegistry? {
         guard let full = mapping.backups.last else { return nil }
-        func stored(_ hash: String?, in backup: String) -> StoredRegistry? {
-            guard let hash else { return nil }
-            // Ludusavi looks inside a zip backup. VNDegen can't, so it takes the registry to be there.
-            if backup.hasSuffix(".zip") { return StoredRegistry(hash: hash, backup: backup, files: []) }
-            let folder = backup == "." ? gameDir : gameDir.appendingPathComponent(backup, isDirectory: true)
-            let files = registryFiles.filter { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
-            guard files.contains(where: { readable($0, in: folder) }) else { return nil }
-            return StoredRegistry(hash: hash, backup: backup, files: files)
-        }
         if let diff = full.children.last, let override = diff.registry {
-            if let found = stored(override.hash, in: diff.name) { return found }
+            if let found = stored(override.hash, in: diff.name, gameDir: gameDir) { return found }
             if override.hash == nil { return nil }
         }
-        return stored(full.registryHash, in: full.name)
+        return stored(full.registryHash, in: full.name, gameDir: gameDir)
+    }
+
+    /// The registry files `backup` holds under the recorded `hash`, nil when it records none or none can be read.
+    static func stored(_ hash: String?, in backup: String, gameDir: URL) -> StoredRegistry? {
+        guard let hash else { return nil }
+        // Ludusavi looks inside a zip backup. VNDegen can't, so it takes the registry to be there.
+        if backup.hasSuffix(".zip") { return StoredRegistry(hash: hash, backup: backup, files: []) }
+        let folder = backup == "." ? gameDir : gameDir.appendingPathComponent(backup, isDirectory: true)
+        let files = registryFiles.filter { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        guard files.contains(where: { readable($0, in: folder) }) else { return nil }
+        return StoredRegistry(hash: hash, backup: backup, files: files)
     }
 
     /// Whether Ludusavi could read the registry file `name` in `folder`: it reads the file as UTF-8, and a `.reg` file
@@ -361,7 +473,9 @@ public struct LudusaviStore: Sendable {
     static func readable(_ name: String, in folder: URL) -> Bool {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)), !data.isEmpty,
               let text = String(data: data, encoding: .utf8) else { return false }
-        guard name.hasSuffix(".reg") else { return true }
+        // Ludusavi deserializes the YAML, so one that doesn't parse is skipped and a differential's falls back to the
+        // full backup's.
+        guard name.hasSuffix(".reg") else { return (try? registryData(yaml: text)) != nil }
         let first = text.drop { $0 == "\u{FEFF}" }.prefix { !$0.isNewline }.trimmingCharacters(in: .whitespaces)
         return first == "Windows Registry Editor Version 5.00" || first == "REGEDIT4"
     }
@@ -608,6 +722,8 @@ public struct RestoreReport: Sendable {
     public var restored: [String]
     /// Paths in the backup that are not saves this engine keeps, such as other games' files or settings.
     public var skipped: [String]
+    /// True when the game's registry values came from the backup too.
+    public var restoredRegistry = false
 }
 
 /// What restoring a backup would do to the saves on this device, by path relative to the save folder.
@@ -620,6 +736,9 @@ public struct RestorePreview: Equatable, Sendable {
     public var unchanged: [String] = []
     /// Saves the backup does not have. Restore leaves them as they are.
     public var kept: [String] = []
+
+    /// How the lists name a game's registry values, such as a Unity game's PlayerPrefs.
+    public static let registryName = "Game settings (registry)"
 }
 
 public struct BackupReport: Sendable {
@@ -670,6 +789,8 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case noStoreFolder(String)
     case engineUnsupported
     case outsideSaveFolder(String)
+    /// The game keeps its saves somewhere else than when the restore's snapshot was taken.
+    case snapshotForOtherFolders
     /// The game's library folder can't be reached, for the reason given.
     case gameFolderUnavailable(String)
 
@@ -699,6 +820,8 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case .engineUnsupported: "Save sync does not support this game's engine yet."
         case let .gameFolderUnavailable(reason): "The game's folder can't be reached. \(reason)"
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
+        case .snapshotForOtherFolders:
+            "The saves kept before the last restore are from another save folder, such as before the game changed how it runs. Nothing was changed."
         }
     }
 }

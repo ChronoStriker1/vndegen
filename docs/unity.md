@@ -1,13 +1,15 @@
 # Unity feasibility study
 
-Roadmap item 10. This study classifies the library's Unity games from their files, weighs each way of running them, and ends with options for the maintainer. No engine was built. It ran on Linux, reading metadata and assemblies only. It decoded no game art, ran no game code, and used no Unity runtime.
+Roadmap item 10. **Decided 2026-11-05:** VNDegen detects Unity games (option 1, done), and on a Mac opens them outside VNDegen, through the game's own Mac version or the player's CrossOver (option 2, built: see [Mac launcher](#mac-launcher)). iPhone and iPad keep the page's explanation. Options 3 and 4 aren't being done.
+
+This study classifies the library's Unity games from their files, weighs each way of running them, and ends with options for the maintainer. No engine was built. It ran on Linux, reading metadata and assemblies only. It decoded no game art, ran no game code, and used no Unity runtime.
 
 Each claim is marked **verified** (measured from game files or run here), **read** (from a named source), or **inferred** (my judgment from those).
 
 ## Summary
 
 - **The library holds 123 Unity folders, not the 60 in the roadmap.** The 60 predates the 2026-10-31 additions. 118 were read: 95 Mono and 23 IL2CPP, 336 GB unpacked. 2 were left out under the project's leave-out rule, and 3 are installers that can't be read without running them.
-- **On Mac, they should run today through Rosetta and Wine or CrossOver, though no game was tested for this study.** VNDegen could hand a game to the player's own copy at small cost, shipping no Wine. Nothing about this route is native, and it depends on Rosetta, which Apple is cutting back after macOS 27.
+- **On Mac, they run today through Rosetta and CrossOver.** The [option 2 proof](#option-2-proof) took four games to their titles and played two, with no per-game setup beyond a Windows font. VNDegen could hand a game to the player's own copy at small cost, shipping no Wine. Nothing about this route is native, and it depends on Rosetta, which Apple is cutting back after macOS 27.
 - **On iPhone and iPad, the only real route is a reimplementation of Unity's engine running the game's .NET code in an interpreter.** It can't reach IL2CPP games. That's months of work for a first group of 18 to 46 games, with no project anywhere that has shown it working on a commercial game.
 - **Unity's own players are out.** The terms grant distribution only to a game's own developer, inside that developer's project. They don't work technically either: the games' shaders are compiled for Direct3D only.
 - **Recommendation: don't build a Unity engine now.** Add the small Mac launcher if having these games in one library is worth about a week. Run a time-boxed spike on the engine only if playing these games on iPad is worth months of work.
@@ -166,7 +168,7 @@ Not allowed, and it wouldn't work. No Unity runtime was downloaded for this stud
 
 ### Translating x86
 
-**Mac: real, and available now.** On Apple silicon, Wine runs as an x86-64 program under Rosetta 2 and handles 32-bit code, which covers the 30 x86 games (read, from WineHQ's notes and press reports). D3D11 reaches Metal through DXVK and MoltenVK or Apple's D3DMetal (public knowledge, not checked here). Rosetta 2 stays fully available through macOS 27, then a reduced version remains for older games (read, reports of Apple's documentation, as Apple's page wouldn't load here). Whether that subset will cover Wine is unknown. This route covers Mono and IL2CPP alike. No game was tested for this study, because the Macs were off limits.
+**Mac: real, and available now.** On Apple silicon, Wine runs as an x86-64 program under Rosetta 2 and handles 32-bit code, which covers the 30 x86 games (read, from WineHQ's notes and press reports). D3D11 reaches Metal through DXVK and MoltenVK or Apple's D3DMetal (public knowledge, not checked here). Rosetta 2 stays fully available through macOS 27, then a reduced version remains for older games (read, reports of Apple's documentation, as Apple's page wouldn't load here). Whether that subset will cover Wine is unknown. This route covers Mono and IL2CPP alike. No game was tested for the study itself, because the Macs were off limits then. The [option 2 proof](#option-2-proof) later ran four, through D3DMetal and, for a 32-bit game, wined3d on MoltenVK.
 
 Wine is LGPL (public knowledge, as its license page refused automated fetches), which the roadmap's License rules don't allow in shipped new engines. Launching the player's own CrossOver or Wine avoids shipping it. Apple's Game Porting Toolkit is free to download, but I couldn't confirm its redistribution terms, so VNDegen shouldn't ship that either.
 
@@ -226,10 +228,12 @@ I found no project that runs commercial Unity games without Unity's player, unde
 
 ## How VNDegen would hold it
 
+Option 1 is built: the Unity plugin (`EngineUnity`) recognizes these games as below, names the Unity version and whether the game is Mono or IL2CPP, and runs on no device, so Play explains itself instead of starting. [engines.md](engines.md#unity) has the rules.
+
 - **Plugin interface.** `EnginePlugin` fits every option without a VNCore change. `detect` can match `UnityPlayer.dll`, `*_Data/globalgamemanagers`, `mainData` or `data.unity3d`, and `compatibilityNote` can tell the player which route applies. A Mac launcher would need its session to start an outside app and wait for it, which the Wine path needs but no engine does today (inferred). I don't expect that to require VNCore to change.
 - **Saves.** 89 of 95 Mono games use `persistentDataPath`, and 77 use PlayerPrefs (verified). On Windows those are `AppData/LocalLow/<company>/<product>` and `HKCU\Software\<company>\<product>` (read, for PlayerPrefs). Company and product names are in `<game>_Data/app.info` (inferred, from Unity's layout).
   - Files map through `saveLocations` directly. For the Mac route they sit inside the Wine prefix, which belongs to the player, so VNDegen would read them and never move the prefix.
-  - **Ludusavi's registry data is a gap.** VNDegen's backups record no registry: `LudusaviStore.swift` writes `registryHash: nil` for a full backup and marks a differential as dropping it (verified). So a game's PlayerPrefs, often its settings and sometimes its progress, wouldn't move between devices until VNDegen handles Ludusavi's registry data. A native engine would convert those values to and from its own store.
+  - **Ludusavi's registry data is only carried along.** Since 0.24.1 a backup VNDegen writes keeps the registry data a Windows PC's backup holds, but VNDegen never applies it on a Mac, iPhone, or iPad (verified, `LudusaviStore.swift` and the 0.24.1 notes). So a game's PlayerPrefs, often its settings and sometimes its progress, wouldn't move between devices until VNDegen reads and writes Ludusavi's registry data. A native engine would convert those values to and from its own store, and the Mac route would write them into the bottle's registry.
 - **Controls.** 93 of 95 games use the legacy `Input` API, which a shim could feed from `EngineSession`'s existing keyboard, mouse and controller mapping, with touch as the mouse (inferred). Games using Rewired (6) or `InControl` need more. On the Mac route, input goes straight to Wine, so VNDegen's mappings and overlay don't apply.
 - **Remove engine files.** With a shim, `UnityPlayer.dll`, `MonoBleedingEdge`, `baselib.dll` and the crash handler would go: 25 to 112 MB in 12 sampled games (verified), a small part of each game. On the Mac route, nothing can go, since the Windows player is what runs.
 - **File name case.** A shim's file calls go through its own `System.IO` layer, which would need `casepath` like the other engines (inferred).
@@ -243,23 +247,81 @@ Sizes are my estimates in agent-thread time, assuming work like the project's ot
 |---|---|---|---|---|
 | **What** | Detect Unity and explain it on the game page | Option 1, plus launch a shipped Mac build or hand off to the player's CrossOver or Wine | One easy game to its title, then playing, on Mac and then an iPad simulator | A real engine with its own UnityEngine, on Mono's interpreter |
 | **Size** | 1 day | About 1 week | 2 to 3 weeks, time-boxed | 3 to 6 months for the 18, 6 to 12 or more for up to 46 to 68, then upkeep |
-| **Mac** | None | In principle all 118 read, untested | 1 game | 18 to 68 games |
+| **Mac** | None | In principle all 118 read. 4 reached their titles in the proof | 1 game | 18 to 68 games |
 | **iPhone, iPad** | None | None | 1 game | 18 to 68 games |
 | **IL2CPP** | None | Mac only | None | None |
 | **3D games** | None | Mac only | None | None |
 | **Lost** | Nothing | Native running, overlay, VNDegen's mappings. PlayerPrefs sync until the registry gap is closed | The time | Fidelity: some games will misbehave in ways hard to diagnose |
 | **Main risk** | None | Rosetta after macOS 27. Depends on software VNDegen doesn't control | It succeeds on one game and says little about the rest | Scope that never ends, as unirecomp-tool found. Mono's future. Unity 6's share keeps rising, and IL2CPP with it |
 
+### Option 2 proof
+
+Run 2026-11-05 on a MacBook Pro with an M5 Max, macOS 27.0.1, in CrossOver Preview 27.0.0 (build 20261006). Everything ran in a new `win10_64` bottle kept in a scratch folder through `CX_BOTTLE_PATH`, with its user folders made real folders inside the bottle and its home drive removed, and was deleted afterwards. A `sandbox-exec` profile blocked every IP connection for Wine and the game (checked with `curl` and `nc` under the same profile). Input was real key presses and clicks, each sent only while the game was the frontmost app. Frame rates are what Metal's performance HUD showed at that moment, not averages, on a 120 Hz display.
+
+| Game | Build | Graphics path | Title | Input | Played | Frame rate |
+|---|---|---|---|---|---|---|
+| Super Mamono Sisters | Mono, x86, Unity 2019.1.7f1 | wined3d on Vulkan through MoltenVK | Yes | Keyboard works | About 50 s of the first stage: moving and attacking | 59 in play, 39 at the tutorial's start |
+| Demon Wants Have Fun! | Mono, x64, Unity 2018.3.0f2 | D3DMetal (Game Porting Toolkit 4.0b2) | Yes, after adding Arial | The pointer follows the mouse. Clicks didn't register, see below | No | 119 to 120 |
+| Hospital Seduction | IL2CPP, x64, Unity 2022.3.25f1 | D3DMetal | Yes | Keyboard works in menus and story | About 45 s from New Game into the story | 117 to 120 |
+| Succubus Showdown | IL2CPP, x64, Unity 6000.3.5f2 | D3DMetal | Yes | Not tried | No | 83 |
+
+Every game ran under Rosetta, which the HUD shows as x86_64. CrossOver picked the graphics path itself: D3DMetal for the 64-bit games, and for the 32-bit one, wined3d's Vulkan renderer, as its log says.
+
+What broke or needs work:
+
+- **Windows fonts.** Demon Wants Have Fun! drew its menu with no text, because it uses Unity's built-in Arial, which the player reads from `C:\Windows\Fonts`, and a new bottle has none there. A copy of the Mac's own Arial in the bottle's Fonts folder brought back "Start game". A launcher would need the bottle to have Windows' core fonts, such as from CrossOver's own installer for them.
+- **Clicks.** Synthetic clicks moved the game's pointer but didn't press anything, in both games tried, while keys worked. Another app's system dialog stayed on screen through those tries, which may explain it, so mouse input is unproven rather than broken.
+- **Window and picture.** Succubus Showdown opened full screen and ignored Unity's window-size arguments. Hospital Seduction's story scene filled only the top left of its window, with black at the right and bottom, which wasn't compared with Windows.
+- **Video.** Hospital Seduction's log says Media Foundation couldn't use the D3D11 device for video and fell back to software decoding. Whether its clip played wasn't seen.
+- **Starting it.** Wine's Mac driver needs the login session's window server, so Wine started over SSH failed to make a window, and Wine started from an app through LaunchServices worked. VNDegen is such an app, and it isn't sandboxed, so it can start CrossOver's command-line `wine` with a bottle as it starts Ren'Py today (inferred).
+
+**Is option 2 worth building?** Yes, if having these games in one library on Mac is worth it: all four reached their titles in an untouched CrossOver bottle, with fonts the one fix that every Unity game using Arial will need. It stays a hand-off. The game runs in its own Wine window, and VNDegen's overlay, controller mapping and save sync don't reach it, while Rosetta's future after macOS 27 decides how long it lasts. Size: about a week, as estimated, made of finding CrossOver, one bottle VNDegen makes for its games with core fonts installed, starting a game and noticing that it quit, showing the shipped Mac build instead where there is one, and pointing save backups at the bottle's `AppData/LocalLow`. Free Wine builds without D3DMetal weren't tried, so a player without CrossOver may get less.
+
 What's left out of every option: Unity's own players (terms, shaders), x86 on iOS (no JIT), rebuilding games (legal and fragile), and a Naninovel-only player (it duplicates the engine and doesn't carry over).
 
 Option 4 has one advantage unirecomp-tool lacked: the real game runs under Wine on the Linux machine, so its behavior can be compared directly. That helps, and doesn't change the scale.
+
+### Mac launcher
+
+Built 2026-11-05 on option 2. On a Mac, Play on a Unity game opens it outside VNDegen. The hub window shows that it's running, with Show game, and the session ends when the game quits, so play time, the hub's Quit to library, and the save backup after a session work as for other games. The game runs in its own window, so VNDegen's overlay, controller mapping and cheats don't reach it.
+
+- **Its own Mac version** when the game ships one, such as SiNiSistar 2's `MAC/SiNiSistar2.app`. The button reads Open Mac version, and the page's Run with option can pick CrossOver instead. An app unpacked from an archive made on Windows has lost its execute bits, so VNDegen gives the main executable its own back before opening it. The code signature doesn't cover file modes. Its saves are in `~/Library/Application Support/<bundle identifier>`, where SiNiSistar 2's own log puts `persistentDataPath`. Its PlayerPrefs, in a preferences file, aren't synced.
+- **The Windows version through the player's CrossOver** otherwise. The button reads Play in CrossOver. VNDegen finds CrossOver by its bundle identifier, `com.codeweavers.CrossOver`, which CrossOver Preview shares, and checks for Rosetta. Without either, the page says what to install. VNDegen ships no Wine.
+
+**One bottle, never the player's.** VNDegen makes `<Application Support>/VNDegen/Unity/Bottles/VNDegen` on the first Play (35 seconds on the MacBook), from CrossOver's `win10_64` template. Every CrossOver call names it by absolute path with `--scope private`, because a bare name follows `CX_BOTTLE_PATH`, which a player's CrossOver.conf can set in its `[EnvironmentVariables]` over the environment VNDegen passes (read in CrossOver's CXBottle.pm, and shown live: a bare name reached a decoy bottle, the absolute path never did). VNDegen refuses any command whose bottle doesn't resolve into its own Bottles folder, or whose folder is inside CrossOver's own. CrossOver's Application Support, its preferences and `~/Applications/CrossOver` were the same before and after setup and every run. Before each launch, VNDegen updates the bottle with `--update-only` and then:
+
+- replaces the Windows user's folders, which CrossOver links to the Mac's Desktop, Documents, Downloads and so on, with folders of the bottle's, each holding a file so Wine can't put the link back, and removes every drive but C: and Z:, Z: being how Wine reaches the game's folder;
+- copies the Mac's own core fonts (Arial, Times New Roman, Courier New, Verdana, Georgia, Tahoma, Trebuchet MS, Comic Sans MS and Impact, from `/System/Library/Fonts/Supplemental`) into `C:\Windows\Fonts`, which brought back Demon Wants Have Fun!'s menu text;
+- runs every later call with `--no-update`, and the game with Wine's menu builder off, so nothing lands in `~/Applications/CrossOver`.
+
+A shipped game can reach the network, as on a PC, and the page says so. Test builds block it with `-unityNoNetwork YES`, which runs every CrossOver process under `sandbox-exec`. The game, Wine's launcher and `wineserver` were checked to be sandboxed.
+
+**Starting and ending.** The game is `wine`'s first plain argument, which `wine` turns into a Z: path. Wine starts the game's window app through LaunchServices, so macOS keeps VNDegen in front. VNDegen finds the app whose `WINEPREFIX` is its bottle and hands it the focus, which took 4 to 10 seconds. Quit to library runs Wine's `taskkill` without `/f`, which closes the game as its close button does (2 to 4 seconds in the checks), then ends that game's process with `taskkill /f` after 10 seconds if it's still running, which reaches no other game in the bottle: VNDegen doesn't start a game whose exe has the same name as one still running there.
+
+**Saves and PlayerPrefs.** Saves sync from the bottle's `AppData/LocalLow/<company>/<product>`, named in `<Game>_Data/app.info`. Backups from Windows, Proton and a Mac build map to it, and the Unity player's own logs and `Unity` cache folder there are left out. PlayerPrefs move with Ludusavi's registry data through VNCore's `RegistrySave`: only `HKEY_CURRENT_USER\Software\<company>\<product>`, and only that key's own values. Before a launch, VNDegen writes the values from `PlayerPrefs.reg` in the game's data directory into the bottle with Wine's regedit, deleting the values the file lacks, never the key, so its subkeys and every other key stay. After the game quits it reads them back. A backup writes them into the backup's `registry.reg` as Ludusavi does, with every other key unchanged and Ludusavi's hash. A restore takes them from `registry.reg`, or from an older backup's `registry.yaml`, and its Undo covers them. Demon Wants Have Fun! opened at the width its restored PlayerPrefs set, and Hospital Seduction in the window size they set.
+
+**Checked on the MacBook (CrossOver Preview 27.0.0).**
+
+| Game | Ran | Notes |
+|---|---|---|
+| Demon Wants Have Fun! (Mono x64) | Title, then Start game by a click | Menu text draws with the copied fonts. Closing its window ended the session. |
+| Hospital Seduction (IL2CPP) | Title, new game, story by clicks and Return | Full screen by default, where the story scene fills the window. |
+| Super Mamono Sisters (Mono x86) | Title | Its own Quit Game ended the session. |
+| SiNiSistar 2 (Mac version) | Title | Notarized. Needed its execute bit back. |
+
+The proof's two caveats:
+
+- **Clicks** work. The proof's clicks failed because they were posted at the HID event tap while another app's system dialog covered the button. Clicks posted at the session tap pressed buttons in both games.
+- **Hospital Seduction's top-left scene** happens when the game runs in a window smaller than the display, such as 1280 by 720: its story scene fills only the top left. Turning CrossOver's high resolution mode (`RetinaMode`) on in VNDegen's bottle halved the window's size in points and drew the scene the same way, so it isn't a setting VNDegen can fix. The game starts full screen, where the scene is right. Video in Hospital Seduction and Succubus Showdown's window size weren't checked again.
+
+Not checked: a backup and restore against a real Ludusavi share from the app (the store's tests cover the registry rules), a player without CrossOver or Rosetta (the page and Play text are in the code and tests), free Wine builds, and the Mac mini.
 
 ### Recommendation
 
 **Not worth building an engine for these games now.** It's the largest engine family in the library, but it's also the worst fit for how VNDegen has grown: every shipped engine has a runtime or a format small enough to finish, and this one has neither. The 23 IL2CPP games and the 33 3D games wouldn't come along, and the newest games are moving away from it.
 
 1. **Do option 1 now**, whichever else is chosen, so a game's page says plainly why it can't run.
-2. **Do option 2 if the maintainer wants these games in one library on Mac.** It's the only route that reaches most of the library at a small cost. First, spend half a day on three games on a Mac: one x86 Mono, one x64 Mono and one IL2CPP, in CrossOver. That's the bigger proof worth doing, since this study couldn't touch a Mac.
+2. **Do option 2 if the maintainer wants these games in one library on Mac.** It's the only route that reaches most of the library at a small cost. First, spend half a day on three games on a Mac: one x86 Mono, one x64 Mono and one IL2CPP, in CrossOver. That's the bigger proof worth doing, since this study couldn't touch a Mac. (Done: see [Option 2 proof](#option-2-proof).)
 3. **Run option 3 only if iPad play of the 2D and VN Mono games is worth months.** Start with half a day on a simulator, showing the Mono interpreter loading an assembly that wasn't in the app. If that fails, stop there. Otherwise take one of the 18 easiest games, such as The Rural Homecoming (Naninovel) or Super Mamono Sisters, with a firm stop at three weeks. Go on to option 4 only if the second game costs much less than the first.
 
 The decision for the maintainer: is iPad play of these games worth months, and is a Mac hand-off, not native, acceptable?

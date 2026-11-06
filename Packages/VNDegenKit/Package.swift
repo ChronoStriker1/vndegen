@@ -22,6 +22,7 @@ let package = Package(
         .library(name: "EngineWolfRPG", targets: ["EngineWolfRPG"]),
         .library(name: "EngineAliceSoft", targets: ["EngineAliceSoft"]),
         .library(name: "EngineNekoSDK", targets: ["EngineNekoSDK"]),
+        .library(name: "EngineUnity", targets: ["EngineUnity"]),
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
@@ -140,6 +141,10 @@ let package = Package(
                              .linkedFramework("CoreText", .when(platforms: [.iOS, .macOS])),
                              .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .macOS]))]),
         .target(name: "EngineNekoSDK", dependencies: ["VNCore", "CNekoSDK", "FrameHost"], swiftSettings: mainActorByDefault),
+        // Recognizes Unity games so their page can say why they can't run. It runs none (docs/unity.md).
+        .target(name: "EngineUnity", dependencies: ["VNCore", "RegistryFile"], swiftSettings: mainActorByDefault),
+        // Reads and writes regedit's .reg files and Ludusavi's registry data, for Unity's PlayerPrefs. Foundation only.
+        .target(name: "RegistryFile"),
         // The Artemis engine's C interface and the Ogg Vorbis decoder its audio uses. The engine itself is a static
         // library the app links, found at run time.
         .target(name: "CArtemis", exclude: ["third_party"]),
@@ -148,7 +153,7 @@ let package = Package(
         .target(name: "Metadata", dependencies: ["VNCore", "ControllerUI"]),
         .target(name: "Lock", dependencies: ["VNCore", "ControllerUI"], swiftSettings: mainActorByDefault),
         .target(name: "HubUI", dependencies: ["VNCore", "ControllerUI", "GameInput", "Metadata", "Lock", "SaveSync", "ArchiveImport", "RuntimePackages", "FontPack", "WebRuntime"], swiftSettings: mainActorByDefault),
-        .target(name: "SaveSync", dependencies: ["VNCore", "ControllerUI", "Rclone"]),
+        .target(name: "SaveSync", dependencies: ["VNCore", "ControllerUI", "Rclone", "RegistryFile"]),
         // rclone's library, built by scripts/rclone-runtime.sh from Rclone/rclone.go. Not in git: scripts/build.sh makes it.
         .binaryTarget(name: "CRclone", path: "build/CRclone.xcframework"),
         .target(name: "Rclone", dependencies: ["CRclone"],
@@ -177,7 +182,7 @@ let package = Package(
         .testTarget(name: "ControllerUITests", dependencies: ["ControllerUI", "VNCore"]),
         .testTarget(name: "LockTests", dependencies: ["Lock", "VNCore"]),
         .testTarget(name: "HubUITests", dependencies: ["HubUI", "VNCore", "GameInput", "Metadata", "Lock", "SaveSync", "EngineRenPy"]),
-        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
+        .testTarget(name: "SaveSyncTests", dependencies: ["SaveSync", "Rclone", "RegistryFile", "EngineRPGMaker", "EngineRenPy"], exclude: ["Fixtures"]),
         .testTarget(name: "RcloneTests", dependencies: ["Rclone", "CRclone"]),
         .testTarget(name: "ArchiveImportTests", dependencies: ["ArchiveImport"], exclude: ["Fixtures"]),
         .testTarget(name: "RuntimePackagesTests", dependencies: ["RuntimePackages"]),
@@ -188,6 +193,8 @@ let package = Package(
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
         .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK"]),
+        .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile"]),
+        .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
     ],
     cxxLanguageStandard: .cxx17

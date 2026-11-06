@@ -49,6 +49,10 @@ struct PluginInfo {
             EngineID("alicesoft"): PluginInfo(versions: "AliceSoft System 3.0 to 3.9 and System 4",
                                               runtime: "VNDegen's System 3 runtime, in C, and System 4 runtime, in C++",
                                               license: "VNDegen, MIT"),
+            EngineID("unity"): PluginInfo(versions: "Unity 4 to Unity 6, Mono and IL2CPP builds for Windows",
+                                          runtime: "Mac only: the game's own Mac version, or the Windows version through your CrossOver",
+                                          license: "VNDegen, MIT. CrossOver is the player's own and isn't included",
+                                          notHere: "VNDegen can't run Unity games on iPhone or iPad. It recognizes them so their page can say why."),
         ]
     }()
 }

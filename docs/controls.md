@@ -13,6 +13,8 @@ Each game has its own control method (Automatic, Touch gamepad, Mouse, or Contro
 
 The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3, R3, and the sticks come from a real controller.
 
+On a phone held upright, and on an iPad or an iPad window that is taller than it is wide, the game moves to the top of the screen and the touch controls fill the space below it, so none of them covers the game. The game keeps its shape. A 4:3 game fills the space above the controls, and a wider game fills the width with a dark band above and below it. With the cursor mouse style, under Mouse or Controller, the cursor still moves when you drag anywhere on the screen, and its Home button sits below the game. Mouse by touch, and Controller without a cursor, have no overlay, so the game stays in the middle of the screen. In landscape the controls sit over the game as before.
+
 ## Buttons in games
 
 In a game, the controller is an Xbox controller, except in engines with no gamepad support. Every button, from the touch gamepad or a real controller, reaches the game as the same Xbox button, and the game reads it with its own gamepad support. RPG Maker MV and MZ map a gamepad themselves, so A confirms, B cancels, X dashes, Y opens the menu, LB and RB turn pages, and the D-pad and left stick move. Like a real Xbox controller there, the Menu, View, and trigger buttons do nothing unless the game uses them.

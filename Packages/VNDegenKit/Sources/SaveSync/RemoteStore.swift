@@ -77,8 +77,9 @@ struct RemoteStore: Sendable {
     }
 
     /// Brings down the backup folders a restore of `backup` (nil for the latest) reads: its full backup and, for a
-    /// differential, that one. Folders already in the mirror move only where they differ.
-    func fetch(_ folder: String, backup: String?) async throws {
+    /// differential, that one. Folders already in the mirror move only where they differ. With `registryOnly`, only
+    /// their registry files come, which is all a status check needs beyond mapping.yaml.
+    func fetch(_ folder: String, backup: String?, registryOnly: Bool = false) async throws {
         let mapping = try local.mapping(folder)
         var names: [String] = []
         for full in mapping.backups {
@@ -88,8 +89,10 @@ struct RemoteStore: Sendable {
         guard !names.isEmpty else { throw SaveSyncError.noBackups }
         // A full backup named `.` keeps its files in drive folders at the top of the game folder, and its registry data there too.
         let rules = names.flatMap { name in
-            name == "." ? ["/\(Self.glob(folder))/drive-*/**"] + LudusaviStore.registryFiles.map { "/\(Self.glob(folder))/\($0)" }
-                : ["/\(Self.glob(folder))/\(Self.glob(name))/**"]
+            let top = name == "." ? "/\(Self.glob(folder))" : "/\(Self.glob(folder))/\(Self.glob(name))"
+            let registry = LudusaviStore.registryFiles.map { "\(top)/\($0)" }
+            if registryOnly { return registry }
+            return name == "." ? ["\(top)/drive-*/**"] + registry : ["\(top)/**"]
         }
         try await call("sync/sync", ["srcFs": root, "dstFs": mirror.path, "_filter": ["IncludeRule": rules]])
     }
