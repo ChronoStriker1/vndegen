@@ -76,6 +76,7 @@ New bugs get a GitHub issue and a line here.
 - [#39](https://github.com/ChronoStriker1/vndegen/issues/39) A launch that fails still sets the game's last played time.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
+- [#44](https://github.com/ChronoStriker1/vndegen/issues/44) No Socks RPG: cutscene layers draw wrong again on iPhone Duo.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
