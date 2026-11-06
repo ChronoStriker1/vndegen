@@ -49,7 +49,7 @@ std::vector<std::string> splitFields(const std::string &rest) {
             start = ++i;
             continue;
         }
-        i += sjisCharLen(rest, i);
+        i += charLen(rest, i);
     }
     return f;
 }
@@ -84,13 +84,13 @@ void Engine::execDll(const std::string &call) {
             start = ++i;
             continue;
         }
-        i += sjisCharLen(rest, i);
+        i += charLen(rest, i);
     }
-    if (dll == "nsfont.dll" && !args.empty() && sjisLower(args[0]) == "gaiji" && args.size() >= 3) {
+    if (dll == "nsfont.dll" && !args.empty() && lowerAscii(args[0]) == "gaiji" && args.size() >= 3) {
         gaiji_.push_back({args[1], args[2]});
         return;
     }
-    logf("exec_dll %s is not emulated", sjisToUtf8(call).c_str());
+    logf("exec_dll %s is not emulated", toUtf8(call).c_str());
 }
 
 void Engine::layerMessage(int layer, const std::string &msg) {
@@ -101,7 +101,7 @@ void Engine::layerMessage(int layer, const std::string &msg) {
         return;
     }
     size_t slash = msg.find('/');
-    std::string verb = sjisLower(msg.substr(0, slash));
+    std::string verb = lowerAscii(msg.substr(0, slash));
     std::string rest = slash == std::string::npos ? std::string() : msg.substr(slash + 1);
     std::vector<std::string> f = splitFields(rest);
     auto find = [&](int id) {
@@ -109,7 +109,7 @@ void Engine::layerMessage(int layer, const std::string &msg) {
     };
     if (verb == "clear") {
         for (const std::string &field : f) {
-            std::string v = sjisLower(trim(field));
+            std::string v = lowerAscii(trim(field));
             if (v == "all") {
                 mspdraw_.clear();
             } else if (auto k = find(atoi(v.c_str())); k != mspdraw_.end()) {
@@ -127,7 +127,7 @@ void Engine::layerMessage(int layer, const std::string &msg) {
         for (size_t i = 1; i < f.size(); i++) {
             size_t eq = f[i].find('=');
             if (eq == std::string::npos) continue;
-            std::string name = sjisLower(trim(f[i].substr(0, eq)));
+            std::string name = lowerAscii(trim(f[i].substr(0, eq)));
             std::optional<double> value = number(f[i].substr(eq + 1));
             if (!value) {
                 logf("MSpDraw set: %s has no usable value", name.c_str());
@@ -143,7 +143,7 @@ void Engine::layerMessage(int layer, const std::string &msg) {
         return;
     }
     if (verb != "draw") {
-        logf("MSpDraw message %s is not emulated", sjisToUtf8(msg).c_str());
+        logf("MSpDraw message %s is not emulated", toUtf8(msg).c_str());
         return;
     }
     // id, then the image tag, which may itself hold commas before its ';', then numbers.

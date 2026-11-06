@@ -43,7 +43,7 @@ private:
         uint64_t offset;
         uint32_t size;
         uint32_t originalSize;
-        uint8_t compression;  // 0 stored, 1 SPB, 2 LZSS
+        uint8_t compression;  // 0 stored, 1 SPB, 2 LZSS, 4 NBZ
     };
     void indexDir(const std::string &dir, const std::string &prefix);
     bool onDisk(std::string_view name, std::string &path) const;

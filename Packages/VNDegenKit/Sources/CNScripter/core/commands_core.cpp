@@ -57,6 +57,11 @@ void cmdDefsub(E &e, const std::string &) {
 
 void cmdSaveDir(E &e, const std::string &) {
     std::string d = e.readStr();
+    // A Ponscripter game's saves are VNDegen's own and stay in their own folder, never the PC's.
+    if (e.ponscripter_) {
+        logf("savedir %s: a Ponscripter game's saves stay in vndegen-saves", toUtf8(d).c_str());
+        return;
+    }
     e.saveDir_ = d;
 }
 
@@ -259,22 +264,6 @@ void cmdTrig(E &e, const std::string &name) {
     e.setVar(v, int(std::lround(r * 1000)));
 }
 
-std::string fullWidthDigits(const std::string &s) {
-    std::string out;
-    for (char c : s) {
-        if (c >= '0' && c <= '9') {
-            out += char(0x82);
-            out += char(0x4F + (c - '0'));
-        } else if (c == '-') {
-            out += char(0x81);
-            out += char(0x7C);
-        } else {
-            out += c;
-        }
-    }
-    return out;
-}
-
 void cmdItoa(E &e, const std::string &name) {
     E::VarRef v = e.readVar();
     e.readComma();
@@ -323,7 +312,7 @@ void cmdSplit(E &e, const std::string &) {
             start = ++i;
             continue;
         }
-        i += sjisCharLen(s, i);
+        i += charLen(s, i);
     }
     size_t k = 0;
     while (e.readComma()) {
@@ -428,6 +417,7 @@ void cmdGetParam(E &e, const std::string &) {
             e.cur_ = caller;
         }
     }
+    if (e.cur_.pos != frame->pos) frame->paramsRead = true;
     frame->pos = e.cur_.pos;
     e.cur_ = mine;
 }
@@ -437,9 +427,9 @@ void cmdGetIni(E &e, const std::string &) {
     e.readComma();
     std::string file = e.readStr();
     e.readComma();
-    std::string section = sjisLower(e.readStr());
+    std::string section = lowerAscii(e.readStr());
     e.readComma();
-    std::string key = sjisLower(e.readStr());
+    std::string key = lowerAscii(e.readStr());
     Bytes data;
     std::string result;
     if (e.fs_.read(file, data)) {
@@ -457,10 +447,10 @@ void cmdGetIni(E &e, const std::string &) {
             };
             line = trim(line);
             if (line.size() > 1 && line[0] == '[') {
-                cur = sjisLower(line.substr(1, line.find(']') - 1));
+                cur = lowerAscii(line.substr(1, line.find(']') - 1));
             } else if (cur == section) {
                 size_t eq = line.find('=');
-                if (eq != std::string::npos && sjisLower(trim(line.substr(0, eq))) == key) {
+                if (eq != std::string::npos && lowerAscii(trim(line.substr(0, eq))) == key) {
                     result = trim(line.substr(eq + 1));
                     // Windows drops a matching pair of quotes around the value.
                     if (result.size() >= 2 && (result.front() == '"' || result.front() == '\'') && result.back() == result.front())
@@ -744,9 +734,20 @@ bool Engine::returnFromSub(const std::string &label) {
     cur_.pos = f.pos;
     cur_.line = f.line;
     cur_.stmt = f.stmt;
-    if (f.hasParams) skipStatement();  // arguments getparam didn't read
+    if (f.hasParams) {
+        // Skip the arguments getparam didn't read. In Ponscripter a word after the arguments it read starts the next
+        // statement, as it does after a built-in command: the Umineko games redefine csp and write "csp %tmp next".
+        skipSpaces();
+        bool word = isalpha(uint8_t(peek())) || peek() == '_';
+        if (!(ponscripter_ && f.paramsRead && word)) skipStatement();
+    }
     jumps_++;
-    if (f.resumeText) inTextLine_ = true;
+    if (f.resumeText) {
+        inTextLine_ = true;
+        caretText_ = f.caret;
+        textLang_ = f.textLang;
+        ponsStyle_ = f.style;
+    }
     return true;
 }
 
