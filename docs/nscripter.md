@@ -128,10 +128,9 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
   keeps neither the text line's language nor the style, so a page replays from its head, whose lines name their
   language. A call frame in the PC format holds only its return offset; which user command it belongs to is worked
   out from the script on load (the name whose label holds where the call was, else the statement's head). VNDegen's
-  own saves keep that beside them, in `saveN.dat.calls`, which stays local and isn't synced, so they always load as
-  they ran; a PC save whose user command jumped to another label before saving, or whose arguments include another
-  user command's name, may not. A sprite `csp` clears also moves to (-500, -500), as on the PC. The PC loads the runtime's save of the
-  Question Arcs' first page to a screen identical to its own load, and the runtime loads the PC's.
+  own saves keep that beside them, in `saveN.dat.calls`, so they load as they ran. A sprite `csp` clears also moves
+  to (-500, -500), as on the PC. The PC loads the runtime's save of the Question Arcs' first page to a screen
+  identical to its own load, and the runtime loads the PC's.
 - A textgosub or pretextgosub routine may draw text of its own; the line it interrupted goes on with its carets,
   language and style as they were. (Inferred: the games' routine draws none.)
 - Malformed UTF-8 (overlong forms, surrogates, values past U+10FFFF) reads a byte at a time, as U+FFFD.
@@ -274,7 +273,11 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   broke a character later than the PC's. `endroll`'s other modes aren't measured. `len` and `mid` count bytes, as in
   NScripter; the games don't use them, and the PC engine wasn't checked. A save made before the first `setwindow`
   writes the default window in the doubled form, where the PC engine writes its own default values (the games set a
-  window first). An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
+  window first). A save without its `saveN.dat.calls` record has its calls worked out from the script: a PC save, and a
+  VNDegen save synced to another device, since the record stays on the device that wrote it. There, a save made
+  inside a user command that jumped to another label before saving, or whose arguments include another user
+  command's name, may load as if it were a different call. An unclosed `~` tag is drawn as it stands, where the PC
+  engine drops the line.
   Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
   that saved; the runtime clears the page and keeps NScripter's savepoints there. The games always set one. With a
   textgosub, a save made before any text follows the statement that saves, where the PC engine keeps the script's start.
