@@ -673,6 +673,13 @@ public:
     // at saveoff, and at the savepoint command.
     bool savepointLive_ = true;
     Bytes savepoint_;
+    // A Ponscripter game with a textgosub moves its savepoint only at a text line's head, before pretextgosub, while
+    // saveon is in effect: to the state at the head of the page, the first text line since the page was cleared.
+    // saveon and saveoff only turn that on and off (measured on the PC).
+    Bytes pageHead_;
+    int pageHeadLine_ = 0, pageHeadStmt_ = 0;
+    bool pageHeadTaken_ = false;
+    bool ponsSaves() const { return ponscripter_ && !textGosub_.empty(); }
     Cursor stmtStart_;  // where the statement being executed began
     void serializeState(Bytes &out);
     void serializeTail(Bytes &out, int line, int stmt);

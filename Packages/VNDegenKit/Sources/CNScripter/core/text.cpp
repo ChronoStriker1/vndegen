@@ -230,6 +230,7 @@ void Engine::clearPage() {
     pushLog();
     page_.clear();
     pageText_.clear();
+    pageHeadTaken_ = false;
     textButtons_.clear();
     resetPen();
     sceneDirty_ = true;
@@ -436,7 +437,9 @@ void Engine::textStep() {
     }
     if (c == '@' || c == '\\') {
         p++;
-        bool page = c == '\\';
+        // A page wait in the language not shown waits without clearing the page, and texec after it leaves the page
+        // too (measured on the PC through where its saves resume).
+        bool page = c == '\\' && !textHiddenByLang();
         textFast_ = false;
         if (page) {
             // The newline right after a page wait doesn't start a new line.
@@ -705,6 +708,7 @@ void cmdSetWindow(E &e, const std::string &name) {
     }
     e.page_.clear();
     e.pageText_.clear();
+    e.pageHeadTaken_ = false;
     e.resetPen();
     e.windowShown_ = false;
     e.sceneDirty_ = true;
@@ -713,6 +717,7 @@ void cmdSetWindow(E &e, const std::string &name) {
 void cmdTextClear(E &e, const std::string &) {
     e.page_.clear();
     e.pageText_.clear();
+    e.pageHeadTaken_ = false;
     e.resetPen();
     e.sceneDirty_ = true;
 }

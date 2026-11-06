@@ -92,6 +92,23 @@ void Engine::freezeSavepoint(bool atTextHead) {
 void Engine::noteStatementStart(bool text) {
     stmtStart_ = cur_;
     if (defineMode_ || !text) return;
+    if (ponsSaves()) {
+        if (!pageHeadTaken_) {
+            pageHead_.clear();
+            serializeState(pageHead_);
+            pageHeadLine_ = cur_.line;
+            pageHeadStmt_ = cur_.stmt;
+            pageHeadTaken_ = true;
+        }
+        // Before the first text, saves follow the statement that saves, as in NScripter.
+        if (savepointLive_ || (saveOn_ && !preTextGosub_.empty())) {
+            savepoint_ = pageHead_;
+            savepointLine_ = pageHeadLine_;
+            savepointStmt_ = pageHeadStmt_;
+            savepointLive_ = false;
+        }
+        return;
+    }
     bool newPage = page_.empty() && pageText_.empty();
     if (newPage || savepointLive_) freezeSavepoint(true);
 }
@@ -523,6 +540,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     caretText_ = false;
     page_.clear();
     pageText_.clear();
+    pageHeadTaken_ = false;
     resetPen();
     windowShown_ = windowUp;
     stack_ = std::move(frames);
@@ -843,12 +861,13 @@ void cmdLoadGame(E &e, const std::string &) { e.loadGame(e.readInt()); }
 void cmdSaveOn(E &e, const std::string &) {
     if (e.autoSaveOff_) return;
     e.saveOn_ = true;
+    if (e.ponsSaves()) return;
     e.savepointLive_ = true;
 }
 
 void cmdSaveOff(E &e, const std::string &) {
     if (e.autoSaveOff_) return;
-    if (e.savepointLive_) e.freezeSavepoint();
+    if (e.savepointLive_ && !e.ponsSaves()) e.freezeSavepoint();
     e.saveOn_ = false;
 }
 

@@ -8,6 +8,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #include "engine.h"
 
@@ -487,6 +488,46 @@ static void reviewRound3() {
     fs::remove_all(dir);
 }
 
+// Where a save resumes in a game with a textgosub, as the PC's saves recorded it in lab scripts shaped like the games':
+// the head of the page, at a text line's head while saveon is in effect, and a hidden page wait doesn't clear the page.
+static std::string savepointAfter(const std::string &body, int clicks) {
+    char temp[] = "/tmp/vnns-ponscripter-savepoint-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    fs::create_directories(dir / "fonts");
+    fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+    std::string script = "*define\npretextgosub *pt\ntextgosub *tg\ngame\n*pt\nsaveon\nreturn\n"
+                         "*tg\ngetreadlang %70\nif %70 = 1 goto *tgend\nsaveoff\nclick\n*tgend\ntexec\nreturn\n"
+                         "*start\nsaveoff\nsetwindow 31,16,25,20,23,23,0,2,0,1,1,#999999,0,0,639,479\nclick\n"
+                         "langjp!sd\nlangen!sd\n" + body + "wait 100000\n";
+    std::ofstream(dir / "0.utf") << script;
+    vnns::Engine engine({root, root});
+    std::string error;
+    assert(engine.start(&error));
+    for (int i = 0; i < clicks; i++) {
+        for (int j = 0; j < 20; j++) engine.step(16);
+        assert(engine.wait_ == vnns::WaitKind::Click);
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+    }
+    for (int j = 0; j < 20; j++) engine.step(16);
+    std::vector<std::string> lines;
+    std::istringstream in(script);
+    for (std::string l; std::getline(in, l);) lines.push_back(l);
+    fs::remove_all(dir);
+    return engine.savepointLive_ ? "live" : lines.at(size_t(engine.savepointLine_));
+}
+
+static void savepoints() {
+    // The click on "Two" is the third; the page that holds it began at its hidden line.
+    assert(savepointAfter("langjp日本\\\nlangen^Again^\\\nlangjp日本二\\\nlangen^Two^\\\n", 3) == "langjp日本二\\");
+    // On "Again", the page still began at the !sd lines: the hidden page wait before it didn't clear it.
+    assert(savepointAfter("langjp日本\\\nlangen^Again^\\\n", 2) == "langjp!sd");
+    // "Two" opens its page, but saveoff was in effect at its head, so the savepoint stays.
+    assert(savepointAfter("langjp日本\\\nlangen^Again^\\\nlangen^Two^\\\n", 3) == "langjp!sd");
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -497,4 +538,5 @@ int main() {
     reviewRound2();
     endRollUnderDialog();
     reviewRound3();
+    savepoints();
 }
