@@ -105,16 +105,17 @@ public struct LockSettingsView: View {
         Form {
             Section {
                 if lock.hasPasscode {
-                    Button("Change Passcode") { model.select(.changePasscode) }
+                    Button("Change passcode") { model.select(.changePasscode) }
                         .focusRow(model.isFocused(.changePasscode), id: LockSettingsModel.Target.changePasscode)
-                    Button("Remove Passcode", role: .destructive) { model.select(.removePasscode) }
+                    Button("Remove passcode", role: .destructive) { model.select(.removePasscode) }
                         .focusRow(model.isFocused(.removePasscode), id: LockSettingsModel.Target.removePasscode)
                 } else {
-                    Button("Set Passcode") { model.select(.setPasscode) }
+                    Button("Set passcode") { model.select(.setPasscode) }
                         .focusRow(model.isFocused(.setPasscode), id: LockSettingsModel.Target.setPasscode)
                 }
             } header: {
-                Text("Hidden games")
+                // The page around it is titled Hidden games already.
+                Text("Passcode")
             } footer: {
                 Text(lock.needsPasscodeSetup
                      ? "Set a passcode before you lock games."

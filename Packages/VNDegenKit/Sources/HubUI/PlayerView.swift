@@ -26,11 +26,11 @@ struct PlayerView: View {
         ZStack {
             SessionViewHost(session: session)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { gameFrame = $0 }
-                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop))
+                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, camera: metrics.landscapeSideCamera))
             if !menu.isOpen, !isCovered, !session.drawsOwnMenu {
                 // The same frame as the game's view, so its normalized locations match the game's.
                 PointerView(mouse: hub.input.mouse, drawsArrow: overlayMode != .cursor)
-                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop))
+                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, camera: metrics.landscapeSideCamera))
             }
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
@@ -54,7 +54,8 @@ struct PlayerView: View {
                 // In a short iPad window the gamepad's top row would reach the window's controls. The cursor's pad covers
                 // the whole screen, so it keeps the full height, and its Home button sits in the other corner.
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input,
-                                     gameFrame: gamePaneHeight == nil ? nil : gameFrame)
+                                     gameFrame: gamePaneHeight == nil && metrics.landscapeSideCamera == nil ? nil : gameFrame,
+                                     controlsBelowGame: gamePaneHeight != nil)
                     .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
                     // Below the game, a side inset's camera is up beside the game, so the gamepad keeps the safe area's
                     // width but sits in the middle of the screen. The cursor's pad keeps the whole screen. The on-screen
@@ -686,15 +687,19 @@ private struct RotateHint: View {
 }
 
 /// Places the game's view: full screen, or `height` tall at the top, below the camera housing, when it sits above the touch
-/// controls. The engine keeps the game's aspect ratio inside the view either way.
+/// controls. In landscape it keeps clear of a camera down one side. The engine keeps the game's aspect ratio inside the
+/// view either way.
 private struct GamePane: ViewModifier {
     let height: CGFloat?
     let top: CGFloat
+    let camera: (edge: HorizontalEdge, width: CGFloat)?
 
     func body(content: Content) -> some View {
         content
             .frame(height: height)
             .padding(.top, height == nil ? 0 : top)
+            .padding(.leading, camera?.edge == .leading ? camera?.width ?? 0 : 0)
+            .padding(.trailing, camera?.edge == .trailing ? camera?.width ?? 0 : 0)
             .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
     }

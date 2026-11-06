@@ -816,10 +816,10 @@ final class Navigator {
         let path = SettingsView.displayPath(hub.library.folder(for: id))
         let stays = "Saves VNDegen keeps for the game in its own data folder stay, and so do the game's artwork, play time, and settings, which come back if you put the folder back. Saves the game writes inside its folder go with it."
         #if os(macOS)
-        let message = "VNDegen moves the game's folder, \(path), to the Trash. \(stays)"
+        let message = "VNDegen moves the game's folder, \(path), to the Trash.\n\n\(stays)"
         let action = "Move to Trash"
         #else
-        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone. \(stays)"
+        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone.\n\n\(stays)"
         let action = "Delete folder"
         #endif
         sheet = .confirm(Confirmation(title: "Remove \(hub.displayTitle(game)) from the library?", message: message,

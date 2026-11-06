@@ -95,6 +95,7 @@ private struct LibraryContainer: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: nav.path)
+        .overlay(alignment: .topTrailing) { CameraHousing() }
         .overlay(alignment: .bottom) {
             if nav.checkingSaves != nil {
                 Label("Checking for newer saves…", systemImage: "arrow.triangle.2.circlepath")
@@ -186,7 +187,8 @@ private struct LibraryContainer: View {
                         .scrollContentBackground(.hidden)
                         .formBesideSideCamera(metrics)
                 }
-                .presentationDetents([.large])
+                // Before Ludusavi is set up the sheet holds one short note.
+                .presentationDetents(model.service.server == nil ? [.medium, .large] : [.large])
                 #if os(macOS)
                 .frame(minWidth: 520, minHeight: 560)
                 #endif
@@ -223,6 +225,23 @@ private struct LibraryContainer: View {
                 #if os(macOS)
                 .frame(minWidth: 560, minHeight: 600)
                 #endif
+        }
+    }
+}
+
+/// Covers the corner around a side camera with the background, so content scrolled up to the top, such as a game
+/// page's details, never shows cut by the camera. It reads as the camera's housing. Nothing elsewhere.
+private struct CameraHousing: View {
+    @Environment(\.hubMetrics) private var metrics
+
+    var body: some View {
+        if metrics.acrossSideCamera {
+            UnevenRoundedRectangle(bottomLeadingRadius: 26, style: .continuous)
+                .fill(Theme.background)
+                .frame(width: metrics.windowControls.trailing, height: metrics.cornerClearance)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 }

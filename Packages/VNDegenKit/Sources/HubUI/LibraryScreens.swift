@@ -32,6 +32,8 @@ private struct ScreenHeader: View {
         .padding(.leading, metrics.topRowPadding(.leading))
         .padding(.trailing, metrics.topRowPadding(.trailing))
         .padding(.top, 10)
+        // The list below starts under a side camera rather than beside it, so nothing scrolls past the camera.
+        .frame(minHeight: metrics.acrossSideCamera ? metrics.cornerClearance : 0, alignment: .top)
         #if os(macOS)
         .padding(.top, 18)
         #endif

@@ -58,6 +58,15 @@ struct HubMetrics: Equatable {
         return size.height > size.width && side > insets.top ? side : 0
     }
 
+    /// The iPhone Duo's outer display, turned on its side, keeps its camera in a safe-area inset down one side of the
+    /// screen and none down the other. iPhones whose camera sits in the Dynamic Island inset both sides alike, so this
+    /// is nil for them, as it is for a portrait screen. A game keeps clear of it, so none of the game sits under the
+    /// camera.
+    var landscapeSideCamera: (edge: HorizontalEdge, width: CGFloat)? {
+        guard size.width > size.height, (insets.leading == 0) != (insets.trailing == 0) else { return nil }
+        return insets.leading > 0 ? (.leading, insets.leading) : (.trailing, insets.trailing)
+    }
+
     /// These metrics for content that reaches across a side camera's inset below the camera: the full width, with the
     /// camera's corner kept clear as an iPad window's controls are, through `topRowPadding` and `cornerClearance`.
     var besideSideCamera: HubMetrics {

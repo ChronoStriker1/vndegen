@@ -29,16 +29,19 @@ public struct TouchControlsOverlay: View {
     let mode: TouchControlsMode
     let mapping: ButtonMapping
     let input: InputHub
-    /// The game's view in the global coordinate space when it shares the screen with the controls rather than filling it,
-    /// as on a phone held upright. The controls then keep below it, so none of them covers the game.
+    /// The game's view in the global coordinate space when it doesn't fill the screen, for the cursor's pointer.
     let gameFrame: CGRect?
+    /// Whether the controls keep below `gameFrame`, so none of them covers the game, as on a phone held upright.
+    let controlsBelowGame: Bool
     @State private var taps = 0
 
-    public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub, gameFrame: CGRect? = nil) {
+    public init(mode: TouchControlsMode, mapping: ButtonMapping, input: InputHub, gameFrame: CGRect? = nil,
+                controlsBelowGame: Bool = false) {
         self.mode = mode
         self.mapping = mapping
         self.input = input
         self.gameFrame = gameFrame
+        self.controlsBelowGame = controlsBelowGame
     }
 
     /// The height `mode`'s controls take below the game in a portrait screen `width` wide, above the safe area's bottom
@@ -59,21 +62,21 @@ public struct TouchControlsOverlay: View {
         GeometryReader { geometry in
             let unit = Self.unit(for: min(geometry.size.width, geometry.size.height))
             // How far down the overlay the controls may start: below the game, when it sits above them.
-            let top = gameFrame.map { max(0, $0.maxY - geometry.frame(in: .global).minY) } ?? 0
+            let top = controlsBelowGame ? gameFrame.map { max(0, $0.maxY - geometry.frame(in: .global).minY) } ?? 0 : 0
             switch mode {
             case .gamepad: GamepadControls(unit: unit, mapping: mapping, press: press).padding(.top, top)
             case .cursor:
                 ZStack(alignment: .topTrailing) {
                     MouseControls(mouse: input.mouse, gameFrame: gameFrame, send: sendPointer)
                     // Below the game the screen is all trackpad, which nothing else would show. Home sits in its corner.
-                    if gameFrame != nil {
+                    if controlsBelowGame {
                         TrackpadHint()
                             .padding(.top, top + 12)
                             .padding([.horizontal, .bottom], 16)
                     }
                     HomeButton(size: unit * 0.62, press: press)
-                        .padding(.top, top + (gameFrame == nil ? 8 : 24))
-                        .padding(.trailing, gameFrame == nil ? 16 : 28)
+                        .padding(.top, top + (controlsBelowGame ? 24 : 8))
+                        .padding(.trailing, controlsBelowGame ? 28 : 16)
                 }
             case .direct, .off: EmptyView()
             }
