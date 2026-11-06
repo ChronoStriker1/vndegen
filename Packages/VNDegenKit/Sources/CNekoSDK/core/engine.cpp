@@ -1625,6 +1625,7 @@ bool Engine::saveToSlot(int slot) {
         return false;
     }
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
+    writeFlipModes(slot, data);
     saveSeen();
     slots_.erase(slot);
     log("saved slot %d at %s #%d", slot, data.scene.c_str(), data.node);
@@ -1647,6 +1648,7 @@ int Engine::newestQuickSlot() {
 void Engine::deleteSlot(int slot) {
     std::remove(savePath(slot, "sav").c_str());
     std::remove(savePath(slot, "bmp").c_str());
+    std::remove(savePath(slot, "vnd").c_str());
     slots_.erase(slot);
     log("deleted slot %d", slot);
     dirty_ = true;
@@ -1661,12 +1663,12 @@ bool Engine::loadFromSlot(int slot) {
         complain("That save couldn't be read.");
         return false;
     }
-    restoreSave(data);
+    restoreSave(data, slot);
     log("loaded slot %d at %s #%d", slot, data.scene.c_str(), data.node);
     return true;
 }
 
-void Engine::restoreSave(const SaveData &d) {
+void Engine::restoreSave(const SaveData &d, int slot) {
     stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
@@ -1700,7 +1702,7 @@ void Engine::restoreSave(const SaveData &d) {
             for (const Node &candidate : flow->nodes)
                 if (candidate.opcode == 1 && candidate.next == call->id) flowCallId_ = candidate.id;
     }
-    std::map<int, FlipModes> flipModes = flipModesAt(d);
+    std::map<int, FlipModes> flipModes = flipModesAt(d, slot);
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         s.path = saved.path;
@@ -2004,14 +2006,17 @@ void Engine::composeDialog(Canvas &out) {
     for (const Button &b : dialog.buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
 }
 
+// A menu's button, or in play the message bar's.
 bool Engine::pressAction(const std::string &action) {
-    if (!screen_) return false;
-    for (const Button &b : screen_->buttons)
-        if (b.action == action) {
-            std::string copy = action;
-            runAction(copy);
-            return true;
-        }
+    const std::vector<Button> *lists[] = {screen_ ? &screen_->buttons : &bar().inner, screen_ ? nullptr : &bar().under};
+    for (const auto *list : lists)
+        if (list)
+            for (const Button &b : *list)
+                if (b.action == action) {
+                    std::string copy = action;
+                    runAction(copy);
+                    return true;
+                }
     return false;
 }
 
@@ -2977,12 +2982,35 @@ void Engine::startFlipbook(const Node &n) {
     back_[p[0]] = s;
 }
 
-// A save holds the picture a flipbook is on but not how it plays. Walking the scene to the saved place finds the command
-// that started each one, following moves between slots: the scene with GOOD Timing's marker up to it, then the script the
-// save is in. A walk that never reaches its place, as when a patch took that node away, says nothing, and a flipbook found
-// nowhere repeats, as nearly all of them do.
-std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d) {
+// A save holds the picture a flipbook is on but not how it plays. VNDegen's own saves keep that beside the save, in
+// save###.vnd, which the PC game doesn't read. For a PC save, walking the scene to the saved place finds the command
+// that started each one, following moves between slots: the scene the flow called before, then the scene with GOOD
+// Timing's marker up to it, then the script the save is in. A walk that never reaches its place, as when a patch took that
+// node away, says nothing, and a flipbook found nowhere repeats, as nearly all of them do. A PC save made after Ejaculate
+// was pressed early can't say where the press was, so its walk runs to the marker.
+std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d, int slot) {
     std::map<int, FlipModes> slots;
+    if (slot >= 0) {
+        // `at SCENE NODE`, then `flip SLOT LOOP REVERSE PATH` lines. It counts only when it was written with this save.
+        auto bytes = readWhole(savePath(slot, "vnd"));
+        std::istringstream in(std::string(bytes.begin(), bytes.end()));
+        std::string line, scene;
+        int node = -1;
+        std::map<int, FlipModes> kept;
+        while (std::getline(in, line)) {
+            std::istringstream words(line);
+            std::string kind;
+            words >> kind;
+            if (kind == "at") words >> scene >> node;
+            else if (kind == "flip") {
+                int at = 0, loop = 1, reverse = 0;
+                std::string path;
+                if (words >> at >> loop >> reverse && std::getline(words >> std::ws, path) && !path.empty())
+                    kept[at] = {sjis::fromUtf8(path), loop != 0, reverse != 0};
+            }
+        }
+        if (node >= 0 && normalizedPath(sjis::fromUtf8(scene)) == normalizedPath(d.scene) && node == d.node) return kept;
+    }
     auto walk = [&](const std::string &name, int stopAt) {
         auto script = name.empty() ? nullptr : loadScript(name);
         if (!script) return;
@@ -3003,9 +3031,32 @@ std::map<int, Engine::FlipModes> Engine::flipModesAt(const SaveData &d) {
         }
         if (n ? n->id == stopAt : stopAt == 0) slots = std::move(walked);
     };
+    // The scene before: back along the flow from the call the save is in, to the call before it. Test Game 93 has one scene
+    // that ends with a flipbook still running into the next.
+    if (auto flow = d.flow.empty() ? nullptr : loadScript(d.flow)) {
+        int at = d.flowNode;
+        for (int guard = 0; guard < 4096; guard++) {
+            const Node *before = nullptr;
+            for (const Node &candidate : flow->nodes)
+                if (candidate.next == at) before = &candidate;
+            if (!before) break;
+            if (before->opcode == 1) {
+                walk(before->s[1], 0);
+                break;
+            }
+            at = before->id;
+        }
+    }
     if (!d.gtScene.empty() && normalizedPath(d.gtScene) != normalizedPath(d.scene)) walk(d.gtScene, d.gtMarker);
     walk(d.scene, d.node);
     return slots;
+}
+
+void Engine::writeFlipModes(int slot, const SaveData &d) {
+    std::string text = "at " + sjis::toUtf8(d.scene) + " " + std::to_string(d.node) + "\n";
+    for (const auto &[at, s] : front_)
+        if (s.flipCount) text += "flip " + std::to_string(at) + " " + (s.flipLoop ? "1" : "0") + " " + (s.flipReverse ? "1" : "0") + " " + sjis::toUtf8(s.path) + "\n";
+    writeWhole(savePath(slot, "vnd"), std::vector<uint8_t>(text.begin(), text.end()));
 }
 
 void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots) {

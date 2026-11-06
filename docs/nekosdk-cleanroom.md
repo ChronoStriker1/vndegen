@@ -169,7 +169,7 @@ A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the mi
 
 The block after the sprite records holds a count at byte 22 and that many sprite numbers after the block's fixed part, in every game seen. The PC's save made at a choice names the choice as its flow node. Its later blocks also hold state the runtime doesn't write, and a save of ours naming the choice makes the PC run past it, so ours names the scene before, and the PC then asks the choice itself.
 
-A flipbook's sprite record has 0 in its second byte and its current picture where other records have 0. A splash's record has no picture and 35 more bytes. Test Game 88's text records are 4 bytes shorter than Test Game 97's.
+A flipbook's sprite record has 0 in its second byte and its current picture where other records have 0. The record doesn't say whether the flipbook repeats or runs backward, so a save of VNDegen's keeps that beside it, in `save###.vnd`, with the scene and node it was made at, and uses it only when they still match. For a PC save the runtime walks the script to the saved node, after the scene the flow called before it, since one scene of Test Game 93 leaves a flipbook running into the next. A PC save made after Ejaculate was pressed early holds the marker but not where the press was, so its walk runs to the marker; that matters only if the same slot starts the same picture again with other modes, or erases it, between the two. A splash's record has no picture and 35 more bytes. Test Game 88's text records are 4 bytes shorter than Test Game 97's.
 
 ## Menus
 

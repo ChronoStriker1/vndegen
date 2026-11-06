@@ -151,7 +151,7 @@ private:
     int firstQuickSlot_ = 81, lastQuickSlot_ = 88, nextQuickSlot_ = 81;
     bool barPinned_ = false;
     SaveData captureSave();
-    void restoreSave(const SaveData &data);
+    void restoreSave(const SaveData &data, int slot = -1);
     void noteThumbnail();
     struct SlotInfo {
         bool exists = false;
@@ -174,7 +174,8 @@ private:
     void advanceFlipbooks();
     void resumeFlipbook(Sprite &s);
     struct FlipModes { std::string path; bool loop, reverse; };
-    std::map<int, FlipModes> flipModesAt(const SaveData &d);
+    std::map<int, FlipModes> flipModesAt(const SaveData &d, int slot);
+    void writeFlipModes(int slot, const SaveData &d);
     void takeScaleAnchor(Sprite &s, const Node &n);
     void anchorOf(const Sprite &s, int &x, int &y) const;
     bool paintedOnBlack(const std::string &path);
