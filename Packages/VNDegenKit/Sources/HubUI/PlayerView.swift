@@ -83,11 +83,12 @@ struct PlayerView: View {
                 Button(action: menuButton) {
                     // The same house as the touch controls' Home button, which opens the same menu.
                     Image(systemName: "house.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(width: 36, height: 36)
+                        .font(.system(size: 16, weight: .bold))
+                        .frame(width: 42, height: 42)
                         .background(.ultraThinMaterial, in: .circle)
-                        .opacity(0.75)
-                        .frame(width: 44, height: 44)
+                        .overlay { Circle().strokeBorder(.white.opacity(0.25)) }
+                        .opacity(0.8)
+                        .frame(width: 48, height: 48)
                         .contentShape(.circle)
                 }
                 .buttonStyle(.plain)

@@ -627,33 +627,41 @@ struct ConfirmationSheet: View {
     @Environment(Navigator.self) private var nav
     @Environment(\.hubMetrics) private var metrics
     let confirmation: Confirmation
+    /// The sheet's height, and how much taller the message is than the room it has. Together they size the sheet to
+    /// its content.
+    @State private var height: CGFloat = 0
+    @State private var overflow: CGFloat = 0
 
     var body: some View {
         // Cancel is the way out, so a Done beside it would only blur which button keeps the game.
         SheetScaffold(title: confirmation.title, escapeCloses: true, showsDone: false) {
             VStack(alignment: .leading, spacing: 22) {
-                // The buttons follow the message. A message too long for the sheet scrolls, so a long path never
-                // pushes them off a small screen.
-                ViewThatFits(in: .vertical) {
-                    details
-                    ScrollView { details }
-                        .scrollBounceBehavior(.basedOnSize)
-                        .scrollPager(nav.pager)
-                }
+                // A message too long for the screen scrolls, so a long path never pushes the buttons off it.
+                ScrollView { details }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollPager(nav.pager)
+                    .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height - $0.containerSize.height } action: { _, extra in
+                        overflow = extra
+                    }
                 HStack(spacing: 12) {
                     HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
                     HubButton(target: .confirmCancel) { Text("Cancel") }
                         .keyboardShortcut(.cancelAction)
                 }
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 22)
         }
-        .fittingDetents(metrics)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .presentationDetents(fitted.map { [.height($0)] } ?? [.medium, .large])
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif
+    }
+
+    /// The sheet's height with the message's room matched to the message. The system keeps it within the screen.
+    private var fitted: CGFloat? {
+        height > 0 ? (height + overflow).rounded() : nil
     }
 
     private var details: some View {

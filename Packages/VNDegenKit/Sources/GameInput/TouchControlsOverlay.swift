@@ -65,15 +65,15 @@ public struct TouchControlsOverlay: View {
             case .cursor:
                 ZStack(alignment: .topTrailing) {
                     MouseControls(mouse: input.mouse, gameFrame: gameFrame, send: sendPointer)
-                    // Below the game the screen is all trackpad, which nothing else would show.
+                    // Below the game the screen is all trackpad, which nothing else would show. Home sits in its corner.
                     if gameFrame != nil {
                         TrackpadHint()
-                            .padding(.top, top + unit * 0.62 + 24)
+                            .padding(.top, top + 12)
                             .padding([.horizontal, .bottom], 16)
                     }
                     HomeButton(size: unit * 0.62, press: press)
-                        .padding(.top, top + 8)
-                        .padding(.trailing, 16)
+                        .padding(.top, top + (gameFrame == nil ? 8 : 24))
+                        .padding(.trailing, gameFrame == nil ? 16 : 28)
                 }
             case .direct, .off: EmptyView()
             }
@@ -155,6 +155,7 @@ private struct GamepadControls: View {
             Text(input.title)
                 .font(.system(size: unit * 0.3, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
+                .shadow(color: .black.opacity(0.6), radius: 1.5)
                 .frame(width: unit * 1.2, height: unit * 0.6)
                 .background(KeyFill(shape: Capsule(style: .circular), pressed: pressed))
         }
@@ -218,6 +219,7 @@ private struct FaceButtons: View {
             Text(input.title)
                 .font(.system(size: unit * 0.4, weight: .heavy, design: .rounded))
                 .foregroundStyle(tint)
+                .shadow(color: .black.opacity(0.6), radius: 1.5)
                 .frame(width: unit, height: unit)
                 .background(KeyFill(shape: Circle(), pressed: pressed))
         }
@@ -234,22 +236,23 @@ private struct DPad: View {
     var body: some View {
         let arm = size * 0.34
         ZStack {
-            DPadCross(arm: arm, length: size * 0.94).fill(.ultraThinMaterial).opacity(0.7)
+            DPadCross(arm: arm, length: size * 0.94).fill(.ultraThinMaterial).opacity(0.4)
             // The pressed arms light up, from the center out.
             ForEach(Self.directions, id: \.self) { direction in
                 Rectangle()
-                    .fill(.white.opacity(held.contains(direction) ? 0.4 : 0.06))
+                    .fill(.white.opacity(held.contains(direction) ? 0.4 : 0.04))
                     .frame(width: arm, height: size * 0.47)
                     .offset(y: -size * 0.235)
                     .rotationEffect(direction.armAngle)
             }
             .clipShape(DPadCross(arm: arm, length: size * 0.94))
-            DPadCross(arm: arm, length: size * 0.94).stroke(.white.opacity(0.22), lineWidth: 1)
+            DPadCross(arm: arm, length: size * 0.94).stroke(.white.opacity(0.32), lineWidth: 1)
             Circle().fill(.black.opacity(0.18)).frame(width: arm * 0.5)
             ForEach(Self.directions, id: \.self) { direction in
                 Image(systemName: "arrowtriangle.up.fill")
                     .font(.system(size: arm * 0.24))
-                    .foregroundStyle(.white.opacity(held.contains(direction) ? 1 : 0.75))
+                    .foregroundStyle(.white.opacity(held.contains(direction) ? 1 : 0.85))
+                    .shadow(color: .black.opacity(0.6), radius: 1.5)
                     .offset(y: -size * 0.33)
                     .rotationEffect(direction.armAngle)
                     .opacity(mapping.action(for: direction) == .nothing ? 0.35 : 1)
@@ -470,10 +473,11 @@ private struct KeyFill<S: InsettableShape>: View {
     let pressed: Bool
 
     var body: some View {
+        // Light enough that the game shows through where the keys sit over it, with an outline that holds on any scene.
         ZStack {
-            shape.fill(.ultraThinMaterial).opacity(0.7)
-            shape.fill(.white.opacity(pressed ? 0.4 : 0.06))
-            shape.strokeBorder(.white.opacity(pressed ? 0.6 : 0.22), lineWidth: 1)
+            shape.fill(.ultraThinMaterial).opacity(0.4)
+            shape.fill(.white.opacity(pressed ? 0.4 : 0.04))
+            shape.strokeBorder(.white.opacity(pressed ? 0.6 : 0.32), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
     }
@@ -488,6 +492,7 @@ private struct RoundKey: View {
         Image(systemName: symbol)
             .font(.system(size: size * 0.4, weight: .semibold))
             .foregroundStyle(.white.opacity(0.9))
+            .shadow(color: .black.opacity(0.6), radius: 1.5)
             .frame(width: size, height: size)
             .background(KeyFill(shape: Circle(), pressed: pressed))
     }
@@ -509,11 +514,11 @@ private struct TrackpadHint: View {
                 .multilineTextAlignment(.center)
                 .opacity(0.8)
         }
-        .foregroundStyle(.white.opacity(0.4))
+        .foregroundStyle(.white.opacity(0.62))
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.white.opacity(0.03), in: shape)
-        .overlay { shape.strokeBorder(.white.opacity(0.1), lineWidth: 1) }
+        .background(.white.opacity(0.05), in: shape)
+        .overlay { shape.strokeBorder(.white.opacity(0.18), lineWidth: 1) }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

@@ -273,8 +273,9 @@ final class Navigator {
     var shelves: [(shelf: Shelf, games: [Game])] {
         let visible = visibleGames
         // The header list and the grid show every game, so Recently played would only repeat the top of All games,
-        // which already lists the last played first.
-        let recent = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        // which already lists the last played first. So would a shelf of one game, which the hero shows too.
+        let played = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        let recent = played.count > 1 ? played : []
         let all: [(Shelf, [Game])] = [
             (.recent, recent),
             (.all, visible.filter { !$0.isLocked }),

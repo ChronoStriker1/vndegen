@@ -152,6 +152,7 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
+                .formBesideSideCamera(metrics)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
                 .onChange(of: nav.focus) { _, focus in
@@ -329,6 +330,7 @@ extension View {
 struct SettingsPageSheet: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
+    @Environment(\.hubMetrics) private var metrics
     let page: Navigator.SettingsPage
 
     var body: some View {
@@ -336,15 +338,15 @@ struct SettingsPageSheet: View {
             switch page {
             case .metadata:
                 SheetScaffold(title: "Metadata sources", escapeCloses: true) {
-                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden)
+                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .lock:
                 SheetScaffold(title: "Hidden games") {
-                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden)
+                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
-                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
+                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .plugins:
                 SheetScaffold(title: "Plugins", subtitle: "Engines built into VNDegen", escapeCloses: true) {

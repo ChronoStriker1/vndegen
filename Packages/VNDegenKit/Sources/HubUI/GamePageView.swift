@@ -115,7 +115,7 @@ struct GamePageView: View {
                 // controller focus moves down to them.
                 VStack(alignment: .leading, spacing: 12) {
                     playButton
-                    FlowLayout(spacing: 10) { secondaryButtons(labels: true) }
+                    FlowLayout(spacing: 10) { secondaryButtons(labels: true, allLabeled: true) }
                 }
                 .onAppear { nav.pageActionsStacked = true }
             }
@@ -135,8 +135,9 @@ struct GamePageView: View {
             .accessibilityLabel(title)
     }
 
+    /// `allLabeled` names the folder and Remove buttons too, for the narrow layout whose rows wrap and have room.
     @ViewBuilder
-    private func secondaryButtons(labels: Bool) -> some View {
+    private func secondaryButtons(labels: Bool, allLabeled: Bool = false) -> some View {
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
             labeled("Artwork", "photo.on.rectangle", labels)
         }
@@ -150,12 +151,19 @@ struct GamePageView: View {
             labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels)
         }
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
-        // The folder and Remove buttons have icons only, as they matter less and the row is long already.
-        HubButton(target: .pageShowFolder, kind: .icon) { Image(systemName: "folder").accessibilityLabel(FileBrowser.openTitle) }
-        if hub.library.offersEngineFiles(game.id) {
-            HubButton(target: .pageEngineFiles, kind: .icon) { Image(systemName: "externaldrive.badge.minus").accessibilityLabel("Remove engine files") }
+        // Elsewhere the folder and Remove buttons have icons only, as they matter less and the row is long already.
+        HubButton(target: .pageShowFolder, kind: allLabeled ? .secondary : .icon) {
+            labeled(FileBrowser.openTitle, "folder", allLabeled)
         }
-        HubButton(target: .pageRemove, kind: .icon) { Image(systemName: "trash").accessibilityLabel("Remove from library") }
+        if hub.library.offersEngineFiles(game.id) {
+            HubButton(target: .pageEngineFiles, kind: allLabeled ? .secondary : .icon) {
+                labeled("Remove engine files", "externaldrive.badge.minus", allLabeled)
+            }
+        }
+        HubButton(target: .pageRemove, kind: allLabeled ? .secondary : .icon) {
+            labeled(allLabeled ? "Remove" : "Remove from library", "trash", allLabeled)
+        }
+        .accessibilityLabel("Remove from library")
     }
 
     @ViewBuilder

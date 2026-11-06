@@ -431,7 +431,8 @@ struct CheatsView: View {
                     .lineLimit(2)
             }
         }
-        .frame(width: min(560, max(0, metrics.size.width - 64)))
+        // The card's padding around it varies with the screen, so it takes the width it is offered, up to a limit.
+        .frame(maxWidth: 560)
         .frame(maxHeight: max(200, metrics.size.height - (metrics.isShort ? 60 : 90)))
         .task { await page.load() }
     }

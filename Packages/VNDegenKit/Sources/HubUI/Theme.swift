@@ -155,6 +155,13 @@ extension View {
             .ignoresSafeArea(.container, edges: metrics.sideCamera > 0 ? .horizontal : [])
     }
 
+    /// A form across a side camera's inset. A form takes its side margins from the system's safe area, which the hub
+    /// ignores there, so without margins of its own it would run to the trailing edge.
+    @ViewBuilder
+    func formBesideSideCamera(_ metrics: HubMetrics) -> some View {
+        if metrics.acrossSideCamera { contentMargins(.horizontal, 20, for: .scrollContent) } else { self }
+    }
+
     /// A sheet's content under metrics from `besideSideCamera`: across the camera's inset too, with its header's
     /// trailing button kept clear of the camera when the sheet reaches up beside it.
     func sheetBesideSideCamera() -> some View {

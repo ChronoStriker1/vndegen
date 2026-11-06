@@ -71,6 +71,7 @@ public struct HubRootView: View {
 private struct LibraryContainer: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
+    @Environment(\.hubMetrics) private var metrics
     @State private var dropTargeted = false
 
     var body: some View {
@@ -181,7 +182,9 @@ private struct LibraryContainer: View {
         case let .saves(model):
             if let game = hub.library.game(model.game) {
                 SheetScaffold(title: "Saves", subtitle: hub.displayTitle(game), escapeCloses: true) {
-                    GameSavesView(model: model) { nav.sheet = .settingsPage(.saves) }.scrollContentBackground(.hidden)
+                    GameSavesView(model: model) { nav.sheet = .settingsPage(.saves) }
+                        .scrollContentBackground(.hidden)
+                        .formBesideSideCamera(metrics)
                 }
                 .presentationDetents([.large])
                 #if os(macOS)

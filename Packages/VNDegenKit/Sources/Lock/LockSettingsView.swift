@@ -151,6 +151,7 @@ public struct LockSettingsView: View {
 private struct PasscodeFlowSheet: View {
     let model: LockSettingsModel
     let entry: PasscodeEntry
+    @Environment(\.cameraCornerTrailing) private var cameraCorner
 
     var body: some View {
         NavigationStack {
@@ -161,6 +162,9 @@ private struct PasscodeFlowSheet: View {
                                    keySize: 72, onSubmit: model.submit)
                 }
             }
+            // Beside a camera in the top corner the system insets that whole side, which would push the keypad off
+            // center below the camera too. The navigation bar keeps its own inset.
+            .ignoresSafeArea(.container, edges: cameraCorner > 0 ? .horizontal : [])
             .navigationTitle(entry.flow?.purpose.title ?? "")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
