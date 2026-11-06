@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.24.2",
+          "buildVersion": "1273",
+          "date": "2026-11-05T22:49:28Z",
+          "localizedDescription": "Unity games now show up in the library with a page that says why VNDegen can't run them, and Individual Voices works in the two NekoSDK games.\n\n## Downloads\n\n- `VNDegen-0.24.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.24.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## New: Unity games are recognized\n\n- VNDegen finds Unity games and says on their page why it can't run them: Unity's terms don't let another app include its player, and the game's code and graphics are made for Windows. The page gives the game's Unity version and whether it's Mono or IL2CPP, and says when the game ships its own Mac version, which you can open from its folder. Pressing Play explains the same.\n- A game another engine already runs keeps that engine. [unity.md](https://github.com/ChronoStriker1/vndegen/blob/main/docs/unity.md) has the study behind this.\n\n## Fixes\n\n- NekoSDK: Config's Individual Voices boxes work in The Alchemist & His Battle-Scarred Homunculus (Mel, Other-Female, Other-Male) and Yarinaoshi no Christmas (Sonya). Before, they were greyed out. Unchecking a speaker silences their lines and their background voice, including one already playing, and checking it again brings it back.\n\n## Known limits\n\n- NekoSDK: the voice settings stay in VNDegen's own file, as Config's other settings do, so they don't move to a PC copy of the game.\n- Unity games don't run in VNDegen. A launcher that opens them in CrossOver on a Mac is being built for a later release.\n\n## What wasn't tested\n\n- No physical device was used. The voice boxes were checked in the Mac app and on an iPad simulator. The muting was checked by recording the runtime's sound on Linux, because the Mac can't record an app's sound.\n- Unity detection was checked across the library's folder listings and in the app for a Mono game, an IL2CPP game, and SiNiSistar 2. A few games packed in installers aren't recognized.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.24.2/VNDegen-0.24.2.ipa",
+          "size": 122966692,
+          "sha256": "d9301caafc138686c9e2fd038f02f55db59d9705ec6eb661db1bd854f2f6e1d0",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.24.1",
           "buildVersion": "1258",
           "date": "2026-11-05T20:06:49Z",

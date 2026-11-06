@@ -113,6 +113,10 @@ scene.
 - A shake is a burst of about 300 ms that dies away, by frame-to-frame motion in the recording. Type 4 moves sideways and
   type 8 moves both ways, inferred from the order of the bursts against the order of the commands.
 
+## Individual Voices
+
+`cfg\voice_type.ini` gives each speaker a type, `#type N`, and lists how the names of their voice files start. Types from 50 hold the background voices of the speaker 50 below. Recordings of a NekoSDK game's sound under Wine show that an unchecked speaker's lines and background voice don't play. The Alchemist's Audio tab has boxes for Mel and the two Misc types, drawn from a sheet of four columns of which the second is unused, and Yarinaoshi no Christmas's has one for Sonya. The boxes' places and their rows for on, off and hovered were matched against the PC game.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.
