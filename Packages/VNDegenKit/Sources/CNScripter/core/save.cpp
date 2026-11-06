@@ -648,8 +648,12 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                     size_t q = end;
                     while (q < t.size() && (t[q] == ' ' || t[q] == '\t')) q++;
                     char next = q < t.size() ? t[q] : '\n';
-                    if (name == "gosub" || name == "selgosub" || name == "csel")
-                        return next == '*' || next == '$' || next == '"' || next == '`';
+                    if (name == "gosub" || name == "selgosub" || name == "csel") {
+                        if (next == '*' || next == '$' || next == '"' || next == '`') return true;
+                        size_t w = q;  // or a string alias standing for the label or string
+                        while (w < t.size() && (isalnum(uint8_t(t[w])) || t[w] == '_')) w++;
+                        return w > q && strAlias_.count(lowerAscii(t.substr(q, w - q)));
+                    }
                     return luaCommands_.count(word) && next != ',';
                 };
                 std::string callee(script_.labelAt(innerLine));
@@ -833,7 +837,12 @@ bool Engine::saveGame(int slot, const std::string &note) {
         // A record a failed move left as .new may be the only one matching the save now in the slot: it goes into
         // place before this save's takes its name, or this save fails.
         Bytes current;
-        if (readFile(path, current)) {
+        struct stat st;
+        if (lstat(path.c_str(), &st) == 0 && !readFile(path, current)) {
+            logf("could not read %s to keep its call record, so the save isn't written", path.c_str());
+            return false;
+        }
+        if (!current.empty()) {
             uint64_t h = fnv1a(current);
             if (recordHash(pending) == std::optional<uint64_t>(h) && recordHash(record) != std::optional<uint64_t>(h) &&
                 rename(pending.c_str(), record.c_str()) != 0) {
@@ -1000,7 +1009,8 @@ void Engine::importPcSaves() {
         return std::all_of(low.begin() + 4, low.end() - 4, [](char c) { return c >= '0' && c <= '9'; });
     };
     auto readAt = [](int dirFd, const std::string &name, Bytes &out) {
-        int fd = openat(dirFd, name.c_str(), O_RDONLY | O_NOFOLLOW);
+        // Non-blocking, so a pipe of a save's name can't hold the game's start; only a plain file is read.
+        int fd = openat(dirFd, name.c_str(), O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
         if (fd < 0) return false;
         struct stat st;
         bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size <= (64 << 20);
@@ -1084,42 +1094,42 @@ void Engine::importPcSaves() {
         Bytes data;
     };
     std::vector<Copy> copies;
+    // Reads one file to copy. A plain file that can't be read now leaves everything as it was, to try again next
+    // time; a link, or anything but a plain file, is passed over.
+    auto take = [&](int dirFd, const std::string &name, bool shot) {
+        Copy c{name, shot, {}};
+        if (readAt(dirFd, name, c.data)) {
+            copies.push_back(std::move(c));
+            return true;
+        }
+        struct stat st;
+        bool plain = fstatat(dirFd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISREG(st.st_mode) &&
+                     st.st_size <= (64 << 20);
+        if (plain)
+            logf("the PC engine's saves can't all be read now (%s); VNDegen tries again next time", name.c_str());
+        return !plain;
+    };
     std::vector<Entry> pcEntries = listAt(pcFd, failed);
     for (const Entry &e : pcEntries) {
         std::string low = lowerAscii(e.name);
         bool wanted = slot(e.name) || low == "global.sav" || low == "envdata";
         if (e.folder || !wanted || !findFolder(own, low.c_str()).empty()) continue;
-        copies.push_back({e.name, false, {}});
-        if (!readAt(pcFd, e.name, copies.back().data)) copies.pop_back();  // a link, or not a plain file
+        if (!take(pcFd, e.name, false)) return;
     }
     std::string pcShotName = findFolder(pcEntries, "screenshot");
-    int pcShotFd = pcShotName.empty() ? -1 : openat(pcFd, pcShotName.c_str(), O_RDONLY | O_DIRECTORY);
-    if (pcShotFd >= 0) {
+    if (!pcShotName.empty()) {
+        int pcShotFd = openat(pcFd, pcShotName.c_str(), O_RDONLY | O_DIRECTORY);
+        if (pcShotFd < 0) return;
         closer.fds.push_back(pcShotFd);
         for (const Entry &e : listAt(pcShotFd, failed)) {
             std::string low = lowerAscii(e.name);
             if (e.folder || low.size() <= 4 || low.compare(low.size() - 4, 4, ".bmp") != 0 ||
                 !findFolder(ownShots, low.c_str()).empty())
                 continue;
-            copies.push_back({e.name, true, {}});
-            if (!readAt(pcShotFd, e.name, copies.back().data)) copies.pop_back();
+            if (!take(pcShotFd, e.name, true)) return;
         }
     }
     if (failed) return;
-    // A source that can't be read now leaves everything as it was, to try again next time.
-    for (const Entry &e : pcEntries) {
-        std::string low = lowerAscii(e.name);
-        bool wanted = !e.folder && (slot(e.name) || low == "global.sav" || low == "envdata") &&
-                      findFolder(own, low.c_str()).empty();
-        auto copying = [&](const Copy &c) { return !c.shot && c.name == e.name; };
-        if (wanted && std::none_of(copies.begin(), copies.end(), copying)) {
-            struct stat st;
-            if (fstatat(pcFd, e.name.c_str(), &st, 0) == 0 && S_ISREG(st.st_mode) && st.st_size <= (64 << 20)) {
-                logf("the PC engine's saves can't all be read now (%s); VNDegen tries again next time", e.name.c_str());
-                return;
-            }
-        }
-    }
     if (copies.empty() && pending.empty()) return;
     if (ownFd < 0) {
         ownName = saveDir_;

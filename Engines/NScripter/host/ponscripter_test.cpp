@@ -2,6 +2,7 @@
 // entries, ":b" images, and proportional text. The behaviour each checks was measured on the Umineko games' engine
 // (docs/nscripter-cleanroom.md).
 #include <bzlib.h>
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <cassert>
@@ -954,6 +955,12 @@ static void reviewLanding4Round3() {
                              "*foo\ngetparam %1\nsaveon\nsavegame 1\nclick\ngetparam %2\nmov %1,%2\nreturn\n";
     straight = run(gosubAlias, 0);
     assert(straight.first == 8 && straight.second == 9 && run(gosubAlias, 2) == straight);
+    // A gosub to a label a string alias names is a gosub.
+    std::string gosubStrAlias = "*define\ndefsub foo\ndefsub bar\nstralias dest,\"*sub\"\ngame\n*start\nfoo 7 mov %9,9" +
+                                tail + "*foo\nmov %8,8 bar 1 gosub dest\nreturn\n*bar\ngetparam %2\nreturn\n"
+                                "*sub\nsaveon\nsavegame 1\nclick\ngetparam %1\nreturn\n";
+    straight = run(gosubStrAlias, 0);
+    assert(straight.first == 7 && straight.second == 9 && run(gosubStrAlias, 2) == straight);
     // A record left as .new, the only one matching the save in the slot, isn't lost to the next save: if it can't go
     // into place, that save is refused, and the slot's save still loads with it.
     {
@@ -970,6 +977,11 @@ static void reviewLanding4Round3() {
         assert(vnns::readFile((dir / "vndegen-saves" / "save1.dat").string(), saved));
         assert(!engine.saveGame(1, "note") && fs::exists(record.string() + ".new"));
         vnns::Bytes kept;
+        assert(vnns::readFile((dir / "vndegen-saves" / "save1.dat").string(), kept) && kept == saved);
+        // Nor when the slot's save can't be read to check: the save is refused.
+        fs::permissions(dir / "vndegen-saves" / "save1.dat", fs::perms::none);
+        assert(!engine.saveGame(1, "other") && fs::exists(record.string() + ".new"));
+        fs::permissions(dir / "vndegen-saves" / "save1.dat", fs::perms::owner_read | fs::perms::owner_write);
         assert(vnns::readFile((dir / "vndegen-saves" / "save1.dat").string(), kept) && kept == saved);
         fs::remove_all(record);
     }
@@ -1092,6 +1104,23 @@ static void importPcSaves() {
     start();
     assert(read(own / "save12.dat") == "twelve" && read(own / "screenshot" / "ss1.bmp") == "shot" &&
            fs::exists(own / "vndegen-imported-pc-saves.txt") && !fs::exists(own / "vndegen-importing-pc-saves.txt"));
+    assert(snapshot(pc) == before);
+    // A pipe of a save's name doesn't hold the start, and isn't copied.
+    fs::remove_all(own);
+    assert(mkfifo((pc / "save13.dat").c_str(), 0644) == 0);
+    start();
+    assert(!fs::exists(own / "save13.dat") && read(own / "save12.dat") == "twelve");
+    fs::remove(pc / "save13.dat");
+    // A thumbnail, or the thumbnails' folder, that can't be read now: nothing is copied, and a later run copies all.
+    for (const fs::path &locked : {pc / "screenshot" / "ss1.bmp", pc / "screenshot"}) {
+        fs::remove_all(own);
+        fs::permissions(locked, fs::perms::none);
+        start();
+        fs::permissions(locked, fs::is_directory(locked) ? fs::perms::owner_all : fs::perms::owner_read | fs::perms::owner_write);
+        assert(!fs::exists(own) || snapshot(own).empty());
+        start();
+        assert(read(own / "screenshot" / "ss1.bmp") == "shot" && read(own / "save12.dat") == "twelve");
+    }
     assert(snapshot(pc) == before);
     fs::remove_all(dir);
 }
