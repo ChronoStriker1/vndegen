@@ -75,14 +75,13 @@ New bugs get a GitHub issue and a line here.
 - [#38](https://github.com/ChronoStriker1/vndegen/issues/38) SaveSync test fails outside build.sh: case-insensitive fallback folder.
 - [#39](https://github.com/ChronoStriker1/vndegen/issues/39) A launch that fails still sets the game's last played time.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
-- [#41](https://github.com/ChronoStriker1/vndegen/issues/41) iPhone portrait: touch controls cover the game; put the game on top and the controls below.
-- [#42](https://github.com/ChronoStriker1/vndegen/issues/42) Home screen: the library view and All games buttons do the same job; keep one.
+- [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - NekoSDK stage 3, on `feat/nekosdk-stage3`: Test Games 84, 85, 88, 89, 92, 93 and 94, with movies through the app's FFmpeg. The other six games come after it.
 - Ponscripter ([#26](https://github.com/ChronoStriker1/vndegen/issues/26)), on `feat/ponscripter`.
-- iPhone portrait layout and the library view button ([#41](https://github.com/ChronoStriker1/vndegen/issues/41), [#42](https://github.com/ChronoStriker1/vndegen/issues/42)), on `feat/portrait-controls`.
+- An iPhone Duo layout audit of every screen, on `feat/portrait-controls`. A Claude and a Codex judge each score it out of 10, until both give 9.0 or higher. The portrait split ([#41](https://github.com/ChronoStriker1/vndegen/issues/41)) and the single library view button ([#42](https://github.com/ChronoStriker1/vndegen/issues/42)) are on `dev` for the next release.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
