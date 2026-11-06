@@ -16,6 +16,8 @@ public actor AlphaVideoCache {
     public static let limit = 512 << 20
     private let root = URL.cachesDirectory.appendingPathComponent("AlphaVideo-v1", isDirectory: true)
     private var cleaned = false
+    /// Clips already logged as having no alpha, so their repeated range requests don't log again.
+    private var opaqueLogged = Set<String>()
 
     public func clear() throws {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
@@ -75,11 +77,13 @@ public actor AlphaVideoCache {
         switch vnalpha_inspect(source, &error, Int32(error.count)) {
         case 1: break
         case 0:
-            log.notice("alpha video \(name, privacy: .public): no alpha track, served as WebM")
+            if opaqueLogged.insert(path).inserted {
+                log.notice("alpha video \(name, privacy: .public): no alpha track, served as WebM")
+            }
             return nil
         default:
             let reason = String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-            log.error("alpha video \(name, privacy: .public): unreadable, \(reason, privacy: .public)")
+            log.error("alpha video \(name, privacy: .public): can't be checked, \(reason, privacy: .public)")
             throw CocoaError(.fileReadUnknown)
         }
         var info = stat()

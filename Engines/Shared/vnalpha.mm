@@ -366,13 +366,17 @@ int vnalpha_inspect(int source, char *error, int error_size) {
     vnalpha_result result{};
     std::unique_ptr<Conversion> conversion;
     try { conversion = std::make_unique<Conversion>(source, result, ""); return conversion->inspect(); }
-    catch (...) {
-        // WebKit may still play a WebM this parser rejects, as long as the parser could read it.
-        int failure = conversion ? conversion->readFailure() : 0;
-        if (!failure) return 0;
-        snprintf(error, error_size, "%s", strerror(failure));
-        return -1;
+    catch (const std::exception& failure) {
+        // A converter that can't start, such as a VP9 decoder short of memory, can't tell either way.
+        if (!conversion) { snprintf(error, error_size, "%s", failure.what()); return -1; }
     }
+    catch (...) {
+        if (!conversion) { snprintf(error, error_size, "Converter failed to start"); return -1; }
+    }
+    // WebKit may still play a WebM this parser rejects, as long as the parser could read it.
+    if (!conversion->readFailure()) return 0;
+    snprintf(error, error_size, "%s", strerror(conversion->readFailure()));
+    return -1;
 }
 int vnalpha_convert(int source, const char *destination, vnalpha_control *control, vnalpha_result *result, char *error, int error_size) {
     @autoreleasepool {
