@@ -225,6 +225,10 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     if (buttonPlate_ && buttonPlate_->w >= width_) barTop_ = plateY_;
     plateHiddenY_ = config_.number("MsgWinButtonPlateBottomPosY", height_);
     if (Bytes ini = files_.read(config_.text("MsgButtonDeclFilename", "cfg\\msg_button.ini"))) messageButtons_ = parseMessageButtons(*ini, *images_);
+    if (Bytes ini = files_.read(config_.text("MsgButtonPlayViewDeclFilename", "cfg\\msg_button_playview.ini"))) {
+        replayButtons_ = parseMessageButtons(*ini, *images_);
+        hasReplayButtons_ = true;
+    }
     titleBgm_ = config_.text("TitleBGM");
 
     if (const char *table = menuTable(folder_))
@@ -404,6 +408,11 @@ void Engine::runAction(const std::string &action) {
         std::string keep = returnTo_;
         openScreen("config" + action.substr(3));
         returnTo_ = keep;
+        return;
+    }
+    // The bar's Exit in a replay ends the replay at once, back to the gallery, as the PC game does without asking.
+    if (action == "Exit" && replaying_) {
+        endStory("scene");
         return;
     }
     if (action == "quit" || action == "Exit") { openDialog(7, [this] { waiting_ = Waiting::Ended; }); return; }
@@ -1984,11 +1993,11 @@ void Engine::composeMessageButtons(Canvas &out) {
     };
     if (innerButtonsShown()) {
         if (fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
-        for (const Button &b : messageButtons_.inner) drawButton(out, b, state(b));
+        for (const Button &b : bar().inner) drawButton(out, b, state(b));
     }
     if (!underButtonsShown()) return;
     if (!fullWidthPlate()) drawPart(out, *buttonPlate_, plateX_, plateY_, 0, 0, buttonPlate_->w, buttonPlate_->h, 1);
-    for (const Button &b : messageButtons_.under) drawButton(out, b, state(b));
+    for (const Button &b : bar().under) drawButton(out, b, state(b));
 }
 
 // The backlog: the story's frame, dimmed, with a page of the last lines, oldest at the top.
@@ -2634,13 +2643,13 @@ void Engine::mouseButton(int button, bool down) {
         // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
         if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
         if (innerWereShown_)
-            if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.inner)) {
+            if (Button *b = buttonAt(pointerX_, pointerY_, bar().inner)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
             }
         if (underWereShown_)
-            if (Button *b = buttonAt(pointerX_, pointerY_, messageButtons_.under)) {
+            if (Button *b = buttonAt(pointerX_, pointerY_, bar().under)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
