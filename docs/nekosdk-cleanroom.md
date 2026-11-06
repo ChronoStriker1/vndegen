@@ -117,6 +117,10 @@ scene.
 
 `cfg\voice_type.ini` gives each speaker a type, `#type N`, and lists how the names of their voice files start. Types from 50 hold the background voices of the speaker 50 below. Recordings of a NekoSDK game's sound under Wine show that an unchecked speaker's lines and background voice don't play. The Alchemist's Audio tab has boxes for Mel and the two Misc types, drawn from a sheet of four columns of which the second is unused, and Yarinaoshi no Christmas's has one for Sonya. The boxes' places and their rows for on, off and hovered were matched against the PC game.
 
+## Replays
+
+A replay from the Scene gallery uses the bar `MsgButtonPlayViewDeclFilename` names in `init.ini`, `cfg\msg_button_playview.ini`, in place of the usual one. In every game seen it differs only in Exit's help picture, which says the gallery ends rather than the game. Under Wine, Test Game 84's Exit in a replay goes straight back to the Scene Library, with no question.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.

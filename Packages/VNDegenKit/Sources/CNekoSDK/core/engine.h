@@ -348,6 +348,10 @@ private:
     Screen *screen_ = nullptr;
     std::string folder_;
     MessageButtons messageButtons_;
+    // A replay from the gallery has its own bar, msg_button_playview.ini, whose Exit leaves the replay.
+    MessageButtons replayButtons_;
+    bool hasReplayButtons_ = false;
+    MessageButtons &bar() { return replaying_ && hasReplayButtons_ ? replayButtons_ : messageButtons_; }
     ImageRef buttonPlate_;
     int plateX_ = 0, plateY_ = 0, plateHiddenY_ = 0;
     int pointerX_ = 0, pointerY_ = 0;
