@@ -26,6 +26,12 @@ struct Writer {
     }
 };
 
+// Positions on the PC Ponscripter engine's doubled screen: doubled as its 32-bit arithmetic does, and halved rounding
+// down.
+static int doubled(int v) { return int(uint32_t(v) * 2u); }
+static int halved(int v) { return int((int64_t(v) - (v < 0 ? 1 : 0)) / 2); }
+static int clampInt(int64_t v) { return int(std::clamp<int64_t>(v, INT32_MIN, INT32_MAX)); }
+
 struct Reader {
     const Bytes &d;
     size_t p = 0;
@@ -116,50 +122,75 @@ void Engine::noteStatementStart(bool text) {
 // ---- serializing ----
 
 // Everything a save holds up to the message history.
+// A Ponscripter game saves in the PC Ponscripter engine's format (black box: lab saves): NScripter's, after a "PNS"
+// header, with positions on the doubled screen, the window by its size in doubled pixels, sprites' shown flags with
+// bit 1 set, its own call stack records, no ruby settings, and ten more fields where NScripter keeps its tail and
+// message history.
 void Engine::serializeState(Bytes &out) {
     Writer w{out};
     const SaveExtras &x = extras_;
-    w.i(2);
+    const bool pns = ponscripter_;
+    auto pos = [&](int v) { return pns ? doubled(v) : v; };
+    if (pns) {
+        out.insert(out.end(), {'P', 'N', 'S', 2, 6});
+        for (int v : x.pnsHead) w.i(v);
+    } else {
+        w.i(2);
+    }
     w.i(win_.bold ? 1 : 0);
     w.i(win_.shadow ? 1 : 0);
     w.i(x.h12);
     w.i(rmode_ ? 1 : 0);
-    // The text color is stored red, blue, green.
-    w.i(chR(textColor_));
-    w.i(chB(textColor_));
-    w.i(chG(textColor_));
+    // The text color is stored red, blue, green. The PC Ponscripter engine stores white there, whatever textcolor set.
+    uint32_t color = pns ? x.pnsColor : textColor_;
+    w.i(chR(color));
+    w.i(chB(color));
+    w.i(chG(color));
     w.s(x.h32);
     w.s(x.h33);
     w.i(windowEffect_.type);
     w.i(windowEffect_.duration);
     w.s(windowEffect_.mask);
-    w.i(win_.tx);
-    w.i(win_.ty);
-    w.i(win_.cols);
-    w.i(win_.rows);
-    w.i(win_.fw);
-    w.i(win_.fh);
-    w.i(win_.fw + win_.px);
-    w.i(win_.fh + win_.py);
+    if (pns) {
+        // The text area's size: columns of the font width and twice the pitch, rows of the height and twice the
+        // spacing, all doubled. The font width isn't kept; Ponscripter's is its height.
+        w.i(doubled(win_.tx));
+        w.i(doubled(win_.ty));
+        w.i(clampInt(int64_t(win_.cols) * 2 * (int64_t(win_.fw) + 2 * int64_t(win_.px))));
+        w.i(clampInt(int64_t(win_.rows) * 2 * (int64_t(win_.fh) + 2 * int64_t(win_.py))));
+        w.i(doubled(win_.fh));
+        w.i(x.pnsWindow);
+        w.i(doubled(win_.px));
+        w.i(doubled(win_.py));
+    } else {
+        w.i(win_.tx);
+        w.i(win_.ty);
+        w.i(win_.cols);
+        w.i(win_.rows);
+        w.i(win_.fw);
+        w.i(win_.fh);
+        w.i(win_.fw + win_.px);
+        w.i(win_.fh + win_.py);
+    }
     w.i(win_.imageWindow ? -1 : int(rgbOf(win_.color)));
     w.i(textSpeed_);
-    w.i(win_.x1);
-    w.i(win_.y1);
-    w.i(win_.x2);
-    w.i(win_.y2);
+    w.i(pos(win_.x1));
+    w.i(pos(win_.y1));
+    w.i(pos(win_.x2));
+    w.i(pos(win_.y2));
     w.s(win_.imageWindow ? win_.imageTag : std::string());
     for (int v : x.h100) w.i(v);
     w.s(scene_.bgTag);
     for (const Sprite &s : scene_.ld) w.s(s.loaded ? s.img.tag : std::string());
-    for (const Sprite &s : scene_.ld) w.i(s.x);
-    for (const Sprite &s : scene_.ld) w.i(s.y);
+    for (const Sprite &s : scene_.ld) w.i(pos(s.x));
+    for (const Sprite &s : scene_.ld) w.i(pos(s.y));
     for (int q : x.ldQ) w.i(q);
     for (const Sprite &s : scene_.ld) w.i(s.alpha);
     for (const Sprite &s : scene_.sp) {
         w.s(s.img.tag);
-        w.i(s.x);
-        w.i(s.y);
-        w.i(s.visible ? 1 : 0);
+        w.i(pos(s.x));
+        w.i(pos(s.y));
+        w.i((s.visible ? 1 : 0) | (pns ? 2 : 0));
         w.i(s.cell);
         w.i(s.alpha);
     }
@@ -168,17 +199,25 @@ void Engine::serializeState(Bytes &out) {
         w.s(str_[size_t(k)]);
     }
     // The call stack, flattened: a gosub is its return offset; a for loop is variable, limit, step and the negated
-    // offset of its body. textgosub frames aren't saved: the savepoint is the head of their text page.
+    // offset of its body. textgosub frames aren't saved: the savepoint is the head of their text page. Ponscripter
+    // writes minus the number of frames, then each frame outermost first: 0 and the return offset for a gosub, 1, the
+    // body's offset, variable, limit and step for a for loop.
     std::vector<int> stack;
+    int frames = 0;
     for (const Frame &f : stack_) {
         if (f.kind == Frame::TextGosub) continue;
-        if (f.kind == Frame::For) {
+        frames++;
+        if (pns && f.kind == Frame::For) {
+            stack.insert(stack.end(), {1, int(f.pos), f.var, f.to, f.step});
+        } else if (pns) {
+            stack.insert(stack.end(), {0, int(f.pos)});
+        } else if (f.kind == Frame::For) {
             stack.insert(stack.end(), {f.var, f.to, f.step, -int(f.pos)});
         } else {
             stack.push_back(int(f.pos));
         }
     }
-    w.i(int(stack.size()));
+    w.i(pns ? -frames : int(stack.size()));
     for (int v : stack) w.i(v);
     w.i(scene_.monocro ? 1 : 0);
     uint32_t mono = scene_.monocroColor;
@@ -225,21 +264,27 @@ void Engine::serializeState(Bytes &out) {
     w.i(x.qInt4);
     w.s(loopBgmHead_);
     w.s(loopBgmTail_);
-    w.i(rubyOn_ ? 1 : 0);
-    w.i(rubyOn_ ? rubyW_ : 0);
-    w.i(rubyOn_ ? rubyH_ : 0);
-    w.s(rubyFont_);
+    if (!pns) {
+        w.i(rubyOn_ ? 1 : 0);
+        w.i(rubyOn_ ? rubyW_ : 0);
+        w.i(rubyOn_ ? rubyH_ : 0);
+        w.s(rubyFont_);
+    }
     w.i(x.qInt5);
     for (const Sprite2 &q : scene_.sp2) {
         w.s(q.img.tag);
-        w.i(q.cx);
-        w.i(q.cy);
+        w.i(pos(q.cx));
+        w.i(pos(q.cy));
         w.i(q.scaleX);
         w.i(q.scaleY);
         w.i(q.rot);
-        w.i(q.visible ? 1 : 0);
+        w.i((q.visible ? 1 : 0) | (pns ? 2 : 0));
         w.i(q.alpha);
         w.i(q.blend == Blend::Add ? 1 : q.blend == Blend::Sub ? 2 : 0);
+    }
+    if (pns) {
+        for (int v : x.pnsTail) w.i(v);
+        return;
     }
     for (int k = 0; k < 8; k++) {
         int v = x.tail[k];
@@ -253,19 +298,17 @@ void Engine::serializeState(Bytes &out) {
     w.i(width_ / 2);
     w.i(width_ * 3 / 4);
     w.i(underline_);
-    // A Ponscripter game's saves are VNDegen's own, so they also keep the text state a page replays from: the line's
-    // language, the language shown, and the style.
-    if (ponscripter_) {
-        w.i(textLang_);
-        w.i(shownLang_);
-        w.i(ponsStyle_.base);
-        w.i((ponsStyle_.italic ? 1 : 0) | (ponsStyle_.bold ? 2 : 0));
-    }
 }
 
 // The message history as it is now, then the savepoint's script position.
 void Engine::serializeTail(Bytes &out, int line, int stmt) {
     Writer w{out};
+    // The PC Ponscripter engine keeps no message history in a save.
+    if (ponscripter_) {
+        w.i(line);
+        w.i(stmt);
+        return;
+    }
     w.i(int(log_.size()));
     for (const std::string &p : log_) w.s(p);
     w.i(int(logTags_.size()));
@@ -277,11 +320,20 @@ void Engine::serializeTail(Bytes &out, int line, int stmt) {
 // Reads a save into the engine and positions the script at its savepoint.
 bool Engine::restoreState(const Bytes &data, std::string *error) {
     Reader r{data};
-    if (r.i() != 2) {
+    SaveExtras x;
+    const bool pns = ponscripter_;
+    auto pos = [&](int v) { return pns ? halved(v) : v; };
+    if (pns) {
+        if (data.size() < 5 || memcmp(data.data(), "PNS", 3) != 0) {
+            if (error) *error = "not a Ponscripter save";
+            return false;
+        }
+        r.p = 5;
+        for (int &v : x.pnsHead) v = r.i();
+    } else if (r.i() != 2) {
         if (error) *error = "not an NScripter format-2 save";
         return false;
     }
-    SaveExtras x;
     Scene sc;
     win_.bold = r.i() != 0;
     win_.shadow = r.i() != 0;
@@ -289,25 +341,39 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     rmode_ = r.i() != 0;
     int tr = r.i(), tb = r.i(), tg = r.i();
     textColor_ = rgba(tr, tg, tb);
+    if (pns) x.pnsColor = textColor_;
     x.h32 = r.s();
     x.h33 = r.s();
     windowEffect_.type = r.i();
     windowEffect_.duration = r.i();
     windowEffect_.mask = r.s();
-    win_.tx = r.i();
-    win_.ty = r.i();
-    win_.cols = r.i();
-    win_.rows = r.i();
-    win_.fw = r.i();
-    win_.fh = r.i();
-    win_.px = r.i() - win_.fw;
-    win_.py = r.i() - win_.fh;
+    if (pns) {
+        win_.tx = halved(r.i());
+        win_.ty = halved(r.i());
+        int width = r.i(), height = r.i();
+        win_.fh = win_.fw = halved(r.i());
+        x.pnsWindow = r.i();
+        win_.px = halved(r.i());
+        win_.py = halved(r.i());
+        int64_t cell = 2 * (int64_t(win_.fw) + 2 * int64_t(win_.px)), line = 2 * (int64_t(win_.fh) + 2 * int64_t(win_.py));
+        win_.cols = cell > 0 ? clampInt(width / cell) : 0;
+        win_.rows = line > 0 ? clampInt(height / line) : 0;
+    } else {
+        win_.tx = r.i();
+        win_.ty = r.i();
+        win_.cols = r.i();
+        win_.rows = r.i();
+        win_.fw = r.i();
+        win_.fh = r.i();
+        win_.px = r.i() - win_.fw;
+        win_.py = r.i() - win_.fh;
+    }
     int color = r.i();
     textSpeed_ = r.i();
-    win_.x1 = r.i();
-    win_.y1 = r.i();
-    win_.x2 = r.i();
-    win_.y2 = r.i();
+    win_.x1 = pos(r.i());
+    win_.y1 = pos(r.i());
+    win_.x2 = pos(r.i());
+    win_.y2 = pos(r.i());
     std::string winImage = r.s();
     win_.imageWindow = color == -1;
     if (win_.imageWindow) {
@@ -321,8 +387,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     std::string ldTags[3];
     for (auto &t : ldTags) t = r.s();
     int ldx[3], ldy[3], lda[3];
-    for (int &v : ldx) v = r.i();
-    for (int &v : ldy) v = r.i();
+    for (int &v : ldx) v = pos(r.i());
+    for (int &v : ldy) v = pos(r.i());
     for (int &v : x.ldQ) v = r.i();
     for (int &v : lda) v = r.i();
     for (int k = 0; k < 3; k++) {
@@ -335,9 +401,9 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     for (Sprite &s : sc.sp) {
         std::string tag = r.s();
-        s.x = r.i();
-        s.y = r.i();
-        s.visible = r.i() != 0;
+        s.x = pos(r.i());
+        s.y = pos(r.i());
+        s.visible = (r.i() & (pns ? 1 : ~0)) != 0;
         s.cell = r.i();
         s.alpha = r.i();
         if (!tag.empty() && loadImage(tag, s.img)) s.loaded = true;
@@ -348,26 +414,47 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         num_[size_t(k)] = r.i();
         str_[size_t(k)] = r.s();
     }
-    int n = r.i();
-    std::vector<int> flat;
-    for (int k = 0; k < n && !r.bad; k++) flat.push_back(r.i());
-    // Read the stack from the top down: a negative entry ends a for loop's four.
     std::vector<Frame> frames;
-    for (int k = int(flat.size()); k > 0;) {
-        Frame f;
-        int v = flat[size_t(k - 1)];
-        if (v < 0 && k >= 4) {
-            f.kind = Frame::For;
-            f.var = flat[size_t(k - 4)];
-            f.to = flat[size_t(k - 3)];
-            f.step = flat[size_t(k - 2)];
-            f.pos = size_t(-v);
-            k -= 4;
-        } else {
-            f.kind = Frame::Gosub;
-            f.pos = size_t(std::max(v, 0));
-            k -= 1;
+    if (pns) {
+        // Minus the number of frames, then each outermost first: 1 for a for loop, else a gosub.
+        int64_t n = -int64_t(r.i());
+        for (int64_t k = 0; k < n && !r.bad && r.p < data.size(); k++) {
+            Frame f;
+            bool loop = r.i() == 1;
+            f.pos = size_t(std::max(r.i(), 0));
+            if (loop) {
+                f.kind = Frame::For;
+                f.var = r.i();
+                f.to = r.i();
+                f.step = r.i();
+            }
+            frames.push_back(f);
         }
+    } else {
+        int n = r.i();
+        std::vector<int> flat;
+        for (int k = 0; k < n && !r.bad; k++) flat.push_back(r.i());
+        // Read the stack from the top down: a negative entry ends a for loop's four.
+        for (int k = int(flat.size()); k > 0;) {
+            Frame f;
+            int v = flat[size_t(k - 1)];
+            if (v < 0 && k >= 4) {
+                f.kind = Frame::For;
+                f.var = flat[size_t(k - 4)];
+                f.to = flat[size_t(k - 3)];
+                f.step = flat[size_t(k - 2)];
+                f.pos = size_t(-v);
+                k -= 4;
+            } else {
+                f.kind = Frame::Gosub;
+                f.pos = size_t(std::max(v, 0));
+                k -= 1;
+            }
+            frames.push_back(f);
+        }
+        std::reverse(frames.begin(), frames.end());
+    }
+    for (Frame &f : frames) {
         f.pos = std::min(f.pos, script_.text().size());
         f.line = script_.lineAt(f.pos);
         // The statement index of a return position: the ':' separators before it on its line, outside strings.
@@ -417,9 +504,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                 readCondition();
             }
         }
-        frames.push_back(f);
     }
-    std::reverse(frames.begin(), frames.end());
     sc.monocro = r.i() != 0;
     int mb = r.i(), mg = r.i(), mr = r.i();
     sc.monocroColor = rgba(mr, mg, mb);
@@ -463,13 +548,15 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     x.qInt3 = r.i();
     x.qInt4 = r.i();
     std::string loopHead = r.s(), loopTail = r.s();
-    rubyOn_ = r.i() != 0;
-    int rw = r.i(), rh = r.i();
-    if (rubyOn_) {
-        rubyW_ = rw;
-        rubyH_ = rh;
+    if (!pns) {
+        rubyOn_ = r.i() != 0;
+        int rw = r.i(), rh = r.i();
+        if (rubyOn_) {
+            rubyW_ = rw;
+            rubyH_ = rh;
+        }
+        rubyFont_ = r.s();
     }
-    rubyFont_ = r.s();
     x.qInt5 = r.i();
     // A fresh game saves an unused slot's alpha as -1, but the PC engine's load leaves it 255, which the next save
     // writes (black box: a save made after loading). The loaded file stands in for the state until the game moves
@@ -477,12 +564,12 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     std::vector<size_t> unusedAlpha;
     for (Sprite2 &q : sc.sp2) {
         std::string tag = r.s();
-        q.cx = r.i();
-        q.cy = r.i();
+        q.cx = pos(r.i());
+        q.cy = pos(r.i());
         q.scaleX = r.i();
         q.scaleY = r.i();
         q.rot = r.i();
-        q.visible = r.i() != 0;
+        q.visible = (r.i() & (pns ? 1 : ~0)) != 0;
         if (tag.empty()) unusedAlpha.push_back(r.p);
         q.alpha = r.i();
         int blend = r.i();
@@ -491,28 +578,26 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         q.img.tag = tag;
         if (tag.empty()) q.alpha = 255;
     }
-    for (int &v : x.tail) v = r.i();
-    sc.allSp2Hidden = x.tail[5] != 0;
-    x.tStr = r.s();
-    r.i();
-    r.i();
-    r.i();  // standing image centres follow from the screen width
-    underline_ = r.i();
-    int textLang = -1, shownLang = shownLang_;
-    PonsStyle style;
-    if (ponscripter_) {
-        textLang = r.i();
-        shownLang = r.i();
-        style.base = r.i();
-        int flags = r.i();
-        style.italic = flags & 1;
-        style.bold = flags & 2;
+    std::vector<std::string> log, tags;
+    size_t historyAt;
+    if (pns) {
+        // The PC Ponscripter engine keeps neither the text state nor a message history; the language shown stays.
+        for (int &v : x.pnsTail) v = r.i();
+        historyAt = r.p;
+    } else {
+        for (int &v : x.tail) v = r.i();
+        sc.allSp2Hidden = x.tail[5] != 0;
+        x.tStr = r.s();
+        r.i();
+        r.i();
+        r.i();  // standing image centres follow from the screen width
+        underline_ = r.i();
+        historyAt = r.p;
+        log.resize(r.count());
+        for (auto &p : log) p = r.s();
+        tags.resize(r.count());
+        for (auto &t : tags) t = r.s();
     }
-    size_t historyAt = r.p;
-    std::vector<std::string> log(r.count());
-    for (auto &p : log) p = r.s();
-    std::vector<std::string> tags(r.count());
-    for (auto &t : tags) t = r.s();
     int line = r.i(), stmt = r.i();
     bool windowUp = x.tail[2] != 0;
     if (r.bad) {
@@ -534,9 +619,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     if (!btndef.empty()) loadImage(btndef, btnImage_);
     log_ = std::move(log);
     logTags_ = std::move(tags);
-    textLang_ = textLang;
-    shownLang_ = shownLang;
-    ponsStyle_ = style;
+    textLang_ = -1;
+    ponsStyle_ = PonsStyle();
     caretText_ = false;
     page_.clear();
     pageText_.clear();
@@ -596,6 +680,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
 
 // ---- save slots ----
 
+std::string Engine::saveFilePath(const std::string &file) const { return fs_.hostPath(joinPath(saveDir_, file)); }
+
 std::string Engine::savePath(int slot) const {
     return fs_.hostPath(joinPath(saveDir_, "save" + std::to_string(slot) + ".dat"));
 }
@@ -610,8 +696,8 @@ bool Engine::saveGame(int slot, const std::string &note) {
         data = savepoint_;
         serializeTail(data, savepointLine_, savepointStmt_);
     }
-    if (!note.empty() || savegame2_) {
-        // savegame2's note follows the position: the note in double quotes, then '*'.
+    if (!note.empty() || savegame2_ || ponscripter_) {
+        // savegame2's note follows the position: the note in double quotes, then '*'. Ponscripter always writes one.
         data.push_back('"');
         data.insert(data.end(), note.begin(), note.end());
         data.push_back('"');
@@ -700,6 +786,9 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 
 // ---- system data: global variables, the file and label logs, read text ----
 
+// The global variables' file: NScripter's gloval.sav, the PC Ponscripter engine's global.sav, the same inside.
+std::string Engine::globalsName() const { return ponscripter_ ? "global.sav" : "gloval.sav"; }
+
 void Engine::loadGlobals() {
     Bytes data;
     // Our menu preference, separate from the PC engine's undocumented envdata.
@@ -708,7 +797,7 @@ void Engine::loadGlobals() {
         textSpeed_ = defaultSpeeds_[speedChoice_];
     }
     globalsOnDisk_.clear();
-    if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, "gloval.sav")), data)) {
+    if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, globalsName())), data)) {
         globalsOnDisk_ = data;
         size_t p = 0;
         for (size_t i = size_t(globalBorder_); i < num_.size() && p + 4 <= data.size(); i++) {
@@ -801,14 +890,14 @@ void Engine::saveGlobalsIfChanged() {
     if (!globalOn_ || defineMode_) return;
     Bytes out = globalsFile();
     if (out == globalsOnDisk_) return;
-    std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
+    std::string path = fs_.hostPath(joinPath(saveDir_, globalsName()));
     if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
 }
 
 void Engine::saveSystemData() {
     if (globalOn_) {
         Bytes out = globalsFile();
-        std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
+        std::string path = fs_.hostPath(joinPath(saveDir_, globalsName()));
         if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
         else logf("could not write %s", path.c_str());
     }
@@ -957,7 +1046,9 @@ void cmdSaveScreenshot(E &e, const std::string &name) {
             row[x * 3 + 2] = uint8_t(chR(p));
         }
     }
-    std::string path = e.fs_.hostPath(file);
+    // The PC Ponscripter engine writes it in its save folder (saves\screenshot\ss1.bmp for the Umineko games'
+    // thumbnails), where images are also found.
+    std::string path = e.ponscripter_ ? e.saveFilePath(file) : e.fs_.hostPath(file);
     if (!e.fs_.write(path, out.data(), out.size())) logf("could not write %s", path.c_str());
     // The image cache may hold an older picture of this name, such as a save thumbnail.
     e.forgetImage(file);

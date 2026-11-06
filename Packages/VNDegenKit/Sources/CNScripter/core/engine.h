@@ -31,6 +31,8 @@ namespace vnns {
 
 constexpr int kSpriteCount = 1000;
 constexpr int kSprite2Count = 256;
+// The PC Ponscripter engine's monocro color before a game sets one, as its saves show.
+constexpr uint32_t kPonsMonocroDefault = 0xFF7AF688;  // red 136, green 246, blue 122, as rgba() packs them
 
 // An image as a script names it, with its tag: ":a;file", ":c/3,100,0;file", ":s/20,20,0;#FFFFFFtext", ...
 struct LoadedImage {
@@ -105,6 +107,11 @@ struct SaveExtras {
     int qInt1 = 0, qInt2 = 1, qInt3 = 0, qInt4 = 0, qInt5 = 0;
     int tail[8] = {0, 0, 0, 0, 0, 0, 0, 0};  // [4] mirrors allsphide, [5] allsp2hide
     std::string tStr;
+    // The PC Ponscripter format's own fields, of unknown meaning: always these in the saves measured.
+    int pnsHead[3] = {1, 1, 0};
+    int pnsWindow = 0;
+    uint32_t pnsColor = 0xFFFFFFFF;  // where NScripter keeps the text color; textcolor doesn't change it
+    int pnsTail[10] = {};
 };
 
 struct Effect {
@@ -611,6 +618,8 @@ public:
         std::string note;
     };
     bool readSaveInfo(int slot, SaveInfo &info);
+    std::string globalsName() const;
+    std::string saveFilePath(const std::string &file) const;  // a file in the save folder, on disk
 
     // Timing, waits and input
     int64_t now_ = 0;

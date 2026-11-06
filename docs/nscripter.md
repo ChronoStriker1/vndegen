@@ -117,9 +117,14 @@ Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
   at twice the screen's resolution this way. `:c` draws a PNG with an alpha channel opaque, as if over black, where
   NScripter would keep its alpha.
 - `steamsetachieve` logs the achievement and does nothing more.
-- Saves: the PC engine keeps its saves in a `saves` folder, in a format of its own. The runtime keeps its own, in
-  NScripter's format with the text line's language, the language shown and the style added, in `vndegen-saves`,
-  whatever `savedir` says, so they never replace a PC save a player copied in, and Ludusavi syncs none of them.
+- Saves are the PC Ponscripter engine's own files, `saveN.dat`, `global.sav` and the thumbnails the games write in
+  `screenshot\`. The runtime keeps them in `vndegen-saves`, whatever `savedir` says, never in the game's `saves` folder,
+  which Steam may sync; a PC backup's `saves` files restore there, and saves move both ways. The format is NScripter's
+  after a `PNS` header, with positions on the doubled screen, the window as a text area in doubled pixels, sprites'
+  shown flags with bit 1 set, call stack records of its own, no ruby settings and no message history. The PC engine
+  keeps neither the text line's language nor the style, so a page replays from its head, whose lines name their
+  language. A sprite `csp` clears also moves to (-500, -500), as on the PC. The PC loads the runtime's save of the
+  Question Arcs' first page to a screen identical to its own load, and the runtime loads the PC's.
 - A textgosub or pretextgosub routine may draw text of its own; the line it interrupted goes on with its carets,
   language and style as they were. (Inferred: the games' routine draws none.)
 - Malformed UTF-8 (overlong forms, surrogates, values past U+10FFFF) reads a byte at a time, as U+FFFD.
@@ -260,8 +265,9 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   ones the games use. The window's character pitch isn't added to proportional text (the games' is 0). `logsp` reads
   tags in any string, where the PC engine reads them only in a page that `gettext` gave; one backlog line in a lab
   broke a character later than the PC's. `endroll`'s other modes aren't measured. `len` and `mid` count bytes, as in
-  NScripter; the games don't use them, and the PC engine wasn't checked. Saves aren't
-  the PC engine's files. An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
+  NScripter; the games don't use them, and the PC engine wasn't checked. A save made before the first `setwindow`
+  writes the default window in the doubled form, where the PC engine writes its own default values (the games set a
+  window first). An unclosed `~` tag is drawn as it stands, where the PC engine drops the line.
   Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
   that saved; the runtime clears the page and keeps NScripter's savepoints there. The games always set one. With a
   textgosub, a save made before any text follows the statement that saves, where the PC engine keeps the script's start.

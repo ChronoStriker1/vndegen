@@ -56,9 +56,11 @@ bool Engine::start(std::string *error) {
     setTextEncoding(ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis);
     if (ponscripter_) {
         logf("Ponscripter game: the script is UTF-8");
-        // The PC engine keeps its saves in saves/, in a format of its own. VNDegen's are NScripter's, so they go in a
-        // folder of their own and never replace a PC save a player copied or synced in.
+        // VNDegen's saves are in the PC engine's format, but they go in a folder of their own, never replacing the PC
+        // engine's saves/, which a player may sync or copy in.
         saveDir_ = "vndegen-saves";
+        extras_.qInt1 = 1;  // as a fresh PC Ponscripter game saves it
+        scene_.monocroColor = kPonsMonocroDefault;
     }
     if (!fs_.open(cfg_.gameRoot)) {
         if (error) *error = "The game folder can't be read.";
@@ -101,6 +103,7 @@ void Engine::resetGame(bool fromDefine) {
     stopMovie();
     clearBlt();
     scene_ = Scene();
+    if (ponscripter_) scene_.monocroColor = kPonsMonocroDefault;
     commitScene();
     clearPage();
     log_.clear();

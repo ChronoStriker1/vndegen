@@ -3,11 +3,13 @@
 // (docs/nscripter-cleanroom.md).
 #include <bzlib.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <sstream>
 
 #include "engine.h"
@@ -147,7 +149,7 @@ static void runGame() {
         assert(!engine.step(16));
     }
     // System data goes to a folder of VNDegen's own, never the PC engine's saves folder.
-    assert(fs::exists(dir / "vndegen-saves" / "gloval.sav") && !fs::exists(dir / "saves"));
+    assert(fs::exists(dir / "vndegen-saves" / "global.sav") && !fs::exists(dir / "saves"));
     fs::remove_all(dir);
 }
 
@@ -312,10 +314,11 @@ static void reviewCases() {
         engine.mouseButton(1, false);
         for (int i = 0; i < 20; i++) engine.step(16);
     };
-    // Hidden text makes no button or ruby, and its clickstr character still waits. A save there keeps the line's
-    // language and style, and goes to VNDegen's folder whatever savedir says.
+    // Hidden text makes no button or ruby, and its clickstr character still waits. A save there goes to VNDegen's
+    // folder whatever savedir says; in the PC's format it keeps no text state, and loading replays the page from a line
+    // that names its language, as the games' lines all do, so the hidden line is hidden again.
     run("*define\nsavedir \"saves\"\nclickstr \"\u3002\",0\ngame\n*start\nrubyon\n"
-        "langjp<1 hidden>(\u65E5/\u306B)\u3002\u3053@\nlangjp\n^hidden^@\nlangen\n^~b~shown^@\nend\n",
+        "langjp<1 hidden>(\u65E5/\u306B)\u3002\u3053@\nlangjp^hidden^@\nlangen^~b~shown^@\nend\n",
         [&](vnns::Engine &engine) {
             assert(engine.textButtons_.empty() && engine.page_.empty() && engine.wait_ == vnns::WaitKind::Click);
             click(engine);
@@ -327,9 +330,10 @@ static void reviewCases() {
             assert(pc == "the PC's save");
             click(engine);  // on to the English line, in bold
             assert(engine.textLang_ == 0 && !engine.page_.empty() && engine.ponsStyle_.bold);
-            assert(engine.loadGame(1) && engine.textLang_ == 1 && !engine.ponsStyle_.bold);
+            assert(engine.loadGame(1) && !engine.ponsStyle_.bold);
             for (int i = 0; i < 20; i++) engine.step(16);
-            assert(engine.page_.empty() && engine.wait_ == vnns::WaitKind::Click);  // the hidden line again
+            // the hidden line again
+            assert(engine.page_.empty() && engine.wait_ == vnns::WaitKind::Click && engine.textLang_ == 1);
             click(engine);
             assert(engine.ponsStyle_.bold && engine.page_[0].face == 2);  // ~b~ applied once, not toggled back
         });
@@ -613,6 +617,69 @@ static void brokenFonts() {
     draw(testFont(cff));
 }
 
+// Saves in the PC Ponscripter engine's format, laid out as its own saves of the same script are (lab saves): a save made
+// inside a for loop and two gosubs loads and finishes the loop. The same script as a Shift-JIS NScripter game keeps
+// NScripter's format and round-trips too.
+static void saveFormats() {
+    std::string body = "*define\ngame\n*sub2\nmov %7,%7+1\nif %7 = 1 savegame 1\nreturn\n*sub\ngosub *sub2\nreturn\n*start\n"
+                       "setwindow 10,20,10,5,20,20,3,4,7,1,0,#abcdef,1,2,600,400\nlsp 3,\":c;pic.bmp\",33,44\n"
+                       "lsp2 5,\":c;pic.bmp\",100,80,50,60,30,200\n"
+                       "for %3 = 1 to 5 step 2\ngosub *sub\nnext\nmov %9,1\nclick\nend\n";
+    for (bool pons : {true, false}) {
+        char temp[] = "/tmp/vnns-saveformat-XXXXXX";
+        const char *root = mkdtemp(temp);
+        assert(root);
+        fs::path dir(root);
+        fs::create_directories(dir / "fonts");
+        fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+        std::ofstream(dir / "pic.bmp", std::ios::binary).write(reinterpret_cast<const char *>(testBitmap().data()),
+                                                               std::streamsize(testBitmap().size()));
+        std::ofstream(dir / (pons ? "0.utf" : "0.txt")) << body;
+        auto play = [&]() {
+            auto engine = std::make_unique<vnns::Engine>(vnns::Engine::Config{root, root});
+            std::string error;
+            assert(engine->start(&error));
+            for (int i = 0; i < 10 && engine->wait_ != vnns::WaitKind::Click; i++) engine->step(16);
+            assert(engine->wait_ == vnns::WaitKind::Click && engine->getNumVar(7) == 3 && engine->getNumVar(9) == 1);
+            return engine;
+        };
+        play();
+        fs::path save = dir / (pons ? "vndegen-saves" : "") / "save1.dat";
+        vnns::Bytes b;
+        assert(vnns::readFile(save.string(), b));
+        auto at = [&](size_t p) { return int32_t(vnns::le32(&b[p])); };
+        if (pons) {
+            assert(memcmp(b.data(), "PNS\x02\x06", 5) == 0);
+            // The window: origin, text area, font height, pitch and spacing, all doubled; then color and speed.
+            const int window[] = {20, 40, 10 * 2 * (20 + 6), 5 * 2 * (20 + 8), 40, 0, 6, 8, 0xabcdef, 7, 2, 4, 1200, 800};
+            for (size_t k = 0; k < 14; k++) assert(at(56 + 4 * k) == window[k]);
+            // Sprite 3 and lsp2 sprite 5: doubled positions, and the shown flag with bit 1.
+            std::string tag(":c;pic.bmp");
+            auto sp = std::search(b.begin(), b.end(), tag.begin(), tag.end()) - b.begin();
+            size_t p = size_t(sp) + tag.size() + 1;
+            assert(at(p) == 66 && at(p + 4) == 88 && at(p + 8) == 3);
+            auto sp2 = std::search(b.begin() + sp + 1, b.end(), tag.begin(), tag.end()) - b.begin();
+            p = size_t(sp2) + tag.size() + 1;
+            assert(at(p) == 200 && at(p + 4) == 160 && at(p + 8) == 50 && at(p + 20) == 3 && at(p + 24) == 200);
+            // The resume line (savegame's, 0-based), statement 0, and an empty note.
+            assert(at(b.size() - 11) == 4 && at(b.size() - 7) == 0 && memcmp(&b[b.size() - 3], "\"\"*", 3) == 0);
+        } else {
+            assert(at(0) == 2);
+        }
+        // Loading in a fresh engine resumes inside the loop and finishes it: three more passes through *sub2.
+        auto engine = std::make_unique<vnns::Engine>(vnns::Engine::Config{root, root});
+        std::string error;
+        assert(engine->start(&error));
+        engine->step(16);
+        assert(engine->loadGame(1));
+        for (int i = 0; i < 10 && engine->wait_ != vnns::WaitKind::Click; i++) engine->step(16);
+        assert(engine->wait_ == vnns::WaitKind::Click && engine->getNumVar(9) == 1 && engine->getNumVar(3) == 7);
+        assert(engine->scene_.sp[3].x == 33 && engine->scene_.sp[3].visible && engine->scene_.sp2[5].cx == 100);
+        assert(engine->win_.tx == 10 && engine->win_.cols == 10 && engine->win_.rows == 5 && engine->win_.fh == 20);
+        fs::remove_all(dir);
+    }
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -625,4 +692,5 @@ int main() {
     reviewRound3();
     savepoints();
     brokenFonts();
+    saveFormats();
 }

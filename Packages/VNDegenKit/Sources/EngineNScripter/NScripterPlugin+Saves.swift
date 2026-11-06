@@ -6,16 +6,37 @@ extension NScripterPlugin {
     /// every platform. The runtime does the same, so a PC backup restores into the folder the game reads.
     nonisolated public func saveLocations(folder: URL, dataDirectory: URL) -> [SaveLocation] {
         guard let layout = NScripterLayout(FolderProbe(scanning: folder)) else { return [] }
-        // A Ponscripter game's PC saves are in a format the runtime doesn't write yet. Its own go to vndegen-saves and
-        // stay out of sync, so they never land in a PC backup.
-        if layout.ponscripter { return [] }
         let root = layout.url(in: folder)
+        // A Ponscripter game's saves are the PC engine's files, but the runtime keeps them in vndegen-saves, never in
+        // the game's own saves folder, which Steam may sync. A PC backup's saves/ files restore there.
+        if layout.ponscripter {
+            return [SaveLocation(directory: root.appendingPathComponent("vndegen-saves")) { path in
+                Self.ponscripterSavePath(path)
+            }]
+        }
         guard let saveDir = Self.saveDirectory(root) else {
             return [SaveLocation(directory: root) { path in Self.engineFileName(path) }]
         }
         // The folder as it is on disk, matched without regard to case as the runtime matches it.
         let directory = FileCase.resolve(saveDir.joined(separator: "/"), in: root)
         return [SaveLocation(directory: directory) { path in Self.saveRelativePath(path, saveDir: saveDir) }]
+    }
+
+    /// `…/saves/save1.dat` maps to `save1.dat`, and the thumbnails the Umineko games write, `…/saves/screenshot/ss1.bmp`,
+    /// to `screenshot/ss1.bmp`; the same files in `vndegen-saves` map the same way. The PC engine's files are
+    /// `saveN.dat`, `global.sav` and `envdata`. VNDegen's own preference file there isn't a save.
+    nonisolated static func ponscripterSavePath(_ path: String) -> String? {
+        let parts = path.split(separator: "/").map(String.init)
+        guard let name = parts.last else { return nil }
+        let lower = name.lowercased()
+        let folder = { (back: Int) in parts.count > back ? parts[parts.count - 1 - back].lowercased() : "" }
+        let isSaveFolder = { (name: String) in name == "saves" || name == "vndegen-saves" }
+        if folder(1) == "screenshot", isSaveFolder(folder(2)), lower.hasSuffix(".bmp") { return "screenshot/" + name }
+        guard isSaveFolder(folder(1)) else { return nil }
+        if ["global.sav", "envdata"].contains(lower) { return name }
+        guard lower.hasPrefix("save"), lower.hasSuffix(".dat") else { return nil }
+        let number = lower.dropFirst(4).dropLast(4)
+        return !number.isEmpty && number.allSatisfy { $0.isASCII && $0.isNumber } ? name : nil
     }
 
     /// The file name of a save the engine writes itself: `saveN.dat`, `gloval.sav`, and the read-text, file and label

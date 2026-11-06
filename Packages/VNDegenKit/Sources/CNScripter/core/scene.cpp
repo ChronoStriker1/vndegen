@@ -43,7 +43,8 @@ ImageRef Engine::loadFileImage(const std::string &file, bool *hasAlpha) {
         }
     } else {
         Bytes data;
-        if (!fs_.read(file, data)) {
+        // A Ponscripter game also finds images in its save folder, such as the save thumbnails it writes there.
+        if (!fs_.read(file, data) && !(ponscripter_ && readFile(saveFilePath(file), data))) {
             errorf("image %s not found", toUtf8(file).c_str());
             return nullptr;
         }
@@ -684,17 +685,24 @@ void loadSprite(E &e, bool visible) {
 void cmdLsp(E &e, const std::string &name) { loadSprite(e, name == "lsp"); }
 
 // csp drops the image; the sprite's position, visibility, cell and alpha stay, as the PC engine's saves show.
-static void clearSprite(Sprite &s) {
+// The PC Ponscripter engine also moves a sprite it clears to (-500, -500) and its first cell, as its saves show; one
+// without an image stays where it is.
+static void clearSprite(E &e, Sprite &s) {
+    bool held = s.loaded;
     s.img = LoadedImage();
     s.loaded = false;
+    if (e.ponscripter_ && held) {
+        s.x = s.y = -500;
+        s.cell = 0;
+    }
 }
 
 void cmdCsp(E &e, const std::string &) {
     int n = e.readInt();
     if (n == -1) {
-        for (Sprite &s : e.scene_.sp) clearSprite(s);
+        for (Sprite &s : e.scene_.sp) clearSprite(e, s);
     } else if (Sprite *s = e.spriteRef(n)) {
-        clearSprite(*s);
+        clearSprite(e, *s);
     }
 }
 

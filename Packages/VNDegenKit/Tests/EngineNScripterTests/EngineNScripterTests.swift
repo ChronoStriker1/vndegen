@@ -39,14 +39,27 @@ private func probe(_ files: [String]) -> FolderProbe {
     #expect(NScripterPlugin().detect(probe(["Game/nscript.dat"]))?.version == nil)
 }
 
-/// The runtime's saves for a Ponscripter game aren't the PC engine's format, so none of them sync.
-@Test func ponscripterSavesStayOutOfSync() throws {
+/// A Ponscripter game's saves are the PC engine's files, kept in vndegen-saves: a PC backup's saves/ files restore
+/// there, thumbnails included, and the game's own saves folder is never written.
+@Test func ponscripterSavesSyncIntoTheirOwnFolder() throws {
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir.appendingPathComponent("saves"), withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
     try Data("*define\ngame\n".utf8).write(to: dir.appendingPathComponent("0.utf"))
     try Data().write(to: dir.appendingPathComponent("arc.nsa"))
-    #expect(NScripterPlugin().saveLocations(folder: dir, dataDirectory: dir).isEmpty)
+    let locations = NScripterPlugin().saveLocations(folder: dir, dataDirectory: dir)
+    let location = try #require(locations.first)
+    #expect(locations.count == 1 && location.directory.lastPathComponent == "vndegen-saves")
+    let map = location.relativePath
+    #expect(map("C:/Steam/Umineko/saves/save12.dat") == "save12.dat")
+    #expect(map("C:/Steam/Umineko/saves/GLOBAL.SAV") == "GLOBAL.SAV")
+    #expect(map("C:/Steam/Umineko/saves/envdata") == "envdata")
+    #expect(map("C:/Steam/Umineko/saves/screenshot/ss3.bmp") == "screenshot/ss3.bmp")
+    #expect(map(dir.path + "/vndegen-saves/save1.dat") == "save1.dat")
+    #expect(map(dir.path + "/vndegen-saves/vndegen-text-speed.dat") == nil)
+    #expect(map("C:/Steam/Umineko/save1.dat") == nil)
+    #expect(map("C:/Steam/Umineko/saves/savex.dat") == nil)
+    #expect(map("C:/Steam/Umineko/bmp/screenshot/ss1.bmp") == nil)
 }
 
 /// A Shift-JIS NScripter game and a UTF-8 Ponscripter game run side by side, each read in its own encoding.
