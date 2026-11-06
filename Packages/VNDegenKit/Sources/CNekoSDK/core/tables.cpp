@@ -1647,7 +1647,7 @@ run 2160 1 1
 
 const char kFunbagFantasy[] = R"(
 screen title
-opening 520 920 1010
+opening 520 920 1010 70 33 65 87
 askerlit
 pic obj\b201_000.bmp 0 0 stage 1
 pic obj\b201_002.bmp -60 -40 stage 1 follow 1 1.5

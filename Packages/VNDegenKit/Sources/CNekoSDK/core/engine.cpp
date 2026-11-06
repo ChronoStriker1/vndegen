@@ -2078,20 +2078,53 @@ bool Engine::composeTitleOpening(Canvas &out) {
     layer(none, 0, false);
     layer(art, 1, false);
     layer(all, 2, true);
-    float k = std::clamp(float(t) / float(tileMs), 0.0f, 1.0f), shown = 1 - (1 - k) * (1 - k);
     int fade = int(std::clamp(float(t - fadeFrom) / float(fadeMs), 0.0f, 1.0f) * 256);
     if (fade > 0) blendFrame(art, all, fade);
     out = none;
+    // `opening TILE FADE_FROM FADE_MS [DELAY LEVEL1 LEVEL2 LEVEL3]`: each quarter is revealed four times over, each copy
+    // DELAY ms behind the one before, and the art shows at LEVELn% of its brightness where n copies cover it, in full where
+    // all four do. Test Game 84's 70 ms and 33, 65 and 87 were fitted from PC screenshots under Wine.
+    int delay = line->size() >= 7 ? field(*line, 3) : 0;
+    int levels[5] = {0, 256, 256, 256, 256};
+    if (delay > 0)
+        for (int n = 1; n <= 3; n++) levels[n] = field(*line, 3 + n) * 256 / 100;
     int halfW = out.w / 2, halfH = out.h / 2;
-    int across = int(float(halfW) * shown), down = int(float(halfH) * shown);
-    auto copy = [&](int x0, int y0, int x1, int y1) {
-        for (int y = std::max(0, y0); y < std::min(out.h, y1); y++)
-            if (x1 > x0) std::memcpy(&out.px[(size_t(y) * out.w + x0) * 4], &art.px[(size_t(y) * out.w + x0) * 4], size_t(x1 - x0) * 4);
+    auto reach = [&](int64_t at, int half) {
+        float k = std::clamp(float(at) / float(tileMs), 0.0f, 1.0f);
+        return int(float(half) * (1 - (1 - k) * (1 - k)));
     };
-    copy(0, 0, across, halfH);
-    copy(halfW, 0, out.w, down);
-    copy(out.w - across, halfH, out.w, out.h);
-    copy(0, out.h - down, halfW, out.h);
+    // Copies a strip of the art, darkened to `level` of 256, into the frame.
+    auto copy = [&](int x0, int y0, int x1, int y1, int level) {
+        x0 = std::max(0, x0), y0 = std::max(0, y0), x1 = std::min(out.w, x1), y1 = std::min(out.h, y1);
+        if (x1 <= x0 || level <= 0) return;
+        for (int y = y0; y < y1; y++) {
+            const uint8_t *from = &art.px[(size_t(y) * out.w + x0) * 4];
+            uint8_t *to = &out.px[(size_t(y) * out.w + x0) * 4];
+            if (level >= 256) {
+                std::memcpy(to, from, size_t(x1 - x0) * 4);
+                continue;
+            }
+            for (int x = x0; x < x1; x++, from += 4, to += 4) {
+                to[0] = uint8_t(from[0] * level >> 8);
+                to[1] = uint8_t(from[1] * level >> 8);
+                to[2] = uint8_t(from[2] * level >> 8);
+                to[3] = 255;
+            }
+        }
+    };
+    int copies = delay > 0 ? 4 : 1;
+    // From the copy furthest behind, which covers least, to the leading one: each strip between two copies' edges shows at
+    // the level of how many cover it.
+    for (int j = copies - 1; j >= 0; j--) {
+        int64_t at = t - int64_t(j) * delay, after = t - int64_t(j + 1) * delay;
+        int level = levels[j + 1];  // the strip between this copy's edge and the next one in is under j + 1 copies
+        int across = reach(at, halfW), down = reach(at, halfH);
+        int acrossIn = j + 1 < copies ? reach(after, halfW) : 0, downIn = j + 1 < copies ? reach(after, halfH) : 0;
+        copy(acrossIn, 0, across, halfH, level);                        // top left, growing rightward
+        copy(halfW, downIn, out.w, down, level);                        // top right, growing downward
+        copy(out.w - across, halfH, out.w - acrossIn, out.h, level);    // bottom right, growing leftward
+        copy(0, out.h - down, halfW, out.h - downIn, level);            // bottom left, growing upward
+    }
     return true;
 }
 
