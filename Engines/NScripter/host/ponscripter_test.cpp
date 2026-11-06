@@ -916,6 +916,8 @@ static void reviewLanding4Round3() {
                            "*foo\ngetparam %1\nsaveon\nsavegame 1\nclick\nreturn\n";
     std::string gotoChain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
                             "*foo\ngetparam %1\nreturn\n*bar\ngoto *elsewhere\n*elsewhere\nsaveon\nsavegame 1\nclick\nreturn\n";
+    std::string gosubChainSave = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
+                                 "*foo\ngetparam %1\nreturn\n*bar\nsaveon\nsavegame 1\nclick\nreturn\n";
     std::string jumpfChain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9" + tail +
                              "*foo\ngetparam %1\nreturn\n*bar\njumpf\n*elsewhere\n~\nsaveon\nsavegame 1\nclick\nreturn\n";
     std::string gotoAlias = "*define\ndefsub foo\ndefsub bar\nnumalias bar,7\ngame\n*start\nfoo bar mov %9,9" + tail +
@@ -947,6 +949,30 @@ static void reviewLanding4Round3() {
                              "*sub\nsaveon\nsavegame 1\nclick\ngetparam %1\nreturn\n";
     auto straight = run(gosubAfter, 0);
     assert(straight.first == 7 && straight.second == 9 && run(gosubAfter, 1) == straight && run(gosubAfter, 2) == straight);
+    // gosub as an alias a user command reads isn't a gosub.
+    std::string gosubAlias = "*define\ndefsub foo\nnumalias gosub,7\ngame\n*start\nfoo gosub,8 mov %9,9" + tail +
+                             "*foo\ngetparam %1\nsaveon\nsavegame 1\nclick\ngetparam %2\nmov %1,%2\nreturn\n";
+    straight = run(gosubAlias, 0);
+    assert(straight.first == 8 && straight.second == 9 && run(gosubAlias, 2) == straight);
+    // A record left as .new, the only one matching the save in the slot, isn't lost to the next save: if it can't go
+    // into place, that save is refused, and the slot's save still loads with it.
+    {
+        std::ofstream(dir / "0.utf") << gosubChainSave;
+        fs::remove_all(dir / "vndegen-saves");
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 20; i++) engine.step(16);
+        fs::remove(record);
+        fs::create_directories(record);  // the record can't take its place
+        assert(engine.saveGame(1, "") && fs::exists(record.string() + ".new"));
+        vnns::Bytes saved;
+        assert(vnns::readFile((dir / "vndegen-saves" / "save1.dat").string(), saved));
+        assert(!engine.saveGame(1, "note") && fs::exists(record.string() + ".new"));
+        vnns::Bytes kept;
+        assert(vnns::readFile((dir / "vndegen-saves" / "save1.dat").string(), kept) && kept == saved);
+        fs::remove_all(record);
+    }
     fs::remove_all(dir);
 }
 
@@ -1058,6 +1084,14 @@ static void importPcSaves() {
     assert(!fs::exists(own) || snapshot(own).empty());
     start();
     assert(read(own / "save12.dat") == "twelve" && read(own / "SAVE1.DAT") == pcSave);
+    assert(snapshot(pc) == before);
+    // A run cut short left its list and one slot: they're VNDegen's own, and the next run finishes the copy.
+    fs::remove_all(own);
+    put(own / "vndegen-importing-pc-saves.txt", "save1.dat\nsave12.dat\nglobal.sav\nenvdata\nscreenshot/ss1.bmp\n");
+    put(own / "SAVE1.DAT", pcSave);
+    start();
+    assert(read(own / "save12.dat") == "twelve" && read(own / "screenshot" / "ss1.bmp") == "shot" &&
+           fs::exists(own / "vndegen-imported-pc-saves.txt") && !fs::exists(own / "vndegen-importing-pc-saves.txt"));
     assert(snapshot(pc) == before);
     fs::remove_all(dir);
 }

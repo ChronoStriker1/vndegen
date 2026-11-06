@@ -2,7 +2,9 @@
 // all write the same layout ("format 2"). docs/nscripter-cleanroom.md says how it was worked out; field names below
 // follow what each field was seen to hold. Integers are little-endian int32; strings are Shift-JIS, NUL-terminated.
 #include <dirent.h>
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -11,7 +13,10 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
+#include <optional>
+#include <set>
 
+#include "casepath.h"
 #include "engine.h"
 
 namespace vnns {
@@ -636,6 +641,17 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
             // label holds where the call was when saved (the next frame's return position, or the save's own for the
             // innermost), else the statement's head as NScripter reads it, else the last.
             if (ponscripter_) {
+                // A built-in that pushes a plain frame, standing as a command: its first argument (a label or a
+                // string) follows, not a comma, as it would where the word is an alias another command reads.
+                auto plainCall = [&](const std::string &word, size_t end) {
+                    std::string name = word.size() > 1 && word[0] == '_' ? word.substr(1) : word;
+                    size_t q = end;
+                    while (q < t.size() && (t[q] == ' ' || t[q] == '\t')) q++;
+                    char next = q < t.size() ? t[q] : '\n';
+                    if (name == "gosub" || name == "selgosub" || name == "csel")
+                        return next == '*' || next == '$' || next == '"' || next == '`';
+                    return luaCommands_.count(word) && next != ',';
+                };
                 std::string callee(script_.labelAt(innerLine));
                 size_t last = std::string::npos, named = std::string::npos, lastGosub = std::string::npos;
                 char quote = 0;
@@ -658,12 +674,13 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
                         last = end;
                         if (word == callee && named == std::string::npos) named = end;
                     }
-                    if (end <= f.pos && (word == "gosub" || word == "_gosub")) lastGosub = end;
+                    if (end <= f.pos && (before == ' ' || before == '\t') && plainCall(word, end)) lastGosub = end;
                     p = end;
                 }
                 if (named != std::string::npos) call = named;
                 else if (call == std::string::npos) call = last;
-                // A gosub after the user command's name made the call: the frame is that gosub's, with no arguments.
+                // A command that pushes a plain frame (gosub, selgosub, csel, a Lua command) after the user command's
+                // name made the call: the frame is that command's, with no arguments.
                 if (lastGosub != std::string::npos && (call == std::string::npos || lastGosub > call))
                     call = std::string::npos;
             }
@@ -775,6 +792,15 @@ static uint64_t fnv1a(const Bytes &data) {
     return h;
 }
 
+// The hash a call record file names, if it is one.
+static std::optional<uint64_t> recordHash(const std::string &path) {
+    Bytes record;
+    if (!readFile(path, record) || record.size() < 16 || memcmp(record.data(), "VNDCALLS", 8) != 0) return {};
+    uint64_t h = 0;
+    for (int k = 0; k < 8; k++) h |= uint64_t(record[8 + size_t(k)]) << (8 * k);
+    return h;
+}
+
 std::string Engine::saveFilePath(const std::string &file) const { return fs_.hostPath(joinPath(saveDir_, file)); }
 
 std::string Engine::savePath(int slot) const {
@@ -804,6 +830,17 @@ bool Engine::saveGame(int slot, const std::string &note) {
     // they were.
     std::string record = path + ".calls", pending = record + ".new";
     if (ponscripter_) {
+        // A record a failed move left as .new may be the only one matching the save now in the slot: it goes into
+        // place before this save's takes its name, or this save fails.
+        Bytes current;
+        if (readFile(path, current)) {
+            uint64_t h = fnv1a(current);
+            if (recordHash(pending) == std::optional<uint64_t>(h) && recordHash(record) != std::optional<uint64_t>(h) &&
+                rename(pending.c_str(), record.c_str()) != 0) {
+                logf("could not move %s into place, so the save isn't written", pending.c_str());
+                return false;
+            }
+        }
         std::vector<uint8_t> flags = savepointLive_ ? callFlags() : savepointCalls_;
         Bytes bytes = {'V', 'N', 'D', 'C', 'A', 'L', 'L', 'S'};
         uint64_t h = fnv1a(data);
@@ -921,30 +958,40 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 // A Ponscripter game copied from a PC brings its saves in the PC engine's saves folder, which VNDegen reads but never
 // writes. The first time the game runs with no save slot of VNDegen's own, they're copied into VNDegen's folder:
 // saveN.dat, global.sav, envdata and screenshot\*.bmp, the set the save sync restores, each only where VNDegen has no
-// file of that name. It's all or nothing: every file is read before any is written, and a write that fails takes back
-// the files this run made, so a later run tries again. A note left in VNDegen's folder keeps it to once.
+// file of that name. VNDegen's folder is opened without following a link and held open, and every file goes in under
+// a name of its own first, then takes its real name only if that's still free, so nothing outside the folder is
+// written and nothing there replaced. A list of the files, written before any goes in, makes them VNDegen's own: a run
+// cut short is finished by the next, and the list becomes the note that keeps it to once.
 void Engine::importPcSaves() {
-    static const char *kNote = "vndegen-imported-pc-saves.txt";
+    static const char *kNote = "vndegen-imported-pc-saves.txt", *kPending = "vndegen-importing-pc-saves.txt";
     struct Entry {
         std::string name;
         bool folder;
     };
-    // A folder's plain files and folders; failed is set when the folder exists but can't be listed.
-    auto list = [](const std::string &dir, bool &failed) {
+    // A folder's entries, by name, without following links; failed is set when it can't be listed.
+    auto listAt = [](int dirFd, bool &failed) {
         std::vector<Entry> out;
-        DIR *d = opendir(dir.c_str());
+        int fd = dup(dirFd);
+        DIR *d = fd >= 0 ? fdopendir(fd) : nullptr;
         if (!d) {
-            failed = errno != ENOENT;
+            if (fd >= 0) close(fd);
+            failed = true;
             return out;
         }
         while (dirent *e = readdir(d)) {
             std::string name = e->d_name;
             struct stat st;
-            if (name == "." || name == ".." || stat((dir + "/" + name).c_str(), &st) != 0) continue;
-            if (S_ISDIR(st.st_mode) || S_ISREG(st.st_mode)) out.push_back({name, S_ISDIR(st.st_mode)});
+            if (name == "." || name == "..") continue;
+            bool folder = fstatat(dirFd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode);
+            out.push_back({name, folder});
         }
         closedir(d);
         return out;
+    };
+    auto findFolder = [](const std::vector<Entry> &entries, const char *name) {
+        for (const Entry &e : entries)
+            if (lowerAscii(e.name) == name) return e.name;
+        return std::string();
     };
     auto slot = [](const std::string &name) {
         std::string low = lowerAscii(name);
@@ -952,72 +999,158 @@ void Engine::importPcSaves() {
             return false;
         return std::all_of(low.begin() + 4, low.end() - 4, [](char c) { return c >= '0' && c <= '9'; });
     };
-    bool failed = false;
-    std::string own = fs_.hostPath(saveDir_);
-    // Any entry of a slot's or the note's name stops it, whatever it is; so does a folder that can't be read.
-    if (DIR *d = opendir(own.c_str())) {
-        while (dirent *e = readdir(d))
-            if (slot(e->d_name) || lowerAscii(e->d_name) == kNote) failed = true;
-        closedir(d);
-    } else if (errno != ENOENT) {
-        failed = true;
-    }
-    if (failed) return;
-    std::string pc;
-    for (const Entry &e : list(fs_.root(), failed))
-        if (e.folder && lowerAscii(e.name) == "saves") pc = fs_.root() + "/" + e.name;
-    char real[PATH_MAX];
-    if (pc.empty() || !realpath(pc.c_str(), real)) return;
-    std::string realPc = real;
-    // Nothing is written inside the PC's saves folder, even through a link where VNDegen's folder would be.
-    auto insidePc = [&](const std::string &path) {
-        std::string dir = path.substr(0, path.rfind('/'));
+    auto readAt = [](int dirFd, const std::string &name, Bytes &out) {
+        int fd = openat(dirFd, name.c_str(), O_RDONLY | O_NOFOLLOW);
+        if (fd < 0) return false;
         struct stat st;
-        while (dir.size() > 1 && lstat(dir.c_str(), &st) != 0) dir.erase(dir.rfind('/'));
-        std::string at = realpath(dir.c_str(), real) ? std::string(real) : realPc;
-        return at == realPc || at.compare(0, realPc.size() + 1, realPc + "/") == 0;
+        bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size <= (64 << 20);
+        if (ok) {
+            out.resize(size_t(st.st_size));
+            ok = read(fd, out.data(), out.size()) == ssize_t(out.size());
+        }
+        close(fd);
+        return ok;
     };
+    // Writes under a fresh name, then gives it the name asked for: replacing what's there, or only if it's free.
+    auto writeAt = [](int dirFd, const std::string &name, const Bytes &data, bool replace) {
+        std::string tmp;
+        int fd = -1;
+        for (int k = 0; k < 100 && fd < 0; k++) {
+            tmp = ".vndegen-import-" + std::to_string(getpid()) + "-" + std::to_string(k);
+            fd = openat(dirFd, tmp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+        }
+        if (fd < 0) return false;
+        bool ok = write(fd, data.data(), data.size()) == ssize_t(data.size());
+        ok = close(fd) == 0 && ok;
+        if (ok) ok = replace ? renameat(dirFd, tmp.c_str(), dirFd, name.c_str()) == 0
+                             : linkat(dirFd, tmp.c_str(), dirFd, name.c_str(), 0) == 0;
+        if (!replace || !ok) unlinkat(dirFd, tmp.c_str(), 0);
+        return ok;
+    };
+
+    bool failed = false;
+    int rootFd = open(fs_.root().c_str(), O_RDONLY | O_DIRECTORY);
+    if (rootFd < 0) return;
+    struct Closer {
+        std::vector<int> fds;
+        ~Closer() {
+            for (int fd : fds) close(fd);
+        }
+    } closer{{rootFd}};
+    std::vector<Entry> top = listAt(rootFd, failed);
+    std::string pcName = findFolder(top, "saves");
+    std::string ownName = findFolder(top, lowerAscii(saveDir_).c_str());
+    if (failed || pcName.empty()) return;
+    int pcFd = openat(rootFd, pcName.c_str(), O_RDONLY | O_DIRECTORY);
+    if (pcFd < 0) return;
+    closer.fds.push_back(pcFd);
+    // VNDegen's folder as it stands: a link, or one that can't be read, stops it.
+    int ownFd = -1;
+    std::vector<Entry> own;
+    std::set<std::string> pending;  // lowercase names a run cut short listed as VNDegen's
+    if (!ownName.empty()) {
+        ownFd = openat(rootFd, ownName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (ownFd < 0) return;
+        closer.fds.push_back(ownFd);
+        own = listAt(ownFd, failed);
+        if (failed || !findFolder(own, kNote).empty()) return;
+        Bytes list;
+        if (!findFolder(own, kPending).empty()) {
+            if (!readAt(ownFd, findFolder(own, kPending), list)) return;
+            std::string text(list.begin(), list.end());
+            for (size_t p = 0; p < text.size();) {
+                size_t nl = text.find('\n', p);
+                std::string line = text.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
+                if (!line.empty()) pending.insert(lowerAscii(line));
+                p = nl == std::string::npos ? text.size() : nl + 1;
+            }
+        }
+        for (const Entry &e : own)
+            if (slot(e.name) && !pending.count(lowerAscii(e.name))) return;
+    }
+    std::string ownShotName = findFolder(own, "screenshot");
+    std::vector<Entry> ownShots;
+    if (!ownShotName.empty()) {
+        int fd = openat(ownFd, ownShotName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (fd < 0) return;
+        closer.fds.push_back(fd);
+        ownShots = listAt(fd, failed);
+        if (failed) return;
+    }
+    // What to copy: each file VNDegen has no entry of that name for, read now, before anything is written.
     struct Copy {
-        std::string from, to;
+        std::string name;  // under VNDegen's folder, or its screenshot folder
+        bool shot;
         Bytes data;
     };
     std::vector<Copy> copies;
-    auto plan = [&](const std::string &from, const std::string &name) {
-        std::string to = saveFilePath(name);
-        struct stat st;
-        if (lstat(to.c_str(), &st) == 0) return;  // VNDegen has one of that name, even a link to nowhere
-        if (stat(from.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || st.st_size > (64 << 20)) return;
-        copies.push_back({from, to, {}});
-    };
-    for (const Entry &e : list(pc, failed)) {
+    std::vector<Entry> pcEntries = listAt(pcFd, failed);
+    for (const Entry &e : pcEntries) {
         std::string low = lowerAscii(e.name);
-        if (!e.folder && (slot(e.name) || low == "global.sav" || low == "envdata")) plan(pc + "/" + e.name, e.name);
-        if (e.folder && low == "screenshot")
-            for (const Entry &shot : list(pc + "/" + e.name, failed)) {
-                std::string shotLow = lowerAscii(shot.name);
-                if (!shot.folder && shotLow.size() > 4 && shotLow.compare(shotLow.size() - 4, 4, ".bmp") == 0)
-                    plan(pc + "/" + e.name + "/" + shot.name, e.name + "\\" + shot.name);
+        bool wanted = slot(e.name) || low == "global.sav" || low == "envdata";
+        if (e.folder || !wanted || !findFolder(own, low.c_str()).empty()) continue;
+        copies.push_back({e.name, false, {}});
+        if (!readAt(pcFd, e.name, copies.back().data)) copies.pop_back();  // a link, or not a plain file
+    }
+    std::string pcShotName = findFolder(pcEntries, "screenshot");
+    int pcShotFd = pcShotName.empty() ? -1 : openat(pcFd, pcShotName.c_str(), O_RDONLY | O_DIRECTORY);
+    if (pcShotFd >= 0) {
+        closer.fds.push_back(pcShotFd);
+        for (const Entry &e : listAt(pcShotFd, failed)) {
+            std::string low = lowerAscii(e.name);
+            if (e.folder || low.size() <= 4 || low.compare(low.size() - 4, 4, ".bmp") != 0 ||
+                !findFolder(ownShots, low.c_str()).empty())
+                continue;
+            copies.push_back({e.name, true, {}});
+            if (!readAt(pcShotFd, e.name, copies.back().data)) copies.pop_back();
+        }
+    }
+    if (failed) return;
+    // A source that can't be read now leaves everything as it was, to try again next time.
+    for (const Entry &e : pcEntries) {
+        std::string low = lowerAscii(e.name);
+        bool wanted = !e.folder && (slot(e.name) || low == "global.sav" || low == "envdata") &&
+                      findFolder(own, low.c_str()).empty();
+        auto copying = [&](const Copy &c) { return !c.shot && c.name == e.name; };
+        if (wanted && std::none_of(copies.begin(), copies.end(), copying)) {
+            struct stat st;
+            if (fstatat(pcFd, e.name.c_str(), &st, 0) == 0 && S_ISREG(st.st_mode) && st.st_size <= (64 << 20)) {
+                logf("the PC engine's saves can't all be read now (%s); VNDegen tries again next time", e.name.c_str());
+                return;
             }
-    }
-    if (failed || copies.empty()) return;
-    for (Copy &c : copies)
-        if (insidePc(c.to) || !readFile(c.from, c.data)) {
-            logf("the PC engine's saves can't all be copied now (%s); VNDegen tries again next time", c.from.c_str());
-            return;
         }
-    std::vector<std::string> made;
+    }
+    if (copies.empty() && pending.empty()) return;
+    if (ownFd < 0) {
+        ownName = saveDir_;
+        if (mkdirat(rootFd, ownName.c_str(), 0755) != 0 && errno != EEXIST) return;
+        ownFd = openat(rootFd, ownName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (ownFd < 0) return;
+        closer.fds.push_back(ownFd);
+    }
+    int shotFd = -1;
+    std::string shotName = ownShotName.empty() ? (pcShotName.empty() ? "screenshot" : pcShotName) : ownShotName;
+    if (std::any_of(copies.begin(), copies.end(), [](const Copy &c) { return c.shot; })) {
+        if (mkdirat(ownFd, shotName.c_str(), 0755) != 0 && errno != EEXIST) return;
+        shotFd = openat(ownFd, shotName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (shotFd < 0) return;
+        closer.fds.push_back(shotFd);
+    }
+    // The list goes first, so what follows is VNDegen's own even if this run is cut short.
+    std::string list;
+    for (const std::string &name : pending) list += name + "\n";
+    for (const Copy &c : copies) list += lowerAscii(c.shot ? shotName + "/" + c.name : c.name) + "\n";
+    if (!writeAt(ownFd, kPending, Bytes(list.begin(), list.end()), true)) return;
+    std::string ownPath = fs_.root() + "/" + ownName;
     for (const Copy &c : copies) {
-        if (!fs_.write(c.to, c.data.data(), c.data.size())) {
-            logf("could not write %s; the PC engine's saves copied so far are taken back", c.to.c_str());
-            for (const std::string &path : made) remove(path.c_str());
+        if (!writeAt(c.shot ? shotFd : ownFd, c.name, c.data, false) && errno != EEXIST) {
+            logf("could not copy %s; VNDegen finishes copying the PC engine's saves next time", c.name.c_str());
             return;
         }
-        made.push_back(c.to);
+        casepath_changed((ownPath + "/" + (c.shot ? shotName + "/" : std::string()) + c.name).c_str());
     }
-    std::string note =
-        "Copied " + std::to_string(made.size()) + " files from the game's saves folder, which stays as it was.\n";
-    fs_.write(saveFilePath(kNote), note.data(), note.size());
-    logf("copied %zu files from the PC engine's saves folder into %s", made.size(), saveDir_.c_str());
+    if (renameat(ownFd, kPending, ownFd, kNote) == 0) casepath_changed((ownPath + "/" + kNote).c_str());
+    logf("copied %zu files from the PC engine's saves folder into %s", copies.size(), ownName.c_str());
 }
 
 // The global variables' file: NScripter's gloval.sav, the PC Ponscripter engine's global.sav, the same inside.
