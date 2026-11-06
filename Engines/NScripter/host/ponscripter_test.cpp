@@ -829,6 +829,60 @@ static void reviewLanding4() {
     fs::remove_all(dir);
 }
 
+// Landing 4's first re-check: a user command whose argument is another's name, and a later user command in a chained
+// statement, load as they ran; a huge window origin reaches ruby, fixed-cell text and the click cursor bounded.
+static void reviewLanding4Round2() {
+    char temp[] = "/tmp/vnns-ponscripter-landing4b-XXXXXX";
+    const char *root = mkdtemp(temp);
+    assert(root);
+    fs::path dir(root);
+    auto run = [&](const std::string &script, bool load) {
+        std::ofstream(dir / "0.utf") << script;
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 20; i++) engine.step(16);
+        assert(engine.wait_ == vnns::WaitKind::Click);
+        if (load) {
+            assert(engine.loadGame(1));
+            for (int i = 0; i < 20; i++) engine.step(16);
+        }
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+        for (int i = 0; i < 20; i++) engine.step(16);
+        return std::make_pair(engine.getNumVar(1), engine.getNumVar(9));
+    };
+    // bar is both a user command and foo's argument (an alias); the save is inside foo.
+    std::string alias = "*define\ndefsub foo\ndefsub bar\nnumalias bar,7\ngame\n*start\nmov %8,8 foo bar mov %9,9\nclick\nend\n"
+                        "*foo\ngetparam %1\nsaveon\nsavegame 1\nclick\nreturn\n*bar\nreturn\n";
+    auto plain = run(alias, false);
+    assert(plain.first == 7 && plain.second == 9 && run(alias, true) == plain);
+    // foo reads its argument and returns; bar, after it, is called and saves without reading its own.
+    std::string chain = "*define\ndefsub foo\ndefsub bar\ngame\n*start\nfoo 1 bar mov %9,9\nclick\nend\n"
+                        "*foo\ngetparam %1\nreturn\n*bar\nsaveon\nsavegame 1\nclick\nreturn\n";
+    plain = run(chain, false);
+    assert(plain.first == 1 && run(chain, true) == plain);
+    // A huge origin, with and without the game's font (the sanitizer build checks the arithmetic).
+    std::string huge = "*define\ngame\n*start\nsetwindow 2147483647,2147483647,20,5,20,20,0,0,0,0,0,#000000,0,0,639,479\n"
+                       "textspeed 0\nrubyon\nlangen(A/abcd)@\nlangen^B^@\nend\n";
+    for (bool font : {false, true}) {
+        if (font) {
+            fs::create_directories(dir / "fonts");
+            fs::copy_file(fs::path(VNNS_FONTS_DIR) / "LiberationSans-Regular.ttf", dir / "fonts" / "face0.ttf");
+        }
+        std::ofstream(dir / "0.utf") << huge;
+        vnns::Engine engine({root, root});
+        std::string error;
+        assert(engine.start(&error));
+        for (int i = 0; i < 20; i++) engine.step(16);
+        assert(engine.win_.tx == 8192 && engine.wait_ == vnns::WaitKind::Click);
+        engine.key(VNNS_KEY_RETURN, true);
+        engine.key(VNNS_KEY_RETURN, false);
+        for (int i = 0; i < 20; i++) engine.step(16);
+    }
+    fs::remove_all(dir);
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -844,4 +898,5 @@ int main() {
     saveFormats();
     reviewRound3Followups();
     reviewLanding4();
+    reviewLanding4Round2();
 }

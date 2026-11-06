@@ -138,6 +138,12 @@ int Script::labelIndex(std::string_view name) const {
     return it == labels_.end() ? -1 : it->second;
 }
 
+std::string_view Script::labelAt(int line) const {
+    auto it = std::upper_bound(labelLines_.begin(), labelLines_.end(), line);
+    if (it == labelLines_.begin()) return {};
+    return labelNames_[size_t(it - labelLines_.begin() - 1)];
+}
+
 int Script::labelLine(std::string_view name) const {
     int i = labelIndex(name);
     return i < 0 ? -1 : labelLines_[size_t(i)];

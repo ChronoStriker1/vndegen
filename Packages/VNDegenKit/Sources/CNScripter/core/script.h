@@ -52,6 +52,8 @@ public:
     // Labels in script order, for the label log.
     const std::vector<std::string> &labels() const { return labelNames_; }
     int labelIndex(std::string_view name) const;
+    // The label whose block holds a line: the last one at or before it, lowercase; empty before the first.
+    std::string_view labelAt(int line) const;
 
 private:
     void parseSettings();

@@ -6,6 +6,7 @@
 // `click` leave pending changes hidden.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <functional>
@@ -690,6 +691,8 @@ public:
     int pageHeadLine_ = 0, pageHeadStmt_ = 0;
     bool pageHeadTaken_ = false;
     bool ponsSaves() const { return ponscripter_ && !textGosub_.empty(); }
+    // Ponscripter bounds the window's text origin as it bounds sizes, so every drawing path's doubled positions fit.
+    static int ponsOrigin(int v) { return std::clamp(v, -8192, 8192); }
     Cursor stmtStart_;  // where the statement being executed began
     void serializeState(Bytes &out);
     void serializeTail(Bytes &out, int line, int stmt);

@@ -356,8 +356,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     windowEffect_.duration = r.i();
     windowEffect_.mask = r.s();
     if (pns) {
-        win_.tx = halved(r.i());
-        win_.ty = halved(r.i());
+        win_.tx = ponsOrigin(halved(r.i()));
+        win_.ty = ponsOrigin(halved(r.i()));
         int width = r.i(), height = r.i();
         win_.fh = win_.fw = halved(r.i());
         x.pnsWindow = r.i();
@@ -468,91 +468,6 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         }
         std::reverse(frames.begin(), frames.end());
     }
-    for (Frame &f : frames) {
-        f.pos = std::min(f.pos, script_.text().size());
-        f.line = script_.lineAt(f.pos);
-        // The statement index of a return position: the ':' separators before it on its line, outside strings.
-        f.stmt = 0;
-        const std::string &t = script_.text();
-        size_t stmtStart = script_.lineStart(f.line);
-        char quote = 0;
-        for (size_t p = stmtStart; p < f.pos; p += charLen(t, p)) {
-            if (quote) {
-                if (t[p] == quote) quote = 0;
-                continue;
-            }
-            if (t[p] == '"' || t[p] == '`') quote = t[p];
-            if (!quote && t[p] == ':') {
-                f.stmt++;
-                stmtStart = p + 1;
-            }
-        }
-        // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
-        // which getparam may still read. The interpreter's own parser finds that command, dispatching names as it
-        // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
-        // variables; its errors aren't the player's, so they aren't logged.
-        if (f.kind == Frame::Gosub) {
-            // Restored on every exit, including the exception a corrupt save's nesting guard throws.
-            quietErrors_++;
-            struct Restore {
-                Engine &e;
-                Cursor cur;
-                ~Restore() {
-                    e.cur_ = cur;
-                    e.quietErrors_--;
-                }
-            } restore{*this, cur_};
-            cur_ = Cursor{stmtStart, f.line, f.stmt};
-            // The call's arguments start after the spaces that follow its name; getparam moved past some.
-            auto userCommand = [&]() {
-                f.hasParams = cur_.pos <= f.pos;
-                skipSpaces();
-                f.paramsRead = f.hasParams && f.pos > cur_.pos;
-            };
-            bool found = false;
-            for (;;) {
-                std::string word = readWord();
-                bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
-                std::string name = builtin ? word.substr(1) : word;
-                if (!builtin && defsubs_.count(name)) {
-                    userCommand();
-                    found = true;
-                    break;
-                }
-                if (name != "if" && name != "notif") break;
-                readCondition();
-            }
-            // In Ponscripter a word after a command's arguments starts the next command, without a colon, so the user
-            // command may stand later: the last of its names before the return position, outside strings and not a
-            // variable's or label's name.
-            if (!found && ponscripter_) {
-                size_t call = std::string::npos;
-                char quote = 0;
-                for (size_t p = stmtStart; p < f.pos;) {
-                    char c = t[p];
-                    if (quote || c == '"' || c == '`') {
-                        quote = quote ? (c == quote ? 0 : quote) : c;
-                        p += charLen(t, p);
-                        continue;
-                    }
-                    if (!(isalpha(uint8_t(c)) || c == '_')) {
-                        p += charLen(t, p);
-                        continue;
-                    }
-                    char before = p > stmtStart ? t[p - 1] : ' ';
-                    cur_.pos = p;
-                    std::string word = readWord();
-                    size_t end = std::max(cur_.pos, p + 1);
-                    if ((before == ' ' || before == '\t') && end <= f.pos && defsubs_.count(word)) call = end;
-                    p = end;
-                }
-                if (call != std::string::npos) {
-                    cur_.pos = call;
-                    userCommand();
-                }
-            }
-        }
-    }
     sc.monocro = r.i() != 0;
     int mb = r.i(), mg = r.i(), mr = r.i();
     sc.monocroColor = rgba(mr, mg, mb);
@@ -652,6 +567,105 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     if (r.bad) {
         if (error) *error = "the save is shorter than its contents need";
         return false;
+    }
+    // Each frame's line, statement and, for a user command, how far getparam read. innerLine is where the call was
+    // when saved.
+    auto finishFrame = [&](Frame &f, int innerLine) {
+        f.pos = std::min(f.pos, script_.text().size());
+        f.line = script_.lineAt(f.pos);
+        // The statement index of a return position: the ':' separators before it on its line, outside strings.
+        f.stmt = 0;
+        const std::string &t = script_.text();
+        size_t stmtStart = script_.lineStart(f.line);
+        char quote = 0;
+        for (size_t p = stmtStart; p < f.pos; p += charLen(t, p)) {
+            if (quote) {
+                if (t[p] == quote) quote = 0;
+                continue;
+            }
+            if (t[p] == '"' || t[p] == '`') quote = t[p];
+            if (!quote && t[p] == ':') {
+                f.stmt++;
+                stmtStart = p + 1;
+            }
+        }
+        // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
+        // which getparam may still read. The interpreter's own parser finds that command, dispatching names as it
+        // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
+        // variables; its errors aren't the player's, so they aren't logged.
+        if (f.kind == Frame::Gosub) {
+            // Restored on every exit, including the exception a corrupt save's nesting guard throws.
+            quietErrors_++;
+            struct Restore {
+                Engine &e;
+                Cursor cur;
+                ~Restore() {
+                    e.cur_ = cur;
+                    e.quietErrors_--;
+                }
+            } restore{*this, cur_};
+            cur_ = Cursor{stmtStart, f.line, f.stmt};
+            // The call's arguments start after the spaces that follow its name; getparam moved past some.
+            auto userCommand = [&]() {
+                f.hasParams = cur_.pos <= f.pos;
+                skipSpaces();
+                f.paramsRead = f.hasParams && f.pos > cur_.pos;
+            };
+            size_t call = std::string::npos;  // where the user command's name ends
+            for (;;) {
+                std::string word = readWord();
+                bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
+                std::string name = builtin ? word.substr(1) : word;
+                if (!builtin && defsubs_.count(name)) {
+                    call = cur_.pos;
+                    break;
+                }
+                if (name != "if" && name != "notif") break;
+                readCondition();
+            }
+            // In Ponscripter a word after a command's arguments starts the next command, without a colon, so the user
+            // command may stand later, and a user command's name may also be an argument (an alias). Its names before
+            // the return position, after a space and outside strings, are the candidates: the call is the one whose
+            // label holds where the call was when saved (the next frame's return position, or the save's own for the
+            // innermost), else the statement's head as NScripter reads it, else the last.
+            if (ponscripter_) {
+                std::string callee(script_.labelAt(innerLine));
+                size_t last = std::string::npos, named = std::string::npos;
+                char quote = 0;
+                for (size_t p = stmtStart; p < f.pos;) {
+                    char c = t[p];
+                    if (quote || c == '"' || c == '`') {
+                        quote = quote ? (c == quote ? 0 : quote) : c;
+                        p += charLen(t, p);
+                        continue;
+                    }
+                    if (!(isalpha(uint8_t(c)) || c == '_')) {
+                        p += charLen(t, p);
+                        continue;
+                    }
+                    char before = p > stmtStart ? t[p - 1] : ' ';
+                    cur_.pos = p;
+                    std::string word = readWord();
+                    size_t end = std::max(cur_.pos, p + 1);
+                    if ((before == ' ' || before == '\t') && end <= f.pos && defsubs_.count(word)) {
+                        last = end;
+                        if (word == callee) named = end;
+                    }
+                    p = end;
+                }
+                if (named != std::string::npos) call = named;
+                else if (call == std::string::npos) call = last;
+            }
+            if (call != std::string::npos) {
+                cur_.pos = call;
+                userCommand();
+            }
+        }
+    };
+    for (size_t k = 0; k < frames.size(); k++) {
+        int inner = k + 1 < frames.size() ? script_.lineAt(std::min(frames[k + 1].pos, script_.text().size()))
+                                          : std::clamp(line, 0, script_.lineCount() - 1);
+        finishFrame(frames[k], inner);
     }
 
     // Commit: the scene, sound, text and the script position. A movie playing now belongs to the game left behind.

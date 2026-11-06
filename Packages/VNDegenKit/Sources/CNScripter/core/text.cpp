@@ -665,8 +665,8 @@ void cmdSetWindow(E &e, const std::string &name) {
         if (i) e.readComma();
         v[i] = e.readInt();
     }
-    w.tx = v[0];
-    w.ty = v[1];
+    w.tx = e.ponscripter_ ? E::ponsOrigin(v[0]) : v[0];
+    w.ty = e.ponscripter_ ? E::ponsOrigin(v[1]) : v[1];
     w.cols = v[2];
     w.rows = v[3];
     w.fw = v[4];
