@@ -76,7 +76,6 @@ New bugs get a GitHub issue and a line here.
 - [#39](https://github.com/ChronoStriker1/vndegen/issues/39) A launch that fails still sets the game's last played time.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
-- [#44](https://github.com/ChronoStriker1/vndegen/issues/44) No Socks RPG: cutscene layers draw wrong again on iPhone Duo.
 - [#45](https://github.com/ChronoStriker1/vndegen/issues/45) NekoSDK: Exit during a gallery replay quits the game instead of returning to the gallery.
 - [#46](https://github.com/ChronoStriker1/vndegen/issues/46) NekoSDK: scene unlocks from a PC backup (play_view.sav) aren't read.
 
@@ -84,7 +83,7 @@ New bugs get a GitHub issue and a line here.
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - NekoSDK stage 3, on `feat/nekosdk-stage3`: Test Games 84, 85, 88, 89, 92, 93 and 94, with movies through the app's FFmpeg. The other six games come after it.
 - Ponscripter ([#26](https://github.com/ChronoStriker1/vndegen/issues/26)), on `feat/ponscripter`.
-- An iPhone Duo layout audit of every screen, on `feat/portrait-controls`. A Claude and a Codex judge each score it out of 10, until both give 9.0 or higher. The portrait split ([#41](https://github.com/ChronoStriker1/vndegen/issues/41)) and the single library view button ([#42](https://github.com/ChronoStriker1/vndegen/issues/42)) are on `dev` for the next release.
+- An iPhone Duo layout audit of every screen, on `feat/portrait-controls`. A Claude and a Codex judge each score it out of 10, until both give 9.0 or higher. The portrait split ([#41](https://github.com/ChronoStriker1/vndegen/issues/41)) and the single library view button ([#42](https://github.com/ChronoStriker1/vndegen/issues/42)) are on `dev` for the next release, with the No Socks RPG white cutscene fix ([#44](https://github.com/ChronoStriker1/vndegen/issues/44)).
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
