@@ -119,11 +119,16 @@ extension LudusaviStore {
     static func registryData(yaml text: String) throws -> RegistryData {
         // serde_yaml reads anything but a mapping as no registry at all.
         guard case let .mapping(hives) = try YAML.parse(text) else { throw YAMLError(line: 1, reason: "registry data isn't a mapping") }
+        // Each hive and key holds a mapping, as serde needs for Ludusavi's maps. Anything else fails the whole file.
+        func mapping(_ node: YAML) throws -> [YAML.Entry] {
+            guard case let .mapping(entries) = node else { throw YAMLError(line: 0, reason: "registry data isn't a mapping") }
+            return entries
+        }
         var data = RegistryData()
         for hive in hives {
-            for key in hive.value.entries {
+            for key in try mapping(hive.value) {
                 var values: [String: RegistryValue] = [:]
-                for entry in key.value.entries {
+                for entry in try mapping(key.value) {
                     if let value = try registryValue(entry.value) { values[entry.key] = value }
                 }
                 data.setValues(values, of: "\(hive.key)\\\(key.key)")
@@ -141,6 +146,9 @@ extension LudusaviStore {
     /// fit it throws, as serde fails Ludusavi's whole file then, so a damaged differential gives way to the full backup.
     private static func registryValue(_ node: YAML) throws -> RegistryValue? {
         let bad = YAMLError(line: 0, reason: "a registry value doesn't fit its kind")
+        // A bare name is a kind with no data, which serde reads as Ludusavi's `Unknown` and leaves out.
+        if case .scalar = node { return nil }
+        if case .literal = node { return nil }
         guard case let .mapping(entries) = node, let entry = entries.first, entries.count == 1 else { throw bad }
         func bytes(_ node: YAML?) throws -> [UInt8] {
             guard case let .sequence(items)? = node else { throw bad }

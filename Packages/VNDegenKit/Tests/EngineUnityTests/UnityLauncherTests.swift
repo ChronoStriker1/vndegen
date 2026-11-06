@@ -186,6 +186,31 @@ import VNCore
 }
 
 @MainActor
+@Suite struct UnitySetupTests {
+    /// Saves set aside while the bottle is made come back whole, even after a setup that stopped halfway left some in
+    /// each place.
+    @Test func mergeKeepsEverySave() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appending(path: "merge-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let aside = base.appending(path: "aside"), saves = base.appending(path: "saves")
+        try fm.createDirectory(at: aside.appending(path: "Studio/Game"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: saves.appending(path: "Studio/Game"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: saves.appending(path: "Other/Game"), withIntermediateDirectories: true)
+        try Data("a".utf8).write(to: aside.appending(path: "Studio/Game/1.sav"))
+        try Data("b".utf8).write(to: saves.appending(path: "Studio/Game/2.sav"))
+        try Data("c".utf8).write(to: saves.appending(path: "Other/Game/3.sav"))
+        try UnityCrossOverSession.merge(saves, into: aside)
+        #expect(!fm.fileExists(atPath: saves.path))
+        try UnityCrossOverSession.merge(aside, into: saves)
+        #expect(!fm.fileExists(atPath: aside.path))
+        for (path, text) in [("Studio/Game/1.sav", "a"), ("Studio/Game/2.sav", "b"), ("Other/Game/3.sav", "c")] {
+            #expect(try String(contentsOf: saves.appending(path: path), encoding: .utf8) == text)
+        }
+    }
+}
+
+@MainActor
 @Suite struct UnityPlayerPrefsTests {
     /// The import writes the game's key alone: the file's values, and deletions of the values the file lacks. It never
     /// deletes the key, which would take its subkeys along.

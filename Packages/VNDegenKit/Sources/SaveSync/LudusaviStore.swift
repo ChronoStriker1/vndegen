@@ -198,6 +198,14 @@ public struct LudusaviStore: Sendable {
         let fm = FileManager.default
         guard fm.fileExists(atPath: snapshot.path) else { throw SaveSyncError.noSnapshot }
         guard isComplete(snapshot: snapshot) else { throw SaveSyncError.incompleteSnapshot }
+        // A snapshot from before VNDegen recorded its folders has none, and undoes as it always did.
+        let foldersFile = snapshot.appendingPathComponent(snapshotFoldersFile)
+        if fm.fileExists(atPath: foldersFile.path) {
+            let recorded = try String(contentsOf: foldersFile, encoding: .utf8)
+            guard recorded == locations.map(\.directory.standardizedFileURL.path).joined(separator: "\n") else {
+                throw SaveSyncError.snapshotForOtherFolders
+            }
+        }
         // Read before anything changes. A saved file that can't be read stops the undo, and only a missing one means
         // there was none.
         let savedRegistry = snapshot.appendingPathComponent(snapshotRegistryFolder, isDirectory: true)
@@ -248,6 +256,9 @@ public struct LudusaviStore: Sendable {
     }
 
     static let snapshotCompleteFile = "complete"
+    /// The save folders a snapshot was taken of, one path a line, so an undo never puts it into other ones, such as
+    /// after a game switched how it runs.
+    static let snapshotFoldersFile = "folders"
     /// Holds a copy of the registry file, or nothing when there was none. Location folders are numbered, so this name
     /// never meets one.
     static let snapshotRegistryFolder = "registry"
@@ -272,6 +283,8 @@ public struct LudusaviStore: Sendable {
                 try fm.copyItem(at: registry.file, to: dir.appendingPathComponent(registry.file.lastPathComponent))
             }
         }
+        try Data(locations.map(\.directory.standardizedFileURL.path).joined(separator: "\n").utf8)
+            .write(to: staging.appendingPathComponent(snapshotFoldersFile))
         try Data().write(to: staging.appendingPathComponent(snapshotCompleteFile))
         try? fm.removeItem(at: snapshot)
         try fm.moveItem(at: staging, to: snapshot)
@@ -776,6 +789,8 @@ public enum SaveSyncError: LocalizedError, Equatable {
     case noStoreFolder(String)
     case engineUnsupported
     case outsideSaveFolder(String)
+    /// The game keeps its saves somewhere else than when the restore's snapshot was taken.
+    case snapshotForOtherFolders
     /// The game's library folder can't be reached, for the reason given.
     case gameFolderUnavailable(String)
 
@@ -805,6 +820,8 @@ public enum SaveSyncError: LocalizedError, Equatable {
         case .engineUnsupported: "Save sync does not support this game's engine yet."
         case let .gameFolderUnavailable(reason): "The game's folder can't be reached. \(reason)"
         case let .outsideSaveFolder(path): "\(path) leads outside the game's save folder. Nothing was changed."
+        case .snapshotForOtherFolders:
+            "The saves kept before the last restore are from another save folder, such as before the game changed how it runs. Nothing was changed."
         }
     }
 }

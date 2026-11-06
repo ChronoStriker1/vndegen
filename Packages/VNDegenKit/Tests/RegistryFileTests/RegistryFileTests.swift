@@ -148,6 +148,17 @@ import Testing
         #expect(RegistryData.writable(values) == ["z": .dword(2)])
     }
 
+    /// regashii writes a name holding a real line break inside its quotes and reads it back. VNDegen must too, so
+    /// rewriting a backup keeps such a value under another key.
+    @Test func readsALineBreakInsideQuotesAsRegashiiWritesIt() throws {
+        var data = RegistryData()
+        data.setValues(["two\nlines": .dword(1), "plain": .sz("x")], of: #"HKEY_CURRENT_USER\Software\Other"#)
+        let text = data.regText
+        #expect(text.contains("\"two\nlines\"=dword:00000001"))
+        let read = try RegistryData(reg: text)
+        #expect(read == data && read.regText == text)
+    }
+
     @Test func writesUTF16WithAByteOrderMark() {
         #expect(RegistryData.utf16File("Aあ") == Data([0xFF, 0xFE, 0x41, 0x00, 0x42, 0x30]))
     }

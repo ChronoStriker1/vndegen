@@ -248,7 +248,8 @@ private struct RegScanner {
                 text.append(unescaped)
                 at += 1
             default:
-                if Self.isLineEnd(char) { return nil }
+                // regashii takes a line break inside quotes as part of the text, and writes one back that way, so a
+                // name holding one in a backup's registry survives a rewrite.
                 text.append(char)
             }
         }

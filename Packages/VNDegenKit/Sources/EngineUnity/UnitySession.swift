@@ -142,9 +142,10 @@ final class UnityCrossOverSession: UnityExternalSession {
         let fm = FileManager.default
         let saves = bottle.userFolder.appendingPathComponent("AppData/LocalLow", isDirectory: true)
         let aside = bottle.folder.appendingPathComponent("LocalLow-kept", isDirectory: true)
-        if fm.fileExists(atPath: saves.path), !fm.fileExists(atPath: aside.path) {
+        // Merged, not moved, so a setup that stopped halfway, with saves in both places, loses none of them.
+        if fm.fileExists(atPath: saves.path) {
             try bottle.checkInside(saves)
-            try fm.moveItem(at: saves, to: aside)
+            try Self.merge(saves, into: aside)
         }
         if fm.fileExists(atPath: bottle.path.path) { try fm.removeItem(at: bottle.path) }
         try fm.createDirectory(at: bottle.folder, withIntermediateDirectories: true)
@@ -154,13 +155,28 @@ final class UnityCrossOverSession: UnityExternalSession {
         try bottle.installFonts()
         if fm.fileExists(atPath: aside.path) {
             try bottle.checkInside(saves)
-            try fm.createDirectory(at: saves, withIntermediateDirectories: true)
-            for name in try fm.contentsOfDirectory(atPath: aside.path) where !fm.fileExists(atPath: saves.appendingPathComponent(name).path) {
-                try fm.moveItem(at: aside.appendingPathComponent(name), to: saves.appendingPathComponent(name))
-            }
-            try fm.removeItem(at: aside)
+            try Self.merge(aside, into: saves)
         }
         try Data().write(to: bottle.readyMarker)
+    }
+
+    /// Moves everything in `source` into `target`, folder by folder, keeping what `target` already has where both hold
+    /// the same file, and removes `source` once it's empty. Links are moved as links, never followed.
+    static func merge(_ source: URL, into target: URL) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: target, withIntermediateDirectories: true)
+        for name in try fm.contentsOfDirectory(atPath: source.path) {
+            let from = source.appendingPathComponent(name), to = target.appendingPathComponent(name)
+            let fromIsFolder = (try? from.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])).map { $0.isDirectory == true && $0.isSymbolicLink != true } ?? false
+            let toIsFolder = (try? to.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])).map { $0.isDirectory == true && $0.isSymbolicLink != true } ?? false
+            if (try? fm.attributesOfItem(atPath: to.path)) == nil {
+                try fm.moveItem(at: from, to: to)
+            } else if fromIsFolder, toIsFolder {
+                try merge(from, into: to)
+            }
+        }
+        // A file in both places stays in `source`, which then isn't empty and isn't removed.
+        if try fm.contentsOfDirectory(atPath: source.path).isEmpty { try fm.removeItem(at: source) }
     }
 
     /// Puts the game's PlayerPrefs from its file into the bottle: the file's values, and a deletion for each value the

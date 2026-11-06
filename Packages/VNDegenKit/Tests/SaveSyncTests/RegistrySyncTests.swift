@@ -187,6 +187,27 @@ import VNCore
         #expect(try LudusaviStore.localRegistryValues(setup.save) == (try Self.fixtureData()).values(of: Self.key))
     }
 
+    /// serde's reading of Ludusavi's YAML: a bare kind name is an unknown value that's left out, and a hive or key that
+    /// isn't a mapping fails the file.
+    @Test func registryYAMLFollowsSerde() throws {
+        let kept = try LudusaviStore.registryData(yaml: "HKEY_CURRENT_USER:\n  \"Software\\\\S\\\\G\":\n    future: unknown\n    a:\n      dword: 1\n")
+        #expect(kept.values(of: #"HKEY_CURRENT_USER\Software\S\G"#) == ["a": .dword(1)])
+        #expect(throws: (any Error).self) { try LudusaviStore.registryData(yaml: "HKEY_CURRENT_USER:\n  \"Software\\\\S\\\\G\":\n") }
+        #expect(throws: (any Error).self) { try LudusaviStore.registryData(yaml: "HKEY_CURRENT_USER: 3\n") }
+    }
+
+    /// A snapshot is undone only into the folders it was taken of. A game switched to its Mac version keeps its saves
+    /// elsewhere, and the snapshot of its bottle's mustn't land there.
+    @Test func undoRefusesOtherSaveFolders() throws {
+        let setup = try Self.setup()
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        let elsewhere = [SaveLocation(directory: setup.snapshot.deletingLastPathComponent().appendingPathComponent("Mac saves")) { _ in nil }]
+        #expect(throws: SaveSyncError.snapshotForOtherFolders) {
+            try LudusaviStore.undoRestore(locations: elsewhere, registry: setup.save, snapshot: setup.snapshot)
+        }
+        try LudusaviStore.undoRestore(locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+    }
+
     /// A snapshot folder that can't be listed stops undo too, rather than passing for one with no file.
     @Test func undoStopsWhenTheSnapshotFolderCantBeListed() throws {
         let setup = try Self.setup()
