@@ -13,7 +13,7 @@ Each game has its own control method (Automatic, Touch gamepad, Mouse, or Contro
 
 The touch gamepad has the D-pad, A, B, X, Y, LB, RB, LT, RT, View, and Menu. L3, R3, and the sticks come from a real controller.
 
-On a phone held upright, and on an iPad or an iPad window that is taller than it is wide, the game moves to the top of the screen and the touch controls fill the space below it, so none of them covers the game. The game keeps its shape. A 4:3 game fills the space above the controls, and a wider game fills the width with a dark band above and below it. With the Mouse method's cursor, the cursor still moves when you drag anywhere on the screen, and its Home button sits below the game. Mouse by touch and Controller have no overlay, so the game stays in the middle of the screen. In landscape the controls sit over the game as before.
+On a phone held upright, and on an iPad or an iPad window that is taller than it is wide, the game moves to the top of the screen and the touch controls fill the space below it, so none of them covers the game. The game keeps its shape. A 4:3 game fills the space above the controls, and a wider game fills the width with a dark band above and below it. With the cursor mouse style, under Mouse or Controller, the cursor still moves when you drag anywhere on the screen, and its Home button sits below the game. Mouse by touch, and Controller without a cursor, have no overlay, so the game stays in the middle of the screen. In landscape the controls sit over the game as before.
 
 ## Buttons in games
 

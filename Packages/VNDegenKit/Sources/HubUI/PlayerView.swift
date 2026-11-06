@@ -173,7 +173,7 @@ struct PlayerView: View {
     private var overlayMode: TouchControlsMode? { menu.isOpen || isCovered ? nil : touchMode }
 
     /// The game's height when it sits at the top of a portrait screen or window, above touch controls that would otherwise
-    /// cover it. Nil when it fills the screen, as in landscape, and when the controls would leave the game too little room.
+    /// cover it. Nil when it fills the screen, as in landscape, and when the controls would leave the game no room.
     /// The hub doesn't know the game's shape, so the pane is at most 4:3, which a 4:3 game fills and a wider one fills
     /// across. It follows the control method rather than the menu, so opening the menu leaves the game where it is.
     private var gamePaneHeight: CGFloat? {
@@ -182,7 +182,7 @@ struct PlayerView: View {
         // bottom inset and shouldn't move the game.
         let controls = TouchControlsOverlay.portraitControlsHeight(touchMode, width: metrics.size.width) + 34
         let height = min(metrics.fullWidth * 0.75, metrics.fullHeight - gamePaneTop - controls)
-        return height >= metrics.fullWidth / 2 ? height : nil
+        return height > 0 ? height : nil
     }
 
     /// Where the game starts when it sits above the controls: below the camera housing. The iPhone Duo's inner display
