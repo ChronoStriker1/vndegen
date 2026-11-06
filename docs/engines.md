@@ -143,7 +143,7 @@ NekoSDK games run on VNDegen's own NekoSDK runtime, written in C++ for VNDegen f
 
 A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a table for each game, drawn from the game's own art. Saves are the PC engine's own files, under `AppData/Roaming` in the game's data folder as on Windows, so they move between VNDegen and a PC copy of the game. Known limits:
 
-- Unlocked pictures and music are read from and written to the PC's `cfg.sav`, so they move with a backup. The PC's Config settings don't: VNDegen keeps its own.
+- Unlocked pictures and music are read from and written to the PC's `cfg.sav`, so they move with a backup. Unlocked scenes don't move with a PC backup yet: the Scene gallery shows only those played in VNDegen (#46). The PC's Config settings don't: VNDegen keeps its own.
 - Config changes text speed, auto speed, what the right button does, the confirmation questions, volumes, Individual Voices, and the music screen's volume, and in The Alchemist the window's opacity. Options that have no meaning here or aren't built, such as resolution, effects and read-only skip, are shown as disabled. Config's moving preview picture is still.
 - A save's lock can't be set, and its comment and the "NEW" mark on the latest save aren't there. The bar's Arrange button isn't there, and neither is Graphics' choice of Original or Arrange art.
 - The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
