@@ -41,9 +41,15 @@ public struct TouchControlsOverlay: View {
         self.gameFrame = gameFrame
     }
 
-    /// The touch gamepad's height in a portrait screen `width` wide, above the safe area's bottom inset.
-    public static func portraitGamepadHeight(width: CGFloat) -> CGFloat {
-        GamepadControls.height(unit: unit(for: width))
+    /// The height `mode`'s controls take below the game in a portrait screen `width` wide, above the safe area's bottom
+    /// inset: the whole gamepad, or the cursor's Home button, since its trackpad covers the screen.
+    public static func portraitControlsHeight(_ mode: TouchControlsMode, width: CGFloat) -> CGFloat {
+        let unit = unit(for: width)
+        return switch mode {
+        case .gamepad: GamepadControls.height(unit: unit)
+        case .cursor: unit * 0.62 + 16
+        case .direct, .off: 0
+        }
     }
 
     /// The size the controls are built from, for an overlay whose shorter side is `side` long.
@@ -100,10 +106,11 @@ private struct GamepadControls: View {
     let mapping: ButtonMapping
     let press: TouchPress
 
-    /// The rows' heights, the spacing between them, and the bottom padding, as `body` lays them out.
+    /// The rows' heights, the spacing after the spacer and between the rows, and the bottom padding, as `body` lays them
+    /// out.
     static func height(unit: CGFloat) -> CGFloat {
         let triggers = 0.6, bumpers = 0.62, sticks = 1 + 0.82 * 2
-        return unit * (triggers + bumpers + sticks + 0.28 * 2 + 0.25)
+        return unit * (triggers + bumpers + sticks + 0.28 * 3 + 0.25)
     }
 
     var body: some View {

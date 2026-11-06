@@ -56,10 +56,11 @@ struct PlayerView: View {
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input,
                                      gameFrame: gamePaneHeight == nil ? nil : gameFrame)
                     .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
-                    // Below the game, a side inset's camera is up beside the game, so the controls keep the safe area's
-                    // width but sit in the middle of the screen. The on-screen keyboard covers them rather than pushing
-                    // them up over the game.
-                    .padding(.horizontal, gamePaneHeight == nil ? 0 : (metrics.insets.leading + metrics.insets.trailing) / 2)
+                    // Below the game, a side inset's camera is up beside the game, so the gamepad keeps the safe area's
+                    // width but sits in the middle of the screen. The cursor's pad keeps the whole screen. The on-screen
+                    // keyboard covers the controls rather than pushing them up over the game.
+                    .padding(.horizontal, gamePaneHeight == nil || overlayMode != .gamepad ? 0
+                             : (metrics.insets.leading + metrics.insets.trailing) / 2)
                     .ignoresSafeArea(gamePaneHeight == nil ? [] : .container, edges: .horizontal)
                     .ignoresSafeArea(gamePaneHeight == nil ? [] : .keyboard)
             }
@@ -176,10 +177,10 @@ struct PlayerView: View {
     /// The hub doesn't know the game's shape, so the pane is at most 4:3, which a 4:3 game fills and a wider one fills
     /// across. It follows the control method rather than the menu, so opening the menu leaves the game where it is.
     private var gamePaneHeight: CGFloat? {
-        guard touchMode?.hasOverlay == true, metrics.fullHeight > metrics.fullWidth else { return nil }
+        guard let touchMode, touchMode.hasOverlay, metrics.fullHeight > metrics.fullWidth else { return nil }
         // From the full height and an allowance for the Home indicator, because the on-screen keyboard changes the
         // bottom inset and shouldn't move the game.
-        let controls = TouchControlsOverlay.portraitGamepadHeight(width: metrics.size.width) + 34
+        let controls = TouchControlsOverlay.portraitControlsHeight(touchMode, width: metrics.size.width) + 34
         let height = min(metrics.fullWidth * 0.75, metrics.fullHeight - gamePaneTop - controls)
         return height >= metrics.fullWidth / 2 ? height : nil
     }
