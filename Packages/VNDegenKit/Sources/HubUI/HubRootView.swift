@@ -16,11 +16,16 @@ public struct HubRootView: View {
         _nav = State(initialValue: Navigator(hub: hub))
     }
 
+    private func metrics(_ geo: GeometryProxy) -> HubMetrics {
+        HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls)
+    }
+
     public var body: some View {
         GeometryReader { geo in
             Group {
                 switch hub.screen {
-                case .library: LibraryContainer()
+                // The player keeps the system's safe area, which its touch controls and game pane are laid out in.
+                case .library: LibraryContainer().besideSideCamera(metrics(geo))
                 case let .playing(_, session): PlayerView(hub: hub, session: session)
                 }
                 // The screenshot viewer covers the library from here rather than from the library's own overlay, since the
@@ -32,7 +37,7 @@ public struct HubRootView: View {
                 }
                 .animation(.easeOut(duration: 0.2), value: nav.sheet?.id)
             }
-            .environment(\.hubMetrics, HubMetrics(size: geo.size, insets: geo.safeAreaInsets, windowControls: windowControls))
+            .environment(\.hubMetrics, metrics(geo))
         }
         #if os(iOS)
         .background {
@@ -103,6 +108,7 @@ private struct LibraryContainer: View {
         .animation(.smooth(duration: 0.2), value: nav.checkingSaves)
         .sheet(item: $nav.presentedSheet) { sheet in
             sheetContent(sheet)
+                .sheetBesideSideCamera()
                 .environment(hub)
                 .environment(nav)
         }
@@ -175,7 +181,7 @@ private struct LibraryContainer: View {
         case let .saves(model):
             if let game = hub.library.game(model.game) {
                 SheetScaffold(title: "Saves", subtitle: hub.displayTitle(game), escapeCloses: true) {
-                    GameSavesView(model: model).scrollContentBackground(.hidden)
+                    GameSavesView(model: model) { nav.sheet = .settingsPage(.saves) }.scrollContentBackground(.hidden)
                 }
                 .presentationDetents([.large])
                 #if os(macOS)

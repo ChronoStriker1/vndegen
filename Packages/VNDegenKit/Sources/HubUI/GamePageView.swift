@@ -111,10 +111,11 @@ struct GamePageView: View {
                     secondaryButtons(labels: false)
                 }
                 .onAppear { nav.pageActionsStacked = false }
-                // The narrowest windows put the other buttons under Play, and controller focus moves down to them.
+                // The narrowest windows put the other buttons under Play, with their names, wrapping as needed, and
+                // controller focus moves down to them.
                 VStack(alignment: .leading, spacing: 12) {
                     playButton
-                    HStack(spacing: 10) { secondaryButtons(labels: false) }
+                    FlowLayout(spacing: 10) { secondaryButtons(labels: true) }
                 }
                 .onAppear { nav.pageActionsStacked = true }
             }

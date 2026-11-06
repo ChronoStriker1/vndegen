@@ -75,16 +75,18 @@ struct PlayerView: View {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
                                onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping,
                                onGameMenu: menu.openGameMenu, onGameItem: choose, onCheats: openCheats)
+                    .besideSideCamera(metrics)
                     .transition(.opacity)
             } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
                 // users get back to the menu.
                 Button(action: menuButton) {
-                    Image(systemName: "square.grid.2x2.fill")
+                    // The same house as the touch controls' Home button, which opens the same menu.
+                    Image(systemName: "house.fill")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 36, height: 36)
                         .background(.ultraThinMaterial, in: .circle)
-                        .opacity(0.55)
+                        .opacity(0.75)
                         .frame(width: 44, height: 44)
                         .contentShape(.circle)
                 }
@@ -113,6 +115,8 @@ struct PlayerView: View {
         .background(.black)
         .sheet(item: $mappingEditor) { editor in
             ButtonMappingSheet(editor: editor) { mappingEditor = nil }
+                .sheetBesideSideCamera()
+                .environment(\.hubMetrics, metrics.besideSideCamera)
                 .environment(hub)
                 .environment(nav)
         }
@@ -464,23 +468,27 @@ private struct PlayerMenuView: View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            switch menu.page {
-            case .main: card
-            case .game:
-                GameMenuView(menu: menu, showsFocus: showsFocus, onChoose: onGameItem)
-                    .padding(isNarrow ? 20 : 28)
-                    .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
-                    .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
-                    .padding(12)
-            case .cheats:
-                if let cheats = menu.cheats {
-                    CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
-                        .padding(isNarrow || metrics.isShort ? 16 : 28)
+            Group {
+                switch menu.page {
+                case .main: card
+                case .game:
+                    GameMenuView(menu: menu, showsFocus: showsFocus, onChoose: onGameItem)
+                        .padding(isNarrow ? 20 : 28)
                         .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
                         .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
                         .padding(12)
+                case .cheats:
+                    if let cheats = menu.cheats {
+                        CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
+                            .padding(isNarrow || metrics.isShort ? 16 : 28)
+                            .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+                            .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+                            .padding(12)
+                    }
                 }
             }
+            // The cards reach across a side camera's inset, so they keep below the camera.
+            .padding(.top, metrics.acrossSideCamera ? metrics.cornerClearance : 0)
         }
         .onScreenKeyboard(menu.page == .cheats ? menu.cheats?.keyboard : nil)
     }

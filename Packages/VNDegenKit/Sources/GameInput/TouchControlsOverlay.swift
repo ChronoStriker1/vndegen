@@ -65,6 +65,12 @@ public struct TouchControlsOverlay: View {
             case .cursor:
                 ZStack(alignment: .topTrailing) {
                     MouseControls(mouse: input.mouse, gameFrame: gameFrame, send: sendPointer)
+                    // Below the game the screen is all trackpad, which nothing else would show.
+                    if gameFrame != nil {
+                        TrackpadHint()
+                            .padding(.top, top + unit * 0.62 + 24)
+                            .padding([.horizontal, .bottom], 16)
+                    }
                     HomeButton(size: unit * 0.62, press: press)
                         .padding(.top, top + 8)
                         .padding(.trailing, 16)
@@ -488,6 +494,30 @@ private struct RoundKey: View {
 }
 
 // MARK: - Cursor mode
+
+/// Marks the trackpad below the game and says how it works. It takes no touches, so they reach the trackpad under it.
+private struct TrackpadHint: View {
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        VStack(spacing: 8) {
+            Image(systemName: "hand.draw")
+                .font(.system(size: 26, weight: .regular))
+            Text("Drag to move the pointer")
+                .font(.system(size: 15, weight: .semibold))
+            Text("Tap to click · Touch and hold to drag\nTwo-finger tap to right click · Two fingers to scroll")
+                .font(.system(size: 12))
+                .multilineTextAlignment(.center)
+                .opacity(0.8)
+        }
+        .foregroundStyle(.white.opacity(0.4))
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.white.opacity(0.03), in: shape)
+        .overlay { shape.strokeBorder(.white.opacity(0.1), lineWidth: 1) }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
 
 private struct MouseControls: View {
     let mouse: VirtualMouse

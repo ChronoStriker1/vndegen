@@ -192,8 +192,12 @@ struct TopBar: View {
         #endif
         .padding(.bottom, 28)
         .background {
-            // Content scrolls under the bar, so fade it out before it meets the buttons.
-            LinearGradient(colors: [Theme.background.opacity(0.9), Theme.background.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom)
+            // Content scrolls under the bar, so it fades out before it meets the buttons, solidly enough that bright art
+            // never shows through behind them.
+            LinearGradient(stops: [.init(color: Theme.background.opacity(0.97), location: 0),
+                                   .init(color: Theme.background.opacity(0.88), location: 0.6),
+                                   .init(color: .clear, location: 1)],
+                           startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea(edges: [.top, .horizontal])
         }
     }

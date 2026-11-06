@@ -412,15 +412,26 @@ struct EmptyLibraryView: View {
     }
 
     var body: some View {
-        let layout = metrics.isCompact || metrics.isShort ? AnyLayout(VStackLayout(spacing: 28)) : AnyLayout(HStackLayout(spacing: 56))
+        let stacked = metrics.isCompact || metrics.isShort
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 24)) : AnyLayout(HStackLayout(spacing: 56))
+        // A phone held upright keeps the posters small, so the actions show without scrolling.
+        let posters: CGFloat = metrics.isShort ? 170 : metrics.isCompact ? 150 : 240
         ScrollView {
             layout {
                 PosterStack()
-                    .frame(width: metrics.isShort ? 180 : 240, height: metrics.isShort ? 170 : 240)
+                    .frame(width: posters, height: posters)
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Add your first game").font(.display(metrics.isCompact ? 28 : 36))
                     if !hub.localArchives.isEmpty {
                         ReadyToImportList(archives: hub.localArchives)
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus").fixedSize() }
+                        HStack(spacing: 12) {
+                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill").fixedSize() }
+                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise").fixedSize() }
+                                .disabled(nav.rescanning)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
@@ -434,23 +445,16 @@ struct EmptyLibraryView: View {
                             }
                         }
                     }
-                    Text("RPG Maker MV and MZ games are supported today. Add game unpacks a zip, RAR, or 7z archive into the library.")
+                    .padding(.top, 6)
+                    Text("Add game unpacks a zip, RAR, or 7z archive into the library.")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.tertiaryText)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus") }
-                        HStack(spacing: 12) {
-                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill") }
-                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise") }
-                                .disabled(nav.rescanning)
-                        }
-                    }
-                    .padding(.top, 6)
                 }
                 .frame(maxWidth: 520, alignment: .leading)
             }
             .padding(.horizontal, metrics.padding)
-            .padding(.vertical, 90)
+            .padding(.top, stacked ? 72 : 90)
+            .padding(.bottom, stacked ? 40 : 90)
             .frame(maxWidth: .infinity, minHeight: metrics.size.height)
         }
         .scrollIndicators(.hidden)

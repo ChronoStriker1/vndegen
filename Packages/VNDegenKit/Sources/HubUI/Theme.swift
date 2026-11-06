@@ -25,6 +25,8 @@ struct HubMetrics: Equatable {
     var size: CGSize
     var insets = EdgeInsets()
     var windowControls = WindowControlsInsets()
+    /// True for metrics from `besideSideCamera`, whose content reaches across the camera's inset.
+    var acrossSideCamera = false
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -46,6 +48,31 @@ struct HubMetrics: Equatable {
 
     /// How far below the safe area's top a view in a top corner starts, to sit below an iPad window's controls.
     var cornerClearance: CGFloat { max(0, windowControls.top - insets.top) }
+
+    /// The iPhone Duo's outer display, held upright, keeps its camera in a safe-area inset down the whole of one side,
+    /// though the camera itself sits at the top of it. Elsewhere a side inset comes with a taller top inset or a
+    /// landscape screen, and this is zero. Here it is the inset's width, which the hub also takes as the camera's
+    /// height, since UIKit reports nothing finer.
+    var sideCamera: CGFloat {
+        let side = max(insets.leading, insets.trailing)
+        return size.height > size.width && side > insets.top ? side : 0
+    }
+
+    /// These metrics for content that reaches across a side camera's inset below the camera: the full width, with the
+    /// camera's corner kept clear as an iPad window's controls are, through `topRowPadding` and `cornerClearance`.
+    var besideSideCamera: HubMetrics {
+        let side = sideCamera
+        guard side > 0 else { return self }
+        var metrics = self
+        metrics.size.width += insets.leading + insets.trailing
+        metrics.windowControls.leading = max(windowControls.leading, insets.leading)
+        metrics.windowControls.trailing = max(windowControls.trailing, insets.trailing)
+        metrics.windowControls.top = max(windowControls.top, insets.top + side)
+        metrics.insets.leading = 0
+        metrics.insets.trailing = 0
+        metrics.acrossSideCamera = true
+        return metrics
+    }
 
     var topBarSpacing: CGFloat { isCompact ? 8 : 12 }
 
@@ -122,6 +149,18 @@ struct HubMetrics: Equatable {
 }
 
 extension View {
+    /// Lays the content out across a side camera's inset, with metrics to match. See `HubMetrics.sideCamera`.
+    func besideSideCamera(_ metrics: HubMetrics) -> some View {
+        environment(\.hubMetrics, metrics.besideSideCamera)
+            .ignoresSafeArea(.container, edges: metrics.sideCamera > 0 ? .horizontal : [])
+    }
+
+    /// A sheet's content under metrics from `besideSideCamera`: across the camera's inset too, with its header's
+    /// trailing button kept clear of the camera when the sheet reaches up beside it.
+    func sheetBesideSideCamera() -> some View {
+        modifier(SheetBesideSideCamera())
+    }
+
     /// Insets both sides by the larger horizontal safe area, so centered layouts stay centered on the screen when only
     /// one side has an inset, such as the iPhone Duo's 84 pt camera inset.
     func balancedHorizontalSafeArea(_ metrics: HubMetrics) -> some View {
@@ -156,5 +195,21 @@ extension TimeInterval {
         guard self >= 60 else { return nil }
         let minutes = Int(self / 60)
         return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
+    }
+}
+
+private struct SheetBesideSideCamera: ViewModifier {
+    @Environment(\.hubMetrics) private var metrics
+    /// The sheet's top in the window.
+    @State private var top = CGFloat.infinity
+
+    func body(content: Content) -> some View {
+        let across = metrics.acrossSideCamera
+        // A sheet that reaches up beside the camera moves only its header's trailing button clear of it.
+        let besideCamera = across && top < metrics.cornerClearance
+        content
+            .environment(\.cameraCornerTrailing, besideCamera ? metrics.windowControls.trailing : 0)
+            .ignoresSafeArea(.container, edges: across ? .horizontal : [])
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { top = $0 }
     }
 }

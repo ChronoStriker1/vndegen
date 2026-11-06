@@ -121,7 +121,8 @@ public struct LockSettingsView: View {
                      : "Locked games stay hidden until you unlock them with \(unlockMethods).")
             }
             Section {
-                Toggle(isOn: Binding(get: { lock.biometricsEnabled }, set: { _ in model.select(.biometrics) })) {
+                // Off while the device has no Face ID or Touch ID, whatever the stored choice, so it never reads as on.
+                Toggle(isOn: Binding(get: { lock.canUseBiometrics }, set: { _ in model.select(.biometrics) })) {
                     Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
                 }
                 .disabled(lock.biometry == .none)

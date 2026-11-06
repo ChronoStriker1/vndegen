@@ -502,9 +502,18 @@ public final class GameSavesModel {
 /// the game page, styled like `SaveSyncSettingsView`.
 public struct GameSavesView: View {
     @State private var model: GameSavesModel
+    /// Opens the Ludusavi settings, offered while no share is set up.
+    private let onSetUp: (() -> Void)?
 
-    public init(service: SaveSyncService, game: GameID) { _model = State(initialValue: GameSavesModel(service: service, game: game)) }
-    public init(model: GameSavesModel) { _model = State(initialValue: model) }
+    public init(service: SaveSyncService, game: GameID) {
+        _model = State(initialValue: GameSavesModel(service: service, game: game))
+        onSetUp = nil
+    }
+
+    public init(model: GameSavesModel, onSetUp: (() -> Void)? = nil) {
+        _model = State(initialValue: model)
+        self.onSetUp = onSetUp
+    }
 
     public var body: some View {
         @Bindable var model = model
@@ -520,6 +529,9 @@ public struct GameSavesView: View {
                     Section {
                         Text(model.service.needsShare ? oldServerNote : "Set up your Ludusavi share in Settings to restore and back up this game's saves.")
                             .foregroundStyle(.secondary)
+                        if let onSetUp, !model.service.needsShare {
+                            Button("Set up Ludusavi backups", systemImage: "externaldrive.badge.plus", action: onSetUp)
+                        }
                     }
                 }
             }
