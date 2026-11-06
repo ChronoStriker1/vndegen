@@ -278,8 +278,8 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   inside a user command that jumped to another label before saving, whose arguments include another user command's
   name, that is the second call to the same command in one statement, or whose line uses a built-in's name (`gosub`,
   `csel`) as an alias inside an expression, may load as if it were a different call. The one-time copy of a PC copy's
-  saves keeps to its folders and never replaces a file, but it trusts what it finds there: a hand-made list of an
-  interrupted copy, or a slot of another case (`SAVE1.DAT` beside `save1.dat`) made while the copy runs, isn't
+  saves keeps to its folders and never replaces a file, but it trusts what it finds there: a hand-made or stale list
+  of an interrupted copy, or a slot of another case (`SAVE1.DAT` beside `save1.dat`) made while the copy runs, isn't
   told from VNDegen's own. An unclosed `~` tag is drawn as it stands, where the PC
   engine drops the line.
   Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
