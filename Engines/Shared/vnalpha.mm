@@ -2,18 +2,23 @@
 #import <Accelerate/Accelerate.h>
 #import <VideoToolbox/VideoToolbox.h>
 #include "vnalpha.h"
-#include "third_party/libwebm/mkvparser/mkvreader.h"
+#include "third_party/libwebm/mkvparser/mkvparser.h"
 #include "vpx/vpx_decoder.h"
 #include "vpx/vp8dx.h"
 #include "third_party/opus/include/opus.h"
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
+#include <cstring>
+#include <fcntl.h>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 struct vnalpha_control { std::atomic<bool> cancelled{false}; };
@@ -21,6 +26,33 @@ vnalpha_control *vnalpha_control_create() { return new vnalpha_control; }
 void vnalpha_control_cancel(vnalpha_control *control) { control->cancelled.store(true); }
 void vnalpha_control_destroy(vnalpha_control *control) { delete control; }
 namespace {
+// Reads the caller's open descriptor in place, as an iOS app's sandbox may refuse to reopen it by a path such as
+// /dev/fd/<n>. It records a failed read, so an unreadable clip is told apart from one without alpha.
+struct DescriptorReader : mkvparser::IMkvReader {
+    int descriptor;
+    long long length = -1;
+    int failure = 0;
+    explicit DescriptorReader(int source) : descriptor(source) {
+        struct stat info{};
+        if (fstat(descriptor, &info)) failure = errno; else length = info.st_size;
+    }
+    int Read(long long position, long count, unsigned char *buffer) override {
+        if (position < 0 || count < 0 || length < 0 || position > length || count > length - position) return -1;
+        for (long done = 0; done < count;) {
+            auto got = pread(descriptor, buffer + done, count - done, position + done);
+            if (got < 0 && errno == EINTR) continue;
+            if (got <= 0) { failure = got < 0 ? errno : EIO; return -1; }
+            done += got;
+        }
+        return 0;
+    }
+    int Length(long long *total, long long *available) override {
+        if (length < 0) return -1;
+        if (total) *total = length;
+        if (available) *available = length;
+        return 0;
+    }
+};
 struct Element { long long id, start, end; };
 struct Track {
     long long number = 0, type = 0, width = 0, height = 0, alpha = 0, delay = 0;
@@ -48,7 +80,7 @@ struct Decoder {
     }
 };
 class Conversion {
-    mkvparser::MkvReader reader;
+    DescriptorReader reader;
     Track track;
     long long video_track = 0, scale = 1000000, cluster_time = 0;
     double duration_ticks = 0;
@@ -296,20 +328,22 @@ class Conversion {
         }
     }
 public:
-    Conversion(vnalpha_result& output, const char *path, vnalpha_control *cancel = nullptr)
-        : control(cancel), result(output), destination(path) {}
+    Conversion(int source, vnalpha_result& output, const char *path, vnalpha_control *cancel = nullptr)
+        : reader(source), control(cancel), result(output), destination(path) {}
+    // The errno of a failed read, or 0 when every read succeeded.
+    int readFailure() const { return reader.failure; }
     ~Conversion() {
         if (writer.status == AVAssetWriterStatusWriting) [writer cancelWriting];
         if (opus) opus_decoder_destroy(opus);
         if (audio_format) CFRelease(audio_format);
     }
-    int inspect(const char *source) {
+    int inspect() {
         headers_only = true;
-        run(source);
+        run();
         return video_track != 0;
     }
-    void run(const char *source) {
-        if (reader.Open(source)) throw std::runtime_error("Cannot open WebM");
+    void run() {
+        if (reader.failure) throw std::runtime_error(strerror(reader.failure));
         long long size, available;
         if (reader.Length(&size, &available)) throw std::runtime_error("Cannot read WebM length");
         // An input can end before the other. Tell AVAssetWriter at that packet, or its interleaver waits forever.
@@ -328,16 +362,24 @@ public:
     }
 };
 }
-int vnalpha_is_alpha(const char *source) {
-    try { vnalpha_result result{}; return Conversion(result, "").inspect(source); }
-    catch (...) { return 0; }
+int vnalpha_inspect(int source, char *error, int error_size) {
+    vnalpha_result result{};
+    std::unique_ptr<Conversion> conversion;
+    try { conversion = std::make_unique<Conversion>(source, result, ""); return conversion->inspect(); }
+    catch (...) {
+        // WebKit may still play a WebM this parser rejects, as long as the parser could read it.
+        int failure = conversion ? conversion->readFailure() : 0;
+        if (!failure) return 0;
+        snprintf(error, error_size, "%s", strerror(failure));
+        return -1;
+    }
 }
-int vnalpha_convert(const char *source, const char *destination, vnalpha_control *control, vnalpha_result *result, char *error, int error_size) {
+int vnalpha_convert(int source, const char *destination, vnalpha_control *control, vnalpha_result *result, char *error, int error_size) {
     @autoreleasepool {
         *result = {};
         auto start = std::chrono::steady_clock::now();
         int status = 0;
-        try { Conversion conversion(*result, destination, control); conversion.run(source); }
+        try { Conversion conversion(source, *result, destination, control); conversion.run(); }
         catch (const std::exception& failure) {
             snprintf(error, error_size, "%s", failure.what());
             [[NSFileManager defaultManager] removeItemAtPath:@(destination) error:nil];
@@ -352,7 +394,10 @@ int vnalpha_convert(const char *source, const char *destination, vnalpha_control
 int main(int argc, char **argv) {
     if (argc != 3) { fprintf(stderr, "usage: vnalpha source.webm destination.mov\n"); return 2; }
     vnalpha_result result{}; char error[512]{};
-    int status = vnalpha_convert(argv[1], argv[2], nullptr, &result, error, sizeof(error));
+    int source = open(argv[1], O_RDONLY);
+    if (source < 0) { perror(argv[1]); return 1; }
+    int status = vnalpha_convert(source, argv[2], nullptr, &result, error, sizeof(error));
+    close(source);
     if (status) { fprintf(stderr, "%s\n", error); return 1; }
     printf("frames=%d width=%d height=%d duration=%.6f seconds=%.6f peak_bytes=%llu\n", result.frames,
            result.width, result.height, result.duration, result.seconds, static_cast<unsigned long long>(result.peak_bytes));
