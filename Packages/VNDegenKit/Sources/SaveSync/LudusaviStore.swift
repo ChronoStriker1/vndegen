@@ -203,8 +203,11 @@ public struct LudusaviStore: Sendable {
         let savedRegistry = snapshot.appendingPathComponent(snapshotRegistryFolder, isDirectory: true)
         var registryBack: Data??
         if let registry, fm.fileExists(atPath: savedRegistry.path) {
+            // Listed rather than probed, since a folder that can't be searched hides a file as well as a missing one.
+            let names: [String]
+            do { names = try fm.contentsOfDirectory(atPath: savedRegistry.path) } catch { throw SaveSyncError.unreadable(savedRegistry.path) }
             let saved = savedRegistry.appendingPathComponent(registry.file.lastPathComponent)
-            if fm.fileExists(atPath: saved.path) {
+            if names.contains(registry.file.lastPathComponent) {
                 do { registryBack = .some(try Data(contentsOf: saved)) } catch { throw SaveSyncError.unreadable(saved.path) }
             } else {
                 registryBack = .some(nil)
@@ -364,7 +367,7 @@ public struct LudusaviStore: Sendable {
         do {
             // A differential inherits only from its full backup, so a registry an earlier differential holds comes along.
             let previousDiff = full?.children.last
-            let carried = Self.latestRegistry(mapping, in: gameDir)
+            let carried = Self.latestRegistry(mapping, in: gameDir) ?? Self.unreadableRegistry(mapping, in: gameDir)
             let registryHash: String?
             let override: DifferentialBackup.RegistryOverride?
             if let newRegistry {

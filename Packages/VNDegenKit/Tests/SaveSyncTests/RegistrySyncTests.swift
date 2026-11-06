@@ -152,18 +152,54 @@ import VNCore
         #expect(text == "Windows Registry Editor Version 5.00\n\n[\(Self.key)]\n\"a\"=dword:00000001\n")
     }
 
-    /// When the registry the latest backup records can't be read, its values can't be merged. The backup must not
-    /// replace it with one holding the game's key alone.
-    @Test func anUnreadableRegistryIsNeverReplaced() throws {
+    /// When the registry the latest backup records can't be read, its values can't be merged. The backup carries its
+    /// files forward byte for byte with their hash, so retention can drop the old backup without losing them, and
+    /// never replaces them with a registry holding the game's key alone.
+    @Test func anUnreadableRegistryIsCarriedAsItIs() throws {
         for (name, content) in [("registry.reg", "garbage, not a regedit file"), ("registry.yaml", "not a mapping")] {
             let setup = try Self.setup(registryFile: name)
             try Data(content.utf8).write(to: setup.gameDir.appendingPathComponent("backup-1/\(name)"))
             try LudusaviStore.writeLocalRegistry(["a": .dword(1)], to: setup.save)
             try write(["file1.rmmzsave": "mine"], to: setup.locations[0])
-            let backup = try #require(try backUp(setup, Retention(full: 2, differential: 0)).backup)
-            #expect(!fm.fileExists(atPath: setup.gameDir.appendingPathComponent("\(backup)/registry.reg").path))
-            #expect(try setup.store.mapping("G").backups.last?.registryHash == nil)
+            let backup = try #require(try backUp(setup, Retention(full: 1, differential: 0)).backup)
+            #expect(try String(contentsOf: setup.gameDir.appendingPathComponent("\(backup)/\(name)"), encoding: .utf8) == content)
+            #expect(try setup.store.mapping("G").backups.map(\.registryHash) == [Self.ludusaviHash])
         }
+    }
+
+    /// A value whose name breaks a line can't go to Wine's regedit, so the game's file leaves it out.
+    @Test func theGamesFileHoldsOnlyWritableNames() throws {
+        let setup = try Self.setup()
+        try LudusaviStore.writeLocalRegistry(["a\n[HKEY_CURRENT_USER]": .dword(1), "b": .dword(2)], to: setup.save)
+        #expect(try LudusaviStore.localRegistryValues(setup.save) == ["b": .dword(2)])
+    }
+
+    @Test func aBadValueInADifferentialsYAMLFallsBackToTheFullBackups() throws {
+        let setup = try Self.setup()
+        var mapping = try setup.store.mapping("G")
+        mapping.backups[0].children = [DifferentialBackup(name: "backup-2-diff", when: Timestamp.epoch, locked: false, files: [:],
+                                                          registry: .init(hash: "bad"))]
+        try Data(mapping.yamlString().utf8).write(to: setup.gameDir.appendingPathComponent("mapping.yaml"))
+        try fm.createDirectory(at: setup.gameDir.appendingPathComponent("backup-2-diff"), withIntermediateDirectories: true)
+        let yaml = "HKEY_CURRENT_USER:\n  \"Software\\\\Studio\\\\Game\":\n    x:\n      dword: not-a-number\n"
+        try Data(yaml.utf8).write(to: setup.gameDir.appendingPathComponent("backup-2-diff/registry.yaml"))
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        #expect(try LudusaviStore.localRegistryValues(setup.save) == (try Self.fixtureData()).values(of: Self.key))
+    }
+
+    /// A snapshot folder that can't be listed stops undo too, rather than passing for one with no file.
+    @Test func undoStopsWhenTheSnapshotFolderCantBeListed() throws {
+        let setup = try Self.setup()
+        try LudusaviStore.writeLocalRegistry(["mine": .dword(1)], to: setup.save)
+        _ = try setup.store.restore(folder: "G", backup: nil, locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        let current = try Data(contentsOf: setup.save.file)
+        let folder = setup.snapshot.appendingPathComponent("registry")
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: folder.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path) }
+        #expect(throws: SaveSyncError.unreadable(folder.path)) {
+            try LudusaviStore.undoRestore(locations: setup.locations, registry: setup.save, snapshot: setup.snapshot)
+        }
+        #expect(try Data(contentsOf: setup.save.file) == current)
     }
 
     /// A game that cleared its PlayerPrefs backs up an empty key, so a restore doesn't bring the old values back.

@@ -130,8 +130,9 @@ import Testing
         #expect(data.values(of: #"HKEY_CURRENT_USER\Software\A"#) == ["s": .raw(kind: 2, bytes: [0x25, 0x41, 0x25, 0])])
     }
 
-    /// A name with a line break, which Wine's `\n` escape can produce, must not open a section of its own.
-    @Test func leavesOutNamesThatWouldBreakALine() throws {
+    /// A name with a line break, which Wine's `\n` escape can produce, is written as regashii writes it, so a file
+    /// VNDegen rewrites keeps it and its hash. `writable` leaves it out of what goes to regedit.
+    @Test func namesThatWouldBreakALine() throws {
         let text = """
             Windows Registry Editor Version 5.00
 
@@ -142,9 +143,9 @@ import Testing
             """
         let data = try RegistryData(reg: text)
         #expect(data.keys.count == 1)
-        let written = data.regText
-        #expect(written == "Windows Registry Editor Version 5.00\n\n[HKEY_CURRENT_USER\\Software\\S\\G]\n\"z\"=dword:00000002\n")
-        #expect(try RegistryData(reg: written).keys.keys.sorted() == [#"HKEY_CURRENT_USER\Software\S\G"#])
+        let values = try #require(data.values(of: #"HKEY_CURRENT_USER\Software\S\G"#))
+        #expect(values.count == 2 && data.regText.contains("\"a\n\n[HKEY_CURRENT_USER]\nb\"=dword:00000001"))
+        #expect(RegistryData.writable(values) == ["z": .dword(2)])
     }
 
     @Test func writesUTF16WithAByteOrderMark() {

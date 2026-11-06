@@ -51,6 +51,9 @@ nonisolated public struct UnityPlugin: EnginePlugin {
             guard let crossOver = CrossOver.installed() else { throw UnityError.crossOverMissing }
             guard CrossOver.hasRosetta else { throw UnityError.rosettaMissing }
             guard let exe = layout.exe(in: launch.folder) else { throw UnityError.notFound }
+            guard !UnityCrossOverSession.runningExes.contains(exe.lastPathComponent.lowercased()) else {
+                throw UnityError.sameExeRunning(exe.lastPathComponent)
+            }
             let bottle = UnityBottle(folder: bottles, tools: crossOver.tools)
             try bottle.checkOwnBottle()
             return UnityCrossOverSession(launch, bottle: bottle, exe: exe,
@@ -207,6 +210,7 @@ nonisolated public enum UnityError: Error, LocalizedError {
     case crossOverMissing
     case rosettaMissing
     case notFound
+    case sameExeRunning(String)
 
     public var errorDescription: String? {
         switch self {
@@ -218,6 +222,8 @@ nonisolated public enum UnityError: Error, LocalizedError {
             "CrossOver needs Rosetta, which isn't installed. Install it with softwareupdate --install-rosetta in Terminal, then try again."
         case .notFound:
             "VNDegen can't find the game's Windows program in its folder."
+        case let .sameExeRunning(name):
+            "Another game whose program is also called \(name) is still running in CrossOver. Quit it, then try again."
         }
     }
 }

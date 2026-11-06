@@ -76,7 +76,7 @@ nonisolated struct UnityBottle: Equatable, Sendable {
         guard !isLink, Self.resolved(path) == ownFolder + "/" + Self.name,
               ownFolder != crossOver, !ownFolder.hasPrefix(crossOver + "/")
         else { throw Refusal.outsideOwnFolder(path.path) }
-        for part in ["drive_c", "dosdevices", "system.reg", "user.reg", "userdef.reg", "cxbottle.conf"] {
+        for part in ["drive_c", "dosdevices", "dosdevices/c:", "system.reg", "user.reg", "userdef.reg", "cxbottle.conf"] {
             try checkInside(path.appendingPathComponent(part))
         }
     }

@@ -25,6 +25,24 @@ extension LudusaviStore {
         return nil
     }
 
+    /// The registry files the latest backup records when none of them can be read, such as a damaged `registry.reg`,
+    /// so a backup carries them forward byte for byte with their recorded hash rather than dropping them. Nil when it
+    /// records none, when its files are missing, or when `latestRegistry` finds a readable one.
+    static func unreadableRegistry(_ mapping: LudusaviMapping, in gameDir: URL) -> StoredRegistry? {
+        guard let full = mapping.backups.last else { return nil }
+        func present(_ hash: String?, in backup: String) -> StoredRegistry? {
+            guard let hash, !backup.hasSuffix(".zip") else { return nil }
+            let folder = backup == "." ? gameDir : gameDir.appendingPathComponent(backup, isDirectory: true)
+            let files = registryFiles.filter { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+            return files.isEmpty ? nil : StoredRegistry(hash: hash, backup: backup, files: files)
+        }
+        if let diff = full.children.last, let override = diff.registry {
+            if let found = present(override.hash, in: diff.name) { return found }
+            if override.hash == nil { return nil }
+        }
+        return present(full.registryHash, in: full.name)
+    }
+
     /// True when the latest backup records registry data, whether or not its files can be read, as `latestRegistry`
     /// would look for it.
     static func recordsRegistry(_ mapping: LudusaviMapping) -> Bool {
@@ -76,9 +94,11 @@ extension LudusaviStore {
     }
 
     /// Writes `values` as the game's file, holding its key alone.
+    /// Writes `values` as the game's file, holding its key alone. A value whose name breaks a line is left out, as the
+    /// file goes to Wine's regedit, which couldn't read it as one value.
     static func writeLocalRegistry(_ values: [String: RegistryValue], to save: RegistrySave) throws {
         try FileManager.default.createDirectory(at: save.file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(registryFile(values, key: save.key).regText.utf8).write(to: save.file, options: .atomic)
+        try Data(registryFile(RegistryData.writable(values), key: save.key).regText.utf8).write(to: save.file, options: .atomic)
     }
 
     static func registryFile(_ values: [String: RegistryValue], key: String) -> RegistryData {
@@ -104,7 +124,7 @@ extension LudusaviStore {
             for key in hive.value.entries {
                 var values: [String: RegistryValue] = [:]
                 for entry in key.value.entries {
-                    if let value = registryValue(entry.value) { values[entry.key] = value }
+                    if let value = try registryValue(entry.value) { values[entry.key] = value }
                 }
                 data.setValues(values, of: "\(hive.key)\\\(key.key)")
             }
@@ -117,23 +137,36 @@ extension LudusaviStore {
         "resourceList": 8, "fullResourceDescriptor": 9, "resourceRequirementsList": 0xa, "qword": 0xb,
     ]
 
-    /// Nil for kinds Ludusavi reads as unknown, which it leaves out of a restore.
-    private static func registryValue(_ node: YAML) -> RegistryValue? {
-        guard let entry = node.entries.first, node.entries.count == 1 else { return nil }
-        let bytes = { (node: YAML) -> [UInt8]? in
-            let items = node.items.compactMap { $0.string.flatMap { UInt8($0) } }
-            return items.count == node.items.count ? items : nil
+    /// Nil for kinds Ludusavi reads as unknown, which it leaves out of a restore. A known kind with data that doesn't
+    /// fit it throws, as serde fails Ludusavi's whole file then, so a damaged differential gives way to the full backup.
+    private static func registryValue(_ node: YAML) throws -> RegistryValue? {
+        let bad = YAMLError(line: 0, reason: "a registry value doesn't fit its kind")
+        guard case let .mapping(entries) = node, let entry = entries.first, entries.count == 1 else { throw bad }
+        func bytes(_ node: YAML?) throws -> [UInt8] {
+            guard case let .sequence(items)? = node else { throw bad }
+            return try items.map { item in
+                guard let byte = item.string.flatMap({ UInt8($0) }) else { throw bad }
+                return byte
+            }
+        }
+        func text() throws -> String {
+            guard let text = entry.value.string else { throw bad }
+            return text
         }
         switch entry.key {
-        case "sz": return entry.value.string.map(RegistryValue.sz)
-        case "expandSz": return entry.value.string.map(RegistryValue.expandSz)
-        case "multiSz": return entry.value.string.map(RegistryValue.multiSz)
-        case "dword": return entry.value.string.flatMap { UInt32($0) }.map(RegistryValue.dword)
-        case "qword": return entry.value.string.flatMap { UInt64($0) }.map(RegistryValue.qword)
-        case "binary": return bytes(entry.value).map(RegistryValue.binary)
+        case "sz": return .sz(try text())
+        case "expandSz": return .expandSz(try text())
+        case "multiSz": return .multiSz(try text())
+        case "dword":
+            guard let number = UInt32(try text()) else { throw bad }
+            return .dword(number)
+        case "qword":
+            guard let number = UInt64(try text()) else { throw bad }
+            return .qword(number)
+        case "binary": return .binary(try bytes(entry.value))
         case "raw":
-            guard let kind = entry.value["kind"]?.string.flatMap({ rawKinds[$0] }), let data = entry.value["data"].flatMap(bytes) else { return nil }
-            return .raw(kind: kind, bytes: data)
+            guard let kind = entry.value["kind"]?.string.flatMap({ rawKinds[$0] }) else { throw bad }
+            return .raw(kind: kind, bytes: try bytes(entry.value["data"]))
         default: return nil
         }
     }

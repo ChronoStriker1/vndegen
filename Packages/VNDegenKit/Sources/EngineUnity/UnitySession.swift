@@ -86,9 +86,14 @@ final class UnityCrossOverSession: UnityExternalSession {
     private let prefs: RegistrySave?
     private var game: Process?
 
+    /// The exe names, lowercased, of the games running in VNDegen's bottle. Wine's `taskkill` finds a game by its exe's
+    /// name, so two games with the same one never run at once, and closing one can't close the other.
+    static var runningExes: Set<String> = []
+
     init(_ launch: GameLaunch, bottle: UnityBottle, exe: URL, prefs: RegistrySave?) {
         self.bottle = bottle
         self.exe = exe
+        Self.runningExes.insert(exe.lastPathComponent.lowercased())
         workdir = exe.deletingLastPathComponent()
         self.prefs = prefs
         super.init(launch, message: "Getting \(launch.game.title) ready in CrossOver…")
@@ -98,6 +103,7 @@ final class UnityCrossOverSession: UnityExternalSession {
     private var environment: [String: String] { ProcessInfo.processInfo.environment }
 
     private func run() async throws {
+        defer { Self.runningExes.remove(exe.lastPathComponent.lowercased()) }
         let fm = FileManager.default
         if !fm.fileExists(atPath: bottle.readyMarker.path) {
             host.setMessage("Setting up CrossOver for Unity games. The first time takes a minute or two.")
@@ -128,16 +134,32 @@ final class UnityCrossOverSession: UnityExternalSession {
         try await exportPrefs()
     }
 
-    /// Makes the bottle once. A bottle without the ready marker is one an earlier setup didn't finish, which VNDegen made
-    /// and may delete.
+    /// Makes the bottle once. A bottle folder without the ready marker is one an earlier setup didn't finish, or only
+    /// the saves a restore put there before the first launch. VNDegen made it and may remake it, but keeps the saves:
+    /// they move aside while CrossOver makes the bottle, and back after.
     private func setUp() async throws {
         try bottle.checkOwnBottle()
         let fm = FileManager.default
+        let saves = bottle.userFolder.appendingPathComponent("AppData/LocalLow", isDirectory: true)
+        let aside = bottle.folder.appendingPathComponent("LocalLow-kept", isDirectory: true)
+        if fm.fileExists(atPath: saves.path), !fm.fileExists(atPath: aside.path) {
+            try bottle.checkInside(saves)
+            try fm.moveItem(at: saves, to: aside)
+        }
         if fm.fileExists(atPath: bottle.path.path) { try fm.removeItem(at: bottle.path) }
         try fm.createDirectory(at: bottle.folder, withIntermediateDirectories: true)
         try await Self.run(bottle.create(environment: environment), "making the bottle")
+        try bottle.checkOwnBottle()
         try bottle.harden()
         try bottle.installFonts()
+        if fm.fileExists(atPath: aside.path) {
+            try bottle.checkInside(saves)
+            try fm.createDirectory(at: saves, withIntermediateDirectories: true)
+            for name in try fm.contentsOfDirectory(atPath: aside.path) where !fm.fileExists(atPath: saves.appendingPathComponent(name).path) {
+                try fm.moveItem(at: aside.appendingPathComponent(name), to: saves.appendingPathComponent(name))
+            }
+            try fm.removeItem(at: aside)
+        }
         try Data().write(to: bottle.readyMarker)
     }
 
@@ -152,7 +174,7 @@ final class UnityCrossOverSession: UnityExternalSession {
             return
         }
         let current = await bottleValues(prefs.key) ?? [:]
-        let text = Self.importText(key: prefs.key, values: values, removing: Set(current.keys))
+        let text = Self.importText(key: prefs.key, values: RegistryData.writable(values), removing: Set(current.keys))
         let staged = launch.dataDirectory.appendingPathComponent("PlayerPrefs-import.reg")
         try RegistryData.utf16File(text).write(to: staged, options: .atomic)
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -165,7 +187,8 @@ final class UnityCrossOverSession: UnityExternalSession {
         data.setValues(values, of: key)
         var text = data.regText
         let kept = Set(values.keys.map { $0.lowercased() })
-        let gone = removing.filter { !kept.contains($0.lowercased()) }
+        // A name with a line break can't be written, so it can't be deleted either, and stays as the bottle has it.
+        let gone = removing.filter { !kept.contains($0.lowercased()) && !RegistryData.breaksLine($0) }
             .sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
         if !gone.isEmpty {
             text.removeLast()
@@ -190,7 +213,7 @@ final class UnityCrossOverSession: UnityExternalSession {
         // regedit fails when the key doesn't exist, which is a game that never saved its PlayerPrefs.
         guard let prefs, let values = await bottleValues(prefs.key) else { return }
         var file = RegistryData()
-        file.setValues(values, of: prefs.key)
+        file.setValues(RegistryData.writable(values), of: prefs.key)
         try FileManager.default.createDirectory(at: prefs.file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(file.regText.utf8).write(to: prefs.file, options: .atomic)
     }

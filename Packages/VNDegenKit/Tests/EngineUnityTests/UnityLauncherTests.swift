@@ -115,11 +115,11 @@ import VNCore
         let theirs = base.appending(path: "Steam")
         try fm.createDirectory(at: theirs.appending(path: "drive_c/users/crossover/AppData/LocalLow/Studio/Game"), withIntermediateDirectories: true)
         try Data().write(to: theirs.appending(path: "user.reg"))
-        for part in ["drive_c", "user.reg"] {
-            let folder = base.appending(path: "Bottles-\(part)")
+        for part in ["drive_c", "user.reg", "dosdevices/c:"] {
+            let folder = base.appending(path: "Bottles-\(part.replacingOccurrences(of: "/", with: "-"))")
             let bottle = UnityBottle(folder: folder, tools: Self.tools)
-            try fm.createDirectory(at: bottle.path, withIntermediateDirectories: true)
-            try fm.createSymbolicLink(at: bottle.path.appending(path: part), withDestinationURL: theirs.appending(path: part))
+            try fm.createDirectory(at: bottle.path.appending(path: "dosdevices"), withIntermediateDirectories: true)
+            try fm.createSymbolicLink(at: bottle.path.appending(path: part), withDestinationURL: theirs.appending(path: "drive_c"))
             #expect(throws: UnityBottle.Refusal.self) { try bottle.checkOwnBottle() }
             #expect(throws: UnityBottle.Refusal.self) { try bottle.installFonts(from: base) }
             if part == "drive_c" {
@@ -192,7 +192,7 @@ import VNCore
     @Test func importChangesOnlyTheGamesValues() throws {
         let key = #"HKEY_CURRENT_USER\Software\Studio\Game"#
         let text = UnityCrossOverSession.importText(key: key, values: ["b": .dword(2), "a": .binary([1, 0])],
-                                                    removing: ["A", "old", "z\"q"])
+                                                    removing: ["A", "old", "z\"q", "x\n\n[HKEY_CURRENT_USER]\n;"])
         #expect(text == """
             Windows Registry Editor Version 5.00
 
