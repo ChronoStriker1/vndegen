@@ -2,10 +2,14 @@
 
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <string>
+#include <vector>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
+// stb_truetype clamps a read that would leave its CFF buffer, after asserting it can't; a game's font may make it.
+#define STBTT_assert(x) ((void)0)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include "../third_party/stb_truetype.h"
@@ -25,8 +29,39 @@ PonsFace::~PonsFace() = default;
 
 // stb_truetype reads a font's tables without checking their lengths, so before it sees a game's file: the table
 // directory (the first font of a collection) and every table it lists lie in the file, the tables stb reads hold what
-// it reads from them (head, hhea, maxp, hmtx, cmap and its subtables, loca), and every loca entry points inside glyf.
-// A CFF font's outlines stb reads with bounds of its own.
+// it reads from them (head, hhea, maxp, hmtx, cmap and its subtables, loca), every loca entry points inside glyf, and
+// composite glyphs nest at most 32 deep, without a cycle (stb follows them recursively). Reads that start there but
+// run on (a glyph's points, a cmap's segment search and glyph array) end in the padding load adds. stb reads a CFF
+// font's outlines with bounds of its own, the CFF table's length (a local change to stb).
+static bool compositesNest(const uint8_t *glyf, uint64_t glyfSize, const std::function<uint64_t(uint64_t)> &loca,
+                           uint64_t glyphs) {
+    std::vector<uint8_t> depth(glyphs, 0);  // 0 not seen, 255 being walked, else 1 + the deepest component's depth
+    std::function<int(uint64_t, int)> walk = [&](uint64_t g, int level) -> int {
+        if (g >= glyphs) return 1;  // stb draws a glyph past the last as nothing
+        if (depth[g] == 255 || level > 32) return -1;
+        if (depth[g]) return depth[g];
+        uint64_t start = loca(g), end = loca(g + 1);
+        int deepest = 0;
+        if (end > start && start + 10 <= glyfSize && int16_t(be16(glyf + start)) < 0) {
+            depth[g] = 255;
+            for (uint64_t at = start + 10; at + 4 <= glyfSize;) {
+                uint16_t flags = be16(glyf + at), part = be16(glyf + at + 2);
+                int d = walk(part, level + 1);
+                if (d < 0) return -1;
+                deepest = std::max(deepest, d);
+                at += 4 + ((flags & 1) ? 4 : 2) + ((flags & 8) ? 2 : (flags & 0x40) ? 4 : (flags & 0x80) ? 8 : 0);
+                if (!(flags & 0x20)) break;
+            }
+        }
+        if (deepest >= 32) return -1;
+        depth[g] = uint8_t(deepest + 1);
+        return depth[g];
+    };
+    for (uint64_t g = 0; g < glyphs; g++)
+        if (walk(g, 0) < 0) return false;
+    return true;
+}
+
 static bool tablesInside(const Bytes &d) {
     if (d.size() < 12) return false;
     uint64_t at = 0;
@@ -72,20 +107,27 @@ static bool tablesInside(const Bytes &d) {
     if (tables.count("glyf")) {
         bool longLoca = be16(tables["head"].p + 50) != 0;
         if (!has("loca", (glyphs + 1) * (longLoca ? 4 : 2))) return false;
-        const uint8_t *loca = tables["loca"].p;
-        for (uint64_t g = 0; g <= glyphs; g++) {
-            uint64_t off = longLoca ? be32(loca + g * 4) : uint64_t(be16(loca + g * 2)) * 2;
-            if (off > tables["glyf"].size) return false;
-        }
-    } else if (!tables.count("CFF ")) {
+        const uint8_t *locaTable = tables["loca"].p;
+        auto loca = [&](uint64_t g) {
+            return longLoca ? uint64_t(be32(locaTable + g * 4)) : uint64_t(be16(locaTable + g * 2)) * 2;
+        };
+        for (uint64_t g = 0; g <= glyphs; g++)
+            if (loca(g) > tables["glyf"].size) return false;
+        if (!compositesNest(tables["glyf"].p, tables["glyf"].size, loca, glyphs)) return false;
+    } else if (!tables.count("CFF ") || tables["CFF "].size >= 0x40000000) {
         return false;
     }
     return true;
 }
 
+// More than any read stb starts inside a checked table can run on: a simple glyph's contours, instructions, flags and
+// points (under 460 KB), or a format 4 cmap's search and glyph array (under 400 KB).
+static constexpr size_t kReadPadding = 1 << 20;
+
 bool PonsFace::load(Bytes data) {
     impl_->data = std::move(data);
     if (!tablesInside(impl_->data)) return false;
+    impl_->data.resize(impl_->data.size() + kReadPadding, 0);
     const unsigned char *d = impl_->data.data();
     int offset = stbtt_GetFontOffsetForIndex(d, 0);
     if (offset < 0 || !stbtt_InitFont(&impl_->info, d, offset)) return false;

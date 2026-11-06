@@ -528,6 +528,91 @@ static void savepoints() {
     assert(savepointAfter("langjp日本\\\nlangen^Again^\\\nlangen^Two^\\\n", 3) == "langjp!sd");
 }
 
+// A small TrueType or CFF font, its tables in tag order, for the font checks: 'H' maps to glyph 1.
+static vnns::Bytes testFont(const std::map<std::string, vnns::Bytes> &tables) {
+    vnns::Bytes out;
+    auto u16 = [&](uint32_t v) { out.push_back(uint8_t(v >> 8)); out.push_back(uint8_t(v)); };
+    auto u32 = [&](uint32_t v) { u16(v >> 16); u16(v & 0xffff); };
+    bool cff = tables.count("CFF ");
+    u32(cff ? 0x4f54544f : 0x00010000);
+    u16(uint32_t(tables.size()));
+    u16(0); u16(0); u16(0);
+    uint32_t at = 12 + 16 * uint32_t(tables.size());
+    for (const auto &[tag, data] : tables) {
+        out.insert(out.end(), tag.begin(), tag.end());
+        u32(0); u32(at); u32(uint32_t(data.size()));
+        at += uint32_t(data.size());
+    }
+    for (const auto &[tag, data] : tables) out.insert(out.end(), data.begin(), data.end());
+    return out;
+}
+
+static vnns::Bytes be(std::initializer_list<int> words) {
+    vnns::Bytes b;
+    for (int w : words) { b.push_back(uint8_t(w >> 8)); b.push_back(uint8_t(w)); }
+    return b;
+}
+
+static std::map<std::string, vnns::Bytes> trueTypeTables(int glyphs, const vnns::Bytes &glyf, const std::vector<int> &loca,
+                                                          int rangeOffset = 0) {
+    std::map<std::string, vnns::Bytes> t;
+    t["head"] = vnns::Bytes(54, 0);
+    t["head"][18] = 1000 >> 8; t["head"][19] = 1000 & 0xff;  // unitsPerEm; short loca
+    t["hhea"] = vnns::Bytes(36, 0);
+    t["hhea"][4] = 800 >> 8; t["hhea"][5] = 800 & 0xff;
+    t["hhea"][34] = uint8_t(glyphs >> 8); t["hhea"][35] = uint8_t(glyphs);
+    t["maxp"] = be({0, 0x5000, glyphs});
+    t["hmtx"] = vnns::Bytes(size_t(glyphs) * 4, 0);
+    for (int g = 0; g < glyphs; g++) t["hmtx"][size_t(g) * 4 + 1] = 200;
+    vnns::Bytes l;
+    for (int o : loca) { vnns::Bytes w = be({o / 2}); l.insert(l.end(), w.begin(), w.end()); }
+    t["loca"] = l;
+    t["glyf"] = glyf;
+    vnns::Bytes cmap = be({0, 1, 3, 1, 0, 12});
+    vnns::Bytes sub = be({4, 32, 0, 4, 4, 1, 0, 'H', 0xffff, 0, 'H', 0xffff, (1 - 'H') & 0xffff, 1, rangeOffset, 0});
+    cmap.insert(cmap.end(), sub.begin(), sub.end());
+    t["cmap"] = cmap;
+    return t;
+}
+
+// Fonts a game could ship broken: each loads or is refused, and drawing 'H' stays inside the font (the sanitizer build
+// runs this too).
+static void brokenFonts() {
+    auto draw = [](const vnns::Bytes &font) {
+        vnns::PonsFace face;
+        if (!face.load(font)) return false;
+        face.glyph('H', 46);
+        return true;
+    };
+    vnns::Bytes composite = be({0xffff, 0, 0, 0, 0, 0, 1, 0});  // one component: glyph 1, byte offsets
+    // A glyph cut off after its first two bytes, at the end of the file.
+    assert(draw(testFont(trueTypeTables(2, be({1}), {0, 0, 2}))));
+    // A cmap segment whose glyph array lies far past the subtable.
+    assert(draw(testFont(trueTypeTables(2, {}, {0, 0, 0}, 65534))));
+    // A composite that contains itself.
+    assert(!draw(testFont(trueTypeTables(2, composite, {0, 0, 16}))));
+    // Composites nested 34 deep are refused, 2 deep drawn.
+    auto chain = [&](int depth) {
+        vnns::Bytes glyf;
+        std::vector<int> loca = {0, 0};
+        for (int g = 1; g <= depth; g++) {
+            vnns::Bytes c = be({0xffff, 0, 0, 0, 0, 0, g + 1, 0});
+            glyf.insert(glyf.end(), c.begin(), c.end());
+            loca.push_back(int(glyf.size()));
+        }
+        loca.push_back(int(glyf.size()));  // the last, empty
+        return testFont(trueTypeTables(depth + 2, glyf, loca));
+    };
+    assert(!draw(chain(34)));
+    assert(draw(chain(2)));
+    // An empty CFF table at the end of the file.
+    auto cff = trueTypeTables(2, {}, {0, 0, 0});
+    cff.erase("glyf");
+    cff.erase("loca");
+    cff["CFF "] = {};
+    draw(testFont(cff));
+}
+
 int main() {
     encodingHelpers();
     runGame();
@@ -539,4 +624,5 @@ int main() {
     endRollUnderDialog();
     reviewRound3();
     savepoints();
+    brokenFonts();
 }
