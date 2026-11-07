@@ -1133,8 +1133,10 @@ void Engine::loadGlobals() {
     if (auto table = screens_.find("cfgsav"); table != screens_.end())
         for (auto [it, end] = table->second.settings.equal_range("implies"); it != end; ++it) {
             int set = field(it->second, 0), also = field(it->second, 1);
-            if (globals_.count(set) && globals_[set] && !(globals_.count(also) && globals_[also])) {
+            if (globals_.count(set) && globals_[set] && !(globals_.count(also) && globals_[also]) && also >= 0 && also < 10000) {
                 globals_[also] = 1;
+                const int32_t on = 1;
+                std::memcpy(&configFile_[4000 + size_t(also) * 4], &on, 4);
                 repaired = true;
                 log("global %d set, as %d is", also, set);
             }
@@ -1152,7 +1154,11 @@ void Engine::loadGlobals() {
             if (validCgId(e.imageIds[p]) && flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
-    if (repaired) saveGlobals();
+    // Only that flag changes in the file: what VNDegen has unlocked besides goes in at its next save, as before.
+    if (repaired) {
+        auto packed = packEntry(configFile_);
+        if (!packed.empty()) writeWhole(saveDir_ + "/" + nameInFolder(saveDir_, "cfg.sav"), packed);
+    }
 }
 
 size_t Engine::configStringLength() const {

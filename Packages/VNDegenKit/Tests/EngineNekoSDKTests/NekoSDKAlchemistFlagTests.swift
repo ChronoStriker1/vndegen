@@ -54,11 +54,13 @@ import TestSupport
     }
 
     // A cfg.sav VNDegen 0.26.1 wrote after the prologue has GLB_ENDING and not GLB_PROLOGUE_OVER. Reading it sets the
-    // prologue's flag and writes the file back, once.
+    // prologue's flag and writes the file back, once, with nothing else in it changed: a track VNDegen has unlocked
+    // goes in at its next save, not here.
     @Test func a0261FileGetsItsPrologueFlag() throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\twaffle\\alchemy\n".utf8),
             "cfg/macrolist.ini": macroFile,
+            "cfg/sound_view.ini": Data("bgm\\b01.ogg\n".utf8),
         ])
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data")
@@ -67,6 +69,7 @@ import TestSupport
         var plain = Data(count: 104_000)
         plain[4000 + 1050 * 4] = 1
         try NekoSDKFlowFixture.packed(plain).write(to: save)
+        try Data("bgm\\b01.ogg\n".utf8).write(to: save.deletingLastPathComponent().appendingPathComponent("vndegen_seen.txt"))
 
         func global(_ file: Data, _ number: Int) -> UInt8 { file[4000 + number * 4] }
         let first = try #require(NekoSDKFlowFixture.start(root, data: data))
@@ -77,6 +80,8 @@ import TestSupport
         let repairedPlain = try NekoSDKFlowFixture.unpacked(repaired)
         #expect(global(repairedPlain, 1000) == 1)
         #expect(global(repairedPlain, 1050) == 1)
+        let changed = (0..<plain.count).filter { plain[$0] != repairedPlain[$0] }
+        #expect(changed == [4000 + 1000 * 4])
 
         let second = try #require(NekoSDKFlowFixture.start(root, data: data))
         #expect(vnneko_debug_variable(second, 0, 1000) == 1)
