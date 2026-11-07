@@ -199,8 +199,13 @@ final class NekoSDKSession: EngineSession {
             scrolledPoints -= Double(notches) * 40
             // Content scrolling down is the wheel turned toward the player.
             vnneko_mouse_wheel(engine, Int32(-notches))
-        case .key:
-            break
+        case let .key(key, pressed):
+            // A key bound to a button, or a debug hook's key: Enter and Space go where the keyboard's would.
+            switch key.keyCode {
+            case 13: hostKey(40, pressed)
+            case 32: hostKey(44, pressed)
+            default: break
+            }
         }
     }
 

@@ -30,6 +30,8 @@ import AppKit
 ///   notifyutil -s vndegen.stick.left 20001000 -p vndegen.stick.left   holds a controller's left stick, or .right, at x
 ///                            then y, each four digits of 1000 plus a thousandth of a full push, here x 1 and y 0. The
 ///                            stick stays there until the next one, such as 10001000 to let go
+///   notifyutil -s vndegen.key 13 -p vndegen.key   presses and releases a key in the game, by web keyCode (13 Enter, 32 Space)
+///   notifyutil -p vndegen.app.resign   posts the app's resign-active notice, and .app.become its become-active one
 ///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
 ///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
@@ -108,6 +110,38 @@ enum DebugHooks {
             notify_get_state(token, &state)
             let point = CGPoint(x: Double(state / 1000 % 1000) / 1000, y: Double(state % 1000) / 1000)
             MainActor.assumeIsolated { tap(hub, at: point) }
+        }
+        // `notifyutil -s vndegen.key 13 -p vndegen.key` presses and releases a key in the running game, by its web
+        // keyCode, as 13 for Enter and 32 for Space.
+        var keyToken: Int32 = 0
+        notify_register_dispatch("\(prefix).key", &keyToken, .main) { token in
+            var state: UInt64 = 0
+            notify_get_state(token, &state)
+            let key = KeyboardKey(key: state == 32 ? " " : state == 13 ? "Enter" : "", code: state == 32 ? "Space" : state == 13 ? "Enter" : "",
+                                  keyCode: Int(state))
+            MainActor.assumeIsolated {
+                guard case let .playing(_, session) = hub.screen else { return }
+                Task {
+                    session.send(.key(key, pressed: true))
+                    try? await Task.sleep(for: .milliseconds(100))
+                    session.send(.key(key, pressed: false))
+                }
+            }
+        }
+        // `notifyutil -p vndegen.app.resign`, and `.app.become`, post the app's resign- and become-active notices, as
+        // switching away to another app and back does, for what a game does while VNDegen isn't active.
+        for (name, active) in [("resign", false), ("become", true)] {
+            var token: Int32 = 0
+            notify_register_dispatch("\(prefix).app.\(name)", &token, .main) { _ in
+                MainActor.assumeIsolated {
+                    #if os(macOS)
+                    let note = active ? NSApplication.didBecomeActiveNotification : NSApplication.didResignActiveNotification
+                    #else
+                    let note = active ? UIApplication.didBecomeActiveNotification : UIApplication.willResignActiveNotification
+                    #endif
+                    NotificationCenter.default.post(name: note, object: nil)
+                }
+            }
         }
         #if os(macOS)
         var quitToken: Int32 = 0
