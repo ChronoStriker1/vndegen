@@ -1439,6 +1439,33 @@ button nav_quit obj\e004_000.bmp 1152 387 9 5 7
 button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen cg
+# The CG viewer's panel, measured under Wine.
+viewer obj\j000_000.bmp 0 558
+viewerhelp obj\j008_000.bmp 830 679 13
+viewerbutton bgmplay obj\j005_000.bmp 246 616
+viewerbutton bgmmute obj\h024_000.bmp 292 616
+viewerslider obj\j004_000.bmp 155 641 12
+viewernumber volume obj\g005_000.bmp 194 617 14 3
+viewerbutton zoomout obj\j003_000.bmp 388 644 3 0 help 9
+viewerbutton zoomreset obj\j003_000.bmp 424 644 3 1 help 10
+viewerbutton zoomin obj\j003_000.bmp 460 644 3 2 help 11
+viewernumber zoom obj\j002_000.bmp 421 611 13 1
+viewernumber zoomfrac obj\j002_001.bmp 444 613 11 2
+viewerbutton set:hair obj\j009_000.bmp 544 639 2 0 helppic obj\h004_004.bmp 400 679 2 0
+viewerlook set:hair 0 0 1 2
+viewerbutton set:hero obj\j009_000.bmp 640 639 2 0 helppic obj\h004_004.bmp 400 679 2 1
+viewerlook set:hero 0 0 1 2
+viewerbutton replay obj\j001_000.bmp 721 643 3 1 help 2
+viewerbutton prevcg obj\j001_001.bmp 808 641 5 0 help 4
+viewerbutton prevvar obj\j001_001.bmp 863 641 5 1 help 5
+viewerbutton nextvar obj\j001_001.bmp 1008 641 5 2 help 6
+viewerbutton nextcg obj\j001_001.bmp 1063 641 5 3 help 7
+viewerbutton auto obj\j001_001.bmp 1123 641 5 4 help 8
+viewerbutton return obj\j001_000.bmp 1182 643 3 2 help 3
+viewerbutton hide obj\l001_000.bmp 1240 588 2 0 help 0
+viewernumber index obj\j002_000.bmp 926 630 13 2
+viewernumber total obj\j002_001.bmp 966 648 11 2
+viewerauto 8000 0
 pic obj\f000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\f001_000.bmp 0 0 1 2 0 0
@@ -1587,6 +1614,10 @@ pic obj\h008_000.bmp 402 229 2 5 0 4
 pic obj\h008_000.bmp 483 229 2 5 1 4
 pic obj\h008_000.bmp 615 379 2 5 0 4
 pic obj\h008_000.bmp 696 379 2 5 1 4
+radio hair 1 obj\h008_000.bmp 764 377 2 5 0
+radio hair 0 obj\h008_000.bmp 845 377 2 5 1
+radio hero 1 obj\h008_000.bmp 940 377 2 5 0
+radio hero 0 obj\h008_000.bmp 1021 377 2 5 1
 slider opacity obj\h009_000.bmp 155 307
 number opacity obj\h011_000.bmp 415 279
 step opacity -1 obj\h010_000.bmp 121 311 2 5 0

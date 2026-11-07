@@ -785,6 +785,13 @@ void Engine::loadGalleries() {
         std::istringstream in(line);
         std::string plain, styled;
         if (in >> plain >> styled && styled.find('.') != std::string::npos) plainArt_[normalizedPath(styled)] = plain;
+        // Ore o Hoshigaru Tsuma to Gibo's lines instead name a CG group and whether it has a version with the protagonist
+        // see-through and one without pubic hair.
+        else if (!plain.empty() && plain.rfind("//", 0) != 0 && !styled.empty() && std::isdigit(uint8_t(styled[0]))) {
+            int hair = 0;
+            in >> hair;
+            artVersions_[normalizedPath(plain)] = {std::atoi(styled.c_str()) != 0, hair != 0};
+        }
     }
     // `#type N`, then how the names of that type's voice files start, then `##`. Types from 50 are the background voices
     // of the character 50 below.
@@ -1097,6 +1104,8 @@ std::map<std::string, int> Engine::startingSettings() const {
     for (const auto &[start, type] : voiceTypes_) out["voice" + std::to_string(type % 50)] = 1;
     // 0 for the base archives' art, 1 for the art set's.
     if (!artSet_.empty()) out["art"] = 0;
+    // The protagonist drawn whole and pubic hair shown, where a game has the other versions.
+    if (!artVersions_.empty()) out["hero"] = out["hair"] = 1;
     auto table = screens_.find("defaults");
     if (table != screens_.end())
         for (auto [it, end] = table->second.settings.equal_range("default"); it != end; ++it)
@@ -3210,13 +3219,32 @@ void Engine::composeGtCount(Canvas &out) {
 }
 
 std::string Engine::shownPath(const std::string &path) const {
+    if (!artVersions_.empty()) return versionPath(path);
     if (setting("express")) return path;
     auto it = plainArt_.find(normalizedPath(path));
     return it == plainArt_.end() ? path : it->second;
 }
 
+// `cg\cg_000_000_000_000_000.bmp` is group cg_000_000's picture as drawn. The third number picks its version: 100 with the
+// protagonist see-through, 1 without pubic hair, 101 both, where change_texture_list.ini says the group has them.
+std::string Engine::versionPath(const std::string &path) const {
+    std::string name = normalizedPath(path);
+    auto slash = name.rfind('\\');
+    std::string file = name.substr(slash == std::string::npos ? 0 : slash + 1);
+    if (file.size() < 15 || file.compare(10, 5, "_000_") != 0) return path;
+    auto it = artVersions_.find(file.substr(0, 10));
+    if (it == artVersions_.end()) return path;
+    int version = (it->second.first && !setting("hero") ? 100 : 0) + (it->second.second && !setting("hair") ? 1 : 0);
+    if (!version) return path;
+    char digits[4];
+    std::snprintf(digits, sizeof digits, "%03d", version);
+    std::string other = name;
+    other.replace((slash == std::string::npos ? 0 : slash + 1) + 11, 3, digits);
+    return files_.exists(other) ? other : path;
+}
+
 void Engine::applyArtSwitch() {
-    if (plainArt_.empty()) return;
+    if (plainArt_.empty() && artVersions_.empty()) return;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set)
             if (!s.path.empty() && !s.flipCount)

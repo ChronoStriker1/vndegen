@@ -62,8 +62,12 @@ void Engine::openViewer(size_t entry) {
 // The entry's music, from cg_view.ini, plays at the music screen's volume while the viewer is open. Its button only mutes
 // it, so it goes on playing underneath, as the PC's does.
 void Engine::viewerMusic() {
-    const auto *bgm = screen_ ? screen_->setting("viewerbgm") : nullptr;
-    if (!bgm) return;
+    // Only a panel with a music control plays it.
+    bool control = false;
+    if (screen_)
+        for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it)
+            control = control || it->second[0] == "bgm" || it->second[0] == "bgmplay" || it->second[0] == "bgmmute";
+    if (!control) return;
     const std::string &path = cgEntries_[viewEntry_].bgm;
     if (path == viewMusicPath_ && viewMusic_) return;
     stopViewerMusic();
@@ -162,7 +166,7 @@ const Engine::GalleryEntry *Engine::viewerScene() const {
 // The picture fills the screen's width. Zoomed, the point of it under the pointer stays where it is. The art set picks
 // which of The Alchemist's two versions of it comes up.
 void Engine::composeViewerPicture(Canvas &out) {
-    ImageRef image = viewing_.empty() ? nullptr : images_->get(viewing_[viewingIndex_]);
+    ImageRef image = viewing_.empty() ? nullptr : images_->get(shownPath(viewing_[viewingIndex_]));
     if (!image) return;
     float base = float(out.w) / float(image->w), zoom = viewerPanel() ? float(viewZoom_) / 100 : 1;
     float w = float(image->w) * base, h = float(image->h) * base;
@@ -179,7 +183,7 @@ int Engine::viewerButtonRow(const std::vector<std::string> &f, bool over) const 
     bool hideWhenOff = std::find(f.begin(), f.end(), "hide") != f.end();
     // The variant buttons are off for an entry of one picture, though not for one with a single picture unlocked.
     bool off = (action == "replay" && !viewerScene()) || ((action == "zoomout" || action == "zoomreset") && viewZoom_ <= kZoomMin) ||
-               (action == "zoomin" && viewZoom_ >= kZoomMax) || (action == "bgm" && !viewMusic_) ||
+               (action == "zoomin" && viewZoom_ >= kZoomMax) || ((action == "bgm" || action == "bgmplay" || action == "bgmmute") && !viewMusic_) ||
                ((action == "prevvar" || action == "nextvar") && cgEntries_[viewEntry_].images.size() < 2);
     if (off) return hideWhenOff ? -1 : kDisabled;
     if (action == "auto" && viewAuto_) return kSelected + (over ? 1 : 0);
@@ -202,14 +206,17 @@ const std::vector<std::string> *Engine::viewerButtonAt(int x, int y) const {
 // Table lines, all on the cg screen:
 //   `viewer PANEL X Y`
 //   `viewerbutton ACTION SHEET X Y [COLS COL] [help ROW] [helppic PICTURE X Y] [hide]`, five rows to a sheet. ACTION is
-//     replay, prevcg, nextcg, prevvar, nextvar, auto, return, hide, zoomout, zoomreset, zoomin, bgm or art, which switches
-//     the game's art set. `hide` leaves it out, rather than disabled, while it can't be used.
+//     replay, prevcg, nextcg, prevvar, nextvar, auto, return, hide, zoomout, zoomreset, zoomin, bgm, which mutes and
+//     unmutes the music, bgmplay and bgmmute, a pair for the same, art, which switches the game's art set, or set:NAME,
+//     which turns the setting NAME on and off. `hide` leaves it out, rather than disabled, while it can't be used.
+//     `helppic PICTURE X Y [ROWS ROW]` is a help picture of its own, or a row of one.
 //   `viewerhelp SHEET X Y ROWS`, where a hovered button's help row goes.
 //   `viewernumber WHAT SHEET X Y STEP DIGITS [CELLS]`, WHAT being index, total, zoom (the whole part), zoomfrac or volume.
 //   `viewercell SHEET X Y CELLS CELL`, a fixed cell, such as a slash.
 //   `viewerslider SHEET X Y [ROW]`, the music volume's fill, with its help row.
 //   `viewerauto EVERY FILL` in ms: with FILL, the slideshow button fills from the right over FILL ms, as Test Game 84's does.
 //   `viewerbgm PLAYCOL PLAYROW MUTECOL MUTEROW`, the music button's column and row playing and muted.
+//   `viewerlook set:NAME ONCOL ONROW OFFCOL OFFROW`, a setting button's column and row on and off.
 void Engine::composeViewer(Canvas &out) {
     if (!viewerPanel() || viewPanelHidden_) return;
     const auto *panel = screen_->setting("viewer");
@@ -217,7 +224,8 @@ void Engine::composeViewer(Canvas &out) {
     const auto *bgmLook = screen_->setting("viewerbgm");
     const auto *timing = screen_->setting("viewerauto");
     int helpRow = -1;
-    const std::string *helpPicture = nullptr;  // `helppic PICTURE X Y`, a help that isn't a row of the sheet
+    const std::string *helpPicture = nullptr;  // `helppic PICTURE X Y [ROWS ROW]`, a help that isn't a row of the sheet
+    size_t helpPictureFields = 0;
     for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it) {
         const auto &f = it->second;
         ImageRef sheet = f.size() >= 4 ? images_->get(f[1]) : nullptr;
@@ -234,10 +242,23 @@ void Engine::composeViewer(Canvas &out) {
         }
         // As the message window's art button: ORIGINAL.ver while the arranged art shows, ARRANGE.ver while the original does.
         if (f[0] == "art") row = (setting("art") ? 2 : 0) + (over ? 1 : 0);
+        // Ore o Hoshigaru Tsuma to Gibo's pair: the one in force shows selected, and the PC gives it no hovered look.
+        bool chosen = (f[0] == "bgmplay" && !viewMuted_) || (f[0] == "bgmmute" && viewMuted_);
+        if (row != kDisabled && (f[0] == "bgmplay" || f[0] == "bgmmute")) row = chosen ? kSelected : over ? kHover : kNormal;
+        if (f[0].rfind("set:", 0) == 0 && row != kDisabled)
+            for (auto [look, lookEnd] = screen_->settings.equal_range("viewerlook"); look != lookEnd; ++look)
+                if (look->second.size() >= 5 && look->second[0] == f[0]) {
+                    bool on = setting(f[0].substr(4)) != 0;
+                    col = number(look->second, on ? 1 : 3);
+                    row = number(look->second, on ? 2 : 4) + (over ? 1 : 0);
+                }
         if (over && row != kDisabled)
             for (size_t i = 4; i + 1 < f.size(); i++) {
                 if (f[i] == "help") helpRow = number(f, i + 1);
-                if (f[i] == "helppic" && i + 3 < f.size()) helpPicture = &f[i + 1];
+                if (f[i] == "helppic" && i + 3 < f.size()) {
+                    helpPicture = &f[i + 1];
+                    helpPictureFields = f.size() - (i + 1);
+                }
             }
         int fillMs = timing && timing->size() >= 2 ? number(*timing, 1) : 0;
         if (f[0] != "auto" || !viewAuto_ || fillMs <= 0) {
@@ -293,7 +314,12 @@ void Engine::composeViewer(Canvas &out) {
             drawPart(out, *sheet, number(f, 2) + i * number(f, 4), number(f, 3), value % 10 * cw, 0, cw, sheet->h, 1);
     }
     if (helpPicture)
-        if (ImageRef pic = images_->get(helpPicture[0])) drawPart(out, *pic, std::atoi(helpPicture[1].c_str()), std::atoi(helpPicture[2].c_str()), 0, 0, pic->w, pic->h, 1);
+        if (ImageRef pic = images_->get(helpPicture[0])) {
+            bool oneRow = helpPictureFields >= 5 && std::isdigit(uint8_t(helpPicture[3][0]));
+            int rows = oneRow ? std::max(1, std::atoi(helpPicture[3].c_str())) : 1, h = pic->h / rows;
+            int row = oneRow ? std::atoi(helpPicture[4].c_str()) : 0;
+            drawPart(out, *pic, std::atoi(helpPicture[1].c_str()), std::atoi(helpPicture[2].c_str()), 0, row * h, pic->w, h, 1);
+        }
     if (const auto *help = screen_->setting("viewerhelp"); help && help->size() >= 4 && helpRow >= 0)
         if (ImageRef sheet = images_->get((*help)[0])) {
             int h = sheet->h / std::max(1, number(*help, 3));
@@ -336,9 +362,12 @@ void Engine::pressViewer(int x, int y) {
         viewerZoom(action == "zoomin" ? 1 : -1);
     } else if (action == "zoomreset") {
         viewZoom_ = kZoomMin;
-    } else if (action == "bgm") {
-        viewMuted_ = !viewMuted_;
+    } else if (action == "bgm" || action == "bgmplay" || action == "bgmmute") {
+        viewMuted_ = action == "bgm" ? !viewMuted_ : action == "bgmmute";
         if (viewMusic_) audio_.fade(viewMusic_, 0, viewMuted_ ? 0 : 100, false);
+    } else if (action.rfind("set:", 0) == 0) {
+        changeSetting(action.substr(4), setting(action.substr(4)) ? 0 : 1);
+        saveSettings();
     } else if (action == "art") {
         // The same setting as Config's Change Illustration, as on the PC.
         runAction("ModeChange");
