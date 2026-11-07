@@ -3460,6 +3460,7 @@ std::shared_ptr<Movie> Engine::openMovie(const std::string &path, bool loop) {
 void Engine::loadMovie(const Node &n) {
     auto movie = openMovie(n.s[1], n.p[9] != 0);
     if (!movie) return;
+    log("movie %s in slot %d%s", n.s[1].c_str(), n.p[3], n.p[9] ? ", looping" : "");
     Sprite &s = back_[n.p[3]];
     s = Sprite{};
     s.path = n.s[1];
