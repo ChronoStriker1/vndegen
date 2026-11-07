@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import ImageIO
 import Testing
 import VNCore
@@ -43,7 +44,7 @@ struct LiveTests {
 
     @Test(arguments: ["No Socks RPG", "Doki Doki Literature Club"])
     func autoMatchStoresRealMetadataAndArt(title: String) async throws {
-        let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let base = TestFolders.root.appending(path: UUID().uuidString)
         let paths = LibraryPaths(gamesRoot: base.appending(path: "Games"), support: base.appending(path: "Support"))
         try FileManager.default.createDirectory(at: paths.folder(for: GameID(title)), withIntermediateDirectories: true)
         let library = LibraryStore(paths: paths, engines: [])

@@ -1,5 +1,6 @@
 import CVNAlpha
 import Foundation
+import TestSupport
 import Testing
 
 private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
@@ -40,7 +41,7 @@ private func inspect(_ descriptor: Int32) -> (Int32, String) {
 }
 
 @Test func aClipConvertsFromItsDescriptor() throws {
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let folder = TestFolders.root.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
     let output = folder.appendingPathComponent("clip.mov")

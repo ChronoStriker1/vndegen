@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import WebRuntime
 
@@ -7,7 +8,7 @@ private struct Sandbox {
     let bridge: NodeBridge
 
     init() throws {
-        root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-bridge-\(UUID().uuidString)", isDirectory: true)
+        root = TestFolders.root.appendingPathComponent("vndegen-bridge-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         bridge = NodeBridge(folder: GameFolder(root: root, webRoot: ""))
     }
@@ -94,7 +95,7 @@ private func decode(_ json: String) throws -> BridgeRequest {
 /// MV's community core (`rpg_managers.js` "community-1.3b") picks www/save/ only when it can make and remove a folder
 /// there. This is its code, run through the shim against a real game folder.
 @Test @MainActor func communityCoreSavesBesideIndexHtml() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-community-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-community-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root.appendingPathComponent("www"), withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let folder = GameFolder(root: root, webRoot: "www")
@@ -125,7 +126,7 @@ private func decode(_ json: String) throws -> BridgeRequest {
 }
 
 @Test @MainActor func tyranoFiveTwoFindsItsElectronPreload() async throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-studio-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-studio-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     let folder = GameFolder(root: root, webRoot: "")

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 import WebRuntime
@@ -7,7 +8,7 @@ import FontPack
 
 /// `VNDEGEN_TEST_DIR` puts the games on another volume, such as a case-sensitive disk image.
 private let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-    ?? FileManager.default.temporaryDirectory
+    ?? TestFolders.root
 
 private func game(_ files: [String: Data]) throws -> URL {
     let root = scratch.appendingPathComponent("vndegen-flash-\(UUID().uuidString)", isDirectory: true)
@@ -201,7 +202,7 @@ private func html(_ text: String) -> Data { Data(text.utf8) }
     // which run at the same time: the bundled fonts, then empty files named as the Korean download's.
     let fonts = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appending(path: "../../../../Engines/Shared/fonts").standardizedFileURL
-    let downloaded = FileManager.default.temporaryDirectory.appending(path: "vndegen-font-tests")
+    let downloaded = TestFolders.root.appending(path: "vndegen-font-tests")
     try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
     for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
         try Data().write(to: downloaded.appending(path: name), options: .atomic)

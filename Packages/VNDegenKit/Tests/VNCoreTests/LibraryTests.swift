@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import VNCore
 
@@ -23,7 +24,7 @@ private struct NeverAskedPlugin: EnginePlugin {
 }
 
 private func makeTempLibrary() throws -> LibraryPaths {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let base = TestFolders.root.appendingPathComponent(UUID().uuidString)
     return LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
 }
 
@@ -47,7 +48,7 @@ private func addGame(_ name: String, files: [String], to paths: LibraryPaths) th
 }
 
 @Test func folderScanListsEveryLevelToItsDepthAndNothingHidden() throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let root = TestFolders.root.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root.appendingPathComponent("a/b/c/d"), withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: root.appendingPathComponent("empty"), withIntermediateDirectories: true)

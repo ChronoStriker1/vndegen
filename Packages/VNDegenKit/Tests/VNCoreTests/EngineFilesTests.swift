@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import VNCore
 
@@ -17,7 +18,7 @@ private struct ListPlugin: EnginePlugin {
 }
 
 private struct Scratch {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
     var paths: LibraryPaths { LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support")) }
     var game: URL { paths.gamesRoot.appendingPathComponent("Game", isDirectory: true) }
 

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import WebRuntime
 
@@ -42,7 +43,7 @@ func writeRawAsar(to url: URL, index json: Data, body: Data) throws {
 private func uint32(_ value: Int) -> Data { withUnsafeBytes(of: UInt32(value).littleEndian) { Data($0) } }
 
 private func electronGame() throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-asar-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-asar-\(UUID().uuidString)", isDirectory: true)
     let resources = root.appendingPathComponent("resources", isDirectory: true)
     try FileManager.default.createDirectory(at: resources.appendingPathComponent("app.asar.unpacked/data/video"), withIntermediateDirectories: true)
     try writeAsar(to: resources.appendingPathComponent("app.asar"), files: [
@@ -97,7 +98,7 @@ private func text(_ response: FileResponse) async throws -> String {
 
 /// Opens an archive whose index has one file, `a.txt`, with this entry, over a 10-byte body.
 private func archive(entry: String, body: Data = Data(count: 10)) throws -> AsarArchive? {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-asar-\(UUID().uuidString).asar")
+    let url = TestFolders.root.appendingPathComponent("vndegen-asar-\(UUID().uuidString).asar")
     defer { try? FileManager.default.removeItem(at: url) }
     try writeRawAsar(to: url, index: Data(#"{"files":{"a.txt":\#(entry)}}"#.utf8), body: body)
     return try? AsarArchive(reading: FileHandle(forReadingFrom: url))
@@ -128,7 +129,7 @@ private func archive(entry: String, body: Data = Data(count: 10)) throws -> Asar
 }
 
 @Test func theIndexIsBoundedBeforeItIsRead() throws {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-asar-\(UUID().uuidString).asar")
+    let url = TestFolders.root.appendingPathComponent("vndegen-asar-\(UUID().uuidString).asar")
     defer { try? FileManager.default.removeItem(at: url) }
     func opens(_ bytes: Data) throws -> Bool {
         try bytes.write(to: url)

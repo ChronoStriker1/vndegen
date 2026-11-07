@@ -1,10 +1,11 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import WebRuntime
 
 /// `VNDEGEN_TEST_DIR` puts the games on another volume, such as a case-sensitive disk image.
 private let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-    ?? FileManager.default.temporaryDirectory
+    ?? TestFolders.root
 
 private func temporaryGame() throws -> URL {
     let root = scratch.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)

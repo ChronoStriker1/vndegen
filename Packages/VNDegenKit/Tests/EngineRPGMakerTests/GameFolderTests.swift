@@ -1,11 +1,12 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 import WebRuntime
 @testable import EngineRPGMaker
 
 private func temporaryGame() throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root.appendingPathComponent("js"), withIntermediateDirectories: true)
     try Data("<html></html>".utf8).write(to: root.appendingPathComponent("index.html"))
     return root
@@ -39,7 +40,7 @@ private func temporaryGame() throws -> URL {
     ("OUTER/WWW/JS/RPG_CORE.JS", "OUTER", "www"),
 ])
 func findsAGameInsideWrapperFolders(core: String, root: String, webRoot: String) throws {
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let folder = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: folder) }
     let url = folder.appendingPathComponent(core)
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -57,7 +58,7 @@ func findsAGameInsideWrapperFolders(core: String, root: String, webRoot: String)
 }
 
 @Test func theShallowestGameWinsAndALongListingIsNotSearched() throws {
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let folder = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: folder) }
     for core in ["Tool/Old/Copy/js/rpg_core.js", "Game/www/js/rpg_core.js"] {
         let url = folder.appendingPathComponent(core)
@@ -67,7 +68,7 @@ func findsAGameInsideWrapperFolders(core: String, root: String, webRoot: String)
     #expect(RPGMakerPlugin(.mv).detect(FolderProbe(scanning: folder))?.evidence == "Game/www/js/rpg_core.js")
 
     // Past the listing, in a folder not named js or www, under a listing too long to be a wrapper.
-    let long = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let long = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: long) }
     let core = long.appendingPathComponent("A/B/Game/js/rpg_core.js")
     try FileManager.default.createDirectory(at: core.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -77,7 +78,7 @@ func findsAGameInsideWrapperFolders(core: String, root: String, webRoot: String)
 }
 
 @Test func aGameAtTheTopWinsOverAnEngineCopyBelowIt() throws {
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let folder = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: folder) }
     for core in ["www/js/rpg_core.js", "Backup/js/rmmz_core.js"] {
         let url = folder.appendingPathComponent(core)
@@ -92,7 +93,7 @@ func findsAGameInsideWrapperFolders(core: String, root: String, webRoot: String)
 
 /// The listing follows a link that `GameFolder` won't, so they disagree about the core. That must not loop.
 @Test func aCoreBehindALinkOutOfTheFolderIsNotAGame() throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: base) }
     let outside = base.appendingPathComponent("outside/js", isDirectory: true), game = base.appendingPathComponent("game", isDirectory: true)
     try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
@@ -115,7 +116,7 @@ func findsAGameInsideWrapperFolders(core: String, root: String, webRoot: String)
 
 /// MessageSkip's auto and skip reach Game commands only when the game turns the plugin on.
 @Test func offersMessageSkipsCommandsWhenThePluginIsOn() throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root.appendingPathComponent("www/js"), withIntermediateDirectories: true)
     let plugins = """

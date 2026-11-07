@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import OSLog
 import Testing
 import WebKit
@@ -145,7 +146,7 @@ private let helpers = """
 /// Serves the stand-in decoder as `script` to a page running the RPG Maker additions, and waits for its worker.
 @MainActor private func decoderPage(script: String = "js/libs/vorbisdecoder.js") async throws -> (WKWebView, URL) {
     let fm = FileManager.default
-    let root = fm.temporaryDirectory.appending(path: "vndegen-vorbis-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let root = TestFolders.root.appending(path: "vndegen-vorbis-\(UUID().uuidString)", directoryHint: .isDirectory)
     let libs = root.appending(path: "js/libs", directoryHint: .isDirectory)
     try fm.createDirectory(at: libs, withIntermediateDirectories: true)
     try Data(#"<html><body><script src="\#(script)"></script><script src="js/rmmz_core.js"></script></body></html>"#.utf8)

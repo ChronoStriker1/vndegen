@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import GameInput
 import Lock
 import Metadata
@@ -24,7 +25,7 @@ private struct TestPlugin: EnginePlugin {
 /// A hub with one game, Test Game, and a navigator on its page.
 @MainActor
 private func makeNavigator(games: [String] = ["Test Game"]) async throws -> (Navigator, GameID) {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("nav-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("nav-\(UUID().uuidString)", isDirectory: true)
     let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
     for game in games {
         try FileManager.default.createDirectory(at: paths.gamesRoot.appendingPathComponent(game), withIntermediateDirectories: true)

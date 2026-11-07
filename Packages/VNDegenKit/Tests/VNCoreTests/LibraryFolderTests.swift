@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import VNCore
 
@@ -11,7 +12,7 @@ private struct MarkerPlugin: EnginePlugin {
 }
 
 private struct Scratch {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
     var paths: LibraryPaths { LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support")) }
     func folder(_ name: String) -> URL { base.appendingPathComponent(name, isDirectory: true) }
 

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import WebRuntime
 @testable import EngineRPGMaker
@@ -6,7 +7,7 @@ import WebRuntime
 /// An MV game deployed in www/ with `files`, path to contents. Its core is the community one unless `core` says otherwise.
 private func mvGame(_ files: [String: String], core: String = "// rpg_managers.js v1.6.1 (community-1.3b)\nStorageManager.canMakeWwwSaveDirectory = function() {};") throws -> URL {
     let fm = FileManager.default
-    let root = fm.temporaryDirectory.appendingPathComponent("vndegen-savemove-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-savemove-\(UUID().uuidString)", isDirectory: true)
     var all = files
     all["www/js/rpg_core.js"] = ""
     all["www/js/rpg_managers.js"] = core
@@ -166,7 +167,7 @@ private func titles(_ index: String?) throws -> [Int: String] {
 
 @Test func anIndexOutsideTheGameIsNeverRead() throws {
     let fm = FileManager.default
-    let outside = fm.temporaryDirectory.appendingPathComponent("vndegen-outside-\(UUID().uuidString).rpgsave")
+    let outside = TestFolders.root.appendingPathComponent("vndegen-outside-\(UUID().uuidString).rpgsave")
     try Data(index([6]).utf8).write(to: outside)
     let root = try mvGame(["save/file1.rpgsave": "mine", "save/global.rpgsave": index([1])])
     defer { try? fm.removeItem(at: root); try? fm.removeItem(at: outside) }
@@ -188,7 +189,7 @@ private func titles(_ index: String?) throws -> [Int: String] {
 /// Exercises the case only on a case-sensitive volume, such as `VNDEGEN_TEST_DIR` from `scripts/build.sh test`.
 @Test func anIndexInTwoSpellingsIsLeftAlone() throws {
     let fm = FileManager.default
-    let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) } ?? fm.temporaryDirectory
+    let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) } ?? TestFolders.root
     let root = scratch.appendingPathComponent("vndegen-spellings-\(UUID().uuidString)", isDirectory: true)
     defer { try? fm.removeItem(at: root) }
     for (path, text) in ["www/js/rpg_core.js": "", "www/js/rpg_managers.js": "StorageManager.canMakeWwwSaveDirectory",
@@ -215,7 +216,7 @@ private func titles(_ index: String?) throws -> [Int: String] {
 @Test func savesStayWhileTestDirectoryIsASymlink() throws {
     // A symlink there, leading nowhere or out of the game, fails the core's mkdirSync through the bridge too.
     let fm = FileManager.default
-    let outside = fm.temporaryDirectory.appendingPathComponent("vndegen-outside-\(UUID().uuidString)", isDirectory: true)
+    let outside = TestFolders.root.appendingPathComponent("vndegen-outside-\(UUID().uuidString)", isDirectory: true)
     try fm.createDirectory(at: outside, withIntermediateDirectories: true)
     defer { try? fm.removeItem(at: outside) }
     for destination in [outside, outside.appendingPathComponent("missing")] {

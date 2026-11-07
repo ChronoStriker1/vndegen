@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import GameInput
 import Testing
 import VNCore
@@ -7,7 +8,7 @@ import VNCore
 /// An editor on Test Game, which follows the Xbox layout.
 @MainActor
 private func makeEditor() async throws -> (ButtonMappingEditor, LibraryStore, LayoutLibrary, GameID) {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("layouts-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("layouts-\(UUID().uuidString)", isDirectory: true)
     let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
     let id = GameID("Test Game")
     try FileManager.default.createDirectory(at: paths.folder(for: id), withIntermediateDirectories: true)

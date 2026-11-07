@@ -10,6 +10,7 @@ import notify
 import UIKit
 #else
 import AppKit
+import QuartzCore
 #endif
 
 /// Launch arguments for screenshots and UI tests. None of this ships in release builds.
@@ -31,7 +32,7 @@ import AppKit
 ///                            then y, each four digits of 1000 plus a thousandth of a full push, here x 1 and y 0. The
 ///                            stick stays there until the next one, such as 10001000 to let go
 ///   notifyutil -p vndegen.app.quit   quits the app as Command-Q does, macOS only
-///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only
+///   notifyutil -p vndegen.app.snapshot   writes the main window to the -snapshot path now, macOS only. See -snapshot
 ///   -forceOrientation landscape   rotates the window scene, for simulators that have no Simulator app to rotate them
 ///   -fakeSession YES         RPG Maker MZ games start a placeholder session instead of the real runtime
 ///   -rgss-ruby <file>        RPG Maker XP, VX and VX Ace games run the Ruby file once their scripts have loaded, through
@@ -39,7 +40,11 @@ import AppKit
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. Sessions of the native runtimes
 ///                            also log their own pacing every 10 seconds, on macOS too ("NSFRAMES", "S3FRAMES", "S4FRAMES",
 ///                            "RGSSFRAMES", "WOLFFRAMES", "KKFRAMES")
-///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session)
+///   -snapshot <path>         writes the main window, with any sheet or alert over it, to a PNG after the input script,
+///                            macOS only (screencapture needs a login session). It draws the window's views, which can't
+///                            include what a Metal view shows, so a game drawn with Metal comes out black. "SNAPSHOT" in the
+///                            app log gives the window id and says when the window has Metal content; capture such a window
+///                            with screencapture -l <window id> instead
 ///   -windowSize 900x600      resizes the window before the snapshot on macOS. On iPad, in Windowed Apps or Stage Manager,
 ///                            the window takes that size the next time it is resized
 ///   -layoutSize 320x480      lays the whole app out in a frame of that size in the middle of the screen, as in a window
@@ -180,7 +185,7 @@ enum DebugHooks {
         }
         #if os(macOS)
         if let path = UserDefaults.standard.string(forKey: "snapshot") {
-            if let size = launchWindowSize, let window = NSApp.windows.first(where: \.isVisible) {
+            if let size = launchWindowSize, let window = mainWindow {
                 window.setContentSize(size)
             }
             try? await Task.sleep(for: .seconds(3))
@@ -190,14 +195,53 @@ enum DebugHooks {
     }
 
     #if os(macOS)
-    /// The main window, or the sheet shown over it, and the sheet over that one.
+    /// The main window, the largest one showing, with whatever is over it drawn in place: a sheet, an alert, or another
+    /// window, as the player sees them. Drawing the views can't read what a Metal layer shows, so the log says when the
+    /// picture has one, with the main window's id that `screencapture -l` takes.
     static func snapshotWindow(to url: URL) {
-        var window = NSApp.windows.first(where: \.isVisible)
-        while let sheet = window?.attachedSheet { window = sheet }
-        guard let view = window?.contentView,
+        let shown = NSApp.windows.filter(\.isVisible)
+        guard let main = mainWindow, let view = main.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
+        var metal = hasMetalLayer(view.layer)
+        // Back to front, so the frontmost lands on top. Each is placed by its content's place on screen.
+        let over = shown.filter { $0 !== main && $0.orderedIndex < main.orderedIndex && $0.frame.intersects(main.frame) }
+            .sorted { $0.orderedIndex > $1.orderedIndex }
+        if !over.isEmpty, let context = NSGraphicsContext(bitmapImageRep: rep) {
+            let base = main.convertToScreen(view.convert(view.bounds, to: nil))
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = context
+            for window in over {
+                // The whole frame, since an alert keeps its text beside its content view rather than in it.
+                guard let content = window.contentView?.superview ?? window.contentView,
+                      let image = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { continue }
+                content.cacheDisplay(in: content.bounds, to: image)
+                // Drawn square: the frame fills its rounded corners, white on an alert.
+                let frame = window.convertToScreen(content.convert(content.bounds, to: nil))
+                image.draw(in: frame.offsetBy(dx: -base.minX, dy: -base.minY))
+                metal = metal || hasMetalLayer(content.layer)
+            }
+            NSGraphicsContext.restoreGraphicsState()
+        }
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
+        if metal {
+            NSLog("SNAPSHOT %@ window %ld has Metal content, which shows black here; use screencapture -l %ld", url.path,
+                  main.windowNumber, main.windowNumber)
+        } else {
+            NSLog("SNAPSHOT %@ window %ld", url.path, main.windowNumber)
+        }
+    }
+
+    /// The largest window showing that is the app's own, not a sheet, panel, or alert over it. The first in
+    /// `NSApp.windows` can be an alert, and a file panel can be larger than a small window.
+    private static var mainWindow: NSWindow? {
+        NSApp.windows.filter { $0.isVisible && !$0.isSheet && !($0 is NSPanel) && $0.parent == nil }
+            .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+    }
+
+    private static func hasMetalLayer(_ layer: CALayer?) -> Bool {
+        guard let layer else { return false }
+        return layer is CAMetalLayer || (layer.sublayers ?? []).contains { hasMetalLayer($0) }
     }
     #endif
 }

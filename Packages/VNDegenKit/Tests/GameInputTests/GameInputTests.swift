@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import GameController
 import Testing
 import VNCore
@@ -125,15 +126,15 @@ import VNCore
 }
 
 @Test @MainActor func libraryConversionRunsOnceForEveryRememberedGame() async throws {
-    let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-mapping-\(UUID().uuidString)")
+    let root = TestFolders.root.appending(path: "vndegen-mapping-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let paths = LibraryPaths(gamesRoot: root.appending(path: "Games"), support: root.appending(path: "Support"))
     for name in ["Old", "Keys", "Gone"] {
         try FileManager.default.createDirectory(at: paths.gamesRoot.appending(path: name), withIntermediateDirectories: true)
     }
-    let suite = "vndegen-conversion-\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = try ScratchDefaults("vndegen-conversion")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let w = KeyboardKey(key: "w", code: "KeyW", keyCode: 87)
 
     let library = LibraryStore(paths: paths, engines: [])
@@ -379,9 +380,9 @@ private final class Consumer {
 }
 
 @Test func touchControlsSettingMigratesToTheDefaultControlMethod() throws {
-    let suite = "vndegen-migration-\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = try ScratchDefaults("vndegen-migration")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     for (legacy, method) in [("mouse", ControlMethod.mouse(.cursor)), ("hidden", .controller(mouse: .touch)), ("gamepad", .gamepad)] {
         defaults.removeObject(forKey: ControlMethod.storageKey)
         defaults.set(legacy, forKey: "touchControlsMode")
