@@ -111,6 +111,13 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
                 else if (key == "if") p.needs = numbers(value);
+                else if (key == "pickby") p.pickBy = number(value);
+                else if (key == "randomif") p.randomIf = numbers(value);
+                else if (key == "more") {
+                    p.variants = {p.image};
+                    std::istringstream files(value);
+                    for (std::string file; std::getline(files, file, ',');) p.variants.push_back(image(file));
+                }
                 else if (key == "part" && at + 4 < w.size()) {
                     p.partX = number(value);
                     p.partY = number(w[at + 2]);

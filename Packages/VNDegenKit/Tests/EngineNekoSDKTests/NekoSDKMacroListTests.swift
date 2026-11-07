@@ -21,36 +21,8 @@ import TestSupport
     ##
     """
 
-    // A game folder of loose files, with an empty archive, since a folder needs one to count as a NekoSDK game.
-    private func game(_ files: [String: Data]) throws -> URL {
-        let root = TestFolders.root.appendingPathComponent("nekosdk-macros-\(UUID().uuidString)")
-        var all = files
-        all["obj.pak"] = Data("NEKOPACK4A".utf8) + Data([4, 0, 0, 0, 0, 0, 0, 0])
-        for (path, data) in all {
-            let url = root.appendingPathComponent(path)
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: url)
-        }
-        return root
-    }
-
-    // A flow script of nodes given as (opcode, next, parameters), numbered from 1.
-    private func flow(_ nodes: [(op: UInt32, next: UInt32, p: [Int: Int32])]) -> Data {
-        var data = Data("NEKOSDK_ADVSCRIPT2".utf8) + Data([0])
-        func put<T: FixedWidthInteger>(_ v: T) { data.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
-        put(UInt32(nodes.count))
-        for (i, node) in nodes.enumerated() {
-            for v: UInt32 in [UInt32(i + 1), 1, 0, node.op] { put(v) }
-            for k in 0..<32 { put(node.p[k] ?? 0) }
-            put(node.next)
-            for _ in 0..<16 { put(Int32(0)) }
-            for _ in 0..<33 { put(UInt32(0)) }
-        }
-        return data
-    }
-
     @Test func placesCountInNameOrder() throws {
-        let root = try game(["cfg/macrolist.ini": Data(macros.utf8)])
+        let root = try NekoSDKFlowFixture.game(["cfg/macrolist.ini": Data(macros.utf8)])
         defer { try? FileManager.default.removeItem(at: root) }
         #expect((0..<4).map { vnneko_debug_macro_number(root.path, 0, $0) } == [51, 52, 1000, 55])
         #expect((0..<3).map { vnneko_debug_macro_number(root.path, 1, $0) } == [100, 101, 4000])
@@ -59,29 +31,81 @@ import TestSupport
 
     @Test func aChangeTakesAScenarioVariablesPlaceFromParameter2() throws {
         // Each change keeps a stale place for the other scope, as the editor does.
-        let root = try game([
-            "cfg/init.ini": Data("FirstFlow\tflow\\t.txt\n".utf8),
-            "cfg/macrolist.ini": Data(macros.utf8),
-            "flow/t.txt": flow([
-                (0, 2, [:]),
-                (6, 3, [0: 1, 1: 3, 2: 1, 4: 2, 5: 5]),
-                (6, 4, [0: 0, 1: 2, 2: 2, 4: 2, 5: 9]),
-                (2, 0, [:]),
-            ]),
-        ])
-        defer { try? FileManager.default.removeItem(at: root) }
-        let data = root.appendingPathComponent("data")
-        let engine: OpaquePointer? = root.path.withCString { rootPath in
-            data.path.withCString { dataPath in
-                var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil, movies: nil)
-                return vnneko_start(&launch)
-            }
+        try NekoSDKFlowFixture.run([
+            .init(op: 0, next: 2),
+            .init(op: 6, next: 3, p: [0: 1, 1: 3, 2: 1, 4: 2, 5: 5]),
+            .init(op: 6, next: 4, p: [0: 0, 1: 2, 2: 2, 4: 2, 5: 9]),
+            .init(op: 2, next: 0),
+        ], macros: macros) { e in
+            #expect(vnneko_debug_variable(e, 1, 101) == 5)
+            #expect(vnneko_debug_variable(e, 1, 100) == 0)
+            #expect(vnneko_debug_variable(e, 0, 1000) == 9)
         }
-        let e = try #require(engine)
-        defer { vnneko_stop(e) }
-        for _ in 0..<20 where vnneko_step(e, 16) {}
-        #expect(vnneko_debug_variable(e, 1, 101) == 5)
-        #expect(vnneko_debug_variable(e, 1, 100) == 0)
-        #expect(vnneko_debug_variable(e, 0, 1000) == 9)
+    }
+
+    // The changes' operations, parameter 3, read from Test Game 94's exe: 0 sets, 1 adds one, 2 takes one, 3 adds the
+    // operand and 4 takes it. Test Game 92's `秋穂カウンタ++` is 3 with an operand of 1, run once per choice of Akiho.
+    @Test func changesSetStepAddAndTake() throws {
+        try NekoSDKFlowFixture.run([
+            .init(op: 0, next: 2),
+            .init(op: 6, next: 3, p: [0: 1, 2: 0, 3: 3, 4: 2, 5: 1]),
+            .init(op: 6, next: 4, p: [0: 1, 2: 0, 3: 3, 4: 2, 5: 1]),
+            .init(op: 6, next: 5, p: [0: 1, 2: 1, 3: 0, 4: 2, 5: 10]),
+            .init(op: 6, next: 6, p: [0: 1, 2: 1, 3: 4, 4: 2, 5: 3]),
+            .init(op: 6, next: 7, p: [0: 1, 2: 1, 3: 2]),
+            .init(op: 6, next: 8, p: [0: 0, 1: 1, 3: 1]),
+            .init(op: 6, next: 9, p: [0: 0, 1: 1, 3: 1]),
+            .init(op: 2, next: 0),
+        ], macros: macros) { e in
+            #expect(vnneko_debug_variable(e, 1, 100) == 2)
+            #expect(vnneko_debug_variable(e, 1, 101) == 6)
+            #expect(vnneko_debug_variable(e, 0, 52) == 2)
+        }
+    }
+
+    // An operand of kind 0 or 1, parameter 4, is the global or scenario variable parameter 5 numbers, by its number.
+    @Test func anOperandNamesAVariableByItsNumber() throws {
+        try NekoSDKFlowFixture.run([
+            .init(op: 0, next: 2),
+            .init(op: 6, next: 3, p: [0: 0, 1: 0, 4: 2, 5: 7]),
+            .init(op: 6, next: 4, p: [0: 1, 2: 0, 3: 0, 4: 0, 5: 51]),
+            // Holds, so it goes to its other target, which sets the marker.
+            .init(op: 5, next: 6, otherwise: 5, p: [0: 1, 2: 0, 3: 0, 4: 0, 5: 51]),
+            .init(op: 6, next: 6, p: [0: 1, 2: 1, 4: 2, 5: 1]),
+            .init(op: 2, next: 0),
+        ], macros: macros) { e in
+            #expect(vnneko_debug_variable(e, 1, 100) == 7)
+            #expect(vnneko_debug_variable(e, 1, 101) == 1)
+        }
+    }
+
+    // A scene end with parameter 0 set is the staff roll, after which the flow goes on: Test Game 94 sets its endings
+    // after it. A game whose table has no staff roll goes straight on.
+    // A condition that holds goes to its other target, as a choice's branch does: Test Game 84's `1:デス＆エス` leads
+    // there to デストラ＆エスケルダを選んでた, and on to the next heroine's question otherwise.
+    @Test func aConditionThatHoldsTakesItsOtherTarget() throws {
+        try NekoSDKFlowFixture.run([
+            .init(op: 0, next: 2),
+            .init(op: 6, next: 3, p: [0: 1, 2: 0, 4: 2, 5: 2]),
+            .init(op: 5, next: 4, otherwise: 5, p: [0: 1, 2: 0, 3: 0, 4: 2, 5: 1]),
+            .init(op: 5, next: 6, otherwise: 7, p: [0: 1, 2: 0, 3: 0, 4: 2, 5: 2]),
+            .init(op: 6, next: 8, p: [0: 1, 2: 1, 4: 2, 5: 1]),
+            .init(op: 6, next: 8, p: [0: 1, 2: 1, 4: 2, 5: 2]),
+            .init(op: 6, next: 8, p: [0: 1, 2: 1, 4: 2, 5: 3]),
+            .init(op: 2, next: 0),
+        ], macros: macros) { e in
+            #expect(vnneko_debug_variable(e, 1, 101) == 3)
+        }
+    }
+
+    @Test func theStoryGoesOnAfterAStaffRoll() throws {
+        try NekoSDKFlowFixture.run([
+            .init(op: 0, next: 2),
+            .init(op: 2, next: 3, p: [0: 1]),
+            .init(op: 6, next: 4, p: [0: 0, 1: 0, 4: 2, 5: 1]),
+            .init(op: 2, next: 0),
+        ], macros: macros) { e in
+            #expect(vnneko_debug_variable(e, 0, 51) == 1)
+        }
     }
 }

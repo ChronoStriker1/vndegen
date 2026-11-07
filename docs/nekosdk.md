@@ -112,7 +112,7 @@ Three games ship movies as extensionless ASF files, all WMV3 Main profile at 128
 |---|---|---|---|---|
 | Test Game 89 | 31 | 76 s, mostly loops of 0.4 to 10 s | None | Script opcode 100 on a sprite slot, 56 times in 28 scripts |
 | Test Game 92 | 72 | 757 s, about 21 Mbit/s | WMA Pro | Script opcode 100 on a sprite slot, 49 times in 8 scripts |
-| Test Game 94 | 2 | 264 s | WMA Lossless | Staff rolls the exe starts, named in the exe and not in scripts |
+| Test Game 94 | 2 | 264 s | WMA Lossless | Staff rolls a flow's scene end starts, named in the exe and not in scripts |
 
 The other 13 games use no movies. Apple's frameworks decode neither video codec nor these audio ones. vnvideo plays only MPEG-1 and Ogg Theora. The KiriKiri plugin's WMV support is FFmpeg, which is LGPL, and its build enables `wmv3` but not `wmapro` or `wmalossless`.
 

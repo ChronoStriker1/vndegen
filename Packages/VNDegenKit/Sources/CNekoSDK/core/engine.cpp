@@ -290,6 +290,14 @@ void Engine::openScreen(const std::string &name) {
     // The drifting line art starts from a sketch picked at random, as the PC's does.
     driftFrom_ = screenMs_;
     driftFirst_ = screen_->settings.count("drift") ? size_t(std::rand()) % screen_->settings.count("drift") : 0;
+    for (Picture &p : screen_->pictures) {
+        if (p.variants.empty()) continue;
+        size_t pick = 0;
+        if (!p.randomIf.empty() && anyGlobalSet(p.randomIf)) pick = size_t(std::rand()) % p.variants.size();
+        else if (auto it = globals_.find(p.pickBy); p.pickBy >= 0 && it != globals_.end() && it->second >= 0) pick = size_t(it->second);
+        // Past the last, the PC keeps its first.
+        p.image = pick < p.variants.size() && p.variants[pick] ? p.variants[pick] : p.variants[0];
+    }
     // `gallerytabs TAB`: the tab a gallery opens on, the middle one of three in Test Game 92.
     if (const auto *tabs = screen_->setting("gallerytabs"); tabs && !tabs->empty()) galleryTab_ = field(*tabs, 0);
     if (name == "title" && !titleBgm_.empty() && !titleMusic_) {
@@ -367,6 +375,8 @@ void Engine::startStory() {
     choiceImage_.clear();
     replaying_ = false;
     waiting_ = Waiting::None;
+    autoRoute_ = pendingRoute_;
+    pendingRoute_ = 0;
     std::string first = config_.text(storyFlowKey_.c_str());
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
@@ -427,6 +437,12 @@ void Engine::runAction(const std::string &action) {
     if (action == "start_prologue") { storyFlowKey_ = "FirstFlow"; startStory(); return; }
     if (action == "start_main") { storyFlowKey_ = mainFlowKey(); startStory(); return; }
     if (action == "start_sub") { storyFlowKey_ = "SubFlow1"; startStory(); return; }
+    if (action.rfind("route", 0) == 0) {
+        pendingRoute_ = std::atoi(action.c_str() + 5);
+        storyFlowKey_ = "FirstFlow";
+        startStory();
+        return;
+    }
     if (action.rfind("track", 0) == 0) {
         playTrack(std::atoi(action.c_str() + 5));
         return;
@@ -1908,6 +1924,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     // viewer it may have come from.
     replaying_ = false;
     replayFromViewer_ = false;
+    autoRoute_ = 0;
     stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
@@ -2762,7 +2779,12 @@ void Engine::runFlow(const Node &n) {
         }
         break;
     }
-    case 2:  // the end of the story, which goes back to the title
+    case 2:  // the end of the story, which goes back to the title, or with parameter 0 set the staff roll, then on
+        if (n.p[0] == 1) {
+            flow.node = flow.script->node(n.next);
+            startStaffRoll();
+            break;
+        }
         log("flow end: %s", sjis::toUtf8(n.s[0]).c_str());
         flow.node = nullptr;
         if (screens_.count("title")) endStory("title");
@@ -2779,18 +2801,24 @@ void Engine::runFlow(const Node &n) {
     case 21:
         flow.node = flow.script->node(choiceResult_ == (n.opcode == 4 ? n.p[0] : 0) ? n.otherwise : n.next);
         break;
-    case 5: {  // a condition on a variable: `next` when it holds
-        int left = variableValue(n.p[0], variableIndex(n)), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
-        // Only `<=`, 2, is read from a script's own words so far. The others follow the order such lists usually have.
+    case 5: {  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
+        // The comparisons, as Test Game 94's exe orders them: ==, !=, <=, >=, <, >.
+        int left = variableValue(n.p[0], variableIndex(n)), right = operand(n);
         bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
-        flow.node = flow.script->node(holds ? n.next : n.otherwise);
+        flow.node = flow.script->node(holds ? n.otherwise : n.next);
         break;
     }
-    case 6: {  // set or step a variable: scope, index, operation (0 set, 1 add one), value
+    case 6: {  // a change to a variable: set, add one, take one, add or take the operand, as the exe orders them
         auto &table = n.p[0] == 1 ? scenario_ : globals_;
-        int number = variableNumber(n.p[0], variableIndex(n));
-        if (n.p[3] == 1) table[number]++;
-        else table[number] = n.p[5];
+        int number = variableNumber(n.p[0], variableIndex(n)), value = operand(n);
+        switch (n.p[3]) {
+        case 0: table[number] = value; break;
+        case 1: table[number]++; break;
+        case 2: table[number]--; break;
+        case 3: table[number] += value; break;
+        case 4: table[number] -= value; break;
+        default: warnOnce("variable change " + std::to_string(n.p[3]) + " isn't built: " + sjis::toUtf8(n.s[0])); break;
+        }
         log("variable %d:%d = %d", n.p[0], number, table[number]);
         if (n.p[0] != 1) saveGlobals();
         break;
@@ -2813,6 +2841,15 @@ int Engine::variableIndex(const Node &n) {
     return n.p[0] == 1 ? n.p[2] : n.p[1];
 }
 
+// The other side of a condition or a change: parameter 5 itself when parameter 4 is 2, else the global (0) or scenario
+// variable (1) parameter 5 numbers, by its number rather than its place in a list, as the exe reads it.
+int Engine::operand(const Node &n) const {
+    if (n.p[4] == 2) return n.p[5];
+    const auto &table = n.p[4] == 1 ? scenario_ : globals_;
+    auto it = table.find(n.p[5]);
+    return it == table.end() ? 0 : it->second;
+}
+
 // Scripts name a variable by its place in macrolist.ini's list, and saves keep it by the number the list gives it.
 int Engine::variableNumber(int scope, int index) const {
     const auto &list = scope == 1 ? scenarioMacros_ : globalMacros_;
@@ -2828,6 +2865,14 @@ int Engine::variableValue(int scope, int index) const {
 void Engine::beginChoice(const Node &n) {
     choiceSheet_ = images_->get(n.s[1]);
     choiceImage_ = n.s[1];
+    // A route's answer is 0 for the upper option or 1 for the lower. A choice that doesn't matter to the route gives 4,
+    // and the PC asks it as usual, as seen under Wine.
+    if (int answer = autoRoute_ >= 1 && autoRoute_ <= 4 && n.opcode == 3 ? n.p[size_t(9 + autoRoute_)] : -1; answer == 0 || answer == 1) {
+        choiceSheet_ = nullptr;
+        choiceResult_ = answer;
+        log("choice %s made for route %d: %d", n.s[1].c_str(), autoRoute_, answer);
+        return;
+    }
     if (!choiceSheet_) {
         complain("Missing choice " + n.s[1]);
         choiceResult_ = 0;
@@ -3123,6 +3168,7 @@ bool Engine::step(int ms) {
         ruleImage_ = nullptr;
         dirty_ = true;
     }
+    if (waiting_ == Waiting::StaffRoll) stepStaffRoll();
     // Config's wait skipping lets a click end a wait.
     if (waiting_ == Waiting::Time && (skip_ || skipToggle_ || now_ >= waitUntil_ || (clicked_ && setting("waitskip")))) {
         waiting_ = Waiting::None;
@@ -3422,7 +3468,7 @@ bool Engine::jump(const std::string &script, int node) {
 
 const char *Engine::debugStatus() {
     char buffer[256];
-    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : "ended";
+    const char *waiting = waiting_ == Waiting::None ? "running" : waiting_ == Waiting::Time ? "time" : waiting_ == Waiting::Click ? "click" : waiting_ == Waiting::Choice ? "choice" : waiting_ == Waiting::StaffRoll ? "staff roll" : "ended";
     std::snprintf(buffer, sizeof buffer, "%s #%d %s t=%lld", scene_.script ? scene_.script->name.c_str() : "(flow)", scene_.node ? scene_.node->id : -1, waiting, (long long)now_);
     status_ = buffer;
     return status_.c_str();
@@ -3890,6 +3936,58 @@ void Engine::loadMovie(const Node &n) {
     s.movieFrom = now_;
     bool ended = false;
     s.image = movie->frame(0, ended);
+}
+
+// The staff roll sits in a slot above any a script uses, with the message window put away. A game whose table names no
+// staff roll goes straight on: Test Game 84's draws its own, which isn't built yet.
+constexpr int kStaffRollSlot = 1 << 20;
+
+void Engine::startStaffRoll() {
+    auto it = screens_.find("staffroll");
+    const auto *movie = it == screens_.end() ? nullptr : it->second.setting("movie");
+    if (!movie || movie->size() < 2) {
+        warnOnce("This game's staff roll isn't built, so the story goes on past it.");
+        return;
+    }
+    auto value = scenario_.find(field(*movie, 0));
+    size_t pick = size_t(std::max(0, value == scenario_.end() ? 0 : value->second));
+    if (pick + 1 >= movie->size()) {
+        warnOnce("No staff roll for " + std::to_string(pick));
+        return;
+    }
+    auto opened = openMovie((*movie)[pick + 1], false);
+    if (!opened) return;
+    log("staff roll %s", (*movie)[pick + 1].c_str());
+    const auto *skip = it->second.setting("skipif");
+    staffRollSkips_ = false;
+    if (skip && !skip->empty()) {
+        std::vector<int> numbers;
+        for (const std::string &number : *skip) numbers.push_back(std::atoi(number.c_str()));
+        staffRollSkips_ = anyGlobalSet(numbers);
+    }
+    Sprite roll;
+    roll.path = (*movie)[pick + 1];
+    roll.movie = opened;
+    roll.movieFrom = now_;
+    bool ended = false;
+    roll.image = opened->frame(0, ended);
+    front_[kStaffRollSlot] = roll;
+    windowShown_ = false;
+    clicked_ = false;
+    waiting_ = Waiting::StaffRoll;
+    dirty_ = true;
+}
+
+// It ends with its movie, or at a click once it may be skipped.
+void Engine::stepStaffRoll() {
+    auto it = front_.find(kStaffRollSlot);
+    bool ended = it == front_.end() || !it->second.movie;
+    if (!ended) it->second.movie->frame(double(now_ - it->second.movieFrom) / 1000, ended);
+    if (!ended && !(clicked_ && staffRollSkips_)) return;
+    front_.erase(kStaffRollSlot);
+    back_.erase(kStaffRollSlot);
+    waiting_ = Waiting::None;
+    dirty_ = true;
 }
 
 // Each sprite's movie shows the frame due at the story's clock, and the newest movie with sound plays it, until no

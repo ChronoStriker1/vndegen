@@ -151,7 +151,7 @@ public:
     bool jump(const std::string &script, int node);
 
 private:
-    enum class Waiting { None, Time, Click, Choice, Ended };
+    enum class Waiting { None, Time, Click, Choice, StaffRoll, Ended };
     struct Frame {
         std::shared_ptr<Script> script;
         const Node *node = nullptr;
@@ -161,6 +161,11 @@ private:
     void warnOnce(const std::string &what);
     // Movies: command 100 loads one into a slot like a picture, and each step shows the frame due.
     void loadMovie(const Node &n);
+    // A flow's staff roll, the table's `staffroll` screen: `movie VARIABLE FILE...` plays the file the scenario
+    // variable numbers, over everything, and `skipif G G...` lets a click end it once one of those globals is set.
+    void startStaffRoll();
+    void stepStaffRoll();
+    bool staffRollSkips_ = false;
     std::shared_ptr<Movie> openMovie(const std::string &path, bool loop);
     void stepMovies();
     void stopMovieSound();
@@ -420,12 +425,16 @@ private:
     bool anyGlobalSet(const std::vector<int> &numbers) const;
     bool shown(const Button &b) const;
     bool shown(const Picture &p) const;
+    // Test Game 94's route buttons replay the story from the prologue with each choice made for that route, 1 to 4, which
+    // its choices name in parameters 10 to 13. Nothing saves it: a load or a new start plays the choices as asked.
+    int pendingRoute_ = 0, autoRoute_ = 0;
 
     // Commands.
     void beginChoice(const Node &n);
     void updateChoice();
     void choicePlace(int &x, int &top, int &step, int &slant) const;
     static int variableIndex(const Node &n);
+    int operand(const Node &n) const;
     int variableValue(int scope, int index) const;
     int variableNumber(int scope, int index) const;
     void endStory(const std::string &screen);

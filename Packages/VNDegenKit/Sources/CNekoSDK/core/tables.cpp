@@ -4118,7 +4118,8 @@ run 2160 1 1
 const char kRinjin[] = R"(
 screen title
 menustages
-pic obj\d000_000.bmp 0 0
+# The art is the one GLB_TITLE_BG (55) numbers until an ending (51 to 54) is reached, then any of the four at random.
+pic obj\d000_000.bmp 0 0 more obj\d000_001.bmp,obj\d000_002.bmp,obj\d000_003.bmp pickby 55 randomif 51,52,53,54
 pic obj\d002_000.bmp 0 0
 pic obj\d004_000.bmp 0 690
 pic obj\d003_000.bmp 251 422 stage 1 blink 2000
@@ -4152,6 +4153,11 @@ pic obj\d007_004.bmp 734 475 1 4 0 3 stage 2 group start/route if 54
 button cg obj\d006_003.bmp 362 353 3 5 0 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 0
 button scene obj\d006_003.bmp 362 409 3 5 1 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 1
 button music obj\d006_003.bmp 362 465 3 5 2 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 2
+# The staff roll after an ending is Kazuki's, Touka's (Momoka's story) or, in the shop's extra, Kanamori's, by
+# SITE_STAFFROLL (104), and a click ends it once an ending was reached before.
+screen staffroll
+movie 104 movie\staffroll_kazuki movie\staffroll_touka sys_1\movie\staffroll_kanamori
+skipif 51 52 53 54
 screen load
 helplast
 selectedlook

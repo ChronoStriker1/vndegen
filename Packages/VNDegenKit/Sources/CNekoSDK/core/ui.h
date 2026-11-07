@@ -42,6 +42,12 @@ struct Picture {
     int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
     std::string group;  // shown only while the screen's submenu of this name, or one inside it, is open
     std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
+    // `more FILE,FILE...`: other pictures that can take this one's place when the screen opens. `pickby G` shows the
+    // one global variable G numbers, and `randomif G,G...` one at random once any of those is set, as Test Game 94's
+    // title picks its art. `variants` holds them all, this one first.
+    std::vector<ImageRef> variants;
+    int pickBy = -1;
+    std::vector<int> randomIf;
     // How far, in pixels, the picture moves against the pointer when it's at the screen's edge, across and down.
     float followX = 0, followY = 0;
     // `part X Y W H`: only that rectangle of the picture, drawn at the picture's place.
