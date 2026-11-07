@@ -165,8 +165,10 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     windowX_ = config_.number("MsgWinPosX");
     windowY_ = config_.number("MsgWinPosY");
     width_ = config_.number("WindowWidth", 1280);
-    // Test Game 95 says 1020 but draws on 1080: its message window and buttons reach the bottom of that.
-    height_ = std::max(config_.number("WindowHeight", 720), windowImage_ ? windowY_ + windowImage_->h : 0);
+    // Test Game 95 says 1020 but draws on 1080: its message window and buttons reach the bottom of that. The message
+    // windows of Haha Sannin to Ana Asobi and Ore o Hoshigaru Tsuma to Gibo hang a pixel past their 720, which the PC cuts
+    // off, so the canvas grows no further than 16:9.
+    height_ = std::max(config_.number("WindowHeight", 720), windowImage_ ? std::min(windowY_ + windowImage_->h, width_ * 9 / 16) : 0);
     canvas_.resize(width_, height_);
     canvas_.clear();
 
