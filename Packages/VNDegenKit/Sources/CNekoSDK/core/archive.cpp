@@ -46,7 +46,7 @@ bool hasFolder(const std::string &name) {
 // base names: The Alchemist's sys_5.pak holds Masami Chie's original CGs and sprites, shown only when the player picks
 // them, and Test Game 86's sys_3.pak blank sprites. Test Games 90 and 92 name their patches' new pictures that way too.
 bool isArt(const std::string &path) {
-    auto slash = path.find('\\');
+    auto slash = path.find_first_of("\\/");
     if (slash == std::string::npos) return false;
     std::string folder = lower(path.substr(0, slash));
     return folder == "cg" || folder == "sc" || folder == "obj" || folder == "parts";
@@ -152,9 +152,12 @@ void Files::indexArchive(const std::string &file, const std::string &folder, int
         source.size = rd32(&index[pos + 4]) ^ uint32_t(key);
         pos += 8;
         if (uint64_t(source.offset) + source.size > fileSize) continue;
-        // An archive in a patch folder, such as Test Game 92's sys_5/obj.pak, holds that folder's files.
+        // An archive in a patch folder, such as Test Game 92's sys_5/obj.pak, holds that folder's files. As in a base
+        // archive, an entry with folders of its own also answers to its own name, unless the full path is art.
         if (!patch.empty()) {
-            addPatched(patch, folder.empty() || hasFolder(name) ? name : folder + "\\" + name, source);
+            std::string qualified = folder.empty() ? name : folder + "\\" + name;
+            addPatched(patch, qualified, source);
+            if (!folder.empty() && hasFolder(name) && !isArt(qualified)) addPatched(patch, name, source);
             continue;
         }
         // Entries with folders of their own: `rain\\x.ogg` in `se.pak` names `se\\rain\\x.ogg`, and a script could mean
@@ -177,7 +180,7 @@ void Files::indexFolder(const std::string &dir, const std::string &prefix, int p
         if (S_ISDIR(st.st_mode)) {
             indexFolder(full, rel, priority, patch);
         } else if (prefix.empty() && low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0) {
-            indexArchive(full, low.substr(0, low.size() - 4), priority, patch);
+            indexArchive(full, low.substr(0, low.size() - 4), priority - 1, patch);
         } else {
             Source source;
             source.priority = priority;
@@ -205,15 +208,15 @@ bool Files::open(const std::string &root) {
         else if (low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0) found.push_back({name, low.substr(0, low.size() - 4), false});
     }
     closedir(d);
-    // A patch's archive and folder outrank the base archives, later patches outrank earlier ones, and a folder outranks
-    // the archive of its own number. Priorities are spaced so both fit.
+    // A patch outranks the base archives and later patches outrank earlier ones. Within a patch, its loose files outrank
+    // the archives in its folder, which outrank its sys_N.pak. Priorities are spaced by three so all fit.
     for (const auto &item : found) {
         int patch = patchNumber(item.stem);
         if (item.folder) {
-            if (patch >= 0) indexFolder(root + "/" + item.name, "", patch * 2 + 2, item.stem);
+            if (patch >= 0) indexFolder(root + "/" + item.name, "", patch * 3 + 3, item.stem);
             continue;
         }
-        if (patch >= 0) indexArchive(root + "/" + item.name, "", patch * 2 + 1, item.stem);
+        if (patch >= 0) indexArchive(root + "/" + item.name, "", patch * 3 + 1, item.stem);
         else indexArchive(root + "/" + item.name, item.stem, 0);
     }
     return !archives_.empty();

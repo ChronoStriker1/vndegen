@@ -2,6 +2,7 @@
 #include <string>
 
 #include "engine.h"
+#include "image.h"
 #include "tables.h"
 #include "vnneko.h"
 
@@ -55,6 +56,21 @@ bool vnneko_is_supported(const char *gameRoot) {
     neko::Config config;
     config.parse(*init);
     return neko::menuTable(neko::normalizedPath(config.text("UserDataDirectory"))) != nullptr;
+}
+bool vnneko_debug_art_pixels(const char *gameRoot, const char *path, const char *artSet, uint32_t out[3]) {
+    neko::Files files;
+    if (!files.open(gameRoot)) return false;
+    neko::Images images(files);
+    // With the decode thread busy on it first, as when a scene prefetches its pictures.
+    images.prefetch({{path, 0}});
+    const char *sets[3] = {"", artSet, ""};
+    for (int i = 0; i < 3; i++) {
+        images.setArtSet(sets[i]);
+        neko::ImageRef image = images.get(path);
+        if (!image || image->rgba.size() < 4) return false;
+        out[i] = uint32_t(image->rgba[0]) << 24 | uint32_t(image->rgba[1]) << 16 | uint32_t(image->rgba[2]) << 8 | image->rgba[3];
+    }
+    return true;
 }
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path) {
     neko::Files files;

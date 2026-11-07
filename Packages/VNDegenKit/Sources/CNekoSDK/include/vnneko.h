@@ -76,6 +76,9 @@ void vnneko_debug_choose(VNNekoEngine *e, int index);
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 // For tests: the stored size of the file the game's archives and patches give for this path, or -1 when none has it.
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);
+// For tests: the first pixel, as RGBA, of the picture at this path read with no art set, then with the patch `artSet`,
+// then with none again, from one picture cache. False when it can't be read.
+bool vnneko_debug_art_pixels(const char *gameRoot, const char *path, const char *artSet, uint32_t out[3]);
 
 #ifdef __cplusplus
 }
