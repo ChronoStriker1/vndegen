@@ -141,6 +141,11 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             }
             screen->buttons.push_back(b);
         } else {
+            if (w[0] == "drift" && !screen->settings.count("drift")) {
+                Picture marker;
+                marker.drift = true;
+                screen->pictures.push_back(marker);
+            }
             screen->settings.emplace(w[0], std::vector<std::string>(w.begin() + 1, w.end()));
         }
     }

@@ -1579,6 +1579,13 @@ helplast
 selectedlook
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
+# Line art of the three women pans down behind the list, each sketch in turn, from a random one (measured under Wine).
+drift obj\g000_001.bmp -170 -791 -17
+drift obj\g000_002.bmp -300 -1035 -16
+drift obj\g000_005.bmp 211 -1098 -135
+drift obj\g000_003.bmp -32 -815 -18
+drift obj\g000_006.bmp 145 -1022 -25
+driftmotion 30 2250 1000 120
 # The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
 # of bars lies over the top and bottom.
 pic obj\h000_000.bmp 1138 0 part 0 0 142 720
@@ -3775,6 +3782,13 @@ helplast
 selectedlook
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
+# Line art of the mothers pans down behind the list, each sketch in turn, from a random one (measured under Wine).
+drift obj\g000_001.bmp -170 -791 -17
+drift obj\g000_002.bmp -300 -1035 -16
+drift obj\g000_005.bmp 211 -1098 -135
+drift obj\g000_003.bmp -32 -815 -18
+drift obj\g000_006.bmp 145 -1022 -25
+driftmotion 30 2250 1000 120
 # The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
 # Wine), and a frame of bars lies over the top and bottom.
 pic obj\h000_000.bmp 1138 0 part 0 0 142 720

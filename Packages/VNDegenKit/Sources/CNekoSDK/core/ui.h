@@ -41,6 +41,8 @@ struct Picture {
     float followX = 0, followY = 0;
     // `part X Y W H`: only that rectangle of the picture, drawn at the picture's place.
     int partX = 0, partY = 0, partW = 0, partH = 0;
+    // Where a screen's `drift` line art draws among its pictures. It has no image of its own.
+    bool drift = false;
 };
 
 // `towardX` and `towardY` are where the pointer is, from -1 at the screen's left or top edge to 1 at the other.
@@ -65,7 +67,7 @@ struct Screen {
 
 // Reads a game's menu table. Lines: `screen NAME`, `pic PATH X Y [COLS ROWS COL ROW] [alpha N] [tab N] [stage N] [follow X Y]`,
 // `button ACTION PATH X Y COLS ROWS COL [toggle] [help PATH X Y COLS ROWS COL ROW]`, and any other line a setting of the
-// screen it's in.
+// screen it's in. The first `drift` line also marks where the drifting line art draws among the pictures.
 std::map<std::string, Screen> parseScreens(const char *table, Images &images, const std::function<void(const std::string &)> &warn);
 
 // The message window's buttons, from msg_button.ini: `#under` ones show while the pointer's at the bottom of the screen, and

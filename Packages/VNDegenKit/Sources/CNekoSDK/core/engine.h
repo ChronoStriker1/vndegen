@@ -269,6 +269,9 @@ private:
     // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
     const std::vector<GalleryEntry> &galleryEntries() const;
     int cellShift() const;
+    void composeDrift(Canvas &out);
+    int64_t driftFrom_ = 0;
+    size_t driftFirst_ = 0;
     ImageRef galleryThumbnail(const std::string &path) const;
     bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }

@@ -274,6 +274,9 @@ void Engine::openScreen(const std::string &name) {
     pressed_.clear();
     dirty_ = true;
     page_ = 0;
+    // The drifting line art starts from a sketch picked at random, as the PC's does.
+    driftFrom_ = screenMs_;
+    driftFirst_ = screen_->settings.count("drift") ? size_t(std::rand()) % screen_->settings.count("drift") : 0;
     // `gallerytabs TAB`: the tab a gallery opens on, the middle one of three in Test Game 92.
     if (const auto *tabs = screen_->setting("gallerytabs"); tabs && !tabs->empty()) galleryTab_ = field(*tabs, 0);
     if (name == "title" && !titleBgm_.empty() && !titleMusic_) {
@@ -956,6 +959,40 @@ ImageRef Engine::galleryThumbnail(const std::string &path) const {
     auto at = name.find("\\small\\cg\\");
     if (at == std::string::npos) return nullptr;
     return images_->get(name.replace(at, 10, "\\small\\cg2\\"));
+}
+
+// `drift PICTURE X FROMY TOY`, one for each sketch in turn, and `driftmotion SPEED FADE GAP ALPHA`: Test Games 92 and 93's
+// music screens show line art that pans down at SPEED pixels a second from FROMY to TOY, fading in and out over FADE ms
+// at its ends, drawn at ALPHA of 256, then after GAP ms the next sketch, round and round. Measured under Wine.
+void Engine::composeDrift(Canvas &out) {
+    const auto *motion = screen_->setting("driftmotion");
+    if (!motion || motion->size() < 4) return;
+    std::vector<const std::vector<std::string> *> sketches;
+    for (auto [it, end] = screen_->settings.equal_range("drift"); it != end; ++it)
+        if (it->second.size() >= 4) sketches.push_back(&it->second);
+    if (sketches.empty()) return;
+    double speed = std::max(1, field(*motion, 0)), fade = std::max(1, field(*motion, 1)), gap = field(*motion, 2), alpha = field(*motion, 3) / 256.0;
+    double at = double(screenMs_ - driftFrom_);
+    // Whole rounds first, so a long stay on the screen costs nothing.
+    double round = 0;
+    for (const auto *s : sketches) round += std::abs(field(*s, 3) - field(*s, 2)) / speed * 1000 + gap;
+    if (round <= 0) return;
+    at = std::fmod(at, round);
+    for (size_t i = 0; i < sketches.size(); i++) {
+        const auto &s = *sketches[(driftFirst_ + i) % sketches.size()];
+        double from = field(s, 2), to = field(s, 3), shown = std::abs(to - from) / speed * 1000;
+        if (at < shown) {
+            ImageRef art = images_->get(s[0]);
+            if (!art) return;
+            double y = from + (to > from ? 1 : -1) * speed * at / 1000;
+            double look = std::min({1.0, at / fade, (shown - at) / fade});
+            drawPart(out, *art, field(s, 1), int(std::floor(y)), 0, 0, art->w, art->h, float(alpha * look));
+            return;
+        }
+        at -= shown;
+        if (at < gap) return;
+        at -= gap;
+    }
 }
 
 // `cellshift TAB DX`: how far across a gallery tab moves its cards, 80 pixels a tab either side of the middle in Test
@@ -2187,7 +2224,8 @@ void Engine::composeScreen(Canvas &out) {
     float towardX, towardY;
     pointerToward(towardX, towardY);
     for (const Picture &p : screen_->pictures)
-        if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p, towardX, towardY);
+        if (p.drift) composeDrift(out);
+        else if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p, towardX, towardY);
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
@@ -2806,7 +2844,7 @@ bool Engine::step(int ms) {
     }
     if (screen_) {
         screenMs_ += ms;
-        if (openingFrom_ >= 0) dirty_ = true;
+        if (openingFrom_ >= 0 || screen_->settings.count("drift")) dirty_ = true;
         stepViewer(ms);
     }
     if (screen_ || logOpen_ || dialogOpen_) {
