@@ -776,9 +776,10 @@ bool writeWhole(const std::string &path, const std::vector<uint8_t> &data) {
 
 }  // namespace
 
-// The PC keeps each list by name, so a script's place in it counts in name order, not the file's: Test Game 84's flows
-// mark chapter 1A at 2, between GLB_01_OVER and GLB_02_OVER, and 94's put GLB_PROLOGUE_OVER, first in its file, after the
-// four GLB_ENDING_s.
+// The PC keeps each list by name, so a script's place in it counts in name order, not the file's: The Alchemist's file
+// lists GLB_PROLOGUE_OVER (1000) before GLB_ENDING (1050), and its flow's プロローグ完了 names place 1, which is 1000 by
+// name, the number a save the PC made after the prologue holds. Test Game 84's flows mark chapter 1A at 2, between
+// GLB_01_OVER and GLB_02_OVER, and 94's put GLB_PROLOGUE_OVER, first in its file, after the four GLB_ENDING_s.
 MacroLists parseMacroList(const std::vector<uint8_t> &file) {
     std::map<std::string, int> global, scenario, *list = nullptr;
     for (const std::string &raw : split(sjis::toUtf8(std::string(file.begin(), file.end())), '\n')) {
@@ -1674,6 +1675,21 @@ void Engine::loadGlobals() {
         std::memcpy(&v, &configFile_[4000 + size_t(i) * 4], 4);
         if (v) globals_[i] = v;
     }
+    // `implies A B` in the table's cfgsav screen: global A set means B is too. VNDegen 0.26.1 counted The Alchemist's
+    // flags in the file's order and set GLB_ENDING (1050) where the prologue's end means GLB_PROLOGUE_OVER (1000), and an
+    // ending can't come before the prologue, so the file is put right as it's read.
+    bool repaired = false;
+    if (auto table = screens_.find("cfgsav"); table != screens_.end())
+        for (auto [it, end] = table->second.settings.equal_range("implies"); it != end; ++it) {
+            int set = field(it->second, 0), also = field(it->second, 1);
+            if (globals_.count(set) && globals_[set] && !(globals_.count(also) && globals_[also]) && also >= 0 && also < 10000) {
+                globals_[also] = 1;
+                const int32_t on = 1;
+                std::memcpy(&configFile_[4000 + size_t(also) * 4], &on, 4);
+                repaired = true;
+                log("global %d set, as %d is", also, set);
+            }
+        }
     // A PC's backup carries what's been unlocked there, which the galleries show here too.
     size_t moved = configStringLength();
     auto flag = [&](size_t at) {
@@ -1687,6 +1703,11 @@ void Engine::loadGlobals() {
             if (validCgId(e.imageIds[p]) && flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
+    // Only that flag changes in the file: what VNDegen has unlocked besides goes in at its next save, as before.
+    if (repaired) {
+        auto packed = packEntry(configFile_);
+        if (!packed.empty()) writeWhole(saveDir_ + "/" + nameInFolder(saveDir_, "cfg.sav"), packed);
+    }
 }
 
 size_t Engine::configStringLength() const {

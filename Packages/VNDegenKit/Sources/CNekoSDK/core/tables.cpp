@@ -874,6 +874,9 @@ button log_down obj\m003_000.bmp 1770 930 4 5 2
 button log_bottom obj\m003_000.bmp 1770 980 4 5 3
 
 screen cfgsav
+# VNDegen 0.26.1 set GLB_ENDING (1050) at the prologue's end in place of GLB_PROLOGUE_OVER (1000); an ending means the
+# prologue was seen.
+implies 1050 1000
 run 4 2 1
 run 16 2 50
 run 24 1 60

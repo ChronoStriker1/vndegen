@@ -2,7 +2,8 @@ import CNekoSDK
 import Foundation
 import TestSupport
 
-// A NekoSDK game of loose files for flow tests, with an empty archive, since a folder needs one to count as a game.
+// A NekoSDK game for flow tests: its files loose in a patch folder, the one kind of folder the runtime reads loose, and an
+// empty archive, since a folder needs one to count as a game.
 enum NekoSDKFlowFixture {
     struct Node {
         var op: UInt32
@@ -16,7 +17,7 @@ enum NekoSDKFlowFixture {
         var all = files
         all["obj.pak"] = Data("NEKOPACK4A".utf8) + Data([4, 0, 0, 0, 0, 0, 0, 0])
         for (path, data) in all {
-            let url = root.appendingPathComponent(path)
+            let url = root.appendingPathComponent(path == "obj.pak" ? path : "sys_1/" + path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: url)
         }
@@ -39,24 +40,60 @@ enum NekoSDKFlowFixture {
         return data
     }
 
-    // Starts a game whose story is this one flow, with this macro list, and runs it to its end.
-    static func run(_ nodes: [Node], macros: String, _ check: (OpaquePointer) -> Void) throws {
-        let root = try game([
-            "cfg/init.ini": Data("FirstFlow\tflow\\t.txt\n".utf8),
-            "cfg/macrolist.ini": Data(macros.utf8),
-            "flow/t.txt": flow(nodes),
-        ])
-        defer { try? FileManager.default.removeItem(at: root) }
-        let data = root.appendingPathComponent("data")
-        let engine: OpaquePointer? = root.path.withCString { rootPath in
-            data.path.withCString { dataPath in
+    // Starts the game with its user data in `data`.
+    static func start(_ root: URL, data: URL) -> OpaquePointer? {
+        let gamePath: String = root.path, dataDirPath: String = data.path
+        return gamePath.withCString { rootPath in
+            dataDirPath.withCString { dataPath in
                 var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil, movies: nil)
                 return vnneko_start(&launch)
             }
         }
-        guard let e = engine else { throw CocoaError(.featureUnsupported) }
+    }
+
+    // Starts a game whose story is this one flow, with this macro list, and runs it to its end.
+    static func run(_ nodes: [Node], macros: String, _ check: (OpaquePointer) -> Void) throws {
+        let root = try game([
+            "cfg/init.ini": Data("FirstFlow\tflow\\t.txt\n".utf8),
+            "cfg/macrolist.ini": macros.data(using: .shiftJIS) ?? Data(),
+            "flow/t.txt": flow(nodes),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        guard let e = start(root, data: root.appendingPathComponent("data")) else { throw CocoaError(.featureUnsupported) }
         defer { vnneko_stop(e) }
         for _ in 0..<20 where vnneko_step(e, 16) {}
         check(e)
+    }
+
+    // A file packed as the PC packs cfg.sav: a zlib stream of stored blocks with its first 4 bytes XORed with a key from
+    // the packed size, then the plain size.
+    static func packed(_ plain: Data) -> Data {
+        var z = Data([0x78, 0x01])
+        var at = 0
+        repeat {
+            let count = min(65535, plain.count - at)
+            z.append(at + count == plain.count ? 1 : 0)
+            z.append(contentsOf: withUnsafeBytes(of: UInt16(count).littleEndian, Array.init))
+            z.append(contentsOf: withUnsafeBytes(of: (~UInt16(count)).littleEndian, Array.init))
+            z.append(plain[plain.startIndex + at..<plain.startIndex + at + count])
+            at += count
+        } while at < plain.count
+        var a: UInt32 = 1, b: UInt32 = 0
+        for byte in plain { a = (a + UInt32(byte)) % 65521; b = (b + a) % 65521 }
+        z.append(contentsOf: withUnsafeBytes(of: (b << 16 | a).bigEndian, Array.init))
+        z.append(contentsOf: withUnsafeBytes(of: UInt32(plain.count).littleEndian, Array.init))
+        var key = UInt32(z.count / 8 + 0x22)
+        for i in 0..<4 { z[i] ^= UInt8(key & 0xff); key <<= 3 }
+        return z
+    }
+
+    // The plain bytes of a packed file.
+    static func unpacked(_ file: Data) throws -> Data {
+        var z = file
+        var key = UInt32(z.count / 8 + 0x22)
+        for i in 0..<4 { z[i] ^= UInt8(key & 0xff); key <<= 3 }
+        // Past the zlib header, up to the Adler checksum and the size: a raw deflate stream.
+        let deflate = z.subdata(in: 2..<(z.count - 8))
+        return try (deflate as NSData).decompressed(using: .zlib) as Data
     }
 }
