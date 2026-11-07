@@ -1913,6 +1913,23 @@ button music obj\b004_000.bmp 23 319 10 5 5 help obj\b005_005.bmp 23 286 1 1 0 0
 button config obj\b004_000.bmp 23 359 10 5 6 help obj\b005_006.bmp 23 326 1 1 0 0
 button quit obj\b004_000.bmp 23 559 10 5 9 help obj\b005_009.bmp 23 526 1 1 0 0
 
+# The staff roll its exe draws, measured under Wine: black, then the logo and the bars over 2 seconds from 2.96, the sky,
+# the characters and the credits fading in from 7.05 as the logo fades out, each moving on its own, everything fading to
+# black from 97 seconds, and Waffle's card from 100 until 107.7, with M19 playing. It marks GLB_99_ENDING (1050) seen,
+# and once that's set a click goes straight on.
+screen staffroll
+length 107700
+music bgm\M19.ogg
+sets 1050
+skipif 1050
+pic obj\s000_000.bmp 0 0
+pic obj\s000_004.bmp 0 115 move 2150 23.41 clamp -2464 115 fadein 7050 2000 fadeout 97000 2000
+pic obj\s000_005.bmp 0 -1997 move 1600 -22.38 fadein 7050 2000 fadeout 97000 2000
+pic obj\s000_006.bmp 574 720 move 7000 39.8 fadein 7050 2000 fadeout 97000 2000
+pic obj\s000_003.bmp 288 148 fadein 2960 2000 fadeout 7050 2000
+pic obj\s000_001.bmp 0 0 fadein 2960 2000
+pic obj\s000_002.bmp 0 603 fadein 2960 2000
+pic obj\s000_007.bmp 534 347 fadein 100000 2000
 screen load
 pic obj\e001_000.bmp 0 0
 slots obj\e002_000.bmp 44 93 162 140 4 5 1 20

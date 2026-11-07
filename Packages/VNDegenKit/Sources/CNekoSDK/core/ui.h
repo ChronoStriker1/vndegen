@@ -58,6 +58,13 @@ struct Picture {
     bool dim = false;
     // `blink MS`: fades in and out, fully shown every MS, as Test Game 94's title prompt does.
     int blinkMs = 0;
+    // A staff roll's layer, by milliseconds from its start: `move MS SPEED` moves it up SPEED pixels a second from then
+    // (down for a negative SPEED), `clamp TOP BOTTOM` keeps its top between those, and `fadein MS LENGTH` and
+    // `fadeout MS LENGTH` fade it in and out.
+    int moveFrom = -1;
+    float speed = 0;
+    int clampTop = -1000000, clampBottom = 1000000;
+    int fadeInAt = -1, fadeInMs = 0, fadeOutAt = -1, fadeOutMs = 0;
 };
 
 // `towardX` and `towardY` are where the pointer is, from -1 at the screen's left or top edge to 1 at the other.

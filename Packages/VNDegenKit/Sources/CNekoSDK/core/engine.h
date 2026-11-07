@@ -163,9 +163,16 @@ private:
     void loadMovie(const Node &n);
     // A flow's staff roll, the table's `staffroll` screen: `movie VARIABLE FILE...` plays the file the scenario
     // variable numbers, over everything, and `skipif G G...` lets a click end it once one of those globals is set.
+    // Or, as Test Game 84's exe draws its own, the screen's pictures as layers over black, `length MS` long, with `music
+    // FILE`, and `sets G` set as it ends.
     void startStaffRoll();
     void stepStaffRoll();
+    void endStaffRoll();
+    void composeStaffRoll(Canvas &out);
+    Canvas staffRollGroup_;
     bool staffRollSkips_ = false;
+    const Screen *staffRollLayers_ = nullptr;
+    int64_t staffRollFrom_ = 0;
     std::shared_ptr<Movie> openMovie(const std::string &path, bool loop);
     void stepMovies();
     void stopMovieSound();

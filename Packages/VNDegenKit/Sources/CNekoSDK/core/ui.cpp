@@ -111,6 +111,23 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
                 else if (key == "if") p.needs = numbers(value);
+                else if ((key == "move" || key == "clamp" || key == "fadein" || key == "fadeout") && at + 2 < w.size()) {
+                    const std::string &second = w[at + 2];
+                    if (key == "move") {
+                        p.moveFrom = number(value);
+                        p.speed = std::strtof(second.c_str(), nullptr);
+                    } else if (key == "clamp") {
+                        p.clampTop = number(value);
+                        p.clampBottom = number(second);
+                    } else if (key == "fadein") {
+                        p.fadeInAt = number(value);
+                        p.fadeInMs = number(second);
+                    } else {
+                        p.fadeOutAt = number(value);
+                        p.fadeOutMs = number(second);
+                    }
+                    at++;
+                }
                 else if (key == "pickby") p.pickBy = number(value);
                 else if (key == "randomif") p.randomIf = numbers(value);
                 else if (key == "more") {

@@ -330,6 +330,7 @@ void Engine::endStory(const std::string &screen) {
     skipToggle_ = false;
     autoMode_ = false;
     windowHiddenByPlayer_ = false;
+    staffRollLayers_ = nullptr;
     gt_ = {};
     splashes_.clear();
     stack_.clear();
@@ -377,6 +378,7 @@ void Engine::startStory() {
     waiting_ = Waiting::None;
     autoRoute_ = pendingRoute_;
     pendingRoute_ = 0;
+    staffRollLayers_ = nullptr;
     std::string first = config_.text(storyFlowKey_.c_str());
     auto flow = first.empty() ? nullptr : loadScript(first);
     if (!flow || !flow->first()) {
@@ -1950,6 +1952,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     replaying_ = false;
     replayFromViewer_ = false;
     autoRoute_ = 0;
+    staffRollLayers_ = nullptr;
     stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
@@ -3970,6 +3973,33 @@ constexpr int kStaffRollSlot = 1 << 20;
 void Engine::startStaffRoll() {
     auto it = screens_.find("staffroll");
     const auto *movie = it == screens_.end() ? nullptr : it->second.setting("movie");
+    if (it != screens_.end() && !movie && !it->second.pictures.empty()) {
+        const Screen &roll = it->second;
+        log("staff roll, %d layers", int(roll.pictures.size()));
+        staffRollLayers_ = &roll;
+        staffRollFrom_ = now_;
+        staffRollSkips_ = false;
+        if (const auto *skip = roll.setting("skipif"); skip && !skip->empty()) {
+            std::vector<int> numbers;
+            for (const std::string &number : *skip) numbers.push_back(std::atoi(number.c_str()));
+            staffRollSkips_ = anyGlobalSet(numbers);
+        }
+        stopKind(kKindBgm, 500);
+        if (const auto *music = roll.setting("music"); music && !music->empty())
+            if (Bytes data = files_.read((*music)[0]))
+                if (int player = audio_.open(data)) {
+                    audio_.setLoops(player, 1);
+                    audio_.setGroup(player, kKindBgm);
+                    audio_.start(player);
+                    bgm_[-1] = player;
+                    noteSeen((*music)[0]);
+                }
+        windowShown_ = false;
+        clicked_ = false;
+        waiting_ = Waiting::StaffRoll;
+        dirty_ = true;
+        return;
+    }
     if (!movie || movie->size() < 2) {
         warnOnce("This game's staff roll isn't built, so the story goes on past it.");
         return;
@@ -4003,16 +4033,73 @@ void Engine::startStaffRoll() {
     dirty_ = true;
 }
 
-// It ends with its movie, or at a click once it may be skipped.
+// It ends with its movie or its length, or at a click once it may be skipped.
 void Engine::stepStaffRoll() {
-    auto it = front_.find(kStaffRollSlot);
-    bool ended = it == front_.end() || !it->second.movie;
-    if (!ended) it->second.movie->frame(double(now_ - it->second.movieFrom) / 1000, ended);
-    if (!ended && !(clicked_ && staffRollSkips_)) return;
+    bool ended;
+    if (staffRollLayers_) {
+        const auto *length = staffRollLayers_->setting("length");
+        ended = now_ - staffRollFrom_ >= (length ? field(*length, 0) : 0);
+        dirty_ = true;
+    } else {
+        auto it = front_.find(kStaffRollSlot);
+        ended = it == front_.end() || !it->second.movie;
+        if (!ended) it->second.movie->frame(double(now_ - it->second.movieFrom) / 1000, ended);
+    }
+    if (ended || (clicked_ && staffRollSkips_)) endStaffRoll();
+}
+
+void Engine::endStaffRoll() {
     front_.erase(kStaffRollSlot);
     back_.erase(kStaffRollSlot);
+    if (staffRollLayers_) {
+        stopKind(kKindBgm, 500);
+        // Test Game 84's exe marks the staff roll seen, GLB_99_ENDING, which no flow sets.
+        bool changed = false;
+        for (auto [it, end] = staffRollLayers_->settings.equal_range("sets"); it != end; ++it) {
+            globals_[field(it->second, 0)] = 1;
+            changed = true;
+        }
+        if (changed) saveGlobals();
+    }
+    staffRollLayers_ = nullptr;
     waiting_ = Waiting::None;
     dirty_ = true;
+}
+
+// Each layer where its motion and fades put it at this moment of the staff roll. Layers in a row with the same fades fade
+// as one picture, as the PC's scene does: its characters stay solid over its sky while it fades.
+void Engine::composeStaffRoll(Canvas &out) {
+    out.clear();
+    double t = double(now_ - staffRollFrom_);
+    const auto &layers = staffRollLayers_->pictures;
+    auto fades = [](const Picture &a, const Picture &b) {
+        return a.fadeInAt == b.fadeInAt && a.fadeInMs == b.fadeInMs && a.fadeOutAt == b.fadeOutAt && a.fadeOutMs == b.fadeOutMs;
+    };
+    for (size_t i = 0; i < layers.size();) {
+        size_t end = i + 1;
+        while (end < layers.size() && fades(layers[i], layers[end])) end++;
+        const Picture &first = layers[i];
+        float alpha = 1;
+        if (first.fadeInAt >= 0) alpha *= float(std::clamp((t - first.fadeInAt) / std::max(1, first.fadeInMs), 0.0, 1.0));
+        if (first.fadeOutAt >= 0) alpha *= float(1 - std::clamp((t - first.fadeOutAt) / std::max(1, first.fadeOutMs), 0.0, 1.0));
+        bool together = end - i > 1 && alpha < 1;
+        Canvas &target = together ? staffRollGroup_ : out;
+        if (together) {
+            if (staffRollGroup_.w != out.w || staffRollGroup_.h != out.h) staffRollGroup_.resize(out.w, out.h);
+            staffRollGroup_.px = out.px;
+        }
+        if (alpha > 0)
+            for (size_t k = i; k < end; k++) {
+                const Picture &p = layers[k];
+                Picture at = p;
+                if (p.moveFrom >= 0 && t > p.moveFrom) at.y = int(std::lround(p.y - p.speed * (t - p.moveFrom) / 1000));
+                at.y = std::clamp(at.y, p.clampTop, p.clampBottom);
+                if (!together) at.alpha *= alpha;
+                drawPicture(target, at);
+            }
+        if (together && alpha > 0) blendFrame(out, staffRollGroup_, int(alpha * 256));
+        i = end;
+    }
 }
 
 // Each sprite's movie shows the frame due at the story's clock, and the newest movie with sound plays it, until no
@@ -4493,6 +4580,10 @@ void Engine::compose() {
         canvas_ = logBase_;
         composeLog(canvas_);
         if (dialogOpen_) composeDialog(canvas_);
+        return;
+    }
+    if (waiting_ == Waiting::StaffRoll && staffRollLayers_) {
+        composeStaffRoll(canvas_);
         return;
     }
     composeScene(canvas_, front_);
