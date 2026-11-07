@@ -534,9 +534,17 @@ public struct GameSavesView: View {
     private var setUpPrompt: some View {
         ViewThatFits(in: .vertical) {
             setUpPromptContent.frame(maxWidth: .infinity, maxHeight: .infinity)
-            ScrollView { setUpPromptContent.padding(.vertical, 20).frame(maxWidth: .infinity) }
+            // A controller's focus on the button scrolls it into view.
+            ScrollViewReader { proxy in
+                ScrollView { setUpPromptContent.padding(.vertical, 20).frame(maxWidth: .infinity) }
+                    .onChange(of: model.isFocused(.setUp), initial: true) { _, focused in
+                        if focused { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(Self.setUpID, anchor: .center) } }
+                    }
+            }
         }
     }
+
+    private static let setUpID = "setUp"
 
     private var setUpPromptContent: some View {
         let focused = model.isFocused(.setUp)
@@ -561,6 +569,7 @@ public struct GameSavesView: View {
                     .overlay { if focused { Capsule(style: .circular).strokeBorder(.white, lineWidth: 2.5) } }
             }
             .buttonStyle(.plain)
+            .id(Self.setUpID)
             .scaleEffect(focused ? 1.05 : 1)
             .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
             .padding(.top, 6)

@@ -137,11 +137,11 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     press(nav, .down, .pageDown)
     #expect(editor.focus == .input(.a))
     press(nav, .pageUp)
-    #expect(editor.focus == .apply(.keyboardAndMouse))
+    #expect(editor.focus == .layouts)
 
-    // Reset sits under the layouts and puts back the engine's layout.
-    let reset = editor.rows().firstIndex { $0 == [.reset] }!
-    for _ in 0..<reset { press(nav, .down) }
+    // Reset sits beside Save under the layout and puts back the engine's layout.
+    #expect(editor.rows()[1] == [.saveNew, .reset])
+    press(nav, .down, .right)
     #expect(editor.focus == .reset)
     press(nav, .confirm)
     #expect(library.game(id)?.buttonMapping == nil)
