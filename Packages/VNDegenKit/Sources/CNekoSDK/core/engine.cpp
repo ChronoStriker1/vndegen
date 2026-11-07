@@ -372,6 +372,13 @@ void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
     if (action == "start") {
+        // A game whose init.ini names no FirstFlow starts at its table's `flow`, as Test Game 89's New Game starts its
+        // first chapter.
+        if (config_.text("FirstFlow").empty()) {
+            storyFlowKey_ = mainFlowKey();
+            startStory();
+            return;
+        }
         // Past the prologue a game may offer to skip it, when its table has that question.
         if (auto it = screens_.find("start"); it != screens_.end()) {
             const auto *after = it->second.setting("after");
@@ -2171,6 +2178,16 @@ void Engine::composeLog(Canvas &out) {
             drawPart(out, *bottom, x, y + thumbH - bottom->h, 0, 0, bottom->w, bottom->h, 1);
         }
     }
+    // `thumb PICTURE X TOP HEIGHT`, a thumb of its own size that travels HEIGHT down from TOP, at the bottom on the newest
+    // lines, as Test Game 89's does.
+    if (const auto *thumb = log->setting("thumb"); thumb && thumb->size() >= 4 && !backlog_.empty())
+        if (ImageRef picture = images_->get((*thumb)[0])) {
+            const auto *rows = log->setting("rows");
+            int total = int(backlog_.size()), shown = std::min(rows ? field(*rows, 4) : 1, total);
+            int travel = field(*thumb, 3) - picture->h, from = std::min(logTop_, total - shown);
+            int y = field(*thumb, 2) + (total <= shown ? travel : travel * (total - shown - from) / (total - shown));
+            drawPart(out, *picture, field(*thumb, 1), y, 0, 0, picture->w, picture->h, 1);
+        }
     for (const Button &b : log->buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
     const auto *rows = log->setting("rows");
     if (!rows || rows->size() < 7) return;

@@ -2904,6 +2904,47 @@ run 2120 9 1
 run 2160 1 1
 )";
 
+// Horny Elves and a Moral Orc (Test Game 89), 1280x720, measured under Wine. Its title, questions and backlog; the other
+// menus come next.
+const char kMoralOrc[] = R"(
+screen title
+pic obj\c000_000.bmp 0 0
+pic obj\d000_000.bmp 384 0
+pic obj\d000_002.bmp 197 0
+pic obj\d000_001.bmp 542 0
+pic obj\c000_001.bmp 0 0
+pic obj\d002_000.bmp 335 451
+pic obj\d003_000.bmp 300 700
+button start obj\d004_000.bmp 19 12 10 5 0
+button load obj\d004_000.bmp 59 153 10 5 1
+button quickload obj\d004_000.bmp 19 294 10 5 2
+button cg obj\d004_000.bmp 1053 12 10 5 3
+button scene obj\d004_000.bmp 1103 153 10 5 4
+button music obj\d004_000.bmp 1053 294 10 5 5
+button config obj\d004_000.bmp 1103 435 10 5 6
+button quit obj\d004_000.bmp 1053 576 10 5 8
+
+screen start
+# New Game starts the first chapter; init.ini names no FirstFlow.
+flow Flow_01
+
+screen dialog
+pic obj\b001_000.bmp 0 241
+pic obj\j000_000.bmp 320 150 1 8 0 0
+button yes obj\b003_000.bmp 410 270 2 5 0
+button no obj\b003_000.bmp 690 270 2 5 1
+
+screen log
+pic obj\n001_000.bmp 1191 110
+thumb obj\e007_001.bmp 1180 95 525
+rows obj\n000_000.bmp 77 61 165 4 146 36
+button log_close obj\m001_000.bmp 1227 19 5 5 0
+button log_top obj\e007_002.bmp 1180 34 4 5 0
+button log_up obj\e007_002.bmp 1180 67 4 5 1
+button log_down obj\e007_002.bmp 1180 622 4 5 2
+button log_bottom obj\e007_002.bmp 1180 655 4 5 3
+)";
+
 const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\x2019_retry") return kChristmas;
     if (folder == "waffle\\alchemy") return kAlchemist;
@@ -2911,6 +2952,7 @@ const char *menuTable(const std::string &folder) {
     if (folder == "waffle\\tmgb") return kTsumaGibo;
     if (folder == "waffle\\funbagfantasy3") return kFunbagFantasy;
     if (folder == "waffle\\funbag4") return kFunbag4;
+    if (folder == "waffle\\moralorc") return kMoralOrc;
     return nullptr;
 }
 
