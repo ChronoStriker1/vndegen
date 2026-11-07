@@ -151,7 +151,7 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
 - Yarinaoshi no Christmas's Manual and Version info buttons aren't there.
 - A repeat of one replay's H choice has two options by assumption. The music screen's first mode button, beside repeat and shuffle, does nothing.
-- Menu backgrounds that change on the PC stay the same here. The help pictures that come up on hover on menu screens aren't drawn, except on Funbag Fantasy 3 if's title, and neither is the "Do not show again" box on a confirmation.
+- Menu backgrounds that change on the PC stay the same here. A confirmation's "Do not show again" box isn't there. Help that comes up on hover over Config's settings groups follows the PC's to within 32 pixels at the groups' edges in The Alchemist, and 20 in the others.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
 

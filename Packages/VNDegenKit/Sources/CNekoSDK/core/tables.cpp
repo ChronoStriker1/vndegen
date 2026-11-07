@@ -867,14 +867,14 @@ pic obj\d004_000.bmp 1122 7 1 5 0 0
 pic obj\d003_000.bmp 174 638 11 5 6 0
 pic obj\d003_000.bmp 532 638 11 5 8 0
 pic obj\d003_000.bmp 1074 638 11 5 10 0
-button start obj\d003_000.bmp 59 592 11 5 0
-button load obj\d003_000.bmp 238 592 11 5 1
-button quickload obj\d003_000.bmp 417 592 11 5 2
-button cg obj\d003_000.bmp 597 592 11 5 3
-button scene obj\d003_000.bmp 775 592 11 5 4
-button music obj\d003_000.bmp 954 592 11 5 5
-button config obj\d003_000.bmp 353 638 11 5 7
-button quit obj\d003_000.bmp 711 638 11 5 9
+button start obj\d003_000.bmp 59 592 11 5 0 help obj\d005_000.bmp 0 686 1 12 0 0
+button load obj\d003_000.bmp 238 592 11 5 1 help obj\d005_000.bmp 0 686 1 12 0 1
+button quickload obj\d003_000.bmp 417 592 11 5 2 help obj\d005_000.bmp 0 686 1 12 0 2
+button cg obj\d003_000.bmp 597 592 11 5 3 help obj\d005_000.bmp 0 686 1 12 0 3
+button scene obj\d003_000.bmp 775 592 11 5 4 help obj\d005_000.bmp 0 686 1 12 0 4
+button music obj\d003_000.bmp 954 592 11 5 5 help obj\d005_000.bmp 0 686 1 12 0 5
+button config obj\d003_000.bmp 353 638 11 5 7 help obj\d005_000.bmp 0 686 1 12 0 7
+button quit obj\d003_000.bmp 711 638 11 5 9 help obj\d005_000.bmp 0 686 1 12 0 9
 
 screen load
 pic obj\e000_000.bmp 0 0
@@ -1023,19 +1023,20 @@ button nav_quit obj\e004_000.bmp 1152 471 10 5 8
 button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen music
+hover 343 676 534 708 obj\g006_000.bmp 868 669 8 7
 pic obj\g000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\g001_000.bmp 0 0
 pic obj\g004_000.bmp 343 676
 slider music obj\g004_001.bmp 370 681
 number music obj\g005_000.bmp 461 659
-button music_prev obj\g003_000.bmp 20 668 7 5 0
-button music_play obj\g003_000.bmp 64 668 7 5 1
+button music_prev obj\g003_000.bmp 20 668 7 5 0 help obj\g006_000.bmp 868 669 1 8 0 0
+button music_play obj\g003_000.bmp 64 668 7 5 1 help obj\g006_000.bmp 868 669 1 8 0 1
 button music_pause obj\g003_000.bmp 108 668 7 5 2
 button music_stop obj\g003_000.bmp 152 668 7 5 3
-button music_next obj\g003_000.bmp 196 668 7 5 4
-button music_repeat obj\g003_000.bmp 240 668 7 5 5
-button music_shuffle obj\g003_000.bmp 284 668 7 5 6
+button music_next obj\g003_000.bmp 196 668 7 5 4 help obj\g006_000.bmp 868 669 1 8 0 4
+button music_repeat obj\g003_000.bmp 240 668 7 5 5 help obj\g006_000.bmp 868 669 1 8 0 5
+button music_shuffle obj\g003_000.bmp 284 668 7 5 6 help obj\g006_000.bmp 868 669 1 8 0 6
 button track0 obj\g002_000.bmp 84 187 13 5 0
 button track1 obj\g002_000.bmp 84 244 13 5 1
 button track2 obj\g002_000.bmp 84 301 13 5 2
@@ -1061,16 +1062,26 @@ button nav_quit obj\e004_000.bmp 1152 471 10 5 8
 button back obj\e004_000.bmp 1152 513 10 5 9
 
 screen config
+# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+hover 410 198 565 270 obj\h004_000.bmp 350 669 9 4
+hover 210 198 370 270 obj\h004_000.bmp 350 669 9 3
+hover 50 174 210 270 obj\h004_000.bmp 350 669 9 2
+hover 581 342 810 414 obj\h004_000.bmp 350 669 9 7
+hover 50 85 565 126 obj\h004_000.bmp 350 669 9 0
+hover 50 126 565 198 obj\h004_000.bmp 350 669 9 1
+hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
+hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
+hover 50 270 565 606 obj\h004_000.bmp 350 669 9 5
 pic obj\h000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\h001_000.bmp 0 0
 pic obj\h005_000.bmp 43 85
-button tab obj\h003_000.bmp 282 25 3 5 0
-button tab2 obj\h003_000.bmp 413 25 3 5 1
-button tab3 obj\h003_000.bmp 544 25 3 5 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2
+button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
+button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
+button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save obj\e004_000.bmp 1152 93 10 5 0
 button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
@@ -1113,16 +1124,26 @@ radio express 1 obj\h014_000.bmp 656 597 2 5 0
 radio express 0 obj\h014_000.bmp 818 597 2 5 1
 
 screen config2
+# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+hover 581 294 810 342 obj\h004_002.bmp 362 669 6 5
+hover 581 85 810 150 obj\h004_002.bmp 362 669 6 0
+hover 810 85 1050 150 obj\h004_002.bmp 362 669 6 1
+hover 581 222 810 294 obj\h004_002.bmp 362 669 6 3
+hover 810 222 1050 294 obj\h004_002.bmp 362 669 6 4
+hover 50 102 565 150 obj\h004_001.bmp 380 669 3 0
+hover 581 150 1090 222 obj\h004_002.bmp 362 669 6 2
+hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
+hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\h001_000.bmp 0 0
 pic obj\h015_000.bmp 43 85
-button tab obj\h003_000.bmp 282 25 3 5 0
-button tab2 obj\h003_000.bmp 413 25 3 5 1
-button tab3 obj\h003_000.bmp 544 25 3 5 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2
+button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
+button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
+button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save obj\e004_000.bmp 1152 93 10 5 0
 button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
@@ -1161,16 +1182,25 @@ pic obj\h010_000.bmp 119 570 2 5 0 4
 pic obj\h010_000.bmp 469 570 2 5 1 4
 
 screen config3
+# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+hover 581 85 810 150 obj\h004_003.bmp 372 669 8 6
+hover 50 85 565 150 obj\h004_003.bmp 372 669 8 0
+hover 50 174 565 246 obj\h004_003.bmp 372 669 8 1
+hover 50 246 565 318 obj\h004_003.bmp 372 669 8 2
+hover 50 318 565 390 obj\h004_003.bmp 372 669 8 3
+hover 50 390 565 462 obj\h004_003.bmp 372 669 8 4
+hover 50 486 565 558 obj\h004_003.bmp 372 669 8 5
+hover 581 150 1090 630 obj\h004_003.bmp 372 669 8 7
 pic obj\h000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\h001_000.bmp 0 0
 pic obj\h021_000.bmp 43 85
-button tab obj\h003_000.bmp 282 25 3 5 0
-button tab2 obj\h003_000.bmp 413 25 3 5 1
-button tab3 obj\h003_000.bmp 544 25 3 5 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2
+button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
+button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
+button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save obj\e004_000.bmp 1152 93 10 5 0
 button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
@@ -1280,14 +1310,14 @@ pic obj\d001_000.bmp 79 2
 pic obj\d004_000.bmp 1122 7 1 5 0 0
 pic obj\d003_000.bmp 815 640 10 5 7 0
 pic obj\d003_000.bmp 1005 640 10 5 9 0
-button start obj\d003_000.bmp 135 596 10 5 0
-button load obj\d003_000.bmp 321 596 10 5 1
-button quickload obj\d003_000.bmp 509 596 10 5 2
-button config obj\d003_000.bmp 701 596 10 5 6
-button quit obj\d003_000.bmp 885 596 10 5 8
-button cg obj\d003_000.bmp 245 640 10 5 3
-button scene obj\d003_000.bmp 437 640 10 5 4
-button music obj\d003_000.bmp 625 640 10 5 5
+button start obj\d003_000.bmp 135 596 10 5 0 help obj\d005_000.bmp 0 686 1 11 0 0
+button load obj\d003_000.bmp 321 596 10 5 1 help obj\d005_000.bmp 0 686 1 11 0 1
+button quickload obj\d003_000.bmp 509 596 10 5 2 help obj\d005_000.bmp 0 686 1 11 0 2
+button config obj\d003_000.bmp 701 596 10 5 6 help obj\d005_000.bmp 0 686 1 11 0 7
+button quit obj\d003_000.bmp 885 596 10 5 8 help obj\d005_000.bmp 0 686 1 11 0 8
+button cg obj\d003_000.bmp 245 640 10 5 3 help obj\d005_000.bmp 0 686 1 11 0 3
+button scene obj\d003_000.bmp 437 640 10 5 4 help obj\d005_000.bmp 0 686 1 11 0 4
+button music obj\d003_000.bmp 625 640 10 5 5 help obj\d005_000.bmp 0 686 1 11 0 5
 
 screen load
 pic obj\e000_000.bmp 0 0
@@ -1430,19 +1460,20 @@ button nav_quit obj\e004_000.bmp 1152 387 9 5 7
 button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen music
+hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\g001_000.bmp 0 0
 pic obj\g004_000.bmp 346 676
 slider music obj\g004_001.bmp 373 681
 number music obj\g005_000.bmp 461 659
-button music_prev obj\g003_000.bmp 20 668 7 5 0
-button music_play obj\g003_000.bmp 64 668 7 5 1
+button music_prev obj\g003_000.bmp 20 668 7 5 0 help obj\g006_000.bmp 868 669 1 8 0 0
+button music_play obj\g003_000.bmp 64 668 7 5 1 help obj\g006_000.bmp 868 669 1 8 0 1
 button music_pause obj\g003_000.bmp 108 668 7 5 2
 button music_stop obj\g003_000.bmp 152 668 7 5 3
-button music_next obj\g003_000.bmp 196 668 7 5 4
-button music_repeat obj\g003_000.bmp 240 668 7 5 5
-button music_shuffle obj\g003_000.bmp 284 668 7 5 6
+button music_next obj\g003_000.bmp 196 668 7 5 4 help obj\g006_000.bmp 868 669 1 8 0 4
+button music_repeat obj\g003_000.bmp 240 668 7 5 5 help obj\g006_000.bmp 868 669 1 8 0 5
+button music_shuffle obj\g003_000.bmp 284 668 7 5 6 help obj\g006_000.bmp 868 669 1 8 0 6
 button track0 obj\g002_000.bmp 84 168 8 5 0
 button track1 obj\g002_000.bmp 84 272 8 5 1
 button track2 obj\g002_000.bmp 84 376 8 5 2
@@ -1462,16 +1493,28 @@ button nav_quit obj\e004_000.bmp 1152 387 9 5 7
 button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen config
+# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+hover 581 342 730 414 obj\h004_000.bmp 350 669 9 7
+hover 410 198 565 270 obj\h004_000.bmp 350 669 9 4
+hover 50 198 210 270 obj\h004_000.bmp 350 669 9 2
+hover 210 198 370 270 obj\h004_000.bmp 350 669 9 3
+hover 50 85 565 126 obj\h004_000.bmp 350 669 9 0
+hover 770 342 930 414 obj\h004_004.bmp 350 669 2 0
+hover 930 342 1090 414 obj\h004_004.bmp 350 669 2 1
+hover 50 126 565 198 obj\h004_000.bmp 350 669 9 1
+hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
+hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
+hover 50 270 565 606 obj\h004_000.bmp 350 669 9 5
 pic obj\h000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\h001_000.bmp 0 0
 pic obj\h005_000.bmp 43 85
-button tab obj\h003_000.bmp 282 25 3 5 0
-button tab2 obj\h003_000.bmp 413 25 3 5 1
-button tab3 obj\h003_000.bmp 544 25 3 5 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2
+button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
+button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
+button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save obj\e004_000.bmp 1152 93 9 5 0
 button nav_load obj\e004_000.bmp 1152 135 9 5 1
 button nav_cg obj\e004_000.bmp 1152 177 9 5 2
@@ -1511,16 +1554,26 @@ pic obj\h013_000.bmp 603 287 8 5 6 4
 pic obj\h013_000.bmp 603 315 8 5 7 4
 
 screen config2
+# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+hover 581 294 810 342 obj\h004_002.bmp 362 669 6 5
+hover 581 85 810 150 obj\h004_002.bmp 362 669 6 0
+hover 810 85 1050 150 obj\h004_002.bmp 362 669 6 1
+hover 581 222 810 294 obj\h004_002.bmp 362 669 6 3
+hover 810 222 1050 294 obj\h004_002.bmp 362 669 6 4
+hover 50 85 565 150 obj\h004_001.bmp 380 669 3 0
+hover 581 150 1090 222 obj\h004_002.bmp 362 669 6 2
+hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
+hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\h001_000.bmp 0 0
 pic obj\h015_000.bmp 43 85
-button tab obj\h003_000.bmp 282 25 3 5 0
-button tab2 obj\h003_000.bmp 413 25 3 5 1
-button tab3 obj\h003_000.bmp 544 25 3 5 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2
+button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
+button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
+button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save obj\e004_000.bmp 1152 93 9 5 0
 button nav_load obj\e004_000.bmp 1152 135 9 5 1
 button nav_cg obj\e004_000.bmp 1152 177 9 5 2
@@ -1558,16 +1611,24 @@ pic obj\h010_000.bmp 119 570 2 5 0 4
 pic obj\h010_000.bmp 469 570 2 5 1 4
 
 screen config3
+# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+hover 581 85 810 150 obj\h004_003.bmp 372 669 8 6
+hover 50 85 565 150 obj\h004_003.bmp 372 669 8 0
+hover 50 174 565 246 obj\h004_003.bmp 372 669 8 1
+hover 50 390 565 462 obj\h004_003.bmp 372 669 8 4
+hover 50 486 565 558 obj\h004_003.bmp 372 669 8 5
+hover 50 246 565 390 obj\h004_003.bmp 372 669 8 2
+hover 581 150 1090 630 obj\h004_003.bmp 372 669 8 7
 pic obj\h000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0
 pic obj\h001_000.bmp 0 0
 pic obj\h021_000.bmp 43 85
-button tab obj\h003_000.bmp 282 25 3 5 0
-button tab2 obj\h003_000.bmp 413 25 3 5 1
-button tab3 obj\h003_000.bmp 544 25 3 5 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2
+button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
+button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
+button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save obj\e004_000.bmp 1152 93 9 5 0
 button nav_load obj\e004_000.bmp 1152 135 9 5 1
 button nav_cg obj\e004_000.bmp 1152 177 9 5 2
