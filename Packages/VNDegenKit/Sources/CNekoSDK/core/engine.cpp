@@ -1861,7 +1861,9 @@ void Engine::composeSlots(Canvas &out) {
             int cx, cy;
             cardPlace(index, cx, cy);
             int row = loading && !info.exists ? int(StateDisabled) : slot == hovered ? int(StateHover) : int(StateNormal);
-            drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, 1);
+            // `emptycards OPACITY`: Test Game 92's PC draws an empty card on the load screen faded, at 80 of 256.
+            float cardOpacity = loading && !info.exists && screen_->setting("emptycards") ? float(offset("emptycards", 0)) / 256 : 1;
+            drawPart(out, *sheet, cx, cy, 0, cardRows ? 0 : row * cardH, sheet->w, cardH, cardOpacity);
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
             if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
