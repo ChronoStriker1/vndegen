@@ -9,6 +9,8 @@ struct GamePageView: View {
     let game: Game
     /// What the engine calls Play for this game, such as "Play in CrossOver". Nil is "Play".
     @State private var playLabel: String?
+    /// How far the page has scrolled, which fades in the band that keeps scrolled content from a side camera.
+    @State private var scrolled: CGFloat = 0
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -46,6 +48,10 @@ struct GamePageView: View {
             }
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: [.horizontal, .top])
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
+                scrolled = offset
+            }
+            .overlay(alignment: .top) { cameraBand }
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController else { return }
                 withAnimation(Theme.focusAnimation) {
@@ -68,6 +74,25 @@ struct GamePageView: View {
             }
             .background(Theme.background)
             .ignoresSafeArea()
+        }
+    }
+
+    /// Beside a side camera, details scrolled up to the top would pass under it, cut by its edge. Once the banner's art
+    /// has scrolled away, a band of the background fades in across the top, as tall as the camera, so they pass under
+    /// that instead.
+    @ViewBuilder
+    private var cameraBand: some View {
+        if metrics.acrossSideCamera {
+            let start = metrics.bannerHeight - metrics.cornerClearance - 48
+            LinearGradient(stops: [.init(color: Theme.background, location: 0),
+                                   .init(color: Theme.background, location: 0.75),
+                                   .init(color: Theme.background.opacity(0), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: metrics.insets.top + metrics.cornerClearance + 20)
+                .ignoresSafeArea()
+                .opacity(min(1, max(0, (scrolled - start) / 48)))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 

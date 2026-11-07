@@ -400,6 +400,8 @@ struct CheatsView: View {
     let page: CheatsPage
     let showsFocus: Bool
     let onBack: () -> Void
+    /// The list's full height, so a short list leaves no empty space below it in the card.
+    @State private var listHeight: CGFloat?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -419,6 +421,8 @@ struct CheatsView: View {
                         .padding(4)
                 }
                 .scrollIndicators(.hidden)
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, height in listHeight = height }
+                .frame(maxHeight: listHeight)
                 .onChange(of: page.focus.target) { _, target in
                     guard page.focus.showsFocus, let target else { return }
                     withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(target) }

@@ -264,3 +264,22 @@ struct LockBackdrop: View {
             .ignoresSafeArea()
     }
 }
+
+/// The lock screens' Cancel, a capsule like the rest of the app's buttons.
+struct LockCancelButton: View {
+    /// Whether Escape presses it too. The unlock screen takes Escape through its host's input instead.
+    var escapes = false
+    let action: () -> Void
+
+    var body: some View {
+        Button("Cancel", action: action)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(Capsule(style: .circular).fill(.white.opacity(0.14)))
+            .contentShape(.capsule)
+            .buttonStyle(.plain)
+            .keyboardShortcut(escapes ? .cancelAction : nil)
+    }
+}

@@ -52,7 +52,6 @@ struct SheetScaffold<Content: View>: View {
 /// Picks one value for a game, such as its engine override or in-game orientation.
 struct ChoiceSheet: View {
     @Environment(Navigator.self) private var nav
-    @Environment(\.hubMetrics) private var metrics
     let sheet: Navigator.Sheet
     let title: String
     let subtitle: String
@@ -103,21 +102,15 @@ struct ChoiceSheet: View {
                 .padding(.horizontal, 22)
                 .padding(.bottom, 22)
             }
-            // A long list runs below a medium sheet, so the controller's focus scrolls into view.
+            .reportsSheetOverflow()
+            // A long list runs past the screen, so the controller's focus scrolls into view.
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController, let focus else { return }
                 withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
             }
             }
         }
-        .fittingDetents(metrics)
-    }
-}
-
-extension View {
-    /// Medium and large, or large alone on a short screen, where half its height cuts a sheet's choices off.
-    func fittingDetents(_ metrics: HubMetrics) -> some View {
-        presentationDetents(metrics.fullHeight < 760 ? [.large] : [.medium, .large])
+        .fittedSheetHeight(fallback: [.large])
     }
 }
 
@@ -625,13 +618,7 @@ final class Confirmation {
 
 struct ConfirmationSheet: View {
     @Environment(Navigator.self) private var nav
-    @Environment(\.hubMetrics) private var metrics
     let confirmation: Confirmation
-    /// The sheet's height, and how much taller the message is than the room it has. Together they size the sheet to
-    /// its content.
-    @State private var height: CGFloat = 0
-    @State private var overflow: CGFloat = 0
-
     var body: some View {
         // Cancel is the way out, so a Done beside it would only blur which button keeps the game.
         SheetScaffold(title: confirmation.title, escapeCloses: true, showsDone: false) {
@@ -640,9 +627,7 @@ struct ConfirmationSheet: View {
                 ScrollView { details }
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollPager(nav.pager)
-                    .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height - $0.containerSize.height } action: { _, extra in
-                        overflow = extra
-                    }
+                    .reportsSheetOverflow()
                 HStack(spacing: 12) {
                     HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
                     HubButton(target: .confirmCancel) { Text("Cancel") }
@@ -652,16 +637,10 @@ struct ConfirmationSheet: View {
             .padding(.horizontal, 22)
             .padding(.bottom, 22)
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
-        .presentationDetents(fitted.map { [.height($0)] } ?? [.medium, .large])
+        .fittedSheetHeight()
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif
-    }
-
-    /// The sheet's height with the message's room matched to the message. The system keeps it within the screen.
-    private var fitted: CGFloat? {
-        height > 0 ? (height + overflow).rounded() : nil
     }
 
     private var details: some View {
