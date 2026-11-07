@@ -502,6 +502,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
     if (action == "System") { barPinned_ = !barPinned_; return; }
     if (action == "EXpress") {
+        if (!artSwitchable()) return;
         changeSetting("express", setting("express") ? 0 : 1);
         saveSettings();
         return;
@@ -2632,7 +2633,11 @@ void Engine::composeMessageButtons(Canvas &out) {
             on = gt_.extend;
         }
         if (b.action == "GOODTiming") on = setting("gt_off") != 0;
-        if (b.action == "EXpress") on = setting("express") == 0;
+        if (b.action == "EXpress") {
+            // 切替不可 while nothing on screen has another version, as Test Games 92 and 94 show it.
+            if (!artSwitchable()) return StateDisabled;
+            on = setting("express") == 0;
+        }
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };
     if (innerButtonsShown()) {
@@ -3844,6 +3849,19 @@ void Engine::composeGtCount(Canvas &out) {
         int w = tens->w / 2;
         drawPart(out, *tens, field(*f, 7), field(*f, 8), std::min(gt_.shownCount / 10, 1) * w, 0, w, tens->h, 1);
     }
+}
+
+// Whether a picture on screen has a version change_texture_list.ini names, which the art switch can show instead.
+bool Engine::artSwitchable() const {
+    for (const auto &[slot, s] : front_) {
+        if (s.path.empty()) continue;
+        std::string name = normalizedPath(s.path);
+        if (plainArt_.count(name)) return true;
+        auto slash = name.rfind('\\');
+        std::string file = name.substr(slash == std::string::npos ? 0 : slash + 1);
+        if (file.size() >= 15 && file.compare(10, 5, "_000_") == 0 && artVersions_.count(file.substr(0, 10))) return true;
+    }
+    return false;
 }
 
 std::string Engine::shownPath(const std::string &path) const {

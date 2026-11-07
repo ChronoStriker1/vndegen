@@ -268,6 +268,7 @@ private:
     // version without pubic hair, which Config's and the CG viewer's switches pick.
     std::map<std::string, std::pair<bool, bool>> artVersions_;
     std::string shownPath(const std::string &path) const;
+    bool artSwitchable() const;
     std::string versionPath(const std::string &path) const;
     void applyArtSwitch();
     // Splash effects: droplets a burst throws out, at a slot's place in the draw order. Their motion is a guess from
