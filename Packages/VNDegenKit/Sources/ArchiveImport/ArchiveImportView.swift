@@ -304,10 +304,17 @@ public struct ArchiveImportView: View {
 /// A drop area for archives, for the hub to place where dropping a game makes sense. Pass the dropped files to
 /// `ArchiveImportView(initialSelection:)`, or to `ArchiveImporter.discard` when they won't be imported.
 public struct ArchiveDropTarget: View {
+    /// A smaller target, for a phone, where dropping files is rare and Choose Archive comes first.
+    var compact = false
     let onDrop: ([URL]) -> Void
     @State private var targeted = false
 
     public init(onDrop: @escaping ([URL]) -> Void) { self.onDrop = onDrop }
+
+    init(compact: Bool, onDrop: @escaping ([URL]) -> Void) {
+        self.compact = compact
+        self.onDrop = onDrop
+    }
 
     public var body: some View {
         VStack(spacing: 10) {
@@ -320,8 +327,8 @@ public struct ArchiveDropTarget: View {
                 .foregroundStyle(ImportTheme.tertiaryText)
         }
         .multilineTextAlignment(.center)
-        .padding(28)
-        .frame(maxWidth: .infinity, minHeight: 170)
+        .padding(compact ? 16 : 28)
+        .frame(maxWidth: .infinity, minHeight: compact ? 0 : 170)
         .background(targeted ? ImportTheme.accent.opacity(0.14) : ImportTheme.surface, in: .rect(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -336,6 +343,12 @@ private struct StepView: View {
     @Bindable var model: ArchiveImportModel
     @Bindable var importer: ArchiveImporter
     @FocusState private var fieldFocus: ArchiveImportModel.Control?
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var phone: Bool { sizeClass == .compact }
+    #else
+    private let phone = false
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -355,13 +368,15 @@ private struct StepView: View {
     }
 
     private var choosing: some View {
+        // A phone leads with Choose Archive, since files are rarely dropped there, and keeps the drop area small.
         Group {
-            ArchiveDropTarget(onDrop: model.choose)
+            if !phone { ArchiveDropTarget(onDrop: model.choose) }
             errorLabel
             Button { model.select(.chooseArchive) } label: { Label("Choose Archive", systemImage: "folder") }
                 .buttonStyle(ImportButtonStyle(kind: .primary, focused: model.isFocused(.chooseArchive)))
                 .keyboardShortcut(.defaultAction)
                 .id(ArchiveImportModel.Control.chooseArchive)
+            if phone { ArchiveDropTarget(compact: true, onDrop: model.choose) }
             if model.showsFocus {
                 Text(model.localArchives.isEmpty
                      ? "Choose Archive opens the file picker, which needs touch or a mouse. With a controller, copy archives into VNDegen's folder and they show up here."
@@ -384,11 +399,11 @@ private struct StepView: View {
             }
             Text("Games are extracted into a library folder you choose after picking the archive, VNDegen's Games folder unless you add others in Settings. The archive itself is read in place and not copied first, so it can stay in iCloud Drive or on a server connected in Files.")
                 .font(.system(size: 13))
-                .foregroundStyle(ImportTheme.tertiaryText)
+                .foregroundStyle(ImportTheme.secondaryText)
             #if os(iOS)
             Text("If Choose Archive does nothing, copy the archive into On My \(UIDevice.current.localizedModel), then VNDegen, in Files. The library lists it under Ready to import.")
                 .font(.system(size: 13))
-                .foregroundStyle(ImportTheme.tertiaryText)
+                .foregroundStyle(ImportTheme.secondaryText)
             #endif
         }
     }

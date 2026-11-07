@@ -44,6 +44,7 @@ private struct ReportsSheetOverflow: ViewModifier {
 /// adds them only at some heights, which would make the height chase itself.
 private struct FittedSheetHeight: ViewModifier {
     let fallback: Set<PresentationDetent>
+    @Environment(\.cameraCornerTrailing) private var cameraCorner
     @State private var height: CGFloat = 0
     @State private var scroll: SheetScroll?
     /// The height the sheet was given. It moves only for a real change in the content, never for the frame or two in
@@ -58,7 +59,8 @@ private struct FittedSheetHeight: ViewModifier {
                 guard let fitted, abs(fitted - (applied ?? 0)) > 8 else { return }
                 applied = fitted
             }
-            .presentationDetents(applied.map { [.height($0)] } ?? fallback)
+            // Beside a camera in the top corner, every sheet opens full height. See `cameraCornerTrailing`.
+            .presentationDetents(cameraCorner > 0 ? [.large] : applied.map { [.height($0)] } ?? fallback)
     }
 
     private var fitted: CGFloat? {

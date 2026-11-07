@@ -138,6 +138,13 @@ struct GamePageView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 16) {
             ViewThatFits(in: .horizontal) {
+                // Every button named, where the row has room.
+                HStack(spacing: 12) {
+                    playButton
+                    Spacer().frame(width: 4)
+                    secondaryButtons(labels: true, allLabeled: true, compact: true)
+                }
+                .onAppear { nav.pageActionsStacked = false }
                 HStack(spacing: 12) {
                     playButton
                     Spacer().frame(width: 4)
@@ -180,9 +187,10 @@ struct GamePageView: View {
 
     /// `allLabeled` names the folder and Remove buttons too, for the narrow layout whose rows wrap and have room.
     @ViewBuilder
-    private func secondaryButtons(labels: Bool, allLabeled: Bool = false) -> some View {
+    /// `compact` keeps every button its own width, for a single row rather than the narrow layout's grid.
+    private func secondaryButtons(labels: Bool, allLabeled: Bool = false, compact: Bool = false) -> some View {
         // In the narrow layout's grid every button fills its column, so the tiles line up.
-        let fills = allLabeled
+        let fills = allLabeled && !compact
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
             labeled("Artwork", "photo.on.rectangle", labels, fills: fills)
         }

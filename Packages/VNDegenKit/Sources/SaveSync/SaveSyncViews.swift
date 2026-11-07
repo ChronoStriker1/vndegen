@@ -522,8 +522,49 @@ public struct GameSavesView: View {
     }
 
     public var body: some View {
+        if model.service.server == nil, model.offersSetUp {
+            setUpPrompt
+        } else {
+            backupsForm
+        }
+    }
+
+    /// Before Ludusavi is set up there are no backups to list, so the sheet says so in the middle of its room, with the
+    /// way to set it up.
+    private var setUpPrompt: some View {
+        let focused = model.isFocused(.setUp)
+        return VStack(spacing: 14) {
+            Image(systemName: "externaldrive.badge.icloud")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundStyle(.secondary)
+            Text("No backups yet")
+                .font(.title3.weight(.semibold))
+            Text("Set up your Ludusavi share to restore and back up this game's saves.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { model.select(.setUp) } label: {
+                Label("Set up Ludusavi backups", systemImage: "externaldrive.badge.plus")
+                    .font(.body.weight(.semibold))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Capsule(style: .circular).fill(.tint))
+                    .foregroundStyle(.white)
+                    .overlay { if focused { Capsule(style: .circular).strokeBorder(.white, lineWidth: 2.5) } }
+            }
+            .buttonStyle(.plain)
+            .scaleEffect(focused ? 1.05 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
+            .padding(.top, 6)
+        }
+        .padding(.horizontal, 28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var backupsForm: some View {
         @Bindable var model = model
-        ScrollViewReader { proxy in
+        return ScrollViewReader { proxy in
             Form {
                 if model.service.server != nil {
                     syncSection
@@ -535,10 +576,6 @@ public struct GameSavesView: View {
                     Section {
                         Text(model.service.needsShare ? oldServerNote : "Set up your Ludusavi share in Settings to restore and back up this game's saves.")
                             .foregroundStyle(.secondary)
-                        if model.offersSetUp {
-                            Button("Set up Ludusavi backups", systemImage: "externaldrive.badge.plus") { model.select(.setUp) }
-                                .focusRow(model.isFocused(.setUp), id: GameSavesModel.Target.setUp)
-                        }
                     }
                 }
             }

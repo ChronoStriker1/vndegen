@@ -481,7 +481,7 @@ private struct PosterStack: View {
         GeometryReader { geo in
             let width = geo.size.width * 0.5
             ZStack {
-                ForEach(Array(["Your Visual Novel", "Your RPG", "Your Game"].enumerated()), id: \.offset) { index, title in
+                ForEach(Array(["Your VN", "Your RPG", "Your Game"].enumerated()), id: \.offset) { index, title in
                     PlaceholderArt(title: title)
                         .frame(width: width, height: width * 1.5)
                         .clipShape(.rect(cornerRadius: 10, style: .continuous))
