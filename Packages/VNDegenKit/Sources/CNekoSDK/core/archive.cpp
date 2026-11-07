@@ -114,7 +114,11 @@ void Files::add(const std::string &path, Source source) {
     if (source.priority >= slot.priority) slot = std::move(source);
 }
 
-constexpr int kLooseFolderPriority = 1000;
+// Lookup order, highest first, from the files Test Game 92's exe opens under Wine: a patch's loose files, then that
+// patch's own archives, later patches before earlier ones, then folders such as `scr` beside the base archives (a fan
+// translation's place), then the base archives. 92's sys_5 scripts win over the older ones in its top-level `scr`.
+constexpr int kLooseFolderPriority = 1;
+int patchArchivePriority(int patch) { return patch * 2 + 2; }
 
 static bool isArchiveName(const std::string &low) { return low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0; }
 
@@ -197,7 +201,7 @@ void Files::indexFolder(const std::string &dir, const std::string &prefix, int p
         } else if (isArchiveName(low) && (!prefix.empty() || !patch.empty())) {
             // A patch folder's own archives, such as Test Game 92's sys_5/obj.pak, hold that folder's files, and Funbag
             // Fantasy 3 keeps 892 more pictures in `sc` beside sc.pak, one small archive to a picture.
-            indexArchive(full, prefix.empty() ? low.substr(0, low.size() - 4) : prefix, priority, patch);
+            indexArchive(full, prefix.empty() ? low.substr(0, low.size() - 4) : prefix, patch.empty() ? priority : priority - 1, patch);
         } else {
             Source source;
             source.priority = priority;
@@ -226,19 +230,18 @@ bool Files::open(const std::string &root) {
         else if (isArchiveName(low)) found.push_back({name, low.substr(0, low.size() - 4), false});
     }
     closedir(d);
-    // A patch's archive and folder outrank the base archives, later patches outrank earlier ones, and a folder outranks
-    // the archive of its own number. Priorities are spaced so both fit.
+    // The order is above kLooseFolderPriority. Patch priorities are spaced so a patch's folder fits above its archive.
     for (const auto &item : found) {
         int patch = patchNumber(item.stem);
         if (item.folder) {
             // Beside the archives, cfg, scr and the like outrank them: a fan translation's changes sit there, and the PC
-            // game shows them. Above any patch, which came first.
-            if (patch >= 0) indexFolder(root + "/" + item.name, "", patch * 2 + 2, item.stem);
+            // game shows them. A patch outranks them.
+            if (patch >= 0) indexFolder(root + "/" + item.name, "", patchArchivePriority(patch) + 1, item.stem);
             else indexFolder(root + "/" + item.name, item.stem, kLooseFolderPriority, {});
             continue;
         }
         if (patch >= 0) {
-            indexArchive(root + "/" + item.name, "", patch * 2 + 1, item.stem);
+            indexArchive(root + "/" + item.name, "", patchArchivePriority(patch), item.stem);
             continue;
         }
         // A second archive of a kind, such as cg2 or sc2, holds more of the same folder.

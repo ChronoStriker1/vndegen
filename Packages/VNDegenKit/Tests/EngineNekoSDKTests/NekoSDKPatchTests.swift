@@ -80,6 +80,21 @@ import Testing
         #expect(size(root, "sys_5\\obj.pak") == -1)
     }
 
+    // Test Game 92's exe, traced under Wine, opens sys_5/scr's loose script and never its top-level scr folder's.
+    @Test func aPatchOutranksLooseFoldersAndItsLooseFilesItsArchive() throws {
+        let root = try game([
+            "scr.pak": pack([("x.txt", 60)]),
+            "scr/x.txt": Data(count: 61),
+            "scr/y.txt": Data(count: 62),
+            "sys_5/scr.pak": pack([("x.txt", 63), ("z.txt", 64)]),
+            "sys_5/scr/x.txt": Data(count: 65),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(size(root, "scr\\x.txt") == 65)
+        #expect(size(root, "scr\\y.txt") == 62)
+        #expect(size(root, "scr\\z.txt") == 64)
+    }
+
     @Test func aLaterPatchWins() throws {
         let root = try game([
             "cfg.pak": pack([("init.ini", 50)]),

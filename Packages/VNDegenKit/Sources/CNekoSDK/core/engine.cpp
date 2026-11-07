@@ -2450,6 +2450,9 @@ void Engine::runScene(const Node &n) {
     case 100:  // load a movie into a slot
         loadMovie(n);
         break;
+    case 101:  // delete the movie in a slot, which goes like a deleted image at the next update
+        back_.erase(p[0]);
+        break;
     case 17: {  // delete a slot
         back_.erase(p[0]);
         break;
