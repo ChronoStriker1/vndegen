@@ -173,7 +173,7 @@ extension View {
     }
 
     /// A sheet's content under metrics from `besideSideCamera`: across the camera's inset too, with its header's
-    /// trailing button kept clear of the camera when the sheet reaches up beside it.
+    /// trailing button kept out of the camera's column.
     func sheetBesideSideCamera() -> some View {
         modifier(SheetBesideSideCamera())
     }
@@ -217,16 +217,13 @@ extension TimeInterval {
 
 private struct SheetBesideSideCamera: ViewModifier {
     @Environment(\.hubMetrics) private var metrics
-    /// The sheet's top in the window.
-    @State private var top = CGFloat.infinity
 
     func body(content: Content) -> some View {
         let across = metrics.acrossSideCamera
-        // A sheet that reaches up beside the camera moves only its header's trailing button clear of it.
-        let besideCamera = across && top < metrics.cornerClearance
+        // Every sheet keeps its header's trailing button out of the camera's column, whether or not the sheet reaches
+        // up beside the camera, so Done sits in the same place on every sheet.
         content
-            .environment(\.cameraCornerTrailing, besideCamera ? metrics.windowControls.trailing : 0)
+            .environment(\.cameraCornerTrailing, across ? metrics.windowControls.trailing : 0)
             .ignoresSafeArea(.container, edges: across ? .horizontal : [])
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { top = $0 }
     }
 }

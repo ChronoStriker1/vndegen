@@ -181,37 +181,46 @@ struct GamePageView: View {
     /// `allLabeled` names the folder and Remove buttons too, for the narrow layout whose rows wrap and have room.
     @ViewBuilder
     private func secondaryButtons(labels: Bool, allLabeled: Bool = false) -> some View {
+        // In the narrow layout's grid every button fills its column, so the tiles line up.
+        let fills = allLabeled
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
-            labeled("Artwork", "photo.on.rectangle", labels)
+            labeled("Artwork", "photo.on.rectangle", labels, fills: fills)
         }
         HubButton(target: .pageMetadata, kind: labels ? .secondary : .icon) {
-            labeled("Find metadata", "text.magnifyingglass", labels)
+            labeled("Find metadata", "text.magnifyingglass", labels, fills: fills)
         }
         HubButton(target: .pageSaves, kind: labels ? .secondary : .icon) {
-            labeled("Saves", "externaldrive", labels)
+            labeled("Saves", "externaldrive", labels, fills: fills)
         }
         HubButton(target: .pageLock, kind: labels ? .secondary : .icon) {
-            labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels)
+            labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels, fills: fills)
         }
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
         // Elsewhere the folder and Remove buttons have icons only, as they matter less and the row is long already.
         HubButton(target: .pageShowFolder, kind: allLabeled ? .secondary : .icon) {
-            labeled(FileBrowser.openTitle, "folder", allLabeled)
+            labeled(FileBrowser.openTitle, "folder", allLabeled, fills: fills)
         }
         if hub.library.offersEngineFiles(game.id) {
             HubButton(target: .pageEngineFiles, kind: allLabeled ? .secondary : .icon) {
-                labeled("Remove engine files", "externaldrive.badge.minus", allLabeled)
+                labeled(allLabeled ? "Engine files" : "Remove engine files", "externaldrive.badge.minus", allLabeled, fills: fills)
             }
+            .accessibilityLabel("Remove engine files")
         }
         HubButton(target: .pageRemove, kind: allLabeled ? .secondary : .icon) {
-            labeled(allLabeled ? "Remove" : "Remove from library", "trash", allLabeled)
+            labeled(allLabeled ? "Remove" : "Remove from library", "trash", allLabeled, fills: fills)
         }
         .accessibilityLabel("Remove from library")
     }
 
     @ViewBuilder
-    private func labeled(_ title: String, _ image: String, _ showTitle: Bool) -> some View {
-        if showTitle { Label(title, systemImage: image) } else { Image(systemName: image).accessibilityLabel(title) }
+    private func labeled(_ title: String, _ image: String, _ showTitle: Bool, fills: Bool = false) -> some View {
+        if showTitle {
+            Label(title, systemImage: image)
+                .lineLimit(1)
+                .frame(maxWidth: fills ? .infinity : nil, alignment: .leading)
+        } else {
+            Image(systemName: image).accessibilityLabel(title)
+        }
     }
 
     @ViewBuilder
