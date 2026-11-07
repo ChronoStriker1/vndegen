@@ -78,6 +78,8 @@ New bugs get a GitHub issue and a line here.
 - [#46](https://github.com/ChronoStriker1/vndegen/issues/46) NekoSDK: scene unlocks from a PC backup (play_view.sav) aren't read.
 - [#47](https://github.com/ChronoStriker1/vndegen/issues/47) NekoSDK: the CG viewer's control panel isn't drawn or usable.
 - [#48](https://github.com/ChronoStriker1/vndegen/issues/48) NekoSDK: The Alchemist shows its alternate Original art instead of the default, with no switch.
+- [#52](https://github.com/ChronoStriker1/vndegen/issues/52) Debug test runs share keychain items with the installed app.
+- [#53](https://github.com/ChronoStriker1/vndegen/issues/53) Unit tests leave UserDefaults suites behind on the build Mac.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
