@@ -238,6 +238,14 @@ public struct ArchiveImportView: View {
 
     @Environment(\.cameraCornerTrailing) private var cameraCorner
 
+    private var closeButton: some View {
+        Button(action: model.close) {
+            Text(model.importer?.step == .extracting ? "Cancel" : "Done").frame(maxWidth: cameraCorner > 0 ? .infinity : nil)
+        }
+        .buttonStyle(ImportButtonStyle(kind: .secondary))
+        .keyboardShortcut(.cancelAction)
+    }
+
     public var body: some View {
         let importer = model.importer
         VStack(alignment: .leading, spacing: 0) {
@@ -249,12 +257,10 @@ public struct ArchiveImportView: View {
                     }
                 }
                 Spacer()
-                Button(importer?.step == .extracting ? "Cancel" : "Done", action: model.close)
-                    .buttonStyle(ImportButtonStyle(kind: .secondary))
-                    .keyboardShortcut(.cancelAction)
+                if cameraCorner == 0 { closeButton }
             }
             .padding(22)
-            // The title and Done keep clear of a camera in the top corner.
+            // The title keeps clear of a camera in the top corner.
             .padding(.trailing, max(0, cameraCorner - 22))
             ScrollViewReader { proxy in
                 ScrollView {
@@ -271,6 +277,10 @@ public struct ArchiveImportView: View {
                     guard let control else { return }
                     withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(control, anchor: .center) }
                 }
+            }
+            // Beside a camera in the top corner, Done moves to the bottom, as on the hub's sheets.
+            if cameraCorner > 0 {
+                closeButton.padding(.horizontal, 22).padding(.vertical, 12)
             }
         }
         .foregroundStyle(.white)

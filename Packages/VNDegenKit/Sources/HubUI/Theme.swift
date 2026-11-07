@@ -220,8 +220,7 @@ private struct SheetBesideSideCamera: ViewModifier {
 
     func body(content: Content) -> some View {
         let across = metrics.acrossSideCamera
-        // Every sheet keeps its header's trailing button out of the camera's column, whether or not the sheet reaches
-        // up beside the camera, so Done sits in the same place on every sheet.
+        // Every sheet keeps its header out of the camera's column and its Done at the bottom. See `cameraCornerTrailing`.
         content
             .environment(\.cameraCornerTrailing, across ? metrics.windowControls.trailing : 0)
             .ignoresSafeArea(.container, edges: across ? .horizontal : [])

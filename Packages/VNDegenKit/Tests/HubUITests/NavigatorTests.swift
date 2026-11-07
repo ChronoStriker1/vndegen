@@ -196,13 +196,28 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
+@Test func splitPageActionsPutTheFolderButtonsOnARowUnderPlay() async throws {
+    let (nav, _) = try await makeNavigator()
+    nav.pageActions = .split
+    // Hide ends the first row, so Right stays there, and Down reaches the folder button drawn under Play.
+    nav.setFocus(.pageLock)
+    press(nav, .right)
+    #expect(nav.focus == .pageLock)
+    nav.setFocus(.pagePlay)
+    press(nav, .down)
+    #expect(nav.focus == .pageShowFolder)
+    press(nav, .right)
+    #expect(nav.focus != .pageShowFolder)
+}
+
+@MainActor
 @Test func stackedPageActionsTakeTheirOwnRowUnderPlay() async throws {
     let (nav, _) = try await makeNavigator()
     nav.setFocus(.pagePlay)
     press(nav, .right)
     #expect(nav.focus == .pageArtwork)
     // A narrow window puts Artwork and the rest under Play, so Down reaches them and Right has nowhere to go.
-    nav.pageActionsStacked = true
+    nav.pageActions = .stacked
     nav.setFocus(.pagePlay)
     press(nav, .right)
     #expect(nav.focus == .pagePlay)
