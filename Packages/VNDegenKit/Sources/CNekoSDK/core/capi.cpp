@@ -108,6 +108,8 @@ bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, 
 }
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
+void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen) { e->engine.setWindowState(canFullScreen, fullScreen); }
+int vnneko_take_window_request(VNNekoEngine *e) { return e->engine.takeWindowRequest(); }
 void vnneko_stop(VNNekoEngine *e) { delete e; }
 const char *vnneko_problem(VNNekoEngine *e) { return e->engine.problem(); }
 const char *vnneko_debug_status(VNNekoEngine *e) { return e->engine.debugStatus(); }

@@ -1263,6 +1263,8 @@ void Engine::viewerTab(int page) { galleryTab_ = page; }
 // MARK: Settings
 
 int Engine::setting(const std::string &name) const {
+    // Config's screen mode is the host window's own state, not a stored setting.
+    if (name == "screen") return fullScreen_ ? 1 : 0;
     auto it = settings_.find(name);
     return it == settings_.end() ? 0 : it->second;
 }
@@ -1390,8 +1392,19 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         int w = digits->w / 10, value = setting(f[0]);
         for (int i = 2; i >= 0; i--, value /= 10) drawPart(out, *digits, field(f, 2) + i * w, field(f, 3), value % 10 * w, 0, w, digits->h, 1);
     }
-    for (auto [it, end] = lines("radio"); it != end; ++it)
-        if (it->second.size() >= 8) cell(it->second, 2, setting(it->second[0]) == field(it->second, 1));
+    for (auto [it, end] = lines("radio"); it != end; ++it) {
+        const auto &f = it->second;
+        if (f.size() < 8) continue;
+        // Screen mode is disabled where the host has no full screen, as on an iPhone or iPad.
+        if (f[0] == "screen" && !canFullScreen_) {
+            if (ImageRef sheet = images_->get(f[2])) {
+                int w = sheet->w / std::max(1, field(f, 5)), h = sheet->h / std::max(1, field(f, 6));
+                drawPart(out, *sheet, field(f, 3), field(f, 4), field(f, 7) * w, int(StateDisabled) * h, w, h, 1);
+            }
+            continue;
+        }
+        cell(f, 2, setting(f[0]) == field(f, 1));
+    }
     for (auto [it, end] = lines("check"); it != end; ++it) {
         const auto &f = it->second;
         if (f.size() < 7) continue;
@@ -1422,6 +1435,11 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
     if (dragging) return false;
     for (auto [it, end] = lines("radio"); it != end; ++it)
         if (it->second.size() >= 8 && within(it->second, 2)) {
+            // Screen mode asks the host to change the window, which reports back what it did.
+            if (it->second[0] == "screen") {
+                if (canFullScreen_) windowRequest_ = field(it->second, 1);
+                return true;
+            }
             changeSetting(it->second[0], field(it->second, 1));
             return true;
         }

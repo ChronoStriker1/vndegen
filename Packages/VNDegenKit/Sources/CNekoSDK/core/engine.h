@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "archive.h"
@@ -115,6 +116,14 @@ public:
     // For test hosts: presses a menu button by its action, as a click on it does.
     bool pressAction(const std::string &action);
     void setPaused(bool paused);
+    // The host window's state, for Config's screen mode, and the change Config asks for: 0 a window, 1 full screen, -1
+    // none.
+    void setWindowState(bool canFullScreen, bool fullScreen) {
+        if (canFullScreen != canFullScreen_ || fullScreen != fullScreen_) dirty_ = true;
+        canFullScreen_ = canFullScreen;
+        fullScreen_ = fullScreen;
+    }
+    int takeWindowRequest() { return std::exchange(windowRequest_, -1); }
 
     const char *problem() const { return problem_.empty() ? nullptr : problem_.c_str(); }
     const char *debugStatus();
@@ -269,6 +278,10 @@ private:
     // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
     const std::vector<GalleryEntry> &galleryEntries() const;
     int cellShift() const;
+    // The host window, for Config's screen mode: whether it can go full screen, whether it is, and a change asked for,
+    // -1 for none.
+    bool canFullScreen_ = false, fullScreen_ = false;
+    int windowRequest_ = -1;
     // Whether a slot, or a picture, is an event CG, which Config's camera work moves.
     bool isCgPath(const std::string &path) const;
     bool isCgSlot(int slot) const;

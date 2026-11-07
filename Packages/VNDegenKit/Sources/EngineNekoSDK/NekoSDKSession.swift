@@ -103,6 +103,7 @@ final class NekoSDKSession: EngineSession {
         #if DEBUG
         let began = CACurrentMediaTime()
         #endif
+        syncWindow(engine)
         if !vnneko_step(engine, Int32(min(max(ms, 0), 100))) {
             finish(byGame: true)
             return
@@ -193,6 +194,23 @@ final class NekoSDKSession: EngineSession {
     }
 
     /// A hardware keyboard: Return and Space click, Escape is the right button, Ctrl skips while held, and the arrows move.
+    /// Config's screen mode follows the Mac window and asks it to change. An iPhone or iPad has no full screen to offer,
+    /// so the buttons show disabled there.
+    private func syncWindow(_ engine: OpaquePointer) {
+        #if os(macOS)
+        guard let window = view.window else {
+            vnneko_set_window_state(engine, false, false)
+            return
+        }
+        let full = window.styleMask.contains(.fullScreen)
+        vnneko_set_window_state(engine, window.collectionBehavior.contains(.fullScreenPrimary) || window.styleMask.contains(.resizable), full)
+        let request = vnneko_take_window_request(engine)
+        if request >= 0, (request == 1) != full { window.toggleFullScreen(nil) }
+        #else
+        vnneko_set_window_state(engine, false, false)
+        #endif
+    }
+
     private func hostKey(_ usage: Int, _ pressed: Bool) {
         switch usage {
         case 40, 88, 44: control(.confirm, pressed)

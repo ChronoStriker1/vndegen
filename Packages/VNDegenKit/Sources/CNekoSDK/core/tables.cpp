@@ -232,8 +232,8 @@ button nav_config obj\e003_000.bmp 1190 300 9 5 5
 button nav_title obj\e003_000.bmp 1190 341 9 5 6
 button nav_quit obj\e003_000.bmp 1190 382 9 5 7
 button back obj\e003_000.bmp 1190 464 9 5 8
-pic obj\h006_000.bmp 172 91 2 5 0 4
-pic obj\h006_000.bmp 294 91 2 5 1 4
+radio screen 0 obj\h006_000.bmp 172 91 2 5 0
+radio screen 1 obj\h006_000.bmp 294 91 2 5 1
 pic obj\h007_000.bmp 172 133 6 5 0 4
 pic obj\h007_000.bmp 294 133 6 5 1 4
 pic obj\h007_000.bmp 416 133 6 5 2 4
@@ -695,8 +695,8 @@ button nav_config obj\e003_000.bmp 1698 446 10 5 6 swap help obj\e004_006.bmp 15
 button nav_title obj\e003_000.bmp 1706 523 10 5 7 swap help obj\e004_007.bmp 1578 469 1 1 0 0
 button nav_quit obj\e003_000.bmp 1714 600 10 5 8 swap help obj\e004_008.bmp 1534 546 1 1 0 0
 button back obj\e003_000.bmp 1738 831 10 5 9 swap help obj\e004_009.bmp 1628 777 1 1 0 0
-pic obj\h006_000.bmp 236 208 2 5 0 4
-pic obj\h006_000.bmp 418 208 2 5 1 4
+radio screen 0 obj\h006_000.bmp 236 208 2 5 0
+radio screen 1 obj\h006_000.bmp 418 208 2 5 1
 pic obj\h007_000.bmp 236 297 6 5 0 4
 pic obj\h007_000.bmp 418 297 6 5 1 4
 pic obj\h007_000.bmp 599 297 6 5 2 4
@@ -1139,8 +1139,8 @@ button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
 button back obj\e004_000.bmp 1152 513 10 5 9
-pic obj\h006_000.bmp 172 93 2 5 0 4
-pic obj\h006_000.bmp 294 93 2 5 1 4
+radio screen 0 obj\h006_000.bmp 172 93 2 5 0
+radio screen 1 obj\h006_000.bmp 294 93 2 5 1
 pic obj\h007_000.bmp 172 133 6 5 0 4
 pic obj\h007_000.bmp 294 133 6 5 1 4
 pic obj\h007_000.bmp 416 133 6 5 2 4
@@ -1656,8 +1656,8 @@ button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 
 button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
 button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
 button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
-pic obj\h006_000.bmp 172 93 2 5 0 4
-pic obj\h006_000.bmp 294 93 2 5 1 4
+radio screen 0 obj\h006_000.bmp 172 93 2 5 0
+radio screen 1 obj\h006_000.bmp 294 93 2 5 1
 pic obj\h007_000.bmp 172 133 6 5 0 4
 pic obj\h007_000.bmp 294 133 6 5 1 4
 pic obj\h007_000.bmp 416 133 6 5 2 4
@@ -2154,8 +2154,8 @@ button nav_config obj\c010_020.bmp 1022 265 10 5 5
 button nav_title obj\c010_020.bmp 1017 301 10 5 7
 button nav_quit obj\c010_020.bmp 1012 337 10 5 8
 button back obj\c010_020.bmp 978 629 10 5 9
-pic obj\c005_000.bmp 132 127 2 5 0 4
-pic obj\c005_000.bmp 239 127 2 5 1 4
+radio screen 0 obj\c005_000.bmp 132 127 2 5 0
+radio screen 1 obj\c005_000.bmp 239 127 2 5 1
 pic obj\c005_001.bmp 132 164 6 5 0 4
 pic obj\c005_001.bmp 239 164 6 5 1 4
 pic obj\c005_001.bmp 346 164 6 5 2 4
@@ -2738,8 +2738,8 @@ button nav_config obj\e003_000.bmp 1129 349 9 5 5 help obj\e004_005.bmp 993 305 
 button nav_title obj\e003_000.bmp 1133 407 9 5 6 help obj\e004_006.bmp 997 363 1 1 0 0
 button nav_quit obj\e003_000.bmp 1137 465 9 5 7 help obj\e004_007.bmp 1001 421 1 1 0 0
 button back obj\e003_000.bmp 1145 581 9 5 8 help obj\e004_008.bmp 1009 537 1 1 0 0
-pic obj\h006_000.bmp 141 157 2 5 0 4
-pic obj\h006_000.bmp 263 157 2 5 1 4
+radio screen 0 obj\h006_000.bmp 141 157 2 5 0
+radio screen 1 obj\h006_000.bmp 263 157 2 5 1
 pic obj\h007_000.bmp 141 199 6 5 0 4
 pic obj\h007_000.bmp 263 199 6 5 1 4
 pic obj\h007_000.bmp 385 199 6 5 2 4
@@ -3261,9 +3261,9 @@ button nav_config obj\f002_000.bmp 829 51 8 5 5
 button nav_title obj\f002_000.bmp 954 51 8 5 6
 button nav_quit obj\f002_000.bmp 1079 51 8 5 7
 button back obj\f002_001.bmp 1195 11 1 5 0
-# Resolution and choosing the window size at start have no meaning here, and screen mode is still to come.
-pic obj\i007_000.bmp 172 151 2 5 0 4
-pic obj\i007_000.bmp 294 151 2 5 1 4
+# Resolution and choosing the window size at start have no meaning here.
+radio screen 0 obj\i007_000.bmp 172 151 2 5 0
+radio screen 1 obj\i007_000.bmp 294 151 2 5 1
 pic obj\i008_000.bmp 172 193 6 5 0 4
 pic obj\i008_000.bmp 294 193 6 5 1 4
 pic obj\i008_000.bmp 416 193 6 5 2 4
@@ -3859,8 +3859,8 @@ button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
 button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
 button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
-pic obj\h006_000.bmp 172 91 2 5 0 4
-pic obj\h006_000.bmp 294 91 2 5 1 4
+radio screen 0 obj\h006_000.bmp 172 91 2 5 0
+radio screen 1 obj\h006_000.bmp 294 91 2 5 1
 pic obj\h007_000.bmp 172 133 6 5 0 4
 pic obj\h007_000.bmp 294 133 6 5 1 4
 pic obj\h007_000.bmp 416 133 6 5 2 4

@@ -3,6 +3,7 @@
 //                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
 //                [--slow ms] [--script file]: lines of `ms click x y`, `ms rclick x y`, `ms down x y`, `ms up x y`,
 //                `ms move x y`, `ms focus dx dy` (a controller's direction), `ms wheel notches`, `ms pause`, `ms resume`,
+//                `ms window CAN FULL` (the host window's state),
 //                `ms press action` or `ms shot name`, with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
@@ -149,6 +150,8 @@ int main(int argc, char **argv) {
                 vnneko_step(e, 0);
                 const uint8_t *now = vnneko_frame(e, &w, &h, &changed);
                 writePng(out + "/" + s.name, now, w, h);
+            } else if (s.what == "window") {
+                vnneko_set_window_state(e, s.x != 0, s.y != 0);
             } else if (s.what == "wheel") {
                 vnneko_mouse_wheel(e, s.x);
             } else if (s.what == "pause" || s.what == "resume") {
@@ -162,6 +165,7 @@ int main(int argc, char **argv) {
                 if (s.what == "click" || s.what == "rclick" || s.what == "up") vnneko_mouse_button(e, button, false);
             }
         }
+        if (int request = vnneko_take_window_request(e); request >= 0) std::printf("window request %d\n", request);
         int count = vnneko_debug_text_count(e);
         if (chooseIndex >= 0 && vnneko_debug_choice_count(e) > 0) vnneko_debug_choose(e, chooseIndex);
         if (period && elapsed >= nextBeat) {

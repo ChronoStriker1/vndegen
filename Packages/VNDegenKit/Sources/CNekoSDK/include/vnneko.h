@@ -85,6 +85,12 @@ void vnneko_set_skip(VNNekoEngine *e, bool on);
 // Stops the clock and sound. vnneko_step does nothing while paused.
 void vnneko_set_paused(VNNekoEngine *e, bool paused);
 
+// The host window, for Config's screen mode: whether it can go full screen, as a Mac's window can and an iPad's can't,
+// and whether it is. Call it each frame; the screen mode buttons show it.
+void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen);
+// The screen mode Config's buttons asked for since the last call: 0 a window, 1 full screen, -1 none.
+int vnneko_take_window_request(VNNekoEngine *e);
+
 // Frees the engine.
 void vnneko_stop(VNNekoEngine *e);
 
