@@ -41,11 +41,12 @@ VNFFMOVIE_API vnffmovie *vnffmovie_open(vnffmovie_read_fn read, void *user, uint
 // The newest frame due at `time` seconds, as width * height RGBA pixels, or NULL until the first is decoded. `changed`
 // says whether it differs from the frame the last call returned, and `ended` whether the movie has finished: decoding
 // done, its last frame due and its sound handed out. A looping movie never ends. The pixels stay valid until the next
-// call.
+// call. Sound that has fallen behind `time` is dropped.
 VNFFMOVIE_API const uint8_t *vnffmovie_frame(vnffmovie *movie, double time, int *changed, int *ended);
 
-// Copies up to `frames` frames of sound. Returns the frames copied, fewer when the decoder hasn't caught up. Safe to
-// call from an audio thread.
+// Copies up to `frames` frames of sound. Returns the frames copied, fewer when the decoder hasn't caught up, and the
+// host plays silence for the rest: the sound's clock moves on by all `frames` either way. Safe to call from an audio
+// thread.
 VNFFMOVIE_API size_t vnffmovie_audio(vnffmovie *movie, float *out, size_t frames);
 
 // Decodes again from `time` seconds. Frames and sound before it are dropped.

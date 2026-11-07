@@ -265,8 +265,10 @@ final class NekoSDKSession: EngineSession {
     func setPaused(_ paused: Bool) {
         self.paused = paused
         guard let engine else { return }
-        vnneko_set_paused(engine, paused)
-        if paused { audio?.pause() } else { audio?.resume() }
+        // Back from the hub's pause, the runtime stays stopped while the app is inactive, if Config asks for that.
+        let stop = paused || (inactive && vnneko_pauses_when_inactive(engine))
+        vnneko_set_paused(engine, stop)
+        if stop { audio?.pause() } else { audio?.resume() }
         clock.reset()
         if !paused { frameView.takeFocus() }
     }

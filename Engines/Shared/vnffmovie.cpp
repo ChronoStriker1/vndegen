@@ -20,13 +20,16 @@ extern "C" {
 
 namespace {
 
-// How far ahead the decode thread runs: a few frames, since a 1280x720 frame is 3.7 MB. Sound never holds it back, so
-// a movie whose sound nobody plays still moves; past two seconds the oldest sound is dropped instead.
+// How far ahead the decode thread runs: a few frames, since a 1280x720 frame is 3.7 MB, and sound up to a few seconds
+// past the picture, which matters once the picture has ended before the sound.
 constexpr size_t kMaxFrames = 4;
-constexpr double kSoundKept = 2.0;
-// Sound whose timestamp is further than this from where the last packet ended gets silence before it, or loses its
-// overlap, so it stays on the picture's clock. Smaller gaps are timestamp rounding and play as they come.
+constexpr double kSoundAhead = 4.0;
+// Sound whose timestamp is further than this from where the queued sound ends gets silence before it, or loses its
+// overlap, so it stays on the picture's clock. Smaller differences are timestamp rounding and play as they come, and
+// they can't add up, since the end is counted from the sound handed out.
 constexpr double kSoundSlack = 0.05;
+// Sound this far behind the picture is dropped, as for a movie whose sound nobody plays, or plays again after another's.
+constexpr double kSoundBehind = 0.1;
 constexpr int kIoBuffer = 64 << 10;
 
 struct Frame {
@@ -58,7 +61,11 @@ struct vnffmovie {
     std::condition_variable wake;
     bool quit = false, finished = false, seekPending = false, passHadFrame = false;
     double seekTarget = 0, dropBefore = 0, loopOffset = 0, lastPts = 0;
-    double soundEnd = 0;  // the movie time the queued sound reaches, where the next packet's sound belongs
+    // The movie time of the sound at the front of the queue. Each pull moves it on by what was asked for, since the host
+    // plays silence for what the queue doesn't have yet.
+    double playClock = 0;
+    double soundEnd = 0;  // the movie time the queued sound reaches
+    double pictureTime = 0;  // the host's clock at its last frame asked for
     // The movie time of the next decoded sound, from the last timestamp plus the sound since: WMA stamps only a packet's
     // first frame. Below 0 when no timestamp has come since a seek or loop.
     double audioClock = 0;
@@ -164,15 +171,24 @@ void takeAudio(vnffmovie *m) {
     if (got <= 0) return;
     size_t channels = size_t(m->info.audio_channels), rate = size_t(m->info.audio_rate);
     // Sound before a seek's target goes with the frames. Otherwise the packet goes where its timestamp says: after
-    // silence over a gap, or without what overlaps the sound already queued.
-    double from = std::max(m->dropBefore, m->soundEnd);
-    if (std::fabs(pts - m->soundEnd) <= kSoundSlack && pts >= m->dropBefore) from = pts;
-    size_t skip = pts < from ? std::min(size_t(got), size_t((from - pts) * double(rate))) : 0;
-    if (pts > from) m->sound.insert(m->sound.end(), size_t(std::min(pts - from, kSoundKept) * double(rate)) * channels, 0.0f);
+    // silence over a gap, or without what overlaps the sound queued or already handed out.
+    double tail = m->playClock + double(m->sound.size() / channels) / double(rate), skipTo = m->dropBefore;
+    if (pts > tail + kSoundSlack) m->sound.insert(m->sound.end(), size_t((pts - tail) * double(rate)) * channels, 0.0f);
+    else if (pts < tail - kSoundSlack) skipTo = std::max(skipTo, tail);
+    size_t skip = pts < skipTo ? std::min(size_t(got), size_t((skipTo - pts) * double(rate))) : 0;
     m->sound.insert(m->sound.end(), pcm.begin() + std::ptrdiff_t(skip * channels), pcm.begin() + std::ptrdiff_t(size_t(got) * channels));
-    m->soundEnd = std::max(from, pts) + double(size_t(got) - skip) / double(rate);
-    size_t kept = size_t(kSoundKept * double(rate)) * channels;
-    if (m->sound.size() > kept) m->sound.erase(m->sound.begin(), m->sound.end() - std::ptrdiff_t(kept));
+    m->soundEnd = m->playClock + double(m->sound.size() / channels) / double(rate);
+}
+
+// Drops the sound that has fallen behind the picture.
+void dropLateSound(vnffmovie *m) {
+    if (!m->info.audio_channels) return;
+    size_t channels = size_t(m->info.audio_channels);
+    double late = m->pictureTime - kSoundBehind - m->playClock;
+    if (late <= 0) return;
+    size_t drop = std::min(m->sound.size() / channels, size_t(late * double(m->info.audio_rate)));
+    m->sound.erase(m->sound.begin(), m->sound.begin() + std::ptrdiff_t(drop * channels));
+    m->playClock += double(drop) / double(m->info.audio_rate);
 }
 
 // Sends a packet, or null to drain, and takes each frame that comes out. A decoder that refuses the packet until its
@@ -210,10 +226,10 @@ void run(vnffmovie *m) {
             m->finished = false;
             m->loopOffset = 0;
             m->lastPts = 0;
-            m->dropBefore = m->soundEnd = m->seekTarget;
+            m->dropBefore = m->soundEnd = m->playClock = m->pictureTime = m->seekTarget;
             if (!restart(m, m->seekTarget)) m->finished = true;
         }
-        if (m->finished || m->frames.size() >= kMaxFrames) {
+        if (m->finished || m->frames.size() >= kMaxFrames || m->soundEnd - m->pictureTime > kSoundAhead) {
             m->wake.wait(lock);
             continue;
         }
@@ -321,7 +337,10 @@ extern "C" const uint8_t *vnffmovie_frame(vnffmovie *m, double time, int *change
         m->frames.pop_front();
         m->hasShown = moved = true;
     }
-    if (moved) m->wake.notify_one();
+    // A later clock lets the decoder run on, if sound far enough ahead held it.
+    if (moved || time > m->pictureTime) m->wake.notify_one();
+    m->pictureTime = std::max(m->pictureTime, time);
+    dropLateSound(m);
     if (changed) *changed = moved;
     // By the clock rather than by what's been pulled, so a movie whose sound nobody plays ends too.
     if (ended) *ended = m->finished && m->frames.empty() && time >= m->shown.pts && time >= m->soundEnd;
@@ -334,6 +353,7 @@ extern "C" size_t vnffmovie_audio(vnffmovie *m, float *out, size_t frames) {
     size_t channels = size_t(m->info.audio_channels), got = std::min(frames, m->sound.size() / channels);
     std::copy(m->sound.begin(), m->sound.begin() + std::ptrdiff_t(got * channels), out);
     m->sound.erase(m->sound.begin(), m->sound.begin() + std::ptrdiff_t(got * channels));
+    m->playClock += double(frames) / double(m->info.audio_rate);
     return got;
 }
 

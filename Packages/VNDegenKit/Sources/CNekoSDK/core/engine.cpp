@@ -632,7 +632,8 @@ bool Engine::moveFocus(int dx, int dy) {
         addButtons(screens_.at("dialog").buttons);
     } else if (logOpen_) {
         addButtons(screens_.at("log").buttons);
-    } else if (waiting_ == Waiting::Choice && choiceSheet_) {
+    } else if (waiting_ == Waiting::Choice && choiceSheet_ && !screen_) {
+        // A choice waiting under a menu, such as Config opened from the story, isn't the one on screen.
         int cellH = choiceSheet_->h / 5, x, top, step;
         int slant;
         choicePlace(x, top, step, slant);
@@ -1128,7 +1129,17 @@ void Engine::composeDrift(Canvas &out) {
     }
 }
 
-bool Engine::isCgPath(const std::string &path) const { return normalizedPath(path).rfind("cg\\", 0) == 0; }
+// A patch's own name for a file, `sys_5\cg\x.bmp`, is the same file.
+bool Engine::isCgPath(const std::string &path) const { return withoutPatch(normalizedPath(path)).rfind("cg\\", 0) == 0; }
+
+// A patch's folder, `sys_N\`, dropped from the front of a normalized path.
+std::string Engine::withoutPatch(const std::string &key) {
+    size_t slash = key.find('\\');
+    if (key.rfind("sys_", 0) != 0 || slash == std::string::npos || slash == 4) return key;
+    for (size_t i = 4; i < slash; i++)
+        if (!std::isdigit(static_cast<unsigned char>(key[i]))) return key;
+    return key.substr(slash + 1);
+}
 
 bool Engine::isCgSlot(int slot) const {
     for (const Sprites *sprites : {&back_, &front_})
@@ -1161,9 +1172,15 @@ bool Engine::sceneUnlocked(const GalleryEntry &scene) const {
     return std::any_of(scene.keys.begin(), scene.keys.end(), [&](const std::string &key) { return seen(key); });
 }
 
+// A patched script is seen under its patch's name or the plain one, whichever the save that reached it used, as both
+// open the same file.
 bool Engine::seen(const std::string &path) const {
-    auto it = seen_.find(normalizedPath(path));
-    return it != seen_.end() && it->second;
+    std::string key = normalizedPath(path);
+    for (const std::string &name : {key, withoutPatch(key), normalizedPath(files_.savedName(key))}) {
+        auto it = seen_.find(name);
+        if (it != seen_.end() && it->second) return true;
+    }
+    return false;
 }
 
 void Engine::saveSeen() {
@@ -1374,6 +1391,8 @@ bool Engine::startReplay(const GalleryEntry &scene) {
     screen_ = nullptr;
     viewingImage_ = false;
     viewAuto_ = false;
+    // The anime viewer's movie and its sound go with it; coming back opens the picture afresh.
+    stopViewerMovie();
     stack_.clear();
     scene_ = {};
     back_.clear();
