@@ -1,4 +1,5 @@
 import CommonCrypto
+import ControllerUI
 import Foundation
 import LocalAuthentication
 import Observation
@@ -52,7 +53,7 @@ public final class LockService {
     private var record: PasscodeRecord?
     private var authenticating = false
 
-    public init(keychainService: String = "com.chronostriker1.vndegen.lock", defaults: UserDefaults = .standard) {
+    public init(keychainService: String = KeychainService.named("com.chronostriker1.vndegen.lock"), defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.keychain = KeychainItem(service: keychainService, account: "passcode")
         biometricsEnabled = defaults.object(forKey: Self.biometricsKey) as? Bool ?? true

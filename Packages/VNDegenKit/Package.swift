@@ -26,6 +26,7 @@ let package = Package(
         .library(name: "Metadata", targets: ["Metadata"]),
         .library(name: "GameInput", targets: ["GameInput"]),
         .library(name: "Lock", targets: ["Lock"]),
+        .library(name: "ControllerUI", targets: ["ControllerUI"]),
         .library(name: "HubUI", targets: ["HubUI"]),
         .library(name: "SaveSync", targets: ["SaveSync"]),
         .library(name: "Rclone", targets: ["Rclone"]),

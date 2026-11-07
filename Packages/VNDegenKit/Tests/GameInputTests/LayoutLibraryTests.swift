@@ -43,9 +43,9 @@ private func buttons(_ name: String, _ library: LibraryStore) throws -> ButtonMa
 
 @Test @MainActor func savedMappingsPlayTheSameAfterUpgrading() async throws {
     let paths = try makePaths()
-    let suite = "vndegen-layouts-\(UUID().uuidString)"
-    let defaults = try #require(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = try ScratchDefaults("vndegen-layouts")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     // library.json as 0.22.2 writes it: a remapped game, a game that follows its engine, and one on the plain Xbox layout.
     // "Earlier" is as a version before gamepad buttons wrote it, with a button sending Confirm.
     let enter = #"{"key":{"_0":{"key":"Enter","code":"Enter","keyCode":13}}}"#

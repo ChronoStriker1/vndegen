@@ -1,3 +1,4 @@
+import ControllerUI
 import CryptoKit
 import Foundation
 import Rclone
@@ -149,7 +150,7 @@ enum OldSSHKey {
 /// Save sync's generic passwords in the Keychain.
 private enum Keychain {
     static func query(_ account: String) -> [CFString: Any] {
-        [kSecClass: kSecClassGenericPassword, kSecAttrService: "com.chronostriker1.vndegen.savesync", kSecAttrAccount: account]
+        [kSecClass: kSecClassGenericPassword, kSecAttrService: KeychainService.named("com.chronostriker1.vndegen.savesync"), kSecAttrAccount: account]
     }
 
     static func read(account: String) throws -> Data? {
