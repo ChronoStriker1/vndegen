@@ -1884,16 +1884,20 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
          comp_num_verts = stbtt_GetGlyphShape(info, gidx, &comp_verts);
          if (comp_num_verts > 0) {
             // Transform vertices.
+            // VNDegen: the font's transform can take a point outside a short, which converting would leave
+            // undefined; it is clamped.
+#define STBTT__TO_SHORT(f) ((stbtt_vertex_type) ((f) > 32767.0f ? 32767.0f : (f) < -32768.0f ? -32768.0f : (f)))
             for (i = 0; i < comp_num_verts; ++i) {
                stbtt_vertex* v = &comp_verts[i];
                stbtt_vertex_type x,y;
                x=v->x; y=v->y;
-               v->x = (stbtt_vertex_type)(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
-               v->y = (stbtt_vertex_type)(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
+               v->x = STBTT__TO_SHORT(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
+               v->y = STBTT__TO_SHORT(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
                x=v->cx; y=v->cy;
-               v->cx = (stbtt_vertex_type)(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
-               v->cy = (stbtt_vertex_type)(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
+               v->cx = STBTT__TO_SHORT(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
+               v->cy = STBTT__TO_SHORT(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
             }
+#undef STBTT__TO_SHORT
             // Append vertices.
             tmp = (stbtt_vertex*)STBTT_malloc((num_vertices+comp_num_verts)*sizeof(stbtt_vertex), info->userdata);
             if (!tmp) {
@@ -2043,8 +2047,9 @@ static int stbtt__run_charstring(const stbtt_fontinfo *info, int glyph_index, st
 #define STBTT__CSERR(s) (0)
 
    // VNDegen: a glyph's charstring stops after this many bytes, its subroutines' included, since a subroutine may call
-   // others many times over; a real glyph takes a few thousand at most.
-   int steps = 1 << 20;
+   // others many times over; a real glyph takes a few thousand at most. It also bounds the glyph's points and the
+   // curve pieces drawing makes of them.
+   int steps = 1 << 16;
 
    // this currently ignores the initial width value, which isn't needed if we have hmtx
    b = stbtt__cff_index_get(info->charstrings, glyph_index);

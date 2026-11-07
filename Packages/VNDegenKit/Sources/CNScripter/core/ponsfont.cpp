@@ -35,31 +35,40 @@ PonsFace::~PonsFace() = default;
 // font's outlines with bounds of its own, the CFF table's length (a local change to stb), and stops a glyph's
 // charstring after a fixed number of steps (another).
 //
-// stb follows composite glyphs recursively, once for every use, and copies the outline at each level. So a composite's
-// header and every component record must lie inside its own loca entry, composites must nest at most 32 deep without
-// a cycle, and expanding any glyph must come to at most kMostGlyphWork components and outline points in all. Glyph
-// entries run forward: stb draws one whose loca entries are reversed from its start.
-static constexpr uint64_t kMostGlyphWork = 1 << 20;
+// stb follows composite glyphs recursively, once for every use, and copies the outline so far at every component. So
+// every component record must lie inside its composite's own loca entry and give its offset as x and y (stb skips no
+// bytes for the other kind, point matching, so it would read the next record from the wrong place; no font tested
+// uses it); composites must nest at most 32 deep without a cycle; and drawing a composite may come to at most
+// kMostGlyphWork points, components and copied points. That also bounds the curve pieces drawing makes of its points.
+// A simple glyph's own points are bounded by its format, at 65,536.
+// Glyph entries run forward: stb draws one whose loca entries are reversed from its start.
+static constexpr uint64_t kMostGlyphWork = 1 << 16;
 
 static bool glyphsDrawable(const uint8_t *glyf, uint64_t glyfSize, const std::function<uint64_t(uint64_t)> &loca,
                            uint64_t glyphs) {
+    struct Cost {
+        uint64_t points = 0;  // the points stb returns for the glyph, at most
+        uint64_t work = 0;    // what drawing it costs: points, components and points copied, its components' included
+    };
     struct Seen {
         uint8_t depth = 0;  // 0 not seen, 255 being walked, else 1 + the deepest component's depth
-        uint64_t work = 0;  // components and outline points that drawing it expands to
+        Cost cost;
     };
     std::vector<Seen> seen(glyphs);
-    // The glyph's depth, or -1 when the font is refused; `work` gets what drawing it costs.
-    std::function<int(uint64_t, int, uint64_t &)> walk = [&](uint64_t g, int level, uint64_t &work) -> int {
-        work = 1;
+    auto capped = [](uint64_t v) { return std::min(v, kMostGlyphWork + 1); };
+    // The glyph's depth, or -1 when the font is refused; `cost` gets what drawing it costs.
+    std::function<int(uint64_t, int, Cost &)> walk = [&](uint64_t g, int level, Cost &cost) -> int {
+        cost = {0, 1};
         if (g >= glyphs) return 1;  // stb draws a glyph past the last as nothing
         Seen &me = seen[g];
         if (me.depth == 255 || level > 32) return -1;
         if (me.depth) {
-            work = me.work;
+            cost = me.cost;
             return me.depth;
         }
         uint64_t start = loca(g), end = loca(g + 1);
         int deepest = 0;
+        bool composite = false;
         if (start > end || end - start == 1) return -1;
         if (start < end) {
             int contours = int16_t(be16(glyf + start));
@@ -71,32 +80,37 @@ static bool glyphsDrawable(const uint8_t *glyf, uint64_t glyfSize, const std::fu
                     points = uint64_t(be16(glyf + start + 10 + (contours - 1) * 2)) + 1;
                 else if (contours > 0)
                     points = 65536;
-                work += points + 2 * uint64_t(contours);
+                cost.points = points + 2 * uint64_t(contours);
+                cost.work = capped(cost.work + cost.points);
             } else {
                 if (end - start < 10) return -1;
+                composite = true;
                 me.depth = 255;
                 for (uint64_t at = start + 10;;) {
                     if (at + 4 > end) return -1;
                     uint16_t flags = be16(glyf + at), part = be16(glyf + at + 2);
+                    if (!(flags & 2)) return -1;
                     uint64_t size = 4 + ((flags & 1) ? 4 : 2) + ((flags & 8) ? 2 : (flags & 0x40) ? 4 : (flags & 0x80) ? 8 : 0);
                     if (at + size > end) return -1;
-                    uint64_t partWork = 0;
-                    int d = walk(part, level + 1, partWork);
+                    Cost partCost;
+                    int d = walk(part, level + 1, partCost);
                     if (d < 0) return -1;
                     deepest = std::max(deepest, d);
-                    work = std::min(work + partWork, kMostGlyphWork + 1);
+                    // stb draws the component, then copies the outline so far and the component's into a new one.
+                    cost.points = capped(cost.points + partCost.points);
+                    cost.work = capped(cost.work + partCost.work + cost.points);
                     at += size;
                     if (!(flags & 0x20)) break;
                 }
             }
         }
-        if (deepest >= 32 || work > kMostGlyphWork) return -1;
-        me = {uint8_t(deepest + 1), work};
+        if (deepest >= 32 || (composite && cost.work > kMostGlyphWork)) return -1;
+        me = {uint8_t(deepest + 1), cost};
         return me.depth;
     };
     for (uint64_t g = 0; g < glyphs; g++) {
-        uint64_t work = 0;
-        if (walk(g, 0, work) < 0) return false;
+        Cost cost;
+        if (walk(g, 0, cost) < 0) return false;
     }
     return true;
 }
@@ -163,8 +177,8 @@ static bool tablesInside(const Bytes &d) {
 }
 
 // More than any read stb starts inside a checked table can run on: a simple glyph's contours, instructions, flags and
-// points (under 460 KB: 10 + 65,534 + 2 + 65,535 bytes, then at most 5 for each of 65,536 points), or a format 4
-// cmap's search and glyph array (under 400 KB).
+// points (under 530 KB: 10 + 65,534 + 2 + 65,535 bytes, then at most 6 for each of 65,536 points, a flag and its
+// repeat count and two coordinates), or a format 4 cmap's search and glyph array (under 400 KB).
 static constexpr size_t kReadPadding = 1 << 20;
 
 bool PonsFace::load(Bytes data) {
