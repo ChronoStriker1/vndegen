@@ -769,11 +769,14 @@ void Engine::loadGalleries() {
             e.thumbnail = f[2];
             if (f.size() > 4) e.bgm = f[4];
             if (f.size() > 5) e.flow = f[5];  // the replay of the scene it's from
+            // Test Game 89's header has no type field: the BGM comes third, and each picture line names the replay.
+            if (f.size() == 4 && normalizedPath(f[3]).find(".ogg") != std::string::npos) e.bgm = f[3];
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
             if (parts.size() >= 3) {
                 cgEntries_.back().imageIds.push_back(std::atoi(parts[1].c_str()));
+                if (parts.size() >= 4 && cgEntries_.back().flow.empty()) cgEntries_.back().flow = trim(parts[3]);
                 cgEntries_.back().images.push_back(parts[2]);
             }
         }

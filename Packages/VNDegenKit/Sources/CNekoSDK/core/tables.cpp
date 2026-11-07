@@ -3000,6 +3000,30 @@ button back obj\f002_001.bmp 1195 11 1 5 0
 
 
 screen cg
+# The CG viewer's panel, measured under Wine. A hovered button's help is a speech bubble.
+viewer obj\k000_000.bmp 0 534
+viewerhelp obj\k004_001.bmp 257 351 12
+viewerbutton bgm obj\k006_000.bmp 378 685 2 0
+viewerbgm 0 0 1 2
+viewerpic obj\h004_000.bmp 277 654
+viewerslider obj\h004_001.bmp 302 657 11
+viewernumber volume obj\f012_000.bmp 391 628 16 3
+viewerbutton zoomout obj\k005_000.bmp 487 668 3 0 help 8
+viewerbutton zoomreset obj\k005_000.bmp 536 668 3 1 help 9
+viewerbutton zoomin obj\k005_000.bmp 585 668 3 2 help 10
+viewernumber zoom obj\g007_000.bmp 531 626 20 1
+viewernumber zoomfrac obj\g008_000.bmp 565 632 18 2
+viewerbutton replay obj\k002_000.bmp 651 668 2 0 help 1
+viewerbutton prevcg obj\k003_000.bmp 755 668 5 0 help 3
+viewerbutton prevvar obj\k003_000.bmp 810 668 5 1 help 4
+viewerbutton nextvar obj\k003_000.bmp 1008 668 5 2 help 5
+viewerbutton nextcg obj\k003_000.bmp 1063 668 5 3 help 6
+viewerbutton auto obj\k003_000.bmp 1123 668 5 4 help 7
+viewerbutton return obj\k002_000.bmp 1182 668 2 1 help 2
+viewerbutton hide obj\k001_000.bmp 1232 593 help 0
+viewernumber index obj\g007_000.bmp 880 651 22 2
+viewernumber total obj\g008_000.bmp 945 676 18 2
+viewerauto 8000 0
 # The PC draws a character beside the cards, from sprite parts the runtime doesn't build yet.
 pic obj\g000_000.bmp 0 0 tab 0
 pic obj\g000_000.bmp 0 0 tab 1

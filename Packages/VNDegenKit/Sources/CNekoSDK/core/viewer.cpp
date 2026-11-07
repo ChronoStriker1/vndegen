@@ -213,6 +213,7 @@ const std::vector<std::string> *Engine::viewerButtonAt(int x, int y) const {
 //   `viewerhelp SHEET X Y ROWS`, where a hovered button's help row goes.
 //   `viewernumber WHAT SHEET X Y STEP DIGITS [CELLS]`, WHAT being index, total, zoom (the whole part), zoomfrac or volume.
 //   `viewercell SHEET X Y CELLS CELL`, a fixed cell, such as a slash.
+//   `viewerpic PICTURE X Y`, fixed art under the controls.
 //   `viewerslider SHEET X Y [ROW]`, the music volume's fill, with its help row.
 //   `viewerauto EVERY FILL` in ms: with FILL, the slideshow button fills from the right over FILL ms, as Test Game 84's does.
 //   `viewerbgm PLAYCOL PLAYROW MUTECOL MUTEROW`, the music button's column and row playing and muted.
@@ -221,6 +222,9 @@ void Engine::composeViewer(Canvas &out) {
     if (!viewerPanel() || viewPanelHidden_) return;
     const auto *panel = screen_->setting("viewer");
     if (ImageRef art = panel->size() >= 3 ? images_->get((*panel)[0]) : nullptr) drawPart(out, *art, number(*panel, 1), number(*panel, 2), 0, 0, art->w, art->h, 1);
+    // `viewerpic PICTURE X Y`: fixed art drawn with the panel, under the controls, such as Test Game 89's volume frame.
+    for (auto [it, end] = screen_->settings.equal_range("viewerpic"); it != end; ++it)
+        if (ImageRef pic = it->second.size() >= 3 ? images_->get(it->second[0]) : nullptr) drawPart(out, *pic, number(it->second, 1), number(it->second, 2), 0, 0, pic->w, pic->h, 1);
     const auto *bgmLook = screen_->setting("viewerbgm");
     const auto *timing = screen_->setting("viewerauto");
     int helpRow = -1;

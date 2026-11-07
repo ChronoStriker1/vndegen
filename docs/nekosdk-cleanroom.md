@@ -195,7 +195,7 @@ The PC game's title, save, config, gallery and dialog screens are code in its ex
 
 ## The CG viewer
 
-The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist, Yarinaoshi no Christmas, Funbag Fantasy 4 and Ore o Hoshigaru Tsuma to Gibo under Wine, and the panel, buttons and picture match the PC's to within blending noise. The PC games behave alike:
+The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist, Yarinaoshi no Christmas, Funbag Fantasy 4, Ore o Hoshigaru Tsuma to Gibo and Horny Elves and a Moral Orc under Wine, and the panel, buttons and picture match the PC's to within blending noise. The PC games behave alike:
 - The zoom runs from 1.00 to 3.00 in steps of 0.05, from the buttons or a wheel notch, and keeps the point under the pointer still. Zoom out and reset are disabled at 1.00, and zoom in at 3.00. Reset is immediate.
 - The slideshow moves on every 8 seconds.
 - The entry's music, the fourth field of its line in `cg_view.ini`, starts with the viewer at the music screen's volume. Its button mutes and unmutes it while it goes on playing.
@@ -205,6 +205,8 @@ The panel's art, its buttons' places and their help lines were matched against s
 - The Alchemist's art button switches the same setting as Config's Change Illustration and the message window's art button.
 
 Ore o Hoshigaru Tsuma to Gibo's `cfg\change_texture_list.ini` lists each CG group with two flags instead of Haha Sannin to Ana Asobi's pairs of pictures: whether the group has a version with the protagonist see-through and one without pubic hair. The third number of a CG's name picks the version, 100 for the first, 1 for the second and 101 for both, so `cg_000_000_100_000_000.bmp` is `cg_000_000_000_000_000.bmp` with the protagonist see-through. Its CG viewer has a play and a mute button in place of one music button, and switches for the two versions, which change the picture at once and are the same settings as Config's. Their help lines are Config's, in `h004_004.bmp`. Its message window's picture reaches 721 pixels down, and the PC's screen stays 720.
+
+Horny Elves and a Moral Orc's `cg_view.ini` header has no type field, so its BGM comes third, and each picture line names its replay flow fourth. Its viewer's help comes up as speech bubbles, which fade in.
 
 Slider fills round to the nearest pixel: at 60, The Alchemist's 173-pixel music bar fills 104 and Yarinaoshi no Christmas's 161-pixel one 97.
 
