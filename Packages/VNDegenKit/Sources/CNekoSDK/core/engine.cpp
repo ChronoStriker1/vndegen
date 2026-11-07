@@ -992,10 +992,11 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         bool over = pointerSeen_ && !dialogOpen_ && inRect(pointerX_, pointerY_, x, y, w, h);
         drawPart(out, *sheet, x, y, field(f, at + 5) * w, (on ? 2 : 0) * h + (over ? h : 0), w, h, 1);
     };
+    // The PC rounds a fill to the nearest pixel: at 60, The Alchemist's 441-pixel opacity bar fills 265.
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
-            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, fill->w * setting(f[0]) / 100, fill->h, 1);
+            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + 50) / 100, fill->h, 1);
     }
     for (auto [it, end] = lines("bar"); it != end; ++it) {
         const auto &f = it->second;
