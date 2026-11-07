@@ -69,6 +69,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - Unity games open on a Mac, in their own Mac version or through the player's CrossOver, with saves and PlayerPrefs synced (0.25.0).
 - Ponscripter, with both Umineko Arcs; on phones held upright the game on top and the controls below; one library view button; an iPhone Duo layout pass; and an engine clock that keeps real time on every display (0.26.0).
 - The Alchemist starts on its default art, and the CG viewer's control panel in the two NekoSDK games (0.26.1).
+- The Alchemist's endings follow the player's choices, and its prologue flag moves to and from a PC (0.26.2).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -78,8 +79,6 @@ New bugs get a GitHub issue and a line here.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#46](https://github.com/ChronoStriker1/vndegen/issues/46) NekoSDK: scene unlocks from a PC backup (play_view.sav) aren't read.
-- [#58](https://github.com/ChronoStriker1/vndegen/issues/58) NekoSDK: The Alchemist's two endings are swapped.
-- [#59](https://github.com/ChronoStriker1/vndegen/issues/59) NekoSDK: The Alchemist records its prologue flag as an ending, which breaks PC backups.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.

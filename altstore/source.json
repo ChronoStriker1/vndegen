@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.26.2",
+          "buildVersion": "1403",
+          "date": "2026-11-07T20:51:04Z",
+          "localizedDescription": "Two fixes for The Alchemist & His Battle-Scarred Homunculus.\n\n## Downloads\n\n- `VNDegen-0.26.2-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.26.2.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- The Alchemist: the ending follows your choices, as on the PC. Earlier versions gave the happy ending for few happy choices and the normal ending for many. (#58)\n- The Alchemist: finishing the prologue is recorded as the PC game records it. A backup moved to a PC now offers Start from Main Story there, and a PC backup's finished prologue counts in VNDegen. A save folder from an earlier version is put right the first time the game starts, changing only that one flag. (#59)\n\n## Known limits\n\n- NekoSDK: scenes unlocked on a PC don't move with a backup yet. The Scene gallery shows those played in VNDegen. This is fixed in work that hasn't shipped yet. (#46)\n\n## What wasn't tested\n\n- No physical device was used. The endings were checked by tests on the game's own flow, and the prologue repair by tests and on the PC game under Wine.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.26.2/VNDegen-0.26.2.ipa",
+          "size": 123243257,
+          "sha256": "820f9a039af073fc7731998bb71d27bd6d3fece034ada87988c66d3998468e6d",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.26.1",
           "buildVersion": "1394",
           "date": "2026-11-07T16:47:51Z",
