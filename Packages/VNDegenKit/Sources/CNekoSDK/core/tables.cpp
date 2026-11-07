@@ -3107,6 +3107,48 @@ button nav_title obj\f002_000.bmp 954 51 8 5 6
 button nav_quit obj\f002_000.bmp 1079 51 8 5 7
 button back obj\f002_001.bmp 1195 11 1 5 0
 
+screen music
+# The PC draws a strip of small portraits along the bottom, overlapping and blended; it isn't drawn here.
+pic obj\h000_000.bmp 0 0
+pic obj\f001_000.bmp 0 0
+pic obj\h001_000.bmp 12 15
+pic obj\h004_000.bmp 290 683
+slider music obj\h004_001.bmp 315 686
+number music obj\f012_000.bmp 403 656
+# Tracks 1 to 6 run down the left and 7 to 16 down the right.
+button track0 obj\h002_000.bmp 21 120 16 5 0
+button track1 obj\h002_000.bmp 21 177 16 5 1
+button track2 obj\h002_000.bmp 21 234 16 5 2
+button track3 obj\h002_000.bmp 21 291 16 5 3
+button track4 obj\h002_000.bmp 21 348 16 5 4
+button track5 obj\h002_000.bmp 21 405 16 5 5
+button track6 obj\h002_000.bmp 279 120 16 5 6
+button track7 obj\h002_000.bmp 279 177 16 5 7
+button track8 obj\h002_000.bmp 279 234 16 5 8
+button track9 obj\h002_000.bmp 279 291 16 5 9
+button track10 obj\h002_000.bmp 279 348 16 5 10
+button track11 obj\h002_000.bmp 279 405 16 5 11
+button track12 obj\h002_000.bmp 279 462 16 5 12
+button track13 obj\h002_000.bmp 279 519 16 5 13
+button track14 obj\h002_000.bmp 279 576 16 5 14
+button track15 obj\h002_000.bmp 279 633 16 5 15
+button music_prev obj\h003_000.bmp 505 659 7 5 0
+button music_play obj\h003_000.bmp 565 659 7 5 1
+button music_pause obj\h003_000.bmp 625 659 7 5 2
+button music_stop obj\h003_000.bmp 685 659 7 5 3
+button music_next obj\h003_000.bmp 745 659 7 5 4
+button music_repeat obj\h003_000.bmp 805 659 7 5 5
+button music_shuffle obj\h003_000.bmp 865 659 7 5 6
+button nav_save obj\f002_000.bmp 666 6 8 5 0
+button nav_load obj\f002_000.bmp 791 6 8 5 1
+button nav_cg obj\f002_000.bmp 916 6 8 5 2
+button nav_scene obj\f002_000.bmp 1041 6 8 5 3
+button nav_music obj\f002_000.bmp 704 51 8 5 4
+button nav_config obj\f002_000.bmp 829 51 8 5 5
+button nav_title obj\f002_000.bmp 954 51 8 5 6
+button nav_quit obj\f002_000.bmp 1079 51 8 5 7
+button back obj\f002_001.bmp 1195 11 1 5 0
+
 screen config
 pic obj\i000_000.bmp 0 0
 pic obj\i006_000.bmp 18 122
