@@ -952,6 +952,10 @@ void Engine::applyArtSet() {
     for (Sprites *sprites : {&back_, &front_})
         for (auto &[slot, sprite] : *sprites)
             if (ImageRef image = images_->get(sprite.path)) sprite.image = image;
+    // A transition and motion blur hold frames drawn with the old art, so they end here.
+    transitioning_ = false;
+    ruleImage_ = nullptr;
+    previousValid_ = false;
     dirty_ = true;
 }
 
