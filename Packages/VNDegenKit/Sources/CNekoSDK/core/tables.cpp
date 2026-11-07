@@ -1901,12 +1901,12 @@ pic obj\c000_000.bmp 0 0
 pic obj\c003_000.bmp 24 397
 pic obj\c003_001.bmp 24 568 alpha 60
 pic obj\c003_002.bmp 24 568
-button tab obj\c002_000.bmp 326 70 3 5 0
-button tab2 obj\c002_000.bmp 444 70 3 5 1
-button tab3 obj\c002_000.bmp 562 70 3 5 2
-button cfg_defaults obj\c001_000.bmp 680 11 3 5 0
-button cfg_undo obj\c001_000.bmp 785 38 3 5 1
-button cfg_apply obj\c001_000.bmp 890 65 3 5 2
+button tab obj\c002_000.bmp 326 70 3 5 0 help obj\c002_001.bmp 0 663 1 3 0 0
+button tab2 obj\c002_000.bmp 444 70 3 5 1 help obj\c002_001.bmp 0 663 1 3 0 1
+button tab3 obj\c002_000.bmp 562 70 3 5 2 help obj\c002_001.bmp 0 663 1 3 0 2
+button cfg_defaults obj\c001_000.bmp 680 11 3 5 0 help obj\c001_001.bmp 0 663 1 3 0 0
+button cfg_undo obj\c001_000.bmp 785 38 3 5 1 help obj\c001_001.bmp 0 663 1 3 0 1
+button cfg_apply obj\c001_000.bmp 890 65 3 5 2 help obj\c001_001.bmp 0 663 1 3 0 2
 button nav_save obj\c010_020.bmp 1047 85 10 5 0
 button nav_load obj\c010_020.bmp 1042 121 10 5 1
 button nav_cg obj\c010_020.bmp 1037 157 10 5 2
@@ -1944,18 +1944,26 @@ check confirm_title obj\c005_006.bmp 499 253 8 5 4
 check confirm_exit obj\c005_006.bmp 499 279 8 5 5
 pic obj\c005_006.bmp 499 305 8 5 6 4
 pic obj\c005_006.bmp 499 331 8 5 7 4
+hover 22 118 475 142 obj\c004_000.bmp 0 663 8 0
+hover 480 118 936 358 obj\c004_000.bmp 0 663 8 6
+hover 22 166 475 214 obj\c004_000.bmp 0 663 8 1
+hover 22 214 169 286 obj\c004_000.bmp 0 663 8 2
+hover 173 214 322 286 obj\c004_000.bmp 0 663 8 3
+hover 327 214 475 286 obj\c004_000.bmp 0 663 8 4
+hover 22 286 475 358 obj\c004_000.bmp 0 663 8 5
+hover 480 358 629 406 obj\c004_000.bmp 0 663 8 7
 
 screen config2
 pic obj\c000_001.bmp 0 0
 pic obj\c003_000.bmp 24 397
 pic obj\c003_001.bmp 24 568 alpha 60
 pic obj\c003_002.bmp 24 568
-button tab obj\c002_000.bmp 326 70 3 5 0
-button tab2 obj\c002_000.bmp 444 70 3 5 1
-button tab3 obj\c002_000.bmp 562 70 3 5 2
-button cfg_defaults obj\c001_000.bmp 680 11 3 5 0
-button cfg_undo obj\c001_000.bmp 785 38 3 5 1
-button cfg_apply obj\c001_000.bmp 890 65 3 5 2
+button tab obj\c002_000.bmp 326 70 3 5 0 help obj\c002_001.bmp 0 663 1 3 0 0
+button tab2 obj\c002_000.bmp 444 70 3 5 1 help obj\c002_001.bmp 0 663 1 3 0 1
+button tab3 obj\c002_000.bmp 562 70 3 5 2 help obj\c002_001.bmp 0 663 1 3 0 2
+button cfg_defaults obj\c001_000.bmp 680 11 3 5 0 help obj\c001_001.bmp 0 663 1 3 0 0
+button cfg_undo obj\c001_000.bmp 785 38 3 5 1 help obj\c001_001.bmp 0 663 1 3 0 1
+button cfg_apply obj\c001_000.bmp 890 65 3 5 2 help obj\c001_001.bmp 0 663 1 3 0 2
 button nav_save obj\c010_020.bmp 1047 85 10 5 0
 button nav_load obj\c010_020.bmp 1042 121 10 5 1
 button nav_cg obj\c010_020.bmp 1037 157 10 5 2
@@ -1990,18 +1998,26 @@ bar obj\c005_003.bmp 119 313 50
 number delay obj\c005_005.bmp 343 281
 pic obj\c005_004.bmp 88 315 2 5 0 4
 pic obj\c005_004.bmp 392 315 2 5 1 4
+hover 22 118 475 190 obj\c004_001.bmp 0 663 3 0
+hover 22 190 475 262 obj\c004_001.bmp 0 663 3 1
+hover 22 262 475 358 obj\c004_001.bmp 0 663 3 2
+hover 480 118 680 166 obj\c004_002.bmp 0 666 5 0
+hover 680 118 936 166 obj\c004_002.bmp 0 666 5 1
+hover 480 190 936 238 obj\c004_002.bmp 0 666 5 2
+hover 480 238 680 286 obj\c004_002.bmp 0 666 5 3
+hover 680 238 886 286 obj\c004_002.bmp 0 666 5 4
 
 screen config3
 pic obj\c000_002.bmp 0 0
 pic obj\c003_000.bmp 24 397
 pic obj\c003_001.bmp 24 568 alpha 60
 pic obj\c003_002.bmp 24 568
-button tab obj\c002_000.bmp 326 70 3 5 0
-button tab2 obj\c002_000.bmp 444 70 3 5 1
-button tab3 obj\c002_000.bmp 562 70 3 5 2
-button cfg_defaults obj\c001_000.bmp 680 11 3 5 0
-button cfg_undo obj\c001_000.bmp 785 38 3 5 1
-button cfg_apply obj\c001_000.bmp 890 65 3 5 2
+button tab obj\c002_000.bmp 326 70 3 5 0 help obj\c002_001.bmp 0 663 1 3 0 0
+button tab2 obj\c002_000.bmp 444 70 3 5 1 help obj\c002_001.bmp 0 663 1 3 0 1
+button tab3 obj\c002_000.bmp 562 70 3 5 2 help obj\c002_001.bmp 0 663 1 3 0 2
+button cfg_defaults obj\c001_000.bmp 680 11 3 5 0 help obj\c001_001.bmp 0 663 1 3 0 0
+button cfg_undo obj\c001_000.bmp 785 38 3 5 1 help obj\c001_001.bmp 0 663 1 3 0 1
+button cfg_apply obj\c001_000.bmp 890 65 3 5 2 help obj\c001_001.bmp 0 663 1 3 0 2
 button nav_save obj\c010_020.bmp 1047 85 10 5 0
 button nav_load obj\c010_020.bmp 1042 121 10 5 1
 button nav_cg obj\c010_020.bmp 1037 157 10 5 2
@@ -2048,6 +2064,14 @@ pic obj\c007_001.bmp 893 311 1 5 0 4
 pic obj\c005_002.bmp 506 414 2 5 0 4
 pic obj\c005_002.bmp 576 414 2 5 1 4
 button tabvoices obj\c007_000.bmp 700 414 1 5 0
+hover 22 118 475 214 obj\c004_003.bmp 0 663 8 0
+hover 480 118 936 214 obj\c004_003.bmp 0 663 8 3
+hover 22 214 475 286 obj\c004_003.bmp 0 663 8 1
+hover 480 214 936 286 obj\c004_003.bmp 0 663 8 4
+hover 22 310 475 382 obj\c004_003.bmp 0 663 8 2
+hover 480 310 936 382 obj\c004_003.bmp 0 663 8 5
+hover 480 382 683 430 obj\c004_003.bmp 0 663 8 6
+hover 683 382 936 430 obj\c004_003.bmp 0 663 8 7
 
 screen configvoices
 over config3 154
