@@ -235,7 +235,9 @@ Measured again on 2026-10-28, after sound decoding moved to its own thread, on t
 | Movies (Test Game 98's three clips, looped) | iPad simulator | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 50 s |
 
 Simulator timing isn't iPad timing. The movies' headers say 59.94 fps, but they hold 29.97 frames a second (88 frames in 2.92 s), which the runtime draws
-in full. Loading a save or opening a menu can take one step of 40 to 100 ms while it decodes images.
+in full. The 30.6 drawn above was the runtime's clock running 2% fast at 60 Hz (#49): the session rounded each refresh
+to whole milliseconds. Since 2026-11-07 it carries the fraction (`MillisecondClock` in FrameHost), and the same movies
+draw 30.0 to 30.2 at 60 and 120 Hz (`docs/frame-rate.md`). Loading a save or opening a menu can take one step of 40 to 100 ms while it decodes images.
 
 ## Built-in dialogs
 

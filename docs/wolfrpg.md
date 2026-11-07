@@ -16,7 +16,9 @@ on DxLib. How the runtime was written, and from which sources, is in `docs/wolfr
 
 The runtime draws each frame on the CPU at the game's resolution (320 x 240 to 960 x 720 in the test games). The
 session steps it once per display refresh on the main thread, and the runtime advances the game at its own frame rate
-from Game.dat (60, or 30). Sound is mixed at 44.1 kHz and pulled by AVAudioEngine on its audio thread; a decoder thread
+from Game.dat (60, or 30). Refreshes reach it as whole milliseconds that add up to real time; one within a
+millisecond of the game's frame time, or of a half, third or quarter of it, counts as exactly that, so a 60 or 120 Hz
+display runs one game frame every one or two refreshes without a skipped or doubled frame (`core/framepace.h`). Sound is mixed at 44.1 kHz and pulled by AVAudioEngine on its audio thread; a decoder thread
 of the runtime's own keeps music decoded ahead. Everything runs in the app's process, with no JIT.
 
 ## Detection
