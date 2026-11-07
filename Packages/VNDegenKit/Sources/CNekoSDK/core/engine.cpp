@@ -2169,6 +2169,13 @@ void Engine::composeScreen(Canvas &out) {
         bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
         if (current) state = over ? StateSelectedHover : StateSelected;
+        // The PC games show no help for the tab, page or menu already open.
+        if (current && b.help) {
+            Button shown = b;
+            shown.help = nullptr;
+            drawButton(out, shown, state);
+            continue;
+        }
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
         if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
@@ -2196,13 +2203,16 @@ void Engine::composeScreen(Canvas &out) {
         }
         drawButton(out, b, state);
     }
-    // `hover X0 Y0 X1 Y1 PICTURE X Y`: a line of help shown while the pointer is over that part of the screen, such as a
-    // settings group in Config, as the PC games show them.
+    // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW]`: a line of help shown while the pointer is over that part of the screen,
+    // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
     if (pointerSeen_ && !dialogOpen_)
         for (auto [it, end] = screen_->settings.equal_range("hover"); it != end; ++it) {
             const auto &f = it->second;
             if (f.size() < 7 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
-            if (ImageRef help = images_->get(f[4])) drawPart(out, *help, field(f, 5), field(f, 6), 0, 0, help->w, help->h, 1);
+            if (ImageRef help = images_->get(f[4])) {
+                int rows = f.size() >= 9 ? std::max(1, field(f, 7)) : 1, h = help->h / rows;
+                drawPart(out, *help, field(f, 5), field(f, 6), 0, (f.size() >= 9 ? field(f, 8) : 0) * h, help->w, h, 1);
+            }
             break;
         }
     if (dialogOpen_) composeDialog(out);
