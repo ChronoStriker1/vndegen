@@ -77,11 +77,14 @@ void Engine::viewerMusic() {
     viewMusic_ = audio_.open(data);
     if (!viewMusic_) return;
     viewMusicPath_ = path;
+    // The music screen's track stops, as it does when leaving that screen by Back.
+    stopTrack();
     audio_.setGroup(viewMusic_, 3);
     audio_.setLoops(viewMusic_, 0);
-    audio_.fade(viewMusic_, 0, viewMuted_ ? 0 : 100, false);
     audio_.play(viewMusic_);
-    if (titleMusic_) audio_.pause(titleMusic_, true);
+    // After play, which sets the volume to full: a muted viewer stays muted from one entry to the next.
+    audio_.fade(viewMusic_, 0, viewMuted_ ? 0 : 100, false);
+    holdMusic();
 }
 
 void Engine::stopViewerMusic() {
@@ -90,7 +93,7 @@ void Engine::stopViewerMusic() {
         viewMusic_ = 0;
     }
     viewMusicPath_.clear();
-    if (titleMusic_) audio_.pause(titleMusic_, false);
+    holdMusic();
 }
 
 void Engine::viewerVariant(int direction) {
@@ -331,25 +334,49 @@ void Engine::composeViewer(Canvas &out) {
         }
 }
 
+// A press on the volume's fill sets it, and holding on follows the pointer along it, past its ends, until let go.
+void Engine::dragViewerSlider(int x, int y) {
+    const auto *slider = screen_->setting("viewerslider");
+    ImageRef fill = slider && slider->size() >= 3 ? images_->get((*slider)[0]) : nullptr;
+    if (!fill || viewPanelHidden_) return;
+    int left = number(*slider, 1), top = number(*slider, 2);
+    bool inside = x >= left && y >= top && x < left + fill->w && y < top + fill->h;
+    if (!inside && !viewerDragging_) return;
+    viewerDragging_ = true;
+    changeSetting("music", std::clamp((x - left) * 100 / std::max(1, fill->w - 1), 0, 100));
+}
+
+// Where a controller's focus can go on the panel: the middle of each button shown, and of the volume.
+std::vector<std::pair<int, int>> Engine::viewerSpots() const {
+    std::vector<std::pair<int, int>> spots;
+    if (viewPanelHidden_) return spots;
+    for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it) {
+        const auto &f = it->second;
+        ImageRef sheet = f.size() >= 4 ? images_->get(f[1]) : nullptr;
+        // A disabled button shows no hover, so the pointer would look lost on one.
+        int row = sheet ? viewerButtonRow(f, false) : -1;
+        if (row < 0 || row == kDisabled) continue;
+        int cols, col;
+        cellOf(f, cols, col);
+        spots.push_back({number(f, 2) + sheet->w / cols / 2, number(f, 3) + sheet->h / 10});
+    }
+    if (const auto *slider = screen_->setting("viewerslider"); slider && slider->size() >= 3)
+        if (ImageRef fill = images_->get((*slider)[0])) spots.push_back({number(*slider, 1) + fill->w / 2, number(*slider, 2) + fill->h / 2});
+    return spots;
+}
+
 void Engine::pressViewer(int x, int y) {
     if (viewPanelHidden_) return;
-    if (const auto *slider = screen_->setting("viewerslider"); slider && slider->size() >= 3)
-        if (ImageRef fill = images_->get((*slider)[0])) {
-            int left = number(*slider, 1), top = number(*slider, 2);
-            if (x >= left && y >= top && x < left + fill->w && y < top + fill->h) {
-                changeSetting("music", std::clamp((x - left) * 100 / std::max(1, fill->w - 1), 0, 100));
-                saveSettings();
-                return;
-            }
-        }
+    dragViewerSlider(x, y);
+    if (viewerDragging_) return;
     const auto *f = viewerButtonAt(x, y);
     if (!f || viewerButtonRow(*f, false) == kDisabled || viewerButtonRow(*f, false) < 0) return;
     const std::string &action = (*f)[0];
     if (action == "replay") {
         if (const GalleryEntry *scene = viewerScene()) {
-            replayFromViewer_ = true;
+            // Only a replay that starts comes back here.
             stopViewerMusic();
-            startReplay(*scene);
+            if (startReplay(*scene)) replayFromViewer_ = true;
         }
     } else if (action == "prevcg" || action == "nextcg") {
         viewerCg(action == "nextcg" ? 1 : -1);

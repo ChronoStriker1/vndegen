@@ -603,6 +603,9 @@ bool Engine::moveFocus(int dx, int dy) {
         int slant;
         choicePlace(x, top, step, slant);
         for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, top + i * step + cellH / 2});
+    } else if (screen_ && viewingImage_ && viewerPanel()) {
+        // The CG viewer's panel, or nothing while it's hidden.
+        for (auto [x, y] : viewerSpots()) spots.push_back({x, y});
     } else if (screen_) {
         addButtons(screen_->buttons);
         if (int perPage = cardsPerPage()) {
@@ -853,10 +856,13 @@ int Engine::nextTrack(int direction) {
 }
 
 // The title's or the story's music waits while the player plays, and while the host has the game paused.
+// The title's and the story's music wait while the session is paused or the music screen or CG viewer plays its own,
+// and the viewer's waits while the session is paused.
 void Engine::holdMusic() {
-    bool hold = paused_ || trackPlayer_;
+    bool hold = paused_ || trackPlayer_ || viewMusic_;
     if (titleMusic_) audio_.pause(titleMusic_, hold);
     for (auto &[channel, player] : bgm_) audio_.pause(player, hold);
+    if (viewMusic_) audio_.pause(viewMusic_, paused_);
 }
 
 void Engine::stopTrack() {
@@ -1091,9 +1097,9 @@ void Engine::openGalleryCell(int index) {
 }
 
 // A replay runs its own flow, and ending it comes back to the gallery it started from.
-void Engine::startReplay(const GalleryEntry &scene) {
+bool Engine::startReplay(const GalleryEntry &scene) {
     auto flow = loadScript(scene.flow);
-    if (!flow || !flow->first()) return;
+    if (!flow || !flow->first()) return false;
     stopTrack();
     if (titleMusic_) {
         audio_.fade(titleMusic_, 500, 0, true);
@@ -1114,6 +1120,7 @@ void Engine::startReplay(const GalleryEntry &scene) {
     replaying_ = true;
     waiting_ = Waiting::None;
     dirty_ = true;
+    return true;
 }
 
 // The gallery tab the viewer returns to.
@@ -1184,6 +1191,10 @@ void Engine::applyArtSet() {
         for (auto &[slot, sprite] : *sprites)
             if (!sprite.path.empty() && !sprite.flipCount)
                 if (ImageRef image = images_->get(shownPath(sprite.path))) sprite.image = image;
+    // A transition and motion blur hold frames drawn with the old art, so they end here.
+    transitioning_ = false;
+    ruleImage_ = nullptr;
+    previousValid_ = false;
     dirty_ = true;
 }
 
@@ -1569,8 +1580,10 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d, int slot) {
-    // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit.
+    // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG
+    // viewer it may have come from.
     replaying_ = false;
+    replayFromViewer_ = false;
     stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
@@ -2773,11 +2786,21 @@ void Engine::mouseMove(float x, float y) {
     pointerX_ = px;
     pointerY_ = py;
     pointerSeen_ = true;
-    if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) pressSettingsWidget(px, py, true);
+    if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
+        if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
+        else pressSettingsWidget(px, py, true);
+    }
 }
 
 void Engine::mouseButton(int button, bool down) {
-    if (button == 0) leftHeld_ = down;
+    if (button == 0) {
+        // The CG viewer's volume is kept when the slider's let go.
+        if (!down && leftHeld_ && viewerDragging_) {
+            viewerDragging_ = false;
+            saveSettings();
+        }
+        leftHeld_ = down;
+    }
     // A click during the title's opening ends it and does nothing more.
     if (down && openingFrom_ >= 0 && screen_ && screen_->name == "title") {
         openingFrom_ = -1;

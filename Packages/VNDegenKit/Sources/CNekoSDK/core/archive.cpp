@@ -48,7 +48,7 @@ bool hasFolder(const std::string &name) {
 // base names: The Alchemist's sys_5.pak holds Masami Chie's original CGs and sprites, shown only when the player picks
 // them, and Test Game 86's sys_3.pak blank sprites. Test Games 90 and 92 name their patches' new pictures that way too.
 bool isArt(const std::string &path) {
-    auto slash = path.find('\\');
+    auto slash = path.find_first_of("\\/");
     if (slash == std::string::npos) return false;
     std::string folder = lower(path.substr(0, slash));
     return folder == "cg" || folder == "sc" || folder == "obj" || folder == "parts";
@@ -114,11 +114,12 @@ void Files::add(const std::string &path, Source source) {
     if (source.priority >= slot.priority) slot = std::move(source);
 }
 
-// Lookup order, highest first, from the files Test Game 92's exe opens under Wine: a patch's loose files, then that
-// patch's own archives, later patches before earlier ones, then folders such as `scr` beside the base archives (a fan
-// translation's place), then the base archives. 92's sys_5 scripts win over the older ones in its top-level `scr`.
+// Lookup order, highest first, from the files Test Game 92's exe opens under Wine: a patch's loose files, then the
+// archives in its folder, then its sys_N.pak, later patches before earlier ones, then folders such as `scr` beside the
+// base archives (a fan translation's place), then the base archives. 92's sys_5 scripts win over the older ones in its
+// top-level `scr`. Patch priorities are spaced by three so a patch's folder archives and loose files fit above its pak.
 constexpr int kLooseFolderPriority = 1;
-int patchArchivePriority(int patch) { return patch * 2 + 2; }
+int patchArchivePriority(int patch) { return patch * 3 + 2; }
 
 static bool isArchiveName(const std::string &low) { return low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0; }
 
@@ -174,9 +175,12 @@ void Files::indexArchive(const std::string &file, const std::string &folder, int
         source.size = rd32(&index[pos + 4]) ^ uint32_t(key);
         pos += 8;
         if (uint64_t(source.offset) + source.size > fileSize) continue;
-        // An archive in a patch folder, such as Test Game 92's sys_5/obj.pak, holds that folder's files.
+        // An archive in a patch folder, such as Test Game 92's sys_5/obj.pak, holds that folder's files. As in a base
+        // archive, an entry with folders of its own also answers to its own name, unless the full path is art.
         if (!patch.empty()) {
-            addPatched(patch, folder.empty() || hasFolder(name) ? name : folder + "\\" + name, source);
+            std::string qualified = folder.empty() ? name : folder + "\\" + name;
+            addPatched(patch, qualified, source);
+            if (!folder.empty() && hasFolder(name) && !isArt(qualified)) addPatched(patch, name, source);
             continue;
         }
         // Entries with folders of their own: `rain\\x.ogg` in `se.pak` names `se\\rain\\x.ogg`, and a script could mean
@@ -230,13 +234,13 @@ bool Files::open(const std::string &root) {
         else if (isArchiveName(low)) found.push_back({name, low.substr(0, low.size() - 4), false});
     }
     closedir(d);
-    // The order is above kLooseFolderPriority. Patch priorities are spaced so a patch's folder fits above its archive.
+    // The order is above kLooseFolderPriority.
     for (const auto &item : found) {
         int patch = patchNumber(item.stem);
         if (item.folder) {
             // Beside the archives, cfg, scr and the like outrank them: a fan translation's changes sit there, and the PC
             // game shows them. A patch outranks them.
-            if (patch >= 0) indexFolder(root + "/" + item.name, "", patchArchivePriority(patch) + 1, item.stem);
+            if (patch >= 0) indexFolder(root + "/" + item.name, "", patchArchivePriority(patch) + 2, item.stem);
             else indexFolder(root + "/" + item.name, item.stem, kLooseFolderPriority, {});
             continue;
         }

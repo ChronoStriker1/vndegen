@@ -291,8 +291,12 @@ private:
     int viewerButtonRow(const std::vector<std::string> &line, bool over) const;
     const std::vector<std::string> *viewerButtonAt(int x, int y) const;
     void pressViewer(int x, int y);
+    void dragViewerSlider(int x, int y);
+    std::vector<std::pair<int, int>> viewerSpots() const;
+    bool viewerDragging_ = false;
     void stepViewer(int ms);
-    void startReplay(const GalleryEntry &scene);
+    // False when the scene has no flow to play.
+    bool startReplay(const GalleryEntry &scene);
     bool replaying_ = false;
     int trackPlayer_ = 0;
 
