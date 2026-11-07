@@ -1,6 +1,7 @@
 // vnwolf.h: the runtime behind a C interface for the app.
 #include "vnwolf.h"
 
+#include "framepace.h"
 #include "game.h"
 #include "render.h"
 
@@ -17,7 +18,7 @@ struct VNWolfEngine {
     std::unique_ptr<Renderer> renderer;
     Bitmap frame;
     FILE *log = nullptr;
-    double elapsedMs = 0;
+    FramePace pace;
     int speed = 1;
     bool paused = false, advanced = true;
     std::string cheatState;
@@ -124,11 +125,9 @@ const char *vnwolf_start_error(void) { return gStartError.empty() ? nullptr : gS
 
 bool vnwolf_step(VNWolfEngine *e, int ms) {
     if (!e || e->paused) return !e || !e->game->quitRequested();
-    double frameMs = 1000.0 / e->game->gameDat().fps();
-    e->elapsedMs += double(ms) * e->speed;
     // At most four of the game's own frames per step, so a stall doesn't make the game race to catch up.
-    int frames = 0, most = 4 * e->speed;
-    while (e->elapsedMs >= frameMs && frames < most) {
+    int frames = e->pace.advance(ms, 1000.0 / e->game->gameDat().fps(), e->speed, 4 * e->speed);
+    for (int i = 0; i < frames; i++) {
         Input in;
         in.held = heldKeys(e) | e->pressed;
         in.pressed = e->pressed;
@@ -144,11 +143,8 @@ bool vnwolf_step(VNWolfEngine *e, int ms) {
         e->mousePressed = 0;
         e->wheel = 0;
         e->game->update(in);
-        e->elapsedMs -= frameMs;
-        frames++;
         if (e->game->quitRequested()) return false;
     }
-    if (e->elapsedMs > frameMs * most) e->elapsedMs = 0;
     if (frames) {
         e->renderer->draw(e->frame);
         e->advanced = true;
@@ -219,7 +215,7 @@ void vnwolf_set_paused(VNWolfEngine *e, bool paused) {
     e->codesPressed.reset();
     e->mouseHeld = e->mousePressed = 0;
     e->wheel = 0;
-    e->elapsedMs = 0;
+    e->pace = {};
     if (Audio *a = e->game->audio()) {
         if (paused) a->pause();
         else a->resume();

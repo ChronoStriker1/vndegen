@@ -24,7 +24,7 @@ final class NScripterSession: EngineSession {
     private var engine: OpaquePointer?
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval?
+    private var clock = MillisecondClock()
     #if DEBUG
     private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
     #endif
@@ -115,8 +115,7 @@ final class NScripterSession: EngineSession {
     fileprivate func step(_ link: CADisplayLink) {
         guard let engine else { return }
         let now = link.timestamp
-        let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
-        lastTimestamp = now
+        let ms = clock.tick(at: now)
         guard !paused else { return }
         if !vnns_step(engine, Int32(min(max(ms, 0), 100))) {
             finish(byGame: true)
@@ -193,7 +192,7 @@ final class NScripterSession: EngineSession {
         // A paused app may be killed without warning too.
         if paused { vnns_save_system_data(engine) }
         if paused { audio?.pause() } else { audio?.resume() }
-        lastTimestamp = nil
+        clock.reset()
         if !paused { frameView.takeFocus() }
     }
 

@@ -23,7 +23,7 @@ final class NekoSDKSession: EngineSession {
     private var engine: OpaquePointer?
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval?
+    private var clock = MillisecondClock()
     #if DEBUG
     private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing(tag: "NEKOFRAMES") : nil
     #endif
@@ -90,8 +90,7 @@ final class NekoSDKSession: EngineSession {
     fileprivate func step(_ link: CADisplayLink) {
         guard let engine else { return }
         let now = link.timestamp
-        let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
-        lastTimestamp = now
+        let ms = clock.tick(at: now)
         guard !paused else { return }
         #if DEBUG
         let began = CACurrentMediaTime()
@@ -206,7 +205,7 @@ final class NekoSDKSession: EngineSession {
         guard let engine else { return }
         vnneko_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
-        lastTimestamp = nil
+        clock.reset()
         if !paused { frameView.takeFocus() }
     }
 

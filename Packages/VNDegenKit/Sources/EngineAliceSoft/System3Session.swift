@@ -24,8 +24,7 @@ final class System3Session: EngineSession {
     private var engine: OpaquePointer?
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval?
-    private var msCarry = 0.0  // the part of a millisecond the last step didn't pass on
+    private var clock = MillisecondClock()
     private var router = System3InputRouter()
     private var frameSize = CGSize(width: 640, height: 480)
     private var shownSerial: UInt32 = .max
@@ -118,11 +117,7 @@ final class System3Session: EngineSession {
     fileprivate func step(_ link: CADisplayLink) {
         guard let engine else { return }
         let now = link.timestamp
-        // Whole milliseconds, carrying the fraction: rounding each 16.67 ms refresh to 17 ran the game 2% fast.
-        let elapsed = lastTimestamp.map { (now - $0) * 1000 + msCarry } ?? 16
-        let ms = Int(elapsed.rounded(.down))
-        msCarry = elapsed - Double(ms)
-        lastTimestamp = now
+        let ms = clock.tick(at: now)
         guard !paused else { return }
         if !vns3_frame(engine, UInt32(min(max(ms, 0), 100))) {
             finish(byGame: true)
@@ -271,8 +266,7 @@ final class System3Session: EngineSession {
         if paused { deliver(router.releaseAll()) }
         vns3_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
-        lastTimestamp = nil
-        msCarry = 0
+        clock.reset()
         #if DEBUG
         pacing?.reset()
         #endif

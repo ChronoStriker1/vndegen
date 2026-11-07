@@ -196,6 +196,7 @@ let package = Package(
         .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile"]),
         .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
+        .testTarget(name: "FrameHostTests", dependencies: ["FrameHost"]),
     ],
     cxxLanguageStandard: .cxx17
 )
