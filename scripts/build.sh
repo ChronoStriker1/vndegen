@@ -83,12 +83,19 @@ case "${1:?destination}" in
     build/vnvideo_test Engines/Shared/testdata | filter 'FAIL|passed|failures'
     # Lookups that ignore case are tested on a case-sensitive volume, as iPhones and iPads have, through
     # VNDEGEN_TEST_DIR. The shared C lookup the RGSS and KiriKiri engines use is tested there first.
-    case_volume=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-case.XXXXXX")
-    scripts/case-volume.sh attach build/case-sensitive.sparseimage "$case_volume"
     # The image keeps what a run leaves, so each run works in a folder of its own and removes it. The run's temporary
-    # folder goes only once the volume inside it is detached.
+    # folder, which holds the mount point, goes only once nothing is mounted there: a mounted volume is another device.
+    case_volume=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-case.XXXXXX")
     case_run=
-    trap 'rm -rf "${case_run:-/nonexistent}"; scripts/case-volume.sh detach "$case_volume" && rmdir "$case_volume" && rm -rf "$run_tmp"' EXIT
+    case_cleanup() {
+      rm -rf "${case_run:-/nonexistent}"
+      if [ "$(stat -f %d "$case_volume")" != "$(stat -f %d "$run_tmp")" ]; then
+        scripts/case-volume.sh detach "$case_volume" || return
+      fi
+      rmdir "$case_volume" && rm -rf "$run_tmp"
+    }
+    trap case_cleanup EXIT
+    scripts/case-volume.sh attach build/case-sensitive.sparseimage "$case_volume"
     case_run=$(mktemp -d "$case_volume/run.XXXXXX")
     mkdir "$case_run/casepath"
     cc -std=c11 -Wall -Wextra -Werror -o build/casepath_test Engines/Shared/casepath.c Engines/Shared/casepath_test.c

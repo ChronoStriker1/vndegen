@@ -205,7 +205,8 @@ enum DebugHooks {
         view.cacheDisplay(in: view.bounds, to: rep)
         var metal = hasMetalLayer(view.layer)
         // Back to front, so the frontmost lands on top. Each is placed by its content's place on screen.
-        let over = shown.filter { $0 !== main && $0.frame.intersects(main.frame) }.sorted { $0.orderedIndex > $1.orderedIndex }
+        let over = shown.filter { $0 !== main && $0.orderedIndex < main.orderedIndex && $0.frame.intersects(main.frame) }
+            .sorted { $0.orderedIndex > $1.orderedIndex }
         if !over.isEmpty, let context = NSGraphicsContext(bitmapImageRep: rep) {
             let base = main.convertToScreen(view.convert(view.bounds, to: nil))
             NSGraphicsContext.saveGraphicsState()
@@ -231,9 +232,11 @@ enum DebugHooks {
         }
     }
 
-    /// The largest window showing. The first in `NSApp.windows` can be an alert or another small window over it.
+    /// The largest window showing that is the app's own, not a sheet, panel, or alert over it. The first in
+    /// `NSApp.windows` can be an alert, and a file panel can be larger than a small window.
     private static var mainWindow: NSWindow? {
-        NSApp.windows.filter(\.isVisible).max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        NSApp.windows.filter { $0.isVisible && !$0.isSheet && !($0 is NSPanel) && $0.parent == nil }
+            .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
     }
 
     private static func hasMetalLayer(_ layer: CALayer?) -> Bool {
