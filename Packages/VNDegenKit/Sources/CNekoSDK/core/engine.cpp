@@ -2195,6 +2195,20 @@ void Engine::composeScreen(Canvas &out) {
     composeTrackTime(out);
     composeSettingsWidgets(out);
     bool fromTitle = returnTo_ == "title";
+    // `helplast`: hovered help draws after every button, as Test Games 92 and 93 draw their side menu's bubbles over the
+    // entry above.
+    bool helpLast = screen_->setting("helplast") != nullptr;
+    const Button *helpOf = nullptr;
+    auto drawButton = [&](Canvas &c, const Button &b, ButtonState state, bool withHelp = false) {
+        if (helpLast && b.help && (withHelp || state == StateHover || state == StateSelectedHover)) {
+            Button shown = b;
+            shown.help = nullptr;
+            neko::drawButton(c, shown, state);
+            helpOf = &b;
+            return;
+        }
+        neko::drawButton(c, b, state, withHelp);
+    };
     for (Button &b : screen_->buttons) {
         if (b.action.rfind("track", 0) == 0) {
             size_t index = size_t(std::atoi(b.action.c_str() + 5));
@@ -2205,7 +2219,8 @@ void Engine::composeScreen(Canvas &out) {
         ButtonState state = over ? StateHover : StateNormal;
         bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
-        if (current) state = over ? StateSelectedHover : StateSelected;
+        // `selectedlook`: the current one keeps its selected look under the pointer, as in Test Games 92 and 93.
+        if (current) state = over && !screen_->setting("selectedlook") ? StateSelectedHover : StateSelected;
         // The PC games show no help for the tab, page or menu already open.
         if (current && b.help) {
             Button shown = b;
@@ -2248,6 +2263,7 @@ void Engine::composeScreen(Canvas &out) {
         }
         drawButton(out, b, state);
     }
+    if (helpOf) drawButtonHelp(out, *helpOf);
     // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW]`: a line of help shown while the pointer is over that part of the screen,
     // such as a settings group in Config, as the PC games show them. Test Game 84 keeps its lines as rows of one sheet.
     if (pointerSeen_ && !dialogOpen_)

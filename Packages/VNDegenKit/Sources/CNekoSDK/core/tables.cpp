@@ -1367,6 +1367,8 @@ button scene obj\d003_000.bmp 437 640 10 5 4 help obj\d005_000.bmp 0 686 1 11 0 
 button music obj\d003_000.bmp 625 640 10 5 5 help obj\d005_000.bmp 0 686 1 11 0 5
 
 screen load
+helplast
+selectedlook
 pic obj\e000_000.bmp 0 0
 # The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
 # of bars lies over the top and bottom.
@@ -1395,17 +1397,19 @@ button page7 obj\e006_000.bmp 632 34 10 5 7
 button page8 obj\e006_000.bmp 682 34 10 5 8
 button page9 obj\e006_000.bmp 732 34 10 5 9
 button page10 obj\e006_001.bmp 782 34 1 5 0
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 
 screen save
+helplast
+selectedlook
 pic obj\e000_000.bmp 0 0
 # The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
 # of bars lies over the top and bottom.
@@ -1433,17 +1437,19 @@ button page7 obj\e006_000.bmp 632 34 10 5 7
 button page8 obj\e006_000.bmp 682 34 10 5 8
 button page9 obj\e006_000.bmp 732 34 10 5 9
 button page10 obj\e006_001.bmp 782 34 1 5 0
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 
 screen cg
+helplast
+selectedlook
 # The CG viewer's panel, measured under Wine.
 viewer obj\j000_000.bmp 0 558
 viewerhelp obj\j008_000.bmp 830 679 13
@@ -1508,17 +1514,19 @@ button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 
 screen scene
+helplast
+selectedlook
 # The galleries' room, and each tab's two women, standing sprites the exe reads from sys.pak (traced under Wine), 73
 # pixels further left a tab.
 pic obj\f000_001.bmp 0 0
@@ -1556,17 +1564,19 @@ button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 
 screen music
+helplast
+selectedlook
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
 # The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
@@ -1592,17 +1602,19 @@ button track4 obj\g002_000.bmp 604 168 8 5 4
 button track5 obj\g002_000.bmp 604 272 8 5 5
 button track6 obj\g002_000.bmp 604 376 8 5 6
 button track7 obj\g002_000.bmp 604 480 8 5 7
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 
 screen config
+helplast
+selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
 hover 581 342 730 414 obj\h004_000.bmp 350 669 9 7
 hover 410 198 565 270 obj\h004_000.bmp 350 669 9 4
@@ -1628,15 +1640,15 @@ button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
 button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
 button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
 button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 pic obj\h006_000.bmp 172 93 2 5 0 4
 pic obj\h006_000.bmp 294 93 2 5 1 4
 pic obj\h007_000.bmp 172 133 6 5 0 4
@@ -1671,6 +1683,8 @@ pic obj\h013_000.bmp 603 287 8 5 6 4
 pic obj\h013_000.bmp 603 315 8 5 7 4
 
 screen config2
+helplast
+selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
 hover 581 294 810 342 obj\h004_002.bmp 362 669 6 5
 hover 581 85 810 150 obj\h004_002.bmp 362 669 6 0
@@ -1694,15 +1708,15 @@ button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
 button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
 button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
 button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 radio text 0 obj\h016_000.bmp 64 122 4 5 0
 radio auto 0 obj\h016_000.bmp 64 200 4 5 0
 radio text 1 obj\h016_000.bmp 186 122 4 5 1
@@ -1731,6 +1745,8 @@ pic obj\h010_000.bmp 119 570 2 5 0 4
 pic obj\h010_000.bmp 469 570 2 5 1 4
 
 screen config3
+helplast
+selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
 hover 581 85 810 150 obj\h004_003.bmp 372 669 8 6
 hover 50 85 565 150 obj\h004_003.bmp 372 669 8 0
@@ -1752,15 +1768,15 @@ button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
 button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
 button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
 button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
-button nav_save obj\e004_000.bmp 1152 93 9 5 0
-button nav_load obj\e004_000.bmp 1152 135 9 5 1
-button nav_cg obj\e004_000.bmp 1152 177 9 5 2
-button nav_scene obj\e004_000.bmp 1152 219 9 5 3
-button nav_music obj\e004_000.bmp 1152 261 9 5 4
-button nav_config obj\e004_000.bmp 1152 303 9 5 5
-button nav_title obj\e004_000.bmp 1152 345 9 5 6
-button nav_quit obj\e004_000.bmp 1152 387 9 5 7
-button back obj\e004_000.bmp 1152 469 9 5 8
+button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
+button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
+button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
+button nav_scene obj\e004_000.bmp 1152 219 9 5 3 help obj\e005_000.bmp 868 171 1 9 0 3
+button nav_music obj\e004_000.bmp 1152 261 9 5 4 help obj\e005_000.bmp 868 213 1 9 0 4
+button nav_config obj\e004_000.bmp 1152 303 9 5 5 help obj\e005_000.bmp 868 255 1 9 0 5
+button nav_title obj\e004_000.bmp 1152 345 9 5 6 help obj\e005_000.bmp 868 297 1 9 0 6
+button nav_quit obj\e004_000.bmp 1152 387 9 5 7 help obj\e005_000.bmp 868 339 1 9 0 7
+button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 8
 slider master obj\h009_000.bmp 154 128
 number master obj\h011_000.bmp 415 100
 step master -1 obj\h010_000.bmp 119 130 2 5 0
@@ -3469,6 +3485,8 @@ button scene sys_5\obj\d003_000.bmp 244 638 11 5 4 help sys_5\obj\d005_000.bmp 0
 button music sys_5\obj\d003_000.bmp 622 638 11 5 6 help sys_5\obj\d005_000.bmp 0 686 1 12 0 6
 
 screen load
+helplast
+selectedlook
 pic obj\e000_000.bmp 0 0
 # The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
 # Wine), and a frame of bars lies over the top and bottom.
@@ -3497,18 +3515,20 @@ button page7 obj\e006_000.bmp 632 34 10 5 7
 button page8 obj\e006_000.bmp 682 34 10 5 8
 button page9 obj\e006_000.bmp 732 34 10 5 9
 button page10 obj\e006_001.bmp 782 34 1 5 0
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 
 screen save
+helplast
+selectedlook
 pic obj\e000_000.bmp 0 0
 # The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
 # Wine), and a frame of bars lies over the top and bottom.
@@ -3536,18 +3556,20 @@ button page7 obj\e006_000.bmp 632 34 10 5 7
 button page8 obj\e006_000.bmp 682 34 10 5 8
 button page9 obj\e006_000.bmp 732 34 10 5 9
 button page10 obj\e006_001.bmp 782 34 1 5 0
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 
 screen cg
+helplast
+selectedlook
 # The CG viewer's panel, measured under Wine.
 viewer obj\j000_000.bmp 0 558
 viewerhelp obj\j008_000.bmp 830 679 13
@@ -3612,18 +3634,20 @@ button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 
 screen anime
+helplast
+selectedlook
 # The anime gallery: entries of movies from anime_view.ini, which play looping in the CG viewer's panel without its art
 # switches.
 viewer obj\j000_000.bmp 0 558
@@ -3684,18 +3708,20 @@ button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 
 screen scene
+helplast
+selectedlook
 # The galleries' room, and each tab's two mothers, standing sprites the exe reads from sc.pak (traced under Wine),
 # 73 pixels further left a tab.
 pic obj\f000_001.bmp 0 0
@@ -3733,18 +3759,20 @@ button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 
 screen music
+helplast
+selectedlook
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
 # The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
@@ -3770,18 +3798,20 @@ button track4 obj\g002_000.bmp 599 162 8 5 4
 button track5 obj\g002_000.bmp 599 266 8 5 5
 button track6 obj\g002_000.bmp 599 370 8 5 6
 button track7 obj\g002_000.bmp 599 474 8 5 7
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 
 screen config
+helplast
+selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
 hover 581 342 730 414 obj\h004_000.bmp 350 669 9 7
 hover 410 198 565 270 obj\h004_000.bmp 350 669 9 4
@@ -3807,16 +3837,16 @@ button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
 button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
 button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
 button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 pic obj\h006_000.bmp 172 93 2 5 0 4
 pic obj\h006_000.bmp 294 93 2 5 1 4
 pic obj\h007_000.bmp 172 133 6 5 0 4
@@ -3851,6 +3881,8 @@ pic obj\h013_000.bmp 603 287 8 5 6 4
 pic obj\h013_000.bmp 603 315 8 5 7 4
 
 screen config2
+helplast
+selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
 hover 581 294 810 342 sys_5\obj\h004_002.bmp 362 669 6 5
 hover 581 85 810 150 sys_5\obj\h004_002.bmp 362 669 6 0
@@ -3874,16 +3906,16 @@ button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
 button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
 button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
 button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 radio text 0 obj\h016_000.bmp 64 122 4 5 0
 radio auto 0 obj\h016_000.bmp 64 200 4 5 0
 radio text 1 obj\h016_000.bmp 186 122 4 5 1
@@ -3912,6 +3944,8 @@ pic obj\h010_000.bmp 119 570 2 5 0 4
 pic obj\h010_000.bmp 469 570 2 5 1 4
 
 screen config3
+helplast
+selectedlook
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
 hover 581 85 810 150 obj\h004_003.bmp 372 669 8 6
 hover 50 85 565 150 obj\h004_003.bmp 372 669 8 0
@@ -3933,16 +3967,16 @@ button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
 button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
 button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
 button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
-button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
-button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
-button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
-button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
-button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
-button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
-button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
-button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
-button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3 help sys_5\obj\e005_000.bmp 868 171 1 10 0 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4 help sys_5\obj\e005_000.bmp 868 213 1 10 0 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5 help sys_5\obj\e005_000.bmp 868 255 1 10 0 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000.bmp 868 297 1 10 0 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
 slider master obj\h009_000.bmp 154 128
 number master obj\h011_000.bmp 415 100
 step master -1 obj\h010_000.bmp 119 130 2 5 0

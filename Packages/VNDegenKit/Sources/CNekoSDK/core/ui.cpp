@@ -54,12 +54,13 @@ void drawButton(Canvas &out, const Button &b, ButtonState state, bool withHelp) 
     int row = state == StateNormal ? b.normalRow : state == StateHover ? b.hoverRow : int(state);
     row = std::min(row, b.rows - 1);
     drawPart(out, *b.sheet, b.x, b.y, b.column * b.cellW(), row * b.cellH(), b.cellW(), b.cellH(), 1);
-    if (withHelp || state == StateHover || state == StateSelectedHover) {
-        if (b.help) {
-            int w = b.help->w / b.helpCols, h = b.help->h / b.helpRows;
-            drawPart(out, *b.help, b.helpX, b.helpY, b.helpColumn * w, b.helpRow * h, w, h, 1);
-        }
-    }
+    if (withHelp || state == StateHover || state == StateSelectedHover) drawButtonHelp(out, b);
+}
+
+void drawButtonHelp(Canvas &out, const Button &b) {
+    if (!b.help) return;
+    int w = b.help->w / b.helpCols, h = b.help->h / b.helpRows;
+    drawPart(out, *b.help, b.helpX, b.helpY, b.helpColumn * w, b.helpRow * h, w, h, 1);
 }
 
 std::map<std::string, Screen> parseScreens(const char *table, Images &images, const std::function<void(const std::string &)> &warn) {

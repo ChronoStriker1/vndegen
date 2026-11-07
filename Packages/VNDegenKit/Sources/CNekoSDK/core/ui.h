@@ -47,6 +47,8 @@ struct Picture {
 void drawPicture(Canvas &out, const Picture &p, float towardX = 0, float towardY = 0);
 // `withHelp` shows the button's help whatever its state, as for the button whose question is open.
 void drawButton(Canvas &out, const Button &b, ButtonState state, bool withHelp = false);
+// A button's help alone, for a screen that draws it after all of its buttons so none covers it.
+void drawButtonHelp(Canvas &out, const Button &b);
 
 // A menu screen from a game's table: pictures and buttons, drawn in order, and where the screen's own parts go.
 struct Screen {
