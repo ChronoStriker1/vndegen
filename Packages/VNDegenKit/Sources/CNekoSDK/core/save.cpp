@@ -149,6 +149,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\tmgb") return &kTsumaGibo;
     if (folder == "waffle\\funbagfantasy3") return &kFunbagFantasy;
     if (folder == "waffle\\funbag4") return &kFunbag4;
+    if (folder == "waffle\\moralorc") return &kMoralOrc;
     return nullptr;
 }
 

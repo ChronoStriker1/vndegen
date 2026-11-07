@@ -2904,8 +2904,8 @@ run 2120 9 1
 run 2160 1 1
 )";
 
-// Horny Elves and a Moral Orc (Test Game 89), 1280x720, measured under Wine. Its title, questions and backlog; the other
-// menus come next.
+// Horny Elves and a Moral Orc (Test Game 89), 1280x720, measured under Wine. Its title, save and load, questions and
+// backlog; the other menus come next.
 const char kMoralOrc[] = R"(
 screen title
 pic obj\c000_000.bmp 0 0
@@ -2923,6 +2923,81 @@ button scene obj\d004_000.bmp 1103 153 10 5 4
 button music obj\d004_000.bmp 1053 294 10 5 5
 button config obj\d004_000.bmp 1103 435 10 5 6
 button quit obj\d004_000.bmp 1053 576 10 5 8
+
+screen load
+pic obj\f000_000.bmp 0 0
+pic obj\f001_000.bmp 0 0
+pic obj\f001_001.bmp 12 15 1 2 0 1
+slots obj\f010_000.bmp 34 158 555 182 3 2
+slotlabel obj\f011_000.bmp 20 24
+slotdigits obj\f011_001.bmp 84 18
+slotthumb 14 51
+datedigits obj\f012_000.bmp 191 91
+dateslash obj\f012_002.bmp
+datecolon obj\f012_003.bmp
+datedash obj\f012_001.bmp
+dategap 16
+slotlock obj\f014_000.bmp 489 85
+slotdelete obj\f014_001.bmp 473 15
+slotchapter obj\f013_000.bmp 186 16 20 flow01 flow02 flow03 flow04 flow05 flow06 flow07 flow08 flow09 flow10 flow11 flow12 flow13 flow14 flow15 flow16 flow18 flow19 flow20 flow21
+button page0 obj\f009_000.bmp 1151 161 10 5 0
+button page1 obj\f009_000.bmp 1213 195 10 5 1
+button page2 obj\f009_000.bmp 1151 245 10 5 2
+button page3 obj\f009_000.bmp 1213 279 10 5 3
+button page4 obj\f009_000.bmp 1151 329 10 5 4
+button page5 obj\f009_000.bmp 1213 363 10 5 5
+button page6 obj\f009_000.bmp 1151 413 10 5 6
+button page7 obj\f009_000.bmp 1213 447 10 5 7
+button page8 obj\f009_000.bmp 1151 497 10 5 8
+button page9 obj\f009_000.bmp 1213 531 10 5 9
+button page10 obj\f009_001.bmp 1155 605 1 5 0
+button nav_save obj\f002_000.bmp 666 6 8 5 0
+button nav_load obj\f002_000.bmp 791 6 8 5 1
+button nav_cg obj\f002_000.bmp 916 6 8 5 2
+button nav_scene obj\f002_000.bmp 1041 6 8 5 3
+button nav_music obj\f002_000.bmp 704 51 8 5 4
+button nav_config obj\f002_000.bmp 829 51 8 5 5
+button nav_title obj\f002_000.bmp 954 51 8 5 6
+button nav_quit obj\f002_000.bmp 1079 51 8 5 7
+button back obj\f002_001.bmp 1195 11 1 5 0
+
+screen save
+pic obj\f000_000.bmp 0 0
+pic obj\f001_000.bmp 0 0
+pic obj\f001_001.bmp 12 15 1 2 0 0
+slots obj\f010_000.bmp 34 158 555 182 3 2
+slotlabel obj\f011_000.bmp 20 24
+slotdigits obj\f011_001.bmp 84 18
+slotthumb 14 51
+datedigits obj\f012_000.bmp 191 91
+dateslash obj\f012_002.bmp
+datecolon obj\f012_003.bmp
+datedash obj\f012_001.bmp
+dategap 16
+slotlock obj\f014_000.bmp 489 85
+slotdelete obj\f014_001.bmp 473 15
+slotchapter obj\f013_000.bmp 186 16 20 flow01 flow02 flow03 flow04 flow05 flow06 flow07 flow08 flow09 flow10 flow11 flow12 flow13 flow14 flow15 flow16 flow18 flow19 flow20 flow21
+button page0 obj\f009_000.bmp 1151 161 10 5 0
+button page1 obj\f009_000.bmp 1213 195 10 5 1
+button page2 obj\f009_000.bmp 1151 245 10 5 2
+button page3 obj\f009_000.bmp 1213 279 10 5 3
+button page4 obj\f009_000.bmp 1151 329 10 5 4
+button page5 obj\f009_000.bmp 1213 363 10 5 5
+button page6 obj\f009_000.bmp 1151 413 10 5 6
+button page7 obj\f009_000.bmp 1213 447 10 5 7
+button page8 obj\f009_000.bmp 1151 497 10 5 8
+button page9 obj\f009_000.bmp 1213 531 10 5 9
+pageoff 10
+button page10 obj\f009_001.bmp 1155 605 1 5 0
+button nav_save obj\f002_000.bmp 666 6 8 5 0
+button nav_load obj\f002_000.bmp 791 6 8 5 1
+button nav_cg obj\f002_000.bmp 916 6 8 5 2
+button nav_scene obj\f002_000.bmp 1041 6 8 5 3
+button nav_music obj\f002_000.bmp 704 51 8 5 4
+button nav_config obj\f002_000.bmp 829 51 8 5 5
+button nav_title obj\f002_000.bmp 954 51 8 5 6
+button nav_quit obj\f002_000.bmp 1079 51 8 5 7
+button back obj\f002_001.bmp 1195 11 1 5 0
 
 screen start
 # New Game starts the first chapter; init.ini names no FirstFlow.

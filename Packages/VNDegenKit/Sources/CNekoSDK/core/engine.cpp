@@ -1382,6 +1382,7 @@ Engine::SlotInfo &Engine::slotInfo(int slot) {
     if (plain.empty() || !parseSave(plain, *layout_, data)) return info;
     info.exists = true;
     std::copy(std::begin(data.date), std::end(data.date), info.date);
+    info.flow = data.flow;
     auto bmp = readWhole(savePath(slot, "bmp"));
     if (!bmp.empty()) info.thumbnail = decodeBmpBytes(bmp);
     return info;
@@ -1707,6 +1708,14 @@ int Engine::cardsPerPage() const {
 }
 
 // Where the card at this place on a page sits.
+// `pageoff N`: page N's button is disabled on this screen, as Test Game 89's Quick Save page is on its save screen.
+bool Engine::pageOff(const std::string &action) const {
+    if (!screen_ || action.rfind("page", 0) != 0) return false;
+    for (auto [it, end] = screen_->settings.equal_range("pageoff"); it != end; ++it)
+        if (!it->second.empty() && action == "page" + it->second[0]) return true;
+    return false;
+}
+
 void Engine::cardPlace(int index, int &x, int &y) const {
     const auto &grid = *screen_->setting("slots");
     int perColumn = field(grid, 5), columns = field(grid, 6);
@@ -1787,6 +1796,19 @@ void Engine::composeSlots(Canvas &out) {
             else if (empty) drawPart(out, *empty, cx + offset("slotempty", 1), cy + offset("slotempty", 2), 0, 0, empty->w, empty->h, 1);
             if (frame && frame->h >= 5 && slot == hovered) drawPart(out, *frame, cx + offset("slotframe", 1), cy + offset("slotframe", 2), 0, frame->h / 5, frame->w, frame->h / 5, 1);
             if (noLabel) drawPart(out, *noLabel, cx + offset("slotlabel", 1), cy + offset("slotlabel", 2), 0, 0, noLabel->w, noLabel->h, 1);
+            // `slotchapter SHEET X Y ROWS FLOW...`: the name of the chapter a save is in, a row of the sheet for each flow
+            // script named in order, as Test Game 89's cards show.
+            if (const auto *chapter = screen_->setting("slotchapter"); chapter && chapter->size() >= 5 && info.exists)
+                if (ImageRef names = images_->get((*chapter)[0])) {
+                    std::string flow = normalizedPath(info.flow);
+                    flow = flow.substr(flow.find_last_of('\\') + 1);
+                    for (size_t i = 4; i < chapter->size(); i++)
+                        if (flow.rfind(normalizedPath((*chapter)[i]), 0) == 0) {
+                            int h = names->h / std::max(1, field(*chapter, 3));
+                            drawPart(out, *names, cx + field(*chapter, 1), cy + field(*chapter, 2), 0, int(i - 4) * h, names->w, h, 1);
+                            break;
+                        }
+                }
             // The Q-Save page numbers its cards from 1 again.
             // Test Game 84's cards there read Q01.
             ImageRef quickMark = slot >= firstQuickSlot_ ? picture("slotquick") : nullptr;
@@ -2066,6 +2088,7 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
+        if (pageOff(b.action)) state = StateDisabled;
         // The PC games show no help for the tab, page or menu already open.
         if (current && b.help) {
             Button shown = b;
@@ -2785,7 +2808,7 @@ void Engine::mouseButton(int button, bool down) {
         }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
-            if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);
+            if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action)) runAction(action);
             if (dialogOpen_) dialogOpener_ = action;
             return;
         }

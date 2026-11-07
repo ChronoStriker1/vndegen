@@ -59,3 +59,13 @@ const SaveLayout kFunbag4 = {
     16,  // the bytes of a text record after its strings
     17,  // where the first record holds the screen size
 };
+const SaveLayout kMoralOrc = {
+    -48,  // the extra bytes of this engine's sprite record over the oldest layout seen
+    {},
+    {{16, "ff00050000d002"}, {125, "ffffffff"}, {149, "f4010000dc0500001e"}, {161, "0a"}, {165, "3c"}, {181, "65"}, {189, "40"}, {197, "dc05"}, {203, "803f"}, {223, "803f"}, {243, "803f"}, {263, "803f"}, {335, "803f0000803f"}, {350, "01"}},
+    {{125, "ffffffff"}, {149, "f4010000dc0500001e"}, {161, "0a"}, {165, "3c"}, {181, "65"}, {189, "40"}, {197, "dc05"}, {203, "803f"}, {223, "803f"}, {243, "803f"}, {263, "803f"}, {333, "cdcc8c3fcdcc8c3f0002"}, {346, "010000ff"}},
+    {{116, "ffffffff64"}},
+    96, 22, {{2, "ffffffff"}, {72, "ffffffff"}},
+    7514, {{9, "68"}, {819, "ffffffff"}, {893, "ffffffff"}, {963, "ffffffff"}, {1013, "04"}, {1045, "3c"}, {6672, "68"}, {7482, "ffffffff"}},
+    16,  // the bytes of a text record after its strings
+};

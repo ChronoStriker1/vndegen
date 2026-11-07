@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
         // With NEKOSAVE_SPRITES set, each sprite's place, which is how to learn what a load command's position modes mean.
         if (std::getenv("NEKOSAVE_SPRITES"))
             for (const SavedSprite &sprite : data.sprites)
-                std::printf("  slot %d flip %d %s at %.1f, %.1f scale %.3f, %.3f anchor %d, %d alpha %d wave %d change %d frames [%s] end %.1f, %.1f scale %.3f\n", sprite.slot, sprite.flipFrame, sprite.path.c_str(), sprite.x, sprite.y, sprite.scaleX, sprite.scaleY, sprite.anchorX, sprite.anchorY, sprite.alpha, sprite.waveOn, sprite.animated, sprite.animationFrames, sprite.animation.c_str(), sprite.endX, sprite.endY, sprite.endScaleX);
+                std::printf("  slot %d flip %d %s at %.1f, %.1f scale %.3f, %.3f anchor %d, %d alpha %d wave %d change %d frames %d [%s] end %.1f, %.1f scale %.3f\n", sprite.slot, sprite.flipFrame, sprite.path.c_str(), sprite.x, sprite.y, sprite.scaleX, sprite.scaleY, sprite.anchorX, sprite.anchorY, sprite.alpha, sprite.waveOn, sprite.animated, sprite.animationFrames, sprite.animation.c_str(), sprite.endX, sprite.endY, sprite.endScaleX);
         for (size_t i = first, shown = 0; first != size_t(-1) && i < std::min(plain.size(), again.size()) && shown < 12; i++)
             if (plain[i] != again[i]) {
                 std::printf("  0x%zx: PC %02x, written %02x\n", i, plain[i], again[i]);

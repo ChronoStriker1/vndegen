@@ -170,8 +170,10 @@ private:
         bool exists = false;
         int date[6] = {};
         ImageRef thumbnail;
+        std::string flow;  // the flow script the save is in, for its chapter's name
     };
     SlotInfo &slotInfo(int slot);
+    bool pageOff(const std::string &action) const;
     void composeSlots(Canvas &out);
     int slotAt(int x, int y) const;
     void composeDialog(Canvas &out);
