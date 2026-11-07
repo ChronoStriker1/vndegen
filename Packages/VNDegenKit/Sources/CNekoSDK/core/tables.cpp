@@ -2490,6 +2490,29 @@ button nav_config obj\e003_000.bmp 1129 349 9 5 5 help obj\e004_005.bmp 993 305 
 button nav_title obj\e003_000.bmp 1133 407 9 5 6 help obj\e004_006.bmp 997 363 1 1 0 0
 button nav_quit obj\e003_000.bmp 1137 465 9 5 7 help obj\e004_007.bmp 1001 421 1 1 0 0
 button back obj\e003_000.bmp 1145 581 9 5 8 help obj\e004_008.bmp 1009 537 1 1 0 0
+# The CG viewer's panel, measured under Wine.
+viewer obj\j000_000.bmp 373 489
+viewerhelp obj\j006_001.bmp 870 681 12
+viewerbutton bgm obj\j006_000.bmp 434 640
+viewerbgm 0 2 0 0
+viewerslider obj\j005_000.bmp 416 610 11
+viewernumber volume obj\g005_000.bmp 481 580 16 3
+viewerbutton zoomout obj\j004_000.bmp 561 634 3 0 help 8
+viewerbutton zoomreset obj\j004_000.bmp 604 634 3 1 help 9
+viewerbutton zoomin obj\j004_000.bmp 647 634 3 2 help 10
+viewernumber zoom obj\j003_000.bmp 600 597 15 1
+viewernumber zoomfrac obj\j003_001.bmp 627 600 13 2
+viewerbutton replay obj\j002_000.bmp 713 640 help 1
+viewerbutton prevcg obj\j002_001.bmp 793 640 6 0 help 3
+viewerbutton prevvar obj\j002_001.bmp 848 640 6 1 help 4
+viewerbutton nextvar obj\j002_001.bmp 1023 640 6 2 help 5
+viewerbutton nextcg obj\j002_001.bmp 1078 640 6 3 help 6
+viewerbutton auto obj\j002_001.bmp 1138 640 6 4 help 7
+viewerbutton return obj\j002_001.bmp 1199 640 6 5 help 2
+viewerbutton hide obj\j001_000.bmp 1230 577 help 0
+viewernumber index obj\j003_000.bmp 921 619 15 2
+viewernumber total obj\j003_001.bmp 976 641 13 2
+viewerauto 8000 0
 
 screen scene
 pic obj\f000_000.bmp 0 0 tab 0

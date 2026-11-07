@@ -177,8 +177,10 @@ void Engine::composeViewerPicture(Canvas &out) {
 int Engine::viewerButtonRow(const std::vector<std::string> &f, bool over) const {
     const std::string &action = f[0];
     bool hideWhenOff = std::find(f.begin(), f.end(), "hide") != f.end();
+    // The variant buttons are off for an entry of one picture, though not for one with a single picture unlocked.
     bool off = (action == "replay" && !viewerScene()) || ((action == "zoomout" || action == "zoomreset") && viewZoom_ <= kZoomMin) ||
-               (action == "zoomin" && viewZoom_ >= kZoomMax) || (action == "bgm" && !viewMusic_);
+               (action == "zoomin" && viewZoom_ >= kZoomMax) || (action == "bgm" && !viewMusic_) ||
+               ((action == "prevvar" || action == "nextvar") && cgEntries_[viewEntry_].images.size() < 2);
     if (off) return hideWhenOff ? -1 : kDisabled;
     if (action == "auto" && viewAuto_) return kSelected + (over ? 1 : 0);
     return over ? kHover : kNormal;
