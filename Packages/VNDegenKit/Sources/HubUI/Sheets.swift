@@ -41,6 +41,7 @@ struct SheetScaffold<Content: View>: View {
                 .frame(maxHeight: doneBelow ? .infinity : nil, alignment: .top)
             if showsDone, doneBelow {
                 done.padding(.horizontal, 22).padding(.vertical, 12)
+                    .background(alignment: .top) { BottomBarFade(color: Theme.background) }
             }
         }
         .foregroundStyle(.white)
@@ -54,6 +55,18 @@ struct SheetScaffold<Content: View>: View {
         }
         .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
         .keyboardShortcut(escapeCloses ? .cancelAction : nil)
+    }
+}
+
+/// Fades a list out where it meets a bar pinned under it, rather than cutting it at a hard edge.
+struct BottomBarFade: View {
+    let color: Color
+
+    var body: some View {
+        LinearGradient(colors: [color.opacity(0), color], startPoint: .top, endPoint: .bottom)
+            .frame(height: 28)
+            .offset(y: -28)
+            .allowsHitTesting(false)
     }
 }
 
@@ -633,22 +646,11 @@ struct ConfirmationSheet: View {
     var body: some View {
         // Cancel is the way out, so a Done beside it would only blur which button keeps the game.
         SheetScaffold(title: confirmation.title, escapeCloses: true, showsDone: false) {
-            if cameraCorner > 0 {
-                // In a full-height sheet the buttons follow the message rather than wait at the bottom, a long way off.
-                ViewThatFits(in: .vertical) {
-                    VStack(alignment: .leading, spacing: 22) {
-                        details
-                        buttons(stacked: true)
-                    }
-                    layout(stacked: true)
-                }
+            // In the folded iPhone Duo's full-height sheets the buttons are stacked full width at the bottom, where the
+            // other sheets put Done.
+            layout(stacked: cameraCorner > 0)
                 .padding(.horizontal, 22)
-                .padding(.bottom, 22)
-            } else {
-                layout(stacked: false)
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 22)
-            }
+                .padding(.bottom, cameraCorner > 0 ? 12 : 22)
         }
         .fittedSheetHeight()
         #if os(macOS)

@@ -154,23 +154,30 @@ private struct PasscodeFlowSheet: View {
     let entry: PasscodeEntry
     @Environment(\.cameraCornerTrailing) private var cameraCorner
 
-    /// Laid out as the unlock screen is: the keypad in the middle, with Cancel in the top corner and the flow's name
-    /// over the keypad's prompt.
+    /// Laid out as the unlock screen is: Cancel in the top corner, then the flow's name over the keypad's prompt, with the
+    /// keypad centered in the space under Cancel.
     var body: some View {
         ZStack {
             LockBackdrop()
-            if let flow = entry.flow {
-                VStack(spacing: 6) {
-                    Text(flow.purpose.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.6))
-                    PasscodeKeypad(entry: entry, title: flow.title, expectedLength: flow.expectedLength(current: model.lock.passcodeLength),
-                                   keySize: 72, onSubmit: model.submit)
+            VStack(spacing: 0) {
+                LockCancelButton(escapes: true, action: model.closeFlow)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                GeometryReader { geometry in
+                    if let flow = entry.flow {
+                        // The keys shrink to fit a short window, such as a phone held sideways.
+                        let keySize = min(72, max(40, (geometry.size.height - 80) / 5.1))
+                        VStack(spacing: 6) {
+                            Text(flow.purpose.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.6))
+                            PasscodeKeypad(entry: entry, title: flow.title, expectedLength: flow.expectedLength(current: model.lock.passcodeLength),
+                                           keySize: keySize, onSubmit: model.submit)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             }
-            LockCancelButton(escapes: true, action: model.closeFlow)
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         // Beside a camera in the top corner the system insets that whole side, which would push the keypad off center
         // below the camera too. Cancel is in the other corner.

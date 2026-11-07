@@ -281,6 +281,11 @@ public struct ArchiveImportView: View {
             // Beside a camera in the top corner, Done moves to the bottom, as on the hub's sheets.
             if cameraCorner > 0 {
                 closeButton.padding(.horizontal, 22).padding(.vertical, 12)
+                    // A long list of archives fades out where it meets the bar.
+                    .background(alignment: .top) {
+                        LinearGradient(colors: [ImportTheme.background.opacity(0), ImportTheme.background], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 28).offset(y: -28).allowsHitTesting(false)
+                    }
             }
         }
         .foregroundStyle(.white)
