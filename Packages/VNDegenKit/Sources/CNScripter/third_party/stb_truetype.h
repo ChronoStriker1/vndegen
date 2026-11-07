@@ -1152,7 +1152,9 @@ static void stbtt__buf_seek(stbtt__buf *b, int o)
 
 static void stbtt__buf_skip(stbtt__buf *b, int o)
 {
-   stbtt__buf_seek(b, b->cursor + o);
+   // VNDegen: summed in 64 bits, since o comes from the font and cursor + o could overflow.
+   long long to = (long long) b->cursor + o;
+   stbtt__buf_seek(b, (to < 0 || to > b->size) ? b->size : (int) to);
 }
 
 static stbtt_uint32 stbtt__buf_get(stbtt__buf *b, int n)
@@ -1259,7 +1261,8 @@ static int stbtt__cff_index_count(stbtt__buf *b)
 
 static stbtt__buf stbtt__cff_index_get(stbtt__buf b, int i)
 {
-   int count, offsize, start, end;
+   int count, offsize;
+   long long start, end, at;
    stbtt__buf_seek(&b, 0);
    count = stbtt__buf_get16(&b);
    offsize = stbtt__buf_get8(&b);
@@ -1268,7 +1271,10 @@ static stbtt__buf stbtt__cff_index_get(stbtt__buf b, int i)
    stbtt__buf_skip(&b, i*offsize);
    start = stbtt__buf_get(&b, offsize);
    end = stbtt__buf_get(&b, offsize);
-   return stbtt__buf_range(&b, 2+(count+1)*offsize+start, end - start);
+   // VNDegen: the offsets come from the font, so the sums are in 64 bits and an entry outside the buffer is empty.
+   at = 2 + (long long)(count+1)*offsize + start;
+   if (end < start || at > b.size || end - start > b.size) return stbtt__new_buf(NULL, 0);
+   return stbtt__buf_range(&b, (int) at, (int) (end - start));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1788,7 +1794,12 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                // where we can start, and we need to save some state for when we wraparound.
                scx = x;
                scy = y;
-               if (!(vertices[off+i+1].type & 1)) {
+               if (i + 1 == n) {
+                  // VNDegen: an off-curve point that starts a contour as the glyph's last point had its next point
+                  // read from past the array; it starts the contour itself.
+                  sx = x;
+                  sy = y;
+               } else if (!(vertices[off+i+1].type & 1)) {
                   // next point is also a curve point, so interpolate an on-point curve
                   sx = (x + (stbtt_int32) vertices[off+i+1].x) >> 1;
                   sy = (y + (stbtt_int32) vertices[off+i+1].y) >> 1;
@@ -2031,9 +2042,14 @@ static int stbtt__run_charstring(const stbtt_fontinfo *info, int glyph_index, st
 
 #define STBTT__CSERR(s) (0)
 
+   // VNDegen: a glyph's charstring stops after this many bytes, its subroutines' included, since a subroutine may call
+   // others many times over; a real glyph takes a few thousand at most.
+   int steps = 1 << 20;
+
    // this currently ignores the initial width value, which isn't needed if we have hmtx
    b = stbtt__cff_index_get(info->charstrings, glyph_index);
    while (b.cursor < b.size) {
+      if (--steps < 0) return STBTT__CSERR("too many steps");
       i = 0;
       clear_stack = 1;
       b0 = stbtt__buf_get8(&b);

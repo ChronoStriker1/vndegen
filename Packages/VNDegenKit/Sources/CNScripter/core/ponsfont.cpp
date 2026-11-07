@@ -29,36 +29,75 @@ PonsFace::~PonsFace() = default;
 
 // stb_truetype reads a font's tables without checking their lengths, so before it sees a game's file: the table
 // directory (the first font of a collection) and every table it lists lie in the file, the tables stb reads hold what
-// it reads from them (head, hhea, maxp, hmtx, cmap and its subtables, loca), every loca entry points inside glyf, and
-// composite glyphs nest at most 32 deep, without a cycle (stb follows them recursively). Reads that start there but
-// run on (a glyph's points, a cmap's segment search and glyph array) end in the padding load adds. stb reads a CFF
-// font's outlines with bounds of its own, the CFF table's length (a local change to stb).
-static bool compositesNest(const uint8_t *glyf, uint64_t glyfSize, const std::function<uint64_t(uint64_t)> &loca,
+// it reads from them (head, hhea, maxp, hmtx, cmap and its subtables, loca), and every loca entry points inside glyf.
+// Where a tag repeats, stb reads the first table with it, and so do these checks. Reads that start there but run on
+// (a simple glyph's points, a cmap's segment search and glyph array) end in the padding load adds. stb reads a CFF
+// font's outlines with bounds of its own, the CFF table's length (a local change to stb), and stops a glyph's
+// charstring after a fixed number of steps (another).
+//
+// stb follows composite glyphs recursively, once for every use, and copies the outline at each level. So a composite's
+// header and every component record must lie inside its own loca entry, composites must nest at most 32 deep without
+// a cycle, and expanding any glyph must come to at most kMostGlyphWork components and outline points in all. Glyph
+// entries run forward: stb draws one whose loca entries are reversed from its start.
+static constexpr uint64_t kMostGlyphWork = 1 << 20;
+
+static bool glyphsDrawable(const uint8_t *glyf, uint64_t glyfSize, const std::function<uint64_t(uint64_t)> &loca,
                            uint64_t glyphs) {
-    std::vector<uint8_t> depth(glyphs, 0);  // 0 not seen, 255 being walked, else 1 + the deepest component's depth
-    std::function<int(uint64_t, int)> walk = [&](uint64_t g, int level) -> int {
+    struct Seen {
+        uint8_t depth = 0;  // 0 not seen, 255 being walked, else 1 + the deepest component's depth
+        uint64_t work = 0;  // components and outline points that drawing it expands to
+    };
+    std::vector<Seen> seen(glyphs);
+    // The glyph's depth, or -1 when the font is refused; `work` gets what drawing it costs.
+    std::function<int(uint64_t, int, uint64_t &)> walk = [&](uint64_t g, int level, uint64_t &work) -> int {
+        work = 1;
         if (g >= glyphs) return 1;  // stb draws a glyph past the last as nothing
-        if (depth[g] == 255 || level > 32) return -1;
-        if (depth[g]) return depth[g];
+        Seen &me = seen[g];
+        if (me.depth == 255 || level > 32) return -1;
+        if (me.depth) {
+            work = me.work;
+            return me.depth;
+        }
         uint64_t start = loca(g), end = loca(g + 1);
         int deepest = 0;
-        if (end > start && start + 10 <= glyfSize && int16_t(be16(glyf + start)) < 0) {
-            depth[g] = 255;
-            for (uint64_t at = start + 10; at + 4 <= glyfSize;) {
-                uint16_t flags = be16(glyf + at), part = be16(glyf + at + 2);
-                int d = walk(part, level + 1);
-                if (d < 0) return -1;
-                deepest = std::max(deepest, d);
-                at += 4 + ((flags & 1) ? 4 : 2) + ((flags & 8) ? 2 : (flags & 0x40) ? 4 : (flags & 0x80) ? 8 : 0);
-                if (!(flags & 0x20)) break;
+        if (start > end || end - start == 1) return -1;
+        if (start < end) {
+            int contours = int16_t(be16(glyf + start));
+            if (contours >= 0) {
+                // stb makes room for the points and two more for each contour. They are read where the glyph says,
+                // which the padding covers when the glyph is cut short.
+                uint64_t points = 0;
+                if (contours > 0 && start + 10 + uint64_t(contours) * 2 <= glyfSize)
+                    points = uint64_t(be16(glyf + start + 10 + (contours - 1) * 2)) + 1;
+                else if (contours > 0)
+                    points = 65536;
+                work += points + 2 * uint64_t(contours);
+            } else {
+                if (end - start < 10) return -1;
+                me.depth = 255;
+                for (uint64_t at = start + 10;;) {
+                    if (at + 4 > end) return -1;
+                    uint16_t flags = be16(glyf + at), part = be16(glyf + at + 2);
+                    uint64_t size = 4 + ((flags & 1) ? 4 : 2) + ((flags & 8) ? 2 : (flags & 0x40) ? 4 : (flags & 0x80) ? 8 : 0);
+                    if (at + size > end) return -1;
+                    uint64_t partWork = 0;
+                    int d = walk(part, level + 1, partWork);
+                    if (d < 0) return -1;
+                    deepest = std::max(deepest, d);
+                    work = std::min(work + partWork, kMostGlyphWork + 1);
+                    at += size;
+                    if (!(flags & 0x20)) break;
+                }
             }
         }
-        if (deepest >= 32) return -1;
-        depth[g] = uint8_t(deepest + 1);
-        return depth[g];
+        if (deepest >= 32 || work > kMostGlyphWork) return -1;
+        me = {uint8_t(deepest + 1), work};
+        return me.depth;
     };
-    for (uint64_t g = 0; g < glyphs; g++)
-        if (walk(g, 0) < 0) return false;
+    for (uint64_t g = 0; g < glyphs; g++) {
+        uint64_t work = 0;
+        if (walk(g, 0, work) < 0) return false;
+    }
     return true;
 }
 
@@ -81,10 +120,13 @@ static bool tablesInside(const Bytes &d) {
         const uint8_t *rec = &d[at + 12 + t * 16];
         uint64_t off = be32(rec + 8), size = be32(rec + 12);
         if (off + size > d.size()) return false;
-        tables[std::string(reinterpret_cast<const char *>(rec), 4)] = {d.data() + off, size};
+        tables.emplace(std::string(reinterpret_cast<const char *>(rec), 4), Table{d.data() + off, size});
     }
     auto has = [&](const char *tag, uint64_t least) { return tables.count(tag) && tables[tag].size >= least; };
     if (!has("head", 54) || !has("hhea", 36) || !has("maxp", 6) || !has("cmap", 4)) return false;
+    // The em size the outlines are drawn at: 0 would scale them without bound.
+    uint16_t unitsPerEm = be16(tables["head"].p + 18);
+    if (unitsPerEm < 16 || unitsPerEm > 16384) return false;
     uint64_t glyphs = be16(tables["maxp"].p + 4), metrics = be16(tables["hhea"].p + 34);
     if (metrics == 0 || metrics > glyphs) return false;
     if (!has("hmtx", metrics * 4 + (glyphs - metrics) * 2)) return false;
@@ -113,7 +155,7 @@ static bool tablesInside(const Bytes &d) {
         };
         for (uint64_t g = 0; g <= glyphs; g++)
             if (loca(g) > tables["glyf"].size) return false;
-        if (!compositesNest(tables["glyf"].p, tables["glyf"].size, loca, glyphs)) return false;
+        if (!glyphsDrawable(tables["glyf"].p, tables["glyf"].size, loca, glyphs)) return false;
     } else if (!tables.count("CFF ") || tables["CFF "].size >= 0x40000000) {
         return false;
     }
@@ -121,7 +163,8 @@ static bool tablesInside(const Bytes &d) {
 }
 
 // More than any read stb starts inside a checked table can run on: a simple glyph's contours, instructions, flags and
-// points (under 460 KB), or a format 4 cmap's search and glyph array (under 400 KB).
+// points (under 460 KB: 10 + 65,534 + 2 + 65,535 bytes, then at most 5 for each of 65,536 points), or a format 4
+// cmap's search and glyph array (under 400 KB).
 static constexpr size_t kReadPadding = 1 << 20;
 
 bool PonsFace::load(Bytes data) {
