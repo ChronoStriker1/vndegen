@@ -101,7 +101,8 @@ bool vnneko_debug_press(VNNekoEngine *e, const char *action);
 // For test hosts: the options of the choice on screen, or -1, and picking one.
 int vnneko_debug_choice_count(VNNekoEngine *e);
 void vnneko_debug_choose(VNNekoEngine *e, int index);
-// For test hosts: starts this scene script and runs it without waiting up to the node. False when it's not there.
+// For test hosts: starts this scene script and runs it without waiting up to the node, or a flow script (under `flow\`)
+// from its start. False when it is not there.
 bool vnneko_debug_jump(VNNekoEngine *e, const char *script, int node);
 // For tests: the stored size of the file the game's archives and patches give for this path, or -1 when none has it.
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path);

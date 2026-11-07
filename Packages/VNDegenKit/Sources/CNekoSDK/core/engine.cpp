@@ -2929,6 +2929,18 @@ void Engine::updateChoice() {
 }
 
 bool Engine::jump(const std::string &script, int node) {
+    // A flow script starts the story at that flow, so its choices run as the flow interpreter runs them.
+    if (normalizedPath(script).rfind("flow\\", 0) == 0) {
+        auto flow = loadScript(script);
+        if (!flow || !flow->first()) return false;
+        screen_ = nullptr;
+        stack_.clear();
+        scene_ = {};
+        stack_.push_back({flow, flow->first()});
+        waiting_ = Waiting::None;
+        dirty_ = true;
+        return true;
+    }
     auto target = loadScript(script);
     // A negative node starts the script from its top.
     if (!target || (node >= 0 && !target->node(node))) return false;

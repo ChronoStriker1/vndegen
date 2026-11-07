@@ -3352,6 +3352,11 @@ default onahole 1
 default hse 80
 default bgvoice 80
 default delay 100
+
+screen choice
+# Its one choice, at the end, has its own picture and no band behind it: four options filling the screen's height. Their
+# places are a guess; no PC save reaches that choice yet.
+place 0 179
 screen start
 # New Game starts the first chapter; init.ini names no FirstFlow.
 flow Flow_01
