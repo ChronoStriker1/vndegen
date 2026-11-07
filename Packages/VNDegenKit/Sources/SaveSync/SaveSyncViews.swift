@@ -530,8 +530,15 @@ public struct GameSavesView: View {
     }
 
     /// Before Ludusavi is set up there are no backups to list, so the sheet says so in the middle of its room, with the
-    /// way to set it up.
+    /// way to set it up. Text too large for the room, such as at the largest text sizes, scrolls.
     private var setUpPrompt: some View {
+        ViewThatFits(in: .vertical) {
+            setUpPromptContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView { setUpPromptContent.padding(.vertical, 20).frame(maxWidth: .infinity) }
+        }
+    }
+
+    private var setUpPromptContent: some View {
         let focused = model.isFocused(.setUp)
         return VStack(spacing: 14) {
             Image(systemName: "externaldrive.badge.icloud")
@@ -559,7 +566,6 @@ public struct GameSavesView: View {
             .padding(.top, 6)
         }
         .padding(.horizontal, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var backupsForm: some View {

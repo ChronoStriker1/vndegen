@@ -183,6 +183,10 @@ private struct PasscodeFlowSheet: View {
         // below the camera too. Cancel is in the other corner.
         .ignoresSafeArea(.container, edges: cameraCorner > 0 ? .horizontal : [])
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        // The keypad sizes itself from the room it has, so the sheet can't take its size from the keypad.
+        .frame(minWidth: 380, minHeight: 600)
+        #endif
     }
 }
 

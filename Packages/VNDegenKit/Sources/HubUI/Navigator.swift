@@ -224,6 +224,8 @@ final class Navigator {
         case stacked
     }
     var pageActions = PageActions.row
+    /// Set by a confirmation that stacks its buttons, as on the folded iPhone Duo, so Up and Down move between them.
+    var confirmationStacked = false
     /// Set by the game page's screenshot grid from its width.
     var screenshotColumns = 2 {
         didSet { if screenshotColumns != oldValue, sheet == nil { setFocus(shownScreenshotTarget(focus)) } }
@@ -314,7 +316,10 @@ final class Navigator {
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
             case .license: return [Row(id: "license", items: [.licenseAccept, .licenseDecline])]
-            case .confirm: return [Row(id: "confirm", items: [.confirmAction, .confirmCancel])]
+            case .confirm:
+                return confirmationStacked
+                    ? [Row(id: "confirm-action", items: [.confirmAction]), Row(id: "confirm-cancel", items: [.confirmCancel])]
+                    : [Row(id: "confirm", items: [.confirmAction, .confirmCancel])]
             // These take controller input through their own models.
             case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .screenshots: return []
             }
@@ -1225,9 +1230,11 @@ final class Navigator {
             return
         case .settingsPage(.licenses)?, .settingsPage(.plugins)?, .license?, .confirm?:
             // Licenses, the plugin list, and a question's details are text to read: up and down scroll a little, the
-            // shoulder buttons a page.
+            // shoulder buttons a page. A question whose buttons are stacked keeps up and down for moving between them.
             switch button {
-            case .up, .down: return pager.scroll(pages: button == .up ? -0.3 : 0.3)
+            case .up, .down:
+                if confirmationStacked, case .confirm? = sheet { break }
+                return pager.scroll(pages: button == .up ? -0.3 : 0.3)
             case .pageUp, .pageDown: return pager.scroll(pages: button == .pageUp ? -1 : 1)
             default: break
             }

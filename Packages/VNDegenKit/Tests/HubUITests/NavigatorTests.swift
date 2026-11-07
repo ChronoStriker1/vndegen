@@ -320,6 +320,22 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
+@Test func stackedConfirmationButtonsMoveUpAndDown() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.confirmationStacked = true
+    nav.perform(.remove, on: id)
+    guard case .confirm? = nav.sheet else { Issue.record("no confirmation"); return }
+    // Drawn one above the other, as on the folded iPhone Duo, so Up reaches the action and Down comes back to Cancel.
+    #expect(nav.focus == .confirmCancel)
+    press(nav, .up)
+    #expect(nav.focus == .confirmAction)
+    press(nav, .down)
+    #expect(nav.focus == .confirmCancel)
+    press(nav, .cancel)
+    #expect(nav.sheet == nil)
+}
+
+@MainActor
 @Test func settingsListsEachAddedFolderWithItsButtons() async throws {
     let (nav, _) = try await makeNavigator()
     let added = nav.hub.library.paths.gamesRoot.deletingLastPathComponent().appendingPathComponent("Added", isDirectory: true)

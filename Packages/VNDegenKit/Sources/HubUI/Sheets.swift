@@ -653,6 +653,7 @@ struct ConfirmationSheet: View {
                 .padding(.bottom, cameraCorner > 0 ? 12 : 22)
         }
         .fittedSheetHeight()
+        .onChange(of: cameraCorner > 0, initial: true) { _, stacked in nav.confirmationStacked = stacked }
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif
