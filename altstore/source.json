@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.26.1",
+          "buildVersion": "1394",
+          "date": "2026-11-07T16:47:51Z",
+          "localizedDescription": "Fixes for the two NekoSDK games: The Alchemist starts on its default art, and both games' CG viewer has its control panel.\n\n## Downloads\n\n- `VNDegen-0.26.1-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.26.1.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- The Alchemist & His Battle-Scarred Homunculus starts on its default Arrange.ver art, as on the PC. Config's \"Change Illustration\" and the message window's art button switch to the Masami Chie Original.ver art and back, and the switch takes effect at once, in the gallery too. (#48)\n- The CG viewer in The Alchemist and Yarinaoshi no Christmas has the PC's control panel: Scene, previous and next CG, Auto, Quit, and where the game has them, zoom and a music volume slider. It works with touch, a pointer and a controller, mute stays on as you move between pictures, and the viewer's music no longer plays over the music player. (#47)\n- The Alchemist's menus show their help text on hover, and Config's sliders fill to the nearest pixel.\n\n## Known limits\n\n- NekoSDK: scenes unlocked on a PC don't move with a backup yet. The Scene gallery shows those played in VNDegen. This is fixed in work that hasn't shipped yet. (#46)\n\n## What wasn't tested\n\n- No physical device was used. The viewer was checked with headless runs on Linux, and the builds on one Mac.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.26.1/VNDegen-0.26.1.ipa",
+          "size": 123244350,
+          "sha256": "830c4c80ac4686360f99b634e9a2f596decd547b4cca684f12cedaf82db1b038",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.26.0",
           "buildVersion": "1381",
           "date": "2026-11-07T16:24:32Z",
