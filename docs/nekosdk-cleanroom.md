@@ -198,6 +198,10 @@ Ore o Hoshigaru Tsuma to Gibo's `cfg\change_texture_list.ini` lists each CG grou
 
 Slider fills round to the nearest pixel: at 60, The Alchemist's 173-pixel music bar fills 104 and Yarinaoshi no Christmas's 161-pixel one 97.
 
+## Movies
+
+Test Game 89 loads its movies with command 100, `[ムービーロード]`: string 1 names `movie\x.wmv`, which on disk is `movie/x` with no extension, parameter 3 is the slot, and parameter 9 is 1 on the loads that come back round, read as looping. The runtime puts the movie in the slot like a picture, shows the frame due at the story's clock, and holds the last frame of one that doesn't loop. The files are WMV 9 in ASF, played through the host's decoder ([video.md](video.md#vnffmovie-wmv-through-the-apps-ffmpeg)). Where a movie sits and what happens at its end haven't been checked against the PC game yet, and Test Game 92's movies come with no command naming them.
+
 ## Readings not yet checked
 
 - Parameter 20 of opcode 18 is a blur that parameter 21 turns on: the PC game draws sharp with 20 alone. The radius is a fit to one frame's sharpness.

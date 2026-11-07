@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "vnneko.h"
+#include "hostmovies.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
 
@@ -73,7 +74,7 @@ int main(int argc, char **argv) {
             }
         }
     }
-    VNNekoLaunch launch{argv[1], std::getenv("NEKO_DATA"), nullptr, NEKO_FONTS_DIR};
+    VNNekoLaunch launch{argv[1], std::getenv("NEKO_DATA"), nullptr, NEKO_FONTS_DIR, hostMovies()};
     VNNekoEngine *e = vnneko_start(&launch);
     if (!e) {
         std::fprintf(stderr, "did not start: %s\n", vnneko_start_error());

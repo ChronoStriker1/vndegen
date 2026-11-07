@@ -8,6 +8,7 @@
 #define VNNEKO_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -16,12 +17,40 @@ extern "C" {
 
 typedef struct VNNekoEngine VNNekoEngine;
 
+// A movie decoder the host lends the runtime, for the games' WMV movies: the app's is vnffmovie in the KiriKiri
+// framework, found with dlsym, and the Linux host's the same code built against the system's FFmpeg. These are its
+// five functions, with the same layouts and meanings as `Engines/Shared/vnffmovie.h`.
+typedef struct VNNekoMovieInfo {
+    int width, height;
+    double fps;
+    double duration;
+    int audioRate, audioChannels;
+} VNNekoMovieInfo;
+
+typedef int64_t (*VNNekoMovieRead)(void *user, uint64_t offset, void *buffer, size_t length);
+
+typedef struct VNNekoMovies {
+    void *(*open)(VNNekoMovieRead read, void *user, uint64_t size, int loop, VNNekoMovieInfo *info, char *error,
+                  size_t errorSize);
+    const uint8_t *(*frame)(void *movie, double time, int *changed, int *ended);
+    size_t (*audio)(void *movie, float *out, size_t frames);
+    void (*seek)(void *movie, double time);
+    void (*close)(void *movie);
+} VNNekoMovies;
+
 typedef struct VNNekoLaunch {
     const char *gameRoot;  // folder holding the game's .pak archives
     const char *dataDir;   // the game's data folder, where saves go, under AppData/Roaming as on Windows
     const char *logPath;   // file the runtime's log is appended to; NULL logs to stderr
     const char *fontDir;   // folder holding the Windows font pack's fonts.tsv
+    // The movie decoder, copied at start. NULL when the host has none: each movie is then logged and left out, and
+    // the game goes on without it.
+    const VNNekoMovies *movies;
 } VNNekoLaunch;
+
+// The app's movie decoder, vnffmovie, found with dlsym among the libraries the process has loaded: the KiriKiri
+// framework exports it. NULL, with the missing function's name in vnneko_start_error(), when it isn't there.
+const VNNekoMovies *vnneko_find_movies(void);
 
 // Starts a game. Returns NULL when it can't, with the reason in vnneko_start_error().
 VNNekoEngine *vnneko_start(const VNNekoLaunch *launch);

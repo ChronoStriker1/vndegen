@@ -251,6 +251,11 @@ bool Files::open(const std::string &root) {
 
 bool Files::exists(const std::string &path) const { return index_.count(normalizedPath(path)) != 0; }
 
+std::string Files::loosePath(const std::string &path) const {
+    auto it = index_.find(normalizedPath(path));
+    return it == index_.end() || it->second.archive >= 0 ? std::string() : it->second.loose;
+}
+
 int64_t Files::storedSize(const std::string &path) const {
     auto it = index_.find(normalizedPath(path));
     if (it == index_.end()) return -1;

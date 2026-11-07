@@ -16,6 +16,7 @@
 #include "audio.h"
 #include "canvas.h"
 #include "image.h"
+#include "movie.h"
 #include "save.h"
 #include "script.h"
 #include "ui.h"
@@ -67,6 +68,9 @@ struct Sprite {
     int anchorX = -1, anchorY = -1;
     // A flipbook: numbered pictures shown in turn.
     int flipCount = 0, flipMs = 25, flipShown = 0;
+    // A movie playing as the picture, and the story time it started at.
+    std::shared_ptr<Movie> movie;
+    int64_t movieFrom = 0;
     int64_t flipBegun = 0;
     bool flipLoop = false, flipReverse = false;
     bool waveOn = false;
@@ -90,6 +94,8 @@ struct Glyph {
 class Engine {
 public:
     bool start(const std::string &root, const std::string &dataDir, const std::string &logPath, const std::string &fontDir, std::string &error);
+    // The host's movie decoder, before start. Without one, movies are logged and left out.
+    void setMovies(const VNNekoMovies &movies) { movies_ = movies; hasMovies_ = true; }
     ~Engine();
 
     bool step(int ms);
@@ -125,6 +131,13 @@ private:
 
     void log(const char *format, ...) __attribute__((format(printf, 2, 3)));
     void warnOnce(const std::string &what);
+    // Movies: command 100 loads one into a slot like a picture, and each step shows the frame due.
+    void loadMovie(const Node &n);
+    std::shared_ptr<Movie> openMovie(const std::string &path, bool loop);
+    void stepMovies();
+    VNNekoMovies movies_{};
+    bool hasMovies_ = false;
+    std::shared_ptr<Movie> soundMovie_;  // the movie whose sound the mix plays
     void complain(const std::string &what);
 
     // Interpreter.

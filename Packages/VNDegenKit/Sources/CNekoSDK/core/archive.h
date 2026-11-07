@@ -19,6 +19,8 @@ public:
     // The file's bytes, or null when no archive or patch has it.
     Bytes read(const std::string &path) const;
     bool exists(const std::string &path) const;
+    // Where a loose file lies on disk, for reading it in pieces, such as a movie; empty for one in an archive or missing.
+    std::string loosePath(const std::string &path) const;
     // The size the archive stores for the file, or a loose file's size; -1 when no archive or patch has it.
     int64_t storedSize(const std::string &path) const;
     // Paths under a folder, such as `flow`, for tools. Lower case.

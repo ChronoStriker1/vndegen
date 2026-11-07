@@ -56,11 +56,18 @@ final class NekoSDKSession: EngineSession {
         let logURL = launch.dataDirectory.appendingPathComponent("logs/nekosdk.txt")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? Data().write(to: logURL)
+        // The movie decoder is vnffmovie in the KiriKiri framework the app embeds. Without it the game runs with its
+        // movies left out.
+        let movies = vnneko_find_movies()
+        if movies == nil {
+            let missing = vnneko_start_error().map { String(cString: $0) } ?? "unknown"
+            nekoSDKLog.notice("movies left out: the KiriKiri framework's decoder isn't loaded (\(missing, privacy: .public))")
+        }
         // The Windows font pack is already set up app-wide (FontPack), so the runtime is given no folder of its own.
         let started: OpaquePointer? = root.path.withCString { rootPath in
             logURL.path.withCString { logPath in
                 launch.dataDirectory.path.withCString { dataPath in
-                    var settings = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: logPath, fontDir: nil)
+                    var settings = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: logPath, fontDir: nil, movies: movies)
                     return vnneko_start(&settings)
                 }
             }

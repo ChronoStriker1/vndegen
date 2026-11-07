@@ -1,3 +1,5 @@
+#include <dlfcn.h>
+
 #include <algorithm>
 #include <string>
 
@@ -15,9 +17,30 @@ static std::string startError;
 
 extern "C" {
 
+const VNNekoMovies *vnneko_find_movies(void) {
+    static VNNekoMovies movies;
+    static bool found = false;
+    if (found) return &movies;
+    void *pointers[5];
+    const char *names[5] = {"vnffmovie_open", "vnffmovie_frame", "vnffmovie_audio", "vnffmovie_seek", "vnffmovie_close"};
+    for (int i = 0; i < 5; i++)
+        if (!(pointers[i] = dlsym(RTLD_DEFAULT, names[i]))) {
+            startError = std::string("no ") + names[i];
+            return nullptr;
+        }
+    movies.open = reinterpret_cast<decltype(movies.open)>(pointers[0]);
+    movies.frame = reinterpret_cast<decltype(movies.frame)>(pointers[1]);
+    movies.audio = reinterpret_cast<decltype(movies.audio)>(pointers[2]);
+    movies.seek = reinterpret_cast<decltype(movies.seek)>(pointers[3]);
+    movies.close = reinterpret_cast<decltype(movies.close)>(pointers[4]);
+    found = true;
+    return &movies;
+}
+
 VNNekoEngine *vnneko_start(const VNNekoLaunch *launch) {
     auto e = std::make_unique<VNNekoEngine>();
     startError.clear();
+    if (launch->movies) e->engine.setMovies(*launch->movies);
     if (!e->engine.start(launch->gameRoot, launch->dataDir ? launch->dataDir : "", launch->logPath ? launch->logPath : "", launch->fontDir ? launch->fontDir : "", startError)) return nullptr;
     return e.release();
 }

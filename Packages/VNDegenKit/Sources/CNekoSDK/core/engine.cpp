@@ -120,6 +120,8 @@ int Config::number(const std::string &key, int fallback) const {
 // MARK: Start and stop
 
 Engine::~Engine() {
+    // The audio thread may be reading a movie's sound, which goes with the sprites.
+    audio_.clearStream();
     saveSeen();
     if (log_ && log_ != stderr) std::fclose(log_);
 }
@@ -243,7 +245,8 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
             firstQuickSlot_ = nextQuickSlot_ = field(*quick, 0);
             lastQuickSlot_ = field(*quick, 1);
         }
-    log("started: %dx%d, %d scripts in scr, %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus");
+    log("started: %dx%d, %d scripts in scr, %s, movies %s", width_, height_, int(files_.list("scr").size()), screens_.empty() ? "no menus yet" : "menus",
+        hasMovies_ ? "through the host's decoder" : "left out, with no decoder");
     loadGalleries();
     loadGlobals();
     loadSettings();
@@ -1579,8 +1582,16 @@ void Engine::restoreSave(const SaveData &d, int slot) {
     for (const SavedSprite &saved : d.sprites) {
         Sprite s;
         s.path = saved.path;
-        s.image = images_->get(shownPath(saved.path));
-        if (!s.image) warnOnce("A save names a missing picture: " + saved.path);
+        // A movie starts again from its beginning. Whether it looped isn't known from the save, and the library's
+        // looping ones are backgrounds, so it loops.
+        if (normalizedPath(saved.path).rfind("movie\\", 0) == 0 && (s.movie = openMovie(saved.path, true))) {
+            s.movieFrom = now_;
+            bool ended = false;
+            s.image = s.movie->frame(0, ended);
+        } else {
+            s.image = images_->get(shownPath(saved.path));
+        }
+        if (!s.image && !s.movie) warnOnce("A save names a missing picture: " + saved.path);
         s.x = saved.x;
         s.y = saved.y;
         s.scaleX = saved.scaleX;
@@ -2396,6 +2407,9 @@ void Engine::runScene(const Node &n) {
     case 23:  // load an image for a difference switch: the same, shown by the next update
         loadImage(n);
         break;
+    case 100:  // load a movie into a slot
+        loadMovie(n);
+        break;
     case 17: {  // delete a slot
         back_.erase(p[0]);
         break;
@@ -2612,6 +2626,7 @@ bool Engine::step(int ms) {
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
     advanceFlipbooks();
+    stepMovies();
     for (auto &[slot, splash] : splashes_) {
         auto gone = [this](const Droplet &d) { return now_ - d.bornMs >= d.lifeMs; };
         auto end = std::remove_if(splash.droplets.begin(), splash.droplets.end(), gone);
@@ -3307,6 +3322,59 @@ void Engine::loadImage(const Node &n) {
     s.image = image;
     s.path = n.s[1];
     s.flipCount = 0;
+    s.movie.reset();
+}
+
+std::shared_ptr<Movie> Engine::openMovie(const std::string &path, bool loop) {
+    if (!hasMovies_) {
+        warnOnce("Movies need the decoder in the KiriKiri framework, which isn't there; left out: " + path);
+        return nullptr;
+    }
+    // Scripts name `movie\x.wmv`, and the file is `movie\x` with no extension.
+    std::string file = path;
+    if (!files_.exists(file) && file.size() > 4 && normalizedPath(file.substr(file.size() - 4)) == ".wmv") file.resize(file.size() - 4);
+    std::string why;
+    auto movie = Movie::open(movies_, files_, file, loop, why);
+    if (!movie) warnOnce("Can't play the movie " + path + ": " + why);
+    return movie;
+}
+
+// Parameter 3 is the slot and 9 says the movie loops. It sits at the top left, as an image with nothing placing it does.
+void Engine::loadMovie(const Node &n) {
+    auto movie = openMovie(n.s[1], n.p[9] != 0);
+    if (!movie) return;
+    Sprite &s = back_[n.p[3]];
+    s = Sprite{};
+    s.path = n.s[1];
+    s.movie = movie;
+    s.movieFrom = now_;
+    bool ended = false;
+    s.image = movie->frame(0, ended);
+}
+
+// Each sprite's movie shows the frame due at the story's clock, and the newest movie with sound plays it, until no
+// sprite holds that movie any more.
+void Engine::stepMovies() {
+    std::shared_ptr<Movie> newest;
+    int64_t newestFrom = -1;
+    for (Sprites *sprites : {&front_, &back_})
+        for (auto &[slot, s] : *sprites) {
+            if (!s.movie) continue;
+            bool ended = false;
+            ImageRef image = s.movie->frame(double(now_ - s.movieFrom) / 1000, ended);
+            if (image && image != s.image) {
+                s.image = image;
+                dirty_ = true;
+            }
+            if (s.movie->hasSound() && s.movieFrom > newestFrom) {
+                newest = s.movie;
+                newestFrom = s.movieFrom;
+            }
+        }
+    if (newest == soundMovie_) return;
+    audio_.clearStream();
+    soundMovie_ = newest;
+    if (Movie *m = soundMovie_.get()) audio_.setStream([m](float *out, int frames) { return m->sound(out, frames); }, kKindSe, 100);
 }
 
 // Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
