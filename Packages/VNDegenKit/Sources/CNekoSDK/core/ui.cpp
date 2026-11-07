@@ -41,6 +41,10 @@ void drawPicture(Canvas &out, const Picture &p, float towardX, float towardY) {
         drawShifted(out, *p.image, float(p.x) - p.followX * towardX, float(p.y) - p.followY * towardY, p.alpha);
         return;
     }
+    if (p.partW > 0 && p.partH > 0) {
+        drawPart(out, *p.image, p.x, p.y, p.partX, p.partY, p.partW, p.partH, p.alpha);
+        return;
+    }
     int w = p.image->w / std::max(1, p.cols), h = p.image->h / std::max(1, p.rows);
     drawPart(out, *p.image, p.x, p.y, p.column * w, p.row * h, w, h, p.alpha);
 }
@@ -94,6 +98,13 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256
                 else if (key == "tab") p.tab = number(value);              // only on that tab of a gallery
                 else if (key == "stage") p.stage = number(value);
+                else if (key == "part" && at + 4 < w.size()) {
+                    p.partX = number(value);
+                    p.partY = number(w[at + 2]);
+                    p.partW = number(w[at + 3]);
+                    p.partH = number(w[at + 4]);
+                    at += 3;
+                }
                 else if (key == "follow" && at + 2 < w.size()) {
                     p.followX = std::strtof(value.c_str(), nullptr);
                     p.followY = std::strtof(w[at + 2].c_str(), nullptr);

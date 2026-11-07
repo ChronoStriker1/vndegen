@@ -3425,7 +3425,9 @@ button music sys_5\obj\d003_000.bmp 622 638 11 5 6 help sys_5\obj\d005_000.bmp 0
 
 screen load
 pic obj\e000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 1
@@ -3464,7 +3466,9 @@ button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
 
 screen save
 pic obj\e000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 0
@@ -3528,8 +3532,18 @@ viewerbutton hide obj\l001_000.bmp 1240 588 2 0 help 0
 viewernumber index obj\j002_000.bmp 926 630 13 2
 viewernumber total obj\j002_001.bmp 966 648 11 2
 viewerauto 8000 0
-pic obj\f000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The galleries' room, and each tab's two mothers, standing sprites the exe reads from sc.pak (traced under Wine),
+# 73 pixels further left a tab.
+pic obj\f000_001.bmp 0 0
+pic sc\sc_001_002_000_001_002.bmp -324 -58 tab 0
+pic sc\sc_000_002_000_001_005.bmp 617 -65 tab 0
+pic sc\sc_001_002_000_001_000.bmp -397 -58 tab 1
+pic sc\sc_000_002_000_001_000.bmp 544 -65 tab 1
+pic sc\sc_001_002_000_001_005.bmp -470 -58 tab 2
+pic sc\sc_000_002_000_001_002.bmp 471 -65 tab 2
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 0
@@ -3590,8 +3604,18 @@ viewerbutton hide obj\l001_000.bmp 1240 588 2 0 help 0
 viewernumber index obj\j002_000.bmp 926 630 13 2
 viewernumber total obj\j002_001.bmp 966 648 11 2
 viewerauto 8000 0
-pic obj\f000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The galleries' room, and each tab's two mothers, standing sprites the exe reads from sc.pak (traced under Wine),
+# 73 pixels further left a tab.
+pic obj\f000_001.bmp 0 0
+pic sc\sc_001_002_000_001_002.bmp -324 -58 tab 0
+pic sc\sc_000_002_000_001_005.bmp 617 -65 tab 0
+pic sc\sc_001_002_000_001_000.bmp -397 -58 tab 1
+pic sc\sc_000_002_000_001_000.bmp 544 -65 tab 1
+pic sc\sc_001_002_000_001_005.bmp -470 -58 tab 2
+pic sc\sc_000_002_000_001_002.bmp 471 -65 tab 2
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 2
@@ -3627,8 +3651,18 @@ button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
 button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
 
 screen scene
-pic obj\f000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The galleries' room, and each tab's two mothers, standing sprites the exe reads from sc.pak (traced under Wine),
+# 73 pixels further left a tab.
+pic obj\f000_001.bmp 0 0
+pic sc\sc_001_002_000_001_002.bmp -324 -58 tab 0
+pic sc\sc_000_002_000_001_005.bmp 617 -65 tab 0
+pic sc\sc_001_002_000_001_000.bmp -397 -58 tab 1
+pic sc\sc_000_002_000_001_000.bmp 544 -65 tab 1
+pic sc\sc_001_002_000_001_005.bmp -470 -58 tab 2
+pic sc\sc_000_002_000_001_002.bmp 471 -65 tab 2
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 1
@@ -3667,7 +3701,9 @@ button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
 screen music
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic obj\g001_000.bmp 0 0
@@ -3714,7 +3750,9 @@ hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
 hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
 hover 50 270 565 606 obj\h004_000.bmp 350 669 9 5
 pic obj\h000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
@@ -3780,7 +3818,9 @@ hover 581 150 1090 222 sys_5\obj\h004_002.bmp 362 669 6 2
 hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
 hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
@@ -3838,7 +3878,9 @@ hover 50 486 565 558 obj\h004_003.bmp 372 669 8 5
 hover 50 246 565 390 obj\h004_003.bmp 372 669 8 2
 hover 581 150 1090 630 obj\h004_003.bmp 372 669 8 7
 pic obj\h000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
+# a frame of bars lies over the top and bottom.
+pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
