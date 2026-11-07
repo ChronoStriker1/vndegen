@@ -2906,8 +2906,10 @@ void Engine::beginChoice(const Node &n) {
         choiceResult_ = 0;
         return;
     }
-    // A replay's choice gives no count. The one seen, in Test Game 84, has two options.
-    choiceCount_ = n.opcode == 20 ? 2 : std::max(1, n.p[1]);
+    // A replay's choice gives no count. The one seen, in Test Game 84, has two options. A choice's count is parameter 0
+    // and one in every game's flows; parameter 1 is it too in most, but 1 in Test Game 94's two-option choices.
+    choiceCount_ = n.opcode == 20 ? 2 : std::max(1, n.p[0] + 1);
+    for (int r = 0; r < 4; r++) choiceRoutes_[size_t(r)] = n.opcode == 3 ? n.p[size_t(10 + r)] : -1;
     choiceBack_ = images_->get(config_.text("ChoiceBackFilename", "obj\\n000_000.bmp"));
     choiceHover_ = -1;
     waiting_ = Waiting::Choice;
@@ -3289,6 +3291,11 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (!down) return;
+    // `mousechoice`: the right button takes a choice's last option, as Test Game 94's mouse icons say.
+    if (button == 1 && waiting_ == Waiting::Choice && choiceSheet_ && !screen_ && !dialogOpen_ && !logOpen_ && choiceTable("mousechoice")) {
+        choose(choiceCount_ - 1);
+        return;
+    }
     if (button == 1) {
         // The right button steps back: out of the log or a menu, else hides or shows the window.
         if (dialogOpen_) {
@@ -3407,6 +3414,8 @@ void Engine::mouseButton(int button, bool down) {
     if (waiting_ == Waiting::Choice) {
         updateChoice();
         if (choiceHover_ >= 0) choose(choiceHover_);
+        // And a left click away from the options, the first.
+        else if (choiceSheet_ && choiceTable("mousechoice")) choose(0);
         return;
     }
     clicked_ = true;
@@ -4657,7 +4666,36 @@ void Engine::compose() {
         choicePlace(x, top, step, slant);
         for (int i = 0; i < choiceCount_; i++)
             drawPart(canvas_, *choiceSheet_, x + i * slant, top + i * step, i * cellW, (i == choiceHover_ ? 1 : 0) * cellH, cellW, cellH, 1);
+        // `routes FILE X STEP G G G G`: once one of the routes' ending globals is set, each option names the routes that
+        // take it, a sheet row per route and a column for cleared or not, stacked STEP apart beside the option's middle,
+        // as Test Game 94 does.
+        const auto *routes = choiceTable("routes");
+        if (routes && routes->size() >= 7) {
+            std::vector<int> ends;
+            for (size_t r = 3; r < 7; r++) ends.push_back(field(*routes, r));
+            ImageRef sheet = images_->get((*routes)[0]);
+            if (sheet && anyGlobalSet(ends)) {
+                int w = sheet->w / 2, h = sheet->h / 4, gap = field(*routes, 2);
+                for (int i = 0; i < choiceCount_; i++) {
+                    std::vector<int> takers;
+                    for (int r = 0; r < 4; r++)
+                        if (choiceRoutes_[size_t(r)] == i) takers.push_back(r);
+                    if (takers.empty()) continue;
+                    int y = top + i * step + cellH / 2 - ((int(takers.size()) - 1) * gap + h) / 2;
+                    for (int r : takers) {
+                        drawPart(canvas_, *sheet, field(*routes, 1), y, anyGlobalSet({ends[size_t(r)]}) ? w : 0, r * h, w, h, 1);
+                        y += gap;
+                    }
+                }
+            }
+        }
     }
+}
+
+// A line of the table's choice screen, or null.
+const std::vector<std::string> *Engine::choiceTable(const std::string &key) const {
+    auto it = screens_.find("choice");
+    return it == screens_.end() ? nullptr : it->second.setting(key);
 }
 
 void Engine::composeMessage(Canvas &out) {

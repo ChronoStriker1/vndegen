@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <functional>
+#include <array>
 #include <map>
 #include <memory>
 #include <set>
@@ -519,6 +520,8 @@ private:
     // A choice: a sheet with one column per option and one row per state (normal, hovered, chosen, ...).
     ImageRef choiceSheet_, choiceBack_;
     int choiceCount_ = 0, choiceHover_ = -1, choiceResult_ = 0;
+    std::array<int, 4> choiceRoutes_{-1, -1, -1, -1};  // the option each of Test Game 94's routes takes, or another value
+    const std::vector<std::string> *choiceTable(const std::string &key) const;
     float mouseX_ = 0, mouseY_ = 0;
     bool mouseMoved_ = false;
 

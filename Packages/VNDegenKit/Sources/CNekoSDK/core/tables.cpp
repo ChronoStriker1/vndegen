@@ -4650,10 +4650,17 @@ button yes obj\b003_000.bmp 449 268 2 5 0
 button no obj\b003_000.bmp 449 350 2 5 1
 pic obj\b002_000.bmp 414 440
 
+# A choice, measured under Wine: the scene darkened, its prompt, and the options with a mouse icon each, the left
+# button's by the first and the right button's by the second, which take them. Once an ending is reached each option
+# names the routes that take it, red for one cleared.
 screen choice
-pic obj\b001_000.bmp 0 130
-pic obj\n000_000.bmp 414 173
-place 263 90
+pic dim 0 0 alpha 162
+pic obj\n000_000.bmp 483 107
+pic obj\b003_000.bmp 393 192 2 1 0 0
+pic obj\b003_000.bmp 393 305 2 1 1 0
+place 195 113
+mousechoice
+routes obj\e011_000.bmp 818 30 51 52 53 54
 
 screen start
 pic obj\d005_000.bmp 390 150
