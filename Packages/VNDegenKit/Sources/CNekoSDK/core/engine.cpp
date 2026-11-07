@@ -71,6 +71,8 @@ const std::map<std::string, int> &defaultSettings() {
         {"pause_inactive", 0},
         // The keyboard's confirm key, 0 Space and 1 Enter; the other does what the right button does.
         {"deckey", 0},
+        // Skip passes all text, or with 0 only what's been read, as the PC starts it with all.
+        {"skipall", 1},
     };
     return defaults;
 }
@@ -131,6 +133,7 @@ Engine::~Engine() {
     // The audio thread may be reading a movie's sound, which goes with the sprites.
     audio_.clearStream();
     saveSeen();
+    saveReadText();
     if (log_ && log_ != stderr) std::fclose(log_);
 }
 
@@ -328,6 +331,7 @@ void Engine::endStory(const std::string &screen) {
     replaying_ = false;
     waiting_ = Waiting::None;
     saveSeen();
+    saveReadText();
     saveGlobals();
     // A replay started from the viewer comes back to it, in the gallery it was opened from, at the picture it left.
     bool toViewer = replayFromViewer_ && screen == "scene";
@@ -871,6 +875,7 @@ void Engine::loadGalleries() {
         while (std::getline(f, line))
             if (!line.empty()) seen_[line] = true;
         loadReadScripts();
+        loadReadText();
     }
 }
 
@@ -895,8 +900,57 @@ void Engine::loadReadScripts() {
         std::string name(reinterpret_cast<const char *>(&d[pos]), strnlen(reinterpret_cast<const char *>(&d[pos]), size_t(length)));
         pos += size_t(length);
         if (!next(ranges) || ranges < 0 || pos + size_t(ranges) * 8 > d.size()) return;
-        pos += size_t(ranges) * 8;
+        // Each range, first and last node id, is text the PC has read, which Config's read-only skip passes; the list
+        // ends (0, 0) then (-2, -2).
+        auto &read = readNodes_[normalizedPath(name)];
+        for (int32_t r = 0; r < ranges; r++) {
+            int32_t first = 0, last = 0;
+            next(first);
+            next(last);
+            if (first > 0 && last >= first && last - first < 100000)
+                for (int32_t id = first; id <= last; id++) read.insert(id);
+        }
         if (!name.empty()) seen_[normalizedPath(name)] = true;
+    }
+}
+
+// VNDegen's own record of the text read, a script to a line with its node ids, kept beside the PC's read.sav.
+void Engine::loadReadText() {
+    std::ifstream f(saveDir_ + "/vndegen_read.txt");
+    std::string line;
+    while (std::getline(f, line)) {
+        std::istringstream in(line);
+        std::string script;
+        int id;
+        if (!(in >> script)) continue;
+        auto &read = readNodes_[script];
+        while (in >> id) read.insert(id);
+    }
+}
+
+void Engine::saveReadText() {
+    if (!readChanged_ || saveDir_.empty() || !makeFolders(saveDir_)) return;
+    std::string text;
+    for (const auto &[script, ids] : readNodes_) {
+        text += script;
+        for (int id : ids) text += " " + std::to_string(id);
+        text += "\n";
+    }
+    writeWhole(saveDir_ + "/vndegen_read.txt", std::vector<uint8_t>(text.begin(), text.end()));
+    readChanged_ = false;
+}
+
+// Config's read-only skip stops skipping at text not read before, as the PC's does; then the text is read.
+void Engine::noteTextRead(const Node &n) {
+    if (!scene_.script) return;
+    auto &read = readNodes_[normalizedPath(scene_.script->name)];
+    bool fresh = read.insert(n.id).second;
+    if (fresh) readChanged_ = true;
+    if (!fresh || setting("skipall") || jumping_) return;
+    skipToggle_ = false;
+    if (skip_) {
+        skip_ = false;
+        skipStopped_ = true;
     }
 }
 
@@ -1717,6 +1771,7 @@ bool Engine::saveToSlot(int slot) {
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
     writeFlipModes(slot, data);
     saveSeen();
+    saveReadText();
     slots_.erase(slot);
     log("saved slot %d at %s #%d", slot, data.scene.c_str(), data.node);
     return true;
@@ -3208,6 +3263,7 @@ bool Engine::jump(const std::string &script, int node) {
     if (node < 0) return true;
     bool wasSkip = skip_;
     skip_ = true;
+    jumping_ = true;
     for (int guard = 0; guard < 2000000 && scene_.node && scene_.node->id != node; guard++) {
         const Node &current = *scene_.node;
         runScene(current);
@@ -3216,6 +3272,7 @@ bool Engine::jump(const std::string &script, int node) {
         transitioning_ = false;
     }
     skip_ = wasSkip;
+    jumping_ = false;
     if (blur_) previousValid_ = false;
     front_ = back_;
     dirty_ = true;
@@ -3955,6 +4012,7 @@ void Engine::showText(const Node &n) {
         int left = at == gt_.texts.end() ? 0 : int(gt_.texts.end() - at);
         gt_.shownCount = left <= gt_.count ? left : 0;
     }
+    noteTextRead(n);
     currentText_ = {};
     currentText_.tag = n.s[3].empty() ? -10 : 0;
     currentText_.name = n.s[1];

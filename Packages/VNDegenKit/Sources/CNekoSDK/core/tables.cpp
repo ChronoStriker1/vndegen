@@ -293,8 +293,8 @@ radio auto 0 obj\h016_000.bmp 64 200 4 5 0
 radio auto 1 obj\h016_000.bmp 186 200 4 5 1
 radio auto 2 obj\h016_000.bmp 308 200 4 5 2
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
-pic obj\h018_000.bmp 617 112 2 5 0 4
-pic obj\h018_000.bmp 698 112 2 5 1 2
+radio skipall 0 obj\h018_000.bmp 617 112 2 5 0
+radio skipall 1 obj\h018_000.bmp 698 112 2 5 1
 radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
 radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
@@ -765,8 +765,8 @@ radio auto 0 obj\h016_000.bmp 251 294 4 5 0
 radio auto 1 obj\h016_000.bmp 373 294 4 5 1
 radio auto 2 obj\h016_000.bmp 495 294 4 5 2
 radio auto 3 obj\h016_000.bmp 617 294 4 5 3
-pic obj\h018_000.bmp 889 238 2 5 0 4
-pic obj\h018_000.bmp 1007 238 2 5 1 2
+radio skipall 0 obj\h018_000.bmp 889 238 2 5 0
+radio skipall 1 obj\h018_000.bmp 1007 238 2 5 1
 radio deckey 0 obj\h019_000.bmp 1263 238 2 5 0
 radio deckey 1 obj\h019_000.bmp 1381 238 2 5 1
 radio rightclick 0 obj\h020_000.bmp 1005 334 5 5 0
@@ -1209,8 +1209,8 @@ radio text 2 obj\h016_000.bmp 308 122 4 5 2
 radio auto 2 obj\h016_000.bmp 308 200 4 5 2
 radio text 3 obj\h016_000.bmp 430 122 4 5 3
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
-pic obj\h018_000.bmp 617 112 2 5 0 4
-pic obj\h018_000.bmp 698 112 2 5 1 2
+radio skipall 0 obj\h018_000.bmp 617 112 2 5 0
+radio skipall 1 obj\h018_000.bmp 698 112 2 5 1
 radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
 radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
@@ -1737,8 +1737,8 @@ radio text 2 obj\h016_000.bmp 308 122 4 5 2
 radio auto 2 obj\h016_000.bmp 308 200 4 5 2
 radio text 3 obj\h016_000.bmp 430 122 4 5 3
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
-pic obj\h018_000.bmp 617 112 2 5 0 4
-pic obj\h018_000.bmp 698 112 2 5 1 2
+radio skipall 0 obj\h018_000.bmp 617 112 2 5 0
+radio skipall 1 obj\h018_000.bmp 698 112 2 5 1
 radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
 radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
@@ -2229,8 +2229,8 @@ radio text 2 obj\c006_000.bmp 191 155 4 5 2
 radio auto 2 obj\c006_000.bmp 191 222 4 5 2
 radio text 3 obj\c006_000.bmp 267 155 4 5 3
 radio auto 3 obj\c006_000.bmp 267 222 4 5 3
-pic obj\c006_001.bmp 520 145 2 5 0 4
-pic obj\c006_001.bmp 591 145 2 5 1 2
+radio skipall 0 obj\c006_001.bmp 520 145 2 5 0
+radio skipall 1 obj\c006_001.bmp 591 145 2 5 1
 radio deckey 0 obj\c006_002.bmp 718 145 2 5 0
 radio deckey 1 obj\c006_002.bmp 790 145 2 5 1
 radio rightclick 0 obj\c006_003.bmp 601 182 5 5 0
@@ -2815,8 +2815,8 @@ radio text 2 obj\h016_000.bmp 278 189 4 5 2
 radio auto 2 obj\h016_000.bmp 278 267 4 5 2
 radio text 3 obj\h016_000.bmp 400 189 4 5 3
 radio auto 3 obj\h016_000.bmp 400 267 4 5 3
-pic obj\h018_000.bmp 587 179 2 5 0 4
-pic obj\h018_000.bmp 668 179 2 5 1 2
+radio skipall 0 obj\h018_000.bmp 587 179 2 5 0
+radio skipall 1 obj\h018_000.bmp 668 179 2 5 1
 radio deckey 0 obj\h019_000.bmp 815 179 2 5 0
 radio deckey 1 obj\h019_000.bmp 896 179 2 5 1
 radio rightclick 0 obj\h020_000.bmp 680 222 5 5 0
@@ -3340,8 +3340,8 @@ slider waittime obj\i010_000.bmp 155 638 200
 number waittime obj\f012_000.bmp 413 609
 step waittime -1 obj\i010_001.bmp 119 640 2 5 0
 step waittime 1 obj\i010_001.bmp 469 640 2 5 1
-pic obj\i015_000.bmp 617 172 2 5 0 4
-pic obj\i015_000.bmp 698 172 2 5 1 4
+radio skipall 0 obj\i015_000.bmp 617 172 2 5 0
+radio skipall 1 obj\i015_000.bmp 698 172 2 5 1
 radio deckey 0 obj\i016_000.bmp 845 172 2 5 0
 radio deckey 1 obj\i016_000.bmp 926 172 2 5 1
 radio rightclick 0 obj\i017_000.bmp 710 215 5 5 0
@@ -3952,8 +3952,8 @@ radio text 2 obj\h016_000.bmp 308 122 4 5 2
 radio auto 2 obj\h016_000.bmp 308 200 4 5 2
 radio text 3 obj\h016_000.bmp 430 122 4 5 3
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
-pic obj\h018_000.bmp 617 112 2 5 0 4
-pic obj\h018_000.bmp 698 112 2 5 1 2
+radio skipall 0 obj\h018_000.bmp 617 112 2 5 0
+radio skipall 1 obj\h018_000.bmp 698 112 2 5 1
 radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
 radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0

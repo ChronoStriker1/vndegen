@@ -8,6 +8,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -111,7 +112,11 @@ public:
     void mouseWheel(int notches);
     // Moves the pointer to the nearest control that way, for a controller or arrow keys. False when there is none here.
     bool moveFocus(int dx, int dy);
-    void setSkip(bool on) { skip_ = on; }
+    // A held skip stopped at unread text stays stopped until it's let go.
+    void setSkip(bool on) {
+        skip_ = on && !skipStopped_;
+        if (!on) skipStopped_ = false;
+    }
     bool inMenu() const { return screen_ != nullptr; }
     // For test hosts: presses a menu button by its action, as a click on it does.
     bool pressAction(const std::string &action);
@@ -296,6 +301,12 @@ private:
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;
     std::unordered_map<std::string, bool> seen_;
+    // The text read, by script and node id, for Config's read-only skip.
+    std::unordered_map<std::string, std::set<int>> readNodes_;
+    bool readChanged_ = false, skipStopped_ = false, jumping_ = false;
+    void loadReadText();
+    void saveReadText();
+    void noteTextRead(const Node &n);
     bool seenChanged_ = false;
     std::vector<std::string> viewing_;
     size_t viewingIndex_ = 0;
