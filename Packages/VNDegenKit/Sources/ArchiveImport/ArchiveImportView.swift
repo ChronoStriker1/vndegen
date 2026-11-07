@@ -236,22 +236,26 @@ public struct ArchiveImportView: View {
         self.onFinish = onFinish
     }
 
+    @Environment(\.cameraCornerTrailing) private var cameraCorner
+
     public var body: some View {
         let importer = model.importer
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Import Game").font(.system(size: 22, weight: .heavy).width(.expanded))
+                    Text("Add game").font(.system(size: 22, weight: .heavy).width(.expanded))
                     if let name = importer?.source?.fileName {
                         Text(name).font(.system(size: 14)).foregroundStyle(ImportTheme.secondaryText).lineLimit(1)
                     }
                 }
                 Spacer()
-                Button(importer?.step == .extracting ? "Cancel" : "Close", action: model.close)
+                Button(importer?.step == .extracting ? "Cancel" : "Done", action: model.close)
                     .buttonStyle(ImportButtonStyle(kind: .secondary))
                     .keyboardShortcut(.cancelAction)
             }
             .padding(22)
+            // The title and Done keep clear of a camera in the top corner.
+            .padding(.trailing, max(0, cameraCorner - 22))
             ScrollViewReader { proxy in
                 ScrollView {
                     if let importer {

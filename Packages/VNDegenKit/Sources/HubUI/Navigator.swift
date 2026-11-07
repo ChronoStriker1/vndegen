@@ -273,8 +273,9 @@ final class Navigator {
     var shelves: [(shelf: Shelf, games: [Game])] {
         let visible = visibleGames
         // The header list and the grid show every game, so Recently played would only repeat the top of All games,
-        // which already lists the last played first.
-        let recent = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        // which already lists the last played first. So would a shelf of one game, which the hero shows too.
+        let played = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        let recent = played.count > 1 ? played : []
         let all: [(Shelf, [Game])] = [
             (.recent, recent),
             (.all, visible.filter { !$0.isLocked }),
@@ -350,8 +351,9 @@ final class Navigator {
                 + (Self.collapsesScreenshots(screenshots.count, columns: columns) ? [Row(id: "page-screenshots-more", items: [.pageScreenshotsMore])] : [])
             let engineFiles: [Target] = pageGameID.map(hub.library.offersEngineFiles) == true ? [.pageEngineFiles] : []
             let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder] + engineFiles + [.pageRemove]
+            // Stacked under Play, the other buttons sit two to a row, as the page draws them.
             let pageActions = pageActionsStacked
-                ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
+                ? [Row(id: "page-play", items: [.pagePlay])] + Self.gridRows("page-actions", secondary, columns: Self.stackedActionColumns)
                 : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
             return [
                 Row(id: "page-back", items: [.back]),
@@ -412,6 +414,9 @@ final class Navigator {
             return target
         }
     }
+
+    /// The columns of the game page's buttons when they stack under Play.
+    static let stackedActionColumns = 2
 
     /// `items` in rows of `columns`. Moving between them keeps the column, as moving through a grid should.
     private static func gridRows(_ id: String, _ items: [Target], columns: Int) -> [Row] {
@@ -815,10 +820,10 @@ final class Navigator {
         let path = SettingsView.displayPath(hub.library.folder(for: id))
         let stays = "Saves VNDegen keeps for the game in its own data folder stay, and so do the game's artwork, play time, and settings, which come back if you put the folder back. Saves the game writes inside its folder go with it."
         #if os(macOS)
-        let message = "VNDegen moves the game's folder, \(path), to the Trash. \(stays)"
+        let message = "VNDegen moves the game's folder, \(path), to the Trash.\n\n\(stays)"
         let action = "Move to Trash"
         #else
-        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone. \(stays)"
+        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone.\n\n\(stays)"
         let action = "Delete folder"
         #endif
         sheet = .confirm(Confirmation(title: "Remove \(hub.displayTitle(game)) from the library?", message: message,

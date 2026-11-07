@@ -121,9 +121,7 @@ public struct UnlockView: View {
     }
 
     private var cancelButton: some View {
-        Button("Cancel") { finish(false) }
-            .font(.body.weight(.medium))
-            .foregroundStyle(.white.opacity(0.8))
+        LockCancelButton { finish(false) }
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }

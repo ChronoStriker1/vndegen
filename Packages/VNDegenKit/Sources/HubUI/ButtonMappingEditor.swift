@@ -676,13 +676,19 @@ struct ButtonMappingSheet: View {
     private func choice(_ action: ControlAction, selected: Bool) -> some View {
         let target = ButtonMappingEditor.Target.action(action)
         let focused = editor.isFocused(target)
-        let label = if case let .key(key) = action { key.label } else { action.title }
+        // Gamepad choices sit under their own Gamepad heading, so they leave the word off their names.
+        let label = switch action {
+        case let .key(key): key.label
+        case let .gamepad(input): input.title
+        default: action.title
+        }
         return Button { editor.select(target) } label: {
             Text(label)
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(focused ? .black : .white)
+                .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {
                     let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)

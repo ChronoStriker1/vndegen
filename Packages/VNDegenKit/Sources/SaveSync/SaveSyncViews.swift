@@ -274,6 +274,8 @@ public struct SaveSyncSettingsView: View {
 public final class GameSavesModel {
     enum Target: Hashable {
         case ludusaviGame, backup(String), restore, backUp, undo
+        /// Opens the Ludusavi settings, offered while no share is set up.
+        case setUp
         /// Rows of the Ludusavi game picker.
         case search, automaticMatch, folder(String)
     }
@@ -316,6 +318,8 @@ public final class GameSavesModel {
     /// The keyboard a controller is typing the picker's search with. The host forwards button presses to it while it is
     /// open.
     public private(set) var keyboard: OnScreenKeyboard?
+    /// Opens the Ludusavi settings. Nil hides the setup button.
+    @ObservationIgnored var onSetUp: (() -> Void)?
 
     public init(service: SaveSyncService, game: GameID) {
         self.service = service
@@ -331,9 +335,12 @@ public final class GameSavesModel {
 
     private var isSetUp: Bool { service.server != nil }
 
+    /// Before Ludusavi is set up, unless an old server setting needs moving to a share, which Settings explains.
+    var offersSetUp: Bool { onSetUp != nil && !service.needsShare }
+
     var rows: [[Target]] {
         if choosingGame { return [[.search], [.automaticMatch]] + filteredFolders.map { [.folder($0.folder)] } }
-        guard isSetUp else { return [] }
+        guard isSetUp else { return offersSetUp ? [[.setUp]] : [] }
         return [[.ludusaviGame]] + backups.reversed().map { [.backup($0.name)] } + [[.restore], [.backUp], [.undo]]
     }
 
@@ -392,6 +399,7 @@ public final class GameSavesModel {
             } onClose: { [weak self] in
                 self?.keyboard = nil
             }
+        case .setUp: onSetUp?()
         case .automaticMatch: pick(nil)
         case let .folder(folder): pick(folder)
         }
@@ -503,8 +511,15 @@ public final class GameSavesModel {
 public struct GameSavesView: View {
     @State private var model: GameSavesModel
 
-    public init(service: SaveSyncService, game: GameID) { _model = State(initialValue: GameSavesModel(service: service, game: game)) }
-    public init(model: GameSavesModel) { _model = State(initialValue: model) }
+    public init(service: SaveSyncService, game: GameID) {
+        _model = State(initialValue: GameSavesModel(service: service, game: game))
+    }
+
+    /// `onSetUp` opens the Ludusavi settings, which the view offers while no share is set up.
+    public init(model: GameSavesModel, onSetUp: (() -> Void)? = nil) {
+        model.onSetUp = onSetUp
+        _model = State(initialValue: model)
+    }
 
     public var body: some View {
         @Bindable var model = model
@@ -520,6 +535,10 @@ public struct GameSavesView: View {
                     Section {
                         Text(model.service.needsShare ? oldServerNote : "Set up your Ludusavi share in Settings to restore and back up this game's saves.")
                             .foregroundStyle(.secondary)
+                        if model.offersSetUp {
+                            Button("Set up Ludusavi backups", systemImage: "externaldrive.badge.plus") { model.select(.setUp) }
+                                .focusRow(model.isFocused(.setUp), id: GameSavesModel.Target.setUp)
+                        }
                     }
                 }
             }

@@ -32,6 +32,8 @@ private struct ScreenHeader: View {
         .padding(.leading, metrics.topRowPadding(.leading))
         .padding(.trailing, metrics.topRowPadding(.trailing))
         .padding(.top, 10)
+        // The list below starts under a side camera rather than beside it, so nothing scrolls past the camera.
+        .frame(minHeight: metrics.acrossSideCamera ? metrics.cornerClearance : 0, alignment: .top)
         #if os(macOS)
         .padding(.top, 18)
         #endif
@@ -152,6 +154,10 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
+                .formBesideSideCamera(metrics)
+                // Its help text reads in lines of a comfortable length on a wide screen.
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
                 .onChange(of: nav.focus) { _, focus in
@@ -329,6 +335,7 @@ extension View {
 struct SettingsPageSheet: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
+    @Environment(\.hubMetrics) private var metrics
     let page: Navigator.SettingsPage
 
     var body: some View {
@@ -336,15 +343,15 @@ struct SettingsPageSheet: View {
             switch page {
             case .metadata:
                 SheetScaffold(title: "Metadata sources", escapeCloses: true) {
-                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden)
+                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .lock:
                 SheetScaffold(title: "Hidden games") {
-                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden)
+                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
-                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
+                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .plugins:
                 SheetScaffold(title: "Plugins", subtitle: "Engines built into VNDegen", escapeCloses: true) {
@@ -412,15 +419,26 @@ struct EmptyLibraryView: View {
     }
 
     var body: some View {
-        let layout = metrics.isCompact || metrics.isShort ? AnyLayout(VStackLayout(spacing: 28)) : AnyLayout(HStackLayout(spacing: 56))
+        let stacked = metrics.isCompact || metrics.isShort
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 24)) : AnyLayout(HStackLayout(spacing: 56))
+        // A phone held upright keeps the posters small, so the actions show without scrolling.
+        let posters: CGFloat = metrics.isShort ? 170 : metrics.isCompact ? 150 : 240
         ScrollView {
             layout {
                 PosterStack()
-                    .frame(width: metrics.isShort ? 180 : 240, height: metrics.isShort ? 170 : 240)
+                    .frame(width: posters, height: posters)
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Add your first game").font(.display(metrics.isCompact ? 28 : 36))
                     if !hub.localArchives.isEmpty {
                         ReadyToImportList(archives: hub.localArchives)
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus").fixedSize() }
+                        HStack(spacing: 12) {
+                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill").fixedSize() }
+                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise").fixedSize() }
+                                .disabled(nav.rescanning)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
@@ -434,23 +452,16 @@ struct EmptyLibraryView: View {
                             }
                         }
                     }
-                    Text("RPG Maker MV and MZ games are supported today. Add game unpacks a zip, RAR, or 7z archive into the library.")
+                    .padding(.top, 6)
+                    Text("Add game unpacks a zip, RAR, or 7z archive into the library.")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.tertiaryText)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus") }
-                        HStack(spacing: 12) {
-                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill") }
-                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise") }
-                                .disabled(nav.rescanning)
-                        }
-                    }
-                    .padding(.top, 6)
                 }
                 .frame(maxWidth: 520, alignment: .leading)
             }
             .padding(.horizontal, metrics.padding)
-            .padding(.vertical, 90)
+            .padding(.top, stacked ? 72 : 90)
+            .padding(.bottom, stacked ? 40 : 90)
             .frame(maxWidth: .infinity, minHeight: metrics.size.height)
         }
         .scrollIndicators(.hidden)
