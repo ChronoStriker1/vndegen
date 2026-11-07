@@ -306,12 +306,12 @@ pic obj\h008_000.bmp 617 250 2 5 0 4
 pic obj\h008_000.bmp 698 250 2 5 1 4
 pic obj\h008_000.bmp 845 250 2 5 0 4
 pic obj\h008_000.bmp 926 250 2 5 1 4
-bar obj\h009_000.bmp 155 568 50
-pic obj\h011_000.bmp 406 539 10 1 1 0
-pic obj\h011_000.bmp 428 539 10 1 0 0
-pic obj\h011_000.bmp 442 539 10 1 0 0
-pic obj\h010_000.bmp 119 570 2 5 0 4
-pic obj\h010_000.bmp 469 570 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\h009_000.bmp 155 568 200
+number waittime obj\h011_000.bmp 406 539 428 442
+step waittime -1 obj\h010_000.bmp 119 570 2 5 0
+step waittime 1 obj\h010_000.bmp 469 570 2 5 1
 
 screen config3
 pic obj\h000_000.bmp 0 0
@@ -778,12 +778,12 @@ pic obj\h008_000.bmp 889 521 2 5 0 4
 pic obj\h008_000.bmp 1007 521 2 5 1 4
 pic obj\h008_000.bmp 1263 521 2 5 0 4
 pic obj\h008_000.bmp 1381 521 2 5 1 4
-bar obj\h009_000.bmp 208 814 50
-pic obj\h011_000.bmp 563 771 10 1 1 0
-pic obj\h011_000.bmp 597 771 10 1 0 0
-pic obj\h011_000.bmp 623 771 10 1 0 0
-pic obj\h010_000.bmp 140 816 2 5 0 4
-pic obj\h010_000.bmp 680 816 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\h009_000.bmp 208 814 200
+number waittime obj\h011_000.bmp 563 771 597 623
+step waittime -1 obj\h010_000.bmp 140 816 2 5 0
+step waittime 1 obj\h010_000.bmp 680 816 2 5 1
 
 screen config3
 # Help shown over each settings group, mapped on a grid of points under Wine, edges within 32 pixels.
@@ -1224,9 +1224,12 @@ pic obj\h008_000.bmp 845 250 2 5 0 4
 pic obj\h008_000.bmp 926 250 2 5 1 4
 check count_color obj\h008_000.bmp 617 344 2 5 0
 pic obj\h008_000.bmp 698 344 2 5 1 4
-bar obj\h009_000.bmp 155 568 50
-pic obj\h010_000.bmp 119 570 2 5 0 4
-pic obj\h010_000.bmp 469 570 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\h009_000.bmp 155 568 200
+number waittime obj\h011_000.bmp 409 540 429 449
+step waittime -1 obj\h010_000.bmp 119 570 2 5 0
+step waittime 1 obj\h010_000.bmp 469 570 2 5 1
 
 screen config3
 # Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
@@ -1747,9 +1750,12 @@ pic obj\h008_000.bmp 845 250 2 5 0 4
 pic obj\h008_000.bmp 926 250 2 5 1 4
 check count_color obj\h008_000.bmp 617 344 2 5 0
 pic obj\h008_000.bmp 698 344 2 5 1 4
-bar obj\h009_000.bmp 155 568 50
-pic obj\h010_000.bmp 119 570 2 5 0 4
-pic obj\h010_000.bmp 469 570 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\h009_000.bmp 155 568 200
+number waittime obj\h011_000.bmp 409 540 429 449
+step waittime -1 obj\h010_000.bmp 119 570 2 5 0
+step waittime 1 obj\h010_000.bmp 469 570 2 5 1
 
 screen config3
 helplast
@@ -2232,10 +2238,12 @@ pic obj\c005_002.bmp 520 265 2 5 0 4
 pic obj\c005_002.bmp 591 265 2 5 1 4
 pic obj\c005_002.bmp 718 265 2 5 0 4
 pic obj\c005_002.bmp 790 265 2 5 1 4
-bar obj\c005_003.bmp 119 313 50
-number delay obj\c005_005.bmp 343 281
-pic obj\c005_004.bmp 88 315 2 5 0 4
-pic obj\c005_004.bmp 392 315 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\c005_003.bmp 119 313 200
+number waittime obj\c005_005.bmp 343 281
+step waittime -1 obj\c005_004.bmp 88 315 2 5 0
+step waittime 1 obj\c005_004.bmp 392 315 2 5 1
 hover 22 118 475 190 obj\c004_001.bmp 0 663 3 0
 hover 22 190 475 262 obj\c004_001.bmp 0 663 3 1
 hover 22 262 475 358 obj\c004_001.bmp 0 663 3 2
@@ -2816,9 +2824,12 @@ pic obj\h008_000.bmp 587 317 2 5 0 4
 pic obj\h008_000.bmp 668 317 2 5 1 4
 pic obj\h008_000.bmp 815 317 2 5 0 4
 pic obj\h008_000.bmp 896 317 2 5 1 4
-bar obj\h009_000.bmp 124 635 50
-pic obj\h010_000.bmp 89 637 2 5 0 4
-pic obj\h010_000.bmp 439 637 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\h009_000.bmp 124 635 200
+number waittime obj\h011_000.bmp 378 607 20
+step waittime -1 obj\h010_000.bmp 89 637 2 5 0
+step waittime 1 obj\h010_000.bmp 439 637 2 5 1
 hover 14 153 534 595 obj\h004_008.bmp 12 108
 hover 552 153 778 215 obj\h004_011.bmp 550 81
 hover 780 153 1006 215 obj\h004_012.bmp 677 81
@@ -3319,10 +3330,12 @@ radio text 2 obj\i014_000.bmp 308 182 4 5 2
 radio auto 2 obj\i014_000.bmp 308 260 4 5 2
 radio text 3 obj\i014_000.bmp 430 182 4 5 3
 radio auto 3 obj\i014_000.bmp 430 260 4 5 3
-bar obj\i010_000.bmp 155 638 50
-number delay obj\f012_000.bmp 413 609
-pic obj\i010_001.bmp 119 640 2 5 0 4
-pic obj\i010_001.bmp 469 640 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\i010_000.bmp 155 638 200
+number waittime obj\f012_000.bmp 413 609
+step waittime -1 obj\i010_001.bmp 119 640 2 5 0
+step waittime 1 obj\i010_001.bmp 469 640 2 5 1
 pic obj\i015_000.bmp 617 172 2 5 0 4
 pic obj\i015_000.bmp 698 172 2 5 1 4
 pic obj\i016_000.bmp 845 172 2 5 0 4
@@ -3950,9 +3963,12 @@ pic obj\h008_000.bmp 845 250 2 5 0 4
 pic obj\h008_000.bmp 926 250 2 5 1 4
 check count_color obj\h008_000.bmp 617 344 2 5 0
 pic obj\h008_000.bmp 698 344 2 5 1 4
-bar obj\h009_000.bmp 155 568 50
-pic obj\h010_000.bmp 119 570 2 5 0 4
-pic obj\h010_000.bmp 469 570 2 5 1 4
+# Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
+range waittime 70 130
+slider waittime obj\h009_000.bmp 155 568 200
+number waittime obj\h011_000.bmp 409 540 429 449
+step waittime -1 obj\h010_000.bmp 119 570 2 5 0
+step waittime 1 obj\h010_000.bmp 469 570 2 5 1
 
 screen config3
 helplast

@@ -278,6 +278,7 @@ private:
     // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
     const std::vector<GalleryEntry> &galleryEntries() const;
     int cellShift() const;
+    int clampSetting(const std::string &name, int value) const;
     // The host window, for Config's screen mode: whether it can go full screen, whether it is, and a change asked for,
     // -1 for none.
     bool canFullScreen_ = false, fullScreen_ = false;

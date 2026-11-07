@@ -65,6 +65,8 @@ const std::map<std::string, int> &defaultSettings() {
         {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
         // Config's effects, waits, clicking past waits and the H scenes' camera work, as the PC starts them.
         {"effect", 1}, {"wait", 1}, {"waitskip", 0}, {"camera", 1}, {"tutorial", 1},
+        // How long waits and fades last, in hundredths: Config's wait time runs from ×0.70 to ×1.30.
+        {"waittime", 100},
     };
     return defaults;
 }
@@ -1353,13 +1355,25 @@ void Engine::saveSettings() {
     writeWhole(saveDir_ + "/vndegen_settings.txt", std::vector<uint8_t>(text.begin(), text.end()));
 }
 
+int Engine::clampSetting(const std::string &name, int value) const {
+    int low = 0, high = 100;
+    if (screen_)
+        for (auto [it, end] = screen_->settings.equal_range("range"); it != end; ++it)
+            if (it->second.size() >= 3 && it->second[0] == name) {
+                low = field(it->second, 1);
+                high = field(it->second, 2);
+            }
+    return std::clamp(value, low, high);
+}
+
 void Engine::changeSetting(const std::string &name, int value) {
     settings_[name] = value;
     applySettings();
     dirty_ = true;
 }
 
-// Table lines: `slider NAME FILL X Y`, `number NAME DIGITS X Y`, `bar FILL X Y PERCENT` for one that can't change,
+// Table lines: `slider NAME FILL X Y [FULL]` with the value that fills it, 100 unless given, `number NAME DIGITS X Y
+// [STEP | X2 X3]`, `range NAME MIN MAX` for what a slider or step can set, 0 to 100 unless given, `bar FILL X Y PERCENT` for one that can't change,
 // `radio NAME VALUE SHEET X Y COLS ROWS COL`, `check NAME SHEET X Y COLS ROWS COL [ON ONHOVER OFF OFFHOVER]` and
 // `step NAME DELTA SHEET X Y COLS ROWS COL`.
 // Sheets run normal, hover, selected, selected and hovered, as the PC's do.
@@ -1377,8 +1391,9 @@ void Engine::composeSettingsWidgets(Canvas &out) {
     // The PC rounds a fill to the nearest pixel: at 60, The Alchemist's 441-pixel opacity bar fills 265.
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
+        int scale = f.size() >= 5 ? std::max(1, field(f, 4)) : 100;
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
-            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + 50) / 100, fill->h, 1);
+            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + scale / 2) / scale, fill->h, 1);
     }
     for (auto [it, end] = lines("bar"); it != end; ++it) {
         const auto &f = it->second;
@@ -1389,8 +1404,15 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         const auto &f = it->second;
         ImageRef digits = f.size() >= 4 ? images_->get(f[1]) : nullptr;
         if (!digits) continue;
-        int w = digits->w / 10, value = setting(f[0]);
-        for (int i = 2; i >= 0; i--, value /= 10) drawPart(out, *digits, field(f, 2) + i * w, field(f, 3), value % 10 * w, 0, w, digits->h, 1);
+        // A STEP spaces the digits apart, and X2 X3 place the second and third, as round the point a panel prints in a wait
+        // time of ×1.00.
+        int w = digits->w / 10, value = setting(f[0]), step = f.size() >= 5 ? field(f, 4) : w;
+        int xs[3] = {field(f, 2), field(f, 2) + step, field(f, 2) + 2 * step};
+        if (f.size() >= 6) {
+            xs[1] = field(f, 4);
+            xs[2] = field(f, 5);
+        }
+        for (int i = 2; i >= 0; i--, value /= 10) drawPart(out, *digits, xs[i], field(f, 3), value % 10 * w, 0, w, digits->h, 1);
     }
     for (auto [it, end] = lines("radio"); it != end; ++it) {
         const auto &f = it->second;
@@ -1428,7 +1450,8 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
         // A held press keeps following the finger along the bar, past its ends.
         int left = field(f, 2), top = field(f, 3);
         if (fill && y >= top && y < top + fill->h && x >= left - (dragging ? 40 : 0) && x < left + fill->w + (dragging ? 40 : 0)) {
-            changeSetting(f[0], std::clamp((x - left) * 100 / std::max(1, fill->w - 1), 0, 100));
+            int scale = f.size() >= 5 ? std::max(1, field(f, 4)) : 100;
+            changeSetting(f[0], clampSetting(f[0], (x - left) * scale / std::max(1, fill->w - 1)));
             return true;
         }
     }
@@ -1456,7 +1479,7 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
         }
     for (auto [it, end] = lines("step"); it != end; ++it)
         if (it->second.size() >= 8 && within(it->second, 2)) {
-            changeSetting(it->second[0], std::clamp(setting(it->second[0]) + field(it->second, 1), 0, 100));
+            changeSetting(it->second[0], clampSetting(it->second[0], setting(it->second[0]) + field(it->second, 1)));
             return true;
         }
     return false;
@@ -2651,7 +2674,7 @@ void Engine::runScene(const Node &n) {
     case 2:  // wait, unless Config turns waits off
         if (!setting("wait")) break;
         waiting_ = Waiting::Time;
-        waitUntil_ = now_ + p[0];
+        waitUntil_ = now_ + int64_t(p[0]) * setting("waittime") / 100;
         break;
     case 4:  // hide the text window
         if (windowShown_) dirty_ = true;
@@ -3914,7 +3937,8 @@ void Engine::screenUpdate(const Node &n) {
     front_ = back_;
     transitioning_ = true;
     transitionType_ = p[0];
-    transitionMs_ = p[1];
+    // Config's wait time stretches a fade as it does a wait.
+    transitionMs_ = std::max(1, p[1] * setting("waittime") / 100);
     transitionStart_ = now_;
     ruleImage_ = n.s[1].empty() ? nullptr : images_->get(n.s[1]);
     dirty_ = true;
