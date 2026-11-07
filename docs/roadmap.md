@@ -82,6 +82,8 @@ New bugs get a GitHub issue and a line here.
 - [#53](https://github.com/ChronoStriker1/vndegen/issues/53) Unit tests leave UserDefaults suites behind on the build Mac.
 - [#54](https://github.com/ChronoStriker1/vndegen/issues/54) Unit tests leave fixture folders in the temp folder.
 - [#55](https://github.com/ChronoStriker1/vndegen/issues/55) Mac: the -snapshot debug hook captures game views black.
+- [#56](https://github.com/ChronoStriker1/vndegen/issues/56) Mac: the -snapshot debug hook captures an alert instead of the main window.
+- [#57](https://github.com/ChronoStriker1/vndegen/issues/57) build.sh leaves an empty xcodegen folder in the temp folder on every build.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
