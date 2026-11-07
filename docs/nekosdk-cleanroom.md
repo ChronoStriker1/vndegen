@@ -133,6 +133,12 @@ A picture's unlock flag in `cfg.sav` goes by its number in `cg_view.ini`, the mi
 
 The block after the sprite records holds a count at byte 22 and that many sprite numbers after the block's fixed part. The PC's save made at a choice names the choice as its flow node. Its later blocks also hold state the runtime doesn't write, and a save of ours naming the choice makes the PC run past it, so ours names the scene before, and the PC then asks the choice itself.
 
+## Flow variables
+
+A flow's condition (command 5) and change (command 6) name their variable by scope, parameter 0, and by its place in that scope's list in `macrolist.ini`. The places count in the names' order, not the file's: The Alchemist's file lists `GLB_PROLOGUE_OVER` (1000) before `GLB_ENDING` (1050), and its flow's `プロローグ完了` names place 1, which by name is 1000, the number a save the PC made after the prologue holds. Other games' flows show the same, such as Test Game 84's, whose chapter 1A is place 2, between `GLB_01_OVER` and `GLB_02_OVER`. VNDegen 0.26.1 counted in the file's order, so it set 1050 at The Alchemist's prologue's end (#59). The table's `implies 1050 1000` puts such a `cfg.sav` right as it's read: an ending means the prologue was seen. Checked under Wine: with the file repaired, the PC's Start offered Prologue or Main Story.
+
+A condition that holds goes to the node's other target, the one a choice's branch takes for its option, and to `next` when it doesn't. The Alchemist's last flow settles it: `HAPPYEND_COUNTER <= 3 の時` has 正規ルートEND as its other target and 幸福ルートEND as `next`, and the counter goes up at the choices toward the happy ending. Test Game 84's `1:デス＆エス` likewise has デストラ＆エスケルダを選んでた as its other target. VNDegen 0.26.1 had it the other way round, so The Alchemist's endings were swapped (#58).
+
 ## Menus
 
 The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.

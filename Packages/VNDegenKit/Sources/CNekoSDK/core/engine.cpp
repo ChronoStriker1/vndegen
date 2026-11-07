@@ -638,20 +638,33 @@ bool writeWhole(const std::string &path, const std::vector<uint8_t> &data) {
 
 }  // namespace
 
+// The PC keeps each list by name, so a script's place in it counts in name order, not the file's: The Alchemist's file
+// lists GLB_PROLOGUE_OVER (1000) before GLB_ENDING (1050), and its flow's プロローグ完了 names place 1, which is 1000
+// by name, the number a save the PC made after the prologue holds.
+MacroLists parseMacroList(const std::vector<uint8_t> &file) {
+    std::map<std::string, int> global, scenario, *list = nullptr;
+    for (const std::string &raw : split(sjis::toUtf8(std::string(file.begin(), file.end())), '\n')) {
+        std::string line = trim(raw.substr(0, raw.find("//")));
+        if (line.rfind("#p", 0) == 0) list = line.find("Global") != std::string::npos ? &global : &scenario;
+        else if (line == "##") list = nullptr;
+        else if (list && !line.empty()) {
+            size_t gap = line.find_first_of(" \t");
+            if (gap != std::string::npos) list->emplace(line.substr(0, gap), std::atoi(line.c_str() + gap));
+        }
+    }
+    MacroLists out;
+    for (const auto &[name, number] : global) out.global.push_back(number);
+    for (const auto &[name, number] : scenario) out.scenario.push_back(number);
+    return out;
+}
+
 // MARK: Galleries
 
 void Engine::loadGalleries() {
     if (Bytes data = files_.read(config_.text("MacroList", "cfg\\macrolist.ini"))) {
-        std::vector<int> *list = nullptr;
-        for (const std::string &raw : split(sjis::toUtf8(std::string(data->begin(), data->end())), '\n')) {
-            std::string line = trim(raw.substr(0, raw.find("//")));
-            if (line.rfind("#p", 0) == 0) list = line.find("Global") != std::string::npos ? &globalMacros_ : &scenarioMacros_;
-            else if (line == "##") list = nullptr;
-            else if (list && !line.empty()) {
-                size_t gap = line.find_first_of(" \t");
-                if (gap != std::string::npos) list->push_back(std::atoi(line.c_str() + gap));
-            }
-        }
+        auto lists = parseMacroList(*data);
+        globalMacros_ = lists.global;
+        scenarioMacros_ = lists.scenario;
     }
     auto lines = [&](const char *path) {
         std::vector<std::string> out;
@@ -1113,6 +1126,19 @@ void Engine::loadGlobals() {
         std::memcpy(&v, &configFile_[4000 + size_t(i) * 4], 4);
         if (v) globals_[i] = v;
     }
+    // `implies A B` in the table's cfgsav screen: global A set means B is too. VNDegen 0.26.1 counted The Alchemist's
+    // flags in the file's order and set GLB_ENDING (1050) where the prologue's end means GLB_PROLOGUE_OVER (1000), and an
+    // ending can't come before the prologue, so the file is put right as it's read.
+    bool repaired = false;
+    if (auto table = screens_.find("cfgsav"); table != screens_.end())
+        for (auto [it, end] = table->second.settings.equal_range("implies"); it != end; ++it) {
+            int set = field(it->second, 0), also = field(it->second, 1);
+            if (globals_.count(set) && globals_[set] && !(globals_.count(also) && globals_[also])) {
+                globals_[also] = 1;
+                repaired = true;
+                log("global %d set, as %d is", also, set);
+            }
+        }
     // A PC's backup carries what's been unlocked there, which the galleries show here too.
     size_t moved = configStringLength();
     auto flag = [&](size_t at) {
@@ -1126,6 +1152,7 @@ void Engine::loadGlobals() {
             if (validCgId(e.imageIds[p]) && flag(kCgFlagsAt + size_t(e.imageIds[p]) * 4)) seen_[normalizedPath(e.images[p])] = true;
     for (size_t i = 0; i < tracks_.size(); i++)
         if (flag(kTrackFlagsAt + i * 4)) seen_[normalizedPath(tracks_[i])] = true;
+    if (repaired) saveGlobals();
 }
 
 size_t Engine::configStringLength() const {
@@ -1841,11 +1868,11 @@ void Engine::runFlow(const Node &n) {
     case 4:  // the other target for the option shown first, `next` for the second: a save the PC wrote after the first
         flow.node = flow.script->node(choiceResult_ == 0 ? n.otherwise : n.next);
         break;
-    case 5: {  // a condition on a variable: `next` when it holds
+    case 5: {  // a condition on a variable: the other target when it holds, `next` when it doesn't, as a choice's branch
         int left = variableValue(n.p[0], n.p[1]), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
         // Only `<=`, 2, is read from a script's own words so far. The others follow the order such lists usually have.
         bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
-        flow.node = flow.script->node(holds ? n.next : n.otherwise);
+        flow.node = flow.script->node(holds ? n.otherwise : n.next);
         break;
     }
     case 6: {  // set or step a variable: scope, index, operation (0 set, 1 add one), value
