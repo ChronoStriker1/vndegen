@@ -303,10 +303,12 @@ private:
     std::unordered_map<std::string, bool> seen_;
     // The text read, by script and node id, for Config's read-only skip.
     std::unordered_map<std::string, std::set<int>> readNodes_;
-    bool readChanged_ = false, skipStopped_ = false, jumping_ = false;
+    bool readChanged_ = false, skipStopped_ = false, jumping_ = false, textFresh_ = false;
     void loadReadText();
     void saveReadText();
     void noteTextRead(const Node &n);
+    void writeReadSav();
+    std::vector<std::string> readScripts_;  // read.sav's scripts, as the PC named them
     bool seenChanged_ = false;
     std::vector<std::string> viewing_;
     size_t viewingIndex_ = 0;

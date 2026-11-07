@@ -903,6 +903,8 @@ void Engine::loadReadScripts() {
         // Each range, first and last node id, is text the PC has read, which Config's read-only skip passes; the list
         // ends (0, 0) then (-2, -2).
         auto &read = readNodes_[normalizedPath(name)];
+        // Kept as the PC named it, so writing the file back never drops or renames one of its entries.
+        if (!name.empty() && std::find(readScripts_.begin(), readScripts_.end(), name) == readScripts_.end()) readScripts_.push_back(name);
         for (int32_t r = 0; r < ranges; r++) {
             int32_t first = 0, last = 0;
             next(first);
@@ -937,14 +939,53 @@ void Engine::saveReadText() {
         text += "\n";
     }
     writeWhole(saveDir_ + "/vndegen_read.txt", std::vector<uint8_t>(text.begin(), text.end()));
+    writeReadSav();
     readChanged_ = false;
+}
+
+// read.sav as the PC writes it, so a backup carries VNDegen's reading to the PC: every script the PC listed, with its
+// ranges and any text read here since, then each script read to its end here, which is what unlocks its scene. A
+// script's ranges are runs of node ids, ending (0, 0) then (-2, -2).
+void Engine::writeReadSav() {
+    std::vector<std::string> scripts = readScripts_;
+    std::vector<std::string> finished;
+    for (const auto &[path, on] : seen_)
+        if (on && path.size() > 4 && path.compare(path.size() - 4, 4, ".txt") == 0) finished.push_back(path);
+    std::sort(finished.begin(), finished.end());
+    for (const std::string &path : finished)
+        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return normalizedPath(s) == path; })) scripts.push_back(path);
+    if (scripts.empty()) return;
+    std::vector<uint8_t> out;
+    auto put = [&](int32_t v) { out.insert(out.end(), reinterpret_cast<uint8_t *>(&v), reinterpret_cast<uint8_t *>(&v) + 4); };
+    put(int32_t(scripts.size()));
+    for (const std::string &script : scripts) {
+        put(int32_t(script.size()));
+        out.insert(out.end(), script.begin(), script.end());
+        std::vector<std::pair<int32_t, int32_t>> runs;
+        if (auto it = readNodes_.find(normalizedPath(script)); it != readNodes_.end())
+            for (int id : it->second) {
+                if (!runs.empty() && runs.back().second == id - 1) runs.back().second = id;
+                else runs.push_back({id, id});
+            }
+        runs.push_back({0, 0});
+        runs.push_back({-2, -2});
+        put(int32_t(runs.size()));
+        for (auto [first, last] : runs) {
+            put(first);
+            put(last);
+        }
+    }
+    auto packed = packEntry(out);
+    if (!packed.empty()) writeWhole(saveDir_ + "/" + nameInFolder(saveDir_, "read.sav"), packed);
 }
 
 // Config's read-only skip stops skipping at text not read before, as the PC's does; then the text is read.
 void Engine::noteTextRead(const Node &n) {
     if (!scene_.script) return;
+    // run() has just marked it, so it was fresh when that mark was new.
     auto &read = readNodes_[normalizedPath(scene_.script->name)];
-    bool fresh = read.insert(n.id).second;
+    bool fresh = textFresh_ || read.insert(n.id).second;
+    textFresh_ = false;
     if (fresh) readChanged_ = true;
     if (!fresh || setting("skipall") || jumping_) return;
     skipToggle_ = false;
@@ -1011,6 +1052,8 @@ void Engine::noteSeen(const std::string &path) {
     if (seen_[key]) return;
     seen_[key] = true;
     seenChanged_ = true;
+    // A script read to its end goes into read.sav too.
+    if (key.size() > 4 && key.compare(key.size() - 4, 4, ".txt") == 0) readChanged_ = true;
 }
 
 // A card's picture. Ore o Hoshigaru Tsuma to Gibo's ini names `obj\small\cg\...` for pictures whose full versions are in
@@ -2598,6 +2641,11 @@ void Engine::run() {
         if (waiting_ != Waiting::None || screen_) return;
         if (scene_.node) {
             const Node &n = *scene_.node;
+            // The PC's read.sav marks every node it runs, not only text, and its read-only skip goes by them.
+            if (!jumping_ && scene_.script && readNodes_[normalizedPath(scene_.script->name)].insert(n.id).second) {
+                readChanged_ = true;
+                textFresh_ = n.opcode == 5;
+            }
             runScene(n);
             if (scene_.node == &n) advance();
             continue;
