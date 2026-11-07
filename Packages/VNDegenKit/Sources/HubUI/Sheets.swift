@@ -21,6 +21,8 @@ struct SheetScaffold<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
+        // Beside a camera in the top corner, Done moves to the bottom. See `cameraCornerTrailing`.
+        let doneBelow = cameraCorner > 0
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -30,20 +32,41 @@ struct SheetScaffold<Content: View>: View {
                     }
                 }
                 Spacer()
-                if showsDone {
-                    Button("Done") { if let onClose { onClose() } else { nav.back() } }
-                        .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
-                        .keyboardShortcut(escapeCloses ? .cancelAction : nil)
-                }
+                if showsDone, !doneBelow { done }
             }
             .padding(22)
-            // The title and Done keep clear of a camera in the top corner.
+            // The title keeps clear of a camera in the top corner.
             .padding(.trailing, max(0, cameraCorner - 22))
             content
+                .frame(maxHeight: doneBelow ? .infinity : nil, alignment: .top)
+            if showsDone, doneBelow {
+                done.padding(.horizontal, 22).padding(.vertical, 12)
+                    .background(alignment: .top) { BottomBarFade(color: Theme.background) }
+            }
         }
         .foregroundStyle(.white)
         .background(Theme.background.opacity(0.98))
         .preferredColorScheme(.dark)
+    }
+
+    private var done: some View {
+        Button { if let onClose { onClose() } else { nav.back() } } label: {
+            Text("Done").frame(maxWidth: cameraCorner > 0 ? .infinity : nil)
+        }
+        .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+        .keyboardShortcut(escapeCloses ? .cancelAction : nil)
+    }
+}
+
+/// Fades a list out where it meets a bar pinned under it, rather than cutting it at a hard edge.
+struct BottomBarFade: View {
+    let color: Color
+
+    var body: some View {
+        LinearGradient(colors: [color.opacity(0), color], startPoint: .top, endPoint: .bottom)
+            .frame(height: 28)
+            .offset(y: -28)
+            .allowsHitTesting(false)
     }
 }
 
@@ -618,29 +641,45 @@ final class Confirmation {
 
 struct ConfirmationSheet: View {
     @Environment(Navigator.self) private var nav
+    @Environment(\.cameraCornerTrailing) private var cameraCorner
     let confirmation: Confirmation
     var body: some View {
         // Cancel is the way out, so a Done beside it would only blur which button keeps the game.
         SheetScaffold(title: confirmation.title, escapeCloses: true, showsDone: false) {
-            VStack(alignment: .leading, spacing: 22) {
-                // A message too long for the screen scrolls, so a long path never pushes the buttons off it.
-                ScrollView { details }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .scrollPager(nav.pager)
-                    .reportsSheetOverflow()
-                HStack(spacing: 12) {
-                    HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
-                    HubButton(target: .confirmCancel) { Text("Cancel") }
-                        .keyboardShortcut(.cancelAction)
-                }
-            }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 22)
+            // In the folded iPhone Duo's full-height sheets the buttons are stacked full width at the bottom, where the
+            // other sheets put Done.
+            layout(stacked: cameraCorner > 0)
+                .padding(.horizontal, 22)
+                .padding(.bottom, cameraCorner > 0 ? 12 : 22)
         }
         .fittedSheetHeight()
+        .onChange(of: cameraCorner > 0, initial: true) { _, stacked in nav.confirmationStacked = stacked }
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif
+    }
+
+    private func layout(stacked: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            // A message too long for the screen scrolls, so a long path never pushes the buttons off it.
+            ScrollView { details }
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollPager(nav.pager)
+                .reportsSheetOverflow()
+            buttons(stacked: stacked)
+        }
+    }
+
+    /// Stacked, each the sheet's full width, on the folded iPhone Duo.
+    private func buttons(stacked: Bool) -> some View {
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
+            HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) {
+                Text(confirmation.action).frame(maxWidth: stacked ? .infinity : nil)
+            }
+            HubButton(target: .confirmCancel) { Text("Cancel").frame(maxWidth: stacked ? .infinity : nil) }
+                .keyboardShortcut(.cancelAction)
+        }
     }
 
     private var details: some View {

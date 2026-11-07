@@ -186,9 +186,9 @@ private struct LibraryContainer: View {
                         .scrollContentBackground(.hidden)
                         .formBesideSideCamera(metrics)
                 }
-                // Before Ludusavi is set up the sheet holds one short note. A form reports no content height to fit
-                // the sheet to, so it opens at half height then.
-                .presentationDetents(model.service.server == nil ? [.medium] : [.large])
+                // Before Ludusavi is set up the sheet holds one short prompt, so it opens at half height, except where
+                // every sheet opens full height. See `cameraCornerTrailing`.
+                .presentationDetents(model.service.server == nil && !metrics.acrossSideCamera ? [.medium] : [.large])
                 #if os(macOS)
                 .frame(minWidth: 520, minHeight: 560)
                 #endif
@@ -198,7 +198,7 @@ private struct LibraryContainer: View {
                 SheetScaffold(title: "Newer saves", subtitle: hub.displayTitle(game), escapeCloses: false) {
                     LaunchSavesView(model: model).scrollContentBackground(.hidden)
                 }
-                .presentationDetents([.medium, .large])
+                .presentationDetents(metrics.acrossSideCamera ? [.large] : [.medium, .large])
                 .interactiveDismissDisabled()
                 #if os(macOS)
                 .frame(minWidth: 480, minHeight: 380)

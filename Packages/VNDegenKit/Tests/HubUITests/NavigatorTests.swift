@@ -138,11 +138,11 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     press(nav, .down, .pageDown)
     #expect(editor.focus == .input(.a))
     press(nav, .pageUp)
-    #expect(editor.focus == .apply(.keyboardAndMouse))
+    #expect(editor.focus == .layouts)
 
-    // Reset sits under the layouts and puts back the engine's layout.
-    let reset = editor.rows().firstIndex { $0 == [.reset] }!
-    for _ in 0..<reset { press(nav, .down) }
+    // Reset sits beside Save under the layout and puts back the engine's layout.
+    #expect(editor.rows()[1] == [.saveNew, .reset])
+    press(nav, .down, .right)
     #expect(editor.focus == .reset)
     press(nav, .confirm)
     #expect(library.game(id)?.buttonMapping == nil)
@@ -197,13 +197,28 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
+@Test func splitPageActionsPutTheFolderButtonsOnARowUnderPlay() async throws {
+    let (nav, _) = try await makeNavigator()
+    nav.pageActions = .split
+    // Hide ends the first row, so Right stays there, and Down reaches the folder button drawn under Play.
+    nav.setFocus(.pageLock)
+    press(nav, .right)
+    #expect(nav.focus == .pageLock)
+    nav.setFocus(.pagePlay)
+    press(nav, .down)
+    #expect(nav.focus == .pageShowFolder)
+    press(nav, .right)
+    #expect(nav.focus != .pageShowFolder)
+}
+
+@MainActor
 @Test func stackedPageActionsTakeTheirOwnRowUnderPlay() async throws {
     let (nav, _) = try await makeNavigator()
     nav.setFocus(.pagePlay)
     press(nav, .right)
     #expect(nav.focus == .pageArtwork)
     // A narrow window puts Artwork and the rest under Play, so Down reaches them and Right has nowhere to go.
-    nav.pageActionsStacked = true
+    nav.pageActions = .stacked
     nav.setFocus(.pagePlay)
     press(nav, .right)
     #expect(nav.focus == .pagePlay)
@@ -303,6 +318,22 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.sheet == nil)
     #expect(FileManager.default.fileExists(atPath: nav.hub.library.folder(for: id).path))
     #expect(nav.hub.library.games.map(\.id) == [id])
+}
+
+@MainActor
+@Test func stackedConfirmationButtonsMoveUpAndDown() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.confirmationStacked = true
+    nav.perform(.remove, on: id)
+    guard case .confirm? = nav.sheet else { Issue.record("no confirmation"); return }
+    // Drawn one above the other, as on the folded iPhone Duo, so Up reaches the action and Down comes back to Cancel.
+    #expect(nav.focus == .confirmCancel)
+    press(nav, .up)
+    #expect(nav.focus == .confirmAction)
+    press(nav, .down)
+    #expect(nav.focus == .confirmCancel)
+    press(nav, .cancel)
+    #expect(nav.sheet == nil)
 }
 
 @MainActor

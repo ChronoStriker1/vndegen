@@ -43,10 +43,14 @@ private func activate(_ editor: ButtonMappingEditor, _ target: ButtonMappingEdit
 
 @Test @MainActor func aControllerPicksSavesEditsAndDeletesALayout() async throws {
     let (editor, library, layouts, id) = try await makeEditor()
+    // The list of layouts starts closed, under the layout the game shows, and opens on that layout.
+    #expect(editor.focus == .layouts && !editor.rows().contains { $0.contains(.apply(.gamepad)) })
+    try activate(editor, .layouts)
     #expect(editor.focus == .apply(.gamepad))
 
-    // A built-in layout copies into the game.
+    // A built-in layout copies into the game, and the list closes.
     try activate(editor, .apply(.rpgMaker))
+    #expect(!editor.listsLayouts && editor.focus == .layouts)
     #expect(library.game(id)?.buttonMapping == ButtonMapping.rpgMaker.overrides)
     #expect(editor.currentLayout?.id == .rpgMaker)
 
@@ -77,6 +81,7 @@ private func activate(_ editor: ButtonMappingEditor, _ target: ButtonMappingEdit
     let saved = try #require(layouts.saved.first)
     #expect(saved.name == "q" && saved.mapping == editor.mapping)
     #expect(editor.currentLayout?.id == saved.id)
+    try activate(editor, .layouts)
     #expect(editor.focus == .apply(saved.id))
 
     // Editing the layout goes to the layout, and to the game showing it. Built-ins have no Edit.
@@ -95,11 +100,14 @@ private func activate(_ editor: ButtonMappingEditor, _ target: ButtonMappingEdit
     #expect(layouts.layout(saved.id)?.name == "qq")
     press(editor, .cancel)
     #expect(editor.editing == nil && editor.focus == .edit(saved.id))
+    // B closes the list of layouts, then leaves the editor to its sheet.
+    #expect(editor.handle(.cancel) && !editor.listsLayouts)
     #expect(editor.handle(.cancel) == false)
 
     // Deleting asks first, B cancels, and the game keeps its buttons.
     let buttons = library.game(id)?.buttonMapping
-    press(editor, .confirm)
+    try activate(editor, .layouts)
+    try activate(editor, .edit(saved.id))
     try activate(editor, .delete)
     #expect(editor.confirmingDelete && editor.focus == .cancelDelete)
     press(editor, .cancel)
@@ -119,6 +127,7 @@ private func activate(_ editor: ButtonMappingEditor, _ target: ButtonMappingEdit
     library.update(id) { $0.buttonMapping = mapping.overrides }
     #expect(editor.currentLayout?.id == first)
 
+    try activate(editor, .layouts)
     try activate(editor, .edit(second))
     try activate(editor, .input(.b))
     try activate(editor, .action(.nothing))

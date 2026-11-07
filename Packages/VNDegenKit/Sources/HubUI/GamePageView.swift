@@ -138,29 +138,45 @@ struct GamePageView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 16) {
             ViewThatFits(in: .horizontal) {
+                // Every button named, where the row has room.
                 HStack(spacing: 12) {
                     playButton
                     Spacer().frame(width: 4)
-                    secondaryButtons(labels: true)
+                    mainButtons(labels: true)
+                    otherButtons(labels: true, short: true)
                 }
-                .onAppear { nav.pageActionsStacked = false }
+                .onAppear { nav.pageActions = .row }
+                // Still every button named, with the folder, engine files, and Remove buttons on a row of their own.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        playButton
+                        Spacer().frame(width: 4)
+                        mainButtons(labels: true)
+                    }
+                    HStack(spacing: 12) { otherButtons(labels: true) }
+                }
+                .onAppear { nav.pageActions = .split }
                 HStack(spacing: 10) {
                     playButton
                     Spacer().frame(width: 4)
-                    secondaryButtons(labels: false)
+                    mainButtons(labels: false)
+                    otherButtons(labels: false)
                 }
-                .onAppear { nav.pageActionsStacked = false }
+                .onAppear { nav.pageActions = .row }
                 // The narrowest windows put the other buttons under Play, with their names, in rows of two that controller
-                // focus moves through as drawn.
-                VStack(alignment: .leading, spacing: 12) {
-                    playButton
+                // focus moves through as drawn. An odd one out at the end, Remove, takes the whole last row.
+                VStack(alignment: .leading, spacing: 10) {
+                    playButton.padding(.bottom, 2)
+                    let lone = (otherButtonCount + Navigator.mainPageActions) % Navigator.stackedActionColumns == 1
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .leading),
                                              count: Navigator.stackedActionColumns),
                               alignment: .leading, spacing: 10) {
-                        secondaryButtons(labels: true, allLabeled: true)
+                        mainButtons(labels: true, fills: true)
+                        otherButtons(labels: true, short: true, fills: true, includesRemove: !lone)
                     }
+                    if lone { removeButton(labels: true, short: true, fills: true) }
                 }
-                .onAppear { nav.pageActionsStacked = true }
+                .onAppear { nav.pageActions = .stacked }
             }
             HeroFacts(game: game)
             if let problem = hub.library.unavailableReason(game.id) {
@@ -178,11 +194,9 @@ struct GamePageView: View {
             .accessibilityLabel(title)
     }
 
-    /// `allLabeled` names the folder and Remove buttons too, for the narrow layout whose rows wrap and have room.
+    /// Artwork, metadata, saves, and hiding, the buttons that stay beside Play.
     @ViewBuilder
-    private func secondaryButtons(labels: Bool, allLabeled: Bool = false) -> some View {
-        // In the narrow layout's grid every button fills its column, so the tiles line up.
-        let fills = allLabeled
+    private func mainButtons(labels: Bool, fills: Bool = false) -> some View {
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
             labeled("Artwork", "photo.on.rectangle", labels, fills: fills)
         }
@@ -196,18 +210,28 @@ struct GamePageView: View {
             labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels, fills: fills)
         }
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
-        // Elsewhere the folder and Remove buttons have icons only, as they matter less and the row is long already.
-        HubButton(target: .pageShowFolder, kind: allLabeled ? .secondary : .icon) {
-            labeled(FileBrowser.openTitle, "folder", allLabeled, fills: fills)
+    }
+
+    private var otherButtonCount: Int { hub.library.offersEngineFiles(game.id) ? 3 : 2 }
+
+    /// The folder, engine files, and Remove buttons. `short` names them briefly, where they share a row or a grid.
+    @ViewBuilder
+    private func otherButtons(labels: Bool, short: Bool = false, fills: Bool = false, includesRemove: Bool = true) -> some View {
+        HubButton(target: .pageShowFolder, kind: labels ? .secondary : .icon) {
+            labeled(FileBrowser.openTitle, "folder", labels, fills: fills)
         }
         if hub.library.offersEngineFiles(game.id) {
-            HubButton(target: .pageEngineFiles, kind: allLabeled ? .secondary : .icon) {
-                labeled(allLabeled ? "Engine files" : "Remove engine files", "externaldrive.badge.minus", allLabeled, fills: fills)
+            HubButton(target: .pageEngineFiles, kind: labels ? .secondary : .icon) {
+                labeled(short ? "Engine files" : "Remove engine files", "externaldrive.badge.minus", labels, fills: fills)
             }
             .accessibilityLabel("Remove engine files")
         }
-        HubButton(target: .pageRemove, kind: allLabeled ? .secondary : .icon) {
-            labeled(allLabeled ? "Remove" : "Remove from library", "trash", allLabeled, fills: fills)
+        if includesRemove { removeButton(labels: labels, short: short, fills: fills) }
+    }
+
+    private func removeButton(labels: Bool, short: Bool, fills: Bool) -> some View {
+        HubButton(target: .pageRemove, kind: labels ? .secondary : .icon) {
+            labeled(short ? "Remove" : "Remove from library", "trash", labels, fills: fills)
         }
         .accessibilityLabel("Remove from library")
     }
