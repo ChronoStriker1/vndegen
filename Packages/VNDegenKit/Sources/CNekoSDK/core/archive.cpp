@@ -127,9 +127,11 @@ static bool isArchiveName(const std::string &low) { return low.size() > 4 && low
 // art also take the place of the base file of the same path, as The Alchemist's msg_button.ini does to add its art button.
 // A file outside any folder in a patch archive stands in for sys.pak's.
 void Files::addPatched(const std::string &patch, const std::string &path, const Source &source) {
-    add(patch + "\\" + path, source);
-    if (!hasFolder(path)) add("sys\\" + path, source);
-    else if (!isArt(path)) add(path, source);
+    Source patched = source;
+    patched.patch = patch;
+    add(patch + "\\" + path, patched);
+    if (!hasFolder(path)) add("sys\\" + path, patched);
+    else if (!isArt(path)) add(path, patched);
 }
 
 void Files::indexArchive(const std::string &file, const std::string &folder, int priority, const std::string &patch) {
@@ -257,6 +259,15 @@ bool Files::open(const std::string &root) {
 }
 
 bool Files::exists(const std::string &path) const { return index_.count(normalizedPath(path)) != 0; }
+
+std::string Files::savedName(const std::string &path) const {
+    auto it = index_.find(normalizedPath(path));
+    if (it == index_.end() || it->second.patch.empty()) return path;
+    const std::string &patch = it->second.patch;
+    std::string low = normalizedPath(path);
+    if (low.compare(0, patch.size() + 1, normalizedPath(patch) + "\\") == 0) return path;
+    return patch + "\\" + path;
+}
 
 std::string Files::loosePath(const std::string &path) const {
     auto it = index_.find(normalizedPath(path));

@@ -190,6 +190,23 @@ import Testing
         #expect(size(root, "scr\\y.txt") == 82)
     }
 
+    // Test Game 92's PC saves name its patched scripts by the patch, and loads the base script for a plain name.
+    @Test func aSaveNamesAPatchedScriptByItsPatch() throws {
+        let root = try game([
+            "scr.pak": pack([("x.txt", 90), ("y.txt", 91)]),
+            "sys_5/scr/x.txt": Data(count: 92),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        func saved(_ path: String) -> String {
+            var out = [CChar](repeating: 0, count: 256)
+            #expect(vnneko_debug_saved_name(root.path, path, &out, out.count))
+            return String(cString: out)
+        }
+        #expect(saved("scr\\x.txt") == "sys_5\\scr\\x.txt")
+        #expect(saved("sys_5\\scr\\x.txt") == "sys_5\\scr\\x.txt")
+        #expect(saved("scr\\y.txt") == "scr\\y.txt")
+    }
+
     @Test func aLaterPatchWins() throws {
         let root = try game([
             "cfg.pak": pack([("init.ini", 50)]),

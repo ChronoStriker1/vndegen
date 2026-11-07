@@ -19,6 +19,9 @@ public:
     // The file's bytes, or null when no archive or patch has it.
     Bytes read(const std::string &path) const;
     bool exists(const std::string &path) const;
+    // The path as the PC names it in a save: `sys_5\scr\x.txt` for a file a patch provides, as Test Game 92's PC saves
+    // name its patched scripts, and the path as given otherwise.
+    std::string savedName(const std::string &path) const;
     // Where a loose file lies on disk, for reading it in pieces, such as a movie; empty for one in an archive or missing.
     std::string loosePath(const std::string &path) const;
     // The size the archive stores for the file, or a loose file's size; -1 when no archive or patch has it.
@@ -32,6 +35,7 @@ private:
         int archive = -1;  // index into archives_; -1 for a loose file
         std::string loose;
         uint32_t offset = 0, size = 0;
+        std::string patch;  // the patch it comes from, such as sys_5, or empty
     };
     void add(const std::string &path, Source source);
     void addPatched(const std::string &patch, const std::string &path, const Source &source);

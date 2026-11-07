@@ -1552,7 +1552,7 @@ SaveData Engine::captureSave() {
     d.date[3] = local.tm_hour;
     d.date[4] = local.tm_min;
     d.date[5] = local.tm_sec;
-    d.flow = stack_.empty() ? "" : stack_.back().script->name;
+    d.flow = stack_.empty() ? "" : files_.savedName(stack_.back().script->name);
     d.flowNode = flowCallId_;
     d.choiceImage = choiceImage_;
     d.dateFlag = choiceImage_.empty() ? 0 : 1;
@@ -1635,14 +1635,14 @@ SaveData Engine::captureSave() {
     soundsOf(bgmNow_, bgm_, 0);
     soundsOf(seNow_, se_, 60);
     // Between scenes the PC's save still names the last one, and it won't ask a choice from a save that doesn't.
-    d.scene = scene_.script ? scene_.script->name : lastScene_;
+    d.scene = files_.savedName(scene_.script ? scene_.script->name : lastScene_);
     d.gtConfig = gt_.config;
     if (gt_.active || gt_.ejaculating) {
         d.gtState = gt_.extending ? std::max(1, gt_.played) : 0;
         d.gtCount = gt_.count;
         d.gtStartNode = gt_.count > 0 && int(gt_.texts.size()) >= gt_.count ? gt_.texts[gt_.texts.size() - size_t(gt_.count)] : 0;
         d.gtMarker = gt_.marker;
-        d.gtScene = gt_.main ? gt_.main->name : "";
+        d.gtScene = gt_.main ? files_.savedName(gt_.main->name) : "";
     }
     d.node = scene_.node ? scene_.node->id : 0;
     return d;

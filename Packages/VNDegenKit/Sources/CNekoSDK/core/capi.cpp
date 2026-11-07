@@ -1,6 +1,7 @@
 #include <dlfcn.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <string>
 
 #include "engine.h"
@@ -98,6 +99,12 @@ bool vnneko_debug_art_pixels(const char *gameRoot, const char *path, const char 
 int64_t vnneko_debug_file_size(const char *gameRoot, const char *path) {
     neko::Files files;
     return files.open(gameRoot) ? files.storedSize(path) : -1;
+}
+bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, size_t size) {
+    neko::Files files;
+    if (!files.open(gameRoot) || !size) return false;
+    std::snprintf(out, size, "%s", files.savedName(path).c_str());
+    return true;
 }
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
