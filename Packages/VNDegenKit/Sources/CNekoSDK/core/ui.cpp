@@ -19,6 +19,14 @@ std::vector<std::string> words(const std::string &line) {
 
 int number(const std::string &s) { return std::atoi(s.c_str()); }
 
+// "1,2,3" as numbers.
+std::vector<int> numbers(const std::string &s) {
+    std::vector<int> out;
+    std::istringstream in(s);
+    for (std::string part; std::getline(in, part, ',');) out.push_back(number(part));
+    return out;
+}
+
 std::string withoutComment(const std::string &line) {
     auto at = line.find("//");
     return at == std::string::npos ? line : line.substr(0, at);
@@ -102,6 +110,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 else if (key == "stage") p.stage = number(value);
                 else if (key == "group") p.group = value;
                 else if (key == "blink") p.blinkMs = number(value);
+                else if (key == "if") p.needs = numbers(value);
                 else if (key == "part" && at + 4 < w.size()) {
                     p.partX = number(value);
                     p.partY = number(w[at + 2]);
@@ -129,6 +138,7 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 if (w[i] == "toggle") b.toggle = true;
                 if (w[i] == "stage" && i + 1 < w.size()) b.stage = number(w[++i]);
                 if (w[i] == "group" && i + 1 < w.size()) b.group = w[++i];
+                if (w[i] == "if" && i + 1 < w.size()) b.needs = numbers(w[++i]);
                 if (w[i] == "swap") {  // this sheet's first row is the hovered look
                     b.normalRow = 1;
                     b.hoverRow = 0;

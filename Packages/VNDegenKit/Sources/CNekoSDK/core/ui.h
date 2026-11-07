@@ -24,7 +24,8 @@ struct Button {
     bool toggle = false;   // stays down until pressed again
     bool always = false;   // reacts even when `disabled` asks otherwise
     int stage = 0;         // in a title with `menustages`, 2 for the menu a click brings up
-    std::string group;     // shown only while the screen's submenu of this name is open
+    std::string group;     // shown only while the screen's submenu of this name, or one inside it, is open
+    std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
     ImageRef help;         // shown while hovered
     int helpX = 0, helpY = 0, helpCols = 1, helpRows = 1, helpColumn = 0, helpRow = 0;
     int cellW() const { return sheet ? sheet->w / cols : 0; }
@@ -39,7 +40,8 @@ struct Picture {
     float alpha = 1;
     int tab = -1;  // a gallery's art for one of its tabs, or -1 for all of them
     int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
-    std::string group;  // shown only while the screen's submenu of this name is open
+    std::string group;  // shown only while the screen's submenu of this name, or one inside it, is open
+    std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
     // How far, in pixels, the picture moves against the pointer when it's at the screen's edge, across and down.
     float followX = 0, followY = 0;
     // `part X Y W H`: only that rectangle of the picture, drawn at the picture's place.

@@ -106,6 +106,16 @@ bool vnneko_debug_saved_name(const char *gameRoot, const char *path, char *out, 
     std::snprintf(out, size, "%s", files.savedName(path).c_str());
     return true;
 }
+int vnneko_debug_variable(VNNekoEngine *e, int scope, int number) { return e->engine.variable(scope, number); }
+int vnneko_debug_macro_number(const char *gameRoot, int scope, int index) {
+    neko::Files files;
+    if (!files.open(gameRoot)) return -1;
+    neko::Bytes data = files.read("cfg\\macrolist.ini");
+    if (!data) return -1;
+    auto lists = neko::parseMacroList(*data);
+    const auto &list = scope == 1 ? lists.scenario : lists.global;
+    return index >= 0 && index < int(list.size()) ? list[size_t(index)] : -1;
+}
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
 void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScreen) { e->engine.setWindowState(canFullScreen, fullScreen); }

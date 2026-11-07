@@ -4134,9 +4134,24 @@ button quickload obj\d006_000.bmp 150 297 8 5 2 stage 2 help obj\d007_000.bmp 0 
 button submenu:gallery obj\d006_000.bmp 150 353 8 5 3 stage 2 help obj\d007_000.bmp 0 666 1 8 0 3
 button config obj\d006_000.bmp 150 409 8 5 4 stage 2 help obj\d007_000.bmp 0 666 1 8 0 4
 button quit obj\d006_000.bmp 150 521 8 5 6 stage 2 help obj\d007_000.bmp 0 666 1 8 0 6
-button cg obj\d006_003.bmp 360 353 3 5 0 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 0
-button scene obj\d006_003.bmp 360 409 3 5 1 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 1
-button music obj\d006_003.bmp 360 465 3 5 2 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 2
+# Past the prologue (GLB_PROLOGUE_OVER, 1000) Start opens where to start from, and after an ending the routes, each with
+# its choices made for it, and Momoka's story.
+startmenu 1000
+button start_prologue obj\d006_001.bmp 362 185 3 5 0 stage 2 group start help obj\d007_001.bmp 0 666 1 3 0 0
+button start_main obj\d006_001.bmp 362 241 3 5 1 stage 2 group start help obj\d007_001.bmp 0 666 1 3 0 1
+button submenu:start/route obj\d006_001.bmp 362 297 3 5 2 stage 2 group start if 51,52,53,54 help obj\d007_001.bmp 0 666 1 3 0 2
+button start_sub obj\d006_004.bmp 362 353 1 5 0 stage 2 group start if 51,52,53,54 help obj\d007_005.bmp 0 666 1 1 0 0
+button route1 obj\d006_002.bmp 574 297 4 5 0 stage 2 group start/route help obj\d007_002.bmp 0 666 1 4 0 0
+button route2 obj\d006_002.bmp 574 353 4 5 1 stage 2 group start/route help obj\d007_002.bmp 0 666 1 4 0 1
+button route3 obj\d006_002.bmp 574 409 4 5 2 stage 2 group start/route help obj\d007_002.bmp 0 666 1 4 0 2
+button route4 obj\d006_002.bmp 574 465 4 5 3 stage 2 group start/route help obj\d007_002.bmp 0 666 1 4 0 3
+pic obj\d007_004.bmp 734 307 1 4 0 0 stage 2 group start/route if 51
+pic obj\d007_004.bmp 734 363 1 4 0 1 stage 2 group start/route if 52
+pic obj\d007_004.bmp 734 419 1 4 0 2 stage 2 group start/route if 53
+pic obj\d007_004.bmp 734 475 1 4 0 3 stage 2 group start/route if 54
+button cg obj\d006_003.bmp 362 353 3 5 0 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 0
+button scene obj\d006_003.bmp 362 409 3 5 1 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 1
+button music obj\d006_003.bmp 362 465 3 5 2 stage 2 group gallery help obj\d007_003.bmp 0 666 1 3 0 2
 screen load
 helplast
 selectedlook

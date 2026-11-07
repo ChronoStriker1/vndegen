@@ -93,6 +93,12 @@ struct Glyph {
     bool italic;
 };
 
+// macrolist.ini's global and scenario variables, by their place as scripts count it.
+struct MacroLists {
+    std::vector<int> global, scenario;
+};
+MacroLists parseMacroList(const std::vector<uint8_t> &file);
+
 class Engine {
 public:
     bool start(const std::string &root, const std::string &dataDir, const std::string &logPath, const std::string &fontDir, std::string &error);
@@ -136,6 +142,12 @@ public:
     const char *debugStatus();
     bool waitingForClick() const { return waiting_ == Waiting::Click; }
     int textCount() const { return textCount_; }
+    // A global (scope 0) or scenario variable (1) by its number, for tests.
+    int variable(int scope, int number) const {
+        const auto &table = scope == 1 ? scenario_ : globals_;
+        auto it = table.find(number);
+        return it == table.end() ? 0 : it->second;
+    }
     bool jump(const std::string &script, int node);
 
 private:
@@ -399,9 +411,12 @@ private:
     void composeLog(Canvas &out);
     Button *buttonAt(int x, int y, std::vector<Button> &buttons);
     // `menustages`: Test Game 94's title shows its art until a click brings up the menu, stage 2, and the right button
-    // puts it away. A `submenu:NAME` button opens the buttons and pictures of that group beside it.
+    // puts it away. A `submenu:NAME` button opens the buttons and pictures of that group beside it, and a group named
+    // `PARENT/NAME` opens inside PARENT's.
     int menuStage_ = 2;
     std::string subMenu_;
+    bool submenuOpen(const std::string &name) const;
+    bool anyGlobalSet(const std::vector<int> &numbers) const;
     bool shown(const Button &b) const;
     bool shown(const Picture &p) const;
 
@@ -409,6 +424,7 @@ private:
     void beginChoice(const Node &n);
     void updateChoice();
     void choicePlace(int &x, int &top, int &step, int &slant) const;
+    static int variableIndex(const Node &n);
     int variableValue(int scope, int index) const;
     int variableNumber(int scope, int index) const;
     void endStory(const std::string &screen);

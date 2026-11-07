@@ -393,8 +393,10 @@ void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
     if (action.rfind("submenu:", 0) == 0) {
+        // Pressed again, a submenu closes, and any inside it, back to the one it opened in.
         std::string name = action.substr(8);
-        subMenu_ = subMenu_ == name ? "" : name;
+        size_t slash = name.rfind('/');
+        subMenu_ = submenuOpen(name) ? (slash == std::string::npos ? "" : name.substr(0, slash)) : name;
         return;
     }
     if (action == "start") {
@@ -403,6 +405,11 @@ void Engine::runAction(const std::string &action) {
         if (config_.text("FirstFlow").empty()) {
             storyFlowKey_ = mainFlowKey();
             startStory();
+            return;
+        }
+        // `startmenu GLOBAL`: past the prologue, Test Game 94's Start opens its submenu of where to start from.
+        if (const auto *menu = screen_ ? screen_->setting("startmenu") : nullptr; menu && anyGlobalSet({field(*menu, 0)})) {
+            runAction("submenu:start");
             return;
         }
         // Past the prologue a game may offer to skip it, when its table has that question.
@@ -419,6 +426,7 @@ void Engine::runAction(const std::string &action) {
     }
     if (action == "start_prologue") { storyFlowKey_ = "FirstFlow"; startStory(); return; }
     if (action == "start_main") { storyFlowKey_ = mainFlowKey(); startStory(); return; }
+    if (action == "start_sub") { storyFlowKey_ = "SubFlow1"; startStory(); return; }
     if (action.rfind("track", 0) == 0) {
         playTrack(std::atoi(action.c_str() + 5));
         return;
@@ -751,20 +759,33 @@ bool writeWhole(const std::string &path, const std::vector<uint8_t> &data) {
 
 }  // namespace
 
+// The PC keeps each list by name, so a script's place in it counts in name order, not the file's: Test Game 84's flows
+// mark chapter 1A at 2, between GLB_01_OVER and GLB_02_OVER, and 94's put GLB_PROLOGUE_OVER, first in its file, after the
+// four GLB_ENDING_s.
+MacroLists parseMacroList(const std::vector<uint8_t> &file) {
+    std::map<std::string, int> global, scenario, *list = nullptr;
+    for (const std::string &raw : split(sjis::toUtf8(std::string(file.begin(), file.end())), '\n')) {
+        std::string line = trim(raw.substr(0, raw.find("//")));
+        if (line.rfind("#p", 0) == 0) list = line.find("Global") != std::string::npos ? &global : &scenario;
+        else if (line == "##") list = nullptr;
+        else if (list && !line.empty()) {
+            size_t gap = line.find_first_of(" \t");
+            if (gap != std::string::npos) list->emplace(line.substr(0, gap), std::atoi(line.c_str() + gap));
+        }
+    }
+    MacroLists out;
+    for (const auto &[name, number] : global) out.global.push_back(number);
+    for (const auto &[name, number] : scenario) out.scenario.push_back(number);
+    return out;
+}
+
 // MARK: Galleries
 
 void Engine::loadGalleries() {
     if (Bytes data = files_.read(config_.text("MacroList", "cfg\\macrolist.ini"))) {
-        std::vector<int> *list = nullptr;
-        for (const std::string &raw : split(sjis::toUtf8(std::string(data->begin(), data->end())), '\n')) {
-            std::string line = trim(raw.substr(0, raw.find("//")));
-            if (line.rfind("#p", 0) == 0) list = line.find("Global") != std::string::npos ? &globalMacros_ : &scenarioMacros_;
-            else if (line == "##") list = nullptr;
-            else if (list && !line.empty()) {
-                size_t gap = line.find_first_of(" \t");
-                if (gap != std::string::npos) list->push_back(std::atoi(line.c_str() + gap));
-            }
-        }
+        auto lists = parseMacroList(*data);
+        globalMacros_ = lists.global;
+        scenarioMacros_ = lists.scenario;
     }
     auto lines = [&](const char *path) {
         std::vector<std::string> out;
@@ -2264,12 +2285,23 @@ Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
 
 // In a title with menu stages, stage 1 is the art before the menu and stage 2 the menu itself; stage 0 shows in both.
 bool Engine::shown(const Button &b) const {
-    return (b.stage == 0 || b.stage == menuStage_) && (b.group.empty() || b.group == subMenu_);
+    return (b.stage == 0 || b.stage == menuStage_) && (b.group.empty() || submenuOpen(b.group)) && (b.needs.empty() || anyGlobalSet(b.needs));
 }
 
 bool Engine::shown(const Picture &p) const {
     bool staged = screen_ && screen_->setting("menustages");
-    return (!staged || p.stage == 0 || p.stage == menuStage_) && (p.group.empty() || p.group == subMenu_);
+    return (!staged || p.stage == 0 || p.stage == menuStage_) && (p.group.empty() || submenuOpen(p.group)) && (p.needs.empty() || anyGlobalSet(p.needs));
+}
+
+// Whether the submenu of this name is open, or one inside it.
+bool Engine::submenuOpen(const std::string &name) const {
+    return subMenu_ == name || subMenu_.rfind(name + "/", 0) == 0;
+}
+
+bool Engine::anyGlobalSet(const std::vector<int> &numbers) const {
+    for (int number : numbers)
+        if (auto it = globals_.find(number); it != globals_.end() && it->second) return true;
+    return false;
 }
 
 // `opening TILE_MS FADE_FROM FADE_MS`: each quarter of the screen shows the stage 1 art from its outer edge, the top left
@@ -2431,7 +2463,7 @@ void Engine::composeScreen(Canvas &out) {
         if (b.action.rfind("page", 0) == 0 && !galleryPageExists(std::atoi(b.action.c_str() + 4))) continue;
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
-        bool current = (!subMenu_.empty() && b.action == "submenu:" + subMenu_) || b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
+        bool current = (!subMenu_.empty() && ((b.action.rfind("submenu:", 0) == 0 && submenuOpen(b.action.substr(8))) || (b.action == "start" && submenuOpen("start")))) || b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
         // `selectedlook`: the current one keeps its selected look under the pointer, as in Test Games 92 and 93.
         if (current) state = over && !screen_->setting("selectedlook") ? StateSelectedHover : StateSelected;
@@ -2729,7 +2761,7 @@ void Engine::runFlow(const Node &n) {
         flow.node = flow.script->node(choiceResult_ == (n.opcode == 4 ? n.p[0] : 0) ? n.otherwise : n.next);
         break;
     case 5: {  // a condition on a variable: `next` when it holds
-        int left = variableValue(n.p[0], n.p[1]), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
+        int left = variableValue(n.p[0], variableIndex(n)), right = n.p[4] == 2 ? n.p[5] : variableValue(n.p[4], n.p[5]);
         // Only `<=`, 2, is read from a script's own words so far. The others follow the order such lists usually have.
         bool holds = n.p[3] == 0 ? left == right : n.p[3] == 1 ? left != right : n.p[3] == 2 ? left <= right : n.p[3] == 3 ? left >= right : n.p[3] == 4 ? left < right : left > right;
         flow.node = flow.script->node(holds ? n.next : n.otherwise);
@@ -2737,7 +2769,7 @@ void Engine::runFlow(const Node &n) {
     }
     case 6: {  // set or step a variable: scope, index, operation (0 set, 1 add one), value
         auto &table = n.p[0] == 1 ? scenario_ : globals_;
-        int number = variableNumber(n.p[0], n.p[1]);
+        int number = variableNumber(n.p[0], variableIndex(n));
         if (n.p[3] == 1) table[number]++;
         else table[number] = n.p[5];
         log("variable %d:%d = %d", n.p[0], number, table[number]);
@@ -2754,6 +2786,12 @@ void Engine::runFlow(const Node &n) {
         warnOnce("flow opcode " + std::to_string(n.opcode) + " isn't built: " + sjis::toUtf8(n.s[0]));
         break;
     }
+}
+
+// A condition or a change names its variable by scope, parameter 0, and its place in that scope's list: parameter 1 for
+// a global, 2 for a scenario variable. The editor keeps both, so the other can hold an old choice, as in Test Game 94.
+int Engine::variableIndex(const Node &n) {
+    return n.p[0] == 1 ? n.p[2] : n.p[1];
 }
 
 // Scripts name a variable by its place in macrolist.ini's list, and saves keep it by the number the list gives it.
@@ -3322,14 +3360,17 @@ void Engine::updateChoice() {
 }
 
 bool Engine::jump(const std::string &script, int node) {
-    // A flow script starts the story at that flow, so its choices run as the flow interpreter runs them.
+    // A flow script starts the story at that flow, from that node when it's above 0, so its choices run as the flow
+    // interpreter runs them.
     if (normalizedPath(script).rfind("flow\\", 0) == 0) {
         auto flow = loadScript(script);
         if (!flow || !flow->first()) return false;
+        const Node *start = node > 0 ? flow->node(node) : flow->first();
+        if (!start) return false;
         screen_ = nullptr;
         stack_.clear();
         scene_ = {};
-        stack_.push_back({flow, flow->first()});
+        stack_.push_back({flow, start});
         waiting_ = Waiting::None;
         dirty_ = true;
         return true;

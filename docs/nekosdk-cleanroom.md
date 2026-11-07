@@ -208,6 +208,12 @@ A flipbook's sprite record has 0 in its second byte and its current picture wher
 
 The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.
 
+## Flow variables
+
+A flow's condition (command 5) and change (command 6) name their variable by scope, parameter 0 (0 global, 1 scenario), and by its place in that scope's list in `macrolist.ini`. The place is parameter 1 for a global and parameter 2 for a scenario variable: the editor keeps both, so the other can hold a stale value, as Test Game 94's title background changes do (global place 5, scenario place 2). The places count in the names' order, not the file's. The flows' own comments settle it: Test Game 84's mark chapter 1A at place 2, between `GLB_01_OVER` and `GLB_02_OVER`, and 2 at place 3; Test Game 88's three heroines' counters are 1 for 秋穂 (`SENARIO_AKIHO`), 5 for 結衣 (`SENARIO_YUI`) and 0 for 藍 (`SENARIO_AI`); and Test Game 94's endings A to D are 0 to 3, the prologue 4 and the title background 5, though its file lists `GLB_PROLOGUE_OVER` first. The runtime had taken parameter 1 for both scopes, which merged Test Games 88, 92 and 93's scenario variables, and the file's order, which shifted 84's chapter flags.
+
+Test Game 94's Start, seen under Wine with globals set in `cfg.sav`: with `GLB_PROLOGUE_OVER` (1000) unset it starts the story; set, it opens a submenu of プロローグから and 本編から beside the main menu, and with any ending (51 to 54) set ルート選択 and 桃華視点シナリオ as well. Route select opens routes A to D beside it, each with its 攻略済み label once its ending is set, and every route showing either way. Start pressed again closes both, and the right button goes back to the title art. Its sheets have the five rows of the other menus' and sit at x 362, as the gallery's do.
+
 ## The CG viewer
 
 The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist, Yarinaoshi no Christmas, Funbag Fantasy 4, Ore o Hoshigaru Tsuma to Gibo and Horny Elves and a Moral Orc under Wine, and the panel, buttons and picture match the PC's to within blending noise. The PC games behave alike:
