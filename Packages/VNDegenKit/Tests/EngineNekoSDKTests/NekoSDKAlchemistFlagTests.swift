@@ -16,6 +16,9 @@ import TestSupport
     ##
     """
 
+    // In CP932, as the game ships it.
+    private var macroFile: Data { macros.data(using: .shiftJIS) ?? Data() }
+
     // flow06's ending: `HAPPYEND_COUNTER <= 3 の時` holding takes its other target, 正規ルートEND, and the happy ending is
     // `next`, for four happy choices or more (#58). Here the endings mark SENARIO_STATUS 2 and 1.
     private func ending(happyChoices: Int32) throws -> Int {
@@ -42,7 +45,7 @@ import TestSupport
 
     // The prologue's end names place 1, which by name is GLB_PROLOGUE_OVER, not GLB_ENDING (#59).
     @Test func placesCountInNameOrder() throws {
-        let root = try NekoSDKFlowFixture.game(["cfg/macrolist.ini": Data(macros.utf8)])
+        let root = try NekoSDKFlowFixture.game(["cfg/macrolist.ini": macroFile])
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(vnneko_debug_macro_number(root.path, 0, 0) == 1050)
         #expect(vnneko_debug_macro_number(root.path, 0, 1) == 1000)
@@ -55,7 +58,7 @@ import TestSupport
     @Test func a0261FileGetsItsPrologueFlag() throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\twaffle\\alchemy\n".utf8),
-            "cfg/macrolist.ini": Data(macros.utf8),
+            "cfg/macrolist.ini": macroFile,
         ])
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data")
@@ -85,7 +88,7 @@ import TestSupport
     @Test func otherFilesAreLeftAlone() throws {
         let root = try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\twaffle\\alchemy\n".utf8),
-            "cfg/macrolist.ini": Data(macros.utf8),
+            "cfg/macrolist.ini": macroFile,
         ])
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data")

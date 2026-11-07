@@ -42,9 +42,10 @@ enum NekoSDKFlowFixture {
 
     // Starts the game with its user data in `data`.
     static func start(_ root: URL, data: URL) -> OpaquePointer? {
-        root.path.withCString { rootPath in
-            data.path.withCString { dataPath in
-                var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil, movies: nil)
+        let gamePath: String = root.path, dataDirPath: String = data.path
+        return gamePath.withCString { rootPath in
+            dataDirPath.withCString { dataPath in
+                var launch = VNNekoLaunch(gameRoot: rootPath, dataDir: dataPath, logPath: nil, fontDir: nil)
                 return vnneko_start(&launch)
             }
         }
@@ -54,7 +55,7 @@ enum NekoSDKFlowFixture {
     static func run(_ nodes: [Node], macros: String, _ check: (OpaquePointer) -> Void) throws {
         let root = try game([
             "cfg/init.ini": Data("FirstFlow\tflow\\t.txt\n".utf8),
-            "cfg/macrolist.ini": Data(macros.utf8),
+            "cfg/macrolist.ini": macros.data(using: .shiftJIS) ?? Data(),
             "flow/t.txt": flow(nodes),
         ])
         defer { try? FileManager.default.removeItem(at: root) }
