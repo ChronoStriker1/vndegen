@@ -40,10 +40,11 @@ import QuartzCore
 ///   -frameMonitor YES        logs frame pacing once a second ("FRAMES" in the app log), iOS only. Sessions of the native runtimes
 ///                            also log their own pacing every 10 seconds, on macOS too ("NSFRAMES", "S3FRAMES", "S4FRAMES",
 ///                            "RGSSFRAMES", "WOLFFRAMES", "KKFRAMES")
-///   -snapshot <path>         writes the main window to a PNG after the input script, macOS only (screencapture needs a login session).
-///                            It draws the window's views, which can't include what a Metal view shows, so a game drawn with
-///                            Metal comes out black. "SNAPSHOT" in the app log gives the window id and says when the window
-///                            has Metal content; capture such a window with screencapture -l <window id> instead
+///   -snapshot <path>         writes the main window, with any sheet or alert over it, to a PNG after the input script,
+///                            macOS only (screencapture needs a login session). It draws the window's views, which can't
+///                            include what a Metal view shows, so a game drawn with Metal comes out black. "SNAPSHOT" in the
+///                            app log gives the window id and says when the window has Metal content; capture such a window
+///                            with screencapture -l <window id> instead
 ///   -windowSize 900x600      resizes the window before the snapshot on macOS. On iPad, in Windowed Apps or Stage Manager,
 ///                            the window takes that size the next time it is resized
 ///   -layoutSize 320x480      lays the whole app out in a frame of that size in the middle of the screen, as in a window
@@ -184,7 +185,7 @@ enum DebugHooks {
         }
         #if os(macOS)
         if let path = UserDefaults.standard.string(forKey: "snapshot") {
-            if let size = launchWindowSize, let window = NSApp.windows.first(where: \.isVisible) {
+            if let size = launchWindowSize, let window = mainWindow {
                 window.setContentSize(size)
             }
             try? await Task.sleep(for: .seconds(3))
@@ -194,21 +195,45 @@ enum DebugHooks {
     }
 
     #if os(macOS)
-    /// The main window, or the sheet shown over it, and the sheet over that one. Drawing the views can't read what a Metal
-    /// layer shows, so the log says when the window has one, with the window id that `screencapture -l` takes.
+    /// The main window, the largest one showing, with whatever is over it drawn in place: a sheet, an alert, or another
+    /// window, as the player sees them. Drawing the views can't read what a Metal layer shows, so the log says when the
+    /// picture has one, with the main window's id that `screencapture -l` takes.
     static func snapshotWindow(to url: URL) {
-        var window = NSApp.windows.first(where: \.isVisible)
-        while let sheet = window?.attachedSheet { window = sheet }
-        guard let window, let view = window.contentView,
+        let shown = NSApp.windows.filter(\.isVisible)
+        guard let main = mainWindow, let view = main.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: url)
-        if hasMetalLayer(view.layer) {
-            NSLog("SNAPSHOT %@ window %ld has Metal content, which shows black here; use screencapture -l %ld", url.path,
-                  window.windowNumber, window.windowNumber)
-        } else {
-            NSLog("SNAPSHOT %@ window %ld", url.path, window.windowNumber)
+        var metal = hasMetalLayer(view.layer)
+        // Back to front, so the frontmost lands on top. Each is placed by its content's place on screen.
+        let over = shown.filter { $0 !== main && $0.frame.intersects(main.frame) }.sorted { $0.orderedIndex > $1.orderedIndex }
+        if !over.isEmpty, let context = NSGraphicsContext(bitmapImageRep: rep) {
+            let base = main.convertToScreen(view.convert(view.bounds, to: nil))
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = context
+            for window in over {
+                // The whole frame, since an alert keeps its text beside its content view rather than in it.
+                guard let content = window.contentView?.superview ?? window.contentView,
+                      let image = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { continue }
+                content.cacheDisplay(in: content.bounds, to: image)
+                // Drawn square: the frame fills its rounded corners, white on an alert.
+                let frame = window.convertToScreen(content.convert(content.bounds, to: nil))
+                image.draw(in: frame.offsetBy(dx: -base.minX, dy: -base.minY))
+                metal = metal || hasMetalLayer(content.layer)
+            }
+            NSGraphicsContext.restoreGraphicsState()
         }
+        try? rep.representation(using: .png, properties: [:])?.write(to: url)
+        if metal {
+            NSLog("SNAPSHOT %@ window %ld has Metal content, which shows black here; use screencapture -l %ld", url.path,
+                  main.windowNumber, main.windowNumber)
+        } else {
+            NSLog("SNAPSHOT %@ window %ld", url.path, main.windowNumber)
+        }
+    }
+
+    /// The largest window showing. The first in `NSApp.windows` can be an alert or another small window over it.
+    private static var mainWindow: NSWindow? {
+        NSApp.windows.filter(\.isVisible).max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
     }
 
     private static func hasMetalLayer(_ layer: CALayer?) -> Bool {

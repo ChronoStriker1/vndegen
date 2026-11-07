@@ -19,6 +19,10 @@ if [ "${1:-}" = test ]; then
   trap 'rm -rf "$run_tmp"' EXIT
 fi
 xcodegen generate --quiet
+# Each xcodegen run leaves an empty <UUID>-<pid>-<hex> folder in the system's temporary folder, where TMPDIR doesn't reach
+# (#57). Empty ones older than 10 minutes go, so a parallel build's folder that is still in use is never touched.
+find -E "$(getconf DARWIN_USER_TEMP_DIR)" -mindepth 1 -maxdepth 1 -type d -empty -mmin +10 \
+  -regex '.*/[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}-[0-9]+-[0-9A-F]{16}' -delete 2>/dev/null || true
 # Save sync's rclone library, which the package links on every platform.
 scripts/rclone-runtime.sh
 scripts/alpha-video.sh bundle
