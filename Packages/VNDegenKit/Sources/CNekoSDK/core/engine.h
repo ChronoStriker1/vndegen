@@ -310,6 +310,7 @@ private:
     // Whether a slot, or a picture, is an event CG, which Config's camera work moves.
     bool isCgPath(const std::string &path) const;
     static std::string withoutPatch(const std::string &key);
+    static std::string readKey(const std::string &name);
     bool isCgSlot(int slot) const;
     void composeDrift(Canvas &out);
     int64_t driftFrom_ = 0;

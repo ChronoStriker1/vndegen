@@ -947,7 +947,7 @@ void Engine::loadReadScripts() {
         if (!next(ranges) || ranges < 0 || pos + size_t(ranges) * 8 > d.size()) return;
         // Each range, first and last node id, is text the PC has read, which Config's read-only skip passes; the list
         // ends (0, 0) then (-2, -2).
-        auto &read = readNodes_[normalizedPath(name)];
+        auto &read = readNodes_[readKey(name)];
         // Kept as the PC named it, so writing the file back never drops or renames one of its entries.
         if (!name.empty() && std::find(readScripts_.begin(), readScripts_.end(), name) == readScripts_.end()) readScripts_.push_back(name);
         for (int32_t r = 0; r < ranges; r++) {
@@ -961,6 +961,10 @@ void Engine::loadReadScripts() {
     }
 }
 
+// A script's read marks go by its name without a patch's folder: the PC's read.sav can name a patched script
+// `sys_5\scr\x.txt` where the flow opens it as `scr\x.txt`, and both are the same file.
+std::string Engine::readKey(const std::string &name) { return withoutPatch(normalizedPath(name)); }
+
 // VNDegen's own record of the text read, a script to a line with its node ids, kept beside the PC's read.sav.
 void Engine::loadReadText() {
     std::ifstream f(saveDir_ + "/vndegen_read.txt");
@@ -970,7 +974,7 @@ void Engine::loadReadText() {
         std::string script;
         int id;
         if (!(in >> script)) continue;
-        auto &read = readNodes_[script];
+        auto &read = readNodes_[readKey(script)];
         while (in >> id) read.insert(id);
     }
 }
@@ -998,7 +1002,7 @@ void Engine::writeReadSav() {
         if (on && path.size() > 4 && path.compare(path.size() - 4, 4, ".txt") == 0) finished.push_back(path);
     std::sort(finished.begin(), finished.end());
     for (const std::string &path : finished)
-        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return normalizedPath(s) == path; })) scripts.push_back(path);
+        if (std::none_of(scripts.begin(), scripts.end(), [&](const std::string &s) { return readKey(s) == readKey(path); })) scripts.push_back(path);
     if (scripts.empty()) return;
     std::vector<uint8_t> out;
     auto put = [&](int32_t v) { out.insert(out.end(), reinterpret_cast<uint8_t *>(&v), reinterpret_cast<uint8_t *>(&v) + 4); };
@@ -1007,7 +1011,7 @@ void Engine::writeReadSav() {
         put(int32_t(script.size()));
         out.insert(out.end(), script.begin(), script.end());
         std::vector<std::pair<int32_t, int32_t>> runs;
-        if (auto it = readNodes_.find(normalizedPath(script)); it != readNodes_.end())
+        if (auto it = readNodes_.find(readKey(script)); it != readNodes_.end())
             for (int id : it->second) {
                 if (!runs.empty() && runs.back().second == id - 1) runs.back().second = id;
                 else runs.push_back({id, id});
@@ -1028,7 +1032,7 @@ void Engine::writeReadSav() {
 void Engine::noteTextRead(const Node &n) {
     if (!scene_.script) return;
     // run() has just marked it, so it was fresh when that mark was new.
-    auto &read = readNodes_[normalizedPath(scene_.script->name)];
+    auto &read = readNodes_[readKey(scene_.script->name)];
     bool fresh = textFresh_ || read.insert(n.id).second;
     textFresh_ = false;
     if (fresh) readChanged_ = true;
@@ -2733,7 +2737,7 @@ void Engine::run() {
         if (scene_.node) {
             const Node &n = *scene_.node;
             // The PC's read.sav marks every node it runs, not only text, and its read-only skip goes by them.
-            if (!jumping_ && scene_.script && readNodes_[normalizedPath(scene_.script->name)].insert(n.id).second) {
+            if (!jumping_ && scene_.script && readNodes_[readKey(scene_.script->name)].insert(n.id).second) {
                 readChanged_ = true;
                 textFresh_ = n.opcode == 5;
             }
