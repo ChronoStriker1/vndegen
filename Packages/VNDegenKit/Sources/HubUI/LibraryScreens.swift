@@ -155,6 +155,9 @@ struct SettingsView: View {
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
                 .formBesideSideCamera(metrics)
+                // Its help text reads in lines of a comfortable length on a wide screen.
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
                 .onChange(of: nav.focus) { _, focus in

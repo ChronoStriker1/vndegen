@@ -79,20 +79,34 @@ struct GamePageView: View {
 
     /// Beside a side camera, details scrolled up to the top would pass under it, cut by its edge. Once the banner's art
     /// has scrolled away, a band of the background fades in across the top, as tall as the camera, so they pass under
-    /// that instead.
+    /// that instead. It carries the back button and the game's name, which scrolled away with the banner.
     @ViewBuilder
     private var cameraBand: some View {
         if metrics.acrossSideCamera {
             let start = metrics.bannerHeight - metrics.cornerClearance - 48
-            LinearGradient(stops: [.init(color: Theme.background, location: 0),
-                                   .init(color: Theme.background, location: 0.75),
-                                   .init(color: Theme.background.opacity(0), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: metrics.insets.top + metrics.cornerClearance + 20)
-                .ignoresSafeArea()
-                .opacity(min(1, max(0, (scrolled - start) / 48)))
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            let shown = min(1, max(0, (scrolled - start) / 48))
+            ZStack(alignment: .topLeading) {
+                LinearGradient(stops: [.init(color: Theme.background, location: 0),
+                                       .init(color: Theme.background, location: 0.8),
+                                       .init(color: Theme.background.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .allowsHitTesting(false)
+                HStack(spacing: 14) {
+                    HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
+                        .accessibilityLabel("Back")
+                    Text(hub.displayTitle(game))
+                        .font(.display(20))
+                        .lineLimit(1)
+                }
+                .padding(.leading, metrics.topRowPadding(.leading))
+                .padding(.trailing, metrics.topRowPadding(.trailing))
+                .padding(.top, 10)
+                .allowsHitTesting(shown > 0.5)
+                .accessibilityHidden(shown < 0.5)
+            }
+            .frame(height: metrics.insets.top + metrics.cornerClearance + 20)
+            .ignoresSafeArea()
+            .opacity(shown)
         }
     }
 
