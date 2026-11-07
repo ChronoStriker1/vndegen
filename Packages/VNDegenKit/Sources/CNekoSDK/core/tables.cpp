@@ -653,8 +653,8 @@ pic obj\h008_000.bmp 561 482 2 5 0 4
 pic obj\h008_000.bmp 679 482 2 5 1 4
 pic obj\h008_000.bmp 827 687 2 5 0 4
 pic obj\h008_000.bmp 945 687 2 5 1 4
-pic obj\h999_000.bmp 1077 687 2 5 0 4
-pic obj\h999_000.bmp 1318 687 2 5 1 4
+radio art 1 obj\h999_000.bmp 1077 687 2 5 0
+radio art 0 obj\h999_000.bmp 1318 687 2 5 1
 slider opacity obj\h009_000.bmp 208 612
 number opacity obj\h011_000.bmp 573 568
 step opacity -1 obj\h010_000.bmp 140 613 2 5 0

@@ -204,6 +204,9 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
         windowOpacity_ = 0;
         windowAlwaysClear_ = true;
     }
+    // The Alchemist's sys_5.pak holds Masami Chie's original CGs and sprites. The PC starts on Waffle's arranged ones in
+    // the base archives, and its message window's art button and Config's Change Illustration switch between them.
+    if (folder_ == "waffle\\alchemy") artSet_ = "sys_5";
 
     if (config_.number("MsgWinButtonPlateDisable") == 0) buttonPlate_ = images_->get(config_.text("MsgWinButtonPlateFilename"));
     barTop_ = bars_.size() > 1 ? barY_[1] : height_ - 102;
@@ -377,6 +380,11 @@ void Engine::runAction(const std::string &action) {
     if (action == "Title") { openDialog(6, [this] { endStory("title"); }); return; }
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
+    if (action == "ModeChange") {
+        changeSetting("art", setting("art") ? 0 : 1);
+        saveSettings();
+        return;
+    }
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
     if (action == "System") { barPinned_ = !barPinned_; return; }
     if (action == "LogMode") { openLog(); return; }
@@ -883,6 +891,8 @@ void Engine::openGalleryCell(int index) {
 std::map<std::string, int> Engine::startingSettings() const {
     std::map<std::string, int> out = defaultSettings();
     for (const auto &[start, type] : voiceTypes_) out["voice" + std::to_string(type % 50)] = 1;
+    // 0 for the base archives' art, 1 for the art set's.
+    if (!artSet_.empty()) out["art"] = 0;
     return out;
 }
 
@@ -930,6 +940,23 @@ void Engine::applySettings() {
     static const int kAutoPercent[] = {200, 100, 50, 0};
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
+    applyArtSet();
+}
+
+// The PC swaps every CG and sprite on screen the moment the art changes.
+void Engine::applyArtSet() {
+    std::string wanted = setting("art") ? artSet_ : "";
+    if (wanted == artShown_) return;
+    artShown_ = wanted;
+    images_->setArtSet(wanted);
+    for (Sprites *sprites : {&back_, &front_})
+        for (auto &[slot, sprite] : *sprites)
+            if (ImageRef image = images_->get(sprite.path)) sprite.image = image;
+    // A transition and motion blur hold frames drawn with the old art, so they end here.
+    transitioning_ = false;
+    ruleImage_ = nullptr;
+    previousValid_ = false;
+    dirty_ = true;
 }
 
 void Engine::loadSettings() {
@@ -1582,7 +1609,10 @@ bool Engine::underButtonsShown() const {
 void Engine::composeMessageButtons(Canvas &out) {
     auto state = [&](const Button &b) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
-        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_);
+        // The art button reads ORIGINAL.ver while the arranged art shows, and ARRANGE.ver, its selected cells, while the
+        // original does.
+        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
+                  (b.action == "ModeChange" && setting("art"));
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         return on ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal;
     };

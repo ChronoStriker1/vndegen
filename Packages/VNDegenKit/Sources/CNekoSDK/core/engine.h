@@ -192,6 +192,7 @@ private:
     bool voiceAllowed(const std::string &voice) const;
     void saveSettings();
     void applySettings();
+    void applyArtSet();
     int setting(const std::string &name) const;
     void changeSetting(const std::string &name, int value);
     std::map<std::string, int> settings_, settingsWhenOpened_;
@@ -295,6 +296,8 @@ private:
 
     // Commands change the back set; a screen update shows it.
     Sprites back_, front_;
+    // The patch holding a second set of CGs and sprites, such as `sys_5`, empty when the game has none, and the set showing.
+    std::string artSet_, artShown_;
     ImageRef ruleImage_;
     int transitionType_ = 0, transitionMs_ = 0;
     int64_t transitionStart_ = 0;
