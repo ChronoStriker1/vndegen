@@ -1577,7 +1577,7 @@ button back obj\e004_000.bmp 1152 469 9 5 8 help obj\e005_000.bmp 868 421 1 9 0 
 screen music
 helplast
 selectedlook
-hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
+hover 343 676 534 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
 # Line art of the three women pans down behind the list, each sketch in turn, from a random one (measured under Wine).
 drift obj\g000_001.bmp -170 -791 -17
@@ -1591,8 +1591,8 @@ driftmotion 30 2250 1000 120
 pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\g001_000.bmp 0 0
-pic obj\g004_000.bmp 346 676
-slider music obj\g004_001.bmp 373 681
+pic obj\g004_000.bmp 343 676
+slider music obj\g004_001.bmp 370 681
 number music obj\g005_000.bmp 461 659
 button music_prev obj\g003_000.bmp 20 668 7 5 0 help obj\g006_000.bmp 868 669 1 8 0 0
 button music_play obj\g003_000.bmp 64 668 7 5 1 help obj\g006_000.bmp 868 669 1 8 0 1
@@ -1601,14 +1601,14 @@ button music_stop obj\g003_000.bmp 152 668 7 5 3
 button music_next obj\g003_000.bmp 196 668 7 5 4 help obj\g006_000.bmp 868 669 1 8 0 4
 button music_repeat obj\g003_000.bmp 240 668 7 5 5 help obj\g006_000.bmp 868 669 1 8 0 5
 button music_shuffle obj\g003_000.bmp 284 668 7 5 6 help obj\g006_000.bmp 868 669 1 8 0 6
-button track0 obj\g002_000.bmp 84 168 8 5 0
-button track1 obj\g002_000.bmp 84 272 8 5 1
-button track2 obj\g002_000.bmp 84 376 8 5 2
-button track3 obj\g002_000.bmp 84 480 8 5 3
-button track4 obj\g002_000.bmp 604 168 8 5 4
-button track5 obj\g002_000.bmp 604 272 8 5 5
-button track6 obj\g002_000.bmp 604 376 8 5 6
-button track7 obj\g002_000.bmp 604 480 8 5 7
+button track0 obj\g002_000.bmp 84 164 8 5 0
+button track1 obj\g002_000.bmp 84 267 8 5 1
+button track2 obj\g002_000.bmp 84 370 8 5 2
+button track3 obj\g002_000.bmp 84 473 8 5 3
+button track4 obj\g002_000.bmp 599 164 8 5 4
+button track5 obj\g002_000.bmp 599 267 8 5 5
+button track6 obj\g002_000.bmp 599 370 8 5 6
+button track7 obj\g002_000.bmp 599 473 8 5 7
 button nav_save obj\e004_000.bmp 1152 93 9 5 0 help obj\e005_000.bmp 868 45 1 9 0 0
 button nav_load obj\e004_000.bmp 1152 135 9 5 1 help obj\e005_000.bmp 868 87 1 9 0 1
 button nav_cg obj\e004_000.bmp 1152 177 9 5 2 help obj\e005_000.bmp 868 129 1 9 0 2
@@ -3780,7 +3780,7 @@ button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 8
 screen music
 helplast
 selectedlook
-hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
+hover 343 676 534 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
 # Line art of the mothers pans down behind the list, each sketch in turn, from a random one (measured under Wine).
 drift obj\g000_001.bmp -170 -791 -17
@@ -3794,8 +3794,8 @@ driftmotion 30 2250 1000 120
 pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\g001_000.bmp 0 0
-pic obj\g004_000.bmp 346 676
-slider music obj\g004_001.bmp 373 681
+pic obj\g004_000.bmp 343 676
+slider music obj\g004_001.bmp 370 681
 number music obj\g005_000.bmp 461 659
 button music_prev obj\g003_000.bmp 20 668 7 5 0 help obj\g006_000.bmp 868 669 1 8 0 0
 button music_play obj\g003_000.bmp 64 668 7 5 1 help obj\g006_000.bmp 868 669 1 8 0 1
@@ -3804,14 +3804,14 @@ button music_stop obj\g003_000.bmp 152 668 7 5 3
 button music_next obj\g003_000.bmp 196 668 7 5 4 help obj\g006_000.bmp 868 669 1 8 0 4
 button music_repeat obj\g003_000.bmp 240 668 7 5 5 help obj\g006_000.bmp 868 669 1 8 0 5
 button music_shuffle obj\g003_000.bmp 284 668 7 5 6 help obj\g006_000.bmp 868 669 1 8 0 6
-button track0 obj\g002_000.bmp 79 162 8 5 0
-button track1 obj\g002_000.bmp 79 266 8 5 1
-button track2 obj\g002_000.bmp 79 370 8 5 2
-button track3 obj\g002_000.bmp 79 474 8 5 3
-button track4 obj\g002_000.bmp 599 162 8 5 4
-button track5 obj\g002_000.bmp 599 266 8 5 5
+button track0 obj\g002_000.bmp 84 164 8 5 0
+button track1 obj\g002_000.bmp 84 267 8 5 1
+button track2 obj\g002_000.bmp 84 370 8 5 2
+button track3 obj\g002_000.bmp 84 473 8 5 3
+button track4 obj\g002_000.bmp 599 164 8 5 4
+button track5 obj\g002_000.bmp 599 267 8 5 5
 button track6 obj\g002_000.bmp 599 370 8 5 6
-button track7 obj\g002_000.bmp 599 474 8 5 7
+button track7 obj\g002_000.bmp 599 473 8 5 7
 button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
