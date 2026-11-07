@@ -83,7 +83,7 @@ New bugs get a GitHub issue and a line here.
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - NekoSDK stage 3, on `feat/nekosdk-stage3`: Test Games 84, 85, 88, 89, 92, 93 and 94, with movies through the app's FFmpeg. The other six games come after it.
-- An iPhone Duo layout audit of every screen, on `feat/portrait-controls`. A Claude and a Codex judge each score it out of 10, until both give 9.0 or higher. The portrait split ([#41](https://github.com/ChronoStriker1/vndegen/issues/41)) and the single library view button ([#42](https://github.com/ChronoStriker1/vndegen/issues/42)) are on `dev` for the next release, with the No Socks RPG white cutscene fix ([#44](https://github.com/ChronoStriker1/vndegen/issues/44)) and the NekoSDK replay Exit fix ([#45](https://github.com/ChronoStriker1/vndegen/issues/45)).
+- An iPhone Duo layout audit of every screen. Its fixes are on `dev` for the next release. A Codex judge scores it 9.1 out of 10 and a Claude judge 8.6, against a goal of 9.0 from both. The portrait split ([#41](https://github.com/ChronoStriker1/vndegen/issues/41)) and the single library view button ([#42](https://github.com/ChronoStriker1/vndegen/issues/42)) are on `dev` too, with the No Socks RPG white cutscene fix ([#44](https://github.com/ChronoStriker1/vndegen/issues/44)) and the NekoSDK replay Exit fix ([#45](https://github.com/ChronoStriker1/vndegen/issues/45)).
 - Ponscripter ([#26](https://github.com/ChronoStriker1/vndegen/issues/26)): both Umineko Arcs run on `dev` for the next release. One font safety commit still needs its review, and its movies run slightly off speed (#49).
 
 ## Licenses
