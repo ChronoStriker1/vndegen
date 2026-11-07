@@ -286,10 +286,18 @@ void Engine::endStory(const std::string &screen) {
     waiting_ = Waiting::None;
     saveSeen();
     saveGlobals();
-    returnTo_ = screen == "scene" ? "title" : "";
+    // A replay started from the CG viewer comes back to it, at the picture it left.
+    bool toViewer = replayFromViewer_ && screen == "scene";
+    replayFromViewer_ = false;
+    std::string to = toViewer ? "cg" : screen;
+    returnTo_ = to == "scene" || to == "cg" ? "title" : "";
     screen_ = nullptr;
-    openScreen(screen);
-    if (screen == "scene") returnTo_ = "title";
+    openScreen(to);
+    if (to == "scene" || to == "cg") returnTo_ = "title";
+    if (toViewer && viewEntry_ < cgEntries_.size() && viewImage_ < cgEntries_[viewEntry_].images.size()) {
+        closeViewer();
+        viewerShow(viewEntry_, viewImage_);
+    }
 }
 
 void Engine::startStory() {
@@ -511,6 +519,9 @@ bool Engine::moveFocus(int dx, int dy) {
         int cellH = choiceSheet_->h / 5, x, top, step;
         choicePlace(x, top, step);
         for (int i = 0; i < choiceCount_; i++) spots.push_back({width_ / 2, top + i * step + cellH / 2});
+    } else if (screen_ && viewingImage_ && viewerPanel()) {
+        // The CG viewer's panel, or nothing while it's hidden.
+        for (auto [x, y] : viewerSpots()) spots.push_back({x, y});
     } else if (screen_) {
         addButtons(screen_->buttons);
         const auto *grid = screen_->setting("slots");
@@ -558,6 +569,11 @@ bool Engine::moveFocus(int dx, int dy) {
 }
 
 void Engine::mouseWheel(int notches) {
+    // In the CG viewer the wheel zooms, a twentieth a notch.
+    if (screen_ && viewingImage_ && viewerPanel() && !dialogOpen_) {
+        viewerZoom(notches);
+        return;
+    }
     if (screen_ || dialogOpen_) return;
     if (logOpen_) scrollLog(notches);
     else if (notches > 0) openLog();
@@ -669,6 +685,7 @@ void Engine::loadGalleries() {
             e.page = std::atoi(f[1].c_str());
             e.thumbnail = f[2];
             if (f.size() > 4) e.bgm = f[4];
+            if (f.size() > 5) e.flow = f[5];  // the replay of the scene it's from
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
@@ -724,10 +741,13 @@ int Engine::nextTrack(int direction) {
 }
 
 // The title's or the story's music waits while the player plays, and while the host has the game paused.
+// The title's and the story's music wait while the session is paused or the music screen or CG viewer plays its own,
+// and the viewer's waits while the session is paused.
 void Engine::holdMusic() {
-    bool hold = paused_ || trackPlayer_;
+    bool hold = paused_ || trackPlayer_ || viewMusic_;
     if (titleMusic_) audio_.pause(titleMusic_, hold);
     for (auto &[channel, player] : bgm_) audio_.pause(player, hold);
+    if (viewMusic_) audio_.pause(viewMusic_, paused_);
 }
 
 void Engine::stopTrack() {
@@ -795,7 +815,8 @@ int Engine::galleryCellAt(int x, int y) const {
 void Engine::composeGallery(Canvas &out) {
     if (viewingImage_) {
         out.clear();
-        if (ImageRef image = images_->get(viewing_[viewingIndex_])) drawImage(out, *image, out.w * 0.5f, out.h * 0.5f, float(out.w) / float(image->w), float(out.w) / float(image->w), 0, 1);
+        composeViewerPicture(out);
+        composeViewer(out);
         return;
     }
     if (screen_->name != "cg" && screen_->name != "scene") return;
@@ -857,6 +878,10 @@ void Engine::openGalleryCell(int index) {
     size_t entry = size_t(page_ * perPage + index);
     if (screen_->name == "cg") {
         if (entry >= cgEntries_.size()) return;
+        if (viewerPanel()) {
+            openViewer(entry);
+            return;
+        }
         viewing_.clear();
         for (const std::string &p : cgEntries_[entry].images)
             if (seen(p)) viewing_.push_back(p);
@@ -865,26 +890,36 @@ void Engine::openGalleryCell(int index) {
         viewingImage_ = true;
         dirty_ = true;
     } else if (entry < sceneEntries_.size() && seen(sceneEntries_[entry].key)) {
-        stopTrack();
-        // A replay runs its own flow, and ending it comes back here.
-        auto flow = loadScript(sceneEntries_[entry].flow);
-        if (!flow || !flow->first()) return;
-        if (titleMusic_) {
-            audio_.fade(titleMusic_, 500, 0, true);
-            audio_.retire(titleMusic_);
-            titleMusic_ = 0;
-        }
-        screen_ = nullptr;
-        stack_.clear();
-        scene_ = {};
-        back_.clear();
-        front_.clear();
-        stack_.push_back({flow, flow->first()});
-        replaying_ = true;
-        waiting_ = Waiting::None;
-        dirty_ = true;
+        startReplay(sceneEntries_[entry]);
     }
 }
+
+// A replay runs its own flow, and ending it comes back to the gallery it started from.
+bool Engine::startReplay(const GalleryEntry &scene) {
+    auto flow = loadScript(scene.flow);
+    if (!flow || !flow->first()) return false;
+    stopTrack();
+    if (titleMusic_) {
+        audio_.fade(titleMusic_, 500, 0, true);
+        audio_.retire(titleMusic_);
+        titleMusic_ = 0;
+    }
+    screen_ = nullptr;
+    viewingImage_ = false;
+    viewAuto_ = false;
+    stack_.clear();
+    scene_ = {};
+    back_.clear();
+    front_.clear();
+    stack_.push_back({flow, flow->first()});
+    replaying_ = true;
+    waiting_ = Waiting::None;
+    dirty_ = true;
+    return true;
+}
+
+// A game without gallery tabs has nothing to switch.
+void Engine::viewerTab(int) {}
 
 // MARK: Settings
 
@@ -996,10 +1031,11 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         bool over = pointerSeen_ && !dialogOpen_ && inRect(pointerX_, pointerY_, x, y, w, h);
         drawPart(out, *sheet, x, y, field(f, at + 5) * w, (on ? 2 : 0) * h + (over ? h : 0), w, h, 1);
     };
+    // The PC rounds a fill to the nearest pixel: at 60, The Alchemist's 441-pixel opacity bar fills 265.
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
-            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, fill->w * setting(f[0]) / 100, fill->h, 1);
+            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + 50) / 100, fill->h, 1);
     }
     for (auto [it, end] = lines("bar"); it != end; ++it) {
         const auto &f = it->second;
@@ -1310,8 +1346,10 @@ bool Engine::loadFromSlot(int slot) {
 }
 
 void Engine::restoreSave(const SaveData &d) {
-    // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit.
+    // A save is the story, so loading one during a replay ends the replay, with its own bar and its Exit, and the CG
+    // viewer it may have come from.
     replaying_ = false;
+    replayFromViewer_ = false;
     stopTrack();
     stopKind(kKindBgm, 300);
     stopKind(kKindSe, 300);
@@ -1585,6 +1623,13 @@ void Engine::composeScreen(Canvas &out) {
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
         if (current) state = over ? StateSelectedHover : StateSelected;
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
+        // The PC games show no help for the tab, page or menu already open.
+        if (current && b.help) {
+            Button shown = b;
+            shown.help = nullptr;
+            drawButton(out, shown, state);
+            continue;
+        }
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
         if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
         bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
@@ -1593,6 +1638,18 @@ void Engine::composeScreen(Canvas &out) {
         if (b.action == "music_pause" && !trackPlayer_) state = StateDisabled;
         drawButton(out, b, state);
     }
+    // `hover X0 Y0 X1 Y1 PICTURE X Y [ROWS ROW]`: a line of help shown while the pointer is over that part of the screen,
+    // such as a settings group in Config, as the PC games show them.
+    if (pointerSeen_ && !dialogOpen_)
+        for (auto [it, end] = screen_->settings.equal_range("hover"); it != end; ++it) {
+            const auto &f = it->second;
+            if (f.size() < 7 || !inRect(pointerX_, pointerY_, field(f, 0), field(f, 1), field(f, 2) - field(f, 0), field(f, 3) - field(f, 1))) continue;
+            if (ImageRef help = images_->get(f[4])) {
+                int rows = f.size() >= 9 ? std::max(1, field(f, 7)) : 1, h = help->h / rows;
+                drawPart(out, *help, field(f, 5), field(f, 6), 0, (f.size() >= 9 ? field(f, 8) : 0) * h, help->w, h, 1);
+            }
+            break;
+        }
     if (dialogOpen_) composeDialog(out);
 }
 
@@ -2024,6 +2081,7 @@ bool Engine::step(int ms) {
         else playTrack(next);
         dirty_ = true;
     }
+    if (screen_) stepViewer(ms);
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
 
@@ -2093,11 +2151,21 @@ void Engine::mouseMove(float x, float y) {
     pointerX_ = px;
     pointerY_ = py;
     pointerSeen_ = true;
-    if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) pressSettingsWidget(px, py, true);
+    if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
+        if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
+        else pressSettingsWidget(px, py, true);
+    }
 }
 
 void Engine::mouseButton(int button, bool down) {
-    if (button == 0) leftHeld_ = down;
+    if (button == 0) {
+        // The CG viewer's volume is kept when the slider's let go.
+        if (!down && leftHeld_ && viewerDragging_) {
+            viewerDragging_ = false;
+            saveSettings();
+        }
+        leftHeld_ = down;
+    }
     if (!down) return;
     if (button == 1) {
         // The right button steps back: out of the log or a menu, else hides or shows the window.
@@ -2107,6 +2175,9 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
         } else if (logOpen_) {
             closeLog();
+        } else if (screen_ && viewingImage_ && viewerPanel()) {
+            viewPanelHidden_ = !viewPanelHidden_;
+            dirty_ = true;
         } else if (screen_) {
             if (screen_->name != "title") runAction("back");
         } else if (windowHiddenByPlayer_ || (windowShown_ && setting("rightclick") == 0)) {
@@ -2144,6 +2215,10 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (screen_) {
+        if (viewingImage_ && viewerPanel()) {
+            pressViewer(pointerX_, pointerY_);
+            return;
+        }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
             if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);
