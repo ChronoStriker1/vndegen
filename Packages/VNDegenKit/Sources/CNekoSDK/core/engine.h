@@ -263,7 +263,13 @@ private:
         std::vector<int> imageIds;
     };
     bool sceneUnlocked(const GalleryEntry &scene) const;
-    std::vector<GalleryEntry> cgEntries_, sceneEntries_;
+    // Test Game 92's anime gallery, from its anime_view.ini: entries of movies, unlocked whole by a scene's script as a
+    // scene is, and shown in the CG viewer.
+    std::vector<GalleryEntry> cgEntries_, sceneEntries_, animeEntries_;
+    // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
+    const std::vector<GalleryEntry> &galleryEntries() const;
+    bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
+    bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;
     std::unordered_map<std::string, bool> seen_;
     bool seenChanged_ = false;
@@ -277,6 +283,15 @@ private:
     int64_t viewMs_ = 0, viewAutoFrom_ = 0;
     int viewZoom_ = 100, viewMusic_ = 0;
     std::string viewMusicPath_;
+    // The anime gallery's movie in the viewer, looping from viewMovieFrom_ on the viewer's clock, and whether the mix
+    // reads its sound.
+    std::shared_ptr<Movie> viewMovie_;
+    int64_t viewMovieFrom_ = 0;
+    ImageRef viewMovieImage_;
+    bool viewMovieSound_ = false;
+    std::string viewerGallery_ = "cg";  // the gallery the viewer was opened from
+    void stopViewerMovie();
+    void stopViewerMovieSound();
     bool viewerPanel() const;
     void openViewer(size_t entry);
     void viewerShow(size_t entry, size_t image);

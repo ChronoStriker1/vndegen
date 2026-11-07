@@ -3410,10 +3410,10 @@ pic sys_5\obj\d000_000.bmp 0 -110
 pic sys_5\obj\d002_000.bmp 0 558
 pic sys_5\obj\d001_000.bmp 111 2
 pic obj\d004_000.bmp 1122 7 1 5 0 0
-# The manual and the web survey open a browser on the PC. The anime gallery is still to come.
+# The manual and the web survey open a browser on the PC.
 pic sys_5\obj\d003_000.bmp 885 592 11 5 8 0
 pic sys_5\obj\d003_000.bmp 1000 638 11 5 10 0
-pic sys_5\obj\d003_000.bmp 433 638 11 5 5 0
+button anime sys_5\obj\d003_000.bmp 433 638 11 5 5 help sys_5\obj\d005_000.bmp 0 686 1 12 0 5
 button start sys_5\obj\d003_000.bmp 129 592 11 5 0 help sys_5\obj\d005_000.bmp 0 686 1 12 0 0
 button load sys_5\obj\d003_000.bmp 318 592 11 5 1 help sys_5\obj\d005_000.bmp 0 686 1 12 0 1
 button quickload sys_5\obj\d003_000.bmp 507 592 11 5 2 help sys_5\obj\d005_000.bmp 0 686 1 12 0 2
@@ -3455,7 +3455,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3493,7 +3493,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3533,6 +3533,7 @@ pic obj\f000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 0
+cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
 cellthumb 8 26
@@ -3548,7 +3549,7 @@ cell 677 408
 celllabel obj\e008_000.bmp -2 8
 celldigits obj\e008_001.bmp 28 3 3 18
 cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
-gallerytabs
+gallerytabs 1
 button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
@@ -3557,7 +3558,68 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
+button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
+button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
+button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
+button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8
+button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
+
+screen anime
+# The anime gallery: entries of movies from anime_view.ini, which play looping in the CG viewer's panel without its art
+# switches.
+viewer obj\j000_000.bmp 0 558
+viewerhelp obj\j008_000.bmp 830 679 13
+viewerbutton bgmplay obj\j005_000.bmp 246 616
+viewerbutton bgmmute obj\h024_000.bmp 292 616
+viewerslider obj\j004_000.bmp 155 641 12
+viewernumber volume obj\g005_000.bmp 194 617 14 3
+viewerbutton zoomout obj\j003_000.bmp 388 644 3 0 help 9
+viewerbutton zoomreset obj\j003_000.bmp 424 644 3 1 help 10
+viewerbutton zoomin obj\j003_000.bmp 460 644 3 2 help 11
+viewernumber zoom obj\j002_000.bmp 421 611 13 1
+viewernumber zoomfrac obj\j002_001.bmp 444 613 11 2
+viewerbutton replay obj\j001_000.bmp 721 643 3 1 help 2
+viewerbutton prevcg obj\j001_001.bmp 808 641 5 0 help 4
+viewerbutton prevvar obj\j001_001.bmp 863 641 5 1 help 5
+viewerbutton nextvar obj\j001_001.bmp 1008 641 5 2 help 6
+viewerbutton nextcg obj\j001_001.bmp 1063 641 5 3 help 7
+viewerbutton auto obj\j001_001.bmp 1123 641 5 4 help 8
+viewerbutton return obj\j001_000.bmp 1182 643 3 2 help 3
+viewerbutton hide obj\l001_000.bmp 1240 588 2 0 help 0
+viewernumber index obj\j002_000.bmp 926 630 13 2
+viewernumber total obj\j002_001.bmp 966 648 11 2
+viewerauto 8000 0
+pic obj\f000_000.bmp 0 0
+# The side panel shows faded, about 150 of 256 by fitting, and a frame of bars lies over the top and bottom.
+pic obj\e003_000.bmp 1138 0 alpha 150
+pic obj\e001_000.bmp 0 0
+pic sys_5\obj\f001_000.bmp 0 0 1 3 0 2
+cellhide
+cellsheet obj\f003_000.bmp
+cellsize 186 156
+cellthumb 8 26
+cell 279 82
+cell 478 82
+cell 677 82
+cell 279 245
+cell 478 245
+cell 677 245
+cell 279 408
+cell 478 408
+cell 677 408
+celllabel obj\e008_000.bmp -2 8
+celldigits obj\e008_001.bmp 28 3 3 18
+gallerytabs 1
+button page0 obj\e006_000.bmp 282 34 10 5 0
+button gtab0 obj\f002_000.bmp 8 654 3 5 0
+button gtab1 obj\f002_000.bmp 384 654 3 5 1
+button gtab2 obj\f002_000.bmp 760 654 3 5 2
+button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
+button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
+button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
+button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3570,6 +3632,7 @@ pic obj\f000_000.bmp 0 0
 pic obj\e003_000.bmp 1138 0 alpha 150
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 1
+cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
 cellthumb 8 26
@@ -3585,7 +3648,7 @@ cell 677 408
 celllabel obj\e008_000.bmp -2 8
 celldigits obj\e008_001.bmp 28 3 3 18
 cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
-gallerytabs
+gallerytabs 1
 button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
@@ -3594,7 +3657,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3630,7 +3693,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3666,7 +3729,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3732,7 +3795,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7
@@ -3790,7 +3853,7 @@ button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene sys_5\obj\e004_000.bmp 1152 219 10 5 3
-pic sys_5\obj\e004_000.bmp 1152 261 10 5 4 0
+button nav_anime sys_5\obj\e004_000.bmp 1152 261 10 5 4
 button nav_music sys_5\obj\e004_000.bmp 1152 303 10 5 5
 button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7

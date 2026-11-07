@@ -26,29 +26,54 @@ constexpr int kNormal = 0, kHover = 1, kSelected = 2, kDisabled = 4;
 constexpr int kZoomMin = 100, kZoomMax = 300, kZoomStep = 5;
 // The slideshow moves on every 8 seconds unless the table says otherwise.
 constexpr int kAutoMs = 8000;
+// A movie's sound plays at the sound effects' volume, as the story's movies do.
+constexpr int kMovieSoundGroup = 1;
 
 }  // namespace
 
-bool Engine::viewerPanel() const { return screen_ && screen_->name == "cg" && screen_->setting("viewer"); }
+bool Engine::viewerPanel() const { return isPictureGallery() && screen_->setting("viewer"); }
 
 void Engine::viewerShow(size_t entry, size_t image) {
     bool newEntry = entry != viewEntry_ || !viewingImage_;
     viewEntry_ = entry;
     viewImage_ = image;
     viewAutoFrom_ = viewMs_;
-    viewing_ = {cgEntries_[entry].images[image]};
+    viewing_ = {galleryEntries()[entry].images[image]};
     viewingIndex_ = 0;
     viewingImage_ = true;
+    // The anime gallery's pictures are movies, which loop with their sound.
+    stopViewerMovie();
+    if (screen_->name == "anime") {
+        viewMovie_ = openMovie(viewing_[0], true);
+        viewMovieFrom_ = viewMs_;
+        if (viewMovie_) {
+            bool ended = false;
+            viewMovieImage_ = viewMovie_->frame(0, ended);
+        }
+    }
     if (newEntry) viewerMusic();
     dirty_ = true;
+}
+
+void Engine::stopViewerMovieSound() {
+    if (!viewMovieSound_) return;
+    audio_.clearStream();
+    viewMovieSound_ = false;
+}
+
+void Engine::stopViewerMovie() {
+    stopViewerMovieSound();
+    viewMovie_.reset();
+    viewMovieImage_ = nullptr;
 }
 
 // Opening a picture from the gallery: its entry's first unlocked one, with the panel up, the picture at its own size and
 // the entry's music playing.
 void Engine::openViewer(size_t entry) {
-    const auto &images = cgEntries_[entry].images;
-    for (size_t i = 0; i < images.size(); i++)
-        if (seen(images[i])) {
+    viewerGallery_ = screen_->name;
+    const GalleryEntry &e = galleryEntries()[entry];
+    for (size_t i = 0; i < e.images.size(); i++)
+        if (galleryImageSeen(e, i)) {
             viewPanelHidden_ = false;
             viewAuto_ = false;
             viewZoom_ = kZoomMin;
@@ -68,7 +93,7 @@ void Engine::viewerMusic() {
         for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it)
             control = control || it->second[0] == "bgm" || it->second[0] == "bgmplay" || it->second[0] == "bgmmute";
     if (!control) return;
-    const std::string &path = cgEntries_[viewEntry_].bgm;
+    const std::string &path = galleryEntries()[viewEntry_].bgm;
     if (path == viewMusicPath_ && viewMusic_) return;
     stopViewerMusic();
     if (path.empty() || path == "0") return;
@@ -97,11 +122,11 @@ void Engine::stopViewerMusic() {
 }
 
 void Engine::viewerVariant(int direction) {
-    const auto &images = cgEntries_[viewEntry_].images;
-    int n = int(images.size());
+    const GalleryEntry &e = galleryEntries()[viewEntry_];
+    int n = int(e.images.size());
     for (int k = 1; k < n; k++) {
         int i = ((int(viewImage_) + direction * k) % n + n) % n;
-        if (seen(images[size_t(i)])) {
+        if (galleryImageSeen(e, size_t(i))) {
             viewerShow(viewEntry_, size_t(i));
             return;
         }
@@ -111,29 +136,29 @@ void Engine::viewerVariant(int direction) {
 // Between entries with a picture unlocked, wrapping at the ends. Next lands on the entry's first unlocked picture.
 // Previous does too within a gallery tab, but on the last when it crosses into another tab or wraps round.
 void Engine::viewerCg(int direction) {
-    int n = int(cgEntries_.size());
+    const auto &entries = galleryEntries();
+    int n = int(entries.size());
     for (int k = 1; k <= n; k++) {
         int at = int(viewEntry_) + direction * k;
         bool wrapped = at < 0 || at >= n;
         size_t e = size_t((at % n + n) % n);
-        const auto &images = cgEntries_[e].images;
         int first = -1, last = -1;
-        for (int i = 0; i < int(images.size()); i++)
-            if (seen(images[size_t(i)])) {
+        for (int i = 0; i < int(entries[e].images.size()); i++)
+            if (galleryImageSeen(entries[e], size_t(i))) {
                 if (first < 0) first = i;
                 last = i;
             }
         if (first < 0) continue;
-        bool fromEnd = direction < 0 && (wrapped || cgEntries_[e].page != cgEntries_[viewEntry_].page);
+        bool fromEnd = direction < 0 && (wrapped || entries[e].page != entries[viewEntry_].page);
         viewerShow(e, size_t(fromEnd ? last : first));
         return;
     }
 }
 
 void Engine::viewerAdvance() {
-    const auto &images = cgEntries_[viewEntry_].images;
-    for (size_t i = viewImage_ + 1; i < images.size(); i++)
-        if (seen(images[i])) {
+    const GalleryEntry &e = galleryEntries()[viewEntry_];
+    for (size_t i = viewImage_ + 1; i < e.images.size(); i++)
+        if (galleryImageSeen(e, i)) {
             viewerShow(viewEntry_, i);
             return;
         }
@@ -146,11 +171,13 @@ void Engine::closeViewer() {
     viewingImage_ = false;
     viewAuto_ = false;
     stopViewerMusic();
+    stopViewerMovie();
     int perPage = std::max(1, int(screen_->settings.count("cell")));
     int before = int(viewEntry_);
     if (screen_->settings.count("gallerytabs")) {
-        const GalleryEntry &e = cgEntries_[viewEntry_];
-        before = int(std::count_if(cgEntries_.begin(), cgEntries_.begin() + std::ptrdiff_t(viewEntry_), [&](const GalleryEntry &o) { return o.page == e.page; }));
+        const auto &entries = galleryEntries();
+        const GalleryEntry &e = entries[viewEntry_];
+        before = int(std::count_if(entries.begin(), entries.begin() + std::ptrdiff_t(viewEntry_), [&](const GalleryEntry &o) { return o.page == e.page; }));
         viewerTab(e.page);
     }
     page_ = before / perPage;
@@ -159,7 +186,7 @@ void Engine::closeViewer() {
 
 // Scene shows, or works, only while the picture's scene is unlocked in the Scene gallery.
 const Engine::GalleryEntry *Engine::viewerScene() const {
-    const std::string &flow = cgEntries_[viewEntry_].flow;
+    const std::string &flow = galleryEntries()[viewEntry_].flow;
     if (flow.empty()) return nullptr;
     for (const GalleryEntry &scene : sceneEntries_)
         if (normalizedPath(scene.flow) == normalizedPath(flow) && sceneUnlocked(scene)) return &scene;
@@ -169,7 +196,7 @@ const Engine::GalleryEntry *Engine::viewerScene() const {
 // The picture fills the screen's width. Zoomed, the point of it under the pointer stays where it is. The art set picks
 // which of The Alchemist's two versions of it comes up.
 void Engine::composeViewerPicture(Canvas &out) {
-    ImageRef image = viewing_.empty() ? nullptr : images_->get(shownPath(viewing_[viewingIndex_]));
+    ImageRef image = viewMovie_ ? viewMovieImage_ : viewing_.empty() ? nullptr : images_->get(shownPath(viewing_[viewingIndex_]));
     if (!image) return;
     float base = float(out.w) / float(image->w), zoom = viewerPanel() ? float(viewZoom_) / 100 : 1;
     float w = float(image->w) * base, h = float(image->h) * base;
@@ -187,7 +214,7 @@ int Engine::viewerButtonRow(const std::vector<std::string> &f, bool over) const 
     // The variant buttons are off for an entry of one picture, though not for one with a single picture unlocked.
     bool off = (action == "replay" && !viewerScene()) || ((action == "zoomout" || action == "zoomreset") && viewZoom_ <= kZoomMin) ||
                (action == "zoomin" && viewZoom_ >= kZoomMax) || ((action == "bgm" || action == "bgmplay" || action == "bgmmute") && !viewMusic_) ||
-               ((action == "prevvar" || action == "nextvar") && cgEntries_[viewEntry_].images.size() < 2);
+               ((action == "prevvar" || action == "nextvar") && galleryEntries()[viewEntry_].images.size() < 2);
     if (off) return hideWhenOff ? -1 : kDisabled;
     if (action == "auto" && viewAuto_) return kSelected + (over ? 1 : 0);
     return over ? kHover : kNormal;
@@ -315,7 +342,7 @@ void Engine::composeViewer(Canvas &out) {
         ImageRef sheet = f.size() >= 6 ? images_->get(f[1]) : nullptr;
         if (!sheet) continue;
         int cells = f.size() >= 7 ? std::max(10, number(f, 6)) : 10, cw = sheet->w / cells, digits = std::max(1, number(f, 5));
-        int value = f[0] == "index" ? int(viewImage_) + 1 : f[0] == "total" ? int(cgEntries_[viewEntry_].images.size()) : f[0] == "zoom" ? viewZoom_ / 100 :
+        int value = f[0] == "index" ? int(viewImage_) + 1 : f[0] == "total" ? int(galleryEntries()[viewEntry_].images.size()) : f[0] == "zoom" ? viewZoom_ / 100 :
                     f[0] == "zoomfrac" ? viewZoom_ % 100 : setting("music");
         for (int i = digits - 1; i >= 0; i--, value /= 10)
             drawPart(out, *sheet, number(f, 2) + i * number(f, 4), number(f, 3), value % 10 * cw, 0, cw, sheet->h, 1);
@@ -415,6 +442,20 @@ void Engine::viewerZoom(int notches) {
 void Engine::stepViewer(int ms) {
     viewMs_ += ms;
     if (!viewingImage_ || !viewerPanel()) return;
+    if (viewMovie_) {
+        bool ended = false;
+        ImageRef frame = viewMovie_->frame(double(viewMs_ - viewMovieFrom_) / 1000, ended);
+        if (frame && frame != viewMovieImage_) {
+            viewMovieImage_ = frame;
+            dirty_ = true;
+        }
+        // The mix reads its sound while the viewer runs. A pause stops it, and this picks it up again.
+        if (!viewMovieSound_ && viewMovie_->hasSound()) {
+            Movie *m = viewMovie_.get();
+            audio_.setStream([m](float *out, int frames) { return m->sound(out, frames); }, kMovieSoundGroup, 100);
+            viewMovieSound_ = true;
+        }
+    }
     if (viewAuto_) {
         dirty_ = true;
         const auto *timing = screen_->setting("viewerauto");

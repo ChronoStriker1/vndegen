@@ -274,6 +274,8 @@ void Engine::openScreen(const std::string &name) {
     pressed_.clear();
     dirty_ = true;
     page_ = 0;
+    // `gallerytabs TAB`: the tab a gallery opens on, the middle one of three in Test Game 92.
+    if (const auto *tabs = screen_->setting("gallerytabs"); tabs && !tabs->empty()) galleryTab_ = field(*tabs, 0);
     if (name == "title" && !titleBgm_.empty() && !titleMusic_) {
         if (Bytes data = files_.read(titleBgm_)) {
             titleMusic_ = audio_.open(data);
@@ -316,15 +318,16 @@ void Engine::endStory(const std::string &screen) {
     waiting_ = Waiting::None;
     saveSeen();
     saveGlobals();
-    // A replay started from the CG viewer comes back to it, at the picture it left.
+    // A replay started from the viewer comes back to it, in the gallery it was opened from, at the picture it left.
     bool toViewer = replayFromViewer_ && screen == "scene";
     replayFromViewer_ = false;
-    std::string to = toViewer ? "cg" : screen;
-    returnTo_ = to == "scene" || to == "cg" ? "title" : "";
+    std::string to = toViewer ? viewerGallery_ : screen;
+    bool gallery = to == "scene" || to == "cg" || to == "anime";
+    returnTo_ = gallery ? "title" : "";
     screen_ = nullptr;
     openScreen(to);
-    if (to == "scene" || to == "cg") returnTo_ = "title";
-    if (toViewer && viewEntry_ < cgEntries_.size() && viewImage_ < cgEntries_[viewEntry_].images.size()) {
+    if (gallery) returnTo_ = "title";
+    if (toViewer && viewEntry_ < galleryEntries().size() && viewImage_ < galleryEntries()[viewEntry_].images.size()) {
         closeViewer();
         viewerShow(viewEntry_, viewImage_);
     }
@@ -555,6 +558,7 @@ void Engine::runAction(const std::string &action) {
     }
     if (action == "nav_cg" || action == "cg") { go("cg"); return; }
     if (action == "nav_scene" || action == "scene") { go("scene"); return; }
+    if ((action == "nav_anime" || action == "anime") && screens_.count("anime")) { go("anime"); return; }
     if (action == "nav_music" || action == "music") { go("music"); return; }
     if (action == "nav_title") { runAction("Title"); return; }
     if (action == "nav_quit") { runAction("quit"); return; }
@@ -785,6 +789,23 @@ void Engine::loadGalleries() {
             }
         }
     }
+    // `#p page thumbnail key bgm flow`, then a `0,0,movie` line for each of the entry's movies, then `##`.
+    for (const std::string &line : lines("cfg\\anime_view.ini")) {
+        auto f = fields(line);
+        if (f.empty()) continue;
+        if (f[0] == "#p" && f.size() >= 6) {
+            GalleryEntry e;
+            e.page = std::atoi(f[1].c_str());
+            e.thumbnail = f[2];
+            e.keys = {f[3]};
+            e.bgm = f[4];
+            e.flow = f[5];
+            animeEntries_.push_back(e);
+        } else if (f[0] != "##" && !animeEntries_.empty()) {
+            auto parts = split(f[0], ',');
+            if (parts.size() >= 3) animeEntries_.back().images.push_back(parts[2]);
+        }
+    }
     // `page thumbnail 0 0 flow key,0,0`, with up to three keys and 0 for none. Test Game 84's second scene names two, and
     // on the PC either one read unlocks it.
     for (const std::string &line : lines("cfg\\play_view.ini")) {
@@ -927,6 +948,18 @@ void Engine::noteSeen(const std::string &path) {
     seenChanged_ = true;
 }
 
+const std::vector<Engine::GalleryEntry> &Engine::galleryEntries() const {
+    if (screen_ && screen_->name == "scene") return sceneEntries_;
+    if (screen_ && screen_->name == "anime") return animeEntries_;
+    return cgEntries_;
+}
+
+// A picture unlocks once seen. An anime entry's movies unlock together with its scene's script.
+bool Engine::galleryImageSeen(const GalleryEntry &entry, size_t image) const {
+    if (screen_ && screen_->name == "anime") return sceneUnlocked(entry);
+    return image < entry.images.size() && seen(entry.images[image]);
+}
+
 bool Engine::sceneUnlocked(const GalleryEntry &scene) const {
     return std::any_of(scene.keys.begin(), scene.keys.end(), [&](const std::string &key) { return seen(key); });
 }
@@ -947,7 +980,7 @@ void Engine::saveSeen() {
 }
 
 int Engine::galleryCellAt(int x, int y) const {
-    if (!screen_ || (screen_->name != "cg" && screen_->name != "scene" && screen_->name != "music")) return -1;
+    if (!screen_ || (!isPictureGallery() && screen_->name != "scene" && screen_->name != "music")) return -1;
     const auto *size = screen_->setting("cellsize");
     if (!size || size->size() < 2) return -1;
     int w = std::atoi((*size)[0].c_str()), h = std::atoi((*size)[1].c_str());
@@ -961,7 +994,7 @@ int Engine::galleryCellAt(int x, int y) const {
 
 // Cells run in the file's order, a page at a time. Cells not unlocked yet stay locked, as the PC's do.
 int Engine::galleryEntry(int cell) const {
-    const auto &entries = screen_->name == "cg" ? cgEntries_ : sceneEntries_;
+    const auto &entries = galleryEntries();
     int perPage = int(screen_->settings.count("cell"));
     int wanted = page_ * perPage + cell;
     if (!screen_->settings.count("gallerytabs")) return wanted < int(entries.size()) ? wanted : -1;
@@ -972,8 +1005,8 @@ int Engine::galleryEntry(int cell) const {
 
 // How many pages a character's gallery tab fills. The buttons for pages past those aren't there.
 bool Engine::galleryPageExists(int page) const {
-    if (!screen_ || (screen_->name != "cg" && screen_->name != "scene") || !screen_->settings.count("gallerytabs")) return true;
-    const auto &entries = screen_->name == "cg" ? cgEntries_ : sceneEntries_;
+    if (!screen_ || (!isPictureGallery() && screen_->name != "scene") || !screen_->settings.count("gallerytabs")) return true;
+    const auto &entries = galleryEntries();
     int count = int(std::count_if(entries.begin(), entries.end(), [&](const GalleryEntry &e) { return e.page == galleryTab_; }));
     return page == 0 || page * int(screen_->settings.count("cell")) < count;
 }
@@ -1026,12 +1059,12 @@ void Engine::composeGallery(Canvas &out) {
         composeViewer(out);
         return;
     }
-    if (screen_->name != "cg" && screen_->name != "scene") return;
+    if (!isPictureGallery() && screen_->name != "scene") return;
     const auto *sheetName = screen_->setting("cellsheet");
     ImageRef sheet = sheetName && !sheetName->empty() ? images_->get((*sheetName)[0]) : nullptr;
     const auto *inset = screen_->setting("cellthumb");
     int dx = inset && inset->size() >= 2 ? std::atoi((*inset)[0].c_str()) : 0, dy = inset && inset->size() >= 2 ? std::atoi((*inset)[1].c_str()) : 0;
-    const auto &entries = screen_->name == "cg" ? cgEntries_ : sceneEntries_;
+    const auto &entries = galleryEntries();
     int index = 0;
     int hovered = pointerSeen_ ? galleryCellAt(pointerX_, pointerY_) : -1;
     int perPage = int(screen_->settings.count("cell"));
@@ -1044,7 +1077,9 @@ void Engine::composeGallery(Canvas &out) {
         bool unlocked = false;
         if (entry < entries.size()) {
             const GalleryEntry &e = entries[entry];
-            unlocked = screen_->name == "scene" ? sceneUnlocked(e) : std::any_of(e.images.begin(), e.images.end(), [&](const std::string &p) { return seen(p); });
+            if (screen_->name == "scene") unlocked = sceneUnlocked(e);
+            else
+                for (size_t i = 0; i < e.images.size() && !unlocked; i++) unlocked = galleryImageSeen(e, i);
         }
         if (sheet) {
             int h = sheet->h / 5;
@@ -1111,8 +1146,8 @@ void Engine::openGalleryCell(int index) {
     int found = galleryEntry(index);
     if (found < 0) return;
     size_t entry = size_t(found);
-    if (screen_->name == "cg") {
-        if (entry >= cgEntries_.size()) return;
+    if (isPictureGallery()) {
+        if (entry >= galleryEntries().size()) return;
         if (viewerPanel()) {
             openViewer(entry);
             return;
@@ -2807,7 +2842,10 @@ bool Engine::step(int ms) {
 void Engine::setPaused(bool paused) {
     paused_ = paused;
     // The next step after a resume picks the movie's sound up again.
-    if (paused) stopMovieSound();
+    if (paused) {
+        stopMovieSound();
+        stopViewerMovieSound();
+    }
     for (auto *channels : {&se_, &voice_})
         for (auto &[channel, player] : *channels) audio_.pause(player, paused);
     holdMusic();
