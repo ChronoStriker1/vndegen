@@ -1860,7 +1860,9 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
          }
          else {
             // @TODO handle matching point
-            STBTT_assert(0);
+            // VNDegen: the component's two point numbers are skipped, so the next record is read from its place, and
+            // the component is drawn where it lies.
+            comp += (flags & 1) ? 4 : 2;
          }
          if (flags & (1<<3)) { // WE_HAVE_A_SCALE
             mtx[0] = mtx[3] = ttSHORT(comp)/16384.0f; comp+=2;
@@ -2046,9 +2048,8 @@ static int stbtt__run_charstring(const stbtt_fontinfo *info, int glyph_index, st
 
 #define STBTT__CSERR(s) (0)
 
-   // VNDegen: a glyph's charstring stops after this many bytes, its subroutines' included, since a subroutine may call
-   // others many times over; a real glyph takes a few thousand at most. It also bounds the glyph's points and the
-   // curve pieces drawing makes of them.
+   // VNDegen: a glyph's charstring stops after this many operators and operands, its subroutines' included, since a
+   // subroutine may call others many times over; a real glyph takes a few thousand at most.
    int steps = 1 << 16;
 
    // this currently ignores the initial width value, which isn't needed if we have hmtx
@@ -3587,8 +3588,14 @@ static void stbtt__add_point(stbtt__point *points, int n, float x, float y)
 }
 
 // tessellate until threshold p is happy... @TODO warped to compensate for non-linear stretching
+// VNDegen: a glyph whose curves flatten to more points than this is not drawn. A TrueType glyph's box comes from its
+// header, so an outline far larger than its box would otherwise be cut into up to 65,536 pieces a curve, taking seconds
+// and gigabytes; a real glyph makes a few thousand.
+#define STBTT__MOST_FLAT_POINTS (1 << 20)
+
 static int stbtt__tesselate_curve(stbtt__point *points, int *num_points, float x0, float y0, float x1, float y1, float x2, float y2, float objspace_flatness_squared, int n)
 {
+   if (*num_points > STBTT__MOST_FLAT_POINTS) return 1; // VNDegen: too many already
    // midpoint
    float mx = (x0 + 2*x1 + x2)/4;
    float my = (y0 + 2*y1 + y2)/4;
@@ -3609,6 +3616,7 @@ static int stbtt__tesselate_curve(stbtt__point *points, int *num_points, float x
 
 static void stbtt__tesselate_cubic(stbtt__point *points, int *num_points, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspace_flatness_squared, int n)
 {
+   if (*num_points > STBTT__MOST_FLAT_POINTS) return; // VNDegen: too many already
    // @TODO this "flatness" calculation is just made-up nonsense that seems to work well enough
    float dx0 = x1-x0;
    float dy0 = y1-y0;
@@ -3716,6 +3724,7 @@ static stbtt__point *stbtt_FlattenCurves(stbtt_vertex *vertices, int num_verts, 
          }
       }
       (*contour_lengths)[n] = num_points - start;
+      if (num_points > STBTT__MOST_FLAT_POINTS) goto error; // VNDegen: not drawn
    }
 
    return points;

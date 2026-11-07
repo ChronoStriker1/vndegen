@@ -1,5 +1,6 @@
 #include "ponsfont.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -10,6 +11,9 @@
 #define STBTT_STATIC
 // stb_truetype clamps a read that would leave its CFF buffer, after asserting it can't; a game's font may make it.
 #define STBTT_assert(x) ((void)0)
+// A CFF glyph's box comes from its points, which a font can put far out; its edges are clamped before they become ints.
+#define STBTT_ifloor(x) ((int) std::floor(std::clamp(double(x), -1e9, 1e9)))
+#define STBTT_iceil(x) ((int) std::ceil(std::clamp(double(x), -1e9, 1e9)))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include "../third_party/stb_truetype.h"
@@ -36,11 +40,10 @@ PonsFace::~PonsFace() = default;
 // charstring after a fixed number of steps (another).
 //
 // stb follows composite glyphs recursively, once for every use, and copies the outline so far at every component. So
-// every component record must lie inside its composite's own loca entry and give its offset as x and y (stb skips no
-// bytes for the other kind, point matching, so it would read the next record from the wrong place; no font tested
-// uses it); composites must nest at most 32 deep without a cycle; and drawing a composite may come to at most
-// kMostGlyphWork points, components and copied points. That also bounds the curve pieces drawing makes of its points.
-// A simple glyph's own points are bounded by its format, at 65,536.
+// every component record must lie inside its composite's own loca entry; composites must nest at most 32 deep without
+// a cycle; and drawing a composite may come to at most kMostGlyphWork points, components and copied points. A simple
+// glyph's own points are bounded by its format, at 65,536. A component placed by matching points is drawn where it
+// lies (a local change to stb). stb gives up on a glyph whose curves flatten to more than a million points (another).
 // Glyph entries run forward: stb draws one whose loca entries are reversed from its start.
 static constexpr uint64_t kMostGlyphWork = 1 << 16;
 
@@ -89,7 +92,6 @@ static bool glyphsDrawable(const uint8_t *glyf, uint64_t glyfSize, const std::fu
                 for (uint64_t at = start + 10;;) {
                     if (at + 4 > end) return -1;
                     uint16_t flags = be16(glyf + at), part = be16(glyf + at + 2);
-                    if (!(flags & 2)) return -1;
                     uint64_t size = 4 + ((flags & 1) ? 4 : 2) + ((flags & 8) ? 2 : (flags & 0x40) ? 4 : (flags & 0x80) ? 8 : 0);
                     if (at + size > end) return -1;
                     Cost partCost;
@@ -133,7 +135,8 @@ static bool tablesInside(const Bytes &d) {
     for (uint64_t t = 0; t < count; t++) {
         const uint8_t *rec = &d[at + 12 + t * 16];
         uint64_t off = be32(rec + 8), size = be32(rec + 12);
-        if (off + size > d.size()) return false;
+        // stb takes a table at offset 0 for a missing one, and a real table never lies in the header or directory.
+        if (off < at + 12 + count * 16 || off + size > d.size()) return false;
         tables.emplace(std::string(reinterpret_cast<const char *>(rec), 4), Table{d.data() + off, size});
     }
     auto has = [&](const char *tag, uint64_t least) { return tables.count(tag) && tables[tag].size >= least; };
@@ -216,8 +219,10 @@ std::shared_ptr<const PonsFace::Glyph> PonsFace::glyph(uint32_t cp, int px) {
     g.advance = int(std::lround(double(advance) * scale * 64)) >> 6;
     int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     stbtt_GetGlyphBitmapBox(f, index, scale, scale, &x0, &y0, &x1, &y1);
-    g.w = std::max(0, x1 - x0);
-    g.h = std::max(0, y1 - y0);
+    // In 64 bits: a CFF glyph's box can span most of an int each way.
+    int64_t w = std::max<int64_t>(0, int64_t(x1) - x0), h = std::max<int64_t>(0, int64_t(y1) - y0);
+    g.w = int(std::min<int64_t>(w, 1 << 30));
+    g.h = int(std::min<int64_t>(h, 1 << 30));
     g.left = x0;
     g.top = -y0;
     if (g.w > 0 && g.h > 0 && g.w <= 4096 && g.h <= 4096) {
