@@ -31,3 +31,11 @@ endforeach()
 # wolfaudio can also play through an SDL3 device on Linux; the runtime never uses SDL.
 find_package(SDL3 REQUIRED CONFIG)
 target_link_libraries(wolfaudio PRIVATE SDL3::SDL3)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(framepace_test framepace_test.cpp)
+  target_include_directories(framepace_test PRIVATE ${RUNTIME}/core)
+  target_compile_options(framepace_test PRIVATE -UNDEBUG)
+  add_test(NAME framepace COMMAND framepace_test)
+endif()
