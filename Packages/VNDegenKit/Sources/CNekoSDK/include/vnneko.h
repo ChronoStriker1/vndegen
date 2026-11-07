@@ -91,6 +91,11 @@ void vnneko_set_window_state(VNNekoEngine *e, bool canFullScreen, bool fullScree
 // The screen mode Config's buttons asked for since the last call: 0 a window, 1 full screen, -1 none.
 int vnneko_take_window_request(VNNekoEngine *e);
 
+// Whether Config asks for the game to stop while the app isn't active. The host pauses it with vnneko_set_paused.
+bool vnneko_pauses_when_inactive(VNNekoEngine *e);
+// Config's confirm key: 0 for Space, 1 for Enter. The other one acts as the right button.
+int vnneko_confirm_key(VNNekoEngine *e);
+
 // Frees the engine.
 void vnneko_stop(VNNekoEngine *e);
 

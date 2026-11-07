@@ -67,6 +67,10 @@ const std::map<std::string, int> &defaultSettings() {
         {"effect", 1}, {"wait", 1}, {"waitskip", 0}, {"camera", 1}, {"tutorial", 1},
         // How long waits and fades last, in hundredths: Config's wait time runs from ×0.70 to ×1.30.
         {"waittime", 100},
+        // Whether the game stops while VNDegen isn't the active app, off as the PC starts it.
+        {"pause_inactive", 0},
+        // The keyboard's confirm key, 0 Space and 1 Enter; the other does what the right button does.
+        {"deckey", 0},
     };
     return defaults;
 }

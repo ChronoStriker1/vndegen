@@ -124,6 +124,8 @@ public:
         fullScreen_ = fullScreen;
     }
     int takeWindowRequest() { return std::exchange(windowRequest_, -1); }
+    bool pausesWhenInactive() const { return setting("pause_inactive") != 0; }
+    int confirmKey() const { return setting("deckey"); }
 
     const char *problem() const { return problem_.empty() ? nullptr : problem_.c_str(); }
     const char *debugStatus();

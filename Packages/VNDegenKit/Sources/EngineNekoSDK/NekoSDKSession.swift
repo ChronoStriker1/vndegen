@@ -49,6 +49,33 @@ final class NekoSDKSession: EngineSession {
             vnneko_mouse_wheel(engine, Int32(whole))
         }
         frameView.onKey = { [weak self] usage, pressed, _ in self?.hostKey(usage, pressed) }
+        // Config's "stop the game when inactive" pauses it while VNDegen isn't the active app.
+        #if canImport(UIKit)
+        let resign = UIApplication.willResignActiveNotification, become = UIApplication.didBecomeActiveNotification
+        #else
+        let resign = NSApplication.didResignActiveNotification, become = NSApplication.didBecomeActiveNotification
+        #endif
+        activityObservers = [
+            NotificationCenter.default.addObserver(forName: resign, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setInactive(true) }
+            },
+            NotificationCenter.default.addObserver(forName: become, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setInactive(false) }
+            },
+        ]
+    }
+
+    private var activityObservers: [NSObjectProtocol] = []
+    private var inactive = false
+
+    /// Pauses the runtime while the app is inactive, when Config asks for it. The hub's own pause, `paused`, wins.
+    private func setInactive(_ inactive: Bool) {
+        self.inactive = inactive
+        guard let engine, !paused else { return }
+        let stop = inactive && vnneko_pauses_when_inactive(engine)
+        vnneko_set_paused(engine, stop)
+        if stop { audio?.pause() } else { audio?.resume() }
+        lastTimestamp = nil
     }
 
     private func start() {
@@ -99,7 +126,7 @@ final class NekoSDKSession: EngineSession {
         let now = link.timestamp
         let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
         lastTimestamp = now
-        guard !paused else { return }
+        guard !paused, !(inactive && vnneko_pauses_when_inactive(engine)) else { return }
         #if DEBUG
         let began = CACurrentMediaTime()
         #endif
@@ -132,6 +159,8 @@ final class NekoSDKSession: EngineSession {
     }
 
     private func finish(byGame: Bool) {
+        activityObservers.forEach(NotificationCenter.default.removeObserver)
+        activityObservers = []
         displayLink?.invalidate()
         displayLink = nil
         audio?.stop()
@@ -212,8 +241,11 @@ final class NekoSDKSession: EngineSession {
     }
 
     private func hostKey(_ usage: Int, _ pressed: Bool) {
+        // Config's confirm key is Space or Enter, and the other one does what the right button does, as on the PC.
+        let enterConfirms = engine.map { vnneko_confirm_key($0) == 1 } ?? false
         switch usage {
-        case 40, 88, 44: control(.confirm, pressed)
+        case 40, 88: control(enterConfirms ? .confirm : .cancel, pressed)
+        case 44: control(enterConfirms ? .cancel : .confirm, pressed)
         case 41: control(.cancel, pressed)
         case 224, 228: control(.dash, pressed)
         case 79: control(.right, pressed)

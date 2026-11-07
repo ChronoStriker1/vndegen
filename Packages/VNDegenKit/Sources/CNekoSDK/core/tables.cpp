@@ -295,15 +295,15 @@ radio auto 2 obj\h016_000.bmp 308 200 4 5 2
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
 pic obj\h018_000.bmp 617 112 2 5 0 4
 pic obj\h018_000.bmp 698 112 2 5 1 2
-pic obj\h019_000.bmp 845 112 2 5 0 4
-pic obj\h019_000.bmp 926 112 2 5 1 4
+radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
+radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
 radio rightclick 1 obj\h020_000.bmp 832 155 5 5 1
 radio rightclick 2 obj\h020_000.bmp 954 155 5 5 2
 radio rightclick 3 obj\h020_000.bmp 710 187 5 5 3
 radio rightclick 4 obj\h020_000.bmp 832 187 5 5 4
-pic obj\h008_000.bmp 617 250 2 5 0 4
-pic obj\h008_000.bmp 698 250 2 5 1 4
+radio pause_inactive 1 obj\h008_000.bmp 617 250 2 5 0
+radio pause_inactive 0 obj\h008_000.bmp 698 250 2 5 1
 pic obj\h008_000.bmp 845 250 2 5 0 4
 pic obj\h008_000.bmp 926 250 2 5 1 4
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
@@ -767,15 +767,15 @@ radio auto 2 obj\h016_000.bmp 495 294 4 5 2
 radio auto 3 obj\h016_000.bmp 617 294 4 5 3
 pic obj\h018_000.bmp 889 238 2 5 0 4
 pic obj\h018_000.bmp 1007 238 2 5 1 2
-pic obj\h019_000.bmp 1263 238 2 5 0 4
-pic obj\h019_000.bmp 1381 238 2 5 1 4
+radio deckey 0 obj\h019_000.bmp 1263 238 2 5 0
+radio deckey 1 obj\h019_000.bmp 1381 238 2 5 1
 radio rightclick 0 obj\h020_000.bmp 1005 334 5 5 0
 radio rightclick 1 obj\h020_000.bmp 1187 334 5 5 1
 radio rightclick 2 obj\h020_000.bmp 1368 334 5 5 2
 radio rightclick 3 obj\h020_000.bmp 1005 392 5 5 3
 radio rightclick 4 obj\h020_000.bmp 1187 392 5 5 4
-pic obj\h008_000.bmp 889 521 2 5 0 4
-pic obj\h008_000.bmp 1007 521 2 5 1 4
+radio pause_inactive 1 obj\h008_000.bmp 889 521 2 5 0
+radio pause_inactive 0 obj\h008_000.bmp 1007 521 2 5 1
 pic obj\h008_000.bmp 1263 521 2 5 0 4
 pic obj\h008_000.bmp 1381 521 2 5 1 4
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
@@ -1211,19 +1211,20 @@ radio text 3 obj\h016_000.bmp 430 122 4 5 3
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
 pic obj\h018_000.bmp 617 112 2 5 0 4
 pic obj\h018_000.bmp 698 112 2 5 1 2
-pic obj\h019_000.bmp 845 114 2 5 0 4
-pic obj\h019_000.bmp 926 114 2 5 1 4
+radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
+radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
 radio rightclick 1 obj\h020_000.bmp 832 155 5 5 1
 radio rightclick 2 obj\h020_000.bmp 954 155 5 5 2
 radio rightclick 3 obj\h020_000.bmp 710 187 5 5 3
 radio rightclick 4 obj\h020_000.bmp 832 187 5 5 4
-pic obj\h008_000.bmp 617 250 2 5 0 4
-pic obj\h008_000.bmp 698 250 2 5 1 4
-pic obj\h008_000.bmp 845 250 2 5 0 4
-pic obj\h008_000.bmp 926 250 2 5 1 4
-check count_color obj\h008_000.bmp 617 344 2 5 0
-pic obj\h008_000.bmp 698 344 2 5 1 4
+radio pause_inactive 1 obj\h008_000.bmp 617 250 2 5 0
+radio pause_inactive 0 obj\h008_000.bmp 698 250 2 5 1
+# The PC's Electric Onahole drives a USB toy. VNDegen keeps the choice and does nothing with it.
+radio onahole 1 obj\h008_000.bmp 845 250 2 5 0
+radio onahole 0 obj\h008_000.bmp 926 250 2 5 1
+radio count_color 1 obj\h008_000.bmp 617 314 2 5 0
+radio count_color 0 obj\h008_000.bmp 698 314 2 5 1
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
 range waittime 70 130
 slider waittime obj\h009_000.bmp 155 568 200
@@ -1316,6 +1317,7 @@ screen gt
 gtcount obj\l005_000.bmp 1147 607 obj\l007_000.bmp 1173 616 obj\l007_001.bmp 1156 616
 
 screen defaults
+default onahole 1
 default bar_always 1
 default opacity 100
 default express 1
@@ -1737,19 +1739,20 @@ radio text 3 obj\h016_000.bmp 430 122 4 5 3
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
 pic obj\h018_000.bmp 617 112 2 5 0 4
 pic obj\h018_000.bmp 698 112 2 5 1 2
-pic obj\h019_000.bmp 845 114 2 5 0 4
-pic obj\h019_000.bmp 926 114 2 5 1 4
+radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
+radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
 radio rightclick 1 obj\h020_000.bmp 832 155 5 5 1
 radio rightclick 2 obj\h020_000.bmp 954 155 5 5 2
 radio rightclick 3 obj\h020_000.bmp 710 187 5 5 3
 radio rightclick 4 obj\h020_000.bmp 832 187 5 5 4
-pic obj\h008_000.bmp 617 250 2 5 0 4
-pic obj\h008_000.bmp 698 250 2 5 1 4
-pic obj\h008_000.bmp 845 250 2 5 0 4
-pic obj\h008_000.bmp 926 250 2 5 1 4
-check count_color obj\h008_000.bmp 617 344 2 5 0
-pic obj\h008_000.bmp 698 344 2 5 1 4
+radio pause_inactive 1 obj\h008_000.bmp 617 250 2 5 0
+radio pause_inactive 0 obj\h008_000.bmp 698 250 2 5 1
+# The PC's Electric Onahole drives a USB toy. VNDegen keeps the choice and does nothing with it.
+radio onahole 1 obj\h008_000.bmp 845 250 2 5 0
+radio onahole 0 obj\h008_000.bmp 926 250 2 5 1
+radio count_color 1 obj\h008_000.bmp 617 314 2 5 0
+radio count_color 0 obj\h008_000.bmp 698 314 2 5 1
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
 range waittime 70 130
 slider waittime obj\h009_000.bmp 155 568 200
@@ -1851,6 +1854,7 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+default onahole 1
 default bar_always 1
 default opacity 100
 
@@ -2227,15 +2231,15 @@ radio text 3 obj\c006_000.bmp 267 155 4 5 3
 radio auto 3 obj\c006_000.bmp 267 222 4 5 3
 pic obj\c006_001.bmp 520 145 2 5 0 4
 pic obj\c006_001.bmp 591 145 2 5 1 2
-pic obj\c006_002.bmp 718 145 2 5 0 4
-pic obj\c006_002.bmp 790 145 2 5 1 4
+radio deckey 0 obj\c006_002.bmp 718 145 2 5 0
+radio deckey 1 obj\c006_002.bmp 790 145 2 5 1
 radio rightclick 0 obj\c006_003.bmp 601 182 5 5 0
 radio rightclick 1 obj\c006_003.bmp 707 182 5 5 1
 radio rightclick 2 obj\c006_003.bmp 813 182 5 5 2
 radio rightclick 3 obj\c006_003.bmp 601 211 5 5 3
 radio rightclick 4 obj\c006_003.bmp 707 211 5 5 4
-pic obj\c005_002.bmp 520 265 2 5 0 4
-pic obj\c005_002.bmp 591 265 2 5 1 4
+radio pause_inactive 1 obj\c005_002.bmp 520 265 2 5 0
+radio pause_inactive 0 obj\c005_002.bmp 591 265 2 5 1
 pic obj\c005_002.bmp 718 265 2 5 0 4
 pic obj\c005_002.bmp 790 265 2 5 1 4
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
@@ -2813,15 +2817,15 @@ radio text 3 obj\h016_000.bmp 400 189 4 5 3
 radio auto 3 obj\h016_000.bmp 400 267 4 5 3
 pic obj\h018_000.bmp 587 179 2 5 0 4
 pic obj\h018_000.bmp 668 179 2 5 1 2
-pic obj\h019_000.bmp 815 179 2 5 0 4
-pic obj\h019_000.bmp 896 179 2 5 1 4
+radio deckey 0 obj\h019_000.bmp 815 179 2 5 0
+radio deckey 1 obj\h019_000.bmp 896 179 2 5 1
 radio rightclick 0 obj\h020_000.bmp 680 222 5 5 0
 radio rightclick 1 obj\h020_000.bmp 802 222 5 5 1
 radio rightclick 2 obj\h020_000.bmp 924 222 5 5 2
 radio rightclick 3 obj\h020_000.bmp 680 254 5 5 3
 radio rightclick 4 obj\h020_000.bmp 802 254 5 5 4
-pic obj\h008_000.bmp 587 317 2 5 0 4
-pic obj\h008_000.bmp 668 317 2 5 1 4
+radio pause_inactive 1 obj\h008_000.bmp 587 317 2 5 0
+radio pause_inactive 0 obj\h008_000.bmp 668 317 2 5 1
 pic obj\h008_000.bmp 815 317 2 5 0 4
 pic obj\h008_000.bmp 896 317 2 5 1 4
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
@@ -3338,15 +3342,15 @@ step waittime -1 obj\i010_001.bmp 119 640 2 5 0
 step waittime 1 obj\i010_001.bmp 469 640 2 5 1
 pic obj\i015_000.bmp 617 172 2 5 0 4
 pic obj\i015_000.bmp 698 172 2 5 1 4
-pic obj\i016_000.bmp 845 172 2 5 0 4
-pic obj\i016_000.bmp 926 172 2 5 1 4
+radio deckey 0 obj\i016_000.bmp 845 172 2 5 0
+radio deckey 1 obj\i016_000.bmp 926 172 2 5 1
 radio rightclick 0 obj\i017_000.bmp 710 215 5 5 0
 radio rightclick 1 obj\i017_000.bmp 832 215 5 5 1
 radio rightclick 2 obj\i017_000.bmp 954 215 5 5 2
 radio rightclick 3 obj\i017_000.bmp 710 247 5 5 3
 radio rightclick 4 obj\i017_000.bmp 832 247 5 5 4
-pic obj\i009_000.bmp 617 310 2 5 0 4
-pic obj\i009_000.bmp 698 310 2 5 1 4
+radio pause_inactive 1 obj\i009_000.bmp 617 310 2 5 0
+radio pause_inactive 0 obj\i009_000.bmp 698 310 2 5 1
 # Electric Onahole drives a toy over USB on the PC. VNDegen keeps the choice and does nothing with it.
 radio onahole 1 obj\i009_000.bmp 845 310 2 5 0
 radio onahole 0 obj\i009_000.bmp 926 310 2 5 1
@@ -3950,19 +3954,26 @@ radio text 3 obj\h016_000.bmp 430 122 4 5 3
 radio auto 3 obj\h016_000.bmp 430 200 4 5 3
 pic obj\h018_000.bmp 617 112 2 5 0 4
 pic obj\h018_000.bmp 698 112 2 5 1 2
-pic obj\h019_000.bmp 845 114 2 5 0 4
-pic obj\h019_000.bmp 926 114 2 5 1 4
+radio deckey 0 obj\h019_000.bmp 845 112 2 5 0
+radio deckey 1 obj\h019_000.bmp 926 112 2 5 1
 radio rightclick 0 obj\h020_000.bmp 710 155 5 5 0
 radio rightclick 1 obj\h020_000.bmp 832 155 5 5 1
 radio rightclick 2 obj\h020_000.bmp 954 155 5 5 2
 radio rightclick 3 obj\h020_000.bmp 710 187 5 5 3
 radio rightclick 4 obj\h020_000.bmp 832 187 5 5 4
-pic obj\h008_000.bmp 617 250 2 5 0 4
-pic obj\h008_000.bmp 698 250 2 5 1 4
-pic obj\h008_000.bmp 845 250 2 5 0 4
-pic obj\h008_000.bmp 926 250 2 5 1 4
-check count_color obj\h008_000.bmp 617 344 2 5 0
-pic obj\h008_000.bmp 698 344 2 5 1 4
+radio pause_inactive 1 obj\h008_000.bmp 617 250 2 5 0
+radio pause_inactive 0 obj\h008_000.bmp 698 250 2 5 1
+# The PC's Electric Onahole drives a USB toy. VNDegen keeps the choice and does nothing with it.
+radio onahole 1 obj\h008_000.bmp 845 250 2 5 0
+radio onahole 0 obj\h008_000.bmp 926 250 2 5 1
+radio count_color 1 obj\h008_000.bmp 617 314 2 5 0
+radio count_color 0 obj\h008_000.bmp 698 314 2 5 1
+# Switching some H scenes' CGs to animation, and moving its camera by hand, show as the PC starts them. Under Wine
+# neither changed what the first movie scene showed, so they stay disabled until what they do is found.
+pic obj\h008_000.bmp 617 378 2 5 0 2
+pic obj\h008_000.bmp 698 378 2 5 1 4
+pic obj\h008_000.bmp 845 378 2 5 0 4
+pic obj\h008_000.bmp 926 378 2 5 1 2
 # Wait time, ×0.70 to ×1.30 in steps of 0.01, stretches waits and fades; the bar is full at ×2.00.
 range waittime 70 130
 slider waittime obj\h009_000.bmp 155 568 200
@@ -4066,6 +4077,7 @@ button start_prologue obj\d007_000.bmp 449 268 2 5 0
 button start_main obj\d007_000.bmp 449 350 2 5 1
 
 screen defaults
+default onahole 1
 default bar_always 1
 default opacity 100
 
