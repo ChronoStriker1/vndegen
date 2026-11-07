@@ -285,6 +285,8 @@ void Engine::openScreen(const std::string &name) {
     pressed_.clear();
     dirty_ = true;
     page_ = 0;
+    menuStage_ = screen_->setting("menustages") ? 1 : 2;
+    subMenu_.clear();
     // The drifting line art starts from a sketch picked at random, as the PC's does.
     driftFrom_ = screenMs_;
     driftFirst_ = screen_->settings.count("drift") ? size_t(std::rand()) % screen_->settings.count("drift") : 0;
@@ -390,6 +392,11 @@ std::string Engine::mainFlowKey() const {
 void Engine::runAction(const std::string &action) {
     log("action %s", action.c_str());
     dirty_ = true;
+    if (action.rfind("submenu:", 0) == 0) {
+        std::string name = action.substr(8);
+        subMenu_ = subMenu_ == name ? "" : name;
+        return;
+    }
     if (action == "start") {
         // A game whose init.ini names no FirstFlow starts at its table's `flow`, as Test Game 89's New Game starts its
         // first chapter.
@@ -611,7 +618,7 @@ bool Engine::moveFocus(int dx, int dy) {
     std::vector<Spot> spots;
     auto addButtons = [&](const std::vector<Button> &buttons) {
         for (const Button &b : buttons)
-            if (b.sheet) spots.push_back({b.x + b.cellW() / 2, b.y + b.cellH() / 2});
+            if (b.sheet && shown(b)) spots.push_back({b.x + b.cellW() / 2, b.y + b.cellH() / 2});
     };
     if (dialogOpen_) {
         addButtons(screens_.at("dialog").buttons);
@@ -2251,8 +2258,18 @@ bool Engine::pressAction(const std::string &action) {
 
 Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
     for (Button &b : buttons)
-        if (b.contains(x, y)) return &b;
+        if (shown(b) && b.contains(x, y)) return &b;
     return nullptr;
+}
+
+// In a title with menu stages, stage 1 is the art before the menu and stage 2 the menu itself; stage 0 shows in both.
+bool Engine::shown(const Button &b) const {
+    return (b.stage == 0 || b.stage == menuStage_) && (b.group.empty() || b.group == subMenu_);
+}
+
+bool Engine::shown(const Picture &p) const {
+    bool staged = screen_ && screen_->setting("menustages");
+    return (!staged || p.stage == 0 || p.stage == menuStage_) && (p.group.empty() || p.group == subMenu_);
 }
 
 // `opening TILE_MS FADE_FROM FADE_MS`: each quarter of the screen shows the stage 1 art from its outer edge, the top left
@@ -2378,7 +2395,12 @@ void Engine::composeScreen(Canvas &out) {
     pointerToward(towardX, towardY);
     for (const Picture &p : screen_->pictures)
         if (p.drift) composeDrift(out);
-        else if (p.tab < 0 || p.tab == galleryTab_) drawPicture(out, p, towardX, towardY);
+        else if (p.dim && shown(p)) tintFrame(out, 0, 0, 0, int(p.alpha * 256));
+        else if (p.blinkMs > 0 && shown(p)) {
+            Picture faded = p;
+            faded.alpha *= float(0.5 + 0.5 * std::cos(2 * kPi * double(screenMs_ % p.blinkMs) / p.blinkMs));
+            drawPicture(out, faded, towardX, towardY);
+        } else if ((p.tab < 0 || p.tab == galleryTab_) && shown(p)) drawPicture(out, p, towardX, towardY);
     composeSlots(out);
     composeGallery(out);
     if (viewingImage_) return;
@@ -2401,6 +2423,7 @@ void Engine::composeScreen(Canvas &out) {
         neko::drawButton(c, b, state, withHelp);
     };
     for (Button &b : screen_->buttons) {
+        if (!shown(b)) continue;
         if (b.action.rfind("track", 0) == 0) {
             size_t index = size_t(std::atoi(b.action.c_str() + 5));
             if (index >= tracks_.size() || !seen(tracks_[index])) continue;
@@ -2408,7 +2431,7 @@ void Engine::composeScreen(Canvas &out) {
         if (b.action.rfind("page", 0) == 0 && !galleryPageExists(std::atoi(b.action.c_str() + 4))) continue;
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_) && !dialogOpen_;
         ButtonState state = over ? StateHover : StateNormal;
-        bool current = b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
+        bool current = (!subMenu_.empty() && b.action == "submenu:" + subMenu_) || b.action == "nav_" + screen_->name || b.action == "page" + std::to_string(page_) || (b.action == "nav_config" && screen_->name.rfind("config", 0) == 0) || b.action == "gtab" + std::to_string(galleryTab_) ||
                        (screen_->name.rfind("config", 0) == 0 && b.action == "tab" + screen_->name.substr(6));
         // `selectedlook`: the current one keeps its selected look under the pointer, as in Test Games 92 and 93.
         if (current) state = over && !screen_->setting("selectedlook") ? StateSelectedHover : StateSelected;
@@ -3020,7 +3043,7 @@ bool Engine::step(int ms) {
     }
     if (screen_) {
         screenMs_ += ms;
-        if (openingFrom_ >= 0 || screen_->settings.count("drift")) dirty_ = true;
+        if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages")) dirty_ = true;
         stepViewer(ms);
     }
     if (screen_ || logOpen_ || dialogOpen_) {
@@ -3148,7 +3171,11 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
         } else if (screen_) {
             // `cancel ACTION` names what the right button does on a screen that isn't left with Back.
-            if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
+            if (screen_->setting("menustages") && menuStage_ >= 2) {
+                menuStage_ = 1;
+                subMenu_.clear();
+                dirty_ = true;
+            } else if (const auto *cancel = screen_->setting("cancel"); cancel && !cancel->empty()) runAction((*cancel)[0]);
             else if (screen_->name != "title") runAction("back");
         } else if (windowHiddenByPlayer_ || (windowShown_ && setting("rightclick") == 0)) {
             windowHiddenByPlayer_ = !windowHiddenByPlayer_;
@@ -3187,6 +3214,12 @@ void Engine::mouseButton(int button, bool down) {
     if (screen_) {
         if (viewingImage_ && viewerPanel()) {
             pressViewer(pointerX_, pointerY_);
+            return;
+        }
+        // A title with menu stages brings up its menu at the first click anywhere.
+        if (menuStage_ < 2) {
+            menuStage_ = 2;
+            dirty_ = true;
             return;
         }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {

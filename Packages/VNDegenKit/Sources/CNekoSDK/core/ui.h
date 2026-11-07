@@ -23,6 +23,8 @@ struct Button {
     int normalRow = 0, hoverRow = 1;
     bool toggle = false;   // stays down until pressed again
     bool always = false;   // reacts even when `disabled` asks otherwise
+    int stage = 0;         // in a title with `menustages`, 2 for the menu a click brings up
+    std::string group;     // shown only while the screen's submenu of this name is open
     ImageRef help;         // shown while hovered
     int helpX = 0, helpY = 0, helpCols = 1, helpRows = 1, helpColumn = 0, helpRow = 0;
     int cellW() const { return sheet ? sheet->w / cols : 0; }
@@ -37,12 +39,17 @@ struct Picture {
     float alpha = 1;
     int tab = -1;  // a gallery's art for one of its tabs, or -1 for all of them
     int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
+    std::string group;  // shown only while the screen's submenu of this name is open
     // How far, in pixels, the picture moves against the pointer when it's at the screen's edge, across and down.
     float followX = 0, followY = 0;
     // `part X Y W H`: only that rectangle of the picture, drawn at the picture's place.
     int partX = 0, partY = 0, partW = 0, partH = 0;
     // Where a screen's `drift` line art draws among its pictures. It has no image of its own.
     bool drift = false;
+    // `pic dim 0 0 alpha N`: the screen behind it darkened by N of 256, as Test Game 94's main menu dims its title.
+    bool dim = false;
+    // `blink MS`: fades in and out, fully shown every MS, as Test Game 94's title prompt does.
+    int blinkMs = 0;
 };
 
 // `towardX` and `towardY` are where the pointer is, from -1 at the screen's left or top edge to 1 at the other.

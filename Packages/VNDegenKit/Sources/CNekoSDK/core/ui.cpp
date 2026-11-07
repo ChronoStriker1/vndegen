@@ -83,7 +83,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             continue;
         } else if (w[0] == "pic" && w.size() >= 4) {
             Picture p;
-            p.image = image(w[1]);
+            p.dim = w[1] == "dim";
+            p.image = p.dim ? nullptr : image(w[1]);
             p.x = number(w[2]);
             p.y = number(w[3]);
             size_t at = 4;
@@ -99,6 +100,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 if (key == "alpha") p.alpha = float(number(value)) / 256;  // of 256
                 else if (key == "tab") p.tab = number(value);              // only on that tab of a gallery
                 else if (key == "stage") p.stage = number(value);
+                else if (key == "group") p.group = value;
+                else if (key == "blink") p.blinkMs = number(value);
                 else if (key == "part" && at + 4 < w.size()) {
                     p.partX = number(value);
                     p.partY = number(w[at + 2]);
@@ -124,6 +127,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
             b.column = number(w[7]);
             for (size_t i = 8; i < w.size(); i++) {
                 if (w[i] == "toggle") b.toggle = true;
+                if (w[i] == "stage" && i + 1 < w.size()) b.stage = number(w[++i]);
+                if (w[i] == "group" && i + 1 < w.size()) b.group = w[++i];
                 if (w[i] == "swap") {  // this sheet's first row is the hovered look
                     b.normalRow = 1;
                     b.hoverRow = 0;

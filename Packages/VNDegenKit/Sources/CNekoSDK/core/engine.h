@@ -398,6 +398,12 @@ private:
     void scrollLog(int lines);
     void composeLog(Canvas &out);
     Button *buttonAt(int x, int y, std::vector<Button> &buttons);
+    // `menustages`: Test Game 94's title shows its art until a click brings up the menu, stage 2, and the right button
+    // puts it away. A `submenu:NAME` button opens the buttons and pictures of that group beside it.
+    int menuStage_ = 2;
+    std::string subMenu_;
+    bool shown(const Button &b) const;
+    bool shown(const Picture &p) const;
 
     // Commands.
     void beginChoice(const Node &n);

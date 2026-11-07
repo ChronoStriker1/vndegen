@@ -152,6 +152,8 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\moralorc") return &kMoralOrc;
     // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
     if (folder == "waffle\\animother") return &kTsumaGibo;
+    // Test Game 94 saves the same way, as far as its PC saves show.
+    if (folder == "waffle\\隣人に壊されていく俺の妻") return &kTsumaGibo;
     return nullptr;
 }
 
