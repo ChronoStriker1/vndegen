@@ -24,7 +24,7 @@ final class WolfRPGSession: EngineSession {
     private var engine: OpaquePointer?
     private var audio: PCMAudioOutput?
     private var displayLink: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval?
+    private var clock = MillisecondClock()
     #if DEBUG
     private let pacing = UserDefaults.standard.bool(forKey: "frameMonitor") ? FramePacing() : nil
     #endif
@@ -111,8 +111,7 @@ final class WolfRPGSession: EngineSession {
     fileprivate func step(_ link: CADisplayLink) {
         guard let engine else { return }
         let now = link.timestamp
-        let ms = lastTimestamp.map { Int(((now - $0) * 1000).rounded()) } ?? 16
-        lastTimestamp = now
+        let ms = clock.tick(at: now)
         guard !paused else { return }
         if !vnwolf_step(engine, Int32(min(max(ms, 0), 100))) {
             finish(byGame: true)
@@ -208,7 +207,7 @@ final class WolfRPGSession: EngineSession {
         if paused { deliver(router.releaseAll()) }
         vnwolf_set_paused(engine, paused)
         if paused { audio?.pause() } else { audio?.resume() }
-        lastTimestamp = nil
+        clock.reset()
         if !paused { frameView.takeFocus() }
     }
 
