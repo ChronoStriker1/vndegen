@@ -1,6 +1,7 @@
 // Plays a movie with vnffmovie against the wall clock, as a host would, and prints what came out: the format, the frames and the seconds
-// of sound, and a checksum of every 30th frame so two runs can be compared. With -seek T it seeks to T seconds first.
-// usage: vnffmovie_test [-seek T] [-loop] <movie>
+// of sound, and a checksum of every 30th frame so two runs can be compared. With -seek T it seeks to T seconds first, and with -mute it
+// takes no sound, as for a movie whose sound another one has taken.
+// usage: vnffmovie_test [-seek T] [-loop] [-mute] <movie>
 #include "vnffmovie.h"
 
 #include <chrono>
@@ -17,15 +18,16 @@ static int64_t readFile(void *user, uint64_t offset, void *buffer, size_t length
 
 int main(int argc, char **argv) {
     double seek = -1;
-    int loop = 0;
+    int loop = 0, mute = 0;
     const char *path = nullptr;
     for (int i = 1; i < argc; i++) {
         if (!std::strcmp(argv[i], "-seek") && i + 1 < argc) seek = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "-loop")) loop = 1;
+        else if (!std::strcmp(argv[i], "-mute")) mute = 1;
         else path = argv[i];
     }
     FILE *f = path ? std::fopen(path, "rb") : nullptr;
-    if (!f) return std::fprintf(stderr, "usage: vnffmovie_test [-seek T] [-loop] <movie>\n"), 2;
+    if (!f) return std::fprintf(stderr, "usage: vnffmovie_test [-seek T] [-loop] [-mute] <movie>\n"), 2;
     std::fseek(f, 0, SEEK_END);
     uint64_t size = uint64_t(std::ftell(f));
     vnffmovie_info info;
@@ -41,7 +43,7 @@ int main(int argc, char **argv) {
     for (;;) {
         int changed = 0, ended = 0;
         const uint8_t *px = vnffmovie_frame(m, t, &changed, &ended);
-        soundFrames += long(vnffmovie_audio(m, sound.data(), 2048));
+        if (!mute) soundFrames += long(vnffmovie_audio(m, sound.data(), 2048));
         if (px && changed) {
             if (frames % 30 == 0) {
                 uint32_t sum = 0;

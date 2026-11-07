@@ -135,6 +135,7 @@ private:
     void loadMovie(const Node &n);
     std::shared_ptr<Movie> openMovie(const std::string &path, bool loop);
     void stepMovies();
+    void stopMovieSound();
     VNNekoMovies movies_{};
     bool hasMovies_ = false;
     std::shared_ptr<Movie> soundMovie_;  // the movie whose sound the mix plays

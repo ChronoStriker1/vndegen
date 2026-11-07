@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include <algorithm>
+#include <cmath>
 #include <condition_variable>
 #include <cstdio>
 #include <cstring>
@@ -19,9 +20,13 @@ extern "C" {
 
 namespace {
 
-// How far ahead the decode thread runs: a few frames, since a 1280x720 frame is 3.7 MB, and a second of sound.
+// How far ahead the decode thread runs: a few frames, since a 1280x720 frame is 3.7 MB. Sound never holds it back, so
+// a movie whose sound nobody plays still moves; past two seconds the oldest sound is dropped instead.
 constexpr size_t kMaxFrames = 4;
-constexpr double kSoundAhead = 1.0;
+constexpr double kSoundKept = 2.0;
+// Sound whose timestamp is further than this from where the last packet ended gets silence before it, or loses its
+// overlap, so it stays on the picture's clock. Smaller gaps are timestamp rounding and play as they come.
+constexpr double kSoundSlack = 0.05;
 constexpr int kIoBuffer = 64 << 10;
 
 struct Frame {
@@ -51,8 +56,12 @@ struct vnffmovie {
     std::thread worker;
     std::mutex mutex;
     std::condition_variable wake;
-    bool quit = false, finished = false, seekPending = false, soundPulled = false;
+    bool quit = false, finished = false, seekPending = false, passHadFrame = false;
     double seekTarget = 0, dropBefore = 0, loopOffset = 0, lastPts = 0;
+    double soundEnd = 0;  // the movie time the queued sound reaches, where the next packet's sound belongs
+    // The movie time of the next decoded sound, from the last timestamp plus the sound since: WMA stamps only a packet's
+    // first frame. Below 0 when no timestamp has come since a seek or loop.
+    double audioClock = 0;
     std::deque<Frame> frames;
     std::deque<float> sound;
     Frame shown;
@@ -121,6 +130,7 @@ void takeVideo(vnffmovie *m, std::unique_lock<std::mutex> &lock) {
     AVFrame *f = m->decoded;
     double pts = seconds(m, f->best_effort_timestamp, m->videoIndex) + m->loopOffset;
     m->lastPts = std::max(m->lastPts, pts);
+    m->passHadFrame = true;
     if (pts + 0.5 / m->info.fps < m->dropBefore) return;
     Frame out;
     out.pts = pts;
@@ -128,8 +138,9 @@ void takeVideo(vnffmovie *m, std::unique_lock<std::mutex> &lock) {
     lock.unlock();
     m->scaler = sws_getCachedContext(m->scaler, f->width, f->height, AVPixelFormat(f->format), m->info.width, m->info.height,
                                      AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
-    uint8_t *planes[1] = {out.pixels.data()};
-    int strides[1] = {m->info.width * 4};
+    // sws_scale reads four planes and strides whatever the format.
+    uint8_t *planes[4] = {out.pixels.data(), nullptr, nullptr, nullptr};
+    int strides[4] = {m->info.width * 4, 0, 0, 0};
     if (m->scaler) sws_scale(m->scaler, f->data, f->linesize, 0, f->height, planes, strides);
     lock.lock();
     m->frames.push_back(std::move(out));
@@ -137,18 +148,31 @@ void takeVideo(vnffmovie *m, std::unique_lock<std::mutex> &lock) {
 
 void takeAudio(vnffmovie *m) {
     AVFrame *f = m->decoded;
-    double pts = seconds(m, f->best_effort_timestamp, m->audioIndex) + m->loopOffset;
+    if (f->best_effort_timestamp != AV_NOPTS_VALUE) m->audioClock = seconds(m, f->best_effort_timestamp, m->audioIndex) + m->loopOffset;
+    else if (m->audioClock < 0) {
+        // After a seek, sound with no time yet can't be placed; a new pass carries on from the sound before.
+        if (m->dropBefore > 0) return;
+        m->audioClock = m->soundEnd;
+    }
+    double pts = m->audioClock;
+    m->audioClock += double(f->nb_samples) / double(m->info.audio_rate);
     int outFrames = swr_get_out_samples(m->resampler, f->nb_samples);
     if (outFrames <= 0) return;
     std::vector<float> pcm(size_t(outFrames) * size_t(m->info.audio_channels));
     uint8_t *out[1] = {reinterpret_cast<uint8_t *>(pcm.data())};
     int got = swr_convert(m->resampler, out, outFrames, const_cast<const uint8_t **>(f->extended_data), f->nb_samples);
     if (got <= 0) return;
-    size_t skip = 0;
-    // Sound before a seek's target is dropped with the frames.
-    if (pts < m->dropBefore) skip = std::min(size_t(got), size_t((m->dropBefore - pts) * m->info.audio_rate));
-    m->sound.insert(m->sound.end(), pcm.begin() + std::ptrdiff_t(skip * size_t(m->info.audio_channels)),
-                    pcm.begin() + std::ptrdiff_t(size_t(got) * size_t(m->info.audio_channels)));
+    size_t channels = size_t(m->info.audio_channels), rate = size_t(m->info.audio_rate);
+    // Sound before a seek's target goes with the frames. Otherwise the packet goes where its timestamp says: after
+    // silence over a gap, or without what overlaps the sound already queued.
+    double from = std::max(m->dropBefore, m->soundEnd);
+    if (std::fabs(pts - m->soundEnd) <= kSoundSlack && pts >= m->dropBefore) from = pts;
+    size_t skip = pts < from ? std::min(size_t(got), size_t((from - pts) * double(rate))) : 0;
+    if (pts > from) m->sound.insert(m->sound.end(), size_t(std::min(pts - from, kSoundKept) * double(rate)) * channels, 0.0f);
+    m->sound.insert(m->sound.end(), pcm.begin() + std::ptrdiff_t(skip * channels), pcm.begin() + std::ptrdiff_t(size_t(got) * channels));
+    m->soundEnd = std::max(from, pts) + double(size_t(got) - skip) / double(rate);
+    size_t kept = size_t(kSoundKept * double(rate)) * channels;
+    if (m->sound.size() > kept) m->sound.erase(m->sound.begin(), m->sound.end() - std::ptrdiff_t(kept));
 }
 
 // Sends a packet, or null to drain, and takes each frame that comes out. A decoder that refuses the packet until its
@@ -165,10 +189,14 @@ void decode(vnffmovie *m, AVCodecContext *context, AVPacket *packet, std::unique
     }
 }
 
-void restart(vnffmovie *m, double target) {
-    av_seek_frame(m->format, -1, int64_t((target + m->start) * AV_TIME_BASE), AVSEEK_FLAG_BACKWARD);
+// False when the container can't seek there.
+bool restart(vnffmovie *m, double target) {
+    if (av_seek_frame(m->format, -1, int64_t((target + m->start) * AV_TIME_BASE), AVSEEK_FLAG_BACKWARD) < 0) return false;
     avcodec_flush_buffers(m->video);
     if (m->audio) avcodec_flush_buffers(m->audio);
+    m->passHadFrame = false;
+    m->audioClock = -1;
+    return true;
 }
 
 void run(vnffmovie *m) {
@@ -182,17 +210,13 @@ void run(vnffmovie *m) {
             m->finished = false;
             m->loopOffset = 0;
             m->lastPts = 0;
-            m->dropBefore = m->seekTarget;
-            restart(m, m->seekTarget);
+            m->dropBefore = m->soundEnd = m->seekTarget;
+            if (!restart(m, m->seekTarget)) m->finished = true;
         }
-        // Sound waits for the host only once it has asked for some, so a host that plays none never stalls the picture.
-        size_t soundCap = size_t(kSoundAhead * m->info.audio_rate * m->info.audio_channels);
-        bool full = m->frames.size() >= kMaxFrames || (m->audio && m->soundPulled && m->sound.size() >= soundCap);
-        if (m->finished || full) {
+        if (m->finished || m->frames.size() >= kMaxFrames) {
             m->wake.wait(lock);
             continue;
         }
-        if (!m->soundPulled && m->sound.size() > soundCap) m->sound.erase(m->sound.begin(), m->sound.end() - std::ptrdiff_t(soundCap));
         lock.unlock();
         int result = av_read_frame(m->format, m->packet);
         lock.lock();
@@ -203,11 +227,13 @@ void run(vnffmovie *m) {
         if (result < 0) {
             decode(m, m->video, nullptr, lock);
             if (m->audio) decode(m, m->audio, nullptr, lock);
-            if (m->loop && m->lastPts > 0) {
+            // A read error ends the movie, as does a loop that can't start over or whose last pass showed nothing.
+            bool atEnd = !m->format->pb->error && (result == AVERROR_EOF || avio_feof(m->format->pb));
+            if (atEnd && m->loop && m->passHadFrame) {
                 // The next pass carries on the clock from one frame after this pass's last.
                 m->loopOffset = m->lastPts + 1 / m->info.fps;
                 m->dropBefore = 0;
-                restart(m, 0);
+                if (!restart(m, 0)) m->finished = true;
             } else {
                 m->finished = true;
             }
@@ -297,18 +323,17 @@ extern "C" const uint8_t *vnffmovie_frame(vnffmovie *m, double time, int *change
     }
     if (moved) m->wake.notify_one();
     if (changed) *changed = moved;
-    if (ended) *ended = m->finished && m->frames.empty() && m->sound.empty() && time >= m->shown.pts;
+    // By the clock rather than by what's been pulled, so a movie whose sound nobody plays ends too.
+    if (ended) *ended = m->finished && m->frames.empty() && time >= m->shown.pts && time >= m->soundEnd;
     return m->hasShown ? m->shown.pixels.data() : nullptr;
 }
 
 extern "C" size_t vnffmovie_audio(vnffmovie *m, float *out, size_t frames) {
     std::lock_guard<std::mutex> lock(m->mutex);
-    m->soundPulled = true;
     if (!m->info.audio_channels) return 0;
     size_t channels = size_t(m->info.audio_channels), got = std::min(frames, m->sound.size() / channels);
     std::copy(m->sound.begin(), m->sound.begin() + std::ptrdiff_t(got * channels), out);
     m->sound.erase(m->sound.begin(), m->sound.begin() + std::ptrdiff_t(got * channels));
-    m->wake.notify_one();
     return got;
 }
 

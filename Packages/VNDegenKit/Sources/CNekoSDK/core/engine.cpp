@@ -310,6 +310,7 @@ void Engine::endStory(const std::string &screen) {
     scene_ = {};
     back_.clear();
     front_.clear();
+    stopMovieSound();
     windowShown_ = false;
     replaying_ = false;
     waiting_ = Waiting::None;
@@ -1628,7 +1629,7 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         s.waveSpeed = saved.waveSpeed;
         s.waveRows = saved.waveRows;
         s.waveSize = saved.waveSize;
-        if (s.image) {
+        if (s.image || s.movie) {
             s.anchorX = saved.anchorX;
             s.anchorY = saved.anchorY;
         }
@@ -2689,7 +2690,11 @@ bool Engine::step(int ms) {
         if (openingFrom_ >= 0) dirty_ = true;
         stepViewer(ms);
     }
-    if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
+    if (screen_ || logOpen_ || dialogOpen_) {
+        // The story's clock stops, and a movie's sound with it.
+        stopMovieSound();
+        return waiting_ != Waiting::Ended;
+    }
     now_ += ms;
     advanceFlipbooks();
     stepMovies();
@@ -2752,6 +2757,8 @@ bool Engine::step(int ms) {
 
 void Engine::setPaused(bool paused) {
     paused_ = paused;
+    // The next step after a resume picks the movie's sound up again.
+    if (paused) stopMovieSound();
     for (auto *channels : {&se_, &voice_})
         for (auto &[channel, player] : *channels) audio_.pause(player, paused);
     holdMusic();
@@ -3338,10 +3345,19 @@ std::string Engine::versionPath(const std::string &path) const {
 
 void Engine::applyArtSwitch() {
     if (plainArt_.empty() && artVersions_.empty()) return;
+    bool changed = false;
     for (auto *set : {&back_, &front_})
         for (auto &[slot, s] : *set)
             if (!s.path.empty() && !s.flipCount)
-                if (ImageRef image = images_->get(shownPath(s.path))) s.image = image;
+                if (ImageRef image = images_->get(shownPath(s.path)); image && image != s.image) {
+                    s.image = image;
+                    changed = true;
+                }
+    if (!changed) return;
+    // A transition and motion blur hold frames drawn with the old pictures, so they end here.
+    transitioning_ = false;
+    ruleImage_ = nullptr;
+    previousValid_ = false;
     dirty_ = true;
 }
 
@@ -3450,9 +3466,16 @@ void Engine::stepMovies() {
             }
         }
     if (newest == soundMovie_) return;
-    audio_.clearStream();
+    stopMovieSound();
     soundMovie_ = newest;
     if (Movie *m = soundMovie_.get()) audio_.setStream([m](float *out, int frames) { return m->sound(out, frames); }, kKindSe, 100);
+}
+
+// The mix stops reading the movie's sound. Whatever the decoder has queued plays when it starts again.
+void Engine::stopMovieSound() {
+    if (!soundMovie_) return;
+    audio_.clearStream();
+    soundMovie_.reset();
 }
 
 // Parameters 6 and 7 are the point in the picture a scale keeps in place, and 8 and 9 say the middle instead.
