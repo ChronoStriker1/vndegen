@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import GameController
 import Testing
 import VNCore
@@ -125,7 +126,7 @@ import VNCore
 }
 
 @Test @MainActor func libraryConversionRunsOnceForEveryRememberedGame() async throws {
-    let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-mapping-\(UUID().uuidString)")
+    let root = TestFolders.root.appending(path: "vndegen-mapping-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let paths = LibraryPaths(gamesRoot: root.appending(path: "Games"), support: root.appending(path: "Support"))
     for name in ["Old", "Keys", "Gone"] {

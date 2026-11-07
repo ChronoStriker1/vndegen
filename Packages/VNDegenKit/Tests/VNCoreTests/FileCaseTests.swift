@@ -1,11 +1,12 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 
 /// `VNDEGEN_TEST_DIR` is a folder on a case-sensitive volume, which `scripts/build.sh test` mounts as iPhones and iPads
 /// have. Without it these tests run on the temporary folder and prove less, since a Mac's usual disk ignores case.
 private let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-    ?? FileManager.default.temporaryDirectory
+    ?? TestFolders.root
 
 private func temporaryFolder(_ files: [String]) throws -> URL {
     let root = scratch.appendingPathComponent("filecase-\(UUID().uuidString)", isDirectory: true)

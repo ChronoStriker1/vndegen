@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import OSLog
 import Testing
 import WebKit
@@ -15,8 +16,8 @@ import WebKit
 
     init(origin: URL, fileStorage: Bool = true) throws {
         self.origin = origin
-        let game = WebGameConfiguration(folder: GameFolder(root: FileManager.default.temporaryDirectory, webRoot: ""), appName: "test",
-                                        runtime: .browser, storageDirectory: fileStorage ? FileManager.default.temporaryDirectory : nil,
+        let game = WebGameConfiguration(folder: GameFolder(root: TestFolders.root, webRoot: ""), appName: "test",
+                                        runtime: .browser, storageDirectory: fileStorage ? TestFolders.root : nil,
                                         buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
         let page = try String(contentsOf: #require(FlashPlugin.hostDirectory).appending(path: "flash-page.js"), encoding: .utf8)
         let configuration = WKWebViewConfiguration()

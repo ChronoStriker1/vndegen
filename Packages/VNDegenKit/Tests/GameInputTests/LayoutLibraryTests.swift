@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import GameInput
@@ -16,7 +17,7 @@ private struct KeyboardEngine: EnginePlugin {
 }
 
 private func makePaths() throws -> LibraryPaths {
-    let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-layouts-\(UUID().uuidString)")
+    let root = TestFolders.root.appending(path: "vndegen-layouts-\(UUID().uuidString)")
     let paths = LibraryPaths(gamesRoot: root.appending(path: "Games"), support: root.appending(path: "Support"))
     try FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
     return paths

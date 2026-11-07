@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineWolfRPG
@@ -48,7 +49,7 @@ import VNCore
 
     /// A real folder, because only a scan can see past the listing's three levels.
     private func folder(_ files: [String]) throws -> URL {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let root = TestFolders.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
         for file in files {
             let url = root.appendingPathComponent(file)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -98,7 +99,7 @@ import VNCore
     }
 
     @Test func savesInTheSaveFolderBesideGameExe() throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "wolfrpg-\(UUID().uuidString)")
+        let root = TestFolders.root.appending(path: "wolfrpg-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         for path in ["Game/Game.exe", "Game/Data.wolf", "Game/Save/SaveData01.sav"] {
             let url = root.appending(path: path)

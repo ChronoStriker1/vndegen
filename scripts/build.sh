@@ -9,6 +9,15 @@
 #                              ad-hoc signed macOS app, zipped. The second argument is the build number.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# What a test run leaves in the temporary folder, from the Swift toolchain and the build steps below too, goes in a
+# folder of its own, removed when the run ends. The Swift tests ignore TMPDIR, as Foundation does on a Mac, and keep
+# their fixtures in TestFolders. App builds keep the system's folder, which Xcode's long-lived build service may hold.
+run_tmp=
+if [ "${1:-}" = test ]; then
+  run_tmp=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-test.XXXXXX")
+  export TMPDIR="$run_tmp/"
+  trap 'rm -rf "$run_tmp"' EXIT
+fi
 xcodegen generate --quiet
 # Save sync's rclone library, which the package links on every platform.
 scripts/rclone-runtime.sh
@@ -72,9 +81,11 @@ case "${1:?destination}" in
     # VNDEGEN_TEST_DIR. The shared C lookup the RGSS and KiriKiri engines use is tested there first.
     case_volume=$(mktemp -d "${TMPDIR:-/tmp}/vndegen-case.XXXXXX")
     scripts/case-volume.sh attach build/case-sensitive.sparseimage "$case_volume"
-    # The image keeps what a run leaves, so each run works in a folder of its own and removes it.
+    # The image keeps what a run leaves, so each run works in a folder of its own and removes it. The run's temporary
+    # folder goes only once the volume inside it is detached.
+    case_run=
+    trap 'rm -rf "${case_run:-/nonexistent}"; scripts/case-volume.sh detach "$case_volume" && rmdir "$case_volume" && rm -rf "$run_tmp"' EXIT
     case_run=$(mktemp -d "$case_volume/run.XXXXXX")
-    trap 'rm -rf "$case_run"; scripts/case-volume.sh detach "$case_volume"; rmdir "$case_volume"' EXIT
     mkdir "$case_run/casepath"
     cc -std=c11 -Wall -Wextra -Werror -o build/casepath_test Engines/Shared/casepath.c Engines/Shared/casepath_test.c
     build/casepath_test "$case_run/casepath"

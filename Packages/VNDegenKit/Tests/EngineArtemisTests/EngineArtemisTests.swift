@@ -1,11 +1,12 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineArtemis
 
 @Suite struct ArtemisLayoutTests {
     private func folder(_ files: [String: Data]) throws -> URL {
-        let root = FileManager.default.temporaryDirectory.appending(path: "artemis-\(UUID().uuidString)")
+        let root = TestFolders.root.appending(path: "artemis-\(UUID().uuidString)")
         for (path, data) in files {
             let url = root.appending(path: path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

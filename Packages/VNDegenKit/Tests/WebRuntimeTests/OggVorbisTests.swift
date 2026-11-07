@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import OSLog
 import Testing
 import WebKit
@@ -12,7 +13,7 @@ private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent
 @MainActor private func oggPage(_ limits: WebGameSession.OggLimits = .init(),
                                 serve: (GameSchemeHandler) -> any WKURLSchemeHandler = { $0 }) async throws -> (PageHarness, URL) {
     let fm = FileManager.default
-    let root = fm.temporaryDirectory.appendingPathComponent("vndegen-ogg-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-ogg-\(UUID().uuidString)", isDirectory: true)
     let bgm = root.appendingPathComponent("data/bgm", isDirectory: true)
     try fm.createDirectory(at: bgm, withIntermediateDirectories: true)
     try Data("<html><body></body></html>".utf8).write(to: root.appendingPathComponent("index.html"))

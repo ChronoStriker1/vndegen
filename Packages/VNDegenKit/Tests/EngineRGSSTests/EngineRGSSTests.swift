@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineRGSS
@@ -8,7 +9,7 @@ private final class GameFolder {
     let root: URL
 
     init(_ files: [String: Data]) throws {
-        root = FileManager.default.temporaryDirectory.appendingPathComponent("rgss-\(UUID().uuidString)", isDirectory: true)
+        root = TestFolders.root.appendingPathComponent("rgss-\(UUID().uuidString)", isDirectory: true)
         for (path, data) in files {
             let file = root.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -95,7 +96,7 @@ private let none: @Sendable (RuntimePackage) -> URL? = { _ in nil }
     }
 
     @Test func launchHandsTheRuntimeTheInstalledRTPsInGameIniOrder() throws {
-        let data = FileManager.default.temporaryDirectory.appendingPathComponent("rgss-data-\(UUID().uuidString)")
+        let data = TestFolders.root.appendingPathComponent("rgss-data-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: data) }
         let installed = try GameFolder(["Graphics/System/Window.png": Data()])
         let game = try GameFolder(["Game.ini": ini("[Game]\nRTP=RPGVXAce\n"), "Game.rgss3a": Data()])

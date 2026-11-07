@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import OSLog
 import WebKit
 @testable import WebRuntime
@@ -13,7 +14,7 @@ import WebKit
     init(storage: Bool = true, scripts: [String] = [], scheme: (any WKURLSchemeHandler)? = nil, folder: GameFolder? = nil,
          runtime: PageRuntime? = nil, answer: @escaping (BridgeRequest) -> BridgeReply) throws {
         self.answer = answer
-        let root = FileManager.default.temporaryDirectory
+        let root = TestFolders.root
         let game = WebGameConfiguration(folder: folder ?? GameFolder(root: root, webRoot: ""), appName: "test", runtime: runtime,
                                         storageDirectory: storage ? root : nil, buttonScript: { _, _ in nil },
                                         scriptArgument: "test-script", log: Logger())

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import OSLog
 import Testing
 import WebKit
@@ -11,7 +12,7 @@ private let tone = URL(filePath: #filePath).deletingLastPathComponent()
 /// An MV game folder with www/js/rpg_core.js and the given files under www/.
 private func mvGame(_ files: [String], core: String = "rpg_core.js") throws -> URL {
     let fm = FileManager.default
-    let root = fm.temporaryDirectory.appending(path: "vndegen-mv-ogg-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let root = TestFolders.root.appending(path: "vndegen-mv-ogg-\(UUID().uuidString)", directoryHint: .isDirectory)
     for file in ["js/\(core)"] + files {
         let url = root.appending(path: "www/\(file)")
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

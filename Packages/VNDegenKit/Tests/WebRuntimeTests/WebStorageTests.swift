@@ -1,9 +1,10 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import WebRuntime
 
 @Test func storageKeepsEveryKeyInsideItsDirectory() throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: base) }
     let storage = WebStorage(directory: base.appendingPathComponent("localStorage"))
     #expect(try storage.load().isEmpty)
@@ -35,7 +36,7 @@ import Testing
 }
 
 @Test func keysThatDifferOnlyInCaseKeepSeparateFiles() throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: base) }
     let storage = WebStorage(directory: base)
     try storage.set("Save1", "upper")
@@ -52,7 +53,7 @@ import Testing
 
 @Test func filesNamedTheOldWayMoveToTheirNewNames() throws {
     let fm = FileManager.default
-    let base = fm.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
     defer { try? fm.removeItem(at: base) }
     try fm.createDirectory(at: base, withIntermediateDirectories: true)
     let storage = WebStorage(directory: base)
@@ -73,7 +74,7 @@ import Testing
 }
 
 @MainActor @Test func pageStorageChangesMemoryOnlyAfterTheDisk() async throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: base) }
     let storage = WebStorage(directory: base)
     try storage.set("a", "1")
@@ -117,7 +118,7 @@ import Testing
 }
 
 @Test func storageReportsAFolderItCannotRead() throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("vndegen-storage-\(UUID().uuidString)", isDirectory: true)
     let directory = base.appendingPathComponent("localStorage")
     defer {
         try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import WebKit
 import WebRuntime
@@ -18,7 +19,7 @@ private let earlyCore = """
 
 @Test func earlyMVCoresSaveBesideTheWebRoot() throws {
     let fm = FileManager.default
-    let root = fm.temporaryDirectory.appendingPathComponent("vndegen-early-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-early-\(UUID().uuidString)", isDirectory: true)
     defer { try? fm.removeItem(at: root) }
     try fm.createDirectory(at: root.appendingPathComponent("www/js"), withIntermediateDirectories: true)
     try Data().write(to: root.appendingPathComponent("www/js/rpg_core.js"))

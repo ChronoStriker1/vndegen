@@ -1,5 +1,6 @@
 import CNScripter
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineNScripter
@@ -42,7 +43,7 @@ private func probe(_ files: [String]) -> FolderProbe {
 /// A Ponscripter game's saves are the PC engine's files, kept in vndegen-saves: a PC backup's saves/ files restore
 /// there, thumbnails included, and the game's own saves folder is never written.
 @Test func ponscripterSavesSyncIntoTheirOwnFolder() throws {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir.appendingPathComponent("saves"), withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
     try Data("*define\ngame\n".utf8).write(to: dir.appendingPathComponent("0.utf"))
@@ -69,7 +70,7 @@ private func probe(_ files: [String]) -> FolderProbe {
     // runScript writes its script to 0.txt; the Shift-JIS file given in its place replaces it.
     let (nscripter, nsDir) = try runScript("", files: ["0.txt": sjis])
     defer { vnns_stop(nscripter); try? FileManager.default.removeItem(at: nsDir) }
-    let ponsDir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let ponsDir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: ponsDir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: ponsDir) }
     try Data("*define\ncaption \"日本語\"\ngame\n*start\nlangen^Hello^@\nend\n".utf8)
@@ -127,7 +128,7 @@ private func probe(_ files: [String]) -> FolderProbe {
 
 /// Runs a small script on the runtime and reads its frame back.
 @Test func theRuntimeDrawsAScriptsBackground() throws {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
     let script = ";mode400\n*define\ngame\n*start\nbg #FF8000,1\nclick\nend\n"
@@ -148,7 +149,7 @@ private func probe(_ files: [String]) -> FolderProbe {
 /// Fixtures/spb/arc.nsa holds synthetic bitmaps packed by NScripter's own nsaarc.exe, which stores bitmaps with its
 /// SPB compression. c_grad.bmp is 16 x 4, pixel (x, y) = (16x, 60y, 8(x + y)).
 @Test func spbBitmapsDecodeExactly() throws {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
     let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/spb/arc.nsa")
@@ -174,7 +175,7 @@ private func probe(_ files: [String]) -> FolderProbe {
 /// Fixtures/lzss/arc.nsa holds the same 16 x 4 gradient stored with the archive's LZSS compression (type 2), packed by
 /// VNDegen's own encoder of the format the runtime decodes.
 @Test func lzssEntriesDecodeExactly() throws {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
     let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/lzss/arc.nsa")
@@ -372,7 +373,7 @@ private func solidBMP(width: Int, height: Int, rgb: (UInt8, UInt8, UInt8)) -> Da
 
 /// Starts a script in a fresh folder holding `files`.
 private func runScript(_ script: String, files: [String: Data] = [:]) throws -> (OpaquePointer, URL) {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try Data(script.utf8).write(to: dir.appendingPathComponent("0.txt"))
     for (name, data) in files {
@@ -436,7 +437,7 @@ private func runScript(_ script: String, files: [String: Data] = [:]) throws -> 
 }
 
 @Test func savesGoToTheScriptsSaveFolder() throws {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     let game = dir.appendingPathComponent("Game")
     try FileManager.default.createDirectory(at: game.appendingPathComponent("SAVE"), withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
@@ -457,7 +458,7 @@ private func runScript(_ script: String, files: [String: Data] = [:]) throws -> 
 }
 
 @Test func withoutASaveFolderOnlyTheEnginesFilesAreSaves() throws {
-    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vnns-\(UUID().uuidString)")
+    let dir = TestFolders.root.appendingPathComponent("vnns-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
     try Data("*define\ngame\n".utf8).write(to: dir.appendingPathComponent("0.txt"))

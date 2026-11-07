@@ -1,6 +1,7 @@
 import CommonCrypto
 import CryptoKit
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineGodot
@@ -10,7 +11,7 @@ private final class GameFolder {
     let root: URL
 
     init(_ files: [String: Data]) throws {
-        root = FileManager.default.temporaryDirectory.appendingPathComponent("godot-\(UUID().uuidString)", isDirectory: true)
+        root = TestFolders.root.appendingPathComponent("godot-\(UUID().uuidString)", isDirectory: true)
         for (path, data) in files {
             let file = root.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)

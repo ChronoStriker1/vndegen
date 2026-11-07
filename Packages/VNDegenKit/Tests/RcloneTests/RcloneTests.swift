@@ -1,5 +1,6 @@
 import CRclone
 import Foundation
+import TestSupport
 import Rclone
 import Testing
 
@@ -9,7 +10,7 @@ private struct Item: Decodable { var Name: String; var Size: Int64; var IsDir: B
 private struct Replaced: Decodable { var replaced: Bool }
 
 private func folder() throws -> URL {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("RcloneTests-\(UUID().uuidString)", isDirectory: true)
+    let url = TestFolders.root.appendingPathComponent("RcloneTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }

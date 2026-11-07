@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 import GameInput
@@ -6,7 +7,7 @@ import GameInput
 
 /// Writes `files` (relative path to contents) into a fresh folder.
 private func folder(_ files: [String: String]) throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-renpy-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-renpy-\(UUID().uuidString)", isDirectory: true)
     for (path, contents) in files {
         let url = root.appendingPathComponent(path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
