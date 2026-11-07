@@ -31,13 +31,13 @@ static uint8_t clamp8(int v) { return uint8_t(v < 0 ? 0 : v > 255 ? 255 : v); }
 void Engine::playMovie(const std::string &file, bool clickStops, bool loop, bool async, int x, int y, int w, int h) {
     auto m = std::make_unique<Movie>();
     if (!fs_.read(file, m->data)) {
-        errorf("movie %s not found", sjisToUtf8(file).c_str());
+        errorf("movie %s not found", toUtf8(file).c_str());
         return;
     }
     plm_buffer_t *buf = plm_buffer_create_with_memory(m->data.data(), m->data.size(), 0);
     m->plm = plm_create_with_buffer(buf, 1);
     if (!m->plm || !plm_probe(m->plm, 5000 * 1024)) {
-        logf("movie %s is not MPEG-1 and can't be played", sjisToUtf8(file).c_str());
+        logf("movie %s is not MPEG-1 and can't be played", toUtf8(file).c_str());
         return;
     }
     m->clickStops = clickStops;

@@ -1,6 +1,7 @@
 #include "gfx.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -111,6 +112,33 @@ bool decodeImage(const Bytes &data, Image &out, bool *hasAlpha) {
     stbi_image_free(pixels);
     if (hasAlpha) *hasAlpha = alpha;
     return true;
+}
+
+Image halveImage(const Image &src) {
+    Image out((src.w + 1) / 2, (src.h + 1) / 2);
+    for (int y = 0; y < out.h; y++)
+        for (int x = 0; x < out.w; x++) {
+            uint32_t sum[4] = {0, 0, 0, 0};
+            for (int dy = 0; dy < 2; dy++)
+                for (int dx = 0; dx < 2; dx++) {
+                    int sx = 2 * x + dx, sy = 2 * y + dy;
+                    if (sx >= src.w || sy >= src.h) continue;
+                    uint32_t p = src.row(sy)[sx];
+                    for (int c = 0; c < 4; c++) sum[c] += p >> (8 * c) & 255;
+                }
+            out.row(y)[x] = sum[0] / 4 | (sum[1] / 4) << 8 | (sum[2] / 4) << 16 | (sum[3] / 4) << 24;
+        }
+    return out;
+}
+
+uint32_t parseHexColor(std::string_view s) {
+    if (!s.empty() && s[0] == '#') s.remove_prefix(1);
+    unsigned v = 0;
+    for (size_t i = 0; i < 6 && i < s.size(); i++) {
+        char c = s[i];
+        v = v << 4 | unsigned(isdigit(uint8_t(c)) ? c - '0' : (tolower(c) - 'a' + 10) & 15);
+    }
+    return rgba(int(v >> 16 & 255), int(v >> 8 & 255), int(v & 255));
 }
 
 }  // namespace vnns

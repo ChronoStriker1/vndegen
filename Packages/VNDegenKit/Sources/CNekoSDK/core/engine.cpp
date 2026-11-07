@@ -217,6 +217,9 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
         windowOpacity_ = 0;
         windowAlwaysClear_ = true;
     }
+    // The Alchemist's sys_5.pak holds Masami Chie's original CGs and sprites. The PC starts on Waffle's arranged ones in
+    // the base archives, and its message window's art button and Config's Change Illustration switch between them.
+    if (folder_ == "waffle\\alchemy") artSet_ = "sys_5";
 
     if (config_.number("MsgWinButtonPlateDisable") == 0) buttonPlate_ = images_->get(config_.text("MsgWinButtonPlateFilename"));
     barTop_ = bars_.size() > 1 ? barY_[1] : height_ - 102;
@@ -427,6 +430,11 @@ void Engine::runAction(const std::string &action) {
     if (action == "Title") { openDialog(6, [this] { endStory("title"); }); return; }
     if (action == "Skip") { skipToggle_ = !skipToggle_; return; }
     if (action == "Auto") { autoMode_ = !autoMode_; return; }
+    if (action == "ModeChange") {
+        changeSetting("art", setting("art") ? 0 : 1);
+        saveSettings();
+        return;
+    }
     if (action == "HideWin") { windowHiddenByPlayer_ = true; return; }
     if (action == "System") { barPinned_ = !barPinned_; return; }
     if (action == "EXpress") {
@@ -627,6 +635,11 @@ bool Engine::moveFocus(int dx, int dy) {
 }
 
 void Engine::mouseWheel(int notches) {
+    // In the CG viewer the wheel zooms, a twentieth a notch.
+    if (screen_ && viewingImage_ && viewerPanel() && !dialogOpen_) {
+        viewerZoom(notches);
+        return;
+    }
     if (screen_ || dialogOpen_) return;
     if (logOpen_) scrollLog(notches);
     else if (notches > 0) openLog();
@@ -942,7 +955,7 @@ void Engine::composeTrackTime(Canvas &out) {
 void Engine::composeGallery(Canvas &out) {
     if (viewingImage_) {
         out.clear();
-        if (ImageRef image = images_->get(viewing_[viewingIndex_])) drawImage(out, *image, out.w * 0.5f, out.h * 0.5f, float(out.w) / float(image->w), float(out.w) / float(image->w), 0, 1);
+        composeViewerPicture(out);
         composeViewer(out);
         return;
     }
@@ -1025,14 +1038,7 @@ void Engine::openGalleryCell(int index) {
     if (screen_->name == "cg") {
         if (entry >= cgEntries_.size()) return;
         if (viewerPanel()) {
-            const auto &images = cgEntries_[entry].images;
-            for (size_t i = 0; i < images.size(); i++)
-                if (seen(images[i])) {
-                    viewPanelHidden_ = false;
-                    viewAuto_ = false;
-                    viewerShow(entry, i);
-                    return;
-                }
+            openViewer(entry);
             return;
         }
         viewing_.clear();
@@ -1047,8 +1053,8 @@ void Engine::openGalleryCell(int index) {
     }
 }
 
+// A replay runs its own flow, and ending it comes back to the gallery it started from.
 void Engine::startReplay(const GalleryEntry &scene) {
-    // A replay runs its own flow, and ending it comes back to the gallery it started from.
     auto flow = loadScript(scene.flow);
     if (!flow || !flow->first()) return;
     stopTrack();
@@ -1073,171 +1079,8 @@ void Engine::startReplay(const GalleryEntry &scene) {
     dirty_ = true;
 }
 
-// MARK: CG viewer
-
-// Test Game 84's viewer, measured under Wine: the panel's buttons step through the pictures of an entry and wrap,
-// step between entries with a picture unlocked, across the gallery's tabs and wrapping at the ends, and Auto moves to the
-// next unlocked picture every 8 seconds. A right click hides or shows the panel, and a click on the picture does nothing.
-bool Engine::viewerPanel() const { return screen_ && screen_->name == "cg" && screen_->setting("viewer"); }
-
-void Engine::viewerShow(size_t entry, size_t image) {
-    viewEntry_ = entry;
-    viewImage_ = image;
-    viewAutoFrom_ = screenMs_;
-    viewing_ = {cgEntries_[entry].images[image]};
-    viewingIndex_ = 0;
-    viewingImage_ = true;
-    dirty_ = true;
-}
-
-void Engine::viewerVariant(int direction) {
-    const auto &images = cgEntries_[viewEntry_].images;
-    int n = int(images.size());
-    for (int k = 1; k < n; k++) {
-        int i = ((int(viewImage_) + direction * k) % n + n) % n;
-        if (seen(images[size_t(i)])) {
-            viewerShow(viewEntry_, size_t(i));
-            return;
-        }
-    }
-}
-
-void Engine::viewerCg(int direction) {
-    int n = int(cgEntries_.size());
-    for (int k = 1; k <= n; k++) {
-        size_t e = size_t(((int(viewEntry_) + direction * k) % n + n) % n);
-        const auto &images = cgEntries_[e].images;
-        int first = -1, last = -1;
-        for (int i = 0; i < int(images.size()); i++)
-            if (seen(images[size_t(i)])) {
-                if (first < 0) first = i;
-                last = i;
-            }
-        if (first < 0) continue;
-        // Going back into another tab lands on that entry's last picture, and within a tab on its first.
-        bool fromEnd = direction < 0 && cgEntries_[e].page != cgEntries_[viewEntry_].page;
-        viewerShow(e, size_t(fromEnd ? last : first));
-        return;
-    }
-}
-
-void Engine::viewerAdvance() {
-    const auto &images = cgEntries_[viewEntry_].images;
-    for (size_t i = viewImage_ + 1; i < images.size(); i++)
-        if (seen(images[i])) {
-            viewerShow(viewEntry_, i);
-            return;
-        }
-    viewerCg(1);
-    viewAutoFrom_ = screenMs_;
-}
-
-// Return goes back to the gallery at the tab and page of the picture shown.
-void Engine::closeViewer() {
-    viewingImage_ = false;
-    viewAuto_ = false;
-    const GalleryEntry &e = cgEntries_[viewEntry_];
-    if (screen_ && screen_->settings.count("gallerytabs")) {
-        galleryTab_ = e.page;
-        int before = int(std::count_if(cgEntries_.begin(), cgEntries_.begin() + std::ptrdiff_t(viewEntry_), [&](const GalleryEntry &o) { return o.page == e.page; }));
-        page_ = before / std::max(1, int(screen_->settings.count("cell")));
-    }
-    dirty_ = true;
-}
-
-// Replay the scene shows only while that scene is unlocked in the Scene gallery.
-const Engine::GalleryEntry *Engine::viewerScene() const {
-    const std::string &flow = cgEntries_[viewEntry_].flow;
-    if (flow.empty()) return nullptr;
-    for (const GalleryEntry &scene : sceneEntries_)
-        if (normalizedPath(scene.flow) == normalizedPath(flow) && seen(scene.key)) return &scene;
-    return nullptr;
-}
-
-// `viewer PANEL X Y`, `viewerbutton ACTION SHEET X Y` with five rows to a sheet, `viewerdigits SHEET X Y STEP SLASHX
-// SLASHY TOTALX TOTALY` with 0 to 9 and a slash, and `viewerauto EVERY FILL` in ms.
-void Engine::composeViewer(Canvas &out) {
-    if (!viewerPanel() || viewPanelHidden_) return;
-    const auto *panel = screen_->setting("viewer");
-    if (ImageRef art = panel->size() >= 3 ? images_->get((*panel)[0]) : nullptr) drawPart(out, *art, field(*panel, 1), field(*panel, 2), 0, 0, art->w, art->h, 1);
-    for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it) {
-        const auto &f = it->second;
-        ImageRef sheet = f.size() >= 4 ? images_->get(f[1]) : nullptr;
-        if (!sheet || (f[0] == "replay" && !viewerScene())) continue;
-        int x = field(f, 2), y = field(f, 3), w = sheet->w, h = sheet->h / 5;
-        bool over = pointerSeen_ && inRect(pointerX_, pointerY_, x, y, w, h);
-        if (f[0] != "auto" || !viewAuto_) {
-            drawPart(out, *sheet, x, y, 0, over ? h : 0, w, h, 1);
-            continue;
-        }
-        // While Auto runs, its button fills from the right with the selected look as the next picture nears. The rest is
-        // the hovered look tinted toward red, 100 of 256.
-        const auto *timing = screen_->setting("viewerauto");
-        int fillMs = timing && timing->size() >= 2 ? std::max(1, field(*timing, 1)) : 7200;
-        int left = w, right = 0;
-        for (int cx = 0; cx < w; cx++)
-            for (int cy = 0; cy < h; cy++)
-                if (sheet->rgba[(size_t(2 * h + cy) * size_t(w) + size_t(cx)) * 4 + 3] >= 250) {  // the button's face, not its soft edge
-                    left = std::min(left, cx);
-                    right = std::max(right, cx + 1);
-                    break;
-                }
-        float done = std::clamp(float(screenMs_ - viewAutoFrom_) / float(fillMs), 0.0f, 1.0f);
-        int split = std::max(0, right - int(float(right - left) * done + 0.5f));
-        drawPart(out, *sheet, x, y, 0, 3 * h, split, h, 1);
-        for (int cy = 0; cy < h && y + cy < out.h; cy++)
-            for (int cx = 0; cx < split && x + cx < out.w; cx++) {
-                int a = sheet->rgba[(size_t(3 * h + cy) * size_t(w) + size_t(cx)) * 4 + 3];
-                if (!a || x + cx < 0 || y + cy < 0) continue;
-                uint8_t *d = &out.px[(size_t(y + cy) * size_t(out.w) + size_t(x + cx)) * 4];
-                int k = 100 * a / 255;
-                d[0] = uint8_t(d[0] + ((255 - d[0]) * k >> 8));
-                d[1] = uint8_t(d[1] - (d[1] * k >> 8));
-                d[2] = uint8_t(d[2] - (d[2] * k >> 8));
-            }
-        drawPart(out, *sheet, x + split, y, split, 2 * h, w - split, h, 1);
-    }
-    const auto *digits = screen_->setting("viewerdigits");
-    ImageRef sheet = digits && digits->size() >= 8 ? images_->get((*digits)[0]) : nullptr;
-    if (!sheet) return;
-    int cw = sheet->w / 11, step = field(*digits, 3);
-    auto two = [&](int value, int x, int y) {
-        drawPart(out, *sheet, x, y, value / 10 % 10 * cw, 0, cw, sheet->h, 1);
-        drawPart(out, *sheet, x + step, y, value % 10 * cw, 0, cw, sheet->h, 1);
-    };
-    two(int(viewImage_) + 1, field(*digits, 1), field(*digits, 2));
-    drawPart(out, *sheet, field(*digits, 4), field(*digits, 5), 10 * cw, 0, cw, sheet->h, 1);
-    two(int(cgEntries_[viewEntry_].images.size()), field(*digits, 6), field(*digits, 7));
-}
-
-void Engine::pressViewer(int x, int y) {
-    if (viewPanelHidden_) return;
-    for (auto [it, end] = screen_->settings.equal_range("viewerbutton"); it != end; ++it) {
-        const auto &f = it->second;
-        ImageRef sheet = f.size() >= 4 ? images_->get(f[1]) : nullptr;
-        if (!sheet || !inRect(x, y, field(f, 2), field(f, 3), sheet->w, sheet->h / 5)) continue;
-        const std::string &action = f[0];
-        if (action == "replay") {
-            if (const GalleryEntry *scene = viewerScene()) {
-                replayFromViewer_ = true;
-                startReplay(*scene);
-            }
-        } else if (action == "prevcg" || action == "nextcg") {
-            viewerCg(action == "nextcg" ? 1 : -1);
-        } else if (action == "prevvar" || action == "nextvar") {
-            viewerVariant(action == "nextvar" ? 1 : -1);
-        } else if (action == "auto") {
-            viewAuto_ = !viewAuto_;
-            viewAutoFrom_ = screenMs_;
-        } else if (action == "return") {
-            closeViewer();
-        } else if (action == "hide") {
-            viewPanelHidden_ = true;
-        }
-        dirty_ = true;
-        return;
-    }
-}
+// The gallery tab the viewer returns to.
+void Engine::viewerTab(int page) { galleryTab_ = page; }
 
 // MARK: Settings
 
@@ -1250,6 +1093,8 @@ int Engine::setting(const std::string &name) const {
 std::map<std::string, int> Engine::startingSettings() const {
     std::map<std::string, int> out = defaultSettings();
     for (const auto &[start, type] : voiceTypes_) out["voice" + std::to_string(type % 50)] = 1;
+    // 0 for the base archives' art, 1 for the art set's.
+    if (!artSet_.empty()) out["art"] = 0;
     auto table = screens_.find("defaults");
     if (table != screens_.end())
         for (auto [it, end] = table->second.settings.equal_range("default"); it != end; ++it)
@@ -1287,6 +1132,20 @@ void Engine::applySettings() {
     autoDelayMs_ = kAutoDelayMs * kAutoPercent[std::clamp(setting("auto"), 0, 3)] / 100;
     if (!windowAlwaysClear_) windowOpacity_ = float(setting("opacity")) / 100;
     applyArtSwitch();
+    applyArtSet();
+}
+
+// The PC swaps every CG and sprite on screen the moment the art set changes.
+void Engine::applyArtSet() {
+    std::string wanted = setting("art") ? artSet_ : "";
+    if (wanted == artShown_) return;
+    artShown_ = wanted;
+    images_->setArtSet(wanted);
+    for (Sprites *sprites : {&back_, &front_})
+        for (auto &[slot, sprite] : *sprites)
+            if (!sprite.path.empty() && !sprite.flipCount)
+                if (ImageRef image = images_->get(shownPath(sprite.path))) sprite.image = image;
+    dirty_ = true;
 }
 
 void Engine::loadSettings() {
@@ -1329,10 +1188,11 @@ void Engine::composeSettingsWidgets(Canvas &out) {
         int row = rows ? rows[(on ? 0 : 2) + (over ? 1 : 0)] : (on ? 2 : 0) + (over ? 1 : 0);
         drawPart(out, *sheet, x, y, field(f, at + 5) * w, row * h, w, h, 1);
     };
+    // The PC rounds a fill to the nearest pixel: at 60, The Alchemist's 441-pixel opacity bar fills 265.
     for (auto [it, end] = lines("slider"); it != end; ++it) {
         const auto &f = it->second;
         if (ImageRef fill = f.size() >= 4 ? images_->get(f[1]) : nullptr)
-            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, fill->w * setting(f[0]) / 100, fill->h, 1);
+            drawPart(out, *fill, field(f, 2), field(f, 3), 0, 0, (fill->w * setting(f[0]) + 50) / 100, fill->h, 1);
     }
     for (auto [it, end] = lines("bar"); it != end; ++it) {
         const auto &f = it->second;
@@ -2177,6 +2037,13 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
+        // The PC games show no help for the tab, page or menu already open.
+        if (current && b.help) {
+            Button shown = b;
+            shown.help = nullptr;
+            drawButton(out, shown, state);
+            continue;
+        }
         if (b.action == "quickload" && !newestQuickSlot()) state = StateDisabled;
         if (b.action == "track" + std::to_string(currentTrack_) && trackPlayer_) state = over ? StateSelectedHover : StateSelected;
         bool musicOn = (b.action == "music_stop" && !trackPlayer_) || (b.action == "music_play" && trackPlayer_ && !trackPaused_) || (b.action == "music_pause" && trackPaused_) ||
@@ -2237,7 +2104,10 @@ bool Engine::underButtonsShown() const {
 void Engine::composeMessageButtons(Canvas &out) {
     auto state = [&](const Button &b) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
-        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_);
+        // The art button reads ORIGINAL.ver while the arranged art shows, and ARRANGE.ver, its selected cells, while the
+        // original does.
+        bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
+                  (b.action == "ModeChange" && setting("art"));
         if (b.action == "QuickLoad" && !newestQuickSlot()) return StateDisabled;
         if (b.action == "Voice" && currentText_.voice.empty()) return StateDisabled;
         if (b.action == "Ejaculation" && !gt_.active) return StateDisabled;
@@ -2726,11 +2596,7 @@ bool Engine::step(int ms) {
     if (screen_) {
         screenMs_ += ms;
         if (openingFrom_ >= 0) dirty_ = true;
-        if (viewingImage_ && viewAuto_ && viewerPanel()) {
-            dirty_ = true;
-            const auto *timing = screen_->setting("viewerauto");
-            if (screenMs_ - viewAutoFrom_ >= (timing && !timing->empty() ? field(*timing, 0) : 8000)) viewerAdvance();
-        }
+        stepViewer(ms);
     }
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;

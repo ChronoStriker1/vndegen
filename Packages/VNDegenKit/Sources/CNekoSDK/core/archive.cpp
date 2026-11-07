@@ -43,6 +43,17 @@ bool hasFolder(const std::string &name) {
     return false;
 }
 
+// A patch's pictures, in its `cg`, `sc`, `obj` and `parts` folders, the four the PC engine maps to a patch's own. The PC
+// reaches them only by the patch's name, such as `sys_5\\cg\\x.bmp`, because a patch's art can be a second set under the
+// base names: The Alchemist's sys_5.pak holds Masami Chie's original CGs and sprites, shown only when the player picks
+// them, and Test Game 86's sys_3.pak blank sprites. Test Games 90 and 92 name their patches' new pictures that way too.
+bool isArt(const std::string &path) {
+    auto slash = path.find('\\');
+    if (slash == std::string::npos) return false;
+    std::string folder = lower(path.substr(0, slash));
+    return folder == "cg" || folder == "sc" || folder == "obj" || folder == "parts";
+}
+
 // `sys_5` is patch 5; anything else isn't a patch.
 int patchNumber(const std::string &name) {
     if (name.rfind("sys_", 0) != 0 || name.size() == 4) return -1;
@@ -107,7 +118,16 @@ constexpr int kLooseFolderPriority = 1000;
 
 static bool isArchiveName(const std::string &low) { return low.size() > 4 && low.compare(low.size() - 4, 4, ".pak") == 0; }
 
-void Files::indexArchive(const std::string &file, const std::string &folder, int priority) {
+// Every file of a patch answers to the patch's name, `sys_5\\cfg\\msg_button.ini`, as the PC asks for some. All but its
+// art also take the place of the base file of the same path, as The Alchemist's msg_button.ini does to add its art button.
+// A file outside any folder in a patch archive stands in for sys.pak's.
+void Files::addPatched(const std::string &patch, const std::string &path, const Source &source) {
+    add(patch + "\\" + path, source);
+    if (!hasFolder(path)) add("sys\\" + path, source);
+    else if (!isArt(path)) add(path, source);
+}
+
+void Files::indexArchive(const std::string &file, const std::string &folder, int priority, const std::string &patch) {
     std::ifstream f(file, std::ios::binary);
     char magic[14];
     if (!f.read(magic, 14) || std::memcmp(magic, "NEKOPACK4", 9)) return;
@@ -150,14 +170,19 @@ void Files::indexArchive(const std::string &file, const std::string &folder, int
         source.size = rd32(&index[pos + 4]) ^ uint32_t(key);
         pos += 8;
         if (uint64_t(source.offset) + source.size > fileSize) continue;
-        // Entries with folders of their own: `cfg\\x.ini` in a patch names that path, and `rain\\x.ogg` in `se.pak` names
-        // `se\\rain\\x.ogg`. A script could mean either, so both find it.
+        // An archive in a patch folder, such as Test Game 92's sys_5/obj.pak, holds that folder's files.
+        if (!patch.empty()) {
+            addPatched(patch, folder.empty() || hasFolder(name) ? name : folder + "\\" + name, source);
+            continue;
+        }
+        // Entries with folders of their own: `rain\\x.ogg` in `se.pak` names `se\\rain\\x.ogg`, and a script could mean
+        // either, so both find it.
         if (hasFolder(name)) add(name, source);
         add(folder + "\\" + name, std::move(source));
     }
 }
 
-void Files::indexFolder(const std::string &dir, const std::string &prefix, int priority) {
+void Files::indexFolder(const std::string &dir, const std::string &prefix, int priority, const std::string &patch) {
     DIR *d = opendir(dir.c_str());
     if (!d) return;
     while (dirent *e = readdir(d)) {
@@ -166,16 +191,19 @@ void Files::indexFolder(const std::string &dir, const std::string &prefix, int p
         std::string full = dir + "/" + name, rel = prefix.empty() ? name : prefix + "\\" + name;
         struct stat st;
         if (stat(full.c_str(), &st)) continue;
+        std::string low = lower(name);
         if (S_ISDIR(st.st_mode)) {
-            indexFolder(full, rel, priority);
-        } else if (!prefix.empty() && isArchiveName(lower(name))) {
-            // Funbag Fantasy 3 keeps 892 more pictures in `sc` beside sc.pak, one small archive to a picture.
-            indexArchive(full, prefix, priority);
+            indexFolder(full, rel, priority, patch);
+        } else if (isArchiveName(low) && (!prefix.empty() || !patch.empty())) {
+            // A patch folder's own archives, such as Test Game 92's sys_5/obj.pak, hold that folder's files, and Funbag
+            // Fantasy 3 keeps 892 more pictures in `sc` beside sc.pak, one small archive to a picture.
+            indexArchive(full, prefix.empty() ? low.substr(0, low.size() - 4) : prefix, priority, patch);
         } else {
             Source source;
             source.priority = priority;
             source.loose = full;
-            add(rel, std::move(source));
+            if (patch.empty()) add(rel, std::move(source));
+            else addPatched(patch, rel, source);
         }
     }
     closedir(d);
@@ -205,19 +233,31 @@ bool Files::open(const std::string &root) {
         if (item.folder) {
             // Beside the archives, cfg, scr and the like outrank them: a fan translation's changes sit there, and the PC
             // game shows them. Above any patch, which came first.
-            if (patch >= 0) indexFolder(root + "/" + item.name, "", patch * 2 + 2);
-            else indexFolder(root + "/" + item.name, item.stem, kLooseFolderPriority);
+            if (patch >= 0) indexFolder(root + "/" + item.name, "", patch * 2 + 2, item.stem);
+            else indexFolder(root + "/" + item.name, item.stem, kLooseFolderPriority, {});
+            continue;
+        }
+        if (patch >= 0) {
+            indexArchive(root + "/" + item.name, "", patch * 2 + 1, item.stem);
             continue;
         }
         // A second archive of a kind, such as cg2 or sc2, holds more of the same folder.
         std::string folder = item.stem;
-        while (patch < 0 && folder.size() > 1 && std::isdigit(static_cast<unsigned char>(folder.back()))) folder.pop_back();
-        indexArchive(root + "/" + item.name, patch >= 0 ? "sys" : folder, patch >= 0 ? patch * 2 + 1 : 0);
+        while (folder.size() > 1 && std::isdigit(static_cast<unsigned char>(folder.back()))) folder.pop_back();
+        indexArchive(root + "/" + item.name, folder, 0);
     }
     return !archives_.empty();
 }
 
 bool Files::exists(const std::string &path) const { return index_.count(normalizedPath(path)) != 0; }
+
+int64_t Files::storedSize(const std::string &path) const {
+    auto it = index_.find(normalizedPath(path));
+    if (it == index_.end()) return -1;
+    if (it->second.archive >= 0) return it->second.size;
+    struct stat st;
+    return stat(it->second.loose.c_str(), &st) ? -1 : int64_t(st.st_size);
+}
 
 Bytes Files::read(const std::string &path) const {
     auto it = index_.find(normalizedPath(path));

@@ -246,29 +246,40 @@ private:
     std::vector<std::string> viewing_;
     size_t viewingIndex_ = 0;
     bool viewingImage_ = false;
-    bool replaying_ = false;
-    // Test Game 84's CG viewer panel, from the cg screen's `viewer` lines: the entry and picture shown, counted among all
-    // of the entry's pictures, whether the player has hidden the panel, and Auto. A replay started from it comes back to it.
+    // The CG viewer's panel, from the cg screen's `viewer...` lines (viewer.cpp): the entry and picture shown, counted among
+    // all of the entry's pictures, the panel hidden, the slideshow, zoom in hundredths, the entry's music and the art shown.
     size_t viewEntry_ = 0, viewImage_ = 0;
-    bool viewPanelHidden_ = false, viewAuto_ = false;
-    int64_t viewAutoFrom_ = 0;
-    bool replayFromViewer_ = false;
+    bool viewPanelHidden_ = false, viewAuto_ = false, viewMuted_ = false, replayFromViewer_ = false;
+    int64_t viewMs_ = 0, viewAutoFrom_ = 0;
+    int viewZoom_ = 100, viewMusic_ = 0;
+    std::string viewMusicPath_;
     bool viewerPanel() const;
+    void openViewer(size_t entry);
     void viewerShow(size_t entry, size_t image);
+    void viewerMusic();
+    void stopViewerMusic();
     void viewerVariant(int direction);
     void viewerCg(int direction);
     void viewerAdvance();
+    void viewerZoom(int notches);
     void closeViewer();
+    void viewerTab(int page);
     const GalleryEntry *viewerScene() const;
+    void composeViewerPicture(Canvas &out);
     void composeViewer(Canvas &out);
+    int viewerButtonRow(const std::vector<std::string> &line, bool over) const;
+    const std::vector<std::string> *viewerButtonAt(int x, int y) const;
     void pressViewer(int x, int y);
+    void stepViewer(int ms);
     void startReplay(const GalleryEntry &scene);
+    bool replaying_ = false;
     int trackPlayer_ = 0;
 
     // Settings, by the names the menu tables use, kept in a small file of VNDegen's beside the saves.
     void loadSettings();
     void saveSettings();
     void applySettings();
+    void applyArtSet();
     std::map<std::string, int> startingSettings() const;
     int galleryTab_ = 0;
     // A cell's entry, or -1. A game with tabs lists only the tab's entries.
@@ -374,6 +385,8 @@ private:
 
     // Commands change the back set; a screen update shows it.
     Sprites back_, front_;
+    // The patch holding a second set of CGs and sprites, such as `sys_5`, empty when the game has none, and the set showing.
+    std::string artSet_, artShown_;
     ImageRef ruleImage_;
     int transitionType_ = 0, transitionMs_ = 0;
     int64_t transitionStart_ = 0;

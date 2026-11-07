@@ -1,7 +1,8 @@
 # NScripter
 
 VNDegen runs NScripter games on its own NScripter runtime, written for VNDegen and MIT licensed like the rest of the
-app. It replaces ONScripter, which is GPL. How it was written, and from which sources, is in
+app. It replaces ONScripter, which is GPL. The same runtime runs Ponscripter games, NScripter's dialect with UTF-8
+scripts, in a mode of its own (see Ponscripter below). How it was written, and from which sources, is in
 `docs/nscripter-cleanroom.md`.
 
 ## Layout
@@ -21,7 +22,7 @@ the runtime's own keeps each playing sound 0.75 s ahead in a ring buffer, so the
 and a slow decode can't make it miss its deadline or hold up the game. Everything runs in the app's process, with no
 JIT, on Mac, iPhone and iPad.
 
-Third-party code: stb_image (PNG, JPEG, BMP), stb_vorbis (Ogg Vorbis), dr_mp3 (MP3), pl_mpeg (MPEG-1 movies with
+Third-party code: stb_image (PNG, JPEG, BMP), stb_vorbis (Ogg Vorbis), stb_truetype (Ponscripter's fonts), dr_mp3 (MP3), pl_mpeg (MPEG-1 movies with
 MP2 sound) and Lua 5.1 (NSLua scripts), all MIT, MIT No Attribution or public domain, listed in
 `Engines/NScripter/UPSTREAM.md`, plus the system's bzip2 library for NBZ sounds. Text is drawn with the font pack's substitutes
 (`docs/fonts.md`): MS Gothic, NScripter's default, is Ume Gothic, a script's `font` or `defaultfont` name goes through
@@ -33,20 +34,21 @@ A game is NScripter when a folder, at the top of the game folder or up to two fo
 `0.txt` or `00.txt` beside an archive (`.nsa`, `.ns2`, `.sar`) or one of NScripter's own files (`envdata`,
 `nslua.dll`, `nsogg2.dll`, `nspng.dll`). A numbered text script alone isn't enough, since `0.txt` could be anything.
 
-Ponscripter games aren't detected, because the runtime can't run them. The Umineko When They Cry Question and Answer Arcs
-(`0.utf`, `arc.nsa`, and `Umineko1to4` or `Umineko5to8` built on Ponscripter) are the library's two. Their script is UTF-8
-with Ponscripter's text markup and commands, and their archives use a compression type the runtime doesn't read. Given the
-Question Arcs' script as `0.txt`, the Linux host stopped at the first menu with no images. The original Japanese
-releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are detected.
+A Ponscripter game has `0.utf` (or `00.utf`) beside its archives, and is detected the same way; the library shows it as
+NScripter, version Ponscripter. The Umineko When They Cry Question and Answer Arcs are the library's two. The original
+Japanese releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are ordinary NScripter games.
+Umineko: Golden Fantasia is neither: it is a fighting game on an engine of its own (Direct3D 9), and isn't supported.
 
 ## What the runtime reads
 
 - Scripts: `0.txt` .. `99.txt` or `00.txt` .. `99.txt` joined in order, else `nscript.dat` (each byte XOR 0x84).
-  `0.txt` wins over `nscript.dat`, as on Windows. The first line may set the screen size and variable counts
+  `0.txt` wins over `nscript.dat`, as on Windows. Ponscripter's `0.utf` .. `99.utf` (or `00.utf` ..) come before all
+  of them. The first line may set the screen size and variable counts
   (`;mode800`, `;value500`, `;$V2000G1000S800,600L10000`).
 - Files, in the order NScripter searches: loose files in the game folder; then `.ns2` archives, highest number first;
   then `arc.nsa` and `arc1.nsa` .. `arc9.nsa`, once the script runs `nsa`. Archive entries stored plain, with the
-  packer's SPB bitmap compression, or with its LZSS compression (type 2) are read. Names match without regard to case, as on
+  packer's SPB bitmap compression, with its LZSS compression (type 2), or as NBZ (type 4, a bzip2 stream, which the
+  Ponscripter games use for their bitmaps) are read. Names match without regard to case, as on
   Windows: loose files through an index of the folder made at start, archive members by their lowercased names, and
   files the game writes later (saves, screenshots) through `casepath_resolve` from `Engines/Shared/casepath.c`. All
   six test games pass the case check (title, play, save and load with every name's case swapped) on the Mac app and
@@ -62,6 +64,76 @@ releases, Umineko no Naku Koro ni Hane and Tsubasa, ship `nscript.dat`, and are 
 - `blt` copies part of the `btndef` image straight onto the screen, scaled to the rectangle it names, past the scene;
   a game's ending credits roll scrolls that way. The drawing stays until the scene is next committed, or the commit
   after that once `ofscpy` has run, as the manual describes.
+
+## Ponscripter
+
+Ponscripter is NScripter with UTF-8 scripts and proportional English text. The runtime runs a game in its Ponscripter
+mode when the game's folder has `0.utf`; script text, file names and string variables are then UTF-8 bytes where they
+would be Shift-JIS, so byte-counted commands (`len`, `mid`) count UTF-8 bytes. The mode's commands are known only to
+Ponscripter games, so an NScripter game reads exactly as before. Everything below was settled as a black box on the
+Umineko games' own engine, run under Wine (see `docs/nscripter-cleanroom.md`).
+
+- Languages. The script holds each line in Japanese and English: `langjp` and `langen` set the language of the text
+  that follows, until the next of them, and `langall` makes it every language's. `showlangen` and `showlangjp` choose
+  the language shown, English until either runs. Text of the other language isn't drawn, makes no text buttons or
+  ruby, applies no `~tags~` and leaves no line break, but its click, page and `clickstr` waits still run; the games' textgosub routine skips them by reading `getreadlang` (-1 for every
+  language, 0 English, 1 Japanese). `language english` is read and ignored: it changed nothing in any lab.
+- English text sits between carets, `^...^`. Inside them `@`, `\`, `#rrggbb`, `!sd`, `!sN`, `!dN`, `!wN` and `_` work
+  as in any text line, while `$`, `%`, `{`, `<`, `(` and `[` are plain characters. A text line whose last character is
+  the closing caret doesn't end the line on screen, so a sentence can run on over several script lines.
+- Text is drawn in the game's own fonts: `h_mapfont n,"file"` names face n's file, and a face it doesn't name is
+  `fonts/face<n>.ttf`. `~cN~` picks face N, plain; `~i~` and `~b~` toggle italic and bold, which add 1 and 2 to the
+  face number, so `~ib~` in a game whose faces 1 to 3 are its bold font draws bold. A style lasts from line to line
+  until a tag changes it. There's no fallback font: a character the face lacks draws as its missing-glyph shape.
+- Layout follows the PC engine, which draws on a screen twice the game's size and halves it. Each glyph is rasterized
+  (stb_truetype, no hinting) at twice the window's font size and placed at whole pixels of that doubled screen, the
+  pen moving by the glyph's advance there, rounded down; there is no kerning, though the fonts carry some. The baseline
+  is the font's ascender below the line's top (at the game's size, rounded up), lines are the font's height plus the
+  window's line spacing apart (at the doubled size, rounded up), and `br` moves down half a line plus the spacing to
+  start a paragraph. A word that won't fit starts a line, and the space before it isn't drawn; Japanese text breaks
+  at any character, with NScripter's line-start kinsoku. The shadow is `shadedistance` pixels of the doubled screen
+  (3 is a pixel and a half), and setwindow's bold flag changes nothing, as on the PC.
+- `'` and `` ` `` are drawn as curly single quotes (U+2019, U+2018), `''` and ``` `` ``` as double ones. `"`, `--`
+  and `...` stay as written, and there are no ligatures.
+- String sprites (`:s`) and `select` items are laid out the same way. A size in an `:s` tag (`:s/16,16,0;`) is the em
+  and the character pitch on the doubled screen, so `/30,30,0` is 15 pixels; only the height and the pitch count.
+- A Ponscripter text line may open with a full-width space, which is drawn, where NScripter would skip it. Outside
+  carets, a half-width space isn't drawn.
+- `gettext` keeps a page's `~tags~`, and `logsp n,text,x,y,colours` draws such a page as a sprite for the games' own
+  backlog: its position is on the doubled screen, it breaks at any character to fit the window's width, the page's
+  line breaks are dropped, and the tags style it. Like `strsp`'s, the sprite isn't brought back by loading a save.
+- `endroll` scrolls the `btndef` image for the end-of-episode credits: its eleven arguments are the screen rectangle,
+  the image rectangle, a mode (the games use 2), the time per pixel in tenths of a millisecond, and the distance in
+  pixels. The script waits until it has scrolled, and a click doesn't cut it short; the image stays on screen, as
+  `blt` drawing does, until the scene is next brought up to date.
+- `drawclear`, `drawsp` and `draw`, NScripter's direct drawing, build a picture of sprites that `draw` puts on the
+  screen in the same way; one tea party's credits animate with them.
+- `tachistate` reads whether each standing image (left, centre, right) is on screen.
+- An effect's mask may be an image tag (`":c;Bmp\Efe\left.bmp"`), as the games write them; the file after the tag
+  is the mask.
+- `h_rendering` (no hinting, whole pixels) is read; it is what the runtime does.
+- Images tagged `:b` (`:b;`, `:bc;`, `:ba/2,0,3;`, ...) are drawn at half their size, rounded up, each pixel the
+  average of a 2x2 block with a pixel past an odd edge counting as transparent. The games' menus and buttons are drawn
+  at twice the screen's resolution this way. `:c` draws a PNG with an alpha channel opaque, as if over black, where
+  NScripter would keep its alpha.
+- `steamsetachieve` logs the achievement and does nothing more.
+- Saves are the PC Ponscripter engine's own files, `saveN.dat`, `global.sav` and the thumbnails the games write in
+  `screenshot\`. The runtime keeps them in `vndegen-saves`, whatever `savedir` says, never in the game's `saves` folder,
+  which Steam may sync; a PC backup's `saves` files restore there, and saves move both ways. The first time a game
+  runs with no save slot of VNDegen's own, the PC's `saveN.dat`, `global.sav`, `envdata` and `screenshot\*.bmp` are
+  copied from its `saves` folder into `vndegen-saves`, never replacing a file there; `saves` is only read, and a note
+  left in `vndegen-saves` keeps the copy to once. The format is NScripter's
+  after a `PNS` header, with positions on the doubled screen, the window as a text area in doubled pixels, sprites'
+  shown flags with bit 1 set, call stack records of its own, no ruby settings and no message history. The PC engine
+  keeps neither the text line's language nor the style, so a page replays from its head, whose lines name their
+  language. A call frame in the PC format holds only its return offset; which user command it belongs to is worked
+  out from the script on load (the name whose label holds where the call was, else the statement's head). VNDegen's
+  own saves keep that beside them, in `saveN.dat.calls`, so they load as they ran. A sprite `csp` clears also moves
+  to (-500, -500), as on the PC. The PC loads the runtime's save of the Question Arcs' first page to a screen
+  identical to its own load, and the runtime loads the PC's.
+- A textgosub or pretextgosub routine may draw text of its own; the line it interrupted goes on with its carets,
+  language and style as they were. (Inferred: the games' routine draws none.)
+- Malformed UTF-8 (overlong forms, surrogates, values past U+10FFFF) reads a byte at a time, as U+FFFD.
 
 ## English word wrap
 
@@ -194,7 +266,25 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   `lngtwave.dll/vwi` and `trvswave.dll/h` are drawn; others crossfade.
 - CD audio plays only from files in the game's `CD` folder; a disc isn't read.
 - MIDI music (`play "song.mid"`) isn't played; no test game has any.
-- `.nsa` compression type 4 isn't read; no test game uses it.
+- Ponscripter: glyph edges differ from the PC's by a few levels of grey, stb_truetype's antialiasing against
+  FreeType's; layout is the same pixel for pixel in every lab. Only the `~i~`, `~b~` and `~cN~` tags are read, the
+  ones the games use. The window's character pitch isn't added to proportional text (the games' is 0). `logsp` reads
+  tags in any string, where the PC engine reads them only in a page that `gettext` gave; one backlog line in a lab
+  broke a character later than the PC's. `endroll`'s other modes aren't measured. `len` and `mid` count bytes, as in
+  NScripter; the games don't use them, and the PC engine wasn't checked. A save made before the first `setwindow`
+  writes the default window in the doubled form, where the PC engine writes its own default values (the games set a
+  window first). A save without its `saveN.dat.calls` record has its calls worked out from the script: a PC save, and a
+  VNDegen save synced to another device, since the record stays on the device that wrote it. There, a save made
+  inside a user command that jumped to another label before saving, whose arguments include another user command's
+  name, that is the second call to the same command in one statement, or whose line uses a built-in's name (`gosub`,
+  `csel`) as an alias inside an expression, may load as if it were a different call. The one-time copy of a PC copy's
+  saves keeps to its folders and never replaces a file, but it trusts what it finds there: a hand-made or stale list
+  of an interrupted copy, or a slot of another case (`SAVE1.DAT` beside `save1.dat`) made while the copy runs, isn't
+  told from VNDegen's own. An unclosed `~` tag is drawn as it stands, where the PC
+  engine drops the line.
+  Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
+  that saved; the runtime clears the page and keeps NScripter's savepoints there. The games always set one. With a
+  textgosub, a save made before any text follows the statement that saves, where the PC engine keeps the script's start.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`

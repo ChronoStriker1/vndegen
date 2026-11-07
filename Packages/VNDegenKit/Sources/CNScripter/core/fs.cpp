@@ -21,7 +21,7 @@ FileSystem::~FileSystem() {
 
 // On-disk names are UTF-8 on Apple systems and when an archive tool converted them; other names are left as the
 // Shift-JIS bytes a Windows zip stored. Both compare in Shift-JIS, as the script writes them.
-static std::string diskNameToSjis(const std::string &name) { return looksUtf8(name) ? utf8ToSjis(name) : name; }
+static std::string diskNameToSjis(const std::string &name) { return looksUtf8(name) ? fromUtf8(name) : name; }
 
 void FileSystem::indexDir(const std::string &dir, const std::string &prefix) {
     DIR *d = opendir(dir.c_str());
@@ -191,8 +191,11 @@ bool FileSystem::read(std::string_view name, Bytes &out) {
         return decodeSpb(raw.data(), raw.size(), out);
     case 2:
         return decodeLzss(raw.data(), raw.size(), e.originalSize, out);
+    case 4:
+        // NBZ: the original size, big-endian, and a bzip2 stream. Ponscripter games store their BMPs so.
+        return decodeNbz(raw, out) && out.size() == e.originalSize;
     default:
-        logf("%s: archive compression %d is not supported", sjisToUtf8(name).c_str(), e.compression);
+        logf("%s: archive compression %d is not supported", toUtf8(name).c_str(), e.compression);
         return false;
     }
 }
@@ -202,7 +205,7 @@ std::string FileSystem::hostPath(std::string_view name) const {
     if (auto it = loose_.find(key); it != loose_.end()) return root_ + "/" + it->second;
     // Other names, such as files the game writes, take each existing name's spelling on disk; the rest stays as the
     // script spells it, so a new file goes into the folder that exists.
-    std::string utf8 = sjisToUtf8(name);
+    std::string utf8 = toUtf8(name);
     std::replace(utf8.begin(), utf8.end(), '\\', '/');
     std::string path = root_;
     size_t start = 0;

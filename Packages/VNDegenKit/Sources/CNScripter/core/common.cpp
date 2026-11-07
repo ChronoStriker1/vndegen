@@ -16,7 +16,11 @@ namespace vnns {
 namespace {
 std::mutex gLogMutex;
 FILE *gLog = nullptr;
+thread_local TextEncoding tEncoding = TextEncoding::ShiftJis;
 }  // namespace
+
+TextEncoding textEncoding() { return tEncoding; }
+void setTextEncoding(TextEncoding encoding) { tEncoding = encoding; }
 
 void setLogFile(const char *path) {
     std::lock_guard<std::mutex> lock(gLogMutex);
@@ -35,7 +39,7 @@ void logf(const char *fmt, ...) {
     fflush(f);
 }
 
-uint32_t sjisDecode(std::string_view s, size_t i, size_t *len) {
+static uint32_t sjisDecode(std::string_view s, size_t i, size_t *len) {
     uint8_t c = uint8_t(s[i]);
     if (!sjisLead(c) || i + 1 >= s.size()) {
         *len = 1;
@@ -69,7 +73,7 @@ static void appendUtf8(std::string &out, uint32_t cp) {
     }
 }
 
-std::string sjisToUtf8(std::string_view s) {
+static std::string sjisToUtf8(std::string_view s) {
     std::string out;
     out.reserve(s.size() * 3 / 2);
     for (size_t i = 0; i < s.size();) {
@@ -98,6 +102,13 @@ static uint32_t utf8Next(std::string_view s, size_t &i, bool *ok) {
         }
         cp = cp << 6 | (uint8_t(s[i + k]) & 0x3F);
     }
+    // Overlong forms, surrogates and values past U+10FFFF aren't characters.
+    static const uint32_t least[4] = {0, 0x80, 0x800, 0x10000};
+    if (cp < least[n] || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF) {
+        *ok = false;
+        i++;
+        return 0;
+    }
     i += n + 1;
     return cp;
 }
@@ -111,7 +122,7 @@ bool looksUtf8(std::string_view s) {
     return ok && high;
 }
 
-std::string utf8ToSjis(std::string_view s) {
+static std::string utf8ToSjis(std::string_view s) {
     static std::unordered_map<uint32_t, uint16_t> reverse;
     static std::once_flag once;
     std::call_once(once, [] {
@@ -145,10 +156,78 @@ std::string utf8ToSjis(std::string_view s) {
     return out;
 }
 
-std::string sjisLower(std::string_view s) {
+size_t charLen(std::string_view s, size_t i) {
+    uint8_t c = uint8_t(s[i]);
+    if (textEncoding() == TextEncoding::ShiftJis) return (sjisLead(c) && i + 1 < s.size()) ? 2 : 1;
+    // A malformed sequence counts one byte at a time, as decodeChar reads it.
+    size_t at = i;
+    bool ok = true;
+    utf8Next(s, at, &ok);
+    return ok ? at - i : 1;
+}
+
+uint32_t decodeChar(std::string_view s, size_t i, size_t *len) {
+    if (textEncoding() == TextEncoding::ShiftJis) return sjisDecode(s, i, len);
+    size_t at = i;
+    bool ok = true;
+    uint32_t cp = utf8Next(s, at, &ok);
+    *len = at - i;
+    return ok ? cp : 0xFFFD;
+}
+
+bool isHalfWidth(std::string_view s, size_t i) {
+    if (textEncoding() == TextEncoding::ShiftJis) return charLen(s, i) == 1;
+    size_t n;
+    uint32_t cp = decodeChar(s, i, &n);
+    return cp < 0x2000 || (cp >= 0xFF61 && cp <= 0xFF9F);
+}
+
+size_t completeLength(std::string_view s) {
+    if (textEncoding() == TextEncoding::ShiftJis) {
+        // A lead byte alone at the end.
+        size_t last = 0;
+        for (size_t i = 0; i < s.size(); i += charLen(s, i)) last = i;
+        return !s.empty() && last + 1 == s.size() && sjisLead(uint8_t(s[last])) ? last : s.size();
+    }
+    // Within the last three bytes, a lead byte whose sequence runs past the end.
+    for (size_t back = 1; back <= 3 && back <= s.size(); back++) {
+        uint8_t b = uint8_t(s[s.size() - back]);
+        if ((b & 0xC0) == 0x80) continue;
+        size_t want = b >= 0xF0 ? 4 : b >= 0xE0 ? 3 : b >= 0xC0 ? 2 : 1;
+        return want > back ? s.size() - back : s.size();
+    }
+    return s.size();
+}
+
+bool isWideSpace(std::string_view s, size_t i) {
+    if (textEncoding() == TextEncoding::ShiftJis)
+        return i + 1 < s.size() && uint8_t(s[i]) == 0x81 && uint8_t(s[i + 1]) == 0x40;
+    return i + 2 < s.size() && uint8_t(s[i]) == 0xE3 && uint8_t(s[i + 1]) == 0x80 && uint8_t(s[i + 2]) == 0x80;
+}
+
+std::string toUtf8(std::string_view s) {
+    return textEncoding() == TextEncoding::ShiftJis ? sjisToUtf8(s) : std::string(s);
+}
+
+std::string fromUtf8(std::string_view s) {
+    return textEncoding() == TextEncoding::ShiftJis ? utf8ToSjis(s) : std::string(s);
+}
+
+std::string fullWidthDigits(std::string_view s) {
+    static const char *const digits[] = {"０", "１", "２", "３", "４", "５", "６", "７", "８", "９"};
+    std::string out;
+    for (char c : s) {
+        if (c >= '0' && c <= '9') out += fromUtf8(digits[c - '0']);
+        else if (c == '-') out += fromUtf8("－");
+        else out += c;
+    }
+    return out;
+}
+
+std::string lowerAscii(std::string_view s) {
     std::string out(s);
     for (size_t i = 0; i < out.size();) {
-        size_t n = sjisCharLen(out, i);
+        size_t n = charLen(out, i);
         if (n == 1 && out[i] >= 'A' && out[i] <= 'Z') out[i] = char(out[i] - 'A' + 'a');
         i += n;
     }
@@ -159,9 +238,9 @@ std::string normalizePath(std::string_view s) {
     std::string out;
     out.reserve(s.size());
     for (size_t i = 0; i < s.size();) {
-        size_t n = sjisCharLen(s, i);
-        if (n == 2) {
-            out.append(s.substr(i, 2));
+        size_t n = charLen(s, i);
+        if (n > 1) {
+            out.append(s.substr(i, n));
         } else {
             char c = s[i];
             if (c == '/') c = '\\';

@@ -73,7 +73,7 @@ The view button in the top bar switches between Header list, Capsule rows, Featu
 | Artemis | a `.pfs` archive or a `system.ini` | Mac, iPhone, iPad | [artemis.md](docs/artemis.md) |
 | Godot 3 and Godot 4 | a `.pck` file, or a pack inside the game's `.exe` | Mac with Apple silicon, iPhone, iPad | [godot.md](docs/godot.md) |
 | Flash (ActionScript 1, 2, and 3) | a projector `.exe`, a `.swf`, or an HTML page that launches movies | Mac, iPhone, iPad | [flash.md](docs/flash.md) |
-| NScripter | `nscript.dat`, or `0.txt` or `00.txt` beside NScripter archives | Mac, iPhone, iPad | [nscripter.md](docs/nscripter.md) |
+| NScripter and Ponscripter | `nscript.dat`, or `0.txt`, `00.txt` or Ponscripter's `0.utf` beside NScripter archives | Mac, iPhone, iPad | [nscripter.md](docs/nscripter.md) |
 | Wolf RPG Editor 2 and 3 | `Data.wolf`, `Data/BasicData`, or `Data/BasicData.wolf` | Mac, iPhone, iPad | [wolfrpg.md](docs/wolfrpg.md) |
 | AliceSoft System 3.0 to 3.9 | `System39.ain` beside a scenario archive such as `RanceSA.ALD`, or `ADISK.DAT` | Mac, iPhone, iPad | [system3.md](docs/system3.md) |
 | AliceSoft System 4 | an `.ain` code file beside `AliceStart.ini`, `System40.ini`, or `System40.exe` | Mac, iPhone, iPad | [system4.md](docs/system4.md) |

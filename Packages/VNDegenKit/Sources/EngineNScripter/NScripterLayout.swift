@@ -9,6 +9,8 @@ nonisolated struct NScripterLayout: Equatable, Sendable {
     /// The file that identified the game, relative to the game folder.
     var evidence: String
     var confidence: DetectionConfidence
+    /// A Ponscripter game: its script is `0.utf`, in UTF-8.
+    var ponscripter: Bool { evidence.lowercased().hasSuffix(".utf") }
 
     init?(_ probe: FolderProbe) {
         // Group the listing by folder, with lowercased names, as Windows compares them.
@@ -44,11 +46,12 @@ nonisolated struct NScripterLayout: Equatable, Sendable {
 
     /// The script file and how sure it makes us. An encoded nscript.dat is NScripter's own format. A numbered text
     /// script counts only beside an archive or the engine's settings file, since 0.txt alone could be anything.
+    /// Ponscripter's `0.utf` comes first, as the runtime reads it first.
     private static func match(_ names: Set<String>) -> (file: String, confidence: DetectionConfidence)? {
         let hasArchive = names.contains { $0.hasSuffix(".nsa") || $0.hasSuffix(".ns2") || $0.hasSuffix(".sar") }
         let companion = hasArchive || names.contains("envdata") || names.contains("nscr.exe") || names.contains("nslua.dll")
             || names.contains("nsogg2.dll") || names.contains("nspng.dll")
-        for script in ["0.txt", "00.txt"] where names.contains(script) && companion {
+        for script in ["0.utf", "00.utf", "0.txt", "00.txt"] where names.contains(script) && companion {
             return (script, .certain)
         }
         if names.contains("nscript.dat") { return ("nscript.dat", .certain) }

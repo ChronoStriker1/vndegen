@@ -56,6 +56,10 @@ bool vnneko_is_supported(const char *gameRoot) {
     config.parse(*init);
     return neko::menuTable(neko::normalizedPath(config.text("UserDataDirectory"))) != nullptr;
 }
+int64_t vnneko_debug_file_size(const char *gameRoot, const char *path) {
+    neko::Files files;
+    return files.open(gameRoot) ? files.storedSize(path) : -1;
+}
 void vnneko_set_skip(VNNekoEngine *e, bool on) { e->engine.setSkip(on); }
 void vnneko_set_paused(VNNekoEngine *e, bool paused) { e->engine.setPaused(paused); }
 void vnneko_stop(VNNekoEngine *e) { delete e; }

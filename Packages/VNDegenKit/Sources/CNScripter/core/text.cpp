@@ -9,15 +9,6 @@
 namespace vnns {
 
 namespace {
-uint32_t parseHexColor(std::string_view s) {
-    if (!s.empty() && s[0] == '#') s.remove_prefix(1);
-    unsigned v = 0;
-    for (size_t i = 0; i < 6 && i < s.size(); i++) {
-        char c = s[i];
-        v = v << 4 | unsigned(isdigit(uint8_t(c)) ? c - '0' : (tolower(c) - 'a' + 10) & 15);
-    }
-    return rgba(int(v >> 16 & 255), int(v >> 8 & 255), int(v & 255));
-}
 bool isHex6(const std::string &t, size_t p) {
     for (size_t i = 0; i < 6; i++)
         if (p + i >= t.size() || !isxdigit(uint8_t(t[p + i]))) return false;
@@ -65,17 +56,17 @@ static void drawCoverage(Image &out, const Glyph &g, int x, int y, uint32_t colo
     }
 }
 
-// Draws Shift-JIS text on one line from (x, y), each character in its cell. Returns nothing; layout is fixed-pitch.
-void Engine::drawGlyphs(Image &out, const std::string &sjis, int x, int y, int fw, int fh, int pitchX, uint32_t color,
+// Draws text on one line from (x, y), each character in its cell. Returns nothing; layout is fixed-pitch.
+void Engine::drawGlyphs(Image &out, const std::string &str, int x, int y, int fw, int fh, int pitchX, uint32_t color,
                         bool bold, bool shadow, int, int, bool) {
     int px = x;
-    for (size_t i = 0; i < sjis.size();) {
+    // Part of a character, as a byte-counted mid leaves at the end of a string, draws nothing.
+    std::string_view text(str.data(), completeLength(str));
+    for (size_t i = 0; i < text.size();) {
         size_t n;
-        uint32_t cp = sjisDecode(sjis, i, &n);
+        bool half = isHalfWidth(text, i);
+        uint32_t cp = decodeChar(text, i, &n);
         i += n;
-        // Half a character, as a byte-counted mid leaves at the end of a string, draws nothing.
-        if (i == sjis.size() && n == 1 && sjisLead(uint8_t(sjis[i - 1]))) break;
-        bool half = n == 1;
         int cw = half ? fw / 2 : fw;
         // A backquote marks half-width text in one game's strings (its save names, say); it isn't drawn.
         if (cp == '`') continue;
@@ -97,7 +88,8 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     int pitch = spFont_.set ? spFont_.px : win_.px;
     bool bold = spFont_.set ? spFont_.bold : win_.bold, shadow = spFont_.set ? spFont_.shadow : win_.shadow;
     size_t p = 0;
-    if (p < spec.size() && spec[p] == '/') {
+    bool sized = p < spec.size() && spec[p] == '/';
+    if (sized) {
         p++;
         // fw,fh,pitch[,mode...]: later settings exist in newer engines; the first four are what this draws.
         int vals[4] = {fw, fh, pitch, 0};
@@ -126,10 +118,15 @@ ImageRef Engine::renderStringImage(const std::string &spec, int &cells) {
     }
     if (colors.empty()) colors.push_back(rgba(255, 255, 255));
     std::string text = spec.substr(p);
+    if (ponscripter_ && ponsFace(0)) {
+        if (colors.size() > 64) colors.resize(64);  // more colour cells than any button has are a broken script
+        // A size the tag gives is the em on Ponscripter's doubled screen; the window's is the em on the game's.
+        return renderPonsString(text, sized ? fh : 2 * fh, sized ? pitch : 2 * pitch, colors, shadow, cells);
+    }
     int64_t advance = 0;
     for (size_t i = 0; i < text.size();) {
-        size_t n = sjisCharLen(text, i);
-        advance += n == 1 ? (fw + pitch) / 2 : fw + pitch;
+        size_t n = charLen(text, i);
+        advance += isHalfWidth(text, i) ? (fw + pitch) / 2 : fw + pitch;
         i += n;
     }
     int width = int(std::clamp<int64_t>(advance, 1, 8192));
@@ -159,7 +156,7 @@ void Engine::showWindow() {
             windowShown_ = true;
             effect_.from = std::move(from);
             effect_.e = windowEffect_;
-            effect_.mask = windowEffect_.mask.empty() ? nullptr : loadFileImage(windowEffect_.mask);
+            effect_.mask = windowEffect_.mask.empty() ? nullptr : loadMask(windowEffect_.mask);
             effect_.start = now_;
             effect_.active = true;
             wait_ = WaitKind::Effect;
@@ -178,7 +175,9 @@ void Engine::drawWindow(Image &out) {
     }
     if (textHidden_) return;
     drawClickCursor(out);
+    if (ponscripter_) drawPonsText(out);
     for (const TextChar &c : page_) {
+        if (c.face >= 0 && c.gaiji.empty()) continue;
         if (!c.gaiji.empty()) {
             if (ImageRef img = loadFileImage(c.gaiji)) blit(out, *img, c.x, c.y, 0, 0, img->w, img->h);
             continue;
@@ -231,26 +230,35 @@ void Engine::clearPage() {
     pushLog();
     page_.clear();
     pageText_.clear();
+    pageHeadTaken_ = false;
     textButtons_.clear();
-    penX_ = 0;
-    penY_ = 0;
+    resetPen();
     sceneDirty_ = true;
 }
 
 void Engine::newLine() {
+    if (ponsText()) {
+        ponsNewLine();
+        return;
+    }
     penX_ = indent_ * fullAdvance();
     penY_ += win_.fh + win_.py;
     pageText_ += '\n';
 }
 
 void Engine::putChar(const std::string &ch, bool isRuby) {
+    if (ponscripter_) lineHadText_ = true;
+    if (ponsText() && !isRuby) {
+        ponsPutChar(ch);
+        return;
+    }
     showWindow();
-    bool half = ch.size() == 1;
+    bool half = isHalfWidth(ch, 0);
     int adv = half ? halfAdvance() : fullAdvance();
     int lineWidth = win_.cols * fullAdvance();
     if (penX_ + adv > lineWidth && penX_ > indent_ * fullAdvance()) {
         // Line-start kinsoku characters hang past the edge instead of starting a line.
-        if (kinsokuStart_.find(ch) == std::string::npos || ch.size() == 1) newLine();
+        if (kinsokuStart_.find(ch) == std::string::npos || half) newLine();
     }
     TextChar c;
     c.ch = ch;
@@ -277,12 +285,31 @@ bool Engine::beginTextLine() {
     lineHadText_ = false;
     noNewlineAtEnd_ = false;
     halfWidthText_ = false;
+    caretText_ = false;
     // A page wait's clear happens as the next page starts, before that page's head becomes the savepoint.
     if (pendingPageClear_) {
         clearPage();
         pendingPageClear_ = false;
     }
     noteTextLineStart();
+    return true;
+}
+
+// After a character of a text line: a clickstr character waits for a click unless a wait follows anyway. True when it
+// waits.
+bool Engine::textClickStr(const std::string &ch) {
+    const std::string &t = script_.text();
+    size_t p = cur_.pos;
+    bool hit = !ignoreClickStr_ && !clickStr_.empty() && !isHalfWidth(ch, 0) && clickStr_.find(ch) != std::string::npos;
+    ignoreClickStr_ = false;
+    if (!hit) return false;
+    char next = p < t.size() ? t[p] : '\n';
+    if (next == '@' || next == '\\') return false;
+    int row = penY_ / std::max(1, win_.fh + win_.py);
+    bool page = row >= win_.rows - clickStrLines_;
+    if (page) pendingPageClear_ = true;
+    textFast_ = false;
+    textClickWait(page);
     return true;
 }
 
@@ -297,6 +324,9 @@ void Engine::textClickWait(bool page) {
         f.line = cur_.line;
         f.stmt = cur_.stmt;
         f.resumeText = true;
+        f.caret = caretText_;
+        f.textLang = textLang_;
+        f.style = ponsStyle_;
         stack_.push_back(f);
         inTextLine_ = false;
         if (!jumpToLabel(textGosub_)) {
@@ -352,6 +382,9 @@ void Engine::textStep() {
             f.line = cur_.line;
             f.stmt = cur_.stmt;
             f.resumeText = true;
+            f.caret = caretText_;
+            f.textLang = textLang_;
+            f.style = ponsStyle_;
             stack_.push_back(f);
             inTextLine_ = false;
             if (!jumpToLabel(preTextGosub_)) {
@@ -365,23 +398,48 @@ void Engine::textStep() {
     if (c == '\n') {
         inTextLine_ = false;
         if (linePage_ && !noNewlineAtEnd_) {
-            // linepage: each text line ends in a page wait.
+            // linepage: each text line ends in a page wait; in the language not shown it keeps the page, as \ does.
             noNewlineAtEnd_ = true;
-            textClickWait(true);
+            textClickWait(!textHiddenByLang());
             if (!textGosub_.empty()) return;
             return;
         }
-        if (!noNewlineAtEnd_ && lineHadText_) newLine();
+        // In Ponscripter, a line whose last character is the caret closing its English text doesn't end the line on
+        // screen, and a line in the language not shown leaves no mark at all.
+        bool ponsJoin = ponscripter_ && (textHiddenByLang() || (p > 0 && t[p - 1] == '^'));
+        if (!noNewlineAtEnd_ && lineHadText_ && !ponsJoin) newLine();
         p++;
         cur_.line++;
         cur_.stmt = 0;
         textFast_ = false;
         return;
     }
-    lineHadText_ = true;
+    // A Ponscripter line ends the line on screen only once it has drawn a character, so a line of tags or of !sd alone
+    // leaves no mark (measured on the PC); putChar notes it.
+    if (!ponscripter_) lineHadText_ = true;
+    if (ponscripter_ && c == '^') {
+        p++;
+        caretText_ = !caretText_;
+        return;
+    }
+    if (ponscripter_ && c == '~') {
+        // ~tags~ set the face and style of the text that follows. An unclosed one is drawn as it stands.
+        size_t close = t.find('~', p + 1);
+        if (close != std::string::npos && close < t.find('\n', p)) {
+            if (!textHiddenByLang()) {
+                applyPonsTag(ponsStyle_, std::string_view(t).substr(p + 1, close - p - 1));
+                // gettext keeps tags, so a backlog drawn with logsp shows the page's styles (measured on the PC).
+                pageText_ += t.substr(p, close - p + 1);
+            }
+            p = close + 1;
+            return;
+        }
+    }
     if (c == '@' || c == '\\') {
         p++;
-        bool page = c == '\\';
+        // A page wait in the language not shown waits without clearing the page, and texec after it leaves the page
+        // too (measured on the PC through where its saves resume).
+        bool page = c == '\\' && !textHiddenByLang();
         textFast_ = false;
         if (page) {
             // The newline right after a page wait doesn't start a new line.
@@ -425,7 +483,7 @@ void Engine::textStep() {
     // One game's English script, written for a patched engine, opens its text lines with a backquote: the text is
     // half-width English, broken between words, and each '|' inside it is a short pause the player can click past.
     // Settled from that script alone; no engine was available to check it against.
-    if (c == '`') {
+    if (c == '`' && !ponscripter_) {
         p++;
         halfWidthText_ = !halfWidthText_;
         return;
@@ -439,17 +497,18 @@ void Engine::textStep() {
         }
         return;
     }
-    if (c == '$' || c == '%') {
+    if ((c == '$' || c == '%') && !caretText_) {
         VarRef v = readVar();
+        if (textHiddenByLang()) return;
         std::string s = v.kind == VarRef::Str ? strVar(v.index) : std::to_string(getNumVar(v.index));
         for (size_t i = 0; i < s.size();) {
-            size_t n = sjisCharLen(s, i);
+            size_t n = charLen(s, i);
             pendingChars_.push_back(s.substr(i, n));
             i += n;
         }
         return;
     }
-    if (c == '{') {
+    if (c == '{' && !caretText_) {
         // {var,value,var,value...} assigns as the text is shown.
         p++;
         while (peek() != '}' && peek() != '\n') {
@@ -459,22 +518,26 @@ void Engine::textStep() {
             if (v.kind == VarRef::Str) {
                 // The value runs to the next comma or brace, unquoted.
                 size_t start = p;
-                while (p < t.size() && t[p] != ',' && t[p] != '}' && t[p] != '\n') p += sjisCharLen(t, p);
+                while (p < t.size() && t[p] != ',' && t[p] != '}' && t[p] != '\n') p += charLen(t, p);
                 setVar(v, t.substr(start, p - start));
             } else {
                 setVar(v, readInt());
             }
             readComma();
             if (p == before) {  // not an assignment: skip to the brace rather than read it again
-                while (peek() != '}' && peek() != '\n') p += sjisCharLen(t, p);
+                while (peek() != '}' && peek() != '\n') p += charLen(t, p);
             }
         }
         if (peek() == '}') p++;
         return;
     }
-    if (c == '<' && !textBtnOff_) {
+    if (c == '<' && !textBtnOff_ && !caretText_) {
         // <N text> or <text>: a text button.
         size_t end = t.find('>', p);
+        if (end != std::string::npos && t.find('\n', p) > end && textHiddenByLang()) {
+            p = end + 1;  // a button in the language not shown isn't made
+            return;
+        }
         if (end != std::string::npos && t.find('\n', p) > end) {
             p++;
             int number = -1;
@@ -490,36 +553,36 @@ void Engine::textStep() {
             uint32_t saved = textColor_;
             textColor_ = linkColor_[0];
             size_t first = page_.size();
-            for (size_t i = 0; i < text.size();) {
-                size_t n = sjisCharLen(text, i);
-                putChar(text.substr(i, n));
-                i += n;
-            }
+            putString(text);
             for (size_t i = first; i < page_.size(); i++) page_[i].link = number;
             textColor_ = saved;
             return;
         }
     }
-    if (c == '(' && rubyOn_) {
+    if (c == '(' && rubyOn_ && !caretText_) {
         // (base/ruby)
         size_t slash = t.find('/', p), close = t.find(')', p), nl = t.find('\n', p);
+        if (slash < close && close < nl && textHiddenByLang()) {
+            p = close + 1;
+            return;
+        }
         if (slash < close && close < nl) {
             std::string base = t.substr(p + 1, slash - p - 1), ruby = t.substr(slash + 1, close - slash - 1);
             p = close + 1;
             int startX = penX_;
             for (size_t i = 0; i < base.size();) {
-                size_t n = sjisCharLen(base, i);
+                size_t n = charLen(base, i);
                 putChar(base.substr(i, n));
                 i += n;
             }
             // Ruby is centred over the base, in its own smaller cells above the line.
             int baseW = penX_ - startX;
             int rubyCount = 0;
-            for (size_t i = 0; i < ruby.size(); i += sjisCharLen(ruby, i)) rubyCount++;
+            for (size_t i = 0; i < ruby.size(); i += charLen(ruby, i)) rubyCount++;
             int rx = win_.tx + startX + (baseW - rubyCount * rubyW_) / 2;
             int ry = win_.ty + penY_;
             for (size_t i = 0; i < ruby.size();) {
-                size_t n = sjisCharLen(ruby, i);
+                size_t n = charLen(ruby, i);
                 TextChar rc;
                 rc.ch = ruby.substr(i, n);
                 rc.x = rx;
@@ -529,6 +592,7 @@ void Engine::textStep() {
                 rc.h = rubyH_;
                 rc.ruby = true;
                 page_.push_back(rc);
+                if (ponscripter_) lineHadText_ = true;  // drawn, so the line ends on screen
                 rx += rubyW_;
                 i += n;
             }
@@ -536,16 +600,29 @@ void Engine::textStep() {
         }
     }
     // An ordinary character.
-    size_t n = sjisCharLen(t, p);
+    size_t n = charLen(t, p);
     std::string ch = t.substr(p, n);
+    if (ponscripter_) ch = ponsChar(t, p, &n);
     p += n;
+    if (textHiddenByLang()) {
+        // Text of the language not shown isn't drawn, but its waits run, a clickstr character's too.
+        textClickStr(ch);
+        return;
+    }
+    // Outside carets, the PC engine draws no half-width space.
+    if (ponscripter_ && !caretText_ && ch == " ") return;
+    if (ch == " " && ponsText() && ponsWrapsBefore(t, p)) {
+        // Ponscripter breaks a line before a word that won't fit, and the space at the break isn't drawn.
+        newLine();
+        return;
+    }
     if (((english_ && cfg_.englishWordWrap) || halfWidthText_) && ch == " ") {
         // Word wrap (the option Test Game 98's patched engine needs): break before a word that won't fit.
         size_t q = p;
         int w = 0;
         while (q < t.size() && t[q] != ' ' && t[q] != '\n' && t[q] != '@' && t[q] != '\\' && t[q] != '|' && t[q] != '`') {
-            size_t m = sjisCharLen(t, q);
-            w += m == 1 ? halfAdvance() : fullAdvance();
+            size_t m = charLen(t, q);
+            w += isHalfWidth(t, q) ? halfAdvance() : fullAdvance();
             q += m;
         }
         int lineWidth = win_.cols * fullAdvance();
@@ -555,19 +632,7 @@ void Engine::textStep() {
         }
     }
     putChar(ch);
-    bool clickStrHit = !ignoreClickStr_ && !clickStr_.empty() && n == 2 && clickStr_.find(ch) != std::string::npos;
-    ignoreClickStr_ = false;
-    if (clickStrHit) {
-        char next = p < t.size() ? t[p] : '\n';
-        if (next != '@' && next != '\\') {
-            int row = penY_ / std::max(1, win_.fh + win_.py);
-            bool page = row >= win_.rows - clickStrLines_;
-            if (page) pendingPageClear_ = true;
-            textFast_ = false;
-            textClickWait(page);
-            return;
-        }
-    }
+    if (textClickStr(ch)) return;
     if (!textFast_ && !skipMode_ && !ctrlSkip() && textSpeed_ > 0) {
         wait_ = WaitKind::Text;
         waitUntil_ = now_ + textSpeed_;
@@ -600,8 +665,8 @@ void cmdSetWindow(E &e, const std::string &name) {
         if (i) e.readComma();
         v[i] = e.readInt();
     }
-    w.tx = v[0];
-    w.ty = v[1];
+    w.tx = e.ponscripter_ ? E::ponsOrigin(v[0]) : v[0];
+    w.ty = e.ponscripter_ ? E::ponsOrigin(v[1]) : v[1];
     w.cols = v[2];
     w.rows = v[3];
     w.fw = v[4];
@@ -644,7 +709,8 @@ void cmdSetWindow(E &e, const std::string &name) {
     }
     e.page_.clear();
     e.pageText_.clear();
-    e.penX_ = e.penY_ = 0;
+    e.pageHeadTaken_ = false;
+    e.resetPen();
     e.windowShown_ = false;
     e.sceneDirty_ = true;
 }
@@ -652,7 +718,8 @@ void cmdSetWindow(E &e, const std::string &name) {
 void cmdTextClear(E &e, const std::string &) {
     e.page_.clear();
     e.pageText_.clear();
-    e.penX_ = e.penY_ = 0;
+    e.pageHeadTaken_ = false;
+    e.resetPen();
     e.sceneDirty_ = true;
 }
 
@@ -685,7 +752,9 @@ void cmdDefaultSpeed(E &e, const std::string &) {
 
 void cmdBr(E &e, const std::string &) {
     e.showWindow();
-    e.newLine();
+    // Ponscripter's br starts a paragraph half a line down.
+    if (e.ponsText()) e.ponsBreakParagraph();
+    else e.newLine();
     e.sceneDirty_ = true;
 }
 
@@ -695,17 +764,15 @@ void cmdLocate(E &e, const std::string &) {
     int y = e.readInt();
     e.penX_ = x * e.halfAdvance();
     e.penY_ = y * (e.win_.fh + e.win_.py);
+    e.penX2_ = 2 * e.penX_;
+    e.penY2_ = 2 * e.penY_;
 }
 
 void cmdPutText(E &e, const std::string &) {
     std::string s = e.readStr();
     bool noBreak = !s.empty() && s.back() == '/';
     if (noBreak) s.pop_back();
-    for (size_t i = 0; i < s.size();) {
-        size_t n = sjisCharLen(s, i);
-        e.putChar(s.substr(i, n));
-        i += n;
-    }
+    e.putString(s);
     if (!noBreak) e.newLine();
     e.sceneDirty_ = true;
 }
@@ -819,7 +886,7 @@ void cmdGetTag(E &e, const std::string &) {
             start = ++i;
             continue;
         }
-        i += sjisCharLen(tag, i);
+        i += charLen(tag, i);
     }
     size_t k = 0;
     do {
@@ -880,7 +947,7 @@ void cmdStrSp(E &e, const std::string &name) {
     std::vector<std::string> lines(1);
     int col = 0;
     for (size_t i = 0; i < text.size();) {
-        size_t k = sjisCharLen(text, i);
+        size_t k = charLen(text, i);
         std::string ch = text.substr(i, k);
         i += k;
         if (ch == "\\") {
@@ -888,7 +955,7 @@ void cmdStrSp(E &e, const std::string &name) {
             col = 0;
             continue;
         }
-        int adv = k == 1 ? 1 : 2;
+        int adv = isHalfWidth(ch, 0) ? 1 : 2;
         if (col + adv > cols * 2) {
             lines.emplace_back();
             col = 0;

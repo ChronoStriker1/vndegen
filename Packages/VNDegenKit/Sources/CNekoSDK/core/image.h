@@ -41,11 +41,17 @@ public:
     ~Images();
     // The same picture, blurred by this radius in pixels. Kept like any other, since scripts hold a blur for a whole scene.
     ImageRef blurred(const std::string &path, int radius);
+    // CGs and sprites, `cg\x.bmp` and `sc\x.bmp`, come from this patch's own set where it has them, as The Alchemist's
+    // original art does from `sys_5`. Empty for the base set.
+    void setArtSet(const std::string &patch);
 
 private:
     void work();
     ImageRef decode(const std::string &path) const;
     ImageRef remember(const std::string &key, ImageRef image);
+    // The path a picture is read from, under the art set's name when that has it. Called with `mu_` held.
+    std::string sourceLocked(const std::string &path) const;
+    std::string source(const std::string &path);
     const Files &files_;
     std::list<std::pair<std::string, ImageRef>> recent_;
     std::unordered_map<std::string, std::list<std::pair<std::string, ImageRef>>::iterator> byPath_;
@@ -55,6 +61,7 @@ private:
     std::condition_variable wake_, done_;
     std::deque<std::pair<std::string, int>> queue_;
     std::string decoding_;
+    std::string artSet_;
     bool stopping_ = false;
     std::thread worker_;
 };

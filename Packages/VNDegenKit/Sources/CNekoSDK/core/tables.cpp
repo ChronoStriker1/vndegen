@@ -96,6 +96,29 @@ button nav_title obj\e003_000.bmp 1190 341 9 5 6
 button nav_quit obj\e003_000.bmp 1190 382 9 5 7
 button back obj\e003_000.bmp 1190 464 9 5 8
 screen cg
+# The CG viewer's panel, measured under Wine.
+viewer obj\j000_000.bmp 0 569
+viewerhelp obj\j001_002.bmp 879 681 13
+viewerbutton bgm obj\j004_000.bmp 397 616 2 0
+viewerbgm 0 0 0 2
+viewerslider obj\j003_000.bmp 277 641 12
+viewernumber volume obj\e008_002.bmp 317 618 12 3
+viewerbutton zoomout obj\j002_000.bmp 511 644 3 0 help 9
+viewerbutton zoomreset obj\j002_000.bmp 547 644 3 1 help 10
+viewerbutton zoomin obj\j002_000.bmp 583 644 3 2 help 11
+viewernumber zoom obj\e008_001.bmp 544 608 14 1
+viewernumber zoomfrac obj\e008_002.bmp 568 611 12 2
+viewerbutton replay obj\j001_000.bmp 721 643 2 0 help 2
+viewerbutton prevcg obj\j001_001.bmp 808 641 5 0 help 4
+viewerbutton prevvar obj\j001_001.bmp 863 641 5 1 help 5
+viewerbutton nextvar obj\j001_001.bmp 1008 641 5 2 help 6
+viewerbutton nextcg obj\j001_001.bmp 1063 641 5 3 help 7
+viewerbutton auto obj\j001_001.bmp 1123 641 5 4 help 8
+viewerbutton return obj\j001_000.bmp 1182 643 2 1 help 3
+viewerbutton hide obj\j000_001.bmp 1240 588 help 0
+viewernumber index obj\e008_001.bmp 925 630 14 2
+viewernumber total obj\e008_002.bmp 965 646 12 2
+viewerauto 8000 0
 pic obj\f000_001.bmp 0 0
 pic obj\f004_000.bmp 380 0
 pic obj\e003_001.bmp 1110 0
@@ -490,6 +513,30 @@ button nav_title obj\e003_000.bmp 1706 523 10 5 7 swap help obj\e004_007.bmp 157
 button nav_quit obj\e003_000.bmp 1714 600 10 5 8 swap help obj\e004_008.bmp 1534 546 1 1 0 0
 button back obj\e003_000.bmp 1738 831 10 5 9 swap help obj\e004_009.bmp 1628 777 1 1 0 0
 screen cg
+# The CG viewer's panel, measured under Wine.
+viewer obj\j999_000.bmp 276 842
+viewerhelp obj\j006_001.bmp 1410 1027 12
+viewerbutton art obj\f999_001.bmp 320 949 helppic obj\j999_001.bmp 847 1027
+viewerbutton bgm obj\j006_000.bmp 641 949 2 1
+viewerbgm 1 2 0 0
+viewerslider obj\j005_000.bmp 620 911 11
+viewernumber volume obj\j003_001.bmp 734 875 20 3
+viewerbutton zoomout obj\j004_000.bmp 840 949 3 0 help 8
+viewerbutton zoomreset obj\j004_000.bmp 904 949 3 1 help 9
+viewerbutton zoomin obj\j004_000.bmp 968 949 3 2 help 10
+viewernumber zoom obj\j003_000.bmp 900 888 26 1
+viewernumber zoomfrac obj\j003_001.bmp 938 896 20 2
+viewerbutton replay obj\j002_000.bmp 1069 949 help 1
+viewerbutton prevcg obj\j002_001.bmp 1228 949 6 0 help 3
+viewerbutton prevvar obj\j002_001.bmp 1294 949 6 1 help 4
+viewerbutton nextvar obj\j002_001.bmp 1549 949 6 2 help 5
+viewerbutton nextcg obj\j002_001.bmp 1615 949 6 3 help 6
+viewerbutton auto obj\j002_001.bmp 1712 949 6 4 help 7
+viewerbutton return obj\j002_001.bmp 1807 949 6 5 help 2
+viewerbutton hide obj\l001_003.bmp 1849 871 2 0 help 0
+viewernumber index obj\j003_000.bmp 1396 923 26 2
+viewernumber total obj\j003_001.bmp 1469 962 20 2
+viewerauto 8000 0
 pic bg\bg_003_000_000_000_000.bmp 0 0
 pic obj\e000_000.bmp 0 0 alpha 110
 pic obj\e000_001.bmp 0 0
@@ -664,8 +711,8 @@ pic obj\h008_000.bmp 561 482 2 5 0 4
 pic obj\h008_000.bmp 679 482 2 5 1 4
 pic obj\h008_000.bmp 827 687 2 5 0 4
 pic obj\h008_000.bmp 945 687 2 5 1 4
-pic obj\h999_000.bmp 1077 687 2 5 0 4
-pic obj\h999_000.bmp 1318 687 2 5 1 4
+radio art 1 obj\h999_000.bmp 1077 687 2 5 0
+radio art 0 obj\h999_000.bmp 1318 687 2 5 1
 slider opacity obj\h009_000.bmp 208 612
 number opacity obj\h011_000.bmp 573 568
 step opacity -1 obj\h010_000.bmp 140 613 2 5 0
@@ -1878,7 +1925,7 @@ button nav_title obj\c010_020.bmp 1017 301 10 5 7
 button nav_quit obj\c010_020.bmp 1012 337 10 5 8
 button back obj\c010_020.bmp 978 629 10 5 9
 viewer obj\n000_000.bmp 627 594
-viewerbutton replay obj\n001_003.bmp 645 658
+viewerbutton replay obj\n001_003.bmp 645 658 hide
 viewerbutton prevcg obj\n001_004.bmp 717 658
 viewerbutton prevvar obj\n001_005.bmp 781 658
 viewerbutton nextvar obj\n001_006.bmp 947 658
@@ -1886,7 +1933,9 @@ viewerbutton nextcg obj\n001_007.bmp 1013 658
 viewerbutton auto obj\n001_008.bmp 1081 658
 viewerbutton return obj\n001_009.bmp 1151 658
 viewerbutton hide obj\n001_010.bmp 1225 604
-viewerdigits obj\n003_000.bmp 854 643 17 884 653 896 663
+viewernumber index obj\n003_000.bmp 854 643 17 2 11
+viewercell obj\n003_000.bmp 884 653 11 10
+viewernumber total obj\n003_000.bmp 896 663 17 2 11
 viewerauto 8000 7200
 
 screen scene

@@ -149,6 +149,10 @@ Measured under Wine. A picture opens with a panel over its bottom right: Replay 
 
 Every PC game seen shows a line of help while the pointer is over a menu button or a settings group, except over the tab, page or menu already open. Each was found by hovering every control of the PC game under Wine, and Config's groups by hovering a grid of points over each tab, 40 by 24 pixels apart (64 in The Alchemist). Funbag Fantasy 4 and The Alchemist draw a picture for each, beside the control. Funbag Fantasy 3 if, Haha Sannin to Ana Asobi and Ore o Hoshigaru Tsuma to Gibo draw one row of a sheet of them, at the bottom left for the title and at the bottom right for Config and music, with rows 34 pixels apart on the title's sheet and 39 on the others. Some sheets are drawn flush with the screen's right edge and others at a fixed place, as measured. The Alchemist's Change Illustration help is a picture of its own, `l999_001`.
 
+## Replays
+
+A replay from the Scene gallery uses the bar `MsgButtonPlayViewDeclFilename` names in `init.ini`, `cfg\msg_button_playview.ini`, in place of the usual one. In every game seen it differs only in Exit's help picture, which says the gallery ends rather than the game. Under Wine, Test Game 84's Exit in a replay goes straight back to the Scene Library, with no question.
+
 ## Two nodes with one number
 
 One script of Test Game 95 has two nodes numbered 1125. The first ends the scene and the second points at itself. A save resuming there on the PC game shows the first's line and goes on to the next scene, so the runtime keeps the first of any number and logs the fault. `nekocheck` fails on any such number that it doesn't list as already checked against the PC game, so run it on any game being added.
@@ -178,6 +182,19 @@ A flipbook's sprite record has 0 in its second byte and its current picture wher
 ## Menus
 
 The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.
+
+## The CG viewer
+
+The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist and Yarinaoshi no Christmas under Wine, and the panel, buttons and picture match the PC's to within blending noise. Both PC games behave alike:
+- The zoom runs from 1.00 to 3.00 in steps of 0.05, from the buttons or a wheel notch, and keeps the point under the pointer still. Zoom out and reset are disabled at 1.00, and zoom in at 3.00. Reset is immediate.
+- The slideshow moves on every 8 seconds.
+- The entry's music, the fourth field of its line in `cg_view.ini`, starts with the viewer at the music screen's volume. Its button mutes and unmutes it while it goes on playing.
+- A right click hides or shows the panel, and a click on the picture does nothing.
+- Previous lands on an entry's last picture when it crosses into another gallery tab or wraps round, and otherwise on its first. Next always lands on the first.
+- A disabled button shows no help.
+- The Alchemist's art button switches the same setting as Config's Change Illustration and the message window's art button.
+
+Slider fills round to the nearest pixel: at 60, The Alchemist's 173-pixel music bar fills 104 and Yarinaoshi no Christmas's 161-pixel one 97.
 
 ## Readings not yet checked
 

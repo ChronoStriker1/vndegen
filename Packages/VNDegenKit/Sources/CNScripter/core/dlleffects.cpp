@@ -39,7 +39,7 @@ struct Breakup {
 bool Engine::startDllEffect(const Image &to) {
     const std::string &spec = effect_.e.mask;
     size_t slash = spec.find('/');
-    std::string path = sjisLower(spec.substr(0, slash));
+    std::string path = lowerAscii(spec.substr(0, slash));
     size_t sep = path.find_last_of("\\/");
     effect_.dll = sep == std::string::npos ? path : path.substr(sep + 1);
     effect_.param = slash == std::string::npos ? std::string() : spec.substr(slash + 1);
@@ -48,7 +48,7 @@ bool Engine::startDllEffect(const Image &to) {
                  (effect_.dll == "lngtwave.dll" && effect_.param == "vwi") ||
                  (effect_.dll == "trvswave.dll" && effect_.param == "h");
     if (!known) {
-        logf("effect DLL %s is not emulated; crossfading instead", sjisToUtf8(spec).c_str());
+        logf("effect DLL %s is not emulated; crossfading instead", toUtf8(spec).c_str());
         return false;
     }
     // The DLL gets the rectangle that changes. The original engine passes the rectangle of what it redrew; the

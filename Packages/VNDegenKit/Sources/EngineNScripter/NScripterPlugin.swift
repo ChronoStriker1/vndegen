@@ -5,7 +5,8 @@ extension EngineID {
     nonisolated public static let nScripter = EngineID("nscripter")
 }
 
-/// NScripter games, run on VNDegen's own NScripter runtime (the CNScripter target) inside the app.
+/// NScripter games, and Ponscripter games (NScripter with UTF-8 scripts), run on VNDegen's own NScripter runtime (the
+/// CNScripter target) inside the app.
 nonisolated public struct NScripterPlugin: EnginePlugin {
     public init() {}
 
@@ -15,7 +16,8 @@ nonisolated public struct NScripterPlugin: EnginePlugin {
 
     public func detect(_ probe: FolderProbe) -> EngineMatch? {
         guard let layout = NScripterLayout(probe) else { return nil }
-        return EngineMatch(engine: descriptor.id, confidence: layout.confidence, evidence: layout.evidence)
+        return EngineMatch(engine: descriptor.id, confidence: layout.confidence,
+                           version: layout.ponscripter ? "Ponscripter" : nil, evidence: layout.evidence)
     }
 
     @MainActor public func makeSession(_ launch: GameLaunch) throws -> any EngineSession {

@@ -6,6 +6,7 @@
 // `click` leave pending changes hidden.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <functional>
@@ -22,6 +23,7 @@
 #include "font.h"
 #include "fs.h"
 #include "gfx.h"
+#include "ponsfont.h"
 #include "script.h"
 
 struct lua_State;
@@ -30,6 +32,8 @@ namespace vnns {
 
 constexpr int kSpriteCount = 1000;
 constexpr int kSprite2Count = 256;
+// The PC Ponscripter engine's monocro color before a game sets one, as its saves show.
+constexpr uint32_t kPonsMonocroDefault = 0xFF7AF688;  // red 136, green 246, blue 122, as rgba() packs them
 
 // An image as a script names it, with its tag: ":a;file", ":c/3,100,0;file", ":s/20,20,0;#FFFFFFtext", ...
 struct LoadedImage {
@@ -104,6 +108,12 @@ struct SaveExtras {
     int qInt1 = 0, qInt2 = 1, qInt3 = 0, qInt4 = 0, qInt5 = 0;
     int tail[8] = {0, 0, 0, 0, 0, 0, 0, 0};  // [4] mirrors allsphide, [5] allsp2hide
     std::string tStr;
+    // The PC Ponscripter format's own fields, of unknown meaning: always these in the saves measured.
+    int pnsHead[3] = {1, 1, 0};
+    int pnsWindow = 0;
+    int pnsAllSp = 0;  // where NScripter keeps allsphide
+    uint32_t pnsColor = 0xFFFFFFFF;  // where NScripter keeps the text color; textcolor doesn't change it
+    int pnsTail[10] = {};
 };
 
 struct Effect {
@@ -113,13 +123,18 @@ struct Effect {
 };
 
 struct TextChar {
-    std::string ch;  // one Shift-JIS character
+    std::string ch;  // one character, in the script's encoding
     int x, y;        // top-left, screen pixels
     uint32_t color;
     int w, h;
     bool ruby = false;
     std::string gaiji;  // NSFont gaiji: an image drawn in place of the character
     int link = -1;      // text button number
+    // Ponscripter text, drawn at twice the screen's resolution: the face, and the pen's x and the baseline's y on that
+    // doubled screen. face is -1 for NScripter's fixed cells.
+    int face = -1, x2 = 0, y2 = 0;
+    int px2 = 0;  // the em it was laid out at, on the doubled screen
+    bool shadow = false;
 };
 
 struct Button {
@@ -219,7 +234,7 @@ public:
     bool defineMode_ = true;
     void jumpToLine(int line);
     bool jumpToLabel(std::string_view label);
-    void skipSpaces();
+    void skipSpaces(bool wide = true);  // wide: full-width spaces too
     char peek() const;
     bool atStatementEnd() const;
     bool readComma();  // consumes a ',' if present
@@ -256,6 +271,13 @@ public:
     void errorf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     int quietErrors_ = 0;  // while above 0, errorf logs nothing
 
+    // Ponscripter's text style. ~cN~ picks face N, plain; ~i~ and ~b~ toggle italic and bold, which add 1 and 2 to it. A
+    // style lasts from line to line until a tag changes it.
+    struct PonsStyle {
+        int base = 0;
+        bool italic = false, bold = false;
+        int face() const { return base + (italic ? 1 : 0) + (bold ? 2 : 0); }
+    };
     struct Frame {
         enum Kind { Gosub, For, TextGosub } kind = Gosub;
         size_t pos = 0;  // return position, or the loop body's start
@@ -264,8 +286,13 @@ public:
         // A defsub call returns to the arguments it hasn't read yet, as the PC engine does (and saves): getparam reads
         // them from pos and moves it on, and return skips any left.
         bool hasParams = false;
+        bool paramsRead = false;  // getparam has read some of them
         // textgosub calls resume text output afterwards
         bool resumeText = false;
+        // Ponscripter: the text line's caret, language and style, which the routine's own text may change.
+        bool caret = false;
+        int textLang = -1;
+        PonsStyle style;
     };
     std::vector<Frame> stack_;
 
@@ -307,6 +334,13 @@ public:
         return loadImage(!tag.empty() && tag[0] == ':' ? tag : ":c;" + tag, out);
     }
     ImageRef loadFileImage(const std::string &file, bool *hasAlpha = nullptr);
+    // An effect's mask file. The Umineko games write theirs as image tags (":c;Bmp\Efe\left.bmp"), which their engine
+    // reads as the file after the tag; in NScripter the string is the file name.
+    ImageRef loadMask(const std::string &spec) {
+        size_t semi = spec.find(';');
+        bool tagged = ponscripter_ && !spec.empty() && spec[0] == ':' && semi != std::string::npos;
+        return loadFileImage(tagged ? spec.substr(semi + 1) : spec);
+    }
     std::unordered_map<std::string, ImageRef> imageCache_;
     std::vector<std::string> imageCacheOrder_;
     std::unordered_set<std::string> imageAlpha_;  // cached images that have an alpha channel
@@ -341,7 +375,11 @@ public:
     Image bltLayer_;
     LoadedImage bltSource_;  // the btndef image, loaded without its transparency for blt
     int bltState_ = 0;  // 0 none, 1 drawn, 2 drawn and ofscpy has run
+    // Draws the btndef image's rectangle (sx, sy, sw, sh), scaled to (dx, dy, dw, dh), into the blt layer: v holds
+    // the eight in that order, as blt takes them.
+    void bltRect(const int64_t v[8]);
     void clearBlt() {
+        endRoll_.on = false;  // a credits roll draws into the blt layer; whatever drops that ends the roll
         bltState_ = 0;
         bltLayer_ = Image();
     }
@@ -405,6 +443,76 @@ public:
     bool ignoreClickStr_ = false;
     bool clickCursorPage_ = false;
     std::vector<std::string> pendingChars_;  // characters of a variable being shown
+    // Ponscripter (ponscripter.cpp, docs/nscripter.md). Settled as a black box on the Umineko games' own engine.
+    bool ponscripter_ = false;
+    bool caretText_ = false;  // inside ^...^ on a text line: English text, where $, %, {, <, ( and [ are plain
+    // The language of the text that follows (langen 0, langjp 1, langall or none -1), and the one shown (showlangen,
+    // showlangjp). Text of another language isn't drawn, but its waits run.
+    int textLang_ = -1;
+    int shownLang_ = 0;
+    TextEncoding encoding() const { return ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis; }
+    bool textHiddenByLang() const { return ponscripter_ && textLang_ >= 0 && textLang_ != shownLang_; }
+    std::map<int, std::string> fontFiles_;  // h_mapfont: the game's font files, by face number
+    // endroll: the btndef image scrolls up through a rectangle, a pixel every speed / 10 ms, for distance pixels,
+    // while the script waits until end. Drawn into the blt layer each step; it stops early if that wait ends early.
+    struct EndRoll {
+        bool on = false;
+        int64_t start = 0, end = 0;
+        uint64_t wait = 0;  // the timer wait it started, so a later one with the same end isn't taken for it
+        int64_t rect[8] = {};
+        int64_t distance = 0, speed = 1;
+    } endRoll_;
+    void stepEndRoll();
+    // drawclear, drawsp and draw build a picture of their own, which draw puts on the screen as blt does.
+    Image drawBuffer_;
+
+    // Ponscripter's proportional text (ponstext.cpp). Positions are in pixels of a screen twice the game's size, where
+    // the engine draws; the text is halved onto the frame.
+    std::map<int, std::unique_ptr<PonsFace>> ponsFaces_;  // loaded on first use; null when the file can't be read
+    PonsFace *ponsFace(int n);
+    PonsStyle ponsStyle_;
+    static void applyPonsTag(PonsStyle &style, std::string_view tag);
+    // The character at t[p] as Ponscripter draws it: ` and ' become curly quotes, `` and '' double ones. Returns the
+    // character, and its length in the script in *used.
+    static std::string ponsChar(std::string_view t, size_t p, size_t *used);
+    bool ponsText() { return ponscripter_ && ponsFace(ponsStyle_.face()); }
+    int penX2_ = 0, penY2_ = 0;  // the pen on the doubled screen, from the text origin
+    void resetPen();
+    int ponsSize() const;
+    int ponsLineWidth2() const;
+    int ponsIndent2() const;
+    int ponsLineHeight2();
+    void ponsPutChar(const std::string &ch);
+    void ponsNewLine();
+    void ponsBreakParagraph();  // br
+    // The width on the doubled screen of the word starting at t[p], up to a space, wait or line end, skipping markup.
+    // literal: t is a string putString puts (only carets and tags are markup), not a text line.
+    int ponsWordWidth(std::string_view t, size_t p, bool literal = false);
+    // Whether the word after the space before t[p] won't fit on the line, so the line breaks there.
+    bool ponsWrapsBefore(std::string_view t, size_t p, bool literal = false);
+    // Puts a string's characters, reading its carets, ~tags~ and quotes (select items, text buttons, puttext).
+    void putString(const std::string &s);
+    struct PonsLayer {
+        Image doubled, frame;  // the page's text on the doubled screen, and halved
+        // Everything a character's pixels depend on, so a cached page is drawn again when any of it changes.
+        struct Placed {
+            std::string ch;
+            int face, px, x2, y2;
+            uint32_t color;
+            bool shadow;
+            int shadeX, shadeY;
+            bool operator==(const Placed &o) const {
+                return ch == o.ch && face == o.face && px == o.px && x2 == o.x2 && y2 == o.y2 && color == o.color &&
+                       shadow == o.shadow && shadeX == o.shadeX && shadeY == o.shadeY;
+            }
+        };
+        std::vector<Placed> placed;
+    } ponsLayer_;
+    void drawPonsText(Image &out);
+    // A ":s" string sprite's text, laid out with an em of px and pitch pixels between characters on the doubled
+    // screen, and halved, one cell per colour. With a wrap width, a character that would pass it starts a line.
+    ImageRef renderPonsString(const std::string &text, int px, int pitch, const std::vector<uint32_t> &colors, bool shadow,
+                              int &cells, int wrap = 0);
     void noteTextLineStart();      // savepoint and read-text bookkeeping at the head of a text line
     bool textBtnOff_ = false;
     int textBtnStart_ = 1;
@@ -430,12 +538,13 @@ public:
     void showWindow();
     void drawWindow(Image &out);
     bool glyphFor(uint32_t cp, int w, int h, bool bold, const Glyph *&out);
-    void drawGlyphs(Image &out, const std::string &sjis, int x, int y, int fw, int fh, int pitchX, uint32_t color,
+    void drawGlyphs(Image &out, const std::string &str, int x, int y, int fw, int fh, int pitchX, uint32_t color,
                     bool bold, bool shadow, int maxCols, int pitchY, bool aa = true);
     ImageRef renderStringImage(const std::string &spec, int &cells);
     int halfAdvance() const;
     int fullAdvance() const;
     void textClickWait(bool page);
+    bool textClickStr(const std::string &ch);
     // setcursor / abssetcursor: the click-wait cursors (0 click, 1 page), shown during the built-in click waits.
     struct ClickCursor {
         Sprite sprite;
@@ -488,6 +597,9 @@ public:
     Cursor selectReturn_;
     size_t selectFirst_ = 0;
     std::vector<int> selectRows_;
+    // Ponscripter: each choice's characters on the page and the bottom of its last line, since a choice may wrap.
+    std::vector<std::pair<size_t, size_t>> selectChars_;
+    std::vector<int> selectBottoms_;
     int selectHover_ = -1;
     bool keyboardSelect_ = false;
     void drawSystemUi(Image &out);
@@ -508,6 +620,8 @@ public:
         std::string note;
     };
     bool readSaveInfo(int slot, SaveInfo &info);
+    std::string globalsName() const;
+    std::string saveFilePath(const std::string &file) const;  // a file in the save folder, on disk
 
     // Timing, waits and input
     int64_t now_ = 0;
@@ -518,6 +632,8 @@ public:
     int64_t wallMs() const;
     WaitKind wait_ = WaitKind::None;
     int64_t waitUntil_ = 0;
+    // Counts timer waits, so the command that started one can tell it from a later wait with the same end.
+    uint64_t timerWaits_ = 0;
     int64_t waitStart_ = 0;
     bool paused_ = false;
     bool checkTrap();
@@ -568,6 +684,20 @@ public:
     // at saveoff, and at the savepoint command.
     bool savepointLive_ = true;
     Bytes savepoint_;
+    // A Ponscripter game with a textgosub moves its savepoint only at a text line's head, before pretextgosub, while
+    // saveon is in effect: to the state at the head of the page, the first text line since the page was cleared.
+    // saveon and saveoff only turn that on and off (measured on the PC).
+    Bytes pageHead_;
+    // For each call frame a Ponscripter save holds, whether it is a user command's (1) and whether getparam has read
+    // its arguments (2): the PC format leaves them to be worked out from the script, which can't always tell. Kept with
+    // each saved state and written beside the save; loadedCalls_ is the record of the save being loaded.
+    std::vector<uint8_t> callFlags() const;
+    std::vector<uint8_t> savepointCalls_, pageHeadCalls_, loadedCalls_;
+    int pageHeadLine_ = 0, pageHeadStmt_ = 0;
+    bool pageHeadTaken_ = false;
+    bool ponsSaves() const { return ponscripter_ && !textGosub_.empty(); }
+    // Ponscripter bounds the window's text origin as it bounds sizes, so every drawing path's doubled positions fit.
+    static int ponsOrigin(int v) { return std::clamp(v, -8192, 8192); }
     Cursor stmtStart_;  // where the statement being executed began
     void serializeState(Bytes &out);
     void serializeTail(Bytes &out, int line, int stmt);
@@ -598,6 +728,7 @@ public:
     bool loadGame(int slot);
     std::string savePath(int slot) const;
     void loadGlobals();
+    void importPcSaves();
     // gloval.sav's contents: each global variable as an int32 and a NUL-terminated string.
     Bytes globalsFile() const;
     Bytes globalsOnDisk_;  // what gloval.sav holds, as far as the engine knows
@@ -684,6 +815,8 @@ public:
 using CommandFn = void (*)(Engine &, const std::string &name);
 // Every command, by lowercase name. Defined across the command files.
 const std::unordered_map<std::string, CommandFn> &commandTable();
+// Ponscripter's own commands, known only in a Ponscripter game, so an NScripter game's script reads as before.
+const std::unordered_map<std::string, CommandFn> &ponscripterCommandTable();
 void registerCommands(std::unordered_map<std::string, CommandFn> &table);
 
 }  // namespace vnns

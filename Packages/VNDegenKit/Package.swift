@@ -169,7 +169,7 @@ let package = Package(
         .target(name: "RuntimePackages", dependencies: ["VNCore", "CLzmaDec"], exclude: ["CLzmaDec", "LICENSES.md", "LICENSE-innoextract.txt", "LICENSE-LZMA-SDK.txt"]),
         // Tests read fixtures by file path, so SwiftPM must not treat them as resources.
         .testTarget(name: "VNCoreTests", dependencies: ["VNCore"], exclude: ["Fixtures"]),
-        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack"], exclude: ["Fixtures"]),
+        .testTarget(name: "WebRuntimeTests", dependencies: ["WebRuntime", "FontPack", "CVNAlpha"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineRPGMakerTests", dependencies: ["EngineRPGMaker", "WebRuntime"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineTyranoTests", dependencies: ["EngineTyrano", "WebRuntime"]),
         .testTarget(name: "EngineFlashTests", dependencies: ["EngineFlash", "WebRuntime", "FontPack"]),
@@ -192,7 +192,7 @@ let package = Package(
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
-        .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK"]),
+        .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK", "CNekoSDK"]),
         .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile"]),
         .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),
