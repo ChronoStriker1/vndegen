@@ -25,6 +25,8 @@ struct HubMetrics: Equatable {
     var size: CGSize
     var insets = EdgeInsets()
     var windowControls = WindowControlsInsets()
+    /// True for metrics from `besideSideCamera`, whose content reaches across the camera's inset.
+    var acrossSideCamera = false
 
     /// Width including the safe area, for art that runs edge to edge.
     var fullWidth: CGFloat { size.width + insets.leading + insets.trailing }
@@ -46,6 +48,41 @@ struct HubMetrics: Equatable {
 
     /// How far below the safe area's top a view in a top corner starts, to sit below an iPad window's controls.
     var cornerClearance: CGFloat { max(0, windowControls.top - insets.top) }
+
+    /// The iPhone Duo's outer display, held upright, keeps its camera in a safe-area inset down the whole of one side,
+    /// though the camera itself sits at the top of it. Elsewhere a side inset comes with a taller top inset or a
+    /// landscape screen, and this is zero. Here it is the inset's width, which the hub also takes as the camera's
+    /// height, since UIKit reports nothing finer.
+    var sideCamera: CGFloat {
+        let side = max(insets.leading, insets.trailing)
+        // The full size, which the on-screen keyboard leaves alone, so opening it never reads as turning the device.
+        return fullHeight > fullWidth && side > insets.top ? side : 0
+    }
+
+    /// The iPhone Duo's outer display, turned on its side, keeps its camera in a safe-area inset down one side of the
+    /// screen and none down the other. iPhones whose camera sits in the Dynamic Island inset both sides alike, so this
+    /// is nil for them, as it is for a portrait screen. A game keeps clear of it, so none of the game sits under the
+    /// camera.
+    var landscapeSideCamera: (edge: HorizontalEdge, width: CGFloat)? {
+        guard fullWidth > fullHeight, (insets.leading == 0) != (insets.trailing == 0) else { return nil }
+        return insets.leading > 0 ? (.leading, insets.leading) : (.trailing, insets.trailing)
+    }
+
+    /// These metrics for content that reaches across a side camera's inset below the camera: the full width, with the
+    /// camera's corner kept clear as an iPad window's controls are, through `topRowPadding` and `cornerClearance`.
+    var besideSideCamera: HubMetrics {
+        let side = sideCamera
+        guard side > 0 else { return self }
+        var metrics = self
+        metrics.size.width += insets.leading + insets.trailing
+        metrics.windowControls.leading = max(windowControls.leading, insets.leading)
+        metrics.windowControls.trailing = max(windowControls.trailing, insets.trailing)
+        metrics.windowControls.top = max(windowControls.top, insets.top + side)
+        metrics.insets.leading = 0
+        metrics.insets.trailing = 0
+        metrics.acrossSideCamera = true
+        return metrics
+    }
 
     var topBarSpacing: CGFloat { isCompact ? 8 : 12 }
 
@@ -122,6 +159,25 @@ struct HubMetrics: Equatable {
 }
 
 extension View {
+    /// Lays the content out across a side camera's inset, with metrics to match. See `HubMetrics.sideCamera`.
+    func besideSideCamera(_ metrics: HubMetrics) -> some View {
+        environment(\.hubMetrics, metrics.besideSideCamera)
+            .ignoresSafeArea(.container, edges: metrics.sideCamera > 0 ? .horizontal : [])
+    }
+
+    /// A form across a side camera's inset. A form takes its side margins from the system's safe area, which the hub
+    /// ignores there, so without margins of its own it would run to the trailing edge.
+    @ViewBuilder
+    func formBesideSideCamera(_ metrics: HubMetrics) -> some View {
+        if metrics.acrossSideCamera { contentMargins(.horizontal, 20, for: .scrollContent) } else { self }
+    }
+
+    /// A sheet's content under metrics from `besideSideCamera`: across the camera's inset too, with its header's
+    /// trailing button kept out of the camera's column.
+    func sheetBesideSideCamera() -> some View {
+        modifier(SheetBesideSideCamera())
+    }
+
     /// Insets both sides by the larger horizontal safe area, so centered layouts stay centered on the screen when only
     /// one side has an inset, such as the iPhone Duo's 84 pt camera inset.
     func balancedHorizontalSafeArea(_ metrics: HubMetrics) -> some View {
@@ -156,5 +212,17 @@ extension TimeInterval {
         guard self >= 60 else { return nil }
         let minutes = Int(self / 60)
         return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
+    }
+}
+
+private struct SheetBesideSideCamera: ViewModifier {
+    @Environment(\.hubMetrics) private var metrics
+
+    func body(content: Content) -> some View {
+        let across = metrics.acrossSideCamera
+        // Every sheet keeps its header out of the camera's column and its Done at the bottom. See `cameraCornerTrailing`.
+        content
+            .environment(\.cameraCornerTrailing, across ? metrics.windowControls.trailing : 0)
+            .ignoresSafeArea(.container, edges: across ? .horizontal : [])
     }
 }

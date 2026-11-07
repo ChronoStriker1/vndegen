@@ -235,7 +235,9 @@ Measured again on 2026-10-28, after sound decoding moved to its own thread, on t
 | Movies (Test Game 98's three clips, looped) | iPad simulator | 60 display, 29.97 movie | 60.0, 30.6 drawn | 60.0 | 50 s |
 
 Simulator timing isn't iPad timing. The movies' headers say 59.94 fps, but they hold 29.97 frames a second (88 frames in 2.92 s), which the runtime draws
-in full. Loading a save or opening a menu can take one step of 40 to 100 ms while it decodes images.
+in full. The 30.6 drawn above was the runtime's clock running 2% fast at 60 Hz (#49): the session rounded each refresh
+to whole milliseconds. Since 2026-11-07 it carries the fraction (`MillisecondClock` in FrameHost), and the same movies
+draw 30.0 to 30.2 at 60 and 120 Hz (`docs/frame-rate.md`). Loading a save or opening a menu can take one step of 40 to 100 ms while it decodes images.
 
 ## Built-in dialogs
 
@@ -285,6 +287,9 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
   that saved; the runtime clears the page and keeps NScripter's savepoints there. The games always set one. With a
   textgosub, a save made before any text follows the statement that saves, where the PC engine keeps the script's start.
+- Ponscripter fonts are checked before use. A font with reversed `loca` entries, or a `cmap` subtable longer than its
+  table, is refused, where FreeType may accept it; none of 1,194 fonts tested does either. A glyph whose outline fills
+  its box can take about 0.5 s to draw at 1024 px, stb_truetype's own cost.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`

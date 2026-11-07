@@ -71,6 +71,8 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | Wolf RPG, reused | Test Game 53, battle | iPad simulator | 60 | 59.6 | 37.5 median, 23.1 lowest | 120 s | 26 to 65 | 10-30 | fb8335a |
 | Wolf RPG, reused | Parade Buster, battle | Mac app, mini | 60 | 59.5 to 59.8 | 30 to 42 | not recorded | not recorded | 11-01 | 788b0c8 |
 | Wolf RPG, reused | YUME-SAME, battle, after its image fix | iPad simulator | 60 | 59.4 to 60.0 | 27.3 to 60.0 | 130 s | not recorded | 11-01 | 04606b3 |
+| Wolf RPG | Milky Quest, title, game frames drawn | Mac app, MacBook | 60 | 60.0 to 60.1, was 57.6 | 89.8 to 120.0 display | 40 s | 2.7 | 11-07 | d6d75f6 |
+| Wolf RPG | Milky Quest, title, game frames drawn | Mac app, mini | 60 | 59.9 to 60.0, was 60.0 running 2% fast | 48.4 to 60.0 display | 40 s | 10 | 11-07 | d6d75f6 |
 | AliceSoft System 3, reused | Panyon, tactical battle | Mac app, mini | 60 | 60.0 | 60 | not recorded | not recorded | 10-31 | 2008a53 |
 | AliceSoft System 3, reused | Panyon, tactical battle | iPad simulator | 60 | 60.0 | one hitch | 147 s | not recorded | 10-31 | 2008a53 |
 | AliceSoft System 4, reused | Sengoku Rance, battle | Mac app, mini | 60 | 60.0 | 60 median, 41 lowest | 250 s | low | 10-31 | not recorded |
@@ -79,10 +81,17 @@ This is the check from item 1 of the roadmap's Next section, done on 2026-11-03.
 | AliceSoft System 4, reused | Rance 02, opening movie | iPad simulator | 30 | 29.98, 6806 of 6810 frames | 60 median, display | 227 s | 10 | 10-31 | not recorded |
 | NScripter, reused | Test Game 26, dungeon walking | Mac app, mini | 60 | 60.0 | 60.0 | 50 s | 3 | 10-28 | not recorded |
 | NScripter, reused | Test Game 26, dungeon walking | iPad simulator | 60 | 60.0 | 60.0 | 40 s | 3 | 10-28 | not recorded |
-| NScripter, reused | Test Game 98, movies | Mac app, mini | 29.97 | 30.6 drawn | 60.0 display | 40 s | 3 | 10-28 | not recorded |
-| NScripter, reused | Test Game 98, movies | iPad simulator | 29.97 | 30.6 drawn | 60.0 display | 50 s | 3 | 10-28 | not recorded |
+| NScripter | Test Game 98, movies | Mac app, mini | 29.97 | 30.0 to 30.2 drawn, was 30.6 | 55.4 to 60.0 display | 40 s | 8 | 11-07 | d2668ff |
+| NScripter | Test Game 98, movies | Mac app, MacBook | 29.97 | 30.0 to 30.2 drawn | 101.5 to 120.0 display | 40 s | 2.0 | 11-07 | d2668ff |
+| NScripter, reused | Test Game 98, movies, before #49's fix | iPad simulator | 29.97 | 30.6 drawn | 60.0 display | 50 s | 3 | 10-28 | not recorded |
+| Ponscripter | Umineko, openings 1 and 3 | Mac app, mini | 29.97 | 29.9 to 30.0 drawn, was 30.6 | 33.3 to 60.0 display | 180 s | 4.3 | 11-07 | d2668ff |
+| Ponscripter | Umineko, openings 1 and 3 | Mac app, MacBook | 29.97 | 29.9 to 30.1 drawn, was 28.8 | 94.3 to 120.0 display | 180 s | 3.1 | 11-07 | d2668ff |
+| Ponscripter | Test movies at 23.976, 25 and 59.94 fps | Mac app, MacBook | as made | 24.0, 25.1 to 25.2, 60.0 drawn | 97.8 to 120.0 display | 75 s | 3.3 | 11-07 | d2668ff |
+| Ponscripter | Test movies at 23.976, 25 and 59.94 fps | Mac app, mini | as made | 24.0, 25.0 to 25.1, 58.6 to 60.0 drawn | 41.5 to 60.0 display | 75 s | 4.9 | 11-07 | d2668ff |
 | Artemis, reused | Test Game 81, opening movie | Mac app, MacBook | 29.97 | 29.97 | 19.95 | 101 s | 30 | 10-31 | afaeec9 |
 | Artemis, reused | Test Game 81, opening movie | iPad simulator | 29.97 | 29.97 | 20.00 | 101 s | quiet | 10-31 | afaeec9 |
+
+Before #49's fix (2026-11-07), NScripter, Ponscripter, NekoSDK and Wolf RPG rounded each display refresh to whole milliseconds, so their clocks ran 4% slow at 120 Hz and 2% fast at 60 Hz. Rows marked "was" give the number before it. A Wolf RPG game at 60 Hz drew 60.0 then too, but ran 61.2 game frames a second, with a double step every 50 refreshes.
 
 A 1% low near 20 for a 30 fps or 24 fps movie is that movie's cadence on a 60 Hz display, where each frame shows for two or three refreshes. It isn't a dropped frame.
 

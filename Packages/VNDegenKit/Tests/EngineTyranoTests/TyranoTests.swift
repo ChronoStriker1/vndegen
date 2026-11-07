@@ -1,11 +1,12 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 import WebRuntime
 @testable import EngineTyrano
 
 private func game(_ files: [String: String]) throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-tyrano-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-tyrano-\(UUID().uuidString)", isDirectory: true)
     for (path, text) in files {
         let url = root.appendingPathComponent(path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -216,7 +217,7 @@ private func detect(_ root: URL) -> EngineMatch? { TyranoPlugin().detect(FolderP
 }
 
 @Test func saveKeyReaderReadsNoMoreThanItsLimit() throws {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-bounded-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-bounded-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: root) }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let small = root.appendingPathComponent("small.sav"), large = root.appendingPathComponent("large.sav")

@@ -1,6 +1,7 @@
 import CNekoSDK
 import Foundation
 import Testing
+import TestSupport
 
 // Patches, as the library's games ship them: The Alchemist's sys_5.pak holds a second art set under the base names and a
 // cfg that replaces the base one, Test Game 90's sys_2.pak new files the game names `sys_2\…`, and Test Game 92's sys_5
@@ -73,7 +74,7 @@ import Testing
     }
 
     private func game(_ files: [String: Data]) throws -> URL {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("nekosdk-patch-\(UUID().uuidString)")
+        let root = TestFolders.root.appendingPathComponent("nekosdk-patch-\(UUID().uuidString)")
         for (path, data) in files {
             let url = root.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

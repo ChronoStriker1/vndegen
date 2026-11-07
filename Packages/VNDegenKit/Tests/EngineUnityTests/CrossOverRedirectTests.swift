@@ -1,5 +1,6 @@
 #if os(macOS)
 import Foundation
+import TestSupport
 import Testing
 @testable import EngineUnity
 
@@ -15,7 +16,7 @@ struct CrossOverRedirectTests {
         let bottle = UnityBottle(folder: folder, tools: try #require(CrossOver.installed()).tools)
         #expect(fm.fileExists(atPath: bottle.path.appendingPathComponent("system.reg").path))
 
-        let scratch = fm.temporaryDirectory.appendingPathComponent("redirect-\(UUID().uuidString)", isDirectory: true)
+        let scratch = TestFolders.root.appendingPathComponent("redirect-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: scratch) }
         let decoy = scratch.appendingPathComponent("decoy/\(UnityBottle.name)", isDirectory: true)
         try fm.createDirectory(at: decoy, withIntermediateDirectories: true)

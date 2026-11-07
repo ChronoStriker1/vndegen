@@ -274,6 +274,8 @@ public struct SaveSyncSettingsView: View {
 public final class GameSavesModel {
     enum Target: Hashable {
         case ludusaviGame, backup(String), restore, backUp, undo
+        /// Opens the Ludusavi settings, offered while no share is set up.
+        case setUp
         /// Rows of the Ludusavi game picker.
         case search, automaticMatch, folder(String)
     }
@@ -316,6 +318,8 @@ public final class GameSavesModel {
     /// The keyboard a controller is typing the picker's search with. The host forwards button presses to it while it is
     /// open.
     public private(set) var keyboard: OnScreenKeyboard?
+    /// Opens the Ludusavi settings. Nil hides the setup button.
+    @ObservationIgnored var onSetUp: (() -> Void)?
 
     public init(service: SaveSyncService, game: GameID) {
         self.service = service
@@ -331,9 +335,12 @@ public final class GameSavesModel {
 
     private var isSetUp: Bool { service.server != nil }
 
+    /// Before Ludusavi is set up, unless an old server setting needs moving to a share, which Settings explains.
+    var offersSetUp: Bool { onSetUp != nil && !service.needsShare }
+
     var rows: [[Target]] {
         if choosingGame { return [[.search], [.automaticMatch]] + filteredFolders.map { [.folder($0.folder)] } }
-        guard isSetUp else { return [] }
+        guard isSetUp else { return offersSetUp ? [[.setUp]] : [] }
         return [[.ludusaviGame]] + backups.reversed().map { [.backup($0.name)] } + [[.restore], [.backUp], [.undo]]
     }
 
@@ -392,6 +399,7 @@ public final class GameSavesModel {
             } onClose: { [weak self] in
                 self?.keyboard = nil
             }
+        case .setUp: onSetUp?()
         case .automaticMatch: pick(nil)
         case let .folder(folder): pick(folder)
         }
@@ -503,12 +511,75 @@ public final class GameSavesModel {
 public struct GameSavesView: View {
     @State private var model: GameSavesModel
 
-    public init(service: SaveSyncService, game: GameID) { _model = State(initialValue: GameSavesModel(service: service, game: game)) }
-    public init(model: GameSavesModel) { _model = State(initialValue: model) }
+    public init(service: SaveSyncService, game: GameID) {
+        _model = State(initialValue: GameSavesModel(service: service, game: game))
+    }
+
+    /// `onSetUp` opens the Ludusavi settings, which the view offers while no share is set up.
+    public init(model: GameSavesModel, onSetUp: (() -> Void)? = nil) {
+        model.onSetUp = onSetUp
+        _model = State(initialValue: model)
+    }
 
     public var body: some View {
+        if model.service.server == nil, model.offersSetUp {
+            setUpPrompt
+        } else {
+            backupsForm
+        }
+    }
+
+    /// Before Ludusavi is set up there are no backups to list, so the sheet says so in the middle of its room, with the
+    /// way to set it up. Text too large for the room, such as at the largest text sizes, scrolls.
+    private var setUpPrompt: some View {
+        ViewThatFits(in: .vertical) {
+            setUpPromptContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A controller's focus on the button scrolls it into view.
+            ScrollViewReader { proxy in
+                ScrollView { setUpPromptContent.padding(.vertical, 20).frame(maxWidth: .infinity) }
+                    .onChange(of: model.isFocused(.setUp), initial: true) { _, focused in
+                        if focused { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(Self.setUpID, anchor: .center) } }
+                    }
+            }
+        }
+    }
+
+    private static let setUpID = "setUp"
+
+    private var setUpPromptContent: some View {
+        let focused = model.isFocused(.setUp)
+        return VStack(spacing: 14) {
+            Image(systemName: "externaldrive.badge.icloud")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundStyle(.secondary)
+            Text("No backups yet")
+                .font(.title3.weight(.semibold))
+            Text("Set up your Ludusavi share to restore and back up this game's saves.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { model.select(.setUp) } label: {
+                Label("Set up Ludusavi backups", systemImage: "externaldrive.badge.plus")
+                    .font(.body.weight(.semibold))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Capsule(style: .circular).fill(.tint))
+                    .foregroundStyle(.white)
+                    .overlay { if focused { Capsule(style: .circular).strokeBorder(.white, lineWidth: 2.5) } }
+            }
+            .buttonStyle(.plain)
+            .id(Self.setUpID)
+            .scaleEffect(focused ? 1.05 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.78), value: focused)
+            .padding(.top, 6)
+        }
+        .padding(.horizontal, 28)
+    }
+
+    private var backupsForm: some View {
         @Bindable var model = model
-        ScrollViewReader { proxy in
+        return ScrollViewReader { proxy in
             Form {
                 if model.service.server != nil {
                     syncSection

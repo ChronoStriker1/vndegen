@@ -2,6 +2,7 @@
 import CLzmaDec
 import CryptoKit
 import Foundation
+import TestSupport
 import Synchronization
 import Testing
 import VNCore
@@ -220,7 +221,7 @@ import VNCore
     }
 
     @Test func refusesFilesThatAreNotInstallers() throws {
-        let file = FileManager.default.temporaryDirectory.appending(path: "not-setup-\(UUID().uuidString).exe")
+        let file = TestFolders.root.appending(path: "not-setup-\(UUID().uuidString).exe")
         try Data(repeating: 0x4d, count: 4096).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         #expect(throws: RuntimeInstallError.unsupportedInstaller("not an Inno Setup installer")) {
@@ -235,7 +236,7 @@ import VNCore
 struct RealRTPInstallerTests {
     @Test(arguments: RealRTP.all)
     func extractsTheSameFilesAsInnoextract(_ rtp: RealRTP) throws {
-        let work = FileManager.default.temporaryDirectory.appending(path: "rtp-extract-\(UUID().uuidString)")
+        let work = TestFolders.root.appending(path: "rtp-extract-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: work) }
         let started = ContinuousClock.now
         let setup: URL
@@ -260,7 +261,7 @@ struct RealRTPInstallerTests {
     /// Files Inno Setup ran through its x86 call filter, wherever they install, must decode to their stored digest.
     @Test(arguments: RealRTP.all)
     func undoesTheCallFilter(_ rtp: RealRTP) throws {
-        let work = FileManager.default.temporaryDirectory.appending(path: "rtp-filter-\(UUID().uuidString)")
+        let work = TestFolders.root.appending(path: "rtp-filter-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: work) }
         let setup: URL
         if case .innoSetup(let path?) = rtp.package.installer {
@@ -378,7 +379,7 @@ private final class TemporaryStore: Sendable {
     let store: RuntimePackageStore
 
     init() throws {
-        root = FileManager.default.temporaryDirectory.appending(path: "runtime-store-\(UUID().uuidString)")
+        root = TestFolders.root.appending(path: "runtime-store-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         store = RuntimePackageStore(root: root)
     }

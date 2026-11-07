@@ -535,12 +535,12 @@ static void savepoints() {
     assert(savepointAfter("langjp日本\\\nlangen^Again^\\\nlangen^Two^\\\n", 3) == "langjp!sd");
 }
 
-// A small TrueType or CFF font, its tables in tag order, for the font checks: 'H' maps to glyph 1.
-static vnns::Bytes testFont(const std::map<std::string, vnns::Bytes> &tables) {
+// A small TrueType or CFF font with these tables in this order, for the font checks: 'H' maps to glyph 1.
+static vnns::Bytes testFont(const std::vector<std::pair<std::string, vnns::Bytes>> &tables) {
     vnns::Bytes out;
     auto u16 = [&](uint32_t v) { out.push_back(uint8_t(v >> 8)); out.push_back(uint8_t(v)); };
     auto u32 = [&](uint32_t v) { u16(v >> 16); u16(v & 0xffff); };
-    bool cff = tables.count("CFF ");
+    bool cff = std::any_of(tables.begin(), tables.end(), [](const auto &t) { return t.first == "CFF "; });
     u32(cff ? 0x4f54544f : 0x00010000);
     u16(uint32_t(tables.size()));
     u16(0); u16(0); u16(0);
@@ -551,6 +551,25 @@ static vnns::Bytes testFont(const std::map<std::string, vnns::Bytes> &tables) {
         at += uint32_t(data.size());
     }
     for (const auto &[tag, data] : tables) out.insert(out.end(), data.begin(), data.end());
+    return out;
+}
+
+// The same, its tables in tag order, or with `last` at the end of the file.
+static vnns::Bytes testFont(const std::map<std::string, vnns::Bytes> &tables, const std::string &last = "") {
+    std::vector<std::pair<std::string, vnns::Bytes>> listed(tables.begin(), tables.end());
+    std::stable_partition(listed.begin(), listed.end(), [&](const auto &t) { return t.first != last; });
+    return testFont(listed);
+}
+
+// A CFF INDEX of these entries, with 2-byte offsets.
+static vnns::Bytes cffIndex(const std::vector<vnns::Bytes> &entries) {
+    if (entries.empty()) return {0, 0};
+    vnns::Bytes out = {uint8_t(entries.size() >> 8), uint8_t(entries.size()), 2};
+    uint32_t at = 1;
+    auto offset = [&] { out.push_back(uint8_t(at >> 8)); out.push_back(uint8_t(at)); };
+    offset();
+    for (const auto &e : entries) { at += uint32_t(e.size()); offset(); }
+    for (const auto &e : entries) out.insert(out.end(), e.begin(), e.end());
     return out;
 }
 
@@ -585,15 +604,18 @@ static std::map<std::string, vnns::Bytes> trueTypeTables(int glyphs, const vnns:
 // Fonts a game could ship broken: each loads or is refused, and drawing 'H' stays inside the font (the sanitizer build
 // runs this too).
 static void brokenFonts() {
+    // 'H' is glyph 1, and 'A', which the cmap lacks, glyph 0.
     auto draw = [](const vnns::Bytes &font) {
         vnns::PonsFace face;
         if (!face.load(font)) return false;
         face.glyph('H', 46);
+        face.glyph('A', 46);
         return true;
     };
-    vnns::Bytes composite = be({0xffff, 0, 0, 0, 0, 0, 1, 0});  // one component: glyph 1, byte offsets
+    // Composites have a box, so stb draws them.
+    vnns::Bytes composite = be({0xffff, 0, 0, 100, 100, 2, 1, 0});  // one component: glyph 1, x and y as bytes
     // A glyph cut off after its first two bytes, at the end of the file.
-    assert(draw(testFont(trueTypeTables(2, be({1}), {0, 0, 2}))));
+    assert(draw(testFont(trueTypeTables(2, be({1}), {0, 0, 2}), "glyf")));
     // A cmap segment whose glyph array lies far past the subtable.
     assert(draw(testFont(trueTypeTables(2, {}, {0, 0, 0}, 65534))));
     // A composite that contains itself.
@@ -603,7 +625,7 @@ static void brokenFonts() {
         vnns::Bytes glyf;
         std::vector<int> loca = {0, 0};
         for (int g = 1; g <= depth; g++) {
-            vnns::Bytes c = be({0xffff, 0, 0, 0, 0, 0, g + 1, 0});
+            vnns::Bytes c = be({0xffff, 0, 0, 100, 100, 2, g + 1, 0});
             glyf.insert(glyf.end(), c.begin(), c.end());
             loca.push_back(int(glyf.size()));
         }
@@ -617,7 +639,134 @@ static void brokenFonts() {
     cff.erase("glyf");
     cff.erase("loca");
     cff["CFF "] = {};
-    draw(testFont(cff));
+    assert(!draw(testFont(cff, "CFF ")));
+
+    // Review of 3145b39a by Claude, with the maintainer's OK. Where a tag repeats, stb reads the first table, so the
+    // checks do too: a first head with an em size of 0 is refused.
+    {
+        auto tables = trueTypeTables(2, {}, {0, 0, 0});
+        std::vector<std::pair<std::string, vnns::Bytes>> listed(tables.begin(), tables.end());
+        vnns::Bytes zeroEm(54, 0);
+        listed.insert(listed.begin(), {"head", zeroEm});
+        assert(!draw(testFont(listed)));
+        assert(draw(testFont(tables)));
+        tables["head"][18] = tables["head"][19] = 0;
+        assert(!draw(testFont(tables)));
+    }
+    // A composite whose loca entries are reversed, which stb draws from its start: there, it contains itself.
+    vnns::Bytes empty(16, 0);
+    vnns::Bytes reversed = empty;
+    reversed.insert(reversed.end(), composite.begin(), composite.end());
+    assert(!draw(testFont(trueTypeTables(2, reversed, {0, 16, 0}))));
+    // A composite of only its header, at the end of the file: stb reads its component from the zeros after it, which
+    // name glyph 0, itself.
+    assert(!draw(testFont(trueTypeTables(2, be({0xffff, 0, 0, 100, 100}), {0, 10, 10}), "glyf")));
+    // A composite whose second component runs past its entry.
+    vnns::Bytes more = be({0xffff, 0, 0, 100, 100, 0x22, 2, 0});
+    assert(!draw(testFont(trueTypeTables(3, more, {0, 0, 16, 16}))));
+    // A component placed by matching points: stb skipped no bytes for its point numbers, so it read the next record
+    // from them, here glyph 1 itself. It now skips them, and draws glyph 2 twice.
+    assert(draw(testFont(trueTypeTables(3, be({0xffff, 0, 0, 100, 100, 0x20, 2, 2, 1, 2, 0, 0}), {0, 0, 24, 24}),
+                         "glyf")));
+    // Composites that each use the next `width` times: 2 levels of 8 are drawn; 4 of 64 (16 million outlines), and
+    // one of 5000, which stb copies over 5000 times as it adds them, are refused.
+    auto fan = [&](int levels, int width) {
+        vnns::Bytes glyf;
+        std::vector<int> loca = {0, 0};
+        for (int g = 1; g <= levels; g++) {
+            vnns::Bytes c = be({0xffff, 0, 0, 100, 100});
+            for (int k = 0; k < width; k++) {
+                vnns::Bytes part = be({k < width - 1 ? 0x22 : 2, g + 1, 0});
+                c.insert(c.end(), part.begin(), part.end());
+            }
+            glyf.insert(glyf.end(), c.begin(), c.end());
+            loca.push_back(int(glyf.size()));
+        }
+        // The last, a triangle.
+        vnns::Bytes triangle = be({1, 0, 0, 100, 100, 2, 0});  // one contour of 3 points, no instructions
+        vnns::Bytes points = {1, 1, 1, 0, 0, 0, 100, 0xff, 0x9c, 0, 0, 0, 0, 0, 100, 0};  // on curve; x, y; pad
+        triangle.insert(triangle.end(), points.begin(), points.end());
+        glyf.insert(glyf.end(), triangle.begin(), triangle.end());
+        loca.push_back(int(glyf.size()));
+        return testFont(trueTypeTables(levels + 2, glyf, loca));
+    };
+    assert(draw(fan(2, 8)));
+    assert(!draw(fan(4, 64)));
+    assert(!draw(fan(1, 5000)));
+    // Round 3. A table at offset 0, which stb takes for a missing one: here maxp. stb takes 65,535 glyphs, where
+    // reading maxp at offset 0 gave the table count, 7, so 'H', mapped to glyph 1000, read its loca entry from past
+    // the table.
+    {
+        auto tables = trueTypeTables(7, {}, std::vector<int>(8, 0));
+        tables["cmap"][36] = uint8_t((1000 - 'H') >> 8);
+        tables["cmap"][37] = uint8_t(1000 - 'H');
+        vnns::Bytes font = testFont(tables);
+        size_t count = vnns::be16(&font[4]);
+        for (size_t t = 0; t < count; t++)
+            if (memcmp(&font[12 + t * 16], "maxp", 4) == 0) std::fill_n(&font[12 + t * 16 + 8], 4, 0);
+        assert(!draw(font));
+    }
+    // A glyph whose outline runs far past its 16-unit box, at an em of 16: 4,000 off-curve points zigzagging 30,000
+    // units each way would flatten into millions of curve pieces. stb gives up on it, quickly, and draws nothing, not
+    // even its second contour, a square filling the box.
+    {
+        vnns::Bytes zig = be({2, 0, 0, 16, 16, 3999, 4003, 0});
+        zig.insert(zig.end(), 4000, 0);  // off curve, x and y as shorts
+        zig.insert(zig.end(), 4, 1);     // on curve
+        const int square[2][4] = {{0, 16, 0, -16}, {0, 0, 16, 0}};
+        for (int axis = 0; axis < 2; axis++) {
+            for (int k = 0; k < 4000; k++) {
+                vnns::Bytes d = be({(k % 2 == axis) ? 30000 : -30000 & 0xffff});
+                zig.insert(zig.end(), d.begin(), d.end());
+            }
+            for (int k = 0; k < 4; k++) {
+                vnns::Bytes d = be({square[axis][k] & 0xffff});
+                zig.insert(zig.end(), d.begin(), d.end());
+            }
+        }
+        auto tables = trueTypeTables(2, zig, {0, 0, int(zig.size())});
+        tables["head"][18] = 0; tables["head"][19] = 16;
+        vnns::PonsFace face;
+        assert(face.load(testFont(tables)));
+        auto g = face.glyph('H', 46);
+        assert(g->w > 0 && std::all_of(g->coverage.begin(), g->coverage.end(), [](uint8_t c) { return c == 0; }));
+    }
+    // A contour of one off-curve point, the glyph's last: stb read the point after it from past its array.
+    vnns::Bytes lone = be({1, 0, 0, 100, 100, 0, 0});
+    vnns::Bytes point = {0, 0, 100, 0, 100, 0};  // off curve; x, y; pad
+    lone.insert(lone.end(), point.begin(), point.end());
+    assert(draw(testFont(trueTypeTables(2, lone, {0, 0, 20}))));
+    // A CFF glyph whose subroutines each call the next 30 times, 10 deep: stb stops it after a fixed number of steps
+    // and draws nothing, where it would run about 30^10 times over.
+    {
+        std::vector<vnns::Bytes> subrs;
+        for (int i = 0; i < 9; i++) {
+            vnns::Bytes body;
+            for (int k = 0; k < 30; k++) { body.push_back(uint8_t(i + 1 + 32)); body.push_back(29); }  // callgsubr
+            body.push_back(11);  // return
+            subrs.push_back(body);
+        }
+        subrs.push_back({140, 140, 5, 11});  // rlineto 1 1, return
+        vnns::Bytes charstrings = cffIndex({{14}, {139, 139, 21, 32, 29, 14}});  // endchar; rmoveto, callgsubr 0
+        vnns::Bytes head = {1, 0, 4, 1};
+        vnns::Bytes names = cffIndex({{'A'}});
+        vnns::Bytes strings = cffIndex({});
+        vnns::Bytes gsubrs = cffIndex(subrs);
+        size_t topSize = cffIndex({vnns::Bytes(6, 0)}).size();
+        uint32_t at = uint32_t(head.size() + names.size() + topSize + strings.size() + gsubrs.size());
+        vnns::Bytes top = cffIndex({{29, uint8_t(at >> 24), uint8_t(at >> 16), uint8_t(at >> 8), uint8_t(at), 17}});
+        vnns::Bytes table;
+        for (const vnns::Bytes *part : {&head, &names, &top, &strings, &gsubrs, &charstrings})
+            table.insert(table.end(), part->begin(), part->end());
+        auto tables = trueTypeTables(2, {}, {0, 0, 0});
+        tables.erase("glyf");
+        tables.erase("loca");
+        tables["CFF "] = table;
+        vnns::PonsFace face;
+        assert(face.load(testFont(tables)));
+        auto g = face.glyph('H', 46);
+        assert(g->w == 0 && g->h == 0);
+    }
 }
 
 // Saves in the PC Ponscripter engine's format, laid out as its own saves of the same script are (lab saves): a save made

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import FontPack
 
@@ -11,7 +12,7 @@ struct FontPackTests {
 
     /// The bundled fonts, then empty files named as the Korean download's fonts.
     static func configure() throws {
-        let downloaded = FileManager.default.temporaryDirectory.appending(path: "vndegen-font-tests")
+        let downloaded = TestFolders.root.appending(path: "vndegen-font-tests")
         try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
         for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
             try Data().write(to: downloaded.appending(path: name), options: .atomic)
@@ -76,7 +77,7 @@ struct FontPackTests {
 /// when the player's can't be read.
 struct MIDISoundFontTests {
     @Test func installReplacesTheEarlierFontAndResetRemovesIt() throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-soundfont-\(UUID().uuidString)")
+        let root = TestFolders.root.appending(path: "vndegen-soundfont-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let directory = root.appending(path: "Support/SoundFont")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -100,7 +101,7 @@ struct MIDISoundFontTests {
     }
 
     @Test func refusesFilesThatArentSoundFonts() throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-soundfont-\(UUID().uuidString)")
+        let root = TestFolders.root.appending(path: "vndegen-soundfont-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let font = root.appending(path: "Font.sf2"), other = root.appending(path: "notes.txt")

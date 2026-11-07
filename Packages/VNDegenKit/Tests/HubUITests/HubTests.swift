@@ -1,5 +1,6 @@
 import EngineRenPy
 import Foundation
+import TestSupport
 import GameInput
 import Lock
 import Metadata
@@ -61,7 +62,7 @@ private struct SlowPlugin: EnginePlugin {
 
 @MainActor
 @Test func aGameCannotRelaunchOrTouchItsSavesUntilItsLastSessionStopped() async throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
     let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
     try FileManager.default.createDirectory(at: paths.gamesRoot.appendingPathComponent("Test Game"), withIntermediateDirectories: true)
     try Data().write(to: paths.gamesRoot.appendingPathComponent("Test Game/slow.txt"))
@@ -120,7 +121,7 @@ private struct SlowPlugin: EnginePlugin {
 }
 
 @MainActor @Test func aRescanThatFindsRenPyClosesTheControlMethodSheet() async throws {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent("hub-\(UUID().uuidString)", isDirectory: true)
     let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
     let game = paths.gamesRoot.appendingPathComponent("Test Game", isDirectory: true)
     try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)

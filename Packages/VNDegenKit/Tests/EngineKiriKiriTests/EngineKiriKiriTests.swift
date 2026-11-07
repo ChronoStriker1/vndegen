@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import GameInput
 import HubUI
@@ -20,7 +21,7 @@ private func probe(_ files: [String]) -> FolderProbe {
 
 /// Writes `files` (relative path to contents) into a fresh folder.
 private func folder(_ files: [String: Data]) throws -> URL {
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent("vndegen-kirikiri-\(UUID().uuidString)", isDirectory: true)
+    let root = TestFolders.root.appendingPathComponent("vndegen-kirikiri-\(UUID().uuidString)", isDirectory: true)
     for (path, contents) in files {
         let url = root.appendingPathComponent(path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

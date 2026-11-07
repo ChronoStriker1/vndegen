@@ -1,11 +1,12 @@
 import EngineRPGMaker
 import Foundation
+import TestSupport
 import Testing
 @testable import VNCore
 
 /// A game folder laid out as a library game's is, in a library of its own.
 private struct Scratch {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let base = TestFolders.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
     var paths: LibraryPaths { LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support")) }
     var game: URL { paths.gamesRoot.appendingPathComponent("Game", isDirectory: true) }
     let id = GameID("Game")

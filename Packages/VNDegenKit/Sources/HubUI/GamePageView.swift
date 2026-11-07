@@ -9,6 +9,8 @@ struct GamePageView: View {
     let game: Game
     /// What the engine calls Play for this game, such as "Play in CrossOver". Nil is "Play".
     @State private var playLabel: String?
+    /// How far the page has scrolled, which fades in the band that keeps scrolled content from a side camera.
+    @State private var scrolled: CGFloat = 0
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -46,6 +48,10 @@ struct GamePageView: View {
             }
             .scrollIndicators(.hidden)
             .ignoresSafeArea(edges: [.horizontal, .top])
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
+                scrolled = offset
+            }
+            .overlay(alignment: .top) { cameraBand }
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController else { return }
                 withAnimation(Theme.focusAnimation) {
@@ -68,6 +74,39 @@ struct GamePageView: View {
             }
             .background(Theme.background)
             .ignoresSafeArea()
+        }
+    }
+
+    /// Beside a side camera, details scrolled up to the top would pass under it, cut by its edge. Once the banner's art
+    /// has scrolled away, a band of the background fades in across the top, as tall as the camera, so they pass under
+    /// that instead. It carries the back button and the game's name, which scrolled away with the banner.
+    @ViewBuilder
+    private var cameraBand: some View {
+        if metrics.acrossSideCamera {
+            let start = metrics.bannerHeight - metrics.cornerClearance - 48
+            let shown = min(1, max(0, (scrolled - start) / 48))
+            ZStack(alignment: .topLeading) {
+                LinearGradient(stops: [.init(color: Theme.background, location: 0),
+                                       .init(color: Theme.background, location: 0.8),
+                                       .init(color: Theme.background.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .allowsHitTesting(false)
+                HStack(spacing: 14) {
+                    HubButton(target: .back, kind: .icon) { Image(systemName: "chevron.left") }
+                        .accessibilityLabel("Back")
+                    Text(hub.displayTitle(game))
+                        .font(.display(20))
+                        .lineLimit(1)
+                }
+                .padding(.leading, metrics.topRowPadding(.leading))
+                .padding(.trailing, metrics.topRowPadding(.trailing))
+                .padding(.top, 10)
+                .allowsHitTesting(shown > 0.5)
+                .accessibilityHidden(shown < 0.5)
+            }
+            .frame(height: metrics.insets.top + metrics.cornerClearance + 20)
+            .ignoresSafeArea()
+            .opacity(shown)
         }
     }
 
@@ -99,24 +138,45 @@ struct GamePageView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 16) {
             ViewThatFits(in: .horizontal) {
+                // Every button named, where the row has room.
                 HStack(spacing: 12) {
                     playButton
                     Spacer().frame(width: 4)
-                    secondaryButtons(labels: true)
+                    mainButtons(labels: true)
+                    otherButtons(labels: true, short: true)
                 }
-                .onAppear { nav.pageActionsStacked = false }
+                .onAppear { nav.pageActions = .row }
+                // Still every button named, with the folder, engine files, and Remove buttons on a row of their own.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        playButton
+                        Spacer().frame(width: 4)
+                        mainButtons(labels: true)
+                    }
+                    HStack(spacing: 12) { otherButtons(labels: true) }
+                }
+                .onAppear { nav.pageActions = .split }
                 HStack(spacing: 10) {
                     playButton
                     Spacer().frame(width: 4)
-                    secondaryButtons(labels: false)
+                    mainButtons(labels: false)
+                    otherButtons(labels: false)
                 }
-                .onAppear { nav.pageActionsStacked = false }
-                // The narrowest windows put the other buttons under Play, and controller focus moves down to them.
-                VStack(alignment: .leading, spacing: 12) {
-                    playButton
-                    HStack(spacing: 10) { secondaryButtons(labels: false) }
+                .onAppear { nav.pageActions = .row }
+                // The narrowest windows put the other buttons under Play, with their names, in rows of two that controller
+                // focus moves through as drawn. An odd one out at the end, Remove, takes the whole last row.
+                VStack(alignment: .leading, spacing: 10) {
+                    playButton.padding(.bottom, 2)
+                    let lone = (otherButtonCount + Navigator.mainPageActions) % Navigator.stackedActionColumns == 1
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .leading),
+                                             count: Navigator.stackedActionColumns),
+                              alignment: .leading, spacing: 10) {
+                        mainButtons(labels: true, fills: true)
+                        otherButtons(labels: true, short: true, fills: true, includesRemove: !lone)
+                    }
+                    if lone { removeButton(labels: true, short: true, fills: true) }
                 }
-                .onAppear { nav.pageActionsStacked = true }
+                .onAppear { nav.pageActions = .stacked }
             }
             HeroFacts(game: game)
             if let problem = hub.library.unavailableReason(game.id) {
@@ -134,32 +194,57 @@ struct GamePageView: View {
             .accessibilityLabel(title)
     }
 
+    /// Artwork, metadata, saves, and hiding, the buttons that stay beside Play.
     @ViewBuilder
-    private func secondaryButtons(labels: Bool) -> some View {
+    private func mainButtons(labels: Bool, fills: Bool = false) -> some View {
         HubButton(target: .pageArtwork, kind: labels ? .secondary : .icon) {
-            labeled("Artwork", "photo.on.rectangle", labels)
+            labeled("Artwork", "photo.on.rectangle", labels, fills: fills)
         }
         HubButton(target: .pageMetadata, kind: labels ? .secondary : .icon) {
-            labeled("Find metadata", "text.magnifyingglass", labels)
+            labeled("Find metadata", "text.magnifyingglass", labels, fills: fills)
         }
         HubButton(target: .pageSaves, kind: labels ? .secondary : .icon) {
-            labeled("Saves", "externaldrive", labels)
+            labeled("Saves", "externaldrive", labels, fills: fills)
         }
         HubButton(target: .pageLock, kind: labels ? .secondary : .icon) {
-            labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels)
+            labeled(game.isLocked ? "Hidden" : "Hide", game.isLocked ? "lock.fill" : "lock.open", labels, fills: fills)
         }
         .accessibilityValue(game.isLocked ? "Hidden" : "Visible")
-        // The folder and Remove buttons have icons only, as they matter less and the row is long already.
-        HubButton(target: .pageShowFolder, kind: .icon) { Image(systemName: "folder").accessibilityLabel(FileBrowser.openTitle) }
-        if hub.library.offersEngineFiles(game.id) {
-            HubButton(target: .pageEngineFiles, kind: .icon) { Image(systemName: "externaldrive.badge.minus").accessibilityLabel("Remove engine files") }
+    }
+
+    private var otherButtonCount: Int { hub.library.offersEngineFiles(game.id) ? 3 : 2 }
+
+    /// The folder, engine files, and Remove buttons. `short` names them briefly, where they share a row or a grid.
+    @ViewBuilder
+    private func otherButtons(labels: Bool, short: Bool = false, fills: Bool = false, includesRemove: Bool = true) -> some View {
+        HubButton(target: .pageShowFolder, kind: labels ? .secondary : .icon) {
+            labeled(FileBrowser.openTitle, "folder", labels, fills: fills)
         }
-        HubButton(target: .pageRemove, kind: .icon) { Image(systemName: "trash").accessibilityLabel("Remove from library") }
+        if hub.library.offersEngineFiles(game.id) {
+            HubButton(target: .pageEngineFiles, kind: labels ? .secondary : .icon) {
+                labeled(short ? "Engine files" : "Remove engine files", "externaldrive.badge.minus", labels, fills: fills)
+            }
+            .accessibilityLabel("Remove engine files")
+        }
+        if includesRemove { removeButton(labels: labels, short: short, fills: fills) }
+    }
+
+    private func removeButton(labels: Bool, short: Bool, fills: Bool) -> some View {
+        HubButton(target: .pageRemove, kind: labels ? .secondary : .icon) {
+            labeled(short ? "Remove" : "Remove from library", "trash", labels, fills: fills)
+        }
+        .accessibilityLabel("Remove from library")
     }
 
     @ViewBuilder
-    private func labeled(_ title: String, _ image: String, _ showTitle: Bool) -> some View {
-        if showTitle { Label(title, systemImage: image) } else { Image(systemName: image).accessibilityLabel(title) }
+    private func labeled(_ title: String, _ image: String, _ showTitle: Bool, fills: Bool = false) -> some View {
+        if showTitle {
+            Label(title, systemImage: image)
+                .lineLimit(1)
+                .frame(maxWidth: fills ? .infinity : nil, alignment: .leading)
+        } else {
+            Image(systemName: image).accessibilityLabel(title)
+        }
     }
 
     @ViewBuilder
@@ -220,6 +305,8 @@ struct GamePageView: View {
     static func scrollsToCenter(_ target: Navigator.Target) -> Bool {
         switch target {
         case .pageEngine, .pageVariant, .pageOrientation, .pageControls, .pageMapping, .pageScreenshot, .pageScreenshotsMore: true
+        // In a short window the actions can sit below the screen, so they scroll into view rather than to the banner.
+        case .pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder, .pageEngineFiles, .pageRemove: true
         default: false
         }
     }

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import ArchiveImport
 
@@ -6,7 +7,7 @@ private let fixtures = URL(fileURLWithPath: #filePath).deletingLastPathComponent
 private var fm: FileManager { .default }
 
 private func temporaryDirectory() throws -> URL {
-    let url = fm.temporaryDirectory.appendingPathComponent("archiveimport-\(UUID().uuidString)", isDirectory: true)
+    let url = TestFolders.root.appendingPathComponent("archiveimport-\(UUID().uuidString)", isDirectory: true)
     try fm.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }
@@ -489,6 +490,8 @@ func refusesImpossibleListedSizes(sizes: [UInt64]) throws {
 
 /// What Files hands a drop target: a provider holding a file representation, offered in place or only as a copy.
 private func provider(for url: URL, inPlace: Bool) -> NSItemProvider {
+    // A drop that can't open in place is copied into the app's folder for drops, which the tests leave empty.
+    TestFolders.removeAtExitIfEmpty(DroppedFiles.copies)
     let provider = NSItemProvider()
     provider.registerFileRepresentation(forTypeIdentifier: "public.zip-archive", fileOptions: inPlace ? [.openInPlace] : [],
                                         visibility: .all) { completion in
@@ -730,7 +733,7 @@ private extension ArchiveImporter.Step {
 /// disk too. `VNDEGEN_TEST_DIR` puts the extraction on a case-sensitive volume, which `scripts/build.sh test` mounts.
 @Test func joinsFoldersThatDifferOnlyInCase() throws {
     let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-        ?? fm.temporaryDirectory
+        ?? TestFolders.root
     let staging = scratch.appendingPathComponent("archiveimport-\(UUID().uuidString)", isDirectory: true)
     try fm.createDirectory(at: staging, withIntermediateDirectories: true)
     defer { try? fm.removeItem(at: staging) }

@@ -1152,7 +1152,9 @@ static void stbtt__buf_seek(stbtt__buf *b, int o)
 
 static void stbtt__buf_skip(stbtt__buf *b, int o)
 {
-   stbtt__buf_seek(b, b->cursor + o);
+   // VNDegen: summed in 64 bits, since o comes from the font and cursor + o could overflow.
+   long long to = (long long) b->cursor + o;
+   stbtt__buf_seek(b, (to < 0 || to > b->size) ? b->size : (int) to);
 }
 
 static stbtt_uint32 stbtt__buf_get(stbtt__buf *b, int n)
@@ -1259,7 +1261,8 @@ static int stbtt__cff_index_count(stbtt__buf *b)
 
 static stbtt__buf stbtt__cff_index_get(stbtt__buf b, int i)
 {
-   int count, offsize, start, end;
+   int count, offsize;
+   long long start, end, at;
    stbtt__buf_seek(&b, 0);
    count = stbtt__buf_get16(&b);
    offsize = stbtt__buf_get8(&b);
@@ -1268,7 +1271,10 @@ static stbtt__buf stbtt__cff_index_get(stbtt__buf b, int i)
    stbtt__buf_skip(&b, i*offsize);
    start = stbtt__buf_get(&b, offsize);
    end = stbtt__buf_get(&b, offsize);
-   return stbtt__buf_range(&b, 2+(count+1)*offsize+start, end - start);
+   // VNDegen: the offsets come from the font, so the sums are in 64 bits and an entry outside the buffer is empty.
+   at = 2 + (long long)(count+1)*offsize + start;
+   if (end < start || at > b.size || end - start > b.size) return stbtt__new_buf(NULL, 0);
+   return stbtt__buf_range(&b, (int) at, (int) (end - start));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1788,7 +1794,12 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                // where we can start, and we need to save some state for when we wraparound.
                scx = x;
                scy = y;
-               if (!(vertices[off+i+1].type & 1)) {
+               if (i + 1 == n) {
+                  // VNDegen: an off-curve point that starts a contour as the glyph's last point had its next point
+                  // read from past the array; it starts the contour itself.
+                  sx = x;
+                  sy = y;
+               } else if (!(vertices[off+i+1].type & 1)) {
                   // next point is also a curve point, so interpolate an on-point curve
                   sx = (x + (stbtt_int32) vertices[off+i+1].x) >> 1;
                   sy = (y + (stbtt_int32) vertices[off+i+1].y) >> 1;
@@ -1849,7 +1860,9 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
          }
          else {
             // @TODO handle matching point
-            STBTT_assert(0);
+            // VNDegen: the component's two point numbers are skipped, so the next record is read from its place, and
+            // the component is drawn where it lies.
+            comp += (flags & 1) ? 4 : 2;
          }
          if (flags & (1<<3)) { // WE_HAVE_A_SCALE
             mtx[0] = mtx[3] = ttSHORT(comp)/16384.0f; comp+=2;
@@ -1873,16 +1886,20 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
          comp_num_verts = stbtt_GetGlyphShape(info, gidx, &comp_verts);
          if (comp_num_verts > 0) {
             // Transform vertices.
+            // VNDegen: the font's transform can take a point outside a short, which converting would leave
+            // undefined; it is clamped.
+#define STBTT__TO_SHORT(f) ((stbtt_vertex_type) ((f) > 32767.0f ? 32767.0f : (f) < -32768.0f ? -32768.0f : (f)))
             for (i = 0; i < comp_num_verts; ++i) {
                stbtt_vertex* v = &comp_verts[i];
                stbtt_vertex_type x,y;
                x=v->x; y=v->y;
-               v->x = (stbtt_vertex_type)(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
-               v->y = (stbtt_vertex_type)(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
+               v->x = STBTT__TO_SHORT(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
+               v->y = STBTT__TO_SHORT(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
                x=v->cx; y=v->cy;
-               v->cx = (stbtt_vertex_type)(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
-               v->cy = (stbtt_vertex_type)(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
+               v->cx = STBTT__TO_SHORT(m * (mtx[0]*x + mtx[2]*y + mtx[4]));
+               v->cy = STBTT__TO_SHORT(n * (mtx[1]*x + mtx[3]*y + mtx[5]));
             }
+#undef STBTT__TO_SHORT
             // Append vertices.
             tmp = (stbtt_vertex*)STBTT_malloc((num_vertices+comp_num_verts)*sizeof(stbtt_vertex), info->userdata);
             if (!tmp) {
@@ -2031,9 +2048,14 @@ static int stbtt__run_charstring(const stbtt_fontinfo *info, int glyph_index, st
 
 #define STBTT__CSERR(s) (0)
 
+   // VNDegen: a glyph's charstring stops after this many operators and operands, its subroutines' included, since a
+   // subroutine may call others many times over; a real glyph takes a few thousand at most.
+   int steps = 1 << 16;
+
    // this currently ignores the initial width value, which isn't needed if we have hmtx
    b = stbtt__cff_index_get(info->charstrings, glyph_index);
    while (b.cursor < b.size) {
+      if (--steps < 0) return STBTT__CSERR("too many steps");
       i = 0;
       clear_stack = 1;
       b0 = stbtt__buf_get8(&b);
@@ -3566,8 +3588,14 @@ static void stbtt__add_point(stbtt__point *points, int n, float x, float y)
 }
 
 // tessellate until threshold p is happy... @TODO warped to compensate for non-linear stretching
+// VNDegen: a glyph whose curves flatten to more points than this is not drawn. A TrueType glyph's box comes from its
+// header, so an outline far larger than its box would otherwise be cut into up to 65,536 pieces a curve, taking seconds
+// and gigabytes; a real glyph makes a few thousand.
+#define STBTT__MOST_FLAT_POINTS (1 << 20)
+
 static int stbtt__tesselate_curve(stbtt__point *points, int *num_points, float x0, float y0, float x1, float y1, float x2, float y2, float objspace_flatness_squared, int n)
 {
+   if (*num_points > STBTT__MOST_FLAT_POINTS) return 1; // VNDegen: too many already
    // midpoint
    float mx = (x0 + 2*x1 + x2)/4;
    float my = (y0 + 2*y1 + y2)/4;
@@ -3588,6 +3616,7 @@ static int stbtt__tesselate_curve(stbtt__point *points, int *num_points, float x
 
 static void stbtt__tesselate_cubic(stbtt__point *points, int *num_points, float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, float objspace_flatness_squared, int n)
 {
+   if (*num_points > STBTT__MOST_FLAT_POINTS) return; // VNDegen: too many already
    // @TODO this "flatness" calculation is just made-up nonsense that seems to work well enough
    float dx0 = x1-x0;
    float dy0 = y1-y0;
@@ -3695,6 +3724,7 @@ static stbtt__point *stbtt_FlattenCurves(stbtt_vertex *vertices, int num_verts, 
          }
       }
       (*contour_lengths)[n] = num_points - start;
+      if (num_points > STBTT__MOST_FLAT_POINTS) goto error; // VNDegen: not drawn
    }
 
    return points;

@@ -1,5 +1,6 @@
 #if os(macOS)
 import Foundation
+import TestSupport
 import RegistryFile
 import Testing
 import VNCore
@@ -37,7 +38,7 @@ import VNCore
     }
 
     @Test func readsAppInfoWhateverItsCase() throws {
-        let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
+        let folder = TestFolders.root.appending(path: "unity-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
         try FileManager.default.createDirectory(at: folder.appending(path: "Game_Data"), withIntermediateDirectories: true)
         try Data().write(to: folder.appending(path: "Game_Data/globalgamemanagers"))
@@ -51,7 +52,7 @@ import VNCore
 
 @Suite struct UnityBottleTests {
     private static func scratch() throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appending(path: "bottle-\(UUID().uuidString)").resolvingSymlinksInPath()
+        let url = TestFolders.root.appending(path: "bottle-\(UUID().uuidString)").resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -191,7 +192,7 @@ import VNCore
     /// each place.
     @Test func mergeKeepsEverySave() throws {
         let fm = FileManager.default
-        let base = fm.temporaryDirectory.appending(path: "merge-\(UUID().uuidString)")
+        let base = TestFolders.root.appending(path: "merge-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: base) }
         let aside = base.appending(path: "aside"), saves = base.appending(path: "saves")
         try fm.createDirectory(at: aside.appending(path: "Studio/Game"), withIntermediateDirectories: true)
@@ -239,7 +240,7 @@ import VNCore
     /// An app from a zip made on Windows has no execute bits. Only its main executable gets them.
     @Test func restoresTheExecuteBitOfTheMainExecutable() throws {
         let fm = FileManager.default
-        let app = fm.temporaryDirectory.appending(path: "mac-\(UUID().uuidString)/Game.app")
+        let app = TestFolders.root.appending(path: "mac-\(UUID().uuidString)/Game.app")
         defer { try? fm.removeItem(at: app.deletingLastPathComponent()) }
         try fm.createDirectory(at: app.appending(path: "Contents/MacOS"), withIntermediateDirectories: true)
         try fm.createDirectory(at: app.appending(path: "Contents/Frameworks"), withIntermediateDirectories: true)
@@ -258,7 +259,7 @@ import VNCore
 @Suite struct UnityRouteTests {
     /// A folder with a Windows build and a Mac build beside it, as SiNiSistar 2 ships.
     static func game() throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
+        let folder = TestFolders.root.appending(path: "unity-\(UUID().uuidString)")
         let fm = FileManager.default
         try fm.createDirectory(at: folder.appending(path: "WIN/Game_Data"), withIntermediateDirectories: true)
         try Data().write(to: folder.appending(path: "WIN/Game_Data/globalgamemanagers"))

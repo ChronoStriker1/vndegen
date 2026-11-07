@@ -15,6 +15,17 @@ struct LibraryHomeView: View {
         #endif
     }
 
+    /// The capsule rows' art, grown when a short library would leave the lower part of a wide screen empty, so its
+    /// shelves fill the height. Never smaller than the metrics' size, and with room for a few capsules across.
+    private func capsuleWidth(shelves: Int) -> CGFloat {
+        let base = metrics.largeTileWidth
+        guard shelves > 0 else { return base }
+        // Each shelf's heading, the focus padding around its capsules, and the space between shelves.
+        let perShelf: CGFloat = 60 + (metrics.isShort ? 18 : 30)
+        let free = metrics.size.height - barClearance - 48 - CGFloat(shelves) * perShelf
+        return max(base, min(free / CGFloat(shelves) / 1.5, metrics.size.width / 3.4, 300))
+    }
+
     var body: some View {
         let hero = nav.heroGame
         let layout = nav.layout
@@ -43,7 +54,7 @@ struct LibraryHomeView: View {
                             case .grid: GridShelf(shelf: shelf.shelf, games: shelf.games)
                             case .featured, .capsules:
                                 ShelfRow(shelf: shelf.shelf, games: shelf.games,
-                                         tileWidth: layout == .capsules ? metrics.largeTileWidth : metrics.tileWidth)
+                                         tileWidth: layout == .capsules ? capsuleWidth(shelves: nav.shelves.count) : metrics.tileWidth)
                             }
                         }
                     }
@@ -192,8 +203,12 @@ struct TopBar: View {
         #endif
         .padding(.bottom, 28)
         .background {
-            // Content scrolls under the bar, so fade it out before it meets the buttons.
-            LinearGradient(colors: [Theme.background.opacity(0.9), Theme.background.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom)
+            // Content scrolls under the bar, so it fades out before it meets the buttons, solidly enough that bright art
+            // never shows through behind them.
+            LinearGradient(stops: [.init(color: Theme.background, location: 0),
+                                   .init(color: Theme.background.opacity(0.95), location: 0.7),
+                                   .init(color: .clear, location: 1)],
+                           startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea(edges: [.top, .horizontal])
         }
     }

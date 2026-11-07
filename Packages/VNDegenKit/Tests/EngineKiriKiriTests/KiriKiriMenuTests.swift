@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineKiriKiri
@@ -58,7 +59,7 @@ private let tawawaMenu = """
 }
 
 @Test func theMenuBarChoiceIsKeptPerGame() throws {
-    let data = FileManager.default.temporaryDirectory.appendingPathComponent("kirikiri-menu-\(UUID().uuidString)")
+    let data = TestFolders.root.appendingPathComponent("kirikiri-menu-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: data) }
     let plugin = KiriKiriPlugin()
     let game = Game(id: GameID("t"))

@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 @testable import WebRuntime
 
@@ -11,7 +12,7 @@ private struct SwapFixture {
 
     init() throws {
         let fm = FileManager.default
-        let base = fm.temporaryDirectory.appendingPathComponent("vndegen-swap-\(UUID().uuidString)", isDirectory: true)
+        let base = TestFolders.root.appendingPathComponent("vndegen-swap-\(UUID().uuidString)", isDirectory: true)
         root = base.appendingPathComponent("game", isDirectory: true)
         outside = base.appendingPathComponent("outside", isDirectory: true)
         try fm.createDirectory(at: root.appendingPathComponent("data"), withIntermediateDirectories: true)

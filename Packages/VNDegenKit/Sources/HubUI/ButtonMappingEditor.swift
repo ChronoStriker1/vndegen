@@ -146,6 +146,8 @@ extension ControllerLayout.ID {
 final class ButtonMappingEditor: Identifiable {
     enum Target: Hashable {
         case input(ControlInput)
+        /// Opens or closes the list of layouts under the layout the game shows.
+        case layouts
         /// Copies a layout's buttons into the game.
         case apply(ControllerLayout.ID)
         /// Saves the game's buttons as a new layout.
@@ -185,6 +187,8 @@ final class ButtonMappingEditor: Identifiable {
     /// The saved layout changes go to. Nil while they go to the game.
     private(set) var editing: ControllerLayout.ID?
     private(set) var confirmingDelete = false
+    /// The list of layouts shows. It starts closed, so the buttons come first, and closes again once one is picked.
+    private(set) var listsLayouts = false
     /// The keyboard a new layout's name is typed on. Finishing it saves the name.
     private(set) var keyboard: OnScreenKeyboard?
     /// The button whose action is being picked. Nil while the list of buttons shows.
@@ -246,10 +250,10 @@ final class ButtonMappingEditor: Identifiable {
         if picking != nil { return Self.sections.map { Self.chunked($0.actions.map(Target.action), columns($0)) } }
         let buttons = Self.inputRows.map { [$0] }
         if editing != nil { return [[[.rename, .delete]], buttons] }
-        let layoutRows = layouts.all.map { layout -> [Target] in
+        let layoutRows = !listsLayouts ? [] : layouts.all.map { layout -> [Target] in
             if case .saved = layout.id { [.apply(layout.id), .edit(layout.id)] } else { [.apply(layout.id)] }
         }
-        return [layoutRows + [[.saveNew], [.reset]], buttons]
+        return [[[.layouts]] + layoutRows + [[.saveNew, .reset]], buttons]
     }
 
     private static func chunked(_ targets: [Target], _ columns: Int) -> [[Target]] {
@@ -296,6 +300,8 @@ final class ButtonMappingEditor: Identifiable {
                 closePicker()
             } else if editing != nil {
                 stopEditing()
+            } else if listsLayouts {
+                activate(.layouts)
             } else {
                 return false
             }
@@ -372,14 +378,21 @@ final class ButtonMappingEditor: Identifiable {
         case let .input(input):
             picking = input
             target = nil
+        case .layouts:
+            listsLayouts.toggle()
+            // Opening moves to the layout the game shows, or the first one when its buttons match none.
+            let shown = currentLayout ?? layouts.all.first
+            target = listsLayouts ? shown.map { Target.apply($0.id) } : .layouts
         case let .apply(id):
             if let layout = layouts.layout(id) { save(layout.mapping) }
+            listsLayouts = false
+            target = .layouts
         case .saveNew:
             let mapping = gameMapping
             guard layouts.shown(for: mapping) == nil else { return }
             openKeyboard(title: "Layout name", text: "") { [weak self] name in
-                guard let self, let id = layouts.add(name: name, mapping: mapping) else { return }
-                target = .apply(id)
+                guard let self, layouts.add(name: name, mapping: mapping) != nil else { return }
+                target = .layouts
             }
         case .reset:
             save(defaultLayout)
@@ -485,22 +498,28 @@ struct ButtonMappingSheet: View {
         #endif
     }
 
-    /// Every layout, with the game's marked, then what the game's buttons do.
+    /// The layout the game shows, which opens the list of layouts, then what the game's buttons do.
     private var layoutList: some View {
         let mapping = editor.mapping, defaultLayout = editor.defaultLayout
         let current = editor.currentLayout
+        let defaultName = editor.layouts.shown(for: defaultLayout)?.name ?? "the default"
         return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Layouts")
-            ForEach(editor.layouts.all) { layout in
-                layoutRow(layout, current: layout.id == current?.id)
+            SectionLabel(text: "Layout")
+            layoutChooser(current)
+            if editor.listsLayouts {
+                ForEach(editor.layouts.all) { layout in
+                    layoutRow(layout, current: layout.id == current?.id)
+                }
             }
-            actionButton(.saveNew, title: "Save as new layout", systemImage: "plus")
-                .disabled(current != nil)
-                .padding(.top, 8)
-            actionButton(.reset, title: "Reset to \(editor.layouts.shown(for: defaultLayout)?.name ?? "the default")",
-                         systemImage: "arrow.counterclockwise")
-                .disabled(mapping == defaultLayout)
-                .padding(.bottom, 8)
+            HStack(spacing: ButtonMappingEditor.spacing) {
+                actionButton(.saveNew, title: "Save as layout", systemImage: "plus")
+                    .disabled(current != nil)
+                    .accessibilityLabel("Save as new layout")
+                actionButton(.reset, title: "Reset", systemImage: "arrow.counterclockwise")
+                    .disabled(mapping == defaultLayout)
+                    .accessibilityLabel("Reset to \(defaultName)")
+            }
+            .padding(.vertical, 8)
             SectionLabel(text: "Buttons")
             buttonRows(mapping)
             note(footnote(defaultLayout))
@@ -536,6 +555,28 @@ struct ButtonMappingSheet: View {
             }
         }
         .animation(Theme.focusAnimation, value: editor.focus)
+    }
+
+    /// The layout the game shows, or Custom, which opens and closes the list of layouts.
+    private func layoutChooser(_ current: ControllerLayout?) -> some View {
+        let target = ButtonMappingEditor.Target.layouts
+        return Button { editor.select(target) } label: {
+            HStack(spacing: 14) {
+                Image(systemName: current?.id.systemImage ?? "slider.horizontal.3").frame(width: 26)
+                Text(current?.name ?? "Custom").font(.system(size: 16, weight: .semibold)).lineLimit(1)
+                Spacer()
+                Text(editor.listsLayouts ? "Close" : "Change").foregroundStyle(Theme.secondaryText)
+                Image(systemName: editor.listsLayouts ? "chevron.up" : "chevron.down").foregroundStyle(Theme.secondaryText)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rowFill(target), in: .rect(cornerRadius: 14, style: .continuous))
+            .overlay { rowStroke(target) }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(current?.name ?? "Custom")
+        .id(target)
     }
 
     /// A layout to pick, with an Edit button when it is one the player saved.
@@ -676,13 +717,19 @@ struct ButtonMappingSheet: View {
     private func choice(_ action: ControlAction, selected: Bool) -> some View {
         let target = ButtonMappingEditor.Target.action(action)
         let focused = editor.isFocused(target)
-        let label = if case let .key(key) = action { key.label } else { action.title }
+        // Gamepad choices sit under their own Gamepad heading, so they leave the word off their names.
+        let label = switch action {
+        case let .key(key): key.label
+        case let .gamepad(input): input.title
+        default: action.title
+        }
         return Button { editor.select(target) } label: {
             Text(label)
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .foregroundStyle(focused ? .black : .white)
+                .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {
                     let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)

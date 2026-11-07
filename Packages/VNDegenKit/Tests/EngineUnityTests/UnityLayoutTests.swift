@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import EngineUnity
@@ -51,7 +52,7 @@ import VNCore
 
     /// A wrapped RPG Maker game is only a likely match. Unity, asked last, must not take it for a Unity tool beside it.
     @Test func neverOutranksAnotherEnginesMatch() throws {
-        let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
+        let folder = TestFolders.root.appending(path: "unity-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder.appending(path: "Release/Tool_Data"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         try Data().write(to: folder.appending(path: "Release/Tool_Data/globalgamemanagers"))
@@ -100,7 +101,7 @@ import VNCore
     }
 
     @Test func readsTheVersionFromEveryHeader() throws {
-        let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
+        let folder = TestFolders.root.appending(path: "unity-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         // A serialized file before format 22, its version after a 20-byte header.
@@ -121,9 +122,9 @@ import VNCore
     }
 
     @Test func pluginRunsOnlyOnTheMac() throws {
-        let plugin = UnityPlugin(bottles: FileManager.default.temporaryDirectory.appending(path: "bottles-\(UUID().uuidString)"))
+        let plugin = UnityPlugin(bottles: TestFolders.root.appending(path: "bottles-\(UUID().uuidString)"))
         #expect(plugin.descriptor.platforms == [.macOS])
-        let folder = FileManager.default.temporaryDirectory.appending(path: "unity-\(UUID().uuidString)")
+        let folder = TestFolders.root.appending(path: "unity-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder.appending(path: "Game_Data/il2cpp_data"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         try Data().write(to: folder.appending(path: "Game_Data/globalgamemanagers"))

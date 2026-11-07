@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import OSLog
 import Testing
 import VNCore
@@ -59,7 +60,7 @@ window.TYRANO = { kag: { stat: { is_strong_stop: true, visible_menu_button: true
 
 /// The NW.js shim, then this script, as a game session injects them.
 @MainActor private func configuration() throws -> WKWebViewConfiguration {
-    let game = WebGameConfiguration(folder: GameFolder(root: FileManager.default.temporaryDirectory, webRoot: ""), appName: "test",
+    let game = WebGameConfiguration(folder: GameFolder(root: TestFolders.root, webRoot: ""), appName: "test",
                                     buttonScript: { _, _ in nil }, scriptArgument: "test-script", log: Logger())
     let configuration = WKWebViewConfiguration()
     for source in [try WebGameSession.shimSource(for: game), try String(contentsOf: script, encoding: .utf8)] {

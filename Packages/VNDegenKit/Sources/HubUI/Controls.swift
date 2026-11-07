@@ -109,18 +109,32 @@ struct HeaderTile: View {
 /// A library tile's menu for a long press or a right click. A controller's X opens the same actions in a sheet.
 private struct GameMenu: ViewModifier {
     @Environment(Navigator.self) private var nav
+    @Environment(\.hubMetrics) private var metrics
     let id: GameID
 
     func body(content: Content) -> some View {
-        content.contextMenu {
-            ForEach(nav.gameActions(id), id: \.action) { item in
-                Button(role: item.action == .remove ? .destructive : nil) {
-                    nav.perform(item.action, on: id)
-                } label: {
-                    Label(item.title, systemImage: item.systemImage)
-                }
-                if item.action == .metadata || item.action == .showFolder { Divider() }
+        // On the folded iPhone Duo the lifted tile is so tall that the menu would scroll to reach Remove, so it lifts a
+        // small header instead.
+        if metrics.acrossSideCamera, let game = nav.hub.library.game(id) {
+            content.contextMenu { items } preview: {
+                GameArt(game: game, slots: [.header, .capsule], size: CGSize(width: 280, height: 131))
+                    .frame(width: 280, height: 131)
+                    .environment(nav.hub)
             }
+        } else {
+            content.contextMenu { items }
+        }
+    }
+
+    @ViewBuilder
+    private var items: some View {
+        ForEach(nav.gameActions(id), id: \.action) { item in
+            Button(role: item.action == .remove ? .destructive : nil) {
+                nav.perform(item.action, on: id)
+            } label: {
+                Label(item.title, systemImage: item.systemImage)
+            }
+            if item.action == .metadata || item.action == .showFolder { Divider() }
         }
     }
 }

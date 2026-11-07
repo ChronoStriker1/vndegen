@@ -1,5 +1,6 @@
 import FontPack
 import Foundation
+import TestSupport
 import OSLog
 import Testing
 import WebKit
@@ -11,7 +12,7 @@ private let bundledFonts = URL(fileURLWithPath: #filePath).deletingLastPathCompo
 /// Configures the folders FontPackTests configures: FontPack's state is process-wide and both suites run at once, so
 /// they must agree on it.
 private func configureFonts() throws {
-    let downloaded = FileManager.default.temporaryDirectory.appending(path: "vndegen-font-tests")
+    let downloaded = TestFolders.root.appending(path: "vndegen-font-tests")
     try FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
     for name in ["SourceHanSansKR-Regular.otf", "SourceHanSansKR-Bold.otf"] {
         try Data().write(to: downloaded.appending(path: name), options: .atomic)
@@ -23,7 +24,7 @@ private func configureFonts() throws {
 @MainActor struct FontTests {
     private func page(preload: Set<String>) async throws -> PageHarness {
         try configureFonts()
-        let root = FileManager.default.temporaryDirectory.appending(path: "vndegen-fonts-\(UUID().uuidString)")
+        let root = TestFolders.root.appending(path: "vndegen-fonts-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data("<html><body></body></html>".utf8).write(to: root.appending(path: "index.html"))
         let folder = GameFolder(root: root, webRoot: "")

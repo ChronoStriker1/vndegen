@@ -2,6 +2,7 @@ import CryptoKit
 import EngineRenPy
 import EngineRPGMaker
 import Foundation
+import TestSupport
 import Testing
 import VNCore
 @testable import SaveSync
@@ -11,7 +12,7 @@ let deckSave = "/home/deck/.local/share/Steam/steamapps/common/NoSocksRPG/save/"
 var fm: FileManager { .default }
 
 func temporaryDirectory() throws -> URL {
-    let url = fm.temporaryDirectory.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
+    let url = TestFolders.root.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
     try fm.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }
@@ -664,7 +665,7 @@ private func freshLibrary() async throws -> (library: LibraryStore, directory: U
 /// `VNDEGEN_TEST_DIR` puts the game on a case-sensitive volume, which `scripts/build.sh test` mounts.
 @Test func restoreReplacesASaveThatDiffersOnlyInCase() throws {
     let scratch = ProcessInfo.processInfo.environment["VNDEGEN_TEST_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-        ?? fm.temporaryDirectory
+        ?? TestFolders.root
     let base = scratch.appendingPathComponent("savesync-\(UUID().uuidString)", isDirectory: true)
     defer { try? fm.removeItem(at: base) }
     let store = LudusaviStore(root: base.appendingPathComponent("ludusavi-backup"))

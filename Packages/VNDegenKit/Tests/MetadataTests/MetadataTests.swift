@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import TestSupport
 import ImageIO
 import Testing
 import VNCore
@@ -11,7 +12,7 @@ private let allKeys: [Credential: String] = [
 
 @MainActor
 private func makeLibrary(_ games: [String]) async throws -> LibraryStore {
-    let base = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let base = TestFolders.root.appending(path: UUID().uuidString)
     let paths = LibraryPaths(gamesRoot: base.appending(path: "Games"), support: base.appending(path: "Support"))
     for name in games {
         try FileManager.default.createDirectory(at: paths.folder(for: GameID(name)), withIntermediateDirectories: true)

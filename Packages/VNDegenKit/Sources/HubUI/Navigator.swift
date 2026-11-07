@@ -214,8 +214,18 @@ final class Navigator {
     }
     /// Set by the home screen's header list from its width.
     var headerColumns = 1
-    /// Set by the game page when a narrow window puts its other buttons in a row under Play.
-    var pageActionsStacked = false
+    /// How the game page lays out its buttons, set by the page from the width it has.
+    enum PageActions {
+        /// Play and the rest in one row.
+        case row
+        /// Play and the main buttons in one row, the folder, engine files, and Remove buttons in another under it.
+        case split
+        /// Play alone, the rest under it two to a row.
+        case stacked
+    }
+    var pageActions = PageActions.row
+    /// Set by a confirmation that stacks its buttons, as on the folded iPhone Duo, so Up and Down move between them.
+    var confirmationStacked = false
     /// Set by the game page's screenshot grid from its width.
     var screenshotColumns = 2 {
         didSet { if screenshotColumns != oldValue, sheet == nil { setFocus(shownScreenshotTarget(focus)) } }
@@ -273,8 +283,9 @@ final class Navigator {
     var shelves: [(shelf: Shelf, games: [Game])] {
         let visible = visibleGames
         // The header list and the grid show every game, so Recently played would only repeat the top of All games,
-        // which already lists the last played first.
-        let recent = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        // which already lists the last played first. So would a shelf of one game, which the hero shows too.
+        let played = layout == .headers || layout == .grid ? [] : Array(visible.filter { $0.lastPlayedAt != nil }.prefix(12))
+        let recent = played.count > 1 ? played : []
         let all: [(Shelf, [Game])] = [
             (.recent, recent),
             (.all, visible.filter { !$0.isLocked }),
@@ -305,7 +316,10 @@ final class Navigator {
                 return [Row(id: "query", items: [.metadataQuery])]
                     + (search.results ?? []).indices.map { Row(id: "result-\($0)", items: [.metadataResult($0)]) }
             case .license: return [Row(id: "license", items: [.licenseAccept, .licenseDecline])]
-            case .confirm: return [Row(id: "confirm", items: [.confirmAction, .confirmCancel])]
+            case .confirm:
+                return confirmationStacked
+                    ? [Row(id: "confirm-action", items: [.confirmAction]), Row(id: "confirm-cancel", items: [.confirmCancel])]
+                    : [Row(id: "confirm", items: [.confirmAction, .confirmCancel])]
             // These take controller input through their own models.
             case .unlock, .saves, .launchSaves, .settingsPage, .importGame, .mapping, .screenshots: return []
             }
@@ -350,12 +364,18 @@ final class Navigator {
                 + (Self.collapsesScreenshots(screenshots.count, columns: columns) ? [Row(id: "page-screenshots-more", items: [.pageScreenshotsMore])] : [])
             let engineFiles: [Target] = pageGameID.map(hub.library.offersEngineFiles) == true ? [.pageEngineFiles] : []
             let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder] + engineFiles + [.pageRemove]
-            let pageActions = pageActionsStacked
-                ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
-                : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
+            // The rows as the page draws them.
+            let actionRows: [Row] = switch pageActions {
+            case .row: [Row(id: "page-actions", items: [.pagePlay] + secondary)]
+            case .split:
+                [Row(id: "page-actions", items: [.pagePlay] + secondary.prefix(Self.mainPageActions), remembersColumn: false),
+                 Row(id: "page-actions-more", items: Array(secondary.dropFirst(Self.mainPageActions)), remembersColumn: false)]
+            case .stacked:
+                [Row(id: "page-play", items: [.pagePlay])] + Self.gridRows("page-actions", secondary, columns: Self.stackedActionColumns)
+            }
             return [
                 Row(id: "page-back", items: [.back]),
-            ] + pageActions + runtimes + screenshotRows + [
+            ] + actionRows + runtimes + screenshotRows + [
                 Row(id: "page-engine", items: [.pageEngine]),
             ] + (pageGameID.flatMap(variants) == nil ? [] : [Row(id: "page-variant", items: [.pageVariant])])
                 + orientation + controls + [Row(id: "page-mapping", items: [.pageMapping])]
@@ -412,6 +432,11 @@ final class Navigator {
             return target
         }
     }
+
+    /// The columns of the game page's buttons when they stack under Play.
+    static let stackedActionColumns = 2
+    /// The game page's buttons after Play that stay beside it when the page splits its buttons over two rows.
+    static let mainPageActions = 4
 
     /// `items` in rows of `columns`. Moving between them keeps the column, as moving through a grid should.
     private static func gridRows(_ id: String, _ items: [Target], columns: Int) -> [Row] {
@@ -815,10 +840,10 @@ final class Navigator {
         let path = SettingsView.displayPath(hub.library.folder(for: id))
         let stays = "Saves VNDegen keeps for the game in its own data folder stay, and so do the game's artwork, play time, and settings, which come back if you put the folder back. Saves the game writes inside its folder go with it."
         #if os(macOS)
-        let message = "VNDegen moves the game's folder, \(path), to the Trash. \(stays)"
+        let message = "VNDegen moves the game's folder, \(path), to the Trash.\n\n\(stays)"
         let action = "Move to Trash"
         #else
-        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone. \(stays)"
+        let message = "VNDegen deletes the game's folder, \(path), and everything in it from this \(UIDevice.current.localizedModel) for good. This can't be undone.\n\n\(stays)"
         let action = "Delete folder"
         #endif
         sheet = .confirm(Confirmation(title: "Remove \(hub.displayTitle(game)) from the library?", message: message,
@@ -1205,9 +1230,11 @@ final class Navigator {
             return
         case .settingsPage(.licenses)?, .settingsPage(.plugins)?, .license?, .confirm?:
             // Licenses, the plugin list, and a question's details are text to read: up and down scroll a little, the
-            // shoulder buttons a page.
+            // shoulder buttons a page. A question whose buttons are stacked keeps up and down for moving between them.
             switch button {
-            case .up, .down: return pager.scroll(pages: button == .up ? -0.3 : 0.3)
+            case .up, .down:
+                if confirmationStacked, case .confirm? = sheet { break }
+                return pager.scroll(pages: button == .up ? -0.3 : 0.3)
             case .pageUp, .pageDown: return pager.scroll(pages: button == .pageUp ? -1 : 1)
             default: break
             }

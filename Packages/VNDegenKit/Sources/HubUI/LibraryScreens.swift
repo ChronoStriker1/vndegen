@@ -32,6 +32,8 @@ private struct ScreenHeader: View {
         .padding(.leading, metrics.topRowPadding(.leading))
         .padding(.trailing, metrics.topRowPadding(.trailing))
         .padding(.top, 10)
+        // The list below starts under a side camera rather than beside it, so nothing scrolls past the camera.
+        .frame(minHeight: metrics.acrossSideCamera ? metrics.cornerClearance : 0, alignment: .top)
         #if os(macOS)
         .padding(.top, 18)
         #endif
@@ -65,7 +67,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Library folders")
                     } footer: {
-                        Text(FileBrowser.instructions + " " + FileBrowser.addedFolders)
+                        Text(FileBrowser.instructions)
                     }
 
                     Section("Sources and privacy") {
@@ -80,7 +82,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Saves")
                     } footer: {
-                        Text("Restore and back up game saves through Ludusavi. Each game's page lists its backups under Saves.")
+                        Text("Back up and restore game saves through Ludusavi.")
                     }
 
                     #if os(iOS)
@@ -106,16 +108,12 @@ struct SettingsView: View {
                     } header: {
                         Text("Controls")
                     } footer: {
-                        Text("Automatic shows the touch gamepad when you play by touch with no controller connected. Mouse with the touch style clicks where you tap, and the cursor style moves a pointer like a trackpad. Controller shows no on-screen controls, and the game ignores touches unless Mouse is on. Each game page can override the control method and orientation, and the VNDegen menu switches the control method while you play.")
+                        Text("Each game's page can change these for that game, and the VNDegen menu switches the method while you play.")
                     }
                     #endif
 
-                    Section {
+                    Section("Engines") {
                         pageRow("Plugins", systemImage: "puzzlepiece.extension", value: "\(hub.library.engines.count) built in", page: .plugins)
-                    } header: {
-                        Text("Engines")
-                    } footer: {
-                        Text("Each engine plugin, the versions it covers, what runs its games, its license, and how many of your games use it.")
                     }
 
                     Section {
@@ -123,7 +121,7 @@ struct SettingsView: View {
                     } header: {
                         Text("Fonts")
                     } footer: {
-                        Text("Games ask for Windows fonts such as MS Gothic and Arial by name. VNDegen includes free fonts with the same measurements for Western and Japanese text. Chinese and Korean games need these downloads from Adobe's Source Han Sans, under the SIL Open Font License. Games started after a download use it.")
+                        Text("Western and Japanese fonts are built in. Chinese and Korean games need these free downloads.")
                     }
 
                     Section {
@@ -135,14 +133,14 @@ struct SettingsView: View {
                     } header: {
                         Text("MIDI music")
                     } footer: {
-                        Text("RPG Maker XP, VX and VX Ace, Wolf RPG Editor and AliceSoft System 3 games play their MIDI music through a General MIDI SoundFont. Choose an .sf2 or .sf3 file to use instead of the built-in FluidR3 Mono; VNDegen keeps a copy of it. If it can't be read, the built-in font plays. Games started after a change use it.")
+                        Text("Older RPG Maker, Wolf RPG and System 3 games play MIDI music with this. Choose an .sf2 or .sf3 file to replace it.")
                     }
 
                     Section {
                         Button("Clear video cache", systemImage: "trash") { nav.select(.clearVideoCache) }
                             .focusRow(.clearVideoCache, nav)
                     } footer: {
-                        Text("Keeps up to 512 MB of prepared transparent movies. Clearing the cache prepares them again when needed.")
+                        Text("Up to 512 MB of prepared movies, made again when needed.")
                     }
 
                     Section {
@@ -152,7 +150,9 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
-                .frame(maxWidth: 760)
+                .formBesideSideCamera(metrics)
+                // Its help text reads in lines of a comfortable length on a wide screen.
+                .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity)
                 .onChange(of: nav.focus) { _, focus in
                     guard nav.focusMovedByController, let focus else { return }
@@ -253,19 +253,23 @@ struct SettingsView: View {
         let target = Navigator.Target.fontPackage(package.id)
         let phase = nav.runtimes.phases[package.id]
         let installed = nav.runtimes.installedFonts.contains(package.id)
+        let size = RuntimeSection.size(package.size)
         let (state, action): (String, String) = switch phase {
         case let .running(progress)?: (RuntimeSection.status(progress), "Cancel")
-        case let .failed(message)?: (message, "Download, \(RuntimeSection.size(package.size))")
-        case nil: installed ? ("Installed", "Remove") : ("Not installed", "Download, \(RuntimeSection.size(package.size))")
+        case let .failed(message)?: (message, "Download")
+        case nil: installed ? ("Installed", "Remove") : ("Not installed · \(size)", "Download")
         }
+        // "Chinese fonts (Source Han Sans CN)" shows as "Chinese fonts", with the typeface under it, so it fits a narrow row.
+        let name = package.name.split(separator: " (", maxSplits: 1).map(String.init)
+        let typeface = name.count == 2 ? String(name[1].dropLast()) + " · " : ""
         return Button { nav.select(target) } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Label(package.name, systemImage: "textformat").foregroundStyle(.white)
+                    Label(name[0], systemImage: "textformat").foregroundStyle(.white)
                     Spacer()
                     Text(action).foregroundStyle(Theme.accent)
                 }
-                Text(state).font(.footnote).foregroundStyle(Theme.secondaryText).fixedSize(horizontal: false, vertical: true)
+                Text(typeface + state).font(.footnote).foregroundStyle(Theme.secondaryText).fixedSize(horizontal: false, vertical: true)
                 if case let .running(progress)? = phase {
                     ProgressView(value: RuntimeSection.fraction(progress, package)).tint(Theme.accent)
                 }
@@ -329,6 +333,7 @@ extension View {
 struct SettingsPageSheet: View {
     @Environment(Hub.self) private var hub
     @Environment(Navigator.self) private var nav
+    @Environment(\.hubMetrics) private var metrics
     let page: Navigator.SettingsPage
 
     var body: some View {
@@ -336,15 +341,15 @@ struct SettingsPageSheet: View {
             switch page {
             case .metadata:
                 SheetScaffold(title: "Metadata sources", escapeCloses: true) {
-                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden)
+                    MetadataSettingsView(model: nav.metadataSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .lock:
                 SheetScaffold(title: "Hidden games") {
-                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden)
+                    LockSettingsView(model: nav.lockSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .saves:
                 SheetScaffold(title: "Ludusavi backups", escapeCloses: true) {
-                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden)
+                    SaveSyncSettingsView(model: nav.saveSettings).scrollContentBackground(.hidden).formBesideSideCamera(metrics)
                 }
             case .plugins:
                 SheetScaffold(title: "Plugins", subtitle: "Engines built into VNDegen", escapeCloses: true) {
@@ -367,8 +372,7 @@ struct SettingsPageSheet: View {
 enum FileBrowser {
     #if os(macOS)
     static let openTitle = "Show in Finder"
-    static let instructions = "Copy each game into its own folder inside ~/Games/VNDegen, then rescan. A zip, RAR, or 7z archive copied there shows up in the library under Ready to import."
-    static let addedFolders = "Add folder takes another folder of game folders, such as one on an external drive or a server. Its games join the library, and stay listed as unavailable while the drive or server is away. Removing a folder takes its games out of the library and leaves its files alone."
+    static let instructions = "Copy each game into its own folder in ~/Games/VNDegen. Archives copied there show up under Ready to import."
     /// Shows `url` in Finder. `create` makes it first, for VNDegen's own games folder. Other folders are never made, so
     /// a folder on a drive that went away isn't made again on the disk under it.
     static func open(_ url: URL, create: Bool = false) {
@@ -377,8 +381,7 @@ enum FileBrowser {
     }
     #else
     static let openTitle = "Open in Files"
-    static let addedFolders = "Add folder takes another folder of game folders from Files, such as one on an external drive or a server connected in Files. Its games join the library, and stay listed as unavailable while the drive or server is away. Removing a folder takes its games out of the library and leaves its files alone."
-    static let instructions = "In the Files app, open On My \(UIDevice.current.localizedModel), then VNDegen, then Games. Copy each game into its own folder there. A zip, RAR, or 7z archive copied into VNDegen or Games shows up in the library under Ready to import."
+    static let instructions = "Copy each game into its own folder in Files, under On My \(UIDevice.current.localizedModel) › VNDegen › Games. Archives copied there show up under Ready to import."
     /// Opens `url` in the Files app. `create` makes it first, for VNDegen's own games folder.
     static func open(_ url: URL, create: Bool = false) {
         if create { try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
@@ -412,15 +415,26 @@ struct EmptyLibraryView: View {
     }
 
     var body: some View {
-        let layout = metrics.isCompact || metrics.isShort ? AnyLayout(VStackLayout(spacing: 28)) : AnyLayout(HStackLayout(spacing: 56))
+        let stacked = metrics.isCompact || metrics.isShort
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 24)) : AnyLayout(HStackLayout(spacing: 56))
+        // A phone held upright keeps the posters small, so the actions show without scrolling.
+        let posters: CGFloat = metrics.isShort ? 170 : metrics.isCompact ? 150 : 240
         ScrollView {
             layout {
                 PosterStack()
-                    .frame(width: metrics.isShort ? 180 : 240, height: metrics.isShort ? 170 : 240)
+                    .frame(width: posters, height: posters)
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Add your first game").font(.display(metrics.isCompact ? 28 : 36))
                     if !hub.localArchives.isEmpty {
                         ReadyToImportList(archives: hub.localArchives)
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus").fixedSize() }
+                        HStack(spacing: 12) {
+                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill").fixedSize() }
+                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise").fixedSize() }
+                                .disabled(nav.rescanning)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 14) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
@@ -434,23 +448,16 @@ struct EmptyLibraryView: View {
                             }
                         }
                     }
-                    Text("RPG Maker MV and MZ games are supported today. Add game unpacks a zip, RAR, or 7z archive into the library.")
+                    .padding(.top, 6)
+                    Text("Add game unpacks a zip, RAR, or 7z archive into the library.")
                         .font(.system(size: 14))
                         .foregroundStyle(Theme.tertiaryText)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HubButton(target: .addGame, kind: .primary) { Label("Add game", systemImage: "plus") }
-                        HStack(spacing: 12) {
-                            HubButton(target: .openFolder) { Label(FileBrowser.openTitle, systemImage: "folder.fill") }
-                            HubButton(target: .rescan) { Label("Rescan", systemImage: "arrow.clockwise") }
-                                .disabled(nav.rescanning)
-                        }
-                    }
-                    .padding(.top, 6)
                 }
                 .frame(maxWidth: 520, alignment: .leading)
             }
             .padding(.horizontal, metrics.padding)
-            .padding(.vertical, 90)
+            .padding(.top, stacked ? 72 : 90)
+            .padding(.bottom, stacked ? 40 : 90)
             .frame(maxWidth: .infinity, minHeight: metrics.size.height)
         }
         .scrollIndicators(.hidden)
@@ -470,7 +477,7 @@ private struct PosterStack: View {
         GeometryReader { geo in
             let width = geo.size.width * 0.5
             ZStack {
-                ForEach(Array(["Your Visual Novel", "Your RPG", "Your Game"].enumerated()), id: \.offset) { index, title in
+                ForEach(Array(["Your VN", "Your RPG", "Your Game"].enumerated()), id: \.offset) { index, title in
                     PlaceholderArt(title: title)
                         .frame(width: width, height: width * 1.5)
                         .clipShape(.rect(cornerRadius: 10, style: .continuous))

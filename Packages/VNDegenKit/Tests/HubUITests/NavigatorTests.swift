@@ -1,4 +1,5 @@
 import Foundation
+import TestSupport
 import GameInput
 import Lock
 import Metadata
@@ -23,11 +24,13 @@ private struct TestPlugin: EnginePlugin {
 
 /// A hub with one game, Test Game, and a navigator on its page.
 @MainActor
-private func makeNavigator() async throws -> (Navigator, GameID) {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("nav-\(UUID().uuidString)", isDirectory: true)
+private func makeNavigator(games: [String] = ["Test Game"]) async throws -> (Navigator, GameID) {
+    let base = TestFolders.root.appendingPathComponent("nav-\(UUID().uuidString)", isDirectory: true)
     let paths = LibraryPaths(gamesRoot: base.appendingPathComponent("Games"), support: base.appendingPathComponent("Support"))
-    try FileManager.default.createDirectory(at: paths.gamesRoot.appendingPathComponent("Test Game"), withIntermediateDirectories: true)
-    try Data().write(to: paths.gamesRoot.appendingPathComponent("Test Game/game.txt"))
+    for game in games {
+        try FileManager.default.createDirectory(at: paths.gamesRoot.appendingPathComponent(game), withIntermediateDirectories: true)
+        try Data().write(to: paths.gamesRoot.appendingPathComponent("\(game)/game.txt"))
+    }
     let library = LibraryStore(paths: paths, engines: [TestPlugin()])
     await library.refresh()
     let hub = Hub(library: library, metadata: MetadataService(), input: InputHub(),
@@ -135,11 +138,11 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     press(nav, .down, .pageDown)
     #expect(editor.focus == .input(.a))
     press(nav, .pageUp)
-    #expect(editor.focus == .apply(.keyboardAndMouse))
+    #expect(editor.focus == .layouts)
 
-    // Reset sits under the layouts and puts back the engine's layout.
-    let reset = editor.rows().firstIndex { $0 == [.reset] }!
-    for _ in 0..<reset { press(nav, .down) }
+    // Reset sits beside Save under the layout and puts back the engine's layout.
+    #expect(editor.rows()[1] == [.saveNew, .reset])
+    press(nav, .down, .right)
     #expect(editor.focus == .reset)
     press(nav, .confirm)
     #expect(library.game(id)?.buttonMapping == nil)
@@ -194,19 +197,39 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
 }
 
 @MainActor
+@Test func splitPageActionsPutTheFolderButtonsOnARowUnderPlay() async throws {
+    let (nav, _) = try await makeNavigator()
+    nav.pageActions = .split
+    // Hide ends the first row, so Right stays there, and Down reaches the folder button drawn under Play.
+    nav.setFocus(.pageLock)
+    press(nav, .right)
+    #expect(nav.focus == .pageLock)
+    nav.setFocus(.pagePlay)
+    press(nav, .down)
+    #expect(nav.focus == .pageShowFolder)
+    press(nav, .right)
+    #expect(nav.focus != .pageShowFolder)
+}
+
+@MainActor
 @Test func stackedPageActionsTakeTheirOwnRowUnderPlay() async throws {
     let (nav, _) = try await makeNavigator()
     nav.setFocus(.pagePlay)
     press(nav, .right)
     #expect(nav.focus == .pageArtwork)
     // A narrow window puts Artwork and the rest under Play, so Down reaches them and Right has nowhere to go.
-    nav.pageActionsStacked = true
+    nav.pageActions = .stacked
     nav.setFocus(.pagePlay)
     press(nav, .right)
     #expect(nav.focus == .pagePlay)
     press(nav, .down)
     #expect(nav.focus == .pageArtwork)
-    press(nav, .up)
+    // They sit two to a row, as the page draws them, so Right and Down move as they look.
+    press(nav, .right)
+    #expect(nav.focus == .pageMetadata)
+    press(nav, .down)
+    #expect(nav.focus == .pageLock)
+    press(nav, .up, .up)
     #expect(nav.focus == .pagePlay)
 }
 
@@ -216,10 +239,11 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     nav.hub.library.update(id) { $0.lastPlayedAt = .now }
     nav.back()
     #expect(nav.focus == .tile(.recent, id) || nav.focus == .tile(.all, id))
+    // One played game shows in the hero and at the top of All games, so it gets no Recently played shelf of its own.
     nav.layout = .featured
-    #expect(nav.rows().map(\.id) == ["bar", "hero", "recent", "all"])
+    #expect(nav.rows().map(\.id) == ["bar", "hero", "all"])
     nav.layout = .capsules
-    #expect(nav.rows().map(\.id) == ["bar", "recent", "all"])
+    #expect(nav.rows().map(\.id) == ["bar", "all"])
     // The header list leaves out Recently played, which would repeat the top of All games.
     nav.layout = .headers
     #expect(nav.rows().map(\.id) == ["bar", "all-0"])
@@ -237,6 +261,20 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.layout == .featured)
     #expect(nav.focus == .layoutButton)
     #expect(UserDefaults.standard.string(forKey: LibraryLayout.storageKey) == LibraryLayout.featured.rawValue)
+}
+
+@MainActor
+@Test func recentlyPlayedShowsOnceTwoGamesHaveBeenPlayed() async throws {
+    let (nav, id) = try await makeNavigator(games: ["Test Game", "Other Game"])
+    nav.back()
+    nav.layout = .capsules
+    nav.hub.library.update(id) { $0.lastPlayedAt = .now }
+    #expect(!nav.rows().map(\.id).contains("recent"))
+    nav.hub.library.update(GameID("Other Game")) { $0.lastPlayedAt = .now }
+    #expect(nav.rows().map(\.id) == ["bar", "recent", "all"])
+    // The header list and the grid never show it.
+    nav.layout = .grid
+    #expect(!nav.rows().map(\.id).contains("recent"))
 }
 
 /// A layout stored by an earlier version must still load, so the raw values never change.
@@ -280,6 +318,22 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.sheet == nil)
     #expect(FileManager.default.fileExists(atPath: nav.hub.library.folder(for: id).path))
     #expect(nav.hub.library.games.map(\.id) == [id])
+}
+
+@MainActor
+@Test func stackedConfirmationButtonsMoveUpAndDown() async throws {
+    let (nav, id) = try await makeNavigator()
+    nav.confirmationStacked = true
+    nav.perform(.remove, on: id)
+    guard case .confirm? = nav.sheet else { Issue.record("no confirmation"); return }
+    // Drawn one above the other, as on the folded iPhone Duo, so Up reaches the action and Down comes back to Cancel.
+    #expect(nav.focus == .confirmCancel)
+    press(nav, .up)
+    #expect(nav.focus == .confirmAction)
+    press(nav, .down)
+    #expect(nav.focus == .confirmCancel)
+    press(nav, .cancel)
+    #expect(nav.sheet == nil)
 }
 
 @MainActor

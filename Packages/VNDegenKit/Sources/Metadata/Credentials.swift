@@ -1,3 +1,4 @@
+import ControllerUI
 import Foundation
 import Security
 
@@ -23,7 +24,7 @@ struct KeychainError: LocalizedError {
 
 /// Generic passwords under one service name, readable after first unlock so background refreshes can use them.
 struct KeychainCredentials: CredentialStore {
-    private let service = "com.chronostriker1.vndegen.metadata"
+    private let service = KeychainService.named("com.chronostriker1.vndegen.metadata")
 
     func read(_ credential: Credential) -> String? {
         var query = baseQuery(credential)
