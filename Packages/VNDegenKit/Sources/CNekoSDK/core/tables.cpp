@@ -1368,29 +1368,32 @@ button music obj\d003_000.bmp 625 640 10 5 5 help obj\d005_000.bmp 0 686 1 11 0 
 
 screen load
 pic obj\e000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 1
-slots obj\e007_000.bmp 26 104 546 136 4 2
-slotlabel obj\e008_000.bmp 9 16
-slotdigits obj\e008_001.bmp 37 9
+slots obj\e007_000.bmp 26 106 546 134 4 2
+slotlabel obj\e008_000.bmp 3 9
+slotdigits obj\e008_001.bmp 33 4
 slotthumb 8 11
 datedigits obj\e009_000.bmp 193 58
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
-datedash obj\e009_001.bmp
 slotlock obj\e010_000.bmp 446 52
 slotdelete obj\e011_000.bmp 473 52
+emptycards 80
 dategap 13
-button page0 obj\e006_000.bmp 280 34 10 5 0
-button page1 obj\e006_000.bmp 330 34 10 5 1
-button page2 obj\e006_000.bmp 380 34 10 5 2
-button page3 obj\e006_000.bmp 430 34 10 5 3
-button page4 obj\e006_000.bmp 480 34 10 5 4
-button page5 obj\e006_000.bmp 530 34 10 5 5
-button page6 obj\e006_000.bmp 580 34 10 5 6
-button page7 obj\e006_000.bmp 630 34 10 5 7
-button page8 obj\e006_000.bmp 680 34 10 5 8
-button page9 obj\e006_000.bmp 730 34 10 5 9
+button page0 obj\e006_000.bmp 282 34 10 5 0
+button page1 obj\e006_000.bmp 332 34 10 5 1
+button page2 obj\e006_000.bmp 382 34 10 5 2
+button page3 obj\e006_000.bmp 432 34 10 5 3
+button page4 obj\e006_000.bmp 482 34 10 5 4
+button page5 obj\e006_000.bmp 532 34 10 5 5
+button page6 obj\e006_000.bmp 582 34 10 5 6
+button page7 obj\e006_000.bmp 632 34 10 5 7
+button page8 obj\e006_000.bmp 682 34 10 5 8
+button page9 obj\e006_000.bmp 732 34 10 5 9
 button page10 obj\e006_001.bmp 782 34 1 5 0
 button nav_save obj\e004_000.bmp 1152 93 9 5 0
 button nav_load obj\e004_000.bmp 1152 135 9 5 1
@@ -1404,29 +1407,31 @@ button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen save
 pic obj\e000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 0
-slots obj\e007_000.bmp 26 104 546 136 4 2
-slotlabel obj\e008_000.bmp 9 16
-slotdigits obj\e008_001.bmp 37 9
+slots obj\e007_000.bmp 26 106 546 134 4 2
+slotlabel obj\e008_000.bmp 3 9
+slotdigits obj\e008_001.bmp 33 4
 slotthumb 8 11
 datedigits obj\e009_000.bmp 193 58
 dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
-datedash obj\e009_001.bmp
 slotlock obj\e010_000.bmp 446 52
 slotdelete obj\e011_000.bmp 473 52
 dategap 13
-button page0 obj\e006_000.bmp 280 34 10 5 0
-button page1 obj\e006_000.bmp 330 34 10 5 1
-button page2 obj\e006_000.bmp 380 34 10 5 2
-button page3 obj\e006_000.bmp 430 34 10 5 3
-button page4 obj\e006_000.bmp 480 34 10 5 4
-button page5 obj\e006_000.bmp 530 34 10 5 5
-button page6 obj\e006_000.bmp 580 34 10 5 6
-button page7 obj\e006_000.bmp 630 34 10 5 7
-button page8 obj\e006_000.bmp 680 34 10 5 8
-button page9 obj\e006_000.bmp 730 34 10 5 9
+button page0 obj\e006_000.bmp 282 34 10 5 0
+button page1 obj\e006_000.bmp 332 34 10 5 1
+button page2 obj\e006_000.bmp 382 34 10 5 2
+button page3 obj\e006_000.bmp 432 34 10 5 3
+button page4 obj\e006_000.bmp 482 34 10 5 4
+button page5 obj\e006_000.bmp 532 34 10 5 5
+button page6 obj\e006_000.bmp 582 34 10 5 6
+button page7 obj\e006_000.bmp 632 34 10 5 7
+button page8 obj\e006_000.bmp 682 34 10 5 8
+button page9 obj\e006_000.bmp 732 34 10 5 9
 button page10 obj\e006_001.bmp 782 34 1 5 0
 button nav_save obj\e004_000.bmp 1152 93 9 5 0
 button nav_load obj\e004_000.bmp 1152 135 9 5 1
@@ -1466,12 +1471,24 @@ viewerbutton hide obj\l001_000.bmp 1240 588 2 0 help 0
 viewernumber index obj\j002_000.bmp 926 630 13 2
 viewernumber total obj\j002_001.bmp 966 648 11 2
 viewerauto 8000 0
-pic obj\f000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The galleries' room, and each tab's two women, standing sprites the exe reads from sys.pak (traced under Wine), 73
+# pixels further left a tab.
+pic obj\f000_001.bmp 0 0
+pic sys\sc_000_002_000_001_001.bmp -163 -39 tab 0
+pic sys\sc_001_002_000_001_003.bmp 596 -39 tab 0
+pic sys\sc_000_002_000_001_000.bmp -236 -39 tab 1
+pic sys\sc_001_002_000_001_000.bmp 523 -39 tab 1
+pic sys\sc_000_002_000_001_003.bmp -309 -39 tab 2
+pic sys\sc_001_002_000_001_001.bmp 450 -39 tab 2
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\f001_000.bmp 0 0 1 2 0 0
+cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 8 26
+cellthumb 10 29
 cell 279 82
 cell 478 82
 cell 677 82
@@ -1481,11 +1498,13 @@ cell 677 245
 cell 279 408
 cell 478 408
 cell 677 408
-celllabel obj\e008_000.bmp 10 15
-celldigits obj\e008_001.bmp 38 10 3 14
-cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
-gallerytabs
-button page0 obj\e006_000.bmp 280 34 10 5 0
+celllabel obj\e008_000.bmp -2 8
+celldigits obj\e008_001.bmp 28 3 3 18
+cellcount obj\f004_000.bmp obj\f004_001.bmp 100 125 128 141
+gallerytabs 1
+cellshift 0 80
+cellshift 2 -80
+button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
@@ -1500,12 +1519,24 @@ button nav_quit obj\e004_000.bmp 1152 387 9 5 7
 button back obj\e004_000.bmp 1152 469 9 5 8
 
 screen scene
-pic obj\f000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The galleries' room, and each tab's two women, standing sprites the exe reads from sys.pak (traced under Wine), 73
+# pixels further left a tab.
+pic obj\f000_001.bmp 0 0
+pic sys\sc_000_002_000_001_001.bmp -163 -39 tab 0
+pic sys\sc_001_002_000_001_003.bmp 596 -39 tab 0
+pic sys\sc_000_002_000_001_000.bmp -236 -39 tab 1
+pic sys\sc_001_002_000_001_000.bmp 523 -39 tab 1
+pic sys\sc_000_002_000_001_003.bmp -309 -39 tab 2
+pic sys\sc_001_002_000_001_001.bmp 450 -39 tab 2
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\f001_000.bmp 0 0 1 2 0 1
+cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 8 26
+cellthumb 10 29
 cell 279 82
 cell 478 82
 cell 677 82
@@ -1515,11 +1546,13 @@ cell 677 245
 cell 279 408
 cell 478 408
 cell 677 408
-celllabel obj\e008_000.bmp 10 15
-celldigits obj\e008_001.bmp 38 10 3 14
-cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
-gallerytabs
-button page0 obj\e006_000.bmp 280 34 10 5 0
+celllabel obj\e008_000.bmp -2 8
+celldigits obj\e008_001.bmp 28 3 3 18
+cellcount obj\f004_000.bmp obj\f004_001.bmp 100 125 128 141
+gallerytabs 1
+cellshift 0 80
+cellshift 2 -80
+button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
 button gtab2 obj\f002_000.bmp 760 654 3 5 2
@@ -1536,7 +1569,10 @@ button back obj\e004_000.bmp 1152 469 9 5 8
 screen music
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\g001_000.bmp 0 0
 pic obj\g004_000.bmp 346 676
 slider music obj\g004_001.bmp 373 681
@@ -1580,7 +1616,10 @@ hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
 hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
 hover 50 270 565 606 obj\h004_000.bmp 350 669 9 5
 pic obj\h000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
 pic obj\h005_000.bmp 43 85
 button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
@@ -1643,7 +1682,10 @@ hover 581 150 1090 222 obj\h004_002.bmp 362 669 6 2
 hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
 hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
 pic obj\h015_000.bmp 43 85
 button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
@@ -1698,7 +1740,10 @@ hover 50 486 565 558 obj\h004_003.bmp 372 669 8 5
 hover 50 246 565 390 obj\h004_003.bmp 372 669 8 2
 hover 581 150 1090 630 obj\h004_003.bmp 372 669 8 7
 pic obj\h000_000.bmp 0 0
-pic obj\e003_000.bmp 1138 0
+# The side panel is the left edge of the room h000, which the exe reads for every menu (traced under Wine), and a frame
+# of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
+pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
 pic obj\h021_000.bmp 43 85
 button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
@@ -3425,10 +3470,9 @@ button music sys_5\obj\d003_000.bmp 622 638 11 5 6 help sys_5\obj\d005_000.bmp 0
 
 screen load
 pic obj\e000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 1
 slots obj\e007_000.bmp 26 106 546 134 4 2
@@ -3466,10 +3510,9 @@ button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
 
 screen save
 pic obj\e000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\e002_000.bmp 0 0 1 2 0 0
 slots obj\e007_000.bmp 26 106 546 134 4 2
@@ -3541,16 +3584,15 @@ pic sc\sc_001_002_000_001_000.bmp -397 -58 tab 1
 pic sc\sc_000_002_000_001_000.bmp 544 -65 tab 1
 pic sc\sc_001_002_000_001_005.bmp -470 -58 tab 2
 pic sc\sc_000_002_000_001_002.bmp 471 -65 tab 2
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 0
 cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 8 26
+cellthumb 10 29
 cell 279 82
 cell 478 82
 cell 677 82
@@ -3562,8 +3604,10 @@ cell 478 408
 cell 677 408
 celllabel obj\e008_000.bmp -2 8
 celldigits obj\e008_001.bmp 28 3 3 18
-cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
+cellcount obj\f004_000.bmp obj\f004_001.bmp 100 125 128 141
 gallerytabs 1
+cellshift 0 80
+cellshift 2 -80
 button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
@@ -3613,16 +3657,15 @@ pic sc\sc_001_002_000_001_000.bmp -397 -58 tab 1
 pic sc\sc_000_002_000_001_000.bmp 544 -65 tab 1
 pic sc\sc_001_002_000_001_005.bmp -470 -58 tab 2
 pic sc\sc_000_002_000_001_002.bmp 471 -65 tab 2
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 2
 cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 8 26
+cellthumb 10 29
 cell 279 82
 cell 478 82
 cell 677 82
@@ -3635,6 +3678,8 @@ cell 677 408
 celllabel obj\e008_000.bmp -2 8
 celldigits obj\e008_001.bmp 28 3 3 18
 gallerytabs 1
+cellshift 0 80
+cellshift 2 -80
 button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
@@ -3660,16 +3705,15 @@ pic sc\sc_001_002_000_001_000.bmp -397 -58 tab 1
 pic sc\sc_000_002_000_001_000.bmp 544 -65 tab 1
 pic sc\sc_001_002_000_001_005.bmp -470 -58 tab 2
 pic sc\sc_000_002_000_001_002.bmp 471 -65 tab 2
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic sys_5\obj\f001_000.bmp 0 0 1 3 0 1
 cellhide
 cellsheet obj\f003_000.bmp
 cellsize 186 156
-cellthumb 8 26
+cellthumb 10 29
 cell 279 82
 cell 478 82
 cell 677 82
@@ -3681,8 +3725,10 @@ cell 478 408
 cell 677 408
 celllabel obj\e008_000.bmp -2 8
 celldigits obj\e008_001.bmp 28 3 3 18
-cellcount obj\f004_000.bmp obj\f004_001.bmp 100 134 134 149
+cellcount obj\f004_000.bmp obj\f004_001.bmp 100 125 128 141
 gallerytabs 1
+cellshift 0 80
+cellshift 2 -80
 button page0 obj\e006_000.bmp 282 34 10 5 0
 button gtab0 obj\f002_000.bmp 8 654 3 5 0
 button gtab1 obj\f002_000.bmp 384 654 3 5 1
@@ -3701,10 +3747,9 @@ button back sys_5\obj\e004_000.bmp 1152 513 10 5 9
 screen music
 hover 346 676 537 708 obj\g006_000.bmp 868 666 8 7
 pic obj\g000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\g001_000.bmp 0 0
 pic obj\g004_000.bmp 346 676
@@ -3750,10 +3795,9 @@ hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
 hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
 hover 50 270 565 606 obj\h004_000.bmp 350 669 9 5
 pic obj\h000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
 pic obj\h005_000.bmp 43 85
@@ -3818,10 +3862,9 @@ hover 581 150 1090 222 sys_5\obj\h004_002.bmp 362 669 6 2
 hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
 hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
 pic obj\h000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
 pic sys_5\obj\h015_000.bmp 43 85
@@ -3878,10 +3921,9 @@ hover 50 486 565 558 obj\h004_003.bmp 372 669 8 5
 hover 50 246 565 390 obj\h004_003.bmp 372 669 8 2
 hover 581 150 1090 630 obj\h004_003.bmp 372 669 8 7
 pic obj\h000_000.bmp 0 0
-# The side panel shows faded, about 150 of 256 by fitting, over the menus' room whatever the screen's own picture, and
-# a frame of bars lies over the top and bottom.
-pic obj\e000_000.bmp 1138 0 part 1138 0 142 720
-pic obj\e003_000.bmp 1138 0 alpha 150
+# The side panel is the left edge of the room h000, the exe's own placement, which it reads for every menu (traced under
+# Wine), and a frame of bars lies over the top and bottom.
+pic obj\h000_000.bmp 1138 0 part 0 0 142 720
 pic obj\e001_000.bmp 0 0
 pic obj\h001_000.bmp 0 0
 pic obj\h021_000.bmp 43 85

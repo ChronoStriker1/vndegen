@@ -268,6 +268,8 @@ private:
     std::vector<GalleryEntry> cgEntries_, sceneEntries_, animeEntries_;
     // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
     const std::vector<GalleryEntry> &galleryEntries() const;
+    int cellShift() const;
+    ImageRef galleryThumbnail(const std::string &path) const;
     bool galleryImageSeen(const GalleryEntry &entry, size_t image) const;
     bool isPictureGallery() const { return screen_ && (screen_->name == "cg" || screen_->name == "anime"); }
     std::vector<std::string> tracks_, trackTitles_;

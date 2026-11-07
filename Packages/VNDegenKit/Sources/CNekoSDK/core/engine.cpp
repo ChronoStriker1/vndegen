@@ -634,7 +634,7 @@ bool Engine::moveFocus(int dx, int dy) {
         const auto *size = screen_->setting("cellsize");
         if (size && size->size() >= 2)
             for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it)
-                spots.push_back({std::atoi(it->second[0].c_str()) + std::atoi((*size)[0].c_str()) / 2, std::atoi(it->second[1].c_str()) + std::atoi((*size)[1].c_str()) / 2});
+                spots.push_back({std::atoi(it->second[0].c_str()) + cellShift() + std::atoi((*size)[0].c_str()) / 2, std::atoi(it->second[1].c_str()) + std::atoi((*size)[1].c_str()) / 2});
     } else {
         return false;
     }
@@ -948,6 +948,25 @@ void Engine::noteSeen(const std::string &path) {
     seenChanged_ = true;
 }
 
+// A card's picture. Ore o Hoshigaru Tsuma to Gibo's ini names `obj\small\cg\...` for pictures whose full versions are in
+// cg2.pak, and its exe, traced under Wine, reads them from `obj\small\cg2\...`.
+ImageRef Engine::galleryThumbnail(const std::string &path) const {
+    if (ImageRef thumb = images_->get(path)) return thumb;
+    std::string name = normalizedPath(path);
+    auto at = name.find("\\small\\cg\\");
+    if (at == std::string::npos) return nullptr;
+    return images_->get(name.replace(at, 10, "\\small\\cg2\\"));
+}
+
+// `cellshift TAB DX`: how far across a gallery tab moves its cards, 80 pixels a tab either side of the middle in Test
+// Games 92 and 93.
+int Engine::cellShift() const {
+    if (!screen_) return 0;
+    for (auto [it, end] = screen_->settings.equal_range("cellshift"); it != end; ++it)
+        if (it->second.size() >= 2 && field(it->second, 0) == galleryTab_) return field(it->second, 1);
+    return 0;
+}
+
 const std::vector<Engine::GalleryEntry> &Engine::galleryEntries() const {
     if (screen_ && screen_->name == "scene") return sceneEntries_;
     if (screen_ && screen_->name == "anime") return animeEntries_;
@@ -986,7 +1005,7 @@ int Engine::galleryCellAt(int x, int y) const {
     int w = std::atoi((*size)[0].c_str()), h = std::atoi((*size)[1].c_str());
     int index = 0;
     for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
-        int cx = std::atoi(it->second[0].c_str()), cy = std::atoi(it->second[1].c_str());
+        int cx = std::atoi(it->second[0].c_str()) + cellShift(), cy = std::atoi(it->second[1].c_str());
         if (x >= cx && y >= cy && x < cx + w && y < cy + h) return index;
     }
     return -1;
@@ -1069,7 +1088,7 @@ void Engine::composeGallery(Canvas &out) {
     int hovered = pointerSeen_ ? galleryCellAt(pointerX_, pointerY_) : -1;
     int perPage = int(screen_->settings.count("cell"));
     for (auto it = screen_->settings.lower_bound("cell"); it != screen_->settings.upper_bound("cell"); ++it, index++) {
-        int cx = std::atoi(it->second[0].c_str()), cy = std::atoi(it->second[1].c_str());
+        int cx = std::atoi(it->second[0].c_str()) + cellShift(), cy = std::atoi(it->second[1].c_str());
         int found = galleryEntry(index);
         // Test Game 85 leaves out the cards past a tab's last entry.
         if (found < 0 && screen_->settings.count("cellhide")) continue;
@@ -1094,7 +1113,7 @@ void Engine::composeGallery(Canvas &out) {
             if (ImageRef art = images_->get((*blank)[0])) drawPart(out, *art, cx + field(*blank, 1), cy + field(*blank, 2), 0, 0, art->w, art->h, 1);
         }
         if (unlocked)
-            if (ImageRef thumb = images_->get(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
+            if (ImageRef thumb = galleryThumbnail(entries[entry].thumbnail)) drawPart(out, *thumb, cx + dx, cy + dy, 0, 0, thumb->w, thumb->h, 1);
         if (unlocked && index == hovered && frame && frame->size() >= 3)
             if (ImageRef art = images_->get((*frame)[0]); art && art->h >= 5) drawPart(out, *art, cx + field(*frame, 1), cy + field(*frame, 2), 0, art->h / 5, art->w, art->h / 5, 1);
         // A card's number, faint on a locked card in some games, and how many of a CG's pictures have been seen.
