@@ -9,12 +9,15 @@ import ControllerUI
 /// Shared chrome for the hub's sheets: a title, a close button, and the dark surface.
 struct SheetScaffold<Content: View>: View {
     @Environment(Navigator.self) private var nav
+    @Environment(\.cameraCornerTrailing) private var cameraCorner
     let title: String
     var subtitle: String?
     /// Only for sheets that turn off keyboard translation. Elsewhere InputHub already maps Escape to cancel.
     var escapeCloses = false
     /// Defaults to closing the navigator's sheet.
     var onClose: (() -> Void)?
+    /// False for a sheet whose own buttons close it, such as a confirmation's Cancel.
+    var showsDone = true
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -23,15 +26,19 @@ struct SheetScaffold<Content: View>: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title).font(.display(22))
                     if let subtitle {
-                        Text(subtitle).font(.system(size: 14)).foregroundStyle(Theme.secondaryText).lineLimit(1)
+                        Text(subtitle).font(.system(size: 14)).foregroundStyle(Theme.secondaryText).lineLimit(2)
                     }
                 }
                 Spacer()
-                Button("Done") { if let onClose { onClose() } else { nav.back() } }
-                    .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
-                    .keyboardShortcut(escapeCloses ? .cancelAction : nil)
+                if showsDone {
+                    Button("Done") { if let onClose { onClose() } else { nav.back() } }
+                        .buttonStyle(HubButtonStyle(kind: .secondary, focused: false))
+                        .keyboardShortcut(escapeCloses ? .cancelAction : nil)
+                }
             }
             .padding(22)
+            // The title and Done keep clear of a camera in the top corner.
+            .padding(.trailing, max(0, cameraCorner - 22))
             content
         }
         .foregroundStyle(.white)
@@ -95,14 +102,15 @@ struct ChoiceSheet: View {
                 .padding(.horizontal, 22)
                 .padding(.bottom, 22)
             }
-            // A long list runs below a medium sheet, so the controller's focus scrolls into view.
+            .reportsSheetOverflow()
+            // A long list runs past the screen, so the controller's focus scrolls into view.
             .onChange(of: nav.focus) { _, focus in
                 guard nav.focusMovedByController, let focus else { return }
                 withAnimation(Theme.focusAnimation) { proxy.scrollTo(focus, anchor: .center) }
             }
             }
         }
-        .presentationDetents([.medium, .large])
+        .fittedSheetHeight(fallback: [.large])
     }
 }
 
@@ -325,7 +333,16 @@ struct ArtworkEditorSheet: View {
                                     .clipShape(.rect(cornerRadius: 8, style: .continuous))
                             }
                         }
-                        .overlay(alignment: .bottomLeading) { Tag(text: candidate.source.displayName).padding(6) }
+                        // A dark backing, since the badge sits on the art itself, which can be any color.
+                        .overlay(alignment: .bottomLeading) {
+                            Text(candidate.source.displayName)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(.black.opacity(0.72), in: Capsule(style: .circular))
+                                .padding(6)
+                        }
                     }
                     .buttonStyle(TileButtonStyle(focused: nav.isFocused(target)))
                     .onHover { if $0 { nav.hover(target) } }
@@ -602,44 +619,48 @@ final class Confirmation {
 struct ConfirmationSheet: View {
     @Environment(Navigator.self) private var nav
     let confirmation: Confirmation
-
     var body: some View {
-        SheetScaffold(title: confirmation.title, escapeCloses: true) {
+        // Cancel is the way out, so a Done beside it would only blur which button keeps the game.
+        SheetScaffold(title: confirmation.title, escapeCloses: true, showsDone: false) {
             VStack(alignment: .leading, spacing: 22) {
-                // Scrolls, so a long path never pushes the buttons off a small screen.
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(confirmation.message)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white.opacity(0.86))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        LazyVStack(alignment: .leading, spacing: 6) {
-                            ForEach(confirmation.rows, id: \.name) { row in
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text(row.name).foregroundStyle(.white)
-                                    Spacer(minLength: 12)
-                                    Text(row.detail).foregroundStyle(Theme.tertiaryText).fixedSize()
-                                }
-                                .font(.system(size: 13))
-                            }
-                        }
-                    }
-                }
-                .scrollBounceBehavior(.basedOnSize)
-                .scrollPager(nav.pager)
+                // A message too long for the screen scrolls, so a long path never pushes the buttons off it.
+                ScrollView { details }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollPager(nav.pager)
+                    .reportsSheetOverflow()
                 HStack(spacing: 12) {
                     HubButton(target: .confirmAction, kind: confirmation.destructive ? .destructive : .primary) { Text(confirmation.action) }
                     HubButton(target: .confirmCancel) { Text("Cancel") }
+                        .keyboardShortcut(.cancelAction)
                 }
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 22)
         }
-        .presentationDetents([.medium, .large])
+        .fittedSheetHeight()
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 280)
         #endif
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(confirmation.message)
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.86))
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            LazyVStack(alignment: .leading, spacing: 6) {
+                ForEach(confirmation.rows, id: \.name) { row in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(row.name).foregroundStyle(.white)
+                        Spacer(minLength: 12)
+                        Text(row.detail).foregroundStyle(Theme.tertiaryText).fixedSize()
+                    }
+                    .font(.system(size: 13))
+                }
+            }
+        }
     }
 }

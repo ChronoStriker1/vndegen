@@ -105,23 +105,25 @@ public struct LockSettingsView: View {
         Form {
             Section {
                 if lock.hasPasscode {
-                    Button("Change Passcode") { model.select(.changePasscode) }
+                    Button("Change passcode") { model.select(.changePasscode) }
                         .focusRow(model.isFocused(.changePasscode), id: LockSettingsModel.Target.changePasscode)
-                    Button("Remove Passcode", role: .destructive) { model.select(.removePasscode) }
+                    Button("Remove passcode", role: .destructive) { model.select(.removePasscode) }
                         .focusRow(model.isFocused(.removePasscode), id: LockSettingsModel.Target.removePasscode)
                 } else {
-                    Button("Set Passcode") { model.select(.setPasscode) }
+                    Button("Set passcode") { model.select(.setPasscode) }
                         .focusRow(model.isFocused(.setPasscode), id: LockSettingsModel.Target.setPasscode)
                 }
             } header: {
-                Text("Hidden games")
+                // The page around it is titled Hidden games already.
+                Text("Passcode")
             } footer: {
                 Text(lock.needsPasscodeSetup
                      ? "Set a passcode before you lock games."
                      : "Locked games stay hidden until you unlock them with \(unlockMethods).")
             }
             Section {
-                Toggle(isOn: Binding(get: { lock.biometricsEnabled }, set: { _ in model.select(.biometrics) })) {
+                // Off while the device has no Face ID or Touch ID, whatever the stored choice, so it never reads as on.
+                Toggle(isOn: Binding(get: { lock.canUseBiometrics }, set: { _ in model.select(.biometrics) })) {
                     Label("Use \(lock.biometry.name)", systemImage: lock.biometry.symbol)
                 }
                 .disabled(lock.biometry == .none)
@@ -150,24 +152,29 @@ public struct LockSettingsView: View {
 private struct PasscodeFlowSheet: View {
     let model: LockSettingsModel
     let entry: PasscodeEntry
+    @Environment(\.cameraCornerTrailing) private var cameraCorner
 
+    /// Laid out as the unlock screen is: the keypad in the middle, with Cancel in the top corner and the flow's name
+    /// over the keypad's prompt.
     var body: some View {
-        NavigationStack {
-            ZStack {
-                LockBackdrop()
-                if let flow = entry.flow {
+        ZStack {
+            LockBackdrop()
+            if let flow = entry.flow {
+                VStack(spacing: 6) {
+                    Text(flow.purpose.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.6))
                     PasscodeKeypad(entry: entry, title: flow.title, expectedLength: flow.expectedLength(current: model.lock.passcodeLength),
                                    keySize: 72, onSubmit: model.submit)
                 }
             }
-            .navigationTitle(entry.flow?.purpose.title ?? "")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: model.closeFlow) }
-            }
+            LockCancelButton(escapes: true, action: model.closeFlow)
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        // Beside a camera in the top corner the system insets that whole side, which would push the keypad off center
+        // below the camera too. Cancel is in the other corner.
+        .ignoresSafeArea(.container, edges: cameraCorner > 0 ? .horizontal : [])
         .preferredColorScheme(.dark)
     }
 }
@@ -175,9 +182,9 @@ private struct PasscodeFlowSheet: View {
 private extension PasscodeFlow.Purpose {
     var title: String {
         switch self {
-        case .create: "Set Passcode"
-        case .change: "Change Passcode"
-        case .remove: "Remove Passcode"
+        case .create: "Set passcode"
+        case .change: "Change passcode"
+        case .remove: "Remove passcode"
         }
     }
 }

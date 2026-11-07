@@ -26,11 +26,11 @@ struct PlayerView: View {
         ZStack {
             SessionViewHost(session: session)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { gameFrame = $0 }
-                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop))
+                .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, camera: metrics.landscapeSideCamera))
             if !menu.isOpen, !isCovered, !session.drawsOwnMenu {
                 // The same frame as the game's view, so its normalized locations match the game's.
                 PointerView(mouse: hub.input.mouse, drawsArrow: overlayMode != .cursor)
-                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop))
+                    .modifier(GamePane(height: gamePaneHeight, top: gamePaneTop, camera: metrics.landscapeSideCamera))
             }
             #if os(iOS)
             if #available(iOS 26, *), OrientationLock.usesSceneLock {
@@ -54,7 +54,8 @@ struct PlayerView: View {
                 // In a short iPad window the gamepad's top row would reach the window's controls. The cursor's pad covers
                 // the whole screen, so it keeps the full height, and its Home button sits in the other corner.
                 TouchControlsOverlay(mode: overlayMode, mapping: mapping, input: hub.input,
-                                     gameFrame: gamePaneHeight == nil ? nil : gameFrame)
+                                     gameFrame: gamePaneHeight == nil && metrics.landscapeSideCamera == nil ? nil : gameFrame,
+                                     controlsBelowGame: gamePaneHeight != nil)
                     .padding(.top, overlayMode == .gamepad ? metrics.cornerClearance : 0)
                     // Below the game, a side inset's camera is up beside the game, so the gamepad keeps the safe area's
                     // width but sits in the middle of the screen. The cursor's pad keeps the whole screen. The on-screen
@@ -75,17 +76,20 @@ struct PlayerView: View {
                 PlayerMenuView(menu: menu, title: title, method: method, showsFocus: hub.input.lastInputKind != .touch,
                                onResume: resume, onQuit: hub.endSession, onMethod: setMethod, onMapping: openMapping,
                                onGameMenu: menu.openGameMenu, onGameItem: choose, onCheats: openCheats)
+                    .besideSideCamera(metrics)
                     .transition(.opacity)
             } else if overlayMode?.hasOverlay != true {
                 // The touch overlays have their own Home button. Without one, this small button is how touch and pointer
                 // users get back to the menu.
                 Button(action: menuButton) {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(width: 36, height: 36)
+                    // The same house as the touch controls' Home button, which opens the same menu.
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .frame(width: 42, height: 42)
                         .background(.ultraThinMaterial, in: .circle)
-                        .opacity(0.55)
-                        .frame(width: 44, height: 44)
+                        .overlay { Circle().strokeBorder(.white.opacity(0.25)) }
+                        .opacity(0.8)
+                        .frame(width: 48, height: 48)
                         .contentShape(.circle)
                 }
                 .buttonStyle(.plain)
@@ -113,6 +117,8 @@ struct PlayerView: View {
         .background(.black)
         .sheet(item: $mappingEditor) { editor in
             ButtonMappingSheet(editor: editor) { mappingEditor = nil }
+                .sheetBesideSideCamera()
+                .environment(\.hubMetrics, metrics.besideSideCamera)
                 .environment(hub)
                 .environment(nav)
         }
@@ -464,23 +470,27 @@ private struct PlayerMenuView: View {
         ZStack {
             Rectangle().fill(.black.opacity(0.55)).ignoresSafeArea()
                 .onTapGesture(perform: onResume)
-            switch menu.page {
-            case .main: card
-            case .game:
-                GameMenuView(menu: menu, showsFocus: showsFocus, onChoose: onGameItem)
-                    .padding(isNarrow ? 20 : 28)
-                    .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
-                    .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
-                    .padding(12)
-            case .cheats:
-                if let cheats = menu.cheats {
-                    CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
-                        .padding(isNarrow || metrics.isShort ? 16 : 28)
+            Group {
+                switch menu.page {
+                case .main: card
+                case .game:
+                    GameMenuView(menu: menu, showsFocus: showsFocus, onChoose: onGameItem)
+                        .padding(isNarrow ? 20 : 28)
                         .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
                         .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
                         .padding(12)
+                case .cheats:
+                    if let cheats = menu.cheats {
+                        CheatsView(page: cheats, showsFocus: showsFocus) { menu.closeCheats() }
+                            .padding(isNarrow || metrics.isShort ? 16 : 28)
+                            .background(.ultraThinMaterial, in: .rect(cornerRadius: 24, style: .continuous))
+                            .overlay { RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke) }
+                            .padding(12)
+                    }
                 }
             }
+            // The cards reach across a side camera's inset, so they keep below the camera.
+            .padding(.top, metrics.acrossSideCamera ? metrics.cornerClearance : 0)
         }
         .onScreenKeyboard(menu.page == .cheats ? menu.cheats?.keyboard : nil)
     }
@@ -677,15 +687,19 @@ private struct RotateHint: View {
 }
 
 /// Places the game's view: full screen, or `height` tall at the top, below the camera housing, when it sits above the touch
-/// controls. The engine keeps the game's aspect ratio inside the view either way.
+/// controls. In landscape it keeps clear of a camera down one side. The engine keeps the game's aspect ratio inside the
+/// view either way.
 private struct GamePane: ViewModifier {
     let height: CGFloat?
     let top: CGFloat
+    let camera: (edge: HorizontalEdge, width: CGFloat)?
 
     func body(content: Content) -> some View {
         content
             .frame(height: height)
             .padding(.top, height == nil ? 0 : top)
+            .padding(.leading, camera?.edge == .leading ? camera?.width ?? 0 : 0)
+            .padding(.trailing, camera?.edge == .trailing ? camera?.width ?? 0 : 0)
             .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
     }
