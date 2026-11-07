@@ -256,10 +256,13 @@ private:
     void openGalleryCell(int index);
     struct GalleryEntry {
         int page = 0;
-        std::string thumbnail, flow, key, bgm;
+        std::string thumbnail, flow, bgm;
+        // A scene's scripts, any one of which read to its end unlocks it.
+        std::vector<std::string> keys;
         std::vector<std::string> images;
-    std::vector<int> imageIds;
+        std::vector<int> imageIds;
     };
+    bool sceneUnlocked(const GalleryEntry &scene) const;
     std::vector<GalleryEntry> cgEntries_, sceneEntries_;
     std::vector<std::string> tracks_, trackTitles_;
     std::unordered_map<std::string, bool> seen_;
@@ -325,6 +328,7 @@ private:
 
     // Global variables, in the PC's cfg.sav.
     void loadGlobals();
+    void loadReadScripts();
     void saveGlobals();
     std::vector<uint8_t> configFile_;
 

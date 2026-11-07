@@ -162,7 +162,7 @@ const Engine::GalleryEntry *Engine::viewerScene() const {
     const std::string &flow = cgEntries_[viewEntry_].flow;
     if (flow.empty()) return nullptr;
     for (const GalleryEntry &scene : sceneEntries_)
-        if (normalizedPath(scene.flow) == normalizedPath(flow) && seen(scene.key)) return &scene;
+        if (normalizedPath(scene.flow) == normalizedPath(flow) && sceneUnlocked(scene)) return &scene;
     return nullptr;
 }
 

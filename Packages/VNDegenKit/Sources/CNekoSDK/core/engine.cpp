@@ -785,7 +785,8 @@ void Engine::loadGalleries() {
             }
         }
     }
-    // `page thumbnail 0 0 flow key,0,0`.
+    // `page thumbnail 0 0 flow key,0,0`, with up to three keys and 0 for none. Test Game 84's second scene names two, and
+    // on the PC either one read unlocks it.
     for (const std::string &line : lines("cfg\\play_view.ini")) {
         auto f = fields(line);
         if (f.size() < 6) continue;
@@ -793,7 +794,8 @@ void Engine::loadGalleries() {
         e.page = std::atoi(f[0].c_str());
         e.thumbnail = f[1];
         e.flow = f[4];
-        e.key = split(f[5], ',')[0];
+        for (const std::string &key : split(f[5], ','))
+            if (!key.empty() && key != "0") e.keys.push_back(key);
         sceneEntries_.push_back(e);
     }
     // A track's file, then in Test Game 84 the picture of its title.
@@ -836,6 +838,33 @@ void Engine::loadGalleries() {
         std::string line;
         while (std::getline(f, line))
             if (!line.empty()) seen_[line] = true;
+        loadReadScripts();
+    }
+}
+
+// read.sav lists the scripts the PC has read to their end: a count, then for each its name's length, the name, and a count
+// of node ranges read, 8 bytes each. A scene unlocks in the PC's Scene gallery once its script is there, so a PC backup's
+// scenes come along. VNDegen doesn't write the file.
+void Engine::loadReadScripts() {
+    auto packed = readWhole(saveDir_ + "/" + nameInFolder(saveDir_, "read.sav"));
+    if (packed.empty()) return;
+    auto d = unpackEntry(packed.data(), packed.size());
+    size_t pos = 0;
+    auto next = [&](int32_t &v) {
+        if (pos + 4 > d.size()) return false;
+        std::memcpy(&v, &d[pos], 4);
+        pos += 4;
+        return true;
+    };
+    int32_t count = 0, length = 0, ranges = 0;
+    if (!next(count)) return;
+    for (int32_t i = 0; i < count; i++) {
+        if (!next(length) || length <= 0 || pos + size_t(length) > d.size()) return;
+        std::string name(reinterpret_cast<const char *>(&d[pos]), strnlen(reinterpret_cast<const char *>(&d[pos]), size_t(length)));
+        pos += size_t(length);
+        if (!next(ranges) || ranges < 0 || pos + size_t(ranges) * 8 > d.size()) return;
+        pos += size_t(ranges) * 8;
+        if (!name.empty()) seen_[normalizedPath(name)] = true;
     }
 }
 
@@ -896,6 +925,10 @@ void Engine::noteSeen(const std::string &path) {
     if (seen_[key]) return;
     seen_[key] = true;
     seenChanged_ = true;
+}
+
+bool Engine::sceneUnlocked(const GalleryEntry &scene) const {
+    return std::any_of(scene.keys.begin(), scene.keys.end(), [&](const std::string &key) { return seen(key); });
 }
 
 bool Engine::seen(const std::string &path) const {
@@ -1011,7 +1044,7 @@ void Engine::composeGallery(Canvas &out) {
         bool unlocked = false;
         if (entry < entries.size()) {
             const GalleryEntry &e = entries[entry];
-            unlocked = screen_->name == "scene" ? seen(e.key) : std::any_of(e.images.begin(), e.images.end(), [&](const std::string &p) { return seen(p); });
+            unlocked = screen_->name == "scene" ? sceneUnlocked(e) : std::any_of(e.images.begin(), e.images.end(), [&](const std::string &p) { return seen(p); });
         }
         if (sheet) {
             int h = sheet->h / 5;
@@ -1091,7 +1124,7 @@ void Engine::openGalleryCell(int index) {
         viewingIndex_ = 0;
         viewingImage_ = true;
         dirty_ = true;
-    } else if (entry < sceneEntries_.size() && seen(sceneEntries_[entry].key)) {
+    } else if (entry < sceneEntries_.size() && sceneUnlocked(sceneEntries_[entry])) {
         startReplay(sceneEntries_[entry]);
     }
 }
@@ -2337,6 +2370,8 @@ void Engine::run() {
             if (scene_.node == &n) advance();
             continue;
         }
+        // A scene's script read to its end unlocks it in the Scene gallery. On the PC, leaving partway doesn't.
+        if (scene_.script) noteSeen(scene_.script->name);
         if (gtNextScript()) continue;
         scene_ = {};
         if (stack_.empty() || !stack_.back().node) {
@@ -2369,7 +2404,6 @@ void Engine::runFlow(const Node &n) {
             scene_ = {script, script->first()};
             lastScene_ = script->name;
             flowCallId_ = n.id;
-            noteSeen(n.s[1]);
             log("scene %s", script->name.c_str());
         }
         break;
