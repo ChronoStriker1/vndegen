@@ -208,7 +208,12 @@ private func press(_ nav: Navigator, _ buttons: VirtualButton...) {
     #expect(nav.focus == .pagePlay)
     press(nav, .down)
     #expect(nav.focus == .pageArtwork)
-    press(nav, .up)
+    // They sit two to a row, as the page draws them, so Right and Down move as they look.
+    press(nav, .right)
+    #expect(nav.focus == .pageMetadata)
+    press(nav, .down)
+    #expect(nav.focus == .pageLock)
+    press(nav, .up, .up)
     #expect(nav.focus == .pagePlay)
 }
 

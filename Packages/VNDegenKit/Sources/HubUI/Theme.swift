@@ -55,7 +55,8 @@ struct HubMetrics: Equatable {
     /// height, since UIKit reports nothing finer.
     var sideCamera: CGFloat {
         let side = max(insets.leading, insets.trailing)
-        return size.height > size.width && side > insets.top ? side : 0
+        // The full size, which the on-screen keyboard leaves alone, so opening it never reads as turning the device.
+        return fullHeight > fullWidth && side > insets.top ? side : 0
     }
 
     /// The iPhone Duo's outer display, turned on its side, keeps its camera in a safe-area inset down one side of the
@@ -63,7 +64,7 @@ struct HubMetrics: Equatable {
     /// is nil for them, as it is for a portrait screen. A game keeps clear of it, so none of the game sits under the
     /// camera.
     var landscapeSideCamera: (edge: HorizontalEdge, width: CGFloat)? {
-        guard size.width > size.height, (insets.leading == 0) != (insets.trailing == 0) else { return nil }
+        guard fullWidth > fullHeight, (insets.leading == 0) != (insets.trailing == 0) else { return nil }
         return insets.leading > 0 ? (.leading, insets.leading) : (.trailing, insets.trailing)
     }
 

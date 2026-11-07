@@ -351,8 +351,9 @@ final class Navigator {
                 + (Self.collapsesScreenshots(screenshots.count, columns: columns) ? [Row(id: "page-screenshots-more", items: [.pageScreenshotsMore])] : [])
             let engineFiles: [Target] = pageGameID.map(hub.library.offersEngineFiles) == true ? [.pageEngineFiles] : []
             let secondary: [Target] = [.pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder] + engineFiles + [.pageRemove]
+            // Stacked under Play, the other buttons sit two to a row, as the page draws them.
             let pageActions = pageActionsStacked
-                ? [Row(id: "page-play", items: [.pagePlay]), Row(id: "page-actions", items: secondary)]
+                ? [Row(id: "page-play", items: [.pagePlay])] + Self.gridRows("page-actions", secondary, columns: Self.stackedActionColumns)
                 : [Row(id: "page-actions", items: [.pagePlay] + secondary)]
             return [
                 Row(id: "page-back", items: [.back]),
@@ -413,6 +414,9 @@ final class Navigator {
             return target
         }
     }
+
+    /// The columns of the game page's buttons when they stack under Play.
+    static let stackedActionColumns = 2
 
     /// `items` in rows of `columns`. Moving between them keeps the column, as moving through a grid should.
     private static func gridRows(_ id: String, _ items: [Target], columns: Int) -> [Row] {

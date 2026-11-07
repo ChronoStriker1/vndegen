@@ -150,11 +150,15 @@ struct GamePageView: View {
                     secondaryButtons(labels: false)
                 }
                 .onAppear { nav.pageActionsStacked = false }
-                // The narrowest windows put the other buttons under Play, with their names, wrapping as needed, and
-                // controller focus moves down to them.
+                // The narrowest windows put the other buttons under Play, with their names, in rows of two that controller
+                // focus moves through as drawn.
                 VStack(alignment: .leading, spacing: 12) {
                     playButton
-                    FlowLayout(spacing: 10) { secondaryButtons(labels: true, allLabeled: true) }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10, alignment: .leading),
+                                             count: Navigator.stackedActionColumns),
+                              alignment: .leading, spacing: 10) {
+                        secondaryButtons(labels: true, allLabeled: true)
+                    }
                 }
                 .onAppear { nav.pageActionsStacked = true }
             }
@@ -268,6 +272,8 @@ struct GamePageView: View {
     static func scrollsToCenter(_ target: Navigator.Target) -> Bool {
         switch target {
         case .pageEngine, .pageVariant, .pageOrientation, .pageControls, .pageMapping, .pageScreenshot, .pageScreenshotsMore: true
+        // In a short window the actions can sit below the screen, so they scroll into view rather than to the banner.
+        case .pageArtwork, .pageMetadata, .pageSaves, .pageLock, .pageShowFolder, .pageEngineFiles, .pageRemove: true
         default: false
         }
     }
