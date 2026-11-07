@@ -240,14 +240,14 @@ pic obj\h007_000.bmp 416 133 6 5 2 4
 pic obj\h007_000.bmp 172 165 6 5 3 4
 pic obj\h007_000.bmp 294 165 6 5 4 4
 pic obj\h007_000.bmp 416 165 6 5 5 4
-pic obj\h008_000.bmp 50 229 2 5 0 4
-pic obj\h008_000.bmp 131 229 2 5 1 4
-pic obj\h008_000.bmp 226 229 2 5 0 4
-pic obj\h008_000.bmp 307 229 2 5 1 4
-pic obj\h008_000.bmp 402 229 2 5 0 4
-pic obj\h008_000.bmp 483 229 2 5 1 4
-pic obj\h008_000.bmp 615 377 2 5 0 4
-pic obj\h008_000.bmp 696 377 2 5 1 4
+radio effect 1 obj\h008_000.bmp 50 229 2 5 0
+radio effect 0 obj\h008_000.bmp 131 229 2 5 1
+radio wait 1 obj\h008_000.bmp 226 229 2 5 0
+radio wait 0 obj\h008_000.bmp 307 229 2 5 1
+radio waitskip 1 obj\h008_000.bmp 402 229 2 5 0
+radio waitskip 0 obj\h008_000.bmp 483 229 2 5 1
+radio camera 1 obj\h008_000.bmp 615 377 2 5 0
+radio camera 0 obj\h008_000.bmp 696 377 2 5 1
 bar obj\h009_000.bmp 155 307 100
 pic obj\h011_000.bmp 415 279 10 1 1 0
 pic obj\h011_000.bmp 429 279 10 1 0 0
@@ -260,7 +260,7 @@ check confirm_delete obj\h013_000.bmp 603 173 8 5 2
 check confirm_quick obj\h013_000.bmp 603 201 8 5 3
 check confirm_title obj\h013_000.bmp 603 229 8 5 4
 check confirm_exit obj\h013_000.bmp 603 257 8 5 5
-pic obj\h013_000.bmp 603 285 8 5 6 4
+check tutorial obj\h013_000.bmp 603 285 8 5 6
 pic obj\h013_000.bmp 603 313 8 5 7 4
 
 screen config2
@@ -703,14 +703,14 @@ pic obj\h007_000.bmp 599 297 6 5 2 4
 pic obj\h007_000.bmp 236 355 6 5 3 4
 pic obj\h007_000.bmp 418 355 6 5 4 4
 pic obj\h007_000.bmp 599 355 6 5 5 4
-pic obj\h008_000.bmp 63 482 2 5 0 4
-pic obj\h008_000.bmp 181 482 2 5 1 4
-pic obj\h008_000.bmp 312 482 2 5 0 4
-pic obj\h008_000.bmp 430 482 2 5 1 4
-pic obj\h008_000.bmp 561 482 2 5 0 4
-pic obj\h008_000.bmp 679 482 2 5 1 4
-pic obj\h008_000.bmp 827 687 2 5 0 4
-pic obj\h008_000.bmp 945 687 2 5 1 4
+radio effect 1 obj\h008_000.bmp 63 482 2 5 0
+radio effect 0 obj\h008_000.bmp 181 482 2 5 1
+radio wait 1 obj\h008_000.bmp 312 482 2 5 0
+radio wait 0 obj\h008_000.bmp 430 482 2 5 1
+radio waitskip 1 obj\h008_000.bmp 561 482 2 5 0
+radio waitskip 0 obj\h008_000.bmp 679 482 2 5 1
+radio camera 1 obj\h008_000.bmp 827 687 2 5 0
+radio camera 0 obj\h008_000.bmp 945 687 2 5 1
 radio art 1 obj\h999_000.bmp 1077 687 2 5 0
 radio art 0 obj\h999_000.bmp 1318 687 2 5 1
 slider opacity obj\h009_000.bmp 208 612
@@ -723,7 +723,7 @@ check confirm_delete obj\h013_000.bmp 842 337 8 5 2
 check confirm_quick obj\h013_000.bmp 842 383 8 5 3
 check confirm_title obj\h013_000.bmp 842 429 8 5 4
 check confirm_exit obj\h013_000.bmp 842 475 8 5 5
-pic obj\h013_000.bmp 842 521 8 5 6 4
+check tutorial obj\h013_000.bmp 842 521 8 5 6
 pic obj\h013_000.bmp 842 567 8 5 7 4
 
 screen config2
@@ -1147,14 +1147,14 @@ pic obj\h007_000.bmp 416 133 6 5 2 4
 pic obj\h007_000.bmp 172 165 6 5 3 4
 pic obj\h007_000.bmp 294 165 6 5 4 4
 pic obj\h007_000.bmp 416 165 6 5 5 4
-pic obj\h008_000.bmp 50 229 2 5 0 4
-pic obj\h008_000.bmp 131 229 2 5 1 4
-pic obj\h008_000.bmp 226 229 2 5 0 4
-pic obj\h008_000.bmp 307 229 2 5 1 4
-pic obj\h008_000.bmp 402 229 2 5 0 4
-pic obj\h008_000.bmp 483 229 2 5 1 4
-pic obj\h008_000.bmp 615 379 2 5 0 4
-pic obj\h008_000.bmp 696 379 2 5 1 4
+radio effect 1 obj\h008_000.bmp 50 229 2 5 0
+radio effect 0 obj\h008_000.bmp 131 229 2 5 1
+radio wait 1 obj\h008_000.bmp 226 229 2 5 0
+radio wait 0 obj\h008_000.bmp 307 229 2 5 1
+radio waitskip 1 obj\h008_000.bmp 402 229 2 5 0
+radio waitskip 0 obj\h008_000.bmp 483 229 2 5 1
+radio camera 1 obj\h008_000.bmp 615 379 2 5 0
+radio camera 0 obj\h008_000.bmp 696 379 2 5 1
 slider opacity obj\h009_000.bmp 155 307
 number opacity obj\h011_000.bmp 415 279
 step opacity -1 obj\h010_000.bmp 121 311 2 5 0
@@ -1165,7 +1165,7 @@ check confirm_delete obj\h013_000.bmp 603 175 8 5 2
 check confirm_quick obj\h013_000.bmp 603 203 8 5 3
 check confirm_title obj\h013_000.bmp 603 231 8 5 4
 check confirm_exit obj\h013_000.bmp 603 259 8 5 5
-pic obj\h013_000.bmp 603 287 8 5 6 4
+check tutorial obj\h013_000.bmp 603 287 8 5 6
 pic obj\h013_000.bmp 603 315 8 5 7 4
 radio express 1 obj\h014_000.bmp 656 597 2 5 0
 radio express 0 obj\h014_000.bmp 818 597 2 5 1
@@ -1664,14 +1664,14 @@ pic obj\h007_000.bmp 416 133 6 5 2 4
 pic obj\h007_000.bmp 172 165 6 5 3 4
 pic obj\h007_000.bmp 294 165 6 5 4 4
 pic obj\h007_000.bmp 416 165 6 5 5 4
-pic obj\h008_000.bmp 50 229 2 5 0 4
-pic obj\h008_000.bmp 131 229 2 5 1 4
-pic obj\h008_000.bmp 226 229 2 5 0 4
-pic obj\h008_000.bmp 307 229 2 5 1 4
-pic obj\h008_000.bmp 402 229 2 5 0 4
-pic obj\h008_000.bmp 483 229 2 5 1 4
-pic obj\h008_000.bmp 615 379 2 5 0 4
-pic obj\h008_000.bmp 696 379 2 5 1 4
+radio effect 1 obj\h008_000.bmp 50 229 2 5 0
+radio effect 0 obj\h008_000.bmp 131 229 2 5 1
+radio wait 1 obj\h008_000.bmp 226 229 2 5 0
+radio wait 0 obj\h008_000.bmp 307 229 2 5 1
+radio waitskip 1 obj\h008_000.bmp 402 229 2 5 0
+radio waitskip 0 obj\h008_000.bmp 483 229 2 5 1
+radio camera 1 obj\h008_000.bmp 615 379 2 5 0
+radio camera 0 obj\h008_000.bmp 696 379 2 5 1
 radio hair 1 obj\h008_000.bmp 764 377 2 5 0
 radio hair 0 obj\h008_000.bmp 845 377 2 5 1
 radio hero 1 obj\h008_000.bmp 940 377 2 5 0
@@ -1686,7 +1686,7 @@ check confirm_delete obj\h013_000.bmp 603 175 8 5 2
 check confirm_quick obj\h013_000.bmp 603 203 8 5 3
 check confirm_title obj\h013_000.bmp 603 231 8 5 4
 check confirm_exit obj\h013_000.bmp 603 259 8 5 5
-pic obj\h013_000.bmp 603 287 8 5 6 4
+check tutorial obj\h013_000.bmp 603 287 8 5 6
 pic obj\h013_000.bmp 603 315 8 5 7 4
 
 screen config2
@@ -2162,14 +2162,14 @@ pic obj\c005_001.bmp 346 164 6 5 2 4
 pic obj\c005_001.bmp 132 192 6 5 3 4
 pic obj\c005_001.bmp 239 192 6 5 4 4
 pic obj\c005_001.bmp 346 192 6 5 5 4
-pic obj\c005_002.bmp 27 247 2 5 0 4
-pic obj\c005_002.bmp 97 247 2 5 1 4
-pic obj\c005_002.bmp 180 247 2 5 0 4
-pic obj\c005_002.bmp 250 247 2 5 1 4
-pic obj\c005_002.bmp 333 247 2 5 0 4
-pic obj\c005_002.bmp 403 247 2 5 1 4
-pic obj\c005_002.bmp 487 391 2 5 0 4
-pic obj\c005_002.bmp 557 391 2 5 1 4
+radio effect 1 obj\c005_002.bmp 27 247 2 5 0
+radio effect 0 obj\c005_002.bmp 97 247 2 5 1
+radio wait 1 obj\c005_002.bmp 180 247 2 5 0
+radio wait 0 obj\c005_002.bmp 250 247 2 5 1
+radio waitskip 1 obj\c005_002.bmp 333 247 2 5 0
+radio waitskip 0 obj\c005_002.bmp 403 247 2 5 1
+radio camera 1 obj\c005_002.bmp 487 391 2 5 0
+radio camera 0 obj\c005_002.bmp 557 391 2 5 1
 slider opacity obj\c005_003.bmp 119 326
 number opacity obj\c005_005.bmp 343 294
 step opacity -1 obj\c005_004.bmp 88 328 2 5 0
@@ -2180,7 +2180,7 @@ check confirm_delete obj\c005_006.bmp 499 201 8 5 2
 check confirm_quick obj\c005_006.bmp 499 227 8 5 3
 check confirm_title obj\c005_006.bmp 499 253 8 5 4
 check confirm_exit obj\c005_006.bmp 499 279 8 5 5
-pic obj\c005_006.bmp 499 305 8 5 6 4
+check tutorial obj\c005_006.bmp 499 305 8 5 6
 pic obj\c005_006.bmp 499 331 8 5 7 4
 hover 22 118 475 142 obj\c004_000.bmp 0 663 8 0
 hover 480 118 936 358 obj\c004_000.bmp 0 663 8 6
@@ -2746,14 +2746,14 @@ pic obj\h007_000.bmp 385 199 6 5 2 4
 pic obj\h007_000.bmp 141 231 6 5 3 4
 pic obj\h007_000.bmp 263 231 6 5 4 4
 pic obj\h007_000.bmp 385 231 6 5 5 4
-pic obj\h008_000.bmp 19 295 2 5 0 4
-pic obj\h008_000.bmp 100 295 2 5 1 4
-pic obj\h008_000.bmp 195 295 2 5 0 4
-pic obj\h008_000.bmp 276 295 2 5 1 4
-pic obj\h008_000.bmp 371 295 2 5 0 4
-pic obj\h008_000.bmp 452 295 2 5 1 4
-pic obj\h008_000.bmp 584 443 2 5 0 4
-pic obj\h008_000.bmp 665 443 2 5 1 4
+radio effect 1 obj\h008_000.bmp 19 295 2 5 0
+radio effect 0 obj\h008_000.bmp 100 295 2 5 1
+radio wait 1 obj\h008_000.bmp 195 295 2 5 0
+radio wait 0 obj\h008_000.bmp 276 295 2 5 1
+radio waitskip 1 obj\h008_000.bmp 371 295 2 5 0
+radio waitskip 0 obj\h008_000.bmp 452 295 2 5 1
+radio camera 1 obj\h008_000.bmp 584 443 2 5 0
+radio camera 0 obj\h008_000.bmp 665 443 2 5 1
 slider opacity obj\h009_000.bmp 124 373
 number opacity obj\h011_000.bmp 385 345
 step opacity -1 obj\h010_000.bmp 89 376 2 5 0
@@ -2764,7 +2764,7 @@ check confirm_delete obj\h013_000.bmp 572 239 8 5 2
 check confirm_quick obj\h013_000.bmp 572 267 8 5 3
 check confirm_title obj\h013_000.bmp 572 295 8 5 4
 check confirm_exit obj\h013_000.bmp 572 323 8 5 5
-pic obj\h013_000.bmp 572 351 8 5 6 4
+check tutorial obj\h013_000.bmp 572 351 8 5 6
 pic obj\h013_000.bmp 572 379 8 5 7 4
 hover 14 153 534 193 obj\h004_000.bmp 12 108
 hover 552 153 1072 413 obj\h004_006.bmp 550 81
@@ -3261,7 +3261,7 @@ button nav_config obj\f002_000.bmp 829 51 8 5 5
 button nav_title obj\f002_000.bmp 954 51 8 5 6
 button nav_quit obj\f002_000.bmp 1079 51 8 5 7
 button back obj\f002_001.bmp 1195 11 1 5 0
-# Screen mode, resolution, effects, delays and camera animations have no meaning here.
+# Resolution and choosing the window size at start have no meaning here, and screen mode is still to come.
 pic obj\i007_000.bmp 172 151 2 5 0 4
 pic obj\i007_000.bmp 294 151 2 5 1 4
 pic obj\i008_000.bmp 172 193 6 5 0 4
@@ -3270,14 +3270,14 @@ pic obj\i008_000.bmp 416 193 6 5 2 4
 pic obj\i008_000.bmp 172 225 6 5 3 4
 pic obj\i008_000.bmp 294 225 6 5 4 4
 pic obj\i008_000.bmp 416 225 6 5 5 4
-pic obj\i009_000.bmp 50 289 2 5 0 4
-pic obj\i009_000.bmp 131 289 2 5 1 4
-pic obj\i009_000.bmp 226 289 2 5 0 4
-pic obj\i009_000.bmp 307 289 2 5 1 4
-pic obj\i009_000.bmp 402 289 2 5 0 4
-pic obj\i009_000.bmp 483 289 2 5 1 4
-pic obj\i009_000.bmp 615 437 2 5 0 4
-pic obj\i009_000.bmp 696 437 2 5 1 4
+radio effect 1 obj\i009_000.bmp 50 289 2 5 0
+radio effect 0 obj\i009_000.bmp 131 289 2 5 1
+radio wait 1 obj\i009_000.bmp 226 289 2 5 0
+radio wait 0 obj\i009_000.bmp 307 289 2 5 1
+radio waitskip 1 obj\i009_000.bmp 402 289 2 5 0
+radio waitskip 0 obj\i009_000.bmp 483 289 2 5 1
+radio camera 1 obj\i009_000.bmp 615 437 2 5 0
+radio camera 0 obj\i009_000.bmp 696 437 2 5 1
 slider opacity obj\i010_000.bmp 155 367
 number opacity obj\f012_000.bmp 415 338
 step opacity -1 obj\i010_001.bmp 119 369 2 5 0
@@ -3288,7 +3288,7 @@ check confirm_delete obj\i012_000.bmp 603 233 8 5 2
 check confirm_quick obj\i012_000.bmp 603 261 8 5 3
 check confirm_title obj\i012_000.bmp 603 289 8 5 4
 check confirm_exit obj\i012_000.bmp 603 317 8 5 5
-pic obj\i012_000.bmp 603 345 8 5 6 4
+check tutorial obj\i012_000.bmp 603 345 8 5 6
 pic obj\i012_000.bmp 603 373 8 5 7 4
 
 screen config2
@@ -3832,8 +3832,6 @@ hover 410 198 565 270 obj\h004_000.bmp 350 669 9 4
 hover 50 198 210 270 obj\h004_000.bmp 350 669 9 2
 hover 210 198 370 270 obj\h004_000.bmp 350 669 9 3
 hover 50 85 565 126 obj\h004_000.bmp 350 669 9 0
-hover 770 342 930 414 obj\h004_004.bmp 350 669 2 0
-hover 930 342 1090 414 obj\h004_004.bmp 350 669 2 1
 hover 50 126 565 198 obj\h004_000.bmp 350 669 9 1
 hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
 hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
@@ -3848,9 +3846,9 @@ pic obj\h005_000.bmp 43 85
 button tab obj\h003_000.bmp 282 25 3 5 0 help obj\h003_001.bmp 830 669 1 3 0 0
 button tab2 obj\h003_000.bmp 413 25 3 5 1 help obj\h003_001.bmp 830 669 1 3 0 1
 button tab3 obj\h003_000.bmp 544 25 3 5 2 help obj\h003_001.bmp 830 669 1 3 0 2
-button cfg_defaults obj\h002_000.bmp 833 32 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
-button cfg_undo obj\h002_000.bmp 919 32 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
-button cfg_apply obj\h002_000.bmp 1005 32 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
+button cfg_defaults obj\h002_000.bmp 816 33 3 5 0 help obj\h002_001.bmp 882 669 1 3 0 0
+button cfg_undo obj\h002_000.bmp 910 33 3 5 1 help obj\h002_001.bmp 882 669 1 3 0 1
+button cfg_apply obj\h002_000.bmp 1004 33 3 5 2 help obj\h002_001.bmp 882 669 1 3 0 2
 button nav_save sys_5\obj\e004_000.bmp 1152 93 10 5 0 help sys_5\obj\e005_000.bmp 868 45 1 10 0 0
 button nav_load sys_5\obj\e004_000.bmp 1152 135 10 5 1 help sys_5\obj\e005_000.bmp 868 87 1 10 0 1
 button nav_cg sys_5\obj\e004_000.bmp 1152 177 10 5 2 help sys_5\obj\e005_000.bmp 868 129 1 10 0 2
@@ -3861,38 +3859,37 @@ button nav_config sys_5\obj\e004_000.bmp 1152 345 10 5 6 help sys_5\obj\e005_000
 button nav_title sys_5\obj\e004_000.bmp 1152 387 10 5 7 help sys_5\obj\e005_000.bmp 868 339 1 10 0 7
 button nav_quit sys_5\obj\e004_000.bmp 1152 429 10 5 8 help sys_5\obj\e005_000.bmp 868 381 1 10 0 8
 button back sys_5\obj\e004_000.bmp 1152 513 10 5 9 help sys_5\obj\e005_000.bmp 868 465 1 10 0 9
-pic obj\h006_000.bmp 172 93 2 5 0 4
-pic obj\h006_000.bmp 294 93 2 5 1 4
+pic obj\h006_000.bmp 172 91 2 5 0 4
+pic obj\h006_000.bmp 294 91 2 5 1 4
 pic obj\h007_000.bmp 172 133 6 5 0 4
 pic obj\h007_000.bmp 294 133 6 5 1 4
 pic obj\h007_000.bmp 416 133 6 5 2 4
 pic obj\h007_000.bmp 172 165 6 5 3 4
 pic obj\h007_000.bmp 294 165 6 5 4 4
 pic obj\h007_000.bmp 416 165 6 5 5 4
-pic obj\h008_000.bmp 50 229 2 5 0 4
-pic obj\h008_000.bmp 131 229 2 5 1 4
-pic obj\h008_000.bmp 226 229 2 5 0 4
-pic obj\h008_000.bmp 307 229 2 5 1 4
-pic obj\h008_000.bmp 402 229 2 5 0 4
-pic obj\h008_000.bmp 483 229 2 5 1 4
-pic obj\h008_000.bmp 615 379 2 5 0 4
-pic obj\h008_000.bmp 696 379 2 5 1 4
-radio hair 1 obj\h008_000.bmp 764 377 2 5 0
-radio hair 0 obj\h008_000.bmp 845 377 2 5 1
-radio hero 1 obj\h008_000.bmp 940 377 2 5 0
-radio hero 0 obj\h008_000.bmp 1021 377 2 5 1
+radio effect 1 obj\h008_000.bmp 50 229 2 5 0
+radio effect 0 obj\h008_000.bmp 131 229 2 5 1
+radio wait 1 obj\h008_000.bmp 226 229 2 5 0
+radio wait 0 obj\h008_000.bmp 307 229 2 5 1
+radio waitskip 1 obj\h008_000.bmp 402 229 2 5 0
+radio waitskip 0 obj\h008_000.bmp 483 229 2 5 1
+radio camera 1 obj\h008_000.bmp 615 377 2 5 0
+radio camera 0 obj\h008_000.bmp 696 377 2 5 1
+# How CGs are drawn: the game's own detailed art, or Waffle's earlier style, from change_texture_list.ini.
+radio express 1 obj\h014_000.bmp 656 595 2 5 0
+radio express 0 obj\h014_000.bmp 913 595 2 5 1
 slider opacity obj\h009_000.bmp 155 307
 number opacity obj\h011_000.bmp 415 279
 step opacity -1 obj\h010_000.bmp 121 311 2 5 0
 step opacity 1 obj\h010_000.bmp 471 311 2 5 1
-check confirm_saveload obj\h013_000.bmp 603 119 8 5 0
-check confirm_overwrite obj\h013_000.bmp 603 147 8 5 1
-check confirm_delete obj\h013_000.bmp 603 175 8 5 2
-check confirm_quick obj\h013_000.bmp 603 203 8 5 3
-check confirm_title obj\h013_000.bmp 603 231 8 5 4
-check confirm_exit obj\h013_000.bmp 603 259 8 5 5
-pic obj\h013_000.bmp 603 287 8 5 6 4
-pic obj\h013_000.bmp 603 315 8 5 7 4
+check confirm_saveload obj\h013_000.bmp 603 117 8 5 0
+check confirm_overwrite obj\h013_000.bmp 603 145 8 5 1
+check confirm_delete obj\h013_000.bmp 603 173 8 5 2
+check confirm_quick obj\h013_000.bmp 603 201 8 5 3
+check confirm_title obj\h013_000.bmp 603 229 8 5 4
+check confirm_exit obj\h013_000.bmp 603 257 8 5 5
+check tutorial obj\h013_000.bmp 603 285 8 5 6
+pic obj\h013_000.bmp 603 313 8 5 7 4
 
 screen config2
 helplast

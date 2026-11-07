@@ -84,6 +84,14 @@ The same file keeps what's been unlocked, read by comparing PC files with what t
 
 Test Games 92 and 93's music screens pan line art behind the track list, measured under Wine by tracking each frame against the five 2200-pixel-tall sketches `obj\g000_001` to `_006`. They come in the order 001, 002, 005, 003, 006 and round again, starting from one picked at random each time the screen opens. Each moves down at 30 pixels a second, at x -170, -300, 211, -32 and 145, from y -791, -1035, -1098, -815 and -1022 to -17, -16, -135, -18 and -25, fading in and out over 2.25 seconds at its ends, with a second of nothing before the next. It draws at 120 of 256 over the room, under the side panel and the frame of bars. The exe reads the sketches as the screen opens, so the order and places are its own; both games share them.
 
+Config's first tab is the same in every game, read from the PC's help lines and measured under Wine on Test Game 92's opening:
+
+- Effects off cuts a timed screen update straight to the new picture, makes a timed image change happen at once, and leaves out named animations and motion blur; the 2.5 second fade-in became a cut while the 4 second wait after it still waited. Flash and screen shake are left out with them, by their names, untested.
+- Waits off skips the `[ウエイト]` waits; the opening's fade still played.
+- Clicking past waits, when on, lets a click end a `[ウエイト]` wait: a click at 5.5 seconds brought the next picture at 5.8 instead of 6.3.
+- Camera work off keeps an event CG whole: timed and immediate image changes don't move or scale a `cg\` picture, though its fades still run, and its named animations don't run. With it on, the opening pans and zooms over the CG.
+- Explanations off hides the pop-ups msg_button.ini gives the message window's buttons.
+
 A scene unlocks once its key script, the last field of its `play_view.ini` line, has been read to its end, measured under Wine on Test Game 89. Leaving its second scene's script partway, after a few lines, and going back to the title left the scene locked, and that script wasn't in `read.sav`. The first scene, whose script `read.sav` lists, was unlocked. A line can name up to three key scripts, with 0 for none, and any one read unlocks the scene: Test Game 84's second scene names two, and the PC unlocked it with a `read.sav` that listed either alone, as well as both. The PC read those files, made by adding names with no ranges read to its own, and unlocked the scenes they named. So the runtime unlocks a scene as one of its scripts ends, and reads `read.sav` to unlock what the PC has. `play_view.sav` isn't about unlocks: unpacked, Test Game 88's has a save's layout, with a date at byte 44004 and sprite records, and the runtime leaves it alone.
 
 When no `cfg.sav` exists the runtime writes the values the PC game wrote on a first run under Wine, listed in `tables.cpp`, because a file of zeros sets the PC game's volumes to 0 and turns its confirmations off.

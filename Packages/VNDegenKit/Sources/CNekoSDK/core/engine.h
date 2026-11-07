@@ -269,6 +269,9 @@ private:
     // The entries of the gallery on screen, and whether one of an entry's pictures is unlocked.
     const std::vector<GalleryEntry> &galleryEntries() const;
     int cellShift() const;
+    // Whether a slot, or a picture, is an event CG, which Config's camera work moves.
+    bool isCgPath(const std::string &path) const;
+    bool isCgSlot(int slot) const;
     void composeDrift(Canvas &out);
     int64_t driftFrom_ = 0;
     size_t driftFirst_ = 0;

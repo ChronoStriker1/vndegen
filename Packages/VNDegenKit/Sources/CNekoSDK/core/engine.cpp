@@ -63,6 +63,8 @@ const std::map<std::string, int> &defaultSettings() {
         {"mute_master", 0}, {"mute_bgm", 0}, {"mute_se", 0}, {"mute_voice", 0},
         {"text", 1}, {"auto", 1}, {"rightclick", 0}, {"opacity", 60}, {"music", 60}, {"count_color", 1}, {"gt_off", 0}, {"express", 1}, {"bar_always", 0},
         {"confirm_saveload", 1}, {"confirm_overwrite", 1}, {"confirm_delete", 1}, {"confirm_quick", 1}, {"confirm_title", 1}, {"confirm_exit", 1},
+        // Config's effects, waits, clicking past waits and the H scenes' camera work, as the PC starts them.
+        {"effect", 1}, {"wait", 1}, {"waitskip", 0}, {"camera", 1}, {"tutorial", 1},
     };
     return defaults;
 }
@@ -993,6 +995,14 @@ void Engine::composeDrift(Canvas &out) {
         if (at < gap) return;
         at -= gap;
     }
+}
+
+bool Engine::isCgPath(const std::string &path) const { return normalizedPath(path).rfind("cg\\", 0) == 0; }
+
+bool Engine::isCgSlot(int slot) const {
+    for (const Sprites *sprites : {&back_, &front_})
+        if (auto it = sprites->find(slot); it != sprites->end() && isCgPath(it->second.path)) return true;
+    return false;
 }
 
 // `cellshift TAB DX`: how far across a gallery tab moves its cards, 80 pixels a tab either side of the middle in Test
@@ -2334,6 +2344,18 @@ bool Engine::underButtonsShown() const {
 }
 
 void Engine::composeMessageButtons(Canvas &out) {
+    // Config's explanations: the message window buttons' pop-ups, msg_button.ini's tutorial pictures, show only while
+    // it's on.
+    bool explain = setting("tutorial") != 0;
+    auto drawButton = [&](Canvas &c, const Button &b, ButtonState st) {
+        if (explain || !b.help) {
+            neko::drawButton(c, b, st);
+            return;
+        }
+        Button shown = b;
+        shown.help = nullptr;
+        neko::drawButton(c, shown, st);
+    };
     auto state = [&](const Button &b) {
         bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
         // The art button reads ORIGINAL.ver while the arranged art shows, and ARRANGE.ver, its selected cells, while the
@@ -2608,7 +2630,8 @@ void Engine::runScene(const Node &n) {
     case 0:  // the start marker
     case 1:  // the first node's copy of the scene name, seen only with no parameters
         break;
-    case 2:  // wait
+    case 2:  // wait, unless Config turns waits off
+        if (!setting("wait")) break;
         waiting_ = Waiting::Time;
         waitUntil_ = now_ + p[0];
         break;
@@ -2641,8 +2664,8 @@ void Engine::runScene(const Node &n) {
     case 18:
         transform(n);
         break;
-    case 19:
-        startNamedAnimation(n);
+    case 19:  // with Config's effects or camera work off, these moves and shakes don't run
+        if (setting("effect") && (setting("camera") || !isCgSlot(n.p[0]))) startNamedAnimation(n);
         break;
     case 20:
         stopNamedAnimation(p[0]);
@@ -2697,6 +2720,7 @@ void Engine::runScene(const Node &n) {
         stopChannel(kKindVoice, p[0], p[1]);
         break;
     case 50:  // flash: a colour over the screen that fades out
+        if (!setting("effect")) break;
         flashMs_ = std::max(1, p[0]);
         flashR_ = p[1];
         flashG_ = p[2];
@@ -2709,12 +2733,14 @@ void Engine::runScene(const Node &n) {
         warnOnce("noise isn't drawn yet");
         break;
     case 53:  // shake the screen
+        if (!setting("effect")) break;
         shakeType_ = p[0];
         shakeSustained_ = false;
         shakeStart_ = now_;
         shakeStopAt_ = -1;
         break;
     case 55:  // a hand-held camera's sway, until stopped: up and down, then sideways, each with a period in frames
+        if (!setting("effect")) break;
         shakeType_ = p[0];
         shakeSustained_ = true;
         shakeAmpY_ = float(p[1]);
@@ -2725,6 +2751,7 @@ void Engine::runScene(const Node &n) {
         shakeStopAt_ = -1;
         break;
     case 115:  // walking: a shake with a small amplitude and step on each axis, until stopped
+        if (!setting("effect")) break;
         shakeType_ = p[0];
         shakeSustained_ = true;
         shakeAmpY_ = float(p[1]);
@@ -2740,6 +2767,7 @@ void Engine::runScene(const Node &n) {
         if (p[0] <= 0) shakeType_ = 0;
         break;
     case 74:  // motion blur on: each frame keeps this much of the last
+        if (!setting("effect")) break;
         blur_ = true;
         blurEnding_ = false;
         blurAmount_ = std::clamp(p[0], 0, 240);
@@ -2867,7 +2895,11 @@ bool Engine::step(int ms) {
         ruleImage_ = nullptr;
         dirty_ = true;
     }
-    if (waiting_ == Waiting::Time && (skip_ || skipToggle_ || now_ >= waitUntil_)) waiting_ = Waiting::None;
+    // Config's wait skipping lets a click end a wait.
+    if (waiting_ == Waiting::Time && (skip_ || skipToggle_ || now_ >= waitUntil_ || (clicked_ && setting("waitskip")))) {
+        waiting_ = Waiting::None;
+        clicked_ = false;
+    }
 
     if (!textDone_) {
         // The last character has finished fading in.
@@ -3677,17 +3709,19 @@ void Engine::transform(const Node &n) {
     auto it = back_.find(p[3]);
     if (it == back_.end()) return;
     Sprite &s = it->second;
+    // With Config's camera work off an event CG stays whole: it isn't moved or scaled.
+    bool still = !setting("camera") && isCgSlot(p[3]);
     // Where the timed changes have it, without a named animation, which goes on adding its own part afterwards.
     Sprite base = s;
     base.looping = false;
     SpriteView was = view(base);
     s.changes.clear();
-    if (p[16]) {
+    if (p[16] && !still) {
         // Parameter 0 makes it a move from where the sprite is, as it does for a change over time.
         s.x = float(p[1]) + (p[0] == 1 ? was.x : 0);
         s.y = float(p[2]) + (p[0] == 1 ? was.y : 0);
     }
-    if (p[17]) {
+    if (p[17] && !still) {
         s.scaleX = float(p[4]) / 1000;
         s.scaleY = float(p[5]) / 1000;
         takeScaleAnchor(s, n);
@@ -3712,6 +3746,8 @@ void Engine::changeOverTime(Sprite &s, const Node &n) {
     const auto &p = n.p;
     foldFinishedChanges(s);
     SpriteView current = view(s);
+    // With Config's camera work off an event CG isn't moved or scaled, and with effects off a change happens at once.
+    bool still = !setting("camera") && isCgPath(s.path);
     int frameMs = 1000;
     int delay = p[24] * frameMs / std::max(1, fps_), length = std::abs(p[25]) * frameMs / std::max(1, fps_);
     Animation a;
@@ -3728,7 +3764,7 @@ void Engine::changeOverTime(Sprite &s, const Node &n) {
         t.lengthMs = length;
         a.tracks.push_back(t);
     };
-    if (p[16]) {
+    if (p[16] && !still) {
         if (p[0] == 1) {
             if (p[1]) add(Track::X, true, 0, float(p[1]));
             if (p[2]) add(Track::Y, true, 0, float(p[2]));
@@ -3737,14 +3773,14 @@ void Engine::changeOverTime(Sprite &s, const Node &n) {
             add(Track::Y, false, current.y, float(p[2]));
         }
     }
-    if (p[17]) {
+    if (p[17] && !still) {
         takeScaleAnchor(s, n);
         add(Track::ScaleX, false, current.scaleX, float(p[4]) / 1000);
         add(Track::ScaleY, false, current.scaleY, float(p[5]) / 1000);
     }
     if (p[19]) add(Track::Alpha, false, current.alpha, float(p[15]) / 256);
     s.changes.push_back(std::move(a));
-    if (skip_) {
+    if (skip_ || !setting("effect")) {
         s.changes.back().begunMs = now_ - s.changes.back().periodMs - 1;
         foldFinishedChanges(s);
     }
@@ -3849,7 +3885,8 @@ void Engine::abortChange(int slot) {
 
 void Engine::screenUpdate(const Node &n) {
     const auto &p = n.p;
-    if (skip_ || p[1] <= 0) {
+    // With Config's effects off the PC cuts straight to the new picture, though a wait after it still waits.
+    if (skip_ || p[1] <= 0 || !setting("effect")) {
         front_ = back_;
         dirty_ = true;
         return;
