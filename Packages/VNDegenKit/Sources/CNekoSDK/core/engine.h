@@ -181,6 +181,32 @@ private:
     std::vector<std::string> viewing_;
     size_t viewingIndex_ = 0;
     bool viewingImage_ = false;
+    // The CG viewer's panel, from the cg screen's `viewer...` lines (viewer.cpp): the entry and picture shown, counted among
+    // all of the entry's pictures, the panel hidden, the slideshow, zoom in hundredths, the entry's music and the art shown.
+    size_t viewEntry_ = 0, viewImage_ = 0;
+    bool viewPanelHidden_ = false, viewAuto_ = false, viewMuted_ = false, replayFromViewer_ = false;
+    int64_t viewMs_ = 0, viewAutoFrom_ = 0;
+    int viewZoom_ = 100, viewMusic_ = 0;
+    std::string viewMusicPath_;
+    bool viewerPanel() const;
+    void openViewer(size_t entry);
+    void viewerShow(size_t entry, size_t image);
+    void viewerMusic();
+    void stopViewerMusic();
+    void viewerVariant(int direction);
+    void viewerCg(int direction);
+    void viewerAdvance();
+    void viewerZoom(int notches);
+    void closeViewer();
+    void viewerTab(int page);
+    const GalleryEntry *viewerScene() const;
+    void composeViewerPicture(Canvas &out);
+    void composeViewer(Canvas &out);
+    int viewerButtonRow(const std::vector<std::string> &line, bool over) const;
+    const std::vector<std::string> *viewerButtonAt(int x, int y) const;
+    void pressViewer(int x, int y);
+    void stepViewer(int ms);
+    void startReplay(const GalleryEntry &scene);
     bool replaying_ = false;
     int trackPlayer_ = 0;
 

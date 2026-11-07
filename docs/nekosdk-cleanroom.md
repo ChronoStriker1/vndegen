@@ -137,6 +137,19 @@ The block after the sprite records holds a count at byte 22 and that many sprite
 
 The PC game's title, save, config, gallery and dialog screens are code in its exe. `CNekoSDK/core/tables.cpp` holds a table for each game: picture names and numbers only. The positions come from screenshots of the PC game under Wine, found by matching each picture against them, and `strings` on the exe gave which pictures each screen uses. Test Game 97's title and save screens match the PC's to within a few grey levels away from the disabled buttons and hover states. No exe was disassembled.
 
+## The CG viewer
+
+The panel's art, its buttons' places and their help lines were matched against screenshots of The Alchemist and Yarinaoshi no Christmas under Wine, and the panel, buttons and picture match the PC's to within blending noise. Both PC games behave alike:
+- The zoom runs from 1.00 to 3.00 in steps of 0.05, from the buttons or a wheel notch, and keeps the point under the pointer still. Zoom out and reset are disabled at 1.00, and zoom in at 3.00. Reset is immediate.
+- The slideshow moves on every 8 seconds.
+- The entry's music, the fourth field of its line in `cg_view.ini`, starts with the viewer at the music screen's volume. Its button mutes and unmutes it while it goes on playing.
+- A right click hides or shows the panel, and a click on the picture does nothing.
+- Previous lands on an entry's last picture when it crosses into another gallery tab or wraps round, and otherwise on its first. Next always lands on the first.
+- A disabled button shows no help.
+- The Alchemist's art button switches the same setting as Config's Change Illustration and the message window's art button.
+
+Slider fills round to the nearest pixel: at 60, The Alchemist's 173-pixel music bar fills 104 and Yarinaoshi no Christmas's 161-pixel one 97.
+
 ## Readings not yet checked
 
 - Parameter 20 of opcode 18 is a blur that parameter 21 turns on: the PC game draws sharp with 20 alone. The radius is a fit to one frame's sharpness.

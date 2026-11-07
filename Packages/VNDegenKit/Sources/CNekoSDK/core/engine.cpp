@@ -286,10 +286,18 @@ void Engine::endStory(const std::string &screen) {
     waiting_ = Waiting::None;
     saveSeen();
     saveGlobals();
-    returnTo_ = screen == "scene" ? "title" : "";
+    // A replay started from the CG viewer comes back to it, at the picture it left.
+    bool toViewer = replayFromViewer_ && screen == "scene";
+    replayFromViewer_ = false;
+    std::string to = toViewer ? "cg" : screen;
+    returnTo_ = to == "scene" || to == "cg" ? "title" : "";
     screen_ = nullptr;
-    openScreen(screen);
-    if (screen == "scene") returnTo_ = "title";
+    openScreen(to);
+    if (to == "scene" || to == "cg") returnTo_ = "title";
+    if (toViewer && viewEntry_ < cgEntries_.size() && viewImage_ < cgEntries_[viewEntry_].images.size()) {
+        closeViewer();
+        viewerShow(viewEntry_, viewImage_);
+    }
 }
 
 void Engine::startStory() {
@@ -558,6 +566,11 @@ bool Engine::moveFocus(int dx, int dy) {
 }
 
 void Engine::mouseWheel(int notches) {
+    // In the CG viewer the wheel zooms, a twentieth a notch.
+    if (screen_ && viewingImage_ && viewerPanel() && !dialogOpen_) {
+        viewerZoom(notches);
+        return;
+    }
     if (screen_ || dialogOpen_) return;
     if (logOpen_) scrollLog(notches);
     else if (notches > 0) openLog();
@@ -669,6 +682,7 @@ void Engine::loadGalleries() {
             e.page = std::atoi(f[1].c_str());
             e.thumbnail = f[2];
             if (f.size() > 4) e.bgm = f[4];
+            if (f.size() > 5) e.flow = f[5];  // the replay of the scene it's from
             cgEntries_.push_back(e);
         } else if (f[0] != "##" && !cgEntries_.empty()) {
             auto parts = split(f[0], ',');
@@ -795,7 +809,8 @@ int Engine::galleryCellAt(int x, int y) const {
 void Engine::composeGallery(Canvas &out) {
     if (viewingImage_) {
         out.clear();
-        if (ImageRef image = images_->get(viewing_[viewingIndex_])) drawImage(out, *image, out.w * 0.5f, out.h * 0.5f, float(out.w) / float(image->w), float(out.w) / float(image->w), 0, 1);
+        composeViewerPicture(out);
+        composeViewer(out);
         return;
     }
     if (screen_->name != "cg" && screen_->name != "scene") return;
@@ -857,6 +872,10 @@ void Engine::openGalleryCell(int index) {
     size_t entry = size_t(page_ * perPage + index);
     if (screen_->name == "cg") {
         if (entry >= cgEntries_.size()) return;
+        if (viewerPanel()) {
+            openViewer(entry);
+            return;
+        }
         viewing_.clear();
         for (const std::string &p : cgEntries_[entry].images)
             if (seen(p)) viewing_.push_back(p);
@@ -865,26 +884,35 @@ void Engine::openGalleryCell(int index) {
         viewingImage_ = true;
         dirty_ = true;
     } else if (entry < sceneEntries_.size() && seen(sceneEntries_[entry].key)) {
-        stopTrack();
-        // A replay runs its own flow, and ending it comes back here.
-        auto flow = loadScript(sceneEntries_[entry].flow);
-        if (!flow || !flow->first()) return;
-        if (titleMusic_) {
-            audio_.fade(titleMusic_, 500, 0, true);
-            audio_.retire(titleMusic_);
-            titleMusic_ = 0;
-        }
-        screen_ = nullptr;
-        stack_.clear();
-        scene_ = {};
-        back_.clear();
-        front_.clear();
-        stack_.push_back({flow, flow->first()});
-        replaying_ = true;
-        waiting_ = Waiting::None;
-        dirty_ = true;
+        startReplay(sceneEntries_[entry]);
     }
 }
+
+// A replay runs its own flow, and ending it comes back to the gallery it started from.
+void Engine::startReplay(const GalleryEntry &scene) {
+    auto flow = loadScript(scene.flow);
+    if (!flow || !flow->first()) return;
+    stopTrack();
+    if (titleMusic_) {
+        audio_.fade(titleMusic_, 500, 0, true);
+        audio_.retire(titleMusic_);
+        titleMusic_ = 0;
+    }
+    screen_ = nullptr;
+    viewingImage_ = false;
+    viewAuto_ = false;
+    stack_.clear();
+    scene_ = {};
+    back_.clear();
+    front_.clear();
+    stack_.push_back({flow, flow->first()});
+    replaying_ = true;
+    waiting_ = Waiting::None;
+    dirty_ = true;
+}
+
+// A game without gallery tabs has nothing to switch.
+void Engine::viewerTab(int) {}
 
 // MARK: Settings
 
@@ -2040,6 +2068,7 @@ bool Engine::step(int ms) {
         else playTrack(next);
         dirty_ = true;
     }
+    if (screen_) stepViewer(ms);
     if (screen_ || logOpen_ || dialogOpen_) return waiting_ != Waiting::Ended;
     now_ += ms;
 
@@ -2123,6 +2152,9 @@ void Engine::mouseButton(int button, bool down) {
             dirty_ = true;
         } else if (logOpen_) {
             closeLog();
+        } else if (screen_ && viewingImage_ && viewerPanel()) {
+            viewPanelHidden_ = !viewPanelHidden_;
+            dirty_ = true;
         } else if (screen_) {
             if (screen_->name != "title") runAction("back");
         } else if (windowHiddenByPlayer_ || (windowShown_ && setting("rightclick") == 0)) {
@@ -2160,6 +2192,10 @@ void Engine::mouseButton(int button, bool down) {
         return;
     }
     if (screen_) {
+        if (viewingImage_ && viewerPanel()) {
+            pressViewer(pointerX_, pointerY_);
+            return;
+        }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
             if (!(action == "nav_save" && returnTo_ == "title")) runAction(action);
