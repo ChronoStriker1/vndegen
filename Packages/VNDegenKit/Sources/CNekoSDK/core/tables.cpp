@@ -2999,6 +2999,10 @@ button nav_title obj\f002_000.bmp 954 51 8 5 6
 button nav_quit obj\f002_000.bmp 1079 51 8 5 7
 button back obj\f002_001.bmp 1195 11 1 5 0
 
+
+screen defaults
+# Quick saves follow the 60 cards, as the PC writes them.
+quickslots 61 66
 screen start
 # New Game starts the first chapter; init.ini names no FirstFlow.
 flow Flow_01

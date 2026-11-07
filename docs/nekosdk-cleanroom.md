@@ -86,6 +86,16 @@ When no `cfg.sav` exists the runtime writes the values the PC game wrote on a fi
 
 Quick saves are ordinary saves in slots 81 to 88, which the Q-Save page after the ten pages of eight shows. Under Wine a session's first quick save overwrote slot 81 and its second went to slot 82. That a page's eight fill and then wrap is assumed, and so is quick load taking the newest. A click on a card's lock changed no file while the game ran, so the runtime doesn't set it.
 
+
+Test Game 89's saves come back byte for byte except where the runtime doesn't read yet. Offsets below are from the end of a sprite record's two strings, in 89's layout:
+- A sprite running an animation has 1 at offset 388, beside the flag at 387 the runtime reads. The runtime writes 0 there.
+- A sprite with no animation has 0 where the runtime writes its slot number, at offset 397, the start of the record's tail. One with an animation has its slot number there in the PC's files too.
+- One sprite record holds 200 at offset 527, a value of its own that the runtime doesn't read.
+- 13242 and 13246 bytes after the records, the PC writes 6 and 3. 277, 285 and 289 bytes after them, a save made just after a load holds 1, 1 and 10.
+- In a save made just after a load, the base record's two alpha fields hold 255 where a fresh one, and the runtime, hold 256.
+
+The runtime writes zeros for the values it doesn't read. A quick save the runtime wrote from the PC's own save loads in the PC game under Wine and shows the same scene. 89's quick saves are slots 61 to 66, after its 60 cards.
+
 ## Meanings settled by comparison with the PC game
 
 Each was measured from recordings of Test Game 97 under Wine: its opening, and ten minutes clicking through the first
