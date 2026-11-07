@@ -52,13 +52,24 @@ static bool hasWordWrapPatch(const std::string &exePath) {
 }
 
 bool Engine::start(std::string *error) {
+    ponscripter_ = Script::isPonscripter(cfg_.gameRoot);
+    setTextEncoding(ponscripter_ ? TextEncoding::Utf8 : TextEncoding::ShiftJis);
+    if (ponscripter_) {
+        logf("Ponscripter game: the script is UTF-8");
+        // VNDegen's saves are in the PC engine's format, but they go in a folder of their own, never replacing the PC
+        // engine's saves/, which a player may sync or copy in.
+        saveDir_ = "vndegen-saves";
+        extras_.qInt1 = 1;  // as a fresh PC Ponscripter game saves it
+        scene_.monocroColor = kPonsMonocroDefault;
+    }
     if (!fs_.open(cfg_.gameRoot)) {
         if (error) *error = "The game folder can't be read.";
         return false;
     }
+    if (ponscripter_) importPcSaves();
     if (!cfg_.englishWordWrap)
         for (const std::string &rel : fs_.topLevelFiles()) {
-            std::string low = sjisLower(rel);
+            std::string low = lowerAscii(rel);
             if (low.size() > 4 && low.compare(low.size() - 4, 4, ".exe") == 0 && hasWordWrapPatch(fs_.root() + "/" + rel)) {
                 cfg_.englishWordWrap = true;
                 logf("%s has the word-wrap patch: English text breaks between words", rel.c_str());
@@ -93,6 +104,7 @@ void Engine::resetGame(bool fromDefine) {
     stopMovie();
     clearBlt();
     scene_ = Scene();
+    if (ponscripter_) scene_.monocroColor = kPonsMonocroDefault;
     commitScene();
     clearPage();
     log_.clear();
@@ -134,6 +146,7 @@ void Engine::waitTimer(int ms, bool skippable) {
     if (ms <= 0) return;
     wait_ = WaitKind::Timer;
     waitUntil_ = now_ + ms;
+    timerWaits_++;
     waitSkippable_ = skippable;
 }
 
@@ -262,6 +275,7 @@ bool Engine::step(int ms) {
         Bytes data;
         if (readSound(loopBgmTail_, data)) audio_.play(AudioMixer::kBgm, std::move(data), true, volBgm_);
     }
+    if (endRoll_.on) stepEndRoll();
     processWait();
     animateSprites();
     tickLayers();
@@ -282,7 +296,7 @@ std::string Engine::debugStatus() const {
     static const char *names[] = {"running", "timer", "click", "text", "effect", "button", "select", "quake", "movie", "dialog"};
     std::string line = script_.text().substr(script_.lineStart(cur_.line),
                                              script_.text().find('\n', script_.lineStart(cur_.line)) - script_.lineStart(cur_.line));
-    return "line " + std::to_string(cur_.line + 1) + " (" + names[int(wait_)] + "): " + sjisToUtf8(line);
+    return "line " + std::to_string(cur_.line + 1) + " (" + names[int(wait_)] + "): " + toUtf8(line);
 }
 
 // ---- input ----
@@ -316,6 +330,6 @@ void Engine::key(int code, bool down) {
     }
 }
 
-void Engine::typeText(const std::string &utf8) { typed_ += utf8ToSjis(utf8); }
+void Engine::typeText(const std::string &utf8) { typed_ += fromUtf8(utf8); }
 
 }  // namespace vnns

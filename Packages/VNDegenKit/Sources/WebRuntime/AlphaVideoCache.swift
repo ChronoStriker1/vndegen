@@ -16,10 +16,13 @@ public actor AlphaVideoCache {
     public static let limit = 512 << 20
     private let root = URL.cachesDirectory.appendingPathComponent("AlphaVideo-v1", isDirectory: true)
     private var cleaned = false
+    /// Clips already logged as having no alpha, so their repeated range requests don't log again.
+    private var opaqueLogged = Set<String>()
 
     public func clear() throws {
         if FileManager.default.fileExists(atPath: root.path) { try FileManager.default.removeItem(at: root) }
         cleaned = false
+        opaqueLogged.removeAll()
     }
 
     private func directory() throws {
@@ -48,15 +51,42 @@ public actor AlphaVideoCache {
         }
     }
 
-    // This actor runs the synchronous converter on its executor, serially and off the main thread.
+    /// The converted movie, nil for a WebM without alpha, which is served as it is. Fails rather than serve an alpha
+    /// WebM unconverted, because WebKit draws its transparent parts opaque, often white over the whole scene.
     func response(folder: GameFolder, path: String, method: String, range: String?,
                   cancellation: AlphaVideoCancellation, log: Logger) throws -> FileResponse? {
+        do {
+            return try convertedResponse(folder: folder, path: path, method: method, range: range,
+                                         cancellation: cancellation, log: log)
+        } catch {
+            if !(error is CancellationError) && !Task.isCancelled {
+                log.error("alpha video \(path, privacy: .public) not served: \(error.localizedDescription, privacy: .public)")
+            }
+            throw error
+        }
+    }
+
+    // This actor runs the synchronous converter on its executor, serially and off the main thread.
+    private func convertedResponse(folder: GameFolder, path: String, method: String, range: String?,
+                                   cancellation: AlphaVideoCancellation, log: Logger) throws -> FileResponse? {
         try Task.checkCancellation()
         guard path.lowercased().hasSuffix(".webm"), let (handle, base, _, name) = folder.open(servedPath: path), base == 0 else { return nil }
         defer { try? handle.close() }
         // Read the descriptor GameFolder confined, rather than reopen a path that could change beneath us.
-        let source = "/dev/fd/\(handle.fileDescriptor)"
-        guard vnalpha_is_alpha(source) != 0 else { return nil }
+        let source = handle.fileDescriptor
+        var error = [CChar](repeating: 0, count: 512)
+        switch vnalpha_inspect(source, &error, Int32(error.count)) {
+        case 1: break
+        case 0:
+            if opaqueLogged.insert(folder.root.path + "\u{0}" + path).inserted {
+                log.notice("alpha video \(name, privacy: .public): no alpha track, served as WebM")
+            }
+            return nil
+        default:
+            let reason = String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            log.error("alpha video \(name, privacy: .public): can't be checked, \(reason, privacy: .public)")
+            throw CocoaError(.fileReadUnknown)
+        }
         var info = stat()
         guard fstat(handle.fileDescriptor, &info) == 0 else { throw CocoaError(.fileReadUnknown) }
         let identity = "\(info.st_dev):\(info.st_ino):\(info.st_size):\(info.st_mtimespec.tv_sec):\(info.st_mtimespec.tv_nsec)"
@@ -66,7 +96,7 @@ public actor AlphaVideoCache {
         if !FileManager.default.fileExists(atPath: cached.path) {
             let partial = root.appendingPathComponent(UUID().uuidString + ".part")
             defer { try? FileManager.default.removeItem(at: partial) }
-            var result = vnalpha_result(), error = [CChar](repeating: 0, count: 512)
+            var result = vnalpha_result()
             let status = vnalpha_convert(source, partial.path, cancellation.native, &result, &error, Int32(error.count))
             let detail = status == 0 ? "complete" : String(decoding: error.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
             log.notice("alpha video \(name, privacy: .public): clip \(result.duration) s, conversion \(result.seconds) s, process peak \(result.peak_bytes / 1048576) MiB, \(detail, privacy: .public)")

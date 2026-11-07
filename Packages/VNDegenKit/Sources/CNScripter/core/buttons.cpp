@@ -28,7 +28,7 @@ int Engine::hitButton(int x, int y) {
     }
     // Text buttons in the window.
     for (const TextChar &c : page_)
-        if (c.link >= 0 && x >= c.x && y >= c.y && x < c.x + (c.ch.size() == 1 ? halfAdvance() : fullAdvance()) &&
+        if (c.link >= 0 && x >= c.x && y >= c.y && x < c.x + (isHalfWidth(c.ch, 0) ? halfAdvance() : fullAdvance()) &&
             y < c.y + c.h)
             for (size_t i = 0; i < buttons_.size(); i++)
                 if (buttons_[i].kind == Button::TextLink && buttons_[i].number == c.link) return int(i);
@@ -596,19 +596,22 @@ void Engine::startSelect(SelectMode mode) {
     clearPage();
     selectFirst_ = page_.size();
     selectRows_.clear();
+    selectChars_.clear();
+    selectBottoms_.clear();
     for (auto &[text, label] : cselItems_) {
         if (text.empty()) {
             selectRows_.push_back(-1);
+            selectChars_.emplace_back(0, 0);
+            selectBottoms_.push_back(-1);
             continue;
         }
         selectRows_.push_back(penY_);
         uint32_t saved = textColor_;
         textColor_ = selectColor(false);
-        for (size_t i = 0; i < text.size();) {
-            size_t n = sjisCharLen(text, i);
-            putChar(text.substr(i, n));
-            i += n;
-        }
+        size_t first = page_.size();
+        putString(text);
+        selectChars_.emplace_back(first, page_.size());
+        selectBottoms_.push_back(penY_ + (ponsText() ? (ponsLineHeight2() + 1) / 2 : win_.fh + win_.py));
         textColor_ = saved;
         newLine();
     }
@@ -630,7 +633,9 @@ bool Engine::pollSelect() {
         int y = selectRows_[i];
         if (y < 0) continue;
         int top = win_.ty + y;
-        if (mouseY_ >= top && mouseY_ < top + rowH && mouseX_ >= win_.tx && mouseX_ < win_.tx + win_.cols * fullAdvance())
+        // A Ponscripter choice may wrap onto more lines; NScripter's are taken a row each, as before.
+        int bottom = ponscripter_ ? win_.ty + selectBottoms_[i] : top + rowH;
+        if (mouseY_ >= top && mouseY_ < bottom && mouseX_ >= win_.tx && mouseX_ < win_.tx + win_.cols * fullAdvance())
             hover = int(i);
     }
     for (int k : in_.keys) {
@@ -651,7 +656,8 @@ bool Engine::pollSelect() {
         selectHover_ = hover;
         for (size_t i = selectFirst_; i < page_.size(); i++) {
             int y = page_[i].y - win_.ty - (rubyOn_ ? rubyH_ : 0);
-            bool on = hover >= 0 && selectRows_[size_t(hover)] == y;
+            bool on = hover >= 0 && (ponscripter_ ? i >= selectChars_[size_t(hover)].first && i < selectChars_[size_t(hover)].second
+                                                  : selectRows_[size_t(hover)] == y);
             page_[i].color = selectColor(on);
         }
         sceneDirty_ = true;

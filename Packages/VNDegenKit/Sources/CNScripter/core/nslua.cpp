@@ -50,7 +50,7 @@ NSFN(nsPopStrRef) {
     return 1;
 }
 NSFN(nsPopLabel) {
-    std::string s = sjisLower(engineOf(L).readLabel());
+    std::string s = lowerAscii(engineOf(L).readLabel());
     lua_pushlstring(L, s.data(), s.size());
     return 1;
 }
@@ -147,11 +147,11 @@ NSFN(nsEnd) {
 }
 NSFN(nsOkBox) {
     // A modal Windows message box; the runtime has no blocking dialog, so the text goes to the log.
-    logf("NSOkBox: %s", sjisToUtf8(luaL_checkstring(L, 1)).c_str());
+    logf("NSOkBox: %s", toUtf8(luaL_checkstring(L, 1)).c_str());
     return 0;
 }
 NSFN(nsYesNoBox) {
-    logf("NSYesNoBox (answered yes): %s", sjisToUtf8(luaL_checkstring(L, 1)).c_str());
+    logf("NSYesNoBox (answered yes): %s", toUtf8(luaL_checkstring(L, 1)).c_str());
     lua_pushboolean(L, 1);
     return 1;
 }
@@ -222,7 +222,7 @@ NSFN(nsGetKey) {
 }
 NSFN(nsSystemCall) {
     Engine &e = engineOf(L);
-    std::string id = sjisLower(luaL_checkstring(L, 1));
+    std::string id = lowerAscii(luaL_checkstring(L, 1));
     if (id == "end" || id == "close") e.requestQuit();
     else if (id == "reset") e.resetGame();
     else if (id == "skip") e.skipMode_ = true;
@@ -435,7 +435,7 @@ NSFN(luaPrint) {
         if (i > 1) line += '\t';
         line += s ? std::string(s, len) : luaL_typename(L, i);
     }
-    logf("Lua: %s", sjisToUtf8(line).c_str());
+    logf("Lua: %s", toUtf8(line).c_str());
     return 0;
 }
 
@@ -485,7 +485,7 @@ struct LuaCall {
 
 void report(lua_State *L, const char *what) {
     const char *msg = lua_tostring(L, -1);
-    logf("Lua error in %s: %s", what, msg ? sjisToUtf8(msg).c_str() : "?");
+    logf("Lua error in %s: %s", what, msg ? toUtf8(msg).c_str() : "?");
     lua_pop(L, 1);
 }
 
@@ -602,7 +602,7 @@ void Engine::execString(const std::string &statement) {
     inTextLine_ = false;
     skipSpaces();
     std::string word = readWord();
-    if (word.empty()) logf("NSExec: no command in \"%s\"", sjisToUtf8(statement).c_str());
+    if (word.empty()) logf("NSExec: no command in \"%s\"", toUtf8(statement).c_str());
     else executeCommand(word);
     script_.endExec();
     cur_ = saved;

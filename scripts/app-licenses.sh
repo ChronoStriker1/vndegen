@@ -18,7 +18,7 @@ cp "$kit/Sources/ArchiveImport/CArchive/LICENSE-zlib.txt" "$out.part/zlib (Defla
 cp "$kit/Sources/CArtemis/third_party/LICENSE-stb_vorbis.txt" "$out.part/stb_vorbis (Artemis audio decoder).txt"
 cp "$kit/Sources/RuntimePackages/LICENSE-innoextract.txt" "$out.part/innoextract (Inno Setup reader).txt"
 cp "$kit/Sources/RuntimePackages/LICENSE-LZMA-SDK.txt" "$out.part/LZMA SDK (installer decoder).txt"
-cp "$kit/Sources/CNScripter/third_party/LICENSE-stb.txt" "$out.part/stb_image and stb_vorbis (NScripter images and Ogg).txt"
+cp "$kit/Sources/CNScripter/third_party/LICENSE-stb.txt" "$out.part/stb_image, stb_truetype and stb_vorbis (NScripter images, Ponscripter text and Ogg).txt"
 cp "$kit/Sources/CNScripter/third_party/LICENSE-pl_mpeg.txt" "$out.part/pl_mpeg (NScripter movies).txt"
 cp "$kit/Sources/CNScripter/third_party/LICENSE-dr_mp3.txt" "$out.part/dr_mp3 (NScripter MP3).txt"
 cp "$kit/Sources/CNScripter/third_party/LICENSE-lua.txt" "$out.part/Lua (NScripter NSLua scripts).txt"

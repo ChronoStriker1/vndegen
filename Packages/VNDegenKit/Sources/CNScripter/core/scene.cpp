@@ -43,12 +43,13 @@ ImageRef Engine::loadFileImage(const std::string &file, bool *hasAlpha) {
         }
     } else {
         Bytes data;
-        if (!fs_.read(file, data)) {
-            errorf("image %s not found", sjisToUtf8(file).c_str());
+        // A Ponscripter game also finds images in its save folder, such as the save thumbnails it writes there.
+        if (!fs_.read(file, data) && !(ponscripter_ && readFile(saveFilePath(file), data))) {
+            errorf("image %s not found", toUtf8(file).c_str());
             return nullptr;
         }
         if (!decodeImage(data, img, &alpha)) {
-            errorf("image %s could not be decoded", sjisToUtf8(file).c_str());
+            errorf("image %s could not be decoded", toUtf8(file).c_str());
             return nullptr;
         }
     }
@@ -85,6 +86,7 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     std::string maskFile, file = tag;
     uint32_t keyColor = 0;
     bool keyByColor = false;
+    bool halfSize = false, explicitCopy = false;
     if (!tag.empty() && tag[0] == ':') {
         size_t semi = std::string::npos;
         // String sprites have no file part; everything after the settings is text.
@@ -99,10 +101,17 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
             return true;
         }
         size_t p = 1;
+        // Ponscripter's ":b" in front of the mode letter draws the image at half its size: the Umineko games' menus
+        // and buttons are drawn at twice the screen's resolution.
+        if (ponscripter_ && p < tag.size() && (tag[p] == 'b' || tag[p] == 'B')) {
+            halfSize = true;
+            p++;
+        }
         if (p < tag.size()) {
             char m = char(tolower(uint8_t(tag[p])));
             if (m == 'a' || m == 'l' || m == 'r' || m == 'c') {
                 mode = std::string(1, m);
+                explicitCopy = m == 'c';
                 p++;
             } else if (m == 'm') {
                 mode = "m";
@@ -155,7 +164,9 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
     bool ownAlpha = false;
     ImageRef base = loadFileImage(file, &ownAlpha);
     if (!base) return false;
-    // An image with an alpha channel of its own (a PNG) keeps it, whatever transparency the tag names.
+    // An image with an alpha channel of its own (a PNG) keeps it, whatever transparency the tag names. Ponscripter's
+    // ":c" is the exception: it draws the image opaque, as if over black.
+    bool dropAlpha = ownAlpha && ponscripter_ && explicitCopy;
     if (ownAlpha) mode = "c";
     if (fileLogOn_) noteFileUsed(file);
     Image img = *base;
@@ -194,6 +205,9 @@ bool Engine::loadImage(const std::string &tag, LoadedImage &out) {
                 if (p == key) p = 0;
         }
     }
+    if (dropAlpha)
+        for (uint32_t &p : img.px) p |= 0xFF000000u;
+    if (halfSize) img = halveImage(img);
     out.image = std::make_shared<const Image>(std::move(img));
     out.cellWidth = out.image->w / cells;
     return true;
@@ -282,7 +296,7 @@ void Engine::printWithEffect(const Effect &e) {
         drawBltLayer(to);
         if (!startDllEffect(to)) effect_.e.type = 10;
     } else if (!e.mask.empty()) {
-        effect_.mask = loadFileImage(e.mask);
+        effect_.mask = loadMask(e.mask);
     }
     effect_.start = now_;
     effect_.active = true;
@@ -450,14 +464,7 @@ void Engine::renderScene(const Scene &s, Image &out, bool withWindow) {
     for (const Scene::Prnum &p : s.prnums)
         if (p.on) {
             // prnum draws its number in full-width digits, w x h per character.
-            std::string digits;
-            for (char c : std::to_string(p.value)) {
-                if (c == '-') digits += "\x81\x7c";
-                else {
-                    digits += char(0x82);
-                    digits += char(0x4F + (c - '0'));
-                }
-            }
+            std::string digits = fullWidthDigits(std::to_string(p.value));
             drawGlyphs(out, digits, p.x, p.y, p.w, p.h, 0, p.color, win_.bold, win_.shadow, 0, 0);
         }
     if (effectsOnScene) {
@@ -543,7 +550,7 @@ using E = Engine;
 void cmdBg(E &e, const std::string &) {
     e.skipSpaces();
     std::string s = e.readStr();
-    std::string low = sjisLower(s);
+    std::string low = lowerAscii(s);
     e.scene_.bgTag = s;
     e.scene_.bg = LoadedImage();
     if (low == "black") {
@@ -678,17 +685,24 @@ void loadSprite(E &e, bool visible) {
 void cmdLsp(E &e, const std::string &name) { loadSprite(e, name == "lsp"); }
 
 // csp drops the image; the sprite's position, visibility, cell and alpha stay, as the PC engine's saves show.
-static void clearSprite(Sprite &s) {
+// The PC Ponscripter engine also moves a sprite it clears to (-500, -500) and its first cell, as its saves show; one
+// without an image stays where it is.
+static void clearSprite(E &e, Sprite &s) {
+    bool held = s.loaded;
     s.img = LoadedImage();
     s.loaded = false;
+    if (e.ponscripter_ && held) {
+        s.x = s.y = -500;
+        s.cell = 0;
+    }
 }
 
 void cmdCsp(E &e, const std::string &) {
     int n = e.readInt();
     if (n == -1) {
-        for (Sprite &s : e.scene_.sp) clearSprite(s);
+        for (Sprite &s : e.scene_.sp) clearSprite(e, s);
     } else if (Sprite *s = e.spriteRef(n)) {
-        clearSprite(*s);
+        clearSprite(e, *s);
     }
 }
 
@@ -770,7 +784,7 @@ void cmdSpWait(E &e, const std::string &) {
 void cmdMonocro(E &e, const std::string &) {
     e.skipSpaces();
     std::string s = e.readStr();
-    if (sjisLower(s) == "off") {
+    if (lowerAscii(s) == "off") {
         e.scene_.monocro = false;
         return;
     }
@@ -795,7 +809,7 @@ void cmdQuake(E &e, const std::string &name) {
 }
 
 void cmdHumanOrder(E &e, const std::string &) {
-    e.humanOrder_ = sjisLower(e.readStr());
+    e.humanOrder_ = lowerAscii(e.readStr());
     Effect ef;
     e.readEffectArgs(ef);
     e.printWithEffect(ef);
@@ -1018,21 +1032,27 @@ void cmdBlt(E &e, const std::string &) {
         if (i) e.readComma();
         v[i] = e.readInt();
     }
+    e.bltRect(v);
+}
+
+}  // namespace
+
+void Engine::bltRect(const int64_t v[8]) {
     // blt copies the image as it is (a Windows BitBlt), so the default transparency mode doesn't apply to it; an image
     // the script tagged itself keeps its tag.
-    const std::string &tag = e.btnImage_.tag;
+    const std::string &tag = btnImage_.tag;
     if (tag.empty()) return;
     std::string opaque = tag[0] == ':' ? tag : ":c;" + tag;
-    if (e.bltSource_.tag != opaque && !e.loadImage(opaque, e.bltSource_)) return;
-    if (!e.bltSource_.image) return;
-    const Image &src = *e.bltSource_.image;
+    if (bltSource_.tag != opaque && !loadImage(opaque, bltSource_)) return;
+    if (!bltSource_.image) return;
+    const Image &src = *bltSource_.image;
     int64_t dx = v[0], dy = v[1], dw = v[2], dh = v[3], sx = v[4], sy = v[5], sw = v[6], sh = v[7];
     if (dw <= 0 || dh <= 0 || sw <= 0 || sh <= 0) return;
-    if (e.bltState_ == 0) {
-        e.bltLayer_ = Image(e.width(), e.height(), 0);
-        e.bltState_ = 1;
+    if (bltState_ == 0) {
+        bltLayer_ = Image(width(), height(), 0);
+        bltState_ = 1;
     }
-    Image &dst = e.bltLayer_;
+    Image &dst = bltLayer_;
     // In 64 bits: a script's rectangle may be anywhere, and only the part on screen and in the image is drawn.
     int64_t y0 = std::max<int64_t>(0, dy), y1 = std::min<int64_t>(dst.h, dy + dh);
     int64_t x0 = std::max<int64_t>(0, dx), x1 = std::min<int64_t>(dst.w, dx + dw);
@@ -1046,8 +1066,10 @@ void cmdBlt(E &e, const std::string &) {
             if (tx >= 0 && tx < src.w) row[x] = over(row[x], srow[tx]);
         }
     }
-    e.composeFrame();
+    composeFrame();
 }
+
+namespace {
 
 // ofscpy (or ofscopy): blt's drawing becomes the offscreen image, so the next plain print shows it too.
 void cmdOfscpy(E &e, const std::string &) {

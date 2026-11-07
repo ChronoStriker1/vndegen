@@ -1,13 +1,22 @@
 // Save files, in the PC engine's formats, so saves move between VNDegen and Windows both ways. NScripter 2.95 to 3.04
 // all write the same layout ("format 2"). docs/nscripter-cleanroom.md says how it was worked out; field names below
 // follow what each field was seen to hold. Integers are little-endian int32; strings are Shift-JIS, NUL-terminated.
+#include <dirent.h>
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
+#include <climits>
 #include <cstring>
 #include <ctime>
+#include <exception>
+#include <optional>
+#include <set>
 
+#include "casepath.h"
 #include "engine.h"
 
 namespace vnns {
@@ -25,6 +34,18 @@ struct Writer {
         out.push_back(0);
     }
 };
+
+// Positions on the PC Ponscripter engine's doubled screen: doubled as its 32-bit arithmetic does, and halved rounding
+// down.
+static int doubled(int v) { return int(uint32_t(v) * 2u); }
+static int halved(int v) { return int((int64_t(v) - (v < 0 ? 1 : 0)) / 2); }
+static int clampInt(int64_t v) { return int(std::clamp<int64_t>(v, INT32_MIN, INT32_MAX)); }
+// The PC Ponscripter engine's text area along one side, doubled: cells of the font size and twice the pitch. In
+// floating point, since a script's sizes can make the product overflow any integer.
+static int textAreaSize(int cells, int size, int pitch) {
+    double v = double(cells) * 2 * (double(size) + 2 * double(pitch));
+    return int(std::clamp(v, double(INT32_MIN), double(INT32_MAX)));
+}
 
 struct Reader {
     const Bytes &d;
@@ -81,6 +102,7 @@ void Engine::freezeSavepoint(bool atTextHead) {
     (void)atTextHead;
     savepoint_.clear();
     serializeState(savepoint_);
+    savepointCalls_ = callFlags();
     savepointLine_ = stmtStart_.line;
     savepointStmt_ = stmtStart_.stmt;
     savepointLive_ = false;
@@ -92,6 +114,26 @@ void Engine::freezeSavepoint(bool atTextHead) {
 void Engine::noteStatementStart(bool text) {
     stmtStart_ = cur_;
     if (defineMode_ || !text) return;
+    // Every Ponscripter page's head is kept, so a textgosub installed mid-page still saves from it.
+    if (ponscripter_ && !pageHeadTaken_) {
+        pageHead_.clear();
+        serializeState(pageHead_);
+        pageHeadCalls_ = callFlags();
+        pageHeadLine_ = cur_.line;
+        pageHeadStmt_ = cur_.stmt;
+        pageHeadTaken_ = true;
+    }
+    if (ponsSaves()) {
+        // Before the first text, saves follow the statement that saves, as in NScripter.
+        if (savepointLive_ || (saveOn_ && !preTextGosub_.empty())) {
+            savepoint_ = pageHead_;
+            savepointCalls_ = pageHeadCalls_;
+            savepointLine_ = pageHeadLine_;
+            savepointStmt_ = pageHeadStmt_;
+            savepointLive_ = false;
+        }
+        return;
+    }
     bool newPage = page_.empty() && pageText_.empty();
     if (newPage || savepointLive_) freezeSavepoint(true);
 }
@@ -99,50 +141,75 @@ void Engine::noteStatementStart(bool text) {
 // ---- serializing ----
 
 // Everything a save holds up to the message history.
+// A Ponscripter game saves in the PC Ponscripter engine's format (black box: lab saves): NScripter's, after a "PNS"
+// header, with positions on the doubled screen, the window by its size in doubled pixels, sprites' shown flags with
+// bit 1 set, its own call stack records, no ruby settings, and ten more fields where NScripter keeps its tail and
+// message history.
 void Engine::serializeState(Bytes &out) {
     Writer w{out};
     const SaveExtras &x = extras_;
-    w.i(2);
+    const bool pns = ponscripter_;
+    auto pos = [&](int v) { return pns ? doubled(v) : v; };
+    if (pns) {
+        out.insert(out.end(), {'P', 'N', 'S', 2, 6});
+        for (int v : x.pnsHead) w.i(v);
+    } else {
+        w.i(2);
+    }
     w.i(win_.bold ? 1 : 0);
     w.i(win_.shadow ? 1 : 0);
     w.i(x.h12);
     w.i(rmode_ ? 1 : 0);
-    // The text color is stored red, blue, green.
-    w.i(chR(textColor_));
-    w.i(chB(textColor_));
-    w.i(chG(textColor_));
+    // The text color is stored red, blue, green. The PC Ponscripter engine stores white there, whatever textcolor set.
+    uint32_t color = pns ? x.pnsColor : textColor_;
+    w.i(chR(color));
+    w.i(chB(color));
+    w.i(chG(color));
     w.s(x.h32);
     w.s(x.h33);
     w.i(windowEffect_.type);
     w.i(windowEffect_.duration);
     w.s(windowEffect_.mask);
-    w.i(win_.tx);
-    w.i(win_.ty);
-    w.i(win_.cols);
-    w.i(win_.rows);
-    w.i(win_.fw);
-    w.i(win_.fh);
-    w.i(win_.fw + win_.px);
-    w.i(win_.fh + win_.py);
+    if (pns) {
+        // The text area's size: columns of the font width and twice the pitch, rows of the height and twice the
+        // spacing, all doubled. The font width isn't kept; Ponscripter's is its height.
+        w.i(doubled(win_.tx));
+        w.i(doubled(win_.ty));
+        w.i(textAreaSize(win_.cols, win_.fw, win_.px));
+        w.i(textAreaSize(win_.rows, win_.fh, win_.py));
+        w.i(doubled(win_.fh));
+        w.i(x.pnsWindow);
+        w.i(doubled(win_.px));
+        w.i(doubled(win_.py));
+    } else {
+        w.i(win_.tx);
+        w.i(win_.ty);
+        w.i(win_.cols);
+        w.i(win_.rows);
+        w.i(win_.fw);
+        w.i(win_.fh);
+        w.i(win_.fw + win_.px);
+        w.i(win_.fh + win_.py);
+    }
     w.i(win_.imageWindow ? -1 : int(rgbOf(win_.color)));
     w.i(textSpeed_);
-    w.i(win_.x1);
-    w.i(win_.y1);
-    w.i(win_.x2);
-    w.i(win_.y2);
+    w.i(pos(win_.x1));
+    w.i(pos(win_.y1));
+    w.i(pos(win_.x2));
+    w.i(pos(win_.y2));
     w.s(win_.imageWindow ? win_.imageTag : std::string());
     for (int v : x.h100) w.i(v);
     w.s(scene_.bgTag);
     for (const Sprite &s : scene_.ld) w.s(s.loaded ? s.img.tag : std::string());
-    for (const Sprite &s : scene_.ld) w.i(s.x);
-    for (const Sprite &s : scene_.ld) w.i(s.y);
+    for (const Sprite &s : scene_.ld) w.i(pos(s.x));
+    for (const Sprite &s : scene_.ld) w.i(pos(s.y));
     for (int q : x.ldQ) w.i(q);
     for (const Sprite &s : scene_.ld) w.i(s.alpha);
     for (const Sprite &s : scene_.sp) {
         w.s(s.img.tag);
-        w.i(s.x);
-        w.i(s.y);
-        w.i(s.visible ? 1 : 0);
+        w.i(pos(s.x));
+        w.i(pos(s.y));
+        w.i((s.visible ? 1 : 0) | (pns ? 2 : 0));
         w.i(s.cell);
         w.i(s.alpha);
     }
@@ -151,17 +218,25 @@ void Engine::serializeState(Bytes &out) {
         w.s(str_[size_t(k)]);
     }
     // The call stack, flattened: a gosub is its return offset; a for loop is variable, limit, step and the negated
-    // offset of its body. textgosub frames aren't saved: the savepoint is the head of their text page.
+    // offset of its body. textgosub frames aren't saved: the savepoint is the head of their text page. Ponscripter
+    // writes minus the number of frames, then each frame outermost first: 0 and the return offset for a gosub, 1, the
+    // body's offset, variable, limit and step for a for loop.
     std::vector<int> stack;
+    int frames = 0;
     for (const Frame &f : stack_) {
         if (f.kind == Frame::TextGosub) continue;
-        if (f.kind == Frame::For) {
+        frames++;
+        if (pns && f.kind == Frame::For) {
+            stack.insert(stack.end(), {1, int(f.pos), f.var, f.to, f.step});
+        } else if (pns) {
+            stack.insert(stack.end(), {0, int(f.pos)});
+        } else if (f.kind == Frame::For) {
             stack.insert(stack.end(), {f.var, f.to, f.step, -int(f.pos)});
         } else {
             stack.push_back(int(f.pos));
         }
     }
-    w.i(int(stack.size()));
+    w.i(pns ? -frames : int(stack.size()));
     for (int v : stack) w.i(v);
     w.i(scene_.monocro ? 1 : 0);
     uint32_t mono = scene_.monocroColor;
@@ -199,7 +274,7 @@ void Engine::serializeState(Bytes &out) {
         w.i(int(rgbOf(p.color)));
     }
     w.i(x.qInt1);
-    w.i(scene_.allSpHidden ? 1 : 0);
+    w.i(pns ? x.pnsAllSp : scene_.allSpHidden ? 1 : 0);  // allsphide leaves the PC Ponscripter engine's alone
     w.i(x.qInt2);
     w.s(btnImage_.tag);
     for (int idx : arrayOrder_)
@@ -208,21 +283,27 @@ void Engine::serializeState(Bytes &out) {
     w.i(x.qInt4);
     w.s(loopBgmHead_);
     w.s(loopBgmTail_);
-    w.i(rubyOn_ ? 1 : 0);
-    w.i(rubyOn_ ? rubyW_ : 0);
-    w.i(rubyOn_ ? rubyH_ : 0);
-    w.s(rubyFont_);
+    if (!pns) {
+        w.i(rubyOn_ ? 1 : 0);
+        w.i(rubyOn_ ? rubyW_ : 0);
+        w.i(rubyOn_ ? rubyH_ : 0);
+        w.s(rubyFont_);
+    }
     w.i(x.qInt5);
     for (const Sprite2 &q : scene_.sp2) {
         w.s(q.img.tag);
-        w.i(q.cx);
-        w.i(q.cy);
+        w.i(pos(q.cx));
+        w.i(pos(q.cy));
         w.i(q.scaleX);
         w.i(q.scaleY);
         w.i(q.rot);
-        w.i(q.visible ? 1 : 0);
+        w.i((q.visible ? 1 : 0) | (pns ? 2 : 0));
         w.i(q.alpha);
         w.i(q.blend == Blend::Add ? 1 : q.blend == Blend::Sub ? 2 : 0);
+    }
+    if (pns) {
+        for (int v : x.pnsTail) w.i(v);
+        return;
     }
     for (int k = 0; k < 8; k++) {
         int v = x.tail[k];
@@ -241,6 +322,12 @@ void Engine::serializeState(Bytes &out) {
 // The message history as it is now, then the savepoint's script position.
 void Engine::serializeTail(Bytes &out, int line, int stmt) {
     Writer w{out};
+    // The PC Ponscripter engine keeps no message history in a save.
+    if (ponscripter_) {
+        w.i(line);
+        w.i(stmt);
+        return;
+    }
     w.i(int(log_.size()));
     for (const std::string &p : log_) w.s(p);
     w.i(int(logTags_.size()));
@@ -252,11 +339,20 @@ void Engine::serializeTail(Bytes &out, int line, int stmt) {
 // Reads a save into the engine and positions the script at its savepoint.
 bool Engine::restoreState(const Bytes &data, std::string *error) {
     Reader r{data};
-    if (r.i() != 2) {
+    SaveExtras x;
+    const bool pns = ponscripter_;
+    auto pos = [&](int v) { return pns ? halved(v) : v; };
+    if (pns) {
+        if (data.size() < 5 || memcmp(data.data(), "PNS", 3) != 0) {
+            if (error) *error = "not a Ponscripter save";
+            return false;
+        }
+        r.p = 5;
+        for (int &v : x.pnsHead) v = r.i();
+    } else if (r.i() != 2) {
         if (error) *error = "not an NScripter format-2 save";
         return false;
     }
-    SaveExtras x;
     Scene sc;
     win_.bold = r.i() != 0;
     win_.shadow = r.i() != 0;
@@ -264,25 +360,40 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     rmode_ = r.i() != 0;
     int tr = r.i(), tb = r.i(), tg = r.i();
     textColor_ = rgba(tr, tg, tb);
+    if (pns) x.pnsColor = textColor_;
     x.h32 = r.s();
     x.h33 = r.s();
     windowEffect_.type = r.i();
     windowEffect_.duration = r.i();
     windowEffect_.mask = r.s();
-    win_.tx = r.i();
-    win_.ty = r.i();
-    win_.cols = r.i();
-    win_.rows = r.i();
-    win_.fw = r.i();
-    win_.fh = r.i();
-    win_.px = r.i() - win_.fw;
-    win_.py = r.i() - win_.fh;
+    if (pns) {
+        win_.tx = ponsOrigin(halved(r.i()));
+        win_.ty = ponsOrigin(halved(r.i()));
+        int width = r.i(), height = r.i();
+        win_.fh = win_.fw = halved(r.i());
+        x.pnsWindow = r.i();
+        win_.px = halved(r.i());
+        win_.py = halved(r.i());
+        int64_t cell = 2 * (int64_t(win_.fw) + 2 * int64_t(win_.px));
+        int64_t line = 2 * (int64_t(win_.fh) + 2 * int64_t(win_.py));
+        win_.cols = cell > 0 ? clampInt(width / cell) : 0;
+        win_.rows = line > 0 ? clampInt(height / line) : 0;
+    } else {
+        win_.tx = r.i();
+        win_.ty = r.i();
+        win_.cols = r.i();
+        win_.rows = r.i();
+        win_.fw = r.i();
+        win_.fh = r.i();
+        win_.px = r.i() - win_.fw;
+        win_.py = r.i() - win_.fh;
+    }
     int color = r.i();
     textSpeed_ = r.i();
-    win_.x1 = r.i();
-    win_.y1 = r.i();
-    win_.x2 = r.i();
-    win_.y2 = r.i();
+    win_.x1 = pos(r.i());
+    win_.y1 = pos(r.i());
+    win_.x2 = pos(r.i());
+    win_.y2 = pos(r.i());
     std::string winImage = r.s();
     win_.imageWindow = color == -1;
     if (win_.imageWindow) {
@@ -296,8 +407,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     std::string ldTags[3];
     for (auto &t : ldTags) t = r.s();
     int ldx[3], ldy[3], lda[3];
-    for (int &v : ldx) v = r.i();
-    for (int &v : ldy) v = r.i();
+    for (int &v : ldx) v = pos(r.i());
+    for (int &v : ldy) v = pos(r.i());
     for (int &v : x.ldQ) v = r.i();
     for (int &v : lda) v = r.i();
     for (int k = 0; k < 3; k++) {
@@ -310,9 +421,9 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     }
     for (Sprite &s : sc.sp) {
         std::string tag = r.s();
-        s.x = r.i();
-        s.y = r.i();
-        s.visible = r.i() != 0;
+        s.x = pos(r.i());
+        s.y = pos(r.i());
+        s.visible = (r.i() & (pns ? 1 : ~0)) != 0;
         s.cell = r.i();
         s.alpha = r.i();
         if (!tag.empty() && loadImage(tag, s.img)) s.loaded = true;
@@ -323,75 +434,52 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         num_[size_t(k)] = r.i();
         str_[size_t(k)] = r.s();
     }
-    int n = r.i();
-    std::vector<int> flat;
-    for (int k = 0; k < n && !r.bad; k++) flat.push_back(r.i());
-    // Read the stack from the top down: a negative entry ends a for loop's four.
     std::vector<Frame> frames;
-    for (int k = int(flat.size()); k > 0;) {
-        Frame f;
-        int v = flat[size_t(k - 1)];
-        if (v < 0 && k >= 4) {
-            f.kind = Frame::For;
-            f.var = flat[size_t(k - 4)];
-            f.to = flat[size_t(k - 3)];
-            f.step = flat[size_t(k - 2)];
-            f.pos = size_t(-v);
-            k -= 4;
-        } else {
-            f.kind = Frame::Gosub;
-            f.pos = size_t(std::max(v, 0));
-            k -= 1;
-        }
-        f.pos = std::min(f.pos, script_.text().size());
-        f.line = script_.lineAt(f.pos);
-        // The statement index of a return position: the ':' separators before it on its line, outside strings.
-        f.stmt = 0;
-        const std::string &t = script_.text();
-        size_t stmtStart = script_.lineStart(f.line);
-        char quote = 0;
-        for (size_t p = stmtStart; p < f.pos; p += sjisCharLen(t, p)) {
-            if (quote) {
-                if (t[p] == quote) quote = 0;
-                continue;
+    if (pns) {
+        // Minus the number of frames, then each outermost first: 1 for a for loop, 0 for a gosub.
+        int64_t n = -int64_t(r.i());
+        bool malformed = n < 0;
+        for (int64_t k = 0; k < n && !r.bad && !malformed; k++) {
+            Frame f;
+            int kind = r.i(), at = r.i();
+            malformed = (kind != 0 && kind != 1) || at < 0 || size_t(at) > script_.text().size();
+            f.pos = size_t(std::max(at, 0));
+            if (kind == 1) {
+                f.kind = Frame::For;
+                f.var = r.i();
+                f.to = r.i();
+                f.step = r.i();
             }
-            if (t[p] == '"' || t[p] == '`') quote = t[p];
-            if (!quote && t[p] == ':') {
-                f.stmt++;
-                stmtStart = p + 1;
-            }
+            frames.push_back(f);
         }
-        // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
-        // which getparam may still read. The interpreter's own parser finds that command, dispatching names as it
-        // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
-        // variables; its errors aren't the player's, so they aren't logged.
-        if (f.kind == Frame::Gosub) {
-            // Restored on every exit, including the exception a corrupt save's nesting guard throws.
-            quietErrors_++;
-            struct Restore {
-                Engine &e;
-                Cursor cur;
-                ~Restore() {
-                    e.cur_ = cur;
-                    e.quietErrors_--;
-                }
-            } restore{*this, cur_};
-            cur_ = Cursor{stmtStart, f.line, f.stmt};
-            for (;;) {
-                std::string word = readWord();
-                bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
-                std::string name = builtin ? word.substr(1) : word;
-                if (!builtin && defsubs_.count(name)) {
-                    f.hasParams = cur_.pos <= f.pos;
-                    break;
-                }
-                if (name != "if" && name != "notif") break;
-                readCondition();
-            }
+        if (malformed || r.bad) {
+            if (error) *error = "the save's call stack is malformed";
+            return false;
         }
-        frames.push_back(f);
+    } else {
+        int n = r.i();
+        std::vector<int> flat;
+        for (int k = 0; k < n && !r.bad; k++) flat.push_back(r.i());
+        // Read the stack from the top down: a negative entry ends a for loop's four.
+        for (int k = int(flat.size()); k > 0;) {
+            Frame f;
+            int v = flat[size_t(k - 1)];
+            if (v < 0 && k >= 4) {
+                f.kind = Frame::For;
+                f.var = flat[size_t(k - 4)];
+                f.to = flat[size_t(k - 3)];
+                f.step = flat[size_t(k - 2)];
+                f.pos = size_t(-v);
+                k -= 4;
+            } else {
+                f.kind = Frame::Gosub;
+                f.pos = size_t(std::max(v, 0));
+                k -= 1;
+            }
+            frames.push_back(f);
+        }
+        std::reverse(frames.begin(), frames.end());
     }
-    std::reverse(frames.begin(), frames.end());
     sc.monocro = r.i() != 0;
     int mb = r.i(), mg = r.i(), mr = r.i();
     sc.monocroColor = rgba(mr, mg, mb);
@@ -427,7 +515,8 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         p.color = pxOf(uint32_t(r.i()));
     }
     x.qInt1 = r.i();
-    sc.allSpHidden = r.i() != 0;
+    if (pns) x.pnsAllSp = r.i();
+    else sc.allSpHidden = r.i() != 0;
     x.qInt2 = r.i();
     std::string btndef = r.s();
     for (int idx : arrayOrder_)
@@ -435,13 +524,15 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     x.qInt3 = r.i();
     x.qInt4 = r.i();
     std::string loopHead = r.s(), loopTail = r.s();
-    rubyOn_ = r.i() != 0;
-    int rw = r.i(), rh = r.i();
-    if (rubyOn_) {
-        rubyW_ = rw;
-        rubyH_ = rh;
+    if (!pns) {
+        rubyOn_ = r.i() != 0;
+        int rw = r.i(), rh = r.i();
+        if (rubyOn_) {
+            rubyW_ = rw;
+            rubyH_ = rh;
+        }
+        rubyFont_ = r.s();
     }
-    rubyFont_ = r.s();
     x.qInt5 = r.i();
     // A fresh game saves an unused slot's alpha as -1, but the PC engine's load leaves it 255, which the next save
     // writes (black box: a save made after loading). The loaded file stands in for the state until the game moves
@@ -449,12 +540,12 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     std::vector<size_t> unusedAlpha;
     for (Sprite2 &q : sc.sp2) {
         std::string tag = r.s();
-        q.cx = r.i();
-        q.cy = r.i();
+        q.cx = pos(r.i());
+        q.cy = pos(r.i());
         q.scaleX = r.i();
         q.scaleY = r.i();
         q.rot = r.i();
-        q.visible = r.i() != 0;
+        q.visible = (r.i() & (pns ? 1 : ~0)) != 0;
         if (tag.empty()) unusedAlpha.push_back(r.p);
         q.alpha = r.i();
         int blend = r.i();
@@ -463,23 +554,155 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
         q.img.tag = tag;
         if (tag.empty()) q.alpha = 255;
     }
-    for (int &v : x.tail) v = r.i();
-    sc.allSp2Hidden = x.tail[5] != 0;
-    x.tStr = r.s();
-    r.i();
-    r.i();
-    r.i();  // standing image centres follow from the screen width
-    underline_ = r.i();
-    size_t historyAt = r.p;
-    std::vector<std::string> log(r.count());
-    for (auto &p : log) p = r.s();
-    std::vector<std::string> tags(r.count());
-    for (auto &t : tags) t = r.s();
+    std::vector<std::string> log, tags;
+    size_t historyAt;
+    if (pns) {
+        // The PC Ponscripter engine keeps neither the text state nor a message history; the language shown stays.
+        for (int &v : x.pnsTail) v = r.i();
+        historyAt = r.p;
+    } else {
+        for (int &v : x.tail) v = r.i();
+        sc.allSp2Hidden = x.tail[5] != 0;
+        x.tStr = r.s();
+        r.i();
+        r.i();
+        r.i();  // standing image centres follow from the screen width
+        underline_ = r.i();
+        historyAt = r.p;
+        log.resize(r.count());
+        for (auto &p : log) p = r.s();
+        tags.resize(r.count());
+        for (auto &t : tags) t = r.s();
+    }
     int line = r.i(), stmt = r.i();
     bool windowUp = x.tail[2] != 0;
     if (r.bad) {
         if (error) *error = "the save is shorter than its contents need";
         return false;
+    }
+    // Each frame's line, statement and, for a user command, how far getparam read. innerLine is where the call was
+    // when saved.
+    auto finishFrame = [&](Frame &f, int innerLine) {
+        f.pos = std::min(f.pos, script_.text().size());
+        f.line = script_.lineAt(f.pos);
+        // The statement index of a return position: the ':' separators before it on its line, outside strings.
+        f.stmt = 0;
+        const std::string &t = script_.text();
+        size_t stmtStart = script_.lineStart(f.line);
+        char quote = 0;
+        for (size_t p = stmtStart; p < f.pos; p += charLen(t, p)) {
+            if (quote) {
+                if (t[p] == quote) quote = 0;
+                continue;
+            }
+            if (t[p] == '"' || t[p] == '`') quote = t[p];
+            if (!quote && t[p] == ':') {
+                f.stmt++;
+                stmtStart = p + 1;
+            }
+        }
+        // A return into a statement whose command, after any if's condition, is a user command is a defsub call,
+        // which getparam may still read. The interpreter's own parser finds that command, dispatching names as it
+        // does: _name is the built-in, then a user command, then if and notif. Reading a condition only reads
+        // variables; its errors aren't the player's, so they aren't logged.
+        if (f.kind == Frame::Gosub) {
+            // Restored on every exit, including the exception a corrupt save's nesting guard throws.
+            quietErrors_++;
+            struct Restore {
+                Engine &e;
+                Cursor cur;
+                ~Restore() {
+                    e.cur_ = cur;
+                    e.quietErrors_--;
+                }
+            } restore{*this, cur_};
+            cur_ = Cursor{stmtStart, f.line, f.stmt};
+            // The call's arguments start after the spaces that follow its name; getparam moved past some.
+            auto userCommand = [&]() {
+                f.hasParams = cur_.pos <= f.pos;
+                skipSpaces();
+                f.paramsRead = f.hasParams && f.pos > cur_.pos;
+            };
+            size_t call = std::string::npos;  // where the user command's name ends
+            for (;;) {
+                std::string word = readWord();
+                bool builtin = word.size() > 1 && word[0] == '_' && commandTable().count(word.substr(1));
+                std::string name = builtin ? word.substr(1) : word;
+                if (!builtin && defsubs_.count(name)) {
+                    call = cur_.pos;
+                    break;
+                }
+                if (name != "if" && name != "notif") break;
+                readCondition();
+            }
+            // In Ponscripter a word after a command's arguments starts the next command, without a colon, so the user
+            // command may stand later, and a user command's name may also be an argument (an alias). Its names before
+            // the return position, after a space and outside strings, are the candidates: the call is the one whose
+            // label holds where the call was when saved (the next frame's return position, or the save's own for the
+            // innermost), else the statement's head as NScripter reads it, else the last.
+            if (ponscripter_) {
+                // A built-in that pushes a plain frame, standing as a command: its first argument (a label or a
+                // string) follows, not a comma, as it would where the word is an alias another command reads.
+                auto plainCall = [&](const std::string &word, size_t end) {
+                    std::string name = word.size() > 1 && word[0] == '_' ? word.substr(1) : word;
+                    size_t q = end;
+                    while (q < t.size() && (t[q] == ' ' || t[q] == '\t')) q++;
+                    char next = q < t.size() ? t[q] : '\n';
+                    if (name == "gosub" || name == "selgosub" || name == "csel") {
+                        if (next == '*' || next == '$' || next == '"' || next == '`') return true;
+                        size_t w = q;  // or a string alias standing for the label or string
+                        while (w < t.size() && (isalnum(uint8_t(t[w])) || t[w] == '_')) w++;
+                        return w > q && strAlias_.count(lowerAscii(t.substr(q, w - q)));
+                    }
+                    return luaCommands_.count(word) && next != ',';
+                };
+                std::string callee(script_.labelAt(innerLine));
+                size_t last = std::string::npos, named = std::string::npos, lastGosub = std::string::npos;
+                char quote = 0;
+                for (size_t p = stmtStart; p < f.pos;) {
+                    char c = t[p];
+                    if (quote || c == '"' || c == '`') {
+                        quote = quote ? (c == quote ? 0 : quote) : c;
+                        p += charLen(t, p);
+                        continue;
+                    }
+                    if (!(isalpha(uint8_t(c)) || c == '_')) {
+                        p += charLen(t, p);
+                        continue;
+                    }
+                    char before = p > stmtStart ? t[p - 1] : ' ';
+                    cur_.pos = p;
+                    std::string word = readWord();
+                    size_t end = std::max(cur_.pos, p + 1);
+                    if ((before == ' ' || before == '\t') && end <= f.pos && defsubs_.count(word)) {
+                        last = end;
+                        if (word == callee && named == std::string::npos) named = end;
+                    }
+                    if (end <= f.pos && (before == ' ' || before == '\t') && plainCall(word, end)) lastGosub = end;
+                    p = end;
+                }
+                if (named != std::string::npos) call = named;
+                else if (call == std::string::npos) call = last;
+                // A command that pushes a plain frame (gosub, selgosub, csel, a Lua command) after the user command's
+                // name made the call: the frame is that command's, with no arguments.
+                if (lastGosub != std::string::npos && (call == std::string::npos || lastGosub > call))
+                    call = std::string::npos;
+            }
+            if (call != std::string::npos) {
+                cur_.pos = call;
+                userCommand();
+            }
+        }
+    };
+    for (size_t k = 0; k < frames.size(); k++) {
+        int inner = k + 1 < frames.size() ? script_.lineAt(std::min(frames[k + 1].pos, script_.text().size()))
+                                          : std::clamp(line, 0, script_.lineCount() - 1);
+        finishFrame(frames[k], inner);
+        // A save VNDegen wrote keeps beside it which calls are user commands', so it needn't be worked out.
+        if (pns && loadedCalls_.size() == frames.size() && frames[k].kind == Frame::Gosub) {
+            frames[k].hasParams = loadedCalls_[k] & 1;
+            frames[k].paramsRead = loadedCalls_[k] & 2;
+        }
     }
 
     // Commit: the scene, sound, text and the script position. A movie playing now belongs to the game left behind.
@@ -496,9 +719,13 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
     if (!btndef.empty()) loadImage(btndef, btnImage_);
     log_ = std::move(log);
     logTags_ = std::move(tags);
+    textLang_ = -1;
+    ponsStyle_ = PonsStyle();
+    caretText_ = false;
     page_.clear();
     pageText_.clear();
-    penX_ = penY_ = 0;
+    pageHeadTaken_ = false;
+    resetPen();
     windowShown_ = windowUp;
     stack_ = std::move(frames);
     buttons_.clear();
@@ -545,6 +772,7 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
             savepoint_[at] = 255;
             savepoint_[at + 1] = savepoint_[at + 2] = savepoint_[at + 3] = 0;
         }
+    savepointCalls_ = callFlags();
     savepointLine_ = line;
     savepointStmt_ = stmt;
     savepointLive_ = false;
@@ -552,6 +780,32 @@ bool Engine::restoreState(const Bytes &data, std::string *error) {
 }
 
 // ---- save slots ----
+
+std::vector<uint8_t> Engine::callFlags() const {
+    std::vector<uint8_t> flags;
+    for (const Frame &f : stack_)
+        if (f.kind != Frame::TextGosub) flags.push_back(uint8_t((f.hasParams ? 1 : 0) | (f.paramsRead ? 2 : 0)));
+    return flags;
+}
+
+// The record of a save's calls beside it, saveN.dat.calls: "VNDCALLS", the save's FNV-1a hash, then a byte per frame.
+// Another save in the slot, one synced or copied in from a PC, doesn't match the hash, and its calls are worked out.
+static uint64_t fnv1a(const Bytes &data) {
+    uint64_t h = 1469598103934665603ull;
+    for (uint8_t b : data) h = (h ^ b) * 1099511628211ull;
+    return h;
+}
+
+// The hash a call record file names, if it is one.
+static std::optional<uint64_t> recordHash(const std::string &path) {
+    Bytes record;
+    if (!readFile(path, record) || record.size() < 16 || memcmp(record.data(), "VNDCALLS", 8) != 0) return {};
+    uint64_t h = 0;
+    for (int k = 0; k < 8; k++) h |= uint64_t(record[8 + size_t(k)]) << (8 * k);
+    return h;
+}
+
+std::string Engine::saveFilePath(const std::string &file) const { return fs_.hostPath(joinPath(saveDir_, file)); }
 
 std::string Engine::savePath(int slot) const {
     return fs_.hostPath(joinPath(saveDir_, "save" + std::to_string(slot) + ".dat"));
@@ -567,18 +821,53 @@ bool Engine::saveGame(int slot, const std::string &note) {
         data = savepoint_;
         serializeTail(data, savepointLine_, savepointStmt_);
     }
-    if (!note.empty() || savegame2_) {
-        // savegame2's note follows the position: the note in double quotes, then '*'.
+    if (!note.empty() || savegame2_ || ponscripter_) {
+        // savegame2's note follows the position: the note in double quotes, then '*'. Ponscripter always writes one.
         data.push_back('"');
         data.insert(data.end(), note.begin(), note.end());
         data.push_back('"');
         data.push_back('*');
     }
     std::string path = savePath(slot);
+    // A Ponscripter save's call record is written first, beside the old one: if it can't be, the save fails. It takes
+    // the old one's place only once the save is written, so a save that fails leaves the slot's save and record as
+    // they were.
+    std::string record = path + ".calls", pending = record + ".new";
+    if (ponscripter_) {
+        // A record a failed move left as .new may be the only one matching the save now in the slot: it goes into
+        // place before this save's takes its name, or this save fails.
+        Bytes current;
+        struct stat st;
+        if (lstat(path.c_str(), &st) == 0 && !readFile(path, current)) {
+            logf("could not read %s to keep its call record, so the save isn't written", path.c_str());
+            return false;
+        }
+        if (!current.empty()) {
+            uint64_t h = fnv1a(current);
+            if (recordHash(pending) == std::optional<uint64_t>(h) && recordHash(record) != std::optional<uint64_t>(h) &&
+                rename(pending.c_str(), record.c_str()) != 0) {
+                logf("could not move %s into place, so the save isn't written", pending.c_str());
+                return false;
+            }
+        }
+        std::vector<uint8_t> flags = savepointLive_ ? callFlags() : savepointCalls_;
+        Bytes bytes = {'V', 'N', 'D', 'C', 'A', 'L', 'L', 'S'};
+        uint64_t h = fnv1a(data);
+        for (int k = 0; k < 8; k++) bytes.push_back(uint8_t(h >> (8 * k)));
+        bytes.insert(bytes.end(), flags.begin(), flags.end());
+        if (!fs_.write(pending, bytes.data(), bytes.size())) {
+            logf("could not write %s", pending.c_str());
+            return false;
+        }
+    }
     if (!fs_.write(path, data.data(), data.size())) {
         logf("could not write %s", path.c_str());
+        if (ponscripter_) remove(pending.c_str());
         return false;
     }
+    // If the record can't take its place, it stays as .new, where a load finds it too.
+    if (ponscripter_ && rename(pending.c_str(), record.c_str()) != 0)
+        logf("could not move %s into place", pending.c_str());
     saveSystemData();
     return true;
 }
@@ -600,8 +889,26 @@ bool Engine::loadGame(int slot) {
     bool rmode = rmode_, eraseOnEffect = eraseOnEffect_, rubyOn = rubyOn_;
     auto fileLog = fileLog_;  // images loaded on the way count as seen
     auto fileLogOrder = fileLogOrder_;
+    loadedCalls_.clear();
+    // The save's call record: the one in place, or one a save left beside it.
+    for (const char *suffix : {".calls", ".calls.new"}) {
+        Bytes record;
+        if (!ponscripter_ || !loadedCalls_.empty() || !readFile(savePath(slot) + suffix, record) ||
+            record.size() < 16 || memcmp(record.data(), "VNDCALLS", 8) != 0)
+            continue;
+        uint64_t h = 0;
+        for (int k = 0; k < 8; k++) h |= uint64_t(record[8 + size_t(k)]) << (8 * k);
+        if (h == fnv1a(data)) loadedCalls_.assign(record.begin() + 16, record.end());
+    }
     std::string error;
-    if (!restoreState(data, &error)) {
+    bool restored = false;
+    try {
+        restored = restoreState(data, &error);
+    } catch (const std::exception &ex) {  // a forged save's nesting, met while finding a call's command
+        error = ex.what();
+    }
+    loadedCalls_.clear();
+    if (!restored) {
         logf("save %d: %s", slot, error.c_str());
         win_ = std::move(win);
         windowEffect_ = std::move(windowEffect);
@@ -657,6 +964,208 @@ bool Engine::readSaveInfo(int slot, SaveInfo &info) {
 
 // ---- system data: global variables, the file and label logs, read text ----
 
+// A Ponscripter game copied from a PC brings its saves in the PC engine's saves folder, which VNDegen reads but never
+// writes. The first time the game runs with no save slot of VNDegen's own, they're copied into VNDegen's folder:
+// saveN.dat, global.sav, envdata and screenshot\*.bmp, the set the save sync restores, each only where VNDegen has no
+// file of that name. VNDegen's folder is opened without following a link and held open, and every file goes in under
+// a name of its own first, then takes its real name only if that's still free, so nothing outside the folder is
+// written and nothing there replaced. A list of the files, written before any goes in, makes them VNDegen's own: a run
+// cut short is finished by the next, and the list becomes the note that keeps it to once.
+void Engine::importPcSaves() {
+    static const char *kNote = "vndegen-imported-pc-saves.txt", *kPending = "vndegen-importing-pc-saves.txt";
+    struct Entry {
+        std::string name;
+        bool folder;
+    };
+    // A folder's entries, by name, without following links; failed is set when it can't be listed.
+    auto listAt = [](int dirFd, bool &failed) {
+        std::vector<Entry> out;
+        int fd = dup(dirFd);
+        DIR *d = fd >= 0 ? fdopendir(fd) : nullptr;
+        if (!d) {
+            if (fd >= 0) close(fd);
+            failed = true;
+            return out;
+        }
+        while (dirent *e = readdir(d)) {
+            std::string name = e->d_name;
+            struct stat st;
+            if (name == "." || name == "..") continue;
+            bool folder = fstatat(dirFd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode);
+            out.push_back({name, folder});
+        }
+        closedir(d);
+        return out;
+    };
+    auto findFolder = [](const std::vector<Entry> &entries, const char *name) {
+        for (const Entry &e : entries)
+            if (lowerAscii(e.name) == name) return e.name;
+        return std::string();
+    };
+    auto slot = [](const std::string &name) {
+        std::string low = lowerAscii(name);
+        if (low.size() <= 8 || low.compare(0, 4, "save") != 0 || low.compare(low.size() - 4, 4, ".dat") != 0)
+            return false;
+        return std::all_of(low.begin() + 4, low.end() - 4, [](char c) { return c >= '0' && c <= '9'; });
+    };
+    auto readAt = [](int dirFd, const std::string &name, Bytes &out) {
+        // Non-blocking, so a pipe of a save's name can't hold the game's start; only a plain file is read.
+        int fd = openat(dirFd, name.c_str(), O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+        if (fd < 0) return false;
+        struct stat st;
+        bool ok = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size <= (64 << 20);
+        if (ok) {
+            out.resize(size_t(st.st_size));
+            ok = read(fd, out.data(), out.size()) == ssize_t(out.size());
+        }
+        close(fd);
+        return ok;
+    };
+    // Writes under a fresh name, then gives it the name asked for: replacing what's there, or only if it's free.
+    auto writeAt = [](int dirFd, const std::string &name, const Bytes &data, bool replace) {
+        std::string tmp;
+        int fd = -1;
+        for (int k = 0; k < 100 && fd < 0; k++) {
+            tmp = ".vndegen-import-" + std::to_string(getpid()) + "-" + std::to_string(k);
+            fd = openat(dirFd, tmp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+        }
+        if (fd < 0) return false;
+        bool ok = write(fd, data.data(), data.size()) == ssize_t(data.size());
+        ok = close(fd) == 0 && ok;
+        if (ok) ok = replace ? renameat(dirFd, tmp.c_str(), dirFd, name.c_str()) == 0
+                             : linkat(dirFd, tmp.c_str(), dirFd, name.c_str(), 0) == 0;
+        if (!replace || !ok) unlinkat(dirFd, tmp.c_str(), 0);
+        return ok;
+    };
+
+    bool failed = false;
+    int rootFd = open(fs_.root().c_str(), O_RDONLY | O_DIRECTORY);
+    if (rootFd < 0) return;
+    struct Closer {
+        std::vector<int> fds;
+        ~Closer() {
+            for (int fd : fds) close(fd);
+        }
+    } closer{{rootFd}};
+    std::vector<Entry> top = listAt(rootFd, failed);
+    std::string pcName = findFolder(top, "saves");
+    std::string ownName = findFolder(top, lowerAscii(saveDir_).c_str());
+    if (failed || pcName.empty()) return;
+    int pcFd = openat(rootFd, pcName.c_str(), O_RDONLY | O_DIRECTORY);
+    if (pcFd < 0) return;
+    closer.fds.push_back(pcFd);
+    // VNDegen's folder as it stands: a link, or one that can't be read, stops it.
+    int ownFd = -1;
+    std::vector<Entry> own;
+    std::set<std::string> pending;  // lowercase names a run cut short listed as VNDegen's
+    if (!ownName.empty()) {
+        ownFd = openat(rootFd, ownName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (ownFd < 0) return;
+        closer.fds.push_back(ownFd);
+        own = listAt(ownFd, failed);
+        if (failed || !findFolder(own, kNote).empty()) return;
+        Bytes list;
+        if (!findFolder(own, kPending).empty()) {
+            if (!readAt(ownFd, findFolder(own, kPending), list)) return;
+            std::string text(list.begin(), list.end());
+            for (size_t p = 0; p < text.size();) {
+                size_t nl = text.find('\n', p);
+                std::string line = text.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
+                if (!line.empty()) pending.insert(lowerAscii(line));
+                p = nl == std::string::npos ? text.size() : nl + 1;
+            }
+        }
+        for (const Entry &e : own)
+            if (slot(e.name) && !pending.count(lowerAscii(e.name))) return;
+    }
+    std::string ownShotName = findFolder(own, "screenshot");
+    std::vector<Entry> ownShots;
+    if (!ownShotName.empty()) {
+        int fd = openat(ownFd, ownShotName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (fd < 0) return;
+        closer.fds.push_back(fd);
+        ownShots = listAt(fd, failed);
+        if (failed) return;
+    }
+    // What to copy: each file VNDegen has no entry of that name for, read now, before anything is written.
+    struct Copy {
+        std::string name;  // under VNDegen's folder, or its screenshot folder
+        bool shot;
+        Bytes data;
+    };
+    std::vector<Copy> copies;
+    // Reads one file to copy. A plain file that can't be read now leaves everything as it was, to try again next
+    // time; a link, or anything but a plain file, is passed over.
+    auto take = [&](int dirFd, const std::string &name, bool shot) {
+        Copy c{name, shot, {}};
+        if (readAt(dirFd, name, c.data)) {
+            copies.push_back(std::move(c));
+            return true;
+        }
+        struct stat st;
+        bool plain = fstatat(dirFd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISREG(st.st_mode) &&
+                     st.st_size <= (64 << 20);
+        if (plain)
+            logf("the PC engine's saves can't all be read now (%s); VNDegen tries again next time", name.c_str());
+        return !plain;
+    };
+    std::vector<Entry> pcEntries = listAt(pcFd, failed);
+    for (const Entry &e : pcEntries) {
+        std::string low = lowerAscii(e.name);
+        bool wanted = slot(e.name) || low == "global.sav" || low == "envdata";
+        if (e.folder || !wanted || !findFolder(own, low.c_str()).empty()) continue;
+        if (!take(pcFd, e.name, false)) return;
+    }
+    std::string pcShotName = findFolder(pcEntries, "screenshot");
+    if (!pcShotName.empty()) {
+        int pcShotFd = openat(pcFd, pcShotName.c_str(), O_RDONLY | O_DIRECTORY);
+        if (pcShotFd < 0) return;
+        closer.fds.push_back(pcShotFd);
+        for (const Entry &e : listAt(pcShotFd, failed)) {
+            std::string low = lowerAscii(e.name);
+            if (e.folder || low.size() <= 4 || low.compare(low.size() - 4, 4, ".bmp") != 0 ||
+                !findFolder(ownShots, low.c_str()).empty())
+                continue;
+            if (!take(pcShotFd, e.name, true)) return;
+        }
+    }
+    if (failed) return;
+    if (copies.empty() && pending.empty()) return;
+    if (ownFd < 0) {
+        ownName = saveDir_;
+        if (mkdirat(rootFd, ownName.c_str(), 0755) != 0 && errno != EEXIST) return;
+        ownFd = openat(rootFd, ownName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (ownFd < 0) return;
+        closer.fds.push_back(ownFd);
+    }
+    int shotFd = -1;
+    std::string shotName = ownShotName.empty() ? (pcShotName.empty() ? "screenshot" : pcShotName) : ownShotName;
+    if (std::any_of(copies.begin(), copies.end(), [](const Copy &c) { return c.shot; })) {
+        if (mkdirat(ownFd, shotName.c_str(), 0755) != 0 && errno != EEXIST) return;
+        shotFd = openat(ownFd, shotName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        if (shotFd < 0) return;
+        closer.fds.push_back(shotFd);
+    }
+    // The list goes first, so what follows is VNDegen's own even if this run is cut short.
+    std::string list;
+    for (const std::string &name : pending) list += name + "\n";
+    for (const Copy &c : copies) list += lowerAscii(c.shot ? shotName + "/" + c.name : c.name) + "\n";
+    if (!writeAt(ownFd, kPending, Bytes(list.begin(), list.end()), true)) return;
+    std::string ownPath = fs_.root() + "/" + ownName;
+    for (const Copy &c : copies) {
+        if (!writeAt(c.shot ? shotFd : ownFd, c.name, c.data, false) && errno != EEXIST) {
+            logf("could not copy %s; VNDegen finishes copying the PC engine's saves next time", c.name.c_str());
+            return;
+        }
+        casepath_changed((ownPath + "/" + (c.shot ? shotName + "/" : std::string()) + c.name).c_str());
+    }
+    if (renameat(ownFd, kPending, ownFd, kNote) == 0) casepath_changed((ownPath + "/" + kNote).c_str());
+    logf("copied %zu files from the PC engine's saves folder into %s", copies.size(), ownName.c_str());
+}
+
+// The global variables' file: NScripter's gloval.sav, the PC Ponscripter engine's global.sav, the same inside.
+std::string Engine::globalsName() const { return ponscripter_ ? "global.sav" : "gloval.sav"; }
+
 void Engine::loadGlobals() {
     Bytes data;
     // Our menu preference, separate from the PC engine's undocumented envdata.
@@ -665,7 +1174,7 @@ void Engine::loadGlobals() {
         textSpeed_ = defaultSpeeds_[speedChoice_];
     }
     globalsOnDisk_.clear();
-    if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, "gloval.sav")), data)) {
+    if (globalOn_ && readFile(fs_.hostPath(joinPath(saveDir_, globalsName())), data)) {
         globalsOnDisk_ = data;
         size_t p = 0;
         for (size_t i = size_t(globalBorder_); i < num_.size() && p + 4 <= data.size(); i++) {
@@ -702,7 +1211,7 @@ void Engine::loadGlobals() {
     }
     if (labelLogOn_) {
         readLog("NScrllog.dat", [&](const std::string &n) {
-            int idx = script_.labelIndex(sjisLower(n));
+            int idx = script_.labelIndex(lowerAscii(n));
             if (idx >= 0) noteLabelVisited(idx);
         });
         noteLabelVisited(script_.labelIndex("define"));
@@ -739,8 +1248,8 @@ bool Engine::isRead(size_t pos) const {
 }
 
 static std::string upperAscii(std::string s) {
-    for (size_t i = 0; i < s.size(); i += sjisCharLen(s, i))
-        if (sjisCharLen(s, i) == 1) s[i] = char(toupper(uint8_t(s[i])));
+    for (size_t i = 0; i < s.size(); i += charLen(s, i))
+        if (charLen(s, i) == 1) s[i] = char(toupper(uint8_t(s[i])));
     return s;
 }
 
@@ -758,14 +1267,14 @@ void Engine::saveGlobalsIfChanged() {
     if (!globalOn_ || defineMode_) return;
     Bytes out = globalsFile();
     if (out == globalsOnDisk_) return;
-    std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
+    std::string path = fs_.hostPath(joinPath(saveDir_, globalsName()));
     if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
 }
 
 void Engine::saveSystemData() {
     if (globalOn_) {
         Bytes out = globalsFile();
-        std::string path = fs_.hostPath(joinPath(saveDir_, "gloval.sav"));
+        std::string path = fs_.hostPath(joinPath(saveDir_, globalsName()));
         if (fs_.write(path, out.data(), out.size())) globalsOnDisk_ = std::move(out);
         else logf("could not write %s", path.c_str());
     }
@@ -818,12 +1327,13 @@ void cmdLoadGame(E &e, const std::string &) { e.loadGame(e.readInt()); }
 void cmdSaveOn(E &e, const std::string &) {
     if (e.autoSaveOff_) return;
     e.saveOn_ = true;
+    if (e.ponsSaves()) return;
     e.savepointLive_ = true;
 }
 
 void cmdSaveOff(E &e, const std::string &) {
     if (e.autoSaveOff_) return;
-    if (e.savepointLive_) e.freezeSavepoint();
+    if (e.savepointLive_ && !e.ponsSaves()) e.freezeSavepoint();
     e.saveOn_ = false;
 }
 
@@ -913,7 +1423,9 @@ void cmdSaveScreenshot(E &e, const std::string &name) {
             row[x * 3 + 2] = uint8_t(chR(p));
         }
     }
-    std::string path = e.fs_.hostPath(file);
+    // The PC Ponscripter engine writes it in its save folder (saves\screenshot\ss1.bmp for the Umineko games'
+    // thumbnails), where images are also found.
+    std::string path = e.ponscripter_ ? e.saveFilePath(file) : e.fs_.hostPath(file);
     if (!e.fs_.write(path, out.data(), out.size())) logf("could not write %s", path.c_str());
     // The image cache may hold an older picture of this name, such as a save thumbnail.
     e.forgetImage(file);
