@@ -174,6 +174,7 @@ private:
     };
     SlotInfo &slotInfo(int slot);
     bool pageOff(const std::string &action) const;
+    bool pageStepOff(const std::string &action) const;
     void composeSlots(Canvas &out);
     int slotAt(int x, int y) const;
     void composeDialog(Canvas &out);

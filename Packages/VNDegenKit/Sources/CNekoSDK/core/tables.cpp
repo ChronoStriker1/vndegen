@@ -2999,6 +2999,114 @@ button nav_quit obj\f002_000.bmp 1079 51 8 5 7
 button back obj\f002_001.bmp 1195 11 1 5 0
 
 
+screen cg
+# The PC draws a character beside the cards, from sprite parts the runtime doesn't build yet.
+pic obj\g000_000.bmp 0 0 tab 0
+pic obj\g000_000.bmp 0 0 tab 1
+pic obj\g000_001.bmp 0 0 tab 2
+pic obj\g000_002.bmp 0 0 tab 3
+pic obj\g000_003.bmp 0 0 tab 4
+pic obj\g001_000.bmp 0 0 tab 0
+pic obj\g001_001.bmp 0 628 tab 0
+pic obj\g001_000.bmp 0 0 tab 1
+pic obj\g001_001.bmp 0 628 tab 1
+pic obj\g001_002.bmp 0 0 tab 2
+pic obj\g001_003.bmp 0 628 tab 2
+pic obj\g001_004.bmp 0 0 tab 3
+pic obj\g001_005.bmp 0 628 tab 3
+pic obj\g001_006.bmp 0 0 tab 4
+pic obj\g001_007.bmp 0 628 tab 4
+pic obj\g003_000.bmp 12 15 1 2 0 0
+cellsheet obj\g006_000.bmp
+cellsize 110 76
+cellthumb 29 33
+cell 154 178
+cell 154 360
+cell 404 178
+cell 404 360
+cell 654 178
+cell 654 360
+cell 904 178
+cell 904 360
+celllabel obj\f011_000.bmp 13 18
+celldigits obj\f011_001.bmp 55 12 2 22
+cellcount obj\g007_000.bmp obj\g009_000.bmp 119 113 159 172 0
+celltotal obj\g008_000.bmp 4
+gallerytabs
+cellhide
+button pageprev obj\g005_000.bmp 20 264 2 5 0
+button pagenext obj\g005_000.bmp 1186 264 2 5 1
+button page0 obj\f009_000.bmp 910 622 10 5 0
+button page1 obj\f009_000.bmp 984 622 10 5 1
+button page2 obj\f009_000.bmp 1058 622 10 5 2
+button gtab0 obj\g004_000.bmp 85 570 5 5 0
+button gtab1 obj\g004_000.bmp 237 570 5 5 1
+button gtab2 obj\g004_000.bmp 389 570 5 5 2
+# Fiona's tab isn't shown until the story reaches her; the switch for that isn't known yet, so it stays hidden.
+button gtab4 obj\g004_000.bmp 693 570 5 5 4
+button nav_save obj\f002_000.bmp 666 6 8 5 0
+button nav_load obj\f002_000.bmp 791 6 8 5 1
+button nav_cg obj\f002_000.bmp 916 6 8 5 2
+button nav_scene obj\f002_000.bmp 1041 6 8 5 3
+button nav_music obj\f002_000.bmp 704 51 8 5 4
+button nav_config obj\f002_000.bmp 829 51 8 5 5
+button nav_title obj\f002_000.bmp 954 51 8 5 6
+button nav_quit obj\f002_000.bmp 1079 51 8 5 7
+button back obj\f002_001.bmp 1195 11 1 5 0
+
+screen scene
+# The PC draws a character beside the cards, from sprite parts the runtime doesn't build yet.
+pic obj\g000_000.bmp 0 0 tab 0
+pic obj\g000_000.bmp 0 0 tab 1
+pic obj\g000_001.bmp 0 0 tab 2
+pic obj\g000_002.bmp 0 0 tab 3
+pic obj\g000_003.bmp 0 0 tab 4
+pic obj\g001_000.bmp 0 0 tab 0
+pic obj\g001_001.bmp 0 628 tab 0
+pic obj\g001_000.bmp 0 0 tab 1
+pic obj\g001_001.bmp 0 628 tab 1
+pic obj\g001_002.bmp 0 0 tab 2
+pic obj\g001_003.bmp 0 628 tab 2
+pic obj\g001_004.bmp 0 0 tab 3
+pic obj\g001_005.bmp 0 628 tab 3
+pic obj\g001_006.bmp 0 0 tab 4
+pic obj\g001_007.bmp 0 628 tab 4
+pic obj\g003_000.bmp 12 15 1 2 0 1
+cellsheet obj\g006_000.bmp
+cellsize 110 76
+cellthumb 29 33
+cell 154 178
+cell 154 360
+cell 404 178
+cell 404 360
+cell 654 178
+cell 654 360
+cell 904 178
+cell 904 360
+celllabel obj\f011_000.bmp 13 18
+celldigits obj\f011_001.bmp 55 12 2 22
+gallerytabs
+cellhide
+button pageprev obj\g005_000.bmp 20 264 2 5 0
+button pagenext obj\g005_000.bmp 1186 264 2 5 1
+button page0 obj\f009_000.bmp 910 622 10 5 0
+button page1 obj\f009_000.bmp 984 622 10 5 1
+button page2 obj\f009_000.bmp 1058 622 10 5 2
+button gtab0 obj\g004_000.bmp 85 570 5 5 0
+button gtab1 obj\g004_000.bmp 237 570 5 5 1
+button gtab2 obj\g004_000.bmp 389 570 5 5 2
+# Fiona's tab isn't shown until the story reaches her; the switch for that isn't known yet, so it stays hidden.
+button gtab4 obj\g004_000.bmp 693 570 5 5 4
+button nav_save obj\f002_000.bmp 666 6 8 5 0
+button nav_load obj\f002_000.bmp 791 6 8 5 1
+button nav_cg obj\f002_000.bmp 916 6 8 5 2
+button nav_scene obj\f002_000.bmp 1041 6 8 5 3
+button nav_music obj\f002_000.bmp 704 51 8 5 4
+button nav_config obj\f002_000.bmp 829 51 8 5 5
+button nav_title obj\f002_000.bmp 954 51 8 5 6
+button nav_quit obj\f002_000.bmp 1079 51 8 5 7
+button back obj\f002_001.bmp 1195 11 1 5 0
+
 screen config
 pic obj\i000_000.bmp 0 0
 pic obj\i006_000.bmp 18 122

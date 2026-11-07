@@ -495,6 +495,11 @@ void Engine::runAction(const std::string &action) {
         if (newest) openDialog(5, [this, newest] { loadFromSlot(newest); });
         return;
     }
+    // Test Game 89's arrows step through a gallery tab's pages and stop at its ends.
+    if (action == "pageprev" || action == "pagenext") {
+        if (!pageStepOff(action)) page_ += action == "pagenext" ? 1 : -1;
+        return;
+    }
     if (action.rfind("gtab", 0) == 0) {
         galleryTab_ = std::atoi(action.c_str() + 4);
         page_ = 0;
@@ -1044,7 +1049,16 @@ void Engine::composeGallery(Canvas &out) {
                 int slashY = y + (counts->size() >= 7 ? field(*counts, 6) : slashInSheet ? 0 : -1);
                 if (slashInSheet) drawPart(out, *sheetOfTen, cx + field(*counts, 4), slashY, 10 * w, 0, w, sheetOfTen->h, 1);
                 else drawPart(out, *slash, cx + field(*counts, 4), slashY, 0, 0, slash->w, slash->h, 1);
-                two(all, cx + field(*counts, 5));
+                // `celltotal DIGITS DY`: the total in a sheet of its own, DY lower, as Test Game 89 draws it.
+                if (const auto *total = screen_->setting("celltotal"); total && total->size() >= 2) {
+                    if (ImageRef totalDigits = images_->get((*total)[0])) {
+                        int tw = totalDigits->w / 10, tx = cx + field(*counts, 5), ty = y + field(*total, 1);
+                        drawPart(out, *totalDigits, tx, ty, all / 10 % 10 * tw, 0, tw, totalDigits->h, 1);
+                        drawPart(out, *totalDigits, tx + tw, ty, all % 10 * tw, 0, tw, totalDigits->h, 1);
+                    }
+                } else {
+                    two(all, cx + field(*counts, 5));
+                }
             }
         }
     }
@@ -1709,6 +1723,12 @@ int Engine::cardsPerPage() const {
 
 // Where the card at this place on a page sits.
 // `pageoff N`: page N's button is disabled on this screen, as Test Game 89's Quick Save page is on its save screen.
+bool Engine::pageStepOff(const std::string &action) const {
+    if (action == "pageprev") return page_ <= 0;
+    if (action == "pagenext") return !galleryPageExists(page_ + 1);
+    return false;
+}
+
 bool Engine::pageOff(const std::string &action) const {
     if (!screen_ || action.rfind("page", 0) != 0) return false;
     for (auto [it, end] = screen_->settings.equal_range("pageoff"); it != end; ++it)
@@ -2088,7 +2108,7 @@ void Engine::composeScreen(Canvas &out) {
             continue;
         }
         if (b.action == "nav_save" && fromTitle) state = StateDisabled;
-        if (pageOff(b.action)) state = StateDisabled;
+        if (pageOff(b.action) || pageStepOff(b.action)) state = StateDisabled;
         // The PC games show no help for the tab, page or menu already open.
         if (current && b.help) {
             Button shown = b;
@@ -2811,7 +2831,7 @@ void Engine::mouseButton(int button, bool down) {
         }
         if (Button *b = buttonAt(pointerX_, pointerY_, screen_->buttons)) {
             std::string action = b->action;
-            if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action)) runAction(action);
+            if (!(action == "nav_save" && returnTo_ == "title") && !pageOff(action) && !pageStepOff(action)) runAction(action);
             if (dialogOpen_) dialogOpener_ = action;
             return;
         }
