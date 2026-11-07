@@ -83,7 +83,7 @@ New bugs get a GitHub issue and a line here.
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
 - NekoSDK stage 3, on `feat/nekosdk-stage3`: Test Games 84, 85, 88, 89, 92, 93 and 94, with movies through the app's FFmpeg. The other six games come after it.
 - An iPhone Duo layout audit of every screen, finished. Its fixes are on `dev` for the next release. The final scores were 9.1 out of 10 from a Codex judge and 8.8 from a Claude judge. The portrait split ([#41](https://github.com/ChronoStriker1/vndegen/issues/41)) and the single library view button ([#42](https://github.com/ChronoStriker1/vndegen/issues/42)) are on `dev` too, with the No Socks RPG white cutscene fix ([#44](https://github.com/ChronoStriker1/vndegen/issues/44)) and the NekoSDK replay Exit fix ([#45](https://github.com/ChronoStriker1/vndegen/issues/45)).
-- Ponscripter ([#26](https://github.com/ChronoStriker1/vndegen/issues/26)): both Umineko Arcs run on `dev` for the next release. One font safety commit still needs its review.
+- Ponscripter ([#26](https://github.com/ChronoStriker1/vndegen/issues/26)): both Umineko Arcs run on `dev` for the next release..
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:

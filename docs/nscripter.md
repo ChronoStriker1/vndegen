@@ -287,6 +287,9 @@ default choice unchanged. The runtime does not read or write the PC engine's `en
   Without a textgosub, the PC engine's `\` waits without clearing the page, and its saves resume at the statement
   that saved; the runtime clears the page and keeps NScripter's savepoints there. The games always set one. With a
   textgosub, a save made before any text follows the statement that saves, where the PC engine keeps the script's start.
+- Ponscripter fonts are checked before use. A font with reversed `loca` entries, or a `cmap` subtable longer than its
+  table, is refused, where FreeType may accept it; none of 1,194 fonts tested does either. A glyph whose outline fills
+  its box can take about 0.5 s to draw at 1024 px, stb_truetype's own cost.
 - The backquoted English text of one release, and its `|` pauses, follow a reading of its script that no engine was
   available to check: the pause's length is a guess.
 - NSLua: the direct drawing functions (`NSD*`), splines and `NL_bind` aren't emulated; `NSOkBox` and `NSYesNoBox`
