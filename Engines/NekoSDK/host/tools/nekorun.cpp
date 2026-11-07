@@ -2,8 +2,8 @@
 // usage: nekorun <game folder> [--out dir] [--every n] [--click ms] [--max ms] [--dt ms] [--jump script node]
 //                [--shots ms,ms,...] [--wav file] [--period ms] [--choose index] [--press action]...
 //                [--slow ms] [--script file]: lines of `ms click x y`, `ms rclick x y`, `ms down x y`, `ms up x y`,
-//                `ms move x y`, `ms focus dx dy` (a controller's direction), `ms press action` or `ms shot name`, with x
-//                and y in canvas pixels
+//                `ms move x y`, `ms focus dx dy` (a controller's direction), `ms wheel notches`, `ms pause`, `ms resume`,
+//                `ms press action` or `ms shot name`, with x and y in canvas pixels
 // --period clicks on a fixed beat whatever the game is doing, as a recording of the PC game was driven.
 #include <algorithm>
 #include <chrono>
@@ -149,6 +149,10 @@ int main(int argc, char **argv) {
                 vnneko_step(e, 0);
                 const uint8_t *now = vnneko_frame(e, &w, &h, &changed);
                 writePng(out + "/" + s.name, now, w, h);
+            } else if (s.what == "wheel") {
+                vnneko_mouse_wheel(e, s.x);
+            } else if (s.what == "pause" || s.what == "resume") {
+                vnneko_set_paused(e, s.what == "pause");
             } else if (s.what == "focus") {
                 if (!vnneko_move_focus(e, s.x, s.y)) std::printf("focus %d %d: nothing to move to\n", s.x, s.y);
             } else {
