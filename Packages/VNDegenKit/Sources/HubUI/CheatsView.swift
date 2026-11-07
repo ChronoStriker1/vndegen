@@ -422,8 +422,9 @@ struct CheatsView: View {
                 }
                 .scrollIndicators(.hidden)
                 .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, height in listHeight = height }
-                // As tall as its rows, up to the room the card has, so the card fits its content.
-                .frame(height: min(listHeight ?? listRoom, listRoom))
+                // No taller than its rows, so a short list leaves no empty space in the card. A long one still shrinks
+                // to the room the card is given.
+                .frame(maxHeight: listHeight)
                 .onChange(of: page.focus.target) { _, target in
                     guard page.focus.showsFocus, let target else { return }
                     withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(target) }
@@ -439,12 +440,6 @@ struct CheatsView: View {
         // The card's padding around it varies with the screen, so it takes the width it is offered, up to a limit.
         .frame(maxWidth: 560)
         .task { await page.load() }
-    }
-
-    /// The list's room: the card's greatest height, less the header and tabs above it and a status line below.
-    private var listRoom: CGFloat {
-        let card = max(200, metrics.size.height - (metrics.isShort ? 60 : 90))
-        return max(120, card - (metrics.isShort ? 50 : 100) - (page.status == nil ? 0 : 48))
     }
 
     private var header: some View {
