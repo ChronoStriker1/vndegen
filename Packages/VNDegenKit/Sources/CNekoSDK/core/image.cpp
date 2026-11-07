@@ -191,13 +191,30 @@ Images::~Images() {
 
 static std::string blurKey(const std::string &key, int radius) { return radius > 0 ? key + "#" + std::to_string(radius) : key; }
 
+void Images::setArtSet(const std::string &patch) {
+    std::lock_guard<std::mutex> lock(mu_);
+    artSet_ = normalizedPath(patch);
+}
+
+std::string Images::sourceLocked(const std::string &path) const {
+    std::string key = normalizedPath(path);
+    if (artSet_.empty() || (key.rfind("cg\\", 0) != 0 && key.rfind("sc\\", 0) != 0)) return key;
+    std::string other = artSet_ + "\\" + key;
+    return files_.exists(other) ? other : key;
+}
+
+std::string Images::source(const std::string &path) {
+    std::lock_guard<std::mutex> lock(mu_);
+    return sourceLocked(path);
+}
+
 void Images::prefetch(const std::vector<std::pair<std::string, int>> &wanted) {
     {
         std::lock_guard<std::mutex> lock(mu_);
         queue_.clear();
         for (const auto &[path, radius] : wanted) {
-            std::string key = blurKey(normalizedPath(path), radius);
-            if (!byPath_.count(key) && key != decoding_) queue_.emplace_back(path, radius);
+            std::string from = sourceLocked(path), key = blurKey(from, radius);
+            if (!byPath_.count(key) && key != decoding_) queue_.emplace_back(from, radius);
         }
         if (!worker_.joinable()) worker_ = std::thread([this] { work(); });
     }
@@ -235,10 +252,10 @@ void Images::work() {
 }
 
 ImageRef Images::get(const std::string &path) {
-    std::string key = normalizedPath(path);
+    std::unique_lock<std::mutex> lock(mu_);
+    std::string key = sourceLocked(path);
     // An empty name would wait for ever: decoding_ is empty while the worker has nothing to do.
     if (key.empty()) return nullptr;
-    std::unique_lock<std::mutex> lock(mu_);
     done_.wait(lock, [&] { return decoding_ != key; });
     auto it = byPath_.find(key);
     if (it != byPath_.end()) {
@@ -246,14 +263,14 @@ ImageRef Images::get(const std::string &path) {
         return it->second->second;
     }
     lock.unlock();
-    ImageRef image = decode(path);
+    ImageRef image = decode(key);
     if (!image) return nullptr;
     lock.lock();
     return remember(key, image);
 }
 
 ImageRef Images::blurred(const std::string &path, int radius) {
-    std::string key = blurKey(normalizedPath(path), radius);
+    std::string key = blurKey(source(path), radius);
     {
         std::unique_lock<std::mutex> lock(mu_);
         done_.wait(lock, [&] { return decoding_ != key; });

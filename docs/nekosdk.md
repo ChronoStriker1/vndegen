@@ -36,16 +36,16 @@ A runtime would be written from scratch. The libraries it needs have permissive 
 | Test Game 83 | 1280x720 | No | |
 | Test Game 84 | 1280x720 | Yes | Loose `sc/*.pak` add-on archives |
 | Test Game 85 | 1280x720 | Yes | |
-| Test Game 86 | 1280x720 | No | `sys_3.pak` patch |
+| Test Game 86 | 1280x720 | No | `sys_3.pak` with blank stand-ins for its sprites |
 | Test Game 87 | 1280x720 | No | |
-| Test Game 88 | 1280x720 | Yes | `gt.pak` interactive text groups, loose `sys_1/scr` patch |
+| Test Game 88 | 1280x720 | Yes | `gt.pak` interactive text groups, loose `sys_1/scr` patch of new scripts |
 | Test Game 89 | 1280x720 | Yes | `init.ini` names its flows under other keys than `FirstFlow`. 31 ASF movies |
-| Test Game 90 | 1280x720 | No | Separate DLC folder, character and phase select screens |
+| Test Game 90 | 1280x720 | No | Separate DLC folder, character and phase select screens, `sys_2.pak` and `sys_3.pak` patches |
 | Test Game 91 | 1280x720 | Yes | `gt.pak` |
-| Test Game 92 | 1280x720 | Yes | `gt.pak`, 72 ASF movies, `sys_5` patch folder |
+| Test Game 92 | 1280x720 | Yes | `gt.pak`, 72 ASF movies, `sys_5` patch folder with archives of its own |
 | Test Game 93 | 1280x720 | Yes | `gt.pak` |
 | Test Game 94 | 1280x720 | Yes | `gt.pak`, 2 ASF movies, fan translation with broken string lengths (below) |
-| Test Game 95 | 1920x1080 | Yes | `sys_5.pak` patch |
+| Test Game 95 | 1920x1080 | Yes | `sys_5.pak` patch with a second set of CGs and sprites |
 | Test Game 96 | 1280x720 | No | Custom vote, comment and route-tree systems, 94 config files |
 | Test Game 97 | 1280x720 | Yes | Short, 7 scripts |
 
@@ -59,7 +59,18 @@ Every `.pak` is NEKOPACK4 mode `A`. GARbro's layout holds for all 16 games:
 - Each index record is a `u32` name length, a CP932 name with its NUL, then a `u32` offset and `u32` size, both XORed with the signed sum of the name bytes. A zero length ends the index.
 - An entry's first 4 bytes are XORed with a rolling key that starts at `size / 8 + 0x22` and shifts left 3 bits per byte. The entry is then a zlib stream, and its last 4 bytes give the unpacked size.
 
-A path like `bg\B300_000.bmp` names entry `B300_000.bmp` in `bg.pak`. Some archives store entries with folders, such as `cfg\gt_000_001_100.txt` in `gt.pak` or `cfg\msg_button.ini` in `sys_5.pak`. Patches come as `sys_N.pak` archives and `sys_N/` folders, which must take priority over the base archives. Scripts refer to files in a different case from the archive, so every lookup must ignore case.
+A path like `bg\B300_000.bmp` names entry `B300_000.bmp` in `bg.pak`. Some archives store entries with folders, such as `cfg\gt_000_001_100.txt` in `gt.pak` or `cfg\msg_button.ini` in `sys_5.pak`. Patches come as `sys_N.pak` archives and `sys_N/` folders, and a later patch outranks an earlier one. A folder holds loose files, archives such as `sys_5/obj.pak` for its `obj` files, or both. The games name a patch's files by the patch, as in `sys_2\voice\kur1_0116.ogg` or `sys_5\obj\c000_000.bmp`, and the runtime gives every patch file that name. A patch's files outside its art folders also take the place of the base file of the same path: The Alchemist's `sys_5\cfg\msg_button.ini` adds the art button to the message window that way. Its art, in `cg`, `sc`, `obj` and `parts`, the folders the PC engine maps to a patch's own, answers only to the patch's name, because it can be a second set under the base names:
+
+| Patch | Holds | Art |
+|---|---|---|
+| Test Game 86 `sys_3.pak` | Its sprites, each a 36-byte blank | A second set under the base names |
+| Test Game 88 `sys_1/` | 5 new scripts | None |
+| Test Game 90 `sys_2.pak` | A new cg_view.ini and play_view.ini, 50 new CG files, 60 obj files, 3 scripts and 592 voices, named `sys_2\…` | New names only |
+| Test Game 90 `sys_3.pak` | 8 new `j200` files outside any folder | New names only |
+| Test Game 92 `sys_5/` | Archives replacing 2 cfg files, 21 obj and 8 parts files, and 9 scripts, which also come loose | The exe asks for them as `sys_5\obj\…` |
+| Test Game 95 `sys_5.pak` | Masami Chie's original art, 129 CG files and 567 sprite files under the base names, 16 obj files identical to the base ones, and a msg_button.ini that adds the art button | A second set under the base names |
+
+Test Games 82 to 85, 87, 89, 93, 94, 96 and 97 have no patch, and Test Game 91 wasn't checked. The Alchemist starts on the base archives' art, Waffle's arrangement, as on the PC. Its message window's art button and Config's Change Illustration show the patch's set instead, and the PC keeps the choice at byte 80 of `cfg.sav`: 0 for the arrangement, 1 for the originals. Scripts refer to files in a different case from the archive, so every lookup must ignore case.
 
 ### Scripts
 

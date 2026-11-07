@@ -192,7 +192,7 @@ let package = Package(
         .testTarget(name: "EngineNScripterTests", dependencies: ["EngineNScripter", "CNScripter"], exclude: ["Fixtures"]),
         .testTarget(name: "EngineWolfRPGTests", dependencies: ["EngineWolfRPG"]),
         .testTarget(name: "EngineAliceSoftTests", dependencies: ["EngineAliceSoft"]),
-        .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK"]),
+        .testTarget(name: "EngineNekoSDKTests", dependencies: ["EngineNekoSDK", "CNekoSDK"]),
         .testTarget(name: "EngineUnityTests", dependencies: ["EngineUnity", "RegistryFile"]),
         .testTarget(name: "RegistryFileTests", dependencies: ["RegistryFile"], exclude: ["Fixtures"]),
         .testTarget(name: "FontPackTests", dependencies: ["FontPack"]),

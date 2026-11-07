@@ -1,5 +1,6 @@
 // A game's files as the scripts name them: `bg\B300_000.bmp` means entry `B300_000.bmp` of `bg.pak`, unless a patch
-// holds the same path. Lookups ignore case, because scripts and archives disagree on it, as Windows lets them.
+// holds the same path outside its art folders. A patch's files also answer to its own name, as in `sys_5\cg\x.bmp`.
+// Lookups ignore case, because scripts and archives disagree on it, as Windows lets them.
 #pragma once
 #include <cstdint>
 #include <memory>
@@ -18,6 +19,8 @@ public:
     // The file's bytes, or null when no archive or patch has it.
     Bytes read(const std::string &path) const;
     bool exists(const std::string &path) const;
+    // The size the archive stores for the file, or a loose file's size; -1 when no archive or patch has it.
+    int64_t storedSize(const std::string &path) const;
     // Paths under a folder, such as `flow`, for tools. Lower case.
     std::vector<std::string> list(const std::string &folder) const;
 
@@ -29,8 +32,10 @@ private:
         uint32_t offset = 0, size = 0;
     };
     void add(const std::string &path, Source source);
-    void indexArchive(const std::string &file, const std::string &folder, int priority);
-    void indexFolder(const std::string &dir, const std::string &prefix, int priority);
+    void addPatched(const std::string &patch, const std::string &path, const Source &source);
+    // `patch` is the patch's name, such as `sys_5`, for an archive or folder of a patch, and empty for the base archives.
+    void indexArchive(const std::string &file, const std::string &folder, int priority, const std::string &patch = {});
+    void indexFolder(const std::string &dir, const std::string &prefix, int priority, const std::string &patch);
     std::vector<std::string> archives_;
     std::unordered_map<std::string, Source> index_;
 };
