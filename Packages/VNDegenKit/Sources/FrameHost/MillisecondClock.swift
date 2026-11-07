@@ -9,12 +9,17 @@ nonisolated public struct MillisecondClock {
 
     public init() {}
 
-    /// The whole milliseconds since the last tick, or 16 on the first tick after a start or `reset()`. Callers cap the
-    /// step themselves; time above the cap is dropped, not carried.
+    /// The whole milliseconds since the last tick, or 16 on the first tick after a start or `reset()`. A timestamp
+    /// earlier than the last is a step of 0 and is otherwise ignored, so the time after it isn't counted twice. Callers
+    /// cap the step themselves; time above the cap is dropped, not carried.
     public mutating func tick(at timestamp: TimeInterval) -> Int {
-        defer { last = timestamp }
-        guard let last else { return 16 }
-        let elapsed = max((timestamp - last) * 1000, 0) + carry
+        guard let last else {
+            self.last = timestamp
+            return 16
+        }
+        guard timestamp >= last else { return 0 }
+        self.last = timestamp
+        let elapsed = (timestamp - last) * 1000 + carry
         let ms = elapsed.rounded(.down)
         carry = elapsed - ms
         return Int(ms)

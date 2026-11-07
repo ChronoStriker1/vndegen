@@ -10,10 +10,14 @@ namespace wolf {
 // runs no frame, the next runs two, and the picture stutters. So a step within a millisecond of the frame time, or of
 // a half, third or quarter of it, counts as exactly that. A display at a whole multiple of the game's rate then runs
 // one frame every one to four refreshes, as the PC engine does on its own display. Only those of 6 ms or more are
-// matched, which keeps them at least 2 ms apart, so a step never lies within a millisecond of two. Other steps, and
-// any on displays above about 170 Hz, count as they come.
+// matched, which keeps them at least 2 ms apart, so a step never lies within a millisecond of two.
+//
+// What matching sets aside is kept. At a whole multiple it stays within a millisecond either way, so it never comes
+// back. On a display that is near a multiple but not one, such as 110 Hz for a 60 fps game, it grows, and it goes back
+// into the game's time once it reaches 2 ms, so the game keeps its own rate there.
 struct FramePace {
     double elapsedMs = 0;
+    double setAsideMs = 0;  // the time matching has taken out of or added to the steps so far
 
     // How many frames to run for a step of `ms` at `speed` times the game's rate: at most `most`, and the rest of a
     // longer stall is dropped rather than caught up.
@@ -24,6 +28,11 @@ struct FramePace {
                 step = frameMs / part;
                 break;
             }
+        }
+        setAsideMs += ms - step;
+        if (std::abs(setAsideMs) >= 2) {
+            step += setAsideMs;
+            setAsideMs = 0;
         }
         elapsedMs += step * speed;
         // The tolerance absorbs rounding in sums of a third of a frame, which can fall a hair short of a whole one.

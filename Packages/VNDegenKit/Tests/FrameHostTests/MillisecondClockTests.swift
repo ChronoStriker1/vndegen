@@ -43,3 +43,12 @@ func stepsAddUpToTheRealTime(hertz: Double) {
     #expect(clock.tick(at: 110) == 16)
     #expect(clock.tick(at: 110.0105) == 10)
 }
+
+@Test func anEarlierTimestampIsIgnored() {
+    var clock = MillisecondClock()
+    _ = clock.tick(at: 1)
+    #expect(clock.tick(at: 1.015625) == 15)
+    #expect(clock.tick(at: 1.0078125) == 0)
+    // 31.25 ms in all since the first tick, 0.25 still carried.
+    #expect(clock.tick(at: 1.03125) == 16)
+}

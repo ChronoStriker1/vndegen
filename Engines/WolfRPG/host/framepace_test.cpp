@@ -61,11 +61,19 @@ void everyFourthRefreshFor30FpsAt120Hz() {
     }
 }
 
-// A display that isn't a multiple of the game's rate still runs the game at its own rate.
+// A display that isn't a multiple of the game's rate still runs the game at its own rate, including those near a
+// multiple, whose steps match a frame or half a frame most of the time, and with uneven timestamps.
 void otherRatesKeepTheGamesTime() {
-    for (double hertz : {240.0, 180.0, 144.0, 90.0, 75.0, 50.0}) {
-        int frames = total(run(hertz, 60, int(hertz * 10), 3.3));
-        assert(std::abs(frames - 600) <= 1);
+    for (double fps : {60.0, 30.0}) {
+        for (double hertz : {240.0, 180.0, 144.0, 125.0, 119.88, 115.0, 110.0, 100.0, 90.0, 75.0, 65.0, 59.94, 55.0, 50.0}) {
+            for (double jitter : {0.0, 0.4}) {
+                for (int speed : {1, 3}) {
+                    int frames = total(run(hertz, fps, int(hertz * 60), 3.3, jitter, speed));
+                    double expected = int(hertz * 60) / hertz * fps * speed;
+                    assert(std::abs(frames - expected) <= 1 + speed);
+                }
+            }
+        }
     }
 }
 
