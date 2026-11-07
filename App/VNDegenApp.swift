@@ -123,6 +123,10 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 
 @main
 struct VNDegenApp: App {
+    #if DEBUG
+    /// First, so a test run's settings are its own before anything below reads one.
+    private let testDefaults: Void = TestDefaults.isolate()
+    #endif
     #if os(iOS)
     @UIApplicationDelegateAdaptor(HubAppDelegate.self) private var appDelegate
     #else
@@ -163,6 +167,9 @@ struct VNDegenApp: App {
 
     private var root: some View {
         HubRootView(hub: hub)
+            #if os(macOS)
+            .background(WindowKeeper())
+            #endif
             .task {
                 #if os(macOS)
                 appDelegate.hub = hub
