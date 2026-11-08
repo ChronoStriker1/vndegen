@@ -310,18 +310,16 @@ button back obj\e004_000.bmp 1172 463 9 5 8 help obj\e005_000.bmp 948 666 1 9 0 
 screen config
 helplast
 selectedlook
-# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
-hover 581 342 730 414 obj\h004_000.bmp 350 669 9 7
-hover 410 198 565 270 obj\h004_000.bmp 350 669 9 4
-hover 50 198 210 270 obj\h004_000.bmp 350 669 9 2
-hover 210 198 370 270 obj\h004_000.bmp 350 669 9 3
-hover 50 85 565 126 obj\h004_000.bmp 350 669 9 0
-hover 770 342 930 414 obj\h004_004.bmp 350 669 2 0
-hover 930 342 1090 414 obj\h004_004.bmp 350 669 2 1
-hover 50 126 565 198 obj\h004_000.bmp 350 669 9 1
-hover 581 414 1090 630 obj\h004_000.bmp 350 669 9 8
-hover 581 85 1090 342 obj\h004_000.bmp 350 669 9 6
-hover 50 270 565 606 obj\h004_000.bmp 350 669 9 5
+# Help shown over each settings group, its edges found to the pixel under Wine by moving the pointer across them.
+hover 583 372 807 432 obj\h004_000.bmp 186 666 9 7
+hover 397 207 563 267 obj\h004_000.bmp 186 666 9 4
+hover 45 207 212 267 obj\h004_000.bmp 186 666 9 2
+hover 221 207 388 267 obj\h004_000.bmp 186 666 9 3
+hover 45 91 563 129 obj\h004_000.bmp 186 666 9 0
+hover 45 133 563 203 obj\h004_000.bmp 186 666 9 1
+hover 583 436 1101 657 obj\h004_000.bmp 186 666 9 8
+hover 583 91 1101 368 obj\h004_000.bmp 186 666 9 6
+hover 45 271 563 611 obj\h004_000.bmp 186 666 9 5
 pic obj\h000_000.bmp 0 0
 # The side panel and the frame, as on every menu (traced under Wine).
 pic obj\e003_000.bmp 1118 0
@@ -380,16 +378,16 @@ pic obj\h013_000.bmp 603 331 8 5 7 4
 screen config2
 helplast
 selectedlook
-# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
+# Help shown over each settings group, its edges found to the pixel under Wine by moving the pointer across them.
 # The count colour has no help on the PC.
-hover 581 85 810 150 obj\h004_002.bmp 33 669 5 0
-hover 810 85 1050 150 obj\h004_002.bmp 33 669 5 1
-hover 581 222 810 294 obj\h004_002.bmp 33 669 5 3
-hover 810 222 1050 294 obj\h004_002.bmp 33 669 5 4
-hover 50 85 565 150 obj\h004_001.bmp 380 669 3 0
-hover 581 150 1090 222 obj\h004_002.bmp 33 669 5 2
-hover 50 174 565 246 obj\h004_001.bmp 380 669 3 1
-hover 50 534 565 606 obj\h004_001.bmp 380 669 3 2
+hover 583 91 807 151 obj\h004_002.bmp 33 666 5 0
+hover 811 91 1035 151 obj\h004_002.bmp 33 666 5 1
+hover 583 229 807 289 obj\h004_002.bmp 33 666 5 3
+hover 811 229 1035 289 obj\h004_002.bmp 33 666 5 4
+hover 45 91 563 165 obj\h004_001.bmp 186 666 3 0
+hover 583 155 1101 225 obj\h004_002.bmp 33 666 5 2
+hover 45 169 563 246 obj\h004_001.bmp 186 666 3 1
+hover 45 536 563 610 obj\h004_001.bmp 186 666 3 2
 pic obj\h000_000.bmp 0 0
 # The side panel and the frame, as on every menu (traced under Wine).
 pic obj\e003_000.bmp 1118 0
@@ -445,14 +443,15 @@ step waittime 1 obj\h010_000.bmp 469 575 2 5 1
 screen config3
 helplast
 selectedlook
-# Help for each settings group, mapped on a grid of points under Wine, edges within 20 pixels.
-hover 581 85 810 150 obj\h004_003.bmp 372 669 8 6
-hover 50 85 565 150 obj\h004_003.bmp 372 669 8 0
-hover 50 174 565 246 obj\h004_003.bmp 372 669 8 1
-hover 50 390 565 462 obj\h004_003.bmp 372 669 8 4
-hover 50 486 565 558 obj\h004_003.bmp 372 669 8 5
-hover 50 246 565 390 obj\h004_003.bmp 372 669 8 2
-hover 581 150 1090 630 obj\h004_003.bmp 372 669 8 7
+# Help shown over each settings group, its edges found to the pixel under Wine by moving the pointer across them.
+hover 583 91 807 151 obj\h004_003.bmp 372 666 9 7
+hover 45 91 563 165 obj\h004_003.bmp 372 666 9 0
+hover 45 169 563 243 obj\h004_003.bmp 372 666 9 1
+hover 45 403 563 477 obj\h004_003.bmp 372 666 9 4
+hover 45 481 563 555 obj\h004_003.bmp 372 666 9 5
+hover 45 247 563 321 obj\h004_003.bmp 372 666 9 2
+hover 45 325 563 399 obj\h004_003.bmp 372 666 9 3
+hover 583 155 1101 533 obj\h004_003.bmp 372 666 9 8
 pic obj\h000_000.bmp 0 0
 # The side panel and the frame, as on every menu (traced under Wine).
 pic obj\e003_000.bmp 1118 0

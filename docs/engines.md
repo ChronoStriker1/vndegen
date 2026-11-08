@@ -154,7 +154,7 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - The film noise over flashbacks, such as The Alchemist's, is drawn as the games' exe draws it, and a PC save made during it loads. A repeating animation saved while it runs plays out once after a load.
 - The titles' Version info shows the PC's message box with the same text; its bonus lines are the ones the PC shows for the copy measured, since which installed parts each needs isn't known. Manual opens the game's own manual in a web view inside the app, which loads only that manual's folder and nothing from the network. Test Games 88, 92, 93 and 94's web survey asks before opening Waffle's page in the system browser (94's copy has no page named, and opens nothing, as on its PC), and a web link in a manual asks the same; neither ever opens from tests or debug hooks.
 - A repeat of one replay's H choice has two options by assumption.
-- Menu backgrounds that change on the PC stay the same here. Help that comes up on hover over Config's settings groups starts and ends where the PC's does, measured to the pixel, except in Test Game 94, whose areas follow the PC's to within 20 pixels: under Wine that game no longer opens a window. Test Game 88's Config is missing the dark band the PC draws across its bottom.
+- Menu backgrounds that change on the PC stay the same here. Help that comes up on hover over Config's settings groups starts and ends where the PC's does, measured to the pixel. Test Game 88's Config is missing the dark band the PC draws across its bottom.
 
 [nekosdk-cleanroom.md](nekosdk-cleanroom.md) has where the runtime's knowledge came from and the save format.
 
