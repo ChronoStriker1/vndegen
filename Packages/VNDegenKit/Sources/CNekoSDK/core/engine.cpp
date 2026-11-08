@@ -1834,6 +1834,28 @@ void Engine::composeSettingsWidgets(Canvas &out) {
     }
     for (auto [it, end] = lines("number"); it != end; ++it) {
         const auto &f = it->second;
+        // `number NAME text RIGHT BASELINE SIZE STEP R G B OR OG OB`: the value as text in face 0 (MS Gothic's stand-in), its
+        // digits STEP apart and the last one's cell ending at RIGHT, with no leading zeros and a one-pixel outline, as Test
+        // Game 82's Config draws its numbers, from no picture.
+        if (f.size() >= 12 && f[1] == "text") {
+            std::string digits = std::to_string(setting(f[0]));
+            int size = field(f, 4), step = field(f, 5), left = field(f, 2) - step * int(digits.size()), baseline = field(f, 3);
+            for (int pass = 0; pass < 2; pass++)
+                for (size_t i = 0; i < digits.size(); i++) {
+                    GlyphImage g;
+                    if (!glyph(0, uint32_t(digits[i]), size, false, g) || g.w <= 0 || g.h <= 0) continue;
+                    // Each digit sits in the middle of its step, as the PC's wider spacing leaves it.
+                    int x = left + int(i) * step + (step - g.advance) / 2 + g.left, y = baseline - g.top;
+                    if (pass == 0) {
+                        for (int dy = -1; dy <= 1; dy++)
+                            for (int dx = -1; dx <= 1; dx++)
+                                if (dx || dy) drawCoverage(out, g.coverage.data(), g.w, g.h, x + dx, y + dy, field(f, 9), field(f, 10), field(f, 11), 256);
+                    } else {
+                        drawCoverage(out, g.coverage.data(), g.w, g.h, x, y, field(f, 6), field(f, 7), field(f, 8), 256);
+                    }
+                }
+            continue;
+        }
         ImageRef digits = f.size() >= 4 ? images_->get(f[1]) : nullptr;
         if (!digits) continue;
         // A STEP spaces the digits apart, and X2 X3 place the second and third, as round the point a panel prints in a wait
