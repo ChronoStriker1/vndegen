@@ -163,9 +163,11 @@ private:
         bool exists = false;
         int date[6] = {};
         ImageRef thumbnail;
+        std::string comment;  // typed on a PC, UTF-8
     };
     SlotInfo &slotInfo(int slot);
     void composeSlots(Canvas &out);
+    void drawComment(Canvas &out, const std::string &utf8, int x, int baseline, int width, int px);
     int slotAt(int x, int y) const;
     void composeDialog(Canvas &out);
     void openDialog(int question, const std::function<void()> &yes);

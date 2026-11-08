@@ -146,7 +146,7 @@ A NekoSDK game keeps its menus in its `.exe`, so VNDegen rebuilds them from a ta
 - Unlocked pictures and music are read from and written to the PC's `cfg.sav`, so they move with a backup. Unlocked scenes don't move with a PC backup yet: the Scene gallery shows only those played in VNDegen (#46). The PC's Config settings don't: VNDegen keeps its own.
 - Config changes text speed, auto speed, what the right button does, the confirmation questions, volumes, Individual Voices, and the music screen's volume, and in The Alchemist the window's opacity and the art, Waffle's arrangement or Masami Chie's originals, which the message window's button also switches. Options that have no meaning here or aren't built, such as resolution, effects and read-only skip, are shown as disabled. Config's moving preview picture is still.
 - The CG viewer's Scene button is enabled only once that scene has played in VNDegen (#46).
-- A card's lock and the NEW mark on the card saved to last work as on the PC and are kept in `cfg.sav`, so they move with a backup. A card's comment, typed on a PC, no longer stops its save from loading, but it isn't shown and can't be typed here.
+- A card's lock and the NEW mark on the card saved to last work as on the PC and are kept in `cfg.sav`, so they move with a backup. A card's comment typed on a PC shows on its card, but a comment can't be typed here yet.
 - The noise effect some scenes of The Alchemist ask for isn't drawn. A repeating animation saved while it runs plays out once after a load.
 - Yarinaoshi no Christmas's Manual and Version info buttons aren't there.
 - Menu backgrounds that change on the PC stay the same here, and a confirmation's "Do not show again" box isn't there.

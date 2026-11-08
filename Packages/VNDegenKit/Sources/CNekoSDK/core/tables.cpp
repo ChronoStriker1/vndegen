@@ -35,6 +35,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
+slotcomment 189 114 327 13
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -75,6 +76,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
+slotcomment 189 114 327 13
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -457,6 +459,7 @@ datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
 slotnew obj\e012_000.bmp -6 -6
+slotcomment 278 157 452 21
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -496,6 +499,7 @@ datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
 slotnew obj\e012_000.bmp -6 -6
+slotcomment 278 157 452 21
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0

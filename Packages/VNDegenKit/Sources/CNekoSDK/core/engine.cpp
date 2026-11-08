@@ -1230,6 +1230,7 @@ Engine::SlotInfo &Engine::slotInfo(int slot) {
     if (plain.empty() || !parseSave(plain, *layout_, data)) return info;
     info.exists = true;
     std::copy(std::begin(data.date), std::end(data.date), info.date);
+    info.comment = sjis::toUtf8(data.comment);
     auto bmp = readWhole(savePath(slot, "bmp"));
     if (!bmp.empty()) info.thumbnail = decodeBmpBytes(bmp);
     return info;
@@ -1590,6 +1591,9 @@ void Engine::composeSlots(Canvas &out) {
             // `slotnew SHEET X Y`: the card saved to last.
             if (ImageRef mark = picture("slotnew"); mark && slot == newest && info.exists)
                 drawPart(out, *mark, cx + offset("slotnew", 1), cy + offset("slotnew", 2), 0, 0, mark->w, mark->h, 1);
+            // `slotcomment X BASELINE WIDTH SIZE`: a comment typed on a PC, in white on the card's bar, cut off at its width.
+            if (const auto *line = screen_->setting("slotcomment"); line && line->size() >= 4 && !info.comment.empty())
+                drawComment(out, info.comment, cx + field(*line, 0), cy + field(*line, 1), field(*line, 2), field(*line, 3));
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m) {
                 if (!m) return;
@@ -3074,6 +3078,22 @@ void Engine::drawGlyph(Canvas &out, const Glyph &g, int pass, int alpha, int r, 
                 if (dx * dx + dy * dy <= frame * frame + 1) drawCoverage(out, coverage, w, image.h, x + dx, y + dy, fr, fg, fb, alpha);
     } else {
         drawCoverage(out, coverage, w, image.h, x, y, r, gr, b, alpha);
+    }
+}
+
+void Engine::drawComment(Canvas &out, const std::string &utf8, int x, int baseline, int width, int px) {
+    int pen = x;
+    for (size_t i = 0; i < utf8.size();) {
+        unsigned char c = static_cast<unsigned char>(utf8[i]);
+        int extra = c < 0x80 ? 0 : c < 0xE0 ? 1 : c < 0xF0 ? 2 : 3;
+        uint32_t cp = extra == 0 ? c : extra == 1 ? c & 0x1F : extra == 2 ? c & 0x0F : c & 0x07;
+        for (int k = 1; k <= extra && i + k < utf8.size(); k++) cp = cp << 6 | (static_cast<unsigned char>(utf8[i + k]) & 0x3F);
+        i += size_t(extra) + 1;
+        GlyphImage g;
+        if (!glyph(fontFace_, cp, px, false, g)) continue;
+        if (pen + g.advance > x + width) break;
+        if (g.w > 0 && g.h > 0) drawCoverage(out, g.coverage.data(), g.w, g.h, pen + g.left, baseline - g.top, 255, 255, 255, 256);
+        pen += g.advance;
     }
 }
 
