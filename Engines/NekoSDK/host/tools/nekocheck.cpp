@@ -12,6 +12,7 @@
 #include "engine.h"
 #include "script.h"
 #include "sjis.h"
+#include "tables.h"
 
 using namespace neko;
 
@@ -79,9 +80,12 @@ void compare(const Node &n, const char *key, int value, Totals &t, const std::st
 
 // Whether any other file of the game's flows, scenes, settings or GOOD Timing lists names this scene script. Test Game
 // 93 carries untranslated scenes nothing names, whose lines are longer than the screen; the game never plays them.
-bool named(const Files &files, const std::string &path) {
+// A script is named by another of the game's scripts or files, or, in the games that keep their story in the exe, by a
+// line of the game's table, its story table's `scene` lines.
+bool named(const Files &files, const std::string &path, const std::string &key) {
     std::string name = path.substr(path.rfind('\\') + 1);
     name = name.substr(0, name.rfind('.'));
+    if (const char *table = menuTable(key); table && std::string(table).find(sjis::toUtf8(name)) != std::string::npos) return true;
     for (const char *folder : {"flow", "scr", "cfg", "gt"})
         for (const std::string &other : files.list(folder)) {
             if (other == path) continue;
@@ -105,7 +109,7 @@ void checkMessages(const char *root, const Files &files, const std::string &key,
         Script script;
         if (!data || !parseScript(data->data(), data->size(), script)) continue;
         // A script nothing names is laid out and reported, but doesn't fail the check.
-        bool isNamed = named(files, path);
+        bool isNamed = named(files, path, key);
         if (!isNamed) t.unnamed++;
         for (const Node &n : script.nodes) {
             if (n.opcode != 5) continue;
