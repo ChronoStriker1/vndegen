@@ -35,6 +35,10 @@ struct SaveLayout {
     // other way round (set 1, under Wine). Test Games 82 and 83 name it in the newer place.
     bool choiceInFirstPlace = false;
     ChoiceFlag choiceFlag = ChoiceFlag::Picture;
+    // The number global 0 gives the first card, the one NEW marks after a save to it: 1 in Test Game 94 and The Alchemist,
+    // whose cfg.sav held 2 and 1 for their second and first cards, and 0 in Test Game 87, which held 2 after a save to
+    // its third and crashed opening a Load page whose global 0 was one past its last card (set 1, under Wine).
+    int firstCard = 1;
 };
 
 namespace {
@@ -86,6 +90,7 @@ const SaveLayout kSideboob2 = [] {
     SaveLayout l = older(39, 33, {{5, "64"}}, 5779, {{903, "3c"}}, 183);
     l.choiceInFirstPlace = true;
     l.choiceFlag = ChoiceFlag::Made;
+    l.firstCard = 0;
     return l;
 }();
 
@@ -272,6 +277,8 @@ bool namesPictureTwice(const SaveLayout &layout) {
 }
 
 ChoiceFlag choiceFlag(const SaveLayout &layout) { return layout.choiceFlag; }
+int newCardNumber(const SaveLayout *layout, int slot) { return slot - 1 + (layout ? layout->firstCard : 1); }
+int newCardSlot(const SaveLayout *layout, int number) { return number + 1 - (layout ? layout->firstCard : 1); }
 
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out) {
     if (plain.size() < 100000) return false;
