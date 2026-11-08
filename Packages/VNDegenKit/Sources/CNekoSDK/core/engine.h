@@ -377,6 +377,46 @@ private:
     // Each heroine's chosen outfit, as its place in her list, and whether the story wears it, kept in cfg.sav as the PC does.
     std::vector<int> spriteOutfit_, spriteLocked_;
     std::string lockedSprite(const std::string &path) const;
+    // The sprite gallery's screen (sprites.cpp): what's shown, and its music.
+    struct SpriteGallery {
+        bool explaining = true, music = true, blur = false, pinned = false, panelsHidden = false;
+        int heroine = 0, background = 0, zoom = 100, list = -1, listScroll = 0;
+        std::vector<int> face, pose;
+        int64_t restingSince = 0, slideSince = -1000000;
+    } sprite_;
+    int spriteMusic_ = 0;
+    bool spriteScreen() const;
+    void openSprites();
+    void closeSprites();
+    void playSpriteMusic();
+    bool spriteAvailable(const std::string &thumbnail) const;
+    std::vector<int> spriteChoices(int picker) const;
+    int &spriteChoice(int picker);
+    int spriteChoice(int picker) const { return const_cast<Engine *>(this)->spriteChoice(picker); }
+    void stepSpriteChoice(int picker, int direction);
+    std::string spriteThumbnail(int picker, int index) const;
+    std::string spriteFigure() const;
+    std::string spriteBackground() const;
+    bool spritePanelsShown() const;
+    float spriteSlide() const;
+    std::pair<std::string, int> spriteControlAt(int x, int y) const;
+    void pressSprites(int x, int y);
+    void stepSprites();
+    void spritePointerMoved();
+    void composeSprites(Canvas &out);
+    void composeSpriteList(Canvas &out);
+    void pressSpriteList(int x, int y);
+    struct SpriteListEntry {
+        int index = 0;      // its place in sc_view.ini's list
+        bool shown = true;  // false for a bonus the copy has only the name of
+    };
+    std::vector<SpriteListEntry> spriteListEntries(int picker) const;
+    std::string spriteListFigure(int picker, int index) const;
+    std::pair<int, int> spriteListPlace(int position) const;
+    int spriteListRows() const;
+    int spriteListAt(int x, int y, bool *onCheck = nullptr) const;
+    // Figures tinted as the lists light them, by file and row.
+    std::map<std::string, ImageRef> spriteTinted_;
     std::unordered_map<std::string, bool> seen_;
     // The text read, by script and node id, for Config's read-only skip.
     std::unordered_map<std::string, std::set<int>> readNodes_;

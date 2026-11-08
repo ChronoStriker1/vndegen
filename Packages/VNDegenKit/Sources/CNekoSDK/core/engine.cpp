@@ -311,7 +311,10 @@ void Engine::openScreen(const std::string &name) {
     if (fromStory) returnTo_.clear();
     else if (screen_ && screen_->name == "title") returnTo_ = "title";
     else if (name == "title") returnTo_.clear();
+    // Leaving the sprite gallery keeps its outfits and locks in cfg.sav and stops its music.
+    if (spriteScreen() && name != "sprites") closeSprites();
     screen_ = &it->second;
+    if (spriteScreen()) openSprites();
     pressed_.clear();
     dirty_ = true;
     page_ = 0;
@@ -344,6 +347,7 @@ void Engine::openScreen(const std::string &name) {
 }
 
 void Engine::closeScreen() {
+    if (spriteScreen()) closeSprites();
     screen_ = nullptr;
     dirty_ = true;
 }
@@ -719,6 +723,7 @@ void Engine::runAction(const std::string &action) {
     if (action == "nav_scene" || action == "scene") { go("scene"); return; }
     if ((action == "nav_anime" || action == "anime") && screens_.count("anime")) { go("anime"); return; }
     if (action == "nav_music" || action == "music") { go("music"); return; }
+    if ((action == "nav_sprites" || action == "sprites") && screens_.count("sprites")) { go("sprites"); return; }
     if (action == "nav_title") { runAction("Title"); return; }
     if (action == "nav_quit") { runAction("quit"); return; }
     warnOnce("Button not built yet: " + action);
@@ -1304,7 +1309,7 @@ int Engine::nextTrack(int direction) {
 // The title's and the story's music wait while the session is paused or the music screen or CG viewer plays its own,
 // and the viewer's waits while the session is paused.
 void Engine::holdMusic() {
-    bool hold = paused_ || trackPlayer_ || viewMusic_;
+    bool hold = paused_ || trackPlayer_ || viewMusic_ || spriteMusic_;
     if (titleMusic_) audio_.pause(titleMusic_, hold);
     for (auto &[channel, player] : bgm_) audio_.pause(player, hold);
     if (viewMusic_) audio_.pause(viewMusic_, paused_);
@@ -2893,6 +2898,11 @@ bool Engine::composeTitleOpening(Canvas &out) {
 
 void Engine::composeScreen(Canvas &out) {
     if (composeTitleOpening(out)) return;
+    if (spriteScreen()) {
+        composeSprites(out);
+        if (dialogOpen_) composeDialog(out);
+        return;
+    }
     out.clear();
     // `over SCREEN DIM`: a panel such as Test Game 84's Individual Voices draws on that screen, darkened by DIM of 256,
     // whose own buttons don't light up under the pointer.
@@ -3625,6 +3635,7 @@ bool Engine::step(int ms) {
     }
     if (screen_) {
         screenMs_ += ms;
+        stepSprites();
         if (openingFrom_ >= 0 || screen_->settings.count("drift") || screen_->setting("menustages")) dirty_ = true;
         // A gallery's character coming up after its tab opens.
         if (screenMs_ - galleryTabAt_ < 400) dirty_ = true;
@@ -3722,10 +3733,12 @@ void Engine::mouseMove(float x, float y) {
     mouseY_ = y;
     mouseMoved_ = true;
     int px = int(x * float(width_)), py = int(y * float(height_));
-    if (px != pointerX_ || py != pointerY_ || !pointerSeen_) dirty_ = true;
+    bool moved = px != pointerX_ || py != pointerY_;
+    if (moved || !pointerSeen_) dirty_ = true;
     pointerX_ = px;
     pointerY_ = py;
     pointerSeen_ = true;
+    if (spriteScreen() && moved) spritePointerMoved();
     if (leftHeld_ && screen_ && !dialogOpen_ && !logOpen_) {
         if (viewingImage_ && viewerPanel()) dragViewerSlider(px, py);
         else pressSettingsWidget(px, py, true);
@@ -3811,6 +3824,10 @@ void Engine::mouseButton(int button, bool down) {
     if (screen_) {
         if (viewingImage_ && viewerPanel()) {
             pressViewer(pointerX_, pointerY_);
+            return;
+        }
+        if (spriteScreen()) {
+            pressSprites(pointerX_, pointerY_);
             return;
         }
         // A title with menu stages brings up its menu at the first click anywhere.

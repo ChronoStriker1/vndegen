@@ -957,7 +957,7 @@ pic obj\d000_000.bmp 0 -128
 pic obj\d002_000.bmp 0 558
 pic obj\d001_000.bmp 42 2
 button versioninfo obj\d004_000.bmp 1122 7 1 5 0 help obj\d005_000.bmp 0 686 1 12 0 11
-pic obj\d003_000.bmp 174 638 11 5 6 0
+button sprites obj\d003_000.bmp 174 638 11 5 6 help obj\d005_000.bmp 0 686 1 12 0 6
 # The manual and the web survey open in a browser on the PC; here the manual opens in the app and the survey only after
 # asking.
 button manual obj\d003_000.bmp 532 638 11 5 8 help obj\d005_000.bmp 0 686 1 12 0 8
@@ -1002,7 +1002,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1039,7 +1039,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1097,7 +1097,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1139,7 +1139,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1178,7 +1178,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1210,7 +1210,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1272,7 +1272,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1333,7 +1333,7 @@ button nav_load obj\e004_000.bmp 1152 135 10 5 1
 button nav_cg obj\e004_000.bmp 1152 177 10 5 2
 button nav_scene obj\e004_000.bmp 1152 219 10 5 3
 button nav_music obj\e004_000.bmp 1152 261 10 5 4
-pic obj\e004_000.bmp 1152 303 10 5 5 0
+button nav_sprites obj\e004_000.bmp 1152 303 10 5 5
 button nav_config obj\e004_000.bmp 1152 345 10 5 6
 button nav_title obj\e004_000.bmp 1152 387 10 5 7
 button nav_quit obj\e004_000.bmp 1152 471 10 5 8
@@ -1403,6 +1403,82 @@ button noask obj\i001_000.bmp 498 444 1 5 0
 
 screen gt
 gtcount obj\l005_000.bmp 1147 607 obj\l007_000.bmp 1173 616 obj\l007_001.bmp 1156 616
+
+screen sprites
+# The sprite gallery (立ち絵鑑賞), measured under Wine: an explanation page, then the heroine (her story sprite in the
+# chosen outfit, pose and face) over a background, sharp or blurred, moving up and down with the pointer, the panels and
+# the picker bar, which slide away 3 seconds after they appear or a click changes something unless pinned, and the list
+# each thumbnail opens.
+spriteexplain obj\d999_000.bmp
+spritemusic bgm\bgm10.ogg
+spriteresting 3000
+spritefigure 640
+spritepanel obj\p001_000.bmp 0 26
+spritename obj\p001_001.bmp 28 95
+spriteradio lock obj\p002_000.bmp 115 206 273
+spriteradio music obj\p002_000.bmp 115 206 321
+spriteradio blur obj\p002_001.bmp 115 206 370
+spritezoom obj\p003_000.bmp 140 180 220 421
+spritezoomdigits obj\p003_001.bmp 46 70 85 427
+spritehint obj\p004_000.bmp 901 407
+spritepin obj\p006_000.bmp 1200 503
+spritebar obj\p005_000.bmp 0 537
+spritearrows obj\p007_000.bmp 76 255 630 241
+spritethumbs 112 594 241
+spriteheroines obj\sc\chara_001_002_000_000_000.bmp obj\sc\chara_002_003_000_000_000.bmp obj\sc\chara_000_002_000_000_000.bmp
+spritelabel 0 obj\p012_000.bmp 122 689 12
+spritelabel 1 obj\p011_000.bmp 373 689 1
+spritenumber 1 obj\p010_001.bmp 689 431 447
+spritelabel 2 obj\p010_000.bmp 578 689 1
+spritenumber 2 obj\p010_001.bmp 689 690 706 722
+spritelabel 3 obj\p009_000.bmp 855 689 3
+spritelabel 4 obj\p008_000.bmp 1096 689 3
+spritehelp lock obj\p001_002.bmp 50 177 3
+spritehelp music obj\p001_003.bmp 50 246
+spritehelp blur obj\p001_004.bmp 50 295
+# The lists, each its own window: backgrounds, faces and outfits as tiles lit red when chosen and blue under the
+# pointer; outfits with a box, a number and a name, two rows at a time with a scroll bar, and the chosen one large;
+# poses and heroines as figures, the chosen lit red, the one under the pointer blue and the others dimmed.
+spritelistclose obj\p015_000.bmp 1150 22
+spritelistframe 0 obj\p025_000.bmp 83 15
+spritelist 0 4 0 158 118 245 178
+spritelisttile 0 thumb_
+spritelistlit 0 obj\p027_000.bmp
+spritelistlabel 0 obj\p026_000.bmp 0 128 12
+spritelistframe 1 obj\p022_000.bmp 83 15
+spritelist 1 5 0 176 64 185 211
+spritelisttile 1 thumb_
+spritelistlit 1 obj\p024_000.bmp
+spritelistpicture 1 obj\p023_000.bmp 30 146
+spritelistnumber 1 obj\p023_001.bmp 146 88 104
+spritelistframe 2 obj\p017_000.bmp 83 15
+spritelist 2 4 2 162 62 160 316
+spritelisttile 2 thumb_
+spritelistlit 2 obj\p021_007.bmp
+spritelistpicture 2 obj\p021_000.bmp 0 0
+spritelistnumber 2 obj\p021_002.bmp 215 104 116 128
+spritelistcheck 2 obj\p021_001.bmp 0 0
+spritelistlabel 2 obj\p021_005.bmp 19 249 11 0
+spritelistlabel 2 obj\p021_004.bmp 19 249 11 1
+spritelistlabel 2 obj\p021_003.bmp 19 249 9 2
+spritelistpreview 2 preview_ 810 37
+spritelistpreviewlabel 2 obj\p020_002.bmp 924 638 11 0
+spritelistpreviewlabel 2 obj\p020_001.bmp 924 638 11 1
+spritelistpreviewlabel 2 obj\p020_000.bmp 924 638 9 2
+spritelistpreviewnumber 2 obj\p010_001.bmp 603 1054 1073 1092
+spritelistscroll 2 obj\p018_000.bmp 114 108 20 518 150
+spritelistarrows 2 obj\p019_000.bmp 114 64 86 628 650
+spritelistframe 3 obj\p016_000.bmp 83 15
+spritelistfigure 3 30 0.8 339 677 1037
+spritelisttint 3 106,106,106 199,245,250 166,106,106
+spritelistfade 3 obj\p015_001.bmp 105 492
+spritelistplace 3 obj\p016_001.bmp 148,609 546,621 902,621
+spritelistframe 4 obj\p014_000.bmp 83 15
+spritelistfigure 4 30 0.8 339 677 1037
+spritelisttint 4 106,106,106 199,245,250 166,106,106
+spritelistfade 4 obj\p015_001.bmp 105 492
+spritelistplace 4 obj\p015_002.bmp 148,609 546,621 902,621
+button back obj\p000_000.bmp 1209 12 1 5 0
 
 screen defaults
 # Version info, the PC's message box, as it shows for the copy measured under Wine; which installed parts each bonus

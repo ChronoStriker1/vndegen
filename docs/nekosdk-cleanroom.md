@@ -235,6 +235,25 @@ it: the outfit field is replaced and the pose, size and face kept. Each heroine 
 PC keeps in `cfg.sav`: the outfit's place in her list at 1212, 1216 and 1220, and the lock at 1224, 1228 and 1232
 (a quit after locking Akiho's third outfit and Ai's fifth wrote 2, 4, 1, 1; global 65 was set with them).
 
+The viewer itself was measured against the PC's frames under Wine, its pieces placed to the pixel. The figure is
+centred and, taller than the screen, moves with the pointer: its top is -(height - 720) x pointer y / 720, at any zoom,
+which fits shots at five pointer heights and at x1.10. The panel, the picker bar with the pin, the hint and 終了 slide
+off the screen, each by its own size, together in about 0.3 s, starting about 3 s after the panels last appeared (the
+explanation or a list closing, or a click bringing them back) or a click changed something; a click on nothing, on the
+side already chosen or the pointer moving doesn't keep them, and a move doesn't bring them back. A chosen radio stays
+red under the pointer. Each radio's help bubble shows over either side, not the icon.
+
+Each thumbnail opens its own window (`p025`, `p022`, `p017`, `p016`, `p014` for backgrounds, faces, outfits, poses and
+heroines). Backgrounds, faces and outfits are tiles, the `thumb_` file beside each thumbnail, lit by a five-row sheet:
+red when chosen, blue under the pointer. Outfits show a box ticked on the chosen one, a number and a name per heroine,
+two rows at a time with a scroll bar, and the chosen one large (`preview_`); the box chooses as the tile does and
+doesn't set the lock. Poses and heroines are the heroine's own sprites at 0.8, each centred unscaled on its column and
+scaled from her top left, multiplied by 166,106,106 when chosen, 199,245,250 under the pointer and 106,106,106
+otherwise (a per-channel fit against the sprites, to within a few levels); a click goes to the nearest column. A click
+on an entry chooses it and leaves the list open; the × or a click outside the window closes it. A bonus whose patch
+folder is there without its pictures (`sys_1`) is listed by name alone and can't be chosen; one whose folder isn't
+(`sys_2`) isn't listed, and numbers count only what's listed.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on
