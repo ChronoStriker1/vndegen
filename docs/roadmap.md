@@ -74,6 +74,7 @@ Agreed with the maintainer on 2026-10-25. Engine order comes from `docs/engine-s
 - The Alchemist's text in Open Sans at the PC's spacing, and Yarinaoshi no Christmas's comments and log placed as on the PC (0.26.4).
 - Yarinaoshi no Christmas's text at the PC's size, and The Alchemist's text 3 px lower (0.26.5).
 - NekoSDK stage 3: Funbag Fantasy 3 if, Funbag Fantasy 4, Haha Sannin to Ana Asobi, Horny Elves and a Moral Orc, Ore o Hoshigaru Tsuma to Gibo and Test Games 92 and 94, with movies, PC read marks both ways, save locks and comments (0.27.0).
+- NekoSDK saves that move to a PC with their pictures (#68), animations that go on after a load, The Alchemist's film noise, the GOOD Timing heart, and Config hover help placed to the pixel (0.27.1).
 
 ## Bugs to fix
 New bugs get a GitHub issue and a line here.
@@ -84,7 +85,6 @@ New bugs get a GitHub issue and a line here.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
 - [#67](https://github.com/ChronoStriker1/vndegen/issues/67) `build.sh test` can exit 1 without showing which Swift test failed.
-- [#68](https://github.com/ChronoStriker1/vndegen/issues/68) NekoSDK: saves VNDegen writes load on the PC without their pictures (fixed on `feat/nekosdk-stage3`).
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
