@@ -283,12 +283,16 @@ button nav_quit obj\e004_000.bmp 1152 471 10 5 8
 button back obj\e004_000.bmp 1152 513 10 5 9
 radio screen 0 obj\h006_000.bmp 172 93 2 5 0
 radio screen 1 obj\h006_000.bmp 294 93 2 5 1
-pic obj\h007_000.bmp 172 133 6 5 0 4
-pic obj\h007_000.bmp 294 133 6 5 1 4
-pic obj\h007_000.bmp 416 133 6 5 2 4
-pic obj\h007_000.bmp 172 165 6 5 3 4
-pic obj\h007_000.bmp 294 165 6 5 4 4
-pic obj\h007_000.bmp 416 165 6 5 5 4
+# The window sizes, 1280x720, 1024x576 and 800x450, then 1280x960, 1024x768 and 800x600: here they pick the frame's shape,
+# 16:9 or 4:3, which the view is scaled to fit. None chosen is automatic, the shape nearer the view's; choosing the one
+# already chosen goes back to it.
+radio screensize 1 obj\h007_000.bmp 172 133 6 5 0
+radio screensize 2 obj\h007_000.bmp 294 133 6 5 1
+radio screensize 3 obj\h007_000.bmp 416 133 6 5 2
+radio screensize 4 obj\h007_000.bmp 172 165 6 5 3
+radio screensize 5 obj\h007_000.bmp 294 165 6 5 4
+radio screensize 6 obj\h007_000.bmp 416 165 6 5 5
+radiooff screensize
 radio effect 1 obj\h008_000.bmp 50 229 2 5 0
 radio effect 0 obj\h008_000.bmp 131 229 2 5 1
 radio wait 1 obj\h008_000.bmp 226 229 2 5 0

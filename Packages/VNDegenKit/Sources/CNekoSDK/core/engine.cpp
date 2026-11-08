@@ -195,6 +195,11 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
     height_ = std::max(config_.number("WindowHeight", 720), windowImage_ ? std::min(windowY_ + windowImage_->h, width_ * 9 / 16) : 0);
     canvas_.resize(width_, height_);
     canvas_.clear();
+    if (std::string square = config_.text("MsgWinSquareFilename"); !square.empty()) {
+        squareImage_ = images_->get(square);
+        squareY_ = config_.number("MsgWinSquarePosY", height_);
+        squareShift_ = config_.number("MsgWinSquareMovement", 240);
+    }
 
     windowShowType_ = config_.number("MsgWinShowType");
     waitMark_ = images_->get(config_.text("MsgWaitMarkFilename"));
@@ -1900,7 +1905,11 @@ bool Engine::pressSettingsWidget(int x, int y, bool dragging) {
                 if (canFullScreen_) windowRequest_ = field(it->second, 1);
                 return true;
             }
-            changeSetting(it->second[0], field(it->second, 1));
+            // `radiooff NAME`: pressing the chosen one again sets 0, as Test Game 88's screen sizes go back to automatic.
+            bool off = false;
+            for (auto [o, oEnd] = lines("radiooff"); o != oEnd; ++o)
+                if (!o->second.empty() && o->second[0] == it->second[0]) off = setting(it->second[0]) == field(it->second, 1);
+            changeSetting(it->second[0], off ? 0 : field(it->second, 1));
             return true;
         }
     for (auto [it, end] = lines("check"); it != end; ++it)
@@ -3176,8 +3185,8 @@ void Engine::composeScreen(Canvas &out) {
 // along it, as Test Game 97 does. A game with no plate shows its one row anywhere along the bar, as Test Game 95 does.
 bool Engine::innerButtonsShown() const {
     // A plate as wide as the screen comes up with all the buttons when the pointer's on it, as in Test Game 85.
-    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= plateY_);
-    return barPinned_ || setting("bar_always") || (pointerSeen_ && pointerY_ >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
+    if (fullWidthPlate()) return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= plateY_);
+    return barPinned_ || setting("bar_always") || (pointerSeen_ && messagePointerY() >= barTop_ && pointerX_ >= (buttonPlate_ ? plateX_ + buttonPlate_->w : 0));
 }
 
 // A plate as wide as the screen carries both rows of buttons, and comes up with the pointer on it, as in Test Game 85.
@@ -3185,7 +3194,7 @@ bool Engine::fullWidthPlate() const { return buttonPlate_ && buttonPlate_->w >= 
 
 bool Engine::underButtonsShown() const {
     if (fullWidthPlate()) return innerButtonsShown();
-    return buttonPlate_ && pointerSeen_ && pointerY_ >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
+    return buttonPlate_ && pointerSeen_ && messagePointerY() >= plateY_ && pointerX_ < plateX_ + buttonPlate_->w;
 }
 
 void Engine::composeMessageButtons(Canvas &out) {
@@ -3202,7 +3211,7 @@ void Engine::composeMessageButtons(Canvas &out) {
         neko::drawButton(c, shown, st);
     };
     auto state = [&](const Button &b) {
-        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
+        bool over = pointerSeen_ && b.contains(pointerX_, messagePointerY());
         // The art button reads ORIGINAL.ver while the arranged art shows, and ARRANGE.ver, its selected cells, while the
         // original does.
         bool on = (b.action == "Skip" && skipToggle_) || (b.action == "Auto" && autoMode_) || (b.action == "System" && barPinned_) ||
@@ -3885,6 +3894,11 @@ void Engine::runScene(const Node &n) {
 
 bool Engine::step(int ms) {
     if (paused_) return waiting_ != Waiting::Ended;
+    if (bool square = wantsSquare(); square != square_) {
+        square_ = square;
+        dirty_ = true;
+        log("frame %s", square ? "4:3" : "16:9");
+    }
     // The player's track ending comes first, since its screen is a menu.
     if (trackPlayer_ && !trackPaused_ && !audio_.playing(trackPlayer_)) {
         int next = nextTrack(1);
@@ -4011,7 +4025,7 @@ void Engine::mouseMove(float x, float y) {
     mouseX_ = x;
     mouseY_ = y;
     mouseMoved_ = true;
-    int px = int(x * float(width_)), py = int(y * float(height_));
+    int px = int(x * float(width_)), py = int(y * float(square_ ? squareY_ + squareShift_ : height_));
     bool moved = px != pointerX_ || py != pointerY_;
     if (moved || !pointerSeen_) dirty_ = true;
     pointerX_ = px;
@@ -4176,15 +4190,15 @@ void Engine::mouseButton(int button, bool down) {
     }
     if (windowShown_) {
         // A touch has no hover, so a tap where hidden buttons sit shows them, and the next tap presses one.
-        if (pointerY_ >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
+        if (messagePointerY() >= barTop_ && !innerWereShown_ && !underWereShown_ && !setting("bar_always")) return;
         if (innerWereShown_)
-            if (Button *b = buttonAt(pointerX_, pointerY_, bar().inner)) {
+            if (Button *b = buttonAt(pointerX_, messagePointerY(), bar().inner)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
             }
         if (underWereShown_)
-            if (Button *b = buttonAt(pointerX_, pointerY_, bar().under)) {
+            if (Button *b = buttonAt(pointerX_, messagePointerY(), bar().under)) {
                 std::string action = b->action;
                 runAction(action);
                 return;
@@ -5563,6 +5577,7 @@ void Engine::composeScene(Canvas &out, const Sprites &sprites) {
 }
 
 void Engine::compose() {
+    messageInStrip_ = false;
     if (screen_) {
         composeScreen(canvas_);
         return;
@@ -5634,7 +5649,8 @@ void Engine::compose() {
     for (size_t i = 0; i < bars_.size(); i++)
         if (bars_[i]) drawPart(canvas_, *bars_[i], 0, barY_[i], 0, 0, bars_[i]->w, bars_[i]->h, 1);
     drawParts(canvas_, Layer::UnderWindow);
-    composeMessage(canvas_);
+    messageInStrip_ = square_;
+    if (!square_) composeMessage(canvas_);
     drawParts(canvas_, Layer::OverWindow);
     composeCameraPanel(canvas_);
     if (partScreen_) drawParts(canvas_, Layer::Screen);
@@ -5692,10 +5708,11 @@ const std::vector<std::string> *Engine::choiceTable(const std::string &key) cons
 void Engine::composeMessage(Canvas &out) {
     if (!windowShown_ || windowHiddenByPlayer_) return;
     if (windowImage_) {
-        int y = windowY_;
+        // In the 4:3 frame Test Game 88's PC puts its window two rows lower than the rest of the layer moves (under Wine).
+        int top = windowY_ + (square_ ? 2 : 0), y = top;
         if (windowShowType_ == 2) {
             int elapsed = int(now_ - windowShownAt_);
-            if (elapsed < kWindowSlideMs) y = out.h - (out.h - windowY_) * elapsed / kWindowSlideMs;
+            if (elapsed < kWindowSlideMs) y = out.h - (out.h - top) * elapsed / kWindowSlideMs;
         }
         drawPart(out, *windowImage_, windowX_, y, 0, 0, windowImage_->w, windowImage_->h, windowOpacity_);
     }
@@ -5882,6 +5899,20 @@ const uint8_t *Engine::frame(int &w, int &h, bool &changed) {
         markSaved_ = false;
         frameChanged_ = true;
     }
+    // The 4:3 frame is built again whenever the 16:9 one changes or the mark is showing, which moves with the strip.
+    if (square_) {
+        bool mark = messageInStrip_ && markShowing();
+        if (frameChanged_ || mark || markSaved_ || frame_.h != squareY_ + squareShift_) {
+            composeStrip();
+            markSaved_ = mark;
+            frameChanged_ = true;
+        }
+        w = frame_.w;
+        h = frame_.h;
+        changed = frameChanged_;
+        frameChanged_ = false;
+        return frame_.px.data();
+    }
     if (markShowing()) {
         markRect(mx, my, mw, mh);
         if (markSaved_) canvas_.restoreRect(mx, my, mw, mh, underMark_);
@@ -5901,6 +5932,37 @@ const uint8_t *Engine::frame(int &w, int &h, bool &changed) {
     changed = frameChanged_;
     frameChanged_ = false;
     return canvas_.px.data();
+}
+
+// Whether the frame is 4:3: Config's `screensize` picks 16:9 (1 to 3) or 4:3 (4 to 6), and with it automatic (0) the
+// shape nearer the host's view, with room either side of the middle so a window dragged across it doesn't flicker.
+bool Engine::wantsSquare() const {
+    if (!squareImage_) return false;
+    int size = setting("screensize");
+    if (size >= 1 && size <= 3) return false;
+    if (size >= 4 && size <= 6) return true;
+    if (viewAspect_ <= 0) return square_;
+    return square_ ? viewAspect_ < 1.60f : viewAspect_ < 1.48f;
+}
+
+// The 4:3 frame: the 16:9 frame, the MsgWinSquare picture under it, and over that picture the message layer drawn as
+// for 16:9 and moved down MsgWinSquareMovement rows, as Test Game 88's PC draws it in a 1280x960 window (under Wine).
+void Engine::composeStrip() {
+    int total = squareY_ + squareShift_;
+    if (frame_.w != width_ || frame_.h != total) frame_.resize(width_, total);
+    if (strip_.w != width_ || strip_.h != height_) strip_.resize(width_, height_);
+    size_t row = size_t(width_) * 4;
+    std::memcpy(frame_.px.data(), canvas_.px.data(), row * size_t(std::min(canvas_.h, total)));
+    // The layer's rows from height_ - squareShift_ go to squareY_; under them is the picture.
+    int from = height_ - squareShift_;
+    std::fill(strip_.px.begin(), strip_.px.end(), uint8_t(0));
+    drawPart(strip_, *squareImage_, 0, from, 0, 0, squareImage_->w, squareImage_->h, 1);
+    if (messageInStrip_) {
+        composeMessage(strip_);
+        if (markShowing()) drawMark(strip_);
+    }
+    for (int y = 0; y < squareShift_ && from + y < strip_.h && squareY_ + y < total; y++)
+        std::memcpy(frame_.px.data() + size_t(squareY_ + y) * row, strip_.px.data() + size_t(from + y) * row, row);
 }
 
 }  // namespace neko

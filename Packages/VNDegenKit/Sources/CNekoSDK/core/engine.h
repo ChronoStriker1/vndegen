@@ -119,6 +119,8 @@ public:
 
     bool step(int ms);
     const uint8_t *frame(int &w, int &h, bool &changed);
+    // The size of the host's view for the game, from which an automatic 4:3 frame is chosen.
+    void setViewSize(float w, float h) { viewAspect_ = h > 0 ? w / h : 0; }
     Audio &audio() { return audio_; }
 
     void mouseMove(float x, float y);
@@ -663,6 +665,18 @@ private:
 
     int width_ = 1280, height_ = 720, fps_ = 60;
     Canvas canvas_, from_, previous_;
+    // The 4:3 frame of a game whose init.ini names a MsgWinSquare picture, as Test Game 88's PC draws it in a 1280x960
+    // window: the 16:9 frame on top, the picture under it, and the message window, text and buttons moved down onto
+    // it. square_ is whether it's on, from Config's `screensize` or, set to automatic, the host's view.
+    ImageRef squareImage_;
+    int squareY_ = 720, squareShift_ = 240;
+    bool square_ = false, messageInStrip_ = false;
+    float viewAspect_ = 0;
+    Canvas frame_, strip_;
+    bool wantsSquare() const;
+    void composeStrip();
+    // The pointer's y as the message window's layer has it, which the 4:3 frame moves down.
+    int messagePointerY() const { return pointerY_ - (square_ ? squareShift_ : 0); }
     bool dirty_ = true, frameChanged_ = false, markSaved_ = false;
     std::vector<uint8_t> underMark_;
     int64_t now_ = 0;
