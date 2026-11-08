@@ -119,6 +119,10 @@ public:
         return it == table.end() ? 0 : it->second;
     }
     bool jump(const std::string &script, int node);
+    // Saving, loading and a card's lock, which tests also call.
+    bool saveToSlot(int slot);
+    bool loadFromSlot(int slot);
+    void toggleLock(int slot);
 
 private:
     enum class Waiting { None, Time, Click, Choice, Ended };
@@ -142,12 +146,13 @@ private:
 
     // Saves.
     std::string savePath(int slot, const char *extension) const;
-    bool saveToSlot(int slot);
-    bool loadFromSlot(int slot);
     void deleteSlot(int slot);
     bool cardAt(int slot, int &x, int &y) const;
-    bool overCardDelete(int slot, int x, int y) const;
+    bool overCardDelete(int slot, int x, int y) const { return overCardPart("slotdelete", slot, x, y); }
+    bool overCardPart(const char *key, int slot, int x, int y) const;
     int newestQuickSlot();
+    // A locked save can be loaded but not saved over or deleted. The lock is kept in cfg.sav, as the PC keeps it.
+    bool locked(int slot) const;
     std::string lastScene_;
     int nextQuickSlot_ = 81;
     bool barPinned_ = false;
@@ -387,6 +392,8 @@ private:
     bool dialogOpen_ = false;
     int dialogQuestion_ = 0, dialogHover_ = -1;
     std::function<void()> dialogYes_;
+    bool dialogNoAsk_ = false;  // the "don't ask again" box, ticked
+    void answerDialog(bool yes);
 
     // Menus, and the message window's buttons.
     std::map<std::string, Screen> screens_;

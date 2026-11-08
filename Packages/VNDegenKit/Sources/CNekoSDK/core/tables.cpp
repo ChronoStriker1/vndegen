@@ -34,6 +34,7 @@ dateslash obj\e008_004.bmp
 datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
+slotnew obj\e010_000.bmp -11 -6
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -73,6 +74,7 @@ dateslash obj\e008_004.bmp
 datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
+slotnew obj\e010_000.bmp -11 -6
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -209,6 +211,8 @@ screen dialog
 pic obj\i000_000.bmp 0 197 1 8 0 0
 button yes obj\b003_000.bmp 435 330 2 5 0
 button no obj\b003_000.bmp 650 330 2 5 1
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\i001_000.bmp 498 652 1 5 0
 
 screen config
 pic obj\h000_000.bmp 0 0
@@ -452,6 +456,7 @@ dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
+slotnew obj\e012_000.bmp -6 -6
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -490,6 +495,7 @@ dateslash obj\e009_002.bmp
 datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
+slotnew obj\e012_000.bmp -6 -6
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -651,6 +657,8 @@ pic obj\b001_000.bmp 0 270
 pic obj\i000_000.bmp 660 380 1 8 0 0
 button yes obj\b003_000.bmp 720 476 2 5 0
 button no obj\b003_000.bmp 1005 476 2 5 1
+# The box that stops the question, whichever answer follows, as on the PC.
+button noask obj\i001_000.bmp 767 707 1 5 0
 
 screen choice
 pic obj\n000_000.bmp 0 259

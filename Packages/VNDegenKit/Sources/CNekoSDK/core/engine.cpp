@@ -416,8 +416,12 @@ void Engine::runAction(const std::string &action) {
         noteThumbnail();
         // Each session starts at the first of the Q-Save page's cards and moves along one a save, as the PC does.
         openDialog(4, [this] {
+            auto step = [this] { nextQuickSlot_ = nextQuickSlot_ == kLastQuickSlot ? kFirstQuickSlot : nextQuickSlot_ + 1; };
+            // A locked card is passed over, and with every one locked there's nowhere to save.
+            for (int tries = kFirstQuickSlot; tries <= kLastQuickSlot && locked(nextQuickSlot_); tries++) step();
+            if (locked(nextQuickSlot_)) return;
             saveToSlot(nextQuickSlot_);
-            nextQuickSlot_ = nextQuickSlot_ == kLastQuickSlot ? kFirstQuickSlot : nextQuickSlot_ + 1;
+            step();
         });
         return;
     }
@@ -1337,6 +1341,9 @@ bool Engine::saveToSlot(int slot) {
         return false;
     }
     if (!thumbnail_.empty()) writeWhole(savePath(slot, "bmp"), thumbnail_);
+    // The card that shows NEW, kept in cfg.sav as the PC keeps it.
+    globals_[0] = slot;
+    saveGlobals();
     saveSeen();
     slots_.erase(slot);
     log("saved slot %d at %s #%d", slot, data.scene.c_str(), data.node);
@@ -1483,8 +1490,27 @@ bool Engine::cardAt(int slot, int &x, int &y) const {
     return true;
 }
 
-bool Engine::overCardDelete(int slot, int x, int y) const {
-    const auto *line = screen_ ? screen_->setting("slotdelete") : nullptr;
+// A card's lock is a global variable from 200 on, one for each card from the first: locking a card under Wine set 200
+// for the first and 204 for the fifth in the cfg.sav the PC wrote on quitting, in The Alchemist, Yarinaoshi no
+// Christmas and Test Games 92 and 94 alike.
+constexpr int kLockGlobals = 200;
+
+bool Engine::locked(int slot) const {
+    auto it = globals_.find(kLockGlobals + slot - 1);
+    return it != globals_.end() && it->second;
+}
+
+void Engine::toggleLock(int slot) {
+    int global = kLockGlobals + slot - 1;
+    if (slot < 1 || global >= 10000) return;
+    globals_[global] = locked(slot) ? 0 : 1;
+    saveGlobals();
+    log("slot %d %s", slot, globals_[global] ? "locked" : "unlocked");
+    dirty_ = true;
+}
+
+bool Engine::overCardPart(const char *key, int slot, int x, int y) const {
+    const auto *line = screen_ ? screen_->setting(key) : nullptr;
     int cx, cy;
     if (!line || line->size() < 3 || !cardAt(slot, cx, cy)) return false;
     ImageRef button = images_->get((*line)[0]);
@@ -1524,6 +1550,8 @@ void Engine::composeSlots(Canvas &out) {
     ImageRef slash = picture("dateslash"), colon = picture("datecolon"), dash = picture("datedash");
     bool loading = screen_->name == "load";
     int hovered = pointerSeen_ ? slotAt(pointerX_, pointerY_) : -1;
+    // NEW marks the card saved to last, which the PC keeps in global 0.
+    int newest = variable(0, 0);
     auto drawNumber = [&](const ImageRef &sheetOfTen, int value, int count, int x, int y) {
         if (!sheetOfTen) return x;
         int w = sheetOfTen->w / 10;
@@ -1547,15 +1575,21 @@ void Engine::composeSlots(Canvas &out) {
             if (ImageRef del = picture("slotdelete"); del && del->h >= 5) {
                 int h = del->h / 5;
                 bool over = pointerSeen_ && !dialogOpen_ && overCardDelete(slot, pointerX_, pointerY_);
-                int shown = !info.exists ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
+                int shown = !info.exists || locked(slot) ? int(StateDisabled) : over ? int(StateHover) : int(StateNormal);
                 drawPart(out, *del, cx + offset("slotdelete", 1), cy + offset("slotdelete", 2), 0, shown * h, del->w, h, 1);
             }
             if (info.thumbnail) drawPart(out, *info.thumbnail, cx + offset("slotthumb", 0), cy + offset("slotthumb", 1), 0, 0, info.thumbnail->w, info.thumbnail->h, 1);
-            // A lock can't be set here, so a card with a save shows it open, over the thumbnail as the PC does.
+            // The lock, over the thumbnail as the PC draws it. Its rows: open, open under the pointer, closed, closed under
+            // the pointer, and none to set.
             if (ImageRef lock = picture("slotlock"); lock && lock->h >= 5) {
                 int h = lock->h / 5;
-                drawPart(out, *lock, cx + offset("slotlock", 1), cy + offset("slotlock", 2), 0, (info.exists ? int(StateNormal) : int(StateDisabled)) * h, lock->w, h, 1);
+                bool over = pointerSeen_ && !dialogOpen_ && overCardPart("slotlock", slot, pointerX_, pointerY_);
+                int shown = !info.exists ? int(StateDisabled) : locked(slot) ? (over ? int(StateSelectedHover) : int(StateSelected)) : over ? int(StateHover) : int(StateNormal);
+                drawPart(out, *lock, cx + offset("slotlock", 1), cy + offset("slotlock", 2), 0, shown * h, lock->w, h, 1);
             }
+            // `slotnew SHEET X Y`: the card saved to last.
+            if (ImageRef mark = picture("slotnew"); mark && slot == newest && info.exists)
+                drawPart(out, *mark, cx + offset("slotnew", 1), cy + offset("slotnew", 2), 0, 0, mark->w, mark->h, 1);
             int x = cx + offset("datedigits", 1), y = cy + offset("datedigits", 2);
             auto mark = [&](const ImageRef &m) {
                 if (!m) return;
@@ -1595,9 +1629,10 @@ void Engine::composeSlots(Canvas &out) {
         }
 }
 
+// The questions in the order of the game's sheet of them, and the Config setting that turns each off.
+static const char *const kConfirmSetting[] = {"confirm_saveload", "confirm_saveload", "confirm_overwrite", "confirm_delete", "confirm_quick", "confirm_quick", "confirm_title", "confirm_exit"};
+
 void Engine::openDialog(int question, const std::function<void()> &yes) {
-    // The questions in the order of the game's sheet of them, and the Config setting that turns each off.
-    static const char *const kConfirmSetting[] = {"confirm_saveload", "confirm_saveload", "confirm_overwrite", "confirm_delete", "confirm_quick", "confirm_quick", "confirm_title", "confirm_exit"};
     if (!screens_.count("dialog") || !setting(kConfirmSetting[question])) {
         yes();
         return;
@@ -1605,7 +1640,22 @@ void Engine::openDialog(int question, const std::function<void()> &yes) {
     dialogOpen_ = true;
     dialogQuestion_ = question;
     dialogYes_ = yes;
+    dialogNoAsk_ = false;
     dirty_ = true;
+}
+
+void Engine::answerDialog(bool yes) {
+    dialogOpen_ = false;
+    dirty_ = true;
+    auto then = dialogYes_;
+    dialogYes_ = nullptr;
+    // The box turns the question off whichever answer closes it, as the PC does, in the Config setting for it.
+    if (dialogNoAsk_) {
+        changeSetting(kConfirmSetting[dialogQuestion_], 0);
+        saveSettings();
+        dialogNoAsk_ = false;
+    }
+    if (yes && then) then();
 }
 
 // The table's dialog screen: a band, one row of a sheet of questions, and yes and no.
@@ -1617,7 +1667,11 @@ void Engine::composeDialog(Canvas &out) {
         if (p.rows > 1) shown.row = dialogQuestion_;
         drawPicture(out, shown);
     }
-    for (const Button &b : dialog.buttons) drawButton(out, b, pointerSeen_ && b.contains(pointerX_, pointerY_) ? StateHover : StateNormal);
+    for (const Button &b : dialog.buttons) {
+        bool over = pointerSeen_ && b.contains(pointerX_, pointerY_);
+        bool ticked = b.action == "noask" && dialogNoAsk_;
+        drawButton(out, b, ticked ? (over ? StateSelectedHover : StateSelected) : over ? StateHover : StateNormal);
+    }
 }
 
 bool Engine::pressAction(const std::string &action) {
@@ -2203,9 +2257,7 @@ void Engine::mouseButton(int button, bool down) {
     if (button == 1) {
         // The right button steps back: out of the log or a menu, else hides or shows the window.
         if (dialogOpen_) {
-            dialogOpen_ = false;
-            dialogYes_ = nullptr;
-            dirty_ = true;
+            answerDialog(false);
         } else if (logOpen_) {
             closeLog();
         } else if (screen_ && viewingImage_ && viewerPanel()) {
@@ -2239,11 +2291,12 @@ void Engine::mouseButton(int button, bool down) {
     if (dialogOpen_) {
         Screen &dialog = screens_.at("dialog");
         if (Button *b = buttonAt(pointerX_, pointerY_, dialog.buttons)) {
-            dialogOpen_ = false;
-            dirty_ = true;
-            auto yes = dialogYes_;
-            dialogYes_ = nullptr;
-            if (b->action == "yes" && yes) yes();
+            if (b->action == "noask") {
+                dialogNoAsk_ = !dialogNoAsk_;
+                dirty_ = true;
+            } else {
+                answerDialog(b->action == "yes");
+            }
         }
         return;
     }
@@ -2273,10 +2326,15 @@ void Engine::mouseButton(int button, bool down) {
         }
         int slot = slotAt(pointerX_, pointerY_);
         if (slot < 0) return;
-        if (overCardDelete(slot, pointerX_, pointerY_)) {
-            if (slotInfo(slot).exists) openDialog(3, [this, slot] { deleteSlot(slot); });
+        if (overCardPart("slotlock", slot, pointerX_, pointerY_)) {
+            if (slotInfo(slot).exists) toggleLock(slot);
             return;
         }
+        if (overCardDelete(slot, pointerX_, pointerY_)) {
+            if (slotInfo(slot).exists && !locked(slot)) openDialog(3, [this, slot] { deleteSlot(slot); });
+            return;
+        }
+        if (locked(slot) && screen_->name == "save") return;
         if (screen_->name == "save") {
             bool overwrite = slotInfo(slot).exists;
             openDialog(overwrite ? 2 : 0, [this, slot] { saveToSlot(slot); dirty_ = true; });
