@@ -166,6 +166,17 @@ import TestSupport
         steps(sixth, 10)
         #expect(at(sixth, "scr\\e.txt"), "\(status(sixth))")
         #expect(vnneko_debug_variable(sixth, 1, 13) == 0)
+        // A save in the scene after the choice holds 2 where the last choice goes, with `lastchoice made`, whichever
+        // option was taken.
+        #expect(vnneko_debug_save(sixth, 8))
+        let after = try #require(try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
+            .first { $0.lastPathComponent.lowercased() == "save008.sav" })
+        let afterPlain = try NekoSDKFlowFixture.unpacked(Data(contentsOf: after))
+        func int32After(_ at: Int) -> Int32 { afterPlain.subdata(in: (afterPlain.startIndex + at)..<(afterPlain.startIndex + at + 4)).withUnsafeBytes { $0.loadUnaligned(as: Int32.self) } }
+        let afterPicture = Int(int32After(0xCD + 4 + 4196))
+        let afterDate = 0xCD + 4 + 4196 + 4 + afterPicture + 39596
+        #expect(int32After(afterDate + 400) == 1)
+        #expect(int32After(afterDate + 520) == 2)
         vnneko_stop(sixth)
 
         // A PC save has no lines beside it: the story goes on from its scene, here inside the chapter.
