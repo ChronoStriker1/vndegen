@@ -1754,11 +1754,20 @@ void Engine::changeSetting(const std::string &name, int value) {
 // `radio NAME VALUE SHEET X Y COLS ROWS COL`, `check NAME SHEET X Y COLS ROWS COL [ON ONHOVER OFF OFFHOVER]` and
 // `step NAME DELTA SHEET X Y COLS ROWS COL`.
 // Sheets run normal, hover, selected, selected and hovered, as the PC's do.
+// `readswap SCRIPT FROM TO`: once that script has been read to its end, a settings widget's sheet FROM is drawn from TO,
+// as Moral Orc's Individual Voices box reads ???? until the story names Fiona.
+std::string Engine::readSwapped(const std::string &sheet) const {
+    if (!screen_) return sheet;
+    for (auto [it, end] = screen_->settings.equal_range("readswap"); it != end; ++it)
+        if (it->second.size() >= 3 && normalizedPath(it->second[1]) == normalizedPath(sheet) && seen(it->second[0])) return it->second[2];
+    return sheet;
+}
+
 void Engine::composeSettingsWidgets(Canvas &out) {
     auto lines = [&](const char *kind) { return screen_->settings.equal_range(kind); };
     // `rows` gives the sheet's rows for on, on and hovered, off, and off and hovered, when they aren't in the usual order.
     auto cell = [&](const std::vector<std::string> &f, size_t at, bool on, const int *rows = nullptr) {
-        ImageRef sheet = images_->get(f[at]);
+        ImageRef sheet = images_->get(readSwapped(f[at]));
         if (!sheet) return;
         int x = field(f, at + 1), y = field(f, at + 2), w = sheet->w / field(f, at + 3), h = sheet->h / field(f, at + 4);
         bool over = pointerSeen_ && !dialogOpen_ && inRect(pointerX_, pointerY_, x, y, w, h);
@@ -1918,10 +1927,18 @@ void Engine::loadGlobals() {
     }
 }
 
+// cfg.sav holds two strings of their own length, which move what follows them: a script's name at 44020 and, 56 bytes
+// after it, a movie's, which Horny Elves and a Moral Orc's PC writes (`movie\bga_001_000_000_000_000.wmv`) and the other
+// games leave empty. The file's size says whether both are counted.
 size_t Engine::configStringLength() const {
-    int32_t length = 0;
-    if (kConfigStringAt + 4 <= configFile_.size()) std::memcpy(&length, &configFile_[kConfigStringAt], 4);
-    return length > 0 && kConfigStringAt + 4 + size_t(length) <= configFile_.size() ? size_t(length) : 0;
+    auto lengthAt = [&](size_t at) {
+        int32_t length = 0;
+        if (at + 4 <= configFile_.size()) std::memcpy(&length, &configFile_[at], 4);
+        return length > 0 && at + 4 + size_t(length) <= configFile_.size() ? size_t(length) : 0;
+    };
+    size_t first = lengthAt(kConfigStringAt), second = lengthAt(kConfigStringAt + 60 + first);
+    if (second && kConfigSize + first + second == configFile_.size()) return first + second;
+    return first;
 }
 
 void Engine::saveGlobals() {
@@ -2666,12 +2683,14 @@ Button *Engine::buttonAt(int x, int y, std::vector<Button> &buttons) {
 
 // In a title with menu stages, stage 1 is the art before the menu and stage 2 the menu itself; stage 0 shows in both.
 bool Engine::shown(const Button &b) const {
-    return (b.stage == 0 || b.stage == menuStage_) && (b.group.empty() || submenuOpen(b.group)) && (b.needs.empty() || anyGlobalSet(b.needs));
+    return (b.stage == 0 || b.stage == menuStage_) && (b.group.empty() || submenuOpen(b.group)) && (b.needs.empty() || anyGlobalSet(b.needs)) &&
+           (b.ifRead.empty() || seen(b.ifRead)) && (b.unlessRead.empty() || !seen(b.unlessRead));
 }
 
 bool Engine::shown(const Picture &p) const {
     bool staged = screen_ && screen_->setting("menustages");
-    return (!staged || p.stage == 0 || p.stage == menuStage_) && (p.group.empty() || submenuOpen(p.group)) && (p.needs.empty() || anyGlobalSet(p.needs));
+    return (!staged || p.stage == 0 || p.stage == menuStage_) && (p.group.empty() || submenuOpen(p.group)) && (p.needs.empty() || anyGlobalSet(p.needs)) &&
+           (p.ifRead.empty() || seen(p.ifRead)) && (p.unlessRead.empty() || !seen(p.unlessRead));
 }
 
 // Whether the submenu of this name is open, or one inside it.

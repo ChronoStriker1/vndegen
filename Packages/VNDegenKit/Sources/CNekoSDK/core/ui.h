@@ -26,6 +26,8 @@ struct Button {
     int stage = 0;         // in a title with `menustages`, 2 for the menu a click brings up
     std::string group;     // shown only while the screen's submenu of this name, or one inside it, is open
     std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
+    // `ifread SCRIPT` and `unlessread SCRIPT`: shown only once that script has been read to its end, or only until then.
+    std::string ifRead, unlessRead;
     ImageRef help;         // shown while hovered
     int helpX = 0, helpY = 0, helpCols = 1, helpRows = 1, helpColumn = 0, helpRow = 0;
     int cellW() const { return sheet ? sheet->w / cols : 0; }
@@ -42,6 +44,8 @@ struct Picture {
     int stage = 0;  // in a title with an opening, 1 for the art the tiles reveal and 2 for what fades in after
     std::string group;  // shown only while the screen's submenu of this name, or one inside it, is open
     std::vector<int> needs;  // `if G,G...`: shown only once one of these global variables is set
+    // `ifread SCRIPT` and `unlessread SCRIPT`: shown only once that script has been read to its end, or only until then.
+    std::string ifRead, unlessRead;
     // `more FILE,FILE...`: other pictures that can take this one's place when the screen opens. `pickby G` shows the
     // one global variable G numbers, and `randomif G,G...` one at random once any of those is set, as Test Game 94's
     // title picks its art. `variants` holds them all, this one first.

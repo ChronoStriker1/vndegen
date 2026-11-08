@@ -117,6 +117,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                             p.rise.push_back({number(point.substr(0, colon)), number(point.substr(colon + 1))});
                 }
                 else if (key == "if") p.needs = numbers(value);
+                else if (key == "ifread") p.ifRead = value;
+                else if (key == "unlessread") p.unlessRead = value;
                 else if ((key == "move" || key == "clamp" || key == "fadein" || key == "fadeout") && at + 2 < w.size()) {
                     const std::string &second = w[at + 2];
                     if (key == "move") {
@@ -169,6 +171,8 @@ std::map<std::string, Screen> parseScreens(const char *table, Images &images, co
                 if (w[i] == "stage" && i + 1 < w.size()) b.stage = number(w[++i]);
                 if (w[i] == "group" && i + 1 < w.size()) b.group = w[++i];
                 if (w[i] == "if" && i + 1 < w.size()) b.needs = numbers(w[++i]);
+                if (w[i] == "ifread" && i + 1 < w.size()) b.ifRead = w[++i];
+                if (w[i] == "unlessread" && i + 1 < w.size()) b.unlessRead = w[++i];
                 if (w[i] == "swap") {  // this sheet's first row is the hovered look
                     b.normalRow = 1;
                     b.hoverRow = 0;

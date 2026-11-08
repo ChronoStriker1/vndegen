@@ -204,6 +204,17 @@ from the tab's heroine, as the PC draws them, and like 93's show how many of an 
 Elves and a Moral Orc draws each tab's character, its `sc` sprite, and on the harem tab the picture `g002_000`; a 30
 fps recording under Wine shows the character come up from below over about 0.17 seconds, overshooting by 21 pixels.
 
+## Horny Elves and a Moral Orc's Fiona
+
+Its CG and Scene galleries' Fiona tab and Config's portrait and voice box for her follow `read.sav`: under Wine, with
+every episode's global set the PC still showed ???? and her silhouette and no tab, and with `scr\ep_011_001_000.txt`
+alone added to its `read.sav` it showed all three. Revealed, it draws `i018` and `i019` where it drew `i118` and
+`i119`. The runtime has table lines shown `ifread` or `unlessread` a script, and `readswap` for a widget's sheet.
+
+Its `cfg.sav` also showed the file's second string: after the script name at 44020, a movie's name 56 bytes on
+(`movie\bga_001_000_000_000_000.wmv`, 33 bytes), which the other games leave empty. Both strings move the unlock flags
+that follow them, so the runtime had read Moral Orc's CG flags from the wrong place; it now counts both.
+
 ## Funbag Fantasy 3 if's music modes
 
 Test Game 84's music screen has three mode buttons where the other games have repeat and shuffle toggles. Clicked on

@@ -3296,6 +3296,7 @@ pic obj\g000_003.bmp 0 0 tab 4
 pic sc\sc_000_000_000_001_000.bmp 340 -40 tab 0 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
 pic sc\sc_001_000_000_001_000.bmp 340 -40 tab 1 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
 pic sc\sc_002_000_000_001_000.bmp 340 -40 tab 2 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
+pic sc\sc_003_000_000_001_000.bmp 340 -40 tab 3 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
 pic obj\g002_000.bmp 200 -40 tab 4 rise 0:720,33:620,67:366,100:117,133:-21,167:-21,200:0
 pic obj\g001_000.bmp 0 0 tab 0
 pic obj\g001_001.bmp 0 628 tab 0
@@ -3333,7 +3334,8 @@ button page2 obj\f009_000.bmp 1058 622 10 5 2
 button gtab0 obj\g004_000.bmp 85 570 5 5 0
 button gtab1 obj\g004_000.bmp 237 570 5 5 1
 button gtab2 obj\g004_000.bmp 389 570 5 5 2
-# Fiona's tab isn't shown until the story reaches her; the switch for that isn't known yet, so it stays hidden.
+# Fiona's tab shows once the script that names her, ep_011_001_000, has been read to its end, as on the PC.
+button gtab3 obj\g004_000.bmp 541 570 5 5 3 ifread scr\ep_011_001_000.txt
 button gtab4 obj\g004_000.bmp 693 570 5 5 4
 button nav_save obj\f002_000.bmp 666 6 8 5 0
 button nav_load obj\f002_000.bmp 791 6 8 5 1
@@ -3386,7 +3388,8 @@ button page2 obj\f009_000.bmp 1058 622 10 5 2
 button gtab0 obj\g004_000.bmp 85 570 5 5 0
 button gtab1 obj\g004_000.bmp 237 570 5 5 1
 button gtab2 obj\g004_000.bmp 389 570 5 5 2
-# Fiona's tab isn't shown until the story reaches her; the switch for that isn't known yet, so it stays hidden.
+# Fiona's tab shows once the script that names her, ep_011_001_000, has been read to its end, as on the PC.
+button gtab3 obj\g004_000.bmp 541 570 5 5 3 ifread scr\ep_011_001_000.txt
 button gtab4 obj\g004_000.bmp 693 570 5 5 4
 button nav_save obj\f002_000.bmp 666 6 8 5 0
 button nav_load obj\f002_000.bmp 791 6 8 5 1
@@ -3541,8 +3544,10 @@ radio onahole 0 obj\i009_000.bmp 926 310 2 5 1
 
 screen config3
 pic obj\i000_000.bmp 0 0
-# Fiona as a silhouette, as before the story names her.
-pic obj\i118_000.bmp 18 122
+# Fiona as a silhouette until the script that names her, ep_011_001_000, has been read to its end, then herself, as on
+# the PC under Wine.
+pic obj\i118_000.bmp 18 122 unlessread scr\ep_011_001_000.txt
+pic obj\i018_000.bmp 18 122 ifread scr\ep_011_001_000.txt
 pic obj\f001_000.bmp 0 0
 pic obj\i002_000.bmp 19 0
 button tab obj\i004_000.bmp 1148 132 3 5 0
@@ -3600,7 +3605,8 @@ button test:se:se\se_05.ogg obj\i020_000.bmp 533 311 1 5 0
 button test:se:se\hse_002_005.ogg obj\i020_000.bmp 533 389 1 5 0
 button test:voice:voice\mis0_0013.ogg obj\i020_000.bmp 533 468 1 5 0
 button test:voice:voice\eim9_0003.ogg obj\i020_000.bmp 533 546 1 5 0
-# Fiona's box reads ???? and her portrait is a silhouette until the story names her; that switch isn't built.
+# Fiona's box reads ???? until the story names her, then her name.
+readswap scr\ep_011_001_000.txt obj\i119_000.bmp obj\i019_000.bmp
 check voice0 obj\i119_000.bmp 785 588 7 5 0
 check voice1 obj\i119_000.bmp 885 549 7 5 1
 check voice2 obj\i119_000.bmp 983 588 7 5 2
