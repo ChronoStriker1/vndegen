@@ -6,6 +6,7 @@ screen title
 # Story once an ending is seen (global 2), and Bonus its galleries; each item's help balloon stands above it.
 menustages
 selectedlook
+submenudim
 pic obj\c000_000.bmp 0 0
 pic obj\c001_000.bmp 351 42
 pic obj\c001_001.bmp 542 668
@@ -318,9 +319,9 @@ number voice text 1024 425 20 15 255 255 255 76 10 73
 number backvoice text 1024 481 20 15 255 255 255 76 10 73
 step opacity -1 obj\h001_003.bmp 60 317 2 5 0
 step opacity 1 obj\h001_003.bmp 508 317 2 5 1
-# One switch for every confirmation on the PC; the runtime has one setting for each question (a gap, to the lead).
-radio confirm_saveload 1 obj\h001_002.bmp 264 348 2 5 0
-radio confirm_saveload 0 obj\h001_002.bmp 381 348 2 5 1
+# One switch for every confirmation on the PC: `confirm` covers every question when the table names no separate ones.
+radio confirm 1 obj\h001_002.bmp 264 348 2 5 0
+radio confirm 0 obj\h001_002.bmp 381 348 2 5 1
 radio tutorial 1 obj\h001_002.bmp 264 376 2 5 0
 radio tutorial 0 obj\h001_002.bmp 381 376 2 5 1
 pic obj\a001_003.bmp 101 403 1 5 0 0
@@ -353,9 +354,8 @@ slider backvoice obj\h001_006.bmp 624 491
 step backvoice -1 obj\h001_003.bmp 596 487 2 5 0
 step backvoice 1 obj\h001_003.bmp 1044 487 2 5 1
 check mute_backvoice obj\h004_003.bmp 949 460 1 5 0
-# Background voices on or off, apart from their volume: no runtime setting yet; drawn as the PC's first run has it.
-pic obj\h001_002.bmp 800 518 2 5 0 2
-pic obj\h001_002.bmp 917 518 2 5 1 0
+radio backvoice_on 1 obj\h001_002.bmp 800 518 2 5 0
+radio backvoice_on 0 obj\h001_002.bmp 917 518 2 5 1
 radio voice_stop 1 obj\h001_002.bmp 800 546 2 5 0
 radio voice_stop 0 obj\h001_002.bmp 917 546 2 5 1
 # Individual voices: the three switches and the button to the per-character screen, not measured yet; drawn as the PC has them.
@@ -363,14 +363,26 @@ pic obj\h004_001.bmp 752 574 4 5 0 0
 pic obj\h004_001.bmp 859 574 4 5 1 0
 pic obj\h004_001.bmp 966 574 4 5 2 0
 pic obj\h004_001.bmp 752 602 4 5 3 0
-# Text speed, auto speed and auto wait are 0-100 sliders on the PC (x 88, y 518, 574, 630); the runtime's text and auto are
-# four steps. Waiting on the lead.
+# Text speed, auto speed and auto wait, measured under Wine (evidence speed82/): text speed 0-100 types at about
+# max(0, 167 - 3 x value) ms a character, default 50; auto speed 0-100 waits about (100 - value) ms a character of the
+# line before going on, default 50; auto wait runs x1 to x200, default x100, and no effect on auto's pace was found
+# in narration, voiced lines or script waits. The runtime's own handling of these three is the lead's (to come).
 pic obj\h001_005.bmp 88 518
-bar obj\h001_006.bmp 88 518 50
+slider textspeed obj\h001_006.bmp 88 518
+step textspeed -1 obj\h001_003.bmp 60 514 2 5 0
+step textspeed 1 obj\h001_003.bmp 508 514 2 5 1
+number textspeed text 488 507 20 15 255 255 255 76 10 73
 pic obj\h001_005.bmp 88 574
-bar obj\h001_006.bmp 88 574 50
+slider autospeed obj\h001_006.bmp 88 574
+step autospeed -1 obj\h001_003.bmp 60 570 2 5 0
+step autospeed 1 obj\h001_003.bmp 508 570 2 5 1
+number autospeed text 488 563 20 15 255 255 255 76 10 73
 pic obj\h001_005.bmp 88 630
-bar obj\h001_006.bmp 88 630 50
+range autowait 1 200
+slider autowait obj\h001_006.bmp 88 630 200
+step autowait -1 obj\h001_003.bmp 60 626 2 5 0
+step autowait 1 obj\h001_003.bmp 508 626 2 5 1
+number autowait text 488 619 20 15 255 255 255 76 10 73
 # Help: zones are each row's extent; their exact edges aren't measured yet (hov.py).
 hover 24 124 536 147 obj\h001_008.bmp 50 10 8 0
 hover 24 152 536 175 obj\h001_008.bmp 50 38 8 1
@@ -492,6 +504,10 @@ pic bg\bg_w.bmp 0 0 fadein 70100 1700
 screen defaults
 layoutcgslot 102             # 82's saves hold a CG in slot 102, and a background and a CG each take the other away
 default opacity 100          # the PC's message window is solid until Config changes it
+default textspeed 50
+default autospeed 50
+default autowait 100
+default backvoice_on 1
 # The text asks for Verdana (face 8, DejaVu Sans here, chosen by the lead against real Verdana). Size 19 and gap 0.64 are
 # Verdana-at-24's widths plus the PC's own gap, 0.2 over its face's advances, measured under Wine; lines 30 apart, the
 # first baseline at 588 and the ink from x 213 as there.
