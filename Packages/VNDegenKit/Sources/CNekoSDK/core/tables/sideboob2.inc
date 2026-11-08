@@ -25,7 +25,83 @@ button scene obj\d001_002.bmp 756 520 6 5 4 group extras help obj\d002_001.bmp 6
 screen start
 flow chapter2
 
+# Save and load, measured under Wine: nine cards a page on ten pages, each card a save's number, thumbnail, date and
+# time, and NEW on the one saved last. The side bar's help steps 48 pixels a button while the buttons step 52. Still
+# to add: the card's "Save Date" label and its chapter name, which the runtime can't draw yet, and the backdrop the
+# paper's torn edges show, which no picture in the archives matches.
+screen load
+pic obj\e000_000.bmp 0 3
+pic obj\e000_001.bmp 75 14 7 1 1 0
+pic obj\e001_000.bmp 1154 0
+slots obj\e003_000.bmp 30 94 369 203 3 3 1
+slotlabel obj\e003_001.bmp 5 5
+slotdigits obj\e003_002.bmp 39 5 3
+slotthumb 7 32
+slotnew obj\e003_010.bmp 289 -18
+datedigits obj\e003_004.bmp 203 59
+dateslash obj\e003_003.bmp
+datecolon obj\e003_006.bmp
+datedash obj\e003_005.bmp
+timeat 270 86
+button page0 obj\e002_000.bmp 416 18 10 5 0
+button page1 obj\e002_000.bmp 486 18 10 5 1
+button page2 obj\e002_000.bmp 556 18 10 5 2
+button page3 obj\e002_000.bmp 626 18 10 5 3
+button page4 obj\e002_000.bmp 696 18 10 5 4
+button page5 obj\e002_000.bmp 766 18 10 5 5
+button page6 obj\e002_000.bmp 836 18 10 5 6
+button page7 obj\e002_000.bmp 906 18 10 5 7
+button page8 obj\e002_000.bmp 976 18 10 5 8
+button page9 obj\e002_000.bmp 1046 18 10 5 9
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
+screen save
+pic obj\e000_000.bmp 0 3
+pic obj\e000_001.bmp 75 14 7 1 0 0
+pic obj\e001_000.bmp 1154 0
+slots obj\e003_000.bmp 30 94 369 203 3 3 1
+slotlabel obj\e003_001.bmp 5 5
+slotdigits obj\e003_002.bmp 39 5 3
+slotthumb 7 32
+slotnew obj\e003_010.bmp 289 -18
+datedigits obj\e003_004.bmp 203 59
+dateslash obj\e003_003.bmp
+datecolon obj\e003_006.bmp
+datedash obj\e003_005.bmp
+timeat 270 86
+button page0 obj\e002_000.bmp 416 18 10 5 0
+button page1 obj\e002_000.bmp 486 18 10 5 1
+button page2 obj\e002_000.bmp 556 18 10 5 2
+button page3 obj\e002_000.bmp 626 18 10 5 3
+button page4 obj\e002_000.bmp 696 18 10 5 4
+button page5 obj\e002_000.bmp 766 18 10 5 5
+button page6 obj\e002_000.bmp 836 18 10 5 6
+button page7 obj\e002_000.bmp 906 18 10 5 7
+button page8 obj\e002_000.bmp 976 18 10 5 8
+button page9 obj\e002_000.bmp 1046 18 10 5 9
+button nav_save obj\e001_001.bmp 1168 103 10 5 0 help obj\e001_002.bmp 1044 15 10 1 0 0
+button nav_load obj\e001_001.bmp 1168 155 10 5 1 help obj\e001_002.bmp 1044 63 10 1 1 0
+button nav_cg obj\e001_001.bmp 1168 207 10 5 2 help obj\e001_002.bmp 1044 111 10 1 2 0
+button nav_sprites obj\e001_001.bmp 1168 259 10 5 3 help obj\e001_002.bmp 1044 159 10 1 3 0
+button nav_scene obj\e001_001.bmp 1168 311 10 5 4 help obj\e001_002.bmp 1044 207 10 1 4 0
+button nav_music obj\e001_001.bmp 1168 363 10 5 5 help obj\e001_002.bmp 1044 255 10 1 5 0
+button nav_config obj\e001_001.bmp 1168 415 10 5 6 help obj\e001_002.bmp 1044 303 10 1 6 0
+button nav_title obj\e001_001.bmp 1168 467 10 5 7 help obj\e001_002.bmp 1044 351 10 1 7 0
+button nav_quit obj\e001_001.bmp 1168 519 10 5 8 help obj\e001_002.bmp 1044 399 10 1 8 0
+button back obj\e001_001.bmp 1168 623 10 5 9 help obj\e001_002.bmp 1044 575 10 1 9 0
+
 screen defaults
+# No quick saves: its ten pages of nine cards run to 90, all ordinary.
+quickslots 91 98
 # Standing pictures: the slot is chosen by the second number of 位置, x by the first, and 14 deletes by slot, from 21
 # PC saves under Wine.
 layoutslotby p1
