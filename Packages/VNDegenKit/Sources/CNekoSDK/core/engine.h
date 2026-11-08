@@ -538,9 +538,9 @@ private:
     // SENARIO_STATUS, 4000), set as the story starts: the PC's saves carry it, and a load goes on in the route.
     int pendingRoute_ = 0, routeVar_ = -1;
     // The older layout's slot for each place of a standing picture, each place's middle from the screen's, and the
-    // background's slot, as Test Game 83 has them.
+    // background's and the CG's slots, as Test Game 83 has them.
     std::array<int, 6> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
-    int layoutBgSlot_ = 100;
+    int layoutBgSlot_ = 100, layoutCgSlot_ = 100;
     int route() const;
 
     // Commands.

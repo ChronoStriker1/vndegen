@@ -68,4 +68,37 @@ import TestSupport
         #expect(pixel(e, 0, 0) != [0, 255, 0])
         #expect(pixel(e, 194, 326) != [255, 0, 0])
     }
+
+    // Test Game 82 keeps its CGs in slot 102 (`layoutcgslot`), and a CG takes the background away, and a background the CG.
+    @Test func aCGSlotOfItsOwnTakesTheBackgroundAway() throws {
+        let root = try NekoSDKFlowFixture.game([
+            "cfg/init.ini": Data("UserDataDirectory\tvndegen\\layouttest\nFirstFlow\tflow\\t.txt\n".utf8),
+            "bg.pak": NekoSDKFlowFixture.archive([("g.bmp", bmp(8, 8, [0, 255, 0]))]),
+            "cg.pak": NekoSDKFlowFixture.archive([("r.bmp", bmp(4, 4, [0, 0, 255]))]),
+            "flow/t.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 1, next: 3, s: [1: "scr\\s.txt"]),
+                .init(op: 2, next: 0),
+            ]),
+            "scr/s.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 10, next: 3, s: [1: "bg\\g.bmp"]),
+                .init(op: 11, next: 4, s: [1: "cg\\r.bmp"]),
+                .init(op: 9, next: 5),
+                .init(op: 2, next: 6, p: [0: 1000]),
+                .init(op: 10, next: 7, s: [1: "bg\\g.bmp"]),
+                .init(op: 9, next: 8),
+                .init(op: 2, next: 0, p: [0: 100_000]),
+            ]),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = try #require(NekoSDKFlowFixture.start(root, data: root.appendingPathComponent("data")))
+        defer { vnneko_stop(e) }
+        for _ in 0..<10 { _ = vnneko_step(e, 16) }
+        // The CG over where the background was, and none of the background, the larger, past it.
+        #expect(pixel(e, 0, 0) == [255, 0, 0])
+        #expect(pixel(e, 6, 6) != [0, 255, 0])
+        for _ in 0..<100 { _ = vnneko_step(e, 16) }
+        #expect(pixel(e, 0, 0) == [0, 255, 0])
+    }
 }

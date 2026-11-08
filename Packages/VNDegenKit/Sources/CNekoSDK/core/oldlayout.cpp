@@ -7,12 +7,17 @@
 // 0, 0. A standing picture at place P (parameter 0) sits in slot 200, 400, 300, 600, 500 or 700 for places 0 to 5, its
 // middle at 0, -272, +272, -400, +400 or 0 from the screen's, and halfway down, with C's division, moved by parameters 2
 // and 3. Every picture in those saves is 780 tall, so halfway down is inferred from command 15, which it matches there.
-// A CG's slot is the background's, inferred: command 12 deletes "background or CG" with no slot named.
+// A CG's slot is the background's there, inferred: command 12 deletes "background or CG" with no slot named.
+//
+// Test Game 82 (set 2, seven PC saves under Wine) keeps its CGs in slot 102: a CG loaded after a background, with no
+// delete between, leaves only the CG's record, so 11 takes the background away. That 10 takes a CG away in turn is
+// inferred, until a save there says.
 //
 // A game whose exe places them otherwise says so in its table, under `screen defaults`:
 //   layoutslots S0 S1 S2 S3 S4 S5     the slot for each place
 //   layoutx X0 X1 X2 X3 X4 X5         each place's middle, from the screen's
-//   layoutbgslot N                    the background's and CG's slot
+//   layoutbgslot N                    the background's slot
+//   layoutcgslot N                    the CG's, the background's unless given
 #include <algorithm>
 #include <cstdlib>
 
@@ -35,6 +40,8 @@ void Engine::loadOldLayout() {
     if (const auto *x = d.setting("layoutx"); x && x->size() >= 6)
         for (size_t i = 0; i < 6; i++) layoutX_[i] = number(*x, i);
     if (const auto *slot = d.setting("layoutbgslot"); slot && !slot->empty()) layoutBgSlot_ = number(*slot, 0);
+    layoutCgSlot_ = layoutBgSlot_;
+    if (const auto *slot = d.setting("layoutcgslot"); slot && !slot->empty()) layoutCgSlot_ = number(*slot, 0);
 }
 
 void Engine::runOldLayout(const Node &n) {
@@ -49,7 +56,10 @@ void Engine::runOldLayout(const Node &n) {
             complain("Missing image " + n.s[1]);
             return;
         }
-        Sprite &s = back_[layoutBgSlot_];
+        // A background and a CG in slots of their own each take the other away.
+        int slot = n.opcode == 10 ? layoutBgSlot_ : layoutCgSlot_, other = n.opcode == 10 ? layoutCgSlot_ : layoutBgSlot_;
+        if (other != slot) back_.erase(other);
+        Sprite &s = back_[slot];
         s = Sprite{};
         s.image = image;
         s.path = n.s[1];
@@ -57,6 +67,7 @@ void Engine::runOldLayout(const Node &n) {
     }
     case 12:
         back_.erase(layoutBgSlot_);
+        back_.erase(layoutCgSlot_);
         break;
     case 13: {
         noteSeen(n.s[1]);
