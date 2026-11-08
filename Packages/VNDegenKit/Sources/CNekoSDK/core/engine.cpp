@@ -2111,15 +2111,17 @@ SaveData Engine::captureSave() {
         SavedSprite out;
         out.slot = slot;
         out.path = s.path;
-        // The newer engine's PC names the picture twice, and loads it from the second: a save with that empty loads on the
-        // PC with every picture gone (Test Game 93 under Wine). Every PC save of the newer engine holds the same name in
-        // both, and every one of the older engine's leaves the second empty.
-        out.nextPath = s.noise || (layout_ && olderLayout(*layout_)) ? "" : s.path;
+        // Some games' PC names the picture twice and loads it from the second (namesPictureTwice).
+        out.nextPath = !s.noise && layout_ && namesPictureTwice(*layout_) ? s.path : "";
         out.noise = s.noise;
         if (s.flipCount > 0) {
             out.flipFrame = s.flipShown;
             out.flipRepeat = s.flipLoop ? 1 : 0;
+            out.flipReverse = s.flipReverse ? 1 : 0;
             out.flipStep = s.flipStep;
+            out.flipParam15 = s.flipParam15;
+            // A one-shot flipbook past its last picture has finished, which the PC saves with its playing bytes at 0.
+            out.flipPlaying = s.flipLoop || s.flipShown < s.flipCount;
         }
         out.x = s.x;
         out.y = s.y;
@@ -2130,6 +2132,9 @@ SaveData Engine::captureSave() {
         anchorOf(s, anchorX, anchorY);
         out.anchorX = anchorX < 0 ? s.image->w / 2 : anchorX;
         out.anchorY = anchorY < 0 ? s.image->h / 2 : anchorY;
+        bool pivoted = s.looping && s.loop.hasPivot;
+        for (const Animation &a : s.changes) pivoted = pivoted || a.hasPivot;
+        if (!s.anchorSet && !pivoted) out.anchorX = out.anchorY = 0;
         out.alpha = int(s.alpha * 256 + 0.5f);
         out.blur = s.blurAmount;
         out.blurOn = s.blurOn;
@@ -2388,11 +2393,13 @@ void Engine::restoreSave(const SaveData &d, int slot) {
         if (s.image || s.movie) {
             s.anchorX = saved.anchorX;
             s.anchorY = saved.anchorY;
+            s.anchorSet = saved.anchorX != 0 || saved.anchorY != 0;
         }
         if (saved.flipFrame >= 0) {
             resumeFlipbook(s);
             s.flipStep = saved.flipStep;
-            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes, saved.flipRepeat);
+            s.flipParam15 = saved.flipParam15;
+            restoreFlipbookModes(s, saved.slot, saved.flipFrame, flipModes, saved.flipRepeat, saved.flipRepeat >= 0 ? saved.flipReverse : -1);
         }
         if (!saved.animation.empty()) {
             Animation a = parseAnimation(saved.animation, s);
@@ -4281,9 +4288,11 @@ void Engine::startFlipbook(const Node &n) {
     s.scaleX = float(p[4]) / 1000;
     s.scaleY = float(p[5]) / 1000;
     s.anchorX = s.anchorY = p[8] ? -1 : 0;
+    s.anchorSet = true;
     s.flipLoop = p[14] != 0;
     s.flipReverse = p[1] != 0;
     s.flipStep = p[16];
+    s.flipParam15 = p[15];
     resumeFlipbook(s);
     if (!s.flipCount) warnOnce("A flipbook isn't in anime_cfg.ini: " + n.s[1]);
     else if (s.flipReverse) {
@@ -4448,7 +4457,7 @@ void Engine::loadPartsState(const SaveData &d, const Sidecar &side) {
         if (auto it = side.parts.find(name); it != side.parts.end()) part->load(it->second);
 }
 
-void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat) {
+void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat, int recordReverse) {
     if (!s.flipCount) return;
     s.flipLoop = true;
     auto it = slots.find(slot);
@@ -4458,6 +4467,7 @@ void Engine::restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map
     }
     // A record that says whether it repeats, as a PC save of Test Game 88 made while it plays does, is believed first.
     if (recordRepeat >= 0) s.flipLoop = recordRepeat != 0;
+    if (recordReverse >= 0) s.flipReverse = recordReverse != 0;
     if (!s.flipLoop && frame >= s.flipCount) {
         s.flipBegun = now_ - int64_t(s.flipCount) * s.flipMs;
         s.flipShown = s.flipCount;
@@ -4860,6 +4870,7 @@ void Engine::loadImage(const Node &n) {
         s.y = float(n.p[2] + (placed ? (height_ - image->h) / 2 : 0));
         s.scaleX = s.scaleY = 1;
         s.anchorX = s.anchorY = -1;
+        s.anchorSet = false;
         s.rotation = 0;
         s.alpha = 1;
         s.changes.clear();
@@ -5087,6 +5098,7 @@ void Engine::anchorOf(const Sprite &s, int &x, int &y) const {
 void Engine::takeScaleAnchor(Sprite &s, const Node &n) {
     s.anchorX = n.p[8] ? -1 : n.p[6];
     s.anchorY = n.p[9] ? -1 : n.p[7];
+    s.anchorSet = true;
 }
 
 // Parameters 16 to 19 say which of position, scale, rotation and alpha the command changes.
@@ -5265,6 +5277,7 @@ void Engine::abortChange(int slot) {
             if (change.hasPivot) {
                 s.anchorX = change.pivotX;
                 s.anchorY = change.pivotY;
+                s.anchorSet = true;
             }
         s.changes.clear();
     }
@@ -5432,6 +5445,7 @@ void Engine::foldFinishedChanges(Sprite &s) {
         if (s.changes.front().hasPivot) {
             s.anchorX = s.changes.front().pivotX;
             s.anchorY = s.changes.front().pivotY;
+            s.anchorSet = true;
         }
         s.changes.erase(s.changes.begin());
     }

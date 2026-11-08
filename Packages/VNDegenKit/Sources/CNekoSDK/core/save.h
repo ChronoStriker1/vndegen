@@ -32,9 +32,11 @@ struct SavedSprite {
     bool noise = false;
     // A splash effect's record (Test Game 88's 200 and 201): no picture, its droplet's picture named in the record, and
     // command 200's parameters 0, 5, 1 to 4, 6, 10, 11 and 7 to 9, in that order.
-    // A flipbook's: whether it repeats, and command 121's parameter 16, which a PC save needs to keep the flipbook (Test
-    // Game 88's, under Wine), or -1 when the record doesn't say.
-    int flipRepeat = -1, flipStep = 0;
+    // A flipbook's: whether it repeats and runs backward, command 121's parameters 15 and 16, and whether it's still
+    // playing, which a PC save needs to keep the flipbook (Test Games 88 and 84, under Wine), or -1 when the record
+    // doesn't say.
+    int flipRepeat = -1, flipReverse = 0, flipStep = 0, flipParam15 = 0;
+    bool flipPlaying = true;
     bool splash = false;
     std::string splashImage;
     std::array<int, 12> splashNumbers{};
@@ -109,8 +111,10 @@ struct SaveLayout;
 const SaveLayout *saveLayout(const std::string &userDataDirectory);
 
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out);
-// Whether a layout is the older engine's, whose saves leave a record's second picture name empty.
-bool olderLayout(const SaveLayout &layout);
+// Whether a game's PC names a record's picture a second time and loads it from there. Test Game 93's PC loses every
+// picture of a save without it, and Test Game 84's crashes loading a save with it (under Wine), so it's per game, from
+// the PC's own saves; a game none of whose PC saves is known leaves it empty, as every save VNDegen wrote before did.
+bool namesPictureTwice(const SaveLayout &layout);
 std::vector<uint8_t> buildSave(const SaveData &data, const SaveLayout &layout);
 
 // A save with its card's comment replaced and nothing else changed, as the PC rewrites it, or nothing when the save is

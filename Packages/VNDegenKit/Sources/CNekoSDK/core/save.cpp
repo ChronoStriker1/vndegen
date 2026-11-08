@@ -62,6 +62,7 @@ SaveLayout older(int recordGap, int afterSize, std::vector<Patch> after, int tai
     return l;
 }
 
+const SaveLayout kAniMother = kTsumaGibo;
 const SaveLayout kFunbag2 = older(26, 0, {}, 818, {}, 123);
 // Test Game 82's 32 PC saves (set 2), half of them Previous Choice files, are Test Game 83's layout with sprite records
 // 4 bytes shorter and the zeros before each 4 bytes longer.
@@ -78,9 +79,11 @@ constexpr int kRecordAnimationAt = 0x1B5, kRecordBlurOn = 0x191, kRecordBlur = 0
 // A splash record names its droplet's picture this far into its fixed part, before the engine's extra bytes: an empty
 // name in every other record. Only Test Game 88 has splashes, so it's checked in that layout alone.
 constexpr int kSplashNameAt = 201;
-// The bytes of a record after its animation text, and a flipbook's fields among them: whether it repeats, two bytes of 1
-// while it plays, command 121's parameter 16, and a byte of 0 where every other record has 100.
-constexpr size_t kRecordTail = 0x261 - 0x1BD, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipStep = 108, kTailFlipHundred = 120;
+// The bytes of a record after its animation text, and a flipbook's fields among them: whether it runs backward and
+// repeats (parameters 1 and 14), two bytes of 1 while it plays, parameters 15 and 16, and a byte of 0 where every other
+// record has 100.
+constexpr size_t kRecordTail = 0x261 - 0x1BD, kTailFlipReverse = 97, kTailFlipRepeat = 101, kTailFlipPlaying = 102, kTailFlipParam15 = 104,
+                 kTailFlipStep = 108, kTailFlipHundred = 120;
 constexpr int kNoiseKind = 4;
 // In the tail after the scene's name: GOOD Timing's numbers, and then its two strings.
 constexpr size_t kTailGtState = 819, kTailGtCount = 823, kTailGtStart = 831, kTailGtMarker = 835, kTailGtStrings = 839;
@@ -233,7 +236,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\funbag4") return &kFunbag4;
     if (folder == "waffle\\moralorc") return &kMoralOrc;
     // Test Game 92 saves as Ore o Hoshigaru Tsuma to Gibo does: its PC save reads with that layout.
-    if (folder == "waffle\\animother") return &kTsumaGibo;
+    if (folder == "waffle\\animother") return &kAniMother;
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest") return &kAlchemist;
@@ -243,7 +246,13 @@ const SaveLayout *saveLayout(const std::string &folder) {
     return nullptr;
 }
 
-bool olderLayout(const SaveLayout &layout) { return layout.olderRecord > 0; }
+bool namesPictureTwice(const SaveLayout &layout) {
+    // The PC's own saves name it twice in the Christmas game, The Alchemist, Test Games 85, 88 and 93; Test Game 84's and
+    // the older engine's leave it empty. Test Game 92 saves in 93's layout but has its own entry until its PC's saves say.
+    for (const SaveLayout *twice : {&kChristmas, &kAlchemist, &kMother3, &kTsumaGibo, &kFunbag4})
+        if (&layout == twice) return true;
+    return false;
+}
 
 bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, SaveData &out) {
     if (plain.size() < 100000) return false;
@@ -374,9 +383,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         s.endScaleX = r.f32At(g + 20);
         s.endScaleY = r.f32At(g + 24);
         s.rawTail.assign(plain.begin() + std::ptrdiff_t(g), plain.begin() + std::ptrdiff_t(g + kRecordTail));
-        if (s.flipFrame >= 0 && (plain[g + kTailFlipPlaying] || plain[g + kTailFlipPlaying + 1])) {
+        // A finished one-shot flipbook keeps its fields with the playing bytes at 0, as Test Game 84's reversed slash does.
+        if (s.flipFrame >= 0 && (plain[g + kTailFlipPlaying] || plain[g + kTailFlipPlaying + 1] || r.i32At(g + kTailFlipStep))) {
             s.flipRepeat = plain[g + kTailFlipRepeat];
+            s.flipReverse = plain[g + kTailFlipReverse];
+            s.flipPlaying = plain[g + kTailFlipPlaying] != 0;
             s.flipStep = r.i32At(g + kTailFlipStep);
+            s.flipParam15 = r.i32At(g + kTailFlipParam15);
         }
         r.at = g + kRecordTail;
         // The film noise's has no picture and nothing more, under Wine in The Alchemist.
@@ -588,8 +601,10 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.setI32(g + 28, s.anchorX);
         w.setI32(g + 32, s.anchorY);
         if (s.flipFrame >= 0 && s.flipRepeat >= 0) {
+            w.b[g + kTailFlipReverse] = s.flipReverse ? 1 : 0;
             w.b[g + kTailFlipRepeat] = s.flipRepeat ? 1 : 0;
-            w.b[g + kTailFlipPlaying] = w.b[g + kTailFlipPlaying + 1] = 1;
+            w.b[g + kTailFlipPlaying] = w.b[g + kTailFlipPlaying + 1] = s.flipPlaying ? 1 : 0;
+            w.setI32(g + kTailFlipParam15, s.flipParam15);
             w.setI32(g + kTailFlipStep, s.flipStep);
             w.b[g + kTailFlipHundred] = 0;
         }

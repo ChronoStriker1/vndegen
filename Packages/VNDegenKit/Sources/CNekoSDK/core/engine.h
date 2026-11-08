@@ -70,8 +70,10 @@ struct Sprite {
     std::vector<Animation> changes;
     Animation loop;
     bool looping = false;
-    // The point in the picture a scale keeps in place, or -1 for its middle.
+    // The point in the picture a scale keeps in place, or -1 for its middle, and whether a command has set it: the PC saves
+    // 0, 0 for a picture whose anchor nothing set (Test Game 93 under Wine).
     int anchorX = -1, anchorY = -1;
+    bool anchorSet = false;
     // A flipbook: numbered pictures shown in turn.
     int flipCount = 0, flipMs = 25, flipShown = 0;
     // A movie playing as the picture, and the story time it started at.
@@ -79,8 +81,8 @@ struct Sprite {
     int64_t movieFrom = 0;
     int64_t flipBegun = 0;
     bool flipLoop = false, flipReverse = false;
-    // Command 121's parameter 16, which saves keep for the PC.
-    int flipStep = 0;
+    // Command 121's parameters 15 and 16, which saves keep for the PC.
+    int flipStep = 0, flipParam15 = 0;
     bool waveOn = false;
     // An effect painted on black, which the PC game adds to the picture.
     bool additive = false;
@@ -286,7 +288,7 @@ private:
     bool galleryPageExists(int page) const;
     void composeTrackCards(Canvas &out);
     void composeTrackTime(Canvas &out);
-    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat = -1);
+    void restoreFlipbookModes(Sprite &s, int slot, int frame, const std::map<int, FlipModes> &slots, int recordRepeat = -1, int recordReverse = -1);
     std::map<std::string, std::pair<int, int>> flipbooks_;
     // GOOD Timing: a scene from opcode 153 to the marker at opcode 154, where Ejaculate jumps past the marker by way of a
     // short script, and Extend holds the story at the marker and plays the config's groups of scripts until Ejaculate.
