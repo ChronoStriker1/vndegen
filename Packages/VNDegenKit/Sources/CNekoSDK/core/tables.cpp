@@ -35,7 +35,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
-slotcomment 189 114 327 13
+slotcomment 189 115 327 18
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -76,7 +76,7 @@ datecolon obj\e008_005.bmp
 datedash obj\e008_003.bmp
 slotlock obj\e009_000.bmp 453 9
 slotnew obj\e010_000.bmp -11 -6
-slotcomment 189 114 327 13
+slotcomment 189 115 327 18
 slotdelete obj\e009_001.bmp 483 15
 dategap 13
 button page0 obj\e006_000.bmp 873 20 10 5 0
@@ -388,7 +388,8 @@ check voice0 obj\h022_000.bmp 600 198 1 5 0
 screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
-rows obj\m000_000.bmp 77 124 165 4 160 12
+# Four entries a page, each under a rule, measured under Wine.
+rows obj\m000_000.bmp 77 124 165 4 163 6
 button log_close obj\m003_000.bmp 1232 22 5 5 0
 button log_top obj\m003_000.bmp 1180 34 5 5 1
 button log_up obj\m003_000.bmp 1180 68 5 5 2
@@ -423,6 +424,12 @@ run 2000 1 100
 run 2004 8 80
 run 2120 9 1
 run 2160 1 1
+
+screen defaults
+# How the PC sets the text, measured under Wine against the same lines here, with VNDegen's stand-in fonts in place of
+# the Windows ones: each glyph four pixels further on than its advance. Comments are in MS Gothic, as the PC asks.
+textgap 4
+commentfont 0
 )";
 
 // Test Game 95.
@@ -459,7 +466,7 @@ datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
 slotnew obj\e012_000.bmp -6 -6
-slotcomment 278 157 452 21
+slotcomment 278 157 452 20
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -499,7 +506,7 @@ datecolon obj\e009_003.bmp
 datedash obj\e009_001.bmp
 slotlock obj\e011_000.bmp 15 139
 slotnew obj\e012_000.bmp -6 -6
-slotcomment 278 157 452 21
+slotcomment 278 157 452 20
 slotdelete obj\e011_001.bmp 672 19
 dategap 21
 button page0 obj\e005_000.bmp 458 64 11 5 0
@@ -878,7 +885,9 @@ screen log
 dim 216
 pic obj\m001_000.bmp 1771 163
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1774 163 756
-rows obj\m000_000.bmp 117 58 250 4 122 60
+# Four entries a page, each under a rule, in the message window's face and size, placed from the Wine capture with
+# the two faces' metrics.
+rows obj\m000_000.bmp 117 58 250 4 125 56
 button log_close obj\l001_003.bmp 1851 21 2 5 0
 button log_top obj\m003_000.bmp 1770 51 4 5 0
 button log_up obj\m003_000.bmp 1770 102 4 5 1
@@ -917,6 +926,16 @@ run 2000 1 100
 run 2004 8 80
 run 2120 9 1
 run 2160 1 1
+
+screen defaults
+# The official English release sets its text in Lucida Sans Unicode (Wine's font log), here Open Sans, at the size and
+# letter gap that best fit the word widths of the publisher's Windows screenshots, lines as far apart as there, and the
+# first glyph one gap in.
+textfont 7
+textsize 22
+textgap 5.93
+textline 42
+textshift 6 0
 )";
 
 }  // namespace

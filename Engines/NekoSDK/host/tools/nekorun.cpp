@@ -147,6 +147,8 @@ int main(int argc, char **argv) {
                 writePng(out + "/" + s.name, now, w, h);
             } else if (s.what == "focus") {
                 if (!vnneko_move_focus(e, s.x, s.y)) std::printf("focus %d %d: nothing to move to\n", s.x, s.y);
+            } else if (s.what == "wheel") {
+                vnneko_mouse_wheel(e, s.x);
             } else {
                 vnneko_mouse_move(e, float(s.x + 0.5) / float(w), float(s.y + 0.5) / float(h));
                 if (s.what == "click" || s.what == "down") vnneko_mouse_button(e, 0, true);

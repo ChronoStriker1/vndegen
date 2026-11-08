@@ -37,10 +37,11 @@ struct FontSource {
     int face = 0;
 };
 
-// The Windows names behind init.ini's MsgFont numbers, as its comment lists them.
+// The Windows names behind init.ini's MsgFont numbers, as its comment lists them, and 7 for Lucida Sans Unicode, which the
+// official English releases ask for in place of them.
 const char *windowsFontName(int face) {
-    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI"};
-    return face >= 0 && face < 7 ? names[face] : names[0];
+    static const char *const names[] = {"MS Gothic", "MS PGothic", "MS Mincho", "MS PMincho", "MS UI Gothic", "Meiryo", "Meiryo UI", "Lucida Sans Unicode"};
+    return face >= 0 && face < 8 ? names[face] : names[0];
 }
 
 bool packFont(int face, FontSource &out) {
