@@ -83,10 +83,11 @@ New bugs get a GitHub issue and a line here.
 - [#40](https://github.com/ChronoStriker1/vndegen/issues/40) Registry sync merges canonically equivalent value names.
 - [#43](https://github.com/ChronoStriker1/vndegen/issues/43) RPG Maker MV: a cursor-mode click on No Socks RPG's Options title command doesn't select it.
 - [#62](https://github.com/ChronoStriker1/vndegen/issues/62) Metadata: Rinjin matched to the wrong VNDB entry.
+- [#67](https://github.com/ChronoStriker1/vndegen/issues/67) `build.sh test` can exit 1 without showing which Swift test failed.
 
 ## In progress
 Each item is work on its own branch, not merged into `dev`. New engine plugins are built and checked on Linux first, then on the iPad simulator.
-- NekoSDK, on `feat/nekosdk-stage3`: stage 3's remaining gaps (the sparkles around the GOOD Timing count, The Alchemist's noise effect, Config hover help placement, Haha Sannin to Ana Asobi's 4:3 mode), then the other nine games.
+- NekoSDK, on `feat/nekosdk-stage3`: stage 3's last gaps (Haha Sannin to Ana Asobi's 4:3 mode and Config band, and small checks). The six games that keep their story order in the exe are in three parallel sets, on `feat/nekosdk-set1` (Test Games 90 and 87), `-set2` (96 and 82) and `-set3` (83 and 86), merged through `feat/nekosdk-stage3`.
 
 ## Licenses
 VNDegen should stay free to distribute and may be sold on the App Store later. Releases up to 0.11.0 include mkxp-z, the first RGSS runtime, so they are GPL-3.0 as a whole, as the README's License section explains. From 0.12.0 VNDegen's own RGSS runtime replaces it. Releases 0.12.0 to 0.17.0 still carried an unused copy of mkxp-z's framework, left over in the folder they were built in, so they are GPL-3.0 as a whole too. From 0.18.0 no GPL component is left:
