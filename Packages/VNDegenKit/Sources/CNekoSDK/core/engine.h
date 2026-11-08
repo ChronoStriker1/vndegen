@@ -537,6 +537,10 @@ private:
     // its choices name in parameters 10 to 13. The route is a scenario variable, `routevar N` in the defaults table (94's
     // SENARIO_STATUS, 4000), set as the story starts: the PC's saves carry it, and a load goes on in the route.
     int pendingRoute_ = 0, routeVar_ = -1;
+    // The older layout's slot for each place of a standing picture, each place's middle from the screen's, and the
+    // background's slot, as Test Game 83 has them.
+    std::array<int, 6> layoutSlots_{200, 400, 300, 600, 500, 700}, layoutX_{0, -272, 272, -400, 400, 0};
+    int layoutBgSlot_ = 100;
     int route() const;
 
     // Commands.
@@ -604,6 +608,9 @@ private:
     int partResultScope_ = -1, partResultNumber_ = 0;
     std::unique_ptr<PartHost> partHost_;
     void loadParts();
+    // The older layout's commands, 10 to 14 and 21 (oldlayout.cpp).
+    void loadOldLayout();
+    void runOldLayout(const Node &n);
     void resetParts();
     bool partCommand(const Node &n);
     void drawParts(Canvas &out, Layer layer, int fromSlot = 0, int toSlot = 0);

@@ -292,6 +292,7 @@ bool Engine::start(const std::string &root, const std::string &dataDir, const st
         hasMovies_ ? "through the host's decoder" : "left out, with no decoder");
     loadGalleries();
     loadParts();
+    loadOldLayout();
     loadGlobals();
     loadSettings();
     if (screens_.count("title")) openScreen("title");
@@ -3471,6 +3472,14 @@ void Engine::runScene(const Node &n) {
         break;
     case 9:
         screenUpdate(n);
+        break;
+    case 10:  // the older layout's background, CG and standing pictures
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 21:
+        runOldLayout(n);
         break;
     case 15:  // load an image into a slot
     case 23:  // load an image for a difference switch: the same, shown by the next update
