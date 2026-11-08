@@ -941,7 +941,7 @@ textfont 7
 textsize 22
 textgap 5.93
 textline 42
-textshift 6 0
+textshift 6 3
 )";
 
 }  // namespace
