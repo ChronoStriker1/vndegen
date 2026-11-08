@@ -27,7 +27,8 @@ struct SaveLayout {
     int rootSizeAt = 0x11;  // where the first record holds the screen size
     int channels = 243;  // the sound channels saved
     // The older engine of the games that keep their story in the exe: a sprite record's fixed part, 0 in the newer
-    // layouts, then the zeros between one record and the next, and those between the sound channels and the scene's name.
+    // layouts, then the zeros before each record, the first's within the 40 bytes after the count, and those between the
+    // sound channels and the scene's name.
     int olderRecord = 0, olderRecordGap = 0, olderSoundGap = 0;
 };
 
@@ -38,7 +39,7 @@ namespace {
 // The older engine's layout, from PC saves made under Wine: Test Game 83's seven (set 3) and Test Game 87's 21 (set 1),
 // every region checked in each. A save names a picture 236 bytes after the flow, and the choice it was made at where the
 // newer engine names it, 4,196 bytes after the flow, with all that follows moved by the first name's length. A sprite record's fixed part is 383 bytes, with x and y as ints, and zeros come
-// between records. Text records end 8 bytes after their strings, as Test Game 94's do. Sound channels come with no byte
+// before each record, the first's within the 40 bytes after the record count, as a save with no records shows. Text records end 8 bytes after their strings, as Test Game 94's do. Sound channels come with no byte
 // before them, each ending a byte after its time, the first 30 for music and the rest for effects. How many channels
 // there are and how many zeros follow them can't be told apart in these saves, whose last channels are all empty; the
 // most channels that fit is taken.
@@ -62,6 +63,13 @@ SaveLayout older(int recordGap, int afterSize, std::vector<Patch> after, int tai
 }
 
 const SaveLayout kFunbag2 = older(26, 0, {}, 818, {}, 123);
+// Test Game 82's 32 PC saves (set 2), half of them Previous Choice files, are Test Game 83's layout with sprite records
+// 4 bytes shorter and the zeros before each 4 bytes longer.
+const SaveLayout kFunbag1 = [] {
+    SaveLayout l = older(30, 0, {}, 818, {}, 123);
+    l.olderRecord = 379;
+    return l;
+}();
 const SaveLayout kSideboob2 = older(39, 33, {{5, "64"}}, 5779, {{903, "3c"}}, 183);
 
 // Where the fields sit, from the end of a record's two path strings. A newer engine adds `recordExtra` bytes before them.
@@ -224,6 +232,7 @@ const SaveLayout *saveLayout(const std::string &folder) {
     if (folder == "waffle\\隣人に壊されていく俺の妻") return &kRinjin;
     // The runtime's own story-table test game saves as The Alchemist does.
     if (folder == "vndegen\\storytest") return &kAlchemist;
+    if (folder == "waffle\\funbagfantasy") return &kFunbag1;
     if (folder == "waffle\\funbagfantasy2") return &kFunbag2;
     if (folder == "waffle\\funbag_fantasy_sideboob_story_2") return &kSideboob2;
     return nullptr;
@@ -260,13 +269,14 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         if (v) out.variables[i] = v;
     }
     int count = r.i32();
-    r.skip(kAfterCount);
+    r.skip(older ? size_t(kAfterCount - layout.olderRecordGap) : kAfterCount);
     if (!r.ok || count < 0 || count > 2000) return false;
     out.noRecords = count == 0;
     out.sprites.clear();
     int extra = layout.recordExtra;
     for (int k = 0; k < count && r.ok; k++) {
         SavedSprite s;
+        if (older) r.skip(size_t(layout.olderRecordGap));
         r.skip(1);
         bool ordinary = r.u8() != 0;
         s.slot = r.i32();
@@ -295,11 +305,13 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
             s.endAlpha = r.i32At(f + kOlderEndAlpha) == 255 ? 256 : r.i32At(f + kOlderEndAlpha);
             s.endScaleX = r.f32At(f + kOlderEndScale);
             s.endScaleY = r.f32At(f + kOlderEndScale + 4);
-            r.at = f + size_t(layout.olderRecord) + (k + 1 < count ? size_t(layout.olderRecordGap) : 0);
+            r.at = f + size_t(layout.olderRecord);
             if (s.slot == -999999) {
                 out.width = r.i32At(f + size_t(layout.rootSizeAt));
                 out.height = r.i32At(f + size_t(layout.rootSizeAt) + 4);
-            } else if (!s.path.empty()) {
+                out.rootAlpha = r.i32At(f + kOlderAlpha);
+            } else if (s.noise || !s.path.empty()) {
+                // The film noise's record has no picture, as in the newer engine: Test Game 82's opening shows it.
                 out.sprites.push_back(s);
             }
             continue;
@@ -341,6 +353,7 @@ bool parseSave(const std::vector<uint8_t> &plain, const SaveLayout &layout, Save
         else {
             out.width = r.i32At(f + size_t(layout.rootSizeAt));
             out.height = r.i32At(f + size_t(layout.rootSizeAt) + 4);
+            out.rootAlpha = s.alpha;
         }
     }
     size_t afterStart = r.at;
@@ -424,10 +437,11 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
     for (const auto &[index, value] : d.variables)
         if (index >= 0 && index < kVariables) w.setI32(table + size_t(index) * 4, value);
     w.i32(d.noRecords ? 0 : int32_t(d.sprites.size()) + 1);
-    w.zeros(kAfterCount);
+    w.zeros(older ? size_t(kAfterCount - layout.olderRecordGap) : kAfterCount);
 
     int extra = layout.recordExtra;
     auto record = [&](const SavedSprite &s, bool root, bool hasNext) {
+        if (older) w.zeros(size_t(layout.olderRecordGap));
         w.u8(1);
         w.u8(s.flipFrame >= 0 || s.noise ? 0 : 1);
         w.i32(root ? -999999 : s.slot);
@@ -436,10 +450,14 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         w.str(s.nextPath);
         if (older) {
             size_t f = w.zeros(size_t(layout.olderRecord));
-            apply(root ? layout.rootHead : layout.spriteHead, w.b.data() + f);
-            if (root) {
+            apply(root || s.noise ? layout.rootHead : layout.spriteHead, w.b.data() + f);
+            if (root || s.noise) {
+                // The film noise's record is the screen's without its first byte, at full alpha, 256.
+                if (s.noise) w.b[f + 12] = 0;
                 w.setI32(f + size_t(layout.rootSizeAt), d.width);
                 w.setI32(f + size_t(layout.rootSizeAt) + 4, d.height);
+                w.setI32(f + kOlderAlpha, root ? d.rootAlpha : 256);
+                w.setI32(f + kOlderEndAlpha, root ? d.rootAlpha : 256);
             } else {
                 // Each place is kept three times, all the same in the saves seen.
                 for (int at : {kOlderX, kOlderEndX, kOlderThirdX}) {
@@ -453,7 +471,6 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
                 w.setI32(f + kOlderAlpha, std::min(255, s.alpha));
                 w.setI32(f + kOlderEndAlpha, std::min(255, s.endAlpha));
             }
-            if (hasNext) w.zeros(size_t(layout.olderRecordGap));
             return;
         }
         size_t f = w.zeros(size_t(kRecordAnimationAt) + extra);
@@ -495,9 +512,9 @@ std::vector<uint8_t> buildSave(const SaveData &d, const SaveLayout &layout) {
         if (!layout.recordExtra) w.setI32(g + 0x261 - 0x1BD - 4, hasNext ? 1 : 0);
     };
     SavedSprite rootSprite;
-    rootSprite.alpha = rootSprite.endAlpha = 256;
+    rootSprite.alpha = rootSprite.endAlpha = d.rootAlpha;
     if (!d.noRecords) {
-        record(rootSprite, true, older && !d.sprites.empty());
+        record(rootSprite, true, false);
         for (size_t i = 0; i < d.sprites.size(); i++) record(d.sprites[i], false, i + 1 < d.sprites.size());
     }
 

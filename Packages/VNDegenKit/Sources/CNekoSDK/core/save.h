@@ -66,6 +66,8 @@ struct SaveData {
     int windowAfter = -1;
     // A save with no records at all, not even the screen's: the PC's Previous Choice file before any choice.
     bool noRecords = false;
+    // The screen's record's two alpha fields: 256, or 255 in a save the PC made just after a load.
+    int rootAlpha = 256;
     SavedText current;
     // The 24 bytes after the text on screen, whose meaning isn't known: zeros in most saves, kept as the PC wrote them.
     std::array<uint8_t, 24> afterText{};
