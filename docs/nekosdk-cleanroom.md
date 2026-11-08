@@ -425,6 +425,7 @@ the screen. Christmas was released only in Japanese, so the reference is a Windo
 two lines whose glyphs have Meiryo's Verdana-like shapes and an 11-pixel x-height: Ume P Gothic 22 with a gap of
 4.66, lines 35 apart, the first glyph 2 pixels in and the baseline 4 lower than Wine's, which puts glyphs within 2
 pixels, the lines' ends within one and the baselines on the screenshot's rows. Its log's text drops by the same 4, inferred from the two faces' ascents.
+Test Game 82, Funbag Fantasy's English release, names Verdana where the Japanese games name MS Gothic (MsgFont 0), at a cell of 24 and again at 96, only once its story starts: its menus are pictures (set 2, from Wine's font log). The runtime gives it face 8, which the font pack maps to DejaVu Sans, chosen against genuine Verdana since the publisher's screenshots show no text ([fonts.md](fonts.md)): at size 19 it gives the game's words within 1.05 pixels of Verdana's widths, with a letter gap 0.44 more than the PC's. Wine draws Verdana in Liberation Sans, so the PC's own gap is to be measured there.
 For the Lucida Sans Unicode games the publisher's Windows screenshots were the reference, since Wine has no Lucida
 Sans Unicode and font-links it to Noto Sans CJK. Word widths alone chose the size poorly, since the runtime's hinted
 advances run about half a pixel a glyph wider than the unhinted ones the first fit used, so each was settled by

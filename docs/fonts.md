@@ -8,7 +8,7 @@ engine reads it.
 ## The fonts
 
 The app bundles the Latin and Japanese fonts in `Engines/Shared/fonts/`, unmodified and under their upstream names.
-They take 27.3 MB in the app and about 13 MB in the zipped IPA. The Chinese and Korean fonts are large, so Settings,
+They take 28.1 MB in the app and about 13 MB in the zipped IPA. The Chinese and Korean fonts are large, so Settings,
 Fonts offers them as downloads of Source Han Sans from Adobe's release: 50.7 MB for Chinese and 26 MB for Korean.
 Games started after a download use it. A device font with the name a game asks for, such as Arial on Apple systems,
 comes before the substitute. The RPG Maker MV and MZ and TyranoScript engines read the table through the `FontPack`
@@ -21,6 +21,7 @@ module, and KiriKiri, RGSS, and the other native engines through `Engines/Shared
 | Courier New, Lucida Console | Liberation Mono | `LiberationMono-Regular.ttf`, `-Bold.ttf` | Liberation 2.1.5 release | SIL OFL 1.1 |
 | Tahoma, MS Shell Dlg 2 | DejaVu Sans Condensed | `DejaVuSansCondensed.ttf`, `-Bold.ttf` | DejaVu 2.37 release | Bitstream Vera license, DejaVu changes public domain |
 | Lucida Sans Unicode | Open Sans (closest, not a metric match) | `OpenSans-Regular.ttf` | Open Sans 3.003, googlefonts/opensans | SIL OFL 1.1 |
+| Verdana | DejaVu Sans (closest, not a metric match) | `DejaVuSans.ttf` | DejaVu 2.37 release | Bitstream Vera license, DejaVu changes public domain |
 | MS Gothic, ＭＳ ゴシック | Ume Gothic | `ume-tgo4.ttf` | Ume font 670 | Ume font license |
 | MS PGothic, ＭＳ Ｐゴシック | Ume P Gothic | `ume-pgo4.ttf` | Ume font 670 | Ume font license |
 | MS UI Gothic | Ume UI Gothic | `ume-ugo4.ttf` | Ume font 670 | Ume font license |
@@ -42,7 +43,9 @@ Where each comes from:
   `msgothic.ttc`. The license allows use, copying, and distribution, with or without changes, commercial or not.
 - DejaVu: `dejavu-fonts-ttf-2.37.tar.bz2` from the 2.37 release of github.com/dejavu-fonts/dejavu-fonts (SHA-256
   `fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7`). Its license allows selling the fonts as part
-  of a larger software package. Wine's own Tahoma is LGPL, so VNDegen doesn't use it.
+  of a larger software package. Wine's own Tahoma is LGPL, so VNDegen doesn't use it. `DejaVuSans.ttf` (SHA-256
+  `7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954`) comes from the same tarball, unmodified: a subset
+  would be a modified font, which the Bitstream Vera license requires to be renamed, and the whole file is 0.76 MB.
 - Open Sans: `fonts/ttf/OpenSans-Regular.ttf` of github.com/googlefonts/opensans at commit
   `bd7e37632246368c60fdcbd374dbf9bad11969b6`, version 3.003 (SHA-256
   `c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59`), with the repository's `OFL.txt`. Regular only:
@@ -76,6 +79,16 @@ Measured with the advance widths in each font, against the real Windows fonts:
   7.7 for Ume Gothic, which VNDegen had used. At their fitted sizes all five give lowercase letters within a pixel of
   the screenshots' height, so the x-height doesn't separate them. The screenshots and the scoring stay in the
   project's private evidence.
+- Verdana, which Funbag Fantasy's English release asks for its story text at a cell of 24 (Wine's font log), has no
+  free metric match either, and the publisher's screenshots of it show no text, so genuine Verdana was the reference:
+  version 2.35 from Microsoft's core fonts for the web (`verdan32.exe`), kept outside the repository and used only to
+  measure. Seven freely licensed sans were scored as for Lucida Sans Unicode, by the RMS error of each word's width over
+  the 2,000 words the game's own lines use most, with one size and one letter gap fitted per font, against Verdana at
+  24 to the cell, 19.75 pixels to the em, each glyph a fixed gap past its advance: DejaVu Sans 1.05 pixels (size 19),
+  DejaVu Sans Condensed 1.08 (21), Liberation Sans 1.28 (20), Noto Sans 1.41 (17), Source Sans 3 1.45 (23), Open Sans
+  1.61 (18) and Fira Sans 1.88 (19), against 2.41 for Ume P Gothic. The order is the same for any gap the PC adds and
+  with Verdana rounded to a 20-pixel em. At its fitted size DejaVu Sans's x-height is 10.4 pixels against Verdana's 10.8,
+  where DejaVu Sans Condensed's is 11.5, so DejaVu Sans is the stand-in.
 - Meiryo and Yu Gothic have no free metric match. They get Ume P Gothic, a Japanese proportional Gothic.
 - Source Han Sans doesn't match the metrics of the Chinese and Korean Windows fonts. Proton uses it for the same
   reason VNDegen does: it is the free font that covers them.
