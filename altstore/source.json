@@ -49,6 +49,16 @@
       },
       "versions": [
         {
+          "version": "0.26.3",
+          "buildVersion": "1416",
+          "date": "2026-11-08T01:30:21Z",
+          "localizedDescription": "Save fixes for The Alchemist & His Battle-Scarred Homunculus and Yarinaoshi no Christmas.\n\n## Downloads\n\n- `VNDegen-0.26.3-macOS.zip` for Mac (macOS 15 or later). It is ad-hoc signed: right-click VNDegen and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/VNDegen.app`.\n- `VNDegen-0.26.3.ipa` for iPhone and iPad (iOS 18 or later). Update it from the AltStore or SideStore source (`https://raw.githubusercontent.com/ChronoStriker1/vndegen/main/altstore/source.json`), or sideload it with Sideloadly.\n\n## Fixes\n\n- A save made on a PC with a comment typed on its card showed as an empty slot and couldn't be loaded. It loads now, and its comment shows on the card. (#61)\n\n## New\n\n- Save cards can be locked, as on the PC. A locked save can be loaded but not overwritten or deleted, and Quick Save skips it. Locks set on a PC carry over in a backup, and the other way round.\n- The NEW mark shows on the save made last, kept with the game's settings as on the PC.\n- The confirmation questions have the PC's \"Don't ask again\" box. Ticking it turns that confirmation off, whichever answer you give, and Config turns it back on.\n- A card's lock and Delete button can be reached with a keyboard or controller.\n\n## Known limits\n\n- Comments can't be typed in VNDegen yet.\n- Scenes unlocked on a PC don't move with a backup yet. The Scene gallery shows those played in VNDegen. (#46)\n\n## What wasn't tested\n\n- No physical device was used. Locks, the last-saved mark and comments were checked against the PC games under Wine, and by tests.",
+          "downloadURL": "https://github.com/ChronoStriker1/vndegen/releases/download/v0.26.3/VNDegen-0.26.3.ipa",
+          "size": 123248667,
+          "sha256": "7e66a4dbd721128a5c2e06592a6b38a801dd85fb28b120abf7d5e2f29e6faab8",
+          "minOSVersion": "18.0"
+        },
+        {
           "version": "0.26.2",
           "buildVersion": "1403",
           "date": "2026-11-07T20:51:04Z",
