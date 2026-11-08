@@ -14,9 +14,16 @@ typealias PlatformViewController = NSViewController
 /// and never in a session driven by debug hooks or tests, which must not reach the network.
 @MainActor
 enum TitleRequests {
-    /// Whether a page may open at all: not under XCTest, and not in a session started with `-debugHooks`.
-    static var mayOpenPages: Bool {
-        UserDefaults.standard.string(forKey: "debugHooks") == nil && ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+    /// Whether a page may open at all: not in tests, and not in a session started with `-debugHooks`.
+    static var mayOpenPages: Bool { UserDefaults.standard.string(forKey: "debugHooks") == nil && !underTest }
+
+    /// Tests, however they run: XCTest loaded into the process (it never is in the app), its environment, or Swift's own
+    /// test runners. Any one is enough, since the environment alone isn't always set.
+    static var underTest: Bool {
+        let process = ProcessInfo.processInfo, environment = process.environment
+        return NSClassFromString("XCTestCase") != nil
+            || ["XCTestConfigurationFilePath", "XCTestBundlePath", "XCTestSessionIdentifier"].contains { environment[$0] != nil }
+            || ["xctest", "swiftpm-testing-helper"].contains(process.processName)
     }
 
     static func show(kind: String, payload: String, over view: PlatformView, done: @escaping () -> Void) {
@@ -112,12 +119,18 @@ enum TitleRequests {
     #endif
 }
 
-/// A web view of a game's manual, held to the manual's own folder.
+/// A web view of a game's manual, held to the manual's own folder. It keeps nothing between visits, and a content rule
+/// blocks every network load, pictures and scripts included, which navigation decisions alone don't see.
 @MainActor
 final class ManualController: PlatformViewController, WKNavigationDelegate {
     private let page: URL, folder: URL
     private var done: (() -> Void)?
-    private let web = WKWebView()
+    private let web: WKWebView = {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        return WKWebView(frame: .zero, configuration: configuration)
+    }()
+    private static let offlineRules = #"[{"trigger":{"url-filter":"^(https?|wss?|ftp)://"},"action":{"type":"block"}}]"#
 
     init(page: URL, folder: URL, done: @escaping () -> Void) {
         self.page = page
@@ -145,7 +158,18 @@ final class ManualController: PlatformViewController, WKNavigationDelegate {
         web.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         view = stack
         #endif
-        web.loadFileURL(page, allowingReadAccessTo: folder)
+        // The manual loads only once nothing in it can reach the network; if the rule can't be made, it doesn't load.
+        WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "vndegen.manual.offline", encodedContentRuleList: Self.offlineRules) { [weak self] rules, error in
+            Task { @MainActor in
+                guard let self else { return }
+                guard let rules else {
+                    nekoSDKLog.error("manual not shown, its offline rule failed: \(String(describing: error), privacy: .public)")
+                    return
+                }
+                self.web.configuration.userContentController.add(rules)
+                self.web.loadFileURL(self.page, allowingReadAccessTo: self.folder)
+            }
+        }
     }
 
     @objc private func close() {

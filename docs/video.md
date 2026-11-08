@@ -47,7 +47,7 @@ The picture is the clock. The decode thread runs four frames ahead and never wai
 
 In a NekoSDK game, the runtime stops reading a movie's sound while the story's clock stops, under a menu, the log, a dialog or a pause, and when the story ends. It picks the sound up again on the next step.
 
-The NekoSDK runtime finds the five functions with `dlsym` (`vnneko_find_movies`), as the app finds the KiriKiri engine's own, and EngineNekoSDK hands them to the runtime at start. When the framework or a function is missing, the app logs it, each movie is logged and left out, and the game goes on. The Linux test host builds the same file against the system's FFmpeg, and `vnffmovie_test <movie>` plays a movie against the wall clock and prints what came out.
+The NekoSDK runtime finds the five functions with `dlsym` (`vnneko_find_movies`), as the app finds the KiriKiri engine's own, and EngineNekoSDK hands them to the runtime at start. When the framework or a function is missing, the app logs it, each movie is logged and left out, and the game goes on. The Linux test host builds the same file against the system's FFmpeg, and `vnffmovie_test <movie>` plays a movie against the wall clock, taking its sound as an audio device would, and prints what came out.
 
 Known limit: after a seek, ASF sound stored ahead of the keyframe the seek lands on is lost, so a little sound after the seek point is missing.
 

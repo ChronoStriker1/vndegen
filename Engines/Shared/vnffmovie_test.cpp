@@ -4,6 +4,7 @@
 // usage: vnffmovie_test [-seek T] [-loop] [-mute] <movie>
 #include "vnffmovie.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -38,12 +39,21 @@ int main(int argc, char **argv) {
     if (seek >= 0) vnffmovie_seek(m, seek);
     auto began = std::chrono::steady_clock::now();
     double t = seek > 0 ? seek : 0;
-    long frames = 0, soundFrames = 0;
+    long frames = 0, soundFrames = 0, asked = 0;
     std::vector<float> sound(4096 * 2);
     for (;;) {
         int changed = 0, ended = 0;
         const uint8_t *px = vnffmovie_frame(m, t, &changed, &ended);
-        if (!mute) soundFrames += long(vnffmovie_audio(m, sound.data(), 2048));
+        // Sound is taken as an audio device would, as much as the clock has reached, never ahead of it.
+        if (!mute && info.audio_rate > 0) {
+            // What was asked counts, as the movie's sound clock does: a device plays silence for what isn't there yet.
+            long due = long((t - (seek > 0 ? seek : 0)) * info.audio_rate) - asked;
+            if (due > 0) {
+                size_t ask = size_t(std::min<long>(due, 4096));
+                soundFrames += long(vnffmovie_audio(m, sound.data(), ask));
+                asked += long(ask);
+            }
+        }
         if (px && changed) {
             if (frames % 30 == 0) {
                 uint32_t sum = 0;
