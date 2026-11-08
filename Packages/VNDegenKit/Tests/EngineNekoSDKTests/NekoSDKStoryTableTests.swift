@@ -16,10 +16,29 @@ import TestSupport
         }
         return try NekoSDKFlowFixture.game([
             "cfg/init.ini": Data("UserDataDirectory\tvndegen\\storytest\n".utf8),
+            "obj.pak": NekoSDKFlowFixture.archive([("n001_000.bmp", choice())]),
             "scr/a.txt": scene,
             "scr/c2.txt": waiting(1000),
-            "scr/b.txt": waiting(100_000),
+            "scr/b.txt": NekoSDKFlowFixture.flow([
+                .init(op: 0, next: 2),
+                .init(op: 5, next: 3, s: [2: "one"]),
+                .init(op: 5, next: 0, s: [2: "two"]),
+            ]),
+            "scr/e.txt": waiting(100_000),
         ])
+    }
+
+    // A choice's sheet, a 24-bit BMP of two rows of options.
+    private func choice() -> Data {
+        let w = 20, h = 10, row = (w * 3 + 3) & ~3
+        var d = Data("BM".utf8)
+        func put(_ v: UInt32) { d.append(contentsOf: withUnsafeBytes(of: v.littleEndian, Array.init)) }
+        put(UInt32(54 + row * h)); put(0); put(54)
+        put(40); put(UInt32(w)); put(UInt32(h))
+        d.append(contentsOf: [1, 0, 24, 0])
+        put(0); put(UInt32(row * h)); put(0); put(0); put(0); put(0)
+        d.append(Data(repeating: 200, count: row * h))
+        return d
     }
 
     private func status(_ e: OpaquePointer) -> String { String(cString: vnneko_debug_status(e)) }
@@ -31,7 +50,8 @@ import TestSupport
     }
 
     private func click(_ e: OpaquePointer) {
-        vnneko_mouse_move(e, 640, 360)
+        // The middle of the frame: the input's coordinates run 0 to 1 over it.
+        vnneko_mouse_move(e, 0.5, 0.5)
         vnneko_mouse_button(e, 0, true)
         vnneko_mouse_button(e, 0, false)
     }
@@ -95,7 +115,39 @@ import TestSupport
         #expect(at(third, "scr\\b.txt"), "\(status(third))")
         #expect(vnneko_debug_variable(third, 1, 9) == 2)
         #expect(vnneko_debug_variable(third, 1, 10) == 0)
+        // A save on the first of the two lines before the choice.
+        #expect(vnneko_debug_choice_count(third) == -1)
+        #expect(vnneko_debug_save(third, 5))
         vnneko_stop(third)
+
+        // It loads on that line, waiting for a click, with the choice still to come after the second.
+        let fifth = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_load(fifth, 5))
+        steps(fifth, 3)
+        #expect(at(fifth, "scr\\b.txt"), "\(status(fifth))")
+        #expect(vnneko_debug_waiting_for_click(fifth))
+        #expect(vnneko_debug_choice_count(fifth) == -1)
+        let shown = vnneko_debug_text_count(fifth)
+        click(fifth)
+        steps(fifth, 200)
+        #expect(vnneko_debug_text_count(fifth) == shown + 1)
+        #expect(vnneko_debug_choice_count(fifth) == -1)
+        click(fifth)
+        steps(fifth, 200)
+        #expect(vnneko_debug_choice_count(fifth) == 2)
+        // A save while the choice waits asks it again.
+        #expect(vnneko_debug_save(fifth, 6))
+        vnneko_stop(fifth)
+
+        let sixth = try #require(NekoSDKFlowFixture.start(root, data: data))
+        #expect(vnneko_debug_load(sixth, 6))
+        steps(sixth, 3)
+        #expect(vnneko_debug_choice_count(sixth) == 2)
+        vnneko_debug_choose(sixth, 1)
+        steps(sixth, 10)
+        #expect(at(sixth, "scr\\e.txt"), "\(status(sixth))")
+        #expect(vnneko_debug_variable(sixth, 1, 13) == 0)
+        vnneko_stop(sixth)
 
         // A PC save has no lines beside it: the story goes on from its scene, here inside the chapter.
         let sidecar = try FileManager.default.contentsOfDirectory(at: saves, includingPropertiesForKeys: nil)
