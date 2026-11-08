@@ -4677,7 +4677,8 @@ button test:voice:voice\tou9_0003.ogg obj\h023_000.bmp 533 489 1 5 0
 screen log
 pic obj\m001_000.bmp 1185 110
 scroll obj\m002_000t.bmp obj\m002_000m.bmp obj\m002_000b.bmp 1185 110 500
-rows obj\m000_000.bmp 77 124 165 4 160 12
+# Four entries a page, each under a rule, in text of 18 pixels to the message window's 24, measured under Wine.
+rows obj\m000_000.bmp 77 69 165 4 99 39 18
 button log_close obj\l001_000.bmp 1240 22 2 5 0
 button log_top obj\m003_000.bmp 1180 34 4 5 0
 button log_up obj\m003_000.bmp 1180 68 4 5 1

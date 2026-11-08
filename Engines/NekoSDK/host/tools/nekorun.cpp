@@ -156,6 +156,9 @@ int main(int argc, char **argv) {
                 vnneko_mouse_wheel(e, s.x);
             } else if (s.what == "pause" || s.what == "resume") {
                 vnneko_set_paused(e, s.what == "pause");
+            } else if (s.what == "wheel") {
+                // `wheel N`: N notches, up for a positive N, as a mouse wheel turns.
+                vnneko_mouse_wheel(e, s.x);
             } else if (s.what == "focus") {
                 if (!vnneko_move_focus(e, s.x, s.y)) std::printf("focus %d %d: nothing to move to\n", s.x, s.y);
             } else {

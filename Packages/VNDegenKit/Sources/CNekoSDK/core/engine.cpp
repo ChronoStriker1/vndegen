@@ -2843,6 +2843,9 @@ void Engine::composeLog(Canvas &out) {
     int ruleX = std::atoi((*rows)[1].c_str()), ruleY = std::atoi((*rows)[2].c_str()), step = std::atoi((*rows)[3].c_str());
     int count = std::atoi((*rows)[4].c_str()), textX = std::atoi((*rows)[5].c_str()), textY = std::atoi((*rows)[6].c_str());
     int lastRow = std::min(count, int(backlog_.size()) - logTop_);
+    // `rows ... SIZE`: the log's own text size, where it prints smaller than the message window, as Test Game 94's does.
+    int messageSize = fontSize_;
+    if (rows->size() >= 8) fontSize_ = field(*rows, 7);
     int ascent = fontAscent(fontFace_, fontSize_);
     for (int row = 0; row < lastRow; row++) {
         // Row 0 is the oldest on the page: the backlog runs newest first.
@@ -2860,6 +2863,7 @@ void Engine::composeLog(Canvas &out) {
         layoutRun(text, textX, y + textY + ascent, false, glyphs);
         drawGlyphs(out, glyphs, logTextR_, logTextG_, logTextB_, logFrameR_, logFrameG_, logFrameB_);
     }
+    fontSize_ = messageSize;
 }
 
 std::shared_ptr<Script> Engine::loadScript(const std::string &path) {
