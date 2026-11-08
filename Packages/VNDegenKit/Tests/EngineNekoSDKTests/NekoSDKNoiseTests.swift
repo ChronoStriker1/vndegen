@@ -55,6 +55,8 @@ import TestSupport
         defer { try? FileManager.default.removeItem(at: root) }
         let data = root.appendingPathComponent("data")
         let first = try #require(NekoSDKFlowFixture.start(root, data: data))
+        // The Alchemist's menus come with its save folder, so the story starts from the title.
+        #expect(vnneko_debug_press(first, "start"))
         for _ in 0..<10 { _ = vnneko_step(first, 16) }
         #expect(topLeft(first) == [255, 0, 0])
         #expect(vnneko_debug_save(first, 1))
